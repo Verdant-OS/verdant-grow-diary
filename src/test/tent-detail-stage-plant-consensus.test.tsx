@@ -131,6 +131,14 @@ describe("Tent Detail stage hint follows the plants in the tent", () => {
     );
   });
 
+  it("a Flower plant naming another grow does not move this tent's stage", () => {
+    // Codex review on #1683: the tent's plant read returns every plant in the
+    // tent, but a plant's own grow_id wins over its tent's grow.
+    plants = [{ ...plant("flower"), growId: "grow-2" }];
+    renderTent();
+    expect(screen.getByTestId("tent-detail-vpd-stage-hint")).toHaveTextContent("In Veg VPD range");
+  });
+
   it("without a plant signal the tent and grow still decide", () => {
     renderTent();
     expect(screen.getByTestId("tent-detail-vpd-stage-hint")).toHaveTextContent("In Veg VPD range");

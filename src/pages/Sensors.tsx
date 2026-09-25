@@ -276,6 +276,7 @@ export default function Sensors() {
   const plantsQuery = usePlants();
   const selectedTentStage = resolveTentEnvironmentStage({
     tentId: selectedTent?.id ?? null,
+    tentGrowId: selectedGrowId,
     tentStage: selectedTent?.stage ?? null,
     ...resolveTentGrowStage({
       growId: selectedGrowId,

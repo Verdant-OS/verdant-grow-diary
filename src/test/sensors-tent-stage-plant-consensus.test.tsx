@@ -22,6 +22,7 @@ describe("resolveTentEnvironmentStage", () => {
     expect(
       resolveTentEnvironmentStage({
         tentId: TENT,
+        tentGrowId: "g1",
         tentStage: "veg",
         growStage: "veg",
         plants: [{ tent_id: TENT, stage: "flower" }],
@@ -33,6 +34,7 @@ describe("resolveTentEnvironmentStage", () => {
     expect(
       resolveTentEnvironmentStage({
         tentId: TENT,
+        tentGrowId: "g1",
         tentStage: "veg",
         growStage: null,
         plants: [{ tent_id: OTHER_TENT, stage: "flower" }],
@@ -44,6 +46,7 @@ describe("resolveTentEnvironmentStage", () => {
     expect(
       resolveTentEnvironmentStage({
         tentId: TENT,
+        tentGrowId: "g1",
         tentStage: "veg",
         growStage: "veg",
         plants: [
@@ -58,6 +61,7 @@ describe("resolveTentEnvironmentStage", () => {
     expect(
       resolveTentEnvironmentStage({
         tentId: TENT,
+        tentGrowId: "g1",
         tentStage: "veg",
         growStage: null,
         plants: [
@@ -72,6 +76,7 @@ describe("resolveTentEnvironmentStage", () => {
     expect(
       resolveTentEnvironmentStage({
         tentId: TENT,
+        tentGrowId: "g1",
         tentStage: "veg",
         growStage: "veg",
         plants: [{ tent_id: TENT, stage: "harvest" }],
@@ -83,6 +88,7 @@ describe("resolveTentEnvironmentStage", () => {
     expect(
       resolveTentEnvironmentStage({
         tentId: TENT,
+        tentGrowId: "g1",
         tentStage: "seedling",
         growStage: "flower",
         plants: [],
@@ -94,6 +100,7 @@ describe("resolveTentEnvironmentStage", () => {
     expect(
       resolveTentEnvironmentStage({
         tentId: TENT,
+        tentGrowId: "g1",
         tentStage: "veg",
         growStage: null,
         plants: null,
@@ -105,14 +112,73 @@ describe("resolveTentEnvironmentStage", () => {
     expect(
       resolveTentEnvironmentStage({
         tentId: null,
+        tentGrowId: "g1",
         tentStage: "flower",
         growStage: "flower",
         plants: [{ tent_id: TENT, stage: "flower" }],
       }),
     ).toBeNull();
     expect(
-      resolveTentEnvironmentStage({ tentId: TENT, tentStage: null, growStage: "", plants: [] }),
+      resolveTentEnvironmentStage({
+        tentId: TENT,
+        tentGrowId: "g1",
+        tentStage: null,
+        growStage: "",
+        plants: [],
+      }),
     ).toBeNull();
+  });
+});
+
+describe("resolveTentEnvironmentStage: canonical grow attribution (Codex review on #1683)", () => {
+  // A plant's own grow_id wins over its tent's grow (growAttributionRules), as
+  // on Alerts and the Dashboard: a plant naming grow g2 in g1's tent is g2's.
+  it("a plant naming another grow never counts, even in this tent", () => {
+    for (const plants of [
+      [{ tent_id: TENT, grow_id: "g2", stage: "flower" }],
+      [{ tentId: TENT, growId: "g2", stage: "flower" }],
+    ]) {
+      expect(
+        resolveTentEnvironmentStage({
+          tentId: TENT,
+          tentGrowId: "g1",
+          tentStage: "veg",
+          growStage: "veg",
+          plants,
+        }),
+      ).toBe("veg");
+    }
+  });
+
+  it("a plant of this grow, or one with no grow, counts through the tent", () => {
+    for (const plant of [
+      { tent_id: TENT, grow_id: "g1", stage: "flower" },
+      { tentId: TENT, growId: "g1", stage: "flower" },
+      { tent_id: TENT, grow_id: null, stage: "flower" },
+    ]) {
+      expect(
+        resolveTentEnvironmentStage({
+          tentId: TENT,
+          tentGrowId: "g1",
+          tentStage: "veg",
+          growStage: "veg",
+          plants: [plant],
+        }),
+      ).toBe("flower");
+    }
+  });
+
+  it("a tent with no grow counts only plants with no grow", () => {
+    const input = { tentId: TENT, tentGrowId: null, tentStage: "veg", growStage: null };
+    expect(
+      resolveTentEnvironmentStage({
+        ...input,
+        plants: [{ tent_id: TENT, grow_id: "g2", stage: "flower" }],
+      }),
+    ).toBe("veg");
+    expect(
+      resolveTentEnvironmentStage({ ...input, plants: [{ tent_id: TENT, stage: "flower" }] }),
+    ).toBe("flower");
   });
 });
 
@@ -152,6 +218,7 @@ describe("resolveTentGrowStage (Codex review on #1683)", () => {
     expect(
       resolveTentEnvironmentStage({
         tentId: TENT,
+        tentGrowId: "g1",
         tentStage: "veg",
         growStage: null,
         growStageResolved: false,
@@ -180,7 +247,7 @@ const STABLE_READINGS = [
   },
 ];
 const plantsState: {
-  data: Array<{ tent_id: string; stage: string }> | undefined;
+  data: Array<{ tent_id: string; grow_id?: string | null; stage: string }> | undefined;
   isError?: boolean;
 } = {
   data: [],
@@ -294,6 +361,15 @@ describe("Sensors page stage chips follow the plants in the tent", () => {
     renderSensors();
     expect(await screen.findByTestId("sensors-stage-status-rh")).toHaveTextContent(
       "Above Flower RH range",
+    );
+  });
+
+  it("a Flower plant naming another grow does not move this tent's stage", async () => {
+    // Codex review on #1683: the plant's own grow_id wins over its tent's.
+    plantsState.data = [{ tent_id: TENT, grow_id: "g2", stage: "flower" }];
+    renderSensors();
+    expect(await screen.findByTestId("sensors-stage-status-rh")).toHaveTextContent(
+      "In Veg RH range",
     );
   });
 

@@ -11,23 +11,30 @@
  *
  * This resolves one tent exactly like the scoped Dashboard's single-tent
  * selection: the tent's grow row, that one tent, and the active plants in
- * that tent, through `resolveAlertContextStage` (consensus, harvest cap,
- * most-advanced-wins; see that module).
+ * that tent that belong to the tent's grow, through `resolveAlertContextStage`
+ * (consensus, harvest cap, most-advanced-wins; see that module). A plant
+ * belongs to a grow by the canonical growAttributionRules: its own grow_id
+ * first, else its tent's grow (Codex review on #1683).
  *
  * Pure: no I/O, no React, no Supabase, no time.
  */
 import { resolveAlertContextStage } from "@/lib/alertStageResolution";
+import { buildTentGrowIndex, resolvePlantGrowId } from "@/lib/growAttributionRules";
 
-/** A plant row (`tent_id`) or a mapped plant (`tentId`). */
+/** A plant row (`tent_id`, `grow_id`) or a mapped plant (`tentId`, `growId`). */
 export interface TentEnvironmentStagePlant {
   readonly tent_id?: string | null;
   readonly tentId?: string | null;
+  readonly grow_id?: string | null;
+  readonly growId?: string | null;
   readonly stage?: string | null;
 }
 
 export interface TentEnvironmentStageInput {
   /** The tent being judged; null when none is selected. */
   readonly tentId: string | null | undefined;
+  /** The tent's grow id; null when the tent has no grow. Required so no caller forgets it. */
+  readonly tentGrowId: string | null | undefined;
   readonly tentStage: unknown;
   /** The tent's grow row stage; null when unknown. */
   readonly growStage: unknown;
@@ -49,11 +56,21 @@ export interface TentEnvironmentStageInput {
 export function resolveTentEnvironmentStage(input: TentEnvironmentStageInput): string | null {
   if (!input.tentId) return null;
   if (input.growStageResolved === false) return null;
+  const tentId = input.tentId;
+  const tentGrowById = buildTentGrowIndex([{ id: tentId, growId: input.tentGrowId ?? null }]);
+  const tentGrowId = resolvePlantGrowId({ tentId }, tentGrowById);
   return resolveAlertContextStage({
     growStage: input.growStage,
     tentStages: [input.tentStage],
     plantStages: (input.plants ?? [])
-      .filter((plant) => (plant.tent_id ?? plant.tentId) === input.tentId)
+      .filter(
+        (plant) =>
+          (plant.tent_id ?? plant.tentId) === tentId &&
+          resolvePlantGrowId(
+            { growId: plant.grow_id ?? plant.growId ?? null, tentId },
+            tentGrowById,
+          ) === tentGrowId,
+      )
       .map((plant) => plant.stage ?? null),
   }).stage;
 }

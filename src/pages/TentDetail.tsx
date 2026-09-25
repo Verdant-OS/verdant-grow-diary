@@ -153,6 +153,7 @@ export default function TentDetail() {
   const { grows, loading: growsLoading, error: growsError } = useGrows();
   const envStage = resolveTentEnvironmentStage({
     tentId: tent?.id ?? null,
+    tentGrowId: tent?.growId ?? null,
     tentStage: tent?.stage ?? null,
     ...resolveTentGrowStage({
       growId: tent?.growId,

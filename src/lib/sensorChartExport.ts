@@ -5,6 +5,8 @@
  *
  * No I/O, no React. Deterministic.
  */
+import { isCurrentStateStale } from "@/lib/sensorTruthCanon";
+import { refreshSensorReadingStatus } from "@/lib/growAdapters";
 import type { SensorReading } from "@/mock";
 import { readObservedSensorMetric } from "@/lib/sensorReadingSelectionRules";
 
@@ -37,10 +39,37 @@ function csvEscape(value: string | number | null | undefined): string {
 
 /**
  * Build CSV text from sensor readings. Output is RFC 4180-ish and
- * deterministic so tests can assert exact rows.
+ * deterministic so tests can assert exact rows. An explicit export clock ages
+ * usable current live/manual evidence; provenance and historical values stay
+ * unchanged. Omitting it preserves the supplied snapshot status.
+ *
+ * Readings whose retained freshness inputs are all current-state evidence
+ * (live or manual) are recomputed first, so a grouped live + manual row ages on
+ * its live window rather than the manual window its merged `source` implies.
+ * Any reading carrying a CSV (historical) time source keeps its supplied status:
+ * CSV history is never aged as current state. Readings without retained inputs
+ * fall back to the source-window check below.
  */
-export function buildSensorReadingsCsv(readings: ReadonlyArray<SensorReading>): string {
-  const rows = readings.map((r) =>
+function isCurrentStateFreshness(reading: SensorReading): boolean {
+  const timeSources = reading.freshness?.timeSources;
+  return (
+    Array.isArray(timeSources) &&
+    timeSources.length > 0 &&
+    timeSources.every((source) => source === "live" || source === "manual")
+  );
+}
+
+export function buildSensorReadingsCsv(
+  readings: ReadonlyArray<SensorReading>,
+  nowMs?: number,
+): string {
+  const clocked =
+    nowMs !== undefined && Number.isFinite(nowMs)
+      ? readings.map((r) =>
+          isCurrentStateFreshness(r) ? refreshSensorReadingStatus(r, new Date(nowMs)) : r,
+        )
+      : readings;
+  const rows = clocked.map((r) =>
     [
       formatUtcTimestamp(r.ts),
       readObservedSensorMetric(r, "temp"),
@@ -50,7 +79,13 @@ export function buildSensorReadingsCsv(readings: ReadonlyArray<SensorReading>): 
       readObservedSensorMetric(r, "soil"),
       readObservedSensorMetric(r, "ppfd"),
       r.source,
-      r.status,
+      nowMs !== undefined &&
+      Number.isFinite(nowMs) &&
+      r.status === "usable" &&
+      (r.source === "live" || r.source === "manual") &&
+      isCurrentStateStale(r.capturedAt, { now: nowMs, source: r.source })
+        ? "stale"
+        : r.status,
       formatUtcTimestamp(r.capturedAt),
     ]
       .map(csvEscape)

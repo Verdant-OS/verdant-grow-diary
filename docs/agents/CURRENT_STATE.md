@@ -42,8 +42,7 @@ serving (§2). This PR's branch carries `c10c095e` by forward merge (`b1f70076`,
   deployment after the instant rollback did **not** auto-promote to the production domain. Whether
   that is Vercel's post-rollback rule or something else is `inference`; the observation is the alias
   record. **Promoting `c10c095e` (or not) is Cheek's decision; no Publish, promote or rollback by
-  Claude.** Growers on new loads are getting `9b06be3f`, which is the last tip the owner approved, so
-  nothing is exposed by this; `#1702`'s change is test and workflow files only.
+  Claude.** By Vercel's alias record, the production hostnames are assigned to the `9b06be3f` build, the last tip the owner approved; what growers actually receive is the public serving state, `NOT_MEASURED` (next bullet). `#1702`'s change is test and workflow files only.
 - **`NOT_MEASURED`:** the public serving state — no DNS or HTTP check from outside has been made
   this session (the egress refuses the apex: HTTP `000` at 11:51, the eighteenth attempt; `CLAUDE.md`
   names Lovable as publisher; the Quick Log smoke lane targets `verdantgrowdiary-com.lovable.app`).
@@ -59,8 +58,7 @@ serving (§2). This PR's branch carries `c10c095e` by forward merge (`b1f70076`,
 `inference` from §2, carried: new page loads got `7053af8f` from 08:29:17 to 09:45:16 UTC; **data
 impact is `NOT_MEASURED`** (no server-side import audit rows; the feasible check is `sensor_readings`
 rows with `source = 'csv'` and `created_at` from 08:29:17, open-ended until sessions loaded before
-09:45:16 can be excluded — an operator or service-role read). Since 09:45:16 new loads get
-`9b06be3f`; `c10c095e` reaches no grower until promoted (§2).
+09:45:16 can be excluded — an operator or service-role read). Since 09:45:16 the alias record points to `9b06be3f`; `c10c095e` is not on the production domain (§2); what growers receive is `NOT_MEASURED`.
 
 ## 4. Merge — `#1702` landed through the merge queue with the required contexts on its head
 
@@ -81,7 +79,7 @@ rows with `source = 'csv'` and `created_at` from 08:29:17, open-ended until sess
 - Verdicts `#1692` `PASS` `24d9e197`, `#1679` `PASS` `c2ce9b10`, `#1698` `PASS` `9e276853`, `#1697`
   `STALE CHILD` `bd64ca8b` stand; `#1684` independent `PASS` stands.
 
-## 5. Reviews on `#1696` — Codex: seven passes, three P1 and fourteen P2 findings, all carried; verdict open
+## 5. Reviews on `#1696` — Codex: eight passes, three P1 and sixteen P2 findings, all carried; verdict open
 
 `established fact`:
 
@@ -101,9 +99,7 @@ rows with `source = 'csv'` and `created_at` from 08:29:17, open-ended until sess
   stale when published — this stamp is on `c10c095e`, §1); `4104421351` (**P2**: the header summary
   said five passes while §5 said six — the header now counts with §5); `4104421341` (**P2**: §8
   presented `600c9902`'s settled lanes as this file's own head result after later heads existed —
-  §8 now states the current head's lanes as read, and this stamp's own head as `NOT_MEASURED`).
-  **Three P1 and fourteen P2 in all, all carried; Codex's verdict on the PR as a whole is still
-  open.** Copilot reviewed no files (Markdown excluded); CodeRabbit skipped every head.
+  §8 now states the current head's lanes as read, and this stamp's own head as `NOT_MEASURED`); **`9b4caa63` — two P2, carried by this amendment:** `4104492611` (§2 and §3 said what growers were getting when only the alias record was read — reworded to the alias record, serving state `NOT_MEASURED`) and `4104492619` (§8's push-red count said six when five were push runs and the sixth was the merge-group dependency audit). CodeRabbit raised the same two points on `9b4caa63` (`4104485695`, `4104485709`). **Three P1 and sixteen P2 in all, all carried; Codex's verdict on the PR as a whole is still open.** Copilot reviewed no files (Markdown excluded); CodeRabbit skipped every earlier head.
 - The two owner-side Claude reads (`5315633209`, `5315834826`) and Claude's replies stand as the
   09:21 stamp §5 records.
 
@@ -138,7 +134,7 @@ red, 2 still in progress (`Core Link and Form Census`, and the `dynamic` push-re
 - **Merge-group (the merge gate):** `CI` (35 required contexts) green; `Full Vitest Suite (PR gate)`
   green; `Security regression` green; four PG15 forward-repair lanes green; `Dependency & Security
   CI` red (below).
-- **Red on the push (6, none new in kind):** `Required-check audit` `FAIL` (§4 — one must-be-green
+- **Red on the push (5, none new in kind; the sixth red run is the merge-group dependency audit above):** `Required-check audit` `FAIL` (§4 — one must-be-green
   context started after the merge); `Dependency & Security CI` (job log 12:04: `hono` `1193729`,
   `1193730`, `1193731` moderate and `js-yaml` `1193727` high, `bun` and `npm` — identical to every
   head and tip today; `#1343` separately owned); `Required core schema present` (sandbox: **14 of

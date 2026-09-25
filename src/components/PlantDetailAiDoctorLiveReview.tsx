@@ -167,6 +167,7 @@ function PlantDetailAiDoctorLiveReviewScope({
   const [rootZoneOmissionScope, setRootZoneOmissionScope] = useState<string | null>(null);
   const [acceptedReviewRequest, setAcceptedReviewRequest] =
     useState<AcceptedAiDoctorReviewRequest | null>(null);
+  const [, setContextRevision] = useState(0);
   const historyOmissionAcknowledged = historyOmissionScope === historyScopeKey;
   const rootZoneOmissionAcknowledged = rootZoneOmissionScope === historyScopeKey;
   const queryClient = useQueryClient();
@@ -257,17 +258,19 @@ function PlantDetailAiDoctorLiveReviewScope({
   const sensorContextBlocked =
     currentSensorPending || queryHistoryRecovery.blocksReview || queryRootZoneRecovery.blocksReview;
 
-  const context = useMemo(
-    () =>
+  const evaluateContext = useCallback(
+    (now?: number) =>
       evaluateAiDoctorContextFromSources({
         plant,
         timelineItems: evidenceItems,
         rootZoneObservations: queryRootZoneObservations,
         currentSensorRows,
         tentId,
+        now,
       }),
     [plant, evidenceItems, queryRootZoneObservations, currentSensorRows, tentId],
   );
+  const context = evaluateContext();
 
   // Row-level, provenance-aware classification. The ingest audit only knows
   // counts/source transport and cannot distinguish a UI test packet from a
@@ -284,11 +287,11 @@ function PlantDetailAiDoctorLiveReviewScope({
   // server. The start handler builds it once more with click-time freshness,
   // so a tab left open cannot silently preserve an out-of-date sensor state.
   const buildReviewPacket = useCallback(
-    (classification: Classification | null, now?: Date) =>
+    (classification: Classification | null, now?: Date, reviewContext = context) =>
       buildAiDoctorReviewRequestPacket({
         plant,
         timelineItems: evidenceItems,
-        context,
+        context: reviewContext,
         csvHistoryRows: queryTentSensorRows,
         currentSensorRows,
         rootZoneObservations: queryRootZoneObservations,
@@ -695,19 +698,28 @@ function PlantDetailAiDoctorLiveReviewScope({
     if (!packet || pendingAcceptedReviewStartRef.current === historyScopeKey) return;
 
     const acceptedAt = new Date();
+    const acceptedContext = evaluateContext(acceptedAt.getTime());
     const acceptedSensorClassification =
       sensorClassificationOverride !== undefined
         ? sensorClassificationOverride
         : classifyAiDoctorCurrentSensorEvidence(currentSensorRows, { now: acceptedAt });
-    const acceptedPacket = buildReviewPacket(acceptedSensorClassification, acceptedAt);
+    const acceptedPacket = buildReviewPacket(
+      acceptedSensorClassification,
+      acceptedAt,
+      acceptedContext,
+    );
     const acceptedEligibility = evaluateAiDoctorReviewEligibility({
-      context,
+      context: acceptedContext,
       hasPlantProfile: plant !== null,
       importedHistory: acceptedPacket.imported_sensor_history,
       historicalRows: queryTentSensorRows,
       missingLiveSensorReadings: acceptedPacket.missingLiveSensorReadings === true,
     });
-    if (!acceptedEligibility.allowed) return;
+    if (!acceptedEligibility.allowed) {
+      // Re-render the current eligibility instead of leaving an expired start action visible.
+      setContextRevision((revision) => revision + 1);
+      return;
+    }
     const acceptedMode =
       acceptedEligibility.mode === "historical_review" ? "historical_review" : "standard";
     const acceptedEvidenceAcceptance = buildEvidenceAcceptanceForPacket(
@@ -723,9 +735,14 @@ function PlantDetailAiDoctorLiveReviewScope({
       sensorClassification: acceptedSensorClassification,
       evidenceAcceptance: acceptedEvidenceAcceptance,
       mode: acceptedMode,
-      readiness: context.readiness,
+      readiness: acceptedContext.readiness,
       includedRootZoneHistory: queryRootZoneObservations.length > 0,
-      confidenceCopy: candidateConfidenceCopy,
+      confidenceCopy:
+        acceptedMode === "historical_review"
+          ? AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY
+          : acceptedContext.readiness === "partial"
+            ? AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY
+            : AI_DOCTOR_LIVE_REVIEW_STRONG_COPY,
       omittedImportedHistory: historyRecovery.state === "omitted_by_choice",
       omittedRootZoneHistory: rootZoneRecovery.state === "omitted_by_choice",
     });

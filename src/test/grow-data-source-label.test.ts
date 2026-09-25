@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { SENSOR_TRUTH_FUTURE_SKEW_MS } from "@/constants/sensorTruthRanges";
 import { classifyGrowDataSource, type GrowDataSourceInput } from "@/lib/growDataSourceLabelRules";
 
 const NOW = new Date("2026-05-21T12:00:00.000Z").getTime();
@@ -58,8 +59,8 @@ describe("classifyGrowDataSource", () => {
     const outsideLiveBoundary = new Date(NOW - 15 * 60 * 1000 - 1).toISOString();
     const atManualBoundary = new Date(NOW - 24 * 60 * 60 * 1000).toISOString();
     const outsideManualBoundary = new Date(NOW - 24 * 60 * 60 * 1000 - 1).toISOString();
-    const atFutureBoundary = new Date(NOW + 15 * 60 * 1000).toISOString();
-    const outsideFutureBoundary = new Date(NOW + 15 * 60 * 1000 + 1).toISOString();
+    const atFutureBoundary = new Date(NOW + SENSOR_TRUTH_FUTURE_SKEW_MS).toISOString();
+    const outsideFutureBoundary = new Date(NOW + SENSOR_TRUTH_FUTURE_SKEW_MS + 1).toISOString();
 
     expect(
       classifyGrowDataSource(
@@ -96,7 +97,7 @@ describe("classifyGrowDataSource", () => {
         { source: "manual", value: 6, timestamp: outsideFutureBoundary },
         { now: NOW },
       ).label,
-    ).toBe("Stale");
+    ).toBe("Unavailable");
   });
 
   it("keeps CSV provenance separate from freshness", () => {
@@ -213,7 +214,8 @@ describe("classifyGrowDataSource", () => {
       },
       { now: NOW, staleThresholdMs: 5 * 60 * 1000 },
     );
-    expect(manualFutureOverride.label).toBe("Stale");
+    expect(manualFutureOverride.label).toBe("Unavailable");
+    expect(manualFutureOverride.message).toMatch(/future/i);
   });
 
   it("is deterministic for repeated identical inputs", () => {

@@ -1,9 +1,9 @@
 /**
  * tentEnvironmentStageRules — the stage a tent's environment readings are
- * judged against on the Sensors page and Tent Detail (QA 2026-09-24, BUG-006
- * follow-up).
+ * judged against on the Sensors page, Tent Detail and the Tents list (QA
+ * 2026-09-24, BUG-006 follow-ups).
  *
- * Both pages used `tents.stage` alone. Alerts and the scoped Dashboard resolve
+ * These pages used `tents.stage` alone. Alerts and the scoped Dashboard resolve
  * the stage from the grow row, the tent and — since BUG-006 — the active
  * plants in scope. So a Flower plant in a tent still marked Veg raised an RH
  * 60% alert on Alerts while Sensors and Tent Detail judged the same reading

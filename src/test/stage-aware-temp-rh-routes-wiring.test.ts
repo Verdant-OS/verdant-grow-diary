@@ -27,7 +27,7 @@ const SNAPSHOT_VM = readFileSync(
 
 describe("Tents list — stage-aware Temp/RH wiring", () => {
   it("renders chips from the shared truth-filtered presenter", () => {
-    expect(TENTS).toMatch(/<TentEnvironmentSnapshotStrip[\s\S]*?stage=\{t\.stage\}/);
+    expect(TENTS).toMatch(/<TentEnvironmentSnapshotStrip[\s\S]*?stage=\{envStage\}/);
     expect(TENT_SNAPSHOT_STRIP).toMatch(/buildTentSnapshotView/);
     expect(TENT_SNAPSHOT_STRIP).toMatch(/value=\{metric\.display\}/);
     expect(TENT_SNAPSHOT_STRIP).toMatch(/status=\{metric\.chipStatus\}/);

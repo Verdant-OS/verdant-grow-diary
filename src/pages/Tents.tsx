@@ -28,6 +28,7 @@ import { isUuid } from "@/lib/isUuid";
 import { loadTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { formatTentLightStatus } from "@/lib/lightScheduleFormat";
 import { resolveVerifiedAssignedPlantCount } from "@/lib/tentManagementRules";
+import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
 import { classifyRequestedGrowScopeState } from "@/lib/growScopeAsyncStateRules";
 import {
   classifyTentsPageAsyncState,
@@ -99,6 +100,7 @@ export default function Tents() {
   // Shared URL `?growId=` resolution against RLS-loaded grows.
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const {
+    grows,
     loading: growsLoading = false,
     error: growsError = null,
     refresh: refreshGrows,
@@ -585,6 +587,25 @@ export default function Tents() {
                   assignmentPlantsQuery,
                   (plant) => plant.tentId === t.id,
                 );
+                // Stage for the environment strip, resolved like Tent Detail
+                // and the Sensors page: the tent's grow row, the tent, and the
+                // active plants in it (QA 2026-09-24, BUG-006 follow-up). A
+                // pending plant read adds no plant signal; a failed refresh
+                // keeps the cached stages. Until the tent's grow row is known,
+                // stage grading is withheld. The stage badge and tent menu
+                // still show the tent's own stage.
+                const envStage = resolveTentEnvironmentStage({
+                  tentId: t.id,
+                  tentGrowId: t.growId ?? null,
+                  tentStage: t.stage,
+                  ...resolveTentGrowStage({
+                    growId: t.growId,
+                    grows,
+                    loading: growsLoading,
+                    error: growsError,
+                  }),
+                  plants,
+                });
                 return (
                   <div
                     key={t.id}
@@ -611,7 +632,7 @@ export default function Tents() {
 
                       <TentEnvironmentSnapshotStrip
                         tentId={t.id}
-                        stage={t.stage}
+                        stage={envStage}
                         sensorRows={readingsByTent[t.id] ?? []}
                         sensorStatus={sensorReadStatus}
                         now={nowTick}

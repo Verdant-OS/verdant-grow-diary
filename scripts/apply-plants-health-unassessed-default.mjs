@@ -116,10 +116,6 @@ function sqlLiteral(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
 }
 
-function sqlTextArray(values) {
-  return `array[${values.map(sqlLiteral).join(",")}]::text[]`;
-}
-
 function safeSha(value) {
   const text = String(value ?? "").trim();
   return /^[0-9a-f]{40}$/.test(text) ? text : null;

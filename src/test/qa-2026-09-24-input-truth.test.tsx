@@ -60,6 +60,12 @@ describe("tent size validation (BUG-012)", () => {
     "4x −4",
     "4 X-4 ft",
     "120x-120 cm",
+    // A negative leading-decimal dimension (Codex review on #1683).
+    "4x-.5",
+    "4x- .5",
+    "4x-,5",
+    "-.5x4",
+    "4 x −.5",
   ])("rejects %s", (size) => {
     expect(tentSizeValidationMessage(size)).toBe(TENT_SIZE_INVALID_MESSAGE);
   });
@@ -80,6 +86,7 @@ describe("tent size validation (BUG-012)", () => {
     "1200x1200x2000 mm",
     "4 - 5 ft",
     "4 − 5 ft",
+    "4x.5",
   ])("accepts %s", (size) => {
     expect(tentSizeValidationMessage(size)).toBeNull();
   });

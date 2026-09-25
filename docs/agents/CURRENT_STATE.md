@@ -5,9 +5,7 @@
 `c10c095ec7f6ec734a56ed6331269757bde7bfff`**, the `#1702` squash, for a reviewer finding — Codex's
 seventh-pass **P1** `4104421334`: the previous stamp still said the tip was `9b06be3f` and that zero
 commits had merged after `#1702` had landed. **One commit** merged since the 11:25 stamp; no migration
-(§1). `#1702` went through the merge queue with **all 35 required contexts green on the merge-group
-head** (§4). **Vercel built the new tip as a production deployment but the production domain still
-serves the rollback target `9b06be3f`** (§2). This stamp also carries the pass's two P2s (§5) and
+(§1). `#1702` went through the merge queue with **all 35 pinned required contexts green on the merge-group head** (the 2026-08-10 ruleset snapshot; live ruleset match `BLOCKED`, §4). **Vercel built the new tip as a production deployment but the custom-domain alias records still point to the rollback target `9b06be3f`** (§2). This stamp also carries the pass's two P2s (§5) and
 states this PR's head lanes as read (§8). No Publish. No APPLY. `HOLD #1250`. Prior header follows.)
 
 ## 1. Deploy tip `c10c095e` — one commit since the 11:25 stamp
@@ -26,20 +24,20 @@ states this PR's head lanes as read (§8). No Publish. No APPLY. `HOLD #1250`. P
 A commit alone never proves deployment, and this one proves the point: the tip is built but not
 serving (§2). This PR's branch carries `c10c095e` by forward merge (`b1f70076`, 12:22).
 
-## 2. Live — the production domain still serves `9b06be3f`; the `c10c095e` build is READY but not aliased
+## 2. Live — the custom-domain alias records still point to `9b06be3f`; the `c10c095e` build is READY with the project and branch aliases only
 
 `established fact` from Vercel's API (project `prj_i2IbBKEA9K2rLLaAO3nrBeJkTXTy`, read-only):
 
 - **`dpl_ExcxdcJn2gHE3TyYd7CUaMf7DQfb`** (`source: git`, `c10c095e`, `target: production`) was
   created 12:03:29 and READY 12:04:02. The 12:04:02 `aliases-assigned` event gave it **2 aliases**:
   the project alias `verdant-grow-diary-verdantgrowdiary.vercel.app` and the branch alias
-  `verdant-grow-diary-git-verdant-grow-diary-…`. It did **not** take `verdantgrowdiary.com`.
+  `verdant-grow-diary-git-verdant-grow-diary-…`. It did **not** take the custom-domain aliases: `verdantgrowdiary.com`, `www.verdantgrowdiary.com` and `verdant-grow-diary.vercel.app` stay on `dpl_6fVRiJ3X…` (re-read 12:39). The state is split: the project alias, one of the four production-facing hostnames in the incident record, now points to this build (`get_deployment` by that hostname, 12:39); the apex, `www` and `verdant-grow-diary.vercel.app` do not.
 - **The alias records for `verdantgrowdiary.com` and `www.verdantgrowdiary.com` still point to
   `dpl_6fVRiJ3XrDbCcGXrtDvCbLvB7HoY` (`9b06be3f`)**, `updatedAt` 09:45:16.8 — the rollback — at the
   12:07 and 12:22 reads (`list_aliases`, `get_deployment` by hostname). Internal alias record, not a
   public DNS or HTTP check.
 - **So the question the 11:25 stamp left `NOT_MEASURED` now has one observation:** a git production
-  deployment after the instant rollback did **not** auto-promote to the production domain. Whether
+  deployment after the instant rollback did **not** auto-promote to the custom domains. Whether
   that is Vercel's post-rollback rule or something else is `inference`; the observation is the alias
   record. **Promoting `c10c095e` (or not) is Cheek's decision; no Publish, promote or rollback by
   Claude.** By Vercel's alias record, the production hostnames are assigned to the `9b06be3f` build, the last tip the owner approved; what growers actually receive is the public serving state, `NOT_MEASURED` (next bullet). `#1702`'s change is test and workflow files only.
@@ -55,10 +53,10 @@ serving (§2). This PR's branch carries `c10c095e` by forward merge (`b1f70076`,
 
 ## 3. What changed for growers — the 75-minute-59-second window stands; nothing new
 
-`inference` from §2, carried: new page loads got `7053af8f` from 08:29:17 to 09:45:16 UTC; **data
+`inference` from §2, carried: if the apex is Vercel-served, new page loads got `7053af8f` from 08:29:17 to 09:45:16 UTC; **data
 impact is `NOT_MEASURED`** (no server-side import audit rows; the feasible check is `sensor_readings`
 rows with `source = 'csv'` and `created_at` from 08:29:17, open-ended until sessions loaded before
-09:45:16 can be excluded — an operator or service-role read). Since 09:45:16 the alias record points to `9b06be3f`; `c10c095e` is not on the production domain (§2); what growers receive is `NOT_MEASURED`.
+09:45:16 can be excluded — an operator or service-role read). Since 09:45:16 the alias record points to `9b06be3f`; `c10c095e` is not on the custom domains (§2); what growers receive is `NOT_MEASURED`.
 
 ## 4. Merge — `#1702` landed through the merge queue with the required contexts on its head
 
@@ -66,8 +64,7 @@ rows with `source = 'csv'` and `created_at` from 08:29:17, open-ended until sess
 
 - **`#1702`** (author and merger `cheekhimself`, merged 12:03:27 UTC, no auto-merge flag). The
   merge-queue commit `c10c095e` carries **8 `merge_group` runs**; its **`CI` run `36131748545`
-  (`success`, 12:03:24) has all 35 jobs green and every one of the 35 ruleset-required contexts
-  present** (`config/required-status-checks.json`, compared by job name). The Vitest gate
+  (`success`, 12:03:24) has all 35 jobs green and every one of the 35 pinned required contexts present** (`config/required-status-checks.json`, the 2026-08-10 snapshot of ruleset `20421416`, compared by job name). Whether the live ruleset still requires exactly these contexts is `BLOCKED` (no admin token; the audit's own ruleset-drift axis reports `BLOCKED`), so this is the pinned set verified, not the live ruleset. The Vitest gate
   (`36131748447`) and `Security regression` were also green on the merge-group head. **This is what
   the `#1680` merge lacked;** `#1680` stays recorded, not waived, not precedent.
 - **`Required-check audit` on `c10c095e` — `FAIL` (run `36132775577`, 12:03:43)**, verbatim: "35
@@ -79,15 +76,14 @@ rows with `source = 'csv'` and `created_at` from 08:29:17, open-ended until sess
 - Verdicts `#1692` `PASS` `24d9e197`, `#1679` `PASS` `c2ce9b10`, `#1698` `PASS` `9e276853`, `#1697`
   `STALE CHILD` `bd64ca8b` stand; `#1684` independent `PASS` stands.
 
-## 5. Reviews on `#1696` — Codex: eight passes, three P1 and sixteen P2 findings, all carried; verdict open
+## 5. Reviews on `#1696` — Codex: nine passes, three P1 and twenty P2 findings, all carried; verdict open
 
 `established fact`:
 
 - **Cheek marked `#1696` ready for review at 11:18 UTC.** Codex (the named independent reviewer)
   has run its Security Review and Code Review on every head; the Security Reviews posted nothing.
   The Code Reviews posted, in order: `538ca410` — **P1** (record the verified rollback; carried at
-  `6eb12549`); `6eb12549` — **P1** (bound the exposure by verified evidence) and **P2** (a stale
-  marker), carried at `dd75f7b0`; `dd75f7b0` — **five P2** (exposure start at the alias event; §1
+  `6eb12549`); `6eb12549` — **P1** (bound the exposure by verified evidence) and **P2** (data impact must stay `NOT_MEASURED`: CSV-import occurrence and possible partial batched writes unreconciled), carried at `dd75f7b0`; `dd75f7b0` — **five P2** (exposure start at the alias event; §1
   contradiction; no server-side audit rows; alias record is not public DNS; future-dated header),
   carried at `51b142b6` and `96a7e0df`; `96a7e0df` — **two P2** (header interval still
   future-dated; data-impact window must not end at the rollback), carried at `600c9902`;
@@ -99,7 +95,7 @@ rows with `source = 'csv'` and `created_at` from 08:29:17, open-ended until sess
   stale when published — this stamp is on `c10c095e`, §1); `4104421351` (**P2**: the header summary
   said five passes while §5 said six — the header now counts with §5); `4104421341` (**P2**: §8
   presented `600c9902`'s settled lanes as this file's own head result after later heads existed —
-  §8 now states the current head's lanes as read, and this stamp's own head as `NOT_MEASURED`); **`9b4caa63` — two P2, carried by this amendment:** `4104492611` (§2 and §3 said what growers were getting when only the alias record was read — reworded to the alias record, serving state `NOT_MEASURED`) and `4104492619` (§8's push-red count said six when five were push runs and the sixth was the merge-group dependency audit). CodeRabbit raised the same two points on `9b4caa63` (`4104485695`, `4104485709`). **Three P1 and sixteen P2 in all, all carried; Codex's verdict on the PR as a whole is still open.** Copilot reviewed no files (Markdown excluded); CodeRabbit skipped every earlier head.
+  §8 now states the current head's lanes as read, and this stamp's own head as `NOT_MEASURED`); **`9b4caa63` — two P2, carried by this amendment:** `4104492611` (§2 and §3 said what growers were getting when only the alias record was read — reworded to the alias record, serving state `NOT_MEASURED`) and `4104492619` (§8's push-red count said six when five were push runs and the sixth was the merge-group dependency audit). CodeRabbit raised the same two points on `9b4caa63` (`4104485695`, `4104485709`); **`e426bd83` — four P2, carried by this amendment:** `4104551659` (the 35 contexts are the pinned snapshot, live ruleset match `BLOCKED` — header, §4, §8, §11), `4104551650` (the exposure window keeps its "if the apex is Vercel-served" condition and no "production domain serves" claim remains — header, §2, §3), `4104551663` (the `6eb12549` P2 is the unmeasured-data-impact finding, not "a stale marker"), `4104551668` (`c10c095e` lacks the custom-domain aliases, not all aliases; the project alias now points to it — §2). **Three P1 and twenty P2 in all, all carried; Codex's verdict on the PR as a whole is still open.** Copilot reviewed no files (Markdown excluded); CodeRabbit skipped every earlier head.
 - The two owner-side Claude reads (`5315633209`, `5315834826`) and Claude's replies stand as the
   09:21 stamp §5 records.
 
@@ -131,7 +127,7 @@ lanes are `NOT_MEASURED` here by construction** and belong to the next stamp or 
 **Tip `c10c095e`, read 12:22 UTC — 34 runs: 23 `push`, 8 `merge_group`, 3 `dynamic`; 26 green, 6
 red, 2 still in progress (`Core Link and Form Census`, and the `dynamic` push-review lane).**
 
-- **Merge-group (the merge gate):** `CI` (35 required contexts) green; `Full Vitest Suite (PR gate)`
+- **Merge-group (the merge gate):** `CI` (the 35 pinned required contexts) green; `Full Vitest Suite (PR gate)`
   green; `Security regression` green; four PG15 forward-repair lanes green; `Dependency & Security
   CI` red (below).
 - **Red on the push (5, none new in kind; the sixth red run is the merge-group dependency audit above):** `Required-check audit` `FAIL` (§4 — one must-be-green
@@ -182,8 +178,8 @@ red, 2 still in progress (`Core Link and Form Census`, and the `dynamic` push-re
 - Its §1 says the tip is `9b06be3f` and zero commits merged; `c10c095e` (`#1702`) merged 12:03:27
   (§1, §4).
 - Its §2 says no production deployment since 09:45 and auto-promotion untested; `dpl_Excxdc…` was
-  built at 12:03 and did not take the domain (§2).
-- Its header says five review passes; six were, and seven now (§5).
+  built at 12:03 and did not take the custom-domain aliases (§2).
+- Its header says five review passes; six were, and nine now (§5).
 - Its §8 presents `600c9902` as this file's head; the head is now this stamp's commit (§8).
 
 Everything else in it is carried unchanged with its original labels, including the incident and
@@ -206,8 +202,7 @@ branch line are updated.
   commit to production (§2 of the superseded block).** Scoping or revoking it is Cheek's; until then
   every stamp reads Vercel's production alias record before citing production.
 - **A merge without the required contexts on its head is not precedent.** `#1680` is recorded, not
-  waived; `#1702` (§4) had them. Claude treats every future merge instruction as requiring the 35
-  required contexts green on the exact head first, and says so before merging if they are not.
+  waived; `#1702` (§4) had them. Claude treats every future merge instruction as requiring the 35 pinned required contexts green on the exact head first (the live ruleset match stays `BLOCKED` until Cheek reads the ruleset), and says so before merging if they are not.
 - **`HOLD #1250`.** `#1369` / `#1641` REVIEW ONLY. `#1343` separately owned. `#1340` owner-closed.
   Manual CodeRabbit requests are authorized for `#1678` / `#1688` and, per its own PR body, `#1699`.
 - **The tip this stamp measured is `c10c095ec7f6ec734a56ed6331269757bde7bfff`.** Once this PR

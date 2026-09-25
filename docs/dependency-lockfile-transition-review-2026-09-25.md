@@ -17,22 +17,23 @@ and contradict the documented setup contracts. Renewing the date after enumerati
 those contracts keeps the expiry gate useful without
 silently deleting consumers or disabling the expiry check.
 
-## Enumerated consumer evidence
+## Enumerated npm references
 
-These are four repository contracts, not four deployments. Every configured marker
-was checked against source; the policy scanner found no undeclared npm consumers.
+These are four configured repository references, not four verified lockfile
+consumers or deployments. Every configured marker was checked against source;
+the policy scanner found no undeclared npm references in the paths it scans.
 
-| Contract                                         | Source evidence at the reviewed base                          | Status                                                                                  |
-| ------------------------------------------------ | ------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `.github/workflows/seo-monitoring.yml`           | The install step uses npm ci, with npm install fallback.      | PASS: workflow source still consumes npm. Its hosted execution was not measured here.   |
-| `README.md`                                      | The build instructions invoke npm run build.                  | PASS: local build contract remains documented.                                          |
-| `.claude/skills/run-verdant-grow-diary/SKILL.md` | Local setup invokes npm install with an isolated userconfig.  | PASS: local setup contract remains documented.                                          |
-| `docs/preview-deployment-verification.md`        | The dashboard checklist lists npm install/build/dev commands. | PASS: documentation still declares npm; actual dashboard configuration is NOT_MEASURED. |
+| Contract                                         | Source evidence at the reviewed base                                    | Status                                                                                               |
+| ------------------------------------------------ | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `.github/workflows/seo-monitoring.yml`           | The install step runs npm's `ci` subcommand, with `install` fallback.   | PASS: executable workflow source uses the committed lock for `ci`. Hosted execution is NOT_MEASURED. |
+| `README.md`                                      | The build instructions invoke `npm run build`.                          | PASS: npm is documented; this command alone does not require a committed npm lock.                   |
+| `.claude/skills/run-verdant-grow-diary/SKILL.md` | Local setup invokes npm's `install` subcommand, then restores the lock. | PASS: npm is documented; this procedure does not establish a lockfile dependency.                    |
+| `docs/preview-deployment-verification.md`        | The checklist lists npm's install, build and dev commands.              | PASS: npm is documented. Actual dashboard configuration and execution are NOT_MEASURED.              |
 
 `vercel.json` already pins Bun install and build commands and is correctly absent
-from this inventory. Its source does not prove that every external dashboard or
-preview deployment follows those commands. Reconcile the preview checklist before
-removing its contract; do not infer a production change from either file.
+from this npm-reference inventory. Its source does not prove that every external
+dashboard or preview deployment follows those commands. Reconcile the preview
+checklist before removing its marker; do not infer a production change from either file.
 
 ## Controls preserved
 

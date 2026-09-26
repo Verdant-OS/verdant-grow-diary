@@ -6,6 +6,7 @@ import {
   buildQuickLogTargetKey,
   type QuickLogTargetIdentityInput,
 } from "@/lib/quickLogActivityRules";
+import { isUuid } from "@/lib/isUuid";
 
 /** The exact, serializable RPC input retained until its outcome is confirmed. */
 export interface PendingQuickLogActivityInput {
@@ -14,7 +15,8 @@ export interface PendingQuickLogActivityInput {
   readonly tentId: string | null;
   readonly plantId: string | null;
   readonly note: string | null;
-  readonly occurredAt: string;
+  /** Legacy v1 attempts sent null; preserve that exact hashed RPC value on retry. */
+  readonly occurredAt: string | null;
   readonly extraDetails: Record<string, unknown> | null;
   readonly idempotencyKey: string;
 }
@@ -51,20 +53,22 @@ export type PendingActivityRead =
   | { readonly status: "blocked" };
 
 const PREFIX = "verdant:quick-log:pending-activity:v1:";
+const RESOLVED_PREFIX = "verdant:quick-log:resolved-activity:v1:";
+
+type ResolvedOutcome =
+  | { readonly kind: "confirmed"; readonly growEventId: string | null }
+  | { readonly kind: "rejected" };
+
+interface ResolvedRecord {
+  readonly record: string;
+  readonly outcome: ResolvedOutcome;
+}
 
 // A resolved RPC can outlive a failed sessionStorage removal. Keep the exact
-// outcome in this tab's memory so a remounted editor retries cleanup without
-// replaying either a confirmed write or a definitive rejection. A full page
-// reload loses this hint; the server idempotency key remains the write fence.
-const resolvedUncleared = new Map<
-  string,
-  {
-    readonly record: string;
-    readonly outcome:
-      | { readonly kind: "confirmed"; readonly growEventId: string | null }
-      | { readonly kind: "rejected" };
-  }
->();
+// outcome in sessionStorage for reloads and in memory for storage-write failures.
+// A failed marker write followed by a failed claim removal cannot be recovered
+// after reload; the original claim remains fail-closed rather than fabricated.
+const resolvedUncleared = new Map<string, ResolvedRecord>();
 
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -124,7 +128,7 @@ function validRecord(
     !optionalId(input.tentId) ||
     !optionalId(input.plantId) ||
     (input.note !== null && typeof input.note !== "string") ||
-    input.occurredAt !== value.createdAt ||
+    (input.occurredAt !== null && input.occurredAt !== value.createdAt) ||
     !nonempty(input.idempotencyKey) ||
     input.idempotencyKey.length < 8 ||
     input.idempotencyKey.length > 200
@@ -165,6 +169,47 @@ function storageKey(ownerId: string, target: QuickLogTargetIdentityInput): strin
   return `${PREFIX}${encodeURIComponent(ownerId)}:${encodeURIComponent(buildQuickLogTargetKey(target))}`;
 }
 
+function resolvedKey(ownerId: string, target: QuickLogTargetIdentityInput): string {
+  return `${RESOLVED_PREFIX}${encodeURIComponent(ownerId)}:${encodeURIComponent(buildQuickLogTargetKey(target))}`;
+}
+
+function validResolvedRecord(
+  value: unknown,
+  record: PendingQuickLogActivity,
+): value is ResolvedRecord {
+  if (!object(value) || !onlyKeys(value, ["record", "outcome"])) return false;
+  if (value.record !== JSON.stringify(record) || !object(value.outcome)) return false;
+  const outcome = value.outcome;
+  if (outcome.kind === "rejected") return onlyKeys(outcome, ["kind"]);
+  return (
+    outcome.kind === "confirmed" &&
+    onlyKeys(outcome, ["kind", "growEventId"]) &&
+    (outcome.growEventId === null || isUuid(outcome.growEventId))
+  );
+}
+
+function readResolvedRecord(record: PendingQuickLogActivity): ResolvedRecord | null {
+  const raw = window.sessionStorage.getItem(resolvedKey(record.ownerId, record.input));
+  if (raw === null) return null;
+  const parsed: unknown = JSON.parse(raw);
+  if (!validResolvedRecord(parsed, record)) throw new Error("Invalid activity outcome marker");
+  return parsed;
+}
+
+function rememberResolvedRecord(record: PendingQuickLogActivity, outcome: ResolvedOutcome): void {
+  if (!validRecord(record, record.ownerId, record.input)) return;
+  const resolved: ResolvedRecord = { record: JSON.stringify(record), outcome };
+  resolvedUncleared.set(storageKey(record.ownerId, record.input), resolved);
+  try {
+    const key = resolvedKey(record.ownerId, record.input);
+    const raw = JSON.stringify(resolved);
+    window.sessionStorage.setItem(key, raw);
+    if (window.sessionStorage.getItem(key) !== raw) return;
+  } catch {
+    // In-tab memory still prevents a second RPC; storage may recover for cleanup.
+  }
+}
+
 /** An invalid or unreadable record is a lock, never an empty draft. */
 export function readPendingQuickLogActivity(
   ownerId: string | null | undefined,
@@ -177,17 +222,23 @@ export function readPendingQuickLogActivity(
     const raw = window.sessionStorage.getItem(key);
     if (raw === null) {
       resolvedUncleared.delete(key);
+      try {
+        window.sessionStorage.removeItem(resolvedKey(ownerId, target));
+      } catch {
+        // A stale marker cannot authorize a write without a matching claim.
+      }
       return { status: "empty" };
     }
     const parsed: unknown = JSON.parse(raw);
-    // Earlier v1 records captured createdAt but did not include occurredAt.
-    // Keep their exact request/key recoverable by adding the captured time,
+    // Earlier v1 records sent p_occurred_at: null. The event RPC hashes this
+    // parameter, so preserve null instead of substituting createdAt.
+    // Keep their exact request/key recoverable by adding the null value,
     // and fail closed if the upgraded record cannot be persisted and read back.
     const migrated =
       object(parsed) &&
       object(parsed.input) &&
       !Object.prototype.hasOwnProperty.call(parsed.input, "occurredAt")
-        ? { ...parsed, input: { ...parsed.input, occurredAt: parsed.createdAt } }
+        ? { ...parsed, input: { ...parsed.input, occurredAt: null } }
         : parsed;
     if (!validRecord(migrated, ownerId, target)) return { status: "blocked" };
     if (migrated !== parsed) {
@@ -195,6 +246,7 @@ export function readPendingQuickLogActivity(
       window.sessionStorage.setItem(key, migratedRaw);
       if (window.sessionStorage.getItem(key) !== migratedRaw) return { status: "blocked" };
     }
+    readResolvedRecord(migrated);
     return { status: "pending", record: migrated };
   } catch {
     return { status: "blocked" };
@@ -206,20 +258,13 @@ export function rememberConfirmedPendingQuickLogActivity(
   record: PendingQuickLogActivity,
   growEventId: string | null,
 ): void {
-  if (!validRecord(record, record.ownerId, record.input)) return;
-  resolvedUncleared.set(storageKey(record.ownerId, record.input), {
-    record: JSON.stringify(record),
-    outcome: { kind: "confirmed", growEventId },
-  });
+  if (growEventId !== null && !isUuid(growEventId)) return;
+  rememberResolvedRecord(record, { kind: "confirmed", growEventId });
 }
 
 /** A definitive first rejection must never be replayed after cleanup fails. */
 export function rememberRejectedPendingQuickLogActivity(record: PendingQuickLogActivity): void {
-  if (!validRecord(record, record.ownerId, record.input)) return;
-  resolvedUncleared.set(storageKey(record.ownerId, record.input), {
-    record: JSON.stringify(record),
-    outcome: { kind: "rejected" },
-  });
+  rememberResolvedRecord(record, { kind: "rejected" });
 }
 
 /** Return only an exact confirmation for this owner, target, and payload. */
@@ -228,7 +273,13 @@ export function readConfirmedPendingQuickLogActivity(
 ): { readonly growEventId: string | null } | null {
   if (!validRecord(record, record.ownerId, record.input)) return null;
   const key = storageKey(record.ownerId, record.input);
-  const resolved = resolvedUncleared.get(key);
+  let resolved: ResolvedRecord | null = null;
+  try {
+    resolved = readResolvedRecord(record);
+  } catch {
+    return null;
+  }
+  resolved ??= resolvedUncleared.get(key) ?? null;
   if (resolved?.record !== JSON.stringify(record) || resolved.outcome.kind !== "confirmed")
     return null;
   return { growEventId: resolved.outcome.growEventId };
@@ -237,7 +288,13 @@ export function readConfirmedPendingQuickLogActivity(
 /** Return only an exact definitive rejection for this owner, target, and payload. */
 export function readRejectedPendingQuickLogActivity(record: PendingQuickLogActivity): boolean {
   if (!validRecord(record, record.ownerId, record.input)) return false;
-  const resolved = resolvedUncleared.get(storageKey(record.ownerId, record.input));
+  let resolved: ResolvedRecord | null = null;
+  try {
+    resolved = readResolvedRecord(record);
+  } catch {
+    return false;
+  }
+  resolved ??= resolvedUncleared.get(storageKey(record.ownerId, record.input)) ?? null;
   return resolved?.record === JSON.stringify(record) && resolved.outcome.kind === "rejected";
 }
 
@@ -280,7 +337,14 @@ export function clearPendingQuickLogActivity(record: PendingQuickLogActivity): b
     const key = storageKey(record.ownerId, record.input);
     window.sessionStorage.removeItem(key);
     const cleared = window.sessionStorage.getItem(key) === null;
-    if (cleared) resolvedUncleared.delete(key);
+    if (cleared) {
+      resolvedUncleared.delete(key);
+      try {
+        window.sessionStorage.removeItem(resolvedKey(record.ownerId, record.input));
+      } catch {
+        // A stale marker has no matching pending record and cannot authorize replay.
+      }
+    }
     return cleared;
   } catch {
     return false;

@@ -497,6 +497,29 @@ describe("All activity types retry confirmation", () => {
     expect(backend.rows.size).toBe(1);
   });
 
+  it("retries a legacy event request with the original null occurrence time", async () => {
+    const view = mount();
+    await loseReply("training");
+    // Model the historical client: it sent null and its v1 claim had no
+    // occurredAt property. The event RPC hashes this parameter.
+    backend.posts[0].p_occurred_at = null;
+    const key = window.sessionStorage.key(0)!;
+    const legacy = JSON.parse(window.sessionStorage.getItem(key)!) as {
+      input: Record<string, unknown>;
+    };
+    delete legacy.input.occurredAt;
+    window.sessionStorage.setItem(key, JSON.stringify(legacy));
+
+    view.unmount();
+    mount();
+    save();
+    await screen.findByTestId("quick-log-all-activities-saved-item");
+    expect(backend.posts).toHaveLength(2);
+    expect(backend.posts[1].p_occurred_at).toBeNull();
+    expect(backend.posts[1]).toEqual(backend.posts[0]);
+    expect(backend.rows.size).toBe(1);
+  });
+
   it("does not show a late confirmed plant A retry as a plant B receipt", async () => {
     const view = mount();
     await loseReply();

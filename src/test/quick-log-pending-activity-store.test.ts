@@ -33,20 +33,21 @@ beforeEach(() => {
 });
 
 describe("pending Quick Log activity recovery", () => {
-  it("upgrades a legacy v1 record with the captured occurrence time before exposing it", () => {
+  it("upgrades a legacy v1 record without changing its null occurrence-time RPC value", () => {
     expect(claimPendingQuickLogActivity(original).status).toBe("claimed");
     const key = window.sessionStorage.key(0)!;
     const legacy = structuredClone(original) as unknown as Record<string, unknown>;
     delete (legacy.input as Record<string, unknown>).occurredAt;
     window.sessionStorage.setItem(key, JSON.stringify(legacy));
+    const legacyRequest = { ...original, input: { ...original.input, occurredAt: null } };
     expect(readPendingQuickLogActivity(original.ownerId, original.input)).toEqual({
       status: "pending",
-      record: original,
+      record: legacyRequest,
     });
-    expect(JSON.parse(window.sessionStorage.getItem(key)!)).toEqual(original);
+    expect(JSON.parse(window.sessionStorage.getItem(key)!)).toEqual(legacyRequest);
     expect(readPendingQuickLogActivity(original.ownerId, original.input)).toEqual({
       status: "pending",
-      record: original,
+      record: legacyRequest,
     });
   });
 
@@ -160,6 +161,46 @@ describe("pending Quick Log activity recovery", () => {
     remove.mockRestore();
     expect(clearPendingQuickLogActivity(original)).toBe(true);
     expect(readRejectedPendingQuickLogActivity(original)).toBe(false);
+  });
+
+  it("restores a definitive rejection after a page-like module reload without replaying it", async () => {
+    expect(claimPendingQuickLogActivity(original).status).toBe("claimed");
+    const remove = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => undefined);
+    expect(clearPendingQuickLogActivity(original)).toBe(false);
+    rememberRejectedPendingQuickLogActivity(original);
+    expect(window.sessionStorage.length).toBe(2);
+
+    vi.resetModules();
+    const reloaded = await import("@/lib/quickLogPendingActivityStore");
+    expect(reloaded.readPendingQuickLogActivity(original.ownerId, original.input).status).toBe(
+      "pending",
+    );
+    expect(reloaded.readRejectedPendingQuickLogActivity(original)).toBe(true);
+    expect(reloaded.readConfirmedPendingQuickLogActivity(original)).toBeNull();
+    remove.mockRestore();
+    expect(reloaded.clearPendingQuickLogActivity(original)).toBe(true);
+    expect(window.sessionStorage.length).toBe(0);
+  });
+
+  it("restores a confirmed outcome after reload and blocks a mismatched outcome marker", async () => {
+    expect(claimPendingQuickLogActivity(original).status).toBe("claimed");
+    rememberConfirmedPendingQuickLogActivity(original, "77777777-7777-4777-8777-000000000001");
+    vi.resetModules();
+    const reloaded = await import("@/lib/quickLogPendingActivityStore");
+    expect(reloaded.readConfirmedPendingQuickLogActivity(original)).toEqual({
+      growEventId: "77777777-7777-4777-8777-000000000001",
+    });
+    const markerKey = Object.keys(window.sessionStorage).find((key) =>
+      key.startsWith("verdant:quick-log:resolved-activity:v1:"),
+    );
+    expect(markerKey).toBeDefined();
+    window.sessionStorage.setItem(
+      markerKey!,
+      JSON.stringify({ record: "wrong", outcome: { kind: "rejected" } }),
+    );
+    expect(reloaded.readPendingQuickLogActivity(original.ownerId, original.input)).toEqual({
+      status: "blocked",
+    });
   });
 
   it("fails closed for missing identity, corrupt storage, and a no-op storage write", () => {

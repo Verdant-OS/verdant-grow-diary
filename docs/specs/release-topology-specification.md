@@ -180,8 +180,9 @@ No competing implementation exists; none is created.
   then this slice's row. The pointer this slice rewrites sits inside AC-9.3, so contract §15 rule 2
   applies: the header was restamped at `4ddb2322` (the tip this branch carried after
   forward-merging `#1703`, whose hunks stayed disjoint from this slice's), every touched clause was
-  re-verified, and the stamp was carried to `7266acd6` when `#1712` and `#1343` merged. An earlier
-  revision of this section said no AC clause changed; that was wrong (Codex on `#1718`).
+  re-verified, and the stamp was carried to `7266acd6` when `#1712` and `#1343` merged, and to
+  `dccaf732` when `#1720` and `#1683` merged. An earlier revision of this section said no AC
+  clause changed; that was wrong (Codex on `#1718`).
 - **Board at the amendment: 48 open PRs.** Every head was fetched as `refs/pull/N/head` and diffed
   against its merge-base with `c9bc1df3`. None besides `#1699` adds or edits
   `docs/specs/release-topology-specification.md`, and `git merge-tree` of this branch against each
@@ -214,8 +215,15 @@ No competing implementation exists; none is created.
   `git diff --name-only 4ddb2322 7266acd6` lists and finds five, all from `#1343`: `package.json`,
   `bun.lock`, `package-lock.json`, `scripts/check-bun-lockfile-policy.mjs` and its test. AC-8.1's
   checker cite `:175-180` moves to **`:186-191`** and its test cite `:387` to **`:492`**, same text;
-  every `package.json` line cite holds. The contract's own §15.1 row records the restamp, the carry
-  and every re-measured count (AT-6).
+  every `package.json` line cite holds.
+
+  The carry to `dccaf732` does the same over the 161 files that
+  `git diff --name-only 7266acd6 dccaf732` lists (`#1720` and `#1683`; no migration) and finds six,
+  all from `#1683`. `supabase/functions/ai-doctor-review/index.ts` gained 29 lines net, so every
+  contract cite into it past `:44` is re-pointed, same text; the grounding rules, `ci.yml`,
+  `writeFeedingTypedEvent.ts` and `PlantDetail.tsx` cites hold. §6.1 row 5 keeps its `:65`, `:307`
+  and `:502`: that table is dated to `c9bc1df3` by its heading. The contract's own §15.1 row records
+  the restamp, both carries and every re-measured count (AT-6).
 
 The collision audit the assignment asked for also covered work on signup and migration hardening
 (`#1703` and `#1701` open; `#1704` merged), CI runners (`#1221` and `#1708` merged), Quick Log
@@ -896,7 +904,9 @@ completed:
     dated observation. Because that pointer is inside AC-9.3, the header is restamped at 4ddb2322
     and carried to 7266acd6: AC-7.3 re-pointed :141 -> :143 (#1661), AC-3.2 521 -> 522 and its
     codebase-map cite :466-467 -> :469-470 (#1703), AC-8.1 re-pointed :175-180 -> :186-191 and
-    :387 -> :492 (#1343), an AC-4.3 method note (all three figures reproduce), §15.1 row
+    :387 -> :492 (#1343), an AC-4.3 method note (all three figures reproduce), §15.1 row; then
+    carried to dccaf732: every ai-doctor-review/index.ts cite past :44 re-pointed (#1683),
+    AC-3.2 522 -> 530, AC-3.4 751 -> 761
   - docs/codebase-map.md, README.md: #1699's two publisher corrections, unchanged
 
 verified_by:
@@ -906,6 +916,8 @@ verified_by:
     cited file is byte-identical at both SHAs (§2.4, AT-4)
   - contract cites into the five files #1343 changed re-read at 7266acd6; AC-3.4, AC-4.3 and
     AC-9.3's workflow grep re-run there
+  - contract cites into the six files #1683 changed re-read at dccaf732; AC-3.2, AC-3.4, AC-4.3
+    and AC-10.2 re-run there, and §13's Quick Log caller lists re-derived
   - §6.1: each row's cites read from the c9bc1df3 blobs; the counts and zero-hit greps re-run
   - Vercel reads 23:28–23:37 UTC (Appendix B): get_deployment per hostname ×4 plus the 08:28 one,
     list_deployments (production, since 08:25 UTC), list_promote_aliases, list_user_events ×2
@@ -943,7 +955,7 @@ next_slice:
   - #1696's owner: cite this document for the promotion axis; carry Appendix B's per-hostname
     reading as the latest live row (a CURRENT_STATE stamp outranks it for the value)
   - Next Claude slice after merge: the governance slice for CLAUDE.md:77, :130 and :138-144.
-    The contract is restamped at 7266acd6 in this slice; a later stamp starts from there
+    The contract is restamped at dccaf732 in this slice; a later stamp starts from there
 
 files_touched:
   - docs/specs/release-topology-specification.md

@@ -11,6 +11,7 @@
  * labeled as manual evidence.
  */
 
+import { isUuid } from "@/lib/isUuid";
 import { supabase as defaultSupabase } from "@/integrations/supabase/client";
 
 export interface QuickLogWateringRpcPayload {
@@ -275,7 +276,7 @@ export async function writeQuickLogWateringTypedEvent(
   }
   if (!envelope || envelope.ok !== true) return { ok: false, reason: "rpc:rejected" };
   const eventId = trimOrNull(envelope.grow_event_id);
-  if (!eventId) return { ok: false, reason: "rpc:no_event_id" };
+  if (!isUuid(eventId)) return { ok: false, reason: "rpc:no_event_id" };
 
   return { ok: true, eventId, reused: envelope.reused === true };
 }

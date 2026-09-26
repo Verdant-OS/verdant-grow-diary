@@ -76,7 +76,10 @@ function acceptedThenLost() {
     if (!reused) ledger.set(args.p_idempotency_key, args);
     return rpc.mock.calls.length === 1
       ? { data: null, error: new Error("reply lost after acceptance") }
-      : { data: { ok: true, grow_event_id: "feed-event-a", reused }, error: null };
+      : {
+          data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused },
+          error: null,
+        };
   });
   return ledger;
 }
@@ -201,7 +204,10 @@ describe("Feed exact recovery through the actual typed writer", () => {
     view.rerender(view.element());
     expect(screen.queryByTestId("qlv2-exact-retry-lock")).toBeNull();
     await act(async () =>
-      resolve({ data: { ok: true, grow_event_id: "feed-event-a" }, error: null }),
+      resolve({
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" },
+        error: null,
+      }),
     );
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(window.sessionStorage.getItem(storageKey())).not.toBeNull();
@@ -210,7 +216,7 @@ describe("Feed exact recovery through the actual typed writer", () => {
     view.rerender(view.element());
     expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeVisible();
     rpc.mockResolvedValue({
-      data: { ok: true, grow_event_id: "feed-event-a", reused: true },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
       error: null,
     });
     fireEvent.click(screen.getByTestId("qlv2-save-retry"));
@@ -220,7 +226,7 @@ describe("Feed exact recovery through the actual typed writer", () => {
 
   it("keeps confirmed cleanup failure honest and retries cleanup without another RPC", async () => {
     rpc.mockResolvedValue({
-      data: { ok: true, grow_event_id: "feed-event-a", reused: false },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: false },
       error: null,
     });
     sheet();
@@ -257,7 +263,7 @@ describe("Feed exact recovery through the actual typed writer", () => {
     window.sessionStorage.setItem(storageKey(), raw);
     await act(async () =>
       resolve({
-        data: { ok: true, grow_event_id: "feed-event-a", reused: false },
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: false },
         error: null,
       }),
     );
@@ -268,4 +274,27 @@ describe("Feed exact recovery through the actual typed writer", () => {
     expect(window.sessionStorage.getItem(storageKey())).toBe(raw);
     expect(rpc).toHaveBeenCalledTimes(1);
   });
+});
+
+it("keeps a malformed receipt unresolved across a target-changing remount and retries exactly", async () => {
+  rpc
+    .mockResolvedValueOnce({ data: { ok: true, grow_event_id: "not-an-event" }, error: null })
+    .mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+      error: null,
+    });
+  const first = sheet();
+  fill();
+  await uncertain();
+  const original = rpc.mock.calls[0][1];
+  expect(toastSuccess).not.toHaveBeenCalled();
+  expect(window.sessionStorage.getItem(storageKey())).not.toBeNull();
+  first.unmount();
+  sheet("plant:plant-b");
+  fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+  await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
+  expect(rpc).toHaveBeenCalledTimes(2);
+  expect(rpc.mock.calls[1][1]).toEqual(original);
+  expect(original).toMatchObject({ p_plant_id: "plant-a", p_grow_id: "grow-a" });
+  expect(window.sessionStorage.getItem(storageKey())).toBeNull();
 });

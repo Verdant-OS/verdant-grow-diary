@@ -37,7 +37,7 @@ function baseInput(overrides: Partial<FeedingTypedEventInput> = {}): FeedingType
 
 function makeClient(
   result: { data?: unknown; error?: unknown } = {
-    data: { ok: true, grow_event_id: "evt-uuid-123", reused: false },
+    data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: false },
   },
 ) {
   const rpc = vi.fn().mockResolvedValue({
@@ -191,11 +191,11 @@ describe("writeFeedingTypedEvent — validation", () => {
 describe("writeFeedingTypedEvent — RPC behavior", () => {
   it("returns the event id and replay state from a successful envelope", async () => {
     const { client, rpc } = makeClient({
-      data: { ok: true, grow_event_id: "evt-uuid-123", reused: true },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
     });
     expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
       ok: true,
-      eventId: "evt-uuid-123",
+      eventId: "77777777-7777-4777-8777-000000000001",
       reused: true,
     });
     expect(rpc).toHaveBeenCalledTimes(1);
@@ -251,4 +251,17 @@ describe("writeFeedingTypedEvent — static safety guards", () => {
     expect(src).not.toMatch(/\.upsert\s*\(/);
     expect(src).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|createClient\s*\(/);
   });
+});
+
+describe("receipt identity", () => {
+  it.each(["not-an-event", "", " ", null, undefined, 42, {}])(
+    "rejects malformed event ID %j",
+    async (id) => {
+      const { client } = makeClient({ data: { ok: true, grow_event_id: id } });
+      expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
+        ok: false,
+        reason: "rpc:no_event_id",
+      });
+    },
+  );
 });

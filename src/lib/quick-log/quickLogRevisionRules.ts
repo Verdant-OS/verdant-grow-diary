@@ -346,7 +346,11 @@ export const QUICKLOG_REVISION_FAILURE_COPY: Record<string, string> = {
   invalid_changes: "Those changes could not be applied.",
   target_not_owned: "That plant or tent is not in your grows.",
   grow_not_owned: "That grow is not yours.",
-  rpc_unavailable: "Entry changes are unavailable. Try again later.",
+  // PGRST202/42883: the RPC does not exist on the server, so nothing ran.
+  // Production served a client ahead of its migration (QA 2026-09-24,
+  // BUG-021); the grower must know the entry is unchanged.
+  rpc_unavailable:
+    "Correcting or retracting entries isn't available right now. Nothing was changed. Try again later.",
   forbidden: "You do not have permission to change this entry.",
   invalid_idempotency_key: "This change could not be identified. Close and reopen the entry.",
   idempotency_conflict: "This change could not be confirmed. Close and reopen the entry.",

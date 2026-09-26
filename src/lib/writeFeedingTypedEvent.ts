@@ -88,6 +88,7 @@ export type WriteFeedingFailureReason =
   | "numeric:not_finite"
   | "occurred_at:invalid"
   | "rpc:no_event_id"
+  | "rpc:invalid_typed_payload"
   | "rpc:rejected"
   | "rpc:error";
 
@@ -253,6 +254,13 @@ export async function writeFeedingTypedEvent(
     response.data && typeof response.data === "object"
       ? (response.data as Record<string, unknown>)
       : null;
+  // The server answered and explicitly rejected the payload during
+  // validation, before any write. Unlike a transport failure or an unknown
+  // rejection, this outcome is definitive: nothing was saved under this key,
+  // so the grower may correct the entry instead of retrying it verbatim.
+  if (envelope && envelope.ok === false && envelope.reason === "invalid_typed_payload") {
+    return { ok: false, reason: "rpc:invalid_typed_payload" };
+  }
   if (!envelope || envelope.ok !== true) {
     return { ok: false, reason: "rpc:rejected" };
   }

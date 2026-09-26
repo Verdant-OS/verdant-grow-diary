@@ -19,6 +19,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { applyStageTargetSeverityToPacket } from "@/lib/aiDoctorPacketStageTargetRules";
+import { canonicalSnapshotReadingValue } from "@/lib/aiDoctorReviewGroundingRules";
 import { validateAndNormalizeAiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacketValidationRules";
 import { executableTsSource } from "@/test/helpers/executableTsSource";
 
@@ -159,6 +160,48 @@ describe("server-side stage-target grading covers every field the grounding chec
 
   it("an in-range aliased reading stays ok", () => {
     expect(notes([{ field: "rh", value: 50, unit: "%" }])).toEqual({ severity: "ok", notes: [] });
+  });
+
+  // Codex review on #1683 (round 19): a canonical field name with a different
+  // declared unit is read by grounding in that unit, so grading must read it
+  // the same way. `temperature_c` 25 in °F is −3.9 °C, not 25 °C.
+  it("`temperature_c` 25 declared in °F is graded as −3.9 °C, as grounding reads it", () => {
+    const reading = { field: "temperature_c", value: 25, unit: "°F" };
+    expect(canonicalSnapshotReadingValue("temperature", reading)).toBeCloseTo(-3.9, 1);
+    const { severity, notes: out } = notes([reading]);
+    expect(severity).toBe("warning");
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatch(/^Current air temperature -3\.9°C is below the flower target range /);
+  });
+
+  it("`temperature_c` 77 declared in °F is graded as 25 °C and stays ok", () => {
+    expect(notes([{ field: "temperature_c", value: 77, unit: "°F" }])).toEqual({
+      severity: "ok",
+      notes: [],
+    });
+  });
+
+  it("canonical fields in their own units grade exactly as before", () => {
+    expect(
+      notes([
+        { field: "temperature_c", value: 24, unit: "°C" },
+        { field: "temperature_f", value: 75, unit: "°F" },
+        { field: "humidity_pct", value: 50, unit: "%" },
+        { field: "vpd_kpa", value: 1.2, unit: "kPa" },
+      ]),
+    ).toEqual({ severity: "ok", notes: [] });
+    expect(notes([{ field: "temperature_f", value: 95, unit: "°F" }]).severity).toBe("warning");
+  });
+
+  it("a canonical field whose unit grounding cannot read is still graded by its name", () => {
+    const reading = { field: "humidity_pct", value: 95, unit: "pct" };
+    expect(canonicalSnapshotReadingValue("humidity", reading)).toBeNull();
+    expect(notes([reading])).toEqual({
+      severity: "warning",
+      notes: [
+        "Current humidity 95% is above the flower target range (40–55%). Do not describe the environment as stable or healthy.",
+      ],
+    });
   });
 });
 

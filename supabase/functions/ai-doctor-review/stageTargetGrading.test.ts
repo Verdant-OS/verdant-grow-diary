@@ -12,7 +12,7 @@ import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { applyStageTargetSeverityToPacket } from "../_shared/aiDoctorPacketStageTargetRules.ts";
 import { validateAndNormalizeAiDoctorReviewRequestPacket } from "../_shared/aiDoctorReviewRequestPacketValidationRules.ts";
 
-function packet(rh: number, field = "humidity_pct") {
+function packet(rh: number, field = "humidity_pct", unit = "%") {
   return {
     schemaVersion: 1,
     plant: { strain: "Northern Lights", stage: "flower", medium: "coco", potSize: "11 L" },
@@ -21,10 +21,10 @@ function packet(rh: number, field = "humidity_pct") {
     recentSensorSnapshot: {
       capturedAt: "2026-09-25T12:05:00.000Z",
       severity: "ok",
-      readings: [{ field, value: rh, unit: "%" }],
+      readings: [{ field, value: rh, unit }],
     },
     recentSensorSnapshotAnnotation: {
-      line: `[source=manual, trust=medium] ${field}=${rh} %`,
+      line: `[source=manual, trust=medium] ${field}=${rh} ${unit}`,
       source: "manual",
       stale: false,
       trust: "medium",
@@ -68,4 +68,17 @@ Deno.test("RH 95% sent as the alias rh is graded as humidity", () => {
   assertEquals(graded.recentSensorSnapshotAnnotation?.safetyNotes, [
     "Current humidity 95% is above the flower target range (40–55%). Do not describe the environment as stable or healthy.",
   ]);
+});
+
+// Codex review on #1683 (round 19): grounding reads a canonical field in its
+// declared unit, so `temperature_c` 25 in °F is −3.9 °C and must be graded so.
+Deno.test("temperature_c 25 declared in °F is graded as -3.9 °C, as grounding reads it", () => {
+  const graded = serverGrade(packet(25, "temperature_c", "°F"));
+  assertEquals(graded.recentSensorSnapshot?.severity, "warning");
+  const notes = graded.recentSensorSnapshotAnnotation?.safetyNotes ?? [];
+  assertEquals(notes.length, 1);
+  assertEquals(
+    notes[0].startsWith("Current air temperature -3.9°C is below the flower target range "),
+    true,
+  );
 });

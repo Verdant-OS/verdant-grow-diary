@@ -514,4 +514,40 @@ describe("Package + docs wiring", () => {
       expect(block).toContain("E2E_FIXTURE_EXPECTED_PLANT_NAME");
     }
   });
+
+  it("README direct local smoke snippets name a host the fixture guard accepts and the dev server serves", () => {
+    // QA 2026-09-24 (#1683): two snippets still used the retired published
+    // Lovable host, which answers HTTP 404 "No Lovable project found at this
+    // address". The obvious swap, verdantgrowdiary.com, is refused by
+    // validateFixtureEnv, so each snippet's values go through the real guard.
+    // Two more set E2E_BASE_URL to localhost:5173 and then ran a bare
+    // `bun run dev`, which the Lovable preset binds to [::]:8080 — nothing
+    // answered on 5173.
+    const RETIRED_LOVABLE_HOST = "verdantgrowdiary-com.lovable.app";
+    const readme = read("e2e/README.md");
+    const directSmokeBlocks = [...readme.matchAll(/```(?:bash|powershell)\r?\n([\s\S]*?)```/g)]
+      .map((match) => match[1])
+      .filter((block) => /(?:^|\r?\n)bun run e2e:quicklog-smoke\r?\n?$/.test(block));
+
+    expect(directSmokeBlocks).toHaveLength(4);
+    for (const block of directSmokeBlocks) {
+      const env: Record<string, string> = {};
+      for (const m of block.matchAll(/(?:export\s+|\$env:)(E2E_[A-Z0-9_]+)\s*=\s*"([^"]*)"/g)) {
+        env[m[1]] = m[2];
+      }
+      expect(validateFixtureEnv(env).errors, block).toEqual([]);
+      const base = new URL(env.E2E_BASE_URL);
+      // One origin for both: the signed-in session lives in that origin's
+      // sessionStorage.
+      expect(new URL(env.E2E_GROW_1_PLANT_URL).origin, block).toBe(base.origin);
+      expect(base.hostname, block).not.toBe(RETIRED_LOVABLE_HOST);
+      // A snippet that starts the dev server must start it on E2E_BASE_URL.
+      const devCommand = block.match(/^bun run dev\b(.*)$/m);
+      if (devCommand) {
+        const host = devCommand[1].match(/--host\s+(\S+)/)?.[1];
+        const port = devCommand[1].match(/--port\s+(\d+)/)?.[1];
+        expect(`http://${host}:${port}`, block).toBe(base.origin);
+      }
+    }
+  });
 });

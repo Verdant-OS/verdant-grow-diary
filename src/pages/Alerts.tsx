@@ -1,5 +1,8 @@
 import { useId, useMemo, useState } from "react";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
+import AlertReasonText from "@/components/AlertReasonText";
+import { usePlants } from "@/hooks/use-plants";
+import { ALERT_LIST_MANUAL_RESOLUTION_NOTE } from "@/lib/alertReasonDisplayRules";
 import { Link } from "@/lib/react-router-compat";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
@@ -24,6 +27,7 @@ import AlertsContextHeaderForGrow from "@/components/AlertsContextHeaderForGrow"
 import AlertsEmptyStateSnapshotCta from "@/components/AlertsEmptyStateSnapshotCta";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import { pickAlertsGrowContext } from "@/lib/alertFreshnessContext";
+import { plantsForAlertPersistence } from "@/lib/alertPlantStageScopeRules";
 import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
 import { deriveAlertReadingSource } from "@/lib/alertReadingSourceRules";
 import { Badge } from "@/components/ui/badge";
@@ -114,6 +118,15 @@ export default function Alerts() {
   const stageByGrow = new Map<string, string | null>(
     grows.map((g) => [g.id, (g as { stage?: string | null }).stage ?? null]),
   );
+  // Plant stages count toward the alert stage (QA 2026-09-24, BUG-006). Each
+  // alert component keeps the plants that resolve to its grow, by grow_id or
+  // through the grow's tents (growAttributionRules). The header shows the
+  // cached stages through a failed refresh; persistence needs a current,
+  // successful read, so a pending or failed read (`null`) holds it back
+  // (Codex review on #1683).
+  const plantsQuery = usePlants();
+  const plantsForAlertStage = plantsQuery.data ?? null;
+  const plantsForPersistence = plantsForAlertPersistence(plantsQuery);
 
   const headerStage = scopedGrowId ? (stageByGrow.get(scopedGrowId) ?? null) : null;
 
@@ -223,7 +236,12 @@ export default function Alerts() {
       {/* Side-effect only: evaluate latest valid snapshot vs grow targets
           and persist breaches into public.alerts. Renders nothing. */}
       {persistGrowIds.map((gid) => (
-        <AlertsAutoPersistForGrow key={gid} growId={gid} stage={stageByGrow.get(gid) ?? null} />
+        <AlertsAutoPersistForGrow
+          key={gid}
+          growId={gid}
+          stage={stageByGrow.get(gid) ?? null}
+          plants={plantsForPersistence}
+        />
       ))}
       <GrowBreadcrumbs
         growId={urlGrowId}
@@ -263,6 +281,7 @@ export default function Alerts() {
           growId={headerContext.growId}
           growName={headerContext.growName}
           stage={headerContext.stage}
+          plants={plantsForAlertStage}
           isFallback={headerContext.isFallback}
           hasOpenAlerts={growIdsWithOpenAlerts.includes(headerContext.growId)}
         />
@@ -428,6 +447,14 @@ export default function Alerts() {
                   {group.label}{" "}
                   <span className="text-xs text-muted-foreground">{items.length}</span>
                 </h2>
+                {group.key === "open" ? (
+                  <p
+                    className="text-xs text-muted-foreground mb-2"
+                    data-testid="alerts-open-manual-resolution-note"
+                  >
+                    {ALERT_LIST_MANUAL_RESOLUTION_NOTE}
+                  </p>
+                ) : null}
                 <ul className="space-y-2">
                   {items.map((a) => (
                     <AlertCard
@@ -581,7 +608,7 @@ function AlertCard({
             {seenLabel}
           </time>
         </div>
-        <p className="text-xs text-muted-foreground">{a.reason}</p>
+        <AlertReasonText reason={a.reason} className="text-xs text-muted-foreground" />
         <AlertTargetContext
           tentId={targetInput.tentId}
           plantId={targetInput.plantId}

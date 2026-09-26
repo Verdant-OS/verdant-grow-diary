@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 import { toast } from "sonner";
+import { buildManualReadingChips } from "@/lib/quickLogManualReadingChipsViewModel";
 import {
   Activity,
   AlertTriangle,
@@ -129,17 +130,8 @@ function buildRecentDiaryPdfInput(
   };
 }
 
-function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
-  const m = row.manualHandheld;
-  if (!m) return null;
-  const items: Array<{ label: string; value: string }> = [];
-  if (m.inputPh) items.push({ label: "Input pH", value: m.inputPh });
-  if (m.inputEc) items.push({ label: "Input EC/PPM", value: m.inputEc });
-  if (m.runoffPh) items.push({ label: "Runoff pH", value: m.runoffPh });
-  if (m.runoffEc) items.push({ label: "Runoff EC/PPM", value: m.runoffEc });
-  if (m.ppfdCanopy) items.push({ label: "PPFD canopy", value: m.ppfdCanopy });
-  if (m.lightDistance) items.push({ label: "Light distance", value: m.lightDistance });
-  if (m.other) m.other.forEach((o) => items.push(o));
+export function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
+  const items = buildManualReadingChips(row.manualHandheld);
   if (items.length === 0) return null;
   return (
     <div
@@ -157,10 +149,16 @@ function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
         {items.map((it, i) => (
           <span
             key={`${row.id}-mh-${i}`}
-            className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background/40 px-2 py-1 text-xs text-muted-foreground"
+            data-invalid={it.invalid ? "true" : undefined}
+            className={
+              it.invalid
+                ? "inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-200"
+                : "inline-flex items-center gap-1 rounded-full border border-border/50 bg-background/40 px-2 py-1 text-xs text-muted-foreground"
+            }
           >
             <span className="font-medium text-foreground/80">{it.label}</span>
             <span>{it.value}</span>
+            {it.invalid ? <span>· outside valid range, not used</span> : null}
           </span>
         ))}
       </div>

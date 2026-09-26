@@ -126,7 +126,7 @@ export function buildStartRoomTentPayload(
 export function buildStartRoomPlantPayload(
   form: StartYourRoomForm,
   ids: StartYourRoomIds,
-): { name: string; grow_id: string; tent_id: string; stage: string; health: string } | null {
+): { name: string; grow_id: string; tent_id: string; stage: string } | null {
   if (!canProceedPlant(form, ids) || !ids.growId || !ids.tentId) return null;
   const stage = trimName(form.plantStage) || "seedling";
   return {
@@ -134,7 +134,8 @@ export function buildStartRoomPlantPayload(
     grow_id: ids.growId,
     tent_id: ids.tentId,
     stage,
-    health: "healthy",
+    // No health: a new plant is not assessed; the column default applies
+    // (QA 2026-09-24, BUG-009).
   };
 }
 

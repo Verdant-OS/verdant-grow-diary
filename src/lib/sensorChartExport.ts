@@ -6,7 +6,7 @@
  * No I/O, no React. Deterministic.
  */
 import { isCurrentStateStale } from "@/lib/sensorTruthCanon";
-import { refreshSensorReadingStatus } from "@/lib/growAdapters";
+import { leastTrustedStatus, refreshSensorReadingStatus } from "@/lib/growAdapters";
 import type { SensorReading } from "@/mock";
 import { readObservedSensorMetric } from "@/lib/sensorReadingSelectionRules";
 
@@ -46,17 +46,31 @@ function csvEscape(value: string | number | null | undefined): string {
  * Readings whose retained freshness inputs are all current-state evidence
  * (live or manual) are recomputed first, so a grouped live + manual row ages on
  * its live window rather than the manual window its merged `source` implies.
- * Any reading carrying a CSV (historical) time source keeps its supplied status:
- * CSV history is never aged as current state. Readings without retained inputs
+ * A reading that mixes current-state evidence with CSV history ages its
+ * live/manual inputs only and keeps the less trusted of that result and its
+ * supplied status, so a stale live component is never exported as usable and
+ * nothing is promoted. CSV-only readings keep their supplied status: CSV
+ * history is never aged as current state. Readings without retained inputs
  * fall back to the source-window check below.
  */
-function isCurrentStateFreshness(reading: SensorReading): boolean {
+function isCurrentStateSource(source: string): boolean {
+  return source === "live" || source === "manual";
+}
+
+function refreshForExport(reading: SensorReading, now: Date): SensorReading {
   const timeSources = reading.freshness?.timeSources;
-  return (
-    Array.isArray(timeSources) &&
-    timeSources.length > 0 &&
-    timeSources.every((source) => source === "live" || source === "manual")
+  if (!reading.freshness || !Array.isArray(timeSources) || timeSources.length === 0) {
+    return reading;
+  }
+  const current = timeSources.filter(isCurrentStateSource);
+  if (current.length === 0) return reading;
+  if (current.length === timeSources.length) return refreshSensorReadingStatus(reading, now);
+  const aged = refreshSensorReadingStatus(
+    { ...reading, freshness: { ...reading.freshness, timeSources: current } },
+    now,
   );
+  const status = leastTrustedStatus(reading.status, aged.status);
+  return status === reading.status ? reading : { ...reading, status };
 }
 
 export function buildSensorReadingsCsv(
@@ -65,9 +79,7 @@ export function buildSensorReadingsCsv(
 ): string {
   const clocked =
     nowMs !== undefined && Number.isFinite(nowMs)
-      ? readings.map((r) =>
-          isCurrentStateFreshness(r) ? refreshSensorReadingStatus(r, new Date(nowMs)) : r,
-        )
+      ? readings.map((r) => refreshForExport(r, new Date(nowMs)))
       : readings;
   const rows = clocked.map((r) =>
     [

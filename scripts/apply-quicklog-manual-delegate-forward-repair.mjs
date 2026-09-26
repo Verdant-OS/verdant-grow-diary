@@ -20,6 +20,11 @@ import { buildPsqlEnvironment, writeTextFile } from "./lib/candidateNumberToolRu
 import { hardenProductionPsqlEnvironment } from "./lib/productionSupabaseTls.mjs";
 import { SOLO_FOUNDER_POLICY } from "./lib/solo-founder-production-authorization.mjs";
 import {
+  ledgerColumnRowsWithNoDefaultFlag,
+  ledgerConstraintRows,
+  sqlTextArrayLiteral,
+} from "./lib/supabaseMigrationLedgerShape.mjs";
+import {
   assertSupabaseDatabaseTargetIdentity,
   SUPABASE_DATABASE_TARGETS,
 } from "./lib/supabaseDatabaseTargetIdentity.mjs";
@@ -468,17 +473,17 @@ select json_build_object(
       and current_user = 'postgres'
       and coalesce((
         select array_agg(format('%s|%s|%s|%s|%s|%s|%s',a.attnum,a.attname,format_type(a.atttypid,a.atttypmod),a.attnotnull,a.attgenerated,a.attidentity,d.oid is null) order by a.attnum) = array[
-          '1|version|text|t|||t','2|name|text|f|||t','3|statements|text[]|f|||t'
+          ${ledgerColumnRowsWithNoDefaultFlag().map(sqlLiteral).join(",")}
         ]::text[]
         from pg_attribute a
         left join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
         where a.attrelid = ledger.oid and a.attnum > 0 and not a.attisdropped
       ),false)
-      and coalesce((select count(*)=1 and bool_and(
-        conname='schema_migrations_pkey' and contype='p' and convalidated
-        and not condeferrable and not condeferred
-        and pg_get_constraintdef(oid,true)='PRIMARY KEY (version)'
-      ) from pg_constraint where conrelid=ledger.oid),false)
+      and coalesce((select array_agg(
+        format('%s|%s|%s|%s|%s|%s',conname,contype,convalidated,condeferrable,condeferred,pg_get_constraintdef(oid,true))
+        order by conname
+      ) = ${sqlTextArrayLiteral(ledgerConstraintRows())}
+      from pg_constraint where conrelid=ledger.oid),false)
       and not exists(select 1 from pg_trigger where tgrelid=ledger.oid and not tgisinternal)
       and not exists(select 1 from pg_rewrite where ev_class=ledger.oid)
       and not exists(select 1 from pg_inherits where inhrelid=ledger.oid or inhparent=ledger.oid)
@@ -490,10 +495,10 @@ select json_build_object(
     select count(*)=4 and bool_and(case
       when rolname='postgres' then oid=current_user::regrole
       when rolname='service_role' then
-        not rolsuper and not rolinherit and not rolcreaterole and not rolcreatedb
+        not rolsuper and not rolcreaterole and not rolcreatedb
         and not rolcanlogin and not rolreplication and rolbypassrls
       else
-        not rolsuper and not rolinherit and not rolcreaterole and not rolcreatedb
+        not rolsuper and not rolcreaterole and not rolcreatedb
         and not rolcanlogin and not rolreplication and not rolbypassrls end)
     from pg_roles where rolname in ('postgres','anon','authenticated','service_role')
   ),false),

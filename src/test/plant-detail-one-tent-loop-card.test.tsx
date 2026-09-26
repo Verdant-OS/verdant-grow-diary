@@ -10,7 +10,7 @@ import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 // Spy on fetch to prove the card itself triggers no network calls.
-const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((() => {
   throw new Error("fetch should not be called by the next-step card");
 }) as never);
 

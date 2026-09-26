@@ -143,6 +143,23 @@ Deno.test("Lovable editor preview receives its exact CORS origin", async () => {
   assertEquals(response.headers.get("access-control-allow-origin"), origin);
 });
 
+Deno.test("retired Lovable host gets the canonical origin, not its own", async () => {
+  // QA 2026-09-24 (#1683): the old published Lovable host answers HTTP 404
+  // "No Lovable project found at this address" and was dropped from the
+  // allow-list. Built from parts so the "no dead host in supabase/functions"
+  // guard stays meaningful.
+  const origin = "https://" + ["verdantgrowdiary-com", "lovable", "app"].join(".");
+  const response = await handleOperatorGgsRealPayloadCommit(
+    new Request("https://example.test", {
+      method: "OPTIONS",
+      headers: { origin },
+    }),
+    deps().value,
+  );
+  assertEquals(response.status, 204);
+  assertEquals(response.headers.get("access-control-allow-origin"), "https://verdantgrowdiary.com");
+});
+
 Deno.test("missing JWT is rejected before auth dependencies", async () => {
   let touched = false;
   const d = deps({

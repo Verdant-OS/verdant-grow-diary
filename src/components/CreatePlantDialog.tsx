@@ -26,7 +26,20 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "@/lib/react-router-compat";
 import CreateTentDialog, { type CreatedTent } from "@/components/CreateTentDialog";
+import {
+  plantStartDateInputMax,
+  plantStartDateInputToIso,
+  plantStartDateSaveMessage,
+} from "@/lib/plantStartDateRules";
 import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
+import {
+  PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE,
+  PLANT_HEALTH_NOT_ASSESSED_LABEL,
+  PLANT_HEALTH_NOT_ASSESSED_OPTION,
+  buildPlantHealthCreateInsert,
+  isPlantHealthClearRejected,
+  plantHealthFromSelectValue,
+} from "@/lib/plantHealthRules";
 import {
   primeConfirmedPlantCaches,
   reaffirmConfirmedPlantCacheMeta,
@@ -94,7 +107,8 @@ function emptyForm(tentId: string) {
     strain: "",
     tent_id: tentId,
     stage: "seedling",
-    health: "healthy",
+    // Not assessed until the grower picks a value (QA 2026-09-24, BUG-009).
+    health: "",
     started_at: "",
     plant_type: "unknown",
   };
@@ -395,6 +409,18 @@ export default function CreatePlantDialog({
       return;
     }
 
+    // A start date is a calendar date: save the picked day at local midnight
+    // and reject future dates before any write (QA 2026-09-24, BUG-004/005).
+    let startedAtIso: string | null = null;
+    if (form.started_at) {
+      const startedAt = plantStartDateInputToIso(form.started_at, new Date());
+      if (startedAt.ok !== true) {
+        toast.error(plantStartDateSaveMessage(startedAt.reason));
+        return;
+      }
+      startedAtIso = startedAt.iso;
+    }
+
     handoffSuppressedRef.current = false;
     createInFlightRef.current = true;
     setBusy(true);
@@ -406,12 +432,14 @@ export default function CreatePlantDialog({
         name: form.name.trim(),
         strain: trimmedStrain || null,
         stage: form.stage,
-        health: form.health,
+        // Always explicit, "unknown" when not assessed: the column default is
+        // "healthy" until 20260924120000 is applied (QA 2026-09-24, BUG-009).
+        ...buildPlantHealthCreateInsert(form.health),
         plant_type: form.plant_type,
         grow_id: targetGrowId,
       };
       if (form.tent_id && form.tent_id !== "none") payload.tent_id = form.tent_id;
-      if (form.started_at) payload.started_at = new Date(form.started_at).toISOString();
+      if (startedAtIso) payload.started_at = startedAtIso;
 
       const validation = validatePlantInsertPayload(payload);
       if (!validation.ok || !validation.value) {
@@ -473,7 +501,13 @@ export default function CreatePlantDialog({
           typeof (error as { message?: unknown }).message === "string"
             ? (error as { message: string }).message
             : "Plant could not be created";
-        toast.error(message);
+        // Before 20260924120000 the trigger rejects "unknown" and nothing is
+        // written; the form stays open so the grower can pick a health value.
+        toast.error(
+          isPlantHealthClearRejected(message)
+            ? PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE
+            : message,
+        );
         return;
       }
       // The insert is now durable. Record that fact before any cache refresh can
@@ -894,12 +928,17 @@ export default function CreatePlantDialog({
                   <Label>Health</Label>
                   <Select
                     value={form.health}
-                    onValueChange={(v) => setForm({ ...form, health: v })}
+                    onValueChange={(v) =>
+                      setForm({ ...form, health: plantHealthFromSelectValue(v) })
+                    }
                   >
-                    <SelectTrigger>
-                      <SelectValue />
+                    <SelectTrigger data-testid="create-plant-health">
+                      <SelectValue placeholder={PLANT_HEALTH_NOT_ASSESSED_LABEL} />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={PLANT_HEALTH_NOT_ASSESSED_OPTION}>
+                        {PLANT_HEALTH_NOT_ASSESSED_LABEL}
+                      </SelectItem>
                       {HEALTH.map((h) => (
                         <SelectItem key={h.value} value={h.value}>
                           {h.label}
@@ -912,6 +951,7 @@ export default function CreatePlantDialog({
                   <Label>Started at (optional)</Label>
                   <Input
                     type="date"
+                    max={plantStartDateInputMax(new Date())}
                     value={form.started_at}
                     onChange={(e) => setForm({ ...form, started_at: e.target.value })}
                   />

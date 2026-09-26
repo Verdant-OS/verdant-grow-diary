@@ -14,6 +14,8 @@ import { Plus, Trash2 } from "lucide-react";
 import {
   FEEDING_FORM_PRODUCT_CAP,
   addFeedingProductRow,
+  feedingProductUnitDisplay,
+  feedingProductUnitFromInput,
   removeFeedingProductRow,
   type QuickLogFeedingFormState,
 } from "@/lib/quickLogFeedingFormViewModel";
@@ -185,9 +187,11 @@ export default function QuickLogFeedingForm({
             />
             <Input
               aria-label={`Product ${idx + 1} unit`}
-              value={row.unit}
+              value={feedingProductUnitDisplay(row.unit)}
               disabled={disabled}
-              onChange={(e) => setProductField(idx, { unit: e.target.value })}
+              onChange={(e) =>
+                setProductField(idx, { unit: feedingProductUnitFromInput(e.target.value) })
+              }
               placeholder="Unit"
             />
             <Button

@@ -258,8 +258,9 @@ describe("Quick Log manual delegate forward-repair PostgreSQL 15 runtime gate", 
     }
     expect(source).toContain("requireDeliveryPreflightBlocked");
     expect(source).toContain('requireDeliveryPreflightStatus(label, "apply"');
+    // Production's service_role is INHERIT and BYPASSRLS; the scaffold reproduces it.
     expect(source).toContain(
-      "create role service_role nologin nosuperuser nocreatedb nocreaterole noinherit noreplication bypassrls",
+      "create role service_role nologin nosuperuser nocreatedb nocreaterole inherit noreplication bypassrls",
     );
     expect(source).toContain("buildLedgerInsertSql");
     expect(source).toContain("ledger_insert_mutated");

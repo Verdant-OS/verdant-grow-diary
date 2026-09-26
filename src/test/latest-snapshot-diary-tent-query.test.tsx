@@ -185,6 +185,47 @@ describe("latest snapshot diary query scope before bounded selection", () => {
     });
   });
 
+  it("pages past metric-empty diary envelopes to the older usable manual snapshot", async () => {
+    io.rows = [
+      diary(),
+      ...Array.from({ length: 25 }, (_, index) =>
+        diary({
+          id: `empty-metrics-${index}`,
+          entry_at: new Date(Date.parse(savedAt) + (index + 1) * 60_000).toISOString(),
+          details: { sensor_snapshot: { metrics: { temperature: "not-a-reading" } } },
+        }),
+      ),
+    ];
+    const { result } = mount();
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.snapshot).toMatchObject({
+      source: "manual",
+      temp: 25,
+      tent_id: "tent-a",
+      diary_evidence_ref: { id: "saved-manual" },
+    });
+    expect(io.diaryReads).toBe(2);
+  });
+
+  it("uses a valid manual envelope on the same row after its diary snapshot is metric-empty", async () => {
+    io.rows = [
+      diary({
+        details: {
+          sensor_snapshot: {},
+          manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 55 },
+        },
+      }),
+    ];
+    const { result } = mount();
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.snapshot).toMatchObject({
+      source: "manual",
+      temp: 25,
+      tent_id: "tent-a",
+      diary_evidence_ref: { id: "saved-manual" },
+    });
+  });
+
   it("retrieves an older manual after 25 newer plain notes in the same tent", async () => {
     io.rows = [
       diary(),

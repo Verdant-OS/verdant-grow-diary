@@ -30,6 +30,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
   EMPTY_SNAPSHOT,
+  hasFiniteSnapshotMetric,
   isSnapshotStale,
   type SensorSnapshot,
   snapshotFromDiary,
@@ -177,7 +178,7 @@ export function useLatestSensorSnapshot(
               row.entry_at,
               details.sensor_snapshot as Record<string, unknown> | undefined,
             );
-            if (snap) {
+            if (hasFiniteSnapshotMetric(snap)) {
               snap.tent_id = rowTentInScope;
               return preferNewer(staleSensorCandidate, snap);
             }

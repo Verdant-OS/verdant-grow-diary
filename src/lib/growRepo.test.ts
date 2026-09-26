@@ -203,6 +203,19 @@ describe("fetchPlants", () => {
     expect(plants[0]?.id).toBe(PLANT_UUID);
   });
 
+  it("fails a grow-scoped read whose tent lookup fails, instead of returning a partial list", async () => {
+    // Codex review on #1683: the partial list dropped legacy plants attributed
+    // to the grow only through its tents, yet read as current, so the Dashboard
+    // could persist an alert against a stage those plants would have changed.
+    resultQueue = [
+      { data: null, error: { message: "tents unavailable" } },
+      { data: [validPlantRow], error: null },
+    ];
+    await expect(fetchPlants(undefined, GROW_UUID)).rejects.toThrow(
+      /fetchPlants.*tents unavailable/,
+    );
+  });
+
   it("degrades grow-scoped filter to grow_id only when tent rollup is empty", async () => {
     resultQueue = [
       { data: [], error: null },

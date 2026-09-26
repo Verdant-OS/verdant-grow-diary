@@ -17,6 +17,12 @@ export const CONSISTENCY_WINDOW_DAYS = 7;
 export interface ConsistencyInput extends Omit<DailyHistoryInput, "days"> {
   /** Window in days for the "X of last N days" metric. Defaults to 7. */
   windowDays?: number;
+  /**
+   * When the plant started being tracked in Verdant (its `created_at`). Days
+   * before this local calendar day with no activity are "not tracked", never
+   * "missed" (QA 2026-09-24, BUG-013). Omitted → every window day is tracked.
+   */
+  trackingStartedAt?: string | null;
 }
 
 /**
@@ -42,6 +48,21 @@ export interface ConsistencySummary {
   tentLevelDays: number;
   /** Day rows newest-first (today index 0). */
   rows: DailyHistoryRow[];
+  /** Local `YYYY-MM-DD` tracking start; present only when one was supplied. */
+  trackingStartDayKey?: string;
+  /** Window days before tracking started with no activity; present with the key. */
+  untrackedDays?: number;
+}
+
+function localDayKey(d: Date): string {
+  const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function resolveTrackingStartDayKey(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? localDayKey(new Date(ms)) : null;
 }
 
 /**
@@ -86,10 +107,15 @@ export function buildDailyGrowCheckConsistency(input: ConsistencyInput): Consist
     combineWindowMinutes: input.combineWindowMinutes,
   });
 
+  const trackingStartDayKey = resolveTrackingStartDayKey(input.trackingStartedAt);
   let checkedDays = 0;
   let tentLevelDays = 0;
+  let untrackedDays = 0;
   for (const r of rows) {
-    if (ACTIVE_KINDS.has(r.kind)) checkedDays += 1;
+    const active = ACTIVE_KINDS.has(r.kind);
+    if (active) checkedDays += 1;
+    // YYYY-MM-DD keys compare correctly as strings.
+    else if (trackingStartDayKey && r.dayKey < trackingStartDayKey) untrackedDays += 1;
     if (r.tentLevel) tentLevelDays += 1;
   }
 
@@ -115,12 +141,13 @@ export function buildDailyGrowCheckConsistency(input: ConsistencyInput): Consist
     windowDays,
     checkedDays,
     currentStreak,
-    missedDays: windowDays - checkedDays,
+    missedDays: windowDays - checkedDays - untrackedDays,
     todayHasActivity,
     todayMethod,
     hasAnyActivity: checkedDays > 0,
     tentLevelDays,
     rows,
+    ...(trackingStartDayKey ? { trackingStartDayKey, untrackedDays } : {}),
   };
 }
 
@@ -130,9 +157,10 @@ export function buildDailyGrowCheckConsistency(input: ConsistencyInput): Consist
  *  - "sensor": only a current-tent manual sensor snapshot counted
  *  - "both":   both kinds counted
  *  - "missed": nothing counted
+ *  - "not-tracked": nothing counted, and the day precedes tracking start
  * Never implies plant health, completion, or quality.
  */
-export type DailyMethodBreakdownMethod = "note" | "sensor" | "both" | "missed";
+export type DailyMethodBreakdownMethod = "note" | "sensor" | "both" | "missed" | "not-tracked";
 
 export interface DailyMethodBreakdownDay {
   dayKey: string;
@@ -147,14 +175,16 @@ export type DailyMethodBreakdownOrder = "oldest-first" | "newest-first";
  * ConsistencySummary. Pure — no fetching, no writes.
  */
 export function buildDailyMethodBreakdown(
-  summary: Pick<ConsistencySummary, "rows">,
+  summary: Pick<ConsistencySummary, "rows" | "trackingStartDayKey">,
   order: DailyMethodBreakdownOrder = "oldest-first",
 ): DailyMethodBreakdownDay[] {
+  const trackingStart = summary.trackingStartDayKey ?? null;
   const days: DailyMethodBreakdownDay[] = summary.rows.map((r) => {
     let method: DailyMethodBreakdownMethod;
     if (r.hasManual && r.hasQuickLog) method = "both";
     else if (r.hasManual) method = "sensor";
     else if (r.hasQuickLog) method = "note";
+    else if (trackingStart && r.dayKey < trackingStart) method = "not-tracked";
     else method = "missed";
     return { dayKey: r.dayKey, label: r.label, method };
   });
@@ -171,6 +201,8 @@ export function formatDailyMethodBreakdownLabel(method: DailyMethodBreakdownMeth
       return "Sensor";
     case "both":
       return "Both";
+    case "not-tracked":
+      return "Not tracked";
     case "missed":
     default:
       return "Missed";

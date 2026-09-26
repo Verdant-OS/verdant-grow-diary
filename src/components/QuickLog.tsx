@@ -507,7 +507,10 @@ export default function QuickLog({
   // child. Presenter state complements this ref but never replaces it.
   const saveInFlightRef = useRef(false);
   const saveLocked = busy || childSaveBusy;
-  const recoveryLocked = starterWaterPending !== null || starterWaterStorageBlocked;
+  // A known unresolved Water locks the dialog. If storage is unavailable
+  // before any known attempt, only Water dispatch needs the storage fence;
+  // Note and other activities have independent receipts and may still save.
+  const recoveryLocked = starterWaterPending !== null;
   const isMainDraftMutationLocked = useCallback(
     () => saveInFlightRef.current || saveLocked || recoveryLocked,
     [saveLocked, recoveryLocked],
@@ -1263,10 +1266,16 @@ export default function QuickLog({
         setSaveError(STARTER_WATER_RECOVERY_PENDING);
         return;
       }
-      if (recovery.status === "blocked") {
+      const intendedEventType = eventTypeUserTouchedRef.current
+        ? eventType
+        : (prefill?.eventType ?? eventType);
+      if (recovery.status === "blocked" && intendedEventType === "watering") {
         setStarterWaterStorageBlocked(true);
         setSaveError(STARTER_WATER_RECOVERY_UNAVAILABLE);
         return;
+      }
+      if (recovery.status === "empty" && starterWaterStorageBlocked) {
+        setStarterWaterStorageBlocked(false);
       }
     }
     if (saveInFlightRef.current || saveLocked || savedTarget) return;
@@ -1510,6 +1519,7 @@ export default function QuickLog({
           return;
         }
         waterRecord = claim.record;
+        setStarterWaterStorageBlocked(false);
         setStarterWaterPending(waterRecord);
         // Dispatch the serialized copy. It is the exact payload every later
         // retry will replay, including the target, timestamp and key.
@@ -1910,8 +1920,12 @@ export default function QuickLog({
           saveBlocked={saveLocked || recoveryLocked}
           isSaveBlocked={isSaveInFlight}
           onBeforeStructuredWaterOpen={() => {
-            if (recoveryLocked) {
-              setSaveError(STARTER_WATER_RECOVERY_PENDING);
+            if (recoveryLocked || starterWaterStorageBlocked) {
+              setSaveError(
+                recoveryLocked
+                  ? STARTER_WATER_RECOVERY_PENDING
+                  : STARTER_WATER_RECOVERY_UNAVAILABLE,
+              );
               return;
             }
             onOpenChange(false);
@@ -3580,7 +3594,7 @@ export default function QuickLog({
               </div>
             )}
           </fieldset>
-          {recoveryLocked && (
+          {(recoveryLocked || starterWaterStorageBlocked) && (
             <div
               data-testid="quick-log-starter-water-recovery"
               role="alert"

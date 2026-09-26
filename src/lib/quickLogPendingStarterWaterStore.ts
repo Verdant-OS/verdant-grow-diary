@@ -19,7 +19,7 @@ export interface PendingStarterWater {
 export const STARTER_WATER_RECOVERY_PENDING =
   "An earlier Watering may already be saved. Retry that exact Watering before starting another; edits on this form will not be sent.";
 export const STARTER_WATER_RECOVERY_UNAVAILABLE =
-  "Watering recovery storage cannot be verified. Restore storage access and retry the original Watering before logging another.";
+  "Watering recovery storage cannot be verified. Watering is paused until storage access returns; other log types can still be saved.";
 export const STARTER_WATER_RECOVERY_CLEAR_FAILED =
   "Your Watering is saved, but recovery could not be cleared. Retry recovery before logging another Watering.";
 

@@ -193,7 +193,32 @@ describe("legacy public-starter Water uncertain receipt", () => {
     fireEvent.click(screen.getByTestId("quick-log-save"));
     await screen.findByTestId("quick-log-starter-water-recovery");
     expect(saveMock).not.toHaveBeenCalled();
-    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(screen.getByTestId("quick-log-save")).not.toBeDisabled();
     expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).not.toBeNull();
+  });
+
+  it("keeps non-Water notes available when Water recovery storage is denied", async () => {
+    saveMock.mockResolvedValue({
+      ok: true,
+      growEventId: "11111111-1111-4111-8111-111111111111",
+    });
+    renderWithClient(
+      <QuickLog
+        open
+        onOpenChange={vi.fn()}
+        prefill={{
+          ...prefill,
+          eventType: "observation",
+          note: "Observation while Water storage is unavailable",
+          wateringVolumeMl: null,
+        }}
+      />,
+    );
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("storage denied");
+    });
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(saveMock.mock.calls[0][0].p_action).toBe("note");
   });
 });

@@ -92,10 +92,13 @@ code is written in this slice.
   the apex and its headers are served (Appendix A.6); the other six redirects were not probed. The
   contract's §12 row that rejected treating it as production configuration rested on a measurement
   made under the other publisher; it is amended in this slice to the durable form.
-- **GitHub Actions publishes nothing.** It gates (35 required contexts in the 2026-08-10 ruleset
-  snapshot; the live ruleset is `NOT_MEASURED`), tags each deploy-branch push that carries no tag
-  yet (`auto-tag-release`, with a `Tree-Hash:` annotation; §5.1), and probes after the fact. No
-  workflow deploys the frontend or the edge functions (re-grepped at the tip: zero deploy steps).
+- **GitHub Actions publishes no frontend or edge code.** It gates (35 required contexts in the
+  2026-08-10 ruleset snapshot; the live ruleset is `NOT_MEASURED`), tags each deploy-branch push
+  that carries no tag yet (`auto-tag-release`, with a `Tree-Hash:` annotation; §5.1), and probes
+  the live host (§5.5). No workflow deploys the frontend or the edge functions (re-grepped at the
+  tip: zero deploy steps). It **does** hold a production write path for the database: ten
+  `workflow_dispatch`-only `apply-*.yml` workflows apply migrations to production when an operator
+  runs them (§5.4), so an audit of production changes includes Actions runs.
 - **Edge functions and the database stay `NOT_MEASURED` / `BLOCKED`.** No Actions path deploys
   edge functions; who does is not measured, and the Supabase tool attached to this session reaches
   only the sandbox project. Migrations reach production through an operator-dispatched workflow

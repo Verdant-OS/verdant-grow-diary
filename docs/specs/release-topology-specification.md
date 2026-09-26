@@ -92,16 +92,18 @@ code is written in this slice.
   enabled for the project then. It is configured as 10 % for five minutes, then 100 %, advancing
   automatically. Of the nine deploy-branch production builds created after that (one `ERROR`, eight
   `READY`), exactly two were rolled out. Each of those two rollouts has a start event: the 02:11
-  start was an API call, and the 06:15 start carries no actor attribution. The other six builds
-  were neither a rollout's canary nor queued for one; the latest is the tip `d510eb56`
-  (Appendix C). Whether a build can start a rollout on its own is `NOT_MEASURED`. At 15:30 UTC
-  every production hostname served the `408c966c` build, so the release state is **`FAIL`** under
-  D-RT-12. That build's commit, and `4ddb2322`'s, have **no merge-queue provenance**: both PRs were
-  merged directly, so M4 classifies both builds as out-of-band publishes (Appendix C.2). The files
-  that differ between `408c966c` and the tip are docs, CI configuration and one e2e spec; none is under
-  `src/`. This amendment models the rollout as a fifth promotion path (§5.7), makes an `ACTIVE`
-  rollout a non-`PASS` state (D-RT-12), makes every rollout action and configuration change a
-  publish action (D-RT-13), and reads the rollout before the hostnames (M10, M11).
+  start was an API call, and the 06:15 start carries no actor attribution. The other six builds were
+  neither a rollout's canary nor queued for one; the latest is the tip `d510eb56` (Appendix C).
+  Whether a build can start a rollout on its own is `NOT_MEASURED`. At 15:30 UTC both platform-owned
+  production hostnames served the `408c966c` build, so the release state is **`FAIL`** under
+  D-RT-12. The apex and `www` bindings named the same build, but their DNS was not re-resolved, so
+  what they served is `NOT_MEASURED` (C.4). That build's commit, and `4ddb2322`'s, have **no
+  merge-queue provenance**: both PRs were merged directly, so M4 classifies both builds as
+  out-of-band publishes (Appendix C.2). The files that differ between `408c966c` and the tip are
+  docs, CI configuration and one e2e spec; none is under `src/`. This amendment models the rollout
+  as a fifth promotion path (§5.7), makes an `ACTIVE` rollout a non-`PASS` state (D-RT-12), makes
+  every rollout action and configuration change a publish action (D-RT-13), and reads the rollout
+  before the hostnames (M10, M11).
 - **The publisher is not who the repository says it is.** `CLAUDE.md`, `docs/codebase-map.md`,
   `README.md`, `scripts/stamp-version.mjs`, `deployment-preview.yml` and `Makefile:77` all name
   Lovable as the production publisher. At the measured instant the apex is published by Vercel.
@@ -1437,7 +1439,7 @@ builds was created, so none could have been queued.
   - **Out-of-band publish.** `4ddb2322` has no merge-queue provenance, so its build is out-of-band
     (M4, M11) even though it is `source: git` on the deploy branch. It was also rolled out.
   - **Out-of-band publish.** `408c966c` has no merge-queue provenance either. **It is the build
-    every production hostname served at C.4.** Whether its squash commit passed the required
+    both platform-owned hostnames served at C.4.** Whether its squash commit passed the required
     contexts anywhere is `NOT_MEASURED`: a PR head's green checks are not the squash commit's.
     Its successor `2ca7b250` was queue-tested on top of it (`pr-1718-408c966c…`), so the tree at
     `408c966c` plus the `#1718` docs did pass the queue once (`inference` that `408c966c`'s code
@@ -1489,22 +1491,31 @@ at which M11 ran completely, not from this read. The two out-of-band publishes t
 M11 findings in their own right. Their actor comes from GitHub's merge record: the owner's account
 merged both PRs directly.
 
-### C.4 What each production hostname served — M10, `get_deployment`, 15:29:57–15:30:09 UTC
+### C.4 What each production hostname served — M10, one read-only pass, about 15:29–15:31 UTC
 
-| Hostname                                         | Deployment      | `target`   | `readyState` | `source` | Ref                  | Commit     |
-| ------------------------------------------------ | --------------- | ---------- | ------------ | -------- | -------------------- | ---------- |
-| `verdantgrowdiary.com`                           | `dpl_FsmTjonj…` | production | `READY`      | git      | `verdant-grow-diary` | `408c966c` |
-| `www.verdantgrowdiary.com`                       | `dpl_FsmTjonj…` | production | `READY`      | git      | `verdant-grow-diary` | `408c966c` |
-| `verdant-grow-diary.vercel.app`                  | `dpl_FsmTjonj…` | production | `READY`      | git      | `verdant-grow-diary` | `408c966c` |
-| `verdant-grow-diary-verdantgrowdiary.vercel.app` | `dpl_FsmTjonj…` | production | `READY`      | git      | `verdant-grow-diary` | `408c966c` |
+| Hostname                                         | Vercel binding (`get_deployment`)                                           | DNS step                    | What it served |
+| ------------------------------------------------ | --------------------------------------------------------------------------- | --------------------------- | -------------- |
+| `verdantgrowdiary.com`                           | `dpl_FsmTjonj…`: production, `READY`, git, `verdant-grow-diary`, `408c966c` | Not re-resolved             | `NOT_MEASURED` |
+| `www.verdantgrowdiary.com`                       | `dpl_FsmTjonj…`: production, `READY`, git, `verdant-grow-diary`, `408c966c` | Not re-resolved             | `NOT_MEASURED` |
+| `verdant-grow-diary.vercel.app`                  | `dpl_FsmTjonj…`: production, `READY`, git, `verdant-grow-diary`, `408c966c` | Not needed (platform-owned) | `408c966c`     |
+| `verdant-grow-diary-verdantgrowdiary.vercel.app` | `dpl_FsmTjonj…`: production, `READY`, git, `verdant-grow-diary`, `408c966c` | Not needed (platform-owned) | `408c966c`     |
 
+- **Order and times.** The reads ran in one read-only pass. `list_project_domains` came first,
+  between about 15:29 and 15:29:57 UTC. The four `get_deployment` calls ran at 15:29:57–15:30:09
+  UTC. `list_promote_aliases` came last, between 15:30:09 and about 15:31 UTC. The exact seconds
+  of the first and last reads were not recorded.
+- **DNS.** M10 resolves each custom hostname's `A`, `AAAA` and `CNAME` before `get_deployment`,
+  because a Vercel binding can outlive a DNS move to another platform. That step was not run
+  here (C.5). So for the apex and `www`, the Vercel binding is recorded but what they served is
+  `NOT_MEASURED`. The two `*.vercel.app` names are platform-owned and need no DNS step.
 - **Domains.** `list_project_domains` (production) returned three verified domains: the apex,
   `www` (a platform `308` to the apex) and `verdant-grow-diary.vercel.app`. The fourth hostname is
   a project alias, not a bound domain. The inventory is otherwise the baseline four.
 - **Promote aliases.** `list_promote_aliases` lists the three bound domains, each `completed`.
-- **Release state: `FAIL` (D-RT-12), in its "built, not rolled out" form.** Every hostname serves
-  one `READY` production Git build, so there is no split. That build is `408c966c`, not the tip
-  `d510eb56`, whose `READY` build (C.2) is neither the canary nor queued (C.1).
+- **Release state: `FAIL` (D-RT-12), in its "built, not rolled out" form.** It rests on the two
+  platform-owned hostnames, which served `408c966c`, not the tip `d510eb56`. The tip's `READY`
+  build (C.2) is neither the canary nor queued (C.1). A `FAIL` needs no bracket (M10), and the
+  apex and `www` being `NOT_MEASURED` cannot turn it into a `PASS`.
 - **Substance.** `git diff --name-only 408c966c d510eb56` lists seven files:
   - `.github/workflows/mocked-e2e-unwired-closure.yml`
   - `README.md`
@@ -1564,12 +1575,12 @@ not measured** from this session and are labelled so. The repository's own descr
 publisher is wrong, and the corrections that need a governance bump are named, not smuggled in.
 
 **At the Rolling Releases amendment (Appendix C)**, the promotion axis had changed shape a third
-time. Since 01:27 UTC on 2026-09-26 it is a staged rollout. Two of eight
-`READY` deploy-branch builds were rolled out, and at 15:30 UTC every production hostname served
-`408c966c` while the tip was `d510eb56`. The release state is still **`FAIL`**, now in its
-"built, not rolled out" form. The served commit itself was merged outside the queue, which M4
-records as an out-of-band publish. The application code at the two commits is identical (no `src/`
-change). Closing it takes a rollout of the tip build, and this document does not start one.
+time. Since 01:27 UTC on 2026-09-26 it is a staged rollout. Two of eight `READY` deploy-branch
+builds were rolled out, and at 15:30 UTC both platform-owned production hostnames served `408c966c`
+while the tip was `d510eb56`. The release state is still **`FAIL`**, now in its "built, not rolled
+out" form. The served commit itself was merged outside the queue, which M4 records as an out-of-band
+publish. The application code at the two commits is identical (no `src/` change). Closing it takes a
+rollout of the tip build, and this document does not start one.
 
 Confidence: **high** in §4 at the Appendix A instant and in Appendix B at its instant, by
 construction of the reads, and in Appendix C at its instant. **Low** in any standing behaviour of

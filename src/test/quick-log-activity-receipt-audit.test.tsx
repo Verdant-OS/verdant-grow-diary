@@ -78,9 +78,11 @@ describe.each(["note", "training"] as const)("%s receipt audit", (activityId) =>
         plantId: "33333333-3333-4333-8333-333333333333",
         idempotencyKey: "receipt-audit-logical-save",
         note: "Synthetic receipt audit",
+        occurredAt: "2026-09-26T00:00:00.000Z",
       });
     });
     expect(receipt).toMatchObject({ ok: true, growEventId: validId });
+    expect(h.rpc.mock.calls[0][1].p_occurred_at).toBe("2026-09-26T00:00:00.000Z");
     expect(h.event).toHaveBeenCalledTimes(1);
   });
 });

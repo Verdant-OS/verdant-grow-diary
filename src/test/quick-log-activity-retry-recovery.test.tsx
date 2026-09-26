@@ -345,6 +345,8 @@ describe("All activity types retry confirmation", () => {
   it("restores the unresolved exact attempt after a remount", async () => {
     const view = mount();
     await loseReply();
+    const originalOccurredAt = backend.posts[0].p_occurred_at;
+    expect(originalOccurredAt).toEqual(expect.any(String));
     view.unmount();
     mount();
     expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toHaveTextContent(
@@ -353,6 +355,7 @@ describe("All activity types retry confirmation", () => {
     save();
     await screen.findByTestId("quick-log-all-activities-saved");
     expect(backend.posts[1]).toEqual(backend.posts[0]);
+    expect(backend.posts[1].p_occurred_at).toBe(originalOccurredAt);
     expect(backend.rows.size).toBe(1);
   });
 

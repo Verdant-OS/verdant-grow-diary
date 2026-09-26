@@ -16,6 +16,7 @@ const original: PendingQuickLogActivity = {
     tentId: "tent-a",
     plantId: "plant-a",
     note: "Observed training",
+    occurredAt: "2026-09-26T00:00:00.000Z",
     extraDetails: { technique: "topping" },
     idempotencyKey: "activity-attempt-a",
   },
@@ -44,6 +45,15 @@ describe("pending Quick Log activity recovery", () => {
       status: "pending",
       record: original,
     });
+  });
+
+  it("rejects an occurrence time that differs from the captured submission", () => {
+    expect(
+      claimPendingQuickLogActivity({
+        ...original,
+        input: { ...original.input, occurredAt: "2026-09-26T01:00:00.000Z" },
+      }),
+    ).toEqual({ status: "blocked" });
   });
 
   it("keeps another target and owner independent while the first is unresolved", () => {

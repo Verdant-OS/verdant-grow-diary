@@ -14,6 +14,7 @@ export interface PendingQuickLogActivityInput {
   readonly tentId: string | null;
   readonly plantId: string | null;
   readonly note: string | null;
+  readonly occurredAt: string;
   readonly extraDetails: Record<string, unknown> | null;
   readonly idempotencyKey: string;
 }
@@ -96,6 +97,7 @@ function validRecord(
       "tentId",
       "plantId",
       "note",
+      "occurredAt",
       "extraDetails",
       "idempotencyKey",
     ])
@@ -106,6 +108,7 @@ function validRecord(
     !optionalId(input.tentId) ||
     !optionalId(input.plantId) ||
     (input.note !== null && typeof input.note !== "string") ||
+    input.occurredAt !== value.createdAt ||
     !nonempty(input.idempotencyKey) ||
     input.idempotencyKey.length < 8 ||
     input.idempotencyKey.length > 200

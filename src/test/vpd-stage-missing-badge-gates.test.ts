@@ -25,8 +25,9 @@ const SITES: { file: string; gate: RegExp }[] = [
     gate: /normalizeVpdStage\(tentStageById\[card\.tentId\]\)\s*===\s*"unknown"/,
   },
   {
+    // BUG-006 follow-up: the resolved stage (grow row + tent + active plants).
     file: "src/pages/TentDetail.tsx",
-    gate: /normalizeVpdStage\(tent\.stage\)\s*===\s*"unknown"/,
+    gate: /normalizeVpdStage\(envStage\)\s*===\s*"unknown"/,
   },
   {
     file: "src/components/PlantTentEnvironmentPanel.tsx",

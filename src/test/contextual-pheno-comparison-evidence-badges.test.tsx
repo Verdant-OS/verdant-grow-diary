@@ -298,7 +298,7 @@ describe("v0.4 mixed partial+untrusted layouts — banned word scan", () => {
       });
 
       it("does not call fetch or expose functions.invoke", () => {
-        const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
           throw new Error("fetch must not be called");
         });
         const { container } = renderInputs(layout.inputs);

@@ -3,6 +3,7 @@
  *
  * BLOCKED unless local Supabase env vars are exported:
  *   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+ *   SUPABASE_DB_URL (loopback PostgreSQL fixture setup via psql)
  *
  * Service role is used strictly for test setup/teardown/admin verification.
  * All tested UPDATE / DELETE / RPC calls run through an authenticated
@@ -18,6 +19,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { expectSanitizedDbError } from "./_helpers/sanitizedDbError";
+import {
+  runProfileFixtureSql,
+  requireLocalProfileEnvironment,
+} from "../../../scripts/security/profiles-db-proof.mjs";
 
 const URL = process.env.SUPABASE_URL ?? "";
 const ANON = process.env.SUPABASE_ANON_KEY ?? "";
@@ -109,59 +114,88 @@ async function profileExists(admin: SupabaseClient, userId: string): Promise<boo
 
 const TEST_RPC_NAME = "__test_profiles_gamification_update";
 
-async function tryCreateTestRpc(admin: SupabaseClient): Promise<boolean> {
+function createTestRpc(): void {
   // Test-only RPC. SECURITY INVOKER so the trigger fires under the caller's
   // rights. Never shipped as a production migration. Dropped in afterAll.
   const sql = `
-    CREATE OR REPLACE FUNCTION public.${TEST_RPC_NAME}(
+    BEGIN;
+    CREATE FUNCTION public.${TEST_RPC_NAME}(
       _profile_user_id uuid, _tier text, _level int, _nugs int
-    ) RETURNS void
+    ) RETURNS integer
     LANGUAGE plpgsql SECURITY INVOKER SET search_path = public AS $fn$
+    DECLARE affected integer;
     BEGIN
       UPDATE public.profiles
          SET tier = COALESCE(_tier, tier),
              level = COALESCE(_level, level),
              nugs_total = COALESCE(_nugs, nugs_total)
        WHERE user_id = _profile_user_id;
+      GET DIAGNOSTICS affected = ROW_COUNT;
+      RETURN affected;
     END;
     $fn$;
+    REVOKE ALL ON FUNCTION public.${TEST_RPC_NAME}(uuid, text, int, int) FROM PUBLIC, anon;
     GRANT EXECUTE ON FUNCTION public.${TEST_RPC_NAME}(uuid, text, int, int) TO authenticated;
+    NOTIFY pgrst, 'reload schema';
+    COMMIT;
   `;
-  const { error } = await admin.rpc("exec_sql" as never, { sql } as never);
-  if (!error) return true;
-  // Fall back: try direct pg via PostgREST is not possible for arbitrary DDL.
-  // If exec_sql doesn't exist in local stack, we mark RPC path BLOCKED (skip).
-  return false;
+  runProfileFixtureSql(sql);
 }
 
-async function tryDropTestRpc(admin: SupabaseClient) {
+function dropTestRpc() {
   const sql = `DROP FUNCTION IF EXISTS public.${TEST_RPC_NAME}(uuid, text, int, int);`;
-  try {
-    await admin.rpc("exec_sql" as never, { sql } as never);
-  } catch {
-    /* best-effort */
+  runProfileFixtureSql(sql);
+}
+
+async function requireRpcWitness(user: TestUser): Promise<void> {
+  // Successful authenticated invocation proves the RPC exists, is granted and
+  // reaches exactly the caller's profile. Schema-cache absence cannot count as
+  // a security rejection. Repeating this same-value update changes no values.
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const { data, error } = await user.client.rpc(
+      TEST_RPC_NAME as never,
+      {
+        _profile_user_id: user.id,
+        _tier: null,
+        _level: null,
+        _nugs: null,
+      } as never,
+    );
+    if (!error) {
+      expect(data).toBe(1);
+      return;
+    }
+    if (error.code !== "PGRST202") throw new Error("Profile RPC positive witness failed.");
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
+  throw new Error("BLOCKED: profile RPC schema cache did not expose the test fixture.");
 }
 
 d("profiles gamification write protection (local DB)", () => {
   let admin: SupabaseClient;
   let userA: TestUser;
   let userB: TestUser;
-  let rpcAvailable = false;
+  let rpcCreated = false;
 
   beforeAll(async () => {
+    requireLocalProfileEnvironment(process.env);
     admin = createClient(URL, SERVICE, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
     userA = await createTestUser(admin, "a");
     userB = await createTestUser(admin, "b");
-    rpcAvailable = await tryCreateTestRpc(admin);
+    createTestRpc();
+    rpcCreated = true;
+    await requireRpcWitness(userA);
   }, 45_000);
 
   afterAll(async () => {
-    if (rpcAvailable) await tryDropTestRpc(admin);
-    if (userA) await cleanupUser(admin, userA);
-    if (userB) await cleanupUser(admin, userB);
+    try {
+      if (rpcCreated) dropTestRpc();
+    } finally {
+      if (userA) await cleanupUser(admin, userA);
+      if (userB) await cleanupUser(admin, userB);
+    }
   }, 30_000);
 
   it("A: authenticated client cannot update profiles.tier", async () => {
@@ -290,11 +324,6 @@ d("profiles gamification write protection (local DB)", () => {
   });
 
   it("J: RPC-triggered gamification update is blocked by trigger", async () => {
-    if (!rpcAvailable) {
-      // Explicitly BLOCKED, not passed: local stack lacks exec_sql DDL helper.
-      console.warn("[profiles gamification] RPC path BLOCKED — local exec_sql unavailable");
-      return;
-    }
     const before = await readProfileAsAdmin(admin, userA.id);
     const { error } = await userA.client.rpc(
       TEST_RPC_NAME as never,
@@ -305,7 +334,8 @@ d("profiles gamification write protection (local DB)", () => {
         _nugs: 10_000,
       } as never,
     );
-    expect(error).not.toBeNull();
+    expect(error?.code).toBe("P0001");
+    expect(error?.message).toMatch(/gamification fields.*not directly writable/i);
     expectSanitizedDbError(error);
     const after = await readProfileAsAdmin(admin, userA.id);
     expect(after.tier).toBe(before.tier);
@@ -316,12 +346,6 @@ d("profiles gamification write protection (local DB)", () => {
   // ── Single-field RPC coverage — proves the trigger fires whichever
   // gamification column is touched, not just the triple-write path.
   it("J1/J2/J3: RPC single-field gamification updates are each blocked", async () => {
-    if (!rpcAvailable) {
-      console.warn(
-        "[profiles gamification] RPC single-field path BLOCKED — local exec_sql unavailable",
-      );
-      return;
-    }
     const before = await readProfileAsAdmin(admin, userA.id);
     const patches: Array<{ tag: string; args: Record<string, unknown> }> = [
       {
@@ -334,6 +358,8 @@ d("profiles gamification write protection (local DB)", () => {
     for (const p of patches) {
       const { error } = await userA.client.rpc(TEST_RPC_NAME as never, p.args as never);
       expect(error, `RPC ${p.tag} attempt should be rejected`).not.toBeNull();
+      expect(error?.code).toBe("P0001");
+      expect(error?.message).toMatch(/gamification fields.*not directly writable/i);
       expectSanitizedDbError(error);
     }
     const after = await readProfileAsAdmin(admin, userA.id);

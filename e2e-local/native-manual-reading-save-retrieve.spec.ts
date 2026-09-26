@@ -101,9 +101,15 @@ test("Sensors manual entry saves three metrics to the chosen tent and reopens in
     const history = page.getByTestId("tent-manual-snapshot-history");
     await expect(history.getByTestId("tent-manual-snapshot-history-item")).toHaveCount(1);
     await expect(history.getByTestId("tent-manual-snapshot-history-source")).toHaveText("Manual");
-    await expect(history.locator('[data-metric="temperature_c"]')).toHaveText("Temp 78.8°F");
-    await expect(history.locator('[data-metric="humidity_pct"]')).toHaveText("RH 60%");
-    await expect(history.locator('[data-metric="soil_moisture_pct"]')).toHaveText("Soil 42%");
+    // Label and value are adjacent spans with no text node between them; the
+    // visible gap is CSS, so textContent reads "Temp78.8°F".
+    await expect(history.locator('[data-metric="temperature_c"]')).toHaveText(
+      /^Temp\s*78\.8\s*°F$/,
+    );
+    await expect(history.locator('[data-metric="humidity_pct"]')).toHaveText(/^RH\s*60\s*%$/);
+    await expect(history.locator('[data-metric="soil_moisture_pct"]')).toHaveText(
+      /^Soil\s*42\s*%$/,
+    );
     await expect(history.locator('[data-metric="vpd_kpa"]')).toHaveCount(0);
     await page.goto(f.env.ui + "/tents/" + f.secondary.tentId);
     await expect(page.getByTestId("tent-manual-snapshot-history-empty")).toBeVisible();

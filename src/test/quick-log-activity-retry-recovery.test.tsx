@@ -67,13 +67,14 @@ function mount(
   initialStage: unknown = "flower",
   onSaveSuccess?: (result: QuickLogAllActivitiesSaveSuccess) => void,
   initialRequestedActivityId: QuickLogActivityId | null = null,
+  target: { growId: string; tentId: string } = { growId: "grow-a", tentId: "tent-a" },
 ) {
   let stage = initialStage;
   const renderTree = (id: string, requestedActivityId: QuickLogActivityId | null = null) => (
     <MemoryRouter>
       <QuickLogAllActivitiesSection
-        growId="grow-a"
-        tentId="tent-a"
+        growId={target.growId}
+        tentId={target.tentId}
         plantId={id}
         plantStage={stage}
         requestedActivityId={requestedActivityId}
@@ -140,6 +141,32 @@ beforeEach(() => {
 });
 
 describe("All activity types retry confirmation", () => {
+  it("blocks a second write after the pending plant moves, then retries only its original target", async () => {
+    const first = mount();
+    await loseReply();
+    first.unmount();
+
+    const moved = mount("plant-a", "flower", undefined, null, {
+      growId: "grow-b",
+      tentId: "tent-b",
+    });
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-all-activities-retry-original")).toBeDisabled();
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toHaveTextContent(
+      /target changed/i,
+    );
+    expect(backend.posts).toHaveLength(1);
+    moved.unmount();
+
+    mount();
+    expect(screen.getByTestId("quick-log-all-activities-retry-original")).toBeEnabled();
+    save();
+    await screen.findByTestId("quick-log-all-activities-saved-item");
+    expect(backend.posts).toHaveLength(2);
+    expect(backend.posts[1]).toEqual(backend.posts[0]);
+    expect(backend.rows.size).toBe(1);
+  });
+
   it("does not hand off requested Water before restoring an unresolved same-target activity", async () => {
     const first = mount();
     await loseReply();

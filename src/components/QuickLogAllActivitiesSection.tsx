@@ -92,6 +92,7 @@ import {
   bindQuickLogActivityDraft,
   buildQuickLogTargetIdentity,
   buildQuickLogTargetKey,
+  buildQuickLogRecoveryScopeKey,
   evaluateQuickLogActivityAvailability,
   evaluateQuickLogPrePersistenceGate,
   validateQuickLogActivityNote,
@@ -340,7 +341,8 @@ export default function QuickLogAllActivitiesSection({
   const activePendingActivity =
     pendingActivity &&
     pendingActivity.ownerId === user?.id &&
-    buildQuickLogTargetKey(pendingActivity.input) === currentTargetKey
+    buildQuickLogRecoveryScopeKey(pendingActivity.input) ===
+      buildQuickLogRecoveryScopeKey(currentTarget)
       ? pendingActivity
       : null;
   const pendingPersistenceGate = useMemo(

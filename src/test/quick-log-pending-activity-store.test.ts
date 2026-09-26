@@ -9,6 +9,7 @@ import {
   rememberRejectedPendingQuickLogActivity,
   type PendingQuickLogActivity,
 } from "@/lib/quickLogPendingActivityStore";
+import { buildQuickLogRecoveryScopeKey } from "@/lib/quickLogActivityRules";
 
 const original: PendingQuickLogActivity = {
   version: 1,
@@ -33,6 +34,38 @@ beforeEach(() => {
 });
 
 describe("pending Quick Log activity recovery", () => {
+  it("uses a deterministic null-safe recovery scope that follows a plant across tents", () => {
+    const moved = { growId: "grow-b", tentId: "tent-b", plantId: "plant-a" };
+    expect(buildQuickLogRecoveryScopeKey(original.input)).toBe(
+      buildQuickLogRecoveryScopeKey(moved),
+    );
+    expect(buildQuickLogRecoveryScopeKey(moved)).toBe(buildQuickLogRecoveryScopeKey(moved));
+    expect(buildQuickLogRecoveryScopeKey(null)).toBe('["grow",null]');
+    expect(buildQuickLogRecoveryScopeKey(undefined)).toBe('["grow",null]');
+    expect(buildQuickLogRecoveryScopeKey({ ...moved, plantId: "plant-b" })).not.toBe(
+      buildQuickLogRecoveryScopeKey(moved),
+    );
+  });
+
+  it("keeps the exact unresolved plant request visible after a tent and grow move", () => {
+    const moved = { growId: "grow-b", tentId: "tent-b", plantId: "plant-a" };
+    expect(claimPendingQuickLogActivity(original)).toEqual({ status: "claimed", record: original });
+    expect(readPendingQuickLogActivity(original.ownerId, moved)).toEqual({
+      status: "pending",
+      record: original,
+    });
+    const replacement = {
+      ...original,
+      input: { ...original.input, ...moved, idempotencyKey: "activity-after-move" },
+    };
+    expect(claimPendingQuickLogActivity(replacement)).toEqual({
+      status: "pending",
+      record: original,
+    });
+    expect(clearPendingQuickLogActivity(original)).toBe(true);
+    expect(readPendingQuickLogActivity(original.ownerId, moved)).toEqual({ status: "empty" });
+  });
+
   it("upgrades a legacy v1 record without changing its null occurrence-time RPC value", () => {
     expect(claimPendingQuickLogActivity(original).status).toBe("claimed");
     const key = window.sessionStorage.key(0)!;

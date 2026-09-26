@@ -71,9 +71,10 @@ code is written in this slice.
   owner-authorised Instant Rollback restored the deploy-branch build at 09:45 UTC. From then on,
   **every deploy-branch merge built a READY production deployment that did not receive the custom
   domains**: at 23:29 UTC the apex served `9b06be3f`, 13 first-parent commits behind the tip
-  `c9bc1df3` (Appendix B). The founding measurement's "six of six auto-promoted" is therefore
-  history, not standing behaviour. This amendment adds the **promotion axis** (§3), resolves what is served
-  **per hostname** rather than from the newest production deployment (§4 step 3, M10), and makes
+  `c9bc1df3` (Appendix B). The founding measurement saw six production builds but observed only the
+  newest one served (A.1), so automatic promotion was never established as standing behaviour. This
+  amendment adds the **promotion axis** (§3), resolves what is served **per hostname** rather than
+  from the newest production deployment (§4 step 3, M10), and makes
   every redeploy, promote, rollback or production-setting change a **publish action** with a
   recorded actor (D-RT-12, D-RT-13).
 - **The publisher is not who the repository says it is.** `CLAUDE.md`, `docs/codebase-map.md`,
@@ -229,9 +230,10 @@ remembered-target recovery and billing. No open PR changes `src/lib/entitlements
 ```
 
 **Building is not serving.** Axis (B) produces READY production deployments; axis (F) decides which
-of them the production hostnames resolve to. They are separate. Appendix A observed them move
-together six times; Appendix B observed one out-of-band promotion and then thirteen builds that
-(F) never picked up.
+of them the production hostnames resolve to. They are separate. Appendix A observed six builds
+and saw only the newest served (A.1); whether the five earlier builds were ever served was not
+recorded. Appendix B observed one out-of-band promotion and then thirteen builds that (F) never
+picked up.
 
 | Axis                   | Owner of the truth                                                                              | Proof that counts                                                                                                    | Never counts as proof                                                                                          |
 | ---------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -249,14 +251,14 @@ together six times; Appendix B observed one out-of-band promotion and then thirt
 Each step names its read, its label, and its status. The values are in Appendix A; the method is
 here. A future restamp re-runs the same steps in the same order.
 
-| Step | Question the step answers                                                                  | Read (tool or command)                                                                                                                           | Label at A                                                     | Status                             |
-| ---- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ---------------------------------- |
-| 1    | Which platform project holds the apex domain?                                              | Vercel `list_project_domains` for the project; DNS resolution of apex and `www`                                                                  | `established fact`                                             | `PASS`                             |
-| 2    | Is that project bound to this repository?                                                  | Vercel `list_projects` filtered by this repository's URL; deployment `meta.githubOrg/Repo`                                                       | `established fact`                                             | `PASS`                             |
-| 3    | Which deployment does **each production hostname** serve, and did it build the deploy tip? | Vercel `get_deployment <hostname>` for the apex, `www`, `verdant-grow-diary.vercel.app` and the project alias (M10); then git info for each      | `established fact`                                             | `PASS` at A (via A.1); `FAIL` at B |
-| 4    | Are the served bytes that deployment's bytes?                                              | `GET https://verdantgrowdiary.com/version.json`; compare `commit` and `buildTime` with the deployment's `githubCommitSha`, `buildingAt`, `ready` | `established fact` for the fields; `inference` for attribution | `PASS` at A; `BLOCKED` at B        |
-| 5    | Is this one publish or a standing behaviour?                                               | The previous N production deployments against the previous N deploy-branch tips, **and** which of them each hostname resolved to                 | `established fact`                                             | `PASS` at A; `FAIL` from 09:45 UTC |
-| 6    | What triggered the observed deployments?                                                   | Deployment `source` (`git`) and `meta.githubCommitRef`; latency from commit to deployment                                                        | `established fact` + `inference`                               | `PASS`                             |
+| Step | Question the step answers                                                                  | Read (tool or command)                                                                                                                           | Label at A                                                     | Status                                                                                          |
+| ---- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| 1    | Which platform project holds the apex domain?                                              | Vercel `list_project_domains` for the project; DNS resolution of apex and `www`                                                                  | `established fact`                                             | `PASS`                                                                                          |
+| 2    | Is that project bound to this repository?                                                  | Vercel `list_projects` filtered by this repository's URL; deployment `meta.githubOrg/Repo`                                                       | `established fact`                                             | `PASS`                                                                                          |
+| 3    | Which deployment does **each production hostname** serve, and did it build the deploy tip? | Vercel `get_deployment <hostname>` for the apex, `www`, `verdant-grow-diary.vercel.app` and the project alias (M10); then git info for each      | `established fact`                                             | `PASS` at A (via A.1); `FAIL` at B                                                              |
+| 4    | Are the served bytes that deployment's bytes?                                              | `GET https://verdantgrowdiary.com/version.json`; compare `commit` and `buildTime` with the deployment's `githubCommitSha`, `buildingAt`, `ready` | `established fact` for the fields; `inference` for attribution | `PASS` at A; `BLOCKED` at B                                                                     |
+| 5    | Is this one publish or a standing behaviour?                                               | The previous N production deployments against the previous N deploy-branch tips, **and** which of them each hostname resolved to                 | `established fact`                                             | Builds `PASS` at A; promotion `NOT_MEASURED` at A for all but the newest; `FAIL` from 09:45 UTC |
+| 6    | What triggered the observed deployments?                                                   | Deployment `source` (`git`) and `meta.githubCommitRef`; latency from commit to deployment                                                        | `established fact` + `inference`                               | `PASS`                                                                                          |
 
 **Conclusion at the Appendix A instant.** The publisher of `verdantgrowdiary.com` is Vercel's Git
 integration for project `verdant-grow-diary`. On the six observed production deployments the
@@ -268,12 +270,12 @@ of statement §14 said must not live in the contract.
 
 **Step 3 was the wrong question, and the amendment replaces it.** The founding chain asked for the
 _newest_ production deployment. Twice on 2026-09-25 that returned a different deployment from the
-one the apex served: after the 09:45 rollback the newest was the stale 08:28 redeploy, and from 12:03
-onwards it was each new tip build that the custom domains never received. A deployment's own `alias`
-array is not a substitute either: at 23:29 UTC the `9b06be3f` deployment still listed the project
-alias, while resolving that hostname returned the `c9bc1df3` build (Appendix B.2). The only reading
-that answers "what is served" is **hostname → deployment**, per hostname (M10). A split between
-hostnames is itself a finding (D-RT-12).
+one the apex served: after the 09:45 rollback the newest was the stale 08:28 redeploy, and from
+12:03 onwards it was each new tip build that the custom domains never received. A deployment's own
+`alias` array is not a substitute either: at 23:29 UTC the `9b06be3f` deployment still listed the
+project alias, while resolving that hostname returned the `c9bc1df3` build (Appendix B.2). The only
+reading that answers "what is served" is **hostname → deployment**, per hostname (M10). A split
+between hostnames is itself a finding (D-RT-12).
 
 **What the chain does not establish**, stated so silence is not read as agreement:
 
@@ -385,14 +387,15 @@ not pick one. It records that the choice is open and gives it to Cheek (§7, §1
 - Migrations are append-only and immutable once merged (`AGENTS.md`); the `Published migration
 integrity` gate compares SHA-256 against the base and is not a required context (contract
   AC-9.1, §13).
-- **There are eight repository apply paths, not one.** At `c9bc1df3`, `.github/workflows/` holds eight
-  `apply-*.yml` workflows, each `workflow_dispatch`-only and each running in GitHub environment
-  `verdant-production-solo-founder`: the general `apply-pinned-production-migrations.yml` and seven
-  pinned single-purpose appliers (`action-queue-transition-forward-repair`,
-  `agreement-acceptance-insert-forward-repair`, `candidate-number-maintenance-migrations`,
-  `pinned-breeding-reconciliation`, `quicklog-corrections-retractions`,
-  `quicklog-manual-delegate-forward-repair`, `signup-acquisition-forward-repair`). `#1701` and
-  `#1703` propose two more. The founding text named only the first; `established fact` by listing.
+- **There are eight repository apply paths, not one.** At `c9bc1df3`, `.github/workflows/` holds
+  eight `apply-*.yml` workflows, each `workflow_dispatch`-only and each running in GitHub
+  environment `verdant-production-solo-founder`: the general
+  `apply-pinned-production-migrations.yml` and seven pinned single-purpose appliers
+  (`action-queue-transition-forward-repair`, `agreement-acceptance-insert-forward-repair`,
+  `candidate-number-maintenance-migrations`, `pinned-breeding-reconciliation`,
+  `quicklog-corrections-retractions`, `quicklog-manual-delegate-forward-repair`,
+  `signup-acquisition-forward-repair`). `#1701` and `#1703` propose two more. The founding text
+  named only the first; `established fact` by listing.
 - The general apply path is `apply-pinned-production-migrations.yml`: `workflow_dispatch` with
   `expected_head_sha`, `confirm_project_ref` (must equal `knkwiiywfkbqznbxwqfh`, `:59`) and
   `confirm_apply`; it runs in GitHub environment `verdant-production-solo-founder` (`:73`) with the
@@ -451,12 +454,13 @@ example. Every bullet is `established fact` from Vercel reads unless labelled.
      repository gate.
   4. _Manual alias assignment_ (`vercel alias set`) and domain moves: the same class as 2 and 3.
 - **The event log distinguishes the actor classes.** In the two windows read (B.3), the
-  Git-integration deployment events carry no token identifier and no `via` application. The 08:28:39 UTC production deployment of PR-branch commit
-  `7053af8f` carried an **API-token identifier and no `via` application**. The 09:45:15 UTC
-  `instant-rollback-created` event carried **`via: Claude.ai`**, a different token, and the reason
-  text "Owner-authorized rollback …". Every event records the owner's Vercel identity as the
-  principal, so the principal alone never identifies the actor (Appendix B.3). The identifier values
-  themselves are deliberately not recorded here (AT-10).
+  Git-integration deployment events carry no token identifier and no `via` application. The 08:28:39
+  UTC production deployment of PR-branch commit `7053af8f` carried an **API-token identifier and no
+  `via` application**. The 09:45:15 UTC `instant-rollback-created` event carried
+  **`via: Claude.ai`**, a different token, and the reason text "Owner-authorized rollback …". Every
+  event records the owner's Vercel identity as the principal, so the principal alone never
+  identifies the actor (Appendix B.3). The identifier values themselves are deliberately not
+  recorded here (AT-10).
 - **The same token that promoted the PR build also changed production settings.** Within 90 seconds
   it enabled Skew Protection (08:28:52) and disabled "include files outside root directory"
   (08:29:43). At 08:26:14 it had attached the project to a GitHub connector for all environments.

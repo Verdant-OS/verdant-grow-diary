@@ -154,7 +154,7 @@ elementPrototype.releasePointerCapture ??= () => {};
 elementPrototype.scrollIntoView ??= () => {};
 
 interface RpcResponse {
-  data: { ok: boolean; grow_event_id: string } | null;
+  data: { ok: boolean; grow_event_id?: string; reason?: string } | null;
   error: { message: string } | null;
 }
 
@@ -760,6 +760,82 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(screen.getByTestId("quick-log-save")).toBeEnabled();
   });
 
+  it("blocks a sibling main save for an unresolved activity while another target stays available", async () => {
+    const pending = deferredRpc();
+    harness.rpc.mockReturnValueOnce(pending.promise);
+    const view = renderQuickLog({ plantId: "p1", growId: "g1", tentId: "t1" });
+    prepareMainNote();
+    const childSave = await prepareChildNote();
+    fireEvent.click(childSave);
+    await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      pending.resolve({ data: null, error: { message: "offline" } });
+      await pending.promise;
+    });
+
+    expect(
+      await screen.findByTestId("quick-log-dialog-all-activities-pending-activity"),
+    ).toBeInTheDocument();
+    expectParentSelectorsLocked(false);
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(screen.getByTestId("quick-log-activity-recovery-lock")).toHaveTextContent(
+      /earlier activity save for this target is unresolved/i,
+    );
+    act(() => submitForm(mainForm()));
+    expect(harness.rpc).toHaveBeenCalledTimes(1);
+
+    view.rerenderQuickLog({ plantId: "p2", growId: "g2", tentId: "t2" });
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+        "data-target-plant-id",
+        "p2",
+      ),
+    );
+    expect(screen.getByTestId("quick-log-save")).toBeEnabled();
+    expectMainDraftSemanticallyLocked(false);
+
+    view.rerenderQuickLog({ plantId: "p1", growId: "g1", tentId: "t1" });
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+        "data-target-plant-id",
+        "p1",
+      ),
+    );
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    act(() => submitForm(mainForm()));
+    expect(harness.rpc).toHaveBeenCalledTimes(1);
+
+    harness.rpc.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000004" },
+      error: null,
+    });
+    fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-retry-original"));
+    await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-activity-recovery-lock")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("releases the sibling save after a definitive first activity rejection", async () => {
+    harness.rpc.mockResolvedValueOnce({
+      data: { ok: false, reason: "invalid_typed_payload" },
+      error: null,
+    });
+    renderQuickLog();
+    prepareMainNote();
+    const childSave = await prepareChildNote();
+    fireEvent.click(childSave);
+    await screen.findByTestId("quick-log-dialog-all-activities-error");
+
+    expect(harness.rpc).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-activity-recovery-lock")).not.toBeInTheDocument(),
+    );
+    await waitFor(() => expect(screen.getByTestId("quick-log-save")).toBeEnabled());
+    expectParentSelectorsLocked(false);
+  });
+
   it("does not let a late main save hide a newer target's empty Note hint", async () => {
     const pending = deferredRpc();
     harness.rpc.mockReturnValue(pending.promise);
@@ -826,7 +902,7 @@ describe("Quick Log shared in-flight coordination", () => {
     );
     expect(screen.getByTestId("quick-log-draft-preview-empty-note")).toBeInTheDocument();
     await waitFor(() => expectParentSelectorsLocked(false));
-    expect(screen.getByTestId("quick-log-save")).toBeEnabled();
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
 
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     expect(view.onOpenChange).toHaveBeenCalledWith(false);

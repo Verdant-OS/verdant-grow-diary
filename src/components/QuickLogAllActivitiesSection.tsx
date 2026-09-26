@@ -124,6 +124,8 @@ export interface QuickLogAllActivitiesSectionProps {
   onSaveStart?: (target: QuickLogAllActivitiesSaveTarget) => boolean;
   /** Releases the parent-owned guard after either success or failure. */
   onSaveEnd?: () => void;
+  /** Reports whether this exact target has an unresolved activity claim. */
+  onRecoveryLockChange?: (target: QuickLogAllActivitiesSaveTarget, locked: boolean) => void;
   /** Presenter lock while either the parent or this section owns the guard. */
   saveBlocked?: boolean;
   /** Reads the same parent-owned synchronous guard used to acquire a save. */
@@ -214,6 +216,7 @@ export default function QuickLogAllActivitiesSection({
   testIdPrefix = "quick-log-all-activities",
   onSaveStart,
   onSaveEnd,
+  onRecoveryLockChange,
   saveBlocked = false,
   isSaveBlocked,
   onBeforeStructuredWaterOpen,
@@ -509,6 +512,20 @@ export default function QuickLogAllActivitiesSection({
     );
     setErrorForActivity(recovery.record.input.activityId);
   }, [currentTarget, currentTargetKey, user?.id]);
+
+  useEffect(() => {
+    if (!onRecoveryLockChange || !currentTarget.growId) return;
+    const locked =
+      !!user?.id && readPendingQuickLogActivity(user.id, currentTarget).status !== "empty";
+    onRecoveryLockChange(
+      {
+        growId: currentTarget.growId,
+        tentId: currentTarget.tentId,
+        plantId: currentTarget.plantId,
+      },
+      locked,
+    );
+  }, [activityRecoveryBlocked, currentTarget, onRecoveryLockChange, pendingActivity, user?.id]);
 
   const canPersistManualSensor = false; // Deferred to ManualSensorReadingCard.
 

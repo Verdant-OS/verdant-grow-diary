@@ -687,6 +687,87 @@ describe("QuickLogV2Sheet — structured watering", () => {
     expect(getLocalStorageItemForTest(RECENT_TARGET_KEY)).toBe(previous);
   });
 
+  it("releases a first pre-write Water rejection for correction with a new key", async () => {
+    wateringWriterMock
+      .mockResolvedValueOnce({ ok: false, reason: "rpc:invalid_typed_payload" })
+      .mockResolvedValueOnce({ ok: true, eventId: "water-event-corrected", reused: false });
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+    enterVolume("500");
+    clickSave();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("qlv2-error")).toHaveTextContent(
+        /server rejected this Watering.*correct/i,
+      ),
+    );
+    expect(screen.queryByTestId("qlv2-post-save")).toBeNull();
+    expect(screen.queryByTestId("qlv2-watering-retry-lock")).toBeNull();
+    expect(screen.getByLabelText("Volume (ml)")).toBeEnabled();
+    expect(readPendingQuickLogWatering(authState.ownerId)).toEqual({ status: "empty" });
+
+    const rejectedKey = wateringWriterMock.mock.calls[0][0].idempotency_key;
+    enterVolume("750");
+    clickSave();
+    await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
+    expect(wateringWriterMock).toHaveBeenCalledTimes(2);
+    expect(wateringWriterMock.mock.calls[1][0].volume_ml).toBe(750);
+    expect(wateringWriterMock.mock.calls[1][0].idempotency_key).not.toBe(rejectedKey);
+  });
+
+  it("retains an earlier ambiguous Water attempt when a later retry is rejected", async () => {
+    wateringWriterMock
+      .mockResolvedValueOnce({ ok: false, reason: "rpc:error" })
+      .mockResolvedValueOnce({ ok: false, reason: "rpc:invalid_typed_payload" });
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+    enterVolume("500");
+    clickSave();
+    await waitFor(() => expect(screen.getByTestId("qlv2-watering-retry-lock")).toBeVisible());
+    const firstKey = wateringWriterMock.mock.calls[0][0].idempotency_key;
+
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+    await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByTestId("qlv2-error")).toHaveTextContent(
+        /could not confirm the watering save/i,
+      ),
+    );
+    expect(wateringWriterMock.mock.calls[1][0].idempotency_key).toBe(firstKey);
+    expect(screen.getByTestId("qlv2-watering-retry-lock")).toBeVisible();
+    expect(screen.getByLabelText("Volume (ml)")).toBeDisabled();
+    expect(readPendingQuickLogWatering(authState.ownerId).status).toBe("pending");
+    expect(screen.queryByTestId("qlv2-post-save")).toBeNull();
+  });
+
+  it("keeps a first rejected Water locked if its pending claim cannot be cleared", async () => {
+    wateringWriterMock.mockResolvedValueOnce({ ok: false, reason: "rpc:invalid_typed_payload" });
+    const storage = window.localStorage;
+    const methodOwner: Storage = Object.prototype.hasOwnProperty.call(storage, "removeItem")
+      ? storage
+      : Object.getPrototypeOf(storage);
+    const remove = methodOwner.removeItem as Storage["removeItem"];
+    const removeSpy = vi.spyOn(methodOwner, "removeItem").mockImplementation(function (
+      this: Storage,
+      key: string,
+    ) {
+      if (key.startsWith("verdant:quick-log:pending-watering:v1:")) {
+        throw new Error("simulated storage refusal");
+      }
+      remove.call(this, key);
+    });
+    try {
+      renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+      enterVolume("500");
+      clickSave();
+      await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.getByTestId("qlv2-watering-retry-lock")).toBeVisible());
+      expect(screen.getByLabelText("Volume (ml)")).toBeDisabled();
+      expect(readPendingQuickLogWatering(authState.ownerId).status).toBe("pending");
+      expect(screen.queryByTestId("qlv2-post-save")).toBeNull();
+    } finally {
+      removeSpy.mockRestore();
+    }
+  });
+
   it("does not invent a remembered plant after a tent-scoped Water succeeds", async () => {
     renderSheet("tent:55555555-5555-4555-8555-555555555555", "water");
     enterVolume();

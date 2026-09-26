@@ -288,6 +288,8 @@ export function wateringFormReasonToHelper(reason: WateringFormFailureReason | s
       return "Humidity must be between 0 and 100%.";
     case "vpd_out_of_range":
       return "VPD must be between 0 and 10 kPa.";
+    case "rpc:invalid_typed_payload":
+      return "The server rejected this Watering as invalid. Correct the values and save again.";
     case "observed_at:invalid":
     case "idempotency_key:invalid":
     default:

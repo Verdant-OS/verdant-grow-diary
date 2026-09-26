@@ -63,8 +63,9 @@ code is written in this slice.
   (team `verdantgrowdiary`), which is git-linked to `Verdant-OS/verdant-grow-diary` and has created
   a **production** deployment for each of the last six pushes to `verdant-grow-diary`; its
   configured production-branch setting is `NOT_MEASURED`. The chain domain → project → deployment →
-  commit → served stamp is closed by measurement (§4). Status **`PASS`**, `established fact` at the
-  Appendix A instant.
+  commit → served stamp is closed by measurement (§4), with one gap: no team-wide enumeration
+  confirmed this project as the apex's only holder (§4 step 1, `NOT_MEASURED` at A). Status
+  **`PASS`** for the chain as read, `established fact` at the Appendix A instant.
 - **Building a production deployment is not promoting it.** Seven hours after Appendix A, a
   production deployment of an unmerged PR-branch commit was created through a platform API token and
   took the apex for about 77 minutes, bypassing the merge queue and every repository gate. An
@@ -91,9 +92,10 @@ code is written in this slice.
   the apex and its headers are served (Appendix A.6); the other six redirects were not probed. The
   contract's §12 row that rejected treating it as production configuration rested on a measurement
   made under the other publisher; it is amended in this slice to the durable form.
-- **GitHub Actions publishes nothing.** It gates (35 required contexts), tags every deploy-branch
-  push (`auto-tag-release`, with a `Tree-Hash:` annotation), and probes after the fact. No workflow
-  deploys the frontend or the edge functions (re-grepped at the tip: zero deploy steps).
+- **GitHub Actions publishes nothing.** It gates (35 required contexts in the 2026-08-10 ruleset
+  snapshot; the live ruleset is `NOT_MEASURED`), tags each deploy-branch push that carries no tag
+  yet (`auto-tag-release`, with a `Tree-Hash:` annotation; §5.1), and probes after the fact. No
+  workflow deploys the frontend or the edge functions (re-grepped at the tip: zero deploy steps).
 - **Edge functions and the database stay `NOT_MEASURED` / `BLOCKED`.** No Actions path deploys
   edge functions; who does is not measured, and the Supabase tool attached to this session reaches
   only the sandbox project. Migrations reach production through an operator-dispatched workflow
@@ -254,7 +256,7 @@ here. A future restamp re-runs the same steps in the same order.
 
 | Step | Question the step answers                                                                  | Read (tool or command)                                                                                                                           | Label at A                                                                                                         | Status                                                                                          |
 | ---- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| 1    | Which platform project holds the apex domain?                                              | Every team project's domain bindings, cross-checked with the served deployment's `projectId` (M2); DNS names the platform only                   | `established fact` for the candidate's verified binding; that it is the only holder is a `source claim` (A.3 note) | `PASS`                                                                                          |
+| 1    | Which platform project holds the apex domain?                                              | Every team project's domain bindings, cross-checked with the served deployment's `projectId` (M2); DNS names the platform only                   | `established fact` for the candidate's verified binding; that it is the only holder is a `source claim` (A.3 note) | `PASS` for the binding; sole holder `NOT_MEASURED` at A                                         |
 | 2    | Is that project bound to this repository?                                                  | Vercel `list_projects` filtered by this repository's URL; deployment `meta.githubOrg/Repo`                                                       | `established fact`                                                                                                 | `PASS`                                                                                          |
 | 3    | Which deployment does **each production hostname** serve, and did it build the deploy tip? | Vercel `get_deployment <hostname>` for the apex, `www`, `verdant-grow-diary.vercel.app` and the project alias (M10); then git info for each      | `established fact`                                                                                                 | Apex and `www` `PASS` at A (A.1); both `vercel.app` aliases `NOT_MEASURED` at A; `FAIL` at B    |
 | 4    | Are the served bytes that deployment's bytes?                                              | `GET https://verdantgrowdiary.com/version.json`; compare `commit` and `buildTime` with the deployment's `githubCommitSha`, `buildingAt`, `ready` | `established fact` for the fields; `inference` for attribution                                                     | `PASS` at A; `BLOCKED` at B                                                                     |
@@ -321,10 +323,12 @@ not pick one. It records that the choice is open and gives it to Cheek (§7, §1
   production-branch setting names it is `NOT_MEASURED` (§4). Whether `main` pushes are in fact
   suppressed was not observed (the deployment list was filtered to `target=production`):
   `NOT_MEASURED`.
-- Ruleset `20421416` requires 35 contexts, all produced by `ci.yml`, pinned in
-  `config/required-status-checks.json` (`capturedAt: 2026-08-10`; `#1221` added `mustBeGreen`
-  entries and `#1708` a seventh, leaving `required` at 35 — parsed at `c9bc1df3`). Merges are
-  squash through the merge queue.
+- `config/required-status-checks.json`, the pinned mirror of ruleset `20421416`
+  (`capturedAt: 2026-08-10`), lists 35 required contexts, all produced by `ci.yml` (`#1221` added
+  `mustBeGreen` entries and `#1708` a seventh, leaving `required` at 35 — parsed at `c9bc1df3`).
+  That is the snapshot, not the live ruleset: a live read needs an admin token (`:6-10`), so
+  whether the ruleset still requires those 35 is `NOT_MEASURED` here, as contract AC-9.1 records.
+  Merges are squash through the merge queue (`CLAUDE.md`, a `source claim`).
 - **A merge produces a production build, not a promotion.** Everything in this subsection sits
   upstream of axis (F). Whether a merged tip is served is answered only by M10 (§5.7).
 - `auto-tag-release.yml` runs on every push to `main` or `verdant-grow-diary` (`:15-17`) and tags
@@ -453,7 +457,7 @@ example. Every bullet is `established fact` from Vercel reads unless labelled.
   gate.**
   1. _Git auto-assignment_: a push to the deploy branch builds a production deployment, and the
      platform assigns the production domains to it when auto-assignment is in effect. The merge
-     queue and the 35 required contexts sit upstream of this path.
+     queue and its required contexts (35 in the pinned snapshot) sit upstream of this path.
   2. _Promote or redeploy_: any READY deployment, including a preview built from an unmerged PR
      branch, can be made production through the dashboard, the CLI (`vercel promote`,
      `vercel --prod`) or the REST API. No repository gate is involved; the authority is whatever
@@ -577,8 +581,11 @@ Durable. Each is a rule a future slice can be held to; none carries a date.
   hostname → deployment reading of M10 is the platform-side proof, and the stamp stays `BLOCKED`,
   not inferred. A stamp with `commitSource: "none"` is resolved through `treeHash` and the tag
   annotations (`docs/release-provenance-runbook.md`), never through `inherited`.
-- **D-RT-7 — Tags are the provenance anchor, not the release.** `auto-tag-release` proves that a
-  push reached GitHub and records its `Tree-Hash`; it proves nothing about a publish.
+- **D-RT-7 — Tags are the provenance anchor, not the release.** A dated `auto-tag-release` tag
+  proves that a push reached GitHub and records its `Tree-Hash`. A commit that already carried a
+  tag gets neither (§5.1): its tree hash is then recoverable only through the resolver's bounded
+  rescan, and outside that window it resolves as `NO_MATCH`. No tag proves anything about a
+  publish.
 - **D-RT-8 — Edge functions are a separate release.** No frontend publish implies an edge deploy.
   Until M6 is run by someone with production read access, the edge axis stays `NOT_MEASURED` and
   release notes say so.

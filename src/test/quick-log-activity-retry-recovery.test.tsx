@@ -280,6 +280,18 @@ describe("All activity types retry confirmation", () => {
     await waitFor(() => expect(backend.posts).toHaveLength(1));
   });
 
+  it("preserves a standalone manual Note longer than the event RPC limit", async () => {
+    backend.loseFirstReply = false;
+    mount();
+    selectActivity("note");
+    enterNote("a".repeat(501));
+    save();
+    await screen.findByTestId("quick-log-all-activities-saved-item");
+    expect(backend.posts).toHaveLength(1);
+    expect(backend.posts[0].p_note).toBe("a".repeat(501));
+    expect(backend.rows.size).toBe(1);
+  });
+
   it("releases a first structured server rejection so the grower can correct the draft", async () => {
     backend.serverRejectOnPost = 1;
     mount();

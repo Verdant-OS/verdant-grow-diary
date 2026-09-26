@@ -861,7 +861,7 @@ export default function QuickLogAllActivitiesSection({
       setErrorForActivity(selected.id);
       return;
     }
-    const noteLengthError = selected.id === "photo" ? null : validateQuickLogActivityNote(note);
+    const noteLengthError = validateQuickLogActivityNote(selected.id, note);
     if (noteLengthError) {
       setErrorReason(noteLengthError);
       setErrorForActivity(selected.id);

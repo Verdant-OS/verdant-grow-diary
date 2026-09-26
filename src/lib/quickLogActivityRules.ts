@@ -33,8 +33,18 @@ export const QUICK_LOG_ACTIVITY_NOTE_MAX_LENGTH = 500;
 export const QUICK_LOG_ACTIVITY_NOTE_TOO_LONG_REASON =
   "Keep the activity note to 500 characters or fewer before saving.";
 
-/** Match the server's character limit without truncating the grower's text. */
-export function validateQuickLogActivityNote(note: unknown): string | null {
+/** Match the event RPC's character limit without constraining manual Notes. */
+export function validateQuickLogActivityNote(
+  activityId: QuickLogActivityId | null | undefined,
+  note: unknown,
+): string | null {
+  // Photo is stored through the diary attachment path, not the event RPC.
+  if (
+    !activityId ||
+    activityId === "photo" ||
+    QUICK_LOG_ACTIVITY_DEFINITIONS[activityId]?.saveRoute !== "event"
+  )
+    return null;
   if (typeof note !== "string") return null;
   return Array.from(note.trim()).length > QUICK_LOG_ACTIVITY_NOTE_MAX_LENGTH
     ? QUICK_LOG_ACTIVITY_NOTE_TOO_LONG_REASON

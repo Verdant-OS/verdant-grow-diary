@@ -47,7 +47,7 @@ function baseInput(overrides: Partial<WateringTypedEventInput> = {}): WateringTy
 
 function makeClient(
   result: { data?: unknown; error?: unknown } = {
-    data: { ok: true, grow_event_id: "event-1", reused: false },
+    data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: false },
   },
 ) {
   const rpc = vi.fn().mockResolvedValue({
@@ -294,12 +294,12 @@ describe("writeQuickLogWateringTypedEvent — validation", () => {
 describe("writeQuickLogWateringTypedEvent — RPC behavior and idempotency", () => {
   it("returns event identity and reuse state from a successful envelope", async () => {
     const { client, rpc } = makeClient({
-      data: { ok: true, grow_event_id: "event-1", reused: true },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
     });
 
     expect(await writeQuickLogWateringTypedEvent(baseInput(), { client })).toEqual({
       ok: true,
-      eventId: "event-1",
+      eventId: "77777777-7777-4777-8777-000000000001",
       reused: true,
     });
     expect(rpc).toHaveBeenCalledTimes(1);
@@ -308,7 +308,7 @@ describe("writeQuickLogWateringTypedEvent — RPC behavior and idempotency", () 
 
   it("reuses the exact idempotency key and RPC args on a logical retry", async () => {
     const { client, rpc } = makeClient({
-      data: { ok: true, grow_event_id: "event-1", reused: true },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
     });
     const input = baseInput({ idempotency_key: "stable-water-retry" });
 
@@ -378,4 +378,17 @@ describe("writeQuickLogWateringTypedEvent — static safety", () => {
     expect(source).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|createClient\s*\(/);
     expect(source).not.toMatch(/device_command|action_queue|create_alert/);
   });
+});
+
+describe("receipt identity", () => {
+  it.each(["not-an-event", "", " ", null, undefined, 42, {}])(
+    "rejects malformed event ID %j",
+    async (id) => {
+      const { client } = makeClient({ data: { ok: true, grow_event_id: id } });
+      expect(await writeQuickLogWateringTypedEvent(baseInput(), { client })).toEqual({
+        ok: false,
+        reason: "rpc:no_event_id",
+      });
+    },
+  );
 });

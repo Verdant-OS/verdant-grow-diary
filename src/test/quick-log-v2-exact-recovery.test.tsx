@@ -443,7 +443,10 @@ describe("ASTRA-001 related Feed recovery", () => {
     expect(rpcMock).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Product 1 name")).toBeEnabled();
     expect(screen.queryByTestId("qlv2-exact-retry-lock")).not.toBeInTheDocument();
-    rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "feed-corrected" }, error: null });
+    rpcMock.mockResolvedValue({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002" },
+      error: null,
+    });
     fireEvent.change(screen.getByLabelText("Product 1 name"), { target: { value: "Base A" } });
     save();
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
@@ -461,7 +464,10 @@ describe("ASTRA-001 related Feed recovery", () => {
       if (JSON.stringify(payload) !== JSON.stringify(stored)) {
         return { data: { ok: false, reason: "idempotency_key_conflict" }, error: null };
       }
-      return { data: { ok: true, reused: true, grow_event_id: "feed-1" }, error: null };
+      return {
+        data: { ok: true, reused: true, grow_event_id: "77777777-7777-4777-8777-000000000003" },
+        error: null,
+      };
     });
     renderSheet();
     fireEvent.click(screen.getByRole("button", { name: "Feed" }));

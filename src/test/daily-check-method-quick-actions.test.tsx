@@ -18,6 +18,10 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "daily-check-method-owner" }, loading: false }),
+}));
+
 import {
   buildDailyCheckEntryHref,
   isQuickLogDailyCheckMethodHint,

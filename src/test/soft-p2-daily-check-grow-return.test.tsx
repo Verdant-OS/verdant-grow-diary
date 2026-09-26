@@ -5,6 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { QUICK_LOG_V2_OPEN_EVENT, type QuickLogV2OpenIntent } from "@/lib/quickLogV2OpenIntent";
 
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "daily-check-return-owner" }, loading: false }),
+}));
+
 const GROW = "00000000-0000-4000-8000-000000000001";
 const PLANT = "00000000-0000-4000-8000-000000000002";
 const TENT = "00000000-0000-4000-8000-000000000003";

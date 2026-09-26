@@ -267,4 +267,61 @@ describe("Sensor Data idle freshness", () => {
       expect(screen.getByTestId("chart-temp")).toHaveTextContent(source + ":25");
     },
   );
+
+  describe("observed VPD never seeds a later stale derivation", () => {
+    function live(ts: string, observedMetrics: SensorReading["observedMetrics"]): SensorReading {
+      return {
+        ...manual(),
+        source: "live",
+        ts,
+        capturedAt: ts,
+        observedMetrics,
+        freshness: { floor: null, timeSources: ["live"] },
+      };
+    }
+
+    it("does not derive from stale inputs after the observed VPD on the same capture is corrected away", () => {
+      vi.useFakeTimers();
+      const now = new Date("2026-09-24T12:00:00Z");
+      vi.setSystemTime(now);
+      const ts = new Date(now.getTime() - 14 * 60000).toISOString();
+      state.sensors = [live(ts, ["temp", "rh", "vpd"])];
+      state.manuals.data = [];
+      mount();
+      expect(screen.getByTestId("sensors-metric-state-vpd")).toHaveAttribute("data-kind", "live");
+      expect(screen.queryByTestId("sensors-vpd-derived-value")).not.toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(2 * 60000);
+      });
+      expect(screen.getByTestId("sensors-metric-state-vpd")).toHaveAttribute("data-kind", "stale");
+      state.sensors = [live(ts, ["temp", "rh"])];
+      act(() => {
+        vi.advanceTimersByTime(60000);
+      });
+      expect(screen.getByTestId("sensors-metric-state-temp")).toHaveAttribute("data-kind", "stale");
+      expect(screen.queryByTestId("sensors-vpd-derived-value")).not.toBeInTheDocument();
+    });
+
+    it("does not derive from stale inputs after a separate observed VPD reading is removed", () => {
+      vi.useFakeTimers();
+      const now = new Date("2026-09-24T12:00:00Z");
+      vi.setSystemTime(now);
+      const inputsAt = new Date(now.getTime() - 14 * 60000).toISOString();
+      const vpdAt = new Date(now.getTime() - 13 * 60000).toISOString();
+      state.sensors = [live(vpdAt, ["vpd"]), live(inputsAt, ["temp", "rh"])];
+      state.manuals.data = [];
+      mount();
+      expect(screen.getByTestId("sensors-metric-state-vpd")).toHaveAttribute("data-kind", "live");
+      expect(screen.queryByTestId("sensors-vpd-derived-value")).not.toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(3 * 60000);
+      });
+      state.sensors = [live(inputsAt, ["temp", "rh"])];
+      act(() => {
+        vi.advanceTimersByTime(60000);
+      });
+      expect(screen.getByTestId("sensors-metric-state-temp")).toHaveAttribute("data-kind", "stale");
+      expect(screen.queryByTestId("sensors-vpd-derived-value")).not.toBeInTheDocument();
+    });
+  });
 });

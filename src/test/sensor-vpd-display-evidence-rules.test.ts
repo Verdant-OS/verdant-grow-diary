@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { SensorReading } from "@/mock";
-import { selectSensorVpdDisplayEvidence } from "@/lib/sensorVpdDisplayEvidenceRules";
+import {
+  retainDisplayedVpdEvidence,
+  selectSensorVpdDisplayEvidence,
+} from "@/lib/sensorVpdDisplayEvidenceRules";
 
 const reading: SensorReading = {
   tentId: "tent-a",
@@ -72,5 +75,46 @@ describe("Sensor Data cached derived VPD evidence", () => {
     expect(
       selectSensorVpdDisplayEvidence([{ ...reading, status: "stale" }, fresh], previous)?.reading,
     ).toBe(fresh);
+  });
+});
+
+describe("retainDisplayedVpdEvidence", () => {
+  const evidence = { reading, temperatureC: 25, humidityPct: 55 };
+
+  it("keeps the same evidence object while its derived estimate is displayed", () => {
+    expect(retainDisplayedVpdEvidence(evidence, 1.27)).toBe(evidence);
+    expect(retainDisplayedVpdEvidence(evidence, 0)).toBe(evidence);
+  });
+
+  it.each([null, Number.NaN, Number.POSITIVE_INFINITY])(
+    "remembers nothing when no derived estimate was displayed (%s)",
+    (displayed) => {
+      expect(retainDisplayedVpdEvidence(evidence, displayed)).toBeNull();
+    },
+  );
+
+  it("remembers nothing without evidence and does not mutate its input", () => {
+    const before = structuredClone(evidence);
+    expect(retainDisplayedVpdEvidence(null, 1.27)).toBeNull();
+    retainDisplayedVpdEvidence(evidence, null);
+    expect(evidence).toEqual(before);
+  });
+
+  it("an observed-VPD visit leaves no cache, so a corrected-away value cannot derive from stale inputs", () => {
+    const observed: SensorReading = {
+      ...reading,
+      vpd: 1.2,
+      observedMetrics: ["temp", "rh", "vpd"],
+    };
+    const shown = selectSensorVpdDisplayEvidence([observed], null);
+    expect(shown).not.toBeNull();
+    const cache = retainDisplayedVpdEvidence(shown, null);
+    expect(cache).toBeNull();
+    const corrected: SensorReading = {
+      ...observed,
+      status: "stale",
+      observedMetrics: ["temp", "rh"],
+    };
+    expect(selectSensorVpdDisplayEvidence([corrected], cache)).toBeNull();
   });
 });

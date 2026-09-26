@@ -42,6 +42,13 @@ interface Props {
   snapshotSource?: SnapshotSource;
   className?: string;
   testId?: string;
+  /**
+   * What an empty, unavailable read describes. "account" (default) is a
+   * list read: nothing exists yet. "record" is a single-record read (for
+   * example one plant by id): its absence says nothing about the account's
+   * other records, so it must not say "No real plants yet".
+   */
+  emptyStateScope?: "account" | "record";
 }
 
 export default function GrowDataSourceDisclosure({
@@ -52,6 +59,7 @@ export default function GrowDataSourceDisclosure({
   snapshotSource,
   className,
   testId = "grow-data-source-disclosure",
+  emptyStateScope = "account",
 }: Props) {
   const combined = combineGrowDataMeta(metas);
   const label: Label = LABEL_BY_SOURCE[combined.dataSource];
@@ -113,11 +121,24 @@ export default function GrowDataSourceDisclosure({
             Unavailable
           </Badge>
         </div>
-        <h2 className="font-display font-semibold">No real {resource} yet</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Add your first {resource.replace(/s$/, "")} to start tracking real data.
-        </p>
-        {welcomeAction && <div className="mt-3">{welcomeAction}</div>}
+        {emptyStateScope === "record" ? (
+          <>
+            <h2 className="font-display font-semibold">
+              This {resource.replace(/s$/, "")} isn&apos;t available
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              No data is shown for it. Your other {resource} are not affected.
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 className="font-display font-semibold">No real {resource} yet</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Add your first {resource.replace(/s$/, "")} to start tracking real data.
+            </p>
+            {welcomeAction && <div className="mt-3">{welcomeAction}</div>}
+          </>
+        )}
       </section>
     );
   }

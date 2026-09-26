@@ -166,11 +166,6 @@ const EXEMPTIONS: Record<string, { class: string; reason: string }> = {
     reason:
       'Credential-free and fully mocked (9 page.route), so this is real signal. 1 of its tests fails deterministically (2 of 2 runs): expect(page).toHaveURL() received "" at the post-signup Timeline assertion. Needs its own triage slice — product defect vs stale expectation is not yet established.',
   },
-  "e2e/timeline-local-day-date-filter.spec.ts": {
-    class: EXEMPTION_CLASS.RED_WHEN_RUN,
-    reason:
-      'Credential-free and mocked (8 page.route). Both tests fail deterministically (2 of 2 runs). (a) "diary_entries lower bound" expected the America/Chicago local-day start, received null. (b) "read-only load must never write" observed POST /rest/v1/rpc/has_role — but a Supabase RPC is POST even for a pure read, so that fence conflates HTTP method with mutation and is likely a test-contract defect, not a product write. Both need triage before wiring.',
-  },
   "e2e/ui-overhaul-responsive.spec.ts": {
     class: EXEMPTION_CLASS.RED_WHEN_RUN,
     reason:
@@ -299,7 +294,7 @@ describe("test execution manifest — every committed test runs, or says why not
     // 19 deno files and 14 specs. Regressing below today's counts fails.
     const byLabel = Object.fromEntries(audit.lanes.map((l: { label: string }) => [l.label, l]));
     expect(byLabel["deno edge tests"].executed).toBeGreaterThanOrEqual(29);
-    expect(byLabel["playwright specs"].executed).toBeGreaterThanOrEqual(49);
+    expect(byLabel["playwright specs"].executed).toBeGreaterThanOrEqual(50);
     expect(byLabel["runtime harnesses"].executed).toBeGreaterThanOrEqual(23);
     expect(byLabel["pgTAP suites"].executed).toBeGreaterThanOrEqual(2);
   });
@@ -317,7 +312,7 @@ describe("test execution manifest — every committed test runs, or says why not
     expect(byClass).toEqual({
       [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 25,
       [EXEMPTION_CLASS.NOT_HERMETIC]: 8,
-      [EXEMPTION_CLASS.RED_WHEN_RUN]: 3,
+      [EXEMPTION_CLASS.RED_WHEN_RUN]: 2,
       [EXEMPTION_CLASS.AWAITING_DECISION]: 1,
     });
     expect(byClass[EXEMPTION_CLASS.FLAKY] ?? 0).toBe(0);

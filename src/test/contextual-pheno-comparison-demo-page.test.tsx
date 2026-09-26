@@ -52,7 +52,7 @@ describe("ContextualPhenoComparisonDemo page", () => {
   });
 
   it("does not call fetch on render", () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       throw new Error("fetch must not be called");
     });
     renderPage();

@@ -51,7 +51,7 @@ function makeContext(events: ReadonlyArray<Record<string, unknown>>) {
 
 describe("AiDoctorContextReadinessPanel quick actions", () => {
   it("renders Fast Add Photo / Add Watering / Add Feeding when missing", () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((() => {
       throw new Error("fetch not allowed in quick-action panel test");
     }) as never);
 

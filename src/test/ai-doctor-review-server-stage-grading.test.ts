@@ -53,7 +53,13 @@ function gradingOrderProblems(code: string): string[] {
   return problems;
 }
 
+type Reading = { field: string; value: number; unit: string };
+
 function packet(rh: number, severity: "ok" | "warning") {
+  return packetWith([{ field: "humidity_pct", value: rh, unit: "%" }], severity);
+}
+
+function packetWith(readings: Reading[], severity: "ok" | "warning" = "ok") {
   return {
     schemaVersion: 1,
     plant: { strain: "Northern Lights", stage: "flower", medium: "coco", potSize: "11 L" },
@@ -62,10 +68,10 @@ function packet(rh: number, severity: "ok" | "warning") {
     recentSensorSnapshot: {
       capturedAt: "2026-09-25T12:05:00.000Z",
       severity,
-      readings: [{ field: "humidity_pct", value: rh, unit: "%" }],
+      readings,
     },
     recentSensorSnapshotAnnotation: {
-      line: `[source=manual, trust=medium] humidity_pct=${rh} %`,
+      line: `[source=manual, trust=medium] ${readings.map((r) => `${r.field}=${r.value} ${r.unit}`).join(", ")}`,
       source: "manual",
       stale: false,
       trust: "medium",
@@ -101,6 +107,58 @@ describe("server-side stage-target grading", () => {
     const graded = serverGrade(packet(50, "ok"));
     expect(graded.recentSensorSnapshot?.severity).toBe("ok");
     expect(graded.recentSensorSnapshotAnnotation?.safetyNotes).toEqual([]);
+  });
+});
+
+// Codex review on #1683 (round 17): the grounding check accepts a reading as
+// humidity, temperature or VPD evidence by metric alias (`rh`, `temp`, `VPD`)
+// and unit, but grading looked only at the canonical field names. RH 95% sent
+// as `rh` stayed "ok" and could back a "stable" claim.
+describe("server-side stage-target grading covers every field the grounding check accepts", () => {
+  function notes(readings: Reading[]) {
+    const graded = serverGrade(packetWith(readings));
+    return {
+      severity: graded.recentSensorSnapshot?.severity,
+      notes: graded.recentSensorSnapshotAnnotation?.safetyNotes ?? [],
+    };
+  }
+
+  it("RH 95% sent as `rh` is graded as humidity", () => {
+    expect(notes([{ field: "rh", value: 95, unit: "%" }])).toEqual({
+      severity: "warning",
+      notes: [
+        "Current humidity 95% is above the flower target range (40–55%). Do not describe the environment as stable or healthy.",
+      ],
+    });
+  });
+
+  it("95 °F sent as `air_temp` is graded as temperature, in Celsius", () => {
+    const { severity, notes: out } = notes([{ field: "air_temp", value: 95, unit: "°F" }]);
+    expect(severity).toBe("warning");
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatch(/^Current air temperature 35°C is above the flower target range /);
+  });
+
+  it("2.5 kPa sent as `VPD` is graded as VPD", () => {
+    const { severity, notes: out } = notes([{ field: "VPD", value: 2.5, unit: "kPa" }]);
+    expect(severity).toBe("warning");
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatch(/^Current VPD 2\.5 kPa is above the flower target range /);
+  });
+
+  it("an aliased reading out of range is graded even beside an in-range canonical one", () => {
+    const { severity, notes: out } = notes([
+      { field: "humidity_pct", value: 50, unit: "%" },
+      { field: "rh", value: 95, unit: "%" },
+    ]);
+    expect(severity).toBe("warning");
+    expect(out).toEqual([
+      "Current humidity 95% is above the flower target range (40–55%). Do not describe the environment as stable or healthy.",
+    ]);
+  });
+
+  it("an in-range aliased reading stays ok", () => {
+    expect(notes([{ field: "rh", value: 50, unit: "%" }])).toEqual({ severity: "ok", notes: [] });
   });
 });
 

@@ -12,7 +12,7 @@ import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { applyStageTargetSeverityToPacket } from "../_shared/aiDoctorPacketStageTargetRules.ts";
 import { validateAndNormalizeAiDoctorReviewRequestPacket } from "../_shared/aiDoctorReviewRequestPacketValidationRules.ts";
 
-function packet(rh: number) {
+function packet(rh: number, field = "humidity_pct") {
   return {
     schemaVersion: 1,
     plant: { strain: "Northern Lights", stage: "flower", medium: "coco", potSize: "11 L" },
@@ -21,10 +21,10 @@ function packet(rh: number) {
     recentSensorSnapshot: {
       capturedAt: "2026-09-25T12:05:00.000Z",
       severity: "ok",
-      readings: [{ field: "humidity_pct", value: rh, unit: "%" }],
+      readings: [{ field, value: rh, unit: "%" }],
     },
     recentSensorSnapshotAnnotation: {
-      line: `[source=manual, trust=medium] humidity_pct=${rh} %`,
+      line: `[source=manual, trust=medium] ${field}=${rh} %`,
       source: "manual",
       stale: false,
       trust: "medium",
@@ -58,4 +58,14 @@ Deno.test("an in-range reading stays ok", () => {
   const graded = serverGrade(packet(50));
   assertEquals(graded.recentSensorSnapshot?.severity, "ok");
   assertEquals(graded.recentSensorSnapshotAnnotation?.safetyNotes, []);
+});
+
+// Codex review on #1683 (round 17): the grounding check reads `rh` as
+// humidity, so grading must too, or RH 95% sent as `rh` stays "ok".
+Deno.test("RH 95% sent as the alias rh is graded as humidity", () => {
+  const graded = serverGrade(packet(95, "rh"));
+  assertEquals(graded.recentSensorSnapshot?.severity, "warning");
+  assertEquals(graded.recentSensorSnapshotAnnotation?.safetyNotes, [
+    "Current humidity 95% is above the flower target range (40–55%). Do not describe the environment as stable or healthy.",
+  ]);
 });

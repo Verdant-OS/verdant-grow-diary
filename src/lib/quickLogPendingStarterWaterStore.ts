@@ -1,6 +1,11 @@
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
 import type { QuickLogResolvedTarget } from "./quickLogTargetIntegrityRules";
 import { isUuid } from "./isUuid";
+import {
+  starterWaterRecoveryKey,
+  typedWaterRecoveryKey,
+  waterRecoveryLockKey,
+} from "./quickLogWaterRecoveryKeys";
 
 /** The legacy public-starter Water RPC must replay this exact logical write. */
 export interface PendingStarterWater {
@@ -23,6 +28,8 @@ export const STARTER_WATER_RECOVERY_UNAVAILABLE =
   "Watering recovery storage cannot be verified. Watering is paused until storage access returns; other log types can still be saved.";
 export const STARTER_WATER_RECOVERY_CLEAR_FAILED =
   "Your Watering is saved, but recovery could not be cleared. Retry recovery before logging another Watering.";
+export const TYPED_WATER_RECOVERY_PENDING =
+  "An earlier Watering from Quick Log may already be saved. Reopen Quick Log and resolve that Watering before starting another.";
 
 export type PendingStarterWaterRead =
   { status: "empty" } | { status: "pending"; record: PendingStarterWater } | { status: "blocked" };
@@ -55,7 +62,7 @@ const RECORD_KEYS = [
   "reviewedDraftUpdatedAt",
 ] as const;
 
-const storageKey = (ownerId: string) => `verdant:quick-log:pending-starter-water:v1:${ownerId}`;
+const storageKey = starterWaterRecoveryKey;
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null &&
   typeof value === "object" &&
@@ -134,6 +141,7 @@ export async function claimPendingStarterWater(
 ): Promise<
   | { status: "claimed"; record: PendingStarterWater }
   | { status: "pending"; record: PendingStarterWater }
+  | { status: "other_pending" }
   | { status: "blocked" }
 > {
   try {
@@ -143,7 +151,11 @@ export async function claimPendingStarterWater(
     // it two tabs could both observe an empty slot and dispatch different keys.
     const locks = window.navigator.locks;
     if (!locks?.request) return { status: "blocked" };
-    return await locks.request(storageKey(record.ownerId), { mode: "exclusive" }, () => {
+    return await locks.request(waterRecoveryLockKey(record.ownerId), { mode: "exclusive" }, () => {
+      // A typed Water is held in the same origin-wide storage. Any value,
+      // including an unreadable one, blocks a different Water operation.
+      if (window.localStorage.getItem(typedWaterRecoveryKey(record.ownerId)) !== null)
+        return { status: "other_pending" as const };
       const current = readPendingStarterWater(record.ownerId);
       if (current.status === "blocked") return current;
       if (current.status === "pending")
@@ -167,7 +179,7 @@ export async function clearPendingStarterWater(record: PendingStarterWater): Pro
     if (!record || !validRecord(record, record.ownerId)) return false;
     const locks = window.navigator.locks;
     if (!locks?.request) return false;
-    return await locks.request(storageKey(record.ownerId), { mode: "exclusive" }, () => {
+    return await locks.request(waterRecoveryLockKey(record.ownerId), { mode: "exclusive" }, () => {
       const current = readPendingStarterWater(record.ownerId);
       if (current.status !== "pending" || !sameRecord(current.record, record)) return false;
       window.localStorage.removeItem(storageKey(record.ownerId));

@@ -1634,24 +1634,28 @@ function QuickLogV2SheetForOwner({
     }
     if (exactWateringSubmission) {
       if (!canContinueNote() || exactWateringSubmission.recovery.ownerId !== user?.id) return;
-      const claim = claimPendingQuickLogWatering(exactWateringSubmission.recovery);
+      const claim = await claimPendingQuickLogWatering(exactWateringSubmission.recovery);
       if (claim.status !== "claimed") {
         if (claim.status === "pending") restorePendingWatering(claim.record);
         else {
           if (!pendingWateringSubmission) wateringRetrySubmissionRef.current = null;
           else keepSubmissionLockedRef.current = true;
-          setLocalError(WATERING_RECOVERY_UNAVAILABLE);
+          setLocalError(
+            claim.status === "other_pending"
+              ? STARTER_WATER_RECOVERY_PENDING
+              : WATERING_RECOVERY_UNAVAILABLE,
+          );
         }
         return;
       }
       exactWateringSubmission.recovery = claim.record;
       keepSubmissionLockedRef.current = true;
     }
-    const releaseUnsentWatering = () => {
+    const releaseUnsentWatering = async () => {
       if (!exactWateringSubmission) return;
       if (
         !pendingWateringSubmission &&
-        clearPendingQuickLogWatering(exactWateringSubmission.recovery)
+        (await clearPendingQuickLogWatering(exactWateringSubmission.recovery))
       ) {
         wateringRetrySubmissionRef.current = null;
         keepSubmissionLockedRef.current = false;
@@ -1741,7 +1745,7 @@ function QuickLogV2SheetForOwner({
     let uploadedPath: string | null = null;
     if (submissionPhotoFile) {
       if (!resolved.growId) {
-        releaseUnsentWatering();
+        await releaseUnsentWatering();
         releaseUnsentNote();
         setLocalError("Choose a target with grow context before attaching a photo.");
         return;
@@ -1759,7 +1763,7 @@ function QuickLogV2SheetForOwner({
         return;
       }
       if (!upload.ok) {
-        releaseUnsentWatering();
+        await releaseUnsentWatering();
         releaseUnsentNote();
         setLocalError((upload as { message: string }).message);
         setSaveStatus("");
@@ -1774,11 +1778,15 @@ function QuickLogV2SheetForOwner({
         throw new Error("Structured Water submission lock was not created.");
       }
       if (!canContinueNote() || exactWateringSubmission.recovery.ownerId !== user?.id) return;
-      const claim = claimPendingQuickLogWatering(exactWateringSubmission.recovery);
+      const claim = await claimPendingQuickLogWatering(exactWateringSubmission.recovery);
       if (claim.status !== "claimed") {
         keepSubmissionLockedRef.current = true;
         setWateringRetryPending(true);
-        setLocalError(WATERING_RECOVERY_UNAVAILABLE);
+        setLocalError(
+          claim.status === "other_pending"
+            ? STARTER_WATER_RECOVERY_PENDING
+            : WATERING_RECOVERY_UNAVAILABLE,
+        );
         return;
       }
       // A second tab can claim the public-starter Water record after this
@@ -1792,7 +1800,7 @@ function QuickLogV2SheetForOwner({
             .remove([uploadedPath])
             .catch(() => {});
         }
-        releaseUnsentWatering();
+        await releaseUnsentWatering();
         setLocalError(
           starterWater.status === "pending"
             ? STARTER_WATER_RECOVERY_PENDING
@@ -1989,7 +1997,7 @@ function QuickLogV2SheetForOwner({
     if (exactSubmission && !canContinueNote()) return;
     let recoveryClearFailed = false;
     if (exactWateringSubmission) {
-      recoveryClearFailed = !clearPendingQuickLogWatering(exactWateringSubmission.recovery);
+      recoveryClearFailed = !(await clearPendingQuickLogWatering(exactWateringSubmission.recovery));
       setWateringStorageFence(recoveryClearFailed);
       confirmedWateringRecoveryRef.current = recoveryClearFailed
         ? exactWateringSubmission.recovery
@@ -2074,7 +2082,7 @@ function QuickLogV2SheetForOwner({
    * save cycle can proceed. Preserves the selected target so the
    * grower doesn't lose their place.
    */
-  function handleRecheckNoteStorage() {
+  async function handleRecheckNoteStorage() {
     if (!postSave || !recoveryStorageFence || saveInFlightRef.current) return;
     const confirmedFeeding = confirmedFeedingRecoveryRef.current;
     if (confirmedFeeding) {
@@ -2096,7 +2104,7 @@ function QuickLogV2SheetForOwner({
       const current = readPendingQuickLogWatering(confirmedWatering.ownerId);
       const cleared =
         current.status === "empty" ||
-        (current.status === "pending" && clearPendingQuickLogWatering(confirmedWatering));
+        (current.status === "pending" && (await clearPendingQuickLogWatering(confirmedWatering)));
       if (!cleared) {
         setLocalError(WATERING_RECOVERY_CLEAR_FAILED);
         return;

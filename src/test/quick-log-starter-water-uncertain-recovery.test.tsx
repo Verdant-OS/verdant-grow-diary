@@ -83,8 +83,14 @@ import {
   claimPendingStarterWater,
   clearPendingStarterWater,
   readPendingStarterWater,
+  TYPED_WATER_RECOVERY_PENDING,
   type PendingStarterWater,
 } from "@/lib/quickLogPendingStarterWaterStore";
+import {
+  claimPendingQuickLogWatering,
+  readPendingQuickLogWatering,
+  type PendingQuickLogWatering,
+} from "@/lib/quickLogPendingWateringStore";
 import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 import {
   PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY,
@@ -158,6 +164,43 @@ afterEach(() => {
 });
 
 describe("legacy public-starter Water uncertain receipt", () => {
+  it("shows typed-Water recovery and sends no starter RPC while another tab owns Water", async () => {
+    const occurredAt = "2026-09-26T08:00:00.000Z";
+    const typed: PendingQuickLogWatering = {
+      version: 1,
+      ownerId: "user-1",
+      createdAt: occurredAt,
+      payload: {
+        idempotency_key: "typed-water-key",
+        grow_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        tent_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        plant_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        occurred_at: occurredAt,
+        volume_ml: 250,
+      },
+      resolved: {
+        ok: true,
+        targetType: "plant",
+        targetId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+      attachments: { photo: false, video: false },
+    };
+    expect((await claimPendingQuickLogWatering(typed)).status).toBe("claimed");
+    seed();
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-save-error")).toHaveTextContent(
+        TYPED_WATER_RECOVERY_PENDING,
+      ),
+    );
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(readPendingQuickLogWatering("user-1")).toEqual({ status: "pending", record: typed });
+  });
+
   it("locks edits and replays the exact stored payload after close and reopen", async () => {
     seed();
     saveMock

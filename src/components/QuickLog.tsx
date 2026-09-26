@@ -100,6 +100,7 @@ import {
   STARTER_WATER_RECOVERY_CLEAR_FAILED,
   STARTER_WATER_RECOVERY_PENDING,
   STARTER_WATER_RECOVERY_UNAVAILABLE,
+  TYPED_WATER_RECOVERY_PENDING,
   claimPendingStarterWater,
   clearPendingStarterWater,
   reconcilePendingStarterWaterClear,
@@ -1517,11 +1518,13 @@ export default function QuickLog({
         });
         if (claim.status !== "claimed") {
           if (claim.status === "pending") setStarterWaterPending(claim.record);
-          else setStarterWaterStorageBlocked(true);
+          else if (claim.status === "blocked") setStarterWaterStorageBlocked(true);
           setSaveError(
             claim.status === "pending"
               ? STARTER_WATER_RECOVERY_PENDING
-              : STARTER_WATER_RECOVERY_UNAVAILABLE,
+              : claim.status === "other_pending"
+                ? TYPED_WATER_RECOVERY_PENDING
+                : STARTER_WATER_RECOVERY_UNAVAILABLE,
           );
           return;
         }

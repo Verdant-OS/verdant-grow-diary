@@ -6,11 +6,12 @@
  * that failed or photo-blocked saves do NOT invalidate or inject any
  * optimistic timeline rows.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const rpcMock = vi.fn();
 
@@ -90,12 +91,32 @@ function clickSave() {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
 }
 
+const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 beforeEach(() => {
   window.sessionStorage.clear();
+  clearLocalStorageForTest();
+  let tail: Promise<unknown> = Promise.resolve();
+  Object.defineProperty(window.navigator, "locks", {
+    configurable: true,
+    value: {
+      request: (_name: string, _options: unknown, callback: () => unknown) => {
+        const turn = tail.then(callback);
+        tail = turn.then(
+          () => undefined,
+          () => undefined,
+        );
+        return turn;
+      },
+    },
+  });
   rpcMock.mockReset();
   invalidateSpy.mockReset();
   toastSuccess.mockReset();
   toastError.mockReset();
+});
+afterEach(() => {
+  if (originalLocks) Object.defineProperty(window.navigator, "locks", originalLocks);
+  else Reflect.deleteProperty(window.navigator, "locks");
 });
 
 describe("QuickLogV2Sheet — post-save refresh", () => {
@@ -122,7 +143,11 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
 
   it("tent-targeted save invalidates tent grouped timeline keys", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002", environment_event_id: null },
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000002",
+        environment_event_id: null,
+      },
       error: null,
     });
     renderSheet("tent:tent-1");
@@ -138,7 +163,11 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
 
   it("plant-in-tent save also refreshes tent grouped timeline (broad prefix)", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000003", environment_event_id: null },
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000003",
+        environment_event_id: null,
+      },
       error: null,
     });
     renderSheet("plant:plant-1");

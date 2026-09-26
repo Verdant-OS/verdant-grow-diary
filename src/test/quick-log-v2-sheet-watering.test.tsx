@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -142,10 +142,25 @@ function clickSave() {
   fireEvent.click(screen.getByTestId("qlv2-save"));
 }
 
+const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 beforeEach(() => {
   authState.ownerId = "user-1";
   window.sessionStorage.clear();
   clearLocalStorageForTest();
+  let tail: Promise<unknown> = Promise.resolve();
+  Object.defineProperty(window.navigator, "locks", {
+    configurable: true,
+    value: {
+      request: (_name: string, _options: unknown, callback: () => unknown) => {
+        const turn = tail.then(callback);
+        tail = turn.then(
+          () => undefined,
+          () => undefined,
+        );
+        return turn;
+      },
+    },
+  });
   clearTemperatureUnitPreference();
   rpcMock.mockReset();
   wateringWriterMock.mockReset();
@@ -176,6 +191,10 @@ beforeEach(() => {
   } else {
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:watering-photo");
   }
+});
+afterEach(() => {
+  if (originalLocks) Object.defineProperty(window.navigator, "locks", originalLocks);
+  else Reflect.deleteProperty(window.navigator, "locks");
 });
 
 async function installAcceptedWaterLedger(loseFirstReply = true) {
@@ -329,7 +348,7 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
     );
   });
 
-  it("does not dispatch Water when same-tab durable storage cannot retain the operation", async () => {
+  it("does not dispatch Water when shared recovery storage cannot retain the operation", async () => {
     const committed = await installAcceptedWaterLedger();
     renderSheet("plant:plant-1", "water");
     enterVolume("750");
@@ -339,7 +358,7 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
       key: string,
       value: string,
     ) {
-      if (this === window.sessionStorage) throw new Error("simulated same-tab storage denial");
+      if (this === window.localStorage) throw new Error("simulated shared storage denial");
       return originalSetItem.call(this, key, value);
     });
     try {
@@ -363,7 +382,7 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
       this: Storage,
       key: string,
     ) {
-      if (this === window.sessionStorage) throw new Error("cleanup unavailable");
+      if (this === window.localStorage) throw new Error("cleanup unavailable");
       originalRemove.call(this, key);
     });
     try {

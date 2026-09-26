@@ -879,7 +879,7 @@ describe("Timeline mounted read-state boundary", () => {
     expect(screen.getByText("Manual room check")).toBeInTheDocument();
   });
 
-  it("excludes a stale Plant Quick Log persist snapshot from Measurements", async () => {
+  it("retains an old Plant Quick Log snapshot with unverified capture time in Measurements", async () => {
     mockPlantQuickLogPersistQueries("2026-07-20T13:00:00.000Z");
 
     renderTimeline("/timeline?sensorSources=manual");
@@ -887,8 +887,16 @@ describe("Timeline mounted read-state boundary", () => {
     await expectPlantQuickLogPersistCardVisibleOnce();
 
     fireEvent.click(screen.getByRole("button", { name: /^Measurements/ }));
-    expect(screen.queryByText("Manual room check")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("timeline-manual-snapshot")).toBeNull();
+    const entry = (await screen.findByText("Manual room check")).closest(
+      '[data-testid="timeline-entry"]',
+    );
+    expect(entry).not.toBeNull();
+    const snapshot = within(entry as HTMLElement).getByTestId("timeline-manual-snapshot");
+    expect(snapshot).toHaveTextContent("Capture time unverified — not current.");
+    expect(within(snapshot).getByTestId("timeline-sensor-source-badge-manual")).toHaveTextContent(
+      "Source: manual",
+    );
+    expect(screen.getAllByTestId("timeline-manual-snapshot")).toHaveLength(1);
   });
 
   it("preserves canonical and legacy snapshot precedence, aliases, and formatting", async () => {

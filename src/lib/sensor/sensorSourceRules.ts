@@ -79,7 +79,7 @@ export function normalizeSensorSource(input: unknown): SensorSource {
   if (typeof input !== "string") return "invalid";
   const v = input.trim().toLowerCase();
   if (v.length === 0) return "invalid";
-  return ALIAS[v] ?? "invalid";
+  return Object.prototype.hasOwnProperty.call(ALIAS, v) ? ALIAS[v] : "invalid";
 }
 
 export function isHealthySensorSource(source: SensorSource): boolean {

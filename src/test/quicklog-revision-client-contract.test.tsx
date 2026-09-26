@@ -35,6 +35,11 @@ import {
   retractQuickLogEntry,
 } from "@/lib/quickLogRevisionService";
 
+// The revision RPCs return Postgres UUIDs. Keep receipt fixtures valid apart from the field a
+// test is about, so a stricter receipt parser cannot reject them for an unrelated reason.
+const RECEIPT_REVISION_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+const RECEIPT_DIARY_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
 function makeRevisionRow(overrides: Record<string, unknown> = {}) {
   return {
     actor_id: "actor-1",
@@ -162,12 +167,14 @@ describe("Quick Log revision client contract", () => {
         revision_id: "",
         revision_no: 1,
         grow_event_id: null,
-        diary_entry_ids: ["diary-1"],
+        diary_entry_ids: [RECEIPT_DIARY_ID],
       },
       error: null,
     });
 
-    await expect(retractQuickLogEntry({ diaryEntryId: "diary-1" }, "accidental")).resolves.toEqual({
+    await expect(
+      retractQuickLogEntry({ diaryEntryId: RECEIPT_DIARY_ID }, "accidental"),
+    ).resolves.toEqual({
       ok: false,
       reason: "rpc_error",
     });
@@ -177,24 +184,28 @@ describe("Quick Log revision client contract", () => {
     supabaseMock.rpc.mockResolvedValue({
       data: {
         ok: true,
-        revision_id: "revision-1",
+        revision_id: RECEIPT_REVISION_ID,
         revision_no: 1,
         grow_event_id: null,
-        diary_entry_ids: ["diary-1"],
+        diary_entry_ids: [RECEIPT_DIARY_ID],
       },
       error: null,
     });
 
-    await retractQuickLogEntry({ diaryEntryId: "diary-1" }, "accidental");
-    await correctQuickLogEntry({ diaryEntryId: "diary-1" }, "typo", {
-      note: "Corrected note",
-    });
+    await expect(
+      retractQuickLogEntry({ diaryEntryId: RECEIPT_DIARY_ID }, "accidental"),
+    ).resolves.toMatchObject({ ok: true });
+    await expect(
+      correctQuickLogEntry({ diaryEntryId: RECEIPT_DIARY_ID }, "typo", {
+        note: "Corrected note",
+      }),
+    ).resolves.toMatchObject({ ok: true });
 
     expect(supabaseMock.rpc).toHaveBeenNthCalledWith(1, "quicklog_retract_entry", {
       p_idempotency_key: expect.any(String),
       p_reason_code: "accidental",
       p_grow_event_id: undefined,
-      p_diary_entry_id: "diary-1",
+      p_diary_entry_id: RECEIPT_DIARY_ID,
       p_reason_note: undefined,
     });
     expect(supabaseMock.rpc).toHaveBeenNthCalledWith(2, "quicklog_correct_entry", {
@@ -202,7 +213,7 @@ describe("Quick Log revision client contract", () => {
       p_reason_code: "typo",
       p_changes: { note: "Corrected note" },
       p_grow_event_id: undefined,
-      p_diary_entry_id: "diary-1",
+      p_diary_entry_id: RECEIPT_DIARY_ID,
       p_reason_note: undefined,
     });
   });

@@ -18,6 +18,7 @@ import { Link } from "@/lib/react-router-compat";
 import { AlertTriangle, Bell, Box, Gauge, ListTodo } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
+import { useNowTick } from "@/hooks/useNowTick";
 import {
   buildPlantEnvironmentReadView,
   buildPlantTentEnvironmentView,
@@ -34,10 +35,11 @@ interface Props {
 }
 
 export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
+  const nowMs = useNowTick();
   const hasTent = !!tentId;
   const environmentQuery = usePlantTentLatestReadings(hasTent ? (tentId ?? null) : null);
   const readings = hasTent ? (environmentQuery.data ?? []) : [];
-  const env = buildPlantTentEnvironmentView(readings);
+  const env = buildPlantTentEnvironmentView(readings, nowMs);
   const environmentReadView = buildPlantEnvironmentReadView({
     ...environmentQuery,
     enabled: hasTent,

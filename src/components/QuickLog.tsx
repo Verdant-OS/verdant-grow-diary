@@ -1921,15 +1921,15 @@ export default function QuickLog({
           isSaveBlocked={isSaveInFlight}
           onBeforeStructuredWaterOpen={() => {
             if (recoveryLocked || starterWaterStorageBlocked) {
-              setSaveError(
-                recoveryLocked
-                  ? STARTER_WATER_RECOVERY_PENDING
-                  : STARTER_WATER_RECOVERY_UNAVAILABLE,
-              );
-              return;
+              const reason = recoveryLocked
+                ? STARTER_WATER_RECOVERY_PENDING
+                : STARTER_WATER_RECOVERY_UNAVAILABLE;
+              setSaveError(reason);
+              return reason;
             }
             onOpenChange(false);
             reset();
+            return undefined;
           }}
         />
 

@@ -60,6 +60,7 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), message: v
 
 import QuickLog, { type QuickLogPrefill } from "@/components/QuickLog";
 import { readPendingStarterWater } from "@/lib/quickLogPendingStarterWaterStore";
+import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 import {
   PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY,
   serializePublicQuickLogStarterDraft,
@@ -195,6 +196,18 @@ describe("legacy public-starter Water uncertain receipt", () => {
     expect(saveMock).not.toHaveBeenCalled();
     expect(screen.getByTestId("quick-log-save")).not.toBeDisabled();
     expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).not.toBeNull();
+
+    const v2Open = vi.fn();
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, v2Open);
+    try {
+      fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-picker-watering"));
+      expect(
+        screen.getByTestId("quick-log-dialog-all-activities-structured-water-error"),
+      ).toHaveTextContent("Watering recovery storage cannot be verified");
+      expect(v2Open).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, v2Open);
+    }
   });
 
   it("keeps non-Water notes available when Water recovery storage is denied", async () => {

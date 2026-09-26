@@ -111,8 +111,8 @@ export interface QuickLogAllActivitiesSectionProps {
   saveBlocked?: boolean;
   /** Reads the same parent-owned synchronous guard used to acquire a save. */
   isSaveBlocked?: () => boolean;
-  /** Parent-owned close/reset seam used before handing Water to Quick Log v2. */
-  onBeforeStructuredWaterOpen?: () => void;
+  /** Parent may veto with a nonempty reason; other return values preserve legacy callbacks. */
+  onBeforeStructuredWaterOpen?: () => unknown;
   /** Caller-owned fail-closed reason that must prevent every persistence path. */
   externalPersistenceBlockReason?: string | null;
   /**
@@ -363,7 +363,11 @@ export default function QuickLogAllActivitiesSection({
       setStructuredWaterError("Choose a plant or tent before logging Water.");
       return false;
     }
-    onBeforeStructuredWaterOpen?.();
+    const waterBlockReason = onBeforeStructuredWaterOpen?.();
+    if (typeof waterBlockReason === "string" && waterBlockReason.trim()) {
+      setStructuredWaterError(waterBlockReason);
+      return false;
+    }
     window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, { detail: intent }));
     return true;
   }, [externalPersistenceBlockReason, growId, onBeforeStructuredWaterOpen, plantId, tentId]);

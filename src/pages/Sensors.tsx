@@ -24,6 +24,9 @@ import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
 import SensorsTestbenchPanel from "@/components/SensorsTestbenchPanel";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
+import { usePlants } from "@/hooks/use-plants";
+import { useGrows } from "@/store/grows";
+import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
 import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
 import { mergeSensorsSeriesWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
@@ -266,8 +269,26 @@ export default function Sensors() {
     soilMoistureCalibrationsQuery.availability === "schema_unavailable";
   const soilMoistureCalibrationUnavailable =
     soilMoistureCalibrationSchemaUnavailable || soilMoistureCalibrationsQuery.isError;
-  const selectedTentStage =
-    (selectedTent as unknown as { stage?: string | null } | null)?.stage ?? null;
+  // Stage for the stage chips, VPD stability and the stage-missing badge. It
+  // is resolved like the scoped Dashboard's single-tent view and the Alerts
+  // page: this tent's grow row, the tent, and the active plants in it (QA
+  // 2026-09-24, BUG-006 follow-up). Until this tent's grow row and the plant
+  // rows are known, stage grading is withheld (Codex review on #1683).
+  const { grows, loading: growsLoading, error: growsError } = useGrows();
+  const plantsQuery = usePlants();
+  const selectedTentStage = resolveTentEnvironmentStage({
+    tentId: selectedTent?.id ?? null,
+    tentGrowId: selectedGrowId,
+    tentStage: selectedTent?.stage ?? null,
+    ...resolveTentGrowStage({
+      growId: selectedGrowId,
+      grows,
+      loading: growsLoading,
+      error: growsError,
+    }),
+    // A failed refresh keeps the cached stages (React Query retains data).
+    plants: plantsQuery.data ?? null,
+  });
   const latestObservedVpd = readObservedSensorMetric(vpdStabilityReadings[0] ?? null, "vpd");
   const [previousVpdInputs, setPreviousVpdInputs] = useState<LatestTrustedVpdInputs | null>(null);
   const latestTrustedVpdInputs = useMemo(

@@ -62,6 +62,13 @@ jobs:
           # on 2026-07-09). Bump deliberately when a newer CLI is needed.
           version: 2.109.1
 
+      - name: Restore pinned CLI public registry fallback
+        if: env.ENABLED == 'true'
+        run: |
+          # setup-cli forces GHCR, disabling CLI 2.109.1's public-registry fallback.
+          # Clear only that override; keep CLI image versions and failure behavior.
+          echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
+
       - name: Prepare immutable migration replay workspace
         if: env.ENABLED == 'true'
         run: |

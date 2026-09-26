@@ -269,8 +269,8 @@ remembered-target recovery and billing. No open PR changes `src/lib/entitlements
   - `#1715` merged during the reads (`d510eb56`, committed 15:20 UTC). It changes CI configuration
     and one e2e spec, none of them a file this document cites by line. `#1701` closed at 15:30
     UTC, superseded by `#1703`.
-- **What changes.** The header, §1, §3, §4, §5.7, D-RT-12, D-RT-13, M10, M11, AT-10, AT-14,
-  AT-15, §10, §12, §14, §15, the closing verdict, and a new Appendix C. Appendices A and B are
+- **What changes.** The header, §1, §3, §4, §5.6, §5.7, a §6.2 row, D-RT-12, D-RT-13, M10, M11,
+  AT-10, AT-14, AT-15, §10, §12, §14, §15, the closing verdict, and a new Appendix C. Appendices A and B are
   not edited (D-RT-11).
 
 ---
@@ -529,8 +529,9 @@ all_except_custom_domains`), so preview URLs are not public while the apex is.
   Lovable path only.
 - `docs/preview-deployment-verification.md` names a Vercel project `verdant-command-center-preview`
   with npm commands and an `/index.html` rewrite. That project did not appear in the repository-URL
-  filtered listing; whether it still exists is `NOT_MEASURED` (a team-wide listing was not
-  requested). The document predates SSR and is a retirement candidate (§14).
+  filtered listing, and the team-wide listing of Appendix C.6 does not contain it either: the team
+  holds one project, `verdant-grow-diary`. Whether it exists under another account is
+  `NOT_MEASURED`. The document predates SSR and is a retirement candidate (§14).
 
 ### 5.7 Promotion — which build the production hostnames serve
 
@@ -671,7 +672,7 @@ not on source, and cite those instead.
 | `scripts/stamp-version.mjs:23-26`                               | "the production publisher (Lovable) sometimes builds from a history-less snapshot"                                         | `FAIL`         | Stale comment: it names Lovable as the production publisher, which §4 contradicts. A script edit with test pins nearby; **deferred** (§14). The observation it records (2026-08-05) stays true as history     |
 | `.github/workflows/deployment-preview.yml:4-12`                 | "Publishing to Lovable's published URL is a manual action from the Lovable UI"                                             | `NOT_MEASURED` | Partial: it describes the Lovable path only, whose publish mechanism is not measured, and omits the measured Vercel publisher (§4). Workflow file; **deferred**                                               |
 | `Makefile:77`                                                   | "Lovable does this automatically"                                                                                          | `NOT_MEASURED` | Comment text (contract §9). **Deferred** with the script comment                                                                                                                                              |
-| `docs/preview-deployment-verification.md:3-8, 14-27`            | preview-only Vercel project `verdant-command-center-preview`, npm, `/index.html` rewrite                                   | `NOT_MEASURED` | Stale: it predates SSR, and the project's existence and settings were not read (§10). Retirement candidate (§14); not edited here                                                                             |
+| `docs/preview-deployment-verification.md:3-8, 14-27`            | preview-only Vercel project `verdant-command-center-preview`, npm, `/index.html` rewrite                                   | `FAIL`         | Stale: it predates SSR, and the project it names is absent from the Vercel team that holds the apex (Appendix C.6; another account is `NOT_MEASURED`). Retirement candidate (§14); not edited here            |
 | `docs/seo/lighting-launch-verification.md:157-161`              | "redirects … return HTTP 200 … Lovable is the production publisher"                                                        | `FAIL`         | Dated record, generated 2026-08-02: A.6 measured `308` redirects, and §4 names the publisher. Historically consistent with contract §14's earlier measurement, so left as a dated record                      |
 | `docs/lovable/verdant-project-knowledge-2026-08-18.md:33`       | "Publish deploys frontend + edge only"                                                                                     | `NOT_MEASURED` | `source claim` from a dated Lovable knowledge snapshot; left, and cited as a claim in §5.3                                                                                                                    |
 | `.github/workflows/lighthouse-ci.yml:4-6`                       | "Verdant publishes locally from Windows"                                                                                   | `FAIL`         | Stale comment, found at the amendment. Contradicted by §4 and Appendix B. Workflow file; **deferred** with the other stale comments                                                                           |
@@ -857,7 +858,7 @@ Stated so nobody reads silence as agreement.
 | Which Nitro preset the Vercel build runs                                                                                                         | `NOT_MEASURED`              | The Vercel build log, or a `nitro` preset line in it                                                                                                                                                                                                                                                                                                                      |
 | The Vercel project's production-branch and build settings                                                                                        | `NOT_MEASURED`              | Project settings read by the owner                                                                                                                                                                                                                                                                                                                                        |
 | Whether `main` pushes are suppressed on the Vercel project                                                                                       | `NOT_MEASURED`              | `list_deployments` unfiltered, or a `main` push observed                                                                                                                                                                                                                                                                                                                  |
-| Whether `verdant-command-center-preview` still exists                                                                                            | `NOT_MEASURED`              | Team-wide `list_projects`                                                                                                                                                                                                                                                                                                                                                 |
+| Whether `verdant-command-center-preview` still exists                                                                                            | `PASS` at C (dated)         | Measured, not unknown: absent from the team-wide listing at 15:38:43 UTC on 2026-09-26, which holds one project (Appendix C.6). Whether it exists under another Vercel account is `NOT_MEASURED`; the owner confirms before the retirement slice                                                                                                                          |
 | Whether `vercel.json:16`'s `/~oauth/*` redirect to the Lovable project host is still correct for OAuth callbacks now that Vercel serves the apex | `NOT_MEASURED`              | Owner check of the OAuth callback path; a probe of `/~oauth/` was not made (auth surface)                                                                                                                                                                                                                                                                                 |
 | The publisher of the 2026-08-05 and 2026-08-28 stamps (`commit: "unknown"`, `ref: "__orphan__"`)                                                 | `NOT_MEASURED`              | `inference`: those were Lovable builds, consistent with `stamp-version.mjs:23-26` and `#1175`'s body. Closed by a Lovable build record for either stamp; not re-measured here                                                                                                                                                                                             |
 | **Why the production hostnames stopped following deploy-branch builds after the 09:45 Instant Rollback**                                         | `NOT_MEASURED`              | `inference` so far: an Instant Rollback pauses auto-assignment until an explicit promote (§5.7). Closed when the owner reads the project's production-domain auto-assignment state, or promotes the tip build and watches whether the next merge follows on its own (M10 before and after). From 01:27 UTC on 2026-09-26 the question also takes the form of the next row |
@@ -960,18 +961,18 @@ Verdict: **safe to merge as documentation.** It changes what readers believe, no
 
 **Deferred — sequenced, not rejected**
 
-| Item                                                                                       | Gate                                                                                 |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `CLAUDE.md` publisher and `vercel.json` corrections                                        | Twelve-file governance bump; its own slice                                           |
-| `stamp-version.mjs`, `deployment-preview.yml`, `Makefile` comment corrections              | Touch scripts and workflows; test pins nearby; its own small slice                   |
-| `docs/preview-deployment-verification.md` retirement                                       | Docs slice after the owner confirms whether the preview project exists               |
-| Edge-function deployer measurement (M6) and applied-migration measurement (M9)             | Need production read access this session does not hold; `No APPLY` stands regardless |
-| The Lovable publisher decision (D-RT-4)                                                    | Cheek                                                                                |
-| `#1175`                                                                                    | Cheek (§11)                                                                          |
-| A runner for AT-4                                                                          | Test slice, alongside the contract's T1                                              |
-| Closing the release-state `FAIL` (start a rolling release of the tip build, or promote it) | Owner — a publish action (D-RT-13)                                                   |
-| Credential inventory and scoping (D-RT-14)                                                 | Owner                                                                                |
-| A scheduled M10 promotion-drift probe                                                      | Workflow slice after this merges; signal only (D-RT-10)                              |
+| Item                                                                                       | Gate                                                                                                    |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `CLAUDE.md` publisher and `vercel.json` corrections                                        | Twelve-file governance bump; its own slice                                                              |
+| `stamp-version.mjs`, `deployment-preview.yml`, `Makefile` comment corrections              | Touch scripts and workflows; test pins nearby; its own small slice                                      |
+| `docs/preview-deployment-verification.md` retirement                                       | Docs slice; the project is absent from the team (C.6), and the owner confirms no other account holds it |
+| Edge-function deployer measurement (M6) and applied-migration measurement (M9)             | Need production read access this session does not hold; `No APPLY` stands regardless                    |
+| The Lovable publisher decision (D-RT-4)                                                    | Cheek                                                                                                   |
+| `#1175`                                                                                    | Cheek (§11)                                                                                             |
+| A runner for AT-4                                                                          | Test slice, alongside the contract's T1                                                                 |
+| Closing the release-state `FAIL` (start a rolling release of the tip build, or promote it) | Owner — a publish action (D-RT-13)                                                                      |
+| Credential inventory and scoping (D-RT-14)                                                 | Owner                                                                                                   |
+| A scheduled M10 promotion-drift probe                                                      | Workflow slice after this merges; signal only (D-RT-10)                                                 |
 
 **Rejected — decided, with a reason**
 
@@ -1099,6 +1100,7 @@ completed:
   - D-RT-13 extended to every rolling-release action and to Rolling Releases configuration
   - M10 reads the rollout record first; M11 audits project-rolling-release-* events
   - AT-15; five §10 rows; §12 and §14 rows; Appendix C
+  - The preview-project unknown closed for this team (C.6): §5.6, the §6.2 row, §10, §14
 
 verified_by:
   - Vercel reads 15:22–15:40 UTC (Appendix C): get_rolling_release, get_rolling_release_config,
@@ -1464,6 +1466,12 @@ corroborates it.
 - Whether an alias moved between 06:00 and 06:22:43 UTC (C.3, window B).
 - The served `/version.json` (M1 was not run from this session), Lovable (M5), DNS (M2),
   the `vercel.json` probes (M7), edge versions (M6) and applied migrations (M9). None was re-run.
+
+### C.6 The team's projects — M3/M5, `list_projects`, 15:38:43 UTC
+
+A team-wide listing (limit 100) returned one project, `verdant-grow-diary`, and no further page.
+Name searches for `preview` and `command-center` returned no project. The listing response carried
+no Git link or domain fields, so those come from M2 and M3, not from this read.
 
 ---
 

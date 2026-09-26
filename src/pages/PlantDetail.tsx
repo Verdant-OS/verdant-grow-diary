@@ -27,6 +27,13 @@ import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActions
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
+import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
+import { formatPlantAge, plantStartDisplayDate, resolvePlantAge } from "@/lib/plantStartDateRules";
+import {
+  plantLastActivityTypeLabel,
+  resolvePlantLastActivityLabel,
+  resolvePlantLastActivitySummary,
+} from "@/lib/plantLastActivityRules";
 import PlantLogStreakMarker from "@/components/PlantLogStreakMarker";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
@@ -79,7 +86,7 @@ import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { useAlertDoctorCreditGateReads } from "@/hooks/useAlertDoctorCreditGateReads";
 import { buildAlertDoctorCreditGate } from "@/lib/alertDoctorCreditGateRules";
 import { useAuth } from "@/store/auth";
-import { format, formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 
 import PlantQuickLog from "@/components/PlantQuickLog";
 import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshnessCard";
@@ -289,6 +296,8 @@ export default function PlantDetail() {
     plantId: plant?.id ?? null,
   });
   const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null);
+  // Same query key as PlantQuickStatusStrip, so this adds no request.
+  const recentActivityQuery = usePlantRecentActivity(plant?.id ?? null);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null], user?.id);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null], user?.id);
 
@@ -384,7 +393,10 @@ export default function PlantDetail() {
     return <BlockedStateView view={blockedView} onRetry={() => refetch()} />;
   }
 
-  // Renders the "Plant not found" empty state with data-source disclosure.
+  // Renders the "Plant not found" state with a record-scoped data-source
+  // disclosure. A single-plant miss says nothing about whether the account
+  // has other plants, so it never says "No real plants yet" (QA 2026-09-24,
+  // BUG-016).
   if (blockedView && blockedView.kind === "not-found") {
     return (
       <div>
@@ -392,6 +404,7 @@ export default function PlantDetail() {
           resource="plants"
           hasAnyData={false}
           metas={[plantMeta]}
+          emptyStateScope="record"
           testId="plant-detail-data-source-disclosure"
         />
         <BlockedStateView view={blockedView} />
@@ -436,7 +449,23 @@ export default function PlantDetail() {
   // query result, in which case rendering nothing is the honest fallback.
   if (!plant) return null;
 
-  const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
+  // Calendar-date semantics: a legacy UTC-midnight start date reads as the
+  // day the grower picked, and a future date never yields a negative age.
+  const ageDaysLabel = formatPlantAge(resolvePlantAge(plant.startedAt, new Date()));
+  const startedDisplayDate = plantStartDisplayDate(plant.startedAt);
+  const lastActivityInput = {
+    status: recentActivityQuery.isError
+      ? ("error" as const)
+      : recentActivityQuery.isPending
+        ? ("loading" as const)
+        : ("ready" as const),
+    rows: recentActivityQuery.data,
+    now: new Date(),
+  };
+  const lastActivityLabel = resolvePlantLastActivityLabel(lastActivityInput);
+  // Text and time come from the same newest diary row; the profile note is
+  // shown separately under its Edit Plant name, "Notes".
+  const lastActivitySummary = resolvePlantLastActivitySummary(lastActivityInput);
   const harvestWatchEligible = isHarvestWatchEligible({
     stage: plant.stage,
     isArchived: plant.isArchived,
@@ -570,6 +599,7 @@ export default function PlantDetail() {
             lastNote: plant.lastNote,
             isArchived: plant.isArchived ?? false,
             photo: plant.photo ?? null,
+            plantType: plant.plantType ?? null,
           }}
           variant="row"
           hideView
@@ -657,13 +687,15 @@ export default function PlantDetail() {
               </div>
               <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Age</div>
-                <div>{ageDays} days</div>
+                <div data-testid="plant-detail-age">{ageDaysLabel}</div>
               </div>
               <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">
                   Started
                 </div>
-                <div>{format(new Date(plant.startedAt), "PP")}</div>
+                <div data-testid="plant-detail-started">
+                  {startedDisplayDate ? format(startedDisplayDate, "PP") : "Unknown"}
+                </div>
               </div>
               <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Health</div>
@@ -674,11 +706,29 @@ export default function PlantDetail() {
               <div className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
                 Last activity
               </div>
-              <p className="break-words text-sm">{plant.lastNote}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Updated {formatDistanceToNow(new Date(plant.startedAt), { addSuffix: true })}
+              {lastActivitySummary ? (
+                <p className="break-words text-sm" data-testid="plant-detail-last-activity-summary">
+                  {plantLastActivityTypeLabel(lastActivitySummary.eventType)}
+                  {lastActivitySummary.text ? `: ${lastActivitySummary.text}` : ""}
+                </p>
+              ) : null}
+              <p
+                className="mt-1 text-xs text-muted-foreground"
+                data-testid="plant-detail-last-activity-age"
+              >
+                {lastActivityLabel}
               </p>
             </div>
+            {plant.lastNote?.trim() ? (
+              <div className="min-w-0">
+                <div className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
+                  Notes
+                </div>
+                <p className="break-words text-sm" data-testid="plant-detail-profile-note">
+                  {plant.lastNote}
+                </p>
+              </div>
+            ) : null}
             <div className="flex min-w-0 flex-wrap gap-2">
               <Button
                 size="sm"
@@ -840,6 +890,7 @@ export default function PlantDetail() {
           <PlantDailyGrowCheckConsistencyCard
             plantId={plant.id}
             currentTentId={plant.tentId ?? null}
+            trackingStartedAt={plant.createdAt ?? null}
           />
           <PlantDailyGrowCheckHistoryCard
             plantId={plant.id}

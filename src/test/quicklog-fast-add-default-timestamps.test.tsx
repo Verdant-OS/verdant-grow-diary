@@ -60,7 +60,7 @@ describe("resolveFastAddIntent — defaults flow into Quick Log prefill", () => 
   });
 
   it("Diagnosis does not trigger a model/API call — navigate only", () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch" as never);
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
     const intent = resolveFastAddIntent("diagnosis", ctx, { now });
     expect(intent.kind).toBe("navigate");
     expect(fetchSpy).not.toHaveBeenCalled();

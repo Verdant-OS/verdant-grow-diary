@@ -12,6 +12,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AlertReasonText from "@/components/AlertReasonText";
+import { ALERT_MANUAL_RESOLUTION_NOTE } from "@/lib/alertReasonDisplayRules";
 import { Link, useParams } from "@/lib/react-router-compat";
 import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";
 import { toast } from "sonner";
@@ -553,7 +555,7 @@ export default function AlertDetail() {
             <h2 id="alert-detail-title" className="font-display font-semibold text-base">
               {alert.title}
             </h2>
-            <p className="text-sm text-muted-foreground mt-1">{alert.reason}</p>
+            <AlertReasonText reason={alert.reason} className="text-sm text-muted-foreground mt-1" />
 
             <div className="mt-3">
               <AlertWhyContext alert={alert} variant="detailed" />
@@ -626,6 +628,14 @@ export default function AlertDetail() {
               </div>
             </dl>
 
+            {(alert.status === "open" || alert.status === "acknowledged") && (
+              <p
+                className="mt-4 text-xs text-muted-foreground"
+                data-testid="alert-detail-manual-resolution-note"
+              >
+                {ALERT_MANUAL_RESOLUTION_NOTE}
+              </p>
+            )}
             <div
               className="flex flex-wrap gap-2 mt-4"
               role="group"

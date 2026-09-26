@@ -71,7 +71,7 @@ function productionSourceFiles(directory: string): string[] {
 }
 
 describe("dependency security Phase A resolution floors", () => {
-  it("runs the final full-suite shard with supported single-fork CLI options", () => {
+  it("runs the final full-suite shard with supported serial and isolated CLI options", () => {
     const [nodeOptions, ...command] = packageJson.scripts["test:full:shard4"].split(" ");
     expect(nodeOptions).toBe("NODE_OPTIONS=--max-old-space-size=6144");
 
@@ -95,7 +95,8 @@ describe("dependency security Phase A resolution floors", () => {
       shard: "4/4",
       pool: "forks",
       maxWorkers: 1,
-      isolate: false,
+      fileParallelism: false,
+      isolate: true,
     });
   });
 

@@ -171,9 +171,9 @@ No competing implementation exists; none is created.
   this PR should merge; closing `#1699` is Cheek's action (§15).
 - **Conflict resolution.** Both §15.1 rows are kept: `#1705`'s `9b06be3f` re-verification first,
   then this slice's row. The pointer this slice rewrites sits inside AC-9.3, so contract §15 rule 2
-  applies: the header is restamped at `5370782` (the tip this branch carries) and every touched
-  clause re-verified. An earlier revision of this section said no AC clause changed; that was wrong
-  (Codex on `#1718`).
+  applies: the header is restamped at `4ddb2322` (the tip this branch carries after forward-merging
+  `#1703`, whose hunks stayed disjoint from this slice's) and every touched clause re-verified. An
+  earlier revision of this section said no AC clause changed; that was wrong (Codex on `#1718`).
 - **Board at the amendment: 48 open PRs.** Every head was fetched as `refs/pull/N/head` and diffed
   against its merge-base with `c9bc1df3`. None besides `#1699` adds or edits
   `docs/specs/release-topology-specification.md`, and `git merge-tree` of this branch against each
@@ -191,14 +191,16 @@ No competing implementation exists; none is created.
 | `#1250` | open, `HOLD`                                                         | Untouched                                                                                                                                                                |
 
 - **The contract past its `9b06be3f` stamp — measured and restamped here.** Intersecting every
-  path cited in `docs/architecture-contract.md` (178 distinct backticked paths with a file
-  extension) with the 36 files that `git diff --name-only 9b06be3f 5370782` lists finds two:
+  path cited in `docs/architecture-contract.md` (177 distinct backticked paths with a file
+  extension) with the 87 files that `git diff --name-only 9b06be3f 4ddb2322` lists finds three:
   - `config/required-status-checks.json` (`#1708`). AC-9.1's claim that the published-migration
     integrity check is neither required nor in `mustBeGreen` **still holds** (35 required, 7
     `mustBeGreen`, none of them that check).
   - `src/components/genetics/BreedingLogContainer.tsx` (`#1661`). AC-7.3 cited `:141` for the
-    `create-breeding-suggestions` invocation; at `5370782` that string is on **`:143`**, a T1
+    `create-breeding-suggestions` invocation; at `4ddb2322` that string is on **`:143`**, a T1
     failure the restamp re-points.
+  - `docs/codebase-map.md` (`#1703`). Three lines inserted at `:289` moved AC-3.2's cite
+    `:466-467` to **`:469-470`**, same text; the restamp re-points it.
 
   The contract's own §15.1 row records the restamp and every re-measured count (AT-6).
 
@@ -399,15 +401,18 @@ not pick one. It records that the choice is open and gives it to Cheek (§7, §1
 - Migrations are append-only and immutable once merged (`AGENTS.md`); the `Published migration
 integrity` gate compares SHA-256 against the base and is not a required context (contract
   AC-9.1, §13).
-- **There are eight repository apply paths, not one.** At `c9bc1df3`, `.github/workflows/` holds
+- **There are ten repository apply paths, not one.** At `c9bc1df3`, `.github/workflows/` held
   eight `apply-*.yml` workflows, each `workflow_dispatch`-only and each running in GitHub
   environment `verdant-production-solo-founder`: the general
   `apply-pinned-production-migrations.yml` and seven pinned single-purpose appliers
   (`action-queue-transition-forward-repair`, `agreement-acceptance-insert-forward-repair`,
   `candidate-number-maintenance-migrations`, `pinned-breeding-reconciliation`,
   `quicklog-corrections-retractions`, `quicklog-manual-delegate-forward-repair`,
-  `signup-acquisition-forward-repair`). `#1701` and `#1703` propose two more. The founding text
-  named only the first; `established fact` by listing.
+  `signup-acquisition-forward-repair`). `#1703`, merged after, adds two more of the same shape
+  (`plants-health-unassessed-default`, `quicklog-revision-idempotent-replay`: each
+  `workflow_dispatch`-only in the same environment, `:4` and `:140`), for ten at `4ddb2322`;
+  `#1701` proposed another at the amendment's read. The founding text named only the first;
+  `established fact` by listing.
 - The general apply path is `apply-pinned-production-migrations.yml`: `workflow_dispatch` with
   `expected_head_sha`, `confirm_project_ref` (must equal `knkwiiywfkbqznbxwqfh`, `:59`) and
   `confirm_apply`; it runs in GitHub environment `verdant-production-solo-founder` (`:73`) with the
@@ -415,7 +420,7 @@ integrity` gate compares SHA-256 against the base and is not a required context 
   (`:113`). `migration-drift-probe.yml` is the read-only counterpart (`workflow_dispatch`,
   environment `verdant-production`, `psql`). `supabase/config.toml:1` pins the same project ref.
 - Lovable authors migrations under its own naming (157 UUID-slug exports in the ledger per
-  `docs/codebase-map.md:416-420`) and, as a `source claim`, applies what it authors through its
+  `docs/codebase-map.md:419-423`) and, as a `source claim`, applies what it authors through its
   Cloud. Nothing in this repository shows that path.
 - Applied state on production is a `docs/agents/CURRENT_STATE.md` axis (contract AC-9.3) and stays
   `NOT_MEASURED` here; through this session's Supabase tool it is `BLOCKED` (sandbox only). The
@@ -597,7 +602,7 @@ Durable. Each is a rule a future slice can be held to; none carries a date.
   release notes say so.
 - **D-RT-9 — Migrations reach production through operator apply paths, and every path counts
   until it is measured or retired.** Committed is not applied. The repository-verified paths are
-  the dispatch workflows with their confirmations (§5.4 lists eight). The Lovable Cloud apply path
+  the dispatch workflows with their confirmations (§5.4 lists ten). The Lovable Cloud apply path
   for Lovable-authored exports is a `source claim`, neither measured nor fenced, so an audit of
   production database changes includes it until Cheek retires or fences it and a measurement
   confirms that (the D-RT-4 decision, applied to the database axis). `No APPLY` is the standing
@@ -666,22 +671,22 @@ own initiative.
 Reviewable by reading; no runner is added in this slice (a T1-style pin for the cited lines is a
 candidate follow-up, §14).
 
-| ID    | Assertion                                                                                                                                                                                                                   | Result at authoring                                                                                                                                                                                                     |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AT-1  | Every topology claim in §4, §5 and §6 carries one status from the constitution's vocabulary                                                                                                                                 | `PASS` (by reading)                                                                                                                                                                                                     |
-| AT-2  | Every `PASS` in §4 names the read that produced it and Appendix A carries that read with a UTC time                                                                                                                         | `PASS`                                                                                                                                                                                                                  |
-| AT-3  | No production behaviour is asserted from repository presence or a green check (D-RT-2); each such input is labelled as an input                                                                                             | `PASS`                                                                                                                                                                                                                  |
-| AT-4  | Every `path:line` cite resolves at `c9bc1df3` to the quoted content (it did at `e1d541e2` for the founding text)                                                                                                            | `PASS` (re-read at the amendment; no runner)                                                                                                                                                                            |
-| AT-5  | `docs/agents/CURRENT_STATE.md` is not edited by this slice                                                                                                                                                                  | `PASS`                                                                                                                                                                                                                  |
-| AT-6  | `docs/architecture-contract.md` edits are confined to the header restamp, its re-verification (AC-3.2 count, AC-4.3 note, AC-7.3 re-point), AC-9.3's pointer, §12, §13, §14 and a §15.1 row; no AC clause statement changes | `PASS`                                                                                                                                                                                                                  |
-| AT-7  | `node scripts/assert-docs-safety.mjs` and `node scripts/assert-release-docs-safety.mjs` exit 0                                                                                                                              | recorded in the PR body                                                                                                                                                                                                 |
-| AT-8  | Prettier (`.prettierrc.json`) reports the touched files clean                                                                                                                                                               | recorded in the PR body                                                                                                                                                                                                 |
-| AT-9  | The corrections table (§6.2) names a file and line for every contradicted statement and an owner for every deferred edit                                                                                                    | `PASS`                                                                                                                                                                                                                  |
-| AT-10 | The document contains no secret, token, connection string, or private environment value; platform identifiers are project and team IDs only                                                                                 | `PASS`                                                                                                                                                                                                                  |
-| AT-11 | The promotion axis is present end to end: a §3 row, §4 step 3 asking per hostname, §5.7, D-RT-12–14, M10 and M11                                                                                                            | `PASS` (by reading)                                                                                                                                                                                                     |
-| AT-12 | No token identifier, session identifier or email address from the platform event log appears in this document (M11's rule)                                                                                                  | `PASS`: an email-shaped pattern (`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`) and the event log's token and session identifier values return no match; the `@` characters in Appendix B are `ref @ sha` separators |
-| AT-13 | Rows 1–10 of §6.1 each carry at least one `path:line` cite read at `c9bc1df3` and none is a `source claim`; rows 11–14 cite the section or appendix measurement they rest on                                                | `PASS` (by reading)                                                                                                                                                                                                     |
-| AT-14 | Every figure in Appendix B names the read that produced it and a UTC time; nothing there is copied from another session without a label                                                                                     | `PASS`                                                                                                                                                                                                                  |
+| ID    | Assertion                                                                                                                                                                                                                                | Result at authoring                                                                                                                                                                                                     |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AT-1  | Every topology claim in §4, §5 and §6 carries one status from the constitution's vocabulary                                                                                                                                              | `PASS` (by reading)                                                                                                                                                                                                     |
+| AT-2  | Every `PASS` in §4 names the read that produced it and Appendix A carries that read with a UTC time                                                                                                                                      | `PASS`                                                                                                                                                                                                                  |
+| AT-3  | No production behaviour is asserted from repository presence or a green check (D-RT-2); each such input is labelled as an input                                                                                                          | `PASS`                                                                                                                                                                                                                  |
+| AT-4  | Every `path:line` cite resolves at `c9bc1df3` to the quoted content (it did at `e1d541e2` for the founding text)                                                                                                                         | `PASS` (re-read at the amendment; no runner)                                                                                                                                                                            |
+| AT-5  | `docs/agents/CURRENT_STATE.md` is not edited by this slice                                                                                                                                                                               | `PASS`                                                                                                                                                                                                                  |
+| AT-6  | `docs/architecture-contract.md` edits are confined to the header restamp, its re-verification (AC-3.2 count and re-point, AC-4.3 note, AC-7.3 re-point), AC-9.3's pointer, §12, §13, §14 and a §15.1 row; no AC clause statement changes | `PASS`                                                                                                                                                                                                                  |
+| AT-7  | `node scripts/assert-docs-safety.mjs` and `node scripts/assert-release-docs-safety.mjs` exit 0                                                                                                                                           | recorded in the PR body                                                                                                                                                                                                 |
+| AT-8  | Prettier (`.prettierrc.json`) reports the touched files clean                                                                                                                                                                            | recorded in the PR body                                                                                                                                                                                                 |
+| AT-9  | The corrections table (§6.2) names a file and line for every contradicted statement and an owner for every deferred edit                                                                                                                 | `PASS`                                                                                                                                                                                                                  |
+| AT-10 | The document contains no secret, token, connection string, or private environment value; platform identifiers are project and team IDs only                                                                                              | `PASS`                                                                                                                                                                                                                  |
+| AT-11 | The promotion axis is present end to end: a §3 row, §4 step 3 asking per hostname, §5.7, D-RT-12–14, M10 and M11                                                                                                                         | `PASS` (by reading)                                                                                                                                                                                                     |
+| AT-12 | No token identifier, session identifier or email address from the platform event log appears in this document (M11's rule)                                                                                                               | `PASS`: an email-shaped pattern (`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`) and the event log's token and session identifier values return no match; the `@` characters in Appendix B are `ref @ sha` separators |
+| AT-13 | Rows 1–10 of §6.1 each carry at least one `path:line` cite read at `c9bc1df3` and none is a `source claim`; rows 11–14 cite the section or appendix measurement they rest on                                                             | `PASS` (by reading)                                                                                                                                                                                                     |
+| AT-14 | Every figure in Appendix B names the read that produced it and a UTC time; nothing there is copied from another session without a label                                                                                                  | `PASS`                                                                                                                                                                                                                  |
 
 ---
 
@@ -736,32 +741,32 @@ publisher regresses; (c) keep parked. This slice does not push to, review, or en
 
 ### This slice — docs only, one branch, one PR
 
-| File                                           | Change                                                                                                                                                                                                                                                                                                       |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `docs/specs/release-topology-specification.md` | New — this document, including the amendment: promotion axis, §5.4 appliers, §6.1 verified at `c9bc1df3`, D-RT-12–14, M10–M11, AT-11–14, §10 rows, Appendix B                                                                                                                                                |
-| `docs/architecture-contract.md`                | §9 prose pointer; §12 `vercel.json` row to its durable form; §13 row from "blocked … #1175 and #1221" to the follow-ups this document names; §14 pointers; §15.1 row. The AC-9.3 pointer touches a clause, so the header is restamped at `5370782` with AC-3.2's count, an AC-4.3 note and AC-7.3's re-point |
-| `docs/codebase-map.md`                         | Replace the "do not fire in production / Lovable is the production publisher" paragraph with the durable rule and a pointer to M7; keep the eight-entry inventory and the paragraph's 11-line span, so the contract's AC-3.2 cite `docs/codebase-map.md:466-467` still resolves                              |
-| `README.md`                                    | One bullet: certificates belong to the measured apex platform, with a pointer                                                                                                                                                                                                                                |
+| File                                           | Change                                                                                                                                                                                                                                                                                                                                       |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/specs/release-topology-specification.md` | New — this document, including the amendment: promotion axis, §5.4 appliers, §6.1 verified at `c9bc1df3`, D-RT-12–14, M10–M11, AT-11–14, §10 rows, Appendix B                                                                                                                                                                                |
+| `docs/architecture-contract.md`                | §9 prose pointer; §12 `vercel.json` row to its durable form; §13 row from "blocked … #1175 and #1221" to the follow-ups this document names; §14 pointers; §15.1 row. The AC-9.3 pointer touches a clause, so the header is restamped at `4ddb2322` with AC-3.2's count and `codebase-map.md` re-point, an AC-4.3 note and AC-7.3's re-point |
+| `docs/codebase-map.md`                         | Replace the "do not fire in production / Lovable is the production publisher" paragraph with the durable rule and a pointer to M7; keep the eight-entry inventory and the paragraph's 11-line span, so the contract's AC-3.2 cite `docs/codebase-map.md:466-467` still resolves                                                              |
+| `README.md`                                    | One bullet: certificates belong to the measured apex platform, with a pointer                                                                                                                                                                                                                                                                |
 
 ### Follow-ups this document names
 
 Owners are Cheek's to assign; each needs an independent reviewer.
 
-| Follow-up                                                                                                                                              | Kind                                                         |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| Governance correction: `CLAUDE.md:130` and `:138-144`, with the twelve-file `Sentinel-Version` bump                                                    | Governance slice                                             |
-| Stale comments: `scripts/stamp-version.mjs:23-26`, `deployment-preview.yml:4-12`, `Makefile:77`, `lighthouse-ci.yml:4-6`, `auto-tag-release.yml:86-87` | Small code/workflow slice, with any test pins renegotiated   |
-| Retire or rewrite `docs/preview-deployment-verification.md`                                                                                            | Docs slice                                                   |
-| M6 run with production read access; record the edge-function versions in `CURRENT_STATE.md`                                                            | Operator measurement                                         |
-| Cheek's D-RT-4 decision on the Lovable publisher, recorded in `CURRENT_STATE.md`                                                                       | Owner decision                                               |
-| `#1175` disposition (§11)                                                                                                                              | Owner decision                                               |
-| `#1696`: carry the live `PASS`, the publisher measurement pointer, and drop the "stays deferred" line                                                  | `#1696`'s owner                                              |
-| A T1-style pin for this document's `path:line` cites                                                                                                   | Test slice                                                   |
-| **Close the release-state `FAIL` (D-RT-12): promote the current tip build, or restore auto-assignment, then run M10**                                  | **Owner action now** — a publish action under D-RT-13        |
-| Record the 08:28 token's holder, then scope or revoke production-scoped platform credentials (D-RT-14)                                                 | Owner action                                                 |
-| Close `#1699` as superseded once this carry-forward is reviewed                                                                                        | Owner action                                                 |
-| A promotion-drift probe: a scheduled read-only job that runs M10 and reports a split or a stale apex                                                   | Workflow slice; a signal under D-RT-10, never a gate         |
-| `docs/codebase-map.md` "Seven … appliers" → eight at the tip (`#1703` proposes ten)                                                                    | Lands with `#1703`; not edited here, to avoid a third writer |
+| Follow-up                                                                                                                                              | Kind                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| Governance correction: `CLAUDE.md:130` and `:138-144`, with the twelve-file `Sentinel-Version` bump                                                    | Governance slice                                                |
+| Stale comments: `scripts/stamp-version.mjs:23-26`, `deployment-preview.yml:4-12`, `Makefile:77`, `lighthouse-ci.yml:4-6`, `auto-tag-release.yml:86-87` | Small code/workflow slice, with any test pins renegotiated      |
+| Retire or rewrite `docs/preview-deployment-verification.md`                                                                                            | Docs slice                                                      |
+| M6 run with production read access; record the edge-function versions in `CURRENT_STATE.md`                                                            | Operator measurement                                            |
+| Cheek's D-RT-4 decision on the Lovable publisher, recorded in `CURRENT_STATE.md`                                                                       | Owner decision                                                  |
+| `#1175` disposition (§11)                                                                                                                              | Owner decision                                                  |
+| `#1696`: carry the live `PASS`, the publisher measurement pointer, and drop the "stays deferred" line                                                  | `#1696`'s owner                                                 |
+| A T1-style pin for this document's `path:line` cites                                                                                                   | Test slice                                                      |
+| **Close the release-state `FAIL` (D-RT-12): promote the current tip build, or restore auto-assignment, then run M10**                                  | **Owner action now** — a publish action under D-RT-13           |
+| Record the 08:28 token's holder, then scope or revoke production-scoped platform credentials (D-RT-14)                                                 | Owner action                                                    |
+| Close `#1699` as superseded once this carry-forward is reviewed                                                                                        | Owner action                                                    |
+| A promotion-drift probe: a scheduled read-only job that runs M10 and reports a split or a stale apex                                                   | Workflow slice; a signal under D-RT-10, never a gate            |
+| `docs/codebase-map.md` "Seven … appliers" → the current count                                                                                          | **Done** by `#1703` (`4ddb2322`): it lists ten. Not edited here |
 
 ---
 
@@ -844,13 +849,15 @@ completed:
   - Founding text (#1699, commits 3ec3578f and cdc0559f, unchanged): topology model, measured
     frontend/SSR chain, remaining axes, corrections, D-RT-1–11, M1–M9, AT-1–10, unknowns, #1175
   - Forward merge of c9bc1df3 with the §15.1 conflict resolved (both rows kept, re-pointed)
-  - Amendment: promotion axis (§3 row F, §4 step 3, §5.7), eight operator appliers (§5.4),
+  - Amendment: promotion axis (§3 row F, §4 step 3, §5.7), operator appliers (§5.4: eight at
+    c9bc1df3, ten at 4ddb2322),
     §6.1 verified from source at c9bc1df3 (14 rows, no source claims left), CLAUDE.md:77 row in
     §6.2, D-RT-12–14, M4 re-scoped and M10–M11 added, AT-11–14, five §10 rows, owner actions
     in §12 and §14, Appendix B (the promotion incident), verdict re-calibrated
   - docs/architecture-contract.md: #1699's §9/§12/§13/§14 edits; the AC-9.3 pointer carries no
-    dated observation. Because that pointer is inside AC-9.3, the header is restamped at 5370782:
-    AC-7.3 re-pointed :141 -> :143 (#1661), AC-3.2 521 -> 522, an AC-4.3 method note, §15.1 row
+    dated observation. Because that pointer is inside AC-9.3, the header is restamped at 4ddb2322:
+    AC-7.3 re-pointed :141 -> :143 (#1661), AC-3.2 521 -> 522 and its codebase-map cite
+    :466-467 -> :469-470 (#1703), an AC-4.3 method note, §15.1 row
   - docs/codebase-map.md, README.md: #1699's two publisher corrections, unchanged
 
 verified_by:
@@ -893,7 +900,7 @@ next_slice:
   - #1696's owner: cite this document for the promotion axis; carry Appendix B's per-hostname
     reading as the latest live row (a CURRENT_STATE stamp outranks it for the value)
   - Next Claude slice after merge: the governance slice for CLAUDE.md:77, :130 and :138-144.
-    The contract is restamped at 5370782 in this slice; a later stamp starts from there
+    The contract is restamped at 4ddb2322 in this slice; a later stamp starts from there
 
 files_touched:
   - docs/specs/release-topology-specification.md

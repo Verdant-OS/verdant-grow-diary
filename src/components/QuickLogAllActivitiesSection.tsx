@@ -150,6 +150,8 @@ export interface QuickLogAllActivitiesSectionProps {
   requestedActivityId?: QuickLogActivityId | null;
   /** Optional handoff note seeded only when a requested editor is applied. */
   requestedNote?: string | null;
+  /** Exact reviewed starter identity to retain with a new uncertain save. */
+  reviewedStarterHandoffKey?: string | null;
   /** Fires only after persistence confirms success. */
   onSaveSuccess?: (result: QuickLogAllActivitiesSaveSuccess) => void;
 }
@@ -164,8 +166,9 @@ export interface QuickLogAllActivitiesSaveSuccess {
   readonly activityId: QuickLogActivityId;
   readonly target: QuickLogAllActivitiesSaveTarget;
   readonly growEventId: string | null;
-  /** Existing uncertain write confirmed later; no current starter draft was submitted. */
+  /** Existing uncertain write confirmed later; compare its handoff before consuming a draft. */
   readonly recovered?: true;
+  readonly reviewedStarterHandoffKey?: string | null;
 }
 
 /** Map a QuickLogActivityId to the "What was saved" DailyCheck source. */
@@ -234,6 +237,7 @@ export default function QuickLogAllActivitiesSection({
   externalPersistenceBlockReason = null,
   requestedActivityId = null,
   requestedNote = null,
+  reviewedStarterHandoffKey = null,
   onSaveSuccess,
 }: QuickLogAllActivitiesSectionProps) {
   const currentTarget = useMemo(
@@ -737,6 +741,7 @@ export default function QuickLogAllActivitiesSection({
           target: capturedTarget,
           growEventId,
           recovered: true,
+          reviewedStarterHandoffKey: record.reviewedStarterHandoffKey ?? null,
         });
       } catch {
         // The confirmed write remains successful if parent cleanup fails.
@@ -1199,6 +1204,7 @@ export default function QuickLogAllActivitiesSection({
           version: 1,
           ownerId: user?.id ?? "",
           createdAt: occurredAt,
+          ...(reviewedStarterHandoffKey ? { reviewedStarterHandoffKey } : {}),
           input: { ...activityInput, occurredAt, idempotencyKey },
           receipt: {
             symptomCheck: guidedSymptomCheck && selected.id === "issue_observation",
@@ -1358,6 +1364,7 @@ export default function QuickLogAllActivitiesSection({
     guidedSymptomStage,
     guidedSymptomStageConfirmed,
     guidedSymptomNoneObserved,
+    reviewedStarterHandoffKey,
   ]);
 
   const noContext = !growId;

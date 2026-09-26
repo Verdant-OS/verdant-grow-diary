@@ -518,6 +518,12 @@ export default function QuickLog({
 
   const prefillRequestKey = quickLogPrefillTargetKey(prefill);
   const draftHandoffKey = quickLogDraftHandoffKey(prefill);
+  const reviewedStarterHandoffKey =
+    prefill?.source === "public-starter" &&
+    prefill.publicStarterDraftId &&
+    prefill.publicStarterDraftUpdatedAt
+      ? draftHandoffKey
+      : null;
   const namedPrefillQueryError =
     prefillRequestKey !== null && (plantsQuery.isError || tentsQuery.isError);
   const namedPrefillQueryPending =
@@ -893,9 +899,14 @@ export default function QuickLog({
    */
   const handleAllActivitiesSaveSuccess = useCallback(
     (result: QuickLogAllActivitiesSaveSuccess) => {
-      // Reconciliation confirms an older request, not the reviewed starter
-      // prefill currently on screen. Keep that draft and its saved marker.
-      if (result.recovered) return;
+      // An older recovered write must not consume the draft on screen. A
+      // recovered write carrying this exact reviewed handoff did save it.
+      if (
+        result.recovered &&
+        (!reviewedStarterHandoffKey ||
+          result.reviewedStarterHandoffKey !== reviewedStarterHandoffKey)
+      )
+        return;
       if (draftHandoffKey !== null) setSavedDraftHandoffKey(draftHandoffKey);
       consumeReviewedPublicStarterDraft();
       const plantId = result.target.plantId;
@@ -910,7 +921,7 @@ export default function QuickLog({
         user?.id ?? null,
       );
     },
-    [consumeReviewedPublicStarterDraft, draftHandoffKey, user?.id],
+    [consumeReviewedPublicStarterDraft, draftHandoffKey, reviewedStarterHandoffKey, user?.id],
   );
 
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
@@ -1737,6 +1748,7 @@ export default function QuickLog({
           testIdPrefix="quick-log-dialog-all-activities"
           requestedActivityId={prefill?.activityId ?? null}
           requestedNote={prefill?.activityId ? (prefill.note ?? null) : null}
+          reviewedStarterHandoffKey={reviewedStarterHandoffKey}
           onSaveSuccess={handleAllActivitiesSaveSuccess}
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}

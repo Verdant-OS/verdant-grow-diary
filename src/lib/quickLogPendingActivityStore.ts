@@ -25,6 +25,8 @@ export interface PendingQuickLogActivity {
   readonly version: 1;
   readonly ownerId: string;
   readonly createdAt: string;
+  /** Exact reviewed starter handoff, if this write originated from one. */
+  readonly reviewedStarterHandoffKey?: string;
   readonly input: PendingQuickLogActivityInput;
   readonly receipt: {
     readonly symptomCheck: boolean;
@@ -99,9 +101,21 @@ function validRecord(
   ownerId: string,
   target: QuickLogTargetIdentityInput,
 ): value is PendingQuickLogActivity {
-  if (!object(value) || !onlyKeys(value, ["version", "ownerId", "createdAt", "input", "receipt"]))
+  if (
+    !object(value) ||
+    !onlyKeys(value, [
+      "version",
+      "ownerId",
+      "createdAt",
+      "reviewedStarterHandoffKey",
+      "input",
+      "receipt",
+    ])
+  )
     return false;
   if (value.version !== 1 || value.ownerId !== ownerId || !nonempty(ownerId)) return false;
+  if (value.reviewedStarterHandoffKey !== undefined && !nonempty(value.reviewedStarterHandoffKey))
+    return false;
   if (
     typeof value.createdAt !== "string" ||
     !Number.isFinite(Date.parse(value.createdAt)) ||

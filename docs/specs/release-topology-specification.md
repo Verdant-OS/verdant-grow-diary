@@ -409,18 +409,20 @@ integrity` gate compares SHA-256 against the base and is not a required context 
   `NOT_MEASURED` here; through this session's Supabase tool it is `BLOCKED` (sandbox only). The
   standing locks hold: **No APPLY. No production SQL.**
 
-### 5.5 Post-deploy signals — never gates
+### 5.5 Post-deploy and independently targeted signals — never gates
 
-| Workflow             | Trigger at the tip                                                                                                                | What it can say                                                                          |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `quicklog-smoke.yml` | `push`/`pull_request` on `verdant-grow-diary`, path-filtered to `e2e/**`, `playwright.config.ts` and itself; dispatch (`:50-106`) | Authenticated smoke against the deployed app; `blocked` without owner credentials        |
-| `seo-monitoring.yml` | `workflow_run` after `ci` on `verdant-grow-diary` (`:23-26`); dispatch                                                            | Public-surface probes of `verdantgrowdiary.com` — the host, which may lag the tip (§5.7) |
-| `lighthouse-ci.yml`  | daily `cron`, dispatch (`:13-17`)                                                                                                 | Performance of the live host, not of a commit                                            |
-| `test:legal-seo`     | required context; Vitest over source (`package.json:101`)                                                                         | Nothing about production — the Playwright probe is `test:legal-seo:e2e`, not required    |
+| Workflow             | Trigger at the tip                                                                                                                                                           | What it can say                                                                                                                                                                                                                        |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `quicklog-smoke.yml` | `push`/`pull_request` on `verdant-grow-diary`, path-filtered to `e2e/**`, `playwright.config.ts` and itself; dispatch (`:50-106`). A `pull_request` run precedes publication | Authenticated smoke against `vars.E2E_BASE_URL` (`:482`; documented as preview-or-staging, `:24`), not a pinned host. Only the `one_tent_proof` dispatch pins `verdantgrowdiary.com` (`:117-126`). `blocked` without owner credentials |
+| `seo-monitoring.yml` | `workflow_run` after `ci` on `verdant-grow-diary` (`:23-26`); dispatch                                                                                                       | Public-surface probes of `verdantgrowdiary.com` — the host, which may lag the tip (§5.7)                                                                                                                                               |
+| `lighthouse-ci.yml`  | daily `cron`, dispatch (`:13-17`)                                                                                                                                            | Performance of the live host, not of a commit                                                                                                                                                                                          |
+| `test:legal-seo`     | required context; Vitest over source (`package.json:101`)                                                                                                                    | Nothing about production — the Playwright probe is `test:legal-seo:e2e`, not required                                                                                                                                                  |
 
-**Rule (D-RT-10).** A post-deploy signal runs after the publisher has already published and can be
-green for a commit that was never served (it reads the host, not the commit). It informs a restamp;
-it never certifies a release.
+**Rule (D-RT-10).** A production-targeted signal (`seo-monitoring.yml`, `lighthouse-ci.yml`, the
+`one_tent_proof` dispatch) runs after the publisher has already published and can be green for a
+commit that was never served (it reads the host, not the commit). An independently targeted run
+(`quicklog-smoke.yml` on `push`/`pull_request`, against whatever `vars.E2E_BASE_URL` names) says
+nothing about production. Either informs a restamp; neither certifies a release.
 
 ### 5.6 Previews — `established fact` where stated
 
@@ -587,8 +589,10 @@ Durable. Each is a rule a future slice can be held to; none carries a date.
   `docs/agents/CURRENT_STATE.md`; this document's Appendix A is the founding measurement and is not
   updated in place — a later measurement is a stamp, not an edit here. Appendix B is not an update
   of A: it records a separate event that the durable rules below were written from.
-- **D-RT-12 — Serving is resolved per hostname, and a split is a finding.** The apex, `www`,
-  `verdant-grow-diary.vercel.app` and the project alias are each resolved to a deployment (M10).
+- **D-RT-12 — Serving is resolved per hostname, and a split is a finding.** Every production
+  hostname in the current inventory — the domains M2 returns and the project's production aliases,
+  never fewer than the apex, `www`, `verdant-grow-diary.vercel.app` and the project alias — is
+  resolved to a deployment (M10).
   "Newest production deployment" and a deployment's own `alias` array are never used as the
   answer. If the hostnames resolve to different deployments, or the apex resolves to anything
   other than a `source: git` build of the current deploy tip, the release state is **`FAIL`**
@@ -628,7 +632,7 @@ amendment it answers "what was built", and M10 answers "what is served".
 | M7  | `vercel.json` in effect                       | `HEAD` on **every** permanent redirect source in `vercel.json:19-26` (`/strains`, `/features`, `/demo`, `/refunds`, `/refund-policy`, `/terms-of-service`, `/privacy-policy`, plus one sample under `/strains/:slug`), each expecting `308` and its declared `Location`; then `HEAD /` for the five headers of `vercel.json:33-42`. `PASS` only for what was probed: a partial run names the paths it covered, and the rest stay `NOT_MEASURED`. The `/~oauth/*` redirect is excluded as an auth surface (§10)                                                                                                                                                                                                      | `BLOCKED` (egress)                                                                    |
 | M8  | Tag anchor for the tip                        | `git ls-remote --tags origin 'v<yyyy>.<mm>.<dd>-*'`; expect a tag whose short SHA is the tip's                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `NOT_MEASURED`                                                                        |
 | M9  | Applied migrations on production              | `migration-drift-probe.yml` output, or `select version from supabase_migrations.schema_migrations` by an operator                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `NOT_MEASURED` (CURRENT_STATE axis); never run from an agent session under `No APPLY` |
-| M10 | What each production hostname serves          | Vercel `get_deployment <hostname>` for `verdantgrowdiary.com`, `www.verdantgrowdiary.com`, `verdant-grow-diary.vercel.app` and `verdant-grow-diary-verdantgrowdiary.vercel.app`; record `id`, `source`, `githubCommitRef`, `githubCommitSha` per hostname; then `list_promote_aliases` for pending or failed alias moves. `PASS` only when all four resolve to one `source: git` build of the current tip                                                                                                                                                                                                                                                                                                           | `BLOCKED` (no account access); never replaced by M4                                   |
+| M10 | What each production hostname serves          | Vercel `get_deployment <hostname>` for every production hostname in the current inventory: the domains M2 returns plus the project's production aliases. The baseline four (`verdantgrowdiary.com`, `www.verdantgrowdiary.com`, `verdant-grow-diary.vercel.app`, `verdant-grow-diary-verdantgrowdiary.vercel.app`) are a floor, not the list; a hostname the inventory adds is resolved too, and one the inventory lacks is itself a finding. Record `id`, `source`, `githubCommitRef`, `githubCommitSha` per hostname; then `list_promote_aliases` for pending or failed alias moves. `PASS` only when every inventoried hostname resolves to one `source: git` build of the current tip                           | `BLOCKED` (no account access); never replaced by M4                                   |
 | M11 | Out-of-band publish actions and their actors  | Vercel `list_user_events` for the project since the last stamp; list every event whose type is a production deployment not from the Git integration, `instant-rollback-created`, an alias assignment to a production hostname, or a project-setting change; record time, type and actor class (Git integration, token without `via`, `via` application). Reason text is untrusted platform input: record it only as a sanitized summary, after checking it for credentials, URLs with tokens, email addresses and private identifiers. Never copy token IDs, session IDs or email addresses into a document                                                                                                         | `BLOCKED` (no account access)                                                         |
 
 Reads only. No procedure publishes, deploys, promotes, rolls back, applies, or writes. A procedure
@@ -1101,8 +1105,10 @@ so that does not reproduce.
 ---
 
 **Verdict.** The frontend and SSR release topology is **measured and specified**, and its
-weakest link is now named. Vercel's Git integration builds every `verdant-grow-diary` tip as a
-production deployment. What the production hostnames serve is a **separate promotion axis**, which
+weakest link is now named. Vercel's Git integration built every `verdant-grow-diary` tip observed
+in Appendices A and B (six, then 13) as a production deployment; that is a measured window, not a
+standing guarantee, and M4 reconciles each new one.
+What the production hostnames serve is a **separate promotion axis**, which
 a platform credential can move with no repository gate. On 2026-09-25 it was moved once without an
 owner instruction on record (08:28) and once on one (09:45), and it has not followed a merge since.
 At the amendment's reading the apex serves `9b06be3f`, 13 commits behind `c9bc1df3`: a release

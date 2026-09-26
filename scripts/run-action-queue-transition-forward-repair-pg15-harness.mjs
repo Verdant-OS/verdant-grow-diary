@@ -11,6 +11,7 @@ import {
   classifyPreflight,
   parsePreflightStdout,
 } from "./apply-action-queue-transition-forward-repair.mjs";
+import { MIGRATION_LEDGER_CREATE_TABLE_SQL } from "./lib/supabaseMigrationLedgerShape.mjs";
 
 const MAX_PSQL_OUTPUT_BYTES = 1_048_576;
 const DISPOSABLE_DATABASE = "verdant_action_queue_transition_repair";
@@ -241,11 +242,7 @@ drop schema if exists auth cascade;
 create schema auth authorization postgres;
 create schema public authorization postgres;
 create schema supabase_migrations authorization postgres;
-create table supabase_migrations.schema_migrations (
-  version text primary key,
-  name text,
-  statements text[]
-);
+${MIGRATION_LEDGER_CREATE_TABLE_SQL}
 alter table supabase_migrations.schema_migrations owner to postgres;
 
 do $roles$
@@ -264,9 +261,9 @@ begin
   end if;
 end
 $roles$;
-alter role anon nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
-alter role authenticated nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
-alter role service_role nologin nosuperuser nocreatedb nocreaterole noinherit noreplication bypassrls;
+alter role anon nologin nosuperuser nocreatedb nocreaterole inherit noreplication nobypassrls;
+alter role authenticated nologin nosuperuser nocreatedb nocreaterole inherit noreplication nobypassrls;
+alter role service_role nologin nosuperuser nocreatedb nocreaterole inherit noreplication bypassrls;
 alter role sandbox_exec nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
 
 create function auth.uid() returns uuid

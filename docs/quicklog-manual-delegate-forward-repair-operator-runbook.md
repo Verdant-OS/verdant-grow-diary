@@ -85,7 +85,7 @@ are excluded from uploaded evidence.
 
 ## Mandatory active-writer gate
 
-All eight registered production migration writers share the workflow-level group
+All ten registered production migration writers share the workflow-level group
 `verdant-production-migration-writer` with `cancel-in-progress: false` and
 `queue: max`. This serializes their complete workflow lifetimes and retains a
 durable queue of pending writers instead of replacing an earlier pending run.
@@ -101,6 +101,8 @@ workflows to have no `queued`, `in_progress`, `waiting`, `pending`, or
 - `apply-quicklog-manual-delegate-forward-repair.yml`
 - `apply-action-queue-transition-forward-repair.yml`
 - `apply-agreement-acceptance-insert-forward-repair.yml`
+- `apply-quicklog-revision-idempotent-replay.yml`
+- `apply-plants-health-unassessed-default.yml`
 
 Run this read-only check from an authenticated GitHub CLI session:
 
@@ -115,6 +117,8 @@ writers=(
   apply-quicklog-manual-delegate-forward-repair.yml
   apply-action-queue-transition-forward-repair.yml
   apply-agreement-acceptance-insert-forward-repair.yml
+  apply-quicklog-revision-idempotent-replay.yml
+  apply-plants-health-unassessed-default.yml
 )
 for workflow in "${writers[@]}"; do
   for status in queued in_progress waiting pending requested; do
@@ -191,7 +195,7 @@ Before APPLY:
    before creating the APPLY dispatch. APPLY must be created no more than
    24 hours after that completion time. Queue or environment-wait time does not
    satisfy the 15-minute minimum; the review window has a 24-hour maximum.
-6. Confirm the six-writer inventory is still idle, then create a fresh APPLY
+6. Confirm the ten-writer inventory is still idle, then create a fresh APPLY
    dispatch at attempt `1` and approve `verdant-production-solo-founder` as the
    founder.
 
@@ -226,7 +230,7 @@ The protected workflow and runner then perform this sequence:
    projected API resources.
 2. Authenticate the immutable prior PREFLIGHT run ID, attempt, artifact digest,
    founder identity, and inclusive 15-minute-to-24-hour review window.
-3. Prove the exact six-writer inventory idle.
+3. Prove the exact ten-writer inventory idle.
 4. Require the dedicated environment's production URL and CA, then re-resolve
    the live `verdant-grow-diary` head before database access.
 5. Revalidate the fixed nine-field authorization evidence before the runner

@@ -5,19 +5,53 @@
  * could otherwise send RH 95% in Flower as severity "ok", and the grounding
  * rules let the model describe that environment as stable.
  *
- * The edge entry cannot be imported under Vitest (Deno.serve, npm:
- * specifiers), so its step order is read from source. The grading itself runs
- * here on a packet the server validator accepted, and again in Deno in
- * supabase/functions/ai-doctor-review/stageTargetGrading.test.ts.
+ * The grading itself runs here on a packet the server validator accepted, and
+ * again in Deno in supabase/functions/ai-doctor-review/stageTargetGrading.test.ts.
+ * The entry's step order is read from its executable text (comments removed),
+ * so a step that survives only in a comment does not count (Codex review on
+ * #1683).
+ *
+ * @source-scan-justified: the edge entry cannot be imported under Vitest. It
+ * calls `Deno.serve` at module scope, reads `Deno.env`, and imports `npm:`
+ * specifiers that Vite does not resolve.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { applyStageTargetSeverityToPacket } from "@/lib/aiDoctorPacketStageTargetRules";
 import { validateAndNormalizeAiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacketValidationRules";
+import { executableTsSource } from "@/test/helpers/executableTsSource";
 
 const FUNCTIONS = resolve(__dirname, "../../supabase/functions");
-const ENTRY = readFileSync(resolve(FUNCTIONS, "ai-doctor-review/index.ts"), "utf8");
+const ENTRY_SOURCE = readFileSync(resolve(FUNCTIONS, "ai-doctor-review/index.ts"), "utf8");
+const ENTRY = executableTsSource(ENTRY_SOURCE);
+
+const GRADE_CALL = "applyStageTargetSeverityToPacket(normalizedPacket)";
+const LATER_STEPS = [
+  ["acceptance check", "isAiDoctorReviewEvidenceAcceptanceCoherentWithPacket("],
+  ["evidence receipt", "buildAiDoctorReviewEvidenceReceiptSnapshot("],
+  ["prompt", "buildAiDoctorPromptMessages(validatedPacket)"],
+  ["credit spend", 'rpc("ai_credit_spend"'],
+] as const;
+
+/** Every way the entry's step order breaks the contract; [] when it holds. */
+function gradingOrderProblems(code: string): string[] {
+  const problems: string[] = [];
+  if (!/const validatedPacket = applyStageTargetSeverityToPacket\(normalizedPacket\);/.test(code)) {
+    problems.push("validatedPacket is not the graded packet");
+  }
+  const validate = code.indexOf("validateAndNormalizeAiDoctorReviewRequestPacket(request.packet)");
+  const grade = code.indexOf(GRADE_CALL);
+  if (validate <= 0) problems.push("no server validation");
+  if (grade <= validate) problems.push("grading does not follow validation");
+  for (const [name, needle] of LATER_STEPS) {
+    if (code.indexOf(needle) <= grade) problems.push(`${name} does not follow grading`);
+  }
+  if (grade >= 0 && /normalizedPacket/.test(code.slice(grade + GRADE_CALL.length))) {
+    problems.push("the ungraded packet is used after grading");
+  }
+  return problems;
+}
 
 function packet(rh: number, severity: "ok" | "warning") {
   return {
@@ -86,22 +120,18 @@ describe("ai-doctor-review grades before the receipt, the prompt and the credit 
   });
 
   it("runs right after validation, ahead of every use of the packet", () => {
-    expect(ENTRY).toMatch(
-      /const validatedPacket = applyStageTargetSeverityToPacket\(normalizedPacket\);/,
+    expect(gradingOrderProblems(ENTRY)).toEqual([]);
+  });
+
+  it("does not count a grading step that survives only in a comment", () => {
+    const step = "const validatedPacket = applyStageTargetSeverityToPacket(normalizedPacket);";
+    expect(ENTRY_SOURCE).toContain(step);
+    const commentedOut = ENTRY_SOURCE.replace(
+      step,
+      `const validatedPacket = request.packet as never; // was: ${step}`,
     );
-    const validate = ENTRY.indexOf(
-      "validateAndNormalizeAiDoctorReviewRequestPacket(request.packet)",
+    expect(gradingOrderProblems(executableTsSource(commentedOut))).toContain(
+      "validatedPacket is not the graded packet",
     );
-    const grade = ENTRY.indexOf("applyStageTargetSeverityToPacket(normalizedPacket)");
-    const coherence = ENTRY.indexOf("isAiDoctorReviewEvidenceAcceptanceCoherentWithPacket(");
-    const receipt = ENTRY.indexOf("buildAiDoctorReviewEvidenceReceiptSnapshot(");
-    const prompt = ENTRY.indexOf("buildAiDoctorPromptMessages(validatedPacket)");
-    const spend = ENTRY.indexOf('rpc("ai_credit_spend"');
-    expect(validate).toBeGreaterThan(0);
-    expect(grade).toBeGreaterThan(validate);
-    for (const later of [coherence, receipt, prompt, spend]) expect(later).toBeGreaterThan(grade);
-    // The ungraded packet never reaches anything after the grading step.
-    const gradeCall = "applyStageTargetSeverityToPacket(normalizedPacket)";
-    expect(ENTRY.slice(grade + gradeCall.length)).not.toMatch(/normalizedPacket/);
   });
 });

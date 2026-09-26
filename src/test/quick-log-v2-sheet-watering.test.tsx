@@ -80,7 +80,21 @@ vi.mock("@/integrations/supabase/client", () => ({
               }),
             }),
           }
-        : { insert: diaryInsert },
+        : table === "watering_events"
+          ? {
+              select: () => ({
+                eq: (_column: string, id: string) => ({
+                  maybeSingle: async () => {
+                    const args = rpcMock.mock.calls.at(-1)?.[1];
+                    return {
+                      data: args ? { event_id: id, volume_ml: args.p_water.volume_ml } : null,
+                      error: null,
+                    };
+                  },
+                }),
+              }),
+            }
+          : { insert: diaryInsert },
   },
 }));
 

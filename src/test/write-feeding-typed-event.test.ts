@@ -205,13 +205,27 @@ describe("writeFeedingTypedEvent — RPC behavior", () => {
       },
       error: null,
     });
-    expect(await writeFeedingTypedEvent(baseInput(), { client, reusedEventReader })).toEqual({
+    const reusedChildReader = vi.fn().mockResolvedValue({
+      data: {
+        event_id: "77777777-7777-4777-8777-000000000001",
+        volume_ml: 750,
+        line_id: "veg-week-3",
+      },
+      error: null,
+    });
+    expect(
+      await writeFeedingTypedEvent(baseInput(), { client, reusedEventReader, reusedChildReader }),
+    ).toEqual({
       ok: true,
       eventId: "77777777-7777-4777-8777-000000000001",
       reused: true,
     });
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(reusedEventReader).toHaveBeenCalledWith("77777777-7777-4777-8777-000000000001");
+    expect(reusedChildReader).toHaveBeenCalledWith(
+      "feeding",
+      "77777777-7777-4777-8777-000000000001",
+    );
     expect(rpc.mock.calls[0][0]).toBe("quicklog_save_event");
   });
 

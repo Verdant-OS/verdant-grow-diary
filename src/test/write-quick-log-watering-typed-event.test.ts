@@ -309,8 +309,16 @@ describe("writeQuickLogWateringTypedEvent — RPC behavior and idempotency", () 
       },
       error: null,
     });
+    const reusedChildReader = vi.fn().mockResolvedValue({
+      data: { event_id: "77777777-7777-4777-8777-000000000001", volume_ml: 750 },
+      error: null,
+    });
     expect(
-      await writeQuickLogWateringTypedEvent(baseInput(), { client, reusedEventReader }),
+      await writeQuickLogWateringTypedEvent(baseInput(), {
+        client,
+        reusedEventReader,
+        reusedChildReader,
+      }),
     ).toEqual({
       ok: true,
       eventId: "77777777-7777-4777-8777-000000000001",
@@ -318,6 +326,10 @@ describe("writeQuickLogWateringTypedEvent — RPC behavior and idempotency", () 
     });
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(reusedEventReader).toHaveBeenCalledWith("77777777-7777-4777-8777-000000000001");
+    expect(reusedChildReader).toHaveBeenCalledWith(
+      "watering",
+      "77777777-7777-4777-8777-000000000001",
+    );
     expect(rpc).toHaveBeenCalledWith("quicklog_save_event", expect.any(Object));
   });
 
@@ -338,9 +350,21 @@ describe("writeQuickLogWateringTypedEvent — RPC behavior and idempotency", () 
       },
       error: null,
     });
+    const reusedChildReader = vi.fn().mockResolvedValue({
+      data: { event_id: "77777777-7777-4777-8777-000000000001", volume_ml: 750 },
+      error: null,
+    });
 
-    await writeQuickLogWateringTypedEvent(input, { client, reusedEventReader });
-    await writeQuickLogWateringTypedEvent(input, { client, reusedEventReader });
+    await writeQuickLogWateringTypedEvent(input, {
+      client,
+      reusedEventReader,
+      reusedChildReader,
+    });
+    await writeQuickLogWateringTypedEvent(input, {
+      client,
+      reusedEventReader,
+      reusedChildReader,
+    });
 
     expect(rpc).toHaveBeenCalledTimes(2);
     expect(rpc.mock.calls[0]).toEqual(rpc.mock.calls[1]);

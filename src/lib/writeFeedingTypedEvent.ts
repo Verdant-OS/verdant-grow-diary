@@ -16,6 +16,7 @@ import { supabase as defaultSupabase } from "@/integrations/supabase/client";
 import {
   verifyActiveTypedQuickLogEvent,
   type TypedQuickLogEventReader,
+  type TypedQuickLogChildReader,
 } from "./quickLogTypedReusedReceipt";
 import { ROOT_ZONE_PRODUCT_CAP } from "./rootZoneObservationRules";
 
@@ -237,6 +238,7 @@ export function mapFeedingInputToRpcArgs(
 export interface WriteFeedingTypedEventOptions {
   client?: FeedingRpcClient;
   reusedEventReader?: TypedQuickLogEventReader;
+  reusedChildReader?: TypedQuickLogChildReader;
 }
 
 export async function writeFeedingTypedEvent(
@@ -282,8 +284,11 @@ export async function writeFeedingTypedEvent(
         growId: mapped.args.p_grow_id,
         tentId: mapped.args.p_tent_id,
         plantId: mapped.args.p_plant_id,
+        volumeMl: mapped.args.p_feed.volume_ml,
+        lineId: mapped.args.p_feed.line_id,
       },
       options.reusedEventReader,
+      options.reusedChildReader,
     ))
   )
     return { ok: false, reason: "rpc:receipt_unverified" };

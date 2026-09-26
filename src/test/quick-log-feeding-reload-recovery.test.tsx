@@ -11,7 +11,8 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: (...args: unknown[]) => rpc(...args),
     from: (table: string) => {
-      if (table !== "grow_events") throw new Error(`Unexpected table ${table}`);
+      if (table !== "grow_events" && table !== "feeding_events")
+        throw new Error(`Unexpected table ${table}`);
       return {
         select: () => ({
           eq: (_column: string, id: string) => ({
@@ -19,15 +20,21 @@ vi.mock("@/integrations/supabase/client", () => ({
               const args = rpc.mock.calls.at(-1)?.[1] as QuickLogFeedingEventRpcArgs | undefined;
               return {
                 data: args
-                  ? {
-                      id,
-                      event_type: args.p_event_type,
-                      source: "manual",
-                      is_deleted: false,
-                      grow_id: args.p_grow_id,
-                      tent_id: args.p_tent_id,
-                      plant_id: args.p_plant_id,
-                    }
+                  ? table === "grow_events"
+                    ? {
+                        id,
+                        event_type: args.p_event_type,
+                        source: "manual",
+                        is_deleted: false,
+                        grow_id: args.p_grow_id,
+                        tent_id: args.p_tent_id,
+                        plant_id: args.p_plant_id,
+                      }
+                    : {
+                        event_id: id,
+                        volume_ml: args.p_feed.volume_ml,
+                        line_id: args.p_feed.line_id,
+                      }
                   : null,
                 error: null,
               };

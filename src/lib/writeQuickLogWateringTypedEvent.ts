@@ -16,6 +16,7 @@ import { supabase as defaultSupabase } from "@/integrations/supabase/client";
 import {
   verifyActiveTypedQuickLogEvent,
   type TypedQuickLogEventReader,
+  type TypedQuickLogChildReader,
 } from "./quickLogTypedReusedReceipt";
 
 export interface QuickLogWateringRpcPayload {
@@ -258,6 +259,7 @@ export function mapWateringInputToRpcArgs(
 export interface WriteWateringTypedEventOptions {
   client?: WateringRpcClient;
   reusedEventReader?: TypedQuickLogEventReader;
+  reusedChildReader?: TypedQuickLogChildReader;
 }
 
 export async function writeQuickLogWateringTypedEvent(
@@ -293,8 +295,10 @@ export async function writeQuickLogWateringTypedEvent(
         growId: mapped.args.p_grow_id,
         tentId: mapped.args.p_tent_id,
         plantId: mapped.args.p_plant_id,
+        volumeMl: mapped.args.p_water.volume_ml,
       },
       options.reusedEventReader,
+      options.reusedChildReader,
     ))
   )
     return { ok: false, reason: "rpc:receipt_unverified" };

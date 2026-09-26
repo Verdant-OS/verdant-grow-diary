@@ -6,6 +6,25 @@ export interface ExpectedTypedQuickLogEvent {
   growId: string;
   tentId: string | null;
   plantId: string | null;
+  volumeMl: number;
+  lineId?: string;
+}
+
+export function matchesTypedQuickLogChild(
+  expected: ExpectedTypedQuickLogEvent,
+  value: unknown,
+): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (!Number.isFinite(expected.volumeMl) || expected.volumeMl <= 0) return false;
+  const child = value as Record<string, unknown>;
+  return (
+    child.event_id === expected.id &&
+    child.volume_ml === expected.volumeMl &&
+    (expected.eventType === "watering" ||
+      (typeof expected.lineId === "string" &&
+        expected.lineId.length > 0 &&
+        child.line_id === expected.lineId))
+  );
 }
 
 export function matchesActiveTypedQuickLogEvent(

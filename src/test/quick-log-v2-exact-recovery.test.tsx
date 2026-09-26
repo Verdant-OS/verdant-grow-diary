@@ -483,6 +483,25 @@ describe("ASTRA-001 related Feed recovery", () => {
     await expectRetry();
     expect(screen.getByLabelText("Applied volume (ml)")).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Applied volume (ml)"), { target: { value: "1000" } });
+    readbackMock.mockImplementationOnce(async () => {
+      const args = stored as {
+        p_grow_id: string;
+        p_tent_id: string | null;
+        p_plant_id: string | null;
+      };
+      return {
+        data: {
+          id: "77777777-7777-4777-8777-000000000003",
+          event_type: "feeding",
+          source: "manual",
+          is_deleted: false,
+          grow_id: args.p_grow_id,
+          tent_id: args.p_tent_id,
+          plant_id: args.p_plant_id,
+        },
+        error: null,
+      };
+    });
     retry();
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
     expect(rpcMock).toHaveBeenCalledTimes(2);

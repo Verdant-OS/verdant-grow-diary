@@ -8,7 +8,35 @@ const owner = vi.hoisted(() => ({ id: "owner-a" }));
 const rpc = vi.fn();
 const toastSuccess = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { rpc: (...args: unknown[]) => rpc(...args) },
+  supabase: {
+    rpc: (...args: unknown[]) => rpc(...args),
+    from: (table: string) => {
+      if (table !== "grow_events") throw new Error(`Unexpected table ${table}`);
+      return {
+        select: () => ({
+          eq: (_column: string, id: string) => ({
+            maybeSingle: async () => {
+              const args = rpc.mock.calls.at(-1)?.[1] as QuickLogFeedingEventRpcArgs | undefined;
+              return {
+                data: args
+                  ? {
+                      id,
+                      event_type: args.p_event_type,
+                      source: "manual",
+                      is_deleted: false,
+                      grow_id: args.p_grow_id,
+                      tent_id: args.p_tent_id,
+                      plant_id: args.p_plant_id,
+                    }
+                  : null,
+                error: null,
+              };
+            },
+          }),
+        }),
+      };
+    },
+  },
 }));
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: owner.id } }) }));
 vi.mock("@/hooks/use-plants", () => ({

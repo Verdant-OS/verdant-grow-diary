@@ -13,6 +13,10 @@
 
 import { isUuid } from "@/lib/isUuid";
 import { supabase as defaultSupabase } from "@/integrations/supabase/client";
+import {
+  verifyActiveTypedQuickLogEvent,
+  type TypedQuickLogEventReader,
+} from "./quickLogTypedReusedReceipt";
 import { ROOT_ZONE_PRODUCT_CAP } from "./rootZoneObservationRules";
 
 export interface QuickLogFeedingRpcPayload {
@@ -88,6 +92,7 @@ export type WriteFeedingFailureReason =
   | "numeric:not_finite"
   | "occurred_at:invalid"
   | "rpc:no_event_id"
+  | "rpc:receipt_unverified"
   | "rpc:invalid_typed_payload"
   | "rpc:rejected"
   | "rpc:error";
@@ -231,6 +236,7 @@ export function mapFeedingInputToRpcArgs(
 
 export interface WriteFeedingTypedEventOptions {
   client?: FeedingRpcClient;
+  reusedEventReader?: TypedQuickLogEventReader;
 }
 
 export async function writeFeedingTypedEvent(
@@ -266,6 +272,21 @@ export async function writeFeedingTypedEvent(
   }
   const eventId = trimOrNull(envelope.grow_event_id);
   if (!isUuid(eventId)) return { ok: false, reason: "rpc:no_event_id" };
+
+  if (
+    envelope.reused === true &&
+    !(await verifyActiveTypedQuickLogEvent(
+      {
+        id: eventId,
+        eventType: "feeding",
+        growId: mapped.args.p_grow_id,
+        tentId: mapped.args.p_tent_id,
+        plantId: mapped.args.p_plant_id,
+      },
+      options.reusedEventReader,
+    ))
+  )
+    return { ok: false, reason: "rpc:receipt_unverified" };
 
   return {
     ok: true,

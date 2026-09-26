@@ -13,6 +13,10 @@
 
 import { isUuid } from "@/lib/isUuid";
 import { supabase as defaultSupabase } from "@/integrations/supabase/client";
+import {
+  verifyActiveTypedQuickLogEvent,
+  type TypedQuickLogEventReader,
+} from "./quickLogTypedReusedReceipt";
 
 export interface QuickLogWateringRpcPayload {
   volume_ml: number;
@@ -82,6 +86,7 @@ export type WriteWateringFailureReason =
   | "sensor_snapshot:invalid"
   | "details:invalid"
   | "rpc:no_event_id"
+  | "rpc:receipt_unverified"
   | "rpc:invalid_typed_payload"
   | "rpc:rejected"
   | "rpc:error";
@@ -252,6 +257,7 @@ export function mapWateringInputToRpcArgs(
 
 export interface WriteWateringTypedEventOptions {
   client?: WateringRpcClient;
+  reusedEventReader?: TypedQuickLogEventReader;
 }
 
 export async function writeQuickLogWateringTypedEvent(
@@ -277,6 +283,21 @@ export async function writeQuickLogWateringTypedEvent(
   if (!envelope || envelope.ok !== true) return { ok: false, reason: "rpc:rejected" };
   const eventId = trimOrNull(envelope.grow_event_id);
   if (!isUuid(eventId)) return { ok: false, reason: "rpc:no_event_id" };
+
+  if (
+    envelope.reused === true &&
+    !(await verifyActiveTypedQuickLogEvent(
+      {
+        id: eventId,
+        eventType: "watering",
+        growId: mapped.args.p_grow_id,
+        tentId: mapped.args.p_tent_id,
+        plantId: mapped.args.p_plant_id,
+      },
+      options.reusedEventReader,
+    ))
+  )
+    return { ok: false, reason: "rpc:receipt_unverified" };
 
   return { ok: true, eventId, reused: envelope.reused === true };
 }

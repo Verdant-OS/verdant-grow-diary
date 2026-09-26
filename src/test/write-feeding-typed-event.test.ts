@@ -193,12 +193,25 @@ describe("writeFeedingTypedEvent — RPC behavior", () => {
     const { client, rpc } = makeClient({
       data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
     });
-    expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
+    const reusedEventReader = vi.fn().mockResolvedValue({
+      data: {
+        id: "77777777-7777-4777-8777-000000000001",
+        event_type: "feeding",
+        source: "manual",
+        is_deleted: false,
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+      },
+      error: null,
+    });
+    expect(await writeFeedingTypedEvent(baseInput(), { client, reusedEventReader })).toEqual({
       ok: true,
       eventId: "77777777-7777-4777-8777-000000000001",
       reused: true,
     });
     expect(rpc).toHaveBeenCalledTimes(1);
+    expect(reusedEventReader).toHaveBeenCalledWith("77777777-7777-4777-8777-000000000001");
     expect(rpc.mock.calls[0][0]).toBe("quicklog_save_event");
   });
 
@@ -254,6 +267,28 @@ describe("writeFeedingTypedEvent — static safety guards", () => {
 });
 
 describe("receipt identity", () => {
+  it("does not confirm a reused Feeding that was retracted after its first save", async () => {
+    const { client } = makeClient({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+    });
+    const reusedEventReader = vi.fn().mockResolvedValue({
+      data: {
+        id: "77777777-7777-4777-8777-000000000001",
+        event_type: "feeding",
+        source: "manual",
+        is_deleted: true,
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+      },
+      error: null,
+    });
+    expect(await writeFeedingTypedEvent(baseInput(), { client, reusedEventReader })).toEqual({
+      ok: false,
+      reason: "rpc:receipt_unverified",
+    });
+  });
+
   it.each(["not-an-event", "", " ", null, undefined, 42, {}])(
     "rejects malformed event ID %j",
     async (id) => {

@@ -26,6 +26,7 @@ import {
 } from "@/lib/quickLogPendingStarterWaterStore";
 import { buildWateringRecoveryForm } from "@/lib/quickLogWateringRecoveryViewModel";
 import { mayCorrectRejectedWatering } from "@/lib/quickLogWateringRejectionRules";
+import { mayCorrectRejectedFeeding } from "@/lib/quickLogFeedingRejectionRules";
 import {
   readPendingQuickLogFeeding,
   claimPendingQuickLogFeeding,
@@ -1491,22 +1492,18 @@ function QuickLogV2SheetForOwner({
       if (!canContinueNote()) return;
       setFeedingSaving(false);
       if (result.ok !== true) {
-        // Writer validation can reject before issuing an RPC. That draft is
-        // safe to correct. So is an explicit server validation rejection:
-        // the server answered that nothing was saved, even for a restored
-        // pending entry. Only an ambiguous server/transport outcome needs
-        // an exact retry.
         const definitiveServerRejection = result.reason === "rpc:invalid_typed_payload";
         const released =
-          (definitiveServerRejection || !pendingFeedingSubmission) &&
-          (definitiveServerRejection || !result.reason.startsWith("rpc:")) &&
-          clearPendingQuickLogFeeding(exactFeedingSubmission.recovery);
+          mayCorrectRejectedFeeding({
+            reason: result.reason,
+            priorClaim: pendingFeedingSubmission !== null,
+          }) && clearPendingQuickLogFeeding(exactFeedingSubmission.recovery);
         const unresolved = !released;
         setExactRetryPending(unresolved);
         keepSubmissionLockedRef.current = unresolved;
         if (!unresolved) feedingRetrySubmissionRef.current = null;
-        // A rejected key never reached a committed save; the corrected entry
-        // is a new logical submission and gets a fresh server key.
+        // Only a fresh claim can be cleared. An older ambiguous attempt may
+        // have committed before a later validation rejection arrived.
         if (released && definitiveServerRejection) {
           saveIdempotencyKeyRef.current = newQuickLogSaveKey();
         }

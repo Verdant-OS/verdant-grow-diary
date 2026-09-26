@@ -28,6 +28,41 @@ export interface PiIngestReadingLike {
   tent_id?: string | null;
 }
 
+/** A missing or malformed required receipt is not an empty accepted history. */
+export function requirePiIngestReadings(data: unknown): PiIngestReadingLike[] {
+  if (
+    !Array.isArray(data) ||
+    !data.every(
+      (row) =>
+        row !== null &&
+        typeof row === "object" &&
+        typeof row.ts === "string" &&
+        Number.isFinite(Date.parse(row.ts)) &&
+        typeof row.metric === "string" &&
+        row.metric.trim().length > 0 &&
+        row.source === PI_INGEST_SOURCE &&
+        (row.tent_id == null || (typeof row.tent_id === "string" && row.tent_id.trim().length > 0)),
+    )
+  ) {
+    throw new Error("Could not load ingest status.");
+  }
+  return data;
+}
+
+/** Cached health is not current evidence while its required read is unresolved. */
+export function piIngestReadState(query: {
+  isPending: boolean;
+  isFetching: boolean;
+  isPaused: boolean;
+  isError: boolean;
+  data: unknown;
+}): "waiting" | "loading" | "unavailable" | "ready" {
+  if (query.isPaused) return "waiting";
+  if (query.isPending || query.isFetching) return "loading";
+  if (query.isError || !query.data) return "unavailable";
+  return "ready";
+}
+
 export interface PiIngestStatusSummary {
   health: PiIngestHealth;
   latestAt: Date | null;

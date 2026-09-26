@@ -4,6 +4,7 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import type { QuickLogAllActivitiesSaveSuccess } from "@/components/QuickLogAllActivitiesSection";
 import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
+import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 
 type Payload = Record<string, unknown>;
 const backend = vi.hoisted(() => ({
@@ -65,6 +66,7 @@ function mount(
   plantId = "plant-a",
   initialStage: unknown = "flower",
   onSaveSuccess?: (result: QuickLogAllActivitiesSaveSuccess) => void,
+  initialRequestedActivityId: QuickLogActivityId | null = null,
 ) {
   let stage = initialStage;
   const renderTree = (id: string, requestedActivityId: QuickLogActivityId | null = null) => (
@@ -79,7 +81,7 @@ function mount(
       />
     </MemoryRouter>
   );
-  const view = render(renderTree(plantId));
+  const view = render(renderTree(plantId, initialRequestedActivityId));
   return {
     ...view,
     changeTarget: (id: string, requestedActivityId: QuickLogActivityId | null = null) =>
@@ -138,6 +140,49 @@ beforeEach(() => {
 });
 
 describe("All activity types retry confirmation", () => {
+  it("does not hand off requested Water before restoring an unresolved same-target activity", async () => {
+    const first = mount();
+    await loseReply();
+    expect(backend.posts).toHaveLength(1);
+    first.unmount();
+
+    const events: Event[] = [];
+    const onOpen = (event: Event) => events.push(event);
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpen);
+    try {
+      mount("plant-a", "flower", undefined, "watering");
+      expect(events).toHaveLength(0);
+      expect(
+        screen.getByTestId("quick-log-all-activities-structured-water-error"),
+      ).toHaveTextContent(/resolve the existing activity recovery before logging water/i);
+      expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toBeInTheDocument();
+      expect(backend.posts).toHaveLength(1);
+    } finally {
+      window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpen);
+    }
+  });
+
+  it("allows requested Water on a different target while the original activity is unresolved", async () => {
+    const first = mount();
+    await loseReply();
+    first.unmount();
+
+    const events: Event[] = [];
+    const onOpen = (event: Event) => events.push(event);
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpen);
+    try {
+      mount("plant-b", "flower", undefined, "watering");
+      expect(events).toHaveLength(1);
+      expect((events[0] as CustomEvent).detail).toEqual({
+        targetKey: "plant:plant-b",
+        action: "water",
+      });
+      expect(backend.posts).toHaveLength(1);
+    } finally {
+      window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpen);
+    }
+  });
+
   it("blocks an unresolved Harvest retry while the current stage is ineligible or unknown", async () => {
     const view = mount();
     selectActivity("harvest");

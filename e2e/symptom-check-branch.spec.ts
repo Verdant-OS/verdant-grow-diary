@@ -383,7 +383,7 @@ test.describe("Plant Detail Symptom Check — local mocked branch proof", () => 
       p_note: SYMPTOM_NOTE,
       p_photo_url: null,
       p_sensor_snapshot: null,
-      p_occurred_at: null,
+      p_occurred_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
       p_details: {
         subtype: "issue",
         event_type: "observation",

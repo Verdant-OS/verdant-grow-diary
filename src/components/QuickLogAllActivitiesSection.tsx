@@ -410,6 +410,17 @@ export default function QuickLogAllActivitiesSection({
       setStructuredWaterError("Missing grow context. Nothing opened.");
       return false;
     }
+    // A requested Water handoff can run before the passive recovery effect.
+    // Read the exact target claim now, before opening a separate writer.
+    const recovery = readPendingQuickLogActivity(user?.id, currentTarget);
+    if (recovery.status !== "empty") {
+      setStructuredWaterError(
+        recovery.status === "blocked"
+          ? ACTIVITY_RECOVERY_UNAVAILABLE
+          : "Resolve the existing activity recovery before logging Water on this target.",
+      );
+      return false;
+    }
     const intent = buildQuickLogV2OpenIntent({ plantId, tentId, action: "water" });
     if (!intent || typeof window === "undefined") {
       setStructuredWaterError("Choose a plant or tent before logging Water.");
@@ -418,7 +429,15 @@ export default function QuickLogAllActivitiesSection({
     onBeforeStructuredWaterOpen?.();
     window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, { detail: intent }));
     return true;
-  }, [externalPersistenceBlockReason, growId, onBeforeStructuredWaterOpen, plantId, tentId]);
+  }, [
+    currentTarget,
+    externalPersistenceBlockReason,
+    growId,
+    onBeforeStructuredWaterOpen,
+    plantId,
+    tentId,
+    user?.id,
+  ]);
 
   useEffect(() => {
     if (previousTargetKeyRef.current === currentTargetKey) return;

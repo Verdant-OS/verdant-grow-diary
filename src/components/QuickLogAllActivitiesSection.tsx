@@ -76,6 +76,7 @@ import {
   MOVED_ACTIVITY_RECOVERY_GUIDANCE,
   readQuickLogPendingActivityReceipt,
 } from "@/lib/quickLogPendingActivityReceipt";
+import { restoreRejectedQuickLogActivityDraft } from "@/lib/quickLogRejectedActivityDraftRules";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
   QUICK_LOG_WEIGHT_UNITS,
@@ -398,6 +399,19 @@ export default function QuickLogAllActivitiesSection({
   // live preference).
   const envCheckTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
   const activeEnvCheckTempUnit = envCheckTempEntryUnitRef.current ?? temperatureUnit;
+  const restoreRejectedDraft = useCallback((record: PendingQuickLogActivity) => {
+    const draft = restoreRejectedQuickLogActivityDraft(record);
+    setNote(record.input.note ?? "");
+    setDetailValues({ ...draft.detailValues });
+    setHarvestWet(draft.harvestWet);
+    setHarvestDry(draft.harvestDry);
+    setHarvestUnit(draft.harvestUnit);
+    setGuidedSymptomCheck(draft.guidedSymptomCheck);
+    setGuidedSymptomStage(draft.guidedSymptomStage);
+    setGuidedSymptomStageConfirmed(draft.guidedSymptomStageConfirmed);
+    setGuidedSymptomNoneObserved(draft.guidedSymptomNoneObserved);
+    envCheckTempEntryUnitRef.current = draft.temperatureEntryUnit;
+  }, []);
   const requestedActivity =
     typeof requestedActivityId === "string" &&
     Object.prototype.hasOwnProperty.call(QUICK_LOG_ACTIVITY_DEFINITIONS, requestedActivityId)
@@ -538,7 +552,11 @@ export default function QuickLogAllActivitiesSection({
     setPendingActivity(recovery.status === "pending" ? recovery.record : null);
     if (recovery.status !== "pending") return;
     setSelectedDraft(bindQuickLogActivityDraft(recovery.record.input.activityId, currentTarget));
-    setNote(recovery.record.input.note ?? "");
+    if (readRejectedPendingQuickLogActivity(recovery.record)) {
+      restoreRejectedDraft(recovery.record);
+    } else {
+      setNote(recovery.record.input.note ?? "");
+    }
     setErrorReason(
       readConfirmedPendingQuickLogActivity(recovery.record)
         ? ACTIVITY_RECOVERY_CLEAR_FAILED
@@ -547,7 +565,7 @@ export default function QuickLogAllActivitiesSection({
           : ACTIVITY_RECOVERY_PENDING,
     );
     setErrorForActivity(recovery.record.input.activityId);
-  }, [currentTarget, currentTargetKey, user?.id]);
+  }, [currentTarget, currentTargetKey, restoreRejectedDraft, user?.id]);
 
   useEffect(() => {
     if (!onRecoveryLockChange || !currentTarget.growId) return;
@@ -763,6 +781,9 @@ export default function QuickLogAllActivitiesSection({
       return;
     }
     if (readRejectedPendingQuickLogActivity(record)) {
+      // Cleanup can finish after a reload. Restore the refused structured
+      // fields before deleting the sole persisted copy of the original draft.
+      restoreRejectedDraft(record);
       if (clearPendingQuickLogActivity(record)) {
         setPendingActivity(null);
         setErrorReason("The server refused this activity. Check its target and fields.");
@@ -860,6 +881,7 @@ export default function QuickLogAllActivitiesSection({
     onSaveEnd,
     onSaveStart,
     plantStage,
+    restoreRejectedDraft,
     save,
     saveBlocked,
     saving,

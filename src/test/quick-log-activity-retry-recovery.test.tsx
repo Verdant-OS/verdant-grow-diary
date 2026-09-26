@@ -370,6 +370,9 @@ describe("All activity types retry confirmation", () => {
     const view = mount();
     selectActivity("training");
     enterNote();
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-technique"), {
+      target: { value: "topping" },
+    });
     save();
     await waitFor(() =>
       expect(screen.getByTestId("quick-log-all-activities-retry-original")).toHaveTextContent(
@@ -396,13 +399,48 @@ describe("All activity types retry confirmation", () => {
       screen.queryByTestId("quick-log-all-activities-pending-activity"),
     ).not.toBeInTheDocument();
     expect(screen.getByTestId("quick-log-all-activities-note")).toBeEnabled();
+    expect(screen.getByTestId("quick-log-all-activities-detail-technique")).toHaveValue("topping");
     expect(backend.posts).toHaveLength(1);
     enterNote("Corrected after rejection");
     save();
     await screen.findByTestId("quick-log-all-activities-saved-item");
     expect(backend.posts).toHaveLength(2);
     expect(backend.posts[1].p_idempotency_key).not.toBe(backend.posts[0].p_idempotency_key);
+    expect(backend.posts[1].p_details).toMatchObject({ technique: "topping" });
     expect(backend.rows.size).toBe(1);
+  });
+
+  it("retains Harvest weights and unit after rejected cleanup succeeds following a reload", async () => {
+    backend.serverRejectOnPost = 1;
+    const remove = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => undefined);
+    const view = mount();
+    selectActivity("harvest");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-wet"), {
+      target: { value: "12.50" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-dry"), {
+      target: { value: "3.25" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-unit"), {
+      target: { value: "lb" },
+    });
+    save();
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-all-activities-retry-original")).toHaveTextContent(
+        "Clear rejected recovery record",
+      ),
+    );
+    view.unmount();
+    mount();
+    remove.mockRestore();
+    save();
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-all-activities-pending-activity")).toBeNull(),
+    );
+    expect(screen.getByTestId("quick-log-all-activities-harvest-wet")).toHaveValue("12.50");
+    expect(screen.getByTestId("quick-log-all-activities-harvest-dry")).toHaveValue("3.25");
+    expect(screen.getByTestId("quick-log-all-activities-harvest-unit")).toHaveValue("lb");
+    expect(backend.posts).toHaveLength(1);
   });
 
   it("blocks an over-500-character note before claiming or sending a request", async () => {

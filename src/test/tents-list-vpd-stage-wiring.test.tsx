@@ -4,7 +4,8 @@
  * Asserts that the legacy hardcoded `vpd > 1.6 || vpd < 0.6` thresholds are
  * gone and that classification flows through the shared Dashboard-strip
  * presenter (`buildTentSnapshotView`), which routes VPD through the
- * canonical `classifyVpdAgainstStage` with the tent's own stage. Also
+ * canonical `classifyVpdAgainstStage` with the tent's resolved environment
+ * stage (grow row, tent and active plants; BUG-006 follow-up). Also
  * static safety: no alerts/action_queue writes, no service_role, no
  * automation/device-control strings.
  */
@@ -48,8 +49,11 @@ describe("Tents list — VPD threshold cleanup", () => {
     );
   });
 
-  it("passes the tent's stage into the presenter", () => {
-    expect(TENTS_SRC).toMatch(/<TentEnvironmentSnapshotStrip[\s\S]*?stage=\{t\.stage\}/);
+  it("passes the tent's resolved environment stage into the presenter", () => {
+    // QA 2026-09-24, BUG-006 follow-up: the grow row, the tent and its active
+    // plants decide, as on Tent Detail and the Sensors page — not tents.stage.
+    expect(TENTS_SRC).toMatch(/<TentEnvironmentSnapshotStrip[\s\S]*?stage=\{envStage\}/);
+    expect(TENTS_SRC).toMatch(/const envStage = resolveTentEnvironmentStage\(/);
     expect(SNAPSHOT_STRIP_SRC).toMatch(
       /buildTentSnapshotView\(selection\.rows, stage, now, \{ temperatureUnit \}\)/,
     );

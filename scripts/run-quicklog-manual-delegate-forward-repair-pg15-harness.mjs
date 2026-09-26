@@ -11,6 +11,7 @@ import {
   classifyPreflight,
   parsePreflightStdout,
 } from "./apply-quicklog-manual-delegate-forward-repair.mjs";
+import { MIGRATION_LEDGER_CREATE_TABLE_SQL } from "./lib/supabaseMigrationLedgerShape.mjs";
 
 const MAX_PSQL_OUTPUT_BYTES = 1_048_576;
 const DISPOSABLE_DATABASE = "verdant_quicklog_delegate_repair";
@@ -206,28 +207,28 @@ drop schema if exists supabase_migrations cascade;
 do $roles$
 begin
   if not exists(select 1 from pg_roles where rolname='anon') then
-    execute 'create role anon nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls';
+    execute 'create role anon nologin nosuperuser nocreatedb nocreaterole inherit noreplication nobypassrls';
   elsif not exists(
     select 1 from pg_roles where rolname='anon'
-      and not rolsuper and not rolinherit and not rolcreaterole and not rolcreatedb
+      and not rolsuper and rolinherit and not rolcreaterole and not rolcreatedb
       and not rolcanlogin and not rolreplication and not rolbypassrls
   ) then
     raise exception 'existing harness role anon has unsafe attributes' using errcode = '55000';
   end if;
   if not exists(select 1 from pg_roles where rolname='authenticated') then
-    execute 'create role authenticated nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls';
+    execute 'create role authenticated nologin nosuperuser nocreatedb nocreaterole inherit noreplication nobypassrls';
   elsif not exists(
     select 1 from pg_roles where rolname='authenticated'
-      and not rolsuper and not rolinherit and not rolcreaterole and not rolcreatedb
+      and not rolsuper and rolinherit and not rolcreaterole and not rolcreatedb
       and not rolcanlogin and not rolreplication and not rolbypassrls
   ) then
     raise exception 'existing harness role authenticated has unsafe attributes' using errcode = '55000';
   end if;
   if not exists(select 1 from pg_roles where rolname='service_role') then
-    execute 'create role service_role nologin nosuperuser nocreatedb nocreaterole noinherit noreplication bypassrls';
+    execute 'create role service_role nologin nosuperuser nocreatedb nocreaterole inherit noreplication bypassrls';
   elsif not exists(
     select 1 from pg_roles where rolname='service_role'
-      and not rolsuper and not rolinherit and not rolcreaterole and not rolcreatedb
+      and not rolsuper and rolinherit and not rolcreaterole and not rolcreatedb
       and not rolcanlogin and not rolreplication and rolbypassrls
   ) then
     raise exception 'existing harness role service_role has unsafe attributes' using errcode = '55000';
@@ -249,11 +250,7 @@ create schema auth authorization postgres;
 create schema supabase_migrations authorization postgres;
 grant usage on schema public, auth to anon, authenticated, service_role;
 
-create table supabase_migrations.schema_migrations(
-  version text primary key,
-  name text,
-  statements text[]
-);
+${MIGRATION_LEDGER_CREATE_TABLE_SQL}
 
 create function auth.uid()
 returns uuid

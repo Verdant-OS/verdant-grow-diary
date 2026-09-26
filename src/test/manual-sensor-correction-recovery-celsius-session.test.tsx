@@ -168,6 +168,8 @@ describe("correction recovery session draft under Fahrenheit preference", () => 
     expect(airTemp.value).not.toBe("78.8");
     expect(view.getByTestId("manual-reading-temp-unit-C")).toHaveAttribute("aria-pressed", "true");
     expect(view.getByLabelText(/Humidity/i)).toHaveValue(60);
+    expect(view.getByTestId("manual-reading-save-unconfirmed")).toBeInTheDocument();
+    expect(view.getByRole("button", { name: "Restore pending correction" })).toBeInTheDocument();
   });
 
   it("restores canonical Celsius digits on the session draft after an unconfirmed save and unit drift", async () => {
@@ -186,6 +188,9 @@ describe("correction recovery session draft under Fahrenheit preference", () => 
     await waitFor(() =>
       expect(view.getByTestId("manual-reading-correction-banner")).toBeInTheDocument(),
     );
+    const airTemp = view.container.querySelector("#m-air-temp") as HTMLInputElement;
+    fireEvent.change(airTemp, { target: { value: "27" } });
+    fireEvent.change(airTemp, { target: { value: "26" } });
     fireEvent.click(view.getByTestId("manual-reading-save"));
     fireEvent.click(view.getByTestId("manual-sensor-review-confirm"));
     await waitFor(() =>
@@ -196,7 +201,6 @@ describe("correction recovery session draft under Fahrenheit preference", () => 
     );
 
     fireEvent.click(view.getByTestId("manual-reading-temp-unit-F"));
-    const airTemp = view.container.querySelector("#m-air-temp") as HTMLInputElement;
     expect(airTemp.value).toBe("78.8");
 
     fireEvent.click(view.getByRole("button", { name: "Restore pending correction" }));
@@ -205,5 +209,8 @@ describe("correction recovery session draft under Fahrenheit preference", () => 
     expect(airTemp.value).not.toBe("78.8");
     expect(view.getByTestId("manual-reading-temp-unit-C")).toHaveAttribute("aria-pressed", "true");
     expect(view.getByLabelText(/Humidity/i)).toHaveValue(60);
+    expect(view.getByTestId("manual-reading-save-unconfirmed")).toBeInTheDocument();
+    expect(view.getByRole("button", { name: "Restore pending correction" })).toBeInTheDocument();
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
   });
 });

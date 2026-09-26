@@ -633,10 +633,24 @@ describe("signup-acquisition forward-repair read-only preflight", () => {
     expect(runner.PREFLIGHT_SQL).toContain("migration_ledger_contract");
     expect(runner.PREFLIGHT_SQL).toContain("supabase_migrations.schema_migrations");
     expect(runner.PREFLIGHT_SQL).toContain("schema_migrations_pkey");
-    expect(runner.PREFLIGHT_SQL).toContain("1|version|text|t|||");
-    expect(runner.PREFLIGHT_SQL).toContain("2|name|text|f|||");
-    expect(runner.PREFLIGHT_SQL).toContain("3|statements|text[]|f|||");
+    // The ledger shape measured on production (scripts/lib/supabaseMigrationLedgerShape.mjs).
+    for (const row of [
+      "1|version|text|t|||",
+      "2|statements|text[]|f|||",
+      "3|name|text|f|||",
+      "4|created_by|text|f|||",
+      "5|idempotency_key|text|f|||",
+      "6|rollback|text[]|f|||",
+    ]) {
+      expect(runner.PREFLIGHT_SQL).toContain(`'${row}'`);
+    }
+    expect(runner.PREFLIGHT_SQL).toContain("con.conname = 'schema_migrations_idempotency_key_key'");
+    expect(runner.PREFLIGHT_SQL).toContain(
+      "index_class.relname = 'schema_migrations_idempotency_key_key'",
+    );
+    // Owner-only ACL is compared with PostgreSQL's default, so PG17 MAINTAIN holds too.
     expect(runner.PREFLIGHT_SQL).toContain("acldefault('r', ledger.relowner)");
+    expect(runner.PREFLIGHT_SQL).toContain("aclexplode(acldefault('r', expected_ledger.relowner))");
     expect(runner.PREFLIGHT_SQL).toContain("not ledger.relrowsecurity");
     expect(runner.PREFLIGHT_SQL).toContain("not ledger.relforcerowsecurity");
     const applySql = runner.buildApplySql(runner.validatePinnedMigrationFile());

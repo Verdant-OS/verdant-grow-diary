@@ -41,6 +41,7 @@ import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { useGrows } from "@/store/grows";
 import { actionsPath, alertsPath, tentDetailPath, tentsPath } from "@/lib/routes";
 
 import { EMPTY_SNAPSHOT, snapshotFromReadings, type SensorSnapshot } from "@/lib/sensorSnapshot";
@@ -67,6 +68,7 @@ import {
   type QuickActionPlantLite,
 } from "@/lib/growRoomQuickActionRules";
 import { classifyVpdAgainstStage, normalizeVpdStage } from "@/lib/vpdStageTargetRules";
+import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
 import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 
 const QUICK_ACTION_ICON: Record<QuickActionKind, typeof Sprout> = {
@@ -122,7 +124,9 @@ function snapshotAgeLabel(ageMin: number | null): string {
 
 export default function GrowRoomMode() {
   const { data: tents } = useTents();
-  const { data: plants = [] } = usePlants();
+  const plantsQuery = usePlants();
+  const { data: plants = [] } = plantsQuery;
+  const { grows, loading: growsLoading, error: growsError } = useGrows();
   const { alerts } = useAlertsList({});
   const { urlGrowId } = useScopedGrow();
   // Read-only surface, but it must still honor the saved °F/°C preference.
@@ -254,13 +258,25 @@ export default function GrowRoomMode() {
     });
   }, [tents, snapshotsByTentId, alertInputs, actions]);
 
+  // Stage each tent's VPD is graded by: the grow row, the tent and the active
+  // plants in it, as Alerts, Tent Detail, the Tents list and the Dashboard
+  // resolve it (QA 2026-09-24, BUG-006 follow-up). Withheld until the grow row
+  // and the plant rows are known; a failed refresh keeps its cached rows.
+  const plantsForStage = plantsQuery.data ?? null;
   const tentStageById = useMemo<Record<string, string | null>>(() => {
     const m: Record<string, string | null> = {};
     for (const t of tents ?? []) {
-      m[t.id] = (t as { stage?: string | null }).stage ?? null;
+      const growId = t.grow_id ?? null;
+      m[t.id] = resolveTentEnvironmentStage({
+        tentId: t.id,
+        tentGrowId: growId,
+        tentStage: (t as { stage?: string | null }).stage ?? null,
+        ...resolveTentGrowStage({ growId, grows, loading: growsLoading, error: growsError }),
+        plants: plantsForStage,
+      });
     }
     return m;
-  }, [tents]);
+  }, [tents, grows, growsLoading, growsError, plantsForStage]);
 
   const showEmpty = !loading && (!tents || tents.length === 0);
 

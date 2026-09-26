@@ -37,6 +37,7 @@ import {
   formatPlantTentMovementNote,
 } from "@/lib/plantTentMovementRules";
 import {
+  MOVE_PLANT_FROM_LABEL,
   PHENO_UNTAG_BEFORE_CROSS_GROW_MOVE_COPY,
   buildPlantPhenoUntagPayload,
   buildPlantTentMoveUpdate,
@@ -549,7 +550,7 @@ export default function AssignTentDialog({
                         className="text-xs text-muted-foreground mt-1"
                         data-testid="assign-tent-previous-tent"
                       >
-                        Previous Tent: {current[0].name}
+                        {MOVE_PLANT_FROM_LABEL}: {current[0].name}
                       </p>
                     )}
                   </div>

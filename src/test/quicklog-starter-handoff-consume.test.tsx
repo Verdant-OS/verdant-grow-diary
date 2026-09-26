@@ -69,21 +69,34 @@ vi.mock("@/store/auth", () => ({
 
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
-    grows: [{ id: "grow-1", name: "Test Grow", stage: "veg" }],
-    activeGrow: { id: "grow-1", name: "Test Grow", stage: "veg" },
-    activeGrowId: "grow-1",
+    grows: [{ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Test Grow", stage: "veg" }],
+    activeGrow: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Test Grow", stage: "veg" },
+    activeGrowId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     setActiveGrowId: vi.fn(),
   }),
 }));
 
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [{ id: "plant-1", name: "Test Plant", tent_id: "tent-1", grow_id: "grow-1" }],
+    data: [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        name: "Test Plant",
+        tent_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        grow_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
   useTents: () => ({
-    data: [{ id: "tent-1", name: "Test Tent", grow_id: "grow-1" }],
+    data: [
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        name: "Test Tent",
+        grow_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
   }),
 }));
 
@@ -136,10 +149,10 @@ function storedDraftRaw(): string | null {
 
 function handoffPrefill(overrides: Partial<QuickLogPrefill> = {}): QuickLogPrefill {
   return {
-    plantId: "plant-1",
+    plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     plantName: "Test Plant",
-    growId: "grow-1",
-    tentId: "tent-1",
+    growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     eventType: "observation",
     note: "First true leaves look healthy.",
     wateringVolumeMl: null,
@@ -422,9 +435,9 @@ describe("Quick Log starter-handoff consume-once", () => {
     setLocalStorageItemForTest(
       "verdant.quickLog.lastTarget.v2.user-1",
       JSON.stringify({
-        plantId: "plant-1",
-        growId: "grow-1",
-        tentId: "tent-1",
+        plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         savedAt: "2026-07-15T09:00:00.000Z",
       }),
     );
@@ -487,9 +500,9 @@ describe("Quick Log starter-handoff consume-once", () => {
     setLocalStorageItemForTest(
       "verdant.quickLog.lastTarget.v2.user-1",
       JSON.stringify({
-        plantId: "plant-1",
-        growId: "grow-1",
-        tentId: "tent-1",
+        plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         savedAt: "2026-07-15T09:00:00.000Z",
       }),
     );

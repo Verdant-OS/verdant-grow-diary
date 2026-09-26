@@ -20,7 +20,10 @@
  *
  * All time is injectable via `now` for tests.
  */
-import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import {
+  LIVE_CURRENT_STATE_STALE_MS,
+  resolveCurrentStateStaleWindowMs,
+} from "@/lib/sensorTruthCanon";
 import type { NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
 
@@ -150,7 +153,7 @@ function isFlowerStage(stage: string | null): boolean {
   return s === "flower" || s === "flowering" || s === "flush";
 }
 
-function isReadingFresh(
+export function isGuidedChecklistReadingFresh(
   reading: GuidedChecklistSensorReading | null | undefined,
   now: number,
 ): boolean {
@@ -159,15 +162,15 @@ function isReadingFresh(
   if (!TRUSTED_SENSOR_SOURCES.has(source)) return false;
   if (reading.quality != null && reading.quality !== "ok") return false;
   const t = parseIso(reading.capturedAt);
-  if (t == null) return false;
-  return now - t <= SENSOR_FRESHNESS_MS;
+  if (t == null || !Number.isFinite(now) || t > now) return false;
+  return now - t <= resolveCurrentStateStaleWindowMs(source);
 }
 
 function describeStaleReason(
   reading: GuidedChecklistSensorReading | null | undefined,
   now: number,
 ): string {
-  if (!reading) return "No sensor reading captured yet.";
+  if (!reading) return "No usable sensor or manual reading in the loaded history.";
   const source = (reading.source ?? "unknown").toLowerCase();
   if (!TRUSTED_SENSOR_SOURCES.has(source)) {
     return `Last reading source was "${source}" — not counted as fresh.`;
@@ -177,10 +180,12 @@ function describeStaleReason(
   }
   const t = parseIso(reading.capturedAt);
   if (t == null) return "Last reading has no valid timestamp.";
+  if (!Number.isFinite(now)) return "Reading freshness could not be confirmed.";
+  if (t > now) return "Last reading has a future timestamp — not counted as fresh.";
   const minutes = Math.max(1, Math.round((now - t) / 60000));
-  if (minutes < 90) return `Last fresh reading was ${minutes} min ago.`;
+  if (minutes < 90) return `Last reading was ${minutes} min ago.`;
   const hours = Math.round(minutes / 60);
-  return `Last fresh reading was ${hours}h ago.`;
+  return `Last reading was ${hours}h ago.`;
 }
 
 function formatAge(ms: number): string {
@@ -275,7 +280,7 @@ export function buildGuidedActionChecklist(
   // 2) Sensor context — one item per tent whose latest reading is not fresh.
   for (const tent of tents) {
     const reading = latestReadingByTent[tent.id] ?? null;
-    if (isReadingFresh(reading, now)) continue;
+    if (isGuidedChecklistReadingFresh(reading, now)) continue;
     items.push({
       id: `sensor:${tent.id}`,
       kind: "sensor_context",

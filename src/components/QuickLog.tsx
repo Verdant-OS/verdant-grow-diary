@@ -313,6 +313,8 @@ const QUICK_OBSERVATION_CHIPS = [
 
 const GROW_STAGE_UNCONFIRMED_MESSAGE =
   "Your log was saved, but the grow's stage update wasn't confirmed. Check the grow's stage before changing it again.";
+const WATER_CONTEXT_CHANGED_MESSAGE =
+  "Watering was saved after this plant changed tents or grows. Open its Timeline to confirm the saved location.";
 
 type SavedTarget = {
   id: string;
@@ -325,6 +327,7 @@ type SavedTarget = {
   eventType: string;
   savedAt: string;
   growStageUnconfirmed?: boolean;
+  waterContextChanged?: boolean;
 };
 
 type LastQuickLogTarget = {
@@ -1579,6 +1582,9 @@ export default function QuickLog({
         return;
       }
 
+      const confirmedTarget = result.savedWaterTarget ?? saveTarget;
+      const waterContextChanged = result.waterContextChanged === true;
+
       const waterClear = waterRecord ? await reconcilePendingStarterWaterClear(waterRecord) : null;
       const waterRecoveryClearFailed =
         waterClear !== null &&
@@ -1599,8 +1605,9 @@ export default function QuickLog({
       // from the selected PLANT, which can differ from the grow, so we gate on
       // the touched ref to avoid silently mutating the grow's stage on an
       // ordinary save. Still never writes an unknown/empty stage.
-      let growStageUnconfirmed = false;
+      let growStageUnconfirmed = waterContextChanged && saveStageWasUserTouched;
       if (
+        !waterContextChanged &&
         saveGrow &&
         saveStageWasUserTouched &&
         normalizeQuickLogStage(saveStage) &&
@@ -1637,6 +1644,8 @@ export default function QuickLog({
           : `Saved ${savedVerb(saveEventType)} for ${plantLabel}`;
       if (waterRecoveryClearFailed) {
         toast.message(STARTER_WATER_RECOVERY_CLEAR_FAILED, { duration: 12_000 });
+      } else if (waterContextChanged) {
+        toast.message(WATER_CONTEXT_CHANGED_MESSAGE, { duration: 12_000 });
       } else if (growStageUnconfirmed) {
         // Some callers navigate after onCreated, so keep the partial outcome
         // visible outside this dialog as well as in its saved-entry panel.
@@ -1648,8 +1657,8 @@ export default function QuickLog({
       rememberLastTarget(
         {
           plantId: saveTarget.plantId,
-          growId: saveTarget.growId,
-          tentId: saveTarget.tentId,
+          growId: confirmedTarget.growId,
+          tentId: confirmedTarget.tentId,
           savedAt: new Date().toISOString(),
         },
         user?.id ?? null,
@@ -1658,14 +1667,15 @@ export default function QuickLog({
       setSavedTarget({
         id: savePlant.id,
         name: plantLabel,
-        tentName: saveTent.name ?? null,
-        growName: saveGrow?.name ?? null,
-        growId: saveTarget.growId ?? null,
-        tentId: saveTarget.tentId ?? null,
+        tentName: waterContextChanged ? null : (saveTent.name ?? null),
+        growName: waterContextChanged ? null : (saveGrow?.name ?? null),
+        growId: confirmedTarget.growId,
+        tentId: confirmedTarget.tentId,
         growEventId: result.growEventId ?? null,
         eventType: saveEventType,
         savedAt: new Date().toISOString(),
         growStageUnconfirmed,
+        waterContextChanged,
       });
       onCreated?.();
       // Public starter handoff consume-once: the shared helper clears the
@@ -1677,7 +1687,7 @@ export default function QuickLog({
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
         targetId: saveTarget.plantId,
-        tentId: saveTarget.tentId,
+        tentId: confirmedTarget.tentId,
       });
       // Explicit, statically-grep-able invalidations for the two V0-loop
       // memory surfaces (Recent Plant Activity + shared diary_entries
@@ -1735,6 +1745,8 @@ export default function QuickLog({
         setSaveError(STARTER_WATER_RECOVERY_PENDING);
         return;
       }
+      const confirmedTarget = result.savedWaterTarget ?? record.target;
+      const waterContextChanged = result.waterContextChanged === true;
       const clearance = await reconcilePendingStarterWaterClear(record);
       const resolved = clearance.status === "cleared" || clearance.status === "already_cleared";
       setStarterWaterStorageBlocked(clearance.status === "blocked");
@@ -1749,19 +1761,20 @@ export default function QuickLog({
       lastFailedSaveSigRef.current = null;
 
       const savedAt = new Date().toISOString();
-      rememberLastTarget({ ...record.target, savedAt }, user.id);
+      rememberLastTarget({ ...confirmedTarget, savedAt }, user.id);
       setSavedTarget({
         id: record.target.plantId,
         name: record.plantName,
-        tentName: record.tentName,
-        growName: record.growName,
-        growId: record.target.growId,
-        tentId: record.target.tentId,
+        tentName: waterContextChanged ? null : record.tentName,
+        growName: waterContextChanged ? null : record.growName,
+        growId: confirmedTarget.growId,
+        tentId: confirmedTarget.tentId,
         growEventId: result.growEventId ?? null,
         eventType: "watering",
         savedAt,
         // A separate grow-stage write was not proven by the ambiguous RPC.
         growStageUnconfirmed: record.stageWasUserTouched,
+        waterContextChanged,
       });
       if (
         record.reviewedDraftId === prefill?.publicStarterDraftId &&
@@ -1782,7 +1795,7 @@ export default function QuickLog({
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
         targetId: record.target.plantId,
-        tentId: record.target.tentId,
+        tentId: confirmedTarget.tentId,
       });
       queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
       queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
@@ -1790,6 +1803,8 @@ export default function QuickLog({
         new CustomEvent("verdant:entry-created", { detail: { createdAt: savedAt } }),
       );
       if (!resolved) toast.message(STARTER_WATER_RECOVERY_CLEAR_FAILED, { duration: 12_000 });
+      else if (waterContextChanged)
+        toast.message(WATER_CONTEXT_CHANGED_MESSAGE, { duration: 12_000 });
       else if (record.stageWasUserTouched)
         toast.message(GROW_STAGE_UNCONFIRMED_MESSAGE, { duration: 12_000 });
       else toast.success(`Saved watering for ${record.plantName}`);
@@ -3561,6 +3576,14 @@ export default function QuickLog({
                         data-testid="quick-log-stage-save-unconfirmed"
                       >
                         {GROW_STAGE_UNCONFIRMED_MESSAGE}
+                      </p>
+                    )}
+                    {savedTarget.waterContextChanged && (
+                      <p
+                        className="mt-2 text-xs text-amber-700 dark:text-amber-400"
+                        data-testid="quick-log-water-context-changed"
+                      >
+                        {WATER_CONTEXT_CHANGED_MESSAGE}
                       </p>
                     )}
                   </div>

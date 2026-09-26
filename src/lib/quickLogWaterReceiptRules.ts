@@ -1,5 +1,6 @@
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
 import type { QuickLogResolvedTarget } from "./quickLogTargetIntegrityRules";
+import { isUuid } from "./isUuid";
 
 type WaterEvent = {
   id?: unknown;
@@ -65,4 +66,32 @@ export function matchesReusedWaterReceipt(
     child.event_id === eventId &&
     child.volume_ml === payload.p_volume_ml
   );
+}
+
+/** A plant may move before replay; use the verified event's actual location. */
+export function resolveStarterWaterReceiptTarget(
+  payload: QuickLogV2SavePayload,
+  eventId: string,
+  event: WaterEvent | null | undefined,
+  child: WaterChild | null | undefined,
+  expectedTarget: QuickLogResolvedTarget,
+): { target: QuickLogResolvedTarget; contextChanged: boolean } | null {
+  if (
+    payload.p_occurred_at === null ||
+    !matchesReusedWaterReceipt(payload, eventId, event, child) ||
+    event?.plant_id !== expectedTarget.plantId ||
+    !isUuid(event.grow_id) ||
+    !isUuid(event.tent_id)
+  )
+    return null;
+  const target = {
+    plantId: expectedTarget.plantId,
+    growId: event.grow_id,
+    tentId: event.tent_id,
+  };
+  return {
+    target,
+    contextChanged:
+      target.growId !== expectedTarget.growId || target.tentId !== expectedTarget.tentId,
+  };
 }

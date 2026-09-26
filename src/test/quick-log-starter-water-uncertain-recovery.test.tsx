@@ -330,6 +330,42 @@ describe("legacy public-starter Water uncertain receipt", () => {
     expect(trackSuccessMock).not.toHaveBeenCalled();
   });
 
+  it("shows the verified saved location when the plant moved before retry committed", async () => {
+    seed();
+    const movedGrowId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const movedTentId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    saveMock
+      .mockResolvedValueOnce({ ok: false, reason: "receipt_unverified" })
+      .mockResolvedValueOnce({
+        ok: true,
+        growEventId: "11111111-1111-4111-8111-111111111111",
+        reused: false,
+        savedWaterTarget: {
+          plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          growId: movedGrowId,
+          tentId: movedTentId,
+        },
+        waterContextChanged: true,
+      });
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await screen.findByTestId("quick-log-starter-water-recovery");
+    fireEvent.click(screen.getByTestId("quick-log-starter-water-retry"));
+    await screen.findByTestId("quick-log-post-save");
+    expect(screen.getByTestId("quick-log-water-context-changed")).toHaveTextContent(
+      /saved after this plant changed tents or grows/i,
+    );
+    expect(screen.getByTestId("quick-log-post-save-description")).not.toHaveTextContent(
+      "Test Tent",
+    );
+    expect(screen.getByTestId("quick-log-view-target-plant")).toHaveAttribute(
+      "data-target-grow-id",
+      movedGrowId,
+    );
+    expect(readPendingStarterWater("user-1")).toEqual({ status: "empty" });
+    expect(trackSuccessMock).toHaveBeenCalledTimes(1);
+  });
+
   it("counts a first confirmed Watering once after recovery is cleared", async () => {
     seed();
     saveMock.mockResolvedValue({

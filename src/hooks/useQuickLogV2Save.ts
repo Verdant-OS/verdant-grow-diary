@@ -8,6 +8,7 @@ import { trackQuickLogSuccess, type QuickLogSuccessInput } from "@/lib/quickLogS
 import {
   matchesReusedWaterEvent,
   matchesReusedWaterReceipt,
+  resolveStarterWaterReceiptTarget,
 } from "@/lib/quickLogWaterReceiptRules";
 
 export interface QuickLogV2SaveResult {
@@ -20,6 +21,9 @@ export interface QuickLogV2SaveResult {
   persistedNote?: string | null;
   /** A recognized structured rejection before any logical event write. */
   definitiveRejected?: boolean;
+  /** Persisted context when a starter plant moved before its Watering committed. */
+  savedWaterTarget?: QuickLogResolvedTarget;
+  waterContextChanged?: boolean;
 }
 
 interface RpcResponse {
@@ -109,8 +113,10 @@ export function useQuickLogV2Save() {
           setError("receipt_unverified");
           return { ok: false, reason: "receipt_unverified" };
         }
-        // A captured starter target must be checked even for a new receipt:
-        // the plant may have moved while an uncertain attempt was waiting.
+        let savedWaterTarget: QuickLogResolvedTarget | undefined;
+        let waterContextChanged = false;
+        // The RPC resolves a plant's grow/tent at write time. Verify the
+        // persisted Watering, then report its actual location if it moved.
         if (payload.p_action === "water" && (r.reused === true || options.expectedWaterTarget)) {
           const eventId = r.grow_event_id as string;
           const { data: event, error: eventError } = await supabase
@@ -122,7 +128,7 @@ export function useQuickLogV2Save() {
             setError("receipt_unverified");
             return { ok: false, reason: "receipt_unverified" };
           }
-          if (!matchesReusedWaterEvent(payload, eventId, event, options.expectedWaterTarget)) {
+          if (!matchesReusedWaterEvent(payload, eventId, event)) {
             setError("receipt_mismatch");
             return { ok: false, reason: "receipt_mismatch" };
           }
@@ -135,11 +141,24 @@ export function useQuickLogV2Save() {
             setError("receipt_unverified");
             return { ok: false, reason: "receipt_unverified" };
           }
-          if (
-            !matchesReusedWaterReceipt(payload, eventId, event, child, options.expectedWaterTarget)
-          ) {
+          if (!matchesReusedWaterReceipt(payload, eventId, event, child)) {
             setError("receipt_mismatch");
             return { ok: false, reason: "receipt_mismatch" };
+          }
+          if (options.expectedWaterTarget) {
+            const resolved = resolveStarterWaterReceiptTarget(
+              payload,
+              eventId,
+              event,
+              child,
+              options.expectedWaterTarget,
+            );
+            if (!resolved) {
+              setError("receipt_mismatch");
+              return { ok: false, reason: "receipt_mismatch" };
+            }
+            savedWaterTarget = resolved.target;
+            waterContextChanged = resolved.contextChanged;
           }
         }
         let persistedNote: string | null | undefined;
@@ -194,6 +213,7 @@ export function useQuickLogV2Save() {
           growEventId: r.grow_event_id ?? null,
           environmentEventId: r.environment_event_id ?? null,
           reused: r.reused === true,
+          ...(savedWaterTarget ? { savedWaterTarget, waterContextChanged } : {}),
           ...(persistedNote !== undefined ? { persistedNote } : {}),
         };
       } catch (thrown) {

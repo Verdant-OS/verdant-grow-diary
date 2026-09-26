@@ -5,7 +5,9 @@ name: deployment-preview
 # CI's production path — edge-shared mirror preflight, typecheck, and a
 # full production build. Green pipeline → this branch builds in CI. What
 # any publisher's preview actually serves is not measured here. Red
-# pipeline → the PR comment says the CI build failed.
+# pipeline → the PR comment names the outcome: a build that ran and
+# failed, a build that never ran because preflight failed (unmeasured,
+# not failed), or a build that ended some other way (e.g. cancelled).
 #
 # This does NOT publish to production. Which platform publishes it, and
 # how, is operating state (docs/agents/CURRENT_STATE.md), never assumed
@@ -149,12 +151,19 @@ jobs:
           set -euo pipefail
           MARKER="<!-- deployment-preview-status -->"
 
+          # Four outcomes, kept distinct: a skipped build is unmeasured, not failed.
           if [ "$PREFLIGHT" = "success" ] && [ "$BUILD" = "success" ]; then
             STATUS="✅ **CI build verified** — preview contents not measured"
             NOTE="Edge-shared mirror in sync, typecheck clean, production build succeeded."
-          else
+          elif [ "$BUILD" = "skipped" ]; then
+            STATUS="⏭️ **CI build not run** (preflight \`$PREFLIGHT\`) — do not share a preview"
+            NOTE="The build stage never ran, so this commit's build is unmeasured, not failed. A preview may still load, but its build may not match this commit."
+          elif [ "$BUILD" = "failure" ]; then
             STATUS="❌ **CI build failed** — do not share a preview"
-            NOTE="One or more gates failed. A preview may still load, but its build may not match this commit."
+            NOTE="The build job failed before this commit could be certified; only the job result is known here, so the workflow run names the failing step. A preview may still load, but its build may not match this commit."
+          else
+            STATUS="⚠️ **CI build did not complete** (\`$BUILD\`) — do not share a preview"
+            NOTE="The build stage ended \`$BUILD\`, so this commit's build is unmeasured. A preview may still load, but its build may not match this commit."
           fi
 
           BODY=$(cat <<EOF

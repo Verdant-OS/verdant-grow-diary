@@ -406,6 +406,7 @@ function expectObservationDraftUnchanged(
 
 beforeEach(() => {
   clearLocalStorageForTest();
+  window.sessionStorage.clear();
   harness.activeGrowId = "g1";
   harness.plants[0].stage = "";
   harness.rpc.mockReset();
@@ -546,6 +547,7 @@ describe("Quick Log shared in-flight coordination", () => {
 
     act(() => {
       harvest.save.click();
+      expect(harness.rpc).toHaveBeenCalledTimes(1);
       childActivityButton("feeding").click();
       fireEvent.change(harvest.wet, { target: { value: "999" } });
       fireEvent.change(harvest.dry, { target: { value: "999" } });
@@ -560,10 +562,17 @@ describe("Quick Log shared in-flight coordination", () => {
       "data-activity-id",
       "harvest",
     );
-    expect(harvest.wet).toHaveValue("120");
-    expect(harvest.dry).toHaveValue("22");
-    expect(harvest.unit).toHaveValue("oz");
-    expect(harvest.note).toHaveValue("Harvest activity A");
+    // The pending presenter replaces the editable form. The detached DOM
+    // inputs can receive synthetic events, but the dispatched payload stays
+    // the original immutable attempt.
+    expect(screen.queryByTestId("quick-log-dialog-all-activities-harvest-wet")).toBeNull();
+    expect(
+      screen.getByTestId("quick-log-dialog-all-activities-pending-activity"),
+    ).toHaveTextContent("Harvest activity A");
+    expect(harness.rpc.mock.calls[0][1]).toMatchObject({
+      p_note: "Harvest activity A",
+      p_details: { harvest: { wetWeight: "120", dryWeight: "22", weightUnit: "oz" } },
+    });
 
     const mainSave = screen.getByTestId("quick-log-save");
     expect(mainSave).toBeDisabled();
@@ -592,7 +601,7 @@ describe("Quick Log shared in-flight coordination", () => {
     );
   });
 
-  it("retains child activity A and re-enables every draft mutation after failure", async () => {
+  it("locks the original child activity after an uncertain failure and retries it unchanged", async () => {
     const pending = deferredRpc();
     harness.rpc.mockReturnValue(pending.promise);
     renderQuickLog();
@@ -623,10 +632,20 @@ describe("Quick Log shared in-flight coordination", () => {
       "data-activity-id",
       "note",
     );
-    expect(note).toHaveValue("Child activity observation");
-    expect(note).toBeEnabled();
-    expect(cancel).toBeEnabled();
-    expect(childSave).toBeEnabled();
+    expect(
+      screen.getByTestId("quick-log-dialog-all-activities-pending-activity"),
+    ).toHaveTextContent("Child activity observation");
+    expect(screen.queryByTestId("quick-log-dialog-all-activities-note")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-dialog-all-activities-cancel")).not.toBeInTheDocument();
+    expect(childActivityButton("feeding")).toBeDisabled();
+    harness.rpc.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000003" },
+      error: null,
+    });
+    fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-retry-original"));
+    await screen.findByTestId("quick-log-dialog-all-activities-saved-item");
+    expect(harness.rpc).toHaveBeenCalledTimes(2);
+    expect(harness.rpc.mock.calls[1]).toEqual(harness.rpc.mock.calls[0]);
     expect(childActivityButton("feeding")).toBeEnabled();
   });
 

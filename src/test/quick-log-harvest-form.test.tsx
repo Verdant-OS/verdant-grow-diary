@@ -18,6 +18,9 @@ const rpcMock = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { rpc: (...args: unknown[]) => rpcMock(...args) },
 }));
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "harvest-owner" }, loading: false }),
+}));
 
 function mount() {
   return render(
@@ -31,6 +34,7 @@ function selectHarvest() {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   rpcMock.mockReset();
 });
 

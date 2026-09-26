@@ -158,6 +158,7 @@ function saveButton() {
 describe("Quick Log starter-handoff consume-once", () => {
   beforeEach(() => {
     clearLocalStorageForTest();
+    window.sessionStorage.clear();
     saveMock.mockReset();
     saveMock.mockResolvedValue({ ok: true });
     insertMock.mockReset();

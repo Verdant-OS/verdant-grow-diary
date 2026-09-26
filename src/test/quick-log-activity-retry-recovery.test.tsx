@@ -10,6 +10,8 @@ const backend = vi.hoisted(() => ({
   loseFirstReply: true,
   rejectFirstWrite: false,
   malformedFirstReply: false,
+  holdPost: 0,
+  heldReply: null as Promise<void> | null,
 }));
 const telemetry = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/quickLogSuccessTelemetry", () => ({ trackQuickLogSuccess: telemetry }));
@@ -30,6 +32,9 @@ vi.mock("@/integrations/supabase/client", () => ({
       }
       if (backend.posts.length === 1 && backend.loseFirstReply) {
         return { data: null, error: { message: "Reply unavailable" } };
+      }
+      if (backend.posts.length === backend.holdPost && backend.heldReply) {
+        await backend.heldReply;
       }
       return {
         data: {
@@ -74,7 +79,10 @@ function enterNote(note = "My observed activity") {
 }
 
 function save() {
-  fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+  fireEvent.click(
+    screen.queryByTestId("quick-log-all-activities-retry-original") ??
+      screen.getByTestId("quick-log-all-activities-save"),
+  );
 }
 
 async function loseReply(activity = "training") {
@@ -82,15 +90,20 @@ async function loseReply(activity = "training") {
   enterNote();
   save();
   await screen.findByTestId("quick-log-all-activities-error");
-  await waitFor(() => expect(screen.getByTestId("quick-log-all-activities-save")).toBeEnabled());
+  await waitFor(() =>
+    expect(screen.getByTestId("quick-log-all-activities-retry-original")).toBeEnabled(),
+  );
 }
 
 beforeEach(() => {
+  vi.restoreAllMocks();
   backend.posts = [];
   backend.rows = new Map();
   backend.loseFirstReply = true;
   backend.rejectFirstWrite = false;
   backend.malformedFirstReply = false;
+  backend.holdPost = 0;
+  backend.heldReply = null;
   telemetry.mockReset();
   window.sessionStorage.clear();
 });
@@ -105,7 +118,7 @@ describe("All activity types retry confirmation", () => {
       expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
         /save is unconfirmed/i,
       );
-      expect(screen.getByTestId("quick-log-all-activities-note")).toHaveValue(
+      expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toHaveTextContent(
         "My observed activity",
       );
       expect(screen.queryByTestId("quick-log-all-activities-saved")).not.toBeInTheDocument();
@@ -144,38 +157,41 @@ describe("All activity types retry confirmation", () => {
     expect(screen.getByTestId("quick-log-all-activities-error")).not.toHaveTextContent(
       /nothing was saved/i,
     );
-    expect(screen.getByTestId("quick-log-all-activities-note")).toHaveValue("My observed activity");
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toHaveTextContent(
+      "My observed activity",
+    );
   });
 
-  it("rotates for edited notes and structured details", async () => {
+  it("does not permit an edited retry to duplicate an accepted activity", async () => {
     mount();
     await loseReply();
-    enterNote("A different observation");
+    expect(screen.queryByTestId("quick-log-all-activities-note")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("quick-log-all-activities-detail-technique"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-all-activities-cancel")).not.toBeInTheDocument();
+    save();
+    await screen.findByTestId("quick-log-all-activities-saved");
+    expect(backend.posts[1]).toEqual(backend.posts[0]);
+    expect(backend.rows.size).toBe(1);
+  });
+
+  it("retains structured details unchanged while checking a lost reply", async () => {
+    mount();
+    selectActivity("training");
+    enterNote();
     fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-technique"), {
       target: { value: "topping" },
     });
     save();
-    await screen.findByTestId("quick-log-all-activities-saved");
-    expect(backend.posts[1].p_idempotency_key).not.toBe(backend.posts[0].p_idempotency_key);
-    expect(backend.posts[1]).toMatchObject({
-      p_note: "A different observation",
-      p_details: { technique: "topping" },
-    });
-    expect(backend.rows.size).toBe(2);
-  });
-
-  it("rotates for a structured-detail edit even when the note stays identical", async () => {
-    mount();
-    await loseReply();
-    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-technique"), {
-      target: { value: "topping" },
-    });
+    await screen.findByTestId("quick-log-all-activities-retry-original");
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toHaveTextContent(
+      "topping",
+    );
     save();
     await screen.findByTestId("quick-log-all-activities-saved");
-    expect(backend.posts[1].p_note).toBe(backend.posts[0].p_note);
-    expect(backend.posts[1].p_idempotency_key).not.toBe(backend.posts[0].p_idempotency_key);
-    expect(backend.posts[1].p_details).toMatchObject({ technique: "topping" });
-    expect(backend.rows.size).toBe(2);
+    expect(backend.posts[1]).toEqual(backend.posts[0]);
+    expect(backend.rows.size).toBe(1);
   });
 
   it("can save once on retry when the first attempt did not commit", async () => {
@@ -219,16 +235,59 @@ describe("All activity types retry confirmation", () => {
     expect(backend.posts[1].p_plant_id).toBe("plant-b");
     expect(backend.posts[1].p_idempotency_key).not.toBe(backend.posts[0].p_idempotency_key);
     expect(backend.rows.size).toBe(2);
+    await act(async () => view.changeTarget("plant-a"));
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toHaveTextContent(
+      "My observed activity",
+    );
+    save();
+    await waitFor(() => expect(backend.posts).toHaveLength(3));
+    expect(backend.posts[2]).toEqual(backend.posts[0]);
+    expect(backend.rows.size).toBe(2);
   });
 
-  it("does not reuse a cancelled draft when the same activity is selected again", async () => {
-    mount();
+  it("restores the unresolved exact attempt after a remount", async () => {
+    const view = mount();
     await loseReply();
-    fireEvent.click(screen.getByTestId("quick-log-all-activities-cancel"));
+    view.unmount();
+    mount();
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toHaveTextContent(
+      "My observed activity",
+    );
+    save();
+    await screen.findByTestId("quick-log-all-activities-saved");
+    expect(backend.posts[1]).toEqual(backend.posts[0]);
+    expect(backend.rows.size).toBe(1);
+  });
+
+  it("does not show a late confirmed plant A retry as a plant B receipt", async () => {
+    const view = mount();
+    await loseReply();
+    let release!: () => void;
+    backend.holdPost = 2;
+    backend.heldReply = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    save();
+    await waitFor(() => expect(backend.posts).toHaveLength(2));
+    await act(async () => view.changeTarget("plant-b"));
+    await act(async () => release());
+    expect(screen.queryByTestId("quick-log-all-activities-saved-item")).not.toBeInTheDocument();
+    selectActivity("training");
+    enterNote("Plant B activity");
+    save();
+    await screen.findByTestId("quick-log-all-activities-saved-item");
+    expect(backend.posts[2].p_plant_id).toBe("plant-b");
+    expect(backend.rows.size).toBe(2);
+  });
+
+  it("does not dispatch when recovery storage silently drops a claim", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => undefined);
+    mount();
     selectActivity("training");
     enterNote();
     save();
-    await screen.findByTestId("quick-log-all-activities-saved");
-    expect(backend.posts[1].p_idempotency_key).not.toBe(backend.posts[0].p_idempotency_key);
+    await screen.findByTestId("quick-log-all-activities-activity-recovery-blocked");
+    expect(backend.posts).toHaveLength(0);
+    expect(screen.queryByTestId("quick-log-all-activities-saved")).not.toBeInTheDocument();
   });
 });

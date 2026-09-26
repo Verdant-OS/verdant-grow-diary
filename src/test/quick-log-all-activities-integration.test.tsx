@@ -17,7 +17,6 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import { QUICK_LOG_ACTIVITY_DEFINITIONS } from "@/constants/quickLogActivityTypes";
-import { QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_STORAGE_KEY } from "@/lib/quickLogPhotoAttachmentRecovery";
 import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
 import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 import {
@@ -128,7 +127,7 @@ async function saveWithoutNote(activityId: string) {
 beforeEach(() => {
   // Recovery fences are intentionally browser-session durable. Keep each
   // integration case isolated while exercising the real remount behavior.
-  window.sessionStorage.removeItem(QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_STORAGE_KEY);
+  window.sessionStorage.clear();
   rpcMock.mockReset();
   storageUploadMock.mockClear();
   storageUploadMock.mockImplementation(async (..._args: unknown[]) => ({
@@ -1219,6 +1218,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b", () => {
       });
       const { unmount } = mountSection();
       await saveWithNote(def.id, "x");
+      await screen.findByTestId("quick-log-all-activities-saved-item");
       const [, args] = rpcMock.mock.calls[0];
       expect(args.p_event_type).not.toBe("harvest");
       unmount();

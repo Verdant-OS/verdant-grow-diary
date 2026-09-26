@@ -5,7 +5,10 @@ import {
   readPendingQuickLogWatering,
   type PendingQuickLogWatering,
 } from "@/lib/quickLogPendingWateringStore";
-import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const ownerA = "11111111-1111-4111-8111-111111111111";
 const ownerB = "22222222-2222-4222-8222-222222222222";
@@ -100,7 +103,7 @@ describe("durable pending Water Quick Log ownership", () => {
     const expected = record();
     const claimed = await claimPendingQuickLogWatering(input);
     expect(claimed).toEqual({ status: "claimed", record: expected });
-    expect(JSON.parse(window.localStorage.getItem(key())!)).toEqual(expected);
+    expect(JSON.parse(getLocalStorageItemForTest(key())!)).toEqual(expected);
     input.payload.volume_ml = 900;
     input.attachments.photo = false;
     input.payload.sensor_snapshot!.metrics.temperature_c = 30;
@@ -127,7 +130,7 @@ describe("durable pending Water Quick Log ownership", () => {
     window.sessionStorage.setItem(key(), JSON.stringify(original));
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
     expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
-    expect(JSON.parse(window.localStorage.getItem(key())!)).toEqual(original);
+    expect(JSON.parse(getLocalStorageItemForTest(key())!)).toEqual(original);
     window.sessionStorage.clear();
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
   });

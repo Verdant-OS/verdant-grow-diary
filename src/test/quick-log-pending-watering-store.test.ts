@@ -132,8 +132,22 @@ describe("durable pending Water Quick Log ownership", () => {
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
     expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
     expect(JSON.parse(getLocalStorageItemForTest(key())!)).toEqual(original);
-    window.sessionStorage.clear();
+    expect(window.sessionStorage.getItem(key())).toBeNull();
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
+    expect(await clearPendingQuickLogWatering(original)).toBe(true);
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "empty" });
+  });
+
+  it("does not dispatch a promoted legacy claim if its tab-local copy cannot be removed", async () => {
+    const original = record();
+    window.sessionStorage.setItem(key(), JSON.stringify(original));
+    const remove = Storage.prototype.removeItem;
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (this: Storage, name) {
+      if (this !== window.sessionStorage) remove.call(this, name);
+    });
+    expect(await claimPendingQuickLogWatering(original)).toEqual({ status: "blocked" });
+    expect(JSON.parse(getLocalStorageItemForTest(key())!)).toEqual(original);
+    expect(window.sessionStorage.getItem(key())).not.toBeNull();
   });
 
   it("treats a matching typed Water cleared by another tab as resolved", async () => {
@@ -155,6 +169,28 @@ describe("durable pending Water Quick Log ownership", () => {
     expect((await claimPendingQuickLogWatering(original)).status).toBe("blocked");
     expect(await clearPendingQuickLogWatering(original)).toBe(false);
   });
+
+  it.each(["grow", "tent", "plant"])(
+    "refuses to promote an internally consistent non-UUID %s target",
+    async (field) => {
+      const invalid = record();
+      if (field === "grow") {
+        invalid.payload.grow_id = "grow-a";
+        invalid.resolved.growId = "grow-a";
+      } else if (field === "tent") {
+        invalid.payload.tent_id = "tent-a";
+        invalid.resolved.tentId = "tent-a";
+      } else {
+        invalid.payload.plant_id = "plant-a";
+        invalid.resolved.plantId = "plant-a";
+        invalid.resolved.targetId = "plant-a";
+      }
+      window.sessionStorage.setItem(key(), JSON.stringify(invalid));
+      expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
+      expect(await claimPendingQuickLogWatering(invalid)).toEqual({ status: "blocked" });
+      expect(getLocalStorageItemForTest(key())).toBeNull();
+    },
+  );
 
   it("does not expire an unresolved save when the clock advances", async () => {
     const pending = record();

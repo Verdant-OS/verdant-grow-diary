@@ -1654,16 +1654,12 @@ function QuickLogV2SheetForOwner({
     }
     const releaseUnsentWatering = async () => {
       if (!exactWateringSubmission) return;
-      if (
-        !pendingWateringSubmission &&
-        (await clearPendingQuickLogWatering(exactWateringSubmission.recovery))
-      ) {
-        wateringRetrySubmissionRef.current = null;
-        keepSubmissionLockedRef.current = false;
-      } else {
-        keepSubmissionLockedRef.current = true;
-        setWateringRetryPending(true);
-      }
+      // Another tab may already be replaying this shared record while this
+      // tab's attachment upload fails. Keep the exact key and target until
+      // a confirmed receipt can clear it; an unsent local attempt alone
+      // does not prove that no other tab dispatched it.
+      keepSubmissionLockedRef.current = true;
+      setWateringRetryPending(true);
     };
 
     let exactManualSubmission = pendingManualSubmission;

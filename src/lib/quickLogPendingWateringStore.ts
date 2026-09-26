@@ -1,6 +1,7 @@
 import type { WateringTypedEventInput } from "./writeQuickLogWateringTypedEvent";
 import type { ResolvedQuickLogV2Target } from "./quickLogV2Rules";
 import { projectRootZoneManualObservationFromDetails } from "./rootZoneManualObservationRules";
+import { isUuid } from "./isUuid";
 import {
   starterWaterRecoveryKey,
   typedWaterRecoveryKey,
@@ -82,7 +83,7 @@ function id(value: unknown): value is string {
 }
 
 function nullableId(value: unknown): boolean {
-  return value === null || id(value);
+  return value === null || isUuid(value);
 }
 
 function timestamp(value: unknown): value is string {
@@ -147,7 +148,9 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogW
     !id(p.idempotency_key) ||
     p.idempotency_key.length < 8 ||
     p.idempotency_key.length > 200 ||
-    !id(p.grow_id)
+    !isUuid(p.grow_id) ||
+    (p.tent_id != null && !isUuid(p.tent_id)) ||
+    (p.plant_id != null && !isUuid(p.plant_id))
   )
     return false;
   if (!numberInRange(p.volume_ml, Number.MIN_VALUE, 1_000_000)) return false;
@@ -186,7 +189,7 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogW
     return false;
   if (
     r.ok !== true ||
-    !id(r.targetId) ||
+    !isUuid(r.targetId) ||
     r.growId !== p.grow_id ||
     ![r.tentId, r.plantId].every(nullableId)
   )
@@ -252,6 +255,14 @@ export async function claimPendingQuickLogWatering(
       window.localStorage.setItem(storageKey(record.ownerId), raw);
       if (window.localStorage.getItem(storageKey(record.ownerId)) !== raw)
         return { status: "blocked" as const };
+      // The shared copy is durable only after readback. Remove the old
+      // tab-local copy before dispatch so another tab's later clearance
+      // cannot resurrect a completed Watering in this tab.
+      if (window.sessionStorage.getItem(storageKey(record.ownerId)) !== null) {
+        window.sessionStorage.removeItem(storageKey(record.ownerId));
+        if (window.sessionStorage.getItem(storageKey(record.ownerId)) !== null)
+          return { status: "blocked" as const };
+      }
       return { status: "claimed" as const, record: JSON.parse(raw) as PendingQuickLogWatering };
     });
   } catch {

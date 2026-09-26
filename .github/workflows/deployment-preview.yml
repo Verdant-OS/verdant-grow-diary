@@ -149,12 +149,19 @@ jobs:
           set -euo pipefail
           MARKER="<!-- deployment-preview-status -->"
 
+          # Four outcomes, kept distinct: a skipped build is unmeasured, not failed.
           if [ "$PREFLIGHT" = "success" ] && [ "$BUILD" = "success" ]; then
             STATUS="✅ **CI build verified** — preview contents not measured"
             NOTE="Edge-shared mirror in sync, typecheck clean, production build succeeded."
-          else
+          elif [ "$BUILD" = "skipped" ]; then
+            STATUS="⏭️ **CI build not run** (preflight \`$PREFLIGHT\`) — do not share a preview"
+            NOTE="The build stage never ran, so this commit's build is unmeasured, not failed. A preview may still load, but its build may not match this commit."
+          elif [ "$BUILD" = "failure" ]; then
             STATUS="❌ **CI build failed** — do not share a preview"
-            NOTE="One or more gates failed. A preview may still load, but its build may not match this commit."
+            NOTE="The production build or typecheck failed. A preview may still load, but its build may not match this commit."
+          else
+            STATUS="⚠️ **CI build did not complete** (\`$BUILD\`) — do not share a preview"
+            NOTE="The build stage ended \`$BUILD\`, so this commit's build is unmeasured. A preview may still load, but its build may not match this commit."
           fi
 
           BODY=$(cat <<EOF

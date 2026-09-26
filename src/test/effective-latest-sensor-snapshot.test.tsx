@@ -25,7 +25,13 @@ vi.mock("@/integrations/supabase/client", () => ({
         in: () => q,
         eq: () => q,
         is: () => q,
+        or: () => q,
         order: () => q,
+        range: (from: number, to: number) =>
+          Promise.resolve({
+            data: Array.isArray(io.diary) ? io.diary.slice(from, to + 1) : io.diary,
+            error: null,
+          }),
         limit: () => {
           if (table === "diary_entries") {
             return Promise.resolve({ data: io.diary, error: null });

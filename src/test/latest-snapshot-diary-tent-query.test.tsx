@@ -17,6 +17,7 @@ const io = vi.hoisted(() => ({
   rows: [] as DiaryRow[],
   missingRetractionColumn: false,
   diaryError: null as { code: string; message: string } | null,
+  diaryErrorAtRead: null as number | null,
   sensorError: false,
   diaryReads: 0,
 }));
@@ -29,6 +30,33 @@ vi.mock("@/integrations/supabase/client", () => ({
       const predicates: Array<(row: DiaryRow) => boolean> = [];
       let retractionFilter = false;
       let descending = false;
+      let idAscending = true;
+      const readRows = async (from: number, toExclusive: number) => {
+        if (table !== "diary_entries") {
+          return { data: [], error: io.sensorError ? { message: "read failed" } : null };
+        }
+        io.diaryReads += 1;
+        if (io.diaryError) return { data: null, error: io.diaryError };
+        if (io.diaryErrorAtRead === io.diaryReads) {
+          return { data: null, error: { code: "42501", message: "page read denied" } };
+        }
+        if (retractionFilter && io.missingRetractionColumn) {
+          return {
+            data: null,
+            error: { code: "42703", message: "column diary_entries.retracted_at does not exist" },
+          };
+        }
+        const data = io.rows
+          .filter((row) => predicates.every((predicate) => predicate(row)))
+          .sort((a, b) => {
+            const byTime = descending
+              ? b.entry_at.localeCompare(a.entry_at)
+              : a.entry_at.localeCompare(b.entry_at);
+            return byTime || (idAscending ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id));
+          })
+          .slice(from, toExclusive);
+        return { data, error: null };
+      };
       const query = {
         select: () => query,
         eq: (column: keyof DiaryRow, value: unknown) => {
@@ -39,6 +67,17 @@ vi.mock("@/integrations/supabase/client", () => ({
           predicates.push((row) => values.includes(row[column]));
           return query;
         },
+        or: (filter: string) => {
+          expect(filter).toBe(
+            "details->sensor_snapshot.not.is.null,details->manual_sensor_snapshot.not.is.null,details->environment_check.not.is.null",
+          );
+          predicates.push((row) =>
+            ["sensor_snapshot", "manual_sensor_snapshot", "environment_check"].some(
+              (key) => row.details[key] != null,
+            ),
+          );
+          return query;
+        },
         is: (column: keyof DiaryRow, value: unknown) => {
           retractionFilter ||= column === "retracted_at";
           predicates.push((row) => row[column] === value);
@@ -46,30 +85,11 @@ vi.mock("@/integrations/supabase/client", () => ({
         },
         order: (column: string, options: { ascending: boolean }) => {
           if (column === "entry_at") descending = !options.ascending;
+          if (column === "id") idAscending = options.ascending;
           return query;
         },
-        limit: async (count: number) => {
-          if (table !== "diary_entries") {
-            return { data: [], error: io.sensorError ? { message: "read failed" } : null };
-          }
-          io.diaryReads += 1;
-          if (io.diaryError) return { data: null, error: io.diaryError };
-          if (retractionFilter && io.missingRetractionColumn) {
-            return {
-              data: null,
-              error: { code: "42703", message: "column diary_entries.retracted_at does not exist" },
-            };
-          }
-          const data = io.rows
-            .filter((row) => predicates.every((predicate) => predicate(row)))
-            .sort((a, b) =>
-              descending
-                ? b.entry_at.localeCompare(a.entry_at)
-                : a.entry_at.localeCompare(b.entry_at),
-            )
-            .slice(0, count);
-          return { data, error: null };
-        },
+        limit: (count: number) => readRows(0, count),
+        range: (from: number, to: number) => readRows(from, to + 1),
       };
       return query;
     },
@@ -111,6 +131,7 @@ beforeEach(() => {
   io.rows = [];
   io.missingRetractionColumn = false;
   io.diaryError = null;
+  io.diaryErrorAtRead = null;
   io.sensorError = false;
   io.diaryReads = 0;
 });
@@ -162,6 +183,60 @@ describe("latest snapshot diary query scope before bounded selection", () => {
       tent_id: "tent-c",
       diary_evidence_ref: { id: "second-selected" },
     });
+  });
+
+  it("retrieves an older manual after 25 newer plain notes in the same tent", async () => {
+    io.rows = [
+      diary(),
+      ...Array.from({ length: 25 }, (_, index) =>
+        diary({
+          id: `plain-note-${index}`,
+          details: { note: "Routine inspection" },
+          entry_at: new Date(Date.parse(savedAt) + (index + 1) * 60_000).toISOString(),
+        }),
+      ),
+    ];
+    const { result } = mount();
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.snapshot).toMatchObject({
+      source: "manual",
+      diary_evidence_ref: { id: "saved-manual" },
+    });
+  });
+
+  it("continues past 25 invalid evidence envelopes to the last usable manual", async () => {
+    io.rows = [
+      diary(),
+      ...Array.from({ length: 25 }, (_, index) =>
+        diary({
+          id: `invalid-evidence-${index}`,
+          details: { manual_sensor_snapshot: { source: "manual", temp_f: "not-a-number" } },
+          entry_at: new Date(Date.parse(savedAt) + (index + 1) * 60_000).toISOString(),
+        }),
+      ),
+    ];
+    const { result } = mount();
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.snapshot.diary_evidence_ref?.id).toBe("saved-manual");
+    expect(io.diaryReads).toBe(2);
+  });
+
+  it("reports unavailable when a later candidate page fails", async () => {
+    io.rows = [
+      diary(),
+      ...Array.from({ length: 25 }, (_, index) =>
+        diary({
+          id: `invalid-evidence-${index}`,
+          details: { manual_sensor_snapshot: { source: "manual", temp_f: "not-a-number" } },
+          entry_at: new Date(Date.parse(savedAt) + (index + 1) * 60_000).toISOString(),
+        }),
+      ),
+    ];
+    io.diaryErrorAtRead = 2;
+    const { result } = mount();
+    await waitFor(() => expect(result.current.status).toBe("unavailable"));
+    expect(io.diaryReads).toBe(2);
+    expect(result.current.snapshot.diary_evidence_ref).toBeUndefined();
   });
 
   it("does not let null attribution, another grow, or retracted rows crowd out scoped evidence", async () => {

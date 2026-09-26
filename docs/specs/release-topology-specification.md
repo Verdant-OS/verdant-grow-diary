@@ -23,9 +23,9 @@ and Supabase tools, one attempt each, nothing routed around. **Amended against**
 that SHA, the stack conclusions of §6.1 verified from source there, and the promotion axis (§3, §4,
 §5.7, M10–M11) measured by Vercel reads at 23:28–23:37 UTC (Appendix B). **Amended again** at
 deploy tip `d510eb56b8e19178968508b306cc0a547adebfb3` (the `#1715` squash, 2026-09-26): the
-promotion axis re-measured for Vercel Rolling Releases by Vercel reads at 15:22–15:49 UTC and
-GitHub Actions reads at about 16:05 UTC (Appendix C). That amendment adds no repository
-`path:line` cite.
+promotion axis re-measured for Vercel Rolling Releases by Vercel reads from 15:22 to about
+15:51 UTC and GitHub Actions reads at about 16:05 UTC (Appendix C). That amendment adds no
+repository `path:line` cite.
 
 Every claim carries a Sentinel label: `established fact`, `source claim`, `practical observation`,
 `inference`, `uncertainty`, `missing evidence`. Every topology check carries one status from the
@@ -1120,8 +1120,8 @@ completed:
   - The preview-project unknown closed for this team (C.6): §5.6, the §6.2 row, §10, §14
 
 verified_by:
-  - Vercel reads 15:22–15:49 UTC (Appendix C): get_rolling_release (opening and closing reads),
-    get_rolling_release_config,
+  - Vercel reads from 15:22 to about 15:51 UTC (Appendix C): get_rolling_release (opening,
+    closing and post-attempt reads), get_rolling_release_config, get_runtime_errors (about 15:50),
     list_deployments (production, since 00:00 UTC), list_user_events (rolling-release, rollback
     and alias types), list_project_domains, get_deployment per hostname x4, list_promote_aliases
   - GitHub: 41 open PR heads fetched and file-listed against their merge-bases with d510eb56;
@@ -1535,16 +1535,16 @@ no Git link or domain fields, so those come from M2 and M3, not from this read.
 This is the one call in Appendix C that was not a read. It is recorded as D-RT-13 requires: the
 action, the deployment, the actor class, the reason and the outcome.
 
-| Field        | Value                                                                                                                                                                                                                                                                |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Action       | `POST /v1/projects/{id}/rolling-release/start`, canary `dpl_E7jYm6aT…` (`d510eb56`, `#1715`)                                                                                                                                                                         |
-| When         | About 15:50 UTC on 2026-09-26                                                                                                                                                                                                                                        |
-| Actor class  | This amendment's session, through the Vercel connector attached to it                                                                                                                                                                                                |
-| Authority    | The owner's in-session grant ("You have full authority"), given after the session reported the release state `FAIL` and asked the owner to start the rollout                                                                                                         |
-| Checks first | The tip was `d510eb56`, and its `merge_group` run was `success`. The build was `READY`, production and git. The rollout record was `COMPLETE` with none active. Runtime errors over the previous hour were zero. `408c966c`..`d510eb56` changes nothing under `src/` |
-| Reason       | Close the "built, not rolled out" `FAIL` with a build whose application code equals the served one                                                                                                                                                                   |
-| Outcome      | `422 unprocessable`: "Unable to start rolling release for this canary deployment." The rollout record read straight afterwards was unchanged: `COMPLETE`, canary `dpl_FsmTjonj…`, `queuedDeploymentId: null`                                                         |
-| After        | No retry and no other promotion path. Diagnosing the `422` was stopped by the session's permission policy. The cause is `NOT_MEASURED`, and the attempt is also recorded on `#1696`                                                                                  |
+| Field        | Value                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Action       | `POST /v1/projects/{id}/rolling-release/start`, canary `dpl_E7jYm6aT…` (`d510eb56`, `#1715`)                                                                                                                                                                                                                                                                                                                                |
+| When         | About 15:50 UTC on 2026-09-26                                                                                                                                                                                                                                                                                                                                                                                               |
+| Actor class  | This amendment's session, through the Vercel connector attached to it                                                                                                                                                                                                                                                                                                                                                       |
+| Authority    | The owner's in-session grant ("You have full authority"), given after the session reported the release state `FAIL` and asked the owner to start the rollout                                                                                                                                                                                                                                                                |
+| Checks first | The tip was `d510eb56`, and its `merge_group` run was `success`. The build was `READY`, production and git. The rollout record was `COMPLETE` with none active. Vercel `get_runtime_errors` (project, `since: 1h`), read at about 15:50 UTC just before the request, returned no runtime errors for the preceding hour. The exact second of that read was not recorded. `408c966c`..`d510eb56` changes nothing under `src/` |
+| Reason       | Close the "built, not rolled out" `FAIL` with a build whose application code equals the served one                                                                                                                                                                                                                                                                                                                          |
+| Outcome      | `422 unprocessable`: "Unable to start rolling release for this canary deployment." The rollout record read straight afterwards (`get_rolling_release`, about 15:50–15:51 UTC; the exact second was not recorded) was unchanged: `COMPLETE`, canary `dpl_FsmTjonj…`, `queuedDeploymentId: null`                                                                                                                              |
+| After        | No retry and no other promotion path. Diagnosing the `422` was stopped by the session's permission policy. The cause is `NOT_MEASURED`, and the attempt is also recorded on `#1696`                                                                                                                                                                                                                                         |
 
 ---
 

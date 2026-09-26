@@ -67,6 +67,34 @@ describe("Quick Log pending activity receipt", () => {
     expect(query.maybeSingle).toHaveBeenCalledTimes(2);
   });
 
+  it("confirms a plant Note whose tent was resolved by the manual RPC", async () => {
+    query.maybeSingle
+      .mockResolvedValueOnce({ data: { grow_event_id: activeEvent.id }, error: null })
+      .mockResolvedValueOnce({
+        data: { ...activeEvent, event_type: "observation" },
+        error: null,
+      });
+    expect(
+      await readQuickLogPendingActivityReceipt("owner-a", "retry-key-a", {
+        ...input,
+        activityId: "note",
+        tentId: null,
+      }),
+    ).toEqual({ status: "confirmed", growEventId: activeEvent.id });
+  });
+
+  it("does not ignore an event-route tent mismatch during pending recovery", async () => {
+    query.maybeSingle
+      .mockResolvedValueOnce({ data: { grow_event_id: activeEvent.id }, error: null })
+      .mockResolvedValueOnce({ data: activeEvent, error: null });
+    expect(
+      await readQuickLogPendingActivityReceipt("owner-a", "retry-key-a", {
+        ...input,
+        tentId: null,
+      }),
+    ).toEqual({ status: "unavailable" });
+  });
+
   it("does not call a retracted activity a confirmed moved-target save", async () => {
     query.maybeSingle
       .mockResolvedValueOnce({ data: { grow_event_id: activeEvent.id }, error: null })

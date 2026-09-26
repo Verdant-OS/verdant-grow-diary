@@ -3,6 +3,7 @@ import {
   hasMatchingQuickLogNoteTarget,
   matchesActiveQuickLogActivityEvent,
   matchesActiveQuickLogNoteEvent,
+  resolveManualNoteReceiptTentId,
   type ExpectedQuickLogActivityEvent,
 } from "@/lib/quickLogReusedActivityReceiptRules";
 import { verifyReusedQuickLogActivityEvent } from "@/lib/quickLogReusedActivityReceipt";
@@ -29,6 +30,19 @@ const event = {
 };
 
 describe("reused Quick Log activity receipt", () => {
+  it("omits only the plant-targeted manual Note tent claim", () => {
+    const plantTarget = { plantId: "plant-a", tentId: null };
+    expect(resolveManualNoteReceiptTentId(plantTarget)).toBeUndefined();
+    expect(resolveManualNoteReceiptTentId(plantTarget)).toBeUndefined();
+    expect(
+      resolveManualNoteReceiptTentId({ plantId: "plant-a", tentId: "stale-tent" }),
+    ).toBeUndefined();
+    expect(resolveManualNoteReceiptTentId({ plantId: null, tentId: "tent-a" })).toBe("tent-a");
+    expect(resolveManualNoteReceiptTentId({ plantId: null, tentId: null })).toBeNull();
+    expect(resolveManualNoteReceiptTentId(null)).toBeNull();
+    expect(resolveManualNoteReceiptTentId(undefined)).toBeNull();
+  });
+
   it("accepts the exact active original deterministically", () => {
     expect(matchesActiveQuickLogActivityEvent(expected, event)).toBe(true);
     expect(matchesActiveQuickLogActivityEvent(expected, event)).toBe(true);

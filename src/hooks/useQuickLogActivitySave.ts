@@ -31,6 +31,7 @@ import {
 } from "@/lib/quickLogV2EntryCreatedEvent";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import { verifyReusedQuickLogActivityEvent } from "@/lib/quickLogReusedActivityReceipt";
+import { resolveManualNoteReceiptTentId } from "@/lib/quickLogReusedActivityReceiptRules";
 
 export interface QuickLogActivitySaveInput {
   activityId: QuickLogActivityId;
@@ -178,7 +179,7 @@ export function useQuickLogActivitySave() {
               id: r.grow_event_id,
               eventType: "observation",
               growId: input.growId,
-              tentId: input.tentId,
+              tentId: resolveManualNoteReceiptTentId(input),
               plantId: input.plantId ?? null,
               note: input.note || null,
               occurredAt: input.occurredAt ?? null,

@@ -112,7 +112,7 @@ describe.each(["note", "training"] as const)("%s receipt audit", (activityId) =>
         source: "manual",
         is_deleted: true,
         grow_id: "11111111-1111-4111-8111-111111111111",
-        tent_id: null,
+        tent_id: activityId === "note" ? "44444444-4444-4444-8444-444444444444" : null,
         plant_id: "33333333-3333-4333-8333-333333333333",
         note: "Synthetic receipt audit",
       },
@@ -125,6 +125,7 @@ describe.each(["note", "training"] as const)("%s receipt audit", (activityId) =>
         activityId,
         growId: "11111111-1111-4111-8111-111111111111",
         plantId: "33333333-3333-4333-8333-333333333333",
+        tentId: null,
         idempotencyKey: "receipt-audit-logical-save",
         note: "Synthetic receipt audit",
       });
@@ -147,7 +148,7 @@ describe.each(["note", "training"] as const)("%s receipt audit", (activityId) =>
         source: "manual",
         is_deleted: false,
         grow_id: "11111111-1111-4111-8111-111111111111",
-        tent_id: null,
+        tent_id: activityId === "note" ? "44444444-4444-4444-8444-444444444444" : null,
         plant_id: "33333333-3333-4333-8333-333333333333",
         note: "Synthetic receipt audit",
       },
@@ -160,6 +161,7 @@ describe.each(["note", "training"] as const)("%s receipt audit", (activityId) =>
         activityId,
         growId: "11111111-1111-4111-8111-111111111111",
         plantId: "33333333-3333-4333-8333-333333333333",
+        tentId: null,
         idempotencyKey: "receipt-audit-logical-save",
         note: "Synthetic receipt audit",
       });
@@ -168,4 +170,39 @@ describe.each(["note", "training"] as const)("%s receipt audit", (activityId) =>
     expect(h.rpc).toHaveBeenCalledTimes(1);
     expect(h.event).toHaveBeenCalledTimes(1);
   });
+});
+
+it("keeps the event-route tent claim strict for a reused training event", async () => {
+  h.rpc.mockResolvedValue({
+    data: { ok: true, grow_event_id: validId, reused: true },
+    error: null,
+  });
+  h.readback.mockResolvedValue({
+    data: {
+      id: validId,
+      event_type: "training",
+      source: "manual",
+      is_deleted: false,
+      grow_id: "11111111-1111-4111-8111-111111111111",
+      tent_id: "44444444-4444-4444-8444-444444444444",
+      plant_id: "33333333-3333-4333-8333-333333333333",
+      note: "Synthetic receipt audit",
+    },
+    error: null,
+  });
+  const { result } = renderHook(() => useQuickLogActivitySave());
+  let receipt;
+  await act(async () => {
+    receipt = await result.current.save({
+      activityId: "training",
+      growId: "11111111-1111-4111-8111-111111111111",
+      plantId: "33333333-3333-4333-8333-333333333333",
+      tentId: null,
+      idempotencyKey: "receipt-audit-logical-save",
+      note: "Synthetic receipt audit",
+    });
+  });
+  expect(receipt).toEqual({ ok: false, reason: "save_failed" });
+  expect(h.telemetry).not.toHaveBeenCalled();
+  expect(h.event).not.toHaveBeenCalled();
 });

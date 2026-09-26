@@ -4,11 +4,19 @@ export interface ExpectedQuickLogActivityEvent {
   id: string;
   eventType: string;
   growId: string;
-  /** Omitted when a plant-targeted call did not know its resolved tent. */
+  /** Omitted only when a plant-targeted manual Note RPC resolved its tent server-side. */
   tentId?: string | null;
   plantId: string | null;
   note: string | null;
   occurredAt: string | null;
+}
+
+/** A plant-targeted manual Note makes no tent claim; the RPC resolves that field. */
+export function resolveManualNoteReceiptTentId(
+  input: { plantId?: string | null; tentId?: string | null } | null | undefined,
+): string | null | undefined {
+  if (input?.plantId) return undefined;
+  return input?.tentId ?? null;
 }
 
 /** A reused ID confirms only the original, still-visible activity. */

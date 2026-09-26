@@ -5,22 +5,22 @@
  * Does not invent live metrics. Rows are insert-equivalent fixtures.
  */
 import { describe, expect, it } from "vitest";
-import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
+import { MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import {
   diaryEntryBelongsInTimelineMeasurements,
   diaryEntryHasMeasurementEvidence,
   isTimelineManualSensorPersistedQualityUsable,
-  isTimelineManualSensorReceiptFresh,
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
   TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX,
+  timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
 
 const TENT = "11111111-1111-4111-8111-111111111111";
 const CAPTURED = "2026-09-09T18:46:00.000Z";
-/** Inside the Timeline "Stale snapshot" window (15 minutes). */
+/** A recent reading, before it becomes historical. */
 const NOW = new Date("2026-09-09T18:51:00.000Z");
 
 function metricRow(
@@ -144,6 +144,39 @@ describe("manualSensorReadingsToTimelineEntries", () => {
     expect(receipt.id.startsWith(TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX)).toBe(true);
   });
 
+  it("retains an older manual reading and presents only observed soil moisture", () => {
+    const now = new Date("2026-09-12T18:51:00.000Z");
+    const rows = [
+      metricRow("temperature_c", fahrenheitToCelsius(76)),
+      metricRow("humidity_pct", 58),
+      metricRow("soil_moisture_pct", 42),
+    ];
+    const receipts = manualSensorReadingsToTimelineEntries(rows, now);
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0].entry_at).toBe(CAPTURED);
+    expect(receipts[0].note).toContain("42% soil moisture");
+    expect(receipts[0].details.manual_sensor_snapshot).toMatchObject({
+      source: "manual",
+      soil_moisture_pct: 42,
+    });
+    expect(receipts[0].details.sensor_snapshot).toMatchObject({ source: "manual", soil: 42 });
+    expect(diaryEntryBelongsInTimelineMeasurements(receipts[0], now)).toBe(true);
+    expect(manualSensorReadingsToTimelineEntries(rows, now)).toEqual(receipts);
+  });
+
+  it("does not invent soil moisture or present an out-of-range soil metric as valid", () => {
+    const now = new Date("2026-09-12T18:51:00.000Z");
+    const rows = [metricRow("temperature_c", fahrenheitToCelsius(76))];
+    const [withoutSoil] = manualSensorReadingsToTimelineEntries(rows, now);
+    expect(withoutSoil.note).not.toContain("soil moisture");
+    expect(withoutSoil.details.sensor_snapshot).not.toHaveProperty("soil");
+    const [badSoil] = manualSensorReadingsToTimelineEntries(
+      [...rows, metricRow("soil_moisture_pct", 101)],
+      now,
+    );
+    expect(badSoil.details.sensor_snapshot).not.toHaveProperty("soil");
+  });
+
   it("excludes live/csv/demo rows so Sensors live data is not a Timeline measurement receipt", () => {
     const tempC = fahrenheitToCelsius(74);
     const rows = [
@@ -170,24 +203,23 @@ describe("manualSensorReadingsToTimelineEntries", () => {
     }
   });
 
-  it("excludes a quality-ok manual the evidence drawer would badge Stale snapshot (Toad Pin 1)", () => {
+  it("retains a quality-ok manual after its current-state freshness expires (Toad Pin 1)", () => {
     const tempC = fahrenheitToCelsius(72);
     const capturedAt = "2026-09-10T00:37:25.988+00:00";
     const now = new Date("2026-09-10T05:01:00.000Z");
-    expect(now.getTime() - Date.parse(capturedAt)).toBeGreaterThan(LIVE_CURRENT_STATE_STALE_MS);
-    expect(isTimelineManualSensorReceiptFresh(capturedAt, now)).toBe(false);
-    expect(
-      manualSensorReadingsToTimelineEntries(
-        [
-          metricRow("temperature_c", tempC, "manual", { ts: capturedAt, quality: "ok" }),
-          metricRow("humidity_pct", 56, "manual", { ts: capturedAt, quality: "ok" }),
-        ],
-        now,
-      ),
-    ).toEqual([]);
+    const receipts = manualSensorReadingsToTimelineEntries(
+      [
+        metricRow("temperature_c", tempC, "manual", { ts: capturedAt, quality: "ok" }),
+        metricRow("humidity_pct", 56, "manual", { ts: capturedAt, quality: "ok" }),
+      ],
+      now,
+    );
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0].entry_at).toBe(capturedAt);
+    expect(diaryEntryBelongsInTimelineMeasurements(receipts[0], now)).toBe(true);
   });
 
-  it("excludes a diary-shaped Pin 1 row from Measurements even when evidence keys still match", () => {
+  it("retains diary-shaped Pin 1 evidence in Measurements as history", () => {
     const capturedAt = "2026-09-10T00:37:25.988+00:00";
     const now = new Date("2026-09-10T05:01:00.000Z");
     const pin1Diary = {
@@ -212,7 +244,7 @@ describe("manualSensorReadingsToTimelineEntries", () => {
       },
     };
     expect(diaryEntryHasMeasurementEvidence(pin1Diary)).toBe(true);
-    expect(diaryEntryBelongsInTimelineMeasurements(pin1Diary, now)).toBe(false);
+    expect(diaryEntryBelongsInTimelineMeasurements(pin1Diary, now)).toBe(true);
 
     const pin1Sibling = {
       ...pin1Diary,
@@ -234,10 +266,10 @@ describe("manualSensorReadingsToTimelineEntries", () => {
         },
       },
     };
-    expect(diaryEntryBelongsInTimelineMeasurements(pin1Sibling, now)).toBe(false);
+    expect(diaryEntryBelongsInTimelineMeasurements(pin1Sibling, now)).toBe(true);
   });
 
-  it("excludes Golden Toad Pin1 live QL persist shape (manual_sensor_snapshot, no ts, no sensor_snapshot)", () => {
+  it("retains old Quick Log manual envelopes while capture-time verification stays separate", () => {
     const capturedAt = "2026-09-10T00:37:25.988+00:00";
     const now = new Date("2026-09-10T05:01:00.000Z");
     const livePairs = [
@@ -266,11 +298,11 @@ describe("manualSensorReadingsToTimelineEntries", () => {
         },
       };
       expect(diaryEntryHasMeasurementEvidence(liveRow)).toBe(true);
-      expect(diaryEntryBelongsInTimelineMeasurements(liveRow, now)).toBe(false);
+      expect(diaryEntryBelongsInTimelineMeasurements(liveRow, now)).toBe(true);
     }
   });
 
-  it("excludes a QL v2 companion snap that stores captured_at instead of ts", () => {
+  it("retains a QL v2 companion snap that stores captured_at instead of ts", () => {
     const capturedAt = "2026-09-10T00:37:25.988+00:00";
     const now = new Date("2026-09-10T05:01:00.000Z");
     expect(
@@ -291,12 +323,11 @@ describe("manualSensorReadingsToTimelineEntries", () => {
         },
         now,
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("still includes a quality-ok manual inside the Stale snapshot window", () => {
+  it("still includes a quality-ok recent manual", () => {
     const tempC = fahrenheitToCelsius(72);
-    expect(isTimelineManualSensorReceiptFresh(CAPTURED, NOW)).toBe(true);
     expect(
       manualSensorReadingsToTimelineEntries(
         [metricRow("temperature_c", tempC), metricRow("humidity_pct", 56)],
@@ -391,6 +422,41 @@ describe("manualSensorReadingsToTimelineEntries", () => {
         NOW,
       ),
     ).toEqual([]);
+  });
+});
+
+describe("timelineManualSnapshotHistoryNotice", () => {
+  const capturedMs = Date.parse(CAPTURED);
+  const input = {
+    sourceKind: "manual",
+    capturedAt: CAPTURED,
+    staleMs: MANUAL_CURRENT_STATE_STALE_MS,
+  };
+
+  it("changes from current to clearly historical at the manual freshness boundary", () => {
+    expect(
+      timelineManualSnapshotHistoryNotice({
+        ...input,
+        nowMs: capturedMs + MANUAL_CURRENT_STATE_STALE_MS,
+      }),
+    ).toBeNull();
+    expect(
+      timelineManualSnapshotHistoryNotice({
+        ...input,
+        nowMs: capturedMs + MANUAL_CURRENT_STATE_STALE_MS + 1,
+      }),
+    ).toBe("Historical manual reading — not current.");
+  });
+
+  it("does not infer current time from a missing or malformed observation timestamp", () => {
+    for (const capturedAt of [null, "not-a-date"]) {
+      expect(timelineManualSnapshotHistoryNotice({ ...input, capturedAt, nowMs: capturedMs })).toBe(
+        "Capture time unverified — not current.",
+      );
+    }
+    expect(
+      timelineManualSnapshotHistoryNotice({ ...input, sourceKind: "live", nowMs: capturedMs }),
+    ).toBeNull();
   });
 });
 

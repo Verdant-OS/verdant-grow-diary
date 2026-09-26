@@ -119,6 +119,7 @@ import {
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
+  timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
 import {
   effectiveSensorReadingsQuery,
@@ -2715,6 +2716,14 @@ export default function Timeline() {
                                       fallback: "manual",
                                       context: "persisted_snapshot",
                                     });
+                                    const manualHistoryNotice = timelineManualSnapshotHistoryNotice(
+                                      {
+                                        sourceKind: sourceBadge.kind,
+                                        capturedAt: snapTs || null,
+                                        nowMs,
+                                        staleMs: snapshotStaleMs,
+                                      },
+                                    );
                                     return (
                                       <div
                                         className="mt-2 flex flex-wrap items-center gap-1.5"
@@ -2725,6 +2734,14 @@ export default function Timeline() {
                                           Manual snapshot
                                         </span>
                                         <TimelineSensorSourceBadge badge={sourceBadge} />
+                                        {manualHistoryNotice && (
+                                          <span
+                                            className="text-[11px] text-muted-foreground"
+                                            data-testid="timeline-manual-history-notice"
+                                          >
+                                            {manualHistoryNotice}
+                                          </span>
+                                        )}
                                         {sensorViewModel?.kind === "invalid" && (
                                           <span
                                             className="text-[11px] text-destructive"

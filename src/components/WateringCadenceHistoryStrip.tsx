@@ -97,7 +97,10 @@ export function WateringCadenceHistoryStrip({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground" data-testid="watering-cadence-history-loading">
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="watering-cadence-history-loading"
+          >
             Loading watering history…
           </p>
         </CardContent>
@@ -131,7 +134,10 @@ export function WateringCadenceHistoryStrip({
           >
             Retry
           </button>
-          <p className="text-xs text-muted-foreground" data-testid="watering-cadence-history-caveat">
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="watering-cadence-history-caveat"
+          >
             {WATERING_CADENCE_HISTORY_CAVEAT}
           </p>
         </CardContent>
@@ -168,14 +174,19 @@ export function WateringCadenceHistoryStrip({
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   Last watering
                 </p>
-                <p className="text-sm font-medium" data-testid="watering-cadence-history-last-relative">
+                <p
+                  className="text-sm font-medium"
+                  data-testid="watering-cadence-history-last-relative"
+                >
                   {model.lastWatering.relativeLabel}
                 </p>
                 <p
                   className="text-xs text-muted-foreground"
                   data-testid="watering-cadence-history-last-absolute"
                 >
-                  {model.lastWatering.absoluteLabel}
+                  <time dateTime={model.lastWatering.occurredAt}>
+                    {model.lastWatering.absoluteLabel}
+                  </time>
                 </p>
                 <p className="text-sm" data-testid="watering-cadence-history-last-volume">
                   {model.lastWatering.volumeLabel}
@@ -220,7 +231,10 @@ export function WateringCadenceHistoryStrip({
             ) : null}
 
             {ledger.isOlderError ? (
-              <p className="text-xs text-muted-foreground" data-testid="watering-cadence-history-truncated">
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="watering-cadence-history-truncated"
+              >
                 Older entries could not be loaded — this strip may be incomplete.
               </p>
             ) : null}

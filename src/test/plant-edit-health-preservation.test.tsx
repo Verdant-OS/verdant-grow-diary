@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import EditPlantDialog from "@/components/EditPlantDialog";
+import { PLANT_HEALTH_CLEAR_UNAVAILABLE_MESSAGE } from "@/lib/plantHealthRules";
 
 const backend = vi.hoisted(() => ({
   updates: [] as Array<{ id: string; payload: Record<string, unknown> }>,
-  error: null as { message: string } | null,
+  error: null as { message: string; code?: string } | null,
 }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), message: vi.fn() }));
 const tents = vi.hoisted(() => [{ id: "tent-a", name: "Tent A", grow_id: "grow-a" }]);
@@ -108,9 +109,9 @@ describe("Edit Plant preserves unknown health", () => {
     },
   );
 
-  it("shows Unknown without choosing Healthy for an unrecognized profile value", () => {
+  it("shows Not assessed yet without choosing Healthy for an unrecognized profile value", () => {
     renderEditor("unknown");
-    expect(healthSelect()).toHaveTextContent("Unknown");
+    expect(healthSelect()).toHaveTextContent("Not assessed yet");
     expect(healthSelect()).not.toHaveTextContent("Healthy");
   });
 
@@ -140,11 +141,12 @@ describe("Edit Plant preserves unknown health", () => {
     expect(backend.updates[0].payload).not.toHaveProperty("grow_id");
   });
 
-  it("offers only supported database health values", async () => {
+  it("offers Not assessed yet plus the recorded health values", async () => {
     renderEditor("unknown");
     fireEvent.keyDown(healthSelect(), { key: "ArrowDown" });
     await screen.findByRole("option", { name: "Healthy" });
     expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "Not assessed yet",
       "Healthy",
       "Watch",
       "Issue",
@@ -156,7 +158,7 @@ describe("Edit Plant preserves unknown health", () => {
     const editor = renderEditor("healthy");
     await chooseHealth("Watch");
     editor.changePlant("unknown", "plant-b");
-    await waitFor(() => expect(healthSelect()).toHaveTextContent("Unknown"));
+    await waitFor(() => expect(healthSelect()).toHaveTextContent("Not assessed yet"));
     fireEvent.click(screen.getByTestId("edit-plant-submit"));
     await waitFor(() => expect(backend.updates).toHaveLength(1));
     expect(backend.updates[0].id).toBe("plant-b");
@@ -168,7 +170,7 @@ describe("Edit Plant preserves unknown health", () => {
     await chooseHealth("Healthy");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.click(screen.getByTestId("edit-plant-trigger"));
-    await waitFor(() => expect(healthSelect()).toHaveTextContent("Unknown"));
+    await waitFor(() => expect(healthSelect()).toHaveTextContent("Not assessed yet"));
     expect(backend.updates).toEqual([]);
   });
 
@@ -181,5 +183,54 @@ describe("Edit Plant preserves unknown health", () => {
     expect(screen.getByTestId("edit-plant-dialog")).toBeVisible();
     expect(screen.getByTestId("edit-plant-submit")).toBeEnabled();
     expect(backend.updates[0].payload).not.toHaveProperty("health");
+  });
+});
+
+describe("Edit Plant clears a recorded assessment", () => {
+  it.each(["healthy", "watch", "issue"])(
+    "writes 'unknown' when %s is taken back to Not assessed yet",
+    async (health) => {
+      renderEditor(health);
+      await chooseHealth("Not assessed yet");
+      fireEvent.click(screen.getByTestId("edit-plant-submit"));
+      await waitFor(() => expect(backend.updates).toHaveLength(1));
+      expect(backend.updates[0].payload).toMatchObject({ health: "unknown", tent_id: "tent-a" });
+      await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Plant updated"));
+    },
+  );
+
+  it("writes nothing when an unassessed plant stays Not assessed yet", async () => {
+    renderEditor("unknown");
+    await chooseHealth("Not assessed yet");
+    fireEvent.click(screen.getByTestId("edit-plant-submit"));
+    await waitFor(() => expect(backend.updates).toHaveLength(1));
+    expect(backend.updates[0].payload).not.toHaveProperty("health");
+  });
+
+  it("before the migration is applied, explains the rejected clear and keeps the edits", async () => {
+    // What validate_plant_row() raises for 'unknown' until 20260924120000.
+    backend.error = { message: "invalid plant health: unknown", code: "P0001" };
+    renderEditor("healthy");
+    fireEvent.change(screen.getByTestId("edit-plant-notes"), {
+      target: { value: "Updated note" },
+    });
+    await chooseHealth("Not assessed yet");
+    fireEvent.click(screen.getByTestId("edit-plant-submit"));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(PLANT_HEALTH_CLEAR_UNAVAILABLE_MESSAGE),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(screen.getByTestId("edit-plant-dialog")).toBeVisible();
+    expect(screen.getByTestId("edit-plant-notes")).toHaveValue("Updated note");
+
+    backend.error = null;
+    await chooseHealth("Healthy");
+    fireEvent.click(screen.getByTestId("edit-plant-submit"));
+    await waitFor(() => expect(backend.updates).toHaveLength(2));
+    expect(backend.updates[1].payload).toMatchObject({
+      health: "healthy",
+      last_note: "Updated note",
+    });
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Plant updated"));
   });
 });

@@ -55,6 +55,8 @@ interface Plant {
   lastNote?: string | null;
   isArchived?: boolean | null;
   photo?: string | null;
+  /** Stored plant type; required for Edit Plant to prefill and preserve it. */
+  plantType?: string | null;
 }
 
 interface Props {

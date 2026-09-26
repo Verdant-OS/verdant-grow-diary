@@ -38,6 +38,24 @@ export function normalizePlantType(value: string | null | undefined): PlantType 
   return "unknown";
 }
 
+/**
+ * Edit-form write guard (QA 2026-09-24, BUG-020): the Edit Plant form was
+ * opened without the stored type, prefilled "Not sure", and every save
+ * overwrote `autoflower` / `photoperiod` with `unknown`.
+ *
+ * Write `plant_type` only when the grower's selection differs from the
+ * stored type. When the caller did not supply the stored type (`undefined`),
+ * never write "unknown" — that would erase a value the form never saw.
+ */
+export function buildPlantTypeUpdate(
+  storedType: string | null | undefined,
+  selectedType: string | null | undefined,
+): { plant_type: PlantType } | { plant_type?: never } {
+  const selected = normalizePlantType(selectedType ?? null);
+  if (storedType === undefined) return selected === "unknown" ? {} : { plant_type: selected };
+  return selected === normalizePlantType(storedType) ? {} : { plant_type: selected };
+}
+
 /** True only for a declared autoflower. Unknown is NOT treated as autoflower here. */
 export function isAutoflower(type: PlantType | string | null | undefined): boolean {
   return normalizePlantType(type ?? null) === "autoflower";

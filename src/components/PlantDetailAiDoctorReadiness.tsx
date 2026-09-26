@@ -28,7 +28,9 @@ import {
 import { Link } from "@/lib/react-router-compat";
 
 import {
+  AI_DOCTOR_SENSOR_EVIDENCE_MODE_LABELS,
   buildPlantDetailAiDoctorReadiness,
+  formatAiDoctorSensorEvidenceStatus,
   type PlantDetailAiDoctorReadinessInput,
   type AiDoctorReadinessLevel,
   type AiDoctorSensorEvidenceMode,
@@ -412,23 +414,15 @@ export default function PlantDetailAiDoctorReadiness({
                 data-testid="plant-detail-ai-doctor-sensor-evidence-mode-badge"
               >
                 {modeIcon(sensor.mode)}
-                {sensor.mode}
+                {AI_DOCTOR_SENSOR_EVIDENCE_MODE_LABELS[sensor.mode]}
               </Badge>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
               <span data-testid="plant-detail-ai-doctor-sensor-evidence-status">
-                status:{" "}
-                <span className="font-mono text-foreground/80">{sensor.status ?? "unknown"}</span>
-              </span>
-              <span data-testid="plant-detail-ai-doctor-sensor-evidence-reason">
-                reason:{" "}
-                <span className="font-mono text-foreground/80">{sensor.reason ?? "unknown"}</span>
+                {formatAiDoctorSensorEvidenceStatus(sensor.status)}
               </span>
               <span data-testid="plant-detail-ai-doctor-sensor-evidence-healthy">
-                healthy evidence:{" "}
-                <span className="font-mono text-foreground/80">
-                  {sensor.countsAsHealthyEvidence ? "yes" : "no"}
-                </span>
+                Counts as current evidence: {sensor.countsAsHealthyEvidence ? "yes" : "no"}
               </span>
             </div>
             <p

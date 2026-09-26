@@ -19,7 +19,7 @@ import {
 } from "@/lib/timelineEvidenceReadinessViewModel";
 
 // Spy fetch so we can prove the panel never triggers an AI/network call.
-const fetchSpy = vi.spyOn(globalThis, "fetch" as never);
+const fetchSpy = vi.spyOn(globalThis, "fetch");
 
 const NOW = new Date("2026-06-10T12:00:00Z");
 const HOUR = 3600 * 1000;

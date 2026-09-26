@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- controlled-runner spawn stubs use loose types for the child_process contract */
 import { describe, it, expect, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
@@ -482,7 +481,29 @@ describe("controlled runner CLI (stubbed vitest)", () => {
 });
 
 describe("defaults", () => {
-  it("defaults match Slice G.1j controlled command", () => {
+  it("passes only Vitest 4-supported worker arguments to the child", async () => {
+    const { root, files } = fakeRepo(1);
+    const delegate = makeSpawnStub({ writeStatus: () => "passed" }).stub;
+    const spawnedArgs: string[][] = [];
+    const result = await commandRun({
+      repoRoot: root,
+      shardSpec: "1/1",
+      batchSize: 1,
+      runsRoot: path.join(root, ".vitest-runs"),
+      files,
+      toolVersions: { node: process.version, bun: "1.3.3", vitest: "4.1.11" },
+      spawnImpl: ((bin: string, args: string[], opts: any) => {
+        spawnedArgs.push(args);
+        return delegate(bin, args, opts);
+      }) as any,
+    });
+    expect(result.exit).toBe(EXIT.GREEN);
+    expect(spawnedArgs).toHaveLength(1);
+    expect(spawnedArgs[0]).toContain("--maxWorkers=8");
+    expect(spawnedArgs[0].some((arg) => arg.startsWith("--minWorkers"))).toBe(false);
+  });
+
+  it("retains the historical run-record defaults", () => {
     expect(DEFAULTS.pool).toBe("forks");
     expect(DEFAULTS.maxWorkers).toBe(8);
     expect(DEFAULTS.minWorkers).toBe(2);

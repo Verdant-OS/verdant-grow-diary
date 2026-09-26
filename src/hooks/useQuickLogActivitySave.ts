@@ -37,6 +37,8 @@ export interface QuickLogActivitySaveInput {
   tentId?: string | null;
   plantId?: string | null;
   note?: string | null;
+  /** Caller-pinned occurrence time, reused verbatim on an exact retry. */
+  occurredAt?: string | null;
   photoUrl?: string | null;
   /**
    * Required for event-route dedupe. The manual route forwards it too when
@@ -147,7 +149,7 @@ export function useQuickLogActivitySave() {
               p_temperature_c: null,
               p_humidity_pct: null,
               p_vpd_kpa: null,
-              p_occurred_at: null,
+              p_occurred_at: input.occurredAt ?? null,
               ...(Object.keys(manualDetails).length > 0 ? { p_details: manualDetails } : {}),
               p_idempotency_key: idempotencyKey,
             } as unknown as Record<string, unknown>,
@@ -213,7 +215,7 @@ export function useQuickLogActivitySave() {
               p_note: input.note ?? null,
               p_photo_url: input.photoUrl ?? null,
               p_sensor_snapshot: null,
-              p_occurred_at: null,
+              p_occurred_at: input.occurredAt ?? null,
               p_details: Object.keys(details).length > 0 ? details : null,
             } as unknown as Record<string, unknown>,
           );

@@ -986,11 +986,12 @@ export default function QuickLogAllActivitiesSection({
           photoDiaryInFlightRef.current = false;
         }
       } else {
+        const occurredAt = new Date().toISOString();
         const claim = claimPendingQuickLogActivity({
           version: 1,
           ownerId: user?.id ?? "",
-          createdAt: new Date().toISOString(),
-          input: { ...activityInput, idempotencyKey },
+          createdAt: occurredAt,
+          input: { ...activityInput, occurredAt, idempotencyKey },
           receipt: {
             symptomCheck: guidedSymptomCheck && selected.id === "issue_observation",
             harvestDetails: harvestDetailsForBreakdown,

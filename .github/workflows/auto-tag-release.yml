@@ -83,8 +83,8 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Production builds may lack git context (history-less Lovable
-          # snapshots stamp commit "unknown" but always carry a treeHash), so
+          # Production builds may lack git context (a history-less publisher
+          # snapshot stamps commit "unknown" but always carries a treeHash), so
           # tags created here record the treeHash of their commit.
           # scripts/resolve-release-provenance.mjs uses these annotations as
           # its fast path and recomputes for anything unannotated.

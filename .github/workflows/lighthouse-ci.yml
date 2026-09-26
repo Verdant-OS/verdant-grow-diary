@@ -1,9 +1,9 @@
 # Lighthouse CI — protects LCP + SEO on the published surface.
 #
 # Runs against https://verdantgrowdiary.com (published, real network).
-# NOT dispatched automatically until the repo owner enables it — Verdant
-# publishes locally from Windows, so this workflow is opt-in via
-# workflow_dispatch + nightly schedule.
+# NOT dispatched automatically until the repo owner enables it — the
+# publisher of the surface is operating state (docs/agents/CURRENT_STATE.md),
+# so this workflow is opt-in via workflow_dispatch + nightly schedule.
 #
 # Assertions live in lighthouserc.cjs. URLs are loaded from
 # public/sitemap.xml so this stays in lockstep with the canonical routes.

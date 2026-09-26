@@ -1,4 +1,4 @@
-# Supabase CLI workflows for the Lovable Cloud backend.
+# Supabase CLI workflows for the hosted Supabase backend.
 #
 # Usage:
 #   make help              # list targets
@@ -74,7 +74,7 @@ types-local: check-cli ## Generate types from local Supabase instance
 functions-serve: check-cli ## Serve edge functions locally with .env.local
 	supabase functions serve --env-file .env.local
 
-functions-deploy: check-cli ## Deploy all edge functions (Lovable does this automatically)
+functions-deploy: check-cli ## Deploy all edge functions (production deployer: docs/agents/CURRENT_STATE.md)
 	supabase functions deploy
 
 reset: check-cli ## Reset local DB (destructive — local only)

@@ -20,11 +20,11 @@
  *   <pkg.version>+<yyyymmdd>.t<treeHashShort>       (git identity absent)
  * Examples: `0.0.0+20260722.c76e2cd37929`, `0.0.0+20260805.t8c1a3e0c53b9`
  *
- * Provenance resilience: the production publisher (Lovable) sometimes
- * builds from a history-less snapshot — a freshly `git init`-ed directory
- * with zero commits and no GITHUB_* env (observed 2026-08-05, when
- * production served `commit: "unknown"`). Identity therefore never relies
- * on git alone:
+ * Provenance resilience: a production publisher can build from a
+ * history-less snapshot — a freshly `git init`-ed directory with zero
+ * commits and no GITHUB_* env (observed 2026-08-05, when production served
+ * `commit: "unknown"`). The publisher itself is operating state, recorded in
+ * docs/agents/CURRENT_STATE.md. Identity therefore never relies on git alone:
  *
  *   - `treeHash` (scripts/lib/tree-hash.mjs) is a deterministic SHA-256
  *     over the build-defining source roots, computable in any snapshot.

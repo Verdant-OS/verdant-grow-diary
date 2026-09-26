@@ -5,7 +5,9 @@ name: deployment-preview
 # CI's production path — edge-shared mirror preflight, typecheck, and a
 # full production build. Green pipeline → this branch builds in CI. What
 # any publisher's preview actually serves is not measured here. Red
-# pipeline → the PR comment says the CI build failed.
+# pipeline → the PR comment names the outcome: a build that ran and
+# failed, a build that never ran because preflight failed (unmeasured,
+# not failed), or a build that ended some other way (e.g. cancelled).
 #
 # This does NOT publish to production. Which platform publishes it, and
 # how, is operating state (docs/agents/CURRENT_STATE.md), never assumed
@@ -158,7 +160,7 @@ jobs:
             NOTE="The build stage never ran, so this commit's build is unmeasured, not failed. A preview may still load, but its build may not match this commit."
           elif [ "$BUILD" = "failure" ]; then
             STATUS="❌ **CI build failed** — do not share a preview"
-            NOTE="The production build or typecheck failed. A preview may still load, but its build may not match this commit."
+            NOTE="The build job failed (typecheck, production build, summary, or upload). A preview may still load, but its build may not match this commit."
           else
             STATUS="⚠️ **CI build did not complete** (\`$BUILD\`) — do not share a preview"
             NOTE="The build stage ended \`$BUILD\`, so this commit's build is unmeasured. A preview may still load, but its build may not match this commit."

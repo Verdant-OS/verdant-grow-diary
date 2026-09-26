@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
+import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
 
 type Payload = Record<string, unknown>;
 const backend = vi.hoisted(() => ({
@@ -10,6 +11,9 @@ const backend = vi.hoisted(() => ({
   loseFirstReply: true,
   rejectFirstWrite: false,
   malformedFirstReply: false,
+  serverRejectOnPost: 0,
+  serverRejectReason: "invalid_typed_payload",
+  failAfterHeldPost: 0,
   holdPost: 0,
   heldReply: null as Promise<void> | null,
 }));
@@ -24,6 +28,9 @@ vi.mock("@/integrations/supabase/client", () => ({
       if (backend.posts.length === 1 && backend.rejectFirstWrite) {
         return { data: null, error: { message: "Write rejected before commit" } };
       }
+      if (backend.posts.length === backend.serverRejectOnPost) {
+        return { data: { ok: false, reason: backend.serverRejectReason }, error: null };
+      }
       const key = String(payload.p_idempotency_key);
       const existing = backend.rows.get(key);
       if (!existing) backend.rows.set(key, payload);
@@ -35,6 +42,9 @@ vi.mock("@/integrations/supabase/client", () => ({
       }
       if (backend.posts.length === backend.holdPost && backend.heldReply) {
         await backend.heldReply;
+      }
+      if (backend.posts.length === backend.failAfterHeldPost) {
+        return { data: null, error: { message: "Reply unavailable after commit" } };
       }
       return {
         data: {
@@ -51,18 +61,23 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 function mount(plantId = "plant-a") {
-  const renderTree = (id: string) => (
+  const renderTree = (id: string, requestedActivityId: QuickLogActivityId | null = null) => (
     <MemoryRouter>
       <QuickLogAllActivitiesSection
         growId="grow-a"
         tentId="tent-a"
         plantId={id}
         plantStage="flower"
+        requestedActivityId={requestedActivityId}
       />
     </MemoryRouter>
   );
   const view = render(renderTree(plantId));
-  return { ...view, changeTarget: (id: string) => view.rerender(renderTree(id)) };
+  return {
+    ...view,
+    changeTarget: (id: string, requestedActivityId: QuickLogActivityId | null = null) =>
+      view.rerender(renderTree(id, requestedActivityId)),
+  };
 }
 
 function selectActivity(id: string) {
@@ -102,6 +117,9 @@ beforeEach(() => {
   backend.loseFirstReply = true;
   backend.rejectFirstWrite = false;
   backend.malformedFirstReply = false;
+  backend.serverRejectOnPost = 0;
+  backend.serverRejectReason = "invalid_typed_payload";
+  backend.failAfterHeldPost = 0;
   backend.holdPost = 0;
   backend.heldReply = null;
   telemetry.mockReset();
@@ -109,6 +127,85 @@ beforeEach(() => {
 });
 
 describe("All activity types retry confirmation", () => {
+  it("blocks an over-500-character note before claiming or sending a request", async () => {
+    mount();
+    selectActivity("training");
+    enterNote("a".repeat(501));
+    save();
+    expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
+      /500 characters or fewer/,
+    );
+    expect(backend.posts).toHaveLength(0);
+    expect(screen.getByTestId("quick-log-all-activities-note")).toBeEnabled();
+    enterNote("a".repeat(500));
+    save();
+    await waitFor(() => expect(backend.posts).toHaveLength(1));
+  });
+
+  it("releases a first structured server rejection so the grower can correct the draft", async () => {
+    backend.serverRejectOnPost = 1;
+    mount();
+    selectActivity("training");
+    enterNote();
+    save();
+    await screen.findByTestId("quick-log-all-activities-error");
+    expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
+      /server refused this activity/i,
+    );
+    expect(screen.getByTestId("quick-log-all-activities-note")).toBeEnabled();
+    expect(
+      screen.queryByTestId("quick-log-all-activities-pending-activity"),
+    ).not.toBeInTheDocument();
+    expect(window.sessionStorage.length).toBe(0);
+    backend.serverRejectOnPost = 0;
+    enterNote("Corrected training note");
+    save();
+    await screen.findByTestId("quick-log-all-activities-saved-item");
+    expect(backend.rows.size).toBe(1);
+    expect(backend.posts[1].p_idempotency_key).not.toBe(backend.posts[0].p_idempotency_key);
+  });
+
+  it("retains an ambiguous earlier attempt when its exact retry is rejected", async () => {
+    const view = mount();
+    await loseReply();
+    backend.serverRejectOnPost = 2;
+    save();
+    await waitFor(() => expect(backend.posts).toHaveLength(2));
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
+        /earlier save may have succeeded/i,
+      ),
+    );
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toBeInTheDocument();
+    expect(backend.posts[1]).toEqual(backend.posts[0]);
+    expect(backend.rows.size).toBe(1);
+    view.unmount();
+    mount();
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toBeInTheDocument();
+  });
+
+  it("does not show plant A's late failed save as plant B's error", async () => {
+    backend.loseFirstReply = false;
+    backend.holdPost = 1;
+    backend.failAfterHeldPost = 1;
+    let release!: () => void;
+    backend.heldReply = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const view = mount();
+    selectActivity("training");
+    enterNote("Plant A activity");
+    save();
+    await waitFor(() => expect(backend.posts).toHaveLength(1));
+    await act(async () => view.changeTarget("plant-b", "training"));
+    expect(screen.getByTestId("quick-log-all-activities-note")).toBeInTheDocument();
+    await act(async () => release());
+    expect(screen.queryByTestId("quick-log-all-activities-error")).not.toBeInTheDocument();
+    await act(async () => view.changeTarget("plant-a"));
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toHaveTextContent(
+      "Plant A activity",
+    );
+  });
   it.each(["training", "note", "environment_check"])(
     "keeps the %s draft and original submission after a malformed success reply",
     async (activity) => {

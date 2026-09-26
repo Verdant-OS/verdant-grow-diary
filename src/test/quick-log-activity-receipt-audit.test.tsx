@@ -26,6 +26,30 @@ const malformed = [
 ];
 
 describe.each(["note", "training"] as const)("%s receipt audit", (activityId) => {
+  it("marks a recognized pre-write rejection without confirming a save", async () => {
+    h.rpc.mockResolvedValue({
+      data: {
+        ok: false,
+        reason: activityId === "note" ? "invalid_details" : "invalid_typed_payload",
+      },
+      error: null,
+    });
+    const { result } = renderHook(() => useQuickLogActivitySave());
+    let receipt;
+    await act(async () => {
+      receipt = await result.current.save({
+        activityId,
+        growId: "11111111-1111-4111-8111-111111111111",
+        plantId: "33333333-3333-4333-8333-333333333333",
+        idempotencyKey: "receipt-audit-logical-save",
+        note: "Synthetic rejected activity",
+      });
+    });
+    expect(receipt).toMatchObject({ ok: false, reason: "server_rejected" });
+    expect(h.telemetry).not.toHaveBeenCalled();
+    expect(h.event).not.toHaveBeenCalled();
+  });
+
   it.each(malformed)("does not confirm $name", async ({ data }) => {
     h.rpc.mockResolvedValue({ data, error: null });
     const { result } = renderHook(() => useQuickLogActivitySave());

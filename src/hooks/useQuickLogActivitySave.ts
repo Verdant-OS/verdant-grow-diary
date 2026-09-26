@@ -21,7 +21,10 @@ import {
   QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
   type QuickLogActivityId,
 } from "@/constants/quickLogActivityTypes";
-import { planQuickLogPersistence } from "@/lib/quickLogActivityRules";
+import {
+  isDefinitiveQuickLogActivityRejection,
+  planQuickLogPersistence,
+} from "@/lib/quickLogActivityRules";
 import {
   QUICK_LOG_V2_ENTRY_CREATED_EVENT,
   dispatchQuickLogV2EntryCreated,
@@ -53,6 +56,7 @@ export type QuickLogActivitySaveReason =
   | "unsupported_activity"
   | "missing_idempotency_key"
   | "missing_target"
+  | "server_rejected"
   | "save_failed";
 
 export interface QuickLogActivitySaveResult {
@@ -133,7 +137,6 @@ export function useQuickLogActivitySave() {
             ...(input.extraDetails ?? {}),
           };
           const { data, error: rpcErr } = await supabase.rpc(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_manual" as any,
             {
               p_target_type: targetType,
@@ -155,6 +158,14 @@ export function useQuickLogActivitySave() {
           }
           const r = (data ?? {}) as ManualRpcResponse;
           if (r.ok !== true || !isUuid(r.grow_event_id)) {
+            if (r.ok === false && isDefinitiveQuickLogActivityRejection(r.reason)) {
+              setError("server_rejected");
+              return {
+                ok: false,
+                reason: "server_rejected",
+                disabledReason: "The server refused this activity. Check its target and fields.",
+              };
+            }
             setError("save_failed");
             return { ok: false, reason: "save_failed" };
           }
@@ -192,7 +203,6 @@ export function useQuickLogActivitySave() {
           // migration is applied to prod.
           details.event_type = plan.eventType;
           const { data, error: rpcErr } = await supabase.rpc(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_event" as any,
             {
               p_idempotency_key: idempotencyKey,
@@ -221,6 +231,14 @@ export function useQuickLogActivitySave() {
                 ok: false,
                 reason: "harvest_backend_unavailable",
                 disabledReason: QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
+              };
+            }
+            if (r.ok === false && isDefinitiveQuickLogActivityRejection(r.reason)) {
+              setError("server_rejected");
+              return {
+                ok: false,
+                reason: "server_rejected",
+                disabledReason: "The server refused this activity. Check its target and fields.",
               };
             }
             setError("save_failed");

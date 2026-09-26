@@ -55,7 +55,18 @@ export default function DailyGrowCheckOnboardingCard({
   const { isDismissed, dismiss } = useOnboardingDismissed(scopeKey);
   const tentsQuery = useTents();
   const plantsQuery = usePlants();
-  const sensorsQuery = useSensorReadings();
+  // Per-tent windows (the focused tents, else every tent); never the
+  // unscoped all-tents read, which hit the Postgres statement timeout.
+  const sensorsQuery = useSensorReadings({
+    tentIds:
+      tentIds && tentIds.length > 0
+        ? tentIds
+        : Array.isArray(tentsQuery.data)
+          ? tentsQuery.data.map((tent) => tent.id)
+          : null,
+    scopeError: !(tentIds && tentIds.length > 0) && tentsQuery.isError,
+    retryScope: tentsQuery.refetch,
+  });
   const diaryQuery = useDiaryEntries();
   const reads = [tentsQuery, plantsQuery, sensorsQuery, diaryQuery];
 

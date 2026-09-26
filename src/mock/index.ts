@@ -35,6 +35,8 @@ export interface Plant {
   potSize?: string | null;
   /** Declared plant type: autoflower | photoperiod | unknown. Never inferred. */
   plantType?: string | null;
+  /** When the plant row was created in Verdant (tracking start), when known. */
+  createdAt?: string | null;
 }
 
 /**
@@ -90,6 +92,25 @@ export interface SensorReading {
   capturedAt: string;
   /** Optional confidence in the value (0..1). */
   confidence?: number;
+  /**
+   * What `status` was derived from, retained so a presenter that ticks its own
+   * clock can recompute the time-sensitive part against `now` without a
+   * refetch (`refreshSensorReadingStatus`). Absent on legacy fixtures, whose
+   * cached status is then never revised — and never promoted.
+   */
+  freshness?: SensorReadingFreshness;
+}
+
+/**
+ * Recompute inputs for a mapped reading. `floor` is the least-trusted status
+ * fixed by persisted source/quality (explicit invalid, degraded, demo, stale);
+ * `timeSources` are the sources of rows whose status came only from capture
+ * time and so may change as the clock moves. A recompute is
+ * `leastTrusted(floor, classify(capturedAt, source, now) for each timeSource)`.
+ */
+export interface SensorReadingFreshness {
+  floor: SensorReadingHealthStatus | null;
+  timeSources: SensorReadingSource[];
 }
 
 export interface Camera {

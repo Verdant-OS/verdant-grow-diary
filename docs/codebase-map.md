@@ -84,14 +84,14 @@ table's shape — the manifest records that a path redirects, not where.
 Several legal/marketing duplicates exist as routes **and** as redirect entries in
 `vercel.json` (`/strains → /cultivars`, `/features → /welcome`, `/terms-of-service → /terms`,
 `/privacy-policy → /privacy`, `/refunds` and `/refund-policy → /refund`, `/demo → /welcome`).
-**Those redirects do not fire in production.** Lovable is the production publisher and does
-not apply Vercel host configuration — all **eight** redirect entries in that file return HTTP 200 with no
-`Location` header, so the destination is reached by client rendering, not by a host redirect
-(`docs/seo/lighting-launch-verification.md`, §Non-blocking host mismatch — that document says
-"six", counting only the aliases its own slice added; the file holds eight, and Lovable ignores
-all of them). The eight are `/strains`, `/strains/:slug`, `/features`, `/demo`, `/refunds`,
-`/refund-policy`, `/terms-of-service`, `/privacy-policy`. `vercel.json` is stale pre-SSR
-configuration that `CURRENT_STATE_ARCHIVE.md` lists for retirement.
+**Whether those redirects fire is a topology measurement, not a property of the file**: a host
+file governs only when the measured publisher applies it (rule D-RT-5 of
+`docs/specs/release-topology-specification.md`). An earlier version of this paragraph said they
+never fire, measured under a publisher that no longer serves the apex
+(`docs/seo/lighting-launch-verification.md`, 2026-08-02). The eight entries are `/strains`,
+`/strains/:slug`, `/features`, `/demo`, `/refunds`, `/refund-policy`, `/terms-of-service`,
+`/privacy-policy`. For their current state run the specification's M7 and record the result in
+the next `docs/agents/CURRENT_STATE.md` stamp; its Appendix A is a dated record, not current state.
 
 ### Authenticated routes (`src/routes/_app/*.tsx`)
 
@@ -289,13 +289,16 @@ that it failed on the head of PR #769 and merged anyway — a documented enforce
 ### Migration replay (PG15) and appliers
 
 Replay gates: `action-queue-transition-forward-repair-pg15`,
-`quicklog-corrections-retractions-pg15`, `quicklog-manual-delegate-forward-repair-pg15`,
+`plants-health-unassessed-default-pg15`, `quicklog-corrections-retractions-pg15`,
+`quicklog-manual-delegate-forward-repair-pg15`, `quicklog-revision-idempotent-replay-pg15`,
 `signup-acquisition-forward-repair-pg15`.
 
-Seven `workflow_dispatch`-only appliers: `apply-pinned-production-migrations`,
-`apply-action-queue-transition-forward-repair`, `apply-quicklog-corrections-retractions`,
-`apply-quicklog-manual-delegate-forward-repair`, `apply-signup-acquisition-forward-repair`,
-`apply-candidate-number-maintenance-migrations`, `apply-pinned-breeding-reconciliation`.
+Ten `workflow_dispatch`-only appliers: `apply-pinned-production-migrations`,
+`apply-action-queue-transition-forward-repair`, `apply-agreement-acceptance-insert-forward-repair`,
+`apply-plants-health-unassessed-default`, `apply-quicklog-corrections-retractions`,
+`apply-quicklog-manual-delegate-forward-repair`, `apply-quicklog-revision-idempotent-replay`,
+`apply-signup-acquisition-forward-repair`, `apply-candidate-number-maintenance-migrations`,
+`apply-pinned-breeding-reconciliation`.
 
 ### Security
 
@@ -463,8 +466,12 @@ Recorded as `established fact` about the tree, not as defects anyone has been as
 - **`docs/architecture.md` is partly pre-migration** — it describes react-router-style route
   mounting and "the AI Coach" as the AI layer. Its product-layer, RLS-ownership and Action
   Queue sections remain accurate and useful.
-- **Two `*Rules.ts` modules import Supabase**, breaking the purity contract:
-  `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`.
+- **Two `*Rules.ts` modules import a generated Supabase type, not the client**:
+  `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`, each through
+  `import type { TablesInsert } from "@/integrations/supabase/types"`. The import is erased at
+  compile time, so neither file performs Supabase I/O. No root-level `*Rules.ts` imports the
+  Supabase client (re-measured at `69aca5e7`). `docs/architecture-contract.md` AC-3.2 still records
+  the two as type-level drift from its "no Supabase" rule.
 - **38 of 492 components and 33 of 139 pages import `@/integrations/supabase/client`
   directly** rather than going through a hook.
 - **`src/lib/*Advisor.ts` has zero files**, though the architecture table once named it as a

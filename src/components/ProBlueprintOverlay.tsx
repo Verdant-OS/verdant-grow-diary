@@ -34,6 +34,10 @@ const PROVENANCE_LABEL: Record<BlueprintOverlayRow["provenance"], string> = {
   manual: "Logged",
   derived: "Computed",
   missing: "No reading",
+  csv: "CSV history",
+  sim: "Simulated",
+  diary: "Diary snapshot",
+  unverified: "Unverified source",
 };
 
 function formatValue(value: number | null, unit: string): string {
@@ -87,9 +91,28 @@ export function ProBlueprintOverlay({
           <SummaryChip tone="green" label="in band" count={summary.green} />
           <SummaryChip tone="amber" label="watch" count={summary.amber} />
           <SummaryChip tone="red" label="out" count={summary.red} />
-          <SummaryChip tone="neutral" label="no data" count={summary.missing} />
+          <SummaryChip tone="neutral" label="not scored" count={summary.missing} />
         </div>
       </header>
+
+      {vm.sensorNotice && (
+        <p
+          data-testid="blueprint-sensor-notice"
+          role="status"
+          className="mb-3 text-sm text-muted-foreground"
+        >
+          {vm.sensorNotice}
+        </p>
+      )}
+      {vm.feedingNotice && (
+        <p
+          data-testid="blueprint-feeding-notice"
+          role="status"
+          className="mb-3 text-sm text-muted-foreground"
+        >
+          {vm.feedingNotice}
+        </p>
+      )}
 
       {!vm.stageKnown && (
         <p

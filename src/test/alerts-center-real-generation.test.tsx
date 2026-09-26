@@ -219,6 +219,10 @@ describe("alert persistence — source-truth guards", () => {
 // ---------------------------------------------------------------------------
 const listAlertsMock = vi.fn();
 
+// The Alerts page reads plant stages for alert stage resolution (BUG-006).
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({ data: [], isError: false }),
+}));
 vi.mock("@/lib/alerts", async () => {
   const actual = await vi.importActual<typeof import("@/lib/alerts")>("@/lib/alerts");
   return {

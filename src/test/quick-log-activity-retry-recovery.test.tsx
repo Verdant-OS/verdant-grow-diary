@@ -5,6 +5,7 @@ import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSect
 import type { QuickLogAllActivitiesSaveSuccess } from "@/components/QuickLogAllActivitiesSection";
 import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
 import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
+import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
 
 type Payload = Record<string, unknown>;
 const backend = vi.hoisted(() => ({
@@ -200,22 +201,35 @@ describe("All activity types retry confirmation", () => {
       growId: "grow-b",
       tentId: "tent-b",
     });
-    fireEvent.click(screen.getByTestId("quick-log-all-activities-retry-original"));
-    await waitFor(() =>
-      expect(screen.queryByTestId("quick-log-all-activities-pending-activity")).toBeNull(),
-    );
-    expect(screen.getByRole("status")).toHaveTextContent(
-      /confirmed for its previous tent or grow/i,
-    );
-    expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
-    expect(onSaveSuccess).toHaveBeenCalledWith(
-      expect.objectContaining({
-        target: { growId: "grow-a", tentId: "tent-a", plantId: "plant-a" },
+    const entryCreated: Event[] = [];
+    const onEntryCreated = (event: Event) => entryCreated.push(event);
+    window.addEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, onEntryCreated);
+    try {
+      fireEvent.click(screen.getByTestId("quick-log-all-activities-retry-original"));
+      await waitFor(() =>
+        expect(screen.queryByTestId("quick-log-all-activities-pending-activity")).toBeNull(),
+      );
+      expect(screen.getByRole("status")).toHaveTextContent(
+        /confirmed for its previous tent or grow/i,
+      );
+      expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
+      expect(onSaveSuccess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          target: { growId: "grow-a", tentId: "tent-a", plantId: "plant-a" },
+          growEventId: "77777777-7777-4777-8777-000000000001",
+          recovered: true,
+        }),
+      );
+      expect(entryCreated).toHaveLength(1);
+      expect((entryCreated[0] as CustomEvent).detail).toMatchObject({
         growEventId: "77777777-7777-4777-8777-000000000001",
-      }),
-    );
-    expect(window.sessionStorage.length).toBe(0);
-    expect(backend.posts).toHaveLength(1);
+        source: "quick_log_v2",
+      });
+      expect(window.sessionStorage.length).toBe(0);
+      expect(backend.posts).toHaveLength(1);
+    } finally {
+      window.removeEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, onEntryCreated);
+    }
   });
 
   it("keeps a moved plant locked when the committed receipt cannot be read", async () => {

@@ -164,6 +164,8 @@ export interface QuickLogAllActivitiesSaveSuccess {
   readonly activityId: QuickLogActivityId;
   readonly target: QuickLogAllActivitiesSaveTarget;
   readonly growEventId: string | null;
+  /** Existing uncertain write confirmed later; no current starter draft was submitted. */
+  readonly recovered?: true;
 }
 
 /** Map a QuickLogActivityId to the "What was saved" DailyCheck source. */
@@ -734,6 +736,7 @@ export default function QuickLogAllActivitiesSection({
           activityId: record.input.activityId,
           target: capturedTarget,
           growEventId,
+          recovered: true,
         });
       } catch {
         // The confirmed write remains successful if parent cleanup fails.
@@ -812,6 +815,13 @@ export default function QuickLogAllActivitiesSection({
             receipt.growEventId,
             clearPendingQuickLogActivity(record),
           );
+          // This read-only reconciliation did not call the save hook, which
+          // normally emits the Timeline refresh event on confirmed success.
+          dispatchQuickLogV2EntryCreated({
+            createdAt: new Date().toISOString(),
+            growEventId: receipt.growEventId,
+            source: "quick_log_v2",
+          });
         } else {
           setErrorReason(
             receipt.status === "not_found"

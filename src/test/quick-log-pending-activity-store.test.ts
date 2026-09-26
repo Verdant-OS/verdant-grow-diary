@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   claimPendingQuickLogActivity,
   clearPendingQuickLogActivity,
+  readConfirmedPendingQuickLogActivity,
   readPendingQuickLogActivity,
+  rememberConfirmedPendingQuickLogActivity,
   type PendingQuickLogActivity,
 } from "@/lib/quickLogPendingActivityStore";
 
@@ -89,6 +91,25 @@ describe("pending Quick Log activity recovery", () => {
     expect(readPendingQuickLogActivity(original.ownerId, original.input)).toEqual({
       status: "empty",
     });
+  });
+
+  it("keeps an uncleared confirmation scoped to the exact record until cleanup succeeds", () => {
+    expect(claimPendingQuickLogActivity(original).status).toBe("claimed");
+    const remove = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => undefined);
+    expect(clearPendingQuickLogActivity(original)).toBe(false);
+    rememberConfirmedPendingQuickLogActivity(original, "77777777-7777-4777-8777-000000000001");
+    expect(readConfirmedPendingQuickLogActivity(original)).toEqual({
+      growEventId: "77777777-7777-4777-8777-000000000001",
+    });
+    expect(
+      readConfirmedPendingQuickLogActivity({
+        ...original,
+        input: { ...original.input, note: "Different payload" },
+      }),
+    ).toBeNull();
+    remove.mockRestore();
+    expect(clearPendingQuickLogActivity(original)).toBe(true);
+    expect(readConfirmedPendingQuickLogActivity(original)).toBeNull();
   });
 
   it("fails closed for missing identity, corrupt storage, and a no-op storage write", () => {

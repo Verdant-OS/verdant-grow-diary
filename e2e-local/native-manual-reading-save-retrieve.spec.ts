@@ -132,9 +132,18 @@ test("Sensors manual entry saves three metrics to the chosen tent and reopens in
       /^Soil\s*42\s*%$/,
     );
     await expect(history.locator('[data-metric="vpd_kpa"]')).toHaveCount(0);
+    // Timeline ids carry captured_at as PostgREST returns it ("…+00:00"), not
+    // the client's toISOString() "…Z" that was posted.
+    const storedCapturedAt = new Set(saved.sensor_readings.map((row) => row.captured_at));
+    expect(storedCapturedAt.size).toBe(1);
+    const [receiptCapturedAt] = storedCapturedAt;
     await page.goto(f.env.ui + "/timeline?growId=" + f.primary.growId);
     const timelineReceipt = page.locator(
-      '[id="timeline-entry-sensor-reading:' + f.primary.tentId + ":" + capturedAt + '"]',
+      '[id="timeline-entry-sensor-reading:' +
+        f.primary.tentId +
+        ":" +
+        String(receiptCapturedAt) +
+        '"]',
     );
     await expect(timelineReceipt).toHaveCount(1);
     await expect(timelineReceipt).toContainText("Manual sensor snapshot: 78.8°F, 60% RH");

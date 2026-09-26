@@ -47,19 +47,34 @@ vi.mock("@/integrations/supabase/client", () => ({
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
-    grows: [{ id: "grow-1", name: "Test Grow", stage: "veg" }],
-    activeGrow: { id: "grow-1", name: "Test Grow", stage: "veg" },
-    activeGrowId: "grow-1",
+    grows: [{ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Test Grow", stage: "veg" }],
+    activeGrow: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Test Grow", stage: "veg" },
+    activeGrowId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     setActiveGrowId: vi.fn(),
   }),
 }));
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [{ id: "plant-1", name: "Test Plant", tent_id: "tent-1", grow_id: "grow-1" }],
+    data: [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        name: "Test Plant",
+        tent_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        grow_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
-  useTents: () => ({ data: [{ id: "tent-1", name: "Test Tent", grow_id: "grow-1" }] }),
+  useTents: () => ({
+    data: [
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        name: "Test Tent",
+        grow_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
+  }),
 }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() } }));
 
@@ -90,10 +105,10 @@ const draft: PublicQuickLogStarterDraft = {
   attribution: {},
 };
 const prefill: QuickLogPrefill = {
-  plantId: "plant-1",
+  plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   plantName: "Test Plant",
-  growId: "grow-1",
-  tentId: "tent-1",
+  growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
   eventType: "watering",
   note: "Starter water",
   wateringVolumeMl: 250,
@@ -160,6 +175,11 @@ describe("legacy public-starter Water uncertain receipt", () => {
     expect(original.p_action).toBe("water");
     expect(original.p_volume_ml).toBe(250);
     expect(original.p_idempotency_key).toEqual(expect.any(String));
+    const pending = readPendingStarterWater("user-1");
+    expect(pending.status).toBe("pending");
+    if (pending.status !== "pending") throw new Error("expected pending Watering");
+    expect(original.p_occurred_at).toBe(pending.record.createdAt);
+    expect(Number.isFinite(Date.parse(original.p_occurred_at))).toBe(true);
     expect(screen.getByTestId("quicklog-note")).toBeDisabled();
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();
     expect(readPendingStarterWater("user-1")).toMatchObject({ status: "pending" });
@@ -211,7 +231,7 @@ describe("legacy public-starter Water uncertain receipt", () => {
       createdAt: "2026-09-26T04:00:00.000Z",
       payload: {
         p_target_type: "plant",
-        p_target_id: "plant-1",
+        p_target_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         p_action: "water",
         p_volume_ml: 250,
         p_note: "Starter water",
@@ -221,7 +241,11 @@ describe("legacy public-starter Water uncertain receipt", () => {
         p_occurred_at: null,
         p_idempotency_key: "original-water-key",
       },
-      target: { plantId: "plant-1", growId: "grow-1", tentId: "tent-1" },
+      target: {
+        plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      },
       plantName: "Test Plant",
       tentName: "Test Tent",
       growName: "Test Grow",
@@ -275,7 +299,11 @@ describe("legacy public-starter Water uncertain receipt", () => {
     await screen.findByTestId("quick-log-post-save");
     expect(saveMock).toHaveBeenCalledTimes(1);
     expect(saveMock.mock.calls[0][1]).toEqual({
-      expectedWaterTarget: { plantId: "plant-1", growId: "grow-1", tentId: "tent-1" },
+      expectedWaterTarget: {
+        plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      },
     });
     expect(readPendingStarterWater("user-1")).toEqual({ status: "empty" });
     expect(trackSuccessMock).toHaveBeenCalledTimes(1);

@@ -1497,10 +1497,15 @@ export default function QuickLog({
 
       let waterRecord: PendingStarterWater | null = null;
       if (saveEventType === "watering") {
+        // Freeze the first attempt's time in both the claimed record and the
+        // RPC payload. A lost-response retry must not move this Watering to
+        // the time of the later replay.
+        const firstAttemptAt = new Date().toISOString();
+        built.payload.p_occurred_at = firstAttemptAt;
         const claim = await claimPendingStarterWater({
           version: 1,
           ownerId: user.id,
-          createdAt: new Date().toISOString(),
+          createdAt: firstAttemptAt,
           payload: built.payload,
           target: saveTarget,
           plantName: savePlant.name,

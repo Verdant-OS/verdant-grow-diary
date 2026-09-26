@@ -17,7 +17,7 @@ const record = (overrides: Partial<PendingStarterWater> = {}): PendingStarterWat
   createdAt: "2026-09-26T04:00:00.000Z",
   payload: {
     p_target_type: "plant",
-    p_target_id: "plant-a",
+    p_target_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     p_action: "water",
     p_volume_ml: 250,
     p_note: "Starter Water",
@@ -27,7 +27,11 @@ const record = (overrides: Partial<PendingStarterWater> = {}): PendingStarterWat
     p_occurred_at: "2026-09-26T04:00:00.000Z",
     p_idempotency_key: "original-water-key",
   },
-  target: { plantId: "plant-a", growId: "grow-a", tentId: "tent-a" },
+  target: {
+    plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  },
   plantName: "Plant A",
   tentName: "Tent A",
   growName: "Grow A",
@@ -94,7 +98,7 @@ describe("legacy starter Water recovery claim", () => {
     expect(
       await claimPendingStarterWater(
         record({
-          payload: { ...first.payload, p_target_id: "plant-b" },
+          payload: { ...first.payload, p_target_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" },
         }),
       ),
     ).toEqual({ status: "blocked" });
@@ -112,6 +116,20 @@ describe("legacy starter Water recovery claim", () => {
     });
     expect(await claimPendingStarterWater(record())).toEqual({ status: "blocked" });
     expect(readPendingStarterWater("owner-a")).toEqual({ status: "blocked" });
+  });
+
+  it("rejects malformed persisted target UUIDs before treating recovery as pending", async () => {
+    const first = record();
+    const malformed = record({
+      target: { ...first.target, growId: "grow-a" },
+    });
+    expect(await claimPendingStarterWater(malformed)).toEqual({ status: "blocked" });
+    setLocalStorageItemForTest(
+      "verdant:quick-log:pending-starter-water:v1:owner-a",
+      JSON.stringify(malformed),
+    );
+    expect(readPendingStarterWater("owner-a")).toEqual({ status: "blocked" });
+    expect(await clearPendingStarterWater(malformed)).toBe(false);
   });
 
   it("serializes competing tabs on one owner before either can dispatch", async () => {

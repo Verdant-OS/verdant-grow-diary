@@ -1,5 +1,6 @@
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
 import type { QuickLogResolvedTarget } from "./quickLogTargetIntegrityRules";
+import { isUuid } from "./isUuid";
 
 /** The legacy public-starter Water RPC must replay this exact logical write. */
 export interface PendingStarterWater {
@@ -77,7 +78,7 @@ function validRecord(value: unknown, ownerId: string): value is PendingStarterWa
     return false;
   if (!object(value.payload) || !onlyKeys(value.payload, PAYLOAD_KEYS)) return false;
   const p = value.payload;
-  if (p.p_target_type !== "plant" || p.p_action !== "water" || !id(p.p_target_id)) return false;
+  if (p.p_target_type !== "plant" || p.p_action !== "water" || !isUuid(p.p_target_id)) return false;
   if (
     !id(p.p_idempotency_key) ||
     p.p_idempotency_key.length < 8 ||
@@ -93,7 +94,7 @@ function validRecord(value: unknown, ownerId: string): value is PendingStarterWa
   if (p.p_details !== undefined && p.p_details !== null && !object(p.p_details)) return false;
   if (!object(value.target) || !onlyKeys(value.target, ["plantId", "growId", "tentId"]))
     return false;
-  if (!id(value.target.plantId) || !id(value.target.growId) || !id(value.target.tentId))
+  if (!isUuid(value.target.plantId) || !isUuid(value.target.growId) || !isUuid(value.target.tentId))
     return false;
   if (value.target.plantId !== p.p_target_id) return false;
   if (!id(value.plantName) || !nullableString(value.tentName) || !nullableString(value.growName))

@@ -24,20 +24,36 @@ vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
     data: [
       {
-        id: "plant-1",
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         name: "Plant 1",
-        tent_id: "tent-1",
-        grow_id: "grow-1",
+        tent_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        grow_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         stage: "flowering",
       },
     ],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
-  useTents: () => ({ data: [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }] }),
+  useTents: () => ({
+    data: [
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        name: "Tent 1",
+        grow_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
+  }),
 }));
 vi.mock("@/store/grows", () => ({
-  useGrows: () => ({ grows: [{ id: "grow-1", name: "Grow 1", stage: "flowering" }] }),
+  useGrows: () => ({
+    grows: [
+      {
+        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        name: "Grow 1",
+        stage: "flowering",
+      },
+    ],
+  }),
 }));
 vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
   useRecentFeedingsForDefaults: () => ({ data: [] }),
@@ -53,7 +69,7 @@ const legacyRecord = {
   createdAt: "2026-09-26T02:00:00.000Z",
   payload: {
     p_target_type: "plant",
-    p_target_id: "plant-1",
+    p_target_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     p_action: "water",
     p_volume_ml: 250,
     p_note: "Starter Water",
@@ -63,7 +79,11 @@ const legacyRecord = {
     p_occurred_at: null,
     p_idempotency_key: "starter-water-key-1",
   },
-  target: { plantId: "plant-1", tentId: "tent-1", growId: "grow-1" },
+  target: {
+    plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  },
   plantName: "Plant 1",
   tentName: "Tent 1",
   growName: "Grow 1",
@@ -87,7 +107,7 @@ describe("typed Water handoff from the public starter", () => {
         <QuickLogV2Sheet
           open
           onOpenChange={vi.fn()}
-          defaultTargetKey="plant:plant-1"
+          defaultTargetKey="plant:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
           defaultAction="water"
         />
       </QueryClientProvider>,

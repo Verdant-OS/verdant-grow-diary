@@ -4,7 +4,9 @@ import {
   clearPendingQuickLogActivity,
   readConfirmedPendingQuickLogActivity,
   readPendingQuickLogActivity,
+  readRejectedPendingQuickLogActivity,
   rememberConfirmedPendingQuickLogActivity,
+  rememberRejectedPendingQuickLogActivity,
   type PendingQuickLogActivity,
 } from "@/lib/quickLogPendingActivityStore";
 
@@ -110,6 +112,24 @@ describe("pending Quick Log activity recovery", () => {
     remove.mockRestore();
     expect(clearPendingQuickLogActivity(original)).toBe(true);
     expect(readConfirmedPendingQuickLogActivity(original)).toBeNull();
+  });
+
+  it("keeps an uncleared definitive rejection distinct from a confirmed save", () => {
+    expect(claimPendingQuickLogActivity(original).status).toBe("claimed");
+    const remove = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => undefined);
+    rememberRejectedPendingQuickLogActivity(original);
+    expect(readRejectedPendingQuickLogActivity(original)).toBe(true);
+    expect(readConfirmedPendingQuickLogActivity(original)).toBeNull();
+    expect(
+      readRejectedPendingQuickLogActivity({
+        ...original,
+        input: { ...original.input, note: "Different payload" },
+      }),
+    ).toBe(false);
+    expect(clearPendingQuickLogActivity(original)).toBe(false);
+    remove.mockRestore();
+    expect(clearPendingQuickLogActivity(original)).toBe(true);
+    expect(readRejectedPendingQuickLogActivity(original)).toBe(false);
   });
 
   it("fails closed for missing identity, corrupt storage, and a no-op storage write", () => {

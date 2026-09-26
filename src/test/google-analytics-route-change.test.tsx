@@ -97,7 +97,7 @@ describe("sanitizePagePath", () => {
 });
 
 describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
-  let gtagMock: ReturnType<typeof vi.fn>;
+  let gtagMock: ReturnType<typeof vi.fn<NonNullable<Window["gtag"]>>>;
 
   beforeEach(() => {
     gtagMock = vi.fn();

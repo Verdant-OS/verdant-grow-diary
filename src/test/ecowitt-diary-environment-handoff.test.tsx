@@ -380,7 +380,7 @@ describe("EcowittIngestValidationPanel — copy + export", () => {
   });
 
   it("Export validation opens preview modal and confirms JSON download (no fetch)", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       throw new Error("export must not perform network calls");
     });
     render(<EcowittIngestValidationPanel input={acceptedInput()} />);

@@ -133,8 +133,11 @@ test("Sensors manual entry saves three metrics to the chosen tent and reopens in
     );
     await expect(history.locator('[data-metric="vpd_kpa"]')).toHaveCount(0);
     await page.goto(f.env.ui + "/timeline?growId=" + f.primary.growId);
+    // The receipt id uses the persisted timestamp. PostgREST may serialize
+    // the same instant with +00:00 while the POST payload used Z.
+    const persistedCapturedAt = String(saved.sensor_readings[0].captured_at);
     const timelineReceipt = page.locator(
-      '[id="timeline-entry-sensor-reading:' + f.primary.tentId + ":" + capturedAt + '"]',
+      '[id="timeline-entry-sensor-reading:' + f.primary.tentId + ":" + persistedCapturedAt + '"]',
     );
     await expect(timelineReceipt).toHaveCount(1);
     await expect(timelineReceipt).toContainText("Manual sensor snapshot: 78.8°F, 60% RH");

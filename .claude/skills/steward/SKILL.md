@@ -33,7 +33,9 @@ A PR is mergeable when **all** of these hold on its **current head**:
    `Full test suite (shard N/32)`, `Lint, typecheck, test, build`,
    `Preflight — edge shared-lib mirror in sync`, `test:legal-seo`. Read them by name; a green
    rollup can hide a missing context.
-2. No `mustBeGreen` context in that file is present-and-red.
+2. No `mustBeGreen` context in that file is present-and-red, and every one marked
+   `alwaysRuns: true` has reported. These are security and coverage gates the ruleset does not
+   enforce, so the queue will not stop a red one; the steward must.
 3. No merge conflict, and up to date with `verdant-grow-diary` (`strictRequiredStatusChecksPolicy`).
 4. No unresolved review thread you can act on.
 5. An independent peer review is SHA-locked to this head (section 5).
@@ -71,9 +73,11 @@ Green CI is not release acceptance, and a merge is not a deployment. Never write
 
 Order of questions, before any fix:
 
-1. **Is it required?** Only the contexts in section 2 block the queue. Non-required reds (dependency
-   audit, browser census, local-DB security lanes, preview builds) are `UNSTABLE`, not blockers —
-   but still diagnose them if the diff could have caused them.
+1. **Is it blocking?** Two sets block: the 35 required contexts, and any `mustBeGreen` context in
+   `config/required-status-checks.json` that is present-and-red (or absent, when `alwaysRuns: true`)
+   — for example `test:security-regression` and `test:security-db-local`. Read that list; do not
+   recite it from memory. Every other red (dependency audit, browser census, preview builds) is
+   `UNSTABLE`, not a blocker — but still diagnose it if the diff could have caused it.
 2. **Is it red on the base too?** Read the push runs on `verdant-grow-diary` for the same workflow.
    Red there → not this PR's. Post **one** PR comment naming the check, the base run, and the fix
    PR if one exists (port it if it gets this PR green). Record lanes that are red on the base in the

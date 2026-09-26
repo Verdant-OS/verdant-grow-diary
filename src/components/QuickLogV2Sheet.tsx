@@ -25,6 +25,7 @@ import {
   STARTER_WATER_RECOVERY_UNAVAILABLE,
 } from "@/lib/quickLogPendingStarterWaterStore";
 import { buildWateringRecoveryForm } from "@/lib/quickLogWateringRecoveryViewModel";
+import { mayCorrectRejectedWatering } from "@/lib/quickLogWateringRejectionRules";
 import {
   readPendingQuickLogFeeding,
   claimPendingQuickLogFeeding,
@@ -1842,10 +1843,28 @@ function QuickLogV2SheetForOwner({
             .catch(() => {});
         }
         if (!canContinueNote()) return;
-        setLocalError(WATERING_SAVE_FAILURE_MESSAGE);
-        setWateringRetryPending(true);
-        keepSubmissionLockedRef.current = true;
-        toast.error(WATERING_SAVE_FAILURE_MESSAGE);
+        const correctable = mayCorrectRejectedWatering({
+          reason: wateringResult.reason,
+          priorClaim: pendingWateringSubmission !== null,
+        });
+        const clearance = correctable
+          ? await reconcilePendingQuickLogWateringClear(exactWateringSubmission.recovery)
+          : null;
+        if (!canContinueNote()) return;
+        // A previous unresolved claim can have committed before its reply was
+        // lost. Even a later validation rejection cannot clear that claim.
+        const released = clearance?.status === "cleared";
+        if (released) {
+          wateringRetrySubmissionRef.current = null;
+          saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+        }
+        setWateringRetryPending(!released);
+        keepSubmissionLockedRef.current = !released;
+        const message = released
+          ? wateringFormReasonToHelper(wateringResult.reason)
+          : WATERING_SAVE_FAILURE_MESSAGE;
+        setLocalError(message);
+        toast.error(message);
         setSaveStatus("");
         return;
       }

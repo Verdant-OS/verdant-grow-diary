@@ -102,6 +102,7 @@ import {
   STARTER_WATER_RECOVERY_UNAVAILABLE,
   claimPendingStarterWater,
   clearPendingStarterWater,
+  reconcilePendingStarterWaterClear,
   readPendingStarterWater,
   type PendingStarterWater,
 } from "@/lib/quickLogPendingStarterWaterStore";
@@ -1536,7 +1537,9 @@ export default function QuickLog({
       // for this logical submission while its first receipt was uncertain.
       const result = await saveViaRpc(
         built.payload,
-        saveEventType === "watering" ? {} : { telemetryIntent: saveEventType },
+        saveEventType === "watering"
+          ? { expectedWaterTarget: saveTarget }
+          : { telemetryIntent: saveEventType },
       );
       if (!result.ok) {
         if (waterRecord && result.definitiveRejected !== true) {
@@ -1567,14 +1570,18 @@ export default function QuickLog({
         return;
       }
 
+      const waterClear = waterRecord ? await reconcilePendingStarterWaterClear(waterRecord) : null;
       const waterRecoveryClearFailed =
-        waterRecord !== null && !(await clearPendingStarterWater(waterRecord));
+        waterClear !== null &&
+        waterClear.status !== "cleared" &&
+        waterClear.status !== "already_cleared";
       if (waterRecoveryClearFailed) {
-        setStarterWaterStorageBlocked(true);
+        setStarterWaterStorageBlocked(waterClear.status === "blocked");
+        if (waterClear.status === "pending") setStarterWaterPending(waterClear.record);
         setSaveError(STARTER_WATER_RECOVERY_CLEAR_FAILED);
       } else if (waterRecord) {
         setStarterWaterPending(null);
-        trackQuickLogSuccess("water");
+        if (waterClear?.status === "cleared") trackQuickLogSuccess("water");
       }
 
       // Persist the stage back to the grow ONLY when the grower changed it by
@@ -1712,19 +1719,23 @@ export default function QuickLog({
       stageWasUserTouched: record.stageWasUserTouched,
     });
     try {
-      const result = await saveViaRpc(record.payload);
+      const result = await saveViaRpc(record.payload, { expectedWaterTarget: record.target });
       if (!result.ok) {
         // Even a definitive rejection NOW cannot prove that the earlier,
         // ambiguous call did not commit. Keep the original record and key.
         setSaveError(STARTER_WATER_RECOVERY_PENDING);
         return;
       }
-      const cleared = await clearPendingStarterWater(record);
-      setStarterWaterStorageBlocked(!cleared);
-      if (cleared) {
+      const clearance = await reconcilePendingStarterWaterClear(record);
+      const resolved = clearance.status === "cleared" || clearance.status === "already_cleared";
+      setStarterWaterStorageBlocked(clearance.status === "blocked");
+      if (resolved) {
         setStarterWaterPending(null);
-        trackQuickLogSuccess("water");
-      } else setSaveError(STARTER_WATER_RECOVERY_CLEAR_FAILED);
+        if (clearance.status === "cleared") trackQuickLogSuccess("water");
+      } else {
+        if (clearance.status === "pending") setStarterWaterPending(clearance.record);
+        setSaveError(STARTER_WATER_RECOVERY_CLEAR_FAILED);
+      }
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
       lastFailedSaveSigRef.current = null;
 
@@ -1769,7 +1780,7 @@ export default function QuickLog({
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", { detail: { createdAt: savedAt } }),
       );
-      if (!cleared) toast.message(STARTER_WATER_RECOVERY_CLEAR_FAILED, { duration: 12_000 });
+      if (!resolved) toast.message(STARTER_WATER_RECOVERY_CLEAR_FAILED, { duration: 12_000 });
       else if (record.stageWasUserTouched)
         toast.message(GROW_STAGE_UNCONFIRMED_MESSAGE, { duration: 12_000 });
       else toast.success(`Saved watering for ${record.plantName}`);
@@ -1930,13 +1941,24 @@ export default function QuickLog({
           saveBlocked={saveLocked || recoveryLocked}
           isSaveBlocked={isSaveInFlight}
           onBeforeStructuredWaterOpen={() => {
-            if (recoveryLocked || starterWaterStorageBlocked) {
-              const reason = recoveryLocked
-                ? STARTER_WATER_RECOVERY_PENDING
-                : STARTER_WATER_RECOVERY_UNAVAILABLE;
+            // Another tab may have claimed Water after this dialog mounted.
+            // Read the shared record at the handoff boundary, not only in the
+            // mount-time effect that supplies the presenter's current state.
+            const shared = readPendingStarterWater(user?.id);
+            if (shared.status !== "empty" || starterWaterStorageBlocked) {
+              const reason =
+                shared.status === "pending"
+                  ? STARTER_WATER_RECOVERY_PENDING
+                  : STARTER_WATER_RECOVERY_UNAVAILABLE;
+              setStarterWaterPending(shared.status === "pending" ? shared.record : null);
+              setStarterWaterStorageBlocked(
+                shared.status === "blocked" || starterWaterStorageBlocked,
+              );
               setSaveError(reason);
               return reason;
             }
+            setStarterWaterPending(null);
+            setStarterWaterStorageBlocked(false);
             onOpenChange(false);
             reset();
             return undefined;

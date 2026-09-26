@@ -176,3 +176,18 @@ export async function clearPendingStarterWater(record: PendingStarterWater): Pro
     return false;
   }
 }
+
+/** Another tab may have cleared a confirmed record first; that is resolved, not a storage error. */
+export async function reconcilePendingStarterWaterClear(
+  record: PendingStarterWater,
+): Promise<
+  | { status: "cleared" }
+  | { status: "already_cleared" }
+  | { status: "pending"; record: PendingStarterWater }
+  | { status: "blocked" }
+> {
+  if (await clearPendingStarterWater(record)) return { status: "cleared" };
+  const current = readPendingStarterWater(record.ownerId);
+  if (current.status === "empty") return { status: "already_cleared" };
+  return current;
+}

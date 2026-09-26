@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   claimPendingStarterWater,
   clearPendingStarterWater,
+  reconcilePendingStarterWaterClear,
   readPendingStarterWater,
   type PendingStarterWater,
 } from "@/lib/quickLogPendingStarterWaterStore";
@@ -135,6 +136,17 @@ describe("legacy starter Water recovery claim", () => {
       clearPendingStarterWater(first),
     ]);
     expect([a, b].filter(Boolean)).toHaveLength(1);
+    expect(readPendingStarterWater("owner-a")).toEqual({ status: "empty" });
+  });
+
+  it("recognizes a matching record already cleared by another tab", async () => {
+    const first = record();
+    await claimPendingStarterWater(first);
+    const [a, b] = await Promise.all([
+      reconcilePendingStarterWaterClear(first),
+      reconcilePendingStarterWaterClear(first),
+    ]);
+    expect([a.status, b.status].sort()).toEqual(["already_cleared", "cleared"]);
     expect(readPendingStarterWater("owner-a")).toEqual({ status: "empty" });
   });
 

@@ -18,6 +18,11 @@ import {
   WATERING_RECOVERY_CLEAR_FAILED,
   type PendingQuickLogWatering,
 } from "@/lib/quickLogPendingWateringStore";
+import {
+  readPendingStarterWater,
+  STARTER_WATER_RECOVERY_PENDING,
+  STARTER_WATER_RECOVERY_UNAVAILABLE,
+} from "@/lib/quickLogPendingStarterWaterStore";
 import { buildWateringRecoveryForm } from "@/lib/quickLogWateringRecoveryViewModel";
 import {
   readPendingQuickLogFeeding,
@@ -1774,6 +1779,26 @@ function QuickLogV2SheetForOwner({
         keepSubmissionLockedRef.current = true;
         setWateringRetryPending(true);
         setLocalError(WATERING_RECOVERY_UNAVAILABLE);
+        return;
+      }
+      // A second tab can claim the public-starter Water record after this
+      // sheet opened (or while its photo was uploading). Check the shared
+      // recovery state at the final dispatch boundary.
+      const starterWater = readPendingStarterWater(exactWateringSubmission.recovery.ownerId);
+      if (starterWater.status !== "empty") {
+        if (uploadedPath) {
+          await supabase.storage
+            .from("diary-photos")
+            .remove([uploadedPath])
+            .catch(() => {});
+        }
+        releaseUnsentWatering();
+        setLocalError(
+          starterWater.status === "pending"
+            ? STARTER_WATER_RECOVERY_PENDING
+            : STARTER_WATER_RECOVERY_UNAVAILABLE,
+        );
+        setSaveStatus("");
         return;
       }
       setSaveStatus("Saving watering…");

@@ -64,7 +64,12 @@ vi.mock("@/hooks/use-tents", () => ({
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() } }));
 
 import QuickLog, { type QuickLogPrefill } from "@/components/QuickLog";
-import { readPendingStarterWater } from "@/lib/quickLogPendingStarterWaterStore";
+import {
+  claimPendingStarterWater,
+  clearPendingStarterWater,
+  readPendingStarterWater,
+  type PendingStarterWater,
+} from "@/lib/quickLogPendingStarterWaterStore";
 import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 import {
   PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY,
@@ -173,6 +178,71 @@ describe("legacy public-starter Water uncertain receipt", () => {
     expect(getLocalStorageItemForTest(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBeNull();
   });
 
+  it("treats a matching cross-tab clear as resolved without a second telemetry count", async () => {
+    seed();
+    saveMock
+      .mockResolvedValueOnce({ ok: false, reason: "receipt_unverified" })
+      .mockImplementationOnce(async () => {
+        const current = readPendingStarterWater("user-1");
+        if (current.status !== "pending") throw new Error("expected pending Watering");
+        expect(await clearPendingStarterWater(current.record)).toBe(true);
+        return {
+          ok: true,
+          reused: true,
+          growEventId: "11111111-1111-4111-8111-111111111111",
+        };
+      });
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await screen.findByTestId("quick-log-starter-water-recovery");
+    fireEvent.click(screen.getByTestId("quick-log-starter-water-retry"));
+    await screen.findByTestId("quick-log-post-save");
+    expect(readPendingStarterWater("user-1")).toEqual({ status: "empty" });
+    expect(trackSuccessMock).not.toHaveBeenCalled();
+    expect(screen.queryByText(/recovery could not be cleared/i)).not.toBeInTheDocument();
+  });
+
+  it("rechecks shared recovery before opening structured Water from an older tab", async () => {
+    seed();
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    const record: PendingStarterWater = {
+      version: 1,
+      ownerId: "user-1",
+      createdAt: "2026-09-26T04:00:00.000Z",
+      payload: {
+        p_target_type: "plant",
+        p_target_id: "plant-1",
+        p_action: "water",
+        p_volume_ml: 250,
+        p_note: "Starter water",
+        p_temperature_c: null,
+        p_humidity_pct: null,
+        p_vpd_kpa: null,
+        p_occurred_at: null,
+        p_idempotency_key: "original-water-key",
+      },
+      target: { plantId: "plant-1", growId: "grow-1", tentId: "tent-1" },
+      plantName: "Test Plant",
+      tentName: "Test Tent",
+      growName: "Test Grow",
+      stageWasUserTouched: false,
+      reviewedDraftId: null,
+      reviewedDraftUpdatedAt: null,
+    };
+    expect(await claimPendingStarterWater(record)).toMatchObject({ status: "claimed" });
+    const v2Open = vi.fn();
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, v2Open);
+    try {
+      fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-picker-watering"));
+      expect(v2Open).not.toHaveBeenCalled();
+      expect(
+        screen.getByTestId("quick-log-dialog-all-activities-structured-water-error"),
+      ).toHaveTextContent("An earlier Watering may already be saved");
+    } finally {
+      window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, v2Open);
+    }
+  });
+
   it("retains the first key even if the recovery call reports a later rejection", async () => {
     seed();
     saveMock
@@ -204,7 +274,9 @@ describe("legacy public-starter Water uncertain receipt", () => {
     fireEvent.click(screen.getByTestId("quick-log-save"));
     await screen.findByTestId("quick-log-post-save");
     expect(saveMock).toHaveBeenCalledTimes(1);
-    expect(saveMock.mock.calls[0][1]).toEqual({});
+    expect(saveMock.mock.calls[0][1]).toEqual({
+      expectedWaterTarget: { plantId: "plant-1", growId: "grow-1", tentId: "tent-1" },
+    });
     expect(readPendingStarterWater("user-1")).toEqual({ status: "empty" });
     expect(trackSuccessMock).toHaveBeenCalledTimes(1);
     expect(trackSuccessMock).toHaveBeenCalledWith("water");

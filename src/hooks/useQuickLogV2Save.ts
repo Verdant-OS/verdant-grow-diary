@@ -3,7 +3,12 @@ import { isUuid } from "@/lib/isUuid";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyQuickLogThrownSaveError } from "@/lib/quickLogSaveErrorMessage";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
+import type { QuickLogResolvedTarget } from "@/lib/quickLogTargetIntegrityRules";
 import { trackQuickLogSuccess, type QuickLogSuccessInput } from "@/lib/quickLogSuccessTelemetry";
+import {
+  matchesReusedWaterEvent,
+  matchesReusedWaterReceipt,
+} from "@/lib/quickLogWaterReceiptRules";
 
 export interface QuickLogV2SaveResult {
   ok: boolean;
@@ -36,6 +41,8 @@ export interface QuickLogV2SaveOptions {
   verifyPersistedNote?: boolean;
   /** The owning sheet/account must still be active at each async boundary. */
   canContinueNote?: () => boolean;
+  /** Exact grow/tent/plant context captured before a public-starter Water write. */
+  expectedWaterTarget?: QuickLogResolvedTarget;
 }
 
 // These normal RPC responses are emitted before the manual event insert.
@@ -101,6 +108,37 @@ export function useQuickLogV2Save() {
         if (payload.p_action === "water" && !isUuid(r.grow_event_id)) {
           setError("receipt_unverified");
           return { ok: false, reason: "receipt_unverified" };
+        }
+        if (payload.p_action === "water" && r.reused === true) {
+          const eventId = r.grow_event_id as string;
+          const { data: event, error: eventError } = await supabase
+            .from("grow_events")
+            .select("id,event_type,source,grow_id,plant_id,tent_id,occurred_at,note")
+            .eq("id", eventId)
+            .maybeSingle();
+          if (eventError || !event) {
+            setError("receipt_unverified");
+            return { ok: false, reason: "receipt_unverified" };
+          }
+          if (!matchesReusedWaterEvent(payload, eventId, event, options.expectedWaterTarget)) {
+            setError("receipt_mismatch");
+            return { ok: false, reason: "receipt_mismatch" };
+          }
+          const { data: child, error: childError } = await supabase
+            .from("watering_events")
+            .select("event_id,volume_ml")
+            .eq("event_id", eventId)
+            .maybeSingle();
+          if (childError || !child) {
+            setError("receipt_unverified");
+            return { ok: false, reason: "receipt_unverified" };
+          }
+          if (
+            !matchesReusedWaterReceipt(payload, eventId, event, child, options.expectedWaterTarget)
+          ) {
+            setError("receipt_mismatch");
+            return { ok: false, reason: "receipt_mismatch" };
+          }
         }
         let persistedNote: string | null | undefined;
         if (payload.p_action === "note") {

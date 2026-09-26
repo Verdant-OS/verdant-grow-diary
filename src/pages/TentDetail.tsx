@@ -8,6 +8,7 @@ import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useParams, Link, useSearchParams } from "@/lib/react-router-compat";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/store/auth";
+import { useNowTick } from "@/hooks/useNowTick";
 import { formatDistanceToNow } from "date-fns";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -171,7 +172,8 @@ export default function TentDetail() {
   const { data: readings = [] } = sensorReadings;
   const importedHistory = useImportedSensorHistory(id);
   const series = buildTentSensorChartSeries(readings);
-  const header = buildTentSensorHeaderView(readings);
+  const nowMs = useNowTick();
+  const header = buildTentSensorHeaderView(readings, nowMs);
   const snap = header.snapshot;
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null], user?.id);
   const activeCount = getActivePlantCount(activePlants);

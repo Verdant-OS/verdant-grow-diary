@@ -9,6 +9,7 @@ on:
       - verdant-grow-diary
       - "codex/sensors-idle-freshness-*"
       - "codex/sensor-chart-export-*"
+      - "codex/native-sensor-idle-proof-*"
   workflow_dispatch:
 
 permissions:
@@ -132,8 +133,8 @@ jobs:
             boundary: "Candidate browser with disposable local backend; not published-site acceptance.",
           };
           writeFileSync("native-local-proof.json", JSON.stringify(proof, null, 2) + "\n");
-          if (expected !== 8 || unexpected !== 0 || flaky !== 0 || skipped !== 0 || errors !== 0) {
-            throw new Error("Native browser acceptance requires eight executed passing scenarios, zero failures, retries, skips, and report errors.");
+          if (expected !== 12 || unexpected !== 0 || flaky !== 0 || skipped !== 0 || errors !== 0) {
+            throw new Error("Native browser acceptance requires twelve executed passing scenarios, zero failures, retries, skips, and report errors.");
           }
           console.log(`Candidate local-backend browser proof: ${expected} passed, 0 failed, 0 skipped. Published-site acceptance remains separate.`);
           NODE

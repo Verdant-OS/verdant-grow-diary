@@ -50,6 +50,15 @@ export type PendingActivityRead =
 
 const PREFIX = "verdant:quick-log:pending-activity:v1:";
 
+// A confirmed RPC can outlive a failed sessionStorage removal. Keep that
+// confirmation in this tab's memory so a remounted editor can retry cleanup
+// without replaying an already confirmed write. A full page reload loses this
+// hint; the unchanged server idempotency key remains the duplicate-write fence.
+const confirmedUncleared = new Map<
+  string,
+  { readonly record: string; readonly growEventId: string | null }
+>();
+
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -157,8 +166,12 @@ export function readPendingQuickLogActivity(
   if (!nonempty(ownerId) || !nonempty(target?.growId) || typeof window === "undefined")
     return { status: "blocked" };
   try {
-    const raw = window.sessionStorage.getItem(storageKey(ownerId, target));
-    if (raw === null) return { status: "empty" };
+    const key = storageKey(ownerId, target);
+    const raw = window.sessionStorage.getItem(key);
+    if (raw === null) {
+      confirmedUncleared.delete(key);
+      return { status: "empty" };
+    }
     const parsed: unknown = JSON.parse(raw);
     return validRecord(parsed, ownerId, target)
       ? { status: "pending", record: parsed }
@@ -166,6 +179,30 @@ export function readPendingQuickLogActivity(
   } catch {
     return { status: "blocked" };
   }
+}
+
+/** Remember a confirmed RPC only when its recovery record could not be cleared. */
+export function rememberConfirmedPendingQuickLogActivity(
+  record: PendingQuickLogActivity,
+  growEventId: string | null,
+): void {
+  if (!validRecord(record, record.ownerId, record.input)) return;
+  confirmedUncleared.set(storageKey(record.ownerId, record.input), {
+    record: JSON.stringify(record),
+    growEventId,
+  });
+}
+
+/** Return only an exact confirmation for this owner, target, and payload. */
+export function readConfirmedPendingQuickLogActivity(
+  record: PendingQuickLogActivity,
+): { readonly growEventId: string | null } | null {
+  if (!validRecord(record, record.ownerId, record.input)) return null;
+  const key = storageKey(record.ownerId, record.input);
+  const confirmed = confirmedUncleared.get(key);
+  if (!confirmed) return null;
+  if (confirmed.record !== JSON.stringify(record)) return null;
+  return { growEventId: confirmed.growEventId };
 }
 
 export function samePendingQuickLogActivity(
@@ -206,7 +243,9 @@ export function clearPendingQuickLogActivity(record: PendingQuickLogActivity): b
       return false;
     const key = storageKey(record.ownerId, record.input);
     window.sessionStorage.removeItem(key);
-    return window.sessionStorage.getItem(key) === null;
+    const cleared = window.sessionStorage.getItem(key) === null;
+    if (cleared) confirmedUncleared.delete(key);
+    return cleared;
   } catch {
     return false;
   }

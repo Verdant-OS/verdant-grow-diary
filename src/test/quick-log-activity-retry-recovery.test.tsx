@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
+import type { QuickLogAllActivitiesSaveSuccess } from "@/components/QuickLogAllActivitiesSection";
 import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
 
 type Payload = Record<string, unknown>;
@@ -60,15 +61,21 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-function mount(plantId = "plant-a") {
+function mount(
+  plantId = "plant-a",
+  initialStage: unknown = "flower",
+  onSaveSuccess?: (result: QuickLogAllActivitiesSaveSuccess) => void,
+) {
+  let stage = initialStage;
   const renderTree = (id: string, requestedActivityId: QuickLogActivityId | null = null) => (
     <MemoryRouter>
       <QuickLogAllActivitiesSection
         growId="grow-a"
         tentId="tent-a"
         plantId={id}
-        plantStage="flower"
+        plantStage={stage}
         requestedActivityId={requestedActivityId}
+        onSaveSuccess={onSaveSuccess}
       />
     </MemoryRouter>
   );
@@ -77,6 +84,10 @@ function mount(plantId = "plant-a") {
     ...view,
     changeTarget: (id: string, requestedActivityId: QuickLogActivityId | null = null) =>
       view.rerender(renderTree(id, requestedActivityId)),
+    changeStage: (nextStage: unknown) => {
+      stage = nextStage;
+      view.rerender(renderTree(plantId));
+    },
   };
 }
 
@@ -127,6 +138,92 @@ beforeEach(() => {
 });
 
 describe("All activity types retry confirmation", () => {
+  it("blocks an unresolved Harvest retry while the current stage is ineligible or unknown", async () => {
+    const view = mount();
+    selectActivity("harvest");
+    save();
+    await waitFor(() => expect(backend.posts).toHaveLength(1));
+    await screen.findByTestId("quick-log-all-activities-pending-activity");
+    await act(async () => view.changeStage("veg"));
+    expect(screen.getByTestId("quick-log-all-activities-retry-original")).toBeDisabled();
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toHaveTextContent(
+      /Flower, Flush, or Harvest stages/,
+    );
+    expect(backend.posts).toHaveLength(1);
+    view.unmount();
+    const remounted = mount("plant-a", null);
+    expect(screen.getByTestId("quick-log-all-activities-retry-original")).toBeDisabled();
+    expect(backend.posts).toHaveLength(1);
+    await act(async () => remounted.changeStage("flower"));
+    expect(screen.getByTestId("quick-log-all-activities-retry-original")).toBeEnabled();
+    save();
+    await screen.findByTestId("quick-log-all-activities-saved-item");
+    expect(backend.posts).toHaveLength(2);
+    expect(backend.posts[1]).toEqual(backend.posts[0]);
+    expect(backend.rows.size).toBe(1);
+  });
+
+  it("retries only storage cleanup after a confirmed activity cannot clear its recovery record", async () => {
+    const onSaveSuccess = vi.fn();
+    const view = mount("plant-a", "flower", onSaveSuccess);
+    await loseReply();
+    const remove = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => undefined);
+    save();
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toHaveTextContent(
+        /activity was saved, but its recovery record could not be cleared/i,
+      ),
+    );
+    expect(backend.posts).toHaveLength(2);
+    expect(backend.rows.size).toBe(1);
+    expect(telemetry).toHaveBeenCalledTimes(1);
+    expect(onSaveSuccess).not.toHaveBeenCalled();
+    save();
+    expect(backend.posts).toHaveLength(2);
+    expect(telemetry).toHaveBeenCalledTimes(1);
+    view.unmount();
+    mount("plant-a", "flower", onSaveSuccess);
+    expect(screen.getByTestId("quick-log-all-activities-retry-original")).toHaveTextContent(
+      "Clear saved recovery record",
+    );
+    save();
+    expect(backend.posts).toHaveLength(2);
+    remove.mockRestore();
+    save();
+    await screen.findByTestId("quick-log-all-activities-saved-item");
+    expect(
+      screen.queryByTestId("quick-log-all-activities-pending-activity"),
+    ).not.toBeInTheDocument();
+    expect(backend.posts).toHaveLength(2);
+    expect(telemetry).toHaveBeenCalledTimes(1);
+    expect(onSaveSuccess).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByTestId("quick-log-all-activities-saved-item")).toHaveLength(1);
+  });
+
+  it("does not replay a first confirmed write when cleanup fails", async () => {
+    backend.loseFirstReply = false;
+    const remove = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => undefined);
+    const onSaveSuccess = vi.fn();
+    mount("plant-a", "flower", onSaveSuccess);
+    selectActivity("training");
+    enterNote();
+    save();
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-all-activities-retry-original")).toHaveTextContent(
+        "Clear saved recovery record",
+      ),
+    );
+    expect(backend.posts).toHaveLength(1);
+    save();
+    expect(backend.posts).toHaveLength(1);
+    remove.mockRestore();
+    save();
+    await screen.findByTestId("quick-log-all-activities-saved-item");
+    expect(backend.posts).toHaveLength(1);
+    expect(backend.rows.size).toBe(1);
+    expect(onSaveSuccess).toHaveBeenCalledTimes(1);
+  });
+
   it("blocks an over-500-character note before claiming or sending a request", async () => {
     mount();
     selectActivity("training");

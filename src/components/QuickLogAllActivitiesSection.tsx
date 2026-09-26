@@ -60,7 +60,9 @@ import {
   ACTIVITY_RECOVERY_UNAVAILABLE,
   claimPendingQuickLogActivity,
   clearPendingQuickLogActivity,
+  readConfirmedPendingQuickLogActivity,
   readPendingQuickLogActivity,
+  rememberConfirmedPendingQuickLogActivity,
   samePendingQuickLogActivity,
   type PendingQuickLogActivity,
 } from "@/lib/quickLogPendingActivityStore";
@@ -335,6 +337,21 @@ export default function QuickLogAllActivitiesSection({
     buildQuickLogTargetKey(pendingActivity.input) === currentTargetKey
       ? pendingActivity
       : null;
+  const pendingPersistenceGate = useMemo(
+    () =>
+      activePendingActivity
+        ? evaluateQuickLogPrePersistenceGate({
+            activityId: activePendingActivity.input.activityId,
+            currentPlantStage: plantStage,
+            selectedTarget: activePendingActivity.input,
+            currentTarget,
+          })
+        : null,
+    [activePendingActivity, currentTarget, plantStage],
+  );
+  const confirmedPendingActivity = activePendingActivity
+    ? readConfirmedPendingQuickLogActivity(activePendingActivity)
+    : null;
   const liveTargetKeyRef = useRef(currentTargetKey);
   const liveOwnerIdRef = useRef(user?.id ?? null);
   useLayoutEffect(() => {
@@ -477,7 +494,11 @@ export default function QuickLogAllActivitiesSection({
     if (recovery.status !== "pending") return;
     setSelectedDraft(bindQuickLogActivityDraft(recovery.record.input.activityId, currentTarget));
     setNote(recovery.record.input.note ?? "");
-    setErrorReason(ACTIVITY_RECOVERY_PENDING);
+    setErrorReason(
+      readConfirmedPendingQuickLogActivity(recovery.record)
+        ? ACTIVITY_RECOVERY_CLEAR_FAILED
+        : ACTIVITY_RECOVERY_PENDING,
+    );
     setErrorForActivity(recovery.record.input.activityId);
   }, [currentTarget, currentTargetKey, user?.id]);
 
@@ -566,6 +587,73 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomNoneObserved(false);
   }, [currentTarget, hasSymptomPlant, isMutationBlocked, plantStage]);
 
+  const finishConfirmedPendingActivity = useCallback(
+    (record: PendingQuickLogActivity, growEventId: string | null, cleared: boolean) => {
+      const capturedTarget = Object.freeze({
+        growId: record.input.growId,
+        tentId: record.input.tentId,
+        plantId: record.input.plantId,
+      });
+      const stillCurrent =
+        liveOwnerIdRef.current === record.ownerId &&
+        liveTargetKeyRef.current === buildQuickLogTargetKey(capturedTarget);
+      if (!cleared) {
+        rememberConfirmedPendingQuickLogActivity(record, growEventId);
+        if (stillCurrent) {
+          setErrorReason(ACTIVITY_RECOVERY_CLEAR_FAILED);
+          setErrorForActivity(record.input.activityId);
+        }
+        return;
+      }
+      if (stillCurrent) {
+        setPendingActivity(null);
+        const source = toSavedSource(record.input.activityId);
+        if (source) {
+          const items = buildDailyCheckSavedItems({
+            source,
+            submittedAt: Date.now(),
+            harvestDetails: source === "harvest" ? record.receipt.harvestDetails : null,
+          });
+          if (items.length > 0)
+            setSaved((previous) => [
+              ...previous,
+              {
+                id: `${record.input.idempotencyKey}-saved`,
+                activityId: record.input.activityId,
+                item: items[0],
+                target: capturedTarget,
+                growEventId,
+                symptomCheck: record.receipt.symptomCheck,
+              },
+            ]);
+        }
+        setSelectedDraft(null);
+        setNote("");
+        setHarvestWet("");
+        setHarvestDry("");
+        setHarvestUnit("g");
+        setDetailValues({});
+        setGuidedSymptomCheck(false);
+        setGuidedSymptomStage(null);
+        setGuidedSymptomStageConfirmed(false);
+        setGuidedSymptomNoneObserved(false);
+        envCheckTempEntryUnitRef.current = null;
+        setErrorReason(null);
+        setErrorForActivity(null);
+      }
+      try {
+        onSaveSuccess?.({
+          activityId: record.input.activityId,
+          target: capturedTarget,
+          growEventId,
+        });
+      } catch {
+        // The confirmed write remains successful if parent cleanup fails.
+      }
+    },
+    [onSaveSuccess],
+  );
+
   const handleRetryPendingActivity = useCallback(async () => {
     if (saving || saveBlocked || isSaveBlocked?.() === true || localSaveInFlightRef.current) return;
     if (externalPersistenceBlockReason) {
@@ -595,6 +683,26 @@ export default function QuickLogAllActivitiesSection({
       setErrorForActivity(record.input.activityId);
       return;
     }
+    const confirmed = readConfirmedPendingQuickLogActivity(record);
+    if (confirmed) {
+      finishConfirmedPendingActivity(
+        record,
+        confirmed.growEventId,
+        clearPendingQuickLogActivity(record),
+      );
+      return;
+    }
+    const persistenceGate = evaluateQuickLogPrePersistenceGate({
+      activityId: record.input.activityId,
+      currentPlantStage: plantStage,
+      selectedTarget: record.input,
+      currentTarget,
+    });
+    if (!persistenceGate.allowed) {
+      setErrorReason(persistenceGate.blockedReason ?? "This activity is not available.");
+      setErrorForActivity(record.input.activityId);
+      return;
+    }
     const capturedTarget = Object.freeze({
       growId: record.input.growId,
       tentId: record.input.tentId,
@@ -621,57 +729,11 @@ export default function QuickLogAllActivitiesSection({
         }
         return;
       }
-      const cleared = clearPendingQuickLogActivity(record);
-      if (stillCurrent) {
-        if (cleared) setPendingActivity(null);
-        const source = toSavedSource(record.input.activityId);
-        if (source) {
-          const items = buildDailyCheckSavedItems({
-            source,
-            submittedAt: Date.now(),
-            harvestDetails: source === "harvest" ? record.receipt.harvestDetails : null,
-          });
-          if (items.length > 0)
-            setSaved((previous) => [
-              ...previous,
-              {
-                id: `${record.input.idempotencyKey}-saved`,
-                activityId: record.input.activityId,
-                item: items[0],
-                target: capturedTarget,
-                growEventId: result.growEventId ?? null,
-                symptomCheck: record.receipt.symptomCheck,
-              },
-            ]);
-        }
-        if (cleared) {
-          setSelectedDraft(null);
-          setNote("");
-          setHarvestWet("");
-          setHarvestDry("");
-          setHarvestUnit("g");
-          setDetailValues({});
-          setGuidedSymptomCheck(false);
-          setGuidedSymptomStage(null);
-          setGuidedSymptomStageConfirmed(false);
-          setGuidedSymptomNoneObserved(false);
-          envCheckTempEntryUnitRef.current = null;
-          setErrorReason(null);
-          setErrorForActivity(null);
-        } else {
-          setErrorReason(ACTIVITY_RECOVERY_CLEAR_FAILED);
-          setErrorForActivity(record.input.activityId);
-        }
-      }
-      try {
-        onSaveSuccess?.({
-          activityId: record.input.activityId,
-          target: capturedTarget,
-          growEventId: result.growEventId ?? null,
-        });
-      } catch {
-        // The confirmed write remains successful if parent cleanup fails.
-      }
+      finishConfirmedPendingActivity(
+        record,
+        result.growEventId ?? null,
+        clearPendingQuickLogActivity(record),
+      );
     } finally {
       localSaveInFlightRef.current = false;
       if (onSaveStart) onSaveEnd?.();
@@ -680,10 +742,11 @@ export default function QuickLogAllActivitiesSection({
     activePendingActivity,
     currentTarget,
     externalPersistenceBlockReason,
+    finishConfirmedPendingActivity,
     isSaveBlocked,
     onSaveEnd,
     onSaveStart,
-    onSaveSuccess,
+    plantStage,
     save,
     saveBlocked,
     saving,
@@ -1047,6 +1110,7 @@ export default function QuickLogAllActivitiesSection({
         if (clearPendingQuickLogActivity(claim.record)) {
           if (stillCurrent) setPendingActivity(null);
         } else {
+          rememberConfirmedPendingQuickLogActivity(claim.record, savedGrowEventId);
           if (stillCurrent) {
             setErrorReason(ACTIVITY_RECOVERY_CLEAR_FAILED);
             setErrorForActivity(selected.id);
@@ -1283,8 +1347,15 @@ export default function QuickLogAllActivitiesSection({
               <p role="status" className="text-xs text-muted-foreground">
                 {saving
                   ? "Saving the original activity. Please wait for confirmation."
-                  : `${ACTIVITY_RECOVERY_PENDING} You can check Timeline before retrying.`}
+                  : confirmedPendingActivity
+                    ? ACTIVITY_RECOVERY_CLEAR_FAILED
+                    : `${ACTIVITY_RECOVERY_PENDING} You can check Timeline before retrying.`}
               </p>
+              {!confirmedPendingActivity && pendingPersistenceGate?.allowed === false && (
+                <p role="note" className="text-xs text-muted-foreground">
+                  {pendingPersistenceGate.blockedReason ?? "This activity is not available."}
+                </p>
+              )}
               {activePendingActivity.input.note && (
                 <p className="text-xs whitespace-pre-wrap break-words">
                   Original note: {activePendingActivity.input.note}
@@ -1300,10 +1371,19 @@ export default function QuickLogAllActivitiesSection({
                 type="button"
                 size="sm"
                 onClick={handleRetryPendingActivity}
-                disabled={saving || saveBlocked || !!externalPersistenceBlockReason}
+                disabled={
+                  saving ||
+                  saveBlocked ||
+                  !!externalPersistenceBlockReason ||
+                  (!confirmedPendingActivity && pendingPersistenceGate?.allowed === false)
+                }
                 data-testid={`${testIdPrefix}-retry-original`}
               >
-                {saving ? "Checking…" : "Retry original activity"}
+                {saving
+                  ? "Checking…"
+                  : confirmedPendingActivity
+                    ? "Clear saved recovery record"
+                    : "Retry original activity"}
               </Button>
             </div>
           ) : (

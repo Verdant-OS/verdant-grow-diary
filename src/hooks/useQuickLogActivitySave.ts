@@ -30,6 +30,7 @@ import {
   dispatchQuickLogV2EntryCreated,
 } from "@/lib/quickLogV2EntryCreatedEvent";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
+import { verifyReusedQuickLogActivityEvent } from "@/lib/quickLogReusedActivityReceipt";
 
 export interface QuickLogActivitySaveInput {
   activityId: QuickLogActivityId;
@@ -171,6 +172,21 @@ export function useQuickLogActivitySave() {
             setError("save_failed");
             return { ok: false, reason: "save_failed" };
           }
+          if (
+            r.reused === true &&
+            !(await verifyReusedQuickLogActivityEvent({
+              id: r.grow_event_id,
+              eventType: "observation",
+              growId: input.growId,
+              tentId: input.tentId,
+              plantId: input.plantId ?? null,
+              note: input.note || null,
+              occurredAt: input.occurredAt ?? null,
+            }))
+          ) {
+            setError("save_failed");
+            return { ok: false, reason: "save_failed" };
+          }
           dispatchQuickLogV2EntryCreated({
             createdAt: new Date().toISOString(),
             growEventId: r.grow_event_id ?? null,
@@ -243,6 +259,21 @@ export function useQuickLogActivitySave() {
                 disabledReason: "The server refused this activity. Check its target and fields.",
               };
             }
+            setError("save_failed");
+            return { ok: false, reason: "save_failed" };
+          }
+          if (
+            r.reused === true &&
+            !(await verifyReusedQuickLogActivityEvent({
+              id: r.grow_event_id,
+              eventType: plan.eventType ?? "",
+              growId: input.growId,
+              tentId: input.tentId,
+              plantId: input.plantId ?? null,
+              note: input.note || null,
+              occurredAt: input.occurredAt ?? null,
+            }))
+          ) {
             setError("save_failed");
             return { ok: false, reason: "save_failed" };
           }

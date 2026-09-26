@@ -1445,8 +1445,11 @@ builds was created, so none could have been queued.
 
 ### C.3 The team event log — M11, `list_user_events`
 
-**Window A: rolling-release, rollback and promotion types, 2026-09-25 09:00 to 2026-09-26 15:40
-UTC.** Eleven type names were requested and six events came back.
+**Window A: rolling-release, rollback and promotion types, from 2026-09-25 09:00 UTC to the read.**
+The read ran at about 15:28 UTC on 2026-09-26. That time comes from the order of calls: after window
+B's read (15:27:37) and before C.4's hostname reads (15:29:57). The exact second was not recorded,
+because the result came back inline. The request's `until` of 15:40 was later than the read, so
+nothing after about 15:28 is covered. Eleven type names were requested and six events came back.
 
 | Time (UTC)          | Event type                          | Actor class                   | What happened                            |
 | ------------------- | ----------------------------------- | ----------------------------- | ---------------------------------------- |
@@ -1466,12 +1469,12 @@ UTC.** Eleven type names were requested and six events came back.
   and `project-skew-protection-updated`. The team's type list was truncated in the read, so whether
   those names exist is `NOT_MEASURED`. "No event returned" is therefore not "no such action".
 
-**Window B: `aliases-assigned`, from 06:22:43 to 15:23:40 UTC on 2026-09-26.** The read returned
-40 events, which is the request's limit, so the stretch from 06:00 to 06:22:43 may be incomplete.
-Every event assigns an alias to a build whose `githubCommitRef` is not `verdant-grow-diary`, that
-is, a branch preview. None assigns one to a deploy-branch build. The payload names no hostname.
-The absence of any production-hostname move is therefore an `inference` from the builds, and C.4
-corroborates it.
+**Window B: `aliases-assigned`, from 06:22:43 to 15:23:40 UTC on 2026-09-26.** The read ran at
+15:27:37 UTC, the time on its saved result. It returned 40 events, which is the request's limit, so
+the stretch from 06:00 to 06:22:43 may be incomplete. Every event assigns an alias to a build whose
+`githubCommitRef` is not `verdant-grow-diary`, that is, a branch preview. None assigns one to a
+deploy-branch build. The payload names no hostname. The absence of any production-hostname move is
+therefore an `inference` from the builds, and C.4 corroborates it.
 
 **M11 result at this amendment: incomplete, recorded as `NOT_MEASURED`.** Three gaps keep it from
 being a complete run:

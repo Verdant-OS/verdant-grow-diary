@@ -134,6 +134,7 @@ jobs:
             "accepted Feed survives lost reply and reload without a second saved record",
             "accepted Feed survives lost reply and reload onto another plant without a second saved record",
             "Sensors manual entry saves three metrics to the chosen tent and reopens in manual history",
+            "committed Sensors manual snapshot survives a lost reply and retries the original tent without duplicate rows",
           ];
           const requiredPassed = requiredTitles.every(title => {
             const matching = tests.filter(test => test.title === title);
@@ -141,8 +142,8 @@ jobs:
               matching[0].attempts.length === 1 &&
               matching[0].attempts[0].status === "passed" && matching[0].attempts[0].retry === 0;
           });
-          if (expected < 20 || unexpected !== 0 || flaky !== 0 || skipped !== 0 || errors !== 0 || !requiredPassed) {
-            throw new Error("Native browser acceptance requires twenty executed passing scenarios including Water/Feed recovery and Sensors manual save/reopen, zero failures, retries, skips, and report errors.");
+          if (expected < 21 || unexpected !== 0 || flaky !== 0 || skipped !== 0 || errors !== 0 || !requiredPassed) {
+            throw new Error("Native browser acceptance requires twenty-one executed passing scenarios including Water/Feed recovery and Sensors manual save/retry/reopen, zero failures, retries, skips, and report errors.");
           }
           console.log(`Candidate local-backend browser proof: ${expected} passed, 0 failed, 0 skipped. Published-site acceptance remains separate.`);
           NODE

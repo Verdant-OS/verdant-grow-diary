@@ -114,3 +114,80 @@ test("Sensors manual entry saves three metrics to the chosen tent and reopens in
     await f.cleanup();
   }
 });
+
+test("committed Sensors manual snapshot survives a lost reply and retries the original tent without duplicate rows", async ({
+  page,
+  context,
+}) => {
+  const f = await createLocalFixture();
+  try {
+    await fenceBrowser(context, f.env);
+    const otherBefore = fingerprint(await witnessRows(f));
+    const requests: Row[][] = [];
+    await context.route(f.env.api + "/rest/v1/sensor_readings*", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      const payload: unknown = route.request().postDataJSON();
+      if (!Array.isArray(payload) || payload.some((row: unknown) => !isRow(row))) {
+        throw new Error("Manual snapshot retry request was not a row batch.");
+      }
+      requests.push(structuredClone(payload as Row[]));
+      const response = await route.fetch({ maxRedirects: 0, maxRetries: 0 });
+      if (requests.length === 1) {
+        expect(response.ok()).toBe(true);
+        return route.abort("connectionreset");
+      }
+      expect(response.status()).toBe(409);
+      const rejection: unknown = await response.json();
+      if (!isRow(rejection)) throw new Error("Retry conflict was not an object.");
+      expect(rejection.code).toBe("23505");
+      return route.fulfill({ response });
+    });
+
+    await signIn(page, f);
+    await page.goto(
+      f.env.ui + "/sensors?tentId=" + f.primary.tentId + "&tentIntent=required#manual-reading",
+    );
+    await expect(page.getByTestId("manual-reading-tent-select")).toContainText(f.primary.tentName);
+    await page.getByTestId("manual-reading-temp-unit-C").click();
+    await page.locator("#m-air-temp").fill("26");
+    await page.locator("#m-humidity").fill("60");
+    await page.locator("#m-soil").fill("42");
+    await page.getByTestId("manual-reading-save").click();
+    await page.getByTestId("manual-sensor-review-confirm").click();
+    await expect(page.getByTestId("manual-reading-save-unconfirmed")).toBeVisible();
+    await expect(page.getByTestId("manual-reading-saved-confirmation")).toHaveCount(0);
+    expect(requests).toHaveLength(1);
+    const committed = await ownerRows(f.owner);
+    expect(committed.sensor_readings).toHaveLength(3);
+    expect(committed.sensor_readings.every((row) => row.tent_id === f.primary.tentId)).toBe(true);
+
+    // A full document navigation onto another owned tent must restore the
+    // pending original target, not send a new snapshot to the visible URL.
+    await page.goto(
+      f.env.ui + "/sensors?tentId=" + f.secondary.tentId + "&tentIntent=required#manual-reading",
+    );
+    await expect(page.getByTestId("manual-reading-tent-select")).toContainText(f.primary.tentName);
+    await expect(page.locator("#m-air-temp")).toHaveValue("26");
+    await expect(page.locator("#m-humidity")).toHaveValue("60");
+    await expect(page.locator("#m-soil")).toHaveValue("42");
+    await expect(page.getByTestId("manual-reading-save-unconfirmed")).toBeVisible();
+    await expect(page.getByTestId("manual-reading-saved-confirmation")).toHaveCount(0);
+    await page.getByTestId("manual-reading-save").click();
+    await page.getByTestId("manual-sensor-review-confirm").click();
+    await expect(page.getByTestId("manual-reading-saved-confirmation")).toBeVisible();
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toEqual(requests[0]);
+    expect(fingerprint(await ownerRows(f.owner))).toBe(fingerprint(committed));
+    expect(fingerprint(await witnessRows(f))).toBe(otherBefore);
+
+    await page.goto(f.env.ui + "/tents/" + f.primary.tentId);
+    const history = page.getByTestId("tent-manual-snapshot-history");
+    await expect(history.getByTestId("tent-manual-snapshot-history-item")).toHaveCount(1);
+    await expect(history.getByTestId("tent-manual-snapshot-history-source")).toHaveText("Manual");
+    await page.goto(f.env.ui + "/tents/" + f.secondary.tentId);
+    await expect(page.getByTestId("tent-manual-snapshot-history-empty")).toBeVisible();
+  } finally {
+    await page.close();
+    await f.cleanup();
+  }
+});

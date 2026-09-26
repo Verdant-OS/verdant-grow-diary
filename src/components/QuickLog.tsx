@@ -95,6 +95,7 @@ import { matchesReviewedPublicStarterDraftRevision } from "@/lib/publicQuickLogH
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
+import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import {
   STARTER_WATER_RECOVERY_CLEAR_FAILED,
   STARTER_WATER_RECOVERY_PENDING,
@@ -1495,7 +1496,7 @@ export default function QuickLog({
 
       let waterRecord: PendingStarterWater | null = null;
       if (saveEventType === "watering") {
-        const claim = claimPendingStarterWater({
+        const claim = await claimPendingStarterWater({
           version: 1,
           ownerId: user.id,
           createdAt: new Date().toISOString(),
@@ -1530,7 +1531,13 @@ export default function QuickLog({
       // the grower's validated UI selection so observation/environment keep
       // their semantic activity even though the legacy RPC stores both as
       // `p_action: "note"`.
-      const result = await saveViaRpc(built.payload, { telemetryIntent: saveEventType });
+      // Water remains untracked until its durable recovery record is cleared.
+      // A later exact-key replay may be `reused`, but no success was counted
+      // for this logical submission while its first receipt was uncertain.
+      const result = await saveViaRpc(
+        built.payload,
+        saveEventType === "watering" ? {} : { telemetryIntent: saveEventType },
+      );
       if (!result.ok) {
         if (waterRecord && result.definitiveRejected !== true) {
           setSaveError(STARTER_WATER_RECOVERY_PENDING);
@@ -1538,7 +1545,7 @@ export default function QuickLog({
           return;
         }
         if (waterRecord) {
-          if (!clearPendingStarterWater(waterRecord)) {
+          if (!(await clearPendingStarterWater(waterRecord))) {
             setStarterWaterStorageBlocked(true);
             setSaveError(STARTER_WATER_RECOVERY_UNAVAILABLE);
             return;
@@ -1561,12 +1568,13 @@ export default function QuickLog({
       }
 
       const waterRecoveryClearFailed =
-        waterRecord !== null && !clearPendingStarterWater(waterRecord);
+        waterRecord !== null && !(await clearPendingStarterWater(waterRecord));
       if (waterRecoveryClearFailed) {
         setStarterWaterStorageBlocked(true);
         setSaveError(STARTER_WATER_RECOVERY_CLEAR_FAILED);
       } else if (waterRecord) {
         setStarterWaterPending(null);
+        trackQuickLogSuccess("water");
       }
 
       // Persist the stage back to the grow ONLY when the grower changed it by
@@ -1704,17 +1712,19 @@ export default function QuickLog({
       stageWasUserTouched: record.stageWasUserTouched,
     });
     try {
-      const result = await saveViaRpc(record.payload, { telemetryIntent: "water" });
+      const result = await saveViaRpc(record.payload);
       if (!result.ok) {
         // Even a definitive rejection NOW cannot prove that the earlier,
         // ambiguous call did not commit. Keep the original record and key.
         setSaveError(STARTER_WATER_RECOVERY_PENDING);
         return;
       }
-      const cleared = clearPendingStarterWater(record);
+      const cleared = await clearPendingStarterWater(record);
       setStarterWaterStorageBlocked(!cleared);
-      if (cleared) setStarterWaterPending(null);
-      else setSaveError(STARTER_WATER_RECOVERY_CLEAR_FAILED);
+      if (cleared) {
+        setStarterWaterPending(null);
+        trackQuickLogSuccess("water");
+      } else setSaveError(STARTER_WATER_RECOVERY_CLEAR_FAILED);
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
       lastFailedSaveSigRef.current = null;
 

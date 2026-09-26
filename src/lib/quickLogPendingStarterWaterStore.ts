@@ -116,7 +116,7 @@ export function readPendingStarterWater(
 ): PendingStarterWaterRead {
   if (!id(ownerId)) return { status: "blocked" };
   try {
-    const raw = window.sessionStorage.getItem(storageKey(ownerId));
+    const raw = window.localStorage.getItem(storageKey(ownerId));
     if (raw === null) return { status: "empty" };
     const value: unknown = JSON.parse(raw);
     return validRecord(value, ownerId)
@@ -128,38 +128,50 @@ export function readPendingStarterWater(
 }
 
 /** Claim before dispatch. A second form can never replace an unresolved write. */
-export function claimPendingStarterWater(
+export async function claimPendingStarterWater(
   record: PendingStarterWater,
-):
+): Promise<
   | { status: "claimed"; record: PendingStarterWater }
   | { status: "pending"; record: PendingStarterWater }
-  | { status: "blocked" } {
+  | { status: "blocked" }
+> {
   try {
     if (!record || !validRecord(record, record.ownerId)) return { status: "blocked" };
-    const current = readPendingStarterWater(record.ownerId);
-    if (current.status === "blocked") return current;
-    if (current.status === "pending")
-      return sameRecord(current.record, record)
-        ? { status: "claimed", record: current.record }
-        : current;
-    const raw = JSON.stringify(record);
-    window.sessionStorage.setItem(storageKey(record.ownerId), raw);
-    if (window.sessionStorage.getItem(storageKey(record.ownerId)) !== raw)
-      return { status: "blocked" };
-    return { status: "claimed", record: JSON.parse(raw) as PendingStarterWater };
+    // localStorage survives tab closure and is shared across tabs. The Web
+    // Lock makes the read/check/write one exclusive claim per owner; without
+    // it two tabs could both observe an empty slot and dispatch different keys.
+    const locks = window.navigator.locks;
+    if (!locks?.request) return { status: "blocked" };
+    return await locks.request(storageKey(record.ownerId), { mode: "exclusive" }, () => {
+      const current = readPendingStarterWater(record.ownerId);
+      if (current.status === "blocked") return current;
+      if (current.status === "pending")
+        return sameRecord(current.record, record)
+          ? { status: "claimed" as const, record: current.record }
+          : current;
+      const raw = JSON.stringify(record);
+      window.localStorage.setItem(storageKey(record.ownerId), raw);
+      if (window.localStorage.getItem(storageKey(record.ownerId)) !== raw)
+        return { status: "blocked" as const };
+      return { status: "claimed" as const, record: JSON.parse(raw) as PendingStarterWater };
+    });
   } catch {
     return { status: "blocked" };
   }
 }
 
 /** Only the matching owner, key, target, and payload may clear recovery. */
-export function clearPendingStarterWater(record: PendingStarterWater): boolean {
+export async function clearPendingStarterWater(record: PendingStarterWater): Promise<boolean> {
   try {
     if (!record || !validRecord(record, record.ownerId)) return false;
-    const current = readPendingStarterWater(record.ownerId);
-    if (current.status !== "pending" || !sameRecord(current.record, record)) return false;
-    window.sessionStorage.removeItem(storageKey(record.ownerId));
-    return window.sessionStorage.getItem(storageKey(record.ownerId)) === null;
+    const locks = window.navigator.locks;
+    if (!locks?.request) return false;
+    return await locks.request(storageKey(record.ownerId), { mode: "exclusive" }, () => {
+      const current = readPendingStarterWater(record.ownerId);
+      if (current.status !== "pending" || !sameRecord(current.record, record)) return false;
+      window.localStorage.removeItem(storageKey(record.ownerId));
+      return window.localStorage.getItem(storageKey(record.ownerId)) === null;
+    });
   } catch {
     return false;
   }

@@ -18,7 +18,7 @@
  * supabase client + auth/grows/plants), with the REAL draft store running
  * against test localStorage.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
@@ -155,9 +155,24 @@ function saveButton() {
   return screen.getByTestId("quick-log-save");
 }
 
+const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 describe("Quick Log starter-handoff consume-once", () => {
   beforeEach(() => {
     clearLocalStorageForTest();
+    let tail: Promise<unknown> = Promise.resolve();
+    Object.defineProperty(window.navigator, "locks", {
+      configurable: true,
+      value: {
+        request: (_name: string, _options: unknown, callback: () => unknown) => {
+          const turn = tail.then(callback);
+          tail = turn.then(
+            () => undefined,
+            () => undefined,
+          );
+          return turn;
+        },
+      },
+    });
     saveMock.mockReset();
     saveMock.mockResolvedValue({ ok: true });
     insertMock.mockReset();
@@ -166,6 +181,11 @@ describe("Quick Log starter-handoff consume-once", () => {
       data: { ok: true, grow_event_id: "feeding-event-1" },
       error: null,
     });
+  });
+
+  afterEach(() => {
+    if (originalLocks) Object.defineProperty(window.navigator, "locks", originalLocks);
+    else Reflect.deleteProperty(window.navigator, "locks");
   });
 
   it("rendering the prefilled dialog performs ZERO writes and never clears the draft", () => {

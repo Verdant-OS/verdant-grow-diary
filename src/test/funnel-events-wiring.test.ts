@@ -53,7 +53,8 @@ function listSourceFiles(dir: string): string[] {
 const QUICK_LOG_V2_SAVE_CALLERS = [
   {
     file: "src/components/QuickLog.tsx",
-    telemetryIntent: /saveViaRpc\(built\.payload,\s*\{\s*telemetryIntent:\s*saveEventType\s*\}\)/,
+    telemetryIntent:
+      /saveViaRpc\(\s*built\.payload,\s*saveEventType === "watering" \? \{\} : \{ telemetryIntent: saveEventType \},\s*\)/,
   },
   {
     file: "src/components/QuickLogV2Sheet.tsx",
@@ -196,6 +197,11 @@ const QUICK_LOG_SUCCESS_SEAMS: Array<{
   calls: number;
   extra: RegExp;
 }> = [
+  {
+    file: "src/components/QuickLog.tsx",
+    calls: 2,
+    extra: /trackQuickLogSuccess\("water"\)/,
+  },
   {
     file: "src/hooks/useQuickLogV2Save.ts",
     calls: 1,
@@ -345,9 +351,17 @@ describe("ordering and safety constraints at the seams", () => {
   it("legacy Quick Log tracks the grower's validated semantic UI selection", () => {
     const src = read("src/components/QuickLog.tsx");
     const supportedGate = src.indexOf("if (!isSupportedLegacyEventType(effectiveEventType))");
-    const save = src.indexOf("saveViaRpc(built.payload, { telemetryIntent: saveEventType })");
+    const save = src.indexOf(
+      'saveEventType === "watering" ? {} : { telemetryIntent: saveEventType }',
+    );
     expect(supportedGate).toBeGreaterThan(-1);
     expect(save).toBeGreaterThan(supportedGate);
+    expect(src).toMatch(
+      /await clearPendingStarterWater\(waterRecord\)[\s\S]*trackQuickLogSuccess\("water"\)/,
+    );
+    expect(src).toMatch(
+      /await clearPendingStarterWater\(record\)[\s\S]*trackQuickLogSuccess\("water"\)/,
+    );
     expect(src).not.toMatch(/telemetryIntent:\s*built\.payload\.p_action/);
   });
 

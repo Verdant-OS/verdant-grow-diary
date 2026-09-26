@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
@@ -8,6 +8,10 @@ import {
 } from "./helpers/localStorageTestHelper";
 
 const saveMock = vi.fn();
+const trackSuccessMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/quickLogSuccessTelemetry", () => ({
+  trackQuickLogSuccess: trackSuccessMock,
+}));
 vi.mock("@/hooks/useQuickLogV2Save", () => ({
   useQuickLogV2Save: () => ({
     save: (...args: unknown[]) => saveMock(...args),
@@ -105,11 +109,31 @@ function seed() {
   );
 }
 
+const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 beforeEach(() => {
   clearLocalStorageForTest();
   window.sessionStorage.clear();
+  let tail: Promise<unknown> = Promise.resolve();
+  Object.defineProperty(window.navigator, "locks", {
+    configurable: true,
+    value: {
+      request: (_name: string, _options: unknown, callback: () => unknown) => {
+        const turn = tail.then(callback);
+        tail = turn.then(
+          () => undefined,
+          () => undefined,
+        );
+        return turn;
+      },
+    },
+  });
   saveMock.mockReset();
+  trackSuccessMock.mockReset();
   vi.restoreAllMocks();
+});
+afterEach(() => {
+  if (originalLocks) Object.defineProperty(window.navigator, "locks", originalLocks);
+  else Reflect.deleteProperty(window.navigator, "locks");
 });
 
 describe("legacy public-starter Water uncertain receipt", () => {
@@ -133,6 +157,7 @@ describe("legacy public-starter Water uncertain receipt", () => {
     expect(screen.getByTestId("quicklog-note")).toBeDisabled();
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();
     expect(readPendingStarterWater("user-1")).toMatchObject({ status: "pending" });
+    expect(trackSuccessMock).not.toHaveBeenCalled();
 
     view.unmount();
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
@@ -142,6 +167,8 @@ describe("legacy public-starter Water uncertain receipt", () => {
     expect(saveMock.mock.calls[1][0]).toEqual(original);
     await screen.findByTestId("quick-log-post-save");
     expect(readPendingStarterWater("user-1")).toEqual({ status: "empty" });
+    expect(trackSuccessMock).toHaveBeenCalledTimes(1);
+    expect(trackSuccessMock).toHaveBeenCalledWith("water");
     expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBeNull();
   });
 
@@ -162,6 +189,63 @@ describe("legacy public-starter Water uncertain receipt", () => {
       record: { payload: original },
     });
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(trackSuccessMock).not.toHaveBeenCalled();
+  });
+
+  it("counts a first confirmed Watering once after recovery is cleared", async () => {
+    seed();
+    saveMock.mockResolvedValue({
+      ok: true,
+      reused: false,
+      growEventId: "11111111-1111-4111-8111-111111111111",
+    });
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await screen.findByTestId("quick-log-post-save");
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    expect(saveMock.mock.calls[0][1]).toEqual({});
+    expect(readPendingStarterWater("user-1")).toEqual({ status: "empty" });
+    expect(trackSuccessMock).toHaveBeenCalledTimes(1);
+    expect(trackSuccessMock).toHaveBeenCalledWith("water");
+  });
+
+  it("does not count a confirmed Watering until a failed clear is recovered", async () => {
+    seed();
+    saveMock
+      .mockResolvedValueOnce({
+        ok: true,
+        reused: false,
+        growEventId: "11111111-1111-4111-8111-111111111111",
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        reused: true,
+        growEventId: "11111111-1111-4111-8111-111111111111",
+      });
+    const removeItem = Storage.prototype.removeItem;
+    let denyFirstClear = true;
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (
+      this: Storage,
+      key: string,
+    ) {
+      if (denyFirstClear && key.startsWith("verdant:quick-log:pending-starter-water:")) {
+        denyFirstClear = false;
+        throw new Error("storage unavailable");
+      }
+      return removeItem.call(this, key);
+    });
+
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await screen.findByTestId("quick-log-post-save");
+    expect(readPendingStarterWater("user-1")).toMatchObject({ status: "pending" });
+    expect(trackSuccessMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("quick-log-starter-water-retry"));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(readPendingStarterWater("user-1")).toEqual({ status: "empty" }));
+    expect(saveMock.mock.calls[1][0]).toEqual(saveMock.mock.calls[0][0]);
+    expect(trackSuccessMock).toHaveBeenCalledTimes(1);
   });
 
   it("clears a definitive pre-write rejection so the grower may edit and resubmit", async () => {
@@ -183,6 +267,7 @@ describe("legacy public-starter Water uncertain receipt", () => {
       saveMock.mock.calls[0][0].p_idempotency_key,
     );
     await screen.findByTestId("quick-log-post-save");
+    expect(trackSuccessMock).toHaveBeenCalledTimes(1);
   });
 
   it("refuses to dispatch Watering if its recovery record cannot be persisted", async () => {
@@ -194,6 +279,7 @@ describe("legacy public-starter Water uncertain receipt", () => {
     fireEvent.click(screen.getByTestId("quick-log-save"));
     await screen.findByTestId("quick-log-starter-water-recovery");
     expect(saveMock).not.toHaveBeenCalled();
+    expect(trackSuccessMock).not.toHaveBeenCalled();
     expect(screen.getByTestId("quick-log-save")).not.toBeDisabled();
     expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).not.toBeNull();
 

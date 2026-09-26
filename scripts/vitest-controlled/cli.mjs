@@ -9,7 +9,7 @@
 //   manifest         (prints deterministic manifest JSON)
 //
 // Deliberate defaults:
-//   pool=forks, maxWorkers=8, minWorkers=2 — matching Slice G.1j.
+//   pool=forks, maxWorkers=8. Vitest 4 no longer accepts --minWorkers.
 //   No timeout, retry, isolation, or environment overrides.
 import fs from "node:fs";
 import path from "node:path";
@@ -284,7 +284,6 @@ export async function runBatch({
     "run",
     `--pool=${runRecord.pool}`,
     `--maxWorkers=${runRecord.maxWorkers}`,
-    `--minWorkers=${runRecord.minWorkers}`,
     `--reporter=${reporterPath}`,
     `--reporter=dot`,
     ...extraArgs,

@@ -103,7 +103,7 @@ describe("photoEventNonDiagnosticLabelRules", () => {
     it("invoking the rule never triggers AI / network side effects (req: no AI call)", () => {
       // The pure helpers must not touch globalThis.fetch. We assert by
       // spying on fetch and confirming zero invocations.
-      const spy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+      const spy = vi.spyOn(globalThis, "fetch").mockImplementation((() => {
         throw new Error("fetch must not be called from pure rules");
       }) as never);
       shouldShowPhotoNonDiagnosticLabel({

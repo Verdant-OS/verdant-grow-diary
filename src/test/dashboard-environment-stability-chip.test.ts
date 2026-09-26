@@ -42,8 +42,12 @@ describe("Dashboard environment stability chip — wiring", () => {
     expect(SRC).toMatch(
       /import\s+\{\s*formatStabilityChipView\s*\}\s+from\s+["']@\/lib\/dashboardStabilityChipCopyRules["']/,
     );
+    // Graded by each tent's resolved stage (grow row, tent, active plants), as
+    // Alerts do (Codex review on #1683); the behavior is rendered in
+    // dashboard-strip-stage-and-manual-save-gate.
+    expect(SRC).toMatch(/const envStage = resolveTentEnvironmentStage\(/);
     expect(SRC).toMatch(
-      /computeEnvironmentStability\(\s*rs\s*,\s*\{\s*stage:\s*t\.stage\s*\}\s*\)/,
+      /computeEnvironmentStability\(\s*rs\s*,\s*\{\s*stage:\s*envStage\s*\}\s*\)/,
     );
     expect(SRC).toMatch(/formatStabilityChipView\(stability\)/);
   });

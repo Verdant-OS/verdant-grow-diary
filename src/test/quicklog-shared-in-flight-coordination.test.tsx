@@ -842,7 +842,9 @@ describe("Quick Log shared in-flight coordination", () => {
       ),
     );
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();
-    expect(screen.getByTestId("quick-log-dialog-all-activities-retry-original")).toBeDisabled();
+    expect(screen.getByTestId("quick-log-dialog-all-activities-retry-original")).toHaveTextContent(
+      "Check original save",
+    );
     act(() => submitForm(mainForm()));
     expect(harness.rpc).toHaveBeenCalledTimes(1);
   });

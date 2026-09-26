@@ -155,6 +155,23 @@ export const EMPTY_SNAPSHOT: SensorSnapshot = {
   tent_id: null,
 };
 
+/** An envelope with a timestamp but no finite measurement is not reading evidence. */
+export function hasFiniteSnapshotMetric(
+  snapshot: SensorSnapshot | null | undefined,
+): snapshot is SensorSnapshot {
+  if (!snapshot) return false;
+  return [
+    snapshot.temp,
+    snapshot.rh,
+    snapshot.vpd,
+    snapshot.co2,
+    snapshot.soil,
+    snapshot.soil_ec,
+    snapshot.soil_temp,
+    snapshot.ppfd,
+  ].some((value) => typeof value === "number" && Number.isFinite(value));
+}
+
 /** Coerce numeric DB values; returns null for null/undefined/NaN/Infinity. */
 export function toFiniteNumber(v: unknown): number | null {
   if (v === null || v === undefined) return null;

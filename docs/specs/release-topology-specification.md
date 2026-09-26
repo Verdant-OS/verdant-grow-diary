@@ -254,7 +254,10 @@ remembered-target recovery and billing. No open PR changes `src/lib/entitlements
 ### 2.5 The Rolling Releases amendment — 2026-09-26
 
 `established fact`, GitHub API, `git` and Vercel reads, 2026-09-26 between 15:20 and 16:05 UTC. The
-last of them is the Actions-runs read behind C.2's provenance column.
+last of them is the Actions-runs read behind C.2's provenance column. One Vercel call in that window
+was **not** a read. After the owner granted authority in-session, the amendment's session sent one
+`rolling-release/start` request for the tip build at about 15:50 UTC. Vercel refused it with `422`,
+and nothing changed (C.7).
 
 - **Why.** `#1718` merged this document as `2ca7b250`. The Vercel reads for the next stamp showed
   that the build of that commit had not been promoted. They also showed that, since 01:27 UTC,
@@ -275,8 +278,9 @@ last of them is the Actions-runs read behind C.2's provenance column.
     and one e2e spec, none of them a file this document cites by line. `#1701` closed at 15:30
     UTC, superseded by `#1703`.
 - **What changes.** The header, §1, §3, §4, §5.6, §5.7, a §6.2 row, D-RT-12, D-RT-13, M10, M11,
-  AT-10, AT-14, AT-15, §10, §12, §14, §15, the closing verdict, and a new Appendix C with its M4
-  and M11 results. Appendices A and B are not edited (D-RT-11).
+  AT-10, AT-14, AT-15, §10, §12, §14, §15, the closing verdict, and a new Appendix C with its M4 and
+  M11 results and the refused rollout start (C.7), plus §13. Appendices A and B are not edited
+  (D-RT-11).
 
 ---
 
@@ -944,10 +948,15 @@ Owners are Cheek's to assign; each needs an independent reviewer.
 
 - **No schema, RLS, auth, edge-function, migration, or application code** is touched. Files are
   `docs/**` and one `README.md` bullet.
-- **No publish, deploy, or apply** was performed or triggered. Every platform interaction was a
-  read (`list_*`, `get_*`, `GET`/`HEAD`), one attempt each. The amendment's session likewise issued
-  **no promote, rollback, redeploy or setting change**; it found the release state `FAIL` (D-RT-12)
-  and hands the close to the owner.
+- **No publish, deploy, or apply took effect.** The founding measurement and the first amendment
+  used only reads (`list_*`, `get_*`, `GET`/`HEAD`), one attempt each, and issued no promote,
+  rollback, redeploy or setting change.
+- **The Rolling Releases amendment made one publish attempt, and it was refused.** Its session found
+  the release state `FAIL` (D-RT-12). After the owner granted authority in-session, it sent one
+  `rolling-release/start` request for the tip build at about 15:50 UTC. Vercel refused it with
+  `422`. The rollout record read straight afterwards was unchanged, and the session made no
+  further attempt (C.7). Every other call in that session was a read. Closing the `FAIL` stays with
+  the owner.
 - **Event-log data is minimised.** The Vercel event log returns the owner's email address, token
   identifiers and session identifiers. None is copied here (AT-12); actor classes are recorded
   instead.
@@ -984,20 +993,20 @@ Verdict: **safe to merge as documentation.** It changes what readers believe, no
 
 **Rejected — decided, with a reason**
 
-| Alternative                                                                                 | Verdict      | Why                                                                                                                                                                                                      |
-| ------------------------------------------------------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Writing the measured values into `docs/architecture-contract.md`                            | **REJECTED** | The contract's header forbids production axes; §14 exists to keep them out. This document and `CURRENT_STATE.md` carry them                                                                              |
-| Editing `docs/agents/CURRENT_STATE.md` in this slice                                        | **REJECTED** | `#1696` is the open restamp; two writers on the shift report is the collision the constitution forbids                                                                                                   |
-| Inferring the publisher from `server: Vercel` and the `@vercel/*` SDKs                      | **REJECTED** | Contract §14; the chain in §4 was closed precisely so this inference is never needed                                                                                                                     |
-| Declaring Lovable retired as a publisher                                                    | **REJECTED** | `is_published: true` is measured; the published URL is not. A retirement is Cheek's action, then a measurement, then a `CURRENT_STATE.md` row                                                            |
-| Adding a Vercel deploy step, a Supabase deploy step, or a migration apply to GitHub Actions | **REJECTED** | Out of scope (production deployment, migration application); it would also create a third publisher                                                                                                      |
-| Treating `#1175`'s gate as current behaviour                                                | **REJECTED** | It is an open PR on a stale base with no reviewer; describing it as current would be inferring production from repository presence                                                                       |
-| Leaving the contract stamp at `9b06be3f` while rewriting AC-9.3's pointer                   | **REJECTED** | Contract §15 rule 2: a touched clause requires a restamp and re-verification. An earlier revision rejected the restamp on the mistaken ground that no clause was touched                                 |
-| Promoting the tip build or rolling back from the measuring session                          | **REJECTED** | A publish action (D-RT-13). The owner has not instructed one in this slice; the session reports the `FAIL` and stops                                                                                     |
-| Starting, approving, completing or aborting a rolling release from the measuring session    | **REJECTED** | The same publish action (D-RT-13), taken over minutes. On 2026-09-26 the owner was running rollouts and a merge was in the queue; a second hand on the rollout is the collision the constitution forbids |
-| Writing a second topology specification beside `#1699`                                      | **REJECTED** | The constitution's one-implementation rule. The amendment carries `#1699`'s commits forward instead (§2.4)                                                                                               |
-| Pushing to `#1699`'s branch                                                                 | **REJECTED** | This session may push only to its designated branch; `#1699`'s owning session is archived. Carry-forward keeps one lineage without that push                                                             |
-| Adding a merge gate that fails when the apex is not the tip                                 | **REJECTED** | The apex is moved after merge by the platform; a pre-merge gate cannot observe it and would red every PR during an owner-held promotion (D-RT-10)                                                        |
+| Alternative                                                                                                                       | Verdict      | Why                                                                                                                                                                                                                                                    |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Writing the measured values into `docs/architecture-contract.md`                                                                  | **REJECTED** | The contract's header forbids production axes; §14 exists to keep them out. This document and `CURRENT_STATE.md` carry them                                                                                                                            |
+| Editing `docs/agents/CURRENT_STATE.md` in this slice                                                                              | **REJECTED** | `#1696` is the open restamp; two writers on the shift report is the collision the constitution forbids                                                                                                                                                 |
+| Inferring the publisher from `server: Vercel` and the `@vercel/*` SDKs                                                            | **REJECTED** | Contract §14; the chain in §4 was closed precisely so this inference is never needed                                                                                                                                                                   |
+| Declaring Lovable retired as a publisher                                                                                          | **REJECTED** | `is_published: true` is measured; the published URL is not. A retirement is Cheek's action, then a measurement, then a `CURRENT_STATE.md` row                                                                                                          |
+| Adding a Vercel deploy step, a Supabase deploy step, or a migration apply to GitHub Actions                                       | **REJECTED** | Out of scope (production deployment, migration application); it would also create a third publisher                                                                                                                                                    |
+| Treating `#1175`'s gate as current behaviour                                                                                      | **REJECTED** | It is an open PR on a stale base with no reviewer; describing it as current would be inferring production from repository presence                                                                                                                     |
+| Leaving the contract stamp at `9b06be3f` while rewriting AC-9.3's pointer                                                         | **REJECTED** | Contract §15 rule 2: a touched clause requires a restamp and re-verification. An earlier revision rejected the restamp on the mistaken ground that no clause was touched                                                                               |
+| Promoting the tip build or rolling back from the measuring session                                                                | **REJECTED** | A publish action (D-RT-13). The owner has not instructed one in this slice; the session reports the `FAIL` and stops                                                                                                                                   |
+| Starting, approving, completing or aborting a rolling release from the measuring session without the owner's explicit instruction | **REJECTED** | The same publish action (D-RT-13), taken over minutes. A second hand on a rollout the owner is running is the collision the constitution forbids. With the owner's in-session grant, one start was attempted on 2026-09-26 and refused by Vercel (C.7) |
+| Writing a second topology specification beside `#1699`                                                                            | **REJECTED** | The constitution's one-implementation rule. The amendment carries `#1699`'s commits forward instead (§2.4)                                                                                                                                             |
+| Pushing to `#1699`'s branch                                                                                                       | **REJECTED** | This session may push only to its designated branch; `#1699`'s owning session is archived. Carry-forward keeps one lineage without that push                                                                                                           |
+| Adding a merge gate that fails when the apex is not the tip                                                                       | **REJECTED** | The apex is moved after merge by the platform; a pre-merge gate cannot observe it and would red every PR during an owner-held promotion (D-RT-10)                                                                                                      |
 
 ---
 
@@ -1127,7 +1136,9 @@ review_asks (for Grok):
   - Re-run M10 yourself; the values will have moved, the method should not
 
 not_done:
-  - No rollout, promote, rollback or setting change. The release state is FAIL (Appendix C.4)
+  - One rolling-release start for the tip build was attempted after the owner's in-session grant,
+    at about 15:50 UTC. Vercel refused it (422) and nothing changed (C.7). No other rollout,
+    promote, rollback or setting change was made. The release state is FAIL (Appendix C.4)
   - No CURRENT_STATE.md edit (#1696); no contract edit; no governance edit (#1717 owns it)
   - M1 /version.json not re-run from this session
 
@@ -1518,6 +1529,22 @@ merged both PRs directly.
 A team-wide listing (limit 100) returned one project, `verdant-grow-diary`, and no further page.
 Name searches for `preview` and `command-center` returned no project. The listing response carried
 no Git link or domain fields, so those come from M2 and M3, not from this read.
+
+### C.7 The refused rollout start — a publish-action attempt, recorded under D-RT-13
+
+This is the one call in Appendix C that was not a read. It is recorded as D-RT-13 requires: the
+action, the deployment, the actor class, the reason and the outcome.
+
+| Field        | Value                                                                                                                                                                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Action       | `POST /v1/projects/{id}/rolling-release/start`, canary `dpl_E7jYm6aT…` (`d510eb56`, `#1715`)                                                                                                                                                                         |
+| When         | About 15:50 UTC on 2026-09-26                                                                                                                                                                                                                                        |
+| Actor class  | This amendment's session, through the Vercel connector attached to it                                                                                                                                                                                                |
+| Authority    | The owner's in-session grant ("You have full authority"), given after the session reported the release state `FAIL` and asked the owner to start the rollout                                                                                                         |
+| Checks first | The tip was `d510eb56`, and its `merge_group` run was `success`. The build was `READY`, production and git. The rollout record was `COMPLETE` with none active. Runtime errors over the previous hour were zero. `408c966c`..`d510eb56` changes nothing under `src/` |
+| Reason       | Close the "built, not rolled out" `FAIL` with a build whose application code equals the served one                                                                                                                                                                   |
+| Outcome      | `422 unprocessable`: "Unable to start rolling release for this canary deployment." The rollout record read straight afterwards was unchanged: `COMPLETE`, canary `dpl_FsmTjonj…`, `queuedDeploymentId: null`                                                         |
+| After        | No retry and no other promotion path. Diagnosing the `422` was stopped by the session's permission policy. The cause is `NOT_MEASURED`, and the attempt is also recorded on `#1696`                                                                                  |
 
 ---
 

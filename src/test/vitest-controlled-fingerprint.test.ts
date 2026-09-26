@@ -111,7 +111,40 @@ function initFixtureRepo(): string {
   const caseRoot = fs.mkdtempSync(path.join(os.tmpdir(), CASE_PREFIX));
   // Node 16.7+ supports recursive fs.cpSync — copies the working tree and
   // .git metadata verbatim, producing a fully independent repository.
-  fs.cpSync(template, caseRoot, { recursive: true });
+  try {
+    fs.cpSync(template, caseRoot, { recursive: true });
+  } catch (error) {
+    // Diagnose hosted-only copy failures without retrying or replacing the
+    // original error. Inspect only these synthetic fixture paths, never env
+    // values, file contents, or the developer's real repository metadata.
+    const inspectFixture = (root: string) =>
+      ["", ".git", ".git/objects", ".git/objects/info", ".git/objects/pack"].map((relativePath) => {
+        const target = path.join(root, relativePath);
+        try {
+          const stat = fs.lstatSync(target);
+          return {
+            relativePath,
+            directory: stat.isDirectory(),
+            symbolicLink: stat.isSymbolicLink(),
+            mode: stat.mode,
+            entries: stat.isDirectory() ? fs.readdirSync(target).sort() : undefined,
+          };
+        } catch (inspectionError) {
+          return {
+            relativePath,
+            inspectionError: inspectionError instanceof Error ? inspectionError.message : "unknown",
+          };
+        }
+      });
+    console.error("FINGERPRINT_FIXTURE_COPY_FAILED", {
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      template: inspectFixture(template),
+      destination: inspectFixture(caseRoot),
+    });
+    throw error;
+  }
   activeCaseDirs.add(caseRoot);
   return caseRoot;
 }

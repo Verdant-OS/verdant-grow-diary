@@ -36,9 +36,22 @@ test("Sensors manual entry saves three metrics to the chosen tent and reopens in
     await page.locator("#m-air-temp").fill("26");
     await page.locator("#m-humidity").fill("60");
     await page.locator("#m-soil").fill("42");
+    const postRequests: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.origin === f.env.api &&
+        url.pathname === "/rest/v1/sensor_readings" &&
+        request.method() === "POST"
+      ) {
+        postRequests.push(request.url());
+      }
+    });
     await page.getByTestId("manual-reading-save").click();
     await expect(page.getByTestId("manual-reading-review-prompt")).toBeVisible();
     await expect(page.getByTestId("manual-reading-saved-confirmation")).toHaveCount(0);
+    expect(postRequests).toHaveLength(0);
+    expect((await ownerRows(f.owner)).sensor_readings).toHaveLength(0);
 
     const responsePromise = page.waitForResponse((response) => {
       const url = new URL(response.url());
@@ -48,9 +61,12 @@ test("Sensors manual entry saves three metrics to the chosen tent and reopens in
         response.request().method() === "POST"
       );
     });
+    const confirmStartedAt = Date.now();
     await page.getByTestId("manual-sensor-review-confirm").click();
     const response = await responsePromise;
+    const responseReceivedAt = Date.now();
     expect(response.ok()).toBe(true);
+    expect(postRequests).toHaveLength(1);
     const payload: unknown = response.request().postDataJSON();
     if (!Array.isArray(payload) || payload.some((row: unknown) => !isRow(row))) {
       throw new Error("Manual snapshot request was not a row batch.");
@@ -65,6 +81,8 @@ test("Sensors manual entry saves three metrics to the chosen tent and reopens in
     const capturedAt = posted[0].captured_at;
     expect(typeof capturedAt).toBe("string");
     expect(Number.isFinite(Date.parse(String(capturedAt)))).toBe(true);
+    expect(Date.parse(String(capturedAt))).toBeGreaterThanOrEqual(confirmStartedAt - 1000);
+    expect(Date.parse(String(capturedAt))).toBeLessThanOrEqual(responseReceivedAt + 1000);
     for (const row of posted) {
       expect(row).toMatchObject({
         tent_id: f.primary.tentId,
@@ -83,6 +101,9 @@ test("Sensors manual entry saves three metrics to the chosen tent and reopens in
 
     const saved = await ownerRows(f.owner);
     expect(saved.sensor_readings).toHaveLength(3);
+    expect(saved.grow_events).toEqual(before.grow_events);
+    expect(saved.diary_entries).toEqual(before.diary_entries);
+    expect(saved.environment_events).toEqual(before.environment_events);
     for (const row of saved.sensor_readings) {
       expect(row).toMatchObject({
         user_id: f.owner.id,
@@ -111,8 +132,18 @@ test("Sensors manual entry saves three metrics to the chosen tent and reopens in
       /^Soil\s*42\s*%$/,
     );
     await expect(history.locator('[data-metric="vpd_kpa"]')).toHaveCount(0);
+    await page.goto(f.env.ui + "/timeline?growId=" + f.primary.growId);
+    const timelineReceipt = page.locator(
+      '[id="timeline-entry-sensor-reading:' + f.primary.tentId + ":" + capturedAt + '"]',
+    );
+    await expect(timelineReceipt).toHaveCount(1);
+    await expect(timelineReceipt).toContainText("Manual sensor snapshot: 78.8°F, 60% RH");
+    await expect(timelineReceipt.getByTestId("timeline-sensor-source-badge-manual")).toHaveText(
+      "Source: manual",
+    );
     await page.goto(f.env.ui + "/tents/" + f.secondary.tentId);
     await expect(page.getByTestId("tent-manual-snapshot-history-empty")).toBeVisible();
+    expect(postRequests).toHaveLength(1);
     expect(fingerprint(await ownerRows(f.owner))).toBe(fingerprint(saved));
     expect(fingerprint(await witnessRows(f))).toBe(otherBefore);
   } finally {

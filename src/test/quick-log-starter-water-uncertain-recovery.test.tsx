@@ -417,7 +417,7 @@ describe("legacy public-starter Water uncertain receipt", () => {
   it("refuses to dispatch Watering if its recovery record cannot be persisted", async () => {
     seed();
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    const blockedStorage = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("storage denied");
     });
     fireEvent.click(screen.getByTestId("quick-log-save"));
@@ -435,6 +435,9 @@ describe("legacy public-starter Water uncertain receipt", () => {
         screen.getByTestId("quick-log-dialog-all-activities-structured-water-error"),
       ).toHaveTextContent("Watering recovery storage cannot be verified");
       expect(v2Open).not.toHaveBeenCalled();
+      blockedStorage.mockRestore();
+      fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-picker-watering"));
+      await waitFor(() => expect(v2Open).toHaveBeenCalledTimes(1));
     } finally {
       window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, v2Open);
     }

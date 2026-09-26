@@ -109,11 +109,13 @@ export function useQuickLogV2Save() {
           setError("receipt_unverified");
           return { ok: false, reason: "receipt_unverified" };
         }
-        if (payload.p_action === "water" && r.reused === true) {
+        // A captured starter target must be checked even for a new receipt:
+        // the plant may have moved while an uncertain attempt was waiting.
+        if (payload.p_action === "water" && (r.reused === true || options.expectedWaterTarget)) {
           const eventId = r.grow_event_id as string;
           const { data: event, error: eventError } = await supabase
             .from("grow_events")
-            .select("id,event_type,source,grow_id,plant_id,tent_id,occurred_at,note")
+            .select("id,event_type,source,grow_id,plant_id,tent_id,occurred_at,note,is_deleted")
             .eq("id", eventId)
             .maybeSingle();
           if (eventError || !event) {

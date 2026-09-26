@@ -13,6 +13,7 @@ import {
   readPendingQuickLogWatering,
   claimPendingQuickLogWatering,
   clearPendingQuickLogWatering,
+  reconcilePendingQuickLogWateringClear,
   WATERING_RECOVERY_UNAVAILABLE,
   WATERING_RECOVERY_PENDING,
   WATERING_RECOVERY_CLEAR_FAILED,
@@ -1997,7 +1998,11 @@ function QuickLogV2SheetForOwner({
     if (exactSubmission && !canContinueNote()) return;
     let recoveryClearFailed = false;
     if (exactWateringSubmission) {
-      recoveryClearFailed = !(await clearPendingQuickLogWatering(exactWateringSubmission.recovery));
+      const clearance = await reconcilePendingQuickLogWateringClear(
+        exactWateringSubmission.recovery,
+      );
+      recoveryClearFailed =
+        clearance.status !== "cleared" && clearance.status !== "already_cleared";
       setWateringStorageFence(recoveryClearFailed);
       confirmedWateringRecoveryRef.current = recoveryClearFailed
         ? exactWateringSubmission.recovery

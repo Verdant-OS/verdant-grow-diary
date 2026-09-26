@@ -104,6 +104,14 @@ describe("cross-path Water claims", () => {
     expect((await claimPendingQuickLogWatering(typed())).status).not.toBe("claimed");
   });
 
+  it("refuses a starter dispatch while a pre-upgrade typed Water remains in this tab", async () => {
+    window.sessionStorage.setItem(
+      `verdant:quick-log:pending-watering:v1:${ownerId}`,
+      JSON.stringify(typed()),
+    );
+    expect((await claimPendingStarterWater(starter())).status).toBe("other_pending");
+  });
+
   it("serializes simultaneous claims so only one path can dispatch", async () => {
     const results = await Promise.all([
       claimPendingStarterWater(starter()),

@@ -10,6 +10,7 @@ import {
 import {
   clearLocalStorageForTest,
   getLocalStorageItemForTest,
+  removeLocalStorageItemForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
 
@@ -259,6 +260,19 @@ async function expectOriginalWaterAndRetry(original: Record<string, unknown>) {
 }
 
 describe("QuickLogV2Sheet — uncertain Water recovery", () => {
+  it("does not fence the next Watering when another tab cleared the confirmed record", async () => {
+    wateringWriterMock.mockImplementation(async () => {
+      removeLocalStorageItemForTest("verdant:quick-log:pending-watering:v1:user-1");
+      return { ok: true, eventId: "water-event-1", reused: true };
+    });
+    renderSheet("plant:plant-1", "water");
+    enterVolume("750");
+    clickSave();
+    await screen.findByTestId("qlv2-post-save");
+    expect(screen.queryByText(/couldn’t finish preparing the next Watering/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /Log another/i })).toBeEnabled();
+  });
+
   it("retains an accepted Water record across Close and reopen instead of starting another save", async () => {
     const committed = await installAcceptedWaterLedger();
     const view = renderSheet("plant:plant-1", "water");

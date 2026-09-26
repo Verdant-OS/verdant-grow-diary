@@ -5,6 +5,7 @@ type WaterEvent = {
   id?: unknown;
   event_type?: unknown;
   source?: unknown;
+  is_deleted?: unknown;
   grow_id?: unknown;
   plant_id?: unknown;
   tent_id?: unknown;
@@ -22,7 +23,12 @@ export function matchesReusedWaterEvent(
   expectedTarget?: QuickLogResolvedTarget,
 ): boolean {
   if (!event || payload.p_action !== "water") return false;
-  if (event.id !== eventId || event.event_type !== "watering" || event.source !== "manual")
+  if (
+    event.id !== eventId ||
+    event.event_type !== "watering" ||
+    event.source !== "manual" ||
+    event.is_deleted !== false
+  )
     return false;
   if (payload.p_target_type === "plant") {
     if (event.plant_id !== payload.p_target_id) return false;

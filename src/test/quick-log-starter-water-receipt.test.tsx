@@ -42,6 +42,7 @@ beforeEach(() => {
       id,
       event_type: "watering",
       source: "manual",
+      is_deleted: false,
       grow_id: "grow-1",
       plant_id: payload.p_target_id,
       tent_id: "tent-1",
@@ -102,6 +103,7 @@ describe("starter Water manual receipt validation", () => {
         id,
         event_type: "observation",
         source: "manual",
+        is_deleted: false,
         plant_id: payload.p_target_id,
         occurred_at: payload.p_occurred_at,
         note: payload.p_note,
@@ -131,6 +133,7 @@ describe("starter Water manual receipt validation", () => {
           id,
           event_type: "watering",
           source: "manual",
+          is_deleted: false,
           grow_id: "grow-1",
           tent_id: "tent-1",
           plant_id: payload.p_target_id,
@@ -157,6 +160,69 @@ describe("starter Water manual receipt validation", () => {
     },
   );
 
+  it("rejects a new Water receipt saved under a moved plant's new grow or tent", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: { ok: true, grow_event_id: id, reused: false },
+      error: null,
+    });
+    mocks.eventRead.mockResolvedValue({
+      data: {
+        id,
+        event_type: "watering",
+        source: "manual",
+        is_deleted: false,
+        grow_id: "new-grow",
+        tent_id: "new-tent",
+        plant_id: payload.p_target_id,
+        occurred_at: payload.p_occurred_at,
+        note: payload.p_note,
+      },
+      error: null,
+    });
+    const { result } = renderHook(() => useQuickLogV2Save());
+    await act(async () => {
+      expect(
+        await result.current.save(payload, {
+          expectedWaterTarget: {
+            plantId: payload.p_target_id,
+            growId: "grow-1",
+            tentId: "tent-1",
+          },
+        }),
+      ).toMatchObject({ ok: false, reason: "receipt_mismatch" });
+    });
+    expect(mocks.track).not.toHaveBeenCalled();
+  });
+
+  it("does not confirm a reused Watering that has been retracted", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: { ok: true, grow_event_id: id, reused: true },
+      error: null,
+    });
+    mocks.eventRead.mockResolvedValue({
+      data: {
+        id,
+        event_type: "watering",
+        source: "manual",
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: payload.p_target_id,
+        occurred_at: payload.p_occurred_at,
+        note: payload.p_note,
+        is_deleted: true,
+      },
+      error: null,
+    });
+    const { result } = renderHook(() => useQuickLogV2Save());
+    await act(async () => {
+      expect(await result.current.save(payload)).toMatchObject({
+        ok: false,
+        reason: "receipt_mismatch",
+      });
+    });
+    expect(mocks.track).not.toHaveBeenCalled();
+  });
+
   it.each([
     { plant_id: "55555555-5555-4555-8555-555555555555" },
     { note: "another Watering" },
@@ -171,6 +237,7 @@ describe("starter Water manual receipt validation", () => {
         id,
         event_type: "watering",
         source: "manual",
+        is_deleted: false,
         plant_id: payload.p_target_id,
         occurred_at: payload.p_occurred_at,
         note: payload.p_note,

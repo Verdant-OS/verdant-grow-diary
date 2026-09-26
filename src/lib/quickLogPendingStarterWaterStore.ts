@@ -135,6 +135,20 @@ export function readPendingStarterWater(
   }
 }
 
+/** An empty read alone does not prove storage writes have recovered. */
+export function canPersistStarterWaterRecovery(ownerId: string | null | undefined): boolean {
+  if (!id(ownerId)) return false;
+  const probeKey = `verdant:quick-log:water-recovery-probe:v1:${ownerId}`;
+  try {
+    window.localStorage.setItem(probeKey, ownerId);
+    if (window.localStorage.getItem(probeKey) !== ownerId) return false;
+    window.localStorage.removeItem(probeKey);
+    return window.localStorage.getItem(probeKey) === null;
+  } catch {
+    return false;
+  }
+}
+
 /** Claim before dispatch. A second form can never replace an unresolved write. */
 export async function claimPendingStarterWater(
   record: PendingStarterWater,
@@ -154,7 +168,10 @@ export async function claimPendingStarterWater(
     return await locks.request(waterRecoveryLockKey(record.ownerId), { mode: "exclusive" }, () => {
       // A typed Water is held in the same origin-wide storage. Any value,
       // including an unreadable one, blocks a different Water operation.
-      if (window.localStorage.getItem(typedWaterRecoveryKey(record.ownerId)) !== null)
+      if (
+        window.localStorage.getItem(typedWaterRecoveryKey(record.ownerId)) !== null ||
+        window.sessionStorage.getItem(typedWaterRecoveryKey(record.ownerId)) !== null
+      )
         return { status: "other_pending" as const };
       const current = readPendingStarterWater(record.ownerId);
       if (current.status === "blocked") return current;

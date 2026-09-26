@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   claimPendingQuickLogWatering,
   clearPendingQuickLogWatering,
+  reconcilePendingQuickLogWateringClear,
   readPendingQuickLogWatering,
   type PendingQuickLogWatering,
 } from "@/lib/quickLogPendingWateringStore";
@@ -133,6 +134,15 @@ describe("durable pending Water Quick Log ownership", () => {
     expect(JSON.parse(getLocalStorageItemForTest(key())!)).toEqual(original);
     window.sessionStorage.clear();
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
+  });
+
+  it("treats a matching typed Water cleared by another tab as resolved", async () => {
+    const original = record();
+    expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
+    expect(await clearPendingQuickLogWatering(original)).toBe(true);
+    expect(await reconcilePendingQuickLogWateringClear(original)).toEqual({
+      status: "already_cleared",
+    });
   });
 
   it("blocks conflicting tab-local and shared recovery records", async () => {

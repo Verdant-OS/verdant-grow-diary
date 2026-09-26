@@ -281,3 +281,17 @@ export async function clearPendingQuickLogWatering(
     return false;
   }
 }
+
+/** Another tab may clear the same confirmed Water first; an empty slot is resolved. */
+export async function reconcilePendingQuickLogWateringClear(
+  record: PendingQuickLogWatering,
+): Promise<
+  | { status: "cleared" }
+  | { status: "already_cleared" }
+  | Exclude<PendingWateringRead, { status: "empty" }>
+> {
+  if (await clearPendingQuickLogWatering(record)) return { status: "cleared" };
+  const current = readPendingQuickLogWatering(record?.ownerId);
+  if (current.status === "empty") return { status: "already_cleared" };
+  return current;
+}

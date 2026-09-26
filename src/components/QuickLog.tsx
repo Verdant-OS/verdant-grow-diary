@@ -102,6 +102,7 @@ import {
   STARTER_WATER_RECOVERY_UNAVAILABLE,
   TYPED_WATER_RECOVERY_PENDING,
   claimPendingStarterWater,
+  canPersistStarterWaterRecovery,
   clearPendingStarterWater,
   reconcilePendingStarterWaterClear,
   readPendingStarterWater,
@@ -1953,7 +1954,10 @@ export default function QuickLog({
             // Read the shared record at the handoff boundary, not only in the
             // mount-time effect that supplies the presenter's current state.
             const shared = readPendingStarterWater(user?.id);
-            if (shared.status !== "empty" || starterWaterStorageBlocked) {
+            if (
+              shared.status !== "empty" ||
+              (starterWaterStorageBlocked && !canPersistStarterWaterRecovery(user?.id))
+            ) {
               const reason =
                 shared.status === "pending"
                   ? STARTER_WATER_RECOVERY_PENDING

@@ -140,7 +140,7 @@ afterEach(() => {
   clients.splice(0).forEach((client) => client.clear());
 });
 
-describe("latest snapshot diary query scope before bounded selection", () => {
+describe("latest snapshot diary query scope and bounded selection", () => {
   it.each([
     [
       "manual envelope",
@@ -260,6 +260,51 @@ describe("latest snapshot diary query scope before bounded selection", () => {
     await waitFor(() => expect(result.current.status).toBe("ok"));
     expect(result.current.snapshot.diary_evidence_ref?.id).toBe("saved-manual");
     expect(io.diaryReads).toBe(2);
+  });
+
+  it("finds a usable manual in the 200th candidate row", async () => {
+    io.rows = [
+      diary(),
+      ...Array.from({ length: 199 }, (_, index) =>
+        diary({
+          id: `invalid-evidence-${index}`,
+          details: { sensor_snapshot: {} },
+          entry_at: new Date(Date.parse(savedAt) + (index + 1) * 60_000).toISOString(),
+        }),
+      ),
+    ];
+    const { result } = mount();
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.snapshot.diary_evidence_ref?.id).toBe("saved-manual");
+    expect(io.diaryReads).toBe(10);
+  });
+
+  it("treats exactly 200 unusable candidates as a completed empty read", async () => {
+    io.rows = Array.from({ length: 200 }, (_, index) =>
+      diary({
+        id: `invalid-evidence-${index}`,
+        details: { sensor_snapshot: {} },
+        entry_at: new Date(Date.parse(savedAt) + index * 60_000).toISOString(),
+      }),
+    );
+    const { result } = mount();
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.snapshot.ts).toBeNull();
+    expect(io.diaryReads).toBe(10);
+  });
+
+  it("stops after ten pages and reports unavailable when more invalid candidates remain", async () => {
+    io.rows = Array.from({ length: 201 }, (_, index) =>
+      diary({
+        id: `invalid-evidence-${index}`,
+        details: { sensor_snapshot: {} },
+        entry_at: new Date(Date.parse(savedAt) + index * 60_000).toISOString(),
+      }),
+    );
+    const { result } = mount();
+    await waitFor(() => expect(result.current.status).toBe("unavailable"));
+    expect(result.current.snapshot.ts).toBeNull();
+    expect(io.diaryReads).toBe(10);
   });
 
   it("reports unavailable when a later candidate page fails", async () => {

@@ -67,6 +67,9 @@ function preferNewer(
 }
 
 const DIARY_EVIDENCE_PAGE_SIZE = 20;
+// Stop after a bounded candidate scan. A non-exhausted scan is unavailable,
+// since older unexamined rows may contain the latest usable diary evidence.
+const DIARY_EVIDENCE_MAX_PAGES = 10;
 const DIARY_EVIDENCE_OR_FILTER =
   "details->sensor_snapshot.not.is.null,details->manual_sensor_snapshot.not.is.null,details->environment_check.not.is.null";
 
@@ -144,7 +147,9 @@ export function useLatestSensorSnapshot(
         // evidence ref for alert persistence (#603). Select `tent_id` so
         // tent-scoped views reject foreign/null attribution (#602).
         if (!growId) return staleSensorCandidate ?? EMPTY_SNAPSHOT;
-        for (let from = 0; ; from += DIARY_EVIDENCE_PAGE_SIZE) {
+        for (let page = 0; page < DIARY_EVIDENCE_MAX_PAGES; page += 1) {
+          const from = page * DIARY_EVIDENCE_PAGE_SIZE;
+          const lastPage = page === DIARY_EVIDENCE_MAX_PAGES - 1;
           const { data: diaryRows, error: diaryErr } = await selectWithRetractionCompat(
             (withRetractionFilter) => {
               let query = supabase.from("diary_entries").select("id,entry_at,details,tent_id");
@@ -153,15 +158,19 @@ export function useLatestSensorSnapshot(
               // Filter and scope before paging: ordinary notes in this or
               // another tent must not crowd out saved environment evidence.
               if (tentIds.length > 0) query = query.in("tent_id", tentIds);
-              return query
-                .or(DIARY_EVIDENCE_OR_FILTER)
-                .order("entry_at", { ascending: false })
-                .order("id", { ascending: true })
-                .range(from, from + DIARY_EVIDENCE_PAGE_SIZE - 1);
+              return (
+                query
+                  .or(DIARY_EVIDENCE_OR_FILTER)
+                  .order("entry_at", { ascending: false })
+                  .order("id", { ascending: true })
+                  // One lookahead row on the final page distinguishes exactly
+                  // 200 exhausted candidates from unexamined older evidence.
+                  .range(from, from + DIARY_EVIDENCE_PAGE_SIZE - (lastPage ? 0 : 1))
+              );
             },
           );
           if (diaryErr || !Array.isArray(diaryRows)) throw new Error("unavailable");
-          for (const row of diaryRows) {
+          for (const row of diaryRows.slice(0, DIARY_EVIDENCE_PAGE_SIZE)) {
             const details = (row.details ?? null) as Record<string, unknown> | null;
             if (!details || typeof details !== "object") continue;
             // #602 / #601: tent-scoped views only accept diary rows attributed
@@ -216,6 +225,10 @@ export function useLatestSensorSnapshot(
           // A candidate key alone does not prove a usable reading. Continue
           // through older pages rather than calling an all-invalid first page
           // a successful empty read.
+          if (lastPage) {
+            if (diaryRows.length > DIARY_EVIDENCE_PAGE_SIZE) throw new Error("unavailable");
+            break;
+          }
           if (diaryRows.length < DIARY_EVIDENCE_PAGE_SIZE) break;
         }
         // 3) Nothing newer in the diary: a stale sensor snapshot is still the

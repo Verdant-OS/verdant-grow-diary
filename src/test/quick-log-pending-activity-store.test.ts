@@ -33,6 +33,36 @@ beforeEach(() => {
 });
 
 describe("pending Quick Log activity recovery", () => {
+  it("upgrades a legacy v1 record with the captured occurrence time before exposing it", () => {
+    expect(claimPendingQuickLogActivity(original).status).toBe("claimed");
+    const key = window.sessionStorage.key(0)!;
+    const legacy = structuredClone(original) as unknown as Record<string, unknown>;
+    delete (legacy.input as Record<string, unknown>).occurredAt;
+    window.sessionStorage.setItem(key, JSON.stringify(legacy));
+    expect(readPendingQuickLogActivity(original.ownerId, original.input)).toEqual({
+      status: "pending",
+      record: original,
+    });
+    expect(JSON.parse(window.sessionStorage.getItem(key)!)).toEqual(original);
+    expect(readPendingQuickLogActivity(original.ownerId, original.input)).toEqual({
+      status: "pending",
+      record: original,
+    });
+  });
+
+  it("keeps a legacy record blocked when its upgrade cannot be written back", () => {
+    expect(claimPendingQuickLogActivity(original).status).toBe("claimed");
+    const key = window.sessionStorage.key(0)!;
+    const legacy = structuredClone(original) as unknown as Record<string, unknown>;
+    delete (legacy.input as Record<string, unknown>).occurredAt;
+    window.sessionStorage.setItem(key, JSON.stringify(legacy));
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => undefined);
+    expect(readPendingQuickLogActivity(original.ownerId, original.input)).toEqual({
+      status: "blocked",
+    });
+    expect(JSON.parse(window.sessionStorage.getItem(key)!)).toEqual(legacy);
+  });
+
   it("claims and reads one exact payload without allowing an edited attempt to replace it", () => {
     expect(claimPendingQuickLogActivity(original)).toEqual({ status: "claimed", record: original });
     expect(readPendingQuickLogActivity(original.ownerId, original.input)).toEqual({

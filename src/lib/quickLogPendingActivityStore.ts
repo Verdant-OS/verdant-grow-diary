@@ -180,9 +180,22 @@ export function readPendingQuickLogActivity(
       return { status: "empty" };
     }
     const parsed: unknown = JSON.parse(raw);
-    return validRecord(parsed, ownerId, target)
-      ? { status: "pending", record: parsed }
-      : { status: "blocked" };
+    // Earlier v1 records captured createdAt but did not include occurredAt.
+    // Keep their exact request/key recoverable by adding the captured time,
+    // and fail closed if the upgraded record cannot be persisted and read back.
+    const migrated =
+      object(parsed) &&
+      object(parsed.input) &&
+      !Object.prototype.hasOwnProperty.call(parsed.input, "occurredAt")
+        ? { ...parsed, input: { ...parsed.input, occurredAt: parsed.createdAt } }
+        : parsed;
+    if (!validRecord(migrated, ownerId, target)) return { status: "blocked" };
+    if (migrated !== parsed) {
+      const migratedRaw = JSON.stringify(migrated);
+      window.sessionStorage.setItem(key, migratedRaw);
+      if (window.sessionStorage.getItem(key) !== migratedRaw) return { status: "blocked" };
+    }
+    return { status: "pending", record: migrated };
   } catch {
     return { status: "blocked" };
   }

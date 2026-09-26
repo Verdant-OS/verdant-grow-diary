@@ -27,6 +27,7 @@ import {
   type ManualSensorMetric,
 } from "@/lib/manualSensorFreshnessRules";
 import { usePlantManualSensorHistory } from "@/hooks/usePlantManualSensorHistory";
+import { useNowTick } from "@/hooks/useNowTick";
 
 interface Props {
   plantId: string;
@@ -61,10 +62,11 @@ const STATE_LABELS: Record<FreshnessState, string> = {
 
 export default function PlantManualSensorFreshnessCard({ plantId, onUpdate }: Props) {
   const { data, isLoading } = usePlantManualSensorHistory(plantId);
+  const nowMs = useNowTick();
 
   const snapshots = useMemo<FreshnessSnapshot[]>(() => {
-    return buildFreshnessSnapshots(data ?? {}, new Date());
-  }, [data]);
+    return buildFreshnessSnapshots(data ?? {}, new Date(nowMs));
+  }, [data, nowMs]);
 
   const cta = useMemo(() => computeFreshnessCta(snapshots), [snapshots]);
   const ctaLabel = cta === "add_first" ? "Add first snapshot" : "Update";

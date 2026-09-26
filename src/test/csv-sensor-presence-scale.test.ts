@@ -99,6 +99,18 @@ describe("CSV presence lookup scale", () => {
     ).rejects.toThrow("CSV presence count did not match page");
   });
 
+  it("rejects when a counted page returns more rows than the server total", async () => {
+    await expect(
+      collectCsvSensorPresenceKeys(
+        async () => ({
+          rows: [row(timestamp(0)), row(timestamp(1))],
+          totalCount: 1,
+        }),
+        () => true,
+      ),
+    ).rejects.toThrow("CSV presence count did not match page");
+  });
+
   it("falls back to empty-page termination when the count header is unavailable", async () => {
     const offsets: number[] = [];
     const rows = timestamps.slice(0, 3).map(row);

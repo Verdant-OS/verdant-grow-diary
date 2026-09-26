@@ -2,9 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   claimPendingQuickLogWatering,
   clearPendingQuickLogWatering,
+  reconcilePendingQuickLogWateringClear,
   readPendingQuickLogWatering,
   type PendingQuickLogWatering,
 } from "@/lib/quickLogPendingWateringStore";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const ownerA = "11111111-1111-4111-8111-111111111111";
 const ownerB = "22222222-2222-4222-8222-222222222222";
@@ -64,20 +69,42 @@ function record(): PendingQuickLogWatering {
   };
 }
 
-beforeEach(() => window.sessionStorage.clear());
-afterEach(() => vi.restoreAllMocks());
+const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
+beforeEach(() => {
+  window.sessionStorage.clear();
+  clearLocalStorageForTest();
+  let tail: Promise<unknown> = Promise.resolve();
+  Object.defineProperty(window.navigator, "locks", {
+    configurable: true,
+    value: {
+      request: (_name: string, _options: unknown, callback: () => unknown) => {
+        const turn = tail.then(callback);
+        tail = turn.then(
+          () => undefined,
+          () => undefined,
+        );
+        return turn;
+      },
+    },
+  });
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  if (originalLocks) Object.defineProperty(window.navigator, "locks", originalLocks);
+  else Reflect.deleteProperty(window.navigator, "locks");
+});
 
 describe("durable pending Water Quick Log ownership", () => {
-  it("reports empty only for an accessible owner slot with no record", () => {
+  it("reports empty only for an accessible owner slot with no record", async () => {
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "empty" });
   });
 
-  it("persists a detached exact claim synchronously before the caller can dispatch", () => {
+  it("persists a detached exact claim before the caller can dispatch", async () => {
     const input = record();
     const expected = record();
-    const claimed = claimPendingQuickLogWatering(input);
+    const claimed = await claimPendingQuickLogWatering(input);
     expect(claimed).toEqual({ status: "claimed", record: expected });
-    expect(JSON.parse(window.sessionStorage.getItem(key())!)).toEqual(expected);
+    expect(JSON.parse(getLocalStorageItemForTest(key())!)).toEqual(expected);
     input.payload.volume_ml = 900;
     input.attachments.photo = false;
     input.payload.sensor_snapshot!.metrics.temperature_c = 30;
@@ -86,7 +113,7 @@ describe("durable pending Water Quick Log ownership", () => {
   });
 
   it("recovers the same payload, destination and attachment intentions after module remount", async () => {
-    expect(claimPendingQuickLogWatering(record()).status).toBe("claimed");
+    expect((await claimPendingQuickLogWatering(record())).status).toBe("claimed");
     vi.resetModules();
     const replacement = await import("@/lib/quickLogPendingWateringStore");
     expect(replacement.readPendingQuickLogWatering(ownerA)).toEqual({
@@ -99,39 +126,111 @@ describe("durable pending Water Quick Log ownership", () => {
     });
   });
 
-  it("does not expire an unresolved save when the clock advances", () => {
+  it("promotes an older tab-local recovery to shared storage before replay", async () => {
+    const original = record();
+    window.sessionStorage.setItem(key(), JSON.stringify(original));
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
+    expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
+    expect(JSON.parse(getLocalStorageItemForTest(key())!)).toEqual(original);
+    expect(window.sessionStorage.getItem(key())).toBeNull();
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
+    expect(await clearPendingQuickLogWatering(original)).toBe(true);
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "empty" });
+  });
+
+  it("does not dispatch a promoted legacy claim if its tab-local copy cannot be removed", async () => {
+    const original = record();
+    window.sessionStorage.setItem(key(), JSON.stringify(original));
+    const remove = Storage.prototype.removeItem;
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (this: Storage, name) {
+      if (this !== window.sessionStorage) remove.call(this, name);
+    });
+    expect(await claimPendingQuickLogWatering(original)).toEqual({ status: "blocked" });
+    expect(JSON.parse(getLocalStorageItemForTest(key())!)).toEqual(original);
+    expect(window.sessionStorage.getItem(key())).not.toBeNull();
+  });
+
+  it("treats a matching typed Water cleared by another tab as resolved", async () => {
+    const original = record();
+    expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
+    expect(await clearPendingQuickLogWatering(original)).toBe(true);
+    expect(await reconcilePendingQuickLogWateringClear(original)).toEqual({
+      status: "already_cleared",
+    });
+  });
+
+  it("blocks conflicting tab-local and shared recovery records", async () => {
+    const original = record();
+    expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
+    const conflicting = record();
+    conflicting.payload.idempotency_key = "other-water-key";
+    window.sessionStorage.setItem(key(), JSON.stringify(conflicting));
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
+    expect((await claimPendingQuickLogWatering(original)).status).toBe("blocked");
+    expect(await clearPendingQuickLogWatering(original)).toBe(false);
+  });
+
+  it.each(["grow", "tent", "plant"])(
+    "refuses to promote an internally consistent non-UUID %s target",
+    async (field) => {
+      const invalid = record();
+      if (field === "grow") {
+        invalid.payload.grow_id = "grow-a";
+        invalid.resolved.growId = "grow-a";
+      } else if (field === "tent") {
+        invalid.payload.tent_id = "tent-a";
+        invalid.resolved.tentId = "tent-a";
+      } else {
+        invalid.payload.plant_id = "plant-a";
+        invalid.resolved.plantId = "plant-a";
+        invalid.resolved.targetId = "plant-a";
+      }
+      window.sessionStorage.setItem(key(), JSON.stringify(invalid));
+      expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
+      expect(await claimPendingQuickLogWatering(invalid)).toEqual({ status: "blocked" });
+      expect(getLocalStorageItemForTest(key())).toBeNull();
+    },
+  );
+
+  it("does not expire an unresolved save when the clock advances", async () => {
     const pending = record();
     pending.createdAt = "2020-01-01T00:00:00.000Z";
-    expect(claimPendingQuickLogWatering(pending).status).toBe("claimed");
+    expect((await claimPendingQuickLogWatering(pending)).status).toBe("claimed");
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: pending });
   });
 
-  it("lets identical retries claim but sends a competing draft back to the original record", () => {
+  it("lets identical retries claim but sends a competing draft back to the original record", async () => {
     const original = record();
-    expect(claimPendingQuickLogWatering(original)).toEqual({ status: "claimed", record: original });
-    expect(claimPendingQuickLogWatering(record())).toEqual({ status: "claimed", record: original });
+    expect(await claimPendingQuickLogWatering(original)).toEqual({
+      status: "claimed",
+      record: original,
+    });
+    expect(await claimPendingQuickLogWatering(record())).toEqual({
+      status: "claimed",
+      record: original,
+    });
     const competitor = record();
     competitor.payload.idempotency_key = "different-save-12345678";
     competitor.payload.volume_ml = 900;
-    expect(claimPendingQuickLogWatering(competitor)).toEqual({
+    expect(await claimPendingQuickLogWatering(competitor)).toEqual({
       status: "pending",
       record: original,
     });
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
   });
 
-  it("isolates owners when reading, claiming and clearing", () => {
+  it("isolates owners when reading, claiming and clearing", async () => {
     const a = record();
     const b = { ...record(), ownerId: ownerB };
-    expect(claimPendingQuickLogWatering(a).status).toBe("claimed");
+    expect((await claimPendingQuickLogWatering(a)).status).toBe("claimed");
     expect(readPendingQuickLogWatering(ownerB)).toEqual({ status: "empty" });
-    expect(claimPendingQuickLogWatering(b).status).toBe("claimed");
-    expect(clearPendingQuickLogWatering(a)).toBe(true);
+    expect((await claimPendingQuickLogWatering(b)).status).toBe("claimed");
+    expect(await clearPendingQuickLogWatering(a)).toBe(true);
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "empty" });
     expect(readPendingQuickLogWatering(ownerB)).toEqual({ status: "pending", record: b });
   });
 
-  it("accepts a tent destination with no plant and preserves absent optional fields", () => {
+  it("accepts a tent destination with no plant and preserves absent optional fields", async () => {
     const pending = record();
     pending.payload = {
       idempotency_key: "tent-water-12345678",
@@ -147,11 +246,14 @@ describe("durable pending Water Quick Log ownership", () => {
       plantId: null,
       growId,
     };
-    expect(claimPendingQuickLogWatering(pending)).toEqual({ status: "claimed", record: pending });
+    expect(await claimPendingQuickLogWatering(pending)).toEqual({
+      status: "claimed",
+      record: pending,
+    });
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: pending });
   });
 
-  it("accepts the canonical numeric boundaries without normalizing the payload", () => {
+  it("accepts the canonical numeric boundaries without normalizing the payload", async () => {
     const pending = record();
     Object.assign(pending.payload, {
       volume_ml: 1_000_000,
@@ -163,7 +265,10 @@ describe("durable pending Water Quick Log ownership", () => {
       water_temp_c: -10,
     });
     pending.payload.sensor_snapshot!.metrics = { temperature_c: 60, humidity_pct: 0, vpd_kpa: 10 };
-    expect(claimPendingQuickLogWatering(pending)).toEqual({ status: "claimed", record: pending });
+    expect(await claimPendingQuickLogWatering(pending)).toEqual({
+      status: "claimed",
+      record: pending,
+    });
   });
 });
 
@@ -177,20 +282,23 @@ describe("fail-closed pending Water validation", () => {
 
   it.each([null, undefined, 0, [], {}])(
     "does not throw for a malformed claim or clear: %j",
-    (input) => {
-      expect(claimPendingQuickLogWatering(input as PendingQuickLogWatering)).toEqual({
+    async (input) => {
+      expect(await claimPendingQuickLogWatering(input as PendingQuickLogWatering)).toEqual({
         status: "blocked",
       });
-      expect(clearPendingQuickLogWatering(input as PendingQuickLogWatering)).toBe(false);
+      expect(await clearPendingQuickLogWatering(input as PendingQuickLogWatering)).toBe(false);
     },
   );
 
-  it.each(["not json", "null", "[]", "{}"])("retains corrupt storage as blocked: %s", (raw) => {
-    window.sessionStorage.setItem(key(), raw);
-    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
-    expect(claimPendingQuickLogWatering(record())).toEqual({ status: "blocked" });
-    expect(window.sessionStorage.getItem(key())).toBe(raw);
-  });
+  it.each(["not json", "null", "[]", "{}"])(
+    "retains corrupt storage as blocked: %s",
+    async (raw) => {
+      window.sessionStorage.setItem(key(), raw);
+      expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
+      expect(await claimPendingQuickLogWatering(record())).toEqual({ status: "blocked" });
+      expect(window.sessionStorage.getItem(key())).toBe(raw);
+    },
+  );
 
   const tampered: Array<[string, (value: PendingQuickLogWatering) => void]> = [
     ["unknown version", (r) => Object.assign(r, { version: 2 })],
@@ -413,12 +521,12 @@ describe("fail-closed pending Water validation", () => {
       (r) => Object.assign(r.attachments, { photoUrl: "private-photo" }),
     ],
   ];
-  it.each(tampered)("blocks a corrupt stored record: %s", (_label, mutate) => {
+  it.each(tampered)("blocks a corrupt stored record: %s", async (_label, mutate) => {
     const input = record();
     mutate(input);
     window.sessionStorage.setItem(key(), JSON.stringify(input));
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
-    expect(clearPendingQuickLogWatering(input)).toBe(false);
+    expect(await clearPendingQuickLogWatering(input)).toBe(false);
   });
 
   it.each([
@@ -427,40 +535,43 @@ describe("fail-closed pending Water validation", () => {
     ["undefined", undefined],
     ["function", () => "silently lost"],
     ["Date", new Date(observedAt)],
-  ])("blocks a claim whose details cannot survive JSON exactly: %s", (_label, value) => {
+  ])("blocks a claim whose details cannot survive JSON exactly: %s", async (_label, value) => {
     const input = record();
     input.payload.details!.bad = value;
-    expect(claimPendingQuickLogWatering(input)).toEqual({ status: "blocked" });
+    expect(await claimPendingQuickLogWatering(input)).toEqual({ status: "blocked" });
     expect(window.sessionStorage.getItem(key())).toBeNull();
   });
 
-  it("blocks cyclic details without throwing or discarding them", () => {
+  it("blocks cyclic details without throwing or discarding them", async () => {
     const input = record();
     input.payload.details!.self = input.payload.details;
-    expect(claimPendingQuickLogWatering(input)).toEqual({ status: "blocked" });
+    expect(await claimPendingQuickLogWatering(input)).toEqual({ status: "blocked" });
     expect(window.sessionStorage.getItem(key())).toBeNull();
   });
 });
 
 describe("storage failures and exact completion", () => {
-  it("blocks when even accessing sessionStorage throws", () => {
+  it("blocks when even accessing sessionStorage throws", async () => {
     vi.spyOn(window, "sessionStorage", "get").mockImplementation(() => {
       throw new Error("disabled");
     });
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
-    expect(claimPendingQuickLogWatering(record())).toEqual({ status: "blocked" });
-    expect(clearPendingQuickLogWatering(record())).toBe(false);
+    expect(await claimPendingQuickLogWatering(record())).toEqual({ status: "blocked" });
+    expect(await clearPendingQuickLogWatering(record())).toBe(false);
   });
 
-  it.each(["throw", "no-op"])("does not permit dispatch after a %s storage write", (failure) => {
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      if (failure === "throw") throw new Error("quota");
-    });
-    expect(claimPendingQuickLogWatering(record())).toEqual({ status: "blocked" });
-    expect(window.sessionStorage.getItem(key())).toBeNull();
-  });
+  it.each(["throw", "no-op"])(
+    "does not permit dispatch after a %s storage write",
+    async (failure) => {
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+        if (failure === "throw") throw new Error("quota");
+      });
+      expect(await claimPendingQuickLogWatering(record())).toEqual({ status: "blocked" });
+      expect(window.sessionStorage.getItem(key())).toBeNull();
+    },
+  );
 
-  it("blocks a claim if the persisted readback is not the requested record", () => {
+  it("blocks a claim if the persisted readback is not the requested record", async () => {
     const originalSet = Storage.prototype.setItem;
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
       this: Storage,
@@ -469,30 +580,33 @@ describe("storage failures and exact completion", () => {
     ) {
       originalSet.call(this, name, "{}");
     });
-    expect(claimPendingQuickLogWatering(record())).toEqual({ status: "blocked" });
+    expect(await claimPendingQuickLogWatering(record())).toEqual({ status: "blocked" });
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
   });
 
-  it("clears only an exact completed claim, then permits a new logical save", () => {
+  it("clears only an exact completed claim, then permits a new logical save", async () => {
     const original = record();
-    expect(claimPendingQuickLogWatering(original).status).toBe("claimed");
+    expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
     const edited = record();
     edited.payload.volume_ml = 900;
-    expect(clearPendingQuickLogWatering(edited)).toBe(false);
+    expect(await clearPendingQuickLogWatering(edited)).toBe(false);
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
-    expect(clearPendingQuickLogWatering(original)).toBe(true);
-    expect(clearPendingQuickLogWatering(original)).toBe(false);
-    expect(claimPendingQuickLogWatering(edited)).toEqual({ status: "claimed", record: edited });
-    expect(clearPendingQuickLogWatering(original)).toBe(false);
+    expect(await clearPendingQuickLogWatering(original)).toBe(true);
+    expect(await clearPendingQuickLogWatering(original)).toBe(false);
+    expect(await claimPendingQuickLogWatering(edited)).toEqual({
+      status: "claimed",
+      record: edited,
+    });
+    expect(await clearPendingQuickLogWatering(original)).toBe(false);
   });
 
-  it.each(["throw", "no-op"])("reports failed cleanup when removeItem is %s", (failure) => {
+  it.each(["throw", "no-op"])("reports failed cleanup when removeItem is %s", async (failure) => {
     const input = record();
-    expect(claimPendingQuickLogWatering(input).status).toBe("claimed");
+    expect((await claimPendingQuickLogWatering(input)).status).toBe("claimed");
     vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
       if (failure === "throw") throw new Error("disabled");
     });
-    expect(clearPendingQuickLogWatering(input)).toBe(false);
+    expect(await clearPendingQuickLogWatering(input)).toBe(false);
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: input });
   });
 });

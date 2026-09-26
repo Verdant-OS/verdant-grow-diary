@@ -3,7 +3,13 @@ import { isUuid } from "@/lib/isUuid";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyQuickLogThrownSaveError } from "@/lib/quickLogSaveErrorMessage";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
+import type { QuickLogResolvedTarget } from "@/lib/quickLogTargetIntegrityRules";
 import { trackQuickLogSuccess, type QuickLogSuccessInput } from "@/lib/quickLogSuccessTelemetry";
+import {
+  matchesReusedWaterEvent,
+  matchesReusedWaterReceipt,
+  resolveStarterWaterReceiptTarget,
+} from "@/lib/quickLogWaterReceiptRules";
 
 export interface QuickLogV2SaveResult {
   ok: boolean;
@@ -15,6 +21,9 @@ export interface QuickLogV2SaveResult {
   persistedNote?: string | null;
   /** A recognized structured rejection before any logical event write. */
   definitiveRejected?: boolean;
+  /** Persisted context when a starter plant moved before its Watering committed. */
+  savedWaterTarget?: QuickLogResolvedTarget;
+  waterContextChanged?: boolean;
 }
 
 interface RpcResponse {
@@ -36,6 +45,8 @@ export interface QuickLogV2SaveOptions {
   verifyPersistedNote?: boolean;
   /** The owning sheet/account must still be active at each async boundary. */
   canContinueNote?: () => boolean;
+  /** Exact grow/tent/plant context captured before a public-starter Water write. */
+  expectedWaterTarget?: QuickLogResolvedTarget;
 }
 
 // These normal RPC responses are emitted before the manual event insert.
@@ -63,7 +74,8 @@ export function useQuickLogV2Save() {
       payload: QuickLogV2SavePayload,
       options: QuickLogV2SaveOptions = {},
     ): Promise<QuickLogV2SaveResult> => {
-      const canContinue = () => payload.p_action !== "note" || options.canContinueNote?.() !== false;
+      const canContinue = () =>
+        payload.p_action !== "note" || options.canContinueNote?.() !== false;
       if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
       setSaving(true);
       setError(null);
@@ -81,8 +93,10 @@ export function useQuickLogV2Save() {
           setError(reason);
           return { ok: false, reason };
         }
-        const r = (data !== null && typeof data === "object" && !Array.isArray(data) ? data : {}) as RpcResponse;
-        if (payload.p_action === "note" ? r.ok !== true : !r.ok) {
+        const r = (
+          data !== null && typeof data === "object" && !Array.isArray(data) ? data : {}
+        ) as RpcResponse;
+        if (r.ok !== true) {
           const reason = typeof r.reason === "string" && r.reason ? r.reason : "save_failed";
           setError(reason);
           return {
@@ -92,6 +106,60 @@ export function useQuickLogV2Save() {
               ? { definitiveRejected: true }
               : {}),
           };
+        }
+        // The public starter Water path still uses this manual RPC. A
+        // success flag without a valid event receipt cannot confirm its save.
+        if (payload.p_action === "water" && !isUuid(r.grow_event_id)) {
+          setError("receipt_unverified");
+          return { ok: false, reason: "receipt_unverified" };
+        }
+        let savedWaterTarget: QuickLogResolvedTarget | undefined;
+        let waterContextChanged = false;
+        // The RPC resolves a plant's grow/tent at write time. Verify the
+        // persisted Watering, then report its actual location if it moved.
+        if (payload.p_action === "water" && (r.reused === true || options.expectedWaterTarget)) {
+          const eventId = r.grow_event_id as string;
+          const { data: event, error: eventError } = await supabase
+            .from("grow_events")
+            .select("id,event_type,source,grow_id,plant_id,tent_id,occurred_at,note,is_deleted")
+            .eq("id", eventId)
+            .maybeSingle();
+          if (eventError || !event) {
+            setError("receipt_unverified");
+            return { ok: false, reason: "receipt_unverified" };
+          }
+          if (!matchesReusedWaterEvent(payload, eventId, event)) {
+            setError("receipt_mismatch");
+            return { ok: false, reason: "receipt_mismatch" };
+          }
+          const { data: child, error: childError } = await supabase
+            .from("watering_events")
+            .select("event_id,volume_ml")
+            .eq("event_id", eventId)
+            .maybeSingle();
+          if (childError || !child) {
+            setError("receipt_unverified");
+            return { ok: false, reason: "receipt_unverified" };
+          }
+          if (!matchesReusedWaterReceipt(payload, eventId, event, child)) {
+            setError("receipt_mismatch");
+            return { ok: false, reason: "receipt_mismatch" };
+          }
+          if (options.expectedWaterTarget) {
+            const resolved = resolveStarterWaterReceiptTarget(
+              payload,
+              eventId,
+              event,
+              child,
+              options.expectedWaterTarget,
+            );
+            if (!resolved) {
+              setError("receipt_mismatch");
+              return { ok: false, reason: "receipt_mismatch" };
+            }
+            savedWaterTarget = resolved.target;
+            waterContextChanged = resolved.contextChanged;
+          }
         }
         let persistedNote: string | null | undefined;
         if (payload.p_action === "note") {
@@ -145,6 +213,7 @@ export function useQuickLogV2Save() {
           growEventId: r.grow_event_id ?? null,
           environmentEventId: r.environment_event_id ?? null,
           reused: r.reused === true,
+          ...(savedWaterTarget ? { savedWaterTarget, waterContextChanged } : {}),
           ...(persistedNote !== undefined ? { persistedNote } : {}),
         };
       } catch (thrown) {

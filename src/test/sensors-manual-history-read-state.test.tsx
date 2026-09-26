@@ -18,6 +18,8 @@ const state = vi.hoisted(() => ({
   sensors: [] as SensorReading[],
 }));
 const TENT = "11111111-1111-4111-8111-111111111111";
+// The Sensors page reads active plants for its stage (BUG-006 follow-up).
+vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: [], isError: false }) }));
 vi.mock("@/hooks/useGrowData", () => ({
   useGrowTents: () => ({
     data: [

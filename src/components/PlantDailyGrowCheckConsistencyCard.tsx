@@ -34,9 +34,15 @@ import {
 interface Props {
   plantId: string;
   currentTentId: string | null;
+  /** Plant `created_at`; earlier days are "not tracked", not "missed". */
+  trackingStartedAt?: string | null;
 }
 
-export default function PlantDailyGrowCheckConsistencyCard({ plantId, currentTentId }: Props) {
+export default function PlantDailyGrowCheckConsistencyCard({
+  plantId,
+  currentTentId,
+  trackingStartedAt,
+}: Props) {
   const queryClient = useQueryClient();
   const reads = useDailyGrowCheckReads(currentTentId);
   const { rawReadings, rawDiary, plants } = reads;
@@ -81,6 +87,7 @@ export default function PlantDailyGrowCheckConsistencyCard({ plantId, currentTen
   const summary = buildDailyGrowCheckConsistency({
     now: new Date(),
     windowDays: CONSISTENCY_WINDOW_DAYS,
+    trackingStartedAt: trackingStartedAt ?? null,
     plantId,
     currentTentId,
     plantsInTentCount,

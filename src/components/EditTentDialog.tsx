@@ -23,7 +23,11 @@ import { Switch } from "@/components/ui/switch";
 import { Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { STAGES } from "@/lib/grow";
-import { buildTentUpdatePayload, isTentUpdatePayloadValid } from "@/lib/tentManagementRules";
+import {
+  buildTentUpdatePayload,
+  isTentUpdatePayloadValid,
+  tentSizeEditValidationMessage,
+} from "@/lib/tentManagementRules";
 import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
 
 /**
@@ -92,7 +96,14 @@ export default function EditTentDialog({ tent, trigger }: Props) {
       light_schedule: form.light_schedule,
       light_wattage: form.light_wattage ? Number(form.light_wattage) : null,
     });
-    if (!isTentUpdatePayloadValid(payload)) {
+    // Only a changed size is validated: a size saved before BUG-012 must not
+    // block renaming the tent.
+    const sizeMessage = tentSizeEditValidationMessage(tent.size, payload.size);
+    if (sizeMessage) {
+      toast.error(sizeMessage);
+      return;
+    }
+    if (!isTentUpdatePayloadValid(payload, tent.size)) {
       toast.error("Tent name is required");
       return;
     }

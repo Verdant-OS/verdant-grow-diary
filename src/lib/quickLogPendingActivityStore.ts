@@ -37,6 +37,8 @@ export const ACTIVITY_RECOVERY_UNAVAILABLE =
   "Activity recovery storage is unavailable or cannot be read safely. No new activity will be sent. Restore storage access before retrying.";
 export const ACTIVITY_RECOVERY_PENDING =
   "Save is unconfirmed. Retry checks the original activity and destination without changing its values.";
+export const ACTIVITY_RECOVERY_RETRY_REJECTED =
+  "The retry was rejected, but an earlier save may have succeeded. Check Timeline before logging another activity on this target.";
 export const ACTIVITY_RECOVERY_CLEAR_FAILED =
   "Your activity was saved, but its recovery record could not be cleared. Restore storage access before logging another activity on this target.";
 

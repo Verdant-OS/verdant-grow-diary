@@ -23,7 +23,7 @@
  *   - No recommendation, no health inference, no "safe to feed / train
  *     / defoliate", no harvest readiness, no diagnosis language.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,7 @@ import {
 import {
   ACTIVITY_RECOVERY_CLEAR_FAILED,
   ACTIVITY_RECOVERY_PENDING,
+  ACTIVITY_RECOVERY_RETRY_REJECTED,
   ACTIVITY_RECOVERY_UNAVAILABLE,
   claimPendingQuickLogActivity,
   clearPendingQuickLogActivity,
@@ -88,6 +89,7 @@ import {
   buildQuickLogTargetKey,
   evaluateQuickLogActivityAvailability,
   evaluateQuickLogPrePersistenceGate,
+  validateQuickLogActivityNote,
   QUICK_LOG_HARVEST_STAGE_DISABLED_REASON,
   type QuickLogActivityDraftBinding,
 } from "@/lib/quickLogActivityRules";
@@ -334,9 +336,11 @@ export default function QuickLogAllActivitiesSection({
       ? pendingActivity
       : null;
   const liveTargetKeyRef = useRef(currentTargetKey);
-  liveTargetKeyRef.current = currentTargetKey;
   const liveOwnerIdRef = useRef(user?.id ?? null);
-  liveOwnerIdRef.current = user?.id ?? null;
+  useLayoutEffect(() => {
+    liveTargetKeyRef.current = currentTargetKey;
+    liveOwnerIdRef.current = user?.id ?? null;
+  }, [currentTargetKey, user?.id]);
   useEffect(() => {
     // Selecting/cancelling an editor, completing a save, or changing owner
     // starts a new logical draft. Field edits are compared at submission.
@@ -605,18 +609,16 @@ export default function QuickLogAllActivitiesSection({
         liveOwnerIdRef.current === record.ownerId &&
         liveTargetKeyRef.current === buildQuickLogTargetKey(capturedTarget);
       if (!result.ok) {
-        if (result.reason !== "save_failed") {
-          const cleared = clearPendingQuickLogActivity(record);
-          if (stillCurrent && cleared) setPendingActivity(null);
-          if (stillCurrent && !cleared) {
-            setErrorReason(ACTIVITY_RECOVERY_CLEAR_FAILED);
-            setErrorForActivity(record.input.activityId);
-            return;
-          }
+        // This is a retry of an earlier unresolved attempt. Even a definitive
+        // rejection of this call cannot prove the earlier attempt did not write.
+        if (stillCurrent) {
+          setErrorReason(
+            result.reason === "server_rejected"
+              ? ACTIVITY_RECOVERY_RETRY_REJECTED
+              : ACTIVITY_RECOVERY_PENDING,
+          );
+          setErrorForActivity(record.input.activityId);
         }
-        if (stillCurrent && result.reason === "save_failed")
-          setErrorReason(ACTIVITY_RECOVERY_PENDING);
-        else if (stillCurrent) setErrorReason(result.disabledReason ?? "Save was refused.");
         return;
       }
       const cleared = clearPendingQuickLogActivity(record);
@@ -758,6 +760,12 @@ export default function QuickLogAllActivitiesSection({
     }
     if (requiresNote && note.trim().length === 0) {
       setErrorReason("Add a short note before saving.");
+      setErrorForActivity(selected.id);
+      return;
+    }
+    const noteLengthError = selected.id === "photo" ? null : validateQuickLogActivityNote(note);
+    if (noteLengthError) {
+      setErrorReason(noteLengthError);
       setErrorForActivity(selected.id);
       return;
     }
@@ -1008,39 +1016,40 @@ export default function QuickLogAllActivitiesSection({
         const result = await save({
           ...claim.record.input,
         });
+        const stillCurrent =
+          liveOwnerIdRef.current === claim.record.ownerId &&
+          liveTargetKeyRef.current === buildQuickLogTargetKey(capturedTarget);
 
         if (!result.ok) {
           if (result.reason !== "save_failed") {
             if (clearPendingQuickLogActivity(claim.record)) {
-              if (
-                liveOwnerIdRef.current === claim.record.ownerId &&
-                liveTargetKeyRef.current === buildQuickLogTargetKey(capturedTarget)
-              )
-                setPendingActivity(null);
+              if (stillCurrent) setPendingActivity(null);
             } else {
-              setErrorReason(ACTIVITY_RECOVERY_CLEAR_FAILED);
-              setErrorForActivity(selected.id);
+              if (stillCurrent) {
+                setErrorReason(ACTIVITY_RECOVERY_CLEAR_FAILED);
+                setErrorForActivity(selected.id);
+              }
               return;
             }
           }
-          setErrorReason(
-            result.reason === "save_failed"
-              ? ACTIVITY_RECOVERY_PENDING
-              : (result.disabledReason ?? "Save was refused."),
-          );
-          setErrorForActivity(selected.id);
+          if (stillCurrent) {
+            setErrorReason(
+              result.reason === "save_failed"
+                ? ACTIVITY_RECOVERY_PENDING
+                : (result.disabledReason ?? "Save was refused."),
+            );
+            setErrorForActivity(selected.id);
+          }
           return;
         }
         savedGrowEventId = result.growEventId ?? null;
         if (clearPendingQuickLogActivity(claim.record)) {
-          if (
-            liveOwnerIdRef.current === claim.record.ownerId &&
-            liveTargetKeyRef.current === buildQuickLogTargetKey(capturedTarget)
-          )
-            setPendingActivity(null);
+          if (stillCurrent) setPendingActivity(null);
         } else {
-          setErrorReason(ACTIVITY_RECOVERY_CLEAR_FAILED);
-          setErrorForActivity(selected.id);
+          if (stillCurrent) {
+            setErrorReason(ACTIVITY_RECOVERY_CLEAR_FAILED);
+            setErrorForActivity(selected.id);
+          }
           return;
         }
       }

@@ -156,4 +156,86 @@ describe("DiaryCalendarSection", () => {
       window.removeEventListener("verdant:open-quicklog", listener);
     }
   });
+
+  describe("flower window overlay (#1636 wiring)", () => {
+    const PLANT_START = "2026-01-01T00:00:00.000Z";
+    const FLOWER_FLIP = "2026-03-02T00:00:00.000Z";
+    const CALENDAR_NOW = new Date("2026-03-12T12:00:00.000Z");
+
+    it("derives plant/flower day labels and a continuous band from window props", () => {
+      render(
+        <DiaryCalendarSection
+          now={CALENDAR_NOW}
+          plantStartedAt={PLANT_START}
+          flowerFlipAt={FLOWER_FLIP}
+          flowerDurationDays={60}
+          flowerDurationKind="grower_set"
+          rawEntries={[
+            {
+              id: "water-1",
+              entry_at: "2026-03-02T09:00:00Z",
+              event_type: "watering",
+              stage: "flower",
+            },
+          ]}
+        />,
+      );
+
+      expect(screen.getByTestId("cultivation-calendar-plant-day")).toHaveTextContent(
+        "Plant day 70",
+      );
+      expect(screen.getByTestId("cultivation-calendar-flower-day")).toHaveTextContent(
+        "Flower day 10 of 60",
+      );
+      expect(screen.queryByTestId("cultivation-calendar-duration-honesty")).toBeNull();
+
+      const banded = screen
+        .getAllByTestId("cultivation-calendar-day")
+        .filter((day) => day.getAttribute("data-stage-band") === "flower");
+      expect(banded.length).toBeGreaterThan(0);
+      expect(banded[0].getAttribute("data-date-key")).toBe("2026-03-02");
+    });
+
+    it("labels suggested duration honestly and still paints the overlay band", () => {
+      render(
+        <DiaryCalendarSection
+          now={CALENDAR_NOW}
+          plantStartedAt={PLANT_START}
+          flowerFlipAt={FLOWER_FLIP}
+          flowerDurationDays={75}
+          flowerDurationKind="suggested"
+          rawEntries={[]}
+        />,
+      );
+
+      expect(screen.getByTestId("cultivation-calendar-month-grid")).toBeInTheDocument();
+      expect(screen.getByTestId("cultivation-calendar-duration-honesty")).toHaveTextContent(
+        /suggested — not your schedule/i,
+      );
+      expect(screen.getByTestId("cultivation-calendar-flower-day")).toHaveTextContent(
+        "Flower day 10 of 75",
+      );
+      expect(
+        screen
+          .getAllByTestId("cultivation-calendar-day")
+          .some((day) => day.getAttribute("data-stage-band") === "flower"),
+      ).toBe(true);
+    });
+
+    it("shows the month grid for a flower band even when diary entries are empty", () => {
+      render(
+        <DiaryCalendarSection
+          now={CALENDAR_NOW}
+          plantStartedAt={PLANT_START}
+          flowerFlipAt={FLOWER_FLIP}
+          flowerDurationDays={60}
+          rawEntries={[]}
+        />,
+      );
+
+      expect(screen.getByTestId("cultivation-calendar-month-grid")).toBeInTheDocument();
+      expect(screen.getByTestId("diary-calendar-empty")).toBeInTheDocument();
+      expect(screen.queryByText(/Plant day 0/i)).toBeNull();
+    });
+  });
 });

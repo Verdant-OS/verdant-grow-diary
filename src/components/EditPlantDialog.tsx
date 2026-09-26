@@ -2,6 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { buildPlantTypeUpdate } from "@/lib/plantTypeRules";
+import {
+  plantStartDateInputMax,
+  plantStartDateInputToIso,
+  plantStartDateInputValue,
+  plantStartDateSaveMessage,
+} from "@/lib/plantStartDateRules";
 import { useTents } from "@/hooks/use-tents";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +50,13 @@ import {
   normalizePlantEditTentSelectValue,
   resolvePlantEditTentOptions,
 } from "@/lib/plantEditSaveRules";
-import { buildPlantHealthUpdate, editablePlantHealth } from "@/lib/plantHealthRules";
+import {
+  PLANT_HEALTH_NOT_ASSESSED_LABEL,
+  PLANT_HEALTH_NOT_ASSESSED_OPTION,
+  buildPlantHealthEditUpdate,
+  editablePlantHealth,
+  plantHealthFromSelectValue,
+} from "@/lib/plantHealthRules";
 
 /**
  * Edits an existing plant's user-facing fields. Profile photo is now
@@ -125,7 +138,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     stage: plant.stage ?? "seedling",
     health: editablePlantHealth(plant.health),
     tent_id: normalizePlantEditTentSelectValue(plant.tentId, availableTentIds),
-    started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
+    started_at: plantStartDateInputValue(plant.startedAt),
     last_note: plant.lastNote ?? "",
     plant_type: plant.plantType ?? "unknown",
   });
@@ -146,7 +159,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
         stage: plant.stage ?? "seedling",
         health: editablePlantHealth(plant.health),
         tent_id: normalizePlantEditTentSelectValue(plant.tentId, availableTentIds),
-        started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
+        started_at: plantStartDateInputValue(plant.startedAt),
         last_note: plant.lastNote ?? "",
         plant_type: plant.plantType ?? "unknown",
       });
@@ -185,6 +198,19 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     if (!user) {
       toast.error("Not signed in");
       return;
+    }
+    // Validate the calendar start date before any upload or write
+    // (QA 2026-09-24, BUG-004/005), but only when the grower changed it: an
+    // unchanged prefill is never rewritten, and a stored future date must
+    // not block an unrelated edit (CodeRabbit review on #1683).
+    let startedAtIso: string | null = null;
+    if (form.started_at && form.started_at !== plantStartDateInputValue(plant.startedAt)) {
+      const startedAt = plantStartDateInputToIso(form.started_at, new Date());
+      if (startedAt.ok !== true) {
+        toast.error(plantStartDateSaveMessage(startedAt.reason));
+        return;
+      }
+      startedAtIso = startedAt.iso;
     }
     setBusy(true);
 
@@ -225,10 +251,10 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       name: form.name.trim(),
       strain: form.strain.trim(),
       stage: form.stage,
-      ...buildPlantHealthUpdate(form.health),
+      ...buildPlantHealthEditUpdate(plant.health, form.health),
       tent_id: resolvedTentId,
       last_note: form.last_note.trim() || null,
-      plant_type: form.plant_type,
+      ...buildPlantTypeUpdate(plant.plantType, form.plant_type),
       ...(growPatch ?? {}),
     };
     if (newReference) {
@@ -236,8 +262,8 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     } else if (clearPhoto) {
       payload.photo_url = null;
     }
-    if (form.started_at) {
-      payload.started_at = new Date(form.started_at).toISOString();
+    if (startedAtIso) {
+      payload.started_at = startedAtIso;
     }
 
     const { error } = await supabase
@@ -522,12 +548,15 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
               <Label>Health</Label>
               <Select
                 value={form.health}
-                onValueChange={(v) => setForm({ ...form, health: editablePlantHealth(v) })}
+                onValueChange={(v) => setForm({ ...form, health: plantHealthFromSelectValue(v) })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Unknown" />
+                  <SelectValue placeholder={PLANT_HEALTH_NOT_ASSESSED_LABEL} />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={PLANT_HEALTH_NOT_ASSESSED_OPTION}>
+                    {PLANT_HEALTH_NOT_ASSESSED_LABEL}
+                  </SelectItem>
                   {HEALTH.map((h) => (
                     <SelectItem key={h.value} value={h.value}>
                       {h.label}
@@ -560,6 +589,13 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             <Label>Started at</Label>
             <Input
               type="date"
+              // An unchanged stored date (even a legacy future one) must not
+              // trip the browser's own limit and block unrelated edits.
+              max={
+                form.started_at === plantStartDateInputValue(plant.startedAt)
+                  ? undefined
+                  : plantStartDateInputMax(new Date())
+              }
               value={form.started_at}
               onChange={(e) => setForm({ ...form, started_at: e.target.value })}
             />

@@ -43,7 +43,7 @@ import PlantDetailTimelineEvidenceReadinessLaunch from "@/components/PlantDetail
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 
-const fetchSpy = vi.spyOn(globalThis, "fetch" as never);
+const fetchSpy = vi.spyOn(globalThis, "fetch");
 
 const TENT_A = "0094303d-5f4a-444a-8fd2-878dd57be453";
 const TENT_B = "604edf84-1040-40e2-a31e-cf67640a981e";

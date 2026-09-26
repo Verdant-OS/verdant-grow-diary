@@ -11,6 +11,7 @@ import {
   normalizePlantEditTentSelectValue,
   resolvePlantEditTentOptions,
 } from "@/lib/plantEditSaveRules";
+import { PLANT_HEALTH_CLEAR_UNAVAILABLE_MESSAGE } from "@/lib/plantHealthRules";
 
 const ROOT = resolve(__dirname, "../..");
 const EDIT_DIALOG = readFileSync(resolve(ROOT, "src/components/EditPlantDialog.tsx"), "utf8");
@@ -75,6 +76,19 @@ describe("formatPlantEditSaveError", () => {
     );
     expect(formatPlantEditSaveError(null)).toBe("Could not save changes. Please try again.");
     expect(formatPlantEditSaveError(undefined)).toBe("Could not save changes. Please try again.");
+  });
+
+  it("explains a health clear rejected before 20260924120000 is applied", () => {
+    expect(
+      formatPlantEditSaveError({ message: "invalid plant health: unknown", code: "P0001" }),
+    ).toBe(PLANT_HEALTH_CLEAR_UNAVAILABLE_MESSAGE);
+    // Other trigger rejections still surface verbatim.
+    expect(formatPlantEditSaveError({ message: "invalid plant health: great" })).toBe(
+      "invalid plant health: great",
+    );
+    expect(formatPlantEditSaveError({ message: "invalid plant health: unknownish" })).toBe(
+      "invalid plant health: unknownish",
+    );
   });
 });
 

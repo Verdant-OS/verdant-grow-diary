@@ -385,7 +385,7 @@ not pick one. It records that the choice is open and gives it to Cheek (§7, §1
 - Migrations are append-only and immutable once merged (`AGENTS.md`); the `Published migration
 integrity` gate compares SHA-256 against the base and is not a required context (contract
   AC-9.1, §13).
-- **There are eight operator apply paths, not one.** At `c9bc1df3`, `.github/workflows/` holds eight
+- **There are eight repository apply paths, not one.** At `c9bc1df3`, `.github/workflows/` holds eight
   `apply-*.yml` workflows, each `workflow_dispatch`-only and each running in GitHub environment
   `verdant-production-solo-founder`: the general `apply-pinned-production-migrations.yml` and seven
   pinned single-purpose appliers (`action-queue-transition-forward-repair`,
@@ -400,7 +400,7 @@ integrity` gate compares SHA-256 against the base and is not a required context 
   (`:113`). `migration-drift-probe.yml` is the read-only counterpart (`workflow_dispatch`,
   environment `verdant-production`, `psql`). `supabase/config.toml:1` pins the same project ref.
 - Lovable authors migrations under its own naming (157 UUID-slug exports in the ledger per
-  `docs/codebase-map.md:417-421`) and, as a `source claim`, applies what it authors through its
+  `docs/codebase-map.md:416-420`) and, as a `source claim`, applies what it authors through its
   Cloud. Nothing in this repository shows that path.
 - Applied state on production is a `docs/agents/CURRENT_STATE.md` axis (contract AC-9.3) and stays
   `NOT_MEASURED` here; through this session's Supabase tool it is `BLOCKED` (sandbox only). The
@@ -568,9 +568,13 @@ Durable. Each is a rule a future slice can be held to; none carries a date.
 - **D-RT-8 — Edge functions are a separate release.** No frontend publish implies an edge deploy.
   Until M6 is run by someone with production read access, the edge axis stays `NOT_MEASURED` and
   release notes say so.
-- **D-RT-9 — Migrations reach production only through the operator apply paths.** Committed is
-  not applied; the dispatch workflows with their confirmations are the paths (§5.4 lists eight);
-  `No APPLY` is the standing lock until Cheek lifts it.
+- **D-RT-9 — Migrations reach production through operator apply paths, and every path counts
+  until it is measured or retired.** Committed is not applied. The repository-verified paths are
+  the dispatch workflows with their confirmations (§5.4 lists eight). The Lovable Cloud apply path
+  for Lovable-authored exports is a `source claim`, neither measured nor fenced, so an audit of
+  production database changes includes it until Cheek retires or fences it and a measurement
+  confirms that (the D-RT-4 decision, applied to the database axis). `No APPLY` is the standing
+  lock until Cheek lifts it.
 - **D-RT-10 — Post-deploy probes are signals.** They inform a restamp and never gate a merge or
   certify a release.
 - **D-RT-11 — Dated values never enter a durable document twice.** They live in
@@ -703,12 +707,12 @@ publisher regresses; (c) keep parked. This slice does not push to, review, or en
 
 ### This slice — docs only, one branch, one PR
 
-| File                                           | Change                                                                                                                                                                                                                |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/specs/release-topology-specification.md` | New — this document, including the amendment: promotion axis, §5.4 appliers, §6.1 verified at `c9bc1df3`, D-RT-12–14, M10–M11, AT-11–14, §10 rows, Appendix B                                                         |
-| `docs/architecture-contract.md`                | §9 prose pointer; §12 `vercel.json` row to its durable form; §13 row from "blocked … #1175 and #1221" to the follow-ups this document names; §14 pointers; §15.1 row. Header stamp unchanged: no AC clause is touched |
-| `docs/codebase-map.md`                         | Replace the "do not fire in production / Lovable is the production publisher" paragraph with the durable rule and a pointer; keep the eight-entry inventory                                                           |
-| `README.md`                                    | One bullet: certificates belong to the measured apex platform, with a pointer                                                                                                                                         |
+| File                                           | Change                                                                                                                                                                                                                                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/specs/release-topology-specification.md` | New — this document, including the amendment: promotion axis, §5.4 appliers, §6.1 verified at `c9bc1df3`, D-RT-12–14, M10–M11, AT-11–14, §10 rows, Appendix B                                                                                                                   |
+| `docs/architecture-contract.md`                | §9 prose pointer; §12 `vercel.json` row to its durable form; §13 row from "blocked … #1175 and #1221" to the follow-ups this document names; §14 pointers; §15.1 row. Header stamp unchanged: no AC clause is touched                                                           |
+| `docs/codebase-map.md`                         | Replace the "do not fire in production / Lovable is the production publisher" paragraph with the durable rule and a pointer to M7; keep the eight-entry inventory and the paragraph's 11-line span, so the contract's AC-3.2 cite `docs/codebase-map.md:466-467` still resolves |
+| `README.md`                                    | One bullet: certificates belong to the measured apex platform, with a pointer                                                                                                                                                                                                   |
 
 ### Follow-ups this document names
 

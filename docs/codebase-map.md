@@ -84,15 +84,14 @@ table's shape — the manifest records that a path redirects, not where.
 Several legal/marketing duplicates exist as routes **and** as redirect entries in
 `vercel.json` (`/strains → /cultivars`, `/features → /welcome`, `/terms-of-service → /terms`,
 `/privacy-policy → /privacy`, `/refunds` and `/refund-policy → /refund`, `/demo → /welcome`).
-**Whether those redirects fire is a topology measurement, not a property of the file.** A host
-configuration file governs only when the measured publisher applies it
-(`docs/specs/release-topology-specification.md`, rule D-RT-5 and procedure M7). An earlier version
-of this paragraph said they never fire; that was measured under a publisher that no longer serves
-the apex (`docs/seo/lighting-launch-verification.md`, §Non-blocking host mismatch, generated
-2026-08-02). The eight entries are `/strains`, `/strains/:slug`, `/features`, `/demo`,
-`/refunds`, `/refund-policy`, `/terms-of-service`, `/privacy-policy`. Do not reason about
-production redirects or headers from this file or from that dated document; read the
-specification's Appendix A or the current `docs/agents/CURRENT_STATE.md` stamp.
+**Whether those redirects fire is a topology measurement, not a property of the file**: a host
+file governs only when the measured publisher applies it (rule D-RT-5 of
+`docs/specs/release-topology-specification.md`). An earlier version of this paragraph said they
+never fire, measured under a publisher that no longer serves the apex
+(`docs/seo/lighting-launch-verification.md`, 2026-08-02). The eight entries are `/strains`,
+`/strains/:slug`, `/features`, `/demo`, `/refunds`, `/refund-policy`, `/terms-of-service`,
+`/privacy-policy`. For their current state run the specification's M7 and read the result in the
+current `docs/agents/CURRENT_STATE.md` stamp; its Appendix A is a dated record, not current state.
 
 ### Authenticated routes (`src/routes/_app/*.tsx`)
 

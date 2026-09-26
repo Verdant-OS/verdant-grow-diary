@@ -893,6 +893,9 @@ export default function QuickLog({
    */
   const handleAllActivitiesSaveSuccess = useCallback(
     (result: QuickLogAllActivitiesSaveSuccess) => {
+      // Reconciliation confirms an older request, not the reviewed starter
+      // prefill currently on screen. Keep that draft and its saved marker.
+      if (result.recovered) return;
       if (draftHandoffKey !== null) setSavedDraftHandoffKey(draftHandoffKey);
       consumeReviewedPublicStarterDraft();
       const plantId = result.target.plantId;

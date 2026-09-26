@@ -97,6 +97,7 @@ import {
   serializePublicQuickLogStarterDraft,
   type PublicQuickLogStarterDraft,
 } from "@/lib/publicQuickLogStarterRules";
+import { claimPendingQuickLogActivity } from "@/lib/quickLogPendingActivityStore";
 
 function renderWithClient(ui: ReactElement) {
   const client = new QueryClient({
@@ -212,6 +213,49 @@ describe("Quick Log starter-handoff consume-once", () => {
     fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-save"));
     await waitFor(() => expect(activityRpcMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(storedDraftRaw()).toBeNull());
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("reconciling an older activity does not consume a different reviewed starter draft", async () => {
+    seedDraft(starterDraft({ logType: "feeding", note: "Light feeding" }));
+    const before = storedDraftRaw();
+    const createdAt = "2026-09-26T00:00:00.000Z";
+    expect(
+      claimPendingQuickLogActivity({
+        version: 1,
+        ownerId: "user-1",
+        createdAt,
+        input: {
+          activityId: "training",
+          growId: "grow-1",
+          tentId: "tent-1",
+          plantId: "plant-1",
+          note: "Older training",
+          occurredAt: createdAt,
+          extraDetails: { technique: "topping" },
+          idempotencyKey: "older-training-retry-key",
+        },
+        receipt: { symptomCheck: false, harvestDetails: null },
+      }).status,
+    ).toBe("claimed");
+    renderWithClient(
+      <QuickLog
+        open
+        onOpenChange={vi.fn()}
+        prefill={handoffPrefill({
+          eventType: "feeding",
+          activityId: "feeding",
+          note: "Light feeding",
+        })}
+      />,
+    );
+
+    fireEvent.click(await screen.findByTestId("quick-log-dialog-all-activities-retry-original"));
+    await waitFor(() => expect(activityRpcMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-dialog-all-activities-pending-activity")).toBeNull(),
+    );
+    expect(storedDraftRaw()).toBe(before);
     expect(saveMock).not.toHaveBeenCalled();
   });
 

@@ -3,7 +3,7 @@ import {
   type QuickLogActivityId,
 } from "@/constants/quickLogActivityTypes";
 import {
-  buildQuickLogTargetKey,
+  buildQuickLogRecoveryScopeKey,
   type QuickLogTargetIdentityInput,
 } from "@/lib/quickLogActivityRules";
 import { isUuid } from "@/lib/isUuid";
@@ -162,15 +162,15 @@ function validRecord(
     )
       return false;
   }
-  return buildQuickLogTargetKey(input) === buildQuickLogTargetKey(target);
+  return buildQuickLogRecoveryScopeKey(input) === buildQuickLogRecoveryScopeKey(target);
 }
 
 function storageKey(ownerId: string, target: QuickLogTargetIdentityInput): string {
-  return `${PREFIX}${encodeURIComponent(ownerId)}:${encodeURIComponent(buildQuickLogTargetKey(target))}`;
+  return `${PREFIX}${encodeURIComponent(ownerId)}:${encodeURIComponent(buildQuickLogRecoveryScopeKey(target))}`;
 }
 
 function resolvedKey(ownerId: string, target: QuickLogTargetIdentityInput): string {
-  return `${RESOLVED_PREFIX}${encodeURIComponent(ownerId)}:${encodeURIComponent(buildQuickLogTargetKey(target))}`;
+  return `${RESOLVED_PREFIX}${encodeURIComponent(ownerId)}:${encodeURIComponent(buildQuickLogRecoveryScopeKey(target))}`;
 }
 
 function validResolvedRecord(

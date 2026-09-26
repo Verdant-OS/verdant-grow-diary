@@ -174,6 +174,16 @@ export function buildQuickLogTargetKey(
   return JSON.stringify([target.growId, target.tentId, target.plantId]);
 }
 
+/** A plant's pending write follows its stable identity when its tent or grow changes. */
+export function buildQuickLogRecoveryScopeKey(
+  input: QuickLogTargetIdentityInput | null | undefined,
+): string {
+  const target = buildQuickLogTargetIdentity(input);
+  if (target.plantId) return JSON.stringify(["plant", target.plantId]);
+  if (target.tentId) return JSON.stringify(["tent", target.tentId]);
+  return JSON.stringify(["grow", target.growId]);
+}
+
 /** Bind a new activity draft to the exact target visible at selection time. */
 export function bindQuickLogActivityDraft(
   activityId: QuickLogActivityId,

@@ -409,6 +409,8 @@ beforeEach(() => {
   window.sessionStorage.clear();
   harness.activeGrowId = "g1";
   harness.plants[0].stage = "";
+  harness.plants[0].grow_id = "g1";
+  harness.plants[0].tent_id = "t1";
   harness.rpc.mockReset();
   harness.growUpdate.mockReset();
   harness.growUpdateEq.mockReset();
@@ -815,6 +817,34 @@ describe("Quick Log shared in-flight coordination", () => {
     await waitFor(() =>
       expect(screen.queryByTestId("quick-log-activity-recovery-lock")).not.toBeInTheDocument(),
     );
+  });
+
+  it("keeps the sibling main save locked when the same plant moves to another tent and grow", async () => {
+    const pending = deferredRpc();
+    harness.rpc.mockReturnValueOnce(pending.promise);
+    const view = renderQuickLog({ plantId: "p1", growId: "g1", tentId: "t1" });
+    prepareMainNote();
+    fireEvent.click(await prepareChildNote());
+    await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      pending.resolve({ data: null, error: { message: "offline" } });
+      await pending.promise;
+    });
+    await screen.findByTestId("quick-log-dialog-all-activities-pending-activity");
+
+    harness.plants[0].grow_id = "g2";
+    harness.plants[0].tent_id = "t2";
+    view.rerenderQuickLog({ plantId: "p1", growId: "g2", tentId: "t2" });
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+        "data-target-tent-id",
+        "t2",
+      ),
+    );
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(screen.getByTestId("quick-log-dialog-all-activities-retry-original")).toBeDisabled();
+    act(() => submitForm(mainForm()));
+    expect(harness.rpc).toHaveBeenCalledTimes(1);
   });
 
   it("releases the sibling save after a definitive first activity rejection", async () => {

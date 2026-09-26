@@ -11,7 +11,7 @@
  * (including photo) stay off the ordinary selector and fail closed
  * if supplied through a crafted prefill.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
@@ -92,7 +92,22 @@ vi.mock("sonner", () => ({
   },
 }));
 
+const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 beforeEach(() => {
+  let tail: Promise<unknown> = Promise.resolve();
+  Object.defineProperty(window.navigator, "locks", {
+    configurable: true,
+    value: {
+      request: (_name: string, _options: unknown, callback: () => unknown) => {
+        const turn = tail.then(callback);
+        tail = turn.then(
+          () => undefined,
+          () => undefined,
+        );
+        return turn;
+      },
+    },
+  });
   saveMock.mockReset();
   saveMock.mockResolvedValue({ ok: true });
   insertMock.mockReset();
@@ -101,6 +116,10 @@ beforeEach(() => {
   toastSuccess.mockReset();
   toastMessage.mockReset();
   window.localStorage.clear();
+});
+afterEach(() => {
+  if (originalLocks) Object.defineProperty(window.navigator, "locks", originalLocks);
+  else Reflect.deleteProperty(window.navigator, "locks");
 });
 
 describe("QuickLog photo attach — disabled (no upload path)", () => {

@@ -23,7 +23,8 @@ import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
 import { dashboardPath } from "../src/lib/routes";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
-  PUBLIC_CORE_CENSUS_ROUTES,
+  AUTHENTICATED_CORE_CENSUS_BATCHES,
+  PUBLIC_CORE_CENSUS_BATCHES,
   classifyLink,
   expectedCensusNavigationPath,
   fallbackSelectExerciseFailureIsFatal,
@@ -2088,26 +2089,38 @@ test.describe("core link and form census", () => {
     ).toEqual([]);
   });
 
-  test("audits every scheduled public page, visible field, and safe internal link", async ({
-    page,
-  }) => {
-    // This exhaustive lane now proves a fresh quiet window after every route,
-    // click-source revisit, and destination; keep that work below the 40m job ceiling.
-    test.setTimeout(420_000);
-    const report = await runLaneCensus(page, "public", PUBLIC_CORE_CENSUS_ROUTES);
-    expect(report.routeAudits).toHaveLength(PUBLIC_CORE_CENSUS_ROUTES.length);
-    expect(report.linkAudits.length).toBeGreaterThan(0);
-    expect(report.clickedInternalHrefs.length).toBeGreaterThan(0);
-  });
+  for (const [index, routes] of PUBLIC_CORE_CENSUS_BATCHES.entries()) {
+    test(`audits every scheduled public page, visible field, and safe internal link (batch ${index + 1}/${PUBLIC_CORE_CENSUS_BATCHES.length})`, async ({
+      page,
+    }) => {
+      // Preserve the timeout and all per-route assertions. Independent batches
+      // prevent earlier pages from consuming the last route's entire budget.
+      test.setTimeout(420_000);
+      const report = await runLaneCensus(page, "public", routes);
+      expect(report.routeAudits.map((route) => route.path)).toEqual(
+        routes.map((route) => route.path),
+      );
+      expect(report.linkAudits.length).toBeGreaterThan(0);
+      expect(report.clickedInternalHrefs.length).toBeGreaterThan(0);
+    });
+  }
 
-  test("audits every scheduled authenticated page, visible field, and safe internal link", async ({
-    page,
-  }) => {
-    test.setTimeout(1_800_000);
-    const report = await runLaneCensus(page, "authenticated", AUTHENTICATED_CORE_CENSUS_ROUTES);
-    expect(report.routeAudits).toHaveLength(AUTHENTICATED_CORE_CENSUS_ROUTES.length);
-    expect(report.fieldAudits.length).toBeGreaterThan(0);
-    expect(report.linkAudits.length).toBeGreaterThan(0);
-    expect(report.clickedInternalHrefs.length).toBeGreaterThan(0);
+  test.describe("authenticated census batches", () => {
+    test.describe.configure({ mode: "parallel" });
+
+    for (const [index, routes] of AUTHENTICATED_CORE_CENSUS_BATCHES.entries()) {
+      test(`audits every scheduled authenticated page, visible field, and safe internal link (batch ${index + 1}/${AUTHENTICATED_CORE_CENSUS_BATCHES.length})`, async ({
+        page,
+      }) => {
+        test.setTimeout(1_800_000);
+        const report = await runLaneCensus(page, "authenticated", routes);
+        expect(report.routeAudits.map((route) => route.path)).toEqual(
+          routes.map((route) => route.path),
+        );
+        expect(report.fieldAudits.length).toBeGreaterThan(0);
+        expect(report.linkAudits.length).toBeGreaterThan(0);
+        expect(report.clickedInternalHrefs.length).toBeGreaterThan(0);
+      });
+    }
   });
 });

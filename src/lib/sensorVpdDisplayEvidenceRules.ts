@@ -50,3 +50,20 @@ export function selectSensorVpdDisplayEvidence(
   const next = { ...previous, reading: retained };
   return sameEvidence(next, previous) ? previous : next;
 }
+
+/**
+ * The only evidence the page may remember for a later stale render: inputs
+ * whose derived estimate was actually displayed. When the card showed an
+ * observed VPD, or no derivation succeeded, nothing is remembered, so a later
+ * correction or removal of the observed value cannot surface an estimate the
+ * grower never saw from inputs that have since gone stale.
+ */
+export function retainDisplayedVpdEvidence(
+  evidence: LatestTrustedVpdInputs | null,
+  displayedDerivedVpdKpa: number | null,
+): LatestTrustedVpdInputs | null {
+  if (!evidence || displayedDerivedVpdKpa === null || !Number.isFinite(displayedDerivedVpdKpa)) {
+    return null;
+  }
+  return evidence;
+}

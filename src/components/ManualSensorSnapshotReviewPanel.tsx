@@ -4,6 +4,7 @@
  * Parent owns draft state and the actual save action.
  */
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { formatSnapshotCapturedAt } from "@/lib/alertReasonDisplayRules";
 import { Badge } from "@/components/ui/badge";
 import type {
   SensorSnapshotReviewFinding,
@@ -87,7 +88,9 @@ export default function ManualSensorSnapshotReviewPanel({ result }: Props) {
         {normalizedPreview.capturedAt ? (
           <p className="text-xs text-muted-foreground">
             Captured at{" "}
-            <span data-testid="snapshot-captured-at">{normalizedPreview.capturedAt}</span>
+            <time data-testid="snapshot-captured-at" dateTime={normalizedPreview.capturedAt}>
+              {formatSnapshotCapturedAt(normalizedPreview.capturedAt)}
+            </time>
           </p>
         ) : null}
       </CardHeader>

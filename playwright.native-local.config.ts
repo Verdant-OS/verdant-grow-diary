@@ -24,8 +24,11 @@ export default defineConfig({
   testDir: "./e2e-local",
   testMatch: [
     "native-save-retrieve.spec.ts",
+    "native-manual-reading-save-retrieve.spec.ts",
     "native-csv-import-reopen.spec.ts",
     "native-revision-recovery.spec.ts",
+    "native-watering-recovery.spec.ts",
+    "native-feeding-recovery.spec.ts",
   ],
   timeout: 180_000,
   expect: { timeout: 15_000 },

@@ -9,7 +9,7 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { ONE_TENT_LOOP_SENSOR_SOURCES } from "@/lib/oneTentLoopNavigationRules";
 
-const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((() => {
   throw new Error("fetch should not be called by the next-step card");
 }) as never);
 

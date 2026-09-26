@@ -114,6 +114,7 @@ describe("mapPlantRow", () => {
       medium: null,
       potSize: null,
       plantType: "unknown",
+      createdAt: plantRow.created_at ?? null,
     });
   });
   it("defaults optional profile fields while preserving invalid health as unknown", () => {

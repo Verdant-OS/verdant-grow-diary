@@ -15,7 +15,7 @@
  *  - fresh live temp/RH/soil rows reach the packet with no raw payload.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render as rtlRender, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render as rtlRender, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import type { ReactElement } from "react";
@@ -370,6 +370,167 @@ beforeEach(() => {
   sensorQueryState.manualRows = null;
   sensorQueryState.currentReadCalls = [];
   trackFunnelEvent.mockClear();
+});
+
+describe("accepted standard review visibility across the seven-day cutoff", () => {
+  function expiringManualContext(now: Date) {
+    itemsRef.current = [];
+    sensorQueryState.csvRows = [];
+    const capturedAt = new Date(now.getTime() - (7 * 24 * 60 - 1) * 60_000).toISOString();
+    sensorQueryState.currentRows = [
+      {
+        id: "accepted-manual-aging",
+        tent_id: TENT_ID,
+        source: "manual",
+        quality: "ok",
+        metric: "temperature_c",
+        value: 24,
+        captured_at: capturedAt,
+        ts: capturedAt,
+        created_at: capturedAt,
+      },
+    ];
+  }
+
+  it.each(["loading", "result", "retry"] as const)(
+    "keeps an accepted standard review visible when the cutoff passes during %s",
+    async (phase) => {
+      const now = new Date("2026-09-23T12:00:00Z");
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(now);
+      try {
+        expiringManualContext(now);
+        let resolveInvoke!: (value: Awaited<ReturnType<InvokeFn>>) => void;
+        const response = new Promise<Awaited<ReturnType<InvokeFn>>>((resolve) => {
+          resolveInvoke = resolve;
+        });
+        const success = { data: { ok: true, result: validResult() }, error: null };
+        const invoke = vi.fn<InvokeFn>(() => response);
+        const persist = vi.fn().mockResolvedValue({ ok: true, id: "accepted-standard-session" });
+        const view = render(reviewElement(invoke, TENT_ID, persist));
+        const confidenceCopy = screen.getByTestId(
+          "plant-ai-doctor-live-review-confidence-copy",
+        ).textContent;
+
+        fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+        await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+        expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+          "data-review-mode",
+          "standard",
+        );
+        expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+          "data-status",
+          "loading",
+        );
+        const acceptedBody = invoke.mock.calls[0][1].body;
+        const frozenPacket = JSON.stringify(acceptedBody.packet);
+        expect(acceptedBody.evidence_acceptance?.reviewMode).toBe("standard");
+        expect(acceptedBody.packet.imported_sensor_history).toBeNull();
+        expect(acceptedBody.packet.recentRootZoneObservations ?? []).toEqual([]);
+        expect(acceptedBody.packet.missingLiveSensorReadings).toBe(true);
+
+        if (phase !== "loading") {
+          await act(async () => {
+            resolveInvoke(
+              phase === "result" ? success : { data: { ok: false, reason: "http" }, error: null },
+            );
+          });
+          await screen.findByTestId(
+            phase === "result"
+              ? "plant-ai-doctor-history-saved"
+              : "plant-ai-doctor-live-review-retry",
+          );
+        }
+
+        vi.setSystemTime(new Date(now.getTime() + 120_000));
+        view.rerenderWithProviders(reviewElement(invoke, TENT_ID, persist));
+        expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+          "data-status",
+          phase === "retry" ? "error" : phase,
+        );
+        expect(screen.getByTestId("plant-ai-doctor-live-review-confidence-copy").textContent).toBe(
+          confidenceCopy,
+        );
+        expect(screen.queryByTestId("plant-ai-doctor-live-review-start")).toBeNull();
+
+        if (phase === "loading") {
+          await act(async () => resolveInvoke(success));
+        } else if (phase === "retry") {
+          invoke.mockResolvedValue(success);
+          const retry = screen.getByTestId("plant-ai-doctor-live-review-retry");
+          expect(retry).toBeEnabled();
+          fireEvent.click(retry);
+          await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
+          expect(invoke.mock.calls[1][1].body.packet).toEqual(acceptedBody.packet);
+          expect(invoke.mock.calls[1][1].body.evidence_acceptance).toEqual(
+            acceptedBody.evidence_acceptance,
+          );
+        }
+
+        await screen.findByTestId("plant-ai-doctor-history-saved");
+        expect(screen.getByTestId("plant-ai-doctor-live-review-result-wrap")).toHaveTextContent(
+          validResult().summary,
+        );
+        vi.setSystemTime(new Date(now.getTime() + 240_000));
+        view.rerenderWithProviders(reviewElement(invoke, TENT_ID, persist));
+        expect(screen.getByTestId("plant-ai-doctor-live-review-result-wrap")).toHaveTextContent(
+          validResult().summary,
+        );
+        expect(screen.getByTestId("plant-ai-doctor-live-review-confidence-copy").textContent).toBe(
+          confidenceCopy,
+        );
+        expect(JSON.stringify(acceptedBody.packet)).toBe(frozenPacket);
+        expect(invoke).toHaveBeenCalledTimes(phase === "retry" ? 2 : 1);
+        expect(persist).toHaveBeenCalledTimes(1);
+        for (const event of ["ai_doctor_result_received", "ai_doctor_session_saved"]) {
+          expect(
+            trackFunnelEvent.mock.calls
+              .filter(([name]) => name === event)
+              .map(([, properties]) => properties),
+          ).toEqual([{ surface: "standard" }]);
+        }
+      } finally {
+        cleanup();
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each(["manual", "timeline"] as const)(
+    "still hides an accepted standard result when its %s sources are removed",
+    async (source) => {
+      const now = new Date("2026-09-23T12:00:00Z");
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(now);
+      try {
+        if (source === "manual") expiringManualContext(now);
+        else itemsRef.current = strongTimeline();
+        const invoke = vi.fn<InvokeFn>(async () => ({
+          data: { ok: true, result: validResult() },
+          error: null,
+        }));
+        const persist = vi.fn().mockResolvedValue({ ok: true, id: "removed-context-session" });
+        const view = render(reviewElement(invoke, TENT_ID, persist));
+        fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+        await screen.findByTestId("plant-ai-doctor-history-saved");
+        expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+          "data-review-mode",
+          "standard",
+        );
+
+        // Keep the clock fixed: loss of evidence, not aging, must still revoke visibility.
+        itemsRef.current = [];
+        sensorQueryState.currentRows = [];
+        view.rerenderWithProviders(reviewElement(invoke, TENT_ID, persist));
+        expect(screen.queryByTestId("plant-ai-doctor-live-review")).toBeNull();
+        expect(invoke).toHaveBeenCalledTimes(1);
+        expect(persist).toHaveBeenCalledTimes(1);
+      } finally {
+        cleanup();
+        vi.useRealTimers();
+      }
+    },
+  );
 });
 
 describe("CSV history pending/error gating", () => {

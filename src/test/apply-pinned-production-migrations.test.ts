@@ -11,6 +11,7 @@ import {
   classifyTargetLedger,
   describeDatabaseUrlRepairProbes,
   EXIT,
+  EXPECTED_LEDGER_COLUMNS,
   extractExpectedFunctionBodies,
   findUnsafeSqlReason,
   PINNED_PRODUCTION_MIGRATIONS,
@@ -418,34 +419,23 @@ function makeTargets(mode: LedgerMode) {
   });
 }
 
+/** The ledger measured read-only on production (knk, PostgreSQL 17.6) on 2026-09-25. */
+const MEASURED_LEDGER_COLUMNS = [
+  { name: "version", data_type: "text", udt_name: "text", nullable: "NO" },
+  { name: "statements", data_type: "ARRAY", udt_name: "_text", nullable: "YES" },
+  { name: "name", data_type: "text", udt_name: "text", nullable: "YES" },
+  { name: "created_by", data_type: "text", udt_name: "text", nullable: "YES" },
+  { name: "idempotency_key", data_type: "text", udt_name: "text", nullable: "YES" },
+  { name: "rollback", data_type: "ARRAY", udt_name: "_text", nullable: "YES" },
+];
+
 function makePreflight(mode: LedgerMode = "apply") {
   return {
     current_user: "postgres",
-    ledger_columns: {
-      version: "text",
-      name: "text",
-      statements: "ARRAY",
-    },
-    ledger_ordered_columns: [
-      {
-        name: "version",
-        data_type: "text",
-        udt_name: "text",
-        nullable: "NO",
-      },
-      {
-        name: "name",
-        data_type: "text",
-        udt_name: "text",
-        nullable: "YES",
-      },
-      {
-        name: "statements",
-        data_type: "ARRAY",
-        udt_name: "_text",
-        nullable: "YES",
-      },
-    ],
+    ledger_columns: Object.fromEntries(
+      MEASURED_LEDGER_COLUMNS.map((column) => [column.name, column.data_type]),
+    ),
+    ledger_ordered_columns: MEASURED_LEDGER_COLUMNS.map((column) => ({ ...column })),
     ledger_primary_key: ["version"],
     targets: makeTargets(mode),
     dependencies: { ...dependencyContract },
@@ -1173,6 +1163,41 @@ describe("production runner", () => {
     expect(readFileSync(reportPath, "utf8")).toContain(
       "no persistent production migration write was attempted",
     );
+  });
+
+  it("expects the measured production ledger and rejects the retired three-column shape", () => {
+    expect(EXPECTED_LEDGER_COLUMNS).toEqual(MEASURED_LEDGER_COLUMNS);
+
+    const retired = makePreflight("verify_only");
+    retired.ledger_columns = { version: "text", name: "text", statements: "ARRAY" };
+    retired.ledger_ordered_columns = [
+      { name: "version", data_type: "text", udt_name: "text", nullable: "NO" },
+      { name: "name", data_type: "text", udt_name: "text", nullable: "YES" },
+      { name: "statements", data_type: "ARRAY", udt_name: "_text", nullable: "YES" },
+    ];
+    const reordered = makePreflight("verify_only");
+    reordered.ledger_ordered_columns = [
+      reordered.ledger_ordered_columns[0],
+      reordered.ledger_ordered_columns[2],
+      reordered.ledger_ordered_columns[1],
+      ...reordered.ledger_ordered_columns.slice(3),
+    ];
+
+    for (const preflight of [retired, reordered]) {
+      const stub = makeSpawnStub({ preflight });
+      const { logger, messages } = makeLogger();
+
+      const result = runPinnedProductionMigrations({
+        env: validEnvironment(),
+        spawnImpl: stub.spawnImpl,
+        readFile: readLfCheckoutFile,
+        logger,
+      });
+
+      expect(result).toBe(EXIT.PREFLIGHT_FAILED);
+      expect(messages.join("\n")).toContain("unexpected_ledger_contract");
+      expect(stub.calls.some(({ args }) => args.includes("--file"))).toBe(false);
+    }
   });
 
   it("fails a weakened verify-only catalog contract without submitting an apply file", () => {

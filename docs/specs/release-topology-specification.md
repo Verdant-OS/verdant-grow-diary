@@ -177,9 +177,10 @@ No competing implementation exists; none is created.
   this PR should merge; closing `#1699` is Cheek's action (§15).
 - **Conflict resolution.** Both §15.1 rows are kept: `#1705`'s `9b06be3f` re-verification first,
   then this slice's row. The pointer this slice rewrites sits inside AC-9.3, so contract §15 rule 2
-  applies: the header is restamped at `4ddb2322` (the tip this branch carries after forward-merging
-  `#1703`, whose hunks stayed disjoint from this slice's) and every touched clause re-verified. An
-  earlier revision of this section said no AC clause changed; that was wrong (Codex on `#1718`).
+  applies: the header was restamped at `4ddb2322` (the tip this branch carried after
+  forward-merging `#1703`, whose hunks stayed disjoint from this slice's), every touched clause was
+  re-verified, and the stamp was carried to `7266acd6` when `#1712` and `#1343` merged. An earlier
+  revision of this section said no AC clause changed; that was wrong (Codex on `#1718`).
 - **Board at the amendment: 48 open PRs.** Every head was fetched as `refs/pull/N/head` and diffed
   against its merge-base with `c9bc1df3`. None besides `#1699` adds or edits
   `docs/specs/release-topology-specification.md`, and `git merge-tree` of this branch against each
@@ -208,7 +209,12 @@ No competing implementation exists; none is created.
   - `docs/codebase-map.md` (`#1703`). Three lines inserted at `:289` moved AC-3.2's cite
     `:466-467` to **`:469-470`**, same text; the restamp re-points it.
 
-  The contract's own §15.1 row records the restamp and every re-measured count (AT-6).
+  The carry to `7266acd6` intersects the same paths with the 56 files that
+  `git diff --name-only 4ddb2322 7266acd6` lists and finds five, all from `#1343`: `package.json`,
+  `bun.lock`, `package-lock.json`, `scripts/check-bun-lockfile-policy.mjs` and its test. AC-8.1's
+  checker cite `:175-180` moves to **`:186-191`** and its test cite `:387` to **`:492`**, same text;
+  every `package.json` line cite holds. The contract's own §15.1 row records the restamp, the carry
+  and every re-measured count (AT-6).
 
 The collision audit the assignment asked for also covered work on signup and migration hardening
 (`#1703` and `#1701` open; `#1704` merged), CI runners (`#1221` and `#1708` merged), Quick Log
@@ -693,7 +699,7 @@ candidate follow-up, §14).
 | AT-3  | No production behaviour is asserted from repository presence or a green check (D-RT-2); each such input is labelled as an input                                                                                                                                                                                                                                                                                                                | `PASS`                                                                                                                                                                                                                  |
 | AT-4  | Every `path:line` cite resolves to its quoted content at the tree it is dated to: `c9bc1df3` for the founding text and the amendment (the founding text also held at `e1d541e2`), `4ddb2322` for the cites added after `#1703` — its two `apply-*.yml` (`:4`, `:140`) do not exist at `c9bc1df3`, and `docs/codebase-map.md:419-423` and `:423-428` are `:416-420` and `:420-425` there. Every other cited file is byte-identical at both SHAs | `PASS` (re-read per tree; no runner)                                                                                                                                                                                    |
 | AT-5  | `docs/agents/CURRENT_STATE.md` is not edited by this slice                                                                                                                                                                                                                                                                                                                                                                                     | `PASS`                                                                                                                                                                                                                  |
-| AT-6  | `docs/architecture-contract.md` edits are confined to the header restamp, its re-verification (AC-3.2 count and re-point, AC-4.3 note, AC-7.3 re-point), AC-9.3's pointer, §12, §13, §14 and a §15.1 row; no AC clause statement changes                                                                                                                                                                                                       | `PASS`                                                                                                                                                                                                                  |
+| AT-6  | `docs/architecture-contract.md` edits are confined to the header restamp, its re-verification (AC-3.2 count and re-point, AC-4.3 note, AC-7.3 re-point, AC-8.1 re-points), AC-9.3's pointer, §12, §13, §14 and a §15.1 row; no AC clause statement changes                                                                                                                                                                                     | `PASS`                                                                                                                                                                                                                  |
 | AT-7  | `node scripts/assert-docs-safety.mjs` and `node scripts/assert-release-docs-safety.mjs` exit 0                                                                                                                                                                                                                                                                                                                                                 | recorded in the PR body                                                                                                                                                                                                 |
 | AT-8  | Prettier (`.prettierrc.json`) reports the touched files clean                                                                                                                                                                                                                                                                                                                                                                                  | recorded in the PR body                                                                                                                                                                                                 |
 | AT-9  | The corrections table (§6.2) names a file and line for every contradicted statement and an owner for every deferred edit                                                                                                                                                                                                                                                                                                                       | `PASS`                                                                                                                                                                                                                  |
@@ -870,9 +876,10 @@ completed:
     §6.2, D-RT-12–14, M4 re-scoped and M10–M11 added, AT-11–14, five §10 rows, owner actions
     in §12 and §14, Appendix B (the promotion incident), verdict re-calibrated
   - docs/architecture-contract.md: #1699's §9/§12/§13/§14 edits; the AC-9.3 pointer carries no
-    dated observation. Because that pointer is inside AC-9.3, the header is restamped at 4ddb2322:
-    AC-7.3 re-pointed :141 -> :143 (#1661), AC-3.2 521 -> 522 and its codebase-map cite
-    :466-467 -> :469-470 (#1703), an AC-4.3 method note, §15.1 row
+    dated observation. Because that pointer is inside AC-9.3, the header is restamped at 4ddb2322
+    and carried to 7266acd6: AC-7.3 re-pointed :141 -> :143 (#1661), AC-3.2 521 -> 522 and its
+    codebase-map cite :466-467 -> :469-470 (#1703), AC-8.1 re-pointed :175-180 -> :186-191 and
+    :387 -> :492 (#1343), an AC-4.3 method note (all three figures reproduce), §15.1 row
   - docs/codebase-map.md, README.md: #1699's two publisher corrections, unchanged
 
 verified_by:
@@ -880,6 +887,8 @@ verified_by:
   - every repository path:line cite re-read at the tree it is dated to: c9bc1df3, or 4ddb2322
     for the #1703 additions (two apply-*.yml, codebase-map.md:419-423 and :423-428); every other
     cited file is byte-identical at both SHAs (§2.4, AT-4)
+  - contract cites into the five files #1343 changed re-read at 7266acd6; AC-3.4, AC-4.3 and
+    AC-9.3's workflow grep re-run there
   - §6.1: each row's cites read from the c9bc1df3 blobs; the counts and zero-hit greps re-run
   - Vercel reads 23:28–23:37 UTC (Appendix B): get_deployment per hostname ×4 plus the 08:28 one,
     list_deployments (production, since 08:25 UTC), list_promote_aliases, list_user_events ×2
@@ -917,7 +926,7 @@ next_slice:
   - #1696's owner: cite this document for the promotion axis; carry Appendix B's per-hostname
     reading as the latest live row (a CURRENT_STATE stamp outranks it for the value)
   - Next Claude slice after merge: the governance slice for CLAUDE.md:77, :130 and :138-144.
-    The contract is restamped at 4ddb2322 in this slice; a later stamp starts from there
+    The contract is restamped at 7266acd6 in this slice; a later stamp starts from there
 
 files_touched:
   - docs/specs/release-topology-specification.md

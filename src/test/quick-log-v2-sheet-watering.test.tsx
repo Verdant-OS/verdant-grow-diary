@@ -930,6 +930,46 @@ describe("QuickLogV2Sheet — structured watering", () => {
     expect(readPendingQuickLogWatering(authState.ownerId)).toEqual(first);
   });
 
+  it("lets a failed photo upload retry the exact Watering without that file", async () => {
+    storageUpload.mockResolvedValue({ data: null, error: { message: "unsupported photo" } });
+    wateringWriterMock.mockResolvedValueOnce({
+      ok: true,
+      eventId: "water-event-other-tab",
+      reused: true,
+    });
+    renderSheet();
+    clickWater();
+    enterVolume("500");
+    const photo = new File([new Uint8Array([1])], "roots.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId("qlv2-photo-library-input"), {
+      target: { files: [photo] },
+    });
+    clickSave();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/photo upload failed/i),
+    );
+    const pending = readPendingQuickLogWatering(authState.ownerId);
+    expect(pending.status).toBe("pending");
+    if (pending.status !== "pending") throw new Error("Water claim was not persisted");
+    expect(wateringWriterMock).not.toHaveBeenCalled();
+
+    expect(screen.getByTestId("qlv2-water-omit-failed-photo")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("qlv2-water-omit-failed-photo"));
+    expect(readPendingQuickLogWatering(authState.ownerId)).toEqual(pending);
+    expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/same Watering/i);
+    expect(screen.getByLabelText("Volume (ml)")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+
+    await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
+    expect(wateringWriterMock.mock.calls[0][0]).toEqual(pending.record.payload);
+    expect(storageUpload).toHaveBeenCalledTimes(1);
+    expect(diaryInsert).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
+    expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/did not attach the photo/i);
+    expect(readPendingQuickLogWatering(authState.ownerId)).toEqual({ status: "empty" });
+  });
+
   it("treats a rejected post-commit photo insert as partial success", async () => {
     diaryInsert.mockRejectedValueOnce(new Error("insert transport reset"));
     renderSheet();

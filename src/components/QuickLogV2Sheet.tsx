@@ -499,6 +499,8 @@ function QuickLogV2SheetForOwner({
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
   const [visitMode, setVisitMode] = useState<GrowWalkVisitMode>("fast_check");
   const [wateringRetryPending, setWateringRetryPending] = useState(Boolean(initialWatering));
+  const [failedWaterPhotoUpload, setFailedWaterPhotoUpload] = useState(false);
+  const [waterPhotoOmitted, setWaterPhotoOmitted] = useState(false);
   const [exactRetryPending, setExactRetryPending] = useState(
     Boolean(initialNote || initialFeeding),
   );
@@ -904,6 +906,8 @@ function QuickLogV2SheetForOwner({
       setSaveStatus("");
       setPostSave(null);
       setWateringRetryPending(false);
+      setFailedWaterPhotoUpload(false);
+      setWaterPhotoOmitted(false);
       setExactRetryPending(false);
       setPersistedNote(undefined);
       setMismatchedReceipt(null);
@@ -1299,6 +1303,8 @@ function QuickLogV2SheetForOwner({
     manualTempEntryUnitRef.current = "celsius";
     wateringTempEntryUnitRef.current = "celsius";
     setWateringRetryPending(true);
+    setFailedWaterPhotoUpload(false);
+    setWaterPhotoOmitted(false);
     keepSubmissionLockedRef.current = true;
     submissionLockedRef.current = true;
     setSubmissionLocked(true);
@@ -1306,6 +1312,23 @@ function QuickLogV2SheetForOwner({
     setLocalError(WATERING_RECOVERY_PENDING);
     resetPhotoSelection();
     resetVideoSelection();
+  }
+
+  function handleOmitFailedWaterPhoto() {
+    // Other tabs can claim the same Watering while this tab uploads media.
+    // Keep the shared payload and idempotency key; only omit the local file
+    // that could not be uploaded. Retry then confirms or writes that exact
+    // Watering without trapping the grower on a permanently failing file.
+    if (saveInFlightRef.current || !failedWaterPhotoUpload) return;
+    const pending = wateringRetrySubmissionRef.current;
+    if (!pending?.photoFile) return;
+    wateringRetrySubmissionRef.current = { ...pending, photoFile: null };
+    resetPhotoSelection();
+    setFailedWaterPhotoUpload(false);
+    setWaterPhotoOmitted(true);
+    setLocalError(
+      "The photo was omitted from this tab’s retry. Retry will check or save the same Watering. Check Timeline before adding the photo separately.",
+    );
   }
 
   function restorePendingFeeding(record: PendingQuickLogFeeding) {
@@ -1762,10 +1785,12 @@ function QuickLogV2SheetForOwner({
       if (!upload.ok) {
         await releaseUnsentWatering();
         releaseUnsentNote();
+        if (exactWateringSubmission) setFailedWaterPhotoUpload(true);
         setLocalError((upload as { message: string }).message);
         setSaveStatus("");
         return;
       }
+      if (exactWateringSubmission) setFailedWaterPhotoUpload(false);
       uploadedPath = upload.path;
     }
 
@@ -2040,6 +2065,10 @@ function QuickLogV2SheetForOwner({
           ? `Log saved — attachment status uncertain: ${mediaFailure}`
           : `Log saved — attachment failed: ${mediaFailure}`,
       );
+    } else if (exactWateringSubmission && waterPhotoOmitted && !recoveryClearFailed) {
+      setLocalError(
+        "Watering saved. This tab did not attach the photo. Check Timeline before adding it separately.",
+      );
     }
     showTimelineConfirmation(successMessage, {
       growId: resolved.growId ?? null,
@@ -2155,6 +2184,8 @@ function QuickLogV2SheetForOwner({
     setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
     wateringTempEntryUnitRef.current = null;
     setWateringRetryPending(false);
+    setFailedWaterPhotoUpload(false);
+    setWaterPhotoOmitted(false);
     setExactRetryPending(false);
     setPersistedNote(undefined);
     setMismatchedReceipt(null);
@@ -2650,15 +2681,27 @@ function QuickLogV2SheetForOwner({
                 entryTemperatureUnit={wateringTempEntryUnitRef.current ?? temperatureUnit}
               />
               {wateringRetryPending && (
-                <p
+                <div
                   role="status"
                   className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm text-foreground"
                   data-testid="qlv2-watering-retry-lock"
                 >
-                  The first result was uncertain. Retry sends the exact same target, timestamp,
+                  The first result is unresolved. Retry sends the exact same target, timestamp,
                   measurements and note. Closing or reloading keeps this record available in this
                   tab. Confirm it before choosing Log another.
-                </p>
+                  {failedWaterPhotoUpload && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      data-testid="qlv2-water-omit-failed-photo"
+                      onClick={handleOmitFailedWaterPhoto}
+                    >
+                      Continue without failed photo
+                    </Button>
+                  )}
+                </div>
               )}
               {volumeMissing && (
                 <p

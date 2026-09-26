@@ -194,7 +194,7 @@ const SOURCE_TRUST_RANK: Record<SensorReadingSource, number> = {
   invalid: 5,
 };
 
-function leastTrustedStatus(
+export function leastTrustedStatus(
   left: SensorReadingHealthStatus,
   right: SensorReadingHealthStatus,
 ): SensorReadingHealthStatus {

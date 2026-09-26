@@ -160,7 +160,7 @@ jobs:
             NOTE="The build stage never ran, so this commit's build is unmeasured, not failed. A preview may still load, but its build may not match this commit."
           elif [ "$BUILD" = "failure" ]; then
             STATUS="❌ **CI build failed** — do not share a preview"
-            NOTE="The build job failed (typecheck, production build, summary, or upload). A preview may still load, but its build may not match this commit."
+            NOTE="The build job failed before this commit could be certified; only the job result is known here, so the workflow run names the failing step. A preview may still load, but its build may not match this commit."
           else
             STATUS="⚠️ **CI build did not complete** (\`$BUILD\`) — do not share a preview"
             NOTE="The build stage ended \`$BUILD\`, so this commit's build is unmeasured. A preview may still load, but its build may not match this commit."

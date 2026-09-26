@@ -178,14 +178,13 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
     expect(SHEET).toMatch(/idempotencyKey: saveIdempotencyKeyRef\.current/);
   });
 
-  it("sheet rotates the shared key only on completed logical submissions", () => {
-    // Four intentional sites: structured-feed success, manual-log success,
+  it("sheet rotates the shared key only on resolved logical submissions", () => {
+    // Five intentional sites: structured-feed success, manual-log success,
     // the grower's explicit "Log another" reset, and a Feed the server
-    // definitively rejected in validation (nothing was written under that
-    // key; the corrected entry is a new logical submission). An ambiguous
-    // failure must never rotate.
+    // definitively rejected in validation, plus a first Water rejection after
+    // its exact pending claim is cleared. An ambiguous failure never rotates.
     const rotations = SHEET.match(/saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/g) ?? [];
-    expect(rotations).toHaveLength(4);
+    expect(rotations).toHaveLength(5);
     expect(SHEET).toMatch(
       /trackQuickLogSuccess\("feed", \{ reused: result\.reused \}\);[\s\S]{0,300}saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/,
     );
@@ -194,6 +193,9 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
     );
     expect(SHEET).toMatch(
       /const definitiveServerRejection = result\.reason === "rpc:invalid_typed_payload";/,
+    );
+    expect(SHEET).toMatch(
+      /const released = clearance\?\.status === "cleared";\s*if \(released\) \{\s*wateringRetrySubmissionRef\.current = null;\s*saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\);/,
     );
   });
 

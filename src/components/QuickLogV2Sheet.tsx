@@ -13,12 +13,19 @@ import {
   readPendingQuickLogWatering,
   claimPendingQuickLogWatering,
   clearPendingQuickLogWatering,
+  reconcilePendingQuickLogWateringClear,
   WATERING_RECOVERY_UNAVAILABLE,
   WATERING_RECOVERY_PENDING,
   WATERING_RECOVERY_CLEAR_FAILED,
   type PendingQuickLogWatering,
 } from "@/lib/quickLogPendingWateringStore";
+import {
+  readPendingStarterWater,
+  STARTER_WATER_RECOVERY_PENDING,
+  STARTER_WATER_RECOVERY_UNAVAILABLE,
+} from "@/lib/quickLogPendingStarterWaterStore";
 import { buildWateringRecoveryForm } from "@/lib/quickLogWateringRecoveryViewModel";
+import { mayCorrectRejectedWatering } from "@/lib/quickLogWateringRejectionRules";
 import {
   readPendingQuickLogFeeding,
   claimPendingQuickLogFeeding,
@@ -493,6 +500,8 @@ function QuickLogV2SheetForOwner({
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
   const [visitMode, setVisitMode] = useState<GrowWalkVisitMode>("fast_check");
   const [wateringRetryPending, setWateringRetryPending] = useState(Boolean(initialWatering));
+  const [failedWaterPhotoUpload, setFailedWaterPhotoUpload] = useState(false);
+  const [waterPhotoOmitted, setWaterPhotoOmitted] = useState(false);
   const [exactRetryPending, setExactRetryPending] = useState(
     Boolean(initialNote || initialFeeding),
   );
@@ -898,6 +907,8 @@ function QuickLogV2SheetForOwner({
       setSaveStatus("");
       setPostSave(null);
       setWateringRetryPending(false);
+      setFailedWaterPhotoUpload(false);
+      setWaterPhotoOmitted(false);
       setExactRetryPending(false);
       setPersistedNote(undefined);
       setMismatchedReceipt(null);
@@ -1293,6 +1304,8 @@ function QuickLogV2SheetForOwner({
     manualTempEntryUnitRef.current = "celsius";
     wateringTempEntryUnitRef.current = "celsius";
     setWateringRetryPending(true);
+    setFailedWaterPhotoUpload(false);
+    setWaterPhotoOmitted(false);
     keepSubmissionLockedRef.current = true;
     submissionLockedRef.current = true;
     setSubmissionLocked(true);
@@ -1300,6 +1313,23 @@ function QuickLogV2SheetForOwner({
     setLocalError(WATERING_RECOVERY_PENDING);
     resetPhotoSelection();
     resetVideoSelection();
+  }
+
+  function handleOmitFailedWaterPhoto() {
+    // Other tabs can claim the same Watering while this tab uploads media.
+    // Keep the shared payload and idempotency key; only omit the local file
+    // that could not be uploaded. Retry then confirms or writes that exact
+    // Watering without trapping the grower on a permanently failing file.
+    if (saveInFlightRef.current || !failedWaterPhotoUpload) return;
+    const pending = wateringRetrySubmissionRef.current;
+    if (!pending?.photoFile) return;
+    wateringRetrySubmissionRef.current = { ...pending, photoFile: null };
+    resetPhotoSelection();
+    setFailedWaterPhotoUpload(false);
+    setWaterPhotoOmitted(true);
+    setLocalError(
+      "The photo was omitted from this tab’s retry. Retry will check or save the same Watering. Check Timeline before adding the photo separately.",
+    );
   }
 
   function restorePendingFeeding(record: PendingQuickLogFeeding) {
@@ -1629,31 +1659,31 @@ function QuickLogV2SheetForOwner({
     }
     if (exactWateringSubmission) {
       if (!canContinueNote() || exactWateringSubmission.recovery.ownerId !== user?.id) return;
-      const claim = claimPendingQuickLogWatering(exactWateringSubmission.recovery);
+      const claim = await claimPendingQuickLogWatering(exactWateringSubmission.recovery);
       if (claim.status !== "claimed") {
         if (claim.status === "pending") restorePendingWatering(claim.record);
         else {
           if (!pendingWateringSubmission) wateringRetrySubmissionRef.current = null;
           else keepSubmissionLockedRef.current = true;
-          setLocalError(WATERING_RECOVERY_UNAVAILABLE);
+          setLocalError(
+            claim.status === "other_pending"
+              ? STARTER_WATER_RECOVERY_PENDING
+              : WATERING_RECOVERY_UNAVAILABLE,
+          );
         }
         return;
       }
       exactWateringSubmission.recovery = claim.record;
       keepSubmissionLockedRef.current = true;
     }
-    const releaseUnsentWatering = () => {
+    const releaseUnsentWatering = async () => {
       if (!exactWateringSubmission) return;
-      if (
-        !pendingWateringSubmission &&
-        clearPendingQuickLogWatering(exactWateringSubmission.recovery)
-      ) {
-        wateringRetrySubmissionRef.current = null;
-        keepSubmissionLockedRef.current = false;
-      } else {
-        keepSubmissionLockedRef.current = true;
-        setWateringRetryPending(true);
-      }
+      // Another tab may already be replaying this shared record while this
+      // tab's attachment upload fails. Keep the exact key and target until
+      // a confirmed receipt can clear it; an unsent local attempt alone
+      // does not prove that no other tab dispatched it.
+      keepSubmissionLockedRef.current = true;
+      setWateringRetryPending(true);
     };
 
     let exactManualSubmission = pendingManualSubmission;
@@ -1736,7 +1766,7 @@ function QuickLogV2SheetForOwner({
     let uploadedPath: string | null = null;
     if (submissionPhotoFile) {
       if (!resolved.growId) {
-        releaseUnsentWatering();
+        await releaseUnsentWatering();
         releaseUnsentNote();
         setLocalError("Choose a target with grow context before attaching a photo.");
         return;
@@ -1754,12 +1784,14 @@ function QuickLogV2SheetForOwner({
         return;
       }
       if (!upload.ok) {
-        releaseUnsentWatering();
+        await releaseUnsentWatering();
         releaseUnsentNote();
+        if (exactWateringSubmission) setFailedWaterPhotoUpload(true);
         setLocalError((upload as { message: string }).message);
         setSaveStatus("");
         return;
       }
+      if (exactWateringSubmission) setFailedWaterPhotoUpload(false);
       uploadedPath = upload.path;
     }
 
@@ -1769,11 +1801,35 @@ function QuickLogV2SheetForOwner({
         throw new Error("Structured Water submission lock was not created.");
       }
       if (!canContinueNote() || exactWateringSubmission.recovery.ownerId !== user?.id) return;
-      const claim = claimPendingQuickLogWatering(exactWateringSubmission.recovery);
+      const claim = await claimPendingQuickLogWatering(exactWateringSubmission.recovery);
       if (claim.status !== "claimed") {
         keepSubmissionLockedRef.current = true;
         setWateringRetryPending(true);
-        setLocalError(WATERING_RECOVERY_UNAVAILABLE);
+        setLocalError(
+          claim.status === "other_pending"
+            ? STARTER_WATER_RECOVERY_PENDING
+            : WATERING_RECOVERY_UNAVAILABLE,
+        );
+        return;
+      }
+      // A second tab can claim the public-starter Water record after this
+      // sheet opened (or while its photo was uploading). Check the shared
+      // recovery state at the final dispatch boundary.
+      const starterWater = readPendingStarterWater(exactWateringSubmission.recovery.ownerId);
+      if (starterWater.status !== "empty") {
+        if (uploadedPath) {
+          await supabase.storage
+            .from("diary-photos")
+            .remove([uploadedPath])
+            .catch(() => {});
+        }
+        await releaseUnsentWatering();
+        setLocalError(
+          starterWater.status === "pending"
+            ? STARTER_WATER_RECOVERY_PENDING
+            : STARTER_WATER_RECOVERY_UNAVAILABLE,
+        );
+        setSaveStatus("");
         return;
       }
       setSaveStatus("Saving watering…");
@@ -1787,10 +1843,28 @@ function QuickLogV2SheetForOwner({
             .catch(() => {});
         }
         if (!canContinueNote()) return;
-        setLocalError(WATERING_SAVE_FAILURE_MESSAGE);
-        setWateringRetryPending(true);
-        keepSubmissionLockedRef.current = true;
-        toast.error(WATERING_SAVE_FAILURE_MESSAGE);
+        const correctable = mayCorrectRejectedWatering({
+          reason: wateringResult.reason,
+          priorClaim: pendingWateringSubmission !== null,
+        });
+        const clearance = correctable
+          ? await reconcilePendingQuickLogWateringClear(exactWateringSubmission.recovery)
+          : null;
+        if (!canContinueNote()) return;
+        // A previous unresolved claim can have committed before its reply was
+        // lost. Even a later validation rejection cannot clear that claim.
+        const released = clearance?.status === "cleared";
+        if (released) {
+          wateringRetrySubmissionRef.current = null;
+          saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+        }
+        setWateringRetryPending(!released);
+        keepSubmissionLockedRef.current = !released;
+        const message = released
+          ? wateringFormReasonToHelper(wateringResult.reason)
+          : WATERING_SAVE_FAILURE_MESSAGE;
+        setLocalError(message);
+        toast.error(message);
         setSaveStatus("");
         return;
       }
@@ -1964,7 +2038,11 @@ function QuickLogV2SheetForOwner({
     if (exactSubmission && !canContinueNote()) return;
     let recoveryClearFailed = false;
     if (exactWateringSubmission) {
-      recoveryClearFailed = !clearPendingQuickLogWatering(exactWateringSubmission.recovery);
+      const clearance = await reconcilePendingQuickLogWateringClear(
+        exactWateringSubmission.recovery,
+      );
+      recoveryClearFailed =
+        clearance.status !== "cleared" && clearance.status !== "already_cleared";
       setWateringStorageFence(recoveryClearFailed);
       confirmedWateringRecoveryRef.current = recoveryClearFailed
         ? exactWateringSubmission.recovery
@@ -2005,6 +2083,10 @@ function QuickLogV2SheetForOwner({
         mediaFailureAmbiguous
           ? `Log saved — attachment status uncertain: ${mediaFailure}`
           : `Log saved — attachment failed: ${mediaFailure}`,
+      );
+    } else if (exactWateringSubmission && waterPhotoOmitted && !recoveryClearFailed) {
+      setLocalError(
+        "Watering saved. This tab did not attach the photo. Check Timeline before adding it separately.",
       );
     }
     showTimelineConfirmation(successMessage, {
@@ -2049,7 +2131,7 @@ function QuickLogV2SheetForOwner({
    * save cycle can proceed. Preserves the selected target so the
    * grower doesn't lose their place.
    */
-  function handleRecheckNoteStorage() {
+  async function handleRecheckNoteStorage() {
     if (!postSave || !recoveryStorageFence || saveInFlightRef.current) return;
     const confirmedFeeding = confirmedFeedingRecoveryRef.current;
     if (confirmedFeeding) {
@@ -2071,7 +2153,7 @@ function QuickLogV2SheetForOwner({
       const current = readPendingQuickLogWatering(confirmedWatering.ownerId);
       const cleared =
         current.status === "empty" ||
-        (current.status === "pending" && clearPendingQuickLogWatering(confirmedWatering));
+        (current.status === "pending" && (await clearPendingQuickLogWatering(confirmedWatering)));
       if (!cleared) {
         setLocalError(WATERING_RECOVERY_CLEAR_FAILED);
         return;
@@ -2121,6 +2203,8 @@ function QuickLogV2SheetForOwner({
     setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
     wateringTempEntryUnitRef.current = null;
     setWateringRetryPending(false);
+    setFailedWaterPhotoUpload(false);
+    setWaterPhotoOmitted(false);
     setExactRetryPending(false);
     setPersistedNote(undefined);
     setMismatchedReceipt(null);
@@ -2616,15 +2700,27 @@ function QuickLogV2SheetForOwner({
                 entryTemperatureUnit={wateringTempEntryUnitRef.current ?? temperatureUnit}
               />
               {wateringRetryPending && (
-                <p
+                <div
                   role="status"
                   className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm text-foreground"
                   data-testid="qlv2-watering-retry-lock"
                 >
-                  The first result was uncertain. Retry sends the exact same target, timestamp,
+                  The first result is unresolved. Retry sends the exact same target, timestamp,
                   measurements and note. Closing or reloading keeps this record available in this
                   tab. Confirm it before choosing Log another.
-                </p>
+                  {failedWaterPhotoUpload && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      data-testid="qlv2-water-omit-failed-photo"
+                      onClick={handleOmitFailedWaterPhoto}
+                    >
+                      Continue without failed photo
+                    </Button>
+                  )}
+                </div>
               )}
               {volumeMissing && (
                 <p

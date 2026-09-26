@@ -29,13 +29,16 @@ async function openQuickLog(page: Page): Promise<void> {
 }
 
 async function pendingWater(page: Page, ownerId: string): Promise<Row | null> {
-  // Read this operation only; never enumerate auth/session storage.
-  const raw = await page.evaluate(
-    (key) => sessionStorage.getItem(key),
+  // Read this operation only; never enumerate auth/session storage. Typed Water
+  // is shared in localStorage so a second tab can see the pending claim. The
+  // legacy same-tab copy must be gone after a new claim is persisted.
+  const { shared, legacy } = await page.evaluate(
+    (key) => ({ shared: localStorage.getItem(key), legacy: sessionStorage.getItem(key) }),
     "verdant:quick-log:pending-watering:v1:" + ownerId,
   );
-  if (raw === null) return null;
-  const value: unknown = JSON.parse(raw);
+  if (legacy !== null) throw new Error("Typed Water left a legacy session recovery copy.");
+  if (shared === null) return null;
+  const value: unknown = JSON.parse(shared);
   if (!isRow(value)) throw new Error("Pending Water envelope is malformed.");
   return value;
 }

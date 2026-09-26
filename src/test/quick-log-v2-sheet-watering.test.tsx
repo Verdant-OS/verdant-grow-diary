@@ -1,8 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import {
+  claimPendingQuickLogWatering,
+  readPendingQuickLogWatering,
+} from "@/lib/quickLogPendingWateringStore";
 import {
   clearTemperatureUnitPreference,
   saveTemperatureUnitPreference,
@@ -10,6 +14,7 @@ import {
 import {
   clearLocalStorageForTest,
   getLocalStorageItemForTest,
+  removeLocalStorageItemForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
 
@@ -25,18 +30,18 @@ const diaryInsert = vi.fn();
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
 const videoValidationMock = vi.fn();
-const RECENT_TARGET_KEY = "verdant.quickLog.lastTarget.v2.user-1";
-const authState = vi.hoisted(() => ({ ownerId: "user-1" }));
+const RECENT_TARGET_KEY = "verdant.quickLog.lastTarget.v2.11111111-1111-4111-8111-111111111111";
+const authState = vi.hoisted(() => ({ ownerId: "11111111-1111-4111-8111-111111111111" }));
 const plantContextState = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
   data: [
     {
-      id: "plant-1",
+      id: "33333333-3333-4333-8333-333333333333",
       name: "Plant 1",
       strain: "Oreoz",
-      tent_id: "tent-1",
-      grow_id: "grow-1",
+      tent_id: "55555555-5555-4555-8555-555555555555",
+      grow_id: "66666666-6666-4666-8666-666666666666",
       stage: "flowering",
       medium: "coco coir",
       pot_size: "5 gal",
@@ -79,12 +84,21 @@ vi.mock("@/hooks/use-plants", () => ({
 
 vi.mock("@/hooks/use-tents", () => ({
   useTents: () => ({
-    data: [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1", stage: "vegetative" }],
+    data: [
+      {
+        id: "55555555-5555-4555-8555-555555555555",
+        name: "Tent 1",
+        grow_id: "66666666-6666-4666-8666-666666666666",
+        stage: "vegetative",
+      },
+    ],
   }),
 }));
 
 vi.mock("@/store/grows", () => ({
-  useGrows: () => ({ grows: [{ id: "grow-1", name: "Home Run", stage: "seedling" }] }),
+  useGrows: () => ({
+    grows: [{ id: "66666666-6666-4666-8666-666666666666", name: "Home Run", stage: "seedling" }],
+  }),
 }));
 
 vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
@@ -104,7 +118,7 @@ vi.mock("sonner", () => ({
 }));
 
 function renderSheet(
-  defaultTargetKey = "plant:plant-1",
+  defaultTargetKey = "plant:33333333-3333-4333-8333-333333333333",
   defaultAction?: "note" | "water" | "feed",
 ) {
   const client = new QueryClient({
@@ -142,10 +156,25 @@ function clickSave() {
   fireEvent.click(screen.getByTestId("qlv2-save"));
 }
 
+const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 beforeEach(() => {
-  authState.ownerId = "user-1";
+  authState.ownerId = "11111111-1111-4111-8111-111111111111";
   window.sessionStorage.clear();
   clearLocalStorageForTest();
+  let tail: Promise<unknown> = Promise.resolve();
+  Object.defineProperty(window.navigator, "locks", {
+    configurable: true,
+    value: {
+      request: (_name: string, _options: unknown, callback: () => unknown) => {
+        const turn = tail.then(callback);
+        tail = turn.then(
+          () => undefined,
+          () => undefined,
+        );
+        return turn;
+      },
+    },
+  });
   clearTemperatureUnitPreference();
   rpcMock.mockReset();
   wateringWriterMock.mockReset();
@@ -176,6 +205,10 @@ beforeEach(() => {
   } else {
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:watering-photo");
   }
+});
+afterEach(() => {
+  if (originalLocks) Object.defineProperty(window.navigator, "locks", originalLocks);
+  else Reflect.deleteProperty(window.navigator, "locks");
 });
 
 async function installAcceptedWaterLedger(loseFirstReply = true) {
@@ -240,9 +273,24 @@ async function expectOriginalWaterAndRetry(original: Record<string, unknown>) {
 }
 
 describe("QuickLogV2Sheet — uncertain Water recovery", () => {
+  it("does not fence the next Watering when another tab cleared the confirmed record", async () => {
+    wateringWriterMock.mockImplementation(async () => {
+      removeLocalStorageItemForTest(
+        "verdant:quick-log:pending-watering:v1:11111111-1111-4111-8111-111111111111",
+      );
+      return { ok: true, eventId: "water-event-1", reused: true };
+    });
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+    enterVolume("750");
+    clickSave();
+    await screen.findByTestId("qlv2-post-save");
+    expect(screen.queryByText(/couldn’t finish preparing the next Watering/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /Log another/i })).toBeEnabled();
+  });
+
   it("retains an accepted Water record across Close and reopen instead of starting another save", async () => {
     const committed = await installAcceptedWaterLedger();
-    const view = renderSheet("plant:plant-1", "water");
+    const view = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
     const original = await saveWaterWithLostReply();
     expect(committed.size).toBe(1);
 
@@ -256,16 +304,16 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
 
   it("restores the same owner's accepted Water after full unmount and clears only after confirmation", async () => {
     const committed = await installAcceptedWaterLedger();
-    const first = renderSheet("plant:plant-1", "water");
+    const first = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
     const original = await saveWaterWithLostReply();
     first.unmount();
 
-    const restored = renderSheet("plant:plant-1", "note");
+    const restored = renderSheet("plant:33333333-3333-4333-8333-333333333333", "note");
     await expectOriginalWaterAndRetry(original);
     expect(committed.size).toBe(1);
     restored.unmount();
 
-    renderSheet("plant:plant-1", "water");
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
     expect(screen.queryByTestId("qlv2-watering-retry-lock")).toBeNull();
     expect(screen.getByLabelText("Volume (ml)")).toHaveValue("");
     enterVolume("500");
@@ -280,12 +328,12 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
     async (boundary) => {
       addSecondPlant();
       const committed = await installAcceptedWaterLedger();
-      const view = renderSheet("plant:plant-1", "water");
+      const view = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
       const original = await saveWaterWithLostReply();
       if (boundary === "across close/reopen") view.rerenderOpen(false);
       view.rerenderOpen(true, "plant:plant-2");
       await expectOriginalWaterAndRetry(original);
-      expect(rpcMock.mock.calls[1][1].p_plant_id).toBe("plant-1");
+      expect(rpcMock.mock.calls[1][1].p_plant_id).toBe("33333333-3333-4333-8333-333333333333");
       expect(committed.size).toBe(1);
     },
   );
@@ -293,7 +341,7 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
   it("keeps A's uncertain Water private while B is active and restores it only when A returns", async () => {
     addSecondPlant();
     const committed = await installAcceptedWaterLedger();
-    const first = renderSheet("plant:plant-1", "water");
+    const first = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
     const original = await saveWaterWithLostReply();
     first.unmount();
 
@@ -308,15 +356,18 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
     expect(rpcMock).toHaveBeenCalledTimes(1);
     other.unmount();
 
-    authState.ownerId = "user-1";
+    authState.ownerId = "11111111-1111-4111-8111-111111111111";
     renderSheet("plant:plant-2", "note");
     await expectOriginalWaterAndRetry(original);
     expect(committed.size).toBe(1);
   });
 
   it("does not replace a corrupt pending Water record or send a new save", async () => {
-    window.sessionStorage.setItem("verdant:quick-log:pending-watering:v1:user-1", "invalid-json");
-    renderSheet("plant:plant-1", "water");
+    window.sessionStorage.setItem(
+      "verdant:quick-log:pending-watering:v1:11111111-1111-4111-8111-111111111111",
+      "invalid-json",
+    );
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
     enterVolume("750");
     clickSave();
     await waitFor(() =>
@@ -324,14 +375,16 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
     );
     expect(wateringWriterMock).not.toHaveBeenCalled();
     expect(rpcMock).not.toHaveBeenCalled();
-    expect(window.sessionStorage.getItem("verdant:quick-log:pending-watering:v1:user-1")).toBe(
-      "invalid-json",
-    );
+    expect(
+      window.sessionStorage.getItem(
+        "verdant:quick-log:pending-watering:v1:11111111-1111-4111-8111-111111111111",
+      ),
+    ).toBe("invalid-json");
   });
 
-  it("does not dispatch Water when same-tab durable storage cannot retain the operation", async () => {
+  it("does not dispatch Water when shared recovery storage cannot retain the operation", async () => {
     const committed = await installAcceptedWaterLedger();
-    renderSheet("plant:plant-1", "water");
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
     enterVolume("750");
     const originalSetItem = Storage.prototype.setItem;
     const blockedStorage = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
@@ -339,7 +392,7 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
       key: string,
       value: string,
     ) {
-      if (this === window.sessionStorage) throw new Error("simulated same-tab storage denial");
+      if (this === window.localStorage) throw new Error("simulated shared storage denial");
       return originalSetItem.call(this, key, value);
     });
     try {
@@ -356,14 +409,14 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
 
   it("keeps a confirmed Water visible while storage cleanup blocks the next entry, without resending", async () => {
     const committed = await installAcceptedWaterLedger(false);
-    renderSheet("plant:plant-1", "water");
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
     enterVolume("750");
     const originalRemove = Storage.prototype.removeItem;
     const blockedRemoval = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (
       this: Storage,
       key: string,
     ) {
-      if (this === window.sessionStorage) throw new Error("cleanup unavailable");
+      if (this === window.localStorage) throw new Error("cleanup unavailable");
       originalRemove.call(this, key);
     });
     try {
@@ -397,7 +450,7 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
             finishUpload = resolve;
           }),
       );
-      const first = renderSheet("plant:plant-1", "water");
+      const first = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
       enterVolume("750");
       fireEvent.change(screen.getByTestId("qlv2-photo-library-input"), {
         target: {
@@ -413,11 +466,16 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
       const other = renderSheet("plant:plant-2", "water");
       if (boundary === "the original owner after a round trip") {
         other.unmount();
-        authState.ownerId = "user-1";
+        authState.ownerId = "11111111-1111-4111-8111-111111111111";
         renderSheet("plant:plant-2", "note");
       }
       await act(async () => {
-        finishUpload({ data: { path: "user-1/grow-1/original.jpg" }, error: null });
+        finishUpload({
+          data: {
+            path: "11111111-1111-4111-8111-111111111111/66666666-6666-4666-8666-666666666666/original.jpg",
+          },
+          error: null,
+        });
       });
       expect(wateringWriterMock).not.toHaveBeenCalled();
       expect(rpcMock).not.toHaveBeenCalled();
@@ -432,7 +490,7 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
 
 describe("QuickLogV2Sheet — structured watering", () => {
   it("opens directly on Water with the exact default target and fails closed for a stale target", () => {
-    const valid = renderSheet("plant:plant-1", "water");
+    const valid = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
     expect(screen.getByTestId("qlv2-watering-form")).toBeInTheDocument();
     expect(screen.getByLabelText("Choose plant or tent for this Quick Log")).toHaveTextContent(
       "Plant · Plant 1",
@@ -456,9 +514,9 @@ describe("QuickLogV2Sheet — structured watering", () => {
     await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
     expect(wateringWriterMock.mock.calls[0][0]).toEqual(
       expect.objectContaining({
-        grow_id: "grow-1",
-        tent_id: "tent-1",
-        plant_id: "plant-1",
+        grow_id: "66666666-6666-4666-8666-666666666666",
+        tent_id: "55555555-5555-4555-8555-555555555555",
+        plant_id: "33333333-3333-4333-8333-333333333333",
         volume_ml: 500,
       }),
     );
@@ -566,7 +624,7 @@ describe("QuickLogV2Sheet — structured watering", () => {
   });
 
   it("remembers the confirmed plant after structured Water succeeds", async () => {
-    renderSheet("plant:plant-1", "water");
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
     enterVolume();
     clickSave();
 
@@ -578,9 +636,9 @@ describe("QuickLogV2Sheet — structured watering", () => {
       unknown
     >;
     expect(stored).toEqual({
-      plantId: "plant-1",
-      growId: "grow-1",
-      tentId: "tent-1",
+      plantId: "33333333-3333-4333-8333-333333333333",
+      growId: "66666666-6666-4666-8666-666666666666",
+      tentId: "55555555-5555-4555-8555-555555555555",
       savedAt: expect.any(String),
     });
     expect(Number.isFinite(Date.parse(String(stored.savedAt)))).toBe(true);
@@ -595,7 +653,7 @@ describe("QuickLogV2Sheet — structured watering", () => {
       },
       error: null,
     });
-    renderSheet("plant:plant-1", "note");
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "note");
     fireEvent.change(screen.getByLabelText("Note (optional)"), {
       target: { value: "Checked leaf posture." },
     });
@@ -605,9 +663,9 @@ describe("QuickLogV2Sheet — structured watering", () => {
     await waitFor(() => expect(getLocalStorageItemForTest(RECENT_TARGET_KEY)).not.toBeNull());
 
     expect(JSON.parse(getLocalStorageItemForTest(RECENT_TARGET_KEY) ?? "null")).toEqual({
-      plantId: "plant-1",
-      growId: "grow-1",
-      tentId: "tent-1",
+      plantId: "33333333-3333-4333-8333-333333333333",
+      growId: "66666666-6666-4666-8666-666666666666",
+      tentId: "55555555-5555-4555-8555-555555555555",
       savedAt: expect.any(String),
     });
   });
@@ -621,7 +679,7 @@ describe("QuickLogV2Sheet — structured watering", () => {
     });
     setLocalStorageItemForTest(RECENT_TARGET_KEY, previous);
     wateringWriterMock.mockResolvedValueOnce({ ok: false, reason: "rpc:error" });
-    renderSheet("plant:plant-1", "water");
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
     enterVolume();
     clickSave();
 
@@ -629,16 +687,97 @@ describe("QuickLogV2Sheet — structured watering", () => {
     expect(getLocalStorageItemForTest(RECENT_TARGET_KEY)).toBe(previous);
   });
 
+  it("releases a first pre-write Water rejection for correction with a new key", async () => {
+    wateringWriterMock
+      .mockResolvedValueOnce({ ok: false, reason: "rpc:invalid_typed_payload" })
+      .mockResolvedValueOnce({ ok: true, eventId: "water-event-corrected", reused: false });
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+    enterVolume("500");
+    clickSave();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("qlv2-error")).toHaveTextContent(
+        /server rejected this Watering.*correct/i,
+      ),
+    );
+    expect(screen.queryByTestId("qlv2-post-save")).toBeNull();
+    expect(screen.queryByTestId("qlv2-watering-retry-lock")).toBeNull();
+    expect(screen.getByLabelText("Volume (ml)")).toBeEnabled();
+    expect(readPendingQuickLogWatering(authState.ownerId)).toEqual({ status: "empty" });
+
+    const rejectedKey = wateringWriterMock.mock.calls[0][0].idempotency_key;
+    enterVolume("750");
+    clickSave();
+    await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
+    expect(wateringWriterMock).toHaveBeenCalledTimes(2);
+    expect(wateringWriterMock.mock.calls[1][0].volume_ml).toBe(750);
+    expect(wateringWriterMock.mock.calls[1][0].idempotency_key).not.toBe(rejectedKey);
+  });
+
+  it("retains an earlier ambiguous Water attempt when a later retry is rejected", async () => {
+    wateringWriterMock
+      .mockResolvedValueOnce({ ok: false, reason: "rpc:error" })
+      .mockResolvedValueOnce({ ok: false, reason: "rpc:invalid_typed_payload" });
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+    enterVolume("500");
+    clickSave();
+    await waitFor(() => expect(screen.getByTestId("qlv2-watering-retry-lock")).toBeVisible());
+    const firstKey = wateringWriterMock.mock.calls[0][0].idempotency_key;
+
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+    await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByTestId("qlv2-error")).toHaveTextContent(
+        /could not confirm the watering save/i,
+      ),
+    );
+    expect(wateringWriterMock.mock.calls[1][0].idempotency_key).toBe(firstKey);
+    expect(screen.getByTestId("qlv2-watering-retry-lock")).toBeVisible();
+    expect(screen.getByLabelText("Volume (ml)")).toBeDisabled();
+    expect(readPendingQuickLogWatering(authState.ownerId).status).toBe("pending");
+    expect(screen.queryByTestId("qlv2-post-save")).toBeNull();
+  });
+
+  it("keeps a first rejected Water locked if its pending claim cannot be cleared", async () => {
+    wateringWriterMock.mockResolvedValueOnce({ ok: false, reason: "rpc:invalid_typed_payload" });
+    const storage = window.localStorage;
+    const methodOwner: Storage = Object.prototype.hasOwnProperty.call(storage, "removeItem")
+      ? storage
+      : Object.getPrototypeOf(storage);
+    const remove = methodOwner.removeItem as Storage["removeItem"];
+    const removeSpy = vi.spyOn(methodOwner, "removeItem").mockImplementation(function (
+      this: Storage,
+      key: string,
+    ) {
+      if (key.startsWith("verdant:quick-log:pending-watering:v1:")) {
+        throw new Error("simulated storage refusal");
+      }
+      remove.call(this, key);
+    });
+    try {
+      renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+      enterVolume("500");
+      clickSave();
+      await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.getByTestId("qlv2-watering-retry-lock")).toBeVisible());
+      expect(screen.getByLabelText("Volume (ml)")).toBeDisabled();
+      expect(readPendingQuickLogWatering(authState.ownerId).status).toBe("pending");
+      expect(screen.queryByTestId("qlv2-post-save")).toBeNull();
+    } finally {
+      removeSpy.mockRestore();
+    }
+  });
+
   it("does not invent a remembered plant after a tent-scoped Water succeeds", async () => {
-    renderSheet("tent:tent-1", "water");
+    renderSheet("tent:55555555-5555-4555-8555-555555555555", "water");
     enterVolume();
     clickSave();
 
     await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
     expect(wateringWriterMock.mock.calls[0][0]).toEqual(
       expect.objectContaining({
-        grow_id: "grow-1",
-        tent_id: "tent-1",
+        grow_id: "66666666-6666-4666-8666-666666666666",
+        tent_id: "55555555-5555-4555-8555-555555555555",
         plant_id: null,
       }),
     );
@@ -774,7 +913,7 @@ describe("QuickLogV2Sheet — structured watering", () => {
       .mockResolvedValueOnce({ ok: false, reason: "rpc:error" })
       .mockResolvedValueOnce({ ok: true, eventId: "water-event-retry", reused: true })
       .mockResolvedValueOnce({ ok: true, eventId: "water-event-fresh", reused: false });
-    const { rerenderOpen } = renderSheet("plant:plant-1", "water");
+    const { rerenderOpen } = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
     enterVolume();
     clickSave();
     await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
@@ -827,16 +966,22 @@ describe("QuickLogV2Sheet — structured watering", () => {
     });
     expect(diaryInsert.mock.calls[0][0]).toEqual(
       expect.objectContaining({
-        grow_id: "grow-1",
-        tent_id: "tent-1",
-        plant_id: "plant-1",
+        grow_id: "66666666-6666-4666-8666-666666666666",
+        tent_id: "55555555-5555-4555-8555-555555555555",
+        plant_id: "33333333-3333-4333-8333-333333333333",
         details: expect.objectContaining({ attached_to_action: "water" }),
       }),
     );
   });
 
-  it("surfaces a rejected pre-commit photo upload and releases the locked draft", async () => {
-    storageUpload.mockRejectedValueOnce(new Error("transport reset"));
+  it("keeps a failed photo upload's shared Water claim while another tab may replay it", async () => {
+    let rejectUpload: ((reason: Error) => void) | null = null;
+    storageUpload.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectUpload = reject;
+        }),
+    );
     renderSheet();
     clickWater();
     enterVolume("500");
@@ -847,12 +992,63 @@ describe("QuickLogV2Sheet — structured watering", () => {
 
     clickSave();
 
+    await waitFor(() => expect(storageUpload).toHaveBeenCalledTimes(1));
+    const first = readPendingQuickLogWatering(authState.ownerId);
+    expect(first.status).toBe("pending");
+    if (first.status !== "pending") throw new Error("Water claim was not persisted");
+    expect(await claimPendingQuickLogWatering(first.record)).toEqual({
+      status: "claimed",
+      record: first.record,
+    });
+    await act(async () => rejectUpload?.(new Error("transport reset")));
+
     await waitFor(() =>
       expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/photo upload failed/i),
     );
     expect(wateringWriterMock).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("qlv2-watering-retry-lock")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Volume (ml)")).toBeEnabled();
+    expect(screen.getByTestId("qlv2-watering-retry-lock")).toBeVisible();
+    expect(screen.getByLabelText("Volume (ml)")).toBeDisabled();
+    expect(readPendingQuickLogWatering(authState.ownerId)).toEqual(first);
+  });
+
+  it("lets a failed photo upload retry the exact Watering without that file", async () => {
+    storageUpload.mockResolvedValue({ data: null, error: { message: "unsupported photo" } });
+    wateringWriterMock.mockResolvedValueOnce({
+      ok: true,
+      eventId: "water-event-other-tab",
+      reused: true,
+    });
+    renderSheet();
+    clickWater();
+    enterVolume("500");
+    const photo = new File([new Uint8Array([1])], "roots.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId("qlv2-photo-library-input"), {
+      target: { files: [photo] },
+    });
+    clickSave();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/photo upload failed/i),
+    );
+    const pending = readPendingQuickLogWatering(authState.ownerId);
+    expect(pending.status).toBe("pending");
+    if (pending.status !== "pending") throw new Error("Water claim was not persisted");
+    expect(wateringWriterMock).not.toHaveBeenCalled();
+
+    expect(screen.getByTestId("qlv2-water-omit-failed-photo")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("qlv2-water-omit-failed-photo"));
+    expect(readPendingQuickLogWatering(authState.ownerId)).toEqual(pending);
+    expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/same Watering/i);
+    expect(screen.getByLabelText("Volume (ml)")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+
+    await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
+    expect(wateringWriterMock.mock.calls[0][0]).toEqual(pending.record.payload);
+    expect(storageUpload).toHaveBeenCalledTimes(1);
+    expect(diaryInsert).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
+    expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/did not attach the photo/i);
+    expect(readPendingQuickLogWatering(authState.ownerId)).toEqual({ status: "empty" });
   });
 
   it("treats a rejected post-commit photo insert as partial success", async () => {
@@ -938,7 +1134,7 @@ describe("QuickLogV2Sheet — structured watering", () => {
     expect(await screen.findByTestId("qlv2-video-checking")).toBeInTheDocument();
 
     rerenderOpen(false);
-    rerenderOpen(true, "tent:tent-1");
+    rerenderOpen(true, "tent:55555555-5555-4555-8555-555555555555");
     await act(async () => {
       settleVideo?.({ ok: true, mime: "video/mp4", sizeBytes: 1, durationS: 10 });
       await Promise.resolve();

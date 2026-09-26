@@ -224,6 +224,47 @@ describe("All activity types retry confirmation", () => {
     expect(onSaveSuccess).toHaveBeenCalledTimes(1);
   });
 
+  it("cleans up a definitive first rejection without replaying it or claiming a save", async () => {
+    backend.serverRejectOnPost = 1;
+    const remove = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => undefined);
+    const view = mount();
+    selectActivity("training");
+    enterNote();
+    save();
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-all-activities-retry-original")).toHaveTextContent(
+        "Clear rejected recovery record",
+      ),
+    );
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toHaveTextContent(
+      /server refused this activity, but its recovery record could not be cleared/i,
+    );
+    expect(backend.posts).toHaveLength(1);
+    expect(backend.rows.size).toBe(0);
+    expect(screen.queryByTestId("quick-log-all-activities-saved-item")).not.toBeInTheDocument();
+    expect(telemetry).not.toHaveBeenCalled();
+    save();
+    expect(backend.posts).toHaveLength(1);
+    view.unmount();
+    mount();
+    expect(screen.getByTestId("quick-log-all-activities-retry-original")).toHaveTextContent(
+      "Clear rejected recovery record",
+    );
+    remove.mockRestore();
+    save();
+    expect(
+      screen.queryByTestId("quick-log-all-activities-pending-activity"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-all-activities-note")).toBeEnabled();
+    expect(backend.posts).toHaveLength(1);
+    enterNote("Corrected after rejection");
+    save();
+    await screen.findByTestId("quick-log-all-activities-saved-item");
+    expect(backend.posts).toHaveLength(2);
+    expect(backend.posts[1].p_idempotency_key).not.toBe(backend.posts[0].p_idempotency_key);
+    expect(backend.rows.size).toBe(1);
+  });
+
   it("blocks an over-500-character note before claiming or sending a request", async () => {
     mount();
     selectActivity("training");

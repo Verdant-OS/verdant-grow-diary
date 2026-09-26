@@ -56,13 +56,16 @@ import {
 import {
   ACTIVITY_RECOVERY_CLEAR_FAILED,
   ACTIVITY_RECOVERY_PENDING,
+  ACTIVITY_RECOVERY_REJECTED_CLEAR_FAILED,
   ACTIVITY_RECOVERY_RETRY_REJECTED,
   ACTIVITY_RECOVERY_UNAVAILABLE,
   claimPendingQuickLogActivity,
   clearPendingQuickLogActivity,
   readConfirmedPendingQuickLogActivity,
   readPendingQuickLogActivity,
+  readRejectedPendingQuickLogActivity,
   rememberConfirmedPendingQuickLogActivity,
+  rememberRejectedPendingQuickLogActivity,
   samePendingQuickLogActivity,
   type PendingQuickLogActivity,
 } from "@/lib/quickLogPendingActivityStore";
@@ -352,6 +355,9 @@ export default function QuickLogAllActivitiesSection({
   const confirmedPendingActivity = activePendingActivity
     ? readConfirmedPendingQuickLogActivity(activePendingActivity)
     : null;
+  const rejectedPendingActivity = activePendingActivity
+    ? readRejectedPendingQuickLogActivity(activePendingActivity)
+    : false;
   const liveTargetKeyRef = useRef(currentTargetKey);
   const liveOwnerIdRef = useRef(user?.id ?? null);
   useLayoutEffect(() => {
@@ -497,7 +503,9 @@ export default function QuickLogAllActivitiesSection({
     setErrorReason(
       readConfirmedPendingQuickLogActivity(recovery.record)
         ? ACTIVITY_RECOVERY_CLEAR_FAILED
-        : ACTIVITY_RECOVERY_PENDING,
+        : readRejectedPendingQuickLogActivity(recovery.record)
+          ? ACTIVITY_RECOVERY_REJECTED_CLEAR_FAILED
+          : ACTIVITY_RECOVERY_PENDING,
     );
     setErrorForActivity(recovery.record.input.activityId);
   }, [currentTarget, currentTargetKey, user?.id]);
@@ -690,6 +698,16 @@ export default function QuickLogAllActivitiesSection({
         confirmed.growEventId,
         clearPendingQuickLogActivity(record),
       );
+      return;
+    }
+    if (readRejectedPendingQuickLogActivity(record)) {
+      if (clearPendingQuickLogActivity(record)) {
+        setPendingActivity(null);
+        setErrorReason("The server refused this activity. Check its target and fields.");
+      } else {
+        setErrorReason(ACTIVITY_RECOVERY_REJECTED_CLEAR_FAILED);
+      }
+      setErrorForActivity(record.input.activityId);
       return;
     }
     const persistenceGate = evaluateQuickLogPrePersistenceGate({
@@ -1089,8 +1107,9 @@ export default function QuickLogAllActivitiesSection({
             if (clearPendingQuickLogActivity(claim.record)) {
               if (stillCurrent) setPendingActivity(null);
             } else {
+              rememberRejectedPendingQuickLogActivity(claim.record);
               if (stillCurrent) {
-                setErrorReason(ACTIVITY_RECOVERY_CLEAR_FAILED);
+                setErrorReason(ACTIVITY_RECOVERY_REJECTED_CLEAR_FAILED);
                 setErrorForActivity(selected.id);
               }
               return;
@@ -1349,13 +1368,17 @@ export default function QuickLogAllActivitiesSection({
                   ? "Saving the original activity. Please wait for confirmation."
                   : confirmedPendingActivity
                     ? ACTIVITY_RECOVERY_CLEAR_FAILED
-                    : `${ACTIVITY_RECOVERY_PENDING} You can check Timeline before retrying.`}
+                    : rejectedPendingActivity
+                      ? ACTIVITY_RECOVERY_REJECTED_CLEAR_FAILED
+                      : `${ACTIVITY_RECOVERY_PENDING} You can check Timeline before retrying.`}
               </p>
-              {!confirmedPendingActivity && pendingPersistenceGate?.allowed === false && (
-                <p role="note" className="text-xs text-muted-foreground">
-                  {pendingPersistenceGate.blockedReason ?? "This activity is not available."}
-                </p>
-              )}
+              {!confirmedPendingActivity &&
+                !rejectedPendingActivity &&
+                pendingPersistenceGate?.allowed === false && (
+                  <p role="note" className="text-xs text-muted-foreground">
+                    {pendingPersistenceGate.blockedReason ?? "This activity is not available."}
+                  </p>
+                )}
               {activePendingActivity.input.note && (
                 <p className="text-xs whitespace-pre-wrap break-words">
                   Original note: {activePendingActivity.input.note}
@@ -1375,7 +1398,9 @@ export default function QuickLogAllActivitiesSection({
                   saving ||
                   saveBlocked ||
                   !!externalPersistenceBlockReason ||
-                  (!confirmedPendingActivity && pendingPersistenceGate?.allowed === false)
+                  (!confirmedPendingActivity &&
+                    !rejectedPendingActivity &&
+                    pendingPersistenceGate?.allowed === false)
                 }
                 data-testid={`${testIdPrefix}-retry-original`}
               >
@@ -1383,7 +1408,9 @@ export default function QuickLogAllActivitiesSection({
                   ? "Checking…"
                   : confirmedPendingActivity
                     ? "Clear saved recovery record"
-                    : "Retry original activity"}
+                    : rejectedPendingActivity
+                      ? "Clear rejected recovery record"
+                      : "Retry original activity"}
               </Button>
             </div>
           ) : (

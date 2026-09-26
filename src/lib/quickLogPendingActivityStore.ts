@@ -42,6 +42,8 @@ export const ACTIVITY_RECOVERY_RETRY_REJECTED =
   "The retry was rejected, but an earlier save may have succeeded. Check Timeline before logging another activity on this target.";
 export const ACTIVITY_RECOVERY_CLEAR_FAILED =
   "Your activity was saved, but its recovery record could not be cleared. Restore storage access before logging another activity on this target.";
+export const ACTIVITY_RECOVERY_REJECTED_CLEAR_FAILED =
+  "The server refused this activity, but its recovery record could not be cleared. Restore storage access; Retry will clear the record without resending the activity.";
 
 export type PendingActivityRead =
   | { readonly status: "empty" }
@@ -50,13 +52,18 @@ export type PendingActivityRead =
 
 const PREFIX = "verdant:quick-log:pending-activity:v1:";
 
-// A confirmed RPC can outlive a failed sessionStorage removal. Keep that
-// confirmation in this tab's memory so a remounted editor can retry cleanup
-// without replaying an already confirmed write. A full page reload loses this
-// hint; the unchanged server idempotency key remains the duplicate-write fence.
-const confirmedUncleared = new Map<
+// A resolved RPC can outlive a failed sessionStorage removal. Keep the exact
+// outcome in this tab's memory so a remounted editor retries cleanup without
+// replaying either a confirmed write or a definitive rejection. A full page
+// reload loses this hint; the server idempotency key remains the write fence.
+const resolvedUncleared = new Map<
   string,
-  { readonly record: string; readonly growEventId: string | null }
+  {
+    readonly record: string;
+    readonly outcome:
+      | { readonly kind: "confirmed"; readonly growEventId: string | null }
+      | { readonly kind: "rejected" };
+  }
 >();
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -169,7 +176,7 @@ export function readPendingQuickLogActivity(
     const key = storageKey(ownerId, target);
     const raw = window.sessionStorage.getItem(key);
     if (raw === null) {
-      confirmedUncleared.delete(key);
+      resolvedUncleared.delete(key);
       return { status: "empty" };
     }
     const parsed: unknown = JSON.parse(raw);
@@ -187,9 +194,18 @@ export function rememberConfirmedPendingQuickLogActivity(
   growEventId: string | null,
 ): void {
   if (!validRecord(record, record.ownerId, record.input)) return;
-  confirmedUncleared.set(storageKey(record.ownerId, record.input), {
+  resolvedUncleared.set(storageKey(record.ownerId, record.input), {
     record: JSON.stringify(record),
-    growEventId,
+    outcome: { kind: "confirmed", growEventId },
+  });
+}
+
+/** A definitive first rejection must never be replayed after cleanup fails. */
+export function rememberRejectedPendingQuickLogActivity(record: PendingQuickLogActivity): void {
+  if (!validRecord(record, record.ownerId, record.input)) return;
+  resolvedUncleared.set(storageKey(record.ownerId, record.input), {
+    record: JSON.stringify(record),
+    outcome: { kind: "rejected" },
   });
 }
 
@@ -199,10 +215,17 @@ export function readConfirmedPendingQuickLogActivity(
 ): { readonly growEventId: string | null } | null {
   if (!validRecord(record, record.ownerId, record.input)) return null;
   const key = storageKey(record.ownerId, record.input);
-  const confirmed = confirmedUncleared.get(key);
-  if (!confirmed) return null;
-  if (confirmed.record !== JSON.stringify(record)) return null;
-  return { growEventId: confirmed.growEventId };
+  const resolved = resolvedUncleared.get(key);
+  if (resolved?.record !== JSON.stringify(record) || resolved.outcome.kind !== "confirmed")
+    return null;
+  return { growEventId: resolved.outcome.growEventId };
+}
+
+/** Return only an exact definitive rejection for this owner, target, and payload. */
+export function readRejectedPendingQuickLogActivity(record: PendingQuickLogActivity): boolean {
+  if (!validRecord(record, record.ownerId, record.input)) return false;
+  const resolved = resolvedUncleared.get(storageKey(record.ownerId, record.input));
+  return resolved?.record === JSON.stringify(record) && resolved.outcome.kind === "rejected";
 }
 
 export function samePendingQuickLogActivity(
@@ -244,7 +267,7 @@ export function clearPendingQuickLogActivity(record: PendingQuickLogActivity): b
     const key = storageKey(record.ownerId, record.input);
     window.sessionStorage.removeItem(key);
     const cleared = window.sessionStorage.getItem(key) === null;
-    if (cleared) confirmedUncleared.delete(key);
+    if (cleared) resolvedUncleared.delete(key);
     return cleared;
   } catch {
     return false;

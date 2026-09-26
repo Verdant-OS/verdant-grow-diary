@@ -27,6 +27,7 @@ import {
   validateTempC,
 } from "./sensorValidation";
 import { selectWithRetractionCompat } from "./quick-log/retractionFilterCompat";
+import { requireEffectiveSensorReadings } from "./effectiveSensorReadingRules";
 
 export interface OperatorRecentDiaryEntry {
   id: string;
@@ -105,9 +106,7 @@ const MCP_SENSOR_CONFIDENCE = {
  * Mapping: invalid/implausible → 0; stale/demo → 0.35; manual/csv → 0.55;
  * live+fresh+ok+plausible → 0.9. Never promotes vendor tokens.
  */
-export function deriveMcpSensorReadingConfidence(
-  input: McpSensorConfidenceInput,
-): number {
+export function deriveMcpSensorReadingConfidence(input: McpSensorConfidenceInput): number {
   const quality =
     typeof input.quality === "string" ? input.quality.trim().toLowerCase() : "invalid";
   if (
@@ -159,7 +158,7 @@ type OwnerScopedSupabaseClient = SupabaseClient<Database>;
 
 const DIARY_COLUMNS = "id,grow_id,plant_id,tent_id,stage,note,entry_at,created_at" as const;
 const SENSOR_COLUMNS =
-  "id,tent_id,metric,value,quality,source,ts,captured_at,created_at,raw_payload" as const;
+  "id,user_id,tent_id,metric,value,quality,source,ts,captured_at,created_at,device_id,raw_payload,correction_valid" as const;
 const SENSOR_CANDIDATE_LIMIT = 25;
 /** One extra row proves a branch overflow without widening its logical cohort. */
 const SENSOR_CANDIDATE_LOOKAHEAD_LIMIT = SENSOR_CANDIDATE_LIMIT + 1;
@@ -451,7 +450,7 @@ function sensorCandidateQuery(
   limit = SENSOR_CANDIDATE_LIMIT,
 ): PromiseLike<SensorCandidateQueryResult> {
   const base = client
-    .from("sensor_readings")
+    .from("sensor_readings_effective" as "sensor_readings")
     .select(SENSOR_COLUMNS)
     .eq("tent_id", tentId)
     .eq("metric", metric);
@@ -469,8 +468,13 @@ function sensorCandidateQuery(
     .limit(limit) as unknown as PromiseLike<SensorCandidateQueryResult>;
 }
 
-function rowsFromSensorCandidateResult(result: SensorCandidateQueryResult): McpSensorQueryRow[] {
-  return Array.isArray(result.data) ? (result.data as McpSensorQueryRow[]) : [];
+function rowsFromSensorCandidateResult(
+  result: SensorCandidateQueryResult,
+  tentId: string,
+): McpSensorQueryRow[] {
+  const rows = requireEffectiveSensorReadings(result.data);
+  if (rows.some((row) => row.tent_id !== tentId)) throw new Error("Sensor snapshot unavailable.");
+  return rows;
 }
 
 /**
@@ -577,7 +581,7 @@ export function selectLatestMcpSensorReadings(
   );
 }
 
-export async function getLatestSensorSnapshotForOwnedTent(
+async function loadLatestSensorSnapshotForOwnedTent(
   client: OwnerScopedSupabaseClient,
   tentId: string,
   options: McpSensorSelectionOptions = {},
@@ -596,7 +600,7 @@ export async function getLatestSensorSnapshotForOwnedTent(
     .maybeSingle();
 
   if (tentError) {
-    return { ok: false, reason: "unavailable", message: tentError.message };
+    return { ok: false, reason: "unavailable", message: "Sensor snapshot unavailable." };
   }
   if (!tent) {
     return {
@@ -605,6 +609,8 @@ export async function getLatestSensorSnapshotForOwnedTent(
       message: "Tent not found for the signed-in grower.",
     };
   }
+
+  if (tent.id !== tentId) throw new Error("Sensor snapshot unavailable.");
 
   // Fetch captured and legacy-null-captured candidates separately for every
   // supported metric. Their union contains the true COALESCE winner, while a
@@ -627,10 +633,10 @@ export async function getLatestSensorSnapshotForOwnedTent(
 
   const primaryFailure = primaryResults.find((result) => result.error);
   if (primaryFailure?.error) {
-    return { ok: false, reason: "unavailable", message: primaryFailure.error.message };
+    return { ok: false, reason: "unavailable", message: "Sensor snapshot unavailable." };
   }
 
-  const primaryRows = primaryResults.map(rowsFromSensorCandidateResult);
+  const primaryRows = primaryResults.map((result) => rowsFromSensorCandidateResult(result, tentId));
   const primaryCandidates = primaryRows.map((rows) => rows.slice(0, SENSOR_CANDIDATE_LIMIT));
   const { nowMs, staleAfterMs } = sensorSelectionClock(options);
 
@@ -663,12 +669,12 @@ export async function getLatestSensorSnapshotForOwnedTent(
   const supplementalResults = await Promise.all(supplementalQueries.map(({ query }) => query));
   const supplementalFailure = supplementalResults.find((result) => result.error);
   if (supplementalFailure?.error) {
-    return { ok: false, reason: "unavailable", message: supplementalFailure.error.message };
+    return { ok: false, reason: "unavailable", message: "Sensor snapshot unavailable." };
   }
 
   const candidates = [
     ...primaryCandidates.flatMap((rows) => rows),
-    ...supplementalResults.flatMap(rowsFromSensorCandidateResult),
+    ...supplementalResults.flatMap((result) => rowsFromSensorCandidateResult(result, tentId)),
   ];
   const readings = selectLatestMcpSensorReadings(candidates, options);
   const contradictionMetrics = findMcpSensorSourceContradictionMetrics(candidates, options);
@@ -692,4 +698,17 @@ export async function getLatestSensorSnapshotForOwnedTent(
       ...(contradictionMetrics.length > 0 ? { contradictionMetrics } : {}),
     },
   };
+}
+
+/** Transport and invalid correction evidence share a sanitized, fail-closed result. */
+export async function getLatestSensorSnapshotForOwnedTent(
+  client: OwnerScopedSupabaseClient,
+  tentId: string,
+  options: McpSensorSelectionOptions = {},
+): ReturnType<typeof loadLatestSensorSnapshotForOwnedTent> {
+  try {
+    return await loadLatestSensorSnapshotForOwnedTent(client, tentId, options);
+  } catch {
+    return { ok: false, reason: "unavailable", message: "Sensor snapshot unavailable." };
+  }
 }

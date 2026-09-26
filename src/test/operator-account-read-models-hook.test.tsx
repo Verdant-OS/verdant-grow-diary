@@ -1,7 +1,8 @@
 import type { PropsWithChildren } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { notifyManualSensorCorrectionConfirmed } from "@/lib/manualSensorCorrectionEvents";
 
 const GROW_ID = "11111111-1111-4111-8111-111111111111";
 const TENT_ID = "22222222-2222-4222-8222-222222222222";
@@ -124,9 +125,102 @@ function readyDefaults() {
 }
 
 describe("useOperatorAccountReadModels", () => {
+  afterEach(() => {
+    cleanup();
+    onlineManager.setOnline(true);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getSnapshot.mockReset();
     readyDefaults();
+  });
+
+  it("keeps a first paused sensor read loading until reconnect", async () => {
+    onlineManager.setOnline(false);
+    const { result } = renderHook(() => useOperatorAccountReadModels(), { wrapper: wrapper() });
+    expect(result.current.status === "ready" && result.current.sensor.status).toBe("loading");
+    expect(mocks.getSnapshot).not.toHaveBeenCalled();
+    await act(async () => onlineManager.setOnline(true));
+    await waitFor(() =>
+      expect(result.current.status === "ready" && result.current.sensor.status).toBe("ok"),
+    );
+  });
+
+  it("refreshes confirmed corrections only for the active owner and withholds cached sensor conclusions", async () => {
+    const { result, unmount } = renderHook(() => useOperatorAccountReadModels(), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() =>
+      expect(result.current.status === "ready" && result.current.sensor.status).toBe("ok"),
+    );
+    const reply = await mocks.getSnapshot.mock.results[0].value;
+    let resolveRead!: (value: unknown) => void;
+    const pending = new Promise((resolve) => {
+      resolveRead = resolve;
+    });
+    mocks.getSnapshot.mockReturnValueOnce(pending);
+    act(() => notifyManualSensorCorrectionConfirmed("other-owner", TENT_ID));
+    expect(mocks.getSnapshot).toHaveBeenCalledTimes(1);
+    act(() => notifyManualSensorCorrectionConfirmed(USER_ID, TENT_ID));
+    await waitFor(() => expect(mocks.getSnapshot).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(result.current.status === "ready" && result.current.sensor.status).toBe("loading"),
+    );
+    if (result.current.status === "ready") {
+      expect(result.current.watering.status).toBe("loading");
+      expect(result.current.watering.sensorRows).toEqual([]);
+    }
+    await act(async () => resolveRead(reply));
+    await waitFor(() =>
+      expect(result.current.status === "ready" && result.current.sensor.status).toBe("ok"),
+    );
+    unmount();
+    act(() => notifyManualSensorCorrectionConfirmed(USER_ID, TENT_ID));
+    expect(mocks.getSnapshot).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not reuse a raw-version sensor cache", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    client.setQueryData(["operator-account-read-model", "sensor", USER_ID, TENT_ID], {
+      ok: true,
+      data: { tent: { id: TENT_ID, grow_id: GROW_ID }, snapshot: null },
+    });
+    mocks.getSnapshot.mockReturnValue(new Promise(() => {}));
+    const view = renderHook(() => useOperatorAccountReadModels(), {
+      wrapper: ({ children }: PropsWithChildren) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    expect(view.result.current.status === "ready" && view.result.current.sensor.status).toBe(
+      "loading",
+    );
+    expect(mocks.getSnapshot).toHaveBeenCalledTimes(1);
+    view.unmount();
+    client.clear();
+  });
+
+  it("withholds a cached snapshot while correction refresh is paused, then recovers on reconnect", async () => {
+    const { result } = renderHook(() => useOperatorAccountReadModels(), { wrapper: wrapper() });
+    await waitFor(() =>
+      expect(result.current.status === "ready" && result.current.sensor.status).toBe("ok"),
+    );
+    act(() => onlineManager.setOnline(false));
+    act(() => notifyManualSensorCorrectionConfirmed(USER_ID, TENT_ID));
+    await waitFor(() =>
+      expect(result.current.status === "ready" && result.current.sensor.status).toBe("loading"),
+    );
+    expect(mocks.getSnapshot).toHaveBeenCalledTimes(1);
+    if (result.current.status === "ready") {
+      expect(result.current.watering.status).toBe("loading");
+      expect(result.current.watering.sensorRows).toEqual([]);
+    }
+    await act(async () => onlineManager.setOnline(true));
+    await waitFor(() => {
+      expect(mocks.getSnapshot).toHaveBeenCalledTimes(2);
+      expect(result.current.status === "ready" && result.current.sensor.status).toBe("ok");
+    });
   });
 
   it("loads diary, single-tent sensor truth, and typed root-zone context for the active owner", async () => {

@@ -20,10 +20,20 @@ const backend = vi.hoisted(() => ({
   heldReply: null as Promise<void> | null,
 }));
 const telemetry = vi.hoisted(() => vi.fn());
+const receiptLookup = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/quickLogSuccessTelemetry", () => ({ trackQuickLogSuccess: telemetry }));
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "owner-a" }, loading: false }) }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
+    from: (table: string) => {
+      if (table !== "quicklog_idempotency") throw new Error(`Unexpected table: ${table}`);
+      const query = {
+        select: () => query,
+        eq: () => query,
+        maybeSingle: () => receiptLookup(),
+      };
+      return query;
+    },
     rpc: async (_name: string, input: Payload) => {
       const payload = structuredClone(input);
       backend.posts.push(payload);
@@ -137,6 +147,8 @@ beforeEach(() => {
   backend.holdPost = 0;
   backend.heldReply = null;
   telemetry.mockReset();
+  receiptLookup.mockReset();
+  receiptLookup.mockResolvedValue({ data: null, error: null });
   window.sessionStorage.clear();
 });
 
@@ -151,10 +163,18 @@ describe("All activity types retry confirmation", () => {
       tentId: "tent-b",
     });
     expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toBeInTheDocument();
-    expect(screen.getByTestId("quick-log-all-activities-retry-original")).toBeDisabled();
+    const check = screen.getByTestId("quick-log-all-activities-retry-original");
+    expect(check).toBeEnabled();
+    expect(check).toHaveTextContent("Check original save");
     expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toHaveTextContent(
-      /target changed/i,
+      /previous tent or grow/i,
     );
+    fireEvent.click(check);
+    await waitFor(() => expect(receiptLookup).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
+      /no confirmed receipt is available yet/i,
+    );
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toBeInTheDocument();
     expect(backend.posts).toHaveLength(1);
     moved.unmount();
 
@@ -165,6 +185,54 @@ describe("All activity types retry confirmation", () => {
     expect(backend.posts).toHaveLength(2);
     expect(backend.posts[1]).toEqual(backend.posts[0]);
     expect(backend.rows.size).toBe(1);
+  });
+
+  it("clears a moved plant's pending claim only after an owner-scoped committed receipt", async () => {
+    const first = mount();
+    await loseReply();
+    first.unmount();
+    const onSaveSuccess = vi.fn();
+    receiptLookup.mockResolvedValueOnce({
+      data: { grow_event_id: "77777777-7777-4777-8777-000000000001" },
+      error: null,
+    });
+    mount("plant-a", "flower", onSaveSuccess, null, {
+      growId: "grow-b",
+      tentId: "tent-b",
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-retry-original"));
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-all-activities-pending-activity")).toBeNull(),
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /confirmed for its previous tent or grow/i,
+    );
+    expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
+    expect(onSaveSuccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: { growId: "grow-a", tentId: "tent-a", plantId: "plant-a" },
+        growEventId: "77777777-7777-4777-8777-000000000001",
+      }),
+    );
+    expect(window.sessionStorage.length).toBe(0);
+    expect(backend.posts).toHaveLength(1);
+  });
+
+  it("keeps a moved plant locked when the committed receipt cannot be read", async () => {
+    const first = mount();
+    await loseReply();
+    first.unmount();
+    receiptLookup.mockResolvedValueOnce({ data: null, error: { message: "read denied" } });
+    mount("plant-a", "flower", undefined, null, { growId: "grow-b", tentId: "tent-b" });
+
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-retry-original"));
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
+        /original save could not be verified/i,
+      ),
+    );
+    expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toBeInTheDocument();
+    expect(backend.posts).toHaveLength(1);
   });
 
   it("does not hand off requested Water before restoring an unresolved same-target activity", async () => {

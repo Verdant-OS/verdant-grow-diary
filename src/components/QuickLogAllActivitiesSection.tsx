@@ -70,6 +70,13 @@ import {
   type PendingQuickLogActivity,
 } from "@/lib/quickLogPendingActivityStore";
 import {
+  MOVED_ACTIVITY_RECEIPT_CONFIRMED,
+  MOVED_ACTIVITY_RECEIPT_NOT_FOUND,
+  MOVED_ACTIVITY_RECEIPT_UNAVAILABLE,
+  MOVED_ACTIVITY_RECOVERY_GUIDANCE,
+  readQuickLogPendingActivityReceipt,
+} from "@/lib/quickLogPendingActivityReceipt";
+import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
   QUICK_LOG_WEIGHT_UNITS,
   type QuickLogActivityDefinition,
@@ -338,6 +345,8 @@ export default function QuickLogAllActivitiesSection({
   const activitySaveKeyRef = useRef<QuickLogSaveKeyState | null>(null);
   const [pendingActivity, setPendingActivity] = useState<PendingQuickLogActivity | null>(null);
   const [activityRecoveryBlocked, setActivityRecoveryBlocked] = useState(false);
+  const [checkingMovedReceipt, setCheckingMovedReceipt] = useState(false);
+  const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null);
   const activePendingActivity =
     pendingActivity &&
     pendingActivity.ownerId === user?.id &&
@@ -345,6 +354,9 @@ export default function QuickLogAllActivitiesSection({
       buildQuickLogRecoveryScopeKey(currentTarget)
       ? pendingActivity
       : null;
+  const pendingTargetChanged =
+    !!activePendingActivity &&
+    buildQuickLogTargetKey(activePendingActivity.input) !== currentTargetKey;
   const pendingPersistenceGate = useMemo(
     () =>
       activePendingActivity
@@ -364,11 +376,13 @@ export default function QuickLogAllActivitiesSection({
     ? readRejectedPendingQuickLogActivity(activePendingActivity)
     : false;
   const liveTargetKeyRef = useRef(currentTargetKey);
+  const liveRecoveryScopeRef = useRef(buildQuickLogRecoveryScopeKey(currentTarget));
   const liveOwnerIdRef = useRef(user?.id ?? null);
   useLayoutEffect(() => {
     liveTargetKeyRef.current = currentTargetKey;
+    liveRecoveryScopeRef.current = buildQuickLogRecoveryScopeKey(currentTarget);
     liveOwnerIdRef.current = user?.id ?? null;
-  }, [currentTargetKey, user?.id]);
+  }, [currentTarget, currentTargetKey, user?.id]);
   useEffect(() => {
     // Selecting/cancelling an editor, completing a save, or changing owner
     // starts a new logical draft. Field edits are compared at submission.
@@ -462,6 +476,7 @@ export default function QuickLogAllActivitiesSection({
     setErrorReason(null);
     setErrorForActivity(null);
     setStructuredWaterError(null);
+    setRecoveryNotice(null);
     setSaved([]);
   }, [currentTargetKey]);
 
@@ -596,6 +611,7 @@ export default function QuickLogAllActivitiesSection({
   const handleSelect = useCallback(
     (a: QuickLogActivityDefinition) => {
       if (isMutationBlocked()) return;
+      setRecoveryNotice(null);
       setErrorReason(null);
       setErrorForActivity(null);
       setStructuredWaterError(null);
@@ -643,16 +659,19 @@ export default function QuickLogAllActivitiesSection({
       const stillCurrent =
         liveOwnerIdRef.current === record.ownerId &&
         liveTargetKeyRef.current === buildQuickLogTargetKey(capturedTarget);
+      const stillSameRecoveryScope =
+        liveOwnerIdRef.current === record.ownerId &&
+        liveRecoveryScopeRef.current === buildQuickLogRecoveryScopeKey(record.input);
       if (!cleared) {
         rememberConfirmedPendingQuickLogActivity(record, growEventId);
-        if (stillCurrent) {
+        if (stillSameRecoveryScope) {
           setErrorReason(ACTIVITY_RECOVERY_CLEAR_FAILED);
           setErrorForActivity(record.input.activityId);
         }
         return;
       }
+      if (stillSameRecoveryScope) setPendingActivity(null);
       if (stillCurrent) {
-        setPendingActivity(null);
         const source = toSavedSource(record.input.activityId);
         if (source) {
           const items = buildDailyCheckSavedItems({
@@ -686,6 +705,11 @@ export default function QuickLogAllActivitiesSection({
         envCheckTempEntryUnitRef.current = null;
         setErrorReason(null);
         setErrorForActivity(null);
+      } else if (stillSameRecoveryScope) {
+        setSelectedDraft(null);
+        setErrorReason(null);
+        setErrorForActivity(null);
+        setRecoveryNotice(MOVED_ACTIVITY_RECEIPT_CONFIRMED);
       }
       try {
         onSaveSuccess?.({
@@ -746,6 +770,39 @@ export default function QuickLogAllActivitiesSection({
         setErrorReason(ACTIVITY_RECOVERY_REJECTED_CLEAR_FAILED);
       }
       setErrorForActivity(record.input.activityId);
+      return;
+    }
+    if (buildQuickLogTargetKey(record.input) !== buildQuickLogTargetKey(currentTarget)) {
+      localSaveInFlightRef.current = true;
+      setCheckingMovedReceipt(true);
+      try {
+        const receipt = await readQuickLogPendingActivityReceipt(
+          record.ownerId,
+          record.input.idempotencyKey,
+        );
+        if (
+          liveOwnerIdRef.current !== record.ownerId ||
+          liveRecoveryScopeRef.current !== buildQuickLogRecoveryScopeKey(record.input)
+        )
+          return;
+        if (receipt.status === "confirmed") {
+          finishConfirmedPendingActivity(
+            record,
+            receipt.growEventId,
+            clearPendingQuickLogActivity(record),
+          );
+        } else {
+          setErrorReason(
+            receipt.status === "not_found"
+              ? MOVED_ACTIVITY_RECEIPT_NOT_FOUND
+              : MOVED_ACTIVITY_RECEIPT_UNAVAILABLE,
+          );
+          setErrorForActivity(record.input.activityId);
+        }
+      } finally {
+        localSaveInFlightRef.current = false;
+        setCheckingMovedReceipt(false);
+      }
       return;
     }
     const persistenceGate = evaluateQuickLogPrePersistenceGate({
@@ -1325,6 +1382,12 @@ export default function QuickLogAllActivitiesSection({
         </p>
       )}
 
+      {recoveryNotice && (
+        <p role="status" className="text-xs text-muted-foreground">
+          {recoveryNotice}
+        </p>
+      )}
+
       {requestedActivityAvailability?.disabled && (
         <p
           role="note"
@@ -1414,7 +1477,9 @@ export default function QuickLogAllActivitiesSection({
                 !rejectedPendingActivity &&
                 pendingPersistenceGate?.allowed === false && (
                   <p role="note" className="text-xs text-muted-foreground">
-                    {pendingPersistenceGate.blockedReason ?? "This activity is not available."}
+                    {pendingTargetChanged
+                      ? MOVED_ACTIVITY_RECOVERY_GUIDANCE
+                      : (pendingPersistenceGate.blockedReason ?? "This activity is not available.")}
                   </p>
                 )}
               {activePendingActivity.input.note && (
@@ -1434,21 +1499,25 @@ export default function QuickLogAllActivitiesSection({
                 onClick={handleRetryPendingActivity}
                 disabled={
                   saving ||
+                  checkingMovedReceipt ||
                   saveBlocked ||
                   !!externalPersistenceBlockReason ||
                   (!confirmedPendingActivity &&
                     !rejectedPendingActivity &&
+                    !pendingTargetChanged &&
                     pendingPersistenceGate?.allowed === false)
                 }
                 data-testid={`${testIdPrefix}-retry-original`}
               >
-                {saving
+                {saving || checkingMovedReceipt
                   ? "Checking…"
                   : confirmedPendingActivity
                     ? "Clear saved recovery record"
                     : rejectedPendingActivity
                       ? "Clear rejected recovery record"
-                      : "Retry original activity"}
+                      : pendingTargetChanged
+                        ? "Check original save"
+                        : "Retry original activity"}
               </Button>
             </div>
           ) : (

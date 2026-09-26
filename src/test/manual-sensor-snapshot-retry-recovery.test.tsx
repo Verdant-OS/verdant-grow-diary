@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { formatSnapshotCapturedAt } from "@/lib/alertReasonDisplayRules";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
@@ -182,7 +183,12 @@ describe("manual snapshot retry confirmation", () => {
     expect(screen.getByTestId("manual-reading-save-unconfirmed")).toHaveTextContent(
       /save is unconfirmed/i,
     );
-    expect(screen.getByTestId("snapshot-captured-at")).toHaveTextContent(CAPTURED);
+    // The retry keeps the submitted observation time (machine value), shown
+    // to the grower as a local date/time rather than raw ISO.
+    expect(screen.getByTestId("snapshot-captured-at")).toHaveAttribute("dateTime", CAPTURED);
+    expect(screen.getByTestId("snapshot-captured-at")).toHaveTextContent(
+      formatSnapshotCapturedAt(CAPTURED),
+    );
     expect(screen.getByLabelText(/Air temp/i)).toHaveValue(25);
     expect(screen.getByLabelText(/Humidity/i)).toHaveValue(60);
     expect(toast.success).not.toHaveBeenCalled();

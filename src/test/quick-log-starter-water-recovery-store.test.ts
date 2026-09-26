@@ -5,6 +5,10 @@ import {
   readPendingStarterWater,
   type PendingStarterWater,
 } from "@/lib/quickLogPendingStarterWaterStore";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const record = (overrides: Partial<PendingStarterWater> = {}): PendingStarterWater => ({
   version: 1,
@@ -34,7 +38,7 @@ const record = (overrides: Partial<PendingStarterWater> = {}): PendingStarterWat
 
 const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
   let tail: Promise<unknown> = Promise.resolve();
   Object.defineProperty(window.navigator, "locks", {
     configurable: true,
@@ -93,7 +97,7 @@ describe("legacy starter Water recovery claim", () => {
         }),
       ),
     ).toEqual({ status: "blocked" });
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       "verdant:quick-log:pending-starter-water:v1:owner-b",
       JSON.stringify({ ...record({ ownerId: "owner-b" }), version: 2 }),
     );

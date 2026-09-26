@@ -5,6 +5,7 @@ import type { ReactElement } from "react";
 import {
   setLocalStorageItemForTest,
   clearLocalStorageForTest,
+  getLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
 
 const saveMock = vi.fn();
@@ -169,7 +170,7 @@ describe("legacy public-starter Water uncertain receipt", () => {
     expect(readPendingStarterWater("user-1")).toEqual({ status: "empty" });
     expect(trackSuccessMock).toHaveBeenCalledTimes(1);
     expect(trackSuccessMock).toHaveBeenCalledWith("water");
-    expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBeNull();
   });
 
   it("retains the first key even if the recovery call reports a later rejection", async () => {
@@ -281,7 +282,7 @@ describe("legacy public-starter Water uncertain receipt", () => {
     expect(saveMock).not.toHaveBeenCalled();
     expect(trackSuccessMock).not.toHaveBeenCalled();
     expect(screen.getByTestId("quick-log-save")).not.toBeDisabled();
-    expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).not.toBeNull();
+    expect(getLocalStorageItemForTest(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).not.toBeNull();
 
     const v2Open = vi.fn();
     window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, v2Open);

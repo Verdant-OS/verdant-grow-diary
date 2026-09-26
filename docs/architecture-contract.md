@@ -1039,8 +1039,8 @@ Actions deploy proves only that Actions does not deploy them. A `Makefile` comme
 do not treat it as publisher evidence. Label the edge path as separate and environment-verified;
 do not assert "manual only" or "Lovable automatic" until the publish trigger is measured
 (§14; how the publish trigger, the promotion of a build to the production hostnames, and the edge
-path are measured is defined in `docs/specs/release-topology-specification.md` §4, §5.3 and §5.7,
-and their dated results live there and in `docs/agents/CURRENT_STATE.md`, never here).
+path are measured is defined in `docs/specs/release-topology-specification.md` §4, §5.3 and §5.7;
+its appendices hold dated results, later `docs/agents/CURRENT_STATE.md` stamps record new ones).
 
 An earlier draft said publishing "ships frontend and edge functions". No repository evidence supports
 an automatic joint ship, and a release operator relying on it could publish a frontend expecting

@@ -64,7 +64,7 @@ bun run dev
 ```
 
 The dev server runs Vite on `http://localhost:8080`. bun is the package manager
-(`bun.lockb` is authoritative) — do not use npm or yarn. On Windows, run
+(`bun.lock` is authoritative) — do not use npm or yarn. On Windows, run
 `bun install` from a checkout outside OneDrive; OneDrive reparse points break it.
 
 ## Environment variables

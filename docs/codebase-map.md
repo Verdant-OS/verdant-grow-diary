@@ -90,8 +90,8 @@ file governs only when the measured publisher applies it (rule D-RT-5 of
 never fire, measured under a publisher that no longer serves the apex
 (`docs/seo/lighting-launch-verification.md`, 2026-08-02). The eight entries are `/strains`,
 `/strains/:slug`, `/features`, `/demo`, `/refunds`, `/refund-policy`, `/terms-of-service`,
-`/privacy-policy`. For their current state run the specification's M7 and read the result in the
-current `docs/agents/CURRENT_STATE.md` stamp; its Appendix A is a dated record, not current state.
+`/privacy-policy`. For their current state run the specification's M7 and record the result in
+the next `docs/agents/CURRENT_STATE.md` stamp; its Appendix A is a dated record, not current state.
 
 ### Authenticated routes (`src/routes/_app/*.tsx`)
 

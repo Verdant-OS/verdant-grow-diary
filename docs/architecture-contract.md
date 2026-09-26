@@ -1217,7 +1217,7 @@ Rejected means decided, with a reason. Re-proposing one requires new evidence, n
 | **Auth migration off Supabase Auth**                   | **REJECTED** | Auth, RLS, and `auth.uid()` are one system. Replacing the first breaks the authorization model                                                                                                                   |
 | **Collapsing vendor/transport into `source`**          | **REJECTED** | Directly contradicts AC-4.2. Would let a vendor name imply health                                                                                                                                                |
 | **Device control / automatic Action Queue**            | **REJECTED** | Product-level safety commitment, not a technical one (AC-7.1)                                                                                                                                                    |
-| **Inferring production behaviours from `vercel.json`** | **REJECTED** | Governs only when the measured publisher applies it: a topology measurement (`docs/specs/release-topology-specification.md` M7), not a property of the file. Earlier rationale: an earlier publisher             |
+| **Inferring production behaviours from `vercel.json`** | **REJECTED** | Governs only when the measured publisher applies it (`docs/specs/release-topology-specification.md` M7), not by being in the repository. Its old "not applied" rationale was measured under a previous publisher |
 
 ---
 

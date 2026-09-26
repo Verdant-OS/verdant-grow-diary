@@ -29,6 +29,56 @@ export const QUICK_LOG_WATERING_NEEDS_TARGET_REASON =
 export const QUICK_LOG_TARGET_CHANGED_REASON =
   "The Quick Log target changed. Choose the activity again before saving.";
 
+export const QUICK_LOG_ACTIVITY_NOTE_MAX_LENGTH = 500;
+export const QUICK_LOG_ACTIVITY_NOTE_TOO_LONG_REASON =
+  "Keep the activity note to 500 characters or fewer before saving.";
+
+/** Match the event RPC's character limit without constraining manual Notes. */
+export function validateQuickLogActivityNote(
+  activityId: QuickLogActivityId | null | undefined,
+  note: unknown,
+): string | null {
+  // Photo is stored through the diary attachment path, not the event RPC.
+  if (
+    !activityId ||
+    activityId === "photo" ||
+    QUICK_LOG_ACTIVITY_DEFINITIONS[activityId]?.saveRoute !== "event"
+  )
+    return null;
+  if (typeof note !== "string") return null;
+  return Array.from(note.trim()).length > QUICK_LOG_ACTIVITY_NOTE_MAX_LENGTH
+    ? QUICK_LOG_ACTIVITY_NOTE_TOO_LONG_REASON
+    : null;
+}
+
+// Only structured responses emitted before the logical event insert prove
+// that THIS RPC did not write. Transport errors, save_failed, malformed replies,
+// and idempotency conflicts cannot release an unresolved retry claim.
+const DEFINITIVE_ACTIVITY_REJECTIONS = new Set([
+  "not_authenticated",
+  "invalid_idempotency_key",
+  "invalid_event_type",
+  "invalid_typed_payload",
+  "invalid_sensor_metric",
+  "invalid_sensor_source",
+  "invalid_sensor_captured_at",
+  "invalid_target_type",
+  "missing_target_id",
+  "unsupported_action",
+  "invalid_volume",
+  "invalid_details",
+  "invalid_logged_at",
+  "target_not_owned",
+  "grow_not_owned",
+  "tent_not_in_grow",
+  "plant_not_in_grow",
+  "plant_not_in_tent",
+]);
+
+export function isDefinitiveQuickLogActivityRejection(reason: unknown): boolean {
+  return typeof reason === "string" && DEFINITIVE_ACTIVITY_REJECTIONS.has(reason);
+}
+
 export const QUICK_LOG_PRIMARY_ACTIVITY_IDS = Object.freeze([
   "note",
   "photo",
@@ -122,6 +172,16 @@ export function buildQuickLogTargetKey(
 ): string {
   const target = buildQuickLogTargetIdentity(input);
   return JSON.stringify([target.growId, target.tentId, target.plantId]);
+}
+
+/** A plant's pending write follows its stable identity when its tent or grow changes. */
+export function buildQuickLogRecoveryScopeKey(
+  input: QuickLogTargetIdentityInput | null | undefined,
+): string {
+  const target = buildQuickLogTargetIdentity(input);
+  if (target.plantId) return JSON.stringify(["plant", target.plantId]);
+  if (target.tentId) return JSON.stringify(["tent", target.tentId]);
+  return JSON.stringify(["grow", target.growId]);
 }
 
 /** Bind a new activity draft to the exact target visible at selection time. */

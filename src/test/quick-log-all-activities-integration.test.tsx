@@ -17,7 +17,6 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import { QUICK_LOG_ACTIVITY_DEFINITIONS } from "@/constants/quickLogActivityTypes";
-import { QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_STORAGE_KEY } from "@/lib/quickLogPhotoAttachmentRecovery";
 import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
 import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 import {
@@ -128,7 +127,7 @@ async function saveWithoutNote(activityId: string) {
 beforeEach(() => {
   // Recovery fences are intentionally browser-session durable. Keep each
   // integration case isolated while exercising the real remount behavior.
-  window.sessionStorage.removeItem(QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_STORAGE_KEY);
+  window.sessionStorage.clear();
   rpcMock.mockReset();
   storageUploadMock.mockClear();
   storageUploadMock.mockImplementation(async (..._args: unknown[]) => ({
@@ -298,7 +297,7 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
 describe("QuickLogAllActivitiesSection — save routing", () => {
   it("notifies its caller exactly once after a confirmed Feeding save", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-feed" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000011" },
       error: null,
     });
     const onSaveSuccess = vi.fn();
@@ -314,7 +313,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
       expect(onSaveSuccess).toHaveBeenCalledWith({
         activityId: "feeding",
         target: { growId: GROW, tentId: TENT, plantId: PLANT },
-        growEventId: "e-feed",
+        growEventId: "77777777-7777-4777-8777-000000000011",
       }),
     );
     expect(onSaveSuccess).toHaveBeenCalledTimes(1);
@@ -322,7 +321,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
   it("Note → quicklog_save_manual with p_action=note; dispatches + saved breakdown", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-note" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000012" },
       error: null,
     });
     const l = listenForEntryCreated();
@@ -347,7 +346,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
   it("Training → quicklog_save_event carries the chosen technique in p_details", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-train" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000013" },
       error: null,
     });
     mountSection();
@@ -372,7 +371,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
   it("Defoliation → quicklog_save_event carries canonical intensity + canopy area + fixed technique", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-defol" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000014" },
       error: null,
     });
     mountSection();
@@ -666,7 +665,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
   it("Issue/Observation → quicklog_save_event carries observed sign + location (never a cause)", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-obs" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000015" },
       error: null,
     });
     mountSection();
@@ -697,7 +696,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
   it("keeps ordinary Issue/Observation available at tent scope without a selected plant", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-tent-observation" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000016" },
       error: null,
     });
     mountSection({ plantId: null });
@@ -719,7 +718,10 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
   });
 
   it("guided Symptom Check never writes on selection and requires confirmed stage", async () => {
-    rpcMock.mockResolvedValueOnce({ data: { ok: true, grow_event_id: "e-symptom" }, error: null });
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000017" },
+      error: null,
+    });
     mountSection();
     fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
     expect(rpcMock).not.toHaveBeenCalled();
@@ -747,7 +749,10 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(args.p_details).not.toHaveProperty("stage");
     expect(
       await screen.findByTestId("quick-log-all-activities-review-symptom-evidence"),
-    ).toHaveAttribute("href", "/timeline?growId=grow-1#timeline-entry-e-symptom");
+    ).toHaveAttribute(
+      "href",
+      "/timeline?growId=grow-1#timeline-entry-77777777-7777-4777-8777-000000000017",
+    );
   });
 
   it("guided Symptom Check renders every canonical Quick Log stage option", () => {
@@ -775,7 +780,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     "guided Symptom Check prefills %s and persists canonical %s evidence",
     async (plantStage, expectedStage) => {
       rpcMock.mockResolvedValueOnce({
-        data: { ok: true, grow_event_id: `e-symptom-${expectedStage}` },
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000101" },
         error: null,
       });
       mountSection({ plantStage });
@@ -813,7 +818,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
   it("clears the no-symptoms box after a clean Symptom Check save before the next start", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-clean-check" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000018" },
       error: null,
     });
     mountSection();
@@ -904,7 +909,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     // test below for the default-preference conversion path.
     saveTemperatureUnitPreference("celsius");
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-env" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000019" },
       error: null,
     });
     mountSection();
@@ -947,7 +952,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     // never store the raw Fahrenheit number under temp_c.
     clearTemperatureUnitPreference();
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-env-f" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000020" },
       error: null,
     });
     mountSection();
@@ -1009,7 +1014,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
   it("Training drops an unchosen (blank) technique — no technique key in p_details", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-train2" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000021" },
       error: null,
     });
     mountSection();
@@ -1080,7 +1085,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
   it("Feeding → quicklog_save_event event_type=feeding", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-f" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000022" },
       error: null,
     });
     mountSection();
@@ -1095,7 +1100,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
   it("Training → quicklog_save_event event_type=training (no defoliation subtype)", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-t" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000023" },
       error: null,
     });
     mountSection();
@@ -1109,7 +1114,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
   it("Defoliation → event_type=training + details.subtype=defoliation (fence)", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-d" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000024" },
       error: null,
     });
     mountSection();
@@ -1134,7 +1139,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
   it("Environment check → quicklog_save_event event_type=environment", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-env" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000019" },
       error: null,
     });
     mountSection();
@@ -1145,7 +1150,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
   it("Issue / observation → quicklog_save_event event_type=observation with issue subtype", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-obs" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000015" },
       error: null,
     });
     mountSection();
@@ -1159,7 +1164,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 describe("QuickLogAllActivitiesSection — Harvest v1b", () => {
   it("Harvest saves via quicklog_save_event event_type=harvest and appears in saved breakdown", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-h" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000025" },
       error: null,
     });
     const l = listenForEntryCreated();
@@ -1208,11 +1213,12 @@ describe("QuickLogAllActivitiesSection — Harvest v1b", () => {
       if (def.id === "photo") continue;
       rpcMock.mockReset();
       rpcMock.mockResolvedValueOnce({
-        data: { ok: true, grow_event_id: `id-${def.id}` },
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000102" },
         error: null,
       });
       const { unmount } = mountSection();
       await saveWithNote(def.id, "x");
+      await screen.findByTestId("quick-log-all-activities-saved-item");
       const [, args] = rpcMock.mock.calls[0];
       expect(args.p_event_type).not.toBe("harvest");
       unmount();
@@ -1316,7 +1322,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
 
   it("saved breakdown shows concise harvest wet/dry/unit details after success", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-hd" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000026" },
       error: null,
     });
     mountSection();
@@ -1340,7 +1346,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
 
   it("saved breakdown hides missing dry/wet and stays plain Harvest with no weights", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-hd2" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000027" },
       error: null,
     });
     mountSection();
@@ -1386,7 +1392,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
 
   it("valid decimals save correctly and appear in saved breakdown", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-dec" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000028" },
       error: null,
     });
     mountSection();

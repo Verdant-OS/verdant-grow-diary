@@ -195,7 +195,7 @@ describe("useQuickLogV2Save telemetry", () => {
 describe("useQuickLogActivitySave telemetry", () => {
   it("emits once from the manual success branch", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "manual-1", reused: false },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000010", reused: false },
       error: null,
     });
     const { result } = renderHook(() => useQuickLogActivitySave());

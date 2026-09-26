@@ -23,7 +23,7 @@
  *   - No recommendation, no health inference, no "safe to feed / train
  *     / defoliate", no harvest readiness, no diagnosis language.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,30 @@ import {
   type QuickLogSaveKeyState,
 } from "@/lib/quickLogSaveKeyPolicy";
 import {
+  ACTIVITY_RECOVERY_CLEAR_FAILED,
+  ACTIVITY_RECOVERY_PENDING,
+  ACTIVITY_RECOVERY_REJECTED_CLEAR_FAILED,
+  ACTIVITY_RECOVERY_RETRY_REJECTED,
+  ACTIVITY_RECOVERY_UNAVAILABLE,
+  claimPendingQuickLogActivity,
+  clearPendingQuickLogActivity,
+  readConfirmedPendingQuickLogActivity,
+  readPendingQuickLogActivity,
+  readRejectedPendingQuickLogActivity,
+  rememberConfirmedPendingQuickLogActivity,
+  rememberRejectedPendingQuickLogActivity,
+  samePendingQuickLogActivity,
+  type PendingQuickLogActivity,
+} from "@/lib/quickLogPendingActivityStore";
+import {
+  MOVED_ACTIVITY_RECEIPT_CONFIRMED,
+  MOVED_ACTIVITY_RECEIPT_NOT_FOUND,
+  MOVED_ACTIVITY_RECEIPT_UNAVAILABLE,
+  MOVED_ACTIVITY_RECOVERY_GUIDANCE,
+  readQuickLogPendingActivityReceipt,
+} from "@/lib/quickLogPendingActivityReceipt";
+import { restoreRejectedQuickLogActivityDraft } from "@/lib/quickLogRejectedActivityDraftRules";
+import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
   QUICK_LOG_WEIGHT_UNITS,
   type QuickLogActivityDefinition,
@@ -76,8 +100,10 @@ import {
   bindQuickLogActivityDraft,
   buildQuickLogTargetIdentity,
   buildQuickLogTargetKey,
+  buildQuickLogRecoveryScopeKey,
   evaluateQuickLogActivityAvailability,
   evaluateQuickLogPrePersistenceGate,
+  validateQuickLogActivityNote,
   QUICK_LOG_HARVEST_STAGE_DISABLED_REASON,
   type QuickLogActivityDraftBinding,
 } from "@/lib/quickLogActivityRules";
@@ -107,6 +133,8 @@ export interface QuickLogAllActivitiesSectionProps {
   onSaveStart?: (target: QuickLogAllActivitiesSaveTarget) => boolean;
   /** Releases the parent-owned guard after either success or failure. */
   onSaveEnd?: () => void;
+  /** Reports whether this exact target has an unresolved activity claim. */
+  onRecoveryLockChange?: (target: QuickLogAllActivitiesSaveTarget, locked: boolean) => void;
   /** Presenter lock while either the parent or this section owns the guard. */
   saveBlocked?: boolean;
   /** Reads the same parent-owned synchronous guard used to acquire a save. */
@@ -122,6 +150,8 @@ export interface QuickLogAllActivitiesSectionProps {
   requestedActivityId?: QuickLogActivityId | null;
   /** Optional handoff note seeded only when a requested editor is applied. */
   requestedNote?: string | null;
+  /** Exact reviewed starter identity to retain with a new uncertain save. */
+  reviewedStarterHandoffKey?: string | null;
   /** Fires only after persistence confirms success. */
   onSaveSuccess?: (result: QuickLogAllActivitiesSaveSuccess) => void;
 }
@@ -136,6 +166,9 @@ export interface QuickLogAllActivitiesSaveSuccess {
   readonly activityId: QuickLogActivityId;
   readonly target: QuickLogAllActivitiesSaveTarget;
   readonly growEventId: string | null;
+  /** Existing uncertain write confirmed later; compare its handoff before consuming a draft. */
+  readonly recovered?: true;
+  readonly reviewedStarterHandoffKey?: string | null;
 }
 
 /** Map a QuickLogActivityId to the "What was saved" DailyCheck source. */
@@ -197,12 +230,14 @@ export default function QuickLogAllActivitiesSection({
   testIdPrefix = "quick-log-all-activities",
   onSaveStart,
   onSaveEnd,
+  onRecoveryLockChange,
   saveBlocked = false,
   isSaveBlocked,
   onBeforeStructuredWaterOpen,
   externalPersistenceBlockReason = null,
   requestedActivityId = null,
   requestedNote = null,
+  reviewedStarterHandoffKey = null,
   onSaveSuccess,
 }: QuickLogAllActivitiesSectionProps) {
   const currentTarget = useMemo(
@@ -315,6 +350,46 @@ export default function QuickLogAllActivitiesSection({
   const { save, saving } = useQuickLogActivitySave();
   const localSaveInFlightRef = useRef(false);
   const activitySaveKeyRef = useRef<QuickLogSaveKeyState | null>(null);
+  const [pendingActivity, setPendingActivity] = useState<PendingQuickLogActivity | null>(null);
+  const [activityRecoveryBlocked, setActivityRecoveryBlocked] = useState(false);
+  const [checkingMovedReceipt, setCheckingMovedReceipt] = useState(false);
+  const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null);
+  const activePendingActivity =
+    pendingActivity &&
+    pendingActivity.ownerId === user?.id &&
+    buildQuickLogRecoveryScopeKey(pendingActivity.input) ===
+      buildQuickLogRecoveryScopeKey(currentTarget)
+      ? pendingActivity
+      : null;
+  const pendingTargetChanged =
+    !!activePendingActivity &&
+    buildQuickLogTargetKey(activePendingActivity.input) !== currentTargetKey;
+  const pendingPersistenceGate = useMemo(
+    () =>
+      activePendingActivity
+        ? evaluateQuickLogPrePersistenceGate({
+            activityId: activePendingActivity.input.activityId,
+            currentPlantStage: plantStage,
+            selectedTarget: activePendingActivity.input,
+            currentTarget,
+          })
+        : null,
+    [activePendingActivity, currentTarget, plantStage],
+  );
+  const confirmedPendingActivity = activePendingActivity
+    ? readConfirmedPendingQuickLogActivity(activePendingActivity)
+    : null;
+  const rejectedPendingActivity = activePendingActivity
+    ? readRejectedPendingQuickLogActivity(activePendingActivity)
+    : false;
+  const liveTargetKeyRef = useRef(currentTargetKey);
+  const liveRecoveryScopeRef = useRef(buildQuickLogRecoveryScopeKey(currentTarget));
+  const liveOwnerIdRef = useRef(user?.id ?? null);
+  useLayoutEffect(() => {
+    liveTargetKeyRef.current = currentTargetKey;
+    liveRecoveryScopeRef.current = buildQuickLogRecoveryScopeKey(currentTarget);
+    liveOwnerIdRef.current = user?.id ?? null;
+  }, [currentTarget, currentTargetKey, user?.id]);
   useEffect(() => {
     // Selecting/cancelling an editor, completing a save, or changing owner
     // starts a new logical draft. Field edits are compared at submission.
@@ -330,6 +405,19 @@ export default function QuickLogAllActivitiesSection({
   // live preference).
   const envCheckTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
   const activeEnvCheckTempUnit = envCheckTempEntryUnitRef.current ?? temperatureUnit;
+  const restoreRejectedDraft = useCallback((record: PendingQuickLogActivity) => {
+    const draft = restoreRejectedQuickLogActivityDraft(record);
+    setNote(record.input.note ?? "");
+    setDetailValues({ ...draft.detailValues });
+    setHarvestWet(draft.harvestWet);
+    setHarvestDry(draft.harvestDry);
+    setHarvestUnit(draft.harvestUnit);
+    setGuidedSymptomCheck(draft.guidedSymptomCheck);
+    setGuidedSymptomStage(draft.guidedSymptomStage);
+    setGuidedSymptomStageConfirmed(draft.guidedSymptomStageConfirmed);
+    setGuidedSymptomNoneObserved(draft.guidedSymptomNoneObserved);
+    envCheckTempEntryUnitRef.current = draft.temperatureEntryUnit;
+  }, []);
   const requestedActivity =
     typeof requestedActivityId === "string" &&
     Object.prototype.hasOwnProperty.call(QUICK_LOG_ACTIVITY_DEFINITIONS, requestedActivityId)
@@ -358,6 +446,17 @@ export default function QuickLogAllActivitiesSection({
       setStructuredWaterError("Missing grow context. Nothing opened.");
       return false;
     }
+    // A requested Water handoff can run before the passive recovery effect.
+    // Read the exact target claim now, before opening a separate writer.
+    const recovery = readPendingQuickLogActivity(user?.id, currentTarget);
+    if (recovery.status !== "empty") {
+      setStructuredWaterError(
+        recovery.status === "blocked"
+          ? ACTIVITY_RECOVERY_UNAVAILABLE
+          : "Resolve the existing activity recovery before logging Water on this target.",
+      );
+      return false;
+    }
     const intent = buildQuickLogV2OpenIntent({ plantId, tentId, action: "water" });
     if (!intent || typeof window === "undefined") {
       setStructuredWaterError("Choose a plant or tent before logging Water.");
@@ -366,7 +465,15 @@ export default function QuickLogAllActivitiesSection({
     onBeforeStructuredWaterOpen?.();
     window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, { detail: intent }));
     return true;
-  }, [externalPersistenceBlockReason, growId, onBeforeStructuredWaterOpen, plantId, tentId]);
+  }, [
+    currentTarget,
+    externalPersistenceBlockReason,
+    growId,
+    onBeforeStructuredWaterOpen,
+    plantId,
+    tentId,
+    user?.id,
+  ]);
 
   useEffect(() => {
     if (previousTargetKeyRef.current === currentTargetKey) return;
@@ -389,6 +496,7 @@ export default function QuickLogAllActivitiesSection({
     setErrorReason(null);
     setErrorForActivity(null);
     setStructuredWaterError(null);
+    setRecoveryNotice(null);
     setSaved([]);
   }, [currentTargetKey]);
 
@@ -437,6 +545,48 @@ export default function QuickLogAllActivitiesSection({
     requestedNote,
   ]);
 
+  // Recover an exact unresolved RPC attempt for this owner and target. A
+  // different target keeps its own editor; returning here restores the retry.
+  useEffect(() => {
+    if (!user?.id || !currentTarget.growId) {
+      setActivityRecoveryBlocked(false);
+      setPendingActivity(null);
+      return;
+    }
+    const recovery = readPendingQuickLogActivity(user?.id, currentTarget);
+    setActivityRecoveryBlocked(recovery.status === "blocked");
+    setPendingActivity(recovery.status === "pending" ? recovery.record : null);
+    if (recovery.status !== "pending") return;
+    setSelectedDraft(bindQuickLogActivityDraft(recovery.record.input.activityId, currentTarget));
+    if (readRejectedPendingQuickLogActivity(recovery.record)) {
+      restoreRejectedDraft(recovery.record);
+    } else {
+      setNote(recovery.record.input.note ?? "");
+    }
+    setErrorReason(
+      readConfirmedPendingQuickLogActivity(recovery.record)
+        ? ACTIVITY_RECOVERY_CLEAR_FAILED
+        : readRejectedPendingQuickLogActivity(recovery.record)
+          ? ACTIVITY_RECOVERY_REJECTED_CLEAR_FAILED
+          : ACTIVITY_RECOVERY_PENDING,
+    );
+    setErrorForActivity(recovery.record.input.activityId);
+  }, [currentTarget, currentTargetKey, restoreRejectedDraft, user?.id]);
+
+  useEffect(() => {
+    if (!onRecoveryLockChange || !currentTarget.growId) return;
+    const locked =
+      !!user?.id && readPendingQuickLogActivity(user.id, currentTarget).status !== "empty";
+    onRecoveryLockChange(
+      {
+        growId: currentTarget.growId,
+        tentId: currentTarget.tentId,
+        plantId: currentTarget.plantId,
+      },
+      locked,
+    );
+  }, [activityRecoveryBlocked, currentTarget, onRecoveryLockChange, pendingActivity, user?.id]);
+
   const canPersistManualSensor = false; // Deferred to ManualSensorReadingCard.
 
   const harvestWetValidation = useMemo(() => validateHarvestWeightInput(harvestWet), [harvestWet]);
@@ -475,16 +625,17 @@ export default function QuickLogAllActivitiesSection({
     );
   }, [selected]);
 
-  const mutationBlocked = saving || saveBlocked;
+  const mutationBlocked =
+    saving || saveBlocked || !!activePendingActivity || activityRecoveryBlocked;
   const isMutationBlocked = useCallback(
-    () =>
-      mutationBlocked || (onSaveStart ? isSaveBlocked?.() === true : localSaveInFlightRef.current),
-    [isSaveBlocked, mutationBlocked, onSaveStart],
+    () => mutationBlocked || localSaveInFlightRef.current || isSaveBlocked?.() === true,
+    [isSaveBlocked, mutationBlocked],
   );
 
   const handleSelect = useCallback(
     (a: QuickLogActivityDefinition) => {
       if (isMutationBlocked()) return;
+      setRecoveryNotice(null);
       setErrorReason(null);
       setErrorForActivity(null);
       setStructuredWaterError(null);
@@ -522,6 +673,236 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomNoneObserved(false);
   }, [currentTarget, hasSymptomPlant, isMutationBlocked, plantStage]);
 
+  const finishConfirmedPendingActivity = useCallback(
+    (record: PendingQuickLogActivity, growEventId: string | null, cleared: boolean) => {
+      const capturedTarget = Object.freeze({
+        growId: record.input.growId,
+        tentId: record.input.tentId,
+        plantId: record.input.plantId,
+      });
+      const stillCurrent =
+        liveOwnerIdRef.current === record.ownerId &&
+        liveTargetKeyRef.current === buildQuickLogTargetKey(capturedTarget);
+      const stillSameRecoveryScope =
+        liveOwnerIdRef.current === record.ownerId &&
+        liveRecoveryScopeRef.current === buildQuickLogRecoveryScopeKey(record.input);
+      if (!cleared) {
+        rememberConfirmedPendingQuickLogActivity(record, growEventId);
+        if (stillSameRecoveryScope) {
+          setErrorReason(ACTIVITY_RECOVERY_CLEAR_FAILED);
+          setErrorForActivity(record.input.activityId);
+        }
+        return;
+      }
+      if (stillSameRecoveryScope) setPendingActivity(null);
+      if (stillCurrent) {
+        const source = toSavedSource(record.input.activityId);
+        if (source) {
+          const items = buildDailyCheckSavedItems({
+            source,
+            submittedAt: Date.now(),
+            harvestDetails: source === "harvest" ? record.receipt.harvestDetails : null,
+          });
+          if (items.length > 0)
+            setSaved((previous) => [
+              ...previous,
+              {
+                id: `${record.input.idempotencyKey}-saved`,
+                activityId: record.input.activityId,
+                item: items[0],
+                target: capturedTarget,
+                growEventId,
+                symptomCheck: record.receipt.symptomCheck,
+              },
+            ]);
+        }
+        setSelectedDraft(null);
+        setNote("");
+        setHarvestWet("");
+        setHarvestDry("");
+        setHarvestUnit("g");
+        setDetailValues({});
+        setGuidedSymptomCheck(false);
+        setGuidedSymptomStage(null);
+        setGuidedSymptomStageConfirmed(false);
+        setGuidedSymptomNoneObserved(false);
+        envCheckTempEntryUnitRef.current = null;
+        setErrorReason(null);
+        setErrorForActivity(null);
+      } else if (stillSameRecoveryScope) {
+        setSelectedDraft(null);
+        setErrorReason(null);
+        setErrorForActivity(null);
+        setRecoveryNotice(MOVED_ACTIVITY_RECEIPT_CONFIRMED);
+      }
+      try {
+        onSaveSuccess?.({
+          activityId: record.input.activityId,
+          target: capturedTarget,
+          growEventId,
+          recovered: true,
+          reviewedStarterHandoffKey: record.reviewedStarterHandoffKey ?? null,
+        });
+      } catch {
+        // The confirmed write remains successful if parent cleanup fails.
+      }
+    },
+    [onSaveSuccess],
+  );
+
+  const handleRetryPendingActivity = useCallback(async () => {
+    if (saving || saveBlocked || isSaveBlocked?.() === true || localSaveInFlightRef.current) return;
+    if (externalPersistenceBlockReason) {
+      setErrorReason(externalPersistenceBlockReason);
+      return;
+    }
+    const recovery = readPendingQuickLogActivity(user?.id, currentTarget);
+    if (recovery.status === "blocked") {
+      setActivityRecoveryBlocked(true);
+      setErrorReason(ACTIVITY_RECOVERY_UNAVAILABLE);
+      return;
+    }
+    if (recovery.status === "empty") {
+      setPendingActivity(null);
+      setSelectedDraft(null);
+      setErrorReason(
+        "The earlier activity is no longer pending here. Check Timeline before logging another.",
+      );
+      return;
+    }
+    const record = recovery.record;
+    if (!activePendingActivity || !samePendingQuickLogActivity(activePendingActivity, record)) {
+      setPendingActivity(record);
+      setSelectedDraft(bindQuickLogActivityDraft(record.input.activityId, currentTarget));
+      setNote(record.input.note ?? "");
+      setErrorReason(ACTIVITY_RECOVERY_PENDING);
+      setErrorForActivity(record.input.activityId);
+      return;
+    }
+    const confirmed = readConfirmedPendingQuickLogActivity(record);
+    if (confirmed) {
+      finishConfirmedPendingActivity(
+        record,
+        confirmed.growEventId,
+        clearPendingQuickLogActivity(record),
+      );
+      return;
+    }
+    if (readRejectedPendingQuickLogActivity(record)) {
+      // Cleanup can finish after a reload. Restore the refused structured
+      // fields before deleting the sole persisted copy of the original draft.
+      restoreRejectedDraft(record);
+      if (clearPendingQuickLogActivity(record)) {
+        setPendingActivity(null);
+        setErrorReason("The server refused this activity. Check its target and fields.");
+      } else {
+        setErrorReason(ACTIVITY_RECOVERY_REJECTED_CLEAR_FAILED);
+      }
+      setErrorForActivity(record.input.activityId);
+      return;
+    }
+    if (buildQuickLogTargetKey(record.input) !== buildQuickLogTargetKey(currentTarget)) {
+      localSaveInFlightRef.current = true;
+      setCheckingMovedReceipt(true);
+      try {
+        const receipt = await readQuickLogPendingActivityReceipt(
+          record.ownerId,
+          record.input.idempotencyKey,
+        );
+        if (
+          liveOwnerIdRef.current !== record.ownerId ||
+          liveRecoveryScopeRef.current !== buildQuickLogRecoveryScopeKey(record.input)
+        )
+          return;
+        if (receipt.status === "confirmed") {
+          finishConfirmedPendingActivity(
+            record,
+            receipt.growEventId,
+            clearPendingQuickLogActivity(record),
+          );
+          // This read-only reconciliation did not call the save hook, which
+          // normally emits the Timeline refresh event on confirmed success.
+          dispatchQuickLogV2EntryCreated({
+            createdAt: new Date().toISOString(),
+            growEventId: receipt.growEventId,
+            source: "quick_log_v2",
+          });
+        } else {
+          setErrorReason(
+            receipt.status === "not_found"
+              ? MOVED_ACTIVITY_RECEIPT_NOT_FOUND
+              : MOVED_ACTIVITY_RECEIPT_UNAVAILABLE,
+          );
+          setErrorForActivity(record.input.activityId);
+        }
+      } finally {
+        localSaveInFlightRef.current = false;
+        setCheckingMovedReceipt(false);
+      }
+      return;
+    }
+    const persistenceGate = evaluateQuickLogPrePersistenceGate({
+      activityId: record.input.activityId,
+      currentPlantStage: plantStage,
+      selectedTarget: record.input,
+      currentTarget,
+    });
+    if (!persistenceGate.allowed) {
+      setErrorReason(persistenceGate.blockedReason ?? "This activity is not available.");
+      setErrorForActivity(record.input.activityId);
+      return;
+    }
+    const capturedTarget = Object.freeze({
+      growId: record.input.growId,
+      tentId: record.input.tentId,
+      plantId: record.input.plantId,
+    });
+    const acquired = onSaveStart ? onSaveStart(capturedTarget) : !localSaveInFlightRef.current;
+    if (!acquired) return;
+    localSaveInFlightRef.current = true;
+    try {
+      const result = await save(record.input);
+      const stillCurrent =
+        liveOwnerIdRef.current === record.ownerId &&
+        liveTargetKeyRef.current === buildQuickLogTargetKey(capturedTarget);
+      if (!result.ok) {
+        // This is a retry of an earlier unresolved attempt. Even a definitive
+        // rejection of this call cannot prove the earlier attempt did not write.
+        if (stillCurrent) {
+          setErrorReason(
+            result.reason === "server_rejected"
+              ? ACTIVITY_RECOVERY_RETRY_REJECTED
+              : ACTIVITY_RECOVERY_PENDING,
+          );
+          setErrorForActivity(record.input.activityId);
+        }
+        return;
+      }
+      finishConfirmedPendingActivity(
+        record,
+        result.growEventId ?? null,
+        clearPendingQuickLogActivity(record),
+      );
+    } finally {
+      localSaveInFlightRef.current = false;
+      if (onSaveStart) onSaveEnd?.();
+    }
+  }, [
+    activePendingActivity,
+    currentTarget,
+    externalPersistenceBlockReason,
+    finishConfirmedPendingActivity,
+    isSaveBlocked,
+    onSaveEnd,
+    onSaveStart,
+    plantStage,
+    restoreRejectedDraft,
+    save,
+    saveBlocked,
+    saving,
+    user?.id,
+  ]);
+
   const handleSave = useCallback(async () => {
     if (isMutationBlocked()) return;
     if (selected?.id === "photo" && photoAttachmentUncertain) {
@@ -534,6 +915,28 @@ export default function QuickLogAllActivitiesSection({
     if (externalPersistenceBlockReason) {
       setErrorReason(externalPersistenceBlockReason);
       setErrorForActivity(selected?.id ?? null);
+      return;
+    }
+    if (!user?.id) {
+      setErrorReason("Sign in before logging an activity.");
+      setErrorForActivity(selected?.id ?? null);
+      return;
+    }
+    const earlierActivity = readPendingQuickLogActivity(user?.id, currentTarget);
+    if (earlierActivity.status === "blocked") {
+      setActivityRecoveryBlocked(true);
+      setErrorReason(ACTIVITY_RECOVERY_UNAVAILABLE);
+      setErrorForActivity(selected?.id ?? null);
+      return;
+    }
+    if (earlierActivity.status === "pending") {
+      setPendingActivity(earlierActivity.record);
+      setSelectedDraft(
+        bindQuickLogActivityDraft(earlierActivity.record.input.activityId, currentTarget),
+      );
+      setNote(earlierActivity.record.input.note ?? "");
+      setErrorReason(ACTIVITY_RECOVERY_PENDING);
+      setErrorForActivity(earlierActivity.record.input.activityId);
       return;
     }
     if (!selected || !selectedDraft) return;
@@ -570,6 +973,12 @@ export default function QuickLogAllActivitiesSection({
     }
     if (requiresNote && note.trim().length === 0) {
       setErrorReason("Add a short note before saving.");
+      setErrorForActivity(selected.id);
+      return;
+    }
+    const noteLengthError = validateQuickLogActivityNote(selected.id, note);
+    if (noteLengthError) {
+      setErrorReason(noteLengthError);
       setErrorForActivity(selected.id);
       return;
     }
@@ -657,7 +1066,7 @@ export default function QuickLogAllActivitiesSection({
     });
     const acquired = onSaveStart ? onSaveStart(capturedTarget) : !localSaveInFlightRef.current;
     if (!acquired) return;
-    if (!onSaveStart) localSaveInFlightRef.current = true;
+    localSaveInFlightRef.current = true;
 
     try {
       const activityInput = {
@@ -790,44 +1199,104 @@ export default function QuickLogAllActivitiesSection({
           photoDiaryInFlightRef.current = false;
         }
       } else {
-        const result = await save({
-          ...activityInput,
-          idempotencyKey,
+        const occurredAt = new Date().toISOString();
+        const claim = claimPendingQuickLogActivity({
+          version: 1,
+          ownerId: user?.id ?? "",
+          createdAt: occurredAt,
+          ...(reviewedStarterHandoffKey ? { reviewedStarterHandoffKey } : {}),
+          input: { ...activityInput, occurredAt, idempotencyKey },
+          receipt: {
+            symptomCheck: guidedSymptomCheck && selected.id === "issue_observation",
+            harvestDetails: harvestDetailsForBreakdown,
+          },
         });
+        if (claim.status !== "claimed") {
+          if (claim.status === "pending") {
+            setPendingActivity(claim.record);
+            setSelectedDraft(
+              bindQuickLogActivityDraft(claim.record.input.activityId, capturedTarget),
+            );
+            setNote(claim.record.input.note ?? "");
+            setErrorReason(ACTIVITY_RECOVERY_PENDING);
+            setErrorForActivity(claim.record.input.activityId);
+          } else {
+            setActivityRecoveryBlocked(true);
+            setErrorReason(ACTIVITY_RECOVERY_UNAVAILABLE);
+            setErrorForActivity(selected.id);
+          }
+          return;
+        }
+        setPendingActivity(claim.record);
+        const result = await save({
+          ...claim.record.input,
+        });
+        const stillCurrent =
+          liveOwnerIdRef.current === claim.record.ownerId &&
+          liveTargetKeyRef.current === buildQuickLogTargetKey(capturedTarget);
 
         if (!result.ok) {
-          setErrorReason(
-            result.reason === "save_failed"
-              ? "Save is unconfirmed. Your draft is still here. Retry to confirm it."
-              : (result.disabledReason ?? "Save was refused."),
-          );
-          setErrorForActivity(selected.id);
+          if (result.reason !== "save_failed") {
+            if (clearPendingQuickLogActivity(claim.record)) {
+              if (stillCurrent) setPendingActivity(null);
+            } else {
+              rememberRejectedPendingQuickLogActivity(claim.record);
+              if (stillCurrent) {
+                setErrorReason(ACTIVITY_RECOVERY_REJECTED_CLEAR_FAILED);
+                setErrorForActivity(selected.id);
+              }
+              return;
+            }
+          }
+          if (stillCurrent) {
+            setErrorReason(
+              result.reason === "save_failed"
+                ? ACTIVITY_RECOVERY_PENDING
+                : (result.disabledReason ?? "Save was refused."),
+            );
+            setErrorForActivity(selected.id);
+          }
           return;
         }
         savedGrowEventId = result.growEventId ?? null;
+        if (clearPendingQuickLogActivity(claim.record)) {
+          if (stillCurrent) setPendingActivity(null);
+        } else {
+          rememberConfirmedPendingQuickLogActivity(claim.record, savedGrowEventId);
+          if (stillCurrent) {
+            setErrorReason(ACTIVITY_RECOVERY_CLEAR_FAILED);
+            setErrorForActivity(selected.id);
+          }
+          return;
+        }
       }
 
       // Success path — build saved-item using the SHARED helper so no
       // local label array can drift out of sync.
-      const source = toSavedSource(selected.id);
-      if (source) {
-        const items = buildDailyCheckSavedItems({
-          source,
-          submittedAt: Date.now(),
-          harvestDetails: source === "harvest" ? harvestDetailsForBreakdown : null,
-        });
-        if (items.length > 0) {
-          setSaved((prev) => [
-            ...prev,
-            {
-              id: `${idempotencyKey}-saved`,
-              activityId: selected.id,
-              item: items[0],
-              target: capturedTarget,
-              growEventId: savedGrowEventId,
-              symptomCheck: guidedSymptomCheck && selected.id === "issue_observation",
-            },
-          ]);
+      const stillCurrent =
+        liveOwnerIdRef.current === user?.id &&
+        liveTargetKeyRef.current === buildQuickLogTargetKey(capturedTarget);
+      if (stillCurrent) {
+        const source = toSavedSource(selected.id);
+        if (source) {
+          const items = buildDailyCheckSavedItems({
+            source,
+            submittedAt: Date.now(),
+            harvestDetails: source === "harvest" ? harvestDetailsForBreakdown : null,
+          });
+          if (items.length > 0) {
+            setSaved((prev) => [
+              ...prev,
+              {
+                id: `${idempotencyKey}-saved`,
+                activityId: selected.id,
+                item: items[0],
+                target: capturedTarget,
+                growEventId: savedGrowEventId,
+                symptomCheck: guidedSymptomCheck && selected.id === "issue_observation",
+              },
+            ]);
+          }
         }
       }
       try {
@@ -840,23 +1309,25 @@ export default function QuickLogAllActivitiesSection({
         // Persistence already succeeded. A caller-owned local cleanup
         // failure must not turn a confirmed write into a false save error.
       }
-      setNote("");
-      setHarvestWet("");
-      setHarvestDry("");
-      setHarvestUnit("g");
-      setDetailValues({});
-      setGuidedSymptomCheck(false);
-      setGuidedSymptomStage(null);
-      setGuidedSymptomStageConfirmed(false);
-      setGuidedSymptomNoneObserved(false);
-      envCheckTempEntryUnitRef.current = null;
-      setPhotoFile(null);
-      setSelectedDraft(null);
-      setErrorReason(null);
-      setErrorForActivity(null);
+      if (stillCurrent) {
+        setNote("");
+        setHarvestWet("");
+        setHarvestDry("");
+        setHarvestUnit("g");
+        setDetailValues({});
+        setGuidedSymptomCheck(false);
+        setGuidedSymptomStage(null);
+        setGuidedSymptomStageConfirmed(false);
+        setGuidedSymptomNoneObserved(false);
+        envCheckTempEntryUnitRef.current = null;
+        setPhotoFile(null);
+        setSelectedDraft(null);
+        setErrorReason(null);
+        setErrorForActivity(null);
+      }
     } finally {
+      localSaveInFlightRef.current = false;
       if (onSaveStart) onSaveEnd?.();
-      else localSaveInFlightRef.current = false;
     }
   }, [
     selected,
@@ -893,6 +1364,7 @@ export default function QuickLogAllActivitiesSection({
     guidedSymptomStage,
     guidedSymptomStageConfirmed,
     guidedSymptomNoneObserved,
+    reviewedStarterHandoffKey,
   ]);
 
   const noContext = !growId;
@@ -936,6 +1408,22 @@ export default function QuickLogAllActivitiesSection({
           data-testid={`${testIdPrefix}-persistence-block`}
         >
           {externalPersistenceBlockReason}
+        </p>
+      )}
+
+      {activityRecoveryBlocked && (
+        <p
+          role="alert"
+          className="text-xs text-destructive"
+          data-testid={`${testIdPrefix}-activity-recovery-blocked`}
+        >
+          {ACTIVITY_RECOVERY_UNAVAILABLE}
+        </p>
+      )}
+
+      {recoveryNotice && (
+        <p role="status" className="text-xs text-muted-foreground">
+          {recoveryNotice}
         </p>
       )}
 
@@ -1013,400 +1501,467 @@ export default function QuickLogAllActivitiesSection({
             <p className="text-[11px] text-muted-foreground">{selected.safetyNote}</p>
           </div>
 
-          {selected.id === "harvest" && selectedAvailability?.disabled && (
-            <p
-              role="note"
-              className="text-xs text-muted-foreground"
-              data-testid={`${testIdPrefix}-harvest-stage-blocked`}
-            >
-              {selectedAvailability.disabledReason ?? QUICK_LOG_HARVEST_STAGE_DISABLED_REASON}
-            </p>
-          )}
-
-          {guidedSymptomCheck && selected.id === "issue_observation" ? (
-            <QuickLogSymptomCheckFields
-              symptomObservedSign={detailValues.observedSign ?? ""}
-              observationLocation={detailValues.observationLocation ?? ""}
-              stage={guidedSymptomStage}
-              stageConfirmed={guidedSymptomStageConfirmed}
-              noSymptomsObserved={guidedSymptomNoneObserved}
-              disabled={mutationBlocked}
-              testIdPrefix={testIdPrefix}
-              onSymptomObservedSignChange={(value) =>
-                setDetailValues((previous) => ({ ...previous, observedSign: value }))
-              }
-              onObservationLocationChange={(value) =>
-                setDetailValues((previous) => ({ ...previous, observationLocation: value }))
-              }
-              onStageChange={(value) => {
-                setGuidedSymptomStage(value);
-                setGuidedSymptomStageConfirmed(false);
-              }}
-              onStageConfirmedChange={setGuidedSymptomStageConfirmed}
-              onNoSymptomsObservedChange={(value) => {
-                setGuidedSymptomNoneObserved(value);
-                if (value) {
-                  setDetailValues((previous) => ({ ...previous, observedSign: "" }));
+          {activePendingActivity ? (
+            <div className="space-y-2" data-testid={`${testIdPrefix}-pending-activity`}>
+              <p role="status" className="text-xs text-muted-foreground">
+                {saving
+                  ? "Saving the original activity. Please wait for confirmation."
+                  : confirmedPendingActivity
+                    ? ACTIVITY_RECOVERY_CLEAR_FAILED
+                    : rejectedPendingActivity
+                      ? ACTIVITY_RECOVERY_REJECTED_CLEAR_FAILED
+                      : `${ACTIVITY_RECOVERY_PENDING} You can check Timeline before retrying.`}
+              </p>
+              {!confirmedPendingActivity &&
+                !rejectedPendingActivity &&
+                pendingPersistenceGate?.allowed === false && (
+                  <p role="note" className="text-xs text-muted-foreground">
+                    {pendingTargetChanged
+                      ? MOVED_ACTIVITY_RECOVERY_GUIDANCE
+                      : (pendingPersistenceGate.blockedReason ?? "This activity is not available.")}
+                  </p>
+                )}
+              {activePendingActivity.input.note && (
+                <p className="text-xs whitespace-pre-wrap break-words">
+                  Original note: {activePendingActivity.input.note}
+                </p>
+              )}
+              {activePendingActivity.input.extraDetails && (
+                <pre className="text-[11px] whitespace-pre-wrap break-words">
+                  Original details:{" "}
+                  {JSON.stringify(activePendingActivity.input.extraDetails, null, 2)}
+                </pre>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleRetryPendingActivity}
+                disabled={
+                  saving ||
+                  checkingMovedReceipt ||
+                  saveBlocked ||
+                  !!externalPersistenceBlockReason ||
+                  (!confirmedPendingActivity &&
+                    !rejectedPendingActivity &&
+                    !pendingTargetChanged &&
+                    pendingPersistenceGate?.allowed === false)
                 }
-              }}
-            />
-          ) : (
-            getQuickLogActivityDetailFields(selected.id, activeEnvCheckTempUnit).length > 0 && (
-              <div
-                className="grid grid-cols-1 sm:grid-cols-2 gap-2"
-                data-testid={`${testIdPrefix}-detail-fields`}
+                data-testid={`${testIdPrefix}-retry-original`}
               >
-                {getQuickLogActivityDetailFields(selected.id, activeEnvCheckTempUnit).map(
-                  (field) => (
-                    <div key={field.key} className="space-y-1">
+                {saving || checkingMovedReceipt
+                  ? "Checking…"
+                  : confirmedPendingActivity
+                    ? "Clear saved recovery record"
+                    : rejectedPendingActivity
+                      ? "Clear rejected recovery record"
+                      : pendingTargetChanged
+                        ? "Check original save"
+                        : "Retry original activity"}
+              </Button>
+            </div>
+          ) : (
+            <>
+              {selected.id === "harvest" && selectedAvailability?.disabled && (
+                <p
+                  role="note"
+                  className="text-xs text-muted-foreground"
+                  data-testid={`${testIdPrefix}-harvest-stage-blocked`}
+                >
+                  {selectedAvailability.disabledReason ?? QUICK_LOG_HARVEST_STAGE_DISABLED_REASON}
+                </p>
+              )}
+
+              {guidedSymptomCheck && selected.id === "issue_observation" ? (
+                <QuickLogSymptomCheckFields
+                  symptomObservedSign={detailValues.observedSign ?? ""}
+                  observationLocation={detailValues.observationLocation ?? ""}
+                  stage={guidedSymptomStage}
+                  stageConfirmed={guidedSymptomStageConfirmed}
+                  noSymptomsObserved={guidedSymptomNoneObserved}
+                  disabled={mutationBlocked}
+                  testIdPrefix={testIdPrefix}
+                  onSymptomObservedSignChange={(value) =>
+                    setDetailValues((previous) => ({ ...previous, observedSign: value }))
+                  }
+                  onObservationLocationChange={(value) =>
+                    setDetailValues((previous) => ({ ...previous, observationLocation: value }))
+                  }
+                  onStageChange={(value) => {
+                    setGuidedSymptomStage(value);
+                    setGuidedSymptomStageConfirmed(false);
+                  }}
+                  onStageConfirmedChange={setGuidedSymptomStageConfirmed}
+                  onNoSymptomsObservedChange={(value) => {
+                    setGuidedSymptomNoneObserved(value);
+                    if (value) {
+                      setDetailValues((previous) => ({ ...previous, observedSign: "" }));
+                    }
+                  }}
+                />
+              ) : (
+                getQuickLogActivityDetailFields(selected.id, activeEnvCheckTempUnit).length > 0 && (
+                  <div
+                    className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+                    data-testid={`${testIdPrefix}-detail-fields`}
+                  >
+                    {getQuickLogActivityDetailFields(selected.id, activeEnvCheckTempUnit).map(
+                      (field) => (
+                        <div key={field.key} className="space-y-1">
+                          <Label
+                            htmlFor={`${testIdPrefix}-detail-${field.key}`}
+                            className="text-[11px] text-muted-foreground"
+                          >
+                            {field.label}
+                            {field.unit ? ` (${field.unit})` : ""} (optional)
+                          </Label>
+                          {field.kind === "select" ? (
+                            <select
+                              id={`${testIdPrefix}-detail-${field.key}`}
+                              data-testid={`${testIdPrefix}-detail-${field.key}`}
+                              value={detailValues[field.key] ?? ""}
+                              onChange={(e) => {
+                                if (isMutationBlocked()) return;
+                                const v = e.target.value;
+                                setDetailValues((prev) => ({ ...prev, [field.key]: v }));
+                              }}
+                              disabled={mutationBlocked}
+                              className="w-full text-sm h-9 rounded-md border border-input bg-background px-2"
+                            >
+                              <option value="">Not recorded</option>
+                              {(field.options ?? []).map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <>
+                              <Input
+                                id={`${testIdPrefix}-detail-${field.key}`}
+                                data-testid={`${testIdPrefix}-detail-${field.key}`}
+                                value={detailValues[field.key] ?? ""}
+                                onChange={(e) => {
+                                  if (isMutationBlocked()) return;
+                                  const v = e.target.value;
+                                  if (field.temperatureCelsius) {
+                                    // Pin the unit the instant this draft goes
+                                    // empty → non-empty (using the LIVE preference at
+                                    // that moment), so label/bounds/save agree even
+                                    // if the preference changes mid-entry. Clearing
+                                    // the field releases the pin.
+                                    const wasEmpty = (detailValues[field.key] ?? "").trim() === "";
+                                    const isEmpty = v.trim() === "";
+                                    if (wasEmpty && !isEmpty) {
+                                      envCheckTempEntryUnitRef.current = temperatureUnit;
+                                    } else if (isEmpty) {
+                                      envCheckTempEntryUnitRef.current = null;
+                                    }
+                                  }
+                                  setDetailValues((prev) => ({ ...prev, [field.key]: v }));
+                                }}
+                                disabled={mutationBlocked}
+                                inputMode={field.kind === "number" ? "decimal" : undefined}
+                                // Text detail is capped at the persistence limit IN the
+                                // input, so nothing a grower types is ever silently
+                                // truncated behind a success receipt.
+                                maxLength={
+                                  field.kind === "text" ? QUICK_LOG_DETAIL_TEXT_MAX : undefined
+                                }
+                                aria-invalid={
+                                  field.kind === "number"
+                                    ? !(
+                                        detailNumberValidations.find((v) => v.key === field.key)
+                                          ?.ok ?? true
+                                      )
+                                    : undefined
+                                }
+                                placeholder={field.placeholder}
+                                className="text-sm"
+                              />
+                              {field.kind === "number" &&
+                                (() => {
+                                  const v = detailNumberValidations.find(
+                                    (x) => x.key === field.key,
+                                  );
+                                  return v && !v.ok ? (
+                                    <p
+                                      role="alert"
+                                      className="text-[11px] text-destructive"
+                                      data-testid={`${testIdPrefix}-detail-${field.key}-error`}
+                                    >
+                                      {v.error}
+                                    </p>
+                                  ) : null;
+                                })()}
+                            </>
+                          )}
+                        </div>
+                      ),
+                    )}
+                  </div>
+                )
+              )}
+
+              {selected.id === "photo" && (
+                <div className="space-y-1" data-testid={`${testIdPrefix}-photo-picker`}>
+                  <Label
+                    htmlFor={`${testIdPrefix}-photo-file`}
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    Photo (required)
+                  </Label>
+                  <Input
+                    id={`${testIdPrefix}-photo-file`}
+                    data-testid={`${testIdPrefix}-photo-file`}
+                    type="file"
+                    accept="image/*"
+                    disabled={mutationBlocked}
+                    onChange={(e) => {
+                      if (isMutationBlocked()) return;
+                      const file = e.target.files?.[0] ?? null;
+                      if (!file) {
+                        setPhotoFile(null);
+                        return;
+                      }
+                      const check = validatePlantProfilePhotoFile(file);
+                      if (!check.ok) {
+                        const failure = check as { ok: false; message: string };
+                        setPhotoFile(null);
+                        setErrorReason(failure.message);
+                        setErrorForActivity("photo");
+                        return;
+                      }
+                      setErrorReason(null);
+                      setErrorForActivity(null);
+                      setPhotoFile(file);
+                    }}
+                    className="text-sm"
+                  />
+                  {photoFile ? (
+                    <p
+                      className="text-[11px] text-muted-foreground"
+                      data-testid={`${testIdPrefix}-photo-selected`}
+                    >
+                      Selected: {photoFile.name}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">
+                      A photo entry needs an actual image — Save stays disabled until one is chosen.
+                    </p>
+                  )}
+                  {photoAttachmentUncertain && (
+                    <p
+                      role="alert"
+                      className="text-[11px] text-destructive"
+                      data-testid={`${testIdPrefix}-photo-uncertain-recovery`}
+                    >
+                      Could not confirm the photo attachment for this selected target. Check
+                      Timeline before adding another photo.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {selected.id === "manual_sensor_snapshot" ? (
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid={`${testIdPrefix}-manual-sensor-hint`}
+                >
+                  Use the Manual Sensor Snapshot card on this page to record a reading. Manual
+                  snapshots stay labeled manual, not live.
+                </p>
+              ) : selected.id === "harvest" ? (
+                <div className="space-y-2" data-testid={`${testIdPrefix}-harvest-fields`}>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="space-y-1">
                       <Label
-                        htmlFor={`${testIdPrefix}-detail-${field.key}`}
+                        htmlFor={`${testIdPrefix}-harvest-wet`}
                         className="text-[11px] text-muted-foreground"
                       >
-                        {field.label}
-                        {field.unit ? ` (${field.unit})` : ""} (optional)
+                        Wet weight (optional)
                       </Label>
-                      {field.kind === "select" ? (
-                        <select
-                          id={`${testIdPrefix}-detail-${field.key}`}
-                          data-testid={`${testIdPrefix}-detail-${field.key}`}
-                          value={detailValues[field.key] ?? ""}
-                          onChange={(e) => {
-                            if (isMutationBlocked()) return;
-                            const v = e.target.value;
-                            setDetailValues((prev) => ({ ...prev, [field.key]: v }));
-                          }}
-                          disabled={mutationBlocked}
-                          className="w-full text-sm h-9 rounded-md border border-input bg-background px-2"
+                      <Input
+                        id={`${testIdPrefix}-harvest-wet`}
+                        data-testid={`${testIdPrefix}-harvest-wet`}
+                        value={harvestWet}
+                        onChange={(e) => {
+                          if (isMutationBlocked()) return;
+                          setHarvestWet(e.target.value);
+                        }}
+                        disabled={mutationBlocked}
+                        inputMode="decimal"
+                        placeholder="e.g. 120"
+                        min={0}
+                        aria-invalid={!harvestWetValidation.ok}
+                        className="text-sm"
+                      />
+                      {harvestWetValidation.error && (
+                        <p
+                          role="alert"
+                          className="text-[11px] text-destructive"
+                          data-testid={`${testIdPrefix}-harvest-wet-error`}
                         >
-                          <option value="">Not recorded</option>
-                          {(field.options ?? []).map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <>
-                          <Input
-                            id={`${testIdPrefix}-detail-${field.key}`}
-                            data-testid={`${testIdPrefix}-detail-${field.key}`}
-                            value={detailValues[field.key] ?? ""}
-                            onChange={(e) => {
-                              if (isMutationBlocked()) return;
-                              const v = e.target.value;
-                              if (field.temperatureCelsius) {
-                                // Pin the unit the instant this draft goes
-                                // empty → non-empty (using the LIVE preference at
-                                // that moment), so label/bounds/save agree even
-                                // if the preference changes mid-entry. Clearing
-                                // the field releases the pin.
-                                const wasEmpty = (detailValues[field.key] ?? "").trim() === "";
-                                const isEmpty = v.trim() === "";
-                                if (wasEmpty && !isEmpty) {
-                                  envCheckTempEntryUnitRef.current = temperatureUnit;
-                                } else if (isEmpty) {
-                                  envCheckTempEntryUnitRef.current = null;
-                                }
-                              }
-                              setDetailValues((prev) => ({ ...prev, [field.key]: v }));
-                            }}
-                            disabled={mutationBlocked}
-                            inputMode={field.kind === "number" ? "decimal" : undefined}
-                            // Text detail is capped at the persistence limit IN the
-                            // input, so nothing a grower types is ever silently
-                            // truncated behind a success receipt.
-                            maxLength={
-                              field.kind === "text" ? QUICK_LOG_DETAIL_TEXT_MAX : undefined
-                            }
-                            aria-invalid={
-                              field.kind === "number"
-                                ? !(
-                                    detailNumberValidations.find((v) => v.key === field.key)?.ok ??
-                                    true
-                                  )
-                                : undefined
-                            }
-                            placeholder={field.placeholder}
-                            className="text-sm"
-                          />
-                          {field.kind === "number" &&
-                            (() => {
-                              const v = detailNumberValidations.find((x) => x.key === field.key);
-                              return v && !v.ok ? (
-                                <p
-                                  role="alert"
-                                  className="text-[11px] text-destructive"
-                                  data-testid={`${testIdPrefix}-detail-${field.key}-error`}
-                                >
-                                  {v.error}
-                                </p>
-                              ) : null;
-                            })()}
-                        </>
+                          {harvestWetValidation.error}
+                        </p>
                       )}
                     </div>
-                  ),
-                )}
-              </div>
-            )
-          )}
-
-          {selected.id === "photo" && (
-            <div className="space-y-1" data-testid={`${testIdPrefix}-photo-picker`}>
-              <Label
-                htmlFor={`${testIdPrefix}-photo-file`}
-                className="text-[11px] text-muted-foreground"
-              >
-                Photo (required)
-              </Label>
-              <Input
-                id={`${testIdPrefix}-photo-file`}
-                data-testid={`${testIdPrefix}-photo-file`}
-                type="file"
-                accept="image/*"
-                disabled={mutationBlocked}
-                onChange={(e) => {
-                  if (isMutationBlocked()) return;
-                  const file = e.target.files?.[0] ?? null;
-                  if (!file) {
-                    setPhotoFile(null);
-                    return;
-                  }
-                  const check = validatePlantProfilePhotoFile(file);
-                  if (!check.ok) {
-                    const failure = check as { ok: false; message: string };
-                    setPhotoFile(null);
-                    setErrorReason(failure.message);
-                    setErrorForActivity("photo");
-                    return;
-                  }
-                  setErrorReason(null);
-                  setErrorForActivity(null);
-                  setPhotoFile(file);
-                }}
-                className="text-sm"
-              />
-              {photoFile ? (
-                <p
-                  className="text-[11px] text-muted-foreground"
-                  data-testid={`${testIdPrefix}-photo-selected`}
-                >
-                  Selected: {photoFile.name}
-                </p>
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor={`${testIdPrefix}-harvest-dry`}
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        Dry weight (optional)
+                      </Label>
+                      <Input
+                        id={`${testIdPrefix}-harvest-dry`}
+                        data-testid={`${testIdPrefix}-harvest-dry`}
+                        value={harvestDry}
+                        onChange={(e) => {
+                          if (isMutationBlocked()) return;
+                          setHarvestDry(e.target.value);
+                        }}
+                        disabled={mutationBlocked}
+                        inputMode="decimal"
+                        placeholder="e.g. 22"
+                        min={0}
+                        aria-invalid={!harvestDryValidation.ok}
+                        className="text-sm"
+                      />
+                      {harvestDryValidation.error && (
+                        <p
+                          role="alert"
+                          className="text-[11px] text-destructive"
+                          data-testid={`${testIdPrefix}-harvest-dry-error`}
+                        >
+                          {harvestDryValidation.error}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor={`${testIdPrefix}-harvest-unit`}
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        Weight unit
+                      </Label>
+                      <select
+                        id={`${testIdPrefix}-harvest-unit`}
+                        data-testid={`${testIdPrefix}-harvest-unit`}
+                        value={harvestUnit}
+                        onChange={(e) => {
+                          if (isMutationBlocked()) return;
+                          setHarvestUnit(e.target.value as QuickLogWeightUnit);
+                        }}
+                        disabled={mutationBlocked}
+                        className="w-full text-sm h-9 rounded-md border border-input bg-background px-2"
+                      >
+                        {QUICK_LOG_WEIGHT_UNITS.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor={`${testIdPrefix}-note`}
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      Note (optional)
+                    </Label>
+                    <Textarea
+                      id={`${testIdPrefix}-note`}
+                      data-testid={`${testIdPrefix}-note`}
+                      value={note}
+                      onChange={(e) => {
+                        if (isMutationBlocked()) return;
+                        setNote(e.target.value);
+                      }}
+                      disabled={mutationBlocked}
+                      placeholder="Removed main cola, lower branches…"
+                      className="min-h-[64px] text-sm"
+                    />
+                  </div>
+                </div>
+              ) : requiresNote ? (
+                <div className="space-y-1">
+                  <Label
+                    htmlFor={`${testIdPrefix}-note`}
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    Note
+                  </Label>
+                  <Textarea
+                    id={`${testIdPrefix}-note`}
+                    data-testid={`${testIdPrefix}-note`}
+                    value={note}
+                    onChange={(e) => {
+                      if (isMutationBlocked()) return;
+                      setNote(e.target.value);
+                    }}
+                    disabled={mutationBlocked}
+                    placeholder="Short observation…"
+                    className="min-h-[64px] text-sm"
+                  />
+                </div>
               ) : (
                 <p className="text-[11px] text-muted-foreground">
-                  A photo entry needs an actual image — Save stays disabled until one is chosen.
+                  Save to record this action on the plant timeline.
                 </p>
               )}
-              {photoAttachmentUncertain && (
-                <p
-                  role="alert"
-                  className="text-[11px] text-destructive"
-                  data-testid={`${testIdPrefix}-photo-uncertain-recovery`}
-                >
-                  Could not confirm the photo attachment for this selected target. Check Timeline
-                  before adding another photo.
-                </p>
-              )}
-            </div>
-          )}
 
-          {selected.id === "manual_sensor_snapshot" ? (
-            <p
-              className="text-xs text-muted-foreground"
-              data-testid={`${testIdPrefix}-manual-sensor-hint`}
-            >
-              Use the Manual Sensor Snapshot card on this page to record a reading. Manual snapshots
-              stay labeled manual, not live.
-            </p>
-          ) : selected.id === "harvest" ? (
-            <div className="space-y-2" data-testid={`${testIdPrefix}-harvest-fields`}>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <div className="space-y-1">
-                  <Label
-                    htmlFor={`${testIdPrefix}-harvest-wet`}
-                    className="text-[11px] text-muted-foreground"
-                  >
-                    Wet weight (optional)
-                  </Label>
-                  <Input
-                    id={`${testIdPrefix}-harvest-wet`}
-                    data-testid={`${testIdPrefix}-harvest-wet`}
-                    value={harvestWet}
-                    onChange={(e) => {
-                      if (isMutationBlocked()) return;
-                      setHarvestWet(e.target.value);
-                    }}
-                    disabled={mutationBlocked}
-                    inputMode="decimal"
-                    placeholder="e.g. 120"
-                    min={0}
-                    aria-invalid={!harvestWetValidation.ok}
-                    className="text-sm"
-                  />
-                  {harvestWetValidation.error && (
-                    <p
-                      role="alert"
-                      className="text-[11px] text-destructive"
-                      data-testid={`${testIdPrefix}-harvest-wet-error`}
-                    >
-                      {harvestWetValidation.error}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <Label
-                    htmlFor={`${testIdPrefix}-harvest-dry`}
-                    className="text-[11px] text-muted-foreground"
-                  >
-                    Dry weight (optional)
-                  </Label>
-                  <Input
-                    id={`${testIdPrefix}-harvest-dry`}
-                    data-testid={`${testIdPrefix}-harvest-dry`}
-                    value={harvestDry}
-                    onChange={(e) => {
-                      if (isMutationBlocked()) return;
-                      setHarvestDry(e.target.value);
-                    }}
-                    disabled={mutationBlocked}
-                    inputMode="decimal"
-                    placeholder="e.g. 22"
-                    min={0}
-                    aria-invalid={!harvestDryValidation.ok}
-                    className="text-sm"
-                  />
-                  {harvestDryValidation.error && (
-                    <p
-                      role="alert"
-                      className="text-[11px] text-destructive"
-                      data-testid={`${testIdPrefix}-harvest-dry-error`}
-                    >
-                      {harvestDryValidation.error}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <Label
-                    htmlFor={`${testIdPrefix}-harvest-unit`}
-                    className="text-[11px] text-muted-foreground"
-                  >
-                    Weight unit
-                  </Label>
-                  <select
-                    id={`${testIdPrefix}-harvest-unit`}
-                    data-testid={`${testIdPrefix}-harvest-unit`}
-                    value={harvestUnit}
-                    onChange={(e) => {
-                      if (isMutationBlocked()) return;
-                      setHarvestUnit(e.target.value as QuickLogWeightUnit);
-                    }}
-                    disabled={mutationBlocked}
-                    className="w-full text-sm h-9 rounded-md border border-input bg-background px-2"
-                  >
-                    {QUICK_LOG_WEIGHT_UNITS.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label
-                  htmlFor={`${testIdPrefix}-note`}
-                  className="text-[11px] text-muted-foreground"
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={
+                    mutationBlocked ||
+                    !!externalPersistenceBlockReason ||
+                    noContext ||
+                    (selected.id === "photo" && photoAttachmentUncertain) ||
+                    selectedAvailability?.disabled ||
+                    selected.id === "manual_sensor_snapshot" ||
+                    (requiresNote && note.trim().length === 0) ||
+                    (selected.id === "harvest" && harvestWeightsInvalid) ||
+                    (selected.id === "photo" && !photoFile) ||
+                    detailNumbersInvalid ||
+                    (guidedSymptomCheck &&
+                      selected.id === "issue_observation" &&
+                      (!hasSymptomPlant ||
+                        (!guidedSymptomNoneObserved &&
+                          !findCannabisSymptomByObservedSign(detailValues.observedSign)) ||
+                        !guidedSymptomStage ||
+                        !guidedSymptomStageConfirmed))
+                  }
+                  data-testid={`${testIdPrefix}-save`}
                 >
-                  Note (optional)
-                </Label>
-                <Textarea
-                  id={`${testIdPrefix}-note`}
-                  data-testid={`${testIdPrefix}-note`}
-                  value={note}
-                  onChange={(e) => {
+                  {saving ? "Saving…" : "Save"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
                     if (isMutationBlocked()) return;
-                    setNote(e.target.value);
+                    setSelectedDraft(null);
+                    setNote("");
+                    setGuidedSymptomCheck(false);
+                    setGuidedSymptomStage(null);
+                    setGuidedSymptomStageConfirmed(false);
+                    setGuidedSymptomNoneObserved(false);
+                    setErrorReason(null);
+                    setErrorForActivity(null);
                   }}
                   disabled={mutationBlocked}
-                  placeholder="Removed main cola, lower branches…"
-                  className="min-h-[64px] text-sm"
-                />
+                  data-testid={`${testIdPrefix}-cancel`}
+                >
+                  Cancel
+                </Button>
               </div>
-            </div>
-          ) : requiresNote ? (
-            <div className="space-y-1">
-              <Label htmlFor={`${testIdPrefix}-note`} className="text-[11px] text-muted-foreground">
-                Note
-              </Label>
-              <Textarea
-                id={`${testIdPrefix}-note`}
-                data-testid={`${testIdPrefix}-note`}
-                value={note}
-                onChange={(e) => {
-                  if (isMutationBlocked()) return;
-                  setNote(e.target.value);
-                }}
-                disabled={mutationBlocked}
-                placeholder="Short observation…"
-                className="min-h-[64px] text-sm"
-              />
-            </div>
-          ) : (
-            <p className="text-[11px] text-muted-foreground">
-              Save to record this action on the plant timeline.
-            </p>
+            </>
           )}
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSave}
-              disabled={
-                mutationBlocked ||
-                !!externalPersistenceBlockReason ||
-                noContext ||
-                (selected.id === "photo" && photoAttachmentUncertain) ||
-                selectedAvailability?.disabled ||
-                selected.id === "manual_sensor_snapshot" ||
-                (requiresNote && note.trim().length === 0) ||
-                (selected.id === "harvest" && harvestWeightsInvalid) ||
-                (selected.id === "photo" && !photoFile) ||
-                detailNumbersInvalid ||
-                (guidedSymptomCheck &&
-                  selected.id === "issue_observation" &&
-                  (!hasSymptomPlant ||
-                    (!guidedSymptomNoneObserved &&
-                      !findCannabisSymptomByObservedSign(detailValues.observedSign)) ||
-                    !guidedSymptomStage ||
-                    !guidedSymptomStageConfirmed))
-              }
-              data-testid={`${testIdPrefix}-save`}
-            >
-              {saving ? "Saving…" : "Save"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                if (isMutationBlocked()) return;
-                setSelectedDraft(null);
-                setNote("");
-                setGuidedSymptomCheck(false);
-                setGuidedSymptomStage(null);
-                setGuidedSymptomStageConfirmed(false);
-                setGuidedSymptomNoneObserved(false);
-                setErrorReason(null);
-                setErrorForActivity(null);
-              }}
-              disabled={mutationBlocked}
-              data-testid={`${testIdPrefix}-cancel`}
-            >
-              Cancel
-            </Button>
-          </div>
 
           {errorReason && errorForActivity === selected.id && (
             <p

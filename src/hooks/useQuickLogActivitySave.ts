@@ -14,13 +14,17 @@
  *     sensor reading path (ManualSensorReadingCard) already handles it.
  */
 import { useCallback, useState } from "react";
+import { isUuid } from "@/lib/isUuid";
 import { supabase } from "@/integrations/supabase/client";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
   QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
   type QuickLogActivityId,
 } from "@/constants/quickLogActivityTypes";
-import { planQuickLogPersistence } from "@/lib/quickLogActivityRules";
+import {
+  isDefinitiveQuickLogActivityRejection,
+  planQuickLogPersistence,
+} from "@/lib/quickLogActivityRules";
 import {
   QUICK_LOG_V2_ENTRY_CREATED_EVENT,
   dispatchQuickLogV2EntryCreated,
@@ -33,6 +37,8 @@ export interface QuickLogActivitySaveInput {
   tentId?: string | null;
   plantId?: string | null;
   note?: string | null;
+  /** Caller-pinned occurrence time, reused verbatim on an exact retry. */
+  occurredAt?: string | null;
   photoUrl?: string | null;
   /**
    * Required for event-route dedupe. The manual route forwards it too when
@@ -52,6 +58,7 @@ export type QuickLogActivitySaveReason =
   | "unsupported_activity"
   | "missing_idempotency_key"
   | "missing_target"
+  | "server_rejected"
   | "save_failed";
 
 export interface QuickLogActivitySaveResult {
@@ -132,7 +139,6 @@ export function useQuickLogActivitySave() {
             ...(input.extraDetails ?? {}),
           };
           const { data, error: rpcErr } = await supabase.rpc(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_manual" as any,
             {
               p_target_type: targetType,
@@ -143,7 +149,7 @@ export function useQuickLogActivitySave() {
               p_temperature_c: null,
               p_humidity_pct: null,
               p_vpd_kpa: null,
-              p_occurred_at: null,
+              p_occurred_at: input.occurredAt ?? null,
               ...(Object.keys(manualDetails).length > 0 ? { p_details: manualDetails } : {}),
               p_idempotency_key: idempotencyKey,
             } as unknown as Record<string, unknown>,
@@ -153,7 +159,15 @@ export function useQuickLogActivitySave() {
             return { ok: false, reason: "save_failed" };
           }
           const r = (data ?? {}) as ManualRpcResponse;
-          if (!r.ok) {
+          if (r.ok !== true || !isUuid(r.grow_event_id)) {
+            if (r.ok === false && isDefinitiveQuickLogActivityRejection(r.reason)) {
+              setError("server_rejected");
+              return {
+                ok: false,
+                reason: "server_rejected",
+                disabledReason: "The server refused this activity. Check its target and fields.",
+              };
+            }
             setError("save_failed");
             return { ok: false, reason: "save_failed" };
           }
@@ -191,7 +205,6 @@ export function useQuickLogActivitySave() {
           // migration is applied to prod.
           details.event_type = plan.eventType;
           const { data, error: rpcErr } = await supabase.rpc(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_event" as any,
             {
               p_idempotency_key: idempotencyKey,
@@ -202,7 +215,7 @@ export function useQuickLogActivitySave() {
               p_note: input.note ?? null,
               p_photo_url: input.photoUrl ?? null,
               p_sensor_snapshot: null,
-              p_occurred_at: null,
+              p_occurred_at: input.occurredAt ?? null,
               p_details: Object.keys(details).length > 0 ? details : null,
             } as unknown as Record<string, unknown>,
           );
@@ -211,7 +224,7 @@ export function useQuickLogActivitySave() {
             return { ok: false, reason: "save_failed" };
           }
           const r = (data ?? {}) as EventRpcResponse;
-          if (!r.ok || !r.grow_event_id) {
+          if (r.ok !== true || !isUuid(r.grow_event_id)) {
             // Stale backend fence: v1b client but validator/allow-list
             // does not accept harvest yet. Never fake-save as observation.
             if (input.activityId === "harvest" && r.reason === "invalid_event_type") {
@@ -220,6 +233,14 @@ export function useQuickLogActivitySave() {
                 ok: false,
                 reason: "harvest_backend_unavailable",
                 disabledReason: QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
+              };
+            }
+            if (r.ok === false && isDefinitiveQuickLogActivityRejection(r.reason)) {
+              setError("server_rejected");
+              return {
+                ok: false,
+                reason: "server_rejected",
+                disabledReason: "The server refused this activity. Check its target and fields.",
               };
             }
             setError("save_failed");

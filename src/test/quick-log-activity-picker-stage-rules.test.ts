@@ -4,6 +4,37 @@ import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
 import type { HarvestStageEligibility } from "@/lib/quickLogStageDefaultRules";
 import * as activityRules from "@/lib/quickLogActivityRules";
 
+describe("Quick Log activity RPC boundaries", () => {
+  it("accepts null and a 500-character note, but refuses 501 without truncation", () => {
+    expect(activityRules.validateQuickLogActivityNote("training", null)).toBeNull();
+    expect(activityRules.validateQuickLogActivityNote("training", "a".repeat(500))).toBeNull();
+    expect(activityRules.validateQuickLogActivityNote("training", "a".repeat(501))).toBe(
+      activityRules.QUICK_LOG_ACTIVITY_NOTE_TOO_LONG_REASON,
+    );
+  });
+
+  it("keeps standalone manual Notes unconstrained by the event RPC limit", () => {
+    expect(activityRules.validateQuickLogActivityNote("note", "a".repeat(501))).toBeNull();
+    expect(activityRules.validateQuickLogActivityNote("photo", "a".repeat(501))).toBeNull();
+    expect(activityRules.validateQuickLogActivityNote(null, "a".repeat(501))).toBeNull();
+  });
+
+  it("counts Unicode characters deterministically at the server boundary", () => {
+    const note = "🌱".repeat(500);
+    expect(activityRules.validateQuickLogActivityNote("training", note)).toBeNull();
+    expect(activityRules.validateQuickLogActivityNote("training", note)).toBeNull();
+    expect(activityRules.validateQuickLogActivityNote("training", note + "🌱")).not.toBeNull();
+  });
+
+  it("distinguishes pre-write rejection from ambiguous or malformed replies", () => {
+    expect(activityRules.isDefinitiveQuickLogActivityRejection("invalid_typed_payload")).toBe(true);
+    expect(activityRules.isDefinitiveQuickLogActivityRejection("target_not_owned")).toBe(true);
+    for (const reason of ["save_failed", "idempotency_key_conflict", null, {}, "unknown"]) {
+      expect(activityRules.isDefinitiveQuickLogActivityRejection(reason)).toBe(false);
+    }
+  });
+});
+
 interface PickerItem {
   activity: { id: QuickLogActivityId };
   disabled: boolean;

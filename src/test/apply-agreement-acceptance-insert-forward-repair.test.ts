@@ -297,9 +297,21 @@ describe("Agreement acceptance insert production delivery", () => {
     );
     expect(sql).toMatch(/when rolname='service_role' then[\s\S]*?and rolbypassrls/);
     expect(sql).toMatch(/else[\s\S]*?and not rolbypassrls end/);
-    expect(sql).toContain("1|version|text|t|||t");
-    expect(sql).toContain("2|name|text|f|||t");
-    expect(sql).toContain("3|statements|text[]|f|||t");
+    // The ledger shape measured on production (scripts/lib/supabaseMigrationLedgerShape.mjs).
+    for (const row of [
+      "1|version|text|t|||t",
+      "2|statements|text[]|f|||t",
+      "3|name|text|f|||t",
+      "4|created_by|text|f|||t",
+      "5|idempotency_key|text|f|||t",
+      "6|rollback|text[]|f|||t",
+      "schema_migrations_idempotency_key_key|u|t|f|f|UNIQUE (idempotency_key)",
+      "schema_migrations_pkey|p|t|f|f|PRIMARY KEY (version)",
+    ]) {
+      expect(sql).toContain(`'${row}'`);
+    }
+    // Client roles are INHERIT on production; privilege fences resolve membership instead.
+    expect(sql).not.toContain("rolinherit");
   });
 
   it("builds an insert-only collision-guarded ledger transaction with no app-table lock", async () => {
@@ -844,6 +856,8 @@ describe("Agreement acceptance insert production delivery", () => {
       "apply-quicklog-manual-delegate-forward-repair.yml",
       "apply-action-queue-transition-forward-repair.yml",
       "apply-agreement-acceptance-insert-forward-repair.yml",
+      "apply-quicklog-revision-idempotent-replay.yml",
+      "apply-plants-health-unassessed-default.yml",
     ];
 
     expect(guard).toBeDefined();
@@ -890,6 +904,8 @@ describe("Agreement acceptance insert production delivery", () => {
       "apply-quicklog-manual-delegate-forward-repair.yml",
       "apply-action-queue-transition-forward-repair.yml",
       "apply-agreement-acceptance-insert-forward-repair.yml",
+      "apply-quicklog-revision-idempotent-replay.yml",
+      "apply-plants-health-unassessed-default.yml",
     ];
 
     for (const writer of writers) {

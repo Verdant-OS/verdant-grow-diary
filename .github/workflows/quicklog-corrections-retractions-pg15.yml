@@ -11,6 +11,7 @@ on:
       - "scripts/lib/candidateNumberToolRuntime.mjs"
       - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
       - "scripts/lib/productionSupabaseTls.mjs"
+      - "scripts/lib/supabaseMigrationLedgerShape.mjs"
       - ".github/workflows/apply-quicklog-corrections-retractions.yml"
       - ".github/workflows/quicklog-corrections-retractions-pg15.yml"
       - ".github/workflows/required-core-migrations.yml"

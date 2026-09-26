@@ -1,15 +1,15 @@
 name: deployment-preview
 
 # Deployment-preview pipeline: on every PR (and manual dispatch), gate
-# the Lovable preview environment behind the same checks that run in
+# this branch's preview build behind the same checks that run in
 # CI's production path — edge-shared mirror preflight, typecheck, and a
-# full production build. Green pipeline → the Lovable preview URL is
-# safe to share. Red pipeline → the preview is still served by Lovable
-# but the PR comment flags it as unverified.
+# full production build. Green pipeline → a preview built from this
+# branch is safe to share. Red pipeline → a preview may still load, but
+# the PR comment flags it as unverified.
 #
-# This does NOT publish to production. Publishing to Lovable's
-# published URL is a manual action from the Lovable UI. This pipeline
-# only certifies the preview is buildable + mirror-consistent.
+# This does NOT publish to production. Which platform publishes it, and
+# how, is operating state (docs/agents/CURRENT_STATE.md), never assumed
+# here. This pipeline only certifies the preview is buildable + mirror-consistent.
 
 on:
   pull_request:
@@ -62,9 +62,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # Stage 2 — production build. Uses the same command Lovable's hosted
+  # Stage 2 — production build. Uses the same command a hosted publisher's
   # build runs (`vite build` via `bun run build`) so a green here means
-  # the same bytecode Lovable will serve on preview refresh.
+  # the same bytecode a preview refresh would serve.
   build:
     name: Production build (preview-bound)
     needs: preflight
@@ -154,7 +154,7 @@ jobs:
             NOTE="Edge-shared mirror in sync, typecheck clean, production build succeeded."
           else
             STATUS="❌ **Preview unverified** — do not share"
-            NOTE="One or more gates failed. The Lovable preview may still load, but its build may not match \`main\`."
+            NOTE="One or more gates failed. A preview may still load, but its build may not match this commit."
           fi
 
           BODY=$(cat <<EOF
@@ -172,7 +172,7 @@ jobs:
 
           - Commit: \`${SHA:0:12}\`
           - Workflow run: $RUN_URL
-          - Lovable preview: use the preview URL from the Lovable editor for this branch.
+          - Preview URL: whatever the publishing platform posts for this branch (see docs/agents/CURRENT_STATE.md).
           EOF
           )
 

@@ -1,8 +1,8 @@
 /**
  * Version-stamp resilience contract.
  *
- * Production publishes through Lovable, whose build sandbox was proven
- * (2026-08-05) to sometimes be a history-less snapshot: a freshly
+ * A production publisher's build sandbox was proven (2026-08-05, on the
+ * publisher of the day) to sometimes be a history-less snapshot: a freshly
  * `git init`-ed directory with zero commits, untracked files, and no
  * GITHUB_* env. In that environment the stamper used to emit
  * `commit: "unknown"` with no usable identity at all.
@@ -259,7 +259,7 @@ describe("tree-hash content identity", () => {
   });
 });
 
-describe("stamper in the proven Lovable history-less sandbox", () => {
+describe("stamper in the proven history-less publisher sandbox", () => {
   it("emits honest unknown commit with treeHash identity and untrusted inherited lineage", () => {
     const box = makeSandbox();
     // The exact signature proven in production 2026-08-05: unborn HEAD.

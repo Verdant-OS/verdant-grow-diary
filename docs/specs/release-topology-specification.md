@@ -615,8 +615,9 @@ Durable. Each is a rule a future slice can be held to; none carries a date.
   resolves as `NO_MATCH`. No tag proves anything about a
   publish.
 - **D-RT-8 — Edge functions are a separate release.** No frontend publish implies an edge deploy.
-  Until M6 is run by someone with production read access, the edge axis stays `NOT_MEASURED` and
-  release notes say so.
+  Until M6 is run by someone with production read access, the production function versions are
+  **`BLOCKED`** wherever the session lacks that access (as in §5.3), the edge deployer's identity
+  stays `NOT_MEASURED`, and release notes say both.
 - **D-RT-9 — Migrations reach production through operator apply paths, and every path counts
   until it is measured or retired.** Committed is not applied. The repository-verified paths are
   the dispatch workflows with their confirmations (§5.4 lists ten). The Lovable Cloud apply path

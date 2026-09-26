@@ -47,7 +47,7 @@ function resultMessage(result: unknown, fallback: string): string {
 export default function PostGrowLearningReport() {
   const { growId } = useParams<{ growId: string }>();
   const navigate = useNavigate();
-  const { status, report, yieldEfficiency, error, saveLesson, applyLessonToNextGrow } =
+  const { status, report, yieldEfficiency, error, reload, saveLesson, applyLessonToNextGrow } =
     usePostGrowLearningReportData(growId);
   const { state: episodesState } = usePlantMemoryEpisodes({
     growId: growId ?? null,
@@ -214,6 +214,9 @@ export default function PostGrowLearningReport() {
           title="Report unavailable"
           description={error ?? "This grow report could not be loaded."}
         />
+        <Button type="button" variant="outline" onClick={() => void reload()}>
+          Retry report
+        </Button>
       </div>
     );
   }

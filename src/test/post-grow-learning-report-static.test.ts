@@ -17,7 +17,9 @@ describe("Post-Grow Learning Report route wiring", () => {
   it("mounts the on-demand report route", () => {
     expect(APP).toContain("PostGrowLearningReport");
     // File route: reports.post-grow.$growId.tsx (classic :growId param)
-    expect(APP).toMatch(/reports\.post-grow\.\$growId|post-grow\/\$growId|\/reports\/post-grow\/:growId/);
+    expect(APP).toMatch(
+      /reports\.post-grow\.\$growId|post-grow\/\$growId|\/reports\/post-grow\/:growId/,
+    );
   });
 
   it("links only completed/archive-stage grows from GrowDetail", () => {
@@ -94,9 +96,13 @@ describe("Post-Grow Learning Report safety", () => {
   it("keeps report data adapter narrow and uses raw lineage only for classification", () => {
     expect(HOOK).toContain('from("grows")');
     expect(HOOK).toContain('from("diary_entries")');
-    expect(HOOK).toContain('from("sensor_readings")');
+    expect(HOOK).toContain("effectiveSensorReadingsQuery()");
+    expect(HOOK).toContain("requireEffectiveSensorReadings(sensorRes.data)");
+    expect(HOOK).not.toContain('from("sensor_readings")');
     expect(HOOK).toContain('from("action_queue")');
-    expect(HOOK).toContain('.select("id,metric,value,ts,captured_at,source,raw_payload")');
+    expect(HOOK).toContain(
+      '"id,user_id,tent_id,metric,value,ts,captured_at,created_at,device_id,source,quality,raw_payload,correction_valid"',
+    );
     expect(HOOK).toContain('.order("captured_at", { ascending: true, nullsFirst: false })');
     expect(HOOK).toContain('.order("ts", { ascending: true })');
     expect(HOOK).toContain('.order("id", { ascending: true })');

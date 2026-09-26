@@ -259,6 +259,32 @@ describe("Quick Log starter-handoff consume-once", () => {
     expect(saveMock).not.toHaveBeenCalled();
   });
 
+  it("recovery of the exact reviewed Feeding starter consumes that draft once", async () => {
+    seedDraft(starterDraft({ logType: "feeding", note: "Light feeding" }));
+    activityRpcMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: "response lost" },
+    });
+    const prefill = handoffPrefill({
+      eventType: "feeding",
+      activityId: "feeding",
+      note: "Light feeding",
+    });
+    const first = renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-save"));
+    await waitFor(() => expect(activityRpcMock).toHaveBeenCalledTimes(1));
+    await screen.findByTestId("quick-log-dialog-all-activities-pending-activity");
+    expect(storedDraftRaw()).not.toBeNull();
+
+    first.unmount();
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(await screen.findByTestId("quick-log-dialog-all-activities-retry-original"));
+    await waitFor(() => expect(activityRpcMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(storedDraftRaw()).toBeNull());
+    expect(activityRpcMock.mock.calls[1][1]).toEqual(activityRpcMock.mock.calls[0][1]);
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
   it("failed Feeding activity save retains the starter draft", async () => {
     activityRpcMock.mockResolvedValueOnce({
       data: null,

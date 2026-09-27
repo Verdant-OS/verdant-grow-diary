@@ -1,5 +1,5 @@
--- Guard Quick Log manual idempotency replays against retracted rows and
--- changed request payloads. This forward migration replaces only the public
+-- Guard Quick Log manual idempotency replays against retracted rows, missing
+-- active diary mirrors, and changed request payloads. This migration replaces only the public
 -- wrapper; the private delegate, existing tables, RLS and grants stay intact.
 BEGIN;
 
@@ -52,6 +52,13 @@ BEGIN
          AND a.atttypid = 'boolean'::pg_catalog.regtype
          AND NOT a.attisdropped
      )
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_catalog.pg_attribute AS a
+       WHERE a.attrelid = 'public.diary_entries'::pg_catalog.regclass
+         AND a.attname = 'retracted_at'
+         AND a.atttypid = 'timestamp with time zone'::pg_catalog.regtype
+         AND NOT a.attisdropped
+     )
      OR pg_catalog.has_function_privilege('anon', v_wrapper_oid, 'EXECUTE')
      OR NOT pg_catalog.has_function_privilege(
        'authenticated', v_wrapper_oid, 'EXECUTE'
@@ -87,6 +94,7 @@ DECLARE
   v_requested_logged_at timestamptz;
   v_logged_at timestamptz;
   v_existing_event_id uuid;
+  v_existing_grow_id uuid;
   v_existing_logged_at timestamptz;
   v_existing_deleted boolean;
   v_existing_request_hash text;
@@ -149,9 +157,11 @@ BEGIN
       )
     );
 
-    SELECT qi.grow_event_id, ge.logged_at, ge.is_deleted, qi.request_hash
+    SELECT qi.grow_event_id, ge.grow_id, ge.logged_at,
+           ge.is_deleted, qi.request_hash
       INTO
         v_existing_event_id,
+        v_existing_grow_id,
         v_existing_logged_at,
         v_existing_deleted,
         v_existing_request_hash
@@ -197,6 +207,31 @@ BEGIN
          'validation_failed', 'idempotency_key_conflict');
       RETURN jsonb_build_object(
         'ok', false, 'reason', 'idempotency_key_conflict'
+      );
+    END IF;
+    IF v_existing_event_id IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1
+         FROM public.diary_entries AS de
+         WHERE de.user_id = uid
+           AND de.grow_id = v_existing_grow_id
+           AND de.retracted_at IS NULL
+           AND (
+             public.quicklog_try_parse_uuid(
+               de.details->>'linked_grow_event_id'
+             ) = v_existing_event_id
+             OR public.quicklog_try_parse_uuid(
+               de.details->>'grow_event_id'
+             ) = v_existing_event_id
+           )
+       ) THEN
+      INSERT INTO public.quicklog_audit_events
+        (user_id, idempotency_key, grow_event_id, status, reason)
+      VALUES
+        (uid, p_idempotency_key, v_existing_event_id,
+         'validation_failed', 'idempotency_receipt_missing');
+      RETURN jsonb_build_object(
+        'ok', false, 'reason', 'idempotency_receipt_missing'
       );
     END IF;
     -- Never backfill a hash from an old replay: that would bless changed input.

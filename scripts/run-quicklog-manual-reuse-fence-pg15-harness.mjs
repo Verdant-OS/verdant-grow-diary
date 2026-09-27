@@ -15,7 +15,7 @@ import {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const migration = "20260927002000_quicklog_manual_reuse_fence.sql";
-const migrationSha256 = "fb6ec0572154984a7d921a085add70c9d876f5fd102d5d8d23272ffd4a5909b3";
+const migrationSha256 = "5017b8f697f77a358df43d38fae486a21cabf92a65aa3af439bc750d221d6b1b";
 const repair = "20260818010000_quicklog_manual_delegate_forward_repair.sql";
 const databaseUrl =
   "postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_quicklog_delegate_repair";
@@ -119,6 +119,10 @@ export async function runManualReuseHarness({
       env,
       { stage: "retraction_fixture", spawnImpl },
     );
+    executeSql("alter table public.diary_entries add column retracted_at timestamptz;", env, {
+      stage: "diary_retraction_fixture",
+      spawnImpl,
+    });
 
     const legacyReceipt = call({ key: legacy }, env, spawnImpl);
     requireReceipt("legacy_initial", legacyReceipt, { ok: true, reused: false });
@@ -191,6 +195,17 @@ export async function runManualReuseHarness({
     requireReceipt("cross_user", otherReceipt, { ok: true, reused: false });
     if (otherReceipt.grow_event_id === fresh.grow_event_id)
       throw new Error("cross_user:receipt_leaked");
+
+    executeSql(
+      `update public.diary_entries set retracted_at=now()
+       where user_id='${owner}' and details->>'linked_grow_event_id'='${fresh.grow_event_id}';`,
+      env,
+      { stage: "retract_diary_mirror", spawnImpl },
+    );
+    requireReceipt("missing_active_mirror", call({}, env, spawnImpl), {
+      ok: false,
+      reason: "idempotency_receipt_missing",
+    });
 
     // Retraction is simulated at the authoritative row. Both new and
     // historical receipts must fail after the row becomes deleted.

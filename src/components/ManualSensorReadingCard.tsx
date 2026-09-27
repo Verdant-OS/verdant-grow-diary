@@ -13,6 +13,7 @@ import {
   createManualDraftValues,
   editManualDraftValues,
   reexpressManualDraftTemperature,
+  restoreUnconfirmedManualDraftValues,
   STANDARD_MANUAL_CORRECTION_IDENTITY,
   type ManualDraftValues,
   type SensorsManualDraft,
@@ -1216,9 +1217,13 @@ export default function ManualSensorReadingCard({
                     );
                     return;
                   }
-                  updateValues(() =>
-                    recoveredCorrectionDraftValues(restored.correction, restored.metrics),
-                  );
+                  updateValues((current) => {
+                    const recovered = recoveredCorrectionDraftValues(
+                      restored.correction,
+                      restored.metrics,
+                    );
+                    return restoreUnconfirmedManualDraftValues(current, recovered);
+                  });
                   setReviewOpen(false);
                 }}
               >

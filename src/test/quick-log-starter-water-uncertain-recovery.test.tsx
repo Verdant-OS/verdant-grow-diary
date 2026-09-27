@@ -310,7 +310,7 @@ describe("legacy public-starter Water uncertain receipt", () => {
     }
   });
 
-  it("retains the first key even if the recovery call reports a later rejection", async () => {
+  it("releases the first key after a definitive recovery rejection", async () => {
     seed();
     saveMock
       .mockResolvedValueOnce({ ok: false, reason: "receipt_unverified" })
@@ -322,12 +322,69 @@ describe("legacy public-starter Water uncertain receipt", () => {
     fireEvent.click(screen.getByTestId("quick-log-starter-water-retry"));
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
     expect(saveMock.mock.calls[1][0]).toEqual(original);
-    expect(readPendingStarterWater("user-1")).toMatchObject({
-      status: "pending",
-      record: { payload: original },
-    });
-    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    await waitFor(() => expect(readPendingStarterWater("user-1")).toEqual({ status: "empty" }));
+    expect(screen.getByTestId("quick-log-save")).not.toBeDisabled();
+    expect(
+      screen.getByText(/re-select a valid grow, tent, and plant before saving again/i),
+    ).toBeInTheDocument();
     expect(trackSuccessMock).not.toHaveBeenCalled();
+  });
+
+  it("clears an exact saved-then-retracted replay without counting an active Watering", async () => {
+    seed();
+    saveMock
+      .mockResolvedValueOnce({ ok: false, reason: "receipt_unverified" })
+      .mockResolvedValueOnce({
+        ok: false,
+        reason: "saved_then_retracted",
+        savedThenRetracted: true,
+      });
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await screen.findByTestId("quick-log-starter-water-recovery");
+    const original = structuredClone(saveMock.mock.calls[0][0]);
+    fireEvent.click(screen.getByTestId("quick-log-starter-water-retry"));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    expect(saveMock.mock.calls[1][0]).toEqual(original);
+    await waitFor(() => expect(readPendingStarterWater("user-1")).toEqual({ status: "empty" }));
+    expect(screen.getByText(/This Watering was saved and later retracted/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-post-save")).not.toBeInTheDocument();
+    expect(trackSuccessMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a retracted claim pending with honest copy when storage clearance fails", async () => {
+    seed();
+    saveMock
+      .mockResolvedValueOnce({ ok: false, reason: "receipt_unverified" })
+      .mockResolvedValueOnce({
+        ok: false,
+        reason: "saved_then_retracted",
+        savedThenRetracted: true,
+      });
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await screen.findByTestId("quick-log-starter-water-recovery");
+    const remove = Storage.prototype.removeItem;
+    const blocked = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (
+      this: Storage,
+      key: string,
+    ) {
+      if (
+        this === window.sessionStorage &&
+        key.startsWith("verdant:quick-log:pending-starter-water:")
+      )
+        throw new Error("storage unavailable");
+      remove.call(this, key);
+    });
+    fireEvent.click(screen.getByTestId("quick-log-starter-water-retry"));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    expect(readPendingStarterWater("user-1")).toMatchObject({ status: "pending" });
+    expect(
+      screen.getByText(/saved and later retracted, but recovery could not be cleared/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-post-save")).not.toBeInTheDocument();
+    expect(trackSuccessMock).not.toHaveBeenCalled();
+    blocked.mockRestore();
   });
 
   it("shows the verified saved location when the plant moved before retry committed", async () => {

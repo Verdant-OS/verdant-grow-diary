@@ -17,10 +17,11 @@ type WaterEvent = {
 type WaterChild = { event_id?: unknown; volume_ml?: unknown };
 
 /** A reused key is confirmation only when its persisted parent matches this Watering. */
-export function matchesReusedWaterEvent(
+function matchesWaterEvent(
   payload: QuickLogV2SavePayload,
   eventId: string,
   event: WaterEvent | null | undefined,
+  isDeleted: boolean,
   expectedTarget?: QuickLogResolvedTarget,
 ): boolean {
   if (!event || payload.p_action !== "water") return false;
@@ -28,7 +29,7 @@ export function matchesReusedWaterEvent(
     event.id !== eventId ||
     event.event_type !== "watering" ||
     event.source !== "manual" ||
-    event.is_deleted !== false
+    event.is_deleted !== isDeleted
   )
     return false;
   if (payload.p_target_type === "plant") {
@@ -52,6 +53,31 @@ export function matchesReusedWaterEvent(
   return true;
 }
 
+export function matchesReusedWaterEvent(
+  payload: QuickLogV2SavePayload,
+  eventId: string,
+  event: WaterEvent | null | undefined,
+  expectedTarget?: QuickLogResolvedTarget,
+): boolean {
+  return matchesWaterEvent(payload, eventId, event, false, expectedTarget);
+}
+
+export function matchesRetractedWaterEvent(
+  payload: QuickLogV2SavePayload,
+  eventId: string,
+  event: WaterEvent | null | undefined,
+): boolean {
+  return matchesWaterEvent(payload, eventId, event, true);
+}
+
+function matchesWaterChild(
+  payload: QuickLogV2SavePayload,
+  eventId: string,
+  child: WaterChild | null | undefined,
+): boolean {
+  return !!child && child.event_id === eventId && child.volume_ml === payload.p_volume_ml;
+}
+
 /** The Watering child must belong to that exact event and retain its submitted volume. */
 export function matchesReusedWaterReceipt(
   payload: QuickLogV2SavePayload,
@@ -62,9 +88,20 @@ export function matchesReusedWaterReceipt(
 ): boolean {
   return (
     matchesReusedWaterEvent(payload, eventId, event, expectedTarget) &&
-    !!child &&
-    child.event_id === eventId &&
-    child.volume_ml === payload.p_volume_ml
+    matchesWaterChild(payload, eventId, child)
+  );
+}
+
+/** A verified retracted replay resolves the original write without reporting an active save. */
+export function matchesRetractedWaterReceipt(
+  payload: QuickLogV2SavePayload,
+  eventId: string,
+  event: WaterEvent | null | undefined,
+  child: WaterChild | null | undefined,
+): boolean {
+  return (
+    matchesRetractedWaterEvent(payload, eventId, event) &&
+    matchesWaterChild(payload, eventId, child)
   );
 }
 

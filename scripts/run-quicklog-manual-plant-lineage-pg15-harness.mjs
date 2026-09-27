@@ -214,12 +214,31 @@ export async function runPlantLineageHarness({
     if (authenticatedUpdate(originalTent, env, spawnImpl) !== plant) {
       throw new Error("same_grow_update_failed");
     }
-    const valid = call("plant-lineage-valid-0001", env, spawnImpl);
+    // The rejected attempt did not claim its key. Repairing the assignment
+    // must let that exact logical submission save once, then reuse that row.
+    const valid = call("plant-lineage-rejected-0001", env, spawnImpl);
     if (valid.ok !== true || valid.reused !== false) throw new Error("same_grow_save_failed");
     requireTrue(
       "valid_lineage_persisted",
       `select grow_id='${originalGrow}' and tent_id='${originalTent}'
        from public.grow_events where id='${valid.grow_event_id}';`,
+      env,
+      spawnImpl,
+    );
+    const replay = call("plant-lineage-rejected-0001", env, spawnImpl);
+    if (
+      replay.ok !== true ||
+      replay.reused !== true ||
+      replay.grow_event_id !== valid.grow_event_id
+    ) {
+      throw new Error("same_grow_exact_retry_failed");
+    }
+    requireTrue(
+      "repair_retry_one_row",
+      `select (select count(*)=1 from public.quicklog_idempotency
+         where user_id='${owner}' and idempotency_key='plant-lineage-rejected-0001')
+       and (select count(*)=2 from public.grow_events where user_id='${owner}')
+       and (select count(*)=2 from public.diary_entries where user_id='${owner}');`,
       env,
       spawnImpl,
     );

@@ -20,6 +20,7 @@ import {
 } from "@/lib/timelineEntryClassification";
 
 export const TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX = "sensor-reading:" as const;
+export const TIMELINE_MANUAL_SENSOR_ROW_LIMIT = 200;
 
 export type TimelineManualSensorReceipt = {
   id: string;
@@ -42,6 +43,27 @@ export type ManualSensorTimelineMetricRow = {
   captured_at?: string | null;
   quality?: string | null;
 };
+
+/**
+ * The query reads one extra metric row. When it finds that sentinel, the
+ * oldest captured_at group might be split across the row boundary. Exclude
+ * that whole group instead of showing a receipt with only some saved metrics.
+ * The caller must disclose that older history is outside this bounded view.
+ */
+export function completeManualSensorTimelineRows<T extends ManualSensorTimelineMetricRow>(
+  rows: readonly T[] | null | undefined,
+  limit = TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
+): { rows: T[]; hasOlderRows: boolean } {
+  if (!Array.isArray(rows) || rows.length === 0) return { rows: [], hasOlderRows: false };
+  if (!Number.isSafeInteger(limit) || limit < 1) return { rows: [], hasOlderRows: true };
+  if (rows.length <= limit) return { rows: [...rows], hasOlderRows: false };
+
+  const boundaryCapturedAt = rows[limit].captured_at ?? null;
+  const completeRows = rows
+    .slice(0, limit)
+    .filter((row) => (row.captured_at ?? null) !== boundaryCapturedAt);
+  return { rows: completeRows, hasOlderRows: true };
+}
 
 export function isTimelineSensorDerivedDiaryId(id: string | null | undefined): boolean {
   return typeof id === "string" && id.startsWith(TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX);

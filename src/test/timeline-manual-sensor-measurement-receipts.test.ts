@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
 import { MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import {
+  completeManualSensorTimelineRows,
   diaryEntryBelongsInTimelineMeasurements,
   diaryEntryHasMeasurementEvidence,
   isTimelineManualSensorPersistedQualityUsable,
@@ -15,6 +16,7 @@ import {
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
   TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX,
+  TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
   timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
 
@@ -40,6 +42,46 @@ function metricRow(
     quality: extras.quality ?? "ok",
   };
 }
+
+describe("completeManualSensorTimelineRows", () => {
+  it("retains all rows when the bounded query proves it reached the end", () => {
+    const rows = Array.from({ length: TIMELINE_MANUAL_SENSOR_ROW_LIMIT }, () =>
+      metricRow("temperature_c", 24),
+    );
+    expect(completeManualSensorTimelineRows(rows)).toEqual({ rows, hasOlderRows: false });
+    expect(completeManualSensorTimelineRows(null)).toEqual({ rows: [], hasOlderRows: false });
+  });
+
+  it("never renders a capture cut by the metric-row cap", () => {
+    const rows = Array.from({ length: 67 }, (_, index) => {
+      const capturedAt = new Date(Date.parse(CAPTURED) - index * 60_000).toISOString();
+      return [
+        metricRow("temperature_c", 24, "manual", { ts: capturedAt }),
+        metricRow("humidity_pct", 55, "manual", { ts: capturedAt }),
+        metricRow("soil_moisture_pct", 40, "manual", { ts: capturedAt }),
+      ];
+    }).flat();
+    const page = completeManualSensorTimelineRows(rows);
+    expect(page.hasOlderRows).toBe(true);
+    expect(page.rows).toHaveLength(198);
+    expect(manualSensorReadingsToTimelineEntries(page.rows, NOW)).toHaveLength(66);
+    expect(page.rows.some((row) => row.captured_at === rows[200].captured_at)).toBe(false);
+    expect(completeManualSensorTimelineRows(rows)).toEqual(page);
+  });
+
+  it("keeps 200 complete rows when the lookahead belongs to an older capture", () => {
+    const current = Array.from({ length: TIMELINE_MANUAL_SENSOR_ROW_LIMIT }, () =>
+      metricRow("temperature_c", 24),
+    );
+    const older = metricRow("humidity_pct", 55, "manual", {
+      ts: "2026-09-08T18:46:00.000Z",
+    });
+    expect(completeManualSensorTimelineRows([...current, older])).toEqual({
+      rows: current,
+      hasOlderRows: true,
+    });
+  });
+});
 
 describe("manualSensorReadingsToTimelineEntries", () => {
   it("uses the effective corrected value in the receipt note, not a stale raw reading", () => {

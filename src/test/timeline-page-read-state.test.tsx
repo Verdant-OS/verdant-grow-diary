@@ -530,6 +530,50 @@ describe("Timeline mounted read-state boundary", () => {
     );
   });
 
+  it("discloses the manual row limit without showing a cut capture as a complete receipt", async () => {
+    const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const readings = Array.from({ length: 67 }, (_, index) => {
+      const capturedAt = new Date(Date.now() - (index + 1) * 60_000).toISOString();
+      return [
+        { tent_id: tent, metric: "temperature_c", value: 24, captured_at: capturedAt },
+        { tent_id: tent, metric: "humidity_pct", value: 58, captured_at: capturedAt },
+        {
+          tent_id: tent,
+          metric: "soil_moisture_pct",
+          value: index === 66 ? 41 : 40,
+          captured_at: capturedAt,
+        },
+      ].map((row, metricIndex) => ({
+        ...row,
+        id: `00000000-0000-4000-8000-${String(index * 3 + metricIndex).padStart(12, "0")}`,
+        user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        source: "manual",
+        quality: "ok",
+        ts: capturedAt,
+        created_at: capturedAt,
+        device_id: null,
+        raw_payload: null,
+        correction_valid: true,
+      }));
+    }).flat();
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "tents") return { data: [{ id: tent }], error: null };
+      if (spec.table === "sensor_readings_effective") return { data: readings, error: null };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByTestId("timeline-manual-history-limit")).toHaveTextContent(
+      "Older manual readings are not shown here",
+    );
+    expect(
+      screen.getAllByText("Manual sensor snapshot: 75.2°F, 58% RH, 40% soil moisture"),
+    ).toHaveLength(66);
+    expect(screen.queryByText(/41% soil moisture/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-partial-read-warning")).not.toBeInTheDocument();
+  });
+
   it("discloses invalid correction evidence as partial history and retains diary entries", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "tents")

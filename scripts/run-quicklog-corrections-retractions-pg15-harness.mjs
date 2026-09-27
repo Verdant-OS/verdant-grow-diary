@@ -284,6 +284,30 @@ function readRequiredCoreCatalog(env, spawnImpl) {
   return parseQuickLogCatalogContract(`${stdout}\n`);
 }
 
+// The hosted core-schema gate uses -c with --single-transaction, whereas this
+// harness normally sends SQL through stdin. Check that exact transport on the
+// disposable database before attributing a hosted psql failure to schema drift.
+function proveRequiredCoreCatalogCliParity(env, spawnImpl) {
+  const viaStdin = readRequiredCoreCatalog(env, spawnImpl);
+  const result = spawnImpl(
+    "psql",
+    [
+      ...buildPsqlArgs({ quiet: true }),
+      "--single-transaction",
+      "-c",
+      QUICKLOG_CORRECTIONS_CATALOG_SQL,
+    ],
+    { encoding: "utf8", env, maxBuffer: MAX_PSQL_OUTPUT_BYTES },
+  );
+  if (result?.error || result?.status !== 0) {
+    throw new Error(`required_core_catalog_cli:${String(result?.status ?? "not_invocable")}`);
+  }
+  const viaCli = parseQuickLogCatalogContract(`${String(result.stdout ?? "").trim()}\n`);
+  if (JSON.stringify(viaCli) !== JSON.stringify(viaStdin)) {
+    throw new Error("required_core_catalog_cli:mismatch");
+  }
+}
+
 function injectBeforeUniqueMarker(sql, marker, injectedSql) {
   if (!injectedSql) return sql;
   const markerIndex = sql.indexOf(marker);
@@ -635,6 +659,7 @@ export async function runPg15Harness({
     attestDisposableTarget(env, spawnImpl);
     resetScaffold(env, spawnImpl);
     proveBaselineAndApply(env, spawnImpl);
+    proveRequiredCoreCatalogCliParity(env, spawnImpl);
     proveFiveFunctionFingerprints(env, spawnImpl);
     proveClientAccessFences(env, spawnImpl);
     proveHostilePolicyDrift(env, spawnImpl);

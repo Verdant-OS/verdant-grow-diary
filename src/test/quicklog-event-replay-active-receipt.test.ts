@@ -38,6 +38,7 @@ describe("Quick Log event replay active-receipt migration", () => {
       sourceHash(priorDelegate, "CREATE OR REPLACE FUNCTION public.quicklog_save_event("),
     );
     expect(preflight).toContain("quicklog_event_replay_preflight_unrecognized");
+    expect(preflight).toMatch(/a\.attname = 'is_deleted'[\s\S]*?AND a\.attnotnull/);
   });
 
   it("checks a locked, active event and diary mirror before either reuse path", () => {

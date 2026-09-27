@@ -25,6 +25,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import { correctQuickLogEntry } from "@/lib/quickLogRevisionService";
+import {
+  buildQuickLogRevisionInvalidationKeys,
+  QUICKLOG_REVISION_INVALIDATION_KEY_CONTAINS,
+} from "@/lib/quickLogRevisionInvalidationRules";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { stampSlot } from "@/lib/evidencePhotoSlotRules";
 import {
@@ -99,6 +103,7 @@ export default function PendingCheckpointBanner({
         const currentNote = typeof row?.note === "string" ? row.note : "";
         const nextNote = appendCheckpointClearMarker(currentNote, status);
         let saved = false;
+        let revisionMeta: { growEventId: string | null; diaryEntryIds: string[] } | null = null;
         if (row?.linkedQuickLog) {
           const intent = `${pending.diaryEntryId}:${status}:${nextNote}`;
           if (correctionKeyRef.current?.intent !== intent) {
@@ -112,6 +117,12 @@ export default function PendingCheckpointBanner({
             correctionKeyRef.current.key,
           );
           saved = result.ok;
+          if (result.ok) {
+            revisionMeta = {
+              growEventId: result.growEventId,
+              diaryEntryIds: result.diaryEntryIds,
+            };
+          }
         } else {
           const { data, error } = await supabase
             .from("diary_entries")
@@ -126,9 +137,23 @@ export default function PendingCheckpointBanner({
         }
         correctionKeyRef.current = null;
         setOptimisticCleared(true);
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["plant_recent_activity", plantId] }),
-          queryClient.invalidateQueries({ queryKey: ["diary_entries"] }),
+        const keys = revisionMeta
+          ? buildQuickLogRevisionInvalidationKeys({ ...revisionMeta, plantId, tentId, growId })
+          : [["plant_recent_activity", plantId], ["diary_entries"]];
+        await Promise.allSettled([
+          ...keys.map((key) => queryClient.invalidateQueries({ queryKey: key as unknown[] })),
+          ...(revisionMeta
+            ? [
+                queryClient.invalidateQueries({
+                  predicate: (query) =>
+                    query.queryKey.some(
+                      (part) =>
+                        typeof part === "string" &&
+                        QUICKLOG_REVISION_INVALIDATION_KEY_CONTAINS.includes(part),
+                    ),
+                }),
+              ]
+            : []),
         ]);
         toast.success(status === "done" ? "Checkpoint marked done." : "Checkpoint dismissed.");
       } catch {
@@ -137,7 +162,7 @@ export default function PendingCheckpointBanner({
         setSaving(false);
       }
     },
-    [pending, saving, entries, queryClient, plantId],
+    [pending, saving, entries, queryClient, plantId, tentId, growId],
   );
 
   const openSameAngle = useCallback(() => {

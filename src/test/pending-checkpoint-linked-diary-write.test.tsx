@@ -46,7 +46,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   mock.rows = [];
   mock.invalidate.mockResolvedValue(undefined);
-  mock.correct.mockResolvedValue({ ok: true });
+  mock.correct.mockResolvedValue({
+    ok: true,
+    growEventId: "event-1",
+    diaryEntryIds: ["entry-1"],
+  });
   mock.select.mockResolvedValue({ data: [{ id: "entry-1" }], error: null });
   mock.update.mockReturnValue({ eq: () => ({ select: mock.select }) });
 });
@@ -66,6 +70,7 @@ describe("checkpoint clearing with the linked diary write fence", () => {
       expect.any(String),
     );
     expect(mock.update).not.toHaveBeenCalled();
+    expect(mock.invalidate).toHaveBeenCalledWith({ queryKey: ["grow_events"] });
   });
 
   it("keeps ordinary diary updates on their existing path", async () => {

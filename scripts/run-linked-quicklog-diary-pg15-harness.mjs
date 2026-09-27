@@ -253,6 +253,7 @@ async function main() {
       `UPDATE public.diary_entries SET details='{"grow_event_id":"event-3"}' WHERE id='${ORDINARY}';`,
     ),
     connection,
+    /linked_quicklog_diary_requires_revision/i,
   );
   expectFailure(
     "client_remove_link",

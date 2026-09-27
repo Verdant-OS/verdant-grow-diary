@@ -68,8 +68,12 @@ SECURITY INVOKER
 SET search_path TO pg_catalog, pg_temp
 AS $linked_quicklog_update$
 BEGIN
-  IF current_user <> 'authenticated'
-     OR NOT COALESCE(OLD.details ?| ARRAY['linked_grow_event_id', 'grow_event_id'], false) THEN
+  IF current_user <> 'authenticated' THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT COALESCE(OLD.details ?| ARRAY['linked_grow_event_id', 'grow_event_id'], false)
+     AND NOT COALESCE(NEW.details ?| ARRAY['linked_grow_event_id', 'grow_event_id'], false) THEN
     RETURN NEW;
   END IF;
 

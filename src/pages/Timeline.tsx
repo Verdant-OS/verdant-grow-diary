@@ -184,6 +184,8 @@ import {
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 import { SENSOR_SOURCE_KINDS, SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
+import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
+import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
 import {
   parseTimelineHighlightToken,
   diaryEntryMatchesHighlight,
@@ -2564,7 +2566,19 @@ export default function Timeline() {
                                 <span title={format(new Date(e.entry_at), "PPpp")}>
                                   {formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}
                                 </span>
-                                {!isTimelineSensorDerivedDiaryId(e.id) ? (
+                                {!isTimelineSensorDerivedDiaryId(e.id) &&
+                                isLinkedQuickLogDiaryDetails(e.details) ? (
+                                  <QuickLogEntryIntegrityControls
+                                    handle={{ diaryEntryId: e.id }}
+                                    currentNote={e.note}
+                                    currentOccurredAt={e.entry_at}
+                                    currentPlantId={e.plant_id ?? null}
+                                    plantId={e.plant_id ?? null}
+                                    tentId={e.tent_id ?? null}
+                                    growId={loopGrowId}
+                                    onChanged={() => void load()}
+                                  />
+                                ) : !isTimelineSensorDerivedDiaryId(e.id) ? (
                                   <>
                                     <button
                                       type="button"
@@ -2579,7 +2593,12 @@ export default function Timeline() {
                                       Edit
                                     </button>
                                     <DiaryEntryRemoveButton
-                                      entry={{ id: e.id, photoUrl: e.photo_url, kind: "diary" }}
+                                      entry={{
+                                        id: e.id,
+                                        photoUrl: e.photo_url,
+                                        kind: "diary",
+                                        details: e.details,
+                                      }}
                                       viewer={{ currentUserId: user }}
                                       plantName={plantName}
                                       plantId={e.plant_id ?? null}

@@ -5,15 +5,16 @@
  * Presenter + thin client derive:
  *  - Reads recent plant diary rows (existing usePlantRecentActivity).
  *  - Parses checkpoint via visitCheckpointRules (no schema).
- *  - Done / Dismiss append a durable `Checkpoint status:` marker on that
- *    diary note through the existing diary_entries.update path.
+ *  - Done / Dismiss append a durable `Checkpoint status:` marker. Linked
+ *    Quick Log companions use the canonical correction RPC; ordinary diary
+ *    rows retain the existing update path.
  *  - Same-angle opens existing Quick Log with checkpoint as note prefill
  *    stamped `[same-angle]` (verdant:open-quicklog); grower still saves.
  *
- * No Action Queue. No new RPC/migration.
+ * No Action Queue. No new RPC.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Camera, Check, Flag, X } from "lucide-react";
 import { toast } from "sonner";
@@ -21,6 +22,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { supabase } from "@/integrations/supabase/client";
+import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
+import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
+import { correctQuickLogEntry } from "@/lib/quickLogRevisionService";
+import { QUICKLOG_REVISION_FAILURE_COPY } from "@/lib/quick-log/quickLogRevisionRules";
+import {
+  buildQuickLogRevisionInvalidationKeys,
+  QUICKLOG_REVISION_INVALIDATION_KEY_CONTAINS,
+} from "@/lib/quickLogRevisionInvalidationRules";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { stampSlot } from "@/lib/evidencePhotoSlotRules";
 import {
@@ -46,6 +55,7 @@ function asCheckpointEntries(rows: unknown): VisitCheckpointDiaryEntry[] {
       entry_at: typeof r.entry_at === "string" ? r.entry_at : null,
       occurred_at: typeof r.occurred_at === "string" ? r.occurred_at : null,
       created_at: typeof r.created_at === "string" ? r.created_at : null,
+      linkedQuickLog: isLinkedQuickLogDiaryDetails(r.details),
     });
   }
   return out;
@@ -71,9 +81,11 @@ export default function PendingCheckpointBanner({
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId);
   const [saving, setSaving] = useState(false);
   const [optimisticCleared, setOptimisticCleared] = useState(false);
+  const correctionKeyRef = useRef<{ intent: string; key: string } | null>(null);
 
   useEffect(() => {
     setOptimisticCleared(false);
+    correctionKeyRef.current = null;
   }, [plantId]);
 
   const entries = useMemo(() => asCheckpointEntries(rawRows), [rawRows]);
@@ -92,25 +104,76 @@ export default function PendingCheckpointBanner({
         const row = entries.find((r) => r.id === pending.diaryEntryId);
         const currentNote = typeof row?.note === "string" ? row.note : "";
         const nextNote = appendCheckpointClearMarker(currentNote, status);
-        const { error } = await supabase
-          .from("diary_entries")
-          .update({ note: nextNote })
-          .eq("id", pending.diaryEntryId);
-        if (error) {
+        let saved = false;
+        let revisionMeta: { growEventId: string | null; diaryEntryIds: string[] } | null = null;
+        if (row?.linkedQuickLog) {
+          const intent = `${pending.diaryEntryId}:${status}:${nextNote}`;
+          if (correctionKeyRef.current && correctionKeyRef.current.intent !== intent) {
+            toast.error("The previous checkpoint update is unconfirmed. Retry that action first.");
+            return;
+          }
+          if (correctionKeyRef.current?.intent !== intent) {
+            correctionKeyRef.current = { intent, key: newQuickLogSaveKey() };
+          }
+          const result = await correctQuickLogEntry(
+            { diaryEntryId: pending.diaryEntryId },
+            "other",
+            { note: nextNote },
+            `Checkpoint ${status}`,
+            correctionKeyRef.current.key,
+          );
+          saved = result.ok;
+          if (result.ok) {
+            revisionMeta = {
+              growEventId: result.growEventId,
+              diaryEntryIds: result.diaryEntryIds,
+            };
+          } else if (
+            result.reason !== "rpc_error" &&
+            Object.hasOwn(QUICKLOG_REVISION_FAILURE_COPY, result.reason)
+          ) {
+            correctionKeyRef.current = null;
+          }
+        } else {
+          const { data, error } = await supabase
+            .from("diary_entries")
+            .update({ note: nextNote })
+            .eq("id", pending.diaryEntryId)
+            .select("id");
+          saved = !error && Array.isArray(data) && data.length === 1;
+        }
+        if (!saved) {
           toast.error("Could not update checkpoint status. Try again.");
           return;
         }
+        correctionKeyRef.current = null;
         setOptimisticCleared(true);
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["plant_recent_activity", plantId] }),
-          queryClient.invalidateQueries({ queryKey: ["diary_entries"] }),
+        const keys = revisionMeta
+          ? buildQuickLogRevisionInvalidationKeys({ ...revisionMeta, plantId, tentId, growId })
+          : [["plant_recent_activity", plantId], ["diary_entries"]];
+        await Promise.allSettled([
+          ...keys.map((key) => queryClient.invalidateQueries({ queryKey: key as unknown[] })),
+          ...(revisionMeta
+            ? [
+                queryClient.invalidateQueries({
+                  predicate: (query) =>
+                    query.queryKey.some(
+                      (part) =>
+                        typeof part === "string" &&
+                        QUICKLOG_REVISION_INVALIDATION_KEY_CONTAINS.includes(part),
+                    ),
+                }),
+              ]
+            : []),
         ]);
         toast.success(status === "done" ? "Checkpoint marked done." : "Checkpoint dismissed.");
+      } catch {
+        toast.error("Could not update checkpoint status. Try again.");
       } finally {
         setSaving(false);
       }
     },
-    [pending, saving, entries, queryClient, plantId],
+    [pending, saving, entries, queryClient, plantId, tentId, growId],
   );
 
   const openSameAngle = useCallback(() => {

@@ -1317,8 +1317,7 @@ function QuickLogV2SheetForOwner({
   }
 
   function handleOmitFailedWaterPhoto() {
-    // Other tabs can claim the same Watering while this tab uploads media.
-    // Keep the shared payload and idempotency key; only omit the local file
+    // Keep this tab's payload and idempotency key; only omit the local file
     // that could not be uploaded. Retry then confirms or writes that exact
     // Watering without trapping the grower on a permanently failing file.
     if (saveInFlightRef.current || !failedWaterPhotoUpload) return;
@@ -1675,10 +1674,8 @@ function QuickLogV2SheetForOwner({
     }
     const releaseUnsentWatering = async () => {
       if (!exactWateringSubmission) return;
-      // Another tab may already be replaying this shared record while this
-      // tab's attachment upload fails. Keep the exact key and target until
-      // a confirmed receipt can clear it; an unsent local attempt alone
-      // does not prove that no other tab dispatched it.
+      // Keep the exact key and target while this attachment upload is
+      // unresolved. A retry must not quietly replace the claimed Watering.
       keepSubmissionLockedRef.current = true;
       setWateringRetryPending(true);
     };
@@ -1809,9 +1806,8 @@ function QuickLogV2SheetForOwner({
         );
         return;
       }
-      // A second tab can claim the public-starter Water record after this
-      // sheet opened (or while its photo was uploading). Check the shared
-      // recovery state at the final dispatch boundary.
+      // The public-starter form in this tab can claim Water after this sheet
+      // opens or while its photo uploads. Recheck before dispatch.
       const starterWater = readPendingStarterWater(exactWateringSubmission.recovery.ownerId);
       if (starterWater.status !== "empty") {
         if (uploadedPath) {

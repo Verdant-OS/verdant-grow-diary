@@ -6,10 +6,7 @@ import {
   readPendingStarterWater,
   type PendingStarterWater,
 } from "@/lib/quickLogPendingStarterWaterStore";
-import {
-  clearLocalStorageForTest,
-  setLocalStorageItemForTest,
-} from "./helpers/localStorageTestHelper";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const record = (overrides: Partial<PendingStarterWater> = {}): PendingStarterWater => ({
   version: 1,
@@ -44,6 +41,7 @@ const record = (overrides: Partial<PendingStarterWater> = {}): PendingStarterWat
 const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 beforeEach(() => {
   clearLocalStorageForTest();
+  window.sessionStorage.clear();
   let tail: Promise<unknown> = Promise.resolve();
   Object.defineProperty(window.navigator, "locks", {
     configurable: true,
@@ -65,15 +63,18 @@ afterEach(() => {
   else Reflect.deleteProperty(window.navigator, "locks");
 });
 
-describe("legacy starter Water recovery claim", () => {
+describe("tab-scoped starter Water recovery claim", () => {
   it("keeps the first exact payload and key across repeated claims and reads", async () => {
     const first = record();
     expect(await claimPendingStarterWater(first)).toEqual({ status: "claimed", record: first });
     expect(await claimPendingStarterWater(first)).toEqual({ status: "claimed", record: first });
     expect(readPendingStarterWater("owner-a")).toEqual({ status: "pending", record: first });
     expect(readPendingStarterWater("owner-a")).toEqual(readPendingStarterWater("owner-a"));
+    expect(
+      window.localStorage.getItem("verdant:quick-log:pending-starter-water:v1:owner-a"),
+    ).toBeNull();
     window.sessionStorage.clear();
-    expect(readPendingStarterWater("owner-a")).toEqual({ status: "pending", record: first });
+    expect(readPendingStarterWater("owner-a")).toEqual({ status: "empty" });
   });
 
   it("refuses an edited payload or new key until the original is cleared", async () => {
@@ -102,7 +103,7 @@ describe("legacy starter Water recovery claim", () => {
         }),
       ),
     ).toEqual({ status: "blocked" });
-    setLocalStorageItemForTest(
+    window.sessionStorage.setItem(
       "verdant:quick-log:pending-starter-water:v1:owner-b",
       JSON.stringify({ ...record({ ownerId: "owner-b" }), version: 2 }),
     );
@@ -124,7 +125,7 @@ describe("legacy starter Water recovery claim", () => {
       target: { ...first.target, growId: "grow-a" },
     });
     expect(await claimPendingStarterWater(malformed)).toEqual({ status: "blocked" });
-    setLocalStorageItemForTest(
+    window.sessionStorage.setItem(
       "verdant:quick-log:pending-starter-water:v1:owner-a",
       JSON.stringify(malformed),
     );
@@ -132,7 +133,7 @@ describe("legacy starter Water recovery claim", () => {
     expect(await clearPendingStarterWater(malformed)).toBe(false);
   });
 
-  it("serializes competing tabs on one owner before either can dispatch", async () => {
+  it("serializes competing claims in one tab before either can dispatch", async () => {
     const first = record();
     const second = record({
       payload: { ...first.payload, p_idempotency_key: "second-water-key" },
@@ -146,7 +147,7 @@ describe("legacy starter Water recovery claim", () => {
     expect(readPendingStarterWater("owner-a")).toEqual({ status: "pending", record: first });
   });
 
-  it("lets only one tab clear and count a recovered logical Watering", async () => {
+  it("lets only one completion clear a recovered logical Watering", async () => {
     const first = record();
     await claimPendingStarterWater(first);
     const [a, b] = await Promise.all([
@@ -157,7 +158,7 @@ describe("legacy starter Water recovery claim", () => {
     expect(readPendingStarterWater("owner-a")).toEqual({ status: "empty" });
   });
 
-  it("recognizes a matching record already cleared by another tab", async () => {
+  it("recognizes a matching record already cleared in this tab", async () => {
     const first = record();
     await claimPendingStarterWater(first);
     const [a, b] = await Promise.all([
@@ -168,7 +169,7 @@ describe("legacy starter Water recovery claim", () => {
     expect(readPendingStarterWater("owner-a")).toEqual({ status: "empty" });
   });
 
-  it("blocks a new Water claim when the cross-tab lock API is unavailable", async () => {
+  it("blocks a new Water claim when the lock API is unavailable", async () => {
     Reflect.deleteProperty(window.navigator, "locks");
     expect(await claimPendingStarterWater(record())).toEqual({ status: "blocked" });
     expect(readPendingStarterWater("owner-a")).toEqual({ status: "empty" });

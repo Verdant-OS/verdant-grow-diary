@@ -421,7 +421,7 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
     ).toBe("invalid-json");
   });
 
-  it("does not dispatch Water when shared recovery storage cannot retain the operation", async () => {
+  it("does not dispatch Water when tab recovery storage cannot retain the operation", async () => {
     const committed = await installAcceptedWaterLedger();
     renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
     enterVolume("750");
@@ -431,7 +431,7 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
       key: string,
       value: string,
     ) {
-      if (this === window.localStorage) throw new Error("simulated shared storage denial");
+      if (this === window.sessionStorage) throw new Error("simulated tab storage denial");
       return originalSetItem.call(this, key, value);
     });
     try {
@@ -455,7 +455,7 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
       this: Storage,
       key: string,
     ) {
-      if (this === window.localStorage) throw new Error("cleanup unavailable");
+      if (this === window.sessionStorage) throw new Error("cleanup unavailable");
       originalRemove.call(this, key);
     });
     try {
@@ -1013,7 +1013,7 @@ describe("QuickLogV2Sheet — structured watering", () => {
     );
   });
 
-  it("keeps a failed photo upload's shared Water claim while another tab may replay it", async () => {
+  it("keeps a failed photo upload's exact Water claim for retry in this tab", async () => {
     let rejectUpload: ((reason: Error) => void) | null = null;
     storageUpload.mockImplementationOnce(
       () =>

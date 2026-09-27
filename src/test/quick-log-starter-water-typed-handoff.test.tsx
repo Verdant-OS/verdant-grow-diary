@@ -3,10 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import { STARTER_WATER_RECOVERY_PENDING } from "@/lib/quickLogPendingStarterWaterStore";
-import {
-  clearLocalStorageForTest,
-  setLocalStorageItemForTest,
-} from "./helpers/localStorageTestHelper";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const writer = vi.fn();
 vi.mock("@/lib/writeQuickLogWateringTypedEvent", () => ({
@@ -119,7 +116,7 @@ afterEach(() => {
 });
 
 describe("typed Water handoff from the public starter", () => {
-  it("rechecks shared recovery before dispatch when another tab claims after the sheet opened", async () => {
+  it("rechecks tab recovery before dispatch when the starter claims after the sheet opened", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     render(
       <QueryClientProvider client={client}>
@@ -132,7 +129,7 @@ describe("typed Water handoff from the public starter", () => {
       </QueryClientProvider>,
     );
     fireEvent.change(screen.getByLabelText("Volume (ml)"), { target: { value: "500" } });
-    setLocalStorageItemForTest(
+    window.sessionStorage.setItem(
       "verdant:quick-log:pending-starter-water:v1:user-1",
       JSON.stringify(legacyRecord),
     );

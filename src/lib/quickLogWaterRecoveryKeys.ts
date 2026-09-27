@@ -1,4 +1,4 @@
-/** One owner lock serializes starter and typed Water claims across tabs. */
+/** One owner lock serializes starter and typed Water claims in the active tab. */
 export const waterRecoveryLockKey = (ownerId: string) =>
   `verdant:quick-log:water-recovery-lock:v1:${ownerId}`;
 

@@ -85,7 +85,7 @@ are excluded from uploaded evidence.
 
 ## Mandatory active-writer gate
 
-All ten registered production migration writers share the workflow-level group
+All eleven registered production migration writers share the workflow-level group
 `verdant-production-migration-writer` with `cancel-in-progress: false` and
 `queue: max`. This serializes their complete workflow lifetimes and retains a
 durable queue of pending writers instead of replacing an earlier pending run.

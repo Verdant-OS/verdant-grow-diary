@@ -270,6 +270,17 @@ for (const mode of ["close/reopen", "reload onto another plant"] as const) {
         "Source: manual",
       );
       await expect(card.getByTestId("timeline-sensor-source-badge-live")).toHaveCount(0);
+
+      // The typed history card must reopen the committed watering amount,
+      // not merely the companion Timeline note after an exact retry.
+      const history = page.getByTestId("watering-history-panel");
+      const historyRow = history.locator("li").filter({ hasText: note });
+      await expect(historyRow).toHaveCount(1);
+      await expect(historyRow.getByTestId("watering-history-source")).toHaveAttribute(
+        "data-source",
+        "manual",
+      );
+      await expect(historyRow).toContainText("750 ml");
     } finally {
       await page.close();
       await f.cleanup();

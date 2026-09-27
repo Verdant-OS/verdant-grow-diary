@@ -336,7 +336,8 @@ async function assertHistory(page: Page, csv: Csv) {
         .filter({ hasText: shownAt })
         .filter({ hasText: metric });
       await expect(row).toHaveCount(1);
-      await expect(row.locator("td").nth(2)).toHaveText(String(observation[metric]));
+      const suffix = { temperature_c: " °C", humidity_pct: "%", vpd_kpa: " kPa" }[metric];
+      await expect(row.locator("td").nth(2)).toHaveText(`${observation[metric]}${suffix}`);
     }
   }
 }

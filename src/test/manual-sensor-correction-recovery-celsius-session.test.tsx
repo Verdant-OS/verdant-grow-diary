@@ -96,11 +96,12 @@ function mountSession(entry: string) {
     tents,
     tentsLoaded: true,
   });
-  return render(
+  const view = render(
     <MemoryRouter initialEntries={[entry]}>
       <SessionHarness session={session} />
     </MemoryRouter>,
   );
+  return Object.assign(view, { session });
 }
 
 afterEach(() => {
@@ -190,7 +191,13 @@ describe("correction recovery session draft under Fahrenheit preference", () => 
     );
     const airTemp = view.container.querySelector("#m-air-temp") as HTMLInputElement;
     fireEvent.change(airTemp, { target: { value: "27" } });
+    // The pending correction has fixed metrics; edit and restore the value to
+    // advance the session revision without changing the correction intent.
     fireEvent.change(airTemp, { target: { value: "26" } });
+    expect(airTemp.value).toBe("26");
+    const editedRevision = view.session.getSnapshot()?.draft?.values.revision;
+    if (editedRevision === undefined) throw new Error("expected edited session draft");
+    expect(editedRevision).toBeGreaterThan(1);
     fireEvent.click(view.getByTestId("manual-reading-save"));
     fireEvent.click(view.getByTestId("manual-sensor-review-confirm"));
     await waitFor(() =>
@@ -207,6 +214,7 @@ describe("correction recovery session draft under Fahrenheit preference", () => 
 
     expect(airTemp.value).toBe("26");
     expect(airTemp.value).not.toBe("78.8");
+    expect(view.session.getSnapshot()?.draft?.values.revision).toBeGreaterThan(editedRevision);
     expect(view.getByTestId("manual-reading-temp-unit-C")).toHaveAttribute("aria-pressed", "true");
     expect(view.getByLabelText(/Humidity/i)).toHaveValue(60);
     expect(view.getByTestId("manual-reading-save-unconfirmed")).toBeInTheDocument();

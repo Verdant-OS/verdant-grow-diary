@@ -301,6 +301,42 @@ describe("pinned linked Quick Log diary production delivery", () => {
     });
   });
 
+  it("recovers canonical schema with a missing ledger without replaying the migration", () => {
+    const env = deliveryEnv({
+      OPERATION: "APPLY",
+      PREFLIGHT_RECEIPT_DIGEST: lane.buildPreflightReceipt({
+        state: canonical,
+        headSha: HEAD,
+      }).digest,
+    });
+    const recorded = {
+      ...canonical,
+      ledger_exact_count: 1,
+      ledger_exact_names: ["linked_quicklog_diary_client_write_fence"],
+      ledger_statements_contract: true,
+    };
+    const responses = [canonical, canonical, recorded];
+    const calls: string[][] = [];
+    const status = lane.runLinkedQuicklogDiaryClientWriteFence({
+      env,
+      readFile: committedMigration,
+      logger: { log() {}, error() {} },
+      spawnImpl: (_command: string, args: string[]) => {
+        calls.push(args);
+        return args.includes("--file")
+          ? { status: 0, stdout: "" }
+          : { status: 0, stdout: `${JSON.stringify(responses.shift())}\n` };
+      },
+    });
+    expect(status).toBe(lane.EXIT.OK);
+    expect(calls).toHaveLength(4);
+    expect(calls.filter((args) => args.includes("--file"))).toHaveLength(1);
+    expect(JSON.parse(readFileSync(env.AUDIT_PATH, "utf8"))).toMatchObject({
+      outcome: "applied_verified",
+      recovery_path: "ledger_only",
+    });
+  });
+
   it("rejects an unreviewed receipt before any persistent write", () => {
     const env = deliveryEnv({
       OPERATION: "APPLY",
@@ -345,5 +381,44 @@ describe("pinned linked Quick Log diary production delivery", () => {
     expect(status).toBe(lane.EXIT.POSTFLIGHT_CONTRACT_FAILED);
     expect(calls).toHaveLength(3);
     expect(calls.filter((args) => args.includes("--file"))).toHaveLength(1);
+  });
+
+  it("rejects an unverified founder context before starting any database process", () => {
+    const env = deliveryEnv({ SOLO_FOUNDER_ENVIRONMENT_APPROVAL_VERIFIED: "false" });
+    let calls = 0;
+    const status = lane.runLinkedQuicklogDiaryClientWriteFence({
+      env,
+      readFile: committedMigration,
+      logger: { log() {}, error() {} },
+      spawnImpl: () => {
+        calls += 1;
+        return { status: 0, stdout: "" };
+      },
+    });
+    expect(status).toBe(lane.EXIT.INPUT_REJECTED);
+    expect(calls).toBe(0);
+  });
+
+  it("keeps database output and credentials out of failed PREFLIGHT evidence", () => {
+    const env = deliveryEnv();
+    const outputSentinel = "user-row-output-do-not-log";
+    const status = lane.runLinkedQuicklogDiaryClientWriteFence({
+      env,
+      readFile: committedMigration,
+      logger: { log() {}, error() {} },
+      spawnImpl: () => ({
+        status: 1,
+        stdout: outputSentinel,
+        stderr: env.SUPABASE_DB_URL,
+      }),
+    });
+    expect(status).toBe(lane.EXIT.PREFLIGHT_FAILED);
+    const evidence = [
+      readFileSync(env.REPORT_PATH, "utf8"),
+      readFileSync(env.AUDIT_PATH, "utf8"),
+    ].join("\n");
+    expect(evidence).not.toContain(outputSentinel);
+    expect(evidence).not.toContain(env.SUPABASE_DB_URL);
+    expect(evidence).not.toContain("local-test-only");
   });
 });

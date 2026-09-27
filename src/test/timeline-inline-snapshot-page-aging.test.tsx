@@ -1,10 +1,11 @@
+import { SENSOR_TRUTH_FUTURE_SKEW_MS } from "@/constants/sensorTruthRanges";
 /**
  * Timeline inline snapshot — page-level idle aging (#1670, review finding F1670-1).
  *
  * `timeline-snapshot-clock.test.tsx` proves `TimelineSnapshotClock` in isolation
  * through a hand-written parent. This file mounts the real Timeline page and
  * proves the page wiring: a manual snapshot rendered while fresh must acquire
- * the stale stage-guidance qualifier once its age crosses the live freshness
+ * the stale stage-guidance qualifier once its age crosses the manual freshness
  * window, with no click, no parent re-render trigger, and no refetch.
  *
  * Dropping the clock wrapper, or a clock that never fires at the freshness
@@ -13,7 +14,8 @@
 import { act, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
 
 interface QuerySpec {
   table: string;
@@ -166,9 +168,9 @@ import Timeline from "@/pages/Timeline";
 
 const MIN = 60_000;
 const NOW = new Date("2026-09-23T12:00:00.000Z");
-// Two minutes inside the live freshness window at mount, so incidental
+// One minute inside the manual freshness window at mount, so incidental
 // real-time drift while the page loads cannot cross the boundary early.
-const CAPTURED_AT = new Date(NOW.getTime() - LIVE_CURRENT_STATE_STALE_MS + 2 * MIN).toISOString();
+const CAPTURED_AT = new Date(NOW.getTime() - MANUAL_CURRENT_STATE_STALE_MS + MIN).toISOString();
 
 const MANUAL_SNAPSHOT_ROW = {
   id: "inline-snapshot-row",
@@ -212,36 +214,314 @@ describe("Timeline page — inline manual snapshot ages while idle", () => {
     vi.useRealTimers();
   });
 
-  it("qualifies stage guidance as stale after the window passes, without interaction or refetch", async () => {
+  it.each(["ts", "captured_at"])(
+    "qualifies %s stage guidance as stale after the window passes, without interaction or refetch",
+    async (timestampField) => {
+      const row = {
+        ...MANUAL_SNAPSHOT_ROW,
+        entry_at: NOW.toISOString(),
+        details: {
+          source: "manual",
+          sensor_snapshot: {
+            source: "manual",
+            [timestampField]: CAPTURED_AT,
+            temp: 24,
+            rh: 55,
+            vpd: 1.1,
+          },
+        },
+      };
+      harness.executeQuery.mockImplementation((spec) => ({
+        data: spec.table === "diary_entries" ? [row] : [],
+        error: null,
+      }));
+      render(
+        <MemoryRouter initialEntries={["/timeline"]}>
+          <Timeline />
+        </MemoryRouter>,
+      );
+
+      const hint = await screen.findByTestId("timeline-vpd-stage-hint");
+      expect(hint).toHaveTextContent(/^In Veg VPD range$/);
+      const snapshot = screen.getByTestId("timeline-manual-snapshot");
+      expect(snapshot).toHaveTextContent("VPD 1.1");
+      const readsBeforeIdle = diaryQueryCount();
+      expect(
+        buildTimelineEvidenceDetailViewModel(row, { nowMs: Date.now() })?.sensor?.isStale,
+      ).toBe(false);
+      // findBy* resolves on the DOM commit, before React runs the passive effect
+      // that arms the minute clock. Flush it so the idle advance below is real.
+      await act(async () => {});
+
+      act(() => {
+        vi.advanceTimersByTime(
+          new Date(CAPTURED_AT).getTime() + MANUAL_CURRENT_STATE_STALE_MS - Date.now(),
+        );
+      });
+      expect(screen.getByTestId("timeline-vpd-stage-hint")).toHaveTextContent(/^In Veg VPD range$/);
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+
+      expect(screen.getByTestId("timeline-vpd-stage-hint")).toHaveTextContent(
+        /^In Veg VPD range \(historical, stale reading\)$/,
+      );
+      // The historical reading itself is preserved, not withdrawn.
+      expect(screen.getByTestId("timeline-manual-snapshot")).toHaveTextContent("VPD 1.1");
+      // Aging came from the clock, not from a re-read of the diary.
+      expect(diaryQueryCount()).toBe(readsBeforeIdle);
+      expect(
+        buildTimelineEvidenceDetailViewModel(row, { nowMs: Date.now() })?.sensor?.isStale,
+      ).toBe(true);
+      expect(harness.insert).not.toHaveBeenCalled();
+      expect(harness.update).not.toHaveBeenCalled();
+      expect(harness.delete).not.toHaveBeenCalled();
+      expect(harness.upsert).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["manual", "user", "entry", "log", "", undefined])(
+    "keeps %s snapshots current past the live window",
+    async (source) => {
+      const ts = new Date(NOW.getTime() - 16 * MIN).toISOString();
+      const row = {
+        ...MANUAL_SNAPSHOT_ROW,
+        details: {
+          ...MANUAL_SNAPSHOT_ROW.details,
+          sensor_snapshot: { ...MANUAL_SNAPSHOT_ROW.details.sensor_snapshot, source, ts },
+        },
+      };
+      harness.executeQuery.mockImplementation((spec) => ({
+        data: spec.table === "diary_entries" ? [row] : [],
+        error: null,
+      }));
+      render(
+        <MemoryRouter initialEntries={["/timeline"]}>
+          <Timeline />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByTestId("timeline-vpd-stage-hint")).toHaveTextContent(
+        /^In Veg VPD range$/,
+      );
+    },
+  );
+
+  it.each(["live", "unknown", "invalid", "csv", "demo"])(
+    "never promotes persisted %s provenance to current stage guidance",
+    async (source) => {
+      const row = {
+        ...MANUAL_SNAPSHOT_ROW,
+        details: {
+          ...MANUAL_SNAPSHOT_ROW.details,
+          sensor_snapshot: { ...MANUAL_SNAPSHOT_ROW.details.sensor_snapshot, source },
+        },
+      };
+      harness.executeQuery.mockImplementation((spec) => ({
+        data: spec.table === "diary_entries" ? [row] : [],
+        error: null,
+      }));
+      render(
+        <MemoryRouter initialEntries={["/timeline"]}>
+          <Timeline />
+        </MemoryRouter>,
+      );
+      await screen.findByTestId("timeline-manual-snapshot");
+      const hint = screen.queryByTestId("timeline-vpd-stage-hint");
+      if (hint) expect(hint).toHaveTextContent(/historical|stale/);
+      expect(
+        buildTimelineEvidenceDetailViewModel(row, { nowMs: Date.now() })?.sensor
+          ?.canSupportCurrentContext,
+      ).toBe(false);
+    },
+  );
+
+  it.each(
+    ["csv", "live", "unknown"].flatMap((source) =>
+      [undefined, "", "   "].map((nestedSource) => ({ source, nestedSource })),
+    ),
+  )(
+    "honors entry-level $source provenance with nested source $nestedSource",
+    async ({ source, nestedSource }) => {
+      const ts = new Date(NOW.getTime() - 16 * MIN).toISOString();
+      const row = {
+        ...MANUAL_SNAPSHOT_ROW,
+        details: {
+          source,
+          sensor_snapshot: {
+            ...MANUAL_SNAPSHOT_ROW.details.sensor_snapshot,
+            source: nestedSource,
+            ts,
+          },
+        },
+      };
+      harness.executeQuery.mockImplementation((spec) => ({
+        data: spec.table === "diary_entries" ? [row] : [],
+        error: null,
+      }));
+      render(
+        <MemoryRouter initialEntries={["/timeline"]}>
+          <Timeline />
+        </MemoryRouter>,
+      );
+      const snapshot = await screen.findByTestId("timeline-manual-snapshot");
+      expect(snapshot).toHaveTextContent(source === "csv" ? "Source: CSV" : "Source: invalid");
+      const hint = screen.queryByTestId("timeline-vpd-stage-hint");
+      if (source === "csv") expect(hint).toHaveTextContent(/historical, stale reading/);
+      else expect(hint).not.toBeInTheDocument();
+      expect(
+        buildTimelineEvidenceDetailViewModel(row, { nowMs: Date.now() })?.sensor
+          ?.canSupportCurrentContext,
+      ).toBe(false);
+    },
+  );
+
+  it.each(["ts", "captured_at"])(
+    "does not assess a future-dated %s snapshot",
+    async (timestampField) => {
+      const row = {
+        ...MANUAL_SNAPSHOT_ROW,
+        details: {
+          source: "manual",
+          sensor_snapshot: {
+            source: "manual",
+            [timestampField]: new Date(NOW.getTime() + 60 * MIN).toISOString(),
+            temp: 24,
+            rh: 55,
+            vpd: 1.1,
+          },
+        },
+      };
+      harness.executeQuery.mockImplementation((spec) => ({
+        data: spec.table === "diary_entries" ? [row] : [],
+        error: null,
+      }));
+      expect(
+        buildTimelineEvidenceDetailViewModel(row, { nowMs: Date.now() })?.sensor
+          ?.canSupportCurrentContext,
+      ).toBe(false);
+      render(
+        <MemoryRouter initialEntries={["/timeline"]}>
+          <Timeline />
+        </MemoryRouter>,
+      );
+      const snapshot = await screen.findByTestId("timeline-manual-snapshot");
+      expect(screen.queryByTestId("timeline-vpd-stage-hint")).not.toBeInTheDocument();
+      expect(snapshot).toHaveTextContent("Future timestamp — freshness cannot be verified.");
+      expect(snapshot).toHaveTextContent("VPD 1.1");
+      const readsBeforeRecovery = diaryQueryCount();
+      await act(async () => {});
+      act(() =>
+        vi.advanceTimersByTime(NOW.getTime() + 60 * MIN - SENSOR_TRUTH_FUTURE_SKEW_MS - Date.now()),
+      );
+      expect(screen.getByTestId("timeline-vpd-stage-hint")).toHaveTextContent(/^In Veg VPD range$/);
+      expect(snapshot).not.toHaveTextContent("Future timestamp");
+      act(() =>
+        vi.advanceTimersByTime(
+          NOW.getTime() + 60 * MIN + MANUAL_CURRENT_STATE_STALE_MS + 1 - Date.now(),
+        ),
+      );
+      expect(screen.getByTestId("timeline-vpd-stage-hint")).toHaveTextContent(
+        "historical, stale reading",
+      );
+      expect(diaryQueryCount()).toBe(readsBeforeRecovery);
+
+      expect(harness.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([undefined, null])(
+    "uses the older captured_at when ts is %s instead of the newer diary time",
+    async (ts) => {
+      const row = {
+        ...MANUAL_SNAPSHOT_ROW,
+        entry_at: NOW.toISOString(),
+        details: {
+          source: "manual",
+          sensor_snapshot: {
+            source: "manual",
+            ts,
+            captured_at: new Date(
+              NOW.getTime() - MANUAL_CURRENT_STATE_STALE_MS - MIN,
+            ).toISOString(),
+            temp: 24,
+            rh: 55,
+            vpd: 1.1,
+          },
+        },
+      };
+      harness.executeQuery.mockImplementation((spec) => ({
+        data: spec.table === "diary_entries" ? [row] : [],
+        error: null,
+      }));
+      expect(
+        buildTimelineEvidenceDetailViewModel(row, { nowMs: Date.now() })?.sensor?.isStale,
+      ).toBe(true);
+      render(
+        <MemoryRouter initialEntries={["/timeline"]}>
+          <Timeline />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByTestId("timeline-vpd-stage-hint")).toHaveTextContent(
+        "In Veg VPD range (historical, stale reading)",
+      );
+      expect(harness.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([undefined, null])(
+    "does not use a recent diary date when both snapshot timestamps are %s",
+    async (captureTime) => {
+      const row = {
+        ...MANUAL_SNAPSHOT_ROW,
+        entry_at: NOW.toISOString(),
+        details: {
+          source: "manual",
+          sensor_snapshot: {
+            source: "manual",
+            ts: captureTime,
+            captured_at: captureTime,
+            temp: 24,
+            rh: 55,
+            vpd: 1.1,
+          },
+        },
+      };
+      harness.executeQuery.mockImplementation((spec) => ({
+        data: spec.table === "diary_entries" ? [row] : [],
+        error: null,
+      }));
+      render(
+        <MemoryRouter initialEntries={["/timeline"]}>
+          <Timeline />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByTestId("timeline-vpd-stage-hint")).toHaveTextContent(
+        "In Veg VPD range (historical, stale reading)",
+      );
+      expect(screen.getByTestId("timeline-manual-snapshot")).toHaveTextContent("VPD 1.1");
+      expect(harness.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["", "not-a-date"])("keeps an unusable capture timestamp %j stale", async (ts) => {
+    const row = {
+      ...MANUAL_SNAPSHOT_ROW,
+      details: {
+        ...MANUAL_SNAPSHOT_ROW.details,
+        sensor_snapshot: { ...MANUAL_SNAPSHOT_ROW.details.sensor_snapshot, ts },
+      },
+    };
+    harness.executeQuery.mockImplementation((spec) => ({
+      data: spec.table === "diary_entries" ? [row] : [],
+      error: null,
+    }));
     render(
       <MemoryRouter initialEntries={["/timeline"]}>
         <Timeline />
       </MemoryRouter>,
     );
-
-    const hint = await screen.findByTestId("timeline-vpd-stage-hint");
-    expect(hint).toHaveTextContent(/^In Veg VPD range$/);
-    const snapshot = screen.getByTestId("timeline-manual-snapshot");
-    expect(snapshot).toHaveTextContent("VPD 1.1");
-    const readsBeforeIdle = diaryQueryCount();
-    // findBy* resolves on the DOM commit, before React runs the passive effect
-    // that arms the minute clock. Flush it so the idle advance below is real.
-    await act(async () => {});
-
-    act(() => {
-      vi.advanceTimersByTime(3 * MIN);
-    });
-
-    expect(screen.getByTestId("timeline-vpd-stage-hint")).toHaveTextContent(
-      /^In Veg VPD range \(historical, stale reading\)$/,
+    expect(await screen.findByTestId("timeline-vpd-stage-hint")).toHaveTextContent(
+      /historical, stale reading/,
     );
-    // The historical reading itself is preserved, not withdrawn.
-    expect(screen.getByTestId("timeline-manual-snapshot")).toHaveTextContent("VPD 1.1");
-    // Aging came from the clock, not from a re-read of the diary.
-    expect(diaryQueryCount()).toBe(readsBeforeIdle);
-    expect(harness.insert).not.toHaveBeenCalled();
-    expect(harness.update).not.toHaveBeenCalled();
-    expect(harness.delete).not.toHaveBeenCalled();
-    expect(harness.upsert).not.toHaveBeenCalled();
   });
 });

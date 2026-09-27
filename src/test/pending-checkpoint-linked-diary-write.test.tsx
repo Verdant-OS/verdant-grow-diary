@@ -100,4 +100,15 @@ describe("checkpoint clearing with the linked diary write fence", () => {
     expect(mock.update).not.toHaveBeenCalled();
     expect(mock.success).not.toHaveBeenCalled();
   });
+
+  it("does not send a conflicting checkpoint decision after an uncertain correction", async () => {
+    mock.correct.mockResolvedValue({ ok: false, reason: "rpc_error" });
+    showCheckpoint({ linked_grow_event_id: "event-1" });
+    fireEvent.click(screen.getByTestId("pending-checkpoint-banner-done"));
+    await waitFor(() => expect(mock.error).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByTestId("pending-checkpoint-banner-dismiss"));
+    await waitFor(() => expect(mock.error).toHaveBeenCalledTimes(2));
+    expect(mock.correct).toHaveBeenCalledTimes(1);
+    expect(mock.success).not.toHaveBeenCalled();
+  });
 });

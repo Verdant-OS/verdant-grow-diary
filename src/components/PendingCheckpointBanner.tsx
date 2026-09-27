@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import { correctQuickLogEntry } from "@/lib/quickLogRevisionService";
+import { QUICKLOG_REVISION_FAILURE_COPY } from "@/lib/quick-log/quickLogRevisionRules";
 import {
   buildQuickLogRevisionInvalidationKeys,
   QUICKLOG_REVISION_INVALIDATION_KEY_CONTAINS,
@@ -84,6 +85,7 @@ export default function PendingCheckpointBanner({
 
   useEffect(() => {
     setOptimisticCleared(false);
+    correctionKeyRef.current = null;
   }, [plantId]);
 
   const entries = useMemo(() => asCheckpointEntries(rawRows), [rawRows]);
@@ -106,6 +108,10 @@ export default function PendingCheckpointBanner({
         let revisionMeta: { growEventId: string | null; diaryEntryIds: string[] } | null = null;
         if (row?.linkedQuickLog) {
           const intent = `${pending.diaryEntryId}:${status}:${nextNote}`;
+          if (correctionKeyRef.current && correctionKeyRef.current.intent !== intent) {
+            toast.error("The previous checkpoint update is unconfirmed. Retry that action first.");
+            return;
+          }
           if (correctionKeyRef.current?.intent !== intent) {
             correctionKeyRef.current = { intent, key: newQuickLogSaveKey() };
           }
@@ -122,6 +128,11 @@ export default function PendingCheckpointBanner({
               growEventId: result.growEventId,
               diaryEntryIds: result.diaryEntryIds,
             };
+          } else if (
+            result.reason !== "rpc_error" &&
+            Object.hasOwn(QUICKLOG_REVISION_FAILURE_COPY, result.reason)
+          ) {
+            correctionKeyRef.current = null;
           }
         } else {
           const { data, error } = await supabase

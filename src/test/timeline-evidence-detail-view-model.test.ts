@@ -80,6 +80,28 @@ describe("timelineEvidenceDetailViewModel", () => {
     }
   });
 
+  it("uses the parent source when a snapshot source is blank without trusting a nonblank invalid source", () => {
+    const entry = {
+      id: "blank-source",
+      entry_at: "2025-06-01T11:55:00Z",
+      details: {
+        source: "csv",
+        sensor_snapshot: { ts: "2025-06-01T11:55:00Z", temp: 23, source: "  " },
+      },
+    };
+    expect(vm(entry)?.sensor?.source).toBe("csv");
+    expect(vm(entry)?.sourceLabels).toContain("CSV import");
+
+    const invalid = vm({
+      ...entry,
+      details: {
+        ...entry.details,
+        sensor_snapshot: { ...entry.details.sensor_snapshot, source: "bogus" },
+      },
+    });
+    expect(invalid?.sensor?.source).toBe("invalid");
+  });
+
   it("flags stale sensor snapshot when older than the live window", () => {
     const m = vm({
       id: "e2",

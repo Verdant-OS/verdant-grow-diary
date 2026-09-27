@@ -186,7 +186,7 @@ function readSensor(
   const rawCapturedAt = obj.ts ?? obj.captured_at;
   const capturedAt = safeString(rawCapturedAt);
   const source = classifyTimelineSensorSource({
-    rawSource: safeString(obj.source ?? readSafeDetail(details, "source")),
+    rawSource: safeString(obj.source) ?? safeString(readSafeDetail(details, "source")),
     fallback: "invalid",
     context: "persisted_snapshot",
   }).kind;

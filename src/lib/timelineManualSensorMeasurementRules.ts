@@ -36,6 +36,7 @@ export type TimelineManualSensorReceipt = {
 
 /** Narrow row shape Timeline may SELECT without `raw_payload` in page source. */
 export type ManualSensorTimelineMetricRow = {
+  id?: string;
   tent_id: string;
   metric: string;
   value: number | string | null;
@@ -57,10 +58,43 @@ export function completeManualSensorTimelineRows<T extends ManualSensorTimelineM
 ): { rows: T[]; hasOlderRows: boolean } {
   if (!Array.isArray(rows) || rows.length === 0) return { rows: [], hasOlderRows: false };
   if (!Number.isSafeInteger(limit) || limit < 1) return { rows: [], hasOlderRows: true };
-  if (rows.length <= limit) return { rows: [...rows], hasOlderRows: false };
+  // The read is the union of captured_at and legacy null-captured_at streams.
+  // Order by the same observation time used for receipt grouping before
+  // applying the metric-row budget; either stream can contain the newest row.
+  const sorted = [...rows].sort((a, b) => {
+    const aObservation = resolveSensorObservationTime(a);
+    const bObservation = resolveSensorObservationTime(b);
+    const aMs = aObservation ? Date.parse(aObservation) : Number.NEGATIVE_INFINITY;
+    const bMs = bObservation ? Date.parse(bObservation) : Number.NEGATIVE_INFINITY;
+    const aTime = Number.isFinite(aMs) ? aMs : Number.NEGATIVE_INFINITY;
+    const bTime = Number.isFinite(bMs) ? bMs : Number.NEGATIVE_INFINITY;
+    if (aTime !== bTime) return bTime - aTime;
+    const aKey = JSON.stringify([
+      aObservation,
+      a.tent_id,
+      a.ts,
+      a.metric,
+      a.id ?? "",
+      a.source ?? "",
+      a.value,
+      a.quality ?? "",
+    ]);
+    const bKey = JSON.stringify([
+      bObservation,
+      b.tent_id,
+      b.ts,
+      b.metric,
+      b.id ?? "",
+      b.source ?? "",
+      b.value,
+      b.quality ?? "",
+    ]);
+    return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+  });
+  if (sorted.length <= limit) return { rows: sorted, hasOlderRows: false };
 
-  const boundaryObservationTime = resolveSensorObservationTime(rows[limit]);
-  const completeRows = rows
+  const boundaryObservationTime = resolveSensorObservationTime(sorted[limit]);
+  const completeRows = sorted
     .slice(0, limit)
     .filter((row) => resolveSensorObservationTime(row) !== boundaryObservationTime);
   return { rows: completeRows, hasOlderRows: true };

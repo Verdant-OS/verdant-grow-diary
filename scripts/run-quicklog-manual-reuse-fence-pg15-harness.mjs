@@ -34,7 +34,7 @@ function sqlFile(name) {
     "\n",
   );
   if (
-    !/^\s*BEGIN;/.test(sql) ||
+    !/(?:^|\n)BEGIN;\n/.test(sql) ||
     !/COMMIT;\s*(?:NOTIFY pgrst, 'reload schema';\s*)?$/.test(sql) ||
     sql.includes("supabase.co")
   ) {

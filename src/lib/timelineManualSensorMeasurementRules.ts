@@ -12,6 +12,7 @@
 import { groupSensorReadingRows } from "@/lib/growAdapters";
 import type { SensorReadingRow } from "@/lib/db";
 import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 import { classifyManualMetric, classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 import {
@@ -46,7 +47,7 @@ export type ManualSensorTimelineMetricRow = {
 
 /**
  * The query reads one extra metric row. When it finds that sentinel, the
- * oldest captured_at group might be split across the row boundary. Exclude
+ * oldest observation-time group might be split across the row boundary. Exclude
  * that whole group instead of showing a receipt with only some saved metrics.
  * The caller must disclose that older history is outside this bounded view.
  */
@@ -58,10 +59,10 @@ export function completeManualSensorTimelineRows<T extends ManualSensorTimelineM
   if (!Number.isSafeInteger(limit) || limit < 1) return { rows: [], hasOlderRows: true };
   if (rows.length <= limit) return { rows: [...rows], hasOlderRows: false };
 
-  const boundaryCapturedAt = rows[limit].captured_at ?? null;
+  const boundaryObservationTime = resolveSensorObservationTime(rows[limit]);
   const completeRows = rows
     .slice(0, limit)
-    .filter((row) => (row.captured_at ?? null) !== boundaryCapturedAt);
+    .filter((row) => resolveSensorObservationTime(row) !== boundaryObservationTime);
   return { rows: completeRows, hasOlderRows: true };
 }
 

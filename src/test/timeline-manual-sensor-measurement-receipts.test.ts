@@ -81,6 +81,21 @@ describe("completeManualSensorTimelineRows", () => {
       hasOlderRows: true,
     });
   });
+
+  it("matches the receipt grouping time when captured_at is absent on the lookahead", () => {
+    const newer = Array.from({ length: TIMELINE_MANUAL_SENSOR_ROW_LIMIT - 1 }, (_, index) =>
+      metricRow("temperature_c", 24, "manual", {
+        ts: new Date(
+          Date.parse(CAPTURED) + (TIMELINE_MANUAL_SENSOR_ROW_LIMIT - index) * 60_000,
+        ).toISOString(),
+      }),
+    );
+    const boundary = metricRow("temperature_c", 24);
+    const lookahead = { ...metricRow("humidity_pct", 55), captured_at: null };
+    const page = completeManualSensorTimelineRows([...newer, boundary, lookahead]);
+    expect(page.rows).toEqual(newer);
+    expect(page.hasOlderRows).toBe(true);
+  });
 });
 
 describe("manualSensorReadingsToTimelineEntries", () => {

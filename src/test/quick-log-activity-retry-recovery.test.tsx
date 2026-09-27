@@ -554,6 +554,7 @@ describe("All activity types retry confirmation", () => {
       backend.malformedFirstReply = true;
       mount();
       await loseReply(activity);
+      expect(backend.posts[0].p_occurred_at).toBeNull();
       expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
         /save is unconfirmed/i,
       );
@@ -684,11 +685,11 @@ describe("All activity types retry confirmation", () => {
     expect(backend.rows.size).toBe(2);
   });
 
-  it("restores the unresolved exact attempt after a remount", async () => {
+  it("restores the exact attempt without sending the device clock after a remount", async () => {
     const view = mount();
     await loseReply();
     const originalOccurredAt = backend.posts[0].p_occurred_at;
-    expect(originalOccurredAt).toEqual(expect.any(String));
+    expect(originalOccurredAt).toBeNull();
     view.unmount();
     mount();
     expect(screen.getByTestId("quick-log-all-activities-pending-activity")).toHaveTextContent(

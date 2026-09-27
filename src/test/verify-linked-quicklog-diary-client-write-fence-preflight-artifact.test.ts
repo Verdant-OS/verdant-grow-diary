@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,9 +10,7 @@ import { describe, expect, it } from "vitest";
 const VERIFIER_PATH = resolve(
   "scripts/verify-linked-quicklog-diary-client-write-fence-preflight-artifact.mjs",
 );
-const MIGRATION_PATH = resolve(
-  "supabase/migrations/20260927094000_linked_quicklog_diary_client_write_fence.sql",
-);
+const MIGRATION = "supabase/migrations/20260927094000_linked_quicklog_diary_client_write_fence.sql";
 const REPOSITORY = "Verdant-OS/verdant-grow-diary";
 const REPOSITORY_ID = 123456789;
 const WORKFLOW_PATH = ".github/workflows/apply-linked-quicklog-diary-client-write-fence.yml";
@@ -27,7 +26,9 @@ const FOUNDER_LOGIN = "cheekhimself";
 const DELIVERY_MODE = "solo_founder_self_review_v1";
 const PRODUCTION_ENVIRONMENT = "verdant-production-solo-founder";
 const MIGRATION_SHA256 = createHash("sha256")
-  .update(readFileSync(MIGRATION_PATH))
+  // The receipt binds the committed LF bytes. Windows Git checkouts may
+  // materialize CRLF, but the protected runner must still reject those bytes.
+  .update(execFileSync("git", ["show", `HEAD:${MIGRATION}`]))
   .digest("hex")
   .toUpperCase();
 

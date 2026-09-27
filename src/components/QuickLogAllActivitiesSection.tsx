@@ -1203,13 +1203,15 @@ export default function QuickLogAllActivitiesSection({
           photoDiaryInFlightRef.current = false;
         }
       } else {
-        const occurredAt = new Date().toISOString();
+        // Fresh activities use the server's occurrence time. Keep the local
+        // claim time for recovery metadata, not as an unbounded RPC timestamp.
+        const createdAt = new Date().toISOString();
         const claim = claimPendingQuickLogActivity({
           version: 1,
           ownerId: user?.id ?? "",
-          createdAt: occurredAt,
+          createdAt,
           ...(reviewedStarterHandoffKey ? { reviewedStarterHandoffKey } : {}),
-          input: { ...activityInput, occurredAt, idempotencyKey },
+          input: { ...activityInput, occurredAt: null, idempotencyKey },
           receipt: {
             symptomCheck: guidedSymptomCheck && selected.id === "issue_observation",
             harvestDetails: harvestDetailsForBreakdown,

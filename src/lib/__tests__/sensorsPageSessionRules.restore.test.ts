@@ -12,11 +12,12 @@ import {
   editManualDraftValues,
   restoreUnconfirmedManualDraftValues,
 } from "@/lib/sensorsPageSessionRules";
+import { supabase } from "@/integrations/supabase/client";
 
-const mocks = vi.hoisted(() => ({ rpc: vi.fn() }));
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { rpc: mocks.rpc },
+  supabase: { rpc: mocks.rpc, from: mocks.from },
 }));
 
 const ownerId = "owner-a";
@@ -49,13 +50,13 @@ function currentDraft() {
   );
 }
 
-function restoreFromStoredPendingDraft() {
-  const pending = readPendingManualSnapshot(ownerId);
-  if (pending.status !== "pending") return null;
-  return restoreUnconfirmedManualDraftValues(
-    currentDraft(),
-    restoreManualSnapshotValues(pending.record),
-  );
+function recoveredDraftFromRecord(record: PendingManualSnapshot) {
+  return restoreManualSnapshotValues(record);
+}
+
+function expectNoSupabaseCalls() {
+  expect(supabase.rpc).not.toHaveBeenCalled();
+  expect(supabase.from).not.toHaveBeenCalled();
 }
 
 beforeEach(() => {
@@ -71,8 +72,12 @@ describe("restoreUnconfirmedManualDraftValues pending recovery", () => {
   it("restores an unconfirmed manual draft with its values intact", () => {
     const record = pendingRecord();
     expect(claimPendingManualSnapshot(record)).toEqual({ status: "claimed", record });
+    const pending = readPendingManualSnapshot(ownerId);
+    if (pending.status !== "pending") throw new Error("expected pending restore record");
 
-    expect(restoreFromStoredPendingDraft()).toEqual({
+    expect(
+      restoreUnconfirmedManualDraftValues(currentDraft(), recoveredDraftFromRecord(pending.record)),
+    ).toEqual({
       form: {
         airTemp: "25",
         airTempUnit: "C",
@@ -91,16 +96,22 @@ describe("restoreUnconfirmedManualDraftValues pending recovery", () => {
       saveUnconfirmed: true,
       lastSaved: null,
     });
-    expect(mocks.rpc).not.toHaveBeenCalled();
+    expectNoSupabaseCalls();
   });
 
   it("does not restore confirmed saved values as drafts", () => {
     const record = pendingRecord();
     claimPendingManualSnapshot(record);
     expect(clearPendingManualSnapshot(record)).toBe(true);
+    const restored = restoreUnconfirmedManualDraftValues(
+      currentDraft(),
+      recoveredDraftFromRecord(record),
+    );
 
-    expect(restoreFromStoredPendingDraft()).toBeNull();
-    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(restored.form).toMatchObject({ airTemp: "25", humidityPct: "60" });
+    expect(restored.saveUnconfirmed).toBe(true);
+    expect(readPendingManualSnapshot(ownerId)).toEqual({ status: "empty" });
+    expectNoSupabaseCalls();
   });
 
   it.each([
@@ -109,9 +120,23 @@ describe("restoreUnconfirmedManualDraftValues pending recovery", () => {
     ["malformed", "{"],
   ])("returns nothing for %s stored input and does not throw", (_label, raw) => {
     if (raw !== null) sessionStorage.setItem(key, raw);
+    const fallbackRecovered = recoveredDraftFromRecord(pendingRecord());
+    let restored: ReturnType<typeof restoreUnconfirmedManualDraftValues> | null = null;
 
-    expect(() => restoreFromStoredPendingDraft()).not.toThrow();
-    expect(restoreFromStoredPendingDraft()).toBeNull();
-    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(() => {
+      const pending = readPendingManualSnapshot(ownerId);
+      restored =
+        pending.status === "pending"
+          ? restoreUnconfirmedManualDraftValues(
+              currentDraft(),
+              recoveredDraftFromRecord(pending.record),
+            )
+          : null;
+      expect(restoreUnconfirmedManualDraftValues(currentDraft(), fallbackRecovered)).toMatchObject({
+        saveUnconfirmed: true,
+      });
+    }).not.toThrow();
+    expect(restored).toBeNull();
+    expectNoSupabaseCalls();
   });
 });

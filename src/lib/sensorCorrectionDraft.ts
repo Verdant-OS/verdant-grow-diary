@@ -3,7 +3,7 @@ import type { ManualEntryInput, ManualReadingMetric } from "@/lib/sensorReadingM
 import { celsiusToInputString, type TemperatureInputUnit } from "@/lib/sensorInputUnitConversion";
 import { createManualDraftValues, type ManualDraftValues } from "@/lib/sensorsPageSessionRules";
 
-const EMPTY: ManualEntryInput = {
+export const EMPTY: ManualEntryInput = {
   airTemp: "",
   humidityPct: "",
   vpdKpa: "",
@@ -12,7 +12,7 @@ const EMPTY: ManualEntryInput = {
   ppfd: "",
 };
 
-function correctionToPrefill(
+export function correctionToPrefill(
   ctx: ManualCorrectionContext | null | undefined,
   unit: TemperatureInputUnit,
 ): ManualEntryInput {

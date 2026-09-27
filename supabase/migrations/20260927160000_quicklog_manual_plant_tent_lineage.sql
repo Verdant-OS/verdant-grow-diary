@@ -5,10 +5,17 @@ BEGIN;
 
 DO $preflight$
 DECLARE
+  v_wrapper oid := pg_catalog.to_regprocedure('public.quicklog_save_manual(text, uuid, text, numeric, text, numeric, numeric, numeric, timestamp with time zone, jsonb, text, text)');
   v_delegate oid := pg_catalog.to_regprocedure('public.quicklog_save_manual_pre_logged_at(text, uuid, text, numeric, text, numeric, numeric, numeric, timestamp with time zone, jsonb, text, text)');
 BEGIN
   PERFORM pg_catalog.pg_advisory_xact_lock(20260927, 1600);
-  IF v_delegate IS NULL OR NOT EXISTS (
+  -- The replay fence parent must be present before replacing its delegate.
+  IF v_wrapper IS NULL OR NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_proc p
+    WHERE p.oid = v_wrapper
+      AND p.prosecdef
+      AND pg_catalog.md5(pg_catalog.replace(p.prosrc, E'\r', '')) = '85e40fcd47d1e38dca8f057fee2d905a'
+  ) OR v_delegate IS NULL OR NOT EXISTS (
     SELECT 1 FROM pg_catalog.pg_proc p
     JOIN pg_catalog.pg_roles r ON r.oid = p.proowner
     WHERE p.oid = v_delegate

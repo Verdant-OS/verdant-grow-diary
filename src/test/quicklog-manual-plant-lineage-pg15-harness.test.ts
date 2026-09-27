@@ -21,6 +21,7 @@ const harness = readFileSync(
 describe("Quick Log manual plant/tent lineage fence", () => {
   it("replaces only the private delegate after an exact source preflight", () => {
     expect(migration).toContain("7ec296e422f7f47c8b2793b051840798");
+    expect(migration).toContain("85e40fcd47d1e38dca8f057fee2d905a");
     expect(migration).toContain(
       'CREATE OR REPLACE FUNCTION public."quicklog_save_manual_pre_logged_at"',
     );

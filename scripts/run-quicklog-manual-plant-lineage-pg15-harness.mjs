@@ -23,7 +23,7 @@ const originalTent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const otherOwnedGrow = "33333333-3333-4333-8333-333333333333";
 const otherOwnedTent = "44444444-4444-4444-8444-444444444444";
 const migration = "20260927160000_quicklog_manual_plant_tent_lineage.sql";
-const migrationSha256 = "f39608859f07708ce9575b9faef4780f8dbbc20472e5d0c06aedcfa5e7a1529a";
+const migrationSha256 = "843bfd62f72b712dccfa9e4a58150e88cf5d2bc045323562abf0af8c54f30014";
 const signature =
   "text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb, text, text";
 
@@ -151,6 +151,24 @@ export async function runPlantLineageHarness({
       stage: "diary_retraction_fixture",
       spawnImpl,
     });
+    const sql = sqlFile(migration);
+    if (createHash("sha256").update(sql).digest("hex") !== migrationSha256) {
+      throw new Error("migration_fingerprint_mismatch");
+    }
+    let rejectedWithoutParent = false;
+    try {
+      executeSql(sql, env, { stage: "lineage_before_parent", spawnImpl });
+    } catch {
+      rejectedWithoutParent = true;
+    }
+    if (!rejectedWithoutParent) throw new Error("missing_parent_accepted");
+    requireTrue(
+      "missing_parent_left_delegate_unchanged",
+      `select md5(replace(prosrc, E'\\r', ''))='7ec296e422f7f47c8b2793b051840798'
+       from pg_proc where oid='public.quicklog_save_manual_pre_logged_at(${signature})'::regprocedure;`,
+      env,
+      spawnImpl,
+    );
     executeSql(sqlFile("20260927002000_quicklog_manual_reuse_fence.sql"), env, {
       stage: "manual_reuse_parent",
       spawnImpl,
@@ -178,10 +196,6 @@ export async function runPlantLineageHarness({
       env,
       { stage: "delegate_identity_before", spawnImpl },
     );
-    const sql = sqlFile(migration);
-    if (createHash("sha256").update(sql).digest("hex") !== migrationSha256) {
-      throw new Error("migration_fingerprint_mismatch");
-    }
     executeSql(sql, env, { stage: "plant_lineage_apply", spawnImpl });
 
     const rejected = call("plant-lineage-rejected-0001", env, spawnImpl);
@@ -238,7 +252,7 @@ export async function runPlantLineageHarness({
     );
     return 1;
   }
-  process.stdout.write("Quick Log plant lineage PG15 harness PASS (8 assertions)\n");
+  process.stdout.write("Quick Log plant lineage PG15 harness PASS\n");
   return 0;
 }
 

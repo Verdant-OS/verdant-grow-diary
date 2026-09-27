@@ -118,6 +118,9 @@ type StoredNote = {
   note: string | null;
   plant_id: string | null;
   tent_id: string | null;
+  event_type: "observation";
+  source: "manual";
+  is_deleted: boolean;
 };
 let committed: Map<string, StoredNote>;
 
@@ -133,6 +136,9 @@ function modelLostNoteReply() {
       note: payload.p_note,
       plant_id: payload.p_target_type === "plant" ? payload.p_target_id : null,
       tent_id: "55555555-5555-4555-8555-555555555555",
+      event_type: "observation",
+      source: "manual",
+      is_deleted: false,
     });
     return { data: null, error: { message: "Failed to fetch" } };
   });
@@ -262,6 +268,22 @@ describe("ASTRA-001 exact Note recovery", () => {
     expect(eqMock).toHaveBeenCalledWith("id", "77777777-7777-4777-8777-000000000001");
     expect(screen.getByTestId("qlv2-persisted-note")).toHaveTextContent(originalNote);
     expect(screen.getByTestId("qlv2-post-save")).not.toHaveTextContent("Edited before resolution");
+  });
+
+  it("keeps a reused Note unresolved when its original event was retracted", async () => {
+    modelLostNoteReply();
+    renderSheet();
+    typeNote();
+    save();
+    await expectRetry();
+    const original = [...committed.values()][0];
+    original.is_deleted = true;
+    retry();
+    await expectRetry();
+    expect(rpcMock).toHaveBeenCalledTimes(2);
+    expect(readbackMock).toHaveBeenCalled();
+    expect(screen.queryByTestId("qlv2-post-save")).not.toBeInTheDocument();
+    expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeInTheDocument();
   });
 
   it("locks the first in-flight attempt and suppresses same-tick double submission", async () => {
@@ -443,7 +465,10 @@ describe("ASTRA-001 related Feed recovery", () => {
     expect(rpcMock).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Product 1 name")).toBeEnabled();
     expect(screen.queryByTestId("qlv2-exact-retry-lock")).not.toBeInTheDocument();
-    rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "feed-corrected" }, error: null });
+    rpcMock.mockResolvedValue({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002" },
+      error: null,
+    });
     fireEvent.change(screen.getByLabelText("Product 1 name"), { target: { value: "Base A" } });
     save();
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
@@ -461,7 +486,10 @@ describe("ASTRA-001 related Feed recovery", () => {
       if (JSON.stringify(payload) !== JSON.stringify(stored)) {
         return { data: { ok: false, reason: "idempotency_key_conflict" }, error: null };
       }
-      return { data: { ok: true, reused: true, grow_event_id: "feed-1" }, error: null };
+      return {
+        data: { ok: true, reused: true, grow_event_id: "77777777-7777-4777-8777-000000000003" },
+        error: null,
+      };
     });
     renderSheet();
     fireEvent.click(screen.getByRole("button", { name: "Feed" }));
@@ -477,6 +505,37 @@ describe("ASTRA-001 related Feed recovery", () => {
     await expectRetry();
     expect(screen.getByLabelText("Applied volume (ml)")).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Applied volume (ml)"), { target: { value: "1000" } });
+    readbackMock.mockImplementationOnce(async () => {
+      const args = stored as {
+        p_grow_id: string;
+        p_tent_id: string | null;
+        p_plant_id: string | null;
+        p_feed: { volume_ml: number; line_id: string };
+      };
+      return {
+        data: {
+          id: "77777777-7777-4777-8777-000000000003",
+          event_type: "feeding",
+          source: "manual",
+          is_deleted: false,
+          grow_id: args.p_grow_id,
+          tent_id: args.p_tent_id,
+          plant_id: args.p_plant_id,
+        },
+        error: null,
+      };
+    });
+    readbackMock.mockImplementationOnce(async () => {
+      const args = stored as { p_feed: { volume_ml: number; line_id: string } };
+      return {
+        data: {
+          event_id: "77777777-7777-4777-8777-000000000003",
+          volume_ml: args.p_feed.volume_ml,
+          line_id: args.p_feed.line_id,
+        },
+        error: null,
+      };
+    });
     retry();
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
     expect(rpcMock).toHaveBeenCalledTimes(2);
@@ -595,6 +654,9 @@ describe("durable unresolved Note recovery", () => {
       note: originalNote,
       plant_id: record.payload.p_target_id,
       tent_id: record.resolved.tentId,
+      event_type: "observation",
+      source: "manual",
+      is_deleted: false,
     });
     renderSheet();
     await expectRetry();
@@ -766,6 +828,9 @@ describe("durable unresolved Note recovery", () => {
       note: originalNote,
       plant_id: record.payload.p_target_id,
       tent_id: record.resolved.tentId,
+      event_type: "observation",
+      source: "manual",
+      is_deleted: false,
     });
     const view = renderSheet();
     await expectRetry();

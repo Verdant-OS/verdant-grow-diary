@@ -84,7 +84,15 @@ function prepareNoteSave() {
 /** A successful retry must verify the persisted event, not just the RPC reply. */
 function mockPersistedNote(eventId: string) {
   readbackMock.mockResolvedValueOnce({
-    data: { id: eventId, note: RETRY_NOTE, plant_id: "plant-1", tent_id: "tent-1" },
+    data: {
+      id: eventId,
+      note: RETRY_NOTE,
+      plant_id: "plant-1",
+      tent_id: "tent-1",
+      event_type: "observation",
+      source: "manual",
+      is_deleted: false,
+    },
     error: null,
   });
 }
@@ -152,7 +160,11 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
         error: null,
       })
       .mockResolvedValueOnce({
-        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", environment_event_id: null },
+        data: {
+          ok: true,
+          grow_event_id: "77777777-7777-4777-8777-000000000001",
+          environment_event_id: null,
+        },
         error: null,
       });
     renderSheet("plant:plant-1");
@@ -172,7 +184,9 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
       ),
     );
     expect(fromMock).toHaveBeenCalledWith("grow_events");
-    expect(selectMock).toHaveBeenCalledWith("id,note,plant_id,tent_id");
+    expect(selectMock).toHaveBeenCalledWith(
+      "id,note,plant_id,tent_id,event_type,source,is_deleted",
+    );
     expect(eqMock).toHaveBeenCalledWith("id", "77777777-7777-4777-8777-000000000001");
     expect(readbackMock).toHaveBeenCalledTimes(1);
     expect(rpcMock.mock.calls[1][1]).toEqual(rpcMock.mock.calls[0][1]);
@@ -194,7 +208,11 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
         error: null,
       })
       .mockResolvedValueOnce({
-        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002", environment_event_id: null },
+        data: {
+          ok: true,
+          grow_event_id: "77777777-7777-4777-8777-000000000002",
+          environment_event_id: null,
+        },
         error: null,
       });
     renderSheet("plant:plant-1");

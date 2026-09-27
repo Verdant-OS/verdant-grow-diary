@@ -50,10 +50,13 @@ function listSourceFiles(dir: string): string[] {
   });
 }
 
+const LEGACY_QUICK_LOG_SAVE_CALL =
+  /saveViaRpc\(\s*built\.payload,\s*saveEventType === "watering"\s*\?\s*\{\s*expectedWaterTarget:\s*saveTarget\s*\}\s*:\s*\{\s*telemetryIntent:\s*saveEventType\s*\},?\s*\)/;
+
 const QUICK_LOG_V2_SAVE_CALLERS = [
   {
     file: "src/components/QuickLog.tsx",
-    telemetryIntent: /saveViaRpc\(built\.payload,\s*\{\s*telemetryIntent:\s*saveEventType\s*\}\)/,
+    telemetryIntent: LEGACY_QUICK_LOG_SAVE_CALL,
   },
   {
     file: "src/components/QuickLogV2Sheet.tsx",
@@ -197,6 +200,11 @@ const QUICK_LOG_SUCCESS_SEAMS: Array<{
   extra: RegExp;
 }> = [
   {
+    file: "src/components/QuickLog.tsx",
+    calls: 2,
+    extra: /trackQuickLogSuccess\("water"\)/,
+  },
+  {
     file: "src/hooks/useQuickLogV2Save.ts",
     calls: 1,
     extra: /trackQuickLogSuccess\(options\.telemetryIntent,\s*\{\s*reused:/,
@@ -327,7 +335,7 @@ describe("each funnel event fires from its canonical seam", () => {
 describe("ordering and safety constraints at the seams", () => {
   it("shared manual RPC telemetry defaults off and fires only after explicit confirmed success", () => {
     const src = read("src/hooks/useQuickLogV2Save.ts");
-    const okBranch = src.indexOf('if (payload.p_action === "note" ? r.ok !== true : !r.ok)');
+    const okBranch = src.indexOf("if (r.ok !== true)");
     const uuidGate = src.indexOf("if (!isUuid(r.grow_event_id))");
     const optIn = src.indexOf("if (options.telemetryIntent !== undefined)");
     const track = src.indexOf("trackQuickLogSuccess(options.telemetryIntent");
@@ -345,9 +353,15 @@ describe("ordering and safety constraints at the seams", () => {
   it("legacy Quick Log tracks the grower's validated semantic UI selection", () => {
     const src = read("src/components/QuickLog.tsx");
     const supportedGate = src.indexOf("if (!isSupportedLegacyEventType(effectiveEventType))");
-    const save = src.indexOf("saveViaRpc(built.payload, { telemetryIntent: saveEventType })");
+    const save = src.search(LEGACY_QUICK_LOG_SAVE_CALL);
     expect(supportedGate).toBeGreaterThan(-1);
     expect(save).toBeGreaterThan(supportedGate);
+    expect(src).toMatch(
+      /const waterClear = waterRecord \? await reconcilePendingStarterWaterClear\(waterRecord\)[\s\S]*if \(waterClear\?\.status === "cleared"\) trackQuickLogSuccess\("water"\)/,
+    );
+    expect(src).toMatch(
+      /const clearance = await reconcilePendingStarterWaterClear\(record\)[\s\S]*if \(clearance\.status === "cleared"\) trackQuickLogSuccess\("water"\)/,
+    );
     expect(src).not.toMatch(/telemetryIntent:\s*built\.payload\.p_action/);
   });
 

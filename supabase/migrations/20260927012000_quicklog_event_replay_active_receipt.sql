@@ -42,6 +42,7 @@ BEGIN
        WHERE a.attrelid = 'public.grow_events'::pg_catalog.regclass
          AND a.attname = 'is_deleted'
          AND a.atttypid = 'boolean'::pg_catalog.regtype
+         AND a.attnotnull
          AND NOT a.attisdropped
      )
      OR NOT EXISTS (

@@ -84,18 +84,18 @@ export default function PendingCheckpointBanner({
   const queryClient = useQueryClient();
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId);
   const [saving, setSaving] = useState(false);
-  const [optimisticCleared, setOptimisticCleared] = useState(false);
+  const [optimisticClearedEntryId, setOptimisticClearedEntryId] = useState<string | null>(null);
   useEffect(() => {
-    setOptimisticCleared(false);
+    setOptimisticClearedEntryId(null);
   }, [plantId]);
 
   const entries = useMemo(() => asCheckpointEntries(rawRows), [rawRows]);
 
   const pending = useMemo(() => {
     if (pendingOverride !== undefined) return pendingOverride;
-    if (optimisticCleared) return null;
-    return derivePendingCheckpoint({ entries });
-  }, [pendingOverride, optimisticCleared, entries]);
+    const next = derivePendingCheckpoint({ entries });
+    return next?.diaryEntryId === optimisticClearedEntryId ? null : next;
+  }, [pendingOverride, optimisticClearedEntryId, entries]);
 
   const clearCheckpoint = useCallback(
     async (status: CheckpointClearStatus) => {
@@ -161,7 +161,7 @@ export default function PendingCheckpointBanner({
           toast.error("Could not update checkpoint status. Try again.");
           return;
         }
-        setOptimisticCleared(true);
+        setOptimisticClearedEntryId(pending.diaryEntryId);
         const keys = revisionMeta
           ? buildQuickLogRevisionInvalidationKeys({ ...revisionMeta, plantId, tentId, growId })
           : [["plant_recent_activity", plantId], ["diary_entries"]];

@@ -159,4 +159,33 @@ describe("checkpoint clearing with the linked diary write fence", () => {
       storageWrite.mockRestore();
     }
   });
+
+  it("shows a later checkpoint on the same plant after clearing the prior one", async () => {
+    mock.rows = [
+      {
+        id: diaryEntryId,
+        note: checkpointNote,
+        entry_at: "2026-09-27T10:00:00Z",
+        details: { linked_grow_event_id: "event-1" },
+      },
+    ];
+    const view = render(<PendingCheckpointBanner plantId="plant-1" />);
+    fireEvent.click(screen.getByTestId("pending-checkpoint-banner-done"));
+    await waitFor(() => expect(mock.success).toHaveBeenCalledWith("Checkpoint marked done."));
+    expect(screen.queryByTestId("pending-checkpoint-banner")).toBeNull();
+
+    mock.rows = [
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        note: "Next checkpoint: Check new growth",
+        entry_at: "2026-09-27T11:00:00Z",
+        details: {},
+      },
+      ...mock.rows,
+    ];
+    view.rerender(<PendingCheckpointBanner plantId="plant-1" />);
+    expect(screen.getByTestId("pending-checkpoint-banner-text").textContent).toBe(
+      "Check new growth",
+    );
+  });
 });

@@ -32,7 +32,7 @@ function sqlFile(name) {
     /\r\n/g,
     "\n",
   );
-  if (!/^BEGIN;\n/m.test(sql) || !/COMMIT;\nNOTIFY pgrst, 'reload schema';\n$/.test(sql)) {
+  if (!/^BEGIN;\n/m.test(sql) || !/COMMIT;\s*(?:NOTIFY pgrst, 'reload schema';\s*)?$/.test(sql)) {
     throw new Error("migration_shape_rejected");
   }
   return sql;

@@ -9,10 +9,7 @@ import {
   readPendingQuickLogWatering,
   type PendingQuickLogWatering,
 } from "@/lib/quickLogPendingWateringStore";
-import {
-  clearLocalStorageForTest,
-  setLocalStorageItemForTest,
-} from "./helpers/localStorageTestHelper";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const ownerId = "11111111-1111-4111-8111-111111111111";
 const plantId = "22222222-2222-4222-8222-222222222222";
@@ -121,7 +118,7 @@ describe("cross-path Water claims", () => {
     expect(new Set(lockNames).size).toBe(1);
   });
 
-  it("keeps a second typed tab on the first exact key", async () => {
+  it("keeps a second typed form in this tab on the first exact key", async () => {
     const second = typed();
     second.payload.idempotency_key = "second-typed-key";
     const [first, later] = await Promise.all([
@@ -133,10 +130,9 @@ describe("cross-path Water claims", () => {
     expect(readPendingQuickLogWatering(ownerId)).toEqual({ status: "pending", record: typed() });
   });
 
-  it("keeps a typed claim after tab-local storage is cleared and releases both paths only after exact clear", async () => {
+  it("releases both paths only after exact clear and releases the claim when the tab closes", async () => {
     const original = typed();
     expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
-    window.sessionStorage.clear();
     expect(readPendingQuickLogWatering(ownerId)).toEqual({ status: "pending", record: original });
     expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
     expect((await claimPendingStarterWater(starter())).status).toBe("other_pending");
@@ -149,10 +145,12 @@ describe("cross-path Water claims", () => {
     expect((await claimPendingStarterWater(starter())).status).toBe("other_pending");
     expect(await clearPendingQuickLogWatering(original)).toBe(true);
     expect((await claimPendingStarterWater(starter())).status).toBe("claimed");
+    window.sessionStorage.clear();
+    expect(readPendingQuickLogWatering(ownerId)).toEqual({ status: "empty" });
   });
 
   it("fails closed when a typed recovery value is malformed", async () => {
-    setLocalStorageItemForTest(`verdant:quick-log:pending-watering:v1:${ownerId}`, "not-json");
+    window.sessionStorage.setItem(`verdant:quick-log:pending-watering:v1:${ownerId}`, "not-json");
     expect(readPendingQuickLogWatering(ownerId)).toEqual({ status: "blocked" });
     expect((await claimPendingStarterWater(starter())).status).toBe("other_pending");
     expect((await claimPendingQuickLogWatering(typed())).status).toBe("blocked");

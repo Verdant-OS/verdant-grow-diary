@@ -94,7 +94,7 @@ afterEach(() => {
   else Reflect.deleteProperty(window.navigator, "locks");
 });
 
-describe("durable pending Water Quick Log ownership", () => {
+describe("tab-scoped pending Water Quick Log ownership", () => {
   it("reports empty only for an accessible owner slot with no record", async () => {
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "empty" });
   });
@@ -104,7 +104,8 @@ describe("durable pending Water Quick Log ownership", () => {
     const expected = record();
     const claimed = await claimPendingQuickLogWatering(input);
     expect(claimed).toEqual({ status: "claimed", record: expected });
-    expect(JSON.parse(getLocalStorageItemForTest(key())!)).toEqual(expected);
+    expect(JSON.parse(window.sessionStorage.getItem(key())!)).toEqual(expected);
+    expect(getLocalStorageItemForTest(key())).toBeNull();
     input.payload.volume_ml = 900;
     input.attachments.photo = false;
     input.payload.sensor_snapshot!.metrics.temperature_c = 30;
@@ -126,31 +127,27 @@ describe("durable pending Water Quick Log ownership", () => {
     });
   });
 
-  it("promotes an older tab-local recovery to shared storage before replay", async () => {
+  it("reuses an older tab-local recovery without copying private data to localStorage", async () => {
     const original = record();
     window.sessionStorage.setItem(key(), JSON.stringify(original));
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
     expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
-    expect(JSON.parse(getLocalStorageItemForTest(key())!)).toEqual(original);
-    expect(window.sessionStorage.getItem(key())).toBeNull();
+    expect(JSON.parse(window.sessionStorage.getItem(key())!)).toEqual(original);
+    expect(getLocalStorageItemForTest(key())).toBeNull();
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
     expect(await clearPendingQuickLogWatering(original)).toBe(true);
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "empty" });
   });
 
-  it("does not dispatch a promoted legacy claim if its tab-local copy cannot be removed", async () => {
+  it("releases a pending claim when its tab session ends", async () => {
     const original = record();
-    window.sessionStorage.setItem(key(), JSON.stringify(original));
-    const remove = Storage.prototype.removeItem;
-    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (this: Storage, name) {
-      if (this !== window.sessionStorage) remove.call(this, name);
-    });
-    expect(await claimPendingQuickLogWatering(original)).toEqual({ status: "blocked" });
-    expect(JSON.parse(getLocalStorageItemForTest(key())!)).toEqual(original);
-    expect(window.sessionStorage.getItem(key())).not.toBeNull();
+    expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
+    window.sessionStorage.clear();
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "empty" });
+    expect(getLocalStorageItemForTest(key())).toBeNull();
   });
 
-  it("treats a matching typed Water cleared by another tab as resolved", async () => {
+  it("treats a matching typed Water already cleared in this tab as resolved", async () => {
     const original = record();
     expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
     expect(await clearPendingQuickLogWatering(original)).toBe(true);
@@ -159,19 +156,19 @@ describe("durable pending Water Quick Log ownership", () => {
     });
   });
 
-  it("blocks conflicting tab-local and shared recovery records", async () => {
+  it("keeps a different pending tab-local record instead of replacing it", async () => {
     const original = record();
     expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
     const conflicting = record();
     conflicting.payload.idempotency_key = "other-water-key";
     window.sessionStorage.setItem(key(), JSON.stringify(conflicting));
-    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
-    expect((await claimPendingQuickLogWatering(original)).status).toBe("blocked");
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: conflicting });
+    expect((await claimPendingQuickLogWatering(original)).status).toBe("pending");
     expect(await clearPendingQuickLogWatering(original)).toBe(false);
   });
 
   it.each(["grow", "tent", "plant"])(
-    "refuses to promote an internally consistent non-UUID %s target",
+    "refuses an internally consistent non-UUID %s target",
     async (field) => {
       const invalid = record();
       if (field === "grow") {

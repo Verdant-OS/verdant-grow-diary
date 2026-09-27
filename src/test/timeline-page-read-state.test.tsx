@@ -152,6 +152,11 @@ vi.mock("@/components/OneTentLoopNextStepCard", () => ({
 
 vi.mock("@/components/GrowBreadcrumbs", () => ({ default: () => null }));
 vi.mock("@/components/EntryEditDialog", () => ({ default: () => null }));
+vi.mock("@/components/QuickLogEntryIntegrityControls", () => ({
+  default: ({ handle }: { handle: { diaryEntryId?: string } }) => (
+    <output data-testid="linked-quicklog-revision-controls" data-diary-id={handle.diaryEntryId} />
+  ),
+}));
 vi.mock("@/components/ScopedGrowBanner", () => ({ default: () => null }));
 vi.mock("@/components/DiaryEntryBadges", () => ({ default: () => null }));
 vi.mock("@/components/EnvironmentCheckSnapshotLinkButton", () => ({
@@ -787,6 +792,33 @@ describe("Timeline mounted read-state boundary", () => {
       "1 stage-tagged log",
     );
     expect(screen.getByTestId("timeline-one-tent-loop-next-step-card")).toBeInTheDocument();
+  });
+
+  it("offers revision controls rather than direct edit for a linked diary companion without a loaded spine", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("linked-diary", "Linked note"),
+              details: { event_type: "quick_log", linked_grow_event_id: "unloaded-spine" },
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    const card = (await screen.findByText("Linked note")).closest('[data-testid="timeline-entry"]');
+    expect(card).not.toBeNull();
+    expect(
+      within(card as HTMLElement).getByTestId("linked-quicklog-revision-controls"),
+    ).toHaveAttribute("data-diary-id", "linked-diary");
+    expect(within(card as HTMLElement).queryByRole("button", { name: "Edit" })).toBeNull();
   });
 
   const PLANT_QL_PERSIST_SNAPSHOT = {

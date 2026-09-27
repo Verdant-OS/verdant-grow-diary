@@ -24,6 +24,7 @@ export type QuickLogSaveReason =
   | "photo_saving_not_enabled"
   | "target_not_owned"
   | "grow_not_owned"
+  | "plant_tent_grow_mismatch"
   | "not_authenticated"
   | "save_failed"
   | "invalid_logged_at"
@@ -61,6 +62,8 @@ export function quickLogReasonToOperatorMessage(reason: string | null | undefine
     case "target_not_owned":
     case "grow_not_owned":
       return "Couldn't save this log because the selected grow, tent, or plant no longer matches your workspace. Re-select the plant and try again.";
+    case "plant_tent_grow_mismatch":
+      return "This plant's assigned tent belongs to another grow, so the entry was not saved.";
     case "not_authenticated":
       return "Sign in to log entries.";
     case "invalid_logged_at":
@@ -105,6 +108,8 @@ export function quickLogSaveRecoveryAction(reason: string | null | undefined): s
     case "missing_target_id":
     case "invalid_uuid_input":
       return "Re-select the grow, tent, and plant from the pickers, then save again.";
+    case "plant_tent_grow_mismatch":
+      return "Check the plant's grow and tent, correct the assignment, then retry this entry.";
     case "invalid_volume":
       return "Enter a volume above zero and save again.";
     case "empty_content":

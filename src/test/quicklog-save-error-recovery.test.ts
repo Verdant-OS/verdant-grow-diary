@@ -32,6 +32,7 @@ const SERVER_REASONS = [
   "invalid_logged_at",
   "target_not_owned",
   "grow_not_owned",
+  "plant_tent_grow_mismatch",
   "save_failed",
 ] as const;
 
@@ -90,6 +91,16 @@ describe("quickLogSaveRecoveryAction — every failure states what to do next", 
       expect(recovery).toMatch(/re-select/i);
       expect(recovery).not.toMatch(/connection/i);
     }
+  });
+
+  it("explains a plant/tent grow mismatch and how to correct the assignment", () => {
+    const message = quickLogReasonToOperatorMessage("plant_tent_grow_mismatch");
+    const recovery = quickLogSaveRecoveryAction("plant_tent_grow_mismatch");
+    expect(message).not.toBe(GENERIC_MESSAGE);
+    expect(message).toMatch(/plant.*tent.*another grow/i);
+    expect(message).toMatch(/not saved/i);
+    expect(recovery).not.toBe(GENERIC_RECOVERY);
+    expect(recovery).toMatch(/correct the assignment.*retry/i);
   });
 
   it("network failures reassure that input is kept", () => {

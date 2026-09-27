@@ -71,33 +71,80 @@ function productionSourceFiles(directory: string): string[] {
 }
 
 describe("dependency security Phase A resolution floors", () => {
-  it("runs the final full-suite shard with supported serial and isolated CLI options", () => {
-    const [nodeOptions, ...command] = packageJson.scripts["test:full:shard4"].split(" ");
-    expect(nodeOptions).toBe("NODE_OPTIONS=--max-old-space-size=6144");
-
-    // Use the installed CLI parser in Node, outside the suite's jsdom globals.
-    const parsed = JSON.parse(
-      execFileSync(
-        process.execPath,
-        [
-          "--input-type=module",
-          "--eval",
-          'import { parseCLI } from "vitest/node"; process.stdout.write(JSON.stringify(parseCLI(process.argv[1])));',
-          command.join(" "),
-        ],
-        { cwd: root, encoding: "utf8" },
-      ),
+  it("runs the final full-suite quarter in restartable isolated processes", () => {
+    expect(packageJson.scripts["test:full:shard4"]).toBe(
+      "node scripts/run-vitest-shard4-isolated.mjs",
     );
-    expect(parsed.filter).toEqual([]);
-    expect(parsed.options).toMatchObject({
-      run: true,
-      reporter: ["dot"],
-      shard: "4/4",
-      pool: "forks",
-      maxWorkers: 1,
-      fileParallelism: false,
-      isolate: true,
-    });
+    const plan = JSON.parse(
+      execFileSync(process.execPath, ["scripts/run-vitest-shard4-isolated.mjs", "--plan-json"], {
+        cwd: root,
+        encoding: "utf8",
+        timeout: 30_000,
+      }),
+    ) as {
+      totalFiles: number;
+      selectedFiles: string[];
+      chunks: string[][];
+      chunkSize: number;
+      fingerprint: string;
+      vitestFlags: string[];
+    };
+    expect(plan.totalFiles).toBeGreaterThan(0);
+    expect(plan.selectedFiles).toHaveLength(Math.floor(plan.totalFiles / 4));
+    expect(plan.chunks.length).toBeGreaterThan(1);
+    expect(plan.chunks.every((chunk) => chunk.length > 0 && chunk.length <= 10)).toBe(true);
+    expect(plan.chunks.flat()).toEqual(plan.selectedFiles);
+    expect(new Set(plan.selectedFiles).size).toBe(plan.selectedFiles.length);
+    expect(plan.fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect(plan.vitestFlags).toEqual([
+      "run",
+      "--reporter=dot",
+      "--pool=forks",
+      "--maxWorkers=1",
+      "--no-file-parallelism",
+      "--isolate",
+    ]);
+  }, 35_000);
+
+  it("fails closed on empty, duplicate, or out-of-repository shard discovery", async () => {
+    const { planIsolatedShard4 } = await import("../../scripts/run-vitest-shard4-isolated.mjs");
+    const fixture = resolve(root, "src/test/fixture.test.ts");
+    await expect(planIsolatedShard4([], root)).rejects.toThrow("no test files");
+    await expect(planIsolatedShard4([fixture, fixture], root)).rejects.toThrow("duplicate");
+    await expect(planIsolatedShard4([resolve(root, "../outside.test.ts")], root)).rejects.toThrow(
+      "outside the repository",
+    );
+  });
+
+  it("spawns one fresh isolated Vitest process per chunk and stops on the first failure", async () => {
+    const { runPlannedShard4 } = await import("../../scripts/run-vitest-shard4-isolated.mjs");
+    const launches: { args: string[]; cwd: string; nodeOptions: string }[] = [];
+    const spawn = (
+      _executable: string,
+      args: string[],
+      options: { cwd: string; env: NodeJS.ProcessEnv },
+    ) => {
+      launches.push({ args, cwd: options.cwd, nodeOptions: options.env.NODE_OPTIONS ?? "" });
+      return { status: launches.length === 2 ? 1 : 0 };
+    };
+    expect(() =>
+      runPlannedShard4(
+        { chunks: [["first.test.ts"], ["second.test.ts"], ["third.test.ts"]] },
+        root,
+        spawn,
+      ),
+    ).toThrow("chunk 2 failed");
+    expect(launches).toHaveLength(2);
+    expect(launches.map(({ args }) => args.at(-1))).toEqual(["first.test.ts", "second.test.ts"]);
+    expect(
+      launches.every(
+        ({ args, cwd }) =>
+          cwd === root && args.includes("--isolate") && args.includes("--no-file-parallelism"),
+      ),
+    ).toBe(true);
+    expect(launches.every(({ nodeOptions }) => nodeOptions.includes("--max-old-space-size"))).toBe(
+      true,
+    );
   });
 
   it("declares the direct security floors", () => {

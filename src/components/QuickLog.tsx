@@ -136,7 +136,10 @@ import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { resolveQuickLogTargetPlan } from "@/lib/quickLogTargetResolutionRules";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 import { persistedSensorSourceLabel } from "@/lib/quickLogSnapshotStripAdapter";
-import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
+import {
+  quickLogDraftPreservedFailureMessage,
+  quickLogReasonToOperatorMessage,
+} from "@/lib/quickLogSaveErrorMessage";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
 import { buildQuickLogDraftPreview } from "@/lib/quickLogDraftPreviewViewModel";
 import {
@@ -1619,9 +1622,7 @@ export default function QuickLog({
         lastFailedSaveSigRef.current = attemptSig;
         const reason = result.reason ?? "save_failed";
         const message = quickLogReasonToOperatorMessage(reason);
-        setSaveError(
-          `${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`,
-        );
+        setSaveError(quickLogDraftPreservedFailureMessage(reason));
         // Surface the (allow-listed) reason code alongside the friendly
         // copy so the operator and tests can correlate the failure with
         // logs without exposing tokens, endpoints, or raw payloads.

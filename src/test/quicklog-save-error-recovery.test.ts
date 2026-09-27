@@ -13,7 +13,9 @@ import { describe, expect, it } from "vitest";
 import {
   classifyQuickLogThrownSaveError,
   describeQuickLogSaveFailure,
+  quickLogDraftPreservedFailureMessage,
   quickLogReasonToOperatorMessage,
+  quickLogSaveRequiresHistoryCheck,
   quickLogSaveRecoveryAction,
 } from "@/lib/quickLogSaveErrorMessage";
 
@@ -24,6 +26,10 @@ const GENERIC_RECOVERY = quickLogSaveRecoveryAction("some_unknown_reason_code");
 const SERVER_REASONS = [
   "not_authenticated",
   "invalid_idempotency_key",
+  "idempotency_key_unverified",
+  "idempotency_receipt_missing",
+  "idempotency_key_retracted",
+  "idempotency_key_conflict",
   "invalid_target_type",
   "missing_target_id",
   "unsupported_action",
@@ -105,6 +111,26 @@ describe("quickLogSaveRecoveryAction — every failure states what to do next", 
 
   it("network failures reassure that input is kept", () => {
     expect(quickLogSaveRecoveryAction("network_error")).toMatch(/input stays/i);
+  });
+
+  it("requires a Timeline check for replay refusals instead of promising another retry", () => {
+    for (const reason of [
+      "idempotency_key_unverified",
+      "idempotency_receipt_missing",
+      "idempotency_key_retracted",
+      "idempotency_key_conflict",
+    ]) {
+      expect(quickLogSaveRequiresHistoryCheck(reason)).toBe(true);
+      const guidance = describeQuickLogSaveFailure(reason);
+      expect(guidance.message).toMatch(/Timeline/i);
+      expect(guidance.recovery).toMatch(/Timeline/i);
+      expect(guidance.recovery).not.toMatch(/retry|try again/i);
+      expect(quickLogDraftPreservedFailureMessage(reason)).toMatch(/Timeline/i);
+      expect(quickLogDraftPreservedFailureMessage(reason)).not.toMatch(/retry|try again/i);
+    }
+    expect(quickLogSaveRequiresHistoryCheck("network_error")).toBe(false);
+    expect(quickLogSaveRequiresHistoryCheck(null)).toBe(false);
+    expect(quickLogDraftPreservedFailureMessage("network_error")).toMatch(/retry/i);
   });
 
   it("describeQuickLogSaveFailure composes the same message and recovery", () => {

@@ -66,7 +66,7 @@ function renderSheet(defaultTargetKey: string) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  render(
+  return render(
     <QueryClientProvider client={client}>
       <QuickLogV2Sheet open={true} onOpenChange={vi.fn()} defaultTargetKey={defaultTargetKey} />
     </QueryClientProvider>,
@@ -114,6 +114,33 @@ beforeEach(() => {
 });
 
 describe("QuickLogV2Sheet — failed save Retry button", () => {
+  it("does not offer an impossible retry after a refused historical replay", async () => {
+    rpcMock.mockResolvedValue({
+      data: { ok: false, reason: "idempotency_key_unverified" },
+      error: null,
+    });
+    const mounted = renderSheet("plant:plant-1");
+    prepareNoteSave();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.getByTestId("qlv2-error")).toHaveTextContent("Timeline"));
+    expect(screen.queryByTestId("qlv2-save-retry")).not.toBeInTheDocument();
+    expect(screen.getByTestId("qlv2-save")).toBeDisabled();
+    expect(screen.getByTestId("qlv2-history-review-link")).toHaveAttribute(
+      "href",
+      "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1",
+    );
+    expect(screen.getByTestId("qlv2-history-review-link")).toHaveAttribute("target", "_blank");
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+
+    mounted.unmount();
+    renderSheet("plant:plant-1");
+    expect(screen.getByTestId("qlv2-error")).toHaveTextContent("Timeline");
+    expect(screen.queryByTestId("qlv2-save-retry")).not.toBeInTheDocument();
+    expect(screen.getByTestId("qlv2-save")).toBeDisabled();
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+  });
+
   it("renders inline error + Retry button on failed save", async () => {
     rpcMock.mockResolvedValue({
       data: { ok: false, reason: "save_failed" },

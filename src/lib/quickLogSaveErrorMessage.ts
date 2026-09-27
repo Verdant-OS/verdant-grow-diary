@@ -33,11 +33,43 @@ export type QuickLogSaveReason =
   | "missing_target_id"
   | "unsupported_action"
   | "invalid_idempotency_key"
+  | "idempotency_key_unverified"
+  | "idempotency_receipt_missing"
+  | "idempotency_key_retracted"
+  | "idempotency_key_conflict"
   | "invalid_uuid_input"
   | "rpc_unavailable"
   | "not_authorized"
   | "network_error"
   | (string & {});
+
+export type QuickLogHistoryCheckReason =
+  | "idempotency_key_unverified"
+  | "idempotency_receipt_missing"
+  | "idempotency_key_retracted"
+  | "idempotency_key_conflict";
+
+const REPLAY_HISTORY_CHECK_REASONS = new Set<string>([
+  "idempotency_key_unverified",
+  "idempotency_receipt_missing",
+  "idempotency_key_retracted",
+  "idempotency_key_conflict",
+]);
+
+/** A refusal that cannot be resolved by resending the same save reference. */
+export function quickLogSaveRequiresHistoryCheck(
+  reason: unknown,
+): reason is QuickLogHistoryCheckReason {
+  return typeof reason === "string" && REPLAY_HISTORY_CHECK_REASONS.has(reason);
+}
+
+/** Preserve the legacy form's draft reassurance without offering an impossible retry. */
+export function quickLogDraftPreservedFailureMessage(reason: string | null | undefined): string {
+  const message = quickLogReasonToOperatorMessage(reason);
+  return quickLogSaveRequiresHistoryCheck(reason)
+    ? `${message} Your input is still here.`
+    : `${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`;
+}
 
 export function quickLogReasonToOperatorMessage(reason: string | null | undefined): string {
   switch (reason) {
@@ -77,6 +109,14 @@ export function quickLogReasonToOperatorMessage(reason: string | null | undefine
       return "The server does not accept this activity type yet.";
     case "invalid_idempotency_key":
       return "The save reference for this entry was rejected.";
+    case "idempotency_key_unverified":
+      return "This log may already be saved, but its earlier save cannot be confirmed. Check Timeline before starting another log.";
+    case "idempotency_receipt_missing":
+      return "The original log's linked history could not be confirmed. Check Timeline before starting another log.";
+    case "idempotency_key_retracted":
+      return "The original log was retracted. Check Timeline before starting another log.";
+    case "idempotency_key_conflict":
+      return "This save reference was already used for different details. Check Timeline before starting another log.";
     case "invalid_uuid_input":
       return "The selected plant or tent reference is malformed.";
     case "rpc_unavailable":
@@ -127,6 +167,11 @@ export function quickLogSaveRecoveryAction(reason: string | null | undefined): s
       return "Refresh the app to pick up the latest version, then log this as a note or watering.";
     case "invalid_idempotency_key":
       return "Close and reopen the log form, then save again — that creates a fresh save reference.";
+    case "idempotency_key_unverified":
+    case "idempotency_receipt_missing":
+    case "idempotency_key_retracted":
+    case "idempotency_key_conflict":
+      return "Check Timeline for the original log. If its history is unclear, ask support before submitting another entry.";
     case "not_authenticated":
       return "Sign in again, then retry. Your input stays on this screen.";
     case "not_authorized":

@@ -43,6 +43,12 @@ export type QuickLogSaveReason =
   | "network_error"
   | (string & {});
 
+export type QuickLogHistoryCheckReason =
+  | "idempotency_key_unverified"
+  | "idempotency_receipt_missing"
+  | "idempotency_key_retracted"
+  | "idempotency_key_conflict";
+
 const REPLAY_HISTORY_CHECK_REASONS = new Set<string>([
   "idempotency_key_unverified",
   "idempotency_receipt_missing",
@@ -51,7 +57,9 @@ const REPLAY_HISTORY_CHECK_REASONS = new Set<string>([
 ]);
 
 /** A refusal that cannot be resolved by resending the same save reference. */
-export function quickLogSaveRequiresHistoryCheck(reason: string | null | undefined): boolean {
+export function quickLogSaveRequiresHistoryCheck(
+  reason: unknown,
+): reason is QuickLogHistoryCheckReason {
   return typeof reason === "string" && REPLAY_HISTORY_CHECK_REASONS.has(reason);
 }
 

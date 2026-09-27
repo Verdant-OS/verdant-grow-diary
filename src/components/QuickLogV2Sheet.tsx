@@ -4,6 +4,7 @@ import {
   readPendingQuickLogNote,
   claimPendingQuickLogNote,
   clearPendingQuickLogNote,
+  markPendingQuickLogNoteHistoryCheck,
   NOTE_RECOVERY_UNAVAILABLE,
   NOTE_RECOVERY_PENDING,
   NOTE_RECOVERY_CLEAR_FAILED,
@@ -477,7 +478,9 @@ function QuickLogV2SheetForOwner({
   const [wateringSaving, setWateringSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(
     initialNote
-      ? NOTE_RECOVERY_PENDING
+      ? initialNote.historyCheckReason
+        ? quickLogReasonToOperatorMessage(initialNote.historyCheckReason)
+        : NOTE_RECOVERY_PENDING
       : initialWatering
         ? WATERING_RECOVERY_PENDING
         : initialFeeding
@@ -499,7 +502,9 @@ function QuickLogV2SheetForOwner({
   const [exactRetryPending, setExactRetryPending] = useState(
     Boolean(initialNote || initialFeeding),
   );
-  const [historyCheckRequired, setHistoryCheckRequired] = useState(false);
+  const [historyCheckRequired, setHistoryCheckRequired] = useState(
+    Boolean(initialNote?.historyCheckReason),
+  );
   const [persistedNote, setPersistedNote] = useState<string | null | undefined>(undefined);
   const [mismatchedReceipt, setMismatchedReceipt] = useState<{
     note: string | null;
@@ -1293,11 +1298,16 @@ function QuickLogV2SheetForOwner({
     setForm(restoredNoteForm(record));
     manualTempEntryUnitRef.current = "celsius";
     setExactRetryPending(true);
+    setHistoryCheckRequired(Boolean(record.historyCheckReason));
     keepSubmissionLockedRef.current = true;
     submissionLockedRef.current = true;
     setSubmissionLocked(true);
     setRestoredMediaPending(record.attachments.photo || record.attachments.video);
-    setLocalError(NOTE_RECOVERY_PENDING);
+    setLocalError(
+      record.historyCheckReason
+        ? quickLogReasonToOperatorMessage(record.historyCheckReason)
+        : NOTE_RECOVERY_PENDING,
+    );
     resetPhotoSelection();
     resetVideoSelection();
   }
@@ -1860,7 +1870,19 @@ function QuickLogV2SheetForOwner({
       }
       if (exactSubmission && !canContinueNote()) return;
       const reason = res.reason || "save_failed";
-      setHistoryCheckRequired(quickLogSaveRequiresHistoryCheck(reason));
+      if (quickLogSaveRequiresHistoryCheck(reason) && exactManualSubmission) {
+        const marked = markPendingQuickLogNoteHistoryCheck(exactManualSubmission.recovery, reason);
+        if (marked.status === "marked") {
+          manualRetrySubmissionRef.current = {
+            ...exactManualSubmission,
+            recovery: marked.record,
+          };
+        }
+        // Even when storage fails, keep this mounted sheet fail-closed.
+        setHistoryCheckRequired(true);
+      } else {
+        setHistoryCheckRequired(false);
+      }
       if (reason === "receipt_mismatch" && res.growEventId && res.persistedNote !== undefined) {
         const navigation = buildQuickLogTimelineNavTarget({
           growId: resolved.growId ?? null,

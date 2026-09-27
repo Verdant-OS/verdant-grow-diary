@@ -24,16 +24,20 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 vi.mock("@/lib/quickLogRevisionService", () => ({ correctQuickLogEntry: mock.correct }));
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" } }),
+}));
 vi.mock("sonner", () => ({ toast: { success: mock.success, error: mock.error } }));
 
 import PendingCheckpointBanner from "@/components/PendingCheckpointBanner";
 
 const checkpointNote = "Observation: clear\nNext checkpoint: Check leaves tomorrow";
+const diaryEntryId = "11111111-1111-4111-8111-111111111111";
 
 function showCheckpoint(details: Record<string, unknown>) {
   mock.rows = [
     {
-      id: "entry-1",
+      id: diaryEntryId,
       note: checkpointNote,
       entry_at: "2026-09-27T10:00:00Z",
       details,
@@ -44,14 +48,15 @@ function showCheckpoint(details: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.sessionStorage.clear();
   mock.rows = [];
   mock.invalidate.mockResolvedValue(undefined);
   mock.correct.mockResolvedValue({
     ok: true,
     growEventId: "event-1",
-    diaryEntryIds: ["entry-1"],
+    diaryEntryIds: [diaryEntryId],
   });
-  mock.select.mockResolvedValue({ data: [{ id: "entry-1" }], error: null });
+  mock.select.mockResolvedValue({ data: [{ id: diaryEntryId }], error: null });
   mock.update.mockReturnValue({ eq: () => ({ select: mock.select }) });
 });
 
@@ -63,7 +68,7 @@ describe("checkpoint clearing with the linked diary write fence", () => {
     fireEvent.click(screen.getByTestId("pending-checkpoint-banner-done"));
     await waitFor(() => expect(mock.success).toHaveBeenCalledWith("Checkpoint marked done."));
     expect(mock.correct).toHaveBeenCalledWith(
-      { diaryEntryId: "entry-1" },
+      { diaryEntryId },
       "other",
       { note: `${checkpointNote}\nCheckpoint status: done` },
       "Checkpoint done",
@@ -71,6 +76,7 @@ describe("checkpoint clearing with the linked diary write fence", () => {
     );
     expect(mock.update).not.toHaveBeenCalled();
     expect(mock.invalidate).toHaveBeenCalledWith({ queryKey: ["grow_events"] });
+    expect(window.sessionStorage.length).toBe(0);
   });
 
   it("keeps ordinary diary updates on their existing path", async () => {
@@ -99,6 +105,7 @@ describe("checkpoint clearing with the linked diary write fence", () => {
     await waitFor(() => expect(mock.error).toHaveBeenCalled());
     expect(mock.update).not.toHaveBeenCalled();
     expect(mock.success).not.toHaveBeenCalled();
+    expect(window.sessionStorage.length).toBe(0);
   });
 
   it("does not send a conflicting checkpoint decision after an uncertain correction", async () => {
@@ -110,5 +117,46 @@ describe("checkpoint clearing with the linked diary write fence", () => {
     await waitFor(() => expect(mock.error).toHaveBeenCalledTimes(2));
     expect(mock.correct).toHaveBeenCalledTimes(1);
     expect(mock.success).not.toHaveBeenCalled();
+  });
+
+  it("reuses the exact correction key after remount when the first reply was lost", async () => {
+    mock.correct.mockResolvedValue({ ok: false, reason: "rpc_error" });
+    mock.rows = [
+      {
+        id: diaryEntryId,
+        note: checkpointNote,
+        entry_at: "2026-09-27T10:00:00Z",
+        details: { linked_grow_event_id: "event-1" },
+      },
+    ];
+    const first = render(<PendingCheckpointBanner plantId="plant-1" />);
+    fireEvent.click(screen.getByTestId("pending-checkpoint-banner-done"));
+    await waitFor(() => expect(mock.correct).toHaveBeenCalledTimes(1));
+    const originalKey = mock.correct.mock.calls[0][4];
+
+    first.unmount();
+    render(<PendingCheckpointBanner plantId="plant-1" />);
+    fireEvent.click(screen.getByTestId("pending-checkpoint-banner-dismiss"));
+    await waitFor(() => expect(mock.error).toHaveBeenCalledTimes(2));
+    expect(mock.correct).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId("pending-checkpoint-banner-done"));
+    await waitFor(() => expect(mock.correct).toHaveBeenCalledTimes(2));
+    expect(mock.correct.mock.calls[1][4]).toBe(originalKey);
+    expect(mock.success).not.toHaveBeenCalled();
+  });
+
+  it("does not send a linked correction when its retry key cannot be preserved", async () => {
+    const storageWrite = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage unavailable");
+    });
+    try {
+      showCheckpoint({ linked_grow_event_id: "event-1" });
+      fireEvent.click(screen.getByTestId("pending-checkpoint-banner-done"));
+      await waitFor(() => expect(mock.error).toHaveBeenCalledTimes(1));
+      expect(mock.correct).not.toHaveBeenCalled();
+      expect(mock.success).not.toHaveBeenCalled();
+    } finally {
+      storageWrite.mockRestore();
+    }
   });
 });

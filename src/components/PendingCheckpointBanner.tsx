@@ -14,7 +14,7 @@
  * No Action Queue. No new RPC.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Camera, Check, Flag, X } from "lucide-react";
 import { toast } from "sonner";
@@ -22,10 +22,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/store/auth";
 import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
-import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import { correctQuickLogEntry } from "@/lib/quickLogRevisionService";
 import { QUICKLOG_REVISION_FAILURE_COPY } from "@/lib/quick-log/quickLogRevisionRules";
+import { createCheckpointCorrectionJournal } from "@/lib/visitCheckpointCorrectionStore";
 import {
   buildQuickLogRevisionInvalidationKeys,
   QUICKLOG_REVISION_INVALIDATION_KEY_CONTAINS,
@@ -40,6 +41,8 @@ import {
   type PendingVisitCheckpoint,
   type VisitCheckpointDiaryEntry,
 } from "@/lib/visitCheckpointRules";
+
+const checkpointCorrectionJournal = createCheckpointCorrectionJournal();
 
 function asCheckpointEntries(rows: unknown): VisitCheckpointDiaryEntry[] {
   if (!Array.isArray(rows)) return [];
@@ -77,15 +80,13 @@ export default function PendingCheckpointBanner({
   tentId,
   pendingOverride,
 }: PendingCheckpointBannerProps) {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId);
   const [saving, setSaving] = useState(false);
   const [optimisticCleared, setOptimisticCleared] = useState(false);
-  const correctionKeyRef = useRef<{ intent: string; key: string } | null>(null);
-
   useEffect(() => {
     setOptimisticCleared(false);
-    correctionKeyRef.current = null;
   }, [plantId]);
 
   const entries = useMemo(() => asCheckpointEntries(rawRows), [rawRows]);
@@ -107,20 +108,27 @@ export default function PendingCheckpointBanner({
         let saved = false;
         let revisionMeta: { growEventId: string | null; diaryEntryIds: string[] } | null = null;
         if (row?.linkedQuickLog) {
+          const ownerId = user?.id;
+          if (!ownerId) {
+            toast.error("Can't safely save this checkpoint right now. Please try again.");
+            return;
+          }
           const intent = `${pending.diaryEntryId}:${status}:${nextNote}`;
-          if (correctionKeyRef.current && correctionKeyRef.current.intent !== intent) {
+          const claim = checkpointCorrectionJournal.claim(ownerId, pending.diaryEntryId, intent);
+          if (claim.status === "conflict") {
             toast.error("The previous checkpoint update is unconfirmed. Retry that action first.");
             return;
           }
-          if (correctionKeyRef.current?.intent !== intent) {
-            correctionKeyRef.current = { intent, key: newQuickLogSaveKey() };
+          if (claim.status === "blocked") {
+            toast.error("Can't safely save this checkpoint right now. Please try again.");
+            return;
           }
           const result = await correctQuickLogEntry(
             { diaryEntryId: pending.diaryEntryId },
             "other",
             { note: nextNote },
             `Checkpoint ${status}`,
-            correctionKeyRef.current.key,
+            claim.idempotencyKey,
           );
           saved = result.ok;
           if (result.ok) {
@@ -128,11 +136,18 @@ export default function PendingCheckpointBanner({
               growEventId: result.growEventId,
               diaryEntryIds: result.diaryEntryIds,
             };
-          } else if (
-            result.reason !== "rpc_error" &&
-            Object.hasOwn(QUICKLOG_REVISION_FAILURE_COPY, result.reason)
+          }
+          if (
+            result.ok ||
+            (result.reason !== "rpc_error" &&
+              Object.hasOwn(QUICKLOG_REVISION_FAILURE_COPY, result.reason))
           ) {
-            correctionKeyRef.current = null;
+            checkpointCorrectionJournal.clear(
+              ownerId,
+              pending.diaryEntryId,
+              intent,
+              claim.idempotencyKey,
+            );
           }
         } else {
           const { data, error } = await supabase
@@ -146,7 +161,6 @@ export default function PendingCheckpointBanner({
           toast.error("Could not update checkpoint status. Try again.");
           return;
         }
-        correctionKeyRef.current = null;
         setOptimisticCleared(true);
         const keys = revisionMeta
           ? buildQuickLogRevisionInvalidationKeys({ ...revisionMeta, plantId, tentId, growId })
@@ -173,7 +187,7 @@ export default function PendingCheckpointBanner({
         setSaving(false);
       }
     },
-    [pending, saving, entries, queryClient, plantId, tentId, growId],
+    [pending, saving, entries, queryClient, plantId, tentId, growId, user?.id],
   );
 
   const openSameAngle = useCallback(() => {

@@ -1,7 +1,11 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
+import {
+  buildSensorsQuickLogManualReadingsQueryKey,
+  useSensorsQuickLogManualReadings,
+} from "@/hooks/useSensorsQuickLogManualReadings";
 
 const io = vi.hoisted(() => ({
   userId: "owner-a" as string | null,
@@ -80,7 +84,7 @@ function mount(tent: string | null = TENT) {
     defaultOptions: { queries: { retry: false, staleTime: Infinity, gcTime: 0 } },
   });
   clients.push(client);
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
+  const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
   return {
@@ -118,7 +122,11 @@ describe("Quick Log manual projection follows the clock without another read", (
     await advance(1);
     expect(result.current.isSuccess).toBe(true);
     expect(result.current.data[0]?.status).toBe("invalid");
-    const cache = client.getQueriesData({ queryKey: ["grow_events", "sensors-ql-manuals"] });
+    const queryKey = [...buildSensorsQuickLogManualReadingsQueryKey(TENT), io.userId ?? "anon"];
+    const cache = client.getQueriesData({ queryKey });
+    expect(cache).toHaveLength(2);
+    expect(cache.map(([key]) => key.at(-1)).sort()).toEqual(["diary", "events"]);
+    expect(cache.some(([, data]) => Array.isArray(data) && data.length === 1)).toBe(true);
     const cacheBefore = structuredClone(cache);
     const readingBefore = structuredClone(result.current.data[0]);
     expect(io.read).toHaveBeenCalledTimes(2);
@@ -130,9 +138,7 @@ describe("Quick Log manual projection follows the clock without another read", (
     expect(result.current.isSuccess).toBe(true);
     expect(result.current.isError).toBe(false);
     expect(io.read).toHaveBeenCalledTimes(2);
-    expect(client.getQueriesData({ queryKey: ["grow_events", "sensors-ql-manuals"] })).toEqual(
-      cacheBefore,
-    );
+    expect(client.getQueriesData({ queryKey })).toEqual(cacheBefore);
     expect(row).toEqual(before);
   });
 

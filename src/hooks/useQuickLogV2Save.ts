@@ -8,6 +8,8 @@ import { trackQuickLogSuccess, type QuickLogSuccessInput } from "@/lib/quickLogS
 import {
   matchesReusedWaterEvent,
   matchesReusedWaterReceipt,
+  matchesRetractedWaterEvent,
+  matchesRetractedWaterReceipt,
   resolveStarterWaterReceiptTarget,
 } from "@/lib/quickLogWaterReceiptRules";
 
@@ -24,6 +26,8 @@ export interface QuickLogV2SaveResult {
   /** Persisted context when a starter plant moved before its Watering committed. */
   savedWaterTarget?: QuickLogResolvedTarget;
   waterContextChanged?: boolean;
+  /** Exact Watering was saved previously, then retracted; it is not an active save. */
+  savedThenRetracted?: boolean;
 }
 
 interface RpcResponse {
@@ -128,7 +132,9 @@ export function useQuickLogV2Save() {
             setError("receipt_unverified");
             return { ok: false, reason: "receipt_unverified" };
           }
-          if (!matchesReusedWaterEvent(payload, eventId, event)) {
+          const retractedReplay =
+            r.reused === true && matchesRetractedWaterEvent(payload, eventId, event);
+          if (!matchesReusedWaterEvent(payload, eventId, event) && !retractedReplay) {
             setError("receipt_mismatch");
             return { ok: false, reason: "receipt_mismatch" };
           }
@@ -140,6 +146,14 @@ export function useQuickLogV2Save() {
           if (childError || !child) {
             setError("receipt_unverified");
             return { ok: false, reason: "receipt_unverified" };
+          }
+          if (retractedReplay) {
+            if (!matchesRetractedWaterReceipt(payload, eventId, event, child)) {
+              setError("receipt_mismatch");
+              return { ok: false, reason: "receipt_mismatch" };
+            }
+            setError("saved_then_retracted");
+            return { ok: false, reason: "saved_then_retracted", savedThenRetracted: true };
           }
           if (!matchesReusedWaterReceipt(payload, eventId, event, child)) {
             setError("receipt_mismatch");

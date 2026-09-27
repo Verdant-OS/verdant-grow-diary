@@ -259,7 +259,7 @@ describe("starter Water manual receipt validation", () => {
     },
   );
 
-  it("does not confirm a reused Watering that has been retracted", async () => {
+  it("resolves an exact reused Watering that has since been retracted without reporting a save", async () => {
     mocks.rpc.mockResolvedValue({
       data: { ok: true, grow_event_id: id, reused: true },
       error: null,
@@ -278,6 +278,37 @@ describe("starter Water manual receipt validation", () => {
       },
       error: null,
     });
+    const { result } = renderHook(() => useQuickLogV2Save());
+    await act(async () => {
+      expect(await result.current.save(payload)).toMatchObject({
+        ok: false,
+        reason: "saved_then_retracted",
+        savedThenRetracted: true,
+      });
+    });
+    expect(mocks.track).not.toHaveBeenCalled();
+  });
+
+  it("does not resolve a retracted Watering whose child volume differs", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: { ok: true, grow_event_id: id, reused: true },
+      error: null,
+    });
+    mocks.eventRead.mockResolvedValue({
+      data: {
+        id,
+        event_type: "watering",
+        source: "manual",
+        is_deleted: true,
+        grow_id: growId,
+        tent_id: tentId,
+        plant_id: payload.p_target_id,
+        occurred_at: payload.p_occurred_at,
+        note: payload.p_note,
+      },
+      error: null,
+    });
+    mocks.waterRead.mockResolvedValue({ data: { event_id: id, volume_ml: 500 }, error: null });
     const { result } = renderHook(() => useQuickLogV2Save());
     await act(async () => {
       expect(await result.current.save(payload)).toMatchObject({

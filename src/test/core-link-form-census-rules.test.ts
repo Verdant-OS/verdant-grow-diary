@@ -4,8 +4,11 @@ import { describe, expect, it } from "vitest";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
+  AUTHENTICATED_CORE_CENSUS_BATCHES,
   PRIVILEGED_ROUTE_PREFIXES,
   PUBLIC_CORE_CENSUS_ROUTES,
+  PUBLIC_CORE_CENSUS_BATCHES,
+  batchCensusRoutes,
   classifyLink,
   expectedCensusNavigationPath,
   fallbackSelectExerciseFailureIsFatal,
@@ -40,6 +43,54 @@ const CENSUS_SPEC_SOURCE = readFileSync(
 );
 
 describe("core link and form census rules", () => {
+  it("schedules every authenticated route once with its original contract and ordered tail", () => {
+    const routes = AUTHENTICATED_CORE_CENSUS_BATCHES.flat();
+    expect(AUTHENTICATED_CORE_CENSUS_ROUTES).toHaveLength(46);
+    expect(AUTHENTICATED_CORE_CENSUS_BATCHES.map((batch) => batch.length)).toEqual([
+      12, 12, 12, 10,
+    ]);
+    expect(routes).toEqual(AUTHENTICATED_CORE_CENSUS_ROUTES);
+    expect(new Set(routes.map((route) => route.path)).size).toBe(46);
+    routes.forEach((route, index) => {
+      expect(route).toBe(AUTHENTICATED_CORE_CENSUS_ROUTES[index]);
+    });
+  });
+
+  it("schedules every public route once without changing its order or contract", () => {
+    expect(PUBLIC_CORE_CENSUS_BATCHES.flat()).toEqual(PUBLIC_CORE_CENSUS_ROUTES);
+    expect(PUBLIC_CORE_CENSUS_BATCHES).toHaveLength(5);
+    expect(PUBLIC_CORE_CENSUS_BATCHES.every((batch) => batch.length > 0 && batch.length <= 7)).toBe(
+      true,
+    );
+    expect(new Set(PUBLIC_CORE_CENSUS_BATCHES.flat().map((route) => route.path)).size).toBe(
+      PUBLIC_CORE_CENSUS_ROUTES.length,
+    );
+    for (const route of PUBLIC_CORE_CENSUS_ROUTES) {
+      expect(PUBLIC_CORE_CENSUS_BATCHES.flat().find((value) => value.path === route.path)).toBe(
+        route,
+      );
+    }
+  });
+
+  it("keeps the final incomplete batch and does not mutate the route schedule", () => {
+    const routes = Object.freeze(PUBLIC_CORE_CENSUS_ROUTES.slice(0, 8));
+    const batches = batchCensusRoutes(routes, 3);
+    expect(batches.map((batch) => batch.map((route) => route.path))).toEqual([
+      ["/welcome", "/auth", "/pricing"],
+      ["/founder", "/checkout/success", "/checkout/cancel"],
+      ["/contact", "/feedback"],
+    ]);
+    expect(routes).toHaveLength(8);
+    expect(batchCensusRoutes([], 3)).toEqual([]);
+  });
+
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    "rejects an invalid census batch limit (%s)",
+    (limit) => {
+      expect(() => batchCensusRoutes(PUBLIC_CORE_CENSUS_ROUTES, limit)).toThrow(/positive integer/);
+    },
+  );
+
   it("matches exact and dynamic manifest routes without allowing the catch-all", () => {
     expect(matchesKnownAppRoute("/grows", MANIFEST)).toBe(true);
     expect(matchesKnownAppRoute("/grows/11111111-1111-4111-8111-111111111111", MANIFEST)).toBe(

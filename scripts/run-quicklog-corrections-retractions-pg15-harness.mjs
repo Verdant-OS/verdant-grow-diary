@@ -306,6 +306,15 @@ function proveRequiredCoreCatalogCliParity(env, spawnImpl) {
   if (JSON.stringify(viaCli) !== JSON.stringify(viaStdin)) {
     throw new Error("required_core_catalog_cli:mismatch");
   }
+  const rejectedSql = spawnImpl(
+    "psql",
+    [...buildPsqlArgs({ quiet: true }), "--single-transaction", "-c", "select 1/0;"],
+    { encoding: "utf8", env, maxBuffer: MAX_PSQL_OUTPUT_BYTES },
+  );
+  if (rejectedSql?.error || rejectedSql?.status === 0 || rejectedSql?.status == null) {
+    throw new Error("required_core_catalog_cli:negative_probe_unexpected");
+  }
+  process.stdout.write(`Quick Log catalog -c SQL rejection status: ${rejectedSql.status}\n`);
 }
 
 function injectBeforeUniqueMarker(sql, marker, injectedSql) {

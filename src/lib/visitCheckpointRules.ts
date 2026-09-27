@@ -5,8 +5,9 @@
  * GDP GATE: no schema/RPC/migration. Checkpoint text is parsed from note
  * bodies written by composeGrowWalkCloseoutNote (`Next checkpoint: …`).
  * Clear is a grower-driven durable marker line on the same entry
- * (`Checkpoint status: done` / `Checkpoint status: dismissed`), matching
- * the existing diary_entries.note update path (EntryEditDialog).
+ * (`Checkpoint status: done` / `Checkpoint status: dismissed`). Linked Quick
+ * Log companions take the audited revision path; ordinary diary rows retain
+ * their direct note update.
  *
  * No Action Queue. No fake data. Client-side derive only.
  */
@@ -24,6 +25,8 @@ export interface VisitCheckpointDiaryEntry {
   readonly entry_at?: string | null;
   readonly occurred_at?: string | null;
   readonly created_at?: string | null;
+  /** A Quick Log companion needs the canonical correction RPC for note changes. */
+  readonly linkedQuickLog?: boolean;
 }
 
 export interface PendingVisitCheckpoint {

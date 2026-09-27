@@ -69,7 +69,7 @@ function expectCount(label, sql, expected, connection) {
   if (actual !== String(expected)) throw new Error(`${label}:expected_${expected}_got_${actual}`);
 }
 
-function expectFailure(label, sql, connection) {
+function expectFailure(label, sql, connection, pattern = /row-level security policy/i) {
   const result = spawnSync("psql", ["-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1"], {
     encoding: "utf8",
     input: sql,
@@ -85,8 +85,8 @@ function expectFailure(label, sql, connection) {
       PGAPPNAME: "verdant-linked-quicklog-diary-pg15-harness",
     },
   });
-  if (result.error || result.status === 0 || !/row-level security policy/i.test(result.stderr)) {
-    throw new Error(`${label}:expected_rls_rejection`);
+  if (result.error || result.status === 0 || !pattern.test(result.stderr)) {
+    throw new Error(`${label}:expected_database_rejection`);
   }
 }
 
@@ -104,7 +104,7 @@ CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
 GRANT USAGE ON SCHEMA auth TO authenticated;
 GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated;
 CREATE TABLE public.diary_entries (
-  id uuid PRIMARY KEY, user_id uuid NOT NULL, details jsonb, note text
+  id uuid PRIMARY KEY, user_id uuid NOT NULL, details jsonb, note text, photo_url text
 );
 ALTER TABLE public.diary_entries ENABLE ROW LEVEL SECURITY;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.diary_entries TO authenticated;
@@ -129,7 +129,7 @@ $function$;
 REVOKE ALL ON FUNCTION public.harness_revise_linked(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.harness_revise_linked(uuid) TO authenticated;
 INSERT INTO public.diary_entries (id, user_id, details, note) VALUES
-  ('${LINKED}', '${OWNER}', '{"linked_grow_event_id":"event-1"}', 'linked'),
+  ('${LINKED}', '${OWNER}', '{"linked_grow_event_id":"event-1","photo_url":"owner/photo.jpg"}', 'linked'),
   ('${LEGACY}', '${OWNER}', '{"grow_event_id":"event-2"}', 'legacy'),
   ('${ORDINARY}', '${OWNER}', '{}', 'ordinary'),
   ('${NULL_DETAILS}', '${OWNER}', NULL, 'null details');
@@ -158,13 +158,39 @@ async function main() {
   runSql(SCAFFOLD, connection);
   runSql(readFileSync(MIGRATION, "utf8"), connection);
 
-  expectCount(
+  expectFailure(
     "linked_update",
-    asOwner(
-      `WITH changed AS (UPDATE public.diary_entries SET note='changed' WHERE id='${LINKED}' RETURNING id) SELECT count(*) FROM changed;`,
-    ),
-    0,
+    asOwner(`UPDATE public.diary_entries SET note='changed' WHERE id='${LINKED}';`),
     connection,
+    /linked_quicklog_diary_requires_revision/i,
+  );
+  expectFailure(
+    "linked_wrong_photo",
+    asOwner(`UPDATE public.diary_entries SET photo_url='owner/other.jpg' WHERE id='${LINKED}';`),
+    connection,
+    /linked_quicklog_diary_requires_revision/i,
+  );
+  expectFailure(
+    "linked_photo_plus_note",
+    asOwner(
+      `UPDATE public.diary_entries SET photo_url='owner/photo.jpg', note='changed' WHERE id='${LINKED}';`,
+    ),
+    connection,
+    /linked_quicklog_diary_requires_revision/i,
+  );
+  expectCount(
+    "linked_photo_normalization",
+    asOwner(
+      `WITH changed AS (UPDATE public.diary_entries SET photo_url='owner/photo.jpg' WHERE id='${LINKED}' RETURNING id) SELECT count(*) FROM changed;`,
+    ),
+    1,
+    connection,
+  );
+  expectFailure(
+    "linked_photo_replacement",
+    asOwner(`UPDATE public.diary_entries SET photo_url='owner/photo.jpg' WHERE id='${LINKED}';`),
+    connection,
+    /linked_quicklog_diary_requires_revision/i,
   );
   expectCount(
     "linked_delete",
@@ -186,6 +212,14 @@ async function main() {
     "ordinary_update",
     asOwner(
       `WITH changed AS (UPDATE public.diary_entries SET note='edited' WHERE id='${ORDINARY}' RETURNING id) SELECT count(*) FROM changed;`,
+    ),
+    1,
+    connection,
+  );
+  expectCount(
+    "null_details_update",
+    asOwner(
+      `WITH changed AS (UPDATE public.diary_entries SET note='edited' WHERE id='${NULL_DETAILS}' RETURNING id) SELECT count(*) FROM changed;`,
     ),
     1,
     connection,
@@ -220,6 +254,12 @@ async function main() {
     ),
     connection,
   );
+  expectFailure(
+    "client_remove_link",
+    asOwner(`UPDATE public.diary_entries SET details='{}' WHERE id='${LINKED}';`),
+    connection,
+    /linked_quicklog_diary_requires_revision/i,
+  );
   expectCount(
     "server_revision_still_writes",
     asOwner(`SELECT public.harness_revise_linked('${LINKED}');`),
@@ -232,7 +272,7 @@ async function main() {
     2,
     connection,
   );
-  process.stdout.write("Linked Quick Log diary PG15 fence PASS: 10 assertions\n");
+  process.stdout.write("Linked Quick Log diary PG15 fence PASS: 16 assertions\n");
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {

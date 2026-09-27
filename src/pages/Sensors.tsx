@@ -6,7 +6,10 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { useAuth } from "@/store/auth";
 import { useNowTick } from "@/hooks/useNowTick";
 import { refreshSensorReadingsStatus } from "@/lib/growAdapters";
-import { selectSensorVpdDisplayEvidence } from "@/lib/sensorVpdDisplayEvidenceRules";
+import {
+  retainDisplayedVpdEvidence,
+  selectSensorVpdDisplayEvidence,
+} from "@/lib/sensorVpdDisplayEvidenceRules";
 import { useSensorsPageSession } from "@/hooks/useSensorsPageSession";
 import { decodeManualCorrectionHash } from "@/lib/manualSensorCorrectionContext";
 import { Activity } from "lucide-react";
@@ -292,9 +295,6 @@ export default function Sensors() {
     () => selectSensorVpdDisplayEvidence(filtered, previousVpdInputs),
     [filtered, previousVpdInputs],
   );
-  useEffect(() => {
-    setPreviousVpdInputs(latestTrustedVpdInputs);
-  }, [latestTrustedVpdInputs]);
   const derivedVpdKpa = useMemo(() => {
     if (latestObservedVpd !== null || !latestTrustedVpdInputs) return null;
     const derived = deriveVpd({
@@ -304,6 +304,11 @@ export default function Sensors() {
     });
     return derived.kind === "derived" ? derived.vpdKpa : null;
   }, [latestObservedVpd, latestTrustedVpdInputs]);
+  // Remember inputs only while their derived estimate is on screen; an
+  // observed VPD must never seed a later stale derivation.
+  useEffect(() => {
+    setPreviousVpdInputs(retainDisplayedVpdEvidence(latestTrustedVpdInputs, derivedVpdKpa));
+  }, [latestTrustedVpdInputs, derivedVpdKpa]);
   const displayedVpdKpa = latestObservedVpd ?? derivedVpdKpa;
   const vpdStageMissing =
     displayedVpdKpa !== null && normalizeVpdStage(selectedTentStage) === "unknown";

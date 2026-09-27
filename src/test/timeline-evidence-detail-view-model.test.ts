@@ -80,6 +80,33 @@ describe("timelineEvidenceDetailViewModel", () => {
     }
   });
 
+  it("uses the parent source when a snapshot source is blank without trusting a nonblank invalid source", () => {
+    const entry = {
+      id: "blank-source",
+      entry_at: "2025-06-01T11:55:00Z",
+      details: {
+        source: "manual",
+        sensor_snapshot: { ts: "2025-06-01T11:55:00Z", temp: 23, source: "  " },
+      },
+    };
+    expect(vm(entry)?.sensor?.source).toBe("manual");
+    expect(vm(entry)?.sensor?.isStale).toBe(false);
+    expect(vm(entry)?.sourceLabels).toContain("Manual");
+
+    const csv = vm({ ...entry, details: { ...entry.details, source: "csv" } });
+    expect(csv?.sensor?.source).toBe("csv");
+    expect(csv?.sourceLabels).toContain("CSV import");
+
+    const invalid = vm({
+      ...entry,
+      details: {
+        ...entry.details,
+        sensor_snapshot: { ...entry.details.sensor_snapshot, source: "bogus" },
+      },
+    });
+    expect(invalid?.sensor?.source).toBe("invalid");
+  });
+
   it("flags stale sensor snapshot when older than the live window", () => {
     const m = vm({
       id: "e2",
@@ -326,6 +353,32 @@ describe("Timeline drawer sensor evidence honesty", () => {
       photo_url: "https://example.test/photo.jpg",
       details: { sensor_snapshot: { source: "manual", temp: 24 } },
     })!;
+    expect(result.contextHint.level).toBe("limited");
+    expect(result.contextHint.description).toMatch(/timestamp/i);
+  });
+
+  it.each([
+    ["sensor_snapshot", undefined],
+    ["sensor_snapshot", null],
+    ["sensor", undefined],
+    ["sensor", null],
+  ])("does not date %s from its diary when capture time is %s", (key, captureTime) => {
+    const result = vm({
+      id: "missing-capture-with-recent-diary",
+      entry_at: recentManual.ts,
+      photo_url: "https://example.test/photo.jpg",
+      details: {
+        [key as string]: {
+          source: "manual",
+          ts: captureTime,
+          captured_at: captureTime,
+          temp: 24,
+        },
+      },
+    })!;
+    expect(result.sensor?.tempC).toBe(24);
+    expect(result.sensor?.capturedAt).toBeNull();
+    expect(result.sensor?.canSupportCurrentContext).toBe(false);
     expect(result.contextHint.level).toBe("limited");
     expect(result.contextHint.description).toMatch(/timestamp/i);
   });

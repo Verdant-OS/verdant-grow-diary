@@ -107,6 +107,7 @@ import {
   type ManualCorrectionRpcClient,
 } from "@/lib/manualSensorCorrectionService";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import { recoveredCorrectionDraftValues } from "@/lib/sensorCorrectionDraft";
 
 interface TentOption {
   id: string;
@@ -174,21 +175,6 @@ function correctionPrefillFromRestoredMetrics(
   return {
     ...correction,
     originalValues: Object.fromEntries(metrics.map((row) => [row.metric, row.value])),
-  };
-}
-
-/** Match standard snapshot restore: canonical °C digits + explicit C override. */
-function recoveredCorrectionDraftValues(
-  correction: ManualCorrectionContext,
-  metrics: ReadonlyArray<ManualReadingMetric>,
-): ManualDraftValues {
-  return {
-    ...createManualDraftValues(
-      correctionToPrefill(correctionPrefillFromRestoredMetrics(correction, metrics), "C"),
-      "C",
-    ),
-    hasEditedReading: true,
-    saveUnconfirmed: true,
   };
 }
 

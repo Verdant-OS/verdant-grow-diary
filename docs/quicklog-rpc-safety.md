@@ -86,6 +86,7 @@ updating this list and the regression tests in the same change.
 | `invalid_logged_at`           | Captured timestamp is malformed, impossible, or too far in the future |
 | `target_not_owned`            | Selected plant/tent does not belong to `auth.uid()`                   |
 | `grow_not_owned`              | Defense-in-depth: resolved grow does not belong to caller             |
+| `plant_tent_grow_mismatch`    | Assigned plant tent belongs to another grow; no save was written      |
 | `save_failed`                 | Atomic persistence failed; no raw database error is exposed           |
 
 ### Reason-code rules

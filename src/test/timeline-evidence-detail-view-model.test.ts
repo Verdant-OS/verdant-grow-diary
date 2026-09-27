@@ -85,12 +85,17 @@ describe("timelineEvidenceDetailViewModel", () => {
       id: "blank-source",
       entry_at: "2025-06-01T11:55:00Z",
       details: {
-        source: "csv",
+        source: "manual",
         sensor_snapshot: { ts: "2025-06-01T11:55:00Z", temp: 23, source: "  " },
       },
     };
-    expect(vm(entry)?.sensor?.source).toBe("csv");
-    expect(vm(entry)?.sourceLabels).toContain("CSV import");
+    expect(vm(entry)?.sensor?.source).toBe("manual");
+    expect(vm(entry)?.sensor?.isStale).toBe(false);
+    expect(vm(entry)?.sourceLabels).toContain("Manual");
+
+    const csv = vm({ ...entry, details: { ...entry.details, source: "csv" } });
+    expect(csv?.sensor?.source).toBe("csv");
+    expect(csv?.sourceLabels).toContain("CSV import");
 
     const invalid = vm({
       ...entry,

@@ -30,6 +30,8 @@ function canonicalManualDefinitions() {
   const definitions = [
     [foundation, "CREATE FUNCTION public.quicklog_try_parse_logged_at(p_value text)\n"],
     [foundation, "CREATE FUNCTION public.quicklog_try_parse_uuid(p_value text)\n"],
+    [foundation, "CREATE FUNCTION public.quicklog_stamp_diary_logged_at()\n"],
+    [foundation, "CREATE FUNCTION public.quicklog_stamp_grow_event_logged_at()\n"],
     [repair, 'CREATE OR REPLACE FUNCTION public."quicklog_save_manual_pre_logged_at"(\n'],
     [foundation, "CREATE FUNCTION public.quicklog_save_manual(\n"],
   ].map(([file, prefix]) => {
@@ -45,7 +47,13 @@ function canonicalManualDefinitions() {
     }
     return source.slice(start, end + "\n$function$;".length);
   });
-  return definitions.join("\n");
+  return `${definitions.join("\n")}
+CREATE TRIGGER trg_quicklog_stamp_diary_logged_at
+  BEFORE INSERT ON public.diary_entries
+  FOR EACH ROW EXECUTE FUNCTION public.quicklog_stamp_diary_logged_at();
+CREATE TRIGGER trg_quicklog_stamp_grow_event_logged_at
+  BEFORE INSERT ON public.grow_events
+  FOR EACH ROW EXECUTE FUNCTION public.quicklog_stamp_grow_event_logged_at();`;
 }
 
 export function disposableConnection(value) {
@@ -135,7 +143,8 @@ GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated;
 CREATE TABLE public.diary_entries (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL,
   details jsonb, note text, photo_url text, grow_id uuid, tent_id uuid, plant_id uuid,
-  entry_at timestamptz NOT NULL DEFAULT now(), logged_at timestamptz, stage text
+  entry_at timestamptz NOT NULL DEFAULT now(), logged_at timestamptz, stage text,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE public.grows (id uuid PRIMARY KEY, user_id uuid NOT NULL);
 CREATE TABLE public.tents (id uuid PRIMARY KEY, user_id uuid NOT NULL, grow_id uuid);
@@ -143,7 +152,8 @@ CREATE TABLE public.plants (id uuid PRIMARY KEY, user_id uuid NOT NULL, grow_id 
 CREATE TABLE public.grow_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL,
   grow_id uuid, tent_id uuid, plant_id uuid, event_type text, source text,
-  occurred_at timestamptz, note text, logged_at timestamptz
+  occurred_at timestamptz, note text, logged_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE public.watering_events (event_id uuid PRIMARY KEY, user_id uuid, volume_ml numeric);
 CREATE TABLE public.environment_events (

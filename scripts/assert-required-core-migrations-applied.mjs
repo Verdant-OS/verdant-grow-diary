@@ -30,9 +30,7 @@ import {
   QUICKLOG_DIARY_RETRACTED_INDEX_CONTRACT_EXPRESSION_SQL,
   QUICKLOG_TARGET_INDEXES_CONTRACT_EXPRESSION_SQL,
 } from "./apply-quicklog-corrections-retractions.mjs";
-import {
-  FUNCTION_SIGNATURES as QUICKLOG_REVISION_REPLAY_SIGNATURES,
-} from "./apply-quicklog-revision-idempotent-replay.mjs";
+import { FUNCTION_SIGNATURES as QUICKLOG_REVISION_REPLAY_SIGNATURES } from "./apply-quicklog-revision-idempotent-replay.mjs";
 import {
   manifestForScope,
   QUICKLOG_CORRECTIONS_CATALOG_CONTRACT,
@@ -171,11 +169,16 @@ with target as (
   join pg_roles r on r.oid = p.proowner
   join pg_language l on l.oid = p.prolang
   where n.nspname = 'public'
-    and p.oid::regprocedure::text in (
-      ${quickLogObservedSignaturesLiteral}
+    and p.proname in (
+      'quicklog_revision_resolve_root', 'quicklog_revision_sibling_env_ids',
+      'quicklog_revision_rebase_captured_at', 'quicklog_retract_entry',
+      'quicklog_correct_entry'
     )
 ), observed_signature_functions as (
   select * from observed_functions
+  where signature in (
+    ${quickLogObservedSignaturesLiteral}
+  )
 ), manual_contract_function_ids(kind, oid) as (
   values
     (
@@ -308,7 +311,7 @@ ${QUICKLOG_DEPENDENCY_CATALOG_EXPRESSIONS_SQL},
       end
     ) from expected_functions e join observed_functions o on o.signature = e.signature
   ), false),
-  'target_function_overloads_contract', (select count(*) = 7 from observed_signature_functions)
+  'target_function_overloads_contract', (select count(*) = 7 from observed_functions)
     and to_regprocedure('${LEGACY_QUICKLOG_SIGNATURES.quicklog_revision_resolve_root}') is not null
     and to_regprocedure('${LEGACY_QUICKLOG_SIGNATURES.quicklog_revision_sibling_env_ids}') is not null
     and to_regprocedure('${LEGACY_QUICKLOG_SIGNATURES.quicklog_revision_rebase_captured_at}') is not null

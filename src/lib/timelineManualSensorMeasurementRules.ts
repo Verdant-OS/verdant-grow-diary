@@ -46,6 +46,12 @@ export type ManualSensorTimelineMetricRow = {
   quality?: string | null;
 };
 
+function timelineObservationTimeMs(row: ManualSensorTimelineMetricRow): number | null {
+  const observation = resolveSensorObservationTime(row);
+  const timeMs = observation ? Date.parse(observation) : Number.NaN;
+  return Number.isFinite(timeMs) ? timeMs : null;
+}
+
 /**
  * The query reads one extra metric row. When it finds that sentinel, the
  * oldest observation-time group might be split across the row boundary. Exclude
@@ -64,10 +70,8 @@ export function completeManualSensorTimelineRows<T extends ManualSensorTimelineM
   const sorted = [...rows].sort((a, b) => {
     const aObservation = resolveSensorObservationTime(a);
     const bObservation = resolveSensorObservationTime(b);
-    const aMs = aObservation ? Date.parse(aObservation) : Number.NEGATIVE_INFINITY;
-    const bMs = bObservation ? Date.parse(bObservation) : Number.NEGATIVE_INFINITY;
-    const aTime = Number.isFinite(aMs) ? aMs : Number.NEGATIVE_INFINITY;
-    const bTime = Number.isFinite(bMs) ? bMs : Number.NEGATIVE_INFINITY;
+    const aTime = timelineObservationTimeMs(a) ?? Number.NEGATIVE_INFINITY;
+    const bTime = timelineObservationTimeMs(b) ?? Number.NEGATIVE_INFINITY;
     if (aTime !== bTime) return bTime - aTime;
     const aKey = JSON.stringify([
       aObservation,
@@ -93,10 +97,12 @@ export function completeManualSensorTimelineRows<T extends ManualSensorTimelineM
   });
   if (sorted.length <= limit) return { rows: sorted, hasOlderRows: false };
 
-  const boundaryObservationTime = resolveSensorObservationTime(sorted[limit]);
+  // Equivalent timestamp strings belong to the same boundary instant.
+  // Unverified times share a fail-closed boundary rather than a partial group.
+  const boundaryObservationTimeMs = timelineObservationTimeMs(sorted[limit]);
   const completeRows = sorted
     .slice(0, limit)
-    .filter((row) => resolveSensorObservationTime(row) !== boundaryObservationTime);
+    .filter((row) => timelineObservationTimeMs(row) !== boundaryObservationTimeMs);
   return { rows: completeRows, hasOlderRows: true };
 }
 

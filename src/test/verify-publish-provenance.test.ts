@@ -9,6 +9,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { parse } from "yaml";
 import {
   buildPublishVerificationReport,
   classifyTokenClassByPrefix,
@@ -552,21 +553,43 @@ describe("package.json wiring", () => {
     expect(prebuild.at(-1)).toBe("node scripts/verify-publish-provenance.mjs");
   });
 
-  it("restores a clean CI worktree immediately before the production stamp", () => {
-    const workflow = readFileSync(resolve(process.cwd(), ".github/workflows/ci.yml"), "utf8");
-    const restoreAt = workflow.indexOf("Restore clean worktree before production stamp");
-    const buildAt = workflow.indexOf("\n      - name: Build\n");
-    const uploadAt = workflow.indexOf("Upload publish verification report");
-    expect(restoreAt).toBeGreaterThan(-1);
-    expect(buildAt).toBeGreaterThan(restoreAt);
-    expect(uploadAt).toBeGreaterThan(buildAt);
-    expect(workflow.includes("git restore --source=HEAD --worktree --staged -- .")).toBe(true);
-    expect(workflow).toContain(
-      "node scripts/verify-publish-provenance.mjs --print-safe-dirty-paths",
-    );
-    expect(workflow).not.toContain("git status --porcelain --untracked-files=all || true");
-    expect(workflow.includes("path: artifacts/publish-verification.json")).toBe(true);
-  });
+  it.each(["LF", "CRLF"])(
+    "restores a clean CI worktree immediately before the production stamp (%s)",
+    (lineEnding) => {
+      const source = readFileSync(
+        resolve(process.cwd(), ".github/workflows/ci.yml"),
+        "utf8",
+      ).replace(/\r\n/g, "\n");
+      const workflow = parse(lineEnding === "CRLF" ? source.replace(/\n/g, "\r\n") : source) as {
+        jobs: Record<
+          string,
+          { steps?: { name?: string; id?: string; run?: string; with?: { path?: string } }[] }
+        >;
+      };
+      const job = Object.values(workflow.jobs).find(({ steps }) =>
+        steps?.some(({ id }) => id === "prod_build"),
+      );
+      expect(job).toBeDefined();
+      const steps = job?.steps ?? [];
+      const restoreAt = steps.findIndex(
+        ({ name }) => name === "Restore clean worktree before production stamp",
+      );
+      const buildAt = steps.findIndex(({ id }) => id === "prod_build");
+      const uploadAt = steps.findIndex(({ name }) => name === "Upload publish verification report");
+      expect(restoreAt).toBeGreaterThan(-1);
+      expect(buildAt).toBe(restoreAt + 1);
+      expect(uploadAt).toBeGreaterThan(buildAt);
+      expect(steps[buildAt]?.run).toBe("bun run build");
+      expect(steps[restoreAt]?.run).toContain("git restore --source=HEAD --worktree --staged -- .");
+      expect(steps[restoreAt]?.run).toContain(
+        "node scripts/verify-publish-provenance.mjs --print-safe-dirty-paths",
+      );
+      expect(steps[restoreAt]?.run).not.toContain(
+        "git status --porcelain --untracked-files=all || true",
+      );
+      expect(steps[uploadAt]?.with?.path).toBe("artifacts/publish-verification.json");
+    },
+  );
 });
 
 describe("resolveCommittedTokenClass (HEAD blob, not working tree)", () => {

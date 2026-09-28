@@ -108,10 +108,10 @@ describe("Soft P2 weekly batch: Daily Check return", () => {
     await screen.findByTestId("daily-check-all-activities-picker-watering");
     expect(screen.getByTestId("destination").textContent).toBe(before);
     const dashboardHref = screen.getByRole("link", { name: "Dashboard" }).getAttribute("href");
-    expect(dashboardHref).toBe(`/dashboard?growId=${GROW}`);
+    expect(dashboardHref).toBe(`/?growId=${GROW}`);
     await act(async () => fireEvent.click(screen.getByRole("link", { name: "Dashboard" })));
     const url = new URL(screen.getByTestId("destination").textContent!, "https://fixture.invalid");
-    expect(url.pathname).toBe("/dashboard");
+    expect(url.pathname).toBe("/");
     expect(url.searchParams.get("growId")).toBe(GROW);
   });
 

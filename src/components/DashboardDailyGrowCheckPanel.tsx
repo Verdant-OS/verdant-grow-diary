@@ -390,7 +390,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
                     <Link
                       to={buildDailyCheckEntryHref({
                         plantId: row.plantId,
-                        growId: scopedGrowId,
+                        growId: row.dailyCheckGrowId,
                         source: "dashboard",
                         method: "note",
                       })}
@@ -410,7 +410,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
                     <Link
                       to={buildDailyCheckEntryHref({
                         plantId: row.plantId,
-                        growId: scopedGrowId,
+                        growId: row.dailyCheckGrowId,
                         source: "dashboard",
                         method: "sensor",
                       })}

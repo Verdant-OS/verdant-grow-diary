@@ -96,6 +96,7 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
     const plants = rawPlants.map((p) => ({
       id: p.id,
       name: p.name ?? "Unnamed plant",
+      growId: p.growId ?? null,
       tentId: p.tentId ?? null,
       stage: (p.stage as string | null | undefined) ?? null,
     }));

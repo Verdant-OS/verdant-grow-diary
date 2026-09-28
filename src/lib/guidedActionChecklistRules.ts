@@ -47,6 +47,7 @@ export interface GuidedActionItem {
 export interface GuidedChecklistPlant {
   id: string;
   name: string;
+  growId: string | null;
   tentId: string | null;
   stage: string | null;
 }
@@ -191,15 +192,22 @@ function formatAge(ms: number): string {
   return `${hours}h`;
 }
 
+function dailyCheckGrowIdForPlant(
+  plant: GuidedChecklistPlant,
+  scopedGrowId: string,
+): string | null {
+  return plant.growId === scopedGrowId ? scopedGrowId : null;
+}
+
 /** Authenticated Daily Check deep-link for a known plant diary activity. */
 function plantDailyCheckHref(
-  plantId: string,
-  growId: string,
+  plant: GuidedChecklistPlant,
+  scopedGrowId: string,
   method: "note" | "watering" | "photo",
 ): string {
   return buildDailyCheckEntryHref({
-    plantId,
-    growId,
+    plantId: plant.id,
+    growId: dailyCheckGrowIdForPlant(plant, scopedGrowId),
     source: "dashboard",
     method,
   });
@@ -213,7 +221,7 @@ function plantDailyCheckHref(
 function tentSensorDailyCheckHref(
   tentId: string,
   plants: readonly GuidedChecklistPlant[],
-  growId: string,
+  scopedGrowId: string,
 ): string {
   const plantInTent = plants
     .filter((p) => p.tentId === tentId)
@@ -222,12 +230,12 @@ function tentSensorDailyCheckHref(
   if (plantInTent) {
     return buildDailyCheckEntryHref({
       plantId: plantInTent.id,
-      growId,
+      growId: dailyCheckGrowIdForPlant(plantInTent, scopedGrowId),
       source: "dashboard",
       method: "sensor",
     });
   }
-  return withGrowId("/daily-check?from=dashboard", growId);
+  return withGrowId("/daily-check?from=dashboard", scopedGrowId);
 }
 
 /**
@@ -312,7 +320,7 @@ export function buildGuidedActionChecklist(
             ? "No watering or feeding logged for this plant yet."
             : `No watering or feeding in ${age}.`,
         ctaLabel: "Quick Log",
-        ctaHref: plantDailyCheckHref(plant.id, input.scopedGrowId, "watering"),
+        ctaHref: plantDailyCheckHref(plant, input.scopedGrowId, "watering"),
         plantId: plant.id,
         tentId: plant.tentId,
       });
@@ -328,7 +336,7 @@ export function buildGuidedActionChecklist(
         title: `Capture a fresh photo of ${plant.name}`,
         reason: lastPhoto == null ? "No photo captured for this plant yet." : `No photo in ${age}.`,
         ctaLabel: "Quick Log",
-        ctaHref: plantDailyCheckHref(plant.id, input.scopedGrowId, "photo"),
+        ctaHref: plantDailyCheckHref(plant, input.scopedGrowId, "photo"),
         plantId: plant.id,
         tentId: plant.tentId,
       });
@@ -349,7 +357,7 @@ export function buildGuidedActionChecklist(
               ? `${plant.name} is in flower — no trichome or pistil note yet.`
               : `${plant.name} is in flower — last trichome/pistil note ${age} ago.`,
           ctaLabel: "Log observation",
-          ctaHref: plantDailyCheckHref(plant.id, input.scopedGrowId, "note"),
+          ctaHref: plantDailyCheckHref(plant, input.scopedGrowId, "note"),
           plantId: plant.id,
           tentId: plant.tentId,
         });

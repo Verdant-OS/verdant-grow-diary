@@ -57,12 +57,14 @@ function entry(
 const PLANT_A: GuidedChecklistPlant = {
   id: "p1",
   name: "Alpha",
+  growId: GROW,
   tentId: "t1",
   stage: "veg",
 };
 const PLANT_FLOWER: GuidedChecklistPlant = {
   id: "p2",
   name: "Bravo",
+  growId: GROW,
   tentId: "t1",
   stage: "flower",
 };
@@ -200,12 +202,14 @@ describe("buildGuidedActionChecklist", () => {
     const BREAK = {
       id: "7c33c797-331f-4788-866d-63551e94ceb6",
       name: "BREAK-4pm-2",
+      growId: GROW,
       tentId: "t1",
       stage: "veg",
     } as const;
     const JUNK = {
       id: "108481fb-dee8-4997-8d61-c5f4f4425bae",
       name: "JUNK-HUNT-20260907",
+      growId: GROW,
       tentId: "t1",
       stage: "veg",
     } as const;
@@ -287,6 +291,18 @@ describe("buildGuidedActionChecklist", () => {
     expect(sensor?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=sensor");
   });
 
+  it("omits growId from Log snapshot when the selected tent plant has no own grow_id", () => {
+    const items = buildGuidedActionChecklist(
+      makeInput({
+        plants: [{ ...PLANT_A, growId: null }],
+        tents: [TENT_1],
+        latestReadingByTent: { t1: null },
+      }),
+    );
+    const sensor = items.find((i) => i.id === "sensor:t1");
+    expect(sensor?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=sensor");
+  });
+
   it("keeps tent-only sensor CTA on authenticated daily-check when the tent has no plants", () => {
     const items = buildGuidedActionChecklist(
       makeInput({
@@ -324,6 +340,25 @@ describe("buildGuidedActionChecklist", () => {
     const trichome = items.find((i) => i.id === "stage:trichome:p2");
     expect(trichome?.ctaHref).toBe(
       "/daily-check?plantId=p2&from=dashboard&method=note&growId=grow-a",
+    );
+  });
+
+  it("omits growId from watering/photo/note shortcuts when the plant has no own grow_id", () => {
+    const noGrowPlant: GuidedChecklistPlant = { ...PLANT_FLOWER, growId: null };
+    const items = buildGuidedActionChecklist(
+      makeInput({
+        plants: [noGrowPlant],
+        diaryEntries: [],
+      }),
+    );
+    expect(items.find((i) => i.id === "cadence:water:p2")?.ctaHref).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=watering",
+    );
+    expect(items.find((i) => i.id === "cadence:photo:p2")?.ctaHref).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=photo",
+    );
+    expect(items.find((i) => i.id === "stage:trichome:p2")?.ctaHref).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=note",
     );
   });
 
@@ -452,6 +487,7 @@ describe("buildGuidedActionChecklist", () => {
     const plants: GuidedChecklistPlant[] = Array.from({ length: 10 }, (_, i) => ({
       id: `p${i}`,
       name: `Plant ${i}`,
+      growId: GROW,
       tentId: "t1",
       stage: "veg",
     }));

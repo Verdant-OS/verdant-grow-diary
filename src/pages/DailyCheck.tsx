@@ -89,6 +89,7 @@ import {
   DAILY_CHECK_TIMELINE_CONFIRMATION_TITLE,
   DAILY_CHECK_TIMELINE_CTA_LABEL,
   buildDailyCheckPostSubmitActions,
+  resolveDailyCheckDashboardBreadcrumbHref,
   buildDailyCheckSavedItems,
   buildDailyCheckTimelineHref,
   formatDailyCheckLoggedAt,
@@ -107,14 +108,7 @@ import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { useAuth } from "@/store/auth";
 import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChangeContextRules";
 
-import {
-  dashboardPath,
-  plantDetailPath,
-  plantsPath,
-  sensorsPath,
-  tentsPath,
-  timelinePath,
-} from "@/lib/routes";
+import { plantDetailPath, plantsPath, sensorsPath, tentsPath, timelinePath } from "@/lib/routes";
 import {
   DAILY_CHECK_EMPTY_NO_TENT_TITLE,
   DAILY_CHECK_EMPTY_NO_TENT_BODY,
@@ -415,11 +409,14 @@ export default function DailyCheck() {
     [selectedPlant?.id, entrySource, urlGrowId],
   );
   const scopedBackAction = urlGrowId ? postSubmitActions.find((action) => action.primary) : null;
-  const dashboardBreadcrumbHref = useMemo(() => dashboardPath(urlGrowId), [urlGrowId]);
-  const backHref =
-    scopedBackAction?.key === "dashboard"
-      ? dashboardBreadcrumbHref
-      : (scopedBackAction?.href ?? "/");
+  const backHref = useMemo(
+    () =>
+      resolveDailyCheckDashboardBreadcrumbHref({
+        growId: urlGrowId,
+        actions: postSubmitActions,
+      }),
+    [urlGrowId, postSubmitActions],
+  );
 
   const loggedAtLabel = useMemo(() => formatDailyCheckLoggedAt(lastSubmittedAt), [lastSubmittedAt]);
   const savedItems = useMemo(

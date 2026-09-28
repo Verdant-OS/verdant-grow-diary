@@ -3,6 +3,12 @@
 Decision: Matthew, 2026-09-28, CHEM-INVENTORY-REPAIR-001 sections 8–9.
 This is docs-only policy/plan. It dispatches no job and changes no CI.
 
+## Fixture identity
+
+The assigned smoke account is cheekhimself@gmail.com. Never use
+matt@verdantgrowdiary.com or the KEEP account. Verify account and fixture
+ownership before a write; the email alone does not grant scope.
+
 ## Target and safety
 
 Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep

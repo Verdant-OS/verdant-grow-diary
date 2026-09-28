@@ -13,6 +13,7 @@ import {
 } from "../../scripts/lib/supabaseDatabaseTargetIdentity.mjs";
 import {
   EXIT,
+  parsePsqlSqlstate,
   runRequiredCoreMigrationsApplied,
 } from "../../scripts/assert-required-core-migrations-applied.mjs";
 import { PREFLIGHT_SQL } from "../../scripts/apply-quicklog-corrections-retractions.mjs";
@@ -1391,6 +1392,58 @@ describe("remote applied-schema runner safety", () => {
     expect(observable).not.toContain(url);
     expect(observable).not.toContain("could not connect using");
     expect(observable).toContain("stderr was suppressed");
+  });
+
+  it("extracts only a psql SQLSTATE line from a rejected catalog query", () => {
+    expect(parsePsqlSqlstate("ERROR:  42501\nDETAIL: private text")).toBe("42501");
+    expect(parsePsqlSqlstate("ERROR:  42P01: relation absent")).toBe("42P01");
+    expect(parsePsqlSqlstate("psql: connection to ERROR:  42501 failed")).toBeNull();
+    expect(parsePsqlSqlstate("ERROR:\n42501")).toBeNull();
+    expect(parsePsqlSqlstate("ERROR:  42501PRIVATE")).toBeNull();
+    expect(parsePsqlSqlstate(null)).toBeNull();
+  });
+
+  it("records the catalog SQLSTATE without exposing stderr or credentials", () => {
+    const sentinel = "CATALOG-SECRET-SENTINEL";
+    const url = directUrl(SANDBOX_REF, 5432, sentinel);
+    const dir = mkdtempSync(join(tmpdir(), "core-schema-catalog-sqlstate-"));
+    tempDirs.push(dir);
+    const reportPath = join(dir, "report.md");
+    const auditPath = join(dir, "audit.json");
+    const { logger, lines } = captureLogger();
+    const calls: string[][] = [];
+
+    const status = runRequiredCoreMigrationsApplied({
+      env: {
+        TARGET_ENV: "sandbox",
+        SUPABASE_DB_URL: url,
+        REPORT_PATH: reportPath,
+        AUDIT_PATH: auditPath,
+      },
+      spawnImpl: (_command, args) => {
+        calls.push(args);
+        return calls.length === 1
+          ? successfulCoreQueryResult(1)
+          : {
+              status: 1,
+              stdout: "",
+              stderr: `ERROR:  42501\nDETAIL: ${sentinel} ${url}`,
+            };
+      },
+      logger,
+    });
+
+    const report = readFileSync(reportPath, "utf8");
+    const audit = JSON.parse(readFileSync(auditPath, "utf8"));
+    const observable = [...lines, report, JSON.stringify(audit)].join("\n");
+    expect(status).toBe(EXIT.SCHEMA_QUERY_FAILED);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toContain("VERBOSITY=sqlstate");
+    expect(report).toContain("PostgreSQL SQLSTATE: `42501`.");
+    expect(audit).toMatchObject({ psql_status: 1, psql_sqlstate: "42501" });
+    expect(observable).not.toContain(sentinel);
+    expect(observable).not.toContain(url);
+    expect(observable).not.toContain("DETAIL:");
   });
 
   /**

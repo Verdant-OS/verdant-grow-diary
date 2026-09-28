@@ -153,14 +153,14 @@ describe("ImportedSensorHistoryPanel", () => {
     expect(filters.textContent ?? "").not.toContain("co2_ppm");
   });
 
-  it("shows imported values with the canonical units on the reopened history table", () => {
+  it("shows rounded imported values with canonical units on the reopened history table", () => {
     render(
       wrap(
         <ImportedSensorHistoryPanel
           tentId="tent-A"
           readings={[
-            csvRow({ metric: "temperature_c", value: 24 }),
-            csvRow({ metric: "humidity_pct", value: 52 }),
+            csvRow({ metric: "temperature_c", value: 24.444444444444443 }),
+            csvRow({ metric: "humidity_pct", value: 52.04 }),
             csvRow({ metric: "vpd_kpa", value: 1.11 }),
           ]}
         />,
@@ -173,7 +173,27 @@ describe("ImportedSensorHistoryPanel", () => {
         row.querySelectorAll("td")[2].textContent,
       ]),
     );
-    expect(values).toEqual({ temperature_c: "24 °C", humidity_pct: "52%", vpd_kpa: "1.11 kPa" });
+    expect(values).toEqual({
+      temperature_c: "24.4 °C",
+      humidity_pct: "52.0%",
+      vpd_kpa: "1.11 kPa",
+    });
+  });
+
+  it("flags out-of-range rows in plain language without hiding the stored value", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[csvRow({ metric: "humidity_pct", value: 150 })]}
+        />,
+      ),
+    );
+    const table = screen.getByTestId("imported-history-recent-rows");
+    expect(table).toHaveTextContent("150.0%");
+    expect(screen.getByTestId("imported-history-out-of-range-note")).toHaveTextContent(
+      "Humidity is out of range.",
+    );
   });
 
   it("never renders raw_payload or forbidden live-creation wording", () => {

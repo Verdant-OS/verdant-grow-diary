@@ -80,8 +80,8 @@ jobs:
             if (/(?:^|\/)\.env(?:\.|$)/i.test(path)) return true;
             const executable = /^(?:src|scripts|tests|e2e|packages)\//i.test(path) && !/\.md$/i.test(path);
             return executable && (
-              /auth|oauth|rls|action[-_]?queue|action[-_]?detail|device[-_]?(?:control|command)|actuator/i.test(path) ||
-              /(?:^|\/)(?:actions|edge)(?:[/.]|$)/i.test(path)
+              /auth|oauth|rls|action[-_]?(?:queue|detail|outcome|follow[-_]?up|response[-_]?memory|completion|status)|linked[-_]?actions?|assigned[-_]?tent[-_]?actions?|live[-_]?proof[-_]?action[-_]?status|recent[-_]?action[-_]?response|device[-_]?(?:control|command)|actuator/i.test(path) ||
+              /(?:^|\/)(?:actions|edge)(?:[/._]|$)/i.test(path)
             );
           }
 
@@ -116,7 +116,13 @@ jobs:
             const codeGlobs = [
               '*auth*', '*Auth*', '*OAuth*', '*[rR][lL][sS]*',
               '*actionQueue*', '*ActionQueue*', '*action-queue*', '*ActionDetail*',
-              '*action-detail*', 'actions.*', 'edge/**',
+              '*action-detail*', 'actions.*', 'actions_*', 'actions/**', 'edge/**',
+              '*actionOutcome*', '*ActionOutcome*', '*action-outcome*',
+              '*actionFollow*', '*ActionFollow*', '*action-follow*',
+              '*actionResponseMemory*', '*ActionResponseMemory*', '*action-response-memory*',
+              '*LinkedAction*', '*linked-action*', '*AssignedTentAction*', '*assigned-tent-action*',
+              '*LiveProofActionStatus*', '*live-proof-action-status*',
+              '*RecentActionResponse*', '*recent-action-response*', '*action-completion*', '*action-status*',
               '*deviceControl*', '*DeviceControl*', '*device-control*',
               '*deviceCommand*', '*DeviceCommand*', '*device-command*', '*actuator*', '*Actuator*',
             ];
@@ -143,6 +149,16 @@ jobs:
               'src/lib/mcp/browserOAuthClient.ts', 'src/test/auth-a11y.test.tsx',
               'src/lib/rlsAuditRules.ts', 'src/lib/alertToActionQueueRules.ts',
               'src/pages/ActionQueue.tsx', 'src/pages/ActionDetail.tsx', 'src/routes/_app/actions.tsx',
+              'src/routes/_app/actions_.$actionId.tsx', 'src/lib/actionOutcomeAnalysisService.ts',
+              'src/components/ActionOutcomeLearningReport.tsx', 'src/test/action-outcome-receipt.test.ts',
+              'src/lib/actionFollowupRules.ts', 'src/lib/actionFollowUpEvidenceService.ts',
+              'src/test/action-follow-up-evidence-service.test.ts', 'src/test/action-completion-followup.test.ts',
+              'src/test/action-status-controls-aria.test.tsx', 'src/lib/actionResponseMemoryService.ts',
+              'src/hooks/useActionResponseMemory.ts', 'src/components/PlantDetailRecentActionResponse.tsx',
+              'src/lib/alertsLinkedActionsViewModel.ts', 'src/components/LinkedActionCountBadge.tsx',
+              'src/hooks/useAlertsLinkedActionCounts.ts', 'src/lib/aiDoctorSessionLinkedActionsViewModel.ts',
+              'src/lib/plantAssignedTentActionRules.ts', 'src/hooks/usePlantAssignedTentActions.ts',
+              'src/components/PlantAssignedTentActionsPanel.tsx', 'src/hooks/useOneTentLiveProofActionStatus.ts',
               'src/lib/deviceControl.ts', 'scripts/device-command.ts', 'src/lib/actuator.ts',
               'bun.lock', 'bun.lockb', 'package-lock.json', 'nested/pnpm-lock.yaml',
               'yarn.lock', 'npm-shrinkwrap.json', 'nested/Cargo.lock',
@@ -156,6 +172,8 @@ jobs:
               'src/lib/libraryRules.ts', 'src/lib/sensorDeviceLabels.ts',
               'src/test/libraryRules.test.ts', 'src/test/component.test.tsx',
               'src/pages/Knowledge.tsx', 'docs/authorization-guide.md', 'package.json',
+              'src/lib/guidedActionChecklistRules.ts', 'src/lib/actionResponsePairingRules.ts',
+              'src/test/action-response-pairing-rules.test.ts',
             ];
             blocked.forEach(path => assert.equal(lockedPath(path), true, path));
             allowed.forEach(path => assert.equal(lockedPath(path), false, path));

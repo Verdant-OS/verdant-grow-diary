@@ -96,6 +96,11 @@ policy as the Claude PR guard. SQL and lockfiles are blocked anywhere in the
 tree. Auth, RLS, Action Queue and device-control code are blocked in source,
 script, test, E2E and package paths; Markdown explanations can remain eligible.
 The guard checks both old and new paths for renames and includes deletions.
+Action Queue coverage includes the `actions_.$actionId.tsx` detail route,
+outcome and follow-up modules, Action Response Memory, linked-action counts,
+assigned-tent actions and live-proof action status. Diary-only Action Response
+Pairing and the guided diary checklist remain eligible; their source contracts
+do not operate on the Action Queue.
 
 `claude-locked-paths` has read-only permission and runs only on PR heads starting
 with `claude/`. It checks out the exact base, fetches the PR head, verifies that

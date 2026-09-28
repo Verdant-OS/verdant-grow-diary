@@ -818,6 +818,65 @@ describe("durable unresolved Note recovery", () => {
     );
   });
 
+  it("keeps a verified null tent out of photo companions and Timeline filters", async () => {
+    modelLostNoteReply();
+    renderSheet();
+    typeNote();
+    attachPhoto();
+    save();
+    await expectRetry();
+    readbackMock.mockResolvedValue({
+      data: {
+        id: confirmedEventId,
+        note: originalNote,
+        grow_id: "66666666-6666-4666-8666-666666666666",
+        plant_id: "33333333-3333-4333-8333-333333333333",
+        tent_id: null,
+      },
+      error: null,
+    });
+    retry();
+    await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
+    expect(photoEntryMock).toHaveBeenCalledTimes(1);
+    expect(photoEntryMock.mock.calls[0][0]).toMatchObject({
+      growId: "66666666-6666-4666-8666-666666666666",
+      plantId: "33333333-3333-4333-8333-333333333333",
+      tentId: null,
+    });
+    fireEvent.click(screen.getByTestId("quick-log-post-save-view"));
+    expect(navigationMock).toHaveBeenCalledTimes(1);
+    expect(navigationMock.mock.calls[0][0].href).not.toContain("tentId=");
+    expect(rpcMock.mock.calls[1][1]).toEqual(rpcMock.mock.calls[0][1]);
+    expect(committed.size).toBe(1);
+  });
+
+  it("does not borrow a stale grow for attachments or navigation when verified grow is null", async () => {
+    modelLostNoteReply();
+    renderSheet();
+    typeNote();
+    attachPhoto();
+    save();
+    await expectRetry();
+    readbackMock.mockResolvedValue({
+      data: {
+        id: confirmedEventId,
+        note: originalNote,
+        grow_id: null,
+        plant_id: "33333333-3333-4333-8333-333333333333",
+        tent_id: null,
+      },
+      error: null,
+    });
+    retry();
+    await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
+    expect(photoEntryMock).not.toHaveBeenCalled();
+    expect(videoEntryMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId("quick-log-post-save-view")).toBeDisabled();
+    expect(navigationMock).not.toHaveBeenCalled();
+    expect(rpcMock.mock.calls[1][1]).toEqual(rpcMock.mock.calls[0][1]);
+    expect(committed.size).toBe(1);
+  });
+
   it("replays a previously committed event with its original lineage instead of today's assignment", async () => {
     modelLostNoteReply();
     const view = renderSheet();

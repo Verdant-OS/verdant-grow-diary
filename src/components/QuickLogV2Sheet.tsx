@@ -50,6 +50,7 @@ import {
   buildQuickLogTimelineNavTarget,
   QUICK_LOG_TIMELINE_CTA_LABEL,
 } from "@/lib/quickLogTimelineNavigationTarget";
+import { resolveQuickLogConfirmedScope } from "@/lib/quickLogConfirmedScopeRules";
 import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -437,26 +438,6 @@ function QuickLogV2SheetForOwner({
         onClick: () => navigateToTimeline(nav.href, nav.hash, nav.path),
       },
     });
-  }
-
-  function resolveConfirmedTimelineScope(
-    resolved: ResolvedQuickLogV2Target,
-    result: {
-      persistedGrowId?: string | null;
-      persistedTentId?: string | null;
-      persistedPlantId?: string | null;
-    },
-  ) {
-    const persistedPlantId = result.persistedPlantId ?? null;
-    const persistedTentId = result.persistedTentId ?? null;
-    return {
-      growId: result.persistedGrowId ?? resolved.growId ?? null,
-      targetType:
-        (persistedPlantId ? "plant" : persistedTentId ? "tent" : resolved.targetType) ?? null,
-      targetId: persistedPlantId ?? persistedTentId ?? resolved.targetId ?? null,
-      tentId: persistedTentId ?? resolved.tentId ?? null,
-      plantId: persistedPlantId ?? resolved.plantId ?? null,
-    };
   }
 
   // Seed from open props on first paint so tent:/plant: defaultTargetKey is
@@ -1864,7 +1845,7 @@ function QuickLogV2SheetForOwner({
       if (exactSubmission && !canContinueNote()) return;
       const reason = res.reason || "save_failed";
       if (reason === "receipt_mismatch" && res.growEventId && res.persistedNote !== undefined) {
-        const confirmedScope = resolveConfirmedTimelineScope(resolved, res);
+        const confirmedScope = resolveQuickLogConfirmedScope(resolved, res);
         const navigation = buildQuickLogTimelineNavTarget({
           growId: confirmedScope.growId,
           targetType: confirmedScope.targetType,
@@ -1891,7 +1872,7 @@ function QuickLogV2SheetForOwner({
     setExactRetryPending(false);
     setPersistedNote(res.persistedNote);
     rememberConfirmedPlantTarget(resolved, user?.id ?? null);
-    const confirmedScope = resolveConfirmedTimelineScope(resolved, res);
+    const confirmedScope = resolveQuickLogConfirmedScope(resolved, res);
 
     // The core grow event is committed. Rotate immediately, before any
     // best-effort attachment work, so a rejected media promise can never

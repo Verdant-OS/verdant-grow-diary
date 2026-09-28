@@ -18,7 +18,7 @@ function HandoffHarness({
   mountTarget: boolean;
   mountAlias?: boolean;
   prefersReducedMotion?: boolean;
-  onScroll: ReturnType<typeof vi.fn>;
+  onScroll: Element["scrollIntoView"];
 }) {
   useTimelineHashAnchorHandoff(hash, ready, { prefersReducedMotion });
 

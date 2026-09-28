@@ -7,6 +7,7 @@ on:
       - "scripts/apply-quicklog-manual-delegate-forward-repair.mjs"
       - "scripts/verify-quicklog-manual-delegate-forward-repair-preflight-artifact.mjs"
       - "scripts/lib/productionSupabaseTls.mjs"
+      - "scripts/lib/supabaseMigrationLedgerShape.mjs"
       - "scripts/lib/solo-founder-production-authorization.mjs"
       - "scripts/verify-solo-founder-production-authorization.mjs"
       - "supabase/migrations/20260818010000_quicklog_manual_delegate_forward_repair.sql"

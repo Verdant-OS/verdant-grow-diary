@@ -105,6 +105,7 @@ import {
   FEEDING_SAVE_SUCCESS_MESSAGE,
   buildFeedingFormPayload,
   feedingFormReasonToHelper,
+  findFeedingPayloadRangeViolation,
   isFeedingFormPristine,
   type QuickLogFeedingFormState,
 } from "@/lib/quickLogFeedingFormViewModel";
@@ -1461,18 +1462,32 @@ function QuickLogV2SheetForOwner({
       setFeedingSaving(false);
       if (result.ok !== true) {
         // Writer validation can reject before issuing an RPC. That draft is
-        // safe to correct; only a server/transport outcome needs exact retry.
+        // safe to correct. So is an explicit server validation rejection:
+        // the server answered that nothing was saved, even for a restored
+        // pending entry. Only an ambiguous server/transport outcome needs
+        // an exact retry.
+        const definitiveServerRejection = result.reason === "rpc:invalid_typed_payload";
         const released =
-          !pendingFeedingSubmission &&
-          !result.reason.startsWith("rpc:") &&
+          (definitiveServerRejection || !pendingFeedingSubmission) &&
+          (definitiveServerRejection || !result.reason.startsWith("rpc:")) &&
           clearPendingQuickLogFeeding(exactFeedingSubmission.recovery);
         const unresolved = !released;
         setExactRetryPending(unresolved);
         keepSubmissionLockedRef.current = unresolved;
         if (!unresolved) feedingRetrySubmissionRef.current = null;
+        // A rejected key never reached a committed save; the corrected entry
+        // is a new logical submission and gets a fresh server key.
+        if (released && definitiveServerRejection) {
+          saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+        }
         const message = unresolved
           ? FEEDING_RECOVERY_PENDING
-          : feedingFormReasonToHelper(result.reason);
+          : feedingFormReasonToHelper(
+              definitiveServerRejection
+                ? (findFeedingPayloadRangeViolation(exactFeedingSubmission.payload) ??
+                    result.reason)
+                : result.reason,
+            );
         setLocalError(message);
         toast.error(message);
         setSaveStatus("");

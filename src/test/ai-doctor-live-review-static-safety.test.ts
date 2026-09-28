@@ -122,7 +122,12 @@ describe("ai doctor live review — edge static safety", () => {
         expect(src).toContain("parseAiDoctorReviewRequestEnvelope");
         expect(src).toContain("validateAndNormalizeAiDoctorReviewRequestPacket");
         const packetValidationIndex = src.indexOf(
-          "const validatedPacket = validateAndNormalizeAiDoctorReviewRequestPacket(request.packet)",
+          "const normalizedPacket = validateAndNormalizeAiDoctorReviewRequestPacket(request.packet)",
+        );
+        // The validated packet is graded against the plant's stage targets
+        // before anything else uses it (Codex review on #1683, round 15).
+        expect(src).toContain(
+          "const validatedPacket = applyStageTargetSeverityToPacket(normalizedPacket)",
         );
         const firstCreditSpendIndex = src.indexOf('.rpc("ai_credit_spend"');
         expect(packetValidationIndex).toBeGreaterThanOrEqual(0);

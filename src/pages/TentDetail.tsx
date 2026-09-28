@@ -47,6 +47,8 @@ import {
 } from "@/hooks/useImportedSensorHistory";
 import { useCsvHistoryWindow } from "@/hooks/useCsvHistoryWindow";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
+import { useGrows } from "@/store/grows";
+import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
 import { buildTentSensorChartSeries, buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 import { resolveVerifiedAssignedPlantCount } from "@/lib/tentManagementRules";
 import { buildTentPlantListReadView } from "@/lib/tentPlantListReadStateRules";
@@ -143,6 +145,26 @@ export default function TentDetail() {
   const activePlants = activePlantsQuery.data ?? EMPTY_TENT_PLANTS;
   const activePlantsIsFetching = activePlantsQuery.isFetching;
   const activePlantsIsError = activePlantsQuery.isError;
+  // Stage for the environment chips, VPD hint, stage-missing badge and
+  // stability card. Resolved like the Sensors page and the scoped Dashboard's
+  // single-tent view: the tent's grow row, the tent, and the active plants in
+  // it (QA 2026-09-24, BUG-006 follow-up). The stage badge and tent menu still
+  // show the tent's own. Until the tent's grow row and the plant rows are
+  // known, stage grading is withheld (Codex review on #1683).
+  const { grows, loading: growsLoading, error: growsError } = useGrows();
+  const envStage = resolveTentEnvironmentStage({
+    tentId: tent?.id ?? null,
+    tentGrowId: tent?.growId ?? null,
+    tentStage: tent?.stage ?? null,
+    ...resolveTentGrowStage({
+      growId: tent?.growId,
+      grows,
+      loading: growsLoading,
+      error: growsError,
+    }),
+    // A failed refresh keeps the cached stages (React Query retains data).
+    plants: activePlantsQuery.data ?? null,
+  });
   const allPlantsQuery = useGrowPlants(id, undefined, { includeArchived: true });
   const plantListRead = buildTentPlantListReadView(allPlantsQuery, activePlantsQuery);
   const allPlants = plantListRead.plants;
@@ -369,7 +391,7 @@ export default function TentDetail() {
             value={(convertCelsiusForDisplay(snap.temp) ?? 0).toFixed(1)}
             unit={getTemperatureUnitSymbol()}
             status={environmentMetricChipStatus(
-              classifyTempAgainstStage(snap.temp, { stage: tent.stage, stale: header.stale }),
+              classifyTempAgainstStage(snap.temp, { stage: envStage, stale: header.stale }),
             )}
           />
         )}
@@ -379,7 +401,7 @@ export default function TentDetail() {
             value={snap.rh}
             unit="%"
             status={environmentMetricChipStatus(
-              classifyRhAgainstStage(snap.rh, { stage: tent.stage, stale: header.stale }),
+              classifyRhAgainstStage(snap.rh, { stage: envStage, stale: header.stale }),
             )}
           />
         )}
@@ -388,7 +410,7 @@ export default function TentDetail() {
           (() => {
             const vpd = classifyVpdAgainstStage({
               value: snap.vpd,
-              stage: tent.stage,
+              stage: envStage,
               stale: header.stale,
             });
             // #21: route VPD chip through the canonical sensor formatter so
@@ -417,7 +439,7 @@ export default function TentDetail() {
         (() => {
           const vpd = classifyVpdAgainstStage({
             value: snap.vpd,
-            stage: tent.stage,
+            stage: envStage,
             stale: header.stale,
           });
           return (
@@ -431,14 +453,14 @@ export default function TentDetail() {
         })()}
       {snap?.vpd !== null &&
         snap?.vpd !== undefined &&
-        normalizeVpdStage(tent.stage) === "unknown" && (
+        normalizeVpdStage(envStage) === "unknown" && (
           <VpdStageMissingBadge testId="tent-detail-vpd-stage-missing-badge" className="mb-4" />
         )}
 
       <EnvironmentStabilityCard
         testId="tent-detail-environment-stability"
         className="mb-4"
-        result={computeEnvironmentStability(series, { stage: tent.stage })}
+        result={computeEnvironmentStability(series, { stage: envStage })}
       />
       <WateringCadenceHistoryStrip
         tentId={id ?? null}
@@ -860,6 +882,7 @@ export default function TentDetail() {
                         lastNote: p.lastNote,
                         isArchived: p.isArchived ?? false,
                         photo: p.photo ?? null,
+                        plantType: p.plantType ?? null,
                       }}
                     />
                   </div>

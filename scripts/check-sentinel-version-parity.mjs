@@ -80,6 +80,11 @@ STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
 
 Do not continue until the context issue is resolved.`;
 
+const REQUIRED_COVERAGE_STARTUP_GATE = REQUIRED_STARTUP_GATE.replace(
+  "files_read:\ncurrent_task:",
+  "files_read:\nopen_handoffs_checked:\ncurrent_task:",
+);
+
 /**
  * CURRENT_STATE.md is deliberately absent from this list. It was imported here until
  * 2026-08-21, when it measured 153,142 bytes / ~27,400 tokens — 19.1% of every context
@@ -169,6 +174,13 @@ function versionIn(text) {
   return match ? match[1] : null;
 }
 
+/** The coverage field became mandatory in the 2026-09-28.2 constitution. */
+function requiresHandoffAck(version) {
+  if (!version) return false;
+  const [date, revision] = version.split(".");
+  return date > "2026-09-28" || (date === "2026-09-28" && Number(revision) >= 2);
+}
+
 /**
  * Content with the version line removed, so "did the rules change?" is asked
  * independently of "did the version change?". Without this the two questions answer each
@@ -247,9 +259,12 @@ if (geminiText) {
 // The owner requires the full visible startup block in the canonical constitution and
 // every detailed role file. A reference to the gate is not enough for disconnected
 // agents that receive only their role prompt.
+const requiredStartupGate = requiresHandoffAck(canonicalVersion)
+  ? REQUIRED_COVERAGE_STARTUP_GATE
+  : REQUIRED_STARTUP_GATE;
 for (const path of [CANONICAL, ...ROLE_FILES]) {
   const text = head.get(path)?.text.replace(/\r\n/g, "\n") ?? "";
-  if (text && !text.includes(REQUIRED_STARTUP_GATE)) {
+  if (text && !text.includes(requiredStartupGate)) {
     problems.push(`${path}: exact mandatory SENTINEL_ACK startup gate is missing`);
   }
 }
@@ -316,6 +331,10 @@ if (claudeText) {
 
 if (!existsSync("docs/agents/CURRENT_STATE.md")) {
   problems.push("docs/agents/CURRENT_STATE.md: missing changing shift report");
+}
+
+if (requiresHandoffAck(canonicalVersion) && !existsSync("docs/agents/HANDOFF_LOG.md")) {
+  problems.push("docs/agents/HANDOFF_LOG.md: missing task coverage log");
 }
 
 if (!existsSync(LEGACY_ARCHIVE)) {

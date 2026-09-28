@@ -77,6 +77,29 @@ describe("event replay locking disposable PostgreSQL proof", () => {
     expect(source.trimEnd()).toMatch(/COMMIT;$/);
   });
 
+  it("sets the real INSERT timestamp context and verifies fixture stamps before applying", async () => {
+    const responses = ["verdant_quicklog_delegate_repair_pg15_disposable_v1", "", "", "f"];
+    const sync = vi.fn((_command: string, _args: string[], _options: { input: string }) => ({
+      status: 0,
+      stdout: responses.shift(),
+      stderr: "",
+    }));
+    const asyncSpawn = vi.fn();
+    await expect(
+      runEventReplayLockHarness({ url: localUrl, spawnImpl: sync, spawnAsyncImpl: asyncSpawn }),
+    ).resolves.toBe(1);
+    expect(sync).toHaveBeenCalledTimes(4);
+    const setup = sync.mock.calls[2][2].input;
+    expect(setup).toMatch(/^begin;/);
+    expect(setup.trimEnd()).toMatch(/commit;$/);
+    expect(
+      setup.indexOf("set local verdant.quicklog_logged_at = '2026-01-01T10:01:00Z'"),
+    ).toBeLessThan(setup.indexOf("insert into public.grow_events"));
+    expect(setup).toContain("set local verdant.quicklog_logged_at = '2026-01-01T10:01:00Z'");
+    expect(sync.mock.calls[3][2].input).toContain("logged_at='2026-01-01T10:01:00Z'");
+    expect(asyncSpawn).not.toHaveBeenCalled();
+  });
+
   it("constructs separate controls for the receipt lock and legacy metadata lock", () => {
     const receipt = mutateLockWait(definition, "receipt");
     const metadata = mutateLockWait(definition, "metadata");

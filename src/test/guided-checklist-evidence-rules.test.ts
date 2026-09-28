@@ -24,6 +24,94 @@ const row = {
 const input = { now, growId: "g1", tentIds: ["t1"], readings: [], diaryEntries: [manual] };
 
 describe("guided evidence scope and provenance", () => {
+  it.each([{ ph: 6.2 }, { ec: 1.2 }, { ph: 6.2, ec: 1.2 }])(
+    "counts usable root-zone-only manual evidence without projecting air metrics: %j",
+    (metrics) => {
+      const result = selectGuidedChecklistEvidence({
+        ...input,
+        diaryEntries: [
+          { ...manual, details: { manual_sensor_snapshot: { source: "manual", ...metrics } } },
+        ],
+      }).t1;
+      expect(result).toEqual({ capturedAt: manual.entry_at, source: "manual", quality: "ok" });
+      expect(isGuidedChecklistReadingFresh(result, now)).toBe(true);
+    },
+  );
+  it.each([{ ph: 3 }, { ph: 9 }, { ec: 0 }, { ec: 19.999 }])(
+    "uses the canonical root-zone presentation boundary: %j",
+    (metrics) => {
+      expect(
+        selectGuidedChecklistEvidence({
+          ...input,
+          diaryEntries: [
+            { ...manual, details: { manual_sensor_snapshot: { source: "manual", ...metrics } } },
+          ],
+        }).t1?.source,
+      ).toBe("manual");
+    },
+  );
+  it.each([
+    { ph: null },
+    { ph: "6.2" },
+    { ph: NaN },
+    { ph: Infinity },
+    { ph: 2.99 },
+    { ph: 9.01 },
+    { ec: "1.2" },
+    { ec: NaN },
+    { ec: Infinity },
+    { ec: -0.01 },
+    { ec: 20 },
+    { ec: 1200 },
+  ])("does not count invalid or suspicious root-zone-only evidence: %j", (metrics) => {
+    expect(
+      selectGuidedChecklistEvidence({
+        ...input,
+        diaryEntries: [
+          { ...manual, details: { manual_sensor_snapshot: { source: "manual", ...metrics } } },
+        ],
+      }).t1,
+    ).toBeNull();
+  });
+  it.each(["live", "csv", "unknown"])("never promotes a %s root-zone diary payload", (source) => {
+    expect(
+      selectGuidedChecklistEvidence({
+        ...input,
+        diaryEntries: [{ ...manual, details: { manual_sensor_snapshot: { source, ph: 6.2 } } }],
+      }).t1,
+    ).toBeNull();
+  });
+  it.each([null, "invalid"])(
+    "requires an observation time for root-zone evidence: %s",
+    (entryAt) => {
+      expect(
+        selectGuidedChecklistEvidence({
+          ...input,
+          diaryEntries: [
+            {
+              ...manual,
+              entry_at: entryAt,
+              details: { manual_sensor_snapshot: { source: "manual", ph: 6.2 } },
+            },
+          ],
+        }).t1,
+      ).toBeNull();
+    },
+  );
+  it("keeps the manual observation window and deterministic survivor preference for root-zone evidence", () => {
+    const diary = Object.freeze({
+      ...manual,
+      details: Object.freeze({
+        manual_sensor_snapshot: Object.freeze({ source: "manual", ph: 6.2 }),
+      }),
+    });
+    const args = { ...input, readings: [{ ...row, quality: "degraded" }], diaryEntries: [diary] };
+    const result = selectGuidedChecklistEvidence(args);
+    expect(selectGuidedChecklistEvidence(args)).toEqual(result);
+    expect(result.t1?.source).toBe("manual");
+    expect(isGuidedChecklistReadingFresh(result.t1, now)).toBe(true);
+    expect(isGuidedChecklistReadingFresh(result.t1, now + 86_400_000)).toBe(false);
+  });
   it.each([{ grow_id: "other" }, { tent_id: "other" }, { tent_id: null }, { retracted_at: at(0) }])(
     "ignores diary evidence outside the selected scope or retracted: %j",
     (change) => {
@@ -79,6 +167,9 @@ describe("guided evidence scope and provenance", () => {
     { source: "constructor" },
     { source: "home_assistant" },
     { quality: "invalid" },
+    { quality: "degraded" },
+    { quality: "stale" },
+    { quality: "unknown" },
     { raw_payload: { vendor: "ecowitt_windows_testbench" } },
     { value: null },
     { value: "" },

@@ -49,6 +49,8 @@ afterEach(() => {
 describe("guided checklist evidence honesty", () => {
   it.each([
     { manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 55 } },
+    { manual_sensor_snapshot: { source: "manual", ph: 6.2 } },
+    { manual_sensor_snapshot: { source: "manual", ec: 1.2 } },
     { environment_check: { temp_c: 25, humidity_pct: 55 } },
   ])("recognizes scoped manual diary evidence %j", (details) => {
     state.diary.data = [

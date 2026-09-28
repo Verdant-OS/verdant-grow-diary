@@ -14,6 +14,7 @@ import {
   schemaEffectLive,
   validatePinnedMigrationFile,
 } from "./apply-signup-acquisition-forward-repair.mjs";
+import { MIGRATION_LEDGER_CREATE_TABLE_SQL } from "./lib/supabaseMigrationLedgerShape.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MAX_PSQL_OUTPUT_BYTES = 1_048_576;
@@ -185,11 +186,7 @@ begin
 end
 $roles$;
 
-create table supabase_migrations.schema_migrations (
-  version text primary key,
-  name text,
-  statements text[]
-);
+${MIGRATION_LEDGER_CREATE_TABLE_SQL}
 
 create table auth.users (
   id uuid primary key,

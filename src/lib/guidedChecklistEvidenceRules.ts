@@ -13,6 +13,7 @@ import {
   isGuidedChecklistReadingFresh,
   type GuidedChecklistSensorReading,
 } from "@/lib/guidedActionChecklistRules";
+import { EC_MSCM_UNIT_MISMATCH_AT, PH_PRESENTATION_REALISTIC } from "@/constants/sensorTruthRanges";
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -21,6 +22,27 @@ function record(value: unknown): Record<string, unknown> | null {
 }
 function text(value: unknown): string | null {
   return typeof value === "string" ? value : null;
+}
+
+/** Checklist evidence can be root-zone-only; the shared air snapshot contract stays unchanged. */
+function manualDiaryEvidence(
+  entryAt: string | null,
+  payload: Record<string, unknown> | null,
+): GuidedChecklistSensorReading | null {
+  const snapshot = snapshotFromManualSensorSnapshot(entryAt, payload);
+  if (snapshot) return { capturedAt: snapshot.ts, source: snapshot.source, quality: "ok" };
+  if (!payload || payload.source !== "manual" || !entryAt || !Number.isFinite(Date.parse(entryAt)))
+    return null;
+  const ph = Object.hasOwn(payload, "ph") ? payload.ph : null;
+  const ec = Object.hasOwn(payload, "ec") ? payload.ec : null;
+  const usablePh =
+    typeof ph === "number" &&
+    Number.isFinite(ph) &&
+    ph >= PH_PRESENTATION_REALISTIC.min &&
+    ph <= PH_PRESENTATION_REALISTIC.max;
+  const usableEc =
+    typeof ec === "number" && Number.isFinite(ec) && ec >= 0 && ec < EC_MSCM_UNIT_MISMATCH_AT;
+  return usablePh || usableEc ? { capturedAt: entryAt, source: "manual", quality: "ok" } : null;
 }
 
 export interface GuidedChecklistRead {
@@ -106,8 +128,9 @@ export function selectGuidedChecklistEvidence(input: {
     const details = record(row.details);
     if (!details) continue;
     const entryAt = text(row.entry_at);
+    const manual = manualDiaryEvidence(entryAt, record(details.manual_sensor_snapshot));
+    if (manual) offer(text(row.tent_id), manual);
     const candidates = [
-      snapshotFromManualSensorSnapshot(entryAt, record(details.manual_sensor_snapshot)),
       snapshotFromEnvironmentCheck(entryAt, record(details.environment_check)),
       snapshotFromDiary(entryAt, record(details.sensor_snapshot)),
     ];

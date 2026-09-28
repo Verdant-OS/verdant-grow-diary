@@ -1,5 +1,123 @@
 # Verdant — Current Operating State
 
+**Last updated:** 2026-09-28 UTC; repository tip and open-PR inventory re-read at
+21:11–21:12 UTC. This stamp's own SHA and time are its Git commit, not a prediction.
+
+**Updated by:** Codex, on Cheek's instructions to finish current repairs, take over
+Claude's unfinished repository work where ownership permits, and remove workflow
+bottlenecks. This is a repository-only restamp on the measured deploy tip
+`566315cedd80e8d2a9ba3d312b5c466fdb568fa3`. Claude's dated operational record is
+preserved below; its historical production observations are not refreshed claims.
+
+## Current repository state — 2026-09-28
+
+- **PASS — checkout identity:** `Verdant-OS/verdant-grow-diary`, origin
+  `https://github.com/Verdant-OS/verdant-grow-diary.git`, deploy branch
+  `verdant-grow-diary`. `git ls-remote origin refs/heads/verdant-grow-diary`
+  returned `566315cedd80e8d2a9ba3d312b5c466fdb568fa3` at 21:11 UTC.
+- **PASS — authorized merge:** [#1727](https://github.com/Verdant-OS/verdant-grow-diary/pull/1727)
+  landed through its protected web queue as that tip, preserving the five reviewed
+  blobs from `19e21660e8a31616406b2f2bd5a2f118ef8889ca`. Queue Main CI
+  [36464233966](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/36464233966)
+  passed **35/35 jobs**; Full Vitest
+  [36464233984](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/36464233984)
+  passed **16/16 batches**. This records a repository merge, not deployment.
+- **PASS — enumerated open work:** GitHub's open-PR endpoint returned **55 PRs**
+  at 21:11–21:12 UTC, **53 draft / 2 ready**, with **no auto-merge enabled**.
+  The ready PRs were `#1679` and held `#1250`. The full 55-head check/file registry
+  and dated local receipts are retained in the owner's Downloads handoff packet.
+  `#1696` remains the sole open writer of this file.
+
+## Current repair and proof heads
+
+- **PASS — local combined repair:** CI-only
+  [#1740](https://github.com/Verdant-OS/verdant-grow-diary/pull/1740) at
+  `f7fef82ee8d1f48a4ccbee4b42efbb5c26d78e0b`, tree
+  `05963dc7cd16e17335f18e67d6c3c8d6c6fff464`: **77 files / 1,497 passed /
+  0 failed / 0 skipped**, two workers; actual `bun run typecheck` **0 diagnostics**;
+  latest five-file ESLint **0 errors / 0 warnings**. It combines the separately
+  preserved save/retrieve, lineage, retry, sensor-history, clock, source, lock,
+  CRLF and read-only catalog repairs. **NEVER MERGE #1740.**
+- **NOT_MEASURED — new combined-head hosted acceptance:** current-head CI and
+  independent interaction confirmation are separate gates. The preceding
+  `141925b6065a64a4d9b8a9de6bdb7f8e0f86c906` proof failed one Main CI job and one
+  Full Vitest batch on an incomplete saved-grow test fixture; that fixture is
+  corrected in the successor. Retain the failed receipts.
+- **PASS — historical terminal proof only:** at
+  `da582a7d1e3414a358776f3b90a3e5777e0fc7a0`, Main CI passed **35/35** and Full
+  Vitest **16/16**; sixteen logs report **44,172 passed test executions /
+  0 failed / 186 skipped**, **3,188 completed chunks**, no failed chunks or visible
+  retries. Native save/retrieve **23/23**, idle aging **12/12**, manual lock PG15
+  **11/11**, event lock PG15 **5/5**, census **131 unit / 5 public / 6 authenticated**,
+  analytics **10 Chromium / 10 WebKit**. These overlap other lanes and are not
+  deduplicated unique tests; they do not cover the new proof SHA.
+- **PASS — lineage/retry source and local regression:**
+  [#1758](https://github.com/Verdant-OS/verdant-grow-diary/pull/1758) at
+  `1d32d1652f0a7e4e614d38440dbd619c51218857`, stacked on `#1745`
+  `34040fabe16d5f37a4ab97d56c3b3940f114626f`: **23 files / 444 passed /
+  0 failed / 0 skipped**, actual typecheck **0 diagnostics**. Authoritative null
+  grow/tent IDs stay null; verified saved lineage supplies attachments/navigation.
+  The older successful-retry mock now includes persisted grow and active/manual
+  fields. New-head hosted CI and independent confirmation remain **NOT_MEASURED**.
+- **PASS — read-only gate repair:**
+  [#1756](https://github.com/Verdant-OS/verdant-grow-diary/pull/1756) at
+  `72aff9f4922cb3d799d01e1d318cdde395406872`, **two changed paths; three test files /
+  161 passed / 0 failed / 0 skipped**, typecheck **0 diagnostics**. Collect all protected-name
+  overloads before counting seven, then inspect pinned signatures for body/ACL.
+  Withdraw the unmerged duplicate/no-op SQL and its four shim-only static tests.
+  Preserve `#1747` SQLSTATE diagnostics when integrating. Current-head hosted and
+  independent acceptance remain **NOT_MEASURED**.
+- **PASS — disposable profile-RPC proof:**
+  [#1654](https://github.com/Verdant-OS/verdant-grow-diary/pull/1654) at
+  `ed581839e0f90cee074dfdfd0c29fad8658743c6`, Security DB run
+  [36479787252](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/36479787252):
+  **16 passed / 0 failed / 0 skipped** with fixture setup repeated before the
+  authenticated witness. Main CI **35/35**, Full Vitest **16/16**. These are
+  disposable-backend results, not production proof.
+- **FAIL — retained initial same-head failure:** `#1653` at
+  `15a5dc4840fd4f57fb89ff9f7e2f4c84672b795b` passed Main CI **35/35** and Full
+  Vitest **16/16**. Its first Security DB attempt reported **66 passed / 1 failed**;
+  **PASS — one targeted retry:** **67 passed / 0 failed**. Root cause is
+  **NOT_MEASURED**. Its older profile harness still prints two RPC paths BLOCKED;
+  use the distinct `#1654` receipt above for those paths, not the nominal old count.
+
+## Ownership, release gates and remaining gaps
+
+- **PASS — current ownership:** Codex leads repository repair/integration. Each
+  implementation keeps a different independent reviewer. Existing Claude review
+  SHA locks are not restamped onto new commits. This Codex-authored record delta
+  requires independent Grok review; current-head review is **NOT_MEASURED**.
+  Claude's Pheno Hunt ownership remains in place.
+- **BLOCKED — hosted Quick Log smoke:** the configured Lovable app returns HTTP
+  404 before authenticated fixture verification. An approved disposable
+  non-production target is still missing. The production QA grow is not staging.
+- **NOT_MEASURED — production acceptance:** current production frontend/Edge
+  identity, Rolling Release/aliases, new migration APPLY, refund fire, and customer
+  save/readback are not re-measured by this repository-only work. Earlier receipts
+  below keep their original targets and dates. Green CI is not deployment.
+- **BLOCKED — protected delivery:** the new manual-replay forward repair still
+  needs a protected byte-pinned delivery lane and the client-first receipt for all
+  four permanent refusal reasons. `#1742` cannot be applied before `#1741`'s
+  compatible client is verified live. No production lane was dispatched here.
+- **NOT_MEASURED — pilot/payment acceptance:** US$99 annual Pro is a confirmed
+  product term; production payment, warm-demand, counter, screenshot and
+  evidence-packet acceptance remain separate owner decisions.
+- **PASS — locks retained:** HOLD `#1250`; `#1369` REVIEW ONLY; `#1740` NEVER
+  MERGE. No new merge/ready, Publish, production PREFLIGHT/APPLY, closed inspection,
+  device, Action Queue, credentials or secret change is authorized by this stamp.
+
+The next repository action is exact-head CI and independent confirmation of the
+preserved component drafts and their composition, followed by the protected
+delivery preparation. Do not close useful unmerged work merely to reduce PR count.
+
+---
+
+## Historical Claude operational record — preserved, not re-measured
+
+The following dated observations retain their original context. Their tip, live
+identity, board counts, CI outcomes and ownership snapshots are historical; the
+repository-only stamp above does not refresh their production evidence.
+
 **Last updated:** 2026-09-27 UTC (tip read 23:53–23:54 UTC on 2026-09-26 and re-read 00:01 UTC; the merge-queue and deploy-branch `ci.yml` run lists read 00:02 UTC; the tip's push lanes and those of the two tips before it read 00:03 UTC; the `Required-check audit` logs of all nine new tip commits read 00:07–00:09 UTC; the tip's core-schema and money-lane log tails read 00:07 UTC; the board re-listed 00:01 UTC with every open head fetched, file-listed and merge-tested against the tip; `#1714`'s PR-head check runs and merge commit read 00:06 UTC; Vercel production deployment list, Rolling Release record, the four production-facing hostnames' alias records and the team event log read 00:02–00:04 UTC; the apex `version.json` read attempted 23:58 UTC and refused by the session egress (`BLOCKED`); `#1696`'s head, files and comments read 23:56–00:10 UTC; this stamp's own time is its git commit time)
 **Updated by:** Claude (2026-09-27 early, restamp on the **new deploy tip `63c32cdc43a72e8409135dc3fea7b57c577d6b45`** on Cheek's instruction "Update CURRENT_STATE.md with the #1733 merge" (23:5x UTC on 2026-09-26). Written by the session that owned `#1733`, not by the `#1696` session, and delivered as one commit on `#1696`'s branch directly above `66cdcc19`, pushed there on Cheek's explicit instruction ("Push the stamp directly to #1696's branch", 00:2x UTC on 2026-09-27) after first being opened as the stacked draft `#1734`, because `#1696` is this file's sole open writer (§11). **Nine commits have merged since the 05:16 stamp: `#1714` (05:17:51, directly, with its pinned contexts still queued or unstarted on its head — the bypass class), then `#1718` (06:05:58), `#1715` (15:27:20), `#1717` (16:09:03), `#1641` (16:12:43), `#1725` (17:30:19), `#1728` (22:28:04), `#1732` (23:00:52) and `#1733` (23:53:17) through the merge queue, each with its merge-group `CI` green before the merge and the audit lane red for the coverage-hole class — 36 files (+3,117 / −186), no migration; one product commit (`#1714`, sensors), the rest documentation, governance, tests and workflow text** (§1, §3, §4). **Production moved twice by Vercel Rolling Releases: the `408c966c` (`#1714`) build was rolled out 06:15:47–06:21:02 (recorded in the release topology specification's Appendix C at the tip), and the `66ea7bd3` (`#1732`) build was rolled out 23:27:30–23:33:23 by the owner principal — the four production-facing hostnames' alias records point to the `66ea7bd3` build since 23:33:23; the tip build `63c32cdc` is READY and not rolled out; the release state is `FAIL` in the "built, not rolled out" form (D-RT-12)** (§2, §3). The architecture contract is re-stamped at `66ea7bd3` (`#1733`) and the release topology specification is at the tip with Rolling Releases modelled (`#1718`, `#1725`, `#1733`) (§9). `#1696` is unchanged at `66cdcc19` and merges cleanly into the tip; 43 open PRs, none but `#1696` touches this file, none adds a migration, all merge cleanly (§5, §6). This session armed auto-merge on `#1732` and `#1733` on Cheek's explicit instructions and made one refused rollout call at 15:50 (§4, §5, §11); nothing else was merged, queued, promoted, rolled out, applied or dispatched by Claude.)
 
@@ -1154,14 +1272,14 @@ records, the incident and rollback record, the sandbox measurements and the pinn
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 21:04 UTC; `git log db0f3d73..origin/verdant-grow-diary`; the GitHub API for `#1711`.
 
-| Field      | Value                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------- |
-| Tip        | **`2f67a54583e20a4b10debf8c4883a887d8a402b6`**                                              |
-| Subject    | `fix(blueprint): withhold current scores for stale and unconfirmed evidence` (`#1657`, author and merger `cheekhimself`, from Codex branch `codex/blueprint-sensor-evidence-truth-20260923`; merged 20:33:32 by the owner directly, not through the merge queue — §4) |
-| Parents    | `b77d28a8` (`#1661`, 20:32:12) ← `84814341` (`#1705`, 20:31:04) ← `0f7b12db` (`#1704`, 20:30:37) ← `f9f697ae` (`#1711`, 20:21:44, merge queue) ← `db0f3d73` (`#1700`) ← `054a4e3e` ← `5a5094cc` ← `b099bbf7` ← `c10c095e` ← `9b06be3f` |
+| Field      | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tip        | **`2f67a54583e20a4b10debf8c4883a887d8a402b6`**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Subject    | `fix(blueprint): withhold current scores for stale and unconfirmed evidence` (`#1657`, author and merger `cheekhimself`, from Codex branch `codex/blueprint-sensor-evidence-truth-20260923`; merged 20:33:32 by the owner directly, not through the merge queue — §4)                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Parents    | `b77d28a8` (`#1661`, 20:32:12) ← `84814341` (`#1705`, 20:31:04) ← `0f7b12db` (`#1704`, 20:30:37) ← `f9f697ae` (`#1711`, 20:21:44, merge queue) ← `db0f3d73` (`#1700`) ← `054a4e3e` ← `5a5094cc` ← `b099bbf7` ← `c10c095e` ← `9b06be3f`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Since      | the 20:21 stamp: **5 commits**, 17 files, +2,082 / −93. `#1711`: one test file. `#1704`: the migration below, a PG15 harness workflow `.github/workflows/user-roles-client-grant-hardening-pg15.yml`, `scripts/run-user-roles-client-grant-hardening-pg15-harness.mjs`, a migration test, and `scripts/run-staff-role-rls-harness.ts` (+8/−4). `#1705`: `docs/architecture-contract.md` only. `#1661`: `src/components/genetics/BreedingLogContainer.tsx` and a test. `#1657`: `src/lib/blueprintEvidenceRules.ts` (new), `src/lib/blueprintOverlayViewModel.ts`, `src/components/PlantBlueprintOverlaySection.tsx`, `src/components/ProBlueprintOverlay.tsx` and four tests. No `config/`, no governance file, not this file |
-| Migrations | **1 — `supabase/migrations/20260925090000_user_roles_client_grant_hardening.sql` (`#1704`).** Its header (`source claim` from the file): removes `anon`'s and `PUBLIC`'s privileges on `public.user_roles` and narrows `authenticated` to `SELECT`; fails closed (SQLSTATE 55000) if a prerequisite differs; re-running is a no-op; it cites a read-only production measurement on 2026-09-25 as its motivation. **Committed is not applied**: `#1704`'s own body says "This PR applies nothing … Delivering it to production needs a protected apply lane (like #1701 and #1703) or an owner-run path; not built here." Production applied state `NOT_MEASURED` by this session. No APPLY. |
-| Config     | `config/required-status-checks.json` unchanged: 35 pinned **required** contexts, 7 **mustBeGreen** |
+| Migrations | **1 — `supabase/migrations/20260925090000_user_roles_client_grant_hardening.sql` (`#1704`).** Its header (`source claim` from the file): removes `anon`'s and `PUBLIC`'s privileges on `public.user_roles` and narrows `authenticated` to `SELECT`; fails closed (SQLSTATE 55000) if a prerequisite differs; re-running is a no-op; it cites a read-only production measurement on 2026-09-25 as its motivation. **Committed is not applied**: `#1704`'s own body says "This PR applies nothing … Delivering it to production needs a protected apply lane (like #1701 and #1703) or an owner-run path; not built here." Production applied state `NOT_MEASURED` by this session. No APPLY.                                   |
+| Config     | `config/required-status-checks.json` unchanged: 35 pinned **required** contexts, 7 **mustBeGreen**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 A commit alone never proves deployment: the tip was built as a Vercel production deployment, but the
 custom-domain alias records still point to `9b06be3f` (§2); public serving state `NOT_MEASURED`. This
@@ -1315,13 +1433,13 @@ for this commit (§4).**
     `CI` (run `36184771128`) 35 of 35 pinned contexts green; merge-group Vitest gate green; merge-group
     dependency audit red. Push-event reds: `Required-check audit` (run `36185307051`, row not read),
     `Dependency & Security CI`, `Required core schema present` (20:32) and `Required money-critical
-    migrations present` (20:55) — the two sandbox lanes' logs not read on this tip; `Core Link and Form
-    Census` and the push Vitest gate cancelled by the `0f7b12db` push (`NOT_MEASURED`).
+migrations present` (20:55) — the two sandbox lanes' logs not read on this tip; `Core Link and Form
+Census` and the push Vitest gate cancelled by the `0f7b12db` push (`NOT_MEASURED`).
   - **`0f7b12db` (`#1704`, direct merge) — 28 runs: 18 green, 2 red, 4 cancelled, 1 skipped, 3 queued.**
     Red: `Required-check audit` (run `36186200536`, log read, §4) and the dependency audit. Cancelled by
     the next push: Vitest gate, census, `Required core schema present`, `SEO parity & head fidelity`.
     Still queued at 21:04: push `CI`, `Required money-critical migrations present`, `Prefix Diff — SARIF
-    upload`. **The tip that added the migration has no concluded `CI` and no concluded sandbox lane.**
+upload`. **The tip that added the migration has no concluded `CI` and no concluded sandbox lane.**
   - **`84814341` (`#1705`, direct merge) — 22 runs: 13 green, 2 red, 5 cancelled, 2 queued.** Red: audit
     (run `36186246454`, log read, §4) and the dependency audit; push `CI` and the money lane queued.
   - **`b77d28a8` (`#1661`, direct merge) — 24 runs: 13 green, 2 red, 5 cancelled, 3 queued, 1 in
@@ -1429,14 +1547,14 @@ Everything else in it is carried unchanged with its original labels, including t
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 20:17 UTC.
 
-| Field      | Value                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------- |
-| Tip        | **`db0f3d73d63ebc7ab780f9d1b561cef4eed1cc74`**                                              |
+| Field      | Value                                                                                                                                                                                                                            |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tip        | **`db0f3d73d63ebc7ab780f9d1b561cef4eed1cc74`**                                                                                                                                                                                   |
 | Subject    | `test(sensors): pin grouped-reading freshness at chart export (defensive hardening)` (`#1700`, author and merger `cheekhimself`, from branch `claude/laughing-faraday-hp4p9l` — another Claude session's slice; merged 14:13:18) |
-| Parents    | `054a4e3e` (`#1692`) ← `5a5094cc` (`#1709`) ← `b099bbf7` (`#1708`) ← `c10c095e` (`#1702`) ← `9b06be3f` (`#1680`) |
-| Since      | the 14:53 stamp: **0 commits** |
-| Migrations | **0** |
-| Config     | `config/required-status-checks.json` unchanged: 35 pinned **required** contexts, 7 **mustBeGreen** |
+| Parents    | `054a4e3e` (`#1692`) ← `5a5094cc` (`#1709`) ← `b099bbf7` (`#1708`) ← `c10c095e` (`#1702`) ← `9b06be3f` (`#1680`)                                                                                                                 |
+| Since      | the 14:53 stamp: **0 commits**                                                                                                                                                                                                   |
+| Migrations | **0**                                                                                                                                                                                                                            |
+| Config     | `config/required-status-checks.json` unchanged: 35 pinned **required** contexts, 7 **mustBeGreen**                                                                                                                               |
 
 A commit alone never proves deployment: the tip was built as a Vercel production deployment, but the
 custom-domain alias records still point to `9b06be3f` (§2); public serving state `NOT_MEASURED`. This
@@ -1605,15 +1723,15 @@ every run on attempt 1; nothing re-run.**
   log read); the scheduled `Sandbox credit-packs smoke (read-only)` (missing `SANDBOX_SMOKE_USER`
   secret, log read). **Three more concluded red after that read, each log read 20:18:**
   - **push `CI` (run `36146026332`) — `failure` 14:38:20:** 29 of 30 jobs green; `Full test suite
-    (shard 15/32)` died in `bun install --frozen-lockfile` before any test ran — "Integrity check
+(shard 15/32)` died in `bun install --frozen-lockfile` before any test ran — "Integrity check
     failed for tarball: form-data" (14:20). The same runner-side cache/registry class that hit
     `ccf132dc`'s shards 19/29, `b099bbf7`'s push `CI` and `4924e8fb`'s two Local lanes today.
   - **push `Full Vitest Suite (PR gate)` (run `36146025959`) — `failure` 14:28:30:** `Full suite —
-    batch 9/16` died the same way ("Integrity check failed for tarball: array-buffer-byte-length"
+batch 9/16` died the same way ("Integrity check failed for tarball: array-buffer-byte-length"
     and "symbol-tree", 14:22) after restoring the shared bun cache; the other 15 batches green.
   - **`Core Link and Form Census` (run `36146026206`, push event) — `failure` 14:48:45:** in
     `Browser census (authenticated)`, `bunx playwright test --project=chromium-mocked
-    e2e/core-link-form-census.spec.ts --grep "scheduled authenticated"` ran 3 tests; two passed;
+e2e/core-link-form-census.spec.ts --grep "scheduled authenticated"` ran 3 tests; two passed;
     the third, "audits every scheduled authenticated page, visible field, and safe internal link",
     hit the 30-minute test timeout while clicking `/pheno-hunts/new?growId=…&tentId=…` from
     `/tents/22222222-…` — "`/tents/22222222-2222-4222-8222-222222222222` must finish the app-shell
@@ -1730,14 +1848,14 @@ warning.
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 14:27 UTC; `git log 054a4e3e..origin/verdant-grow-diary`; the GitHub API for `#1700`.
 
-| Field      | Value                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------- |
-| Tip        | **`db0f3d73d63ebc7ab780f9d1b561cef4eed1cc74`**                                              |
+| Field      | Value                                                                                                                                                                                                                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tip        | **`db0f3d73d63ebc7ab780f9d1b561cef4eed1cc74`**                                                                                                                                                                                                                                                      |
 | Subject    | `test(sensors): pin grouped-reading freshness at chart export (defensive hardening)` (`#1700`, author and merger `cheekhimself`, from branch `claude/laughing-faraday-hp4p9l` — another Claude session's slice; merged 14:13:18; the commit's own timestamp, 13:52:48, is the merge-queue commit's) |
-| Parents    | `054a4e3e` (`#1692`, merged 13:51:07) ← `5a5094cc` (`#1709`) ← `b099bbf7` (`#1708`) ← `c10c095e` (`#1702`) |
-| Since      | the 14:11 stamp: **1 commit**; 2 files, +161 / −1 — `src/lib/sensorChartExport.ts` and a new `src/test/sensor-chart-export-grouped-freshness.test.ts`; no `supabase/`, no `config/`, no governance file, not this file |
-| Migrations | **0** |
-| Config     | `config/required-status-checks.json` unchanged: 35 pinned **required** contexts, 7 **mustBeGreen** |
+| Parents    | `054a4e3e` (`#1692`, merged 13:51:07) ← `5a5094cc` (`#1709`) ← `b099bbf7` (`#1708`) ← `c10c095e` (`#1702`)                                                                                                                                                                                          |
+| Since      | the 14:11 stamp: **1 commit**; 2 files, +161 / −1 — `src/lib/sensorChartExport.ts` and a new `src/test/sensor-chart-export-grouped-freshness.test.ts`; no `supabase/`, no `config/`, no governance file, not this file                                                                              |
+| Migrations | **0**                                                                                                                                                                                                                                                                                               |
+| Config     | `config/required-status-checks.json` unchanged: 35 pinned **required** contexts, 7 **mustBeGreen**                                                                                                                                                                                                  |
 
 A commit alone never proves deployment: the tip was built as a Vercel production deployment, but the
 custom-domain alias records still point to `9b06be3f` (§2); public serving state `NOT_MEASURED`. This
@@ -1898,7 +2016,7 @@ result belongs to a later read.**
 - **Merge-group (the merge gate):** `CI` (35 pinned required contexts) green; the Vitest gate,
   `Security regression` and the four PG15 forward-repair lanes green; `Dependency & Security CI` red.
 - **Red (6); the audit, schema, money and scheduled-smoke logs read 14:28, the two dependency-audit logs not re-read:** `Required-check audit` `FAIL` (§4); `Dependency & Security CI` on the merge-group and push events — logs not re-read on this tip, cause `NOT_MEASURED` here (the `hono` and `js-yaml` advisories were read on this PR's `ccf132dc` head, 14:11 stamp §8; `#1343` separately owned); **`Required core schema
-  present` — "14 of 51 required core column(s) are missing"** in the sandbox (identity verified,
+present` — "14 of 51 required core column(s) are missing"** in the sandbox (identity verified,
   `shared-supavisor-transaction`), every one from
   `supabase/migrations/20260811090000_quicklog_corrections_retractions.sql` (thirteen
   `quicklog_entry_revisions` columns and `diary_entries.retracted_at`), while "All 4 required
@@ -1906,7 +2024,7 @@ result belongs to a later read.**
   Applied (in required set): 15 Missing: 2 Unexpected: 0"** in the sandbox, the two missing being
   `20260914212330_founder_refund_subscription_reference.sql` and
   `20260915193000_founder_refund_grant_serialization.sql`; **`Sandbox credit-packs smoke
-  (read-only)`** (scheduled, 14:25) — died before any smoke ran: "No target user configured. Set
+(read-only)`** (scheduled, 14:25) — died before any smoke ran: "No target user configured. Set
   SANDBOX_SMOKE_USER secret or pass 'user' input." — a missing secret on a scheduled lane, not this
   file's, never re-run by Claude.
 - **Neither re-run.** The two sandbox lanes report the state of the pinned sandbox, not production
@@ -2020,14 +2138,14 @@ carried (§7). No Publish. No APPLY. `HOLD #1250`. Prior header follows.)
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 14:07 UTC; `git log c10c095e..origin/verdant-grow-diary`.
 
-| Field      | Value                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------- |
-| Tip        | **`054a4e3ec2e96c7466f2a82a861af7df1d8c59c1`**                                              |
-| Subject    | `test(csv): consolidate candidate lookup follow-up coverage` (`#1692`, author `cursor[bot]`, merged by `cheekhimself` 13:51:07) |
+| Field      | Value                                                                                                                                                                                                                                    |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tip        | **`054a4e3ec2e96c7466f2a82a861af7df1d8c59c1`**                                                                                                                                                                                           |
+| Subject    | `test(csv): consolidate candidate lookup follow-up coverage` (`#1692`, author `cursor[bot]`, merged by `cheekhimself` 13:51:07)                                                                                                          |
 | Parents    | `5a5094cc` (`#1709`, `fix(deps): bump the Cursor SDK spike to Vitest 4.1.11`, merged 13:46:37) ← `b099bbf7` (`#1708`, `test(ci): audit the Timeline local-day lane and bind the role fixture to its path`, merged 13:30:57) ← `c10c095e` |
-| Since      | the 13:27 stamp: **3 commits**; 7 files, +113 / −43; no `src/` app change beyond tests, no `supabase/`, no governance file, not this file |
-| Migrations | **0** |
-| Config     | `#1708` edits `config/required-status-checks.json`: the pinned **required** list is unchanged at 35; the **mustBeGreen** list grows from 6 to 7 (`Timeline local-day date filter (mocked)`) |
+| Since      | the 13:27 stamp: **3 commits**; 7 files, +113 / −43; no `src/` app change beyond tests, no `supabase/`, no governance file, not this file                                                                                                |
+| Migrations | **0**                                                                                                                                                                                                                                    |
+| Config     | `#1708` edits `config/required-status-checks.json`: the pinned **required** list is unchanged at 35; the **mustBeGreen** list grows from 6 to 7 (`Timeline local-day date filter (mocked)`)                                              |
 
 A commit alone never proves deployment: each of the three tips was built as a Vercel production
 deployment, but the custom-domain alias records still point to `9b06be3f` (§2); public serving state
@@ -2152,7 +2270,7 @@ lanes are `NOT_MEASURED` here by construction** and belong to the next stamp or 
 - **`CI` (run `36141107980`) — `success` on attempt 2, 14:06:28 UTC.** Attempt 1 concluded
   `failure` at 13:56:14 with 33 jobs green and two jobs, `Full test suite (shard 19/32)` and
   `(shard 29/32)`, dead in the `Install dependencies` step before any test ran: `bun install
-  --frozen-lockfile` → "Integrity check failed for tarball: data-view-byte-offset" after restoring
+--frozen-lockfile` → "Integrity check failed for tarball: data-view-byte-offset" after restoring
   the shared `Linux-bun-` install cache (both job logs read). The base's own push `CI` on `b099bbf7`
   died the same way in its `Lint, typecheck, test, build` job at 13:52 ("Integrity check failed for
   tarball: h3"), so this is a runner-side cache or registry class, not this file's diff. A job that dies before any test body runs is the one case this lock allows a single re-run: the failed
@@ -2179,7 +2297,7 @@ push-event result belongs to a later read.**
   `Security regression` and the four PG15 forward-repair lanes green; `Dependency & Security CI` red.
 - **Red (6):** `Required-check audit` `FAIL` (§4); `Dependency & Security CI` on the merge-group and
   push events (same advisories); `Required core schema present` and `Required money-critical
-  migrations present` (their logs were not re-read this stamp; the 12:22 causes — sandbox 14 of 51
+migrations present` (their logs were not re-read this stamp; the 12:22 causes — sandbox 14 of 51
   core columns and 2 of 17 money migrations missing — are the standing record and are re-measured
   by every tip push); a scheduled `Paddle Craft catalog preflight` (`Verify Paddle Craft catalog`,
   verdict `fail`, rc 2, 14:03 — a scheduled catalog check, reason not read beyond the verdict, not
@@ -2288,12 +2406,12 @@ APPLY. `HOLD #1250`. Prior header follows.)
 
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25 13:25 UTC; `git log c10c095e..origin/verdant-grow-diary` is empty.
 
-| Field      | Value                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------- |
-| Tip        | **`c10c095ec7f6ec734a56ed6331269757bde7bfff`**                                              |
-| Subject    | `test(timeline): bind date-filter proof to core reads and reject fixture writes` (`#1702`)  |
-| Parent     | `9b06be3fd…` (`#1680`, the tip of every stamp from 06:28 to 12:17)                          |
-| Since | the 12:25 stamp: **0 commits**; `#1702` (committer date 11:51:54, merged 12:03:27) is still the tip |
+| Field      | Value                                                                                                                                                                        |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tip        | **`c10c095ec7f6ec734a56ed6331269757bde7bfff`**                                                                                                                               |
+| Subject    | `test(timeline): bind date-filter proof to core reads and reject fixture writes` (`#1702`)                                                                                   |
+| Parent     | `9b06be3fd…` (`#1680`, the tip of every stamp from 06:28 to 12:17)                                                                                                           |
+| Since      | the 12:25 stamp: **0 commits**; `#1702` (committer date 11:51:54, merged 12:03:27) is still the tip                                                                          |
 | Migrations | **0** — `#1702` changes `e2e/timeline-local-day-date-filter.spec.ts`, `.github/workflows/mocked-e2e-unwired-closure.yml` and `src/test/test-execution-manifest.test.ts` only |
 
 A commit alone never proves deployment, and this one proves the point: the tip is built, the three custom-domain alias records remain on `9b06be3f` while the project alias points to this build (§2), and the public serving state is `NOT_MEASURED`. This PR's branch carries `c10c095e` by forward merge (`b1f70076`, 12:22); `aaa2dbb5` is its head as of this stamp's reads.
@@ -2399,7 +2517,7 @@ lanes are `NOT_MEASURED` here by construction** and belong to the next stamp or 
 
 - **Merge-group (the merge gate):** `CI` (the 35 pinned required contexts) green; `Full Vitest Suite (PR gate)`
   green; `Security regression` green; four PG15 forward-repair lanes green; `Dependency & Security
-  CI` red (below).
+CI` red (below).
 - **Red on the push (6; the seventh red run is the merge-group dependency audit above, the eighth the scheduled Lighthouse below):** `Core Link and Form Census` — its `Browser census (authenticated)` job (12:35): one test of three failed, `e2e/core-link-form-census.spec.ts:2103` "audits every scheduled authenticated page, visible field, and safe internal link", after a 30.7-minute run — the known base-red class whose fix is `#1478` (Codex's open slice), red on the tip and on other PRs today; not this file's; not re-run. `Required-check audit` `FAIL` (§4 — one must-be-green
   context started after the merge); `Dependency & Security CI` (job log 12:04: `hono` `1193729`,
   `1193730`, `1193731` moderate and `js-yaml` `1193727` high, `bun` and `npm` — identical to every
@@ -2523,12 +2641,12 @@ states this PR's head lanes as read (§8). No Publish. No APPLY. `HOLD #1250`. P
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 12:22 UTC; `git log 9b06be3f..origin/verdant-grow-diary`.
 
-| Field      | Value                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------- |
-| Tip        | **`c10c095ec7f6ec734a56ed6331269757bde7bfff`**                                              |
-| Subject    | `test(timeline): bind date-filter proof to core reads and reject fixture writes` (`#1702`)  |
-| Parent     | `9b06be3fd…` (`#1680`, the tip of every stamp from 06:28 to 12:17)                          |
-| Since      | the 11:25 stamp: **1 commit** (`#1702`); committer date 11:51:54 (the merge-queue commit); merged 12:03:27 |
+| Field      | Value                                                                                                                                                                        |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tip        | **`c10c095ec7f6ec734a56ed6331269757bde7bfff`**                                                                                                                               |
+| Subject    | `test(timeline): bind date-filter proof to core reads and reject fixture writes` (`#1702`)                                                                                   |
+| Parent     | `9b06be3fd…` (`#1680`, the tip of every stamp from 06:28 to 12:17)                                                                                                           |
+| Since      | the 11:25 stamp: **1 commit** (`#1702`); committer date 11:51:54 (the merge-queue commit); merged 12:03:27                                                                   |
 | Migrations | **0** — `#1702` changes `e2e/timeline-local-day-date-filter.spec.ts`, `.github/workflows/mocked-e2e-unwired-closure.yml` and `src/test/test-execution-manifest.test.ts` only |
 
 A commit alone never proves deployment, and this one proves the point: the tip is built, the three custom-domain alias records remain on `9b06be3f` while the project alias points to this build (§2), and the public serving state is `NOT_MEASURED`. This PR's branch carries `c10c095e` by forward merge (`b1f70076`, 12:22).
@@ -2638,7 +2756,7 @@ red, 2 still in progress (`Core Link and Form Census`, and the `dynamic` push-re
 
 - **Merge-group (the merge gate):** `CI` (the 35 pinned required contexts) green; `Full Vitest Suite (PR gate)`
   green; `Security regression` green; four PG15 forward-repair lanes green; `Dependency & Security
-  CI` red (below).
+CI` red (below).
 - **Red on the push (5, none new in kind; the sixth red run is the merge-group dependency audit above):** `Required-check audit` `FAIL` (§4 — one must-be-green
   context started after the merge); `Dependency & Security CI` (job log 12:04: `hono` `1193729`,
   `1193730`, `1193731` moderate and `js-yaml` `1193727` high, `bun` and `npm` — identical to every
@@ -2761,13 +2879,13 @@ APPLY. `HOLD #1250`. Prior header follows.)
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 11:51 UTC.
 
-| Field      | Value                                                                              |
-| ---------- | ---------------------------------------------------------------------------------- |
-| Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as every stamp since 06:28)   |
-| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)          |
-| Parent     | `bbcc2faa4…` (`#1677`)                                                             |
-| Since      | the 11:25 stamp: **0 commits**                                                     |
-| Migrations | **0**                                                                              |
+| Field      | Value                                                                            |
+| ---------- | -------------------------------------------------------------------------------- |
+| Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as every stamp since 06:28) |
+| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)        |
+| Parent     | `bbcc2faa4…` (`#1677`)                                                           |
+| Since      | the 11:25 stamp: **0 commits**                                                   |
+| Migrations | **0**                                                                            |
 
 A commit alone never proves deployment; this tip's deployment is proven separately — Vercel's
 production aliases point to its build `dpl_6fVRiJ3X…` as of 09:45:16, re-read 11:51 (§2).
@@ -2777,14 +2895,14 @@ production aliases point to its build `dpl_6fVRiJ3X…` as of 09:45:16, re-read 
 `established fact` from Vercel's API (project `prj_i2IbBKEA9K2rLLaAO3nrBeJkTXTy`, read-only), as
 the 11:25 stamp §2 records after its amendments, unchanged at the 11:51 re-read:
 
-| Time (UTC)   | Event                                                                                                                                              | Source                                  |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| 06:22:23     | `dpl_6fVRiJ3XrDbCcGXrtDvCbLvB7HoY` (`git`, tip `9b06be3f`) built                                                                                    | deployment record                       |
-| 08:28:39     | `dpl_BhuJT6qqVNckHMibRxYNXDHK4DM7` (`redeploy`, `7053af8f` on `cursor/missing-test-coverage-b7df`) created **by the Cursor Agent** — event-log GitHub login `cursoragent`, under the owner's account via an API token; the same token attached the GitHub connector 08:26:14, enabled Skew Protection 08:28:52, changed a project setting 08:29:43 | team event log, read 11:32              |
+| Time (UTC)   | Event                                                                                                                                                                                                                                                                                                                                                                                                                                 | Source                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| 06:22:23     | `dpl_6fVRiJ3XrDbCcGXrtDvCbLvB7HoY` (`git`, tip `9b06be3f`) built                                                                                                                                                                                                                                                                                                                                                                      | deployment record                                            |
+| 08:28:39     | `dpl_BhuJT6qqVNckHMibRxYNXDHK4DM7` (`redeploy`, `7053af8f` on `cursor/missing-test-coverage-b7df`) created **by the Cursor Agent** — event-log GitHub login `cursoragent`, under the owner's account via an API token; the same token attached the GitHub connector 08:26:14, enabled Skew Protection 08:28:52, changed a project setting 08:29:43                                                                                    | team event log, read 11:32                                   |
 | **08:29:17** | **`cursoragent` assigns 5 aliases to it — exposure of new page loads starts.** The event payload carries the count only (`aliasCount: 5`); the deployment record names them: the four production-facing hostnames `verdantgrowdiary.com`, `www.verdantgrowdiary.com`, `verdant-grow-diary.vercel.app`, `verdant-grow-diary-verdantgrowdiary.vercel.app`, plus its own branch alias `verdant-grow-diary-git-cursor-missing-t-795c8d-…` | team event log; `get_deployment` `dpl_BhuJT6qq…`, read 12:16 |
-| **09:45:15** | **`instant-rollback-created`** to `dpl_6fVRiJ3X…` by the owner principal (owner-authorized; issued by another Claude session on Cheek's instruction, `source claim` for the instruction: comment `5830322101`) | team event log                          |
-| **09:45:16** | **The four production-facing aliases re-assigned to `dpl_6fVRiJ3X…` (`aliasCount: 4`) — exposure of new page loads ends.** The fifth, the Cursor branch alias, is not production-facing and stays with `dpl_BhuJT6qq…` | event log; alias `updatedAt` |
-| 10:19–11:51  | Vercel's alias records for `verdantgrowdiary.com`, `www.` and `verdant-grow-diary.vercel.app` point to `dpl_6fVRiJ3X…` (internal alias record, not a public DNS or HTTP check) | `get_deployment` by hostname, five reads |
+| **09:45:15** | **`instant-rollback-created`** to `dpl_6fVRiJ3X…` by the owner principal (owner-authorized; issued by another Claude session on Cheek's instruction, `source claim` for the instruction: comment `5830322101`)                                                                                                                                                                                                                        | team event log                                               |
+| **09:45:16** | **The four production-facing aliases re-assigned to `dpl_6fVRiJ3X…` (`aliasCount: 4`) — exposure of new page loads ends.** The fifth, the Cursor branch alias, is not production-facing and stays with `dpl_BhuJT6qq…`                                                                                                                                                                                                                | event log; alias `updatedAt`                                 |
+| 10:19–11:51  | Vercel's alias records for `verdantgrowdiary.com`, `www.` and `verdant-grow-diary.vercel.app` point to `dpl_6fVRiJ3X…` (internal alias record, not a public DNS or HTTP check)                                                                                                                                                                                                                                                        | `get_deployment` by hostname, five reads                     |
 
 - **`NOT_MEASURED`:** the public serving state — no DNS or HTTP check from outside has been made
   this session (the egress refuses the apex: HTTP `000` at 11:51, the eighteenth attempt; `CLAUDE.md`
@@ -2985,13 +3103,13 @@ Prior header follows.)
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 11:24 UTC.
 
-| Field      | Value                                                                              |
-| ---------- | ---------------------------------------------------------------------------------- |
-| Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as every stamp since 06:28)   |
-| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)          |
-| Parent     | `bbcc2faa4…` (`#1677`)                                                             |
-| Since      | the 09:21 stamp: **0 commits**                                                     |
-| Migrations | **0**                                                                              |
+| Field      | Value                                                                            |
+| ---------- | -------------------------------------------------------------------------------- |
+| Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as every stamp since 06:28) |
+| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)        |
+| Parent     | `bbcc2faa4…` (`#1677`)                                                           |
+| Since      | the 09:21 stamp: **0 commits**                                                   |
+| Migrations | **0**                                                                            |
 
 A commit alone never proves deployment; this tip's deployment is proven separately — Vercel's
 production aliases point to its build `dpl_6fVRiJ3X…` as of 09:45:16 (§2).
@@ -3001,13 +3119,13 @@ production aliases point to its build `dpl_6fVRiJ3X…` as of 09:45:16 (§2).
 `established fact` from the Vercel API (project `prj_i2IbBKEA9K2rLLaAO3nrBeJkTXTy`, read-only)
 unless labelled otherwise.
 
-| Time (UTC)    | Event                                                                                              | Source                                                   |
-| ------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| 06:22:23      | `dpl_6fVRiJ3XrDbCcGXrtDvCbLvB7HoY` (`source: git`, `9b06be3f`) built and takes the production slot  | deployment record, read 08:52                            |
-| **08:28:39**  | **`dpl_BhuJT6qqVNckHMibRxYNXDHK4DM7` (`source: redeploy`, `7053af8f` on `cursor/missing-test-coverage-b7df`) deployed to production by the Cursor Agent** (event log: GitHub login `cursoragent`, under the owner's account via an API token); `cursoragent` assigned its 5 aliases at 08:29:17 | deployment record, read 08:52; event log, read 11:36 |
-| **09:45:15**  | **`instant-rollback-created`: rolled back from `dpl_BhuJT6qq…` to `dpl_6fVRiJ3X…`** by the `cheekhimself` principal — owner-authorized, issued by another Claude session on Cheek's explicit instruction (`source claim` for the instruction: PR comment `5830322101`) | Vercel team event log, read 11:36 |
-| **09:45:16**  | **Four production aliases re-assigned to `dpl_6fVRiJ3X…`** (`aliases-assigned`; alias records `updatedAt` 09:45:16.8) — the rollback's completion | event log and alias records, read 11:36 |
-| 10:19, 11:17, 11:24 | **Vercel's alias records for `verdantgrowdiary.com`, `www.verdantgrowdiary.com` and `verdant-grow-diary.vercel.app` all point to `dpl_6fVRiJ3X…` (`9b06be3f`)** — `get_deployment` by hostname; this is Vercel's internal alias record, not a public DNS or HTTP check | this session's reads |
+| Time (UTC)          | Event                                                                                                                                                                                                                                                                                           | Source                                               |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 06:22:23            | `dpl_6fVRiJ3XrDbCcGXrtDvCbLvB7HoY` (`source: git`, `9b06be3f`) built and takes the production slot                                                                                                                                                                                              | deployment record, read 08:52                        |
+| **08:28:39**        | **`dpl_BhuJT6qqVNckHMibRxYNXDHK4DM7` (`source: redeploy`, `7053af8f` on `cursor/missing-test-coverage-b7df`) deployed to production by the Cursor Agent** (event log: GitHub login `cursoragent`, under the owner's account via an API token); `cursoragent` assigned its 5 aliases at 08:29:17 | deployment record, read 08:52; event log, read 11:36 |
+| **09:45:15**        | **`instant-rollback-created`: rolled back from `dpl_BhuJT6qq…` to `dpl_6fVRiJ3X…`** by the `cheekhimself` principal — owner-authorized, issued by another Claude session on Cheek's explicit instruction (`source claim` for the instruction: PR comment `5830322101`)                          | Vercel team event log, read 11:36                    |
+| **09:45:16**        | **Four production aliases re-assigned to `dpl_6fVRiJ3X…`** (`aliases-assigned`; alias records `updatedAt` 09:45:16.8) — the rollback's completion                                                                                                                                               | event log and alias records, read 11:36              |
+| 10:19, 11:17, 11:24 | **Vercel's alias records for `verdantgrowdiary.com`, `www.verdantgrowdiary.com` and `verdant-grow-diary.vercel.app` all point to `dpl_6fVRiJ3X…` (`9b06be3f`)** — `get_deployment` by hostname; this is Vercel's internal alias record, not a public DNS or HTTP check                          | this session's reads                                 |
 
 - **A rollback re-points the production alias without creating a deployment**, so the production
   list ordered by creation time still shows `dpl_BhuJT6qq…` first. That order is not the serving
@@ -3243,13 +3361,13 @@ Publish. No APPLY. `HOLD #1250`. Prior header follows.)
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 09:13:47 UTC.
 
-| Field      | Value                                                                              |
-| ---------- | ---------------------------------------------------------------------------------- |
-| Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as every stamp since 06:28)   |
-| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)          |
-| Parent     | `bbcc2faa4…` (`#1677`)                                                             |
-| Since      | the 09:08 stamp: **0 commits**                                                     |
-| Migrations | **0**                                                                              |
+| Field      | Value                                                                            |
+| ---------- | -------------------------------------------------------------------------------- |
+| Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as every stamp since 06:28) |
+| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)        |
+| Parent     | `bbcc2faa4…` (`#1677`)                                                           |
+| Since      | the 09:08 stamp: **0 commits**                                                   |
+| Migrations | **0**                                                                            |
 
 Committed is not deployed — and, since 08:28:39, deployed is not the tip (§2).
 
@@ -3453,13 +3571,13 @@ Everything else is carried from the 08:55 stamp. Rollback is Cheek's. No Publish
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 09:04:47 UTC.
 
-| Field      | Value                                                                              |
-| ---------- | ---------------------------------------------------------------------------------- |
-| Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as every stamp since 06:28)   |
-| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)          |
-| Parent     | `bbcc2faa4…` (`#1677`)                                                             |
-| Since      | the 08:55 stamp: **0 commits**                                                     |
-| Migrations | **0**                                                                              |
+| Field      | Value                                                                            |
+| ---------- | -------------------------------------------------------------------------------- |
+| Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as every stamp since 06:28) |
+| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)        |
+| Parent     | `bbcc2faa4…` (`#1677`)                                                           |
+| Since      | the 08:55 stamp: **0 commits**                                                   |
+| Migrations | **0**                                                                            |
 
 Committed is not deployed — and, since 08:28:39, deployed is not the tip (§2).
 
@@ -3654,13 +3772,13 @@ tip by forward merge, as that review asked (§11). Tip lanes, board and locks ar
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 08:53 UTC.
 
-| Field      | Value                                                                              |
-| ---------- | ---------------------------------------------------------------------------------- |
-| Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as every stamp since 06:28)   |
-| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)          |
-| Parent     | `bbcc2faa4…` (`#1677`)                                                             |
-| Since      | the 08:50 stamp: **0 commits**                                                     |
-| Migrations | **0**                                                                              |
+| Field      | Value                                                                            |
+| ---------- | -------------------------------------------------------------------------------- |
+| Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as every stamp since 06:28) |
+| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)        |
+| Parent     | `bbcc2faa4…` (`#1677`)                                                           |
+| Since      | the 08:50 stamp: **0 commits**                                                   |
+| Migrations | **0**                                                                            |
 
 The tip is unchanged. What changed is what the publisher serves (§2). Committed is not deployed —
 and, as of 08:28:39, deployed is not the tip.
@@ -3670,12 +3788,12 @@ and, as of 08:28:39, deployed is not the tip.
 `established fact` from the Vercel API (project `verdant-grow-diary`, `prj_i2IbBKEA9K2rLLaAO3nrBeJkTXTy`,
 read-only, read by this session at 08:52 UTC) and from `git` at 08:52 UTC:
 
-| Production deployment                  | Source     | Created (UTC)  | Commit                                            |
-| -------------------------------------- | ---------- | -------------- | ------------------------------------------------- |
+| Production deployment                           | Source         | Created (UTC)                 | Commit                                              |
+| ----------------------------------------------- | -------------- | ----------------------------- | --------------------------------------------------- |
 | **`dpl_BhuJT6qqVNckHMibRxYNXDHK4DM7`** (newest) | **`redeploy`** | **08:28:39** (READY 08:29:16) | **`7053af8f`, `cursor/missing-test-coverage-b7df`** |
-| `dpl_6fVRiJ3XrDbCcGXrtDvCbLvB7HoY`     | `git`      | 06:22:23 (READY 06:22:55) | `9b06be3f`, `verdant-grow-diary` (the tip)         |
-| `dpl_Be2eKsbkukTUpwKbrroBtdbqkDe4`     | `git`      | 06:05:43       | `bbcc2faa`                                        |
-| `dpl_CSURBxJTnhWibaYoyg7C6ZfWHtqE`     | `git`      | 05:31:08       | `6e910615`                                        |
+| `dpl_6fVRiJ3XrDbCcGXrtDvCbLvB7HoY`              | `git`          | 06:22:23 (READY 06:22:55)     | `9b06be3f`, `verdant-grow-diary` (the tip)          |
+| `dpl_Be2eKsbkukTUpwKbrroBtdbqkDe4`              | `git`          | 06:05:43                      | `bbcc2faa`                                          |
+| `dpl_CSURBxJTnhWibaYoyg7C6ZfWHtqE`              | `git`          | 05:31:08                      | `6e910615`                                          |
 
 - **The newest production deployment's alias list includes `verdantgrowdiary.com`,
   `www.verdantgrowdiary.com` and `verdant-grow-diary.vercel.app`.** In Vercel's records the
@@ -3851,13 +3969,13 @@ Publish. No APPLY. `HOLD #1250`. Prior header follows.)
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 08:35:05 UTC.
 
-| Field      | Value                                                                              |
-| ---------- | ---------------------------------------------------------------------------------- |
+| Field      | Value                                                                                                    |
+| ---------- | -------------------------------------------------------------------------------------------------------- |
 | Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as the 06:28, 07:28, 07:54, 08:13 and 08:32 stamps) |
-| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)          |
-| Parent     | `bbcc2faa4…` (`#1677`)                                                             |
-| Since      | the 08:32 stamp: **0 commits**                                                     |
-| Migrations | **0**                                                                              |
+| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)                                |
+| Parent     | `bbcc2faa4…` (`#1677`)                                                                                   |
+| Since      | the 08:32 stamp: **0 commits**                                                                           |
+| Migrations | **0**                                                                                                    |
 
 Committed is not deployed; edge-function deploy state stays `NOT_MEASURED`.
 
@@ -3915,7 +4033,7 @@ cancelled; 0 in progress.** Last conclusion 08:49:39 UTC.
 
 - **Queue:** observed, not measured per run: at the 08:35:05 read, two minutes after the push, 14 of 27
   runs had concluded, 10 were in progress and 3 were still `queued` (`CI`, `Full Vitest Suite (PR
-  gate)`, `deployment-preview`); the Vitest gate started at 08:41, `CI` at 08:43:52 — ten minutes
+gate)`, `deployment-preview`); the Vitest gate started at 08:41, `CI` at 08:43:52 — ten minutes
   queued — and `CI` concluded last, at 08:50. The same three lanes queued longest on the two
   previous heads. A queued lane is neither green nor red; queue time is not a result.
 - **`CI` (run `36113546589`) — `success`, 08:49:39 UTC.** The workflow that produces the 35
@@ -4015,13 +4133,13 @@ Publish. No APPLY. `HOLD #1250`. Prior header follows.)
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 08:18:10 UTC.
 
-| Field      | Value                                                                              |
-| ---------- | ---------------------------------------------------------------------------------- |
+| Field      | Value                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------- |
 | Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as the 06:28, 07:28, 07:54 and 08:13 stamps) |
-| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)          |
-| Parent     | `bbcc2faa4…` (`#1677`)                                                             |
-| Since      | the 08:13 stamp: **0 commits**                                                     |
-| Migrations | **0**                                                                              |
+| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)                         |
+| Parent     | `bbcc2faa4…` (`#1677`)                                                                            |
+| Since      | the 08:13 stamp: **0 commits**                                                                    |
+| Migrations | **0**                                                                                             |
 
 Committed is not deployed; edge-function deploy state stays `NOT_MEASURED`.
 
@@ -4079,7 +4197,7 @@ cancelled; 0 in progress.** Last conclusion 08:31:37 UTC.
 
 - **Queue:** observed, not measured per run: at the 08:18:10 read, four and a half minutes after the push,
   19 of 27 runs had concluded, 5 were in progress and 3 were still `queued` (`CI`, `Full Vitest
-  Suite (PR gate)`, `deployment-preview`); `CI` was in progress by 08:25 and concluded last, at
+Suite (PR gate)`, `deployment-preview`); `CI` was in progress by 08:25 and concluded last, at
   08:32. Shorter than the eleven-minute `CI` wait on `f4c3f459`. A queued lane is neither green nor red; queue time is not a result.
 - **`CI` (run `36111786990`) — `success`, 08:31:37 UTC.** The workflow that produces the 35
   ruleset-required contexts; the workflow conclusion was read, not each job.
@@ -4178,13 +4296,13 @@ Publish. No APPLY. `HOLD #1250`. Prior header follows.)
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 08:03:19 UTC.
 
-| Field      | Value                                                                              |
-| ---------- | ---------------------------------------------------------------------------------- |
+| Field      | Value                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------ |
 | Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as the 06:28, 07:28 and 07:54 stamps) |
-| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)          |
-| Parent     | `bbcc2faa4…` (`#1677`)                                                             |
-| Since      | the 07:54 stamp: **0 commits**                                                     |
-| Migrations | **0**                                                                              |
+| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)                  |
+| Parent     | `bbcc2faa4…` (`#1677`)                                                                     |
+| Since      | the 07:54 stamp: **0 commits**                                                             |
+| Migrations | **0**                                                                                      |
 
 Committed is not deployed; edge-function deploy state stays `NOT_MEASURED`.
 
@@ -4344,13 +4462,13 @@ Publish. No APPLY. `HOLD #1250`. Prior header follows.)
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 07:28:38 UTC.
 
-| Field      | Value                                                                              |
-| ---------- | ---------------------------------------------------------------------------------- |
+| Field      | Value                                                                               |
+| ---------- | ----------------------------------------------------------------------------------- |
 | Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as the 06:28 and 07:28 stamps) |
-| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)          |
-| Parent     | `bbcc2faa4…` (`#1677`)                                                             |
-| Since      | the 07:28 stamp: **0 commits**                                                     |
-| Migrations | **0**                                                                              |
+| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)           |
+| Parent     | `bbcc2faa4…` (`#1677`)                                                              |
+| Since      | the 07:28 stamp: **0 commits**                                                      |
+| Migrations | **0**                                                                               |
 
 Committed is not deployed; edge-function deploy state stays `NOT_MEASURED`.
 
@@ -4511,13 +4629,13 @@ from the 06:28 stamp unchanged. No Publish. No APPLY. `HOLD #1250`. Prior header
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 07:24:07 UTC.
 
-| Field      | Value                                                                              |
-| ---------- | ---------------------------------------------------------------------------------- |
-| Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as the 06:28 stamp)           |
-| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`)          |
-| Parent     | `bbcc2faa4…` (`#1677`)                                                             |
-| Since      | the 06:28 stamp: **0 commits**                                                     |
-| Migrations | **0**                                                                              |
+| Field      | Value                                                                     |
+| ---------- | ------------------------------------------------------------------------- |
+| Tip        | **`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`** (same as the 06:28 stamp)  |
+| Subject    | `fix(sensors): recheck freshness when exporting chart readings` (`#1680`) |
+| Parent     | `bbcc2faa4…` (`#1677`)                                                    |
+| Since      | the 06:28 stamp: **0 commits**                                            |
+| Migrations | **0**                                                                     |
 
 The one-commit delta from `bbcc2faa` (three sensor export files) is in the superseded 06:28 stamp
 §1 and §3. Committed is not deployed; edge-function deploy state stays `NOT_MEASURED`.
@@ -4918,13 +5036,13 @@ follows.)
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 06:14:39 UTC.
 
-| Field      | Value                                                                            |
-| ---------- | -------------------------------------------------------------------------------- |
+| Field      | Value                                                                               |
+| ---------- | ----------------------------------------------------------------------------------- |
 | Tip        | **`bbcc2faa403278a451ca400d9e21eacbec3d8e71`** (same as the 06:12 and 06:15 stamps) |
-| Subject    | `fix(sensors): age and recover cached sensor evidence without refetch` (`#1677`) |
-| Parent     | `6e910615d…` (`#1690`)                                                           |
-| Since      | the 06:15 stamp: **0 commits**                                                   |
-| Migrations | **0**                                                                            |
+| Subject    | `fix(sensors): age and recover cached sensor evidence without refetch` (`#1677`)    |
+| Parent     | `6e910615d…` (`#1690`)                                                              |
+| Since      | the 06:15 stamp: **0 commits**                                                      |
+| Migrations | **0**                                                                               |
 
 The one-commit delta from `6e910615` (eight sensor files, `+762/−14`) is in the superseded 06:12
 stamp §1. Committed is not deployed; edge-function deploy state stays `NOT_MEASURED`.
@@ -5479,13 +5597,13 @@ reviews, merge and locks are carried from the 05:40 stamp unchanged. No Publish.
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 05:53:53 UTC.
 
-| Field      | Value                                                                                |
-| ---------- | ------------------------------------------------------------------------------------ |
-| Tip        | **`6e910615dbb207eac653cb927a15ef48ed91bfb4`** (same as the 05:40 stamp)             |
-| Subject    | `fix(csv): reconcile sparse duplicates beyond the first history page` (`#1690`)      |
-| Parent     | `e1d541e25…` (`#1691`)                                                               |
-| Since      | the 05:40 stamp: **0 commits**                                                       |
-| Migrations | **0**                                                                                |
+| Field      | Value                                                                           |
+| ---------- | ------------------------------------------------------------------------------- |
+| Tip        | **`6e910615dbb207eac653cb927a15ef48ed91bfb4`** (same as the 05:40 stamp)        |
+| Subject    | `fix(csv): reconcile sparse duplicates beyond the first history page` (`#1690`) |
+| Parent     | `e1d541e25…` (`#1691`)                                                          |
+| Since      | the 05:40 stamp: **0 commits**                                                  |
+| Migrations | **0**                                                                           |
 
 The one-commit delta from `e1d541e2` (seven CSV files, `+963/−44`) is in the superseded 05:40 stamp
 §1. Committed is not deployed; edge-function deploy state stays `NOT_MEASURED`.
@@ -5645,14 +5763,14 @@ header follows.)
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 05:33:47 UTC.
 
-| Field      | Value                                                                                  |
-| ---------- | -------------------------------------------------------------------------------------- |
-| Tip        | **`6e910615dbb207eac653cb927a15ef48ed91bfb4`**                                         |
-| Subject    | `fix(csv): reconcile sparse duplicates beyond the first history page` (`#1690`)        |
-| Parent     | `e1d541e25…` (`#1691`)                                                                 |
+| Field      | Value                                                                                    |
+| ---------- | ---------------------------------------------------------------------------------------- |
+| Tip        | **`6e910615dbb207eac653cb927a15ef48ed91bfb4`**                                           |
+| Subject    | `fix(csv): reconcile sparse duplicates beyond the first history page` (`#1690`)          |
+| Parent     | `e1d541e25…` (`#1691`)                                                                   |
 | Committed  | 2026-09-25 **05:31:05 UTC** (`-05:00` author clock); squash-merged by Claude via the API |
-| Since      | `e1d541e2` (the tip the last two stamps measured): **1 commit**                        |
-| Migrations | **0** (`git diff --name-only e1d541e2 6e910615 -- supabase/migrations/` is empty)      |
+| Since      | `e1d541e2` (the tip the last two stamps measured): **1 commit**                          |
+| Migrations | **0** (`git diff --name-only e1d541e2 6e910615 -- supabase/migrations/` is empty)        |
 
 **Files in the squash (7, `+963/−44`):** `src/components/EnvironmentCsvImportLauncher.tsx`,
 `src/lib/csvSensorPresenceService.ts` (new), `src/lib/csvSensorPresenceScopeRules.ts` (new), and
@@ -5838,13 +5956,13 @@ Prior header follows.)
 `established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
 05:15 UTC.
 
-| Field      | Value                                                                  |
-| ---------- | ---------------------------------------------------------------------- |
+| Field      | Value                                                                    |
+| ---------- | ------------------------------------------------------------------------ |
 | Tip        | **`e1d541e2559eb42d5e452035e79b1d796c91c0f9`** (same as the 02:05 stamp) |
-| Subject    | `fix(sensors): reject future timestamps as healthy evidence` (`#1691`) |
-| Parent     | `cb6c3288b…` (`#1221`)                                                 |
-| Since      | the 02:05 stamp: **0 commits**                                         |
-| Migrations | **0**                                                                  |
+| Subject    | `fix(sensors): reject future timestamps as healthy evidence` (`#1691`)   |
+| Parent     | `cb6c3288b…` (`#1221`)                                                   |
+| Since      | the 02:05 stamp: **0 commits**                                           |
+| Migrations | **0**                                                                    |
 
 The two-commit history since `08994aa8` (`#1221`, `#1691`) is in the superseded 02:05 stamp §1 and
 is unchanged. Committed is not deployed; edge-function deploy state stays `NOT_MEASURED`.
@@ -5877,15 +5995,15 @@ approval state. Claude authored no commit in any of these heads except the `#167
 `52669125`, which was verified as blob-identical only, not self-accepted. Overlapping suites are not
 summed; CI job counts are not test counts.
 
-| PR      | Head       | Verdict         | Local evidence                                                                                                                  | Hosted lanes on the head                                                                                                     |
-| ------- | ---------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `#1690` | `35ab3762` | **`PASS`**      | focused 4 files **58/0/0**; RED (launcher without the range filter) **2 failed / 9 passed**, 501 recovery reads vs 6; tsc/lint/prettier clean; merge-clean into `e1d541e2` | 35 required contexts green; `test:security-db-local` and both native local-backend jobs green; red: authenticated census, dependency audit, nested SDK audit |
-| `#1692` | `24d9e197` | **`PASS`**      | tree `d5fa400b`; one file **+65/−0**; added lines byte-identical to `7053af8f`; **62/0/0**; lint/prettier clean                  | carried from its body (Main 35/35, full 16/16, census 2/1/0); not re-read                                                    |
-| `#1677` | `52669125` | **`PASS`**      | `47e7d019` is one regex line; old expression absent from `Sensors.tsx`, new present once; selection file **20/0/0**; PR files unchanged by the merge; stack tree **212/0/0**; tsc 0 | 35 required contexts green; `tsc`, `tsgo + build`, `test:security-db-local`, native jobs, GA E2E green; red: authenticated census, dependency audit, nested SDK audit |
-| `#1680` | `dbddd328` | **`PASS`**      | ancestor check yes; delta 3 files **+108/−4**, blobs identical to `5ee4ff3d`; stack tree **212/0/0**                            | **every job green, authenticated census 3/0/0** (28.5 min) — the only head where that lane passed                            |
-| `#1679` | `c2ce9b10` | **`PASS`**      | ancestor check yes; delta 3 proof files **+388/−0**, blobs identical to `76afd88f`; stack tree **212/0/0**                       | native 8-scenario lane green; full 16/16; red: **GA E2E (webkit)** consent-banner assertion, not attributed (inference)       |
-| `#1698` | `9e276853` | **`PASS`**      | ancestor check yes; delta 4 files **+371/−3**, blobs identical to `588d793d`; **212/0/0** on tree `226c7805`; RED (hook reverted to the `#1679` blob) **8 failed / 7 passed** of 15; tsc 0; eslint 0; merge-tree vs tip returns the head's own tree | native **12-scenario** lane green; full 16/16; red: authenticated census (all-route timeout)                                 |
-| `#1697` | `bd64ca8b` | **`STALE CHILD`** | based on `97c8e9ad`, not `35ab3762` (`merge-base --is-ancestor`: no); own delta 2 test files **+78/−0**; composed onto `35ab3762` merge-clean (tree `f7a04669`) and **63/0/0** | API `mergeable_state: clean`; lanes not re-read                                                                              |
+| PR      | Head       | Verdict           | Local evidence                                                                                                                                                                                                                                      | Hosted lanes on the head                                                                                                                                              |
+| ------- | ---------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `#1690` | `35ab3762` | **`PASS`**        | focused 4 files **58/0/0**; RED (launcher without the range filter) **2 failed / 9 passed**, 501 recovery reads vs 6; tsc/lint/prettier clean; merge-clean into `e1d541e2`                                                                          | 35 required contexts green; `test:security-db-local` and both native local-backend jobs green; red: authenticated census, dependency audit, nested SDK audit          |
+| `#1692` | `24d9e197` | **`PASS`**        | tree `d5fa400b`; one file **+65/−0**; added lines byte-identical to `7053af8f`; **62/0/0**; lint/prettier clean                                                                                                                                     | carried from its body (Main 35/35, full 16/16, census 2/1/0); not re-read                                                                                             |
+| `#1677` | `52669125` | **`PASS`**        | `47e7d019` is one regex line; old expression absent from `Sensors.tsx`, new present once; selection file **20/0/0**; PR files unchanged by the merge; stack tree **212/0/0**; tsc 0                                                                 | 35 required contexts green; `tsc`, `tsgo + build`, `test:security-db-local`, native jobs, GA E2E green; red: authenticated census, dependency audit, nested SDK audit |
+| `#1680` | `dbddd328` | **`PASS`**        | ancestor check yes; delta 3 files **+108/−4**, blobs identical to `5ee4ff3d`; stack tree **212/0/0**                                                                                                                                                | **every job green, authenticated census 3/0/0** (28.5 min) — the only head where that lane passed                                                                     |
+| `#1679` | `c2ce9b10` | **`PASS`**        | ancestor check yes; delta 3 proof files **+388/−0**, blobs identical to `76afd88f`; stack tree **212/0/0**                                                                                                                                          | native 8-scenario lane green; full 16/16; red: **GA E2E (webkit)** consent-banner assertion, not attributed (inference)                                               |
+| `#1698` | `9e276853` | **`PASS`**        | ancestor check yes; delta 4 files **+371/−3**, blobs identical to `588d793d`; **212/0/0** on tree `226c7805`; RED (hook reverted to the `#1679` blob) **8 failed / 7 passed** of 15; tsc 0; eslint 0; merge-tree vs tip returns the head's own tree | native **12-scenario** lane green; full 16/16; red: authenticated census (all-route timeout)                                                                          |
+| `#1697` | `bd64ca8b` | **`STALE CHILD`** | based on `97c8e9ad`, not `35ab3762` (`merge-base --is-ancestor`: no); own delta 2 test files **+78/−0**; composed onto `35ab3762` merge-clean (tree `f7a04669`) and **63/0/0**                                                                      | API `mergeable_state: clean`; lanes not re-read                                                                                                                       |
 
 - **`#1690`'s open Codex P2** (`discussion_r4099773068`, restrict race recovery to the failed batch)
   was confirmed fixed by the RED/GREEN pair, replied to, and **resolved by Claude as reviewer**. The
@@ -8060,31 +8178,31 @@ passed. Stay on Paddle; live checkout off. Prior header follows.)
 measured 15:49 UTC. The last stamped block sits on `860d39a9`, delivered by `#1251`
 (`c718c5b3a`); everything below it is unstamped until now.
 
-| #     | Merge SHA   | Commit (UTC)     | Files | Migrations | Subject                                          |
-| ----- | ----------- | ---------------- | ----: | ---------: | ------------------------------------------------ |
-| #1252 | `408c4142e` | 2026-09-02 20:41 |     6 |          0 | `fast-uri` override → 3.1.6 (four high advisories) |
-| #1255 | `cb8ee9fd8` | 2026-09-02 21:00 |     1 |          0 | Dependabot `qs` 6.15.3 → 6.16.0                  |
-| #1256 | `b4cbd54f5` | 2026-09-02 22:23 |     4 |          0 | do not load entitlements on `getUser` miss       |
-| #1257 | `92a67bf2c` | 2026-09-03 00:42 |     4 |          0 | gate AppShell entitlements on `sessionReady`     |
-| #1258 | `697c78649` | 2026-09-03 01:44 |     2 |          0 | honour plant-only `/doctor?plantId=` carry       |
-| #1259 | `ac3dada08` | 2026-09-03 04:31 |     3 |          0 | hoist plant-scoped Better/Same/Worse in V2 sheet |
-| #1260 | `549fb9817` | 2026-09-03 04:58 |     5 |          0 | saved status check-in counts as recent activity  |
-| #1261 | `da4825cae` | 2026-09-03 05:02 |     2 |          0 | agreements verify-error retries without sign-out |
-| #1262 | `8fbd0bb0c` | 2026-09-03 17:05 |     4 |          0 | verify-error fails open; `revalidation_failed`   |
-| #1263 | `94f9c631a` | 2026-09-03 18:26 |     3 |          0 | expose only a client-held session                |
-| #1264 | `ce4a87f62` | 2026-09-03 19:21 |     2 |          0 | fail closed on null plant activity               |
-| #1265 | `70154eaba` | 2026-09-03 19:59 |    10 |          0 | signed-out re-entry lands on `/auth?redirectTo`  |
-| #1267 | `9f15ca323` | 2026-09-03 22:33 |     2 |          0 | bound grow detail loading                        |
-| #1266 | `f5eed61d8` | 2026-09-03 23:26 |     2 |          0 | confirm local sign-out before leaving for `/auth` |
-| #1268 | `aba373892` | 2026-09-04 00:43 |     2 |          0 | stale Quick Log empty-note hint after save       |
-| #1269 | `85bcdd353` | 2026-09-04 01:34 |     2 |          0 | clear saved hint on Log another                  |
-| #1270 | `ef7cec687` | 2026-09-04 03:24 |     2 |          0 | reconcile a relayed session to this tab's bearer |
-| #1272 | `d686efaac` | 2026-09-04 05:41 |     3 |          0 | route mobile Quick Log FAB to shared dialog      |
-| #1271 | `7530893d9` | 2026-09-04 06:11 |     2 |          0 | tell auth, gateway and config apart              |
+| #     | Merge SHA   | Commit (UTC)     | Files | Migrations | Subject                                             |
+| ----- | ----------- | ---------------- | ----: | ---------: | --------------------------------------------------- |
+| #1252 | `408c4142e` | 2026-09-02 20:41 |     6 |          0 | `fast-uri` override → 3.1.6 (four high advisories)  |
+| #1255 | `cb8ee9fd8` | 2026-09-02 21:00 |     1 |          0 | Dependabot `qs` 6.15.3 → 6.16.0                     |
+| #1256 | `b4cbd54f5` | 2026-09-02 22:23 |     4 |          0 | do not load entitlements on `getUser` miss          |
+| #1257 | `92a67bf2c` | 2026-09-03 00:42 |     4 |          0 | gate AppShell entitlements on `sessionReady`        |
+| #1258 | `697c78649` | 2026-09-03 01:44 |     2 |          0 | honour plant-only `/doctor?plantId=` carry          |
+| #1259 | `ac3dada08` | 2026-09-03 04:31 |     3 |          0 | hoist plant-scoped Better/Same/Worse in V2 sheet    |
+| #1260 | `549fb9817` | 2026-09-03 04:58 |     5 |          0 | saved status check-in counts as recent activity     |
+| #1261 | `da4825cae` | 2026-09-03 05:02 |     2 |          0 | agreements verify-error retries without sign-out    |
+| #1262 | `8fbd0bb0c` | 2026-09-03 17:05 |     4 |          0 | verify-error fails open; `revalidation_failed`      |
+| #1263 | `94f9c631a` | 2026-09-03 18:26 |     3 |          0 | expose only a client-held session                   |
+| #1264 | `ce4a87f62` | 2026-09-03 19:21 |     2 |          0 | fail closed on null plant activity                  |
+| #1265 | `70154eaba` | 2026-09-03 19:59 |    10 |          0 | signed-out re-entry lands on `/auth?redirectTo`     |
+| #1267 | `9f15ca323` | 2026-09-03 22:33 |     2 |          0 | bound grow detail loading                           |
+| #1266 | `f5eed61d8` | 2026-09-03 23:26 |     2 |          0 | confirm local sign-out before leaving for `/auth`   |
+| #1268 | `aba373892` | 2026-09-04 00:43 |     2 |          0 | stale Quick Log empty-note hint after save          |
+| #1269 | `85bcdd353` | 2026-09-04 01:34 |     2 |          0 | clear saved hint on Log another                     |
+| #1270 | `ef7cec687` | 2026-09-04 03:24 |     2 |          0 | reconcile a relayed session to this tab's bearer    |
+| #1272 | `d686efaac` | 2026-09-04 05:41 |     3 |          0 | route mobile Quick Log FAB to shared dialog         |
+| #1271 | `7530893d9` | 2026-09-04 06:11 |     2 |          0 | tell auth, gateway and config apart                 |
 | #1273 | `d0d76c80a` | 2026-09-04 13:50 |     3 |          0 | stop blaming the connection for a status-less error |
-| #1274 | `bef83862c` | 2026-09-04 14:27 |     2 |          0 | require both transport signals                   |
-| #1275 | `440d196a4` | 2026-09-04 15:25 |     1 |          0 | enforce the both-signals contract (tests only)   |
-| #1276 | `763e703f0` | 2026-09-04 15:40 |     3 |          0 | make checkout recovery match its cause           |
+| #1274 | `bef83862c` | 2026-09-04 14:27 |     2 |          0 | require both transport signals                      |
+| #1275 | `440d196a4` | 2026-09-04 15:25 |     1 |          0 | enforce the both-signals contract (tests only)      |
+| #1276 | `763e703f0` | 2026-09-04 15:40 |     3 |          0 | make checkout recovery match its cause              |
 
 Full tip oid: `763e703f08b99866715472702b5e5957693915f7`.
 
@@ -8137,7 +8255,7 @@ pipeline from parity.
 - **Served through Vercel — MEASURED.** Both live reads returned `server: Vercel`,
   `x-vercel-cache: HIT`, edge `iad1`. That establishes the response path and nothing more.
 - **Who initiates the publish — `NOT_MEASURED`.** Response headers cannot answer it. A Lovable
-  publication can be *hosted* by Vercel and would return exactly these headers. No deployment
+  publication can be _hosted_ by Vercel and would return exactly these headers. No deployment
   metadata, build log or trigger record was inspected in this slice.
 
 An earlier draft of this block read the headers as proof that `CLAUDE.md`'s "Lovable is the
@@ -8172,7 +8290,8 @@ the hook, the analytics schema, or any UI file. Reason tokens stay telemetry-onl
 `#1275` is tests-only: it closed a hole where the `#1274` "both signals" contract could be reverted
 to a name-only check with all 28 tests still green. Proven by mutation, not by a RED-on-parent
 (the parent already carried the fix): name-only mutant + merged tests = 28 passed; the same mutant
-+ `#1275`'s tests = 2 failed; real predicate + `#1275`'s tests = 29 passed.
+
+- `#1275`'s tests = 2 failed; real predicate + `#1275`'s tests = 29 passed.
 
 **No live Paddle flip, no payments change, no secrets, no env vars** in any of the four.
 
@@ -8199,10 +8318,10 @@ merged at **15:48:44 UTC**, roughly three minutes later, with none of the three 
 verified each against the **merged** source at `763e703f0` — these are not relayed bot claims:
 
 1. **Plan intent is persisted before the sign-out it depends on** (`src/pages/Pricing.tsx:349`).
-   `handleCheckoutReauthentication` calls `savePlanIntent(rawSku)` and *then* `await signOut()`;
+   `handleCheckoutReauthentication` calls `savePlanIntent(rawSku)` and _then_ `await signOut()`;
    the `catch` only calls `setReauthenticating(false)`. A rejected sign-out therefore leaves a
    valid one-shot intent in `sessionStorage` (`verdant.checkout.planIntent.v1`, 15-minute TTL,
-   destructive consume). A later Pricing mount in that same tab — including one after a *different*
+   destructive consume). A later Pricing mount in that same tab — including one after a _different_
    account signs in — consumes it and auto-opens a paid checkout overlay the current grower never
    selected. **Not an entitlement grant** (billing stays server-authoritative via the webhook) and
    the plan is allowlist-constrained, but it is an unrequested billing surface. Fix is small: save
@@ -8227,7 +8346,7 @@ and does not adopt this slice without assignment.** Cheek's to route.
 
 **This is the fourth consecutive PR in this area where reviewer findings landed two to four minutes
 before the merge.** `#1271`, `#1273`, `#1274` and now `#1276`. Codex and Copilot only review on the
-*ready* transition, which in practice is also the enqueue. Holding the enqueue until the reviewer
+_ready_ transition, which in practice is also the enqueue. Holding the enqueue until the reviewer
 checks report would let each round's findings land inside the PR that raised them instead of
 chaining another. Recorded as an operating observation; the call is Cheek's.
 
@@ -8311,7 +8430,7 @@ restamp of a state document cannot collide two SQL files dated 2026-07-21. **UNS
 stood down once on the PR, no second comment, no further re-run.
 
 Route note, because it cuts against the earlier pattern: on `d0d76c80a`, `bef83862c` and
-`7d5f0971` the bot reported *"Service health check failed"* **before** the branch error, while on
+`7d5f0971` the bot reported _"Service health check failed"_ **before** the branch error, while on
 `436aa6c27` Deployments went **green** first (Database / Services / APIs ✅) and only then
 Migrations failed. Same end state, different route — so **neither the warning nor the green
 deployment predicts this lane**; only its own conclusion does.
@@ -8897,19 +9016,19 @@ graph: squash, parent `3fca5b069`, author date `2026-09-02T10:34:01Z`, **6 files
 
 Claude fetched `https://verdantgrowdiary.com/version.json` in this slice.
 
-| Field        | Value                                      |
-| ------------ | ------------------------------------------ |
-| `commit`     | `883729544157a21b5f43210eb59d6cb8ce02ae1b` |
-| `dirty`      | **`false`**                                |
-| `ref`        | `verdant-grow-diary`                       |
-| `commitTime` | `2026-09-02T11:19:36Z`                     |
-| `buildTime`  | `2026-09-02T12:41:20.798Z` (~7:41 AM CT)   |
-| `treeHash`   | `cc51a64c74d9` (short)                     |
-| server       | **Vercel** (`server: Vercel` header)       |
-| apex HTTP    | `200`                                      |
-| www HTTP     | `308` → apex `version.json`, server Vercel |
-| measured     | 2026-09-02 **15:15:36 UTC** (~10:15 AM CT) |
-| source       | `https://verdantgrowdiary.com/version.json`|
+| Field        | Value                                       |
+| ------------ | ------------------------------------------- |
+| `commit`     | `883729544157a21b5f43210eb59d6cb8ce02ae1b`  |
+| `dirty`      | **`false`**                                 |
+| `ref`        | `verdant-grow-diary`                        |
+| `commitTime` | `2026-09-02T11:19:36Z`                      |
+| `buildTime`  | `2026-09-02T12:41:20.798Z` (~7:41 AM CT)    |
+| `treeHash`   | `cc51a64c74d9` (short)                      |
+| server       | **Vercel** (`server: Vercel` header)        |
+| apex HTTP    | `200`                                       |
+| www HTTP     | `308` → apex `version.json`, server Vercel  |
+| measured     | 2026-09-02 **15:15:36 UTC** (~10:15 AM CT)  |
+| source       | `https://verdantgrowdiary.com/version.json` |
 
 **Current production is MEASURED. Tip = live.** Do not record it as `NOT_MEASURED`. Do not carry
 `8716d3bf` as current live. One `www` attempt in this slice timed out at 20 s before the retry
@@ -9034,7 +9153,6 @@ Carried from GDP's dashboard read unless marked MEASURED.
   parented on `88372954`. Unique file `docs/agents/CURRENT_STATE.md`. No `src/`, no `supabase/`,
   no `package.json`. No ready. No merge. No assignee. No auto-merge.
 
-
 **Prior update:** GDP (2026-09-02: **#1247 MERGED as `8716d3bf`** — squash, one parent.
 **Deploy tip = live `8716d3bf`, `dirty:false`**, independently MEASURED from
 `https://verdantgrowdiary.com/version.json` at ~6:09 AM CT (`buildTime`
@@ -9050,9 +9168,9 @@ live as `3e0c61f2`; that row is **superseded**. Prior header follows.)
 
 `established fact`, from the commit graph. **Squash, one parent, not a two-parent merge.**
 
-| PR        | Merge SHA   | Parent      | Files | Migrations | Merged (UTC)     |
-| --------- | ----------- | ----------- | ----: | ---------: | ---------------- |
-| **#1247** | `8716d3bf`  | `3fca5b069` |     6 |      **0** | 2026-09-02 10:34 |
+| PR        | Merge SHA  | Parent      | Files | Migrations | Merged (UTC)     |
+| --------- | ---------- | ----------- | ----: | ---------: | ---------------- |
+| **#1247** | `8716d3bf` | `3fca5b069` |     6 |      **0** | 2026-09-02 10:34 |
 
 Full merge SHA: `8716d3bfcd8aba5c95a4a2479aa1cd890b22dddd`. Parent:
 `3fca5b069265d941ccb868f114840c45e5ded5e5` (deploy tip before this squash). Subject:
@@ -9078,15 +9196,15 @@ branch.
 
 GDP fetched `https://verdantgrowdiary.com/version.json` after the merge.
 
-| Field       | Value                                      |
-| ----------- | ------------------------------------------ |
-| `commit`    | `8716d3bfcd8aba5c95a4a2479aa1cd890b22dddd` |
-| `dirty`     | **`false`**                                |
-| `ref`       | `verdant-grow-diary`                       |
-| server      | **Vercel**                                 |
-| `buildTime` | `2026-09-02T10:39:16.035Z` (~5:39 AM CT)   |
-| measured    | 2026-09-02 ~**6:09 AM CT**                 |
-| source      | `https://verdantgrowdiary.com/version.json`|
+| Field       | Value                                       |
+| ----------- | ------------------------------------------- |
+| `commit`    | `8716d3bfcd8aba5c95a4a2479aa1cd890b22dddd`  |
+| `dirty`     | **`false`**                                 |
+| `ref`       | `verdant-grow-diary`                        |
+| server      | **Vercel**                                  |
+| `buildTime` | `2026-09-02T10:39:16.035Z` (~5:39 AM CT)    |
+| measured    | 2026-09-02 ~**6:09 AM CT**                  |
+| source      | `https://verdantgrowdiary.com/version.json` |
 
 **Current production is MEASURED. Tip = live.** Do not record it as `NOT_MEASURED`. Do not
 carry `3e0c61f2` as current live. **A resolver still returning `185.158.133.1` / `5c197f75`
@@ -9171,9 +9289,9 @@ follows.)
 
 `established fact`, from the GitHub merge object. **Two parents, not a squash.**
 
-| PR        | Merge SHA    | Parents                                         | Files | Migrations | Merged (UTC)     |
-| --------- | ------------ | ----------------------------------------------- | ----: | ---------: | ---------------- |
-| **#1242** | `3e0c61f2`   | `c6a6c87dd` + `cc7b8e7ed`                       |     4 |      **0** | 2026-09-02 05:54 |
+| PR        | Merge SHA  | Parents                   | Files | Migrations | Merged (UTC)     |
+| --------- | ---------- | ------------------------- | ----: | ---------: | ---------------- |
+| **#1242** | `3e0c61f2` | `c6a6c87dd` + `cc7b8e7ed` |     4 |      **0** | 2026-09-02 05:54 |
 
 Full merge SHA: `3e0c61f2bbbb0586ca4a03807dddafd490c3904d`. Parents:
 `c6a6c87ddad670c32914d3bc2e5b4b7181956efc` (deploy tip before this merge) and
@@ -9192,15 +9310,15 @@ each a squash. This restamp does **not** re-count the 41/23/18 harness figures; 
 
 GDP fetched `https://verdantgrowdiary.com/version.json` after the merge.
 
-| Field      | Value                                                      |
-| ---------- | ---------------------------------------------------------- |
-| `commit`   | `3e0c61f2bbbb0586ca4a03807dddafd490c3904d`                 |
-| `dirty`    | **`false`**                                                |
-| `ref`      | `verdant-grow-diary`                                       |
-| server     | **Vercel**                                                 |
-| `buildTime`| `2026-09-02T05:54:28.167Z` (~12:54 AM CT)                  |
-| measured   | 2026-09-02 ~**12:56 AM CT**                                |
-| source     | `https://verdantgrowdiary.com/version.json`                |
+| Field       | Value                                       |
+| ----------- | ------------------------------------------- |
+| `commit`    | `3e0c61f2bbbb0586ca4a03807dddafd490c3904d`  |
+| `dirty`     | **`false`**                                 |
+| `ref`       | `verdant-grow-diary`                        |
+| server      | **Vercel**                                  |
+| `buildTime` | `2026-09-02T05:54:28.167Z` (~12:54 AM CT)   |
+| measured    | 2026-09-02 ~**12:56 AM CT**                 |
+| source      | `https://verdantgrowdiary.com/version.json` |
 
 **Current production is MEASURED. Tip = live.** Do not record it as `NOT_MEASURED`. Do not carry
 `aab55387` or `c6a6c87d` as current live. **A resolver still returning `185.158.133.1` /
@@ -13397,32 +13515,32 @@ At **2026-09-16 19:36:45.66782 UTC**, all **24 / 24** requested rows returned
 as applied** in that hosted ledger. Missing old export markers do not prove their schema
 effects are absent or authorize replay over later hardening.
 
-| Requested migration | Hosted ledger output / status |
-| --- | --- |
-| `20260707120000_breeding_workflow_v1.sql` | `matches: []` — **FAIL** |
-| `20260728163100_production_breeding_workflow_reconciliation.sql` | `matches: []` — **FAIL** |
-| `20260825233000_pheno_hunts_ownership_check_restore.sql` | `matches: []` — **FAIL** |
-| `20260826100000_pheno_candidate_diary_entries_top_n_rpc.sql` | `matches: []` — **FAIL** |
-| `20260721182752_4fc51714-bc29-4044-9b91-180c065e997f.sql` | `matches: []` — **FAIL** |
-| `20260721190300_6e424afe-215e-474e-8e41-d62406450973.sql` | `matches: []` — **FAIL** |
-| `20260721190434_d4c06065-8426-4d69-aac6-f1135e381aee.sql` | `matches: []` — **FAIL** |
-| `20260721190634_e16d1c98-27e3-4246-882c-d6ebc0c4491b.sql` | `matches: []` — **FAIL** |
-| `20260721190735_ad890fa2-a669-48bb-92fc-89376b84370f.sql` | `matches: []` — **FAIL** |
-| `20260721192508_2ee8c89c-be17-4c29-8d73-684db0db4649.sql` | `matches: []` — **FAIL** |
-| `20260721192852_78e5de95-fef1-456d-a0d1-e026e4e1115b.sql` | `matches: []` — **FAIL** |
-| `20260721193009_804e0421-0e2e-470f-a9b6-adf4bc312ae1.sql` | `matches: []` — **FAIL** |
-| `20260721193128_17950647-c02c-4adb-a83e-cd186cfca7a8.sql` | `matches: []` — **FAIL** |
-| `20260721193247_f6b46fe2-299b-4f0b-91cf-80768cf5c11c.sql` | `matches: []` — **FAIL** |
-| `20260721193431_99226d9d-eff2-4bf1-bda4-7f86584e2162.sql` | `matches: []` — **FAIL** |
-| `20260721193523_380202e1-6b43-48b8-8831-ab5b99bd4a51.sql` | `matches: []` — **FAIL** |
-| `20260721193641_c9189cd4-85d1-4c1f-808e-bb1e5779ca70.sql` | `matches: []` — **FAIL** |
-| `20260721194118_d777533e-a1d4-4b36-a75e-ea7742e7cd6e.sql` | `matches: []` — **FAIL** |
-| `20260721194154_9cf7d1a8-174a-44fd-ad49-8ca1fe2e41fb.sql` | `matches: []` — **FAIL** |
-| `20260721194239_18592b2d-3ca9-4608-bbf5-c2262e422c70.sql` | `matches: []` — **FAIL** |
-| `20260721194325_f96507e6-a612-4d26-a99d-2a261f2c0ad5.sql` | `matches: []` — **FAIL** |
-| `20260721193747_2f19fd24-b3a8-4e2d-87ab-e7c1cf71ce55.sql` | `matches: []` — **FAIL** |
-| `20260721185858_5f0fda0a-baef-4dc5-a53c-aa468e45ddb1.sql` | `matches: []` — **FAIL** |
-| `20260721185929_b8b30ebf-cf2c-4082-9b7b-6dcc6871e707.sql` | `matches: []` — **FAIL** |
+| Requested migration                                              | Hosted ledger output / status |
+| ---------------------------------------------------------------- | ----------------------------- |
+| `20260707120000_breeding_workflow_v1.sql`                        | `matches: []` — **FAIL**      |
+| `20260728163100_production_breeding_workflow_reconciliation.sql` | `matches: []` — **FAIL**      |
+| `20260825233000_pheno_hunts_ownership_check_restore.sql`         | `matches: []` — **FAIL**      |
+| `20260826100000_pheno_candidate_diary_entries_top_n_rpc.sql`     | `matches: []` — **FAIL**      |
+| `20260721182752_4fc51714-bc29-4044-9b91-180c065e997f.sql`        | `matches: []` — **FAIL**      |
+| `20260721190300_6e424afe-215e-474e-8e41-d62406450973.sql`        | `matches: []` — **FAIL**      |
+| `20260721190434_d4c06065-8426-4d69-aac6-f1135e381aee.sql`        | `matches: []` — **FAIL**      |
+| `20260721190634_e16d1c98-27e3-4246-882c-d6ebc0c4491b.sql`        | `matches: []` — **FAIL**      |
+| `20260721190735_ad890fa2-a669-48bb-92fc-89376b84370f.sql`        | `matches: []` — **FAIL**      |
+| `20260721192508_2ee8c89c-be17-4c29-8d73-684db0db4649.sql`        | `matches: []` — **FAIL**      |
+| `20260721192852_78e5de95-fef1-456d-a0d1-e026e4e1115b.sql`        | `matches: []` — **FAIL**      |
+| `20260721193009_804e0421-0e2e-470f-a9b6-adf4bc312ae1.sql`        | `matches: []` — **FAIL**      |
+| `20260721193128_17950647-c02c-4adb-a83e-cd186cfca7a8.sql`        | `matches: []` — **FAIL**      |
+| `20260721193247_f6b46fe2-299b-4f0b-91cf-80768cf5c11c.sql`        | `matches: []` — **FAIL**      |
+| `20260721193431_99226d9d-eff2-4bf1-bda4-7f86584e2162.sql`        | `matches: []` — **FAIL**      |
+| `20260721193523_380202e1-6b43-48b8-8831-ab5b99bd4a51.sql`        | `matches: []` — **FAIL**      |
+| `20260721193641_c9189cd4-85d1-4c1f-808e-bb1e5779ca70.sql`        | `matches: []` — **FAIL**      |
+| `20260721194118_d777533e-a1d4-4b36-a75e-ea7742e7cd6e.sql`        | `matches: []` — **FAIL**      |
+| `20260721194154_9cf7d1a8-174a-44fd-ad49-8ca1fe2e41fb.sql`        | `matches: []` — **FAIL**      |
+| `20260721194239_18592b2d-3ca9-4608-bbf5-c2262e422c70.sql`        | `matches: []` — **FAIL**      |
+| `20260721194325_f96507e6-a612-4d26-a99d-2a261f2c0ad5.sql`        | `matches: []` — **FAIL**      |
+| `20260721193747_2f19fd24-b3a8-4e2d-87ab-e7c1cf71ce55.sql`        | `matches: []` — **FAIL**      |
+| `20260721185858_5f0fda0a-baef-4dc5-a53c-aa468e45ddb1.sql`        | `matches: []` — **FAIL**      |
+| `20260721185929_b8b30ebf-cf2c-4082-9b7b-6dcc6871e707.sql`        | `matches: []` — **FAIL**      |
 
 **Catalog and policy measurements:**
 

@@ -259,11 +259,13 @@ describe("DashboardDailyGrowCheckPanel · component", () => {
     ).toHaveLength(1);
   });
 
-  it("unchecked plant Add note action links to /daily-check?plantId=<id>&from=dashboard&method=note", () => {
+  it("unchecked plant Add note action preserves the selected grow and note method", () => {
     renderPanel();
     const action = screen.getByTestId("dashboard-daily-grow-check-panel-row-action-note");
     const link = (action.tagName === "A" ? action : action.querySelector("a")) as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe("/daily-check?plantId=p2&from=dashboard&method=note");
+    expect(link.getAttribute("href")).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=note&growId=g1",
+    );
   });
 });
 

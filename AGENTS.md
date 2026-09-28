@@ -1,3 +1,5 @@
+> Ownership and the connector spec: see [docs/agents/OWNERSHIP.md](docs/agents/OWNERSHIP.md). It wins on conflicts.
+
 # Verdant Agent Constitution
 
 **Sentinel-Version: 2026-09-25.1**

@@ -44,7 +44,6 @@ import { toast } from "sonner";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
   AIR_TEMP_PLACEHOLDER,
-  celsiusToInputString,
   temperatureInputUnitFromPreference,
   TEMPERATURE_INPUT_UNITS,
   TEMPERATURE_UNIT_SYMBOL,
@@ -107,6 +106,11 @@ import {
   type ManualCorrectionRpcClient,
 } from "@/lib/manualSensorCorrectionService";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import {
+  correctionToPrefill,
+  EMPTY,
+  recoveredCorrectionDraftValues,
+} from "@/lib/sensorCorrectionDraft";
 
 interface TentOption {
   id: string;
@@ -131,15 +135,6 @@ interface Props {
   session?: SensorsPageSessionController;
 }
 
-const EMPTY: ManualEntryInput = {
-  airTemp: "",
-  humidityPct: "",
-  vpdKpa: "",
-  co2Ppm: "",
-  soilMoisturePct: "",
-  ppfd: "",
-};
-
 const STANDARD_TARGET_CONTEXT = STANDARD_MANUAL_CORRECTION_IDENTITY;
 const subscribeWithoutSession = () => () => {};
 const readWithoutSession = () => null;
@@ -148,25 +143,6 @@ const CORRECTION_SAVE_UNCONFIRMED_MESSAGE =
 const STANDARD_SAVE_UNCONFIRMED_MESSAGE =
   "Manual snapshot save is unconfirmed. Your readings are still here. Retry this snapshot to confirm it.";
 
-function correctionToPrefill(
-  ctx: ManualCorrectionContext | null | undefined,
-  unit: TemperatureInputUnit,
-): ManualEntryInput {
-  if (!ctx) return { ...EMPTY, airTempUnit: unit };
-  const v = ctx.originalValues;
-  const out: ManualEntryInput = { ...EMPTY, airTempUnit: unit };
-  if (typeof v.temperature_c === "number") {
-    // Stored value is canonical Celsius; render it in the grower's entry unit.
-    out.airTemp = celsiusToInputString(v.temperature_c, unit);
-  }
-  if (typeof v.humidity_pct === "number") out.humidityPct = String(v.humidity_pct);
-  if (typeof v.vpd_kpa === "number") out.vpdKpa = String(v.vpd_kpa);
-  if (typeof v.co2_ppm === "number") out.co2Ppm = String(v.co2_ppm);
-  if (typeof v.soil_moisture_pct === "number") out.soilMoisturePct = String(v.soil_moisture_pct);
-  if (typeof v.ppfd === "number") out.ppfd = String(v.ppfd);
-  return out;
-}
-
 function correctionPrefillFromRestoredMetrics(
   correction: ManualCorrectionContext,
   metrics: ReadonlyArray<ManualReadingMetric>,
@@ -174,21 +150,6 @@ function correctionPrefillFromRestoredMetrics(
   return {
     ...correction,
     originalValues: Object.fromEntries(metrics.map((row) => [row.metric, row.value])),
-  };
-}
-
-/** Match standard snapshot restore: canonical °C digits + explicit C override. */
-function recoveredCorrectionDraftValues(
-  correction: ManualCorrectionContext,
-  metrics: ReadonlyArray<ManualReadingMetric>,
-): ManualDraftValues {
-  return {
-    ...createManualDraftValues(
-      correctionToPrefill(correctionPrefillFromRestoredMetrics(correction, metrics), "C"),
-      "C",
-    ),
-    hasEditedReading: true,
-    saveUnconfirmed: true,
   };
 }
 

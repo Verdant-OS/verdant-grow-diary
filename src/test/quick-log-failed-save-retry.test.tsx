@@ -88,6 +88,7 @@ function mockPersistedNote(eventId: string) {
     data: {
       id: eventId,
       note: RETRY_NOTE,
+      grow_id: "grow-1",
       plant_id: "plant-1",
       tent_id: "tent-1",
       event_type: "observation",
@@ -267,7 +268,7 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
     );
     expect(fromMock).toHaveBeenCalledWith("grow_events");
     expect(selectMock).toHaveBeenCalledWith(
-      "id,note,plant_id,tent_id,event_type,source,is_deleted",
+      "id,note,grow_id,plant_id,tent_id,event_type,source,is_deleted",
     );
     expect(eqMock).toHaveBeenCalledWith("id", "77777777-7777-4777-8777-000000000001");
     expect(readbackMock).toHaveBeenCalledTimes(1);

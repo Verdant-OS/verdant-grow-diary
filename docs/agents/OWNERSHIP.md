@@ -1,6 +1,6 @@
 # Verdant ownership — single source of truth
 
-**Pinned file.** This file is the one place to point at for who owns what in the Verdant engineering loop. `docs/agents/CURRENT_STATE.md` links here, and this file wins over `CURRENT_STATE.md`. `AGENTS.md` still wins over this file until a Sentinel-Version bump adds a pointer there. Matthew Cheek's own words override both.
+**Pinned file.** This file is the one place to point at for who owns what in the Verdant engineering loop. `docs/agents/CURRENT_STATE.md` links here, and this file wins over `CURRENT_STATE.md`. `AGENTS.md` points here too, and this file wins over it on ownership and routing. Matthew Cheek's own words override both.
 
 - **Repo:** `Verdant-OS/verdant-grow-diary`, deploy branch `verdant-grow-diary`
 - **Owner of this file:** Codex. Any agent may propose an edit as a draft PR.

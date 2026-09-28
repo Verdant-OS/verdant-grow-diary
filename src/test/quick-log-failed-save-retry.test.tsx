@@ -13,6 +13,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import { QUICK_LOG_TIMELINE_CTA_LABEL } from "@/lib/quickLogTimelineNavigationTarget";
+import { readPendingQuickLogNote } from "@/lib/quickLogPendingNoteStore";
 
 const rpcMock = vi.fn();
 const fromMock = vi.fn();
@@ -114,6 +115,60 @@ beforeEach(() => {
 });
 
 describe("QuickLogV2Sheet — failed save Retry button", () => {
+  it("can explicitly discard a remounted historical refusal without claiming or resubmitting it", async () => {
+    rpcMock.mockResolvedValue({
+      data: { ok: false, reason: "idempotency_key_unverified" },
+      error: null,
+    });
+    const mounted = renderSheet("plant:plant-1");
+    prepareNoteSave();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByTestId("qlv2-history-review-link");
+    expect(readPendingQuickLogNote("user-1").status).toBe("pending");
+    mounted.unmount();
+    const restored = renderSheet("plant:plant-1");
+    fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+    expect(readPendingQuickLogNote("user-1").status).toBe("empty");
+    expect(screen.getByLabelText("Note (optional)")).toHaveValue("");
+    expect(screen.queryByTestId("qlv2-exact-retry-lock")).not.toBeInTheDocument();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    restored.unmount();
+    renderSheet("plant:plant-1");
+    expect(screen.queryByTestId("qlv2-exact-retry-lock")).not.toBeInTheDocument();
+    prepareNoteSave();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(2));
+    expect(rpcMock.mock.calls[1][1].p_idempotency_key).not.toBe(
+      rpcMock.mock.calls[0][1].p_idempotency_key,
+    );
+  });
+
+  it("retains the historical draft if verified storage removal fails", async () => {
+    rpcMock.mockResolvedValue({
+      data: { ok: false, reason: "idempotency_receipt_missing" },
+      error: null,
+    });
+    renderSheet("plant:plant-1");
+    prepareNoteSave();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByTestId("qlv2-history-review-link");
+    const pending = readPendingQuickLogNote("user-1");
+    const remove = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("synthetic storage refusal");
+    });
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+      expect(readPendingQuickLogNote("user-1")).toEqual(pending);
+      expect(screen.getByTestId("qlv2-save")).toBeDisabled();
+      expect(screen.getByLabelText("Note (optional)")).toHaveValue(RETRY_NOTE);
+      expect(rpcMock).toHaveBeenCalledTimes(1);
+      expect(toastSuccess).not.toHaveBeenCalled();
+    } finally {
+      remove.mockRestore();
+    }
+  });
+
   it("does not offer an impossible retry after a refused historical replay", async () => {
     rpcMock.mockResolvedValue({
       data: { ok: false, reason: "idempotency_key_unverified" },

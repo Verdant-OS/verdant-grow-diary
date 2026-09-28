@@ -56,6 +56,40 @@ const REPLAY_HISTORY_CHECK_REASONS = new Set<string>([
   "idempotency_key_conflict",
 ]);
 
+export const QUICK_LOG_HISTORY_REVIEW_HELPER =
+  "Check Timeline before starting another log; this save reference cannot confirm the original entry.";
+export const QUICK_LOG_HISTORY_REVIEW_LOCK_COPY =
+  "This save reference cannot confirm the original log. Check Timeline in another tab before making a new entry. This draft remains locked while its history is unclear.";
+export const QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY =
+  "Check Timeline for the original log before making another entry. This draft remains here.";
+export const QUICK_LOG_HISTORY_REVIEW_LINK_LABEL = "Open Timeline in a new tab";
+export const QUICK_LOG_HISTORY_DISCARD_LABEL = "I checked Timeline; discard draft";
+export const QUICK_LOG_HISTORY_DISCARD_HELPER =
+  "Discard only after checking the original log. This clears this draft, never saved history. If history is unclear, ask support before making another entry.";
+export const QUICK_LOG_HISTORY_DISCARD_FAILED =
+  "This draft could not be removed from this tab. It remains locked; try again when browser storage is available.";
+
+/** Explicit local-draft resolution; never permission to write or claim a saved receipt. */
+export function canDiscardQuickLogHistoryDraft(
+  input:
+    | {
+        historyCheckRequired: boolean;
+        inFlight: boolean;
+        currentOwnerId: string | null | undefined;
+        draftOwnerId: string | null | undefined;
+      }
+    | null
+    | undefined,
+): boolean {
+  return (
+    input?.historyCheckRequired === true &&
+    input.inFlight === false &&
+    typeof input.currentOwnerId === "string" &&
+    input.currentOwnerId.trim().length > 0 &&
+    input.currentOwnerId === input.draftOwnerId
+  );
+}
+
 /** A refusal that cannot be resolved by resending the same save reference. */
 export function quickLogSaveRequiresHistoryCheck(
   reason: unknown,

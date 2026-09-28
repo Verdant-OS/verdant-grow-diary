@@ -157,6 +157,14 @@ import {
 import {
   quickLogReasonToOperatorMessage,
   quickLogSaveRequiresHistoryCheck,
+  canDiscardQuickLogHistoryDraft,
+  QUICK_LOG_HISTORY_REVIEW_HELPER,
+  QUICK_LOG_HISTORY_REVIEW_LOCK_COPY,
+  QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY,
+  QUICK_LOG_HISTORY_REVIEW_LINK_LABEL,
+  QUICK_LOG_HISTORY_DISCARD_LABEL,
+  QUICK_LOG_HISTORY_DISCARD_HELPER,
+  QUICK_LOG_HISTORY_DISCARD_FAILED,
 } from "@/lib/quickLogSaveErrorMessage";
 import {
   QUICK_LOG_POST_SAVE_VIEW_LABEL,
@@ -853,7 +861,7 @@ function QuickLogV2SheetForOwner({
         })
       : null;
   const saveHelper = historyCheckRequired
-    ? "Check Timeline before starting another log; this save reference cannot confirm the original entry."
+    ? QUICK_LOG_HISTORY_REVIEW_HELPER
     : wateringRetryPending
       ? "Retry checks the original watering record. Closing or reloading keeps it available in this tab; confirm it before logging another."
       : getSaveHelperMessage({
@@ -2216,6 +2224,25 @@ function QuickLogV2SheetForOwner({
     setLocalError(null);
   }
 
+  const historyDiscardAllowed = canDiscardQuickLogHistoryDraft({
+    historyCheckRequired,
+    inFlight:
+      recoveryStorageFence || saving || feedingSaving || wateringSaving || saveInFlightRef.current,
+    currentOwnerId: user?.id,
+    draftOwnerId: manualRetrySubmissionRef.current?.recovery.ownerId,
+  });
+  function handleDiscardHistoryDraft() {
+    const pending = manualRetrySubmissionRef.current;
+    if (!historyDiscardAllowed || !pending || saveInFlightRef.current) return;
+    if (!clearPendingQuickLogNote(pending.recovery)) {
+      setLocalError(QUICK_LOG_HISTORY_DISCARD_FAILED);
+      return;
+    }
+    // Explicit abandonment after history review, never a confirmed server receipt.
+    saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+    handleLogAnother();
+  }
+
   function handleLogAnother() {
     if (recoveryStorageFence) return;
     setRestoredMediaPending(false);
@@ -2303,7 +2330,7 @@ function QuickLogV2SheetForOwner({
       if (manualRetrySubmissionRef.current || feedingRetrySubmissionRef.current) {
         toast.message(
           historyCheckRequired
-            ? "Check Timeline for the original log before making another entry. This draft remains here."
+            ? QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY
             : "Resolve the original save with Retry before closing or making changes.",
         );
         return;
@@ -3029,8 +3056,7 @@ function QuickLogV2SheetForOwner({
             >
               {historyCheckRequired ? (
                 <>
-                  This save reference cannot confirm the original log. Check Timeline in another tab
-                  before making a new entry. This draft remains locked while its history is unclear.
+                  {QUICK_LOG_HISTORY_REVIEW_LOCK_COPY}
                   {historyReviewNavigation && (
                     <a
                       className="block underline"
@@ -3039,9 +3065,19 @@ function QuickLogV2SheetForOwner({
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Open Timeline in a new tab
+                      {QUICK_LOG_HISTORY_REVIEW_LINK_LABEL}
                     </a>
                   )}
+                  <span className="block mt-2">{QUICK_LOG_HISTORY_DISCARD_HELPER}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2"
+                    disabled={!historyDiscardAllowed}
+                    onClick={handleDiscardHistoryDraft}
+                  >
+                    {QUICK_LOG_HISTORY_DISCARD_LABEL}
+                  </Button>
                 </>
               ) : (
                 <>

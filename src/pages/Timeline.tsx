@@ -115,10 +115,13 @@ import {
 } from "@/lib/growDiaryTimelineRules";
 import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayRules";
 import {
+  completeManualSensorTimelineRows,
   diaryEntryBelongsInTimelineMeasurements,
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
+  TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
+  timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
 import {
   effectiveSensorReadingsQuery,
@@ -439,6 +442,7 @@ export default function Timeline() {
   // Tent Manual Snapshots live in `sensor_readings`, not diary_entries.
   // Read-side receipts only — never a second write path.
   const [manualSensorMeasurementEntries, setManualSensorMeasurementEntries] = useState<Entry[]>([]);
+  const [manualSensorHistoryLimited, setManualSensorHistoryLimited] = useState(false);
   // Keyset pagination (audit M1): the diary is unbounded but the page used
   // to silently cap at the newest 100 rows and report "Showing 100 of 100".
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
@@ -619,6 +623,7 @@ export default function Timeline() {
     if (!user || !activeGrowId) {
       setEntries([]);
       setManualSensorMeasurementEntries([]);
+      setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
       setGrowEventsTotal(null);
@@ -639,6 +644,7 @@ export default function Timeline() {
     if (!activeReadKey) {
       setEntries([]);
       setManualSensorMeasurementEntries([]);
+      setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
       setGrowEventsTotal(null);
@@ -661,6 +667,7 @@ export default function Timeline() {
     setLoadingOlder(false);
     setCoreRead({ status: "loading", readKey: requestedReadKey });
     setPartialReadSources([]);
+    setManualSensorHistoryLimited(false);
     setSupplementalLoading(true);
     setLoadOlderError(false);
 
@@ -723,6 +730,7 @@ export default function Timeline() {
       // and is never allowed to hold the diary or watering history hostage.
       setEntries(coreRows);
       setManualSensorMeasurementEntries([]);
+      setManualSensorHistoryLimited(false);
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
       setGrowEvents(nextGrowEvents);
       setGrowEventsTotal(
@@ -860,6 +868,7 @@ export default function Timeline() {
               if (tentsResult.error || !Array.isArray(tentsResult.data)) {
                 markPartial("manual_sensor_readings");
                 setManualSensorMeasurementEntries([]);
+                setManualSensorHistoryLimited(false);
                 return;
               }
               const tentIds = tentsResult.data
@@ -867,6 +876,7 @@ export default function Timeline() {
                 .filter((id): id is string => Boolean(id));
               if (tentIds.length === 0) {
                 setManualSensorMeasurementEntries([]);
+                setManualSensorHistoryLimited(false);
                 return;
               }
               let sensorQuery = effectiveSensorReadingsQuery()
@@ -875,7 +885,7 @@ export default function Timeline() {
                 .eq("source", "manual")
                 .order("captured_at", { ascending: false, nullsFirst: false })
                 .order("ts", { ascending: false })
-                .limit(200);
+                .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
               if (timelineDateRangeBounds.startIso) {
                 sensorQuery = sensorQuery.gte("ts", timelineDateRangeBounds.startIso);
               }
@@ -887,12 +897,13 @@ export default function Timeline() {
               if (sensorResult.error || !Array.isArray(sensorResult.data)) {
                 markPartial("manual_sensor_readings");
                 setManualSensorMeasurementEntries([]);
+                setManualSensorHistoryLimited(false);
                 return;
               }
-              let receipts = manualSensorReadingsToTimelineEntries(
+              const manualPage = completeManualSensorTimelineRows(
                 requireEffectiveSensorReadings(sensorResult.data),
-                new Date(),
               );
+              let receipts = manualSensorReadingsToTimelineEntries(manualPage.rows, new Date());
               if (timelineDateRangeBounds.startIso) {
                 receipts = receipts.filter(
                   (row) => row.entry_at >= timelineDateRangeBounds.startIso!,
@@ -904,10 +915,12 @@ export default function Timeline() {
                 );
               }
               setManualSensorMeasurementEntries(receipts as Entry[]);
+              setManualSensorHistoryLimited(manualPage.hasOlderRows);
             } catch {
               if (!isCurrentRequest()) return;
               markPartial("manual_sensor_readings");
               setManualSensorMeasurementEntries([]);
+              setManualSensorHistoryLimited(false);
             }
           })(),
         );
@@ -1659,6 +1672,20 @@ export default function Timeline() {
           >
             Try again
           </Button>
+        </div>
+      )}
+
+      {manualSensorHistoryLimited && (
+        <div
+          className="glass mb-4 rounded-2xl border border-amber-500/30 p-4"
+          role="status"
+          data-testid="timeline-manual-history-limit"
+        >
+          <p className="font-medium">Manual reading history is limited</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            This Timeline view shows only the newest complete manual captures. Older manual readings
+            are not shown here.
+          </p>
         </div>
       )}
 
@@ -2734,6 +2761,14 @@ export default function Timeline() {
                                       fallback: "manual",
                                       context: "persisted_snapshot",
                                     });
+                                    const manualHistoryNotice = timelineManualSnapshotHistoryNotice(
+                                      {
+                                        sourceKind: sourceBadge.kind,
+                                        capturedAt: snapTs || null,
+                                        nowMs,
+                                        staleMs: snapshotStaleMs,
+                                      },
+                                    );
                                     return (
                                       <div
                                         className="mt-2 flex flex-wrap items-center gap-1.5"
@@ -2744,6 +2779,14 @@ export default function Timeline() {
                                           Manual snapshot
                                         </span>
                                         <TimelineSensorSourceBadge badge={sourceBadge} />
+                                        {manualHistoryNotice && (
+                                          <span
+                                            className="text-[11px] text-muted-foreground"
+                                            data-testid="timeline-manual-history-notice"
+                                          >
+                                            {manualHistoryNotice}
+                                          </span>
+                                        )}
                                         {sensorViewModel?.kind === "invalid" && (
                                           <span
                                             className="text-[11px] text-destructive"

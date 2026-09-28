@@ -116,6 +116,17 @@ export function computeVpdKpa(tempC: number, rhPct: number): number {
   return Math.max(0, Math.round(vpd * 1000) / 1000);
 }
 
+/** The one validation error that is not about a typed value: nothing entered. */
+export const MANUAL_ENTRY_EMPTY_ERROR = "Enter at least one reading.";
+
+/**
+ * Errors about values the grower typed (VPD -1, RH 101, PPFD 5000, a
+ * malformed temperature), i.e. everything except the empty-form prompt.
+ */
+export function manualEntryValueErrors(validation: ManualEntryValidation): string[] {
+  return validation.errors.filter((error) => error !== MANUAL_ENTRY_EMPTY_ERROR);
+}
+
 /** Build & validate the metric list for a manual entry. Pure. */
 export function validateManualEntry(input: ManualEntryInput): ManualEntryValidation {
   const errors: string[] = [];
@@ -206,7 +217,7 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   }
 
   if (metrics.length === 0 && errors.length === 0) {
-    errors.push("Enter at least one reading.");
+    errors.push(MANUAL_ENTRY_EMPTY_ERROR);
   }
 
   return {

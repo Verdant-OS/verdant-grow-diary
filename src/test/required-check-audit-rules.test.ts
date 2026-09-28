@@ -81,7 +81,8 @@ describe("config/required-status-checks.json", () => {
     // `required-check-audit.yml` can only catch a hole that is declared. The
     // closure lane is the one P2(b) added — a PR that wires 15 specs and then
     // leaves its own job ungated repeats exactly what P4 exists to close
-    // (Codex, round 3 on #1221).
+    // (Codex, round 3 on #1221). #1702 added a second job to that lane, the
+    // Timeline local-day proof, and the same rule applies to it (Copilot on #1702).
     for (const context of [
       "test:security-regression",
       "test:security-db-local",
@@ -89,6 +90,7 @@ describe("config/required-status-checks.json", () => {
       "irrigation harness typecheck (tsc --noEmit)",
       "Deno bridge auth + handler E2E",
       "Mocked E2E closure (15 previously unrun specs)",
+      "Timeline local-day date filter (mocked)",
     ]) {
       expect(MUST_BE_GREEN).toContain(context);
       expect(PINNED.required).not.toContain(context);
@@ -103,6 +105,7 @@ describe("config/required-status-checks.json", () => {
       "irrigation harness typecheck (tsc --noEmit)",
       "Deno bridge auth + handler E2E",
       "Mocked E2E closure (15 previously unrun specs)",
+      "Timeline local-day date filter (mocked)",
     ]) {
       const entry = entries.find((e: { context: string }) => e.context === context);
       expect(entry?.alwaysRuns).toBe(false);

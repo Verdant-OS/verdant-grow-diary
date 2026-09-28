@@ -194,7 +194,7 @@ const SOURCE_TRUST_RANK: Record<SensorReadingSource, number> = {
   invalid: 5,
 };
 
-function leastTrustedStatus(
+export function leastTrustedStatus(
   left: SensorReadingHealthStatus,
   right: SensorReadingHealthStatus,
 ): SensorReadingHealthStatus {
@@ -259,6 +259,7 @@ export function mapPlantRow(row: PlantRow): Plant {
     medium: cleanPlantString(row.medium),
     potSize: cleanPlantString(row.pot_size),
     plantType: normalizePlantType((row as { plant_type?: string | null }).plant_type ?? null),
+    createdAt: row.created_at ?? null,
   };
 }
 

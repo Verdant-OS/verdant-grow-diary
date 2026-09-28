@@ -13,6 +13,11 @@ import { findUnsafeSqlReason } from "./apply-pinned-production-migrations.mjs";
 import { buildPsqlEnvironment, writeTextFile } from "./lib/candidateNumberToolRuntime.mjs";
 import { hardenProductionPsqlEnvironment } from "./lib/productionSupabaseTls.mjs";
 import {
+  ledgerColumnRowsByName,
+  ledgerConstraintRows,
+  sqlTextArrayLiteral,
+} from "./lib/supabaseMigrationLedgerShape.mjs";
+import {
   assertSupabaseDatabaseTargetIdentity,
   SUPABASE_DATABASE_TARGETS,
 } from "./lib/supabaseDatabaseTargetIdentity.mjs";
@@ -91,7 +96,6 @@ export const QUICKLOG_CATALOG_SEARCH_PATH_SQL = "pg_catalog, public";
 export const QUICKLOG_DEPENDENCY_CATALOG_EXPRESSIONS_SQL = `
   'authenticated_role_contract', coalesce((
     select not authenticated_role.rolsuper
-      and not authenticated_role.rolinherit
       and not authenticated_role.rolcreaterole
       and not authenticated_role.rolcreatedb
       and not authenticated_role.rolcanlogin
@@ -503,11 +507,11 @@ select json_build_object(
       and has_table_privilege(current_user, ledger.oid, 'SELECT,INSERT,UPDATE')
       and coalesce((
         select array_agg(format('%s|%s|%s|%s', a.attname, format_type(a.atttypid,a.atttypmod), a.attnotnull, coalesce(pg_get_expr(d.adbin,d.adrelid),'')) order by a.attnum)
-          = array['version|text|t|','name|text|f|','statements|text[]|f|']::text[]
+          = ${sqlTextArrayLiteral(ledgerColumnRowsByName())}
         from pg_attribute a left join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
         where a.attrelid=ledger.oid and a.attnum>0 and not a.attisdropped
       ), false)
-      and coalesce((select count(*)=1 and bool_and(conname='schema_migrations_pkey' and contype='p' and convalidated and pg_get_constraintdef(oid,true)='PRIMARY KEY (version)') from pg_constraint where conrelid=ledger.oid), false)
+      and coalesce((select array_agg(format('%s|%s|%s|%s|%s|%s',conname,contype,convalidated,condeferrable,condeferred,pg_get_constraintdef(oid,true)) order by conname) = ${sqlTextArrayLiteral(ledgerConstraintRows())} from pg_constraint where conrelid=ledger.oid), false)
       and not exists (select 1 from pg_trigger where tgrelid=ledger.oid and not tgisinternal)
       and not exists (select 1 from pg_rewrite where ev_class=ledger.oid)
     from migration_ledger ledger join pg_roles owner_role on owner_role.oid=ledger.relowner

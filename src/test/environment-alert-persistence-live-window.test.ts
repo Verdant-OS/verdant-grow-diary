@@ -27,14 +27,8 @@
  * Pure. No I/O, no Supabase, no clock reads (now is always injected).
  */
 import { describe, it, expect } from "vitest";
-import {
-  isSnapshotPersistable,
-  selectPersistableAlerts,
-} from "@/lib/environmentAlertPersistence";
-import {
-  LIVE_CURRENT_STATE_STALE_MS,
-  MANUAL_CURRENT_STATE_STALE_MS,
-} from "@/lib/sensorTruthCanon";
+import { isSnapshotPersistable, selectPersistableAlerts } from "@/lib/environmentAlertPersistence";
+import { LIVE_CURRENT_STATE_STALE_MS, MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import type { EnvironmentAlert } from "@/lib/environmentAlerts";
 
@@ -64,6 +58,32 @@ const REAL_ALERT = {
 } as unknown as EnvironmentAlert;
 
 describe("alert persistence uses the LIVE window regardless of source", () => {
+  it.each(["live", "manual"] as const)(
+    "rejects invalid and future %s observation times",
+    (source) => {
+      for (const ts of [null, "", "invalid", new Date(NOW + 1).toISOString()]) {
+        const snapshot = { ...agedSnapshot(0, source), ts };
+        const context = { snapshot, quality: "good" as const, now: NOW };
+        expect(isSnapshotPersistable(context), String(ts)).toBe(false);
+        expect(selectPersistableAlerts([REAL_ALERT], context), String(ts)).toEqual([]);
+      }
+    },
+  );
+  it.each([NaN, Infinity, -Infinity])("rejects an unconfirmed clock: %s", (now) => {
+    expect(
+      isSnapshotPersistable({ snapshot: agedSnapshot(0, "manual"), quality: "good", now }),
+    ).toBe(false);
+  });
+  it.each(["live", "manual"] as const)(
+    "preserves exact current and live-window boundaries for %s",
+    (source) => {
+      for (const age of [0, LIVE_CURRENT_STATE_STALE_MS]) {
+        expect(
+          isSnapshotPersistable({ snapshot: agedSnapshot(age, source), quality: "good", now: NOW }),
+        ).toBe(true);
+      }
+    },
+  );
   it("the two canon windows really do differ, or these tests prove nothing", () => {
     expect(MANUAL_CURRENT_STATE_STALE_MS).toBeGreaterThan(LIVE_CURRENT_STATE_STALE_MS);
   });
@@ -76,7 +96,11 @@ describe("alert persistence uses the LIVE window regardless of source", () => {
 
   it("a fresh manual snapshot (inside the live window) is persistable", () => {
     expect(
-      isSnapshotPersistable({ snapshot: agedSnapshot(60_000, "manual"), quality: "good", now: NOW }),
+      isSnapshotPersistable({
+        snapshot: agedSnapshot(60_000, "manual"),
+        quality: "good",
+        now: NOW,
+      }),
     ).toBe(true);
   });
 

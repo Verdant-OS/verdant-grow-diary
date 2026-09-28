@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { tentSizeValidationMessage } from "@/lib/tentManagementRules";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
@@ -172,6 +173,11 @@ export default function CreateTentDialog({
     if (!hasTrimmedRequiredIdentity(form.name)) return;
     if (!targetGrowId) {
       toast.error("Choose a verified grow before creating a tent.");
+      return;
+    }
+    const sizeMessage = tentSizeValidationMessage(form.size);
+    if (sizeMessage) {
+      toast.error(sizeMessage);
       return;
     }
     let tentId: string;

@@ -11,7 +11,10 @@
  *    via `convertCelsiusForDisplay`.
  */
 import { useMemo } from "react";
-import { useNowTick } from "@/hooks/useNowTick";
+import {
+  useAlertsPresentationClock,
+  type AlertsPresentationClock,
+} from "@/hooks/useAlertsPresentationClock";
 import AlertsContextHeader from "@/components/AlertsContextHeader";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useGrowTargets } from "@/hooks/useGrowTargets";
@@ -19,6 +22,11 @@ import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildAlertsHeaderContext } from "@/lib/alertFreshnessContext";
 import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 import { resolveAlertContextStage } from "@/lib/alertStageResolution";
+import {
+  type AlertStagePlant,
+  alertHeaderStageReadsSettled,
+  resolveGrowPlantStages,
+} from "@/lib/alertPlantStageScopeRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
@@ -28,6 +36,13 @@ interface Props {
    * PLUS the grow's tents' stages via `resolveAlertContextStage`, so a
    * stale `grows.stage` cannot claim outdated targets (live audit #14). */
   stage: string | null;
+  /**
+   * Active plants (any grow). The ones that resolve to this grow, by their own
+   * grow_id or else through one of this grow's tents, add their stages; see
+   * resolveAlertContextStage rule 8. `null` while the plant read is pending
+   * or failed with no data: the header then withholds the stage.
+   */
+  plants?: ReadonlyArray<AlertStagePlant> | null;
   /** When true, shows a small "Showing alert context for X" note so the
    * operator can tell the header is using a fallback grow, not the one
    * in the URL. */
@@ -35,30 +50,38 @@ interface Props {
   /** True when the relevant grow already has at least one open alert.
    * Drives the duplicate-prevention reassurance banner. */
   hasOpenAlerts?: boolean;
+  clock?: AlertsPresentationClock;
 }
 
 export default function AlertsContextHeaderForGrow({
   growId,
   growName,
   stage,
+  plants,
   isFallback = false,
   hasOpenAlerts = false,
+  clock,
 }: Props) {
-  const { data: tents = [] } = useGrowTents(growId);
+  const { data: tentRows } = useGrowTents(growId);
+  const tents = useMemo(() => tentRows ?? [], [tentRows]);
   const tentIds = tents.map((t) => t.id);
   const sensorState = useLatestSensorSnapshot(growId, tentIds);
   const targetsState = useGrowTargets(growId);
   const tempUnit = useTemperatureUnitPreference();
-  const now = useNowTick();
+  const { now } = useAlertsPresentationClock(sensorState.snapshot, clock);
   // Stage precedence lives in resolveAlertContextStage: grow stage + tent
-  // stages, most advanced known stage wins on disagreement.
+  // stages, most advanced known stage wins on disagreement. Until the tent
+  // and plant reads have data the stage is not known, so the header says so
+  // instead of stating the grow/tent stage (Codex review on #1683).
+  const stagePending = !alertHeaderStageReadsSettled({ tents: tentRows, plants });
   const resolvedStage = useMemo(
     () =>
       resolveAlertContextStage({
         growStage: stage,
         tentStages: tents.map((t) => t.stage),
+        plantStages: resolveGrowPlantStages(plants, growId, tents) ?? null,
       }).stage,
-    [stage, tents],
+    [stage, tents, plants, growId],
   );
 
   const snapshotReadState = buildSensorSnapshotReadState(sensorState);
@@ -77,6 +100,7 @@ export default function AlertsContextHeaderForGrow({
       buildAlertsHeaderContext({
         growName,
         stage: resolvedStage,
+        stagePending,
         targets: targetsState.status === "ok" ? targetsState.targets : null,
         snapshot: confirmedSnapshot,
         status: headerStatus,
@@ -86,6 +110,7 @@ export default function AlertsContextHeaderForGrow({
     [
       growName,
       resolvedStage,
+      stagePending,
       targetsState.status,
       targetsState.targets,
       confirmedSnapshot,

@@ -70,6 +70,7 @@ import {
   appendHardwareReadingsToNote,
   computeQuickLogHardwareDefaultOpen,
   hasAnyHardwareReading,
+  validateHardwareReadings,
   type QuickLogHardwareReadings,
 } from "@/lib/quickLogHardwareReadingsRules";
 import {
@@ -1299,6 +1300,12 @@ export default function QuickLog({
     ) {
       setSaveError(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);
       toast.message(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);
+      return;
+    }
+    const hardwareValidation = validateHardwareReadings(hardware);
+    if (hardwareValidation.ok !== true) {
+      setSaveError(hardwareValidation.message);
+      toast.error(hardwareValidation.message);
       return;
     }
 

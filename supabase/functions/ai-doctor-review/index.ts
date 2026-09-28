@@ -42,6 +42,7 @@ import { validateAiDoctorReviewResult } from "./contract.ts";
 import { buildAiDoctorPromptMessages } from "../_shared/aiDoctorPromptAssembly.ts";
 import { parseAiDoctorReviewRequestEnvelope } from "../_shared/aiDoctorReviewRequestTransportRules.ts";
 import { validateAndNormalizeAiDoctorReviewRequestPacket } from "../_shared/aiDoctorReviewRequestPacketValidationRules.ts";
+import { applyStageTargetSeverityToPacket } from "../_shared/aiDoctorPacketStageTargetRules.ts";
 import { validateAiDoctorReviewGrounding } from "../_shared/aiDoctorReviewGroundingRules.ts";
 import {
   buildAiDoctorReviewEvidenceReceiptSnapshot,
@@ -274,11 +275,18 @@ Deno.serve(async (req) => {
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return calmFailure("http");
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: auth } } },
-    );
+    // createClient throws on a missing URL or key, which would surface as an
+    // unexpected failure instead of the configuration outage it is.
+    const authSupabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!authSupabaseUrl || !supabaseAnonKey) {
+      const missing = !authSupabaseUrl ? "supabase_url" : "supabase_anon_key";
+      console.log(`ai-doctor-review status=config_missing missing=${missing}`);
+      return calmFailure("config");
+    }
+    const supabase = createClient(authSupabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: auth } },
+    });
     const { data: u } = await supabase.auth.getUser();
     if (!u?.user) return calmFailure("http");
     const userId = u.user.id;
@@ -288,6 +296,21 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const billingEnvironmentResolution = resolveRequiredServerBillingEnvironment();
+    // Name the failed precondition with a fixed code (never a value) so an
+    // operator can tell which server configuration is missing from the logs.
+    const configMissing = !serviceRoleKey
+      ? "service_role_key"
+      : !supabaseUrl
+        ? "supabase_url"
+        : !billingEnvironmentResolution.ok
+          ? billingEnvironmentResolution.reason
+          : !receiptHmacSecret
+            ? "receipt_hmac_key"
+            : new TextEncoder().encode(receiptHmacSecret).byteLength < 32
+              ? "receipt_hmac_key_too_short"
+              : !isReceiptHmacKeyId(receiptHmacKeyId)
+                ? "receipt_hmac_key_id"
+                : null;
     if (
       !serviceRoleKey ||
       !supabaseUrl ||
@@ -296,7 +319,7 @@ Deno.serve(async (req) => {
       new TextEncoder().encode(receiptHmacSecret).byteLength < 32 ||
       !isReceiptHmacKeyId(receiptHmacKeyId)
     ) {
-      console.log("ai-doctor-review status=config_missing");
+      console.log(`ai-doctor-review status=config_missing missing=${configMissing ?? "unknown"}`);
       return calmFailure("config");
     }
     const creditSupabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -306,7 +329,7 @@ Deno.serve(async (req) => {
 
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) {
-      console.log("ai-doctor-review status=config_missing");
+      console.log("ai-doctor-review status=config_missing missing=lovable_api_key");
       return calmFailure("config");
     }
 
@@ -323,10 +346,16 @@ Deno.serve(async (req) => {
     // Validate the complete model-context schema before the first credit RPC.
     // Reconstruction drops unknown/prototype keys and bounds every promptable
     // string, array, and number; malformed packets fail without a spend.
-    const validatedPacket = validateAndNormalizeAiDoctorReviewRequestPacket(request.packet);
-    if (!validatedPacket) {
+    const normalizedPacket = validateAndNormalizeAiDoctorReviewRequestPacket(request.packet);
+    if (!normalizedPacket) {
       return calmFailure("shape");
     }
+    // Grade the current reading against the plant's stage targets here too.
+    // The client does this before send (BUG-008), but a direct caller could
+    // send an out-of-target reading as "ok", and the grounding rules would let
+    // the model call it stable (Codex review on #1683). Idempotent for a packet
+    // the client already graded; everything below sees only the graded packet.
+    const validatedPacket = applyStageTargetSeverityToPacket(normalizedPacket);
 
     // Server resolves grow scope from an untrusted transport envelope; the
     // atomic credit RPC re-checks ownership. `request.packet` is deliberately

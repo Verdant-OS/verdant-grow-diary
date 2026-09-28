@@ -46,6 +46,25 @@ function cleanStamp(overrides: Record<string, unknown> = {}) {
 
 const temporaryRoots: string[] = [];
 
+function makeCheckoutFixture() {
+  const root = mkdtempSync(join(tmpdir(), "verdant-publish-identity-"));
+  temporaryRoots.push(root);
+  const env = {
+    ...process.env,
+    GIT_AUTHOR_NAME: "fixture",
+    GIT_AUTHOR_EMAIL: "fixture@example.com",
+    GIT_COMMITTER_NAME: "fixture",
+    GIT_COMMITTER_EMAIL: "fixture@example.com",
+  };
+  const git = (args: string[]) =>
+    spawnSync("git", ["-C", root, ...args], { encoding: "utf8", env });
+  expect(git(["init"]).status).toBe(0);
+  expect(git(["commit", "--allow-empty", "-m", "fixture checkout"]).status).toBe(0);
+  const head = git(["rev-parse", "HEAD"]).stdout.trim();
+  expect(head).toMatch(/^[0-9a-f]{40}$/);
+  return { root, head };
+}
+
 afterEach(() => {
   for (const root of temporaryRoots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
@@ -74,6 +93,21 @@ describe("classifyTokenClassByPrefix", () => {
 });
 
 describe("stamp blockers and orphan classification", () => {
+  it.each([
+    [CLEAN_SHA, "PASS"],
+    ["cccccccccccccccccccccccccccccccccccccccc", "FAIL"],
+  ])("checks stamped identity against measured checkout %s", (checkoutCommit, verdict) => {
+    const report = buildPublishVerificationReport({
+      stamp: cleanStamp(),
+      checkoutCommit,
+      committedTokenClass: "test_",
+      effectiveTokenClass: "test_",
+    });
+    expect(report.verdict).toBe(verdict);
+    expect(report.checkoutCommit).toBe(checkoutCommit);
+    expect(report.blockers).toEqual(verdict === "FAIL" ? ["commit_mismatch"] : []);
+  });
+
   it("passes a clean stamp with a real ref and 40-char SHA", () => {
     const stamp = cleanStamp();
     expect(collectStampBlockers(stamp)).toEqual([]);
@@ -283,6 +317,32 @@ describe("token class compare + report assembly", () => {
 });
 
 describe("parseGitPorcelainPaths", () => {
+  it("prints only redacted dirty paths for the CI diagnostic command", () => {
+    const { root } = makeCheckoutFixture();
+    writeFileSync(join(root, `${FIXTURE_TEST_TOKEN}.txt`), "fixture only\n");
+    const result = spawnSync(
+      process.execPath,
+      [resolve(process.cwd(), "scripts/verify-publish-provenance.mjs"), "--print-safe-dirty-paths"],
+      { cwd: root, encoding: "utf8" },
+    );
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual(["[redacted]"]);
+    expect(result.stdout).not.toContain(FIXTURE_TEST_TOKEN);
+    expect(result.stderr).toBe("");
+  });
+
+  it("redacts token-shaped path metadata without replacing the dirty blocker", () => {
+    const report = buildPublishVerificationReport({
+      stamp: cleanStamp({ dirty: true }),
+      committedTokenClass: "test_",
+      effectiveTokenClass: "test_",
+      dirtyPaths: [`src/${FIXTURE_TEST_TOKEN}.ts`],
+    });
+    expect(report.blockers).toEqual(["stamp_dirty"]);
+    expect(report.dirtyPaths).toEqual(["[redacted]"]);
+    expect(reportJsonLeaksTokenPayload(JSON.stringify(report))).toBe(false);
+  });
+
   it("extracts path names only from porcelain status", () => {
     expect(
       parseGitPorcelainPaths(" M .env.production\n?? vite.config.ts.timestamp-1.mjs\n"),
@@ -299,6 +359,91 @@ describe("parseGitPorcelainPaths", () => {
 });
 
 describe("runPublishVerification (injected I/O)", () => {
+  it.each(["test_publish", "live_feature", "feature/test_publish"])(
+    "accepts ordinary ref %s without publishing token-shaped metadata",
+    async (ref) => {
+      const root = mkdtempSync(join(tmpdir(), "verdant-publish-ref-"));
+      temporaryRoots.push(root);
+      const reportPath = resolve(root, "artifacts/publish-verification.json");
+      const logs: string[] = [];
+      const { exitCode, report } = await runPublishVerification({
+        rootDir: root,
+        reportPath,
+        readStamp: () => cleanStamp({ ref }),
+        resolveCommitted: async () => "test_",
+        resolveEffective: async () => "test_",
+        logger: {
+          log: (line: string) => logs.push(line),
+          error: (line: string) => logs.push(line),
+        },
+      });
+      expect(exitCode).toBe(0);
+      expect(report.verdict).toBe("PASS");
+      expect(report.ref).toBe("[redacted]");
+      expect(logs).toEqual(["[publish-verify] PASS"]);
+      expect(reportJsonLeaksTokenPayload(readFileSync(reportPath, "utf8"))).toBe(false);
+    },
+  );
+
+  it("rejects a stale stamped SHA even when GITHUB_SHA repeats it", async () => {
+    const { root, head } = makeCheckoutFixture();
+    const hadGithubSha = Object.hasOwn(process.env, "GITHUB_SHA");
+    const previousGithubSha = process.env.GITHUB_SHA;
+    process.env.GITHUB_SHA = CLEAN_SHA;
+    try {
+      const { exitCode, report } = await runPublishVerification({
+        rootDir: root,
+        readStamp: () => cleanStamp(),
+        resolveCommitted: async () => "test_",
+        resolveEffective: async () => "test_",
+        logger: { log: () => undefined, error: () => undefined },
+      });
+      expect(exitCode).toBe(1);
+      expect(report.blockers).toEqual(["commit_mismatch"]);
+      expect(report.commit).toBe(CLEAN_SHA);
+      expect(report.checkoutCommit).toBe(head);
+    } finally {
+      if (hadGithubSha) process.env.GITHUB_SHA = previousGithubSha;
+      else delete process.env.GITHUB_SHA;
+    }
+  });
+
+  it("accepts a stamp matching the independently measured checkout", async () => {
+    const { root, head } = makeCheckoutFixture();
+    const { exitCode, report } = await runPublishVerification({
+      rootDir: root,
+      readStamp: () => cleanStamp({ commit: head, shortCommit: head.slice(0, 12) }),
+      resolveCommitted: async () => "test_",
+      resolveEffective: async () => "test_",
+      logger: { log: () => undefined, error: () => undefined },
+    });
+    expect(exitCode).toBe(0);
+    expect(report.checkoutCommit).toBe(head);
+  });
+
+  it("replaces an unsafe report without copying its detected payload", async () => {
+    const root = mkdtempSync(join(tmpdir(), "verdant-publish-unsafe-"));
+    temporaryRoots.push(root);
+    const reportPath = resolve(root, "artifacts/publish-verification.json");
+    const logs: string[] = [];
+    const { exitCode, report } = await runPublishVerification({
+      rootDir: root,
+      reportPath,
+      readStamp: () => cleanStamp({ shortCommit: FIXTURE_LIVE_TOKEN }),
+      resolveCommitted: async () => "test_",
+      resolveEffective: async () => "test_",
+      logger: { log: (line: string) => logs.push(line), error: (line: string) => logs.push(line) },
+    });
+    expect(exitCode).toBe(1);
+    expect(report.blockers).toEqual(["report_unsafe"]);
+    const written = readFileSync(reportPath, "utf8");
+    expect(written).not.toContain(FIXTURE_LIVE_TOKEN);
+    expect(JSON.stringify(report)).not.toContain(FIXTURE_LIVE_TOKEN);
+    expect(JSON.stringify(logs)).not.toContain(FIXTURE_LIVE_TOKEN);
+    expect(reportJsonLeaksTokenPayload(written)).toBe(false);
+    expect(logs).toEqual(["[publish-verify] FAIL report_unsafe"]);
+  });
+
   it("writes artifacts/publish-verification.json and exits 0 on a clean stamp", async () => {
     const root = mkdtempSync(join(tmpdir(), "verdant-publish-verify-"));
     temporaryRoots.push(root);
@@ -416,11 +561,20 @@ describe("package.json wiring", () => {
     expect(buildAt).toBeGreaterThan(restoreAt);
     expect(uploadAt).toBeGreaterThan(buildAt);
     expect(workflow.includes("git restore --source=HEAD --worktree --staged -- .")).toBe(true);
+    expect(workflow).toContain(
+      "node scripts/verify-publish-provenance.mjs --print-safe-dirty-paths",
+    );
+    expect(workflow).not.toContain("git status --porcelain --untracked-files=all || true");
     expect(workflow.includes("path: artifacts/publish-verification.json")).toBe(true);
   });
 });
 
 describe("resolveCommittedTokenClass (HEAD blob, not working tree)", () => {
+  it("reports unavailable when the committed environment cannot be read", async () => {
+    const { root } = makeCheckoutFixture();
+    expect(await resolveCommittedTokenClass(root)).toBe("unavailable");
+  });
+
   it("reports the committed class when the working tree is mutated to the other class", async () => {
     const root = mkdtempSync(join(tmpdir(), "verdant-publish-verify-git-"));
     temporaryRoots.push(root);

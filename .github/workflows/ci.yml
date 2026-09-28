@@ -544,7 +544,7 @@ jobs:
       - name: Restore clean worktree before production stamp
         run: |
           echo "::group::worktree before restore"
-          git status --porcelain --untracked-files=all || true
+          node scripts/verify-publish-provenance.mjs --print-safe-dirty-paths
           echo "::endgroup::"
           git restore --source=HEAD --worktree --staged -- .
           git clean -fd \

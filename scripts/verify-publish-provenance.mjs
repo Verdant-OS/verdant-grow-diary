@@ -6,7 +6,8 @@
  * stamp-version must stay fail-open for provenance (degrade, don't die).
  * This script is the separate fail-closed gate:
  *
- *   FAIL when stamped dirty, ref is __orphan__, or commit is unknown/none.
+ *   FAIL when stamped dirty, ref is __orphan__, commit is unknown/none, or
+ *   a measured checkout HEAD disagrees with the stamp.
  *   Token CLASS mismatch is reported only (never a new build blocker here —
  *   assert-paddle-production-sandbox.mjs owns production token acceptance).
  *
@@ -27,6 +28,7 @@ import { resolveCanonicalPaddleProductionToken } from "./e2e/managed-session-mat
 const TOKEN_NAME = "VITE_PAYMENTS_CLIENT_TOKEN";
 const MAX_ENV_BYTES = 64 * 1024;
 const COMMIT_SHA_RE = /^[0-9a-f]{40}$/;
+const TOKEN_PAYLOAD_RE = /(?:test_|live_)[A-Za-z0-9_-]+/;
 
 /** Canonical token-class labels for the downloadable report. */
 export const PUBLISH_TOKEN_CLASSES = Object.freeze(["test_", "live_", "unavailable", "missing"]);
@@ -37,6 +39,8 @@ export const PUBLISH_BLOCKER_CODES = Object.freeze([
   "stamp_orphan",
   "commit_unknown",
   "stamp_missing",
+  "commit_mismatch",
+  "report_unsafe",
 ]);
 
 /** Fixed mismatch codes (reported; not automatic blockers in this gate). */
@@ -83,9 +87,10 @@ export function isOrphanStamp(stamp) {
  * Collect fixed blocker codes from a stamped version record.
  *
  * @param {Record<string, unknown> | null | undefined} stamp
+ * @param {string | null} [checkoutCommit]
  * @returns {string[]}
  */
-export function collectStampBlockers(stamp) {
+export function collectStampBlockers(stamp, checkoutCommit = null) {
   if (!stamp || typeof stamp !== "object") {
     return ["stamp_missing"];
   }
@@ -103,6 +108,15 @@ export function collectStampBlockers(stamp) {
     !COMMIT_SHA_RE.test(stamp.commit)
   ) {
     blockers.push("commit_unknown");
+  }
+  if (
+    typeof checkoutCommit === "string" &&
+    COMMIT_SHA_RE.test(checkoutCommit) &&
+    typeof stamp.commit === "string" &&
+    COMMIT_SHA_RE.test(stamp.commit) &&
+    stamp.commit !== checkoutCommit
+  ) {
+    blockers.push("commit_mismatch");
   }
   return blockers;
 }
@@ -148,11 +162,15 @@ function stripPorcelainPathQuotes(rawPath) {
   return trimmed;
 }
 
+function redactTokenShapedMetadata(value) {
+  return TOKEN_PAYLOAD_RE.test(value) ? "[redacted]" : value;
+}
+
 function sanitizeDirtyPath(rawPath) {
   if (typeof rawPath !== "string") return "";
   const withoutControls = rawPath.replace(/[\u0000-\u001f\u007f]/gu, "").trim();
   if (withoutControls.length === 0) return "";
-  return withoutControls.slice(0, MAX_DIRTY_PATH_CHARS);
+  return redactTokenShapedMetadata(withoutControls.slice(0, MAX_DIRTY_PATH_CHARS));
 }
 
 /**
@@ -221,6 +239,7 @@ export function sanitizeDirtyPathList(dirtyPaths) {
  *   effectiveTokenClass: string,
  *   generatedAt?: string,
  *   dirtyPaths?: string[],
+ *   checkoutCommit?: string | null,
  * }} input
  */
 export function buildPublishVerificationReport({
@@ -229,8 +248,13 @@ export function buildPublishVerificationReport({
   effectiveTokenClass,
   generatedAt = new Date().toISOString(),
   dirtyPaths = [],
+  checkoutCommit = null,
 }) {
-  const blockers = collectStampBlockers(stamp);
+  const measuredCheckoutCommit =
+    typeof checkoutCommit === "string" && COMMIT_SHA_RE.test(checkoutCommit)
+      ? checkoutCommit
+      : null;
+  const blockers = collectStampBlockers(stamp, measuredCheckoutCommit);
   const tokenCompare = compareTokenClasses(committedTokenClass, effectiveTokenClass);
   const verdict = decidePublishVerdict(blockers);
   const orphan = isOrphanStamp(stamp);
@@ -245,7 +269,11 @@ export function buildPublishVerificationReport({
       : commit !== "unknown" && COMMIT_SHA_RE.test(commit)
         ? commit.slice(0, 12)
         : "unknown";
-  const ref = stamp && typeof stamp.ref === "string" ? stamp.ref : "unknown";
+  // Refs and path names may contain ordinary token-prefix words. Redact that
+  // metadata before scanning the report instead of rejecting a valid build.
+  const ref = redactTokenShapedMetadata(
+    stamp && typeof stamp.ref === "string" ? stamp.ref : "unknown",
+  );
   const dirty = stamp && typeof stamp.dirty === "boolean" ? stamp.dirty : true;
   // Prefer the stamped field. Legacy public/version.json may omit it; do not
   // invent commitSource:"none" when a 40-char commit is already present.
@@ -268,6 +296,7 @@ export function buildPublishVerificationReport({
     schema: "verdant.publish-verification.v1",
     tokenClassVocabulary: [...PUBLISH_TOKEN_CLASSES],
     commit,
+    checkoutCommit: measuredCheckoutCommit,
     shortCommit,
     ref,
     dirty,
@@ -313,7 +342,22 @@ export function reportJsonLeaksTokenPayload(serialized) {
   if (typeof serialized !== "string") return true;
   // Class labels alone ("test_" / "live_") are allowed; anything with a
   // non-empty payload after the prefix is a leak.
-  return /(?:test_|live_)[A-Za-z0-9_-]+/.test(serialized);
+  return TOKEN_PAYLOAD_RE.test(serialized);
+}
+
+/** Resolve HEAD independently of the stamp and GITHUB_SHA; never log git stderr. */
+export function resolveCheckoutCommit(rootDir = process.cwd()) {
+  try {
+    const commit = execSync("git rev-parse --verify HEAD", {
+      cwd: rootDir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: MAX_ENV_BYTES,
+    }).trim();
+    return COMMIT_SHA_RE.test(commit) ? commit : null;
+  } catch {
+    return null;
+  }
 }
 
 function readStampFile(versionPath) {
@@ -383,7 +427,7 @@ function tokenClassFromEnvText(envText) {
  */
 export async function resolveCommittedTokenClass(rootDir = process.cwd()) {
   const raw = readCommittedProductionEnvText(rootDir);
-  if (!raw.ok) return "missing";
+  if (!raw.ok) return "unavailable";
   return tokenClassFromEnvText(raw.text);
 }
 
@@ -465,6 +509,7 @@ export async function resolveEffectiveTokenClass(rootDir = process.cwd()) {
  *   readStamp?: (path: string) => Record<string, unknown> | null,
  *   resolveCommitted?: (root: string) => Promise<string>,
  *   resolveEffective?: (root: string) => Promise<string>,
+ *   resolveCheckout?: (root: string) => string | null,
  *   now?: () => string,
  *   logger?: { log: Function, error: Function },
  * }} [options]
@@ -477,10 +522,12 @@ export async function runPublishVerification({
   readStamp = readStampFile,
   resolveCommitted = resolveCommittedTokenClass,
   resolveEffective = resolveEffectiveTokenClass,
+  resolveCheckout = resolveCheckoutCommit,
   now = () => new Date().toISOString(),
   logger = console,
 } = {}) {
   const stamp = readStamp(versionPath);
+  const checkoutCommit = resolveCheckout(rootDir);
   const committedTokenClass = await resolveCommitted(rootDir);
   const effectiveTokenClass = await resolveEffective(rootDir);
   const dirtyPaths = readMeaningfulDirtyPaths(rootDir);
@@ -491,17 +538,25 @@ export async function runPublishVerification({
     effectiveTokenClass,
     generatedAt: now(),
     dirtyPaths,
+    checkoutCommit,
   });
 
   const serialized = `${JSON.stringify(report, null, 2)}\n`;
   if (reportJsonLeaksTokenPayload(serialized)) {
     // Refuse to write a leaking report; fail closed with fixed codes only.
     const safeFail = {
-      ...report,
-      verdict: "FAIL",
-      blockers: [...new Set([...report.blockers, "stamp_missing"])],
+      ...buildPublishVerificationReport({
+        stamp: null,
+        committedTokenClass: "unavailable",
+        effectiveTokenClass: "unavailable",
+        generatedAt: "unavailable",
+      }),
+      blockers: ["report_unsafe"],
     };
     const safeSerialized = `${JSON.stringify(safeFail, null, 2)}\n`;
+    if (reportJsonLeaksTokenPayload(safeSerialized)) {
+      throw new Error("publish_verification_report_unsafe");
+    }
     mkdirSync(dirname(reportPath), { recursive: true });
     writeFileSync(reportPath, safeSerialized, "utf8");
     logger.error(formatPublishVerificationSummary(safeFail));
@@ -519,6 +574,10 @@ export async function runPublishVerification({
 }
 
 async function main() {
+  if (process.argv[2] === "--print-safe-dirty-paths") {
+    console.log(JSON.stringify(readMeaningfulDirtyPaths(process.cwd())));
+    return;
+  }
   const { exitCode } = await runPublishVerification();
   process.exitCode = exitCode;
 }

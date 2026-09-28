@@ -65,6 +65,33 @@ registered writers are:
 - `apply-plants-health-unassessed-default.yml`
 - `apply-linked-quicklog-diary-client-write-fence.yml`
 
+## Mandatory compatible-client delivery gate
+
+Missing or unverified client delivery is **BLOCKED** for APPLY. The founder
+must record a compatible-client receipt before authorizing the SQL fence.
+The receipt must identify the actual live client bundle, its exact SHA,
+measurement time, and reviewed #1741 frontend ancestry or equivalent reviewed
+fix. A merged PR, green CI, or a `version.json` SHA alone is not client
+acceptance. Publishing requires its own founder authorization.
+
+Include SHA-locked disposable browser/regression evidence that the delivered
+client handles rejected linked-row writes and zero affected rows honestly:
+delete must not report "Log removed" when nothing was deleted, edit must
+offer the canonical correction path, and a refused photo attachment must
+retain its pending checkpoint for safe recovery. Keep this fixture evidence
+separate from the measured live bundle identity; do not label a mocked
+failure as a production result. An old client that checks only the DELETE
+error can report false success after this migration silently affects zero
+rows, so deploying SQL first is unsafe.
+
+The workflow does not verify frontend deployment or browser behavior.
+Its protected approval must therefore reference the founder-reviewed
+compatible-client receipt as well as the exact PREFLIGHT receipt. Missing,
+stale, or contradicted evidence stops APPLY. Recheck the client identity
+immediately before dispatch. Read-only PREFLIGHT can precede client delivery;
+SQL APPLY cannot. After APPLY, separately verify live save/correct/retract
+and checkpoint recovery on an explicitly authorized disposable fixture.
+
 ## Dispatch sequence — founder only, after merge and independent review
 
 1. Confirm #1741 and this delivery lane have independent PASS reviews on
@@ -84,7 +111,8 @@ registered writers are:
    artifact SHA-256. Wait at least **15 minutes** and no more than **24 hours**,
    recheck the deploy SHA and active writers, and obtain the founder's explicit
    go/no-go for this exact target and receipt.
-5. Only after that authorization, dispatch **APPLY** from the same deploy SHA
+5. Recheck and record the mandatory compatible-client receipt above alongside
+   the PREFLIGHT receipt. Only after that authorization, dispatch **APPLY** from the same deploy SHA
    with `confirm_apply=APPLY LINKED QUICKLOG DIARY CLIENT WRITE FENCE`,
    the recorded `preflight_run_id`,
    `expected_preflight_run_attempt=1`,

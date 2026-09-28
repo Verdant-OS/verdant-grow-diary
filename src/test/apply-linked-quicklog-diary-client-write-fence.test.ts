@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { rootCertificates } from "node:tls";
+import { load as loadYaml } from "js-yaml";
 import { afterEach, describe, expect, it } from "vitest";
 import * as lane from "../../scripts/apply-linked-quicklog-diary-client-write-fence.mjs";
 import { PRODUCTION_SUPABASE_CA_FILENAME } from "../../scripts/lib/productionSupabaseTls.mjs";
@@ -209,8 +210,18 @@ describe("pinned linked Quick Log diary production delivery", () => {
 
   it("keeps the workflow founder-gated, exact-head, serialized and pinned", () => {
     const workflow = readFileSync(WORKFLOW, "utf8");
-    expect(workflow).toContain("environment: verdant-production-solo-founder");
-    expect(workflow).toContain("group: verdant-production-migration-writer");
+    const parsed = loadYaml(workflow) as {
+      on: Record<string, unknown>;
+      concurrency: { group: string; "cancel-in-progress": boolean; queue: string };
+      jobs: { apply: { environment: string } };
+    };
+    expect(Object.keys(parsed.on)).toEqual(["workflow_dispatch"]);
+    expect(parsed.jobs.apply.environment).toBe("verdant-production-solo-founder");
+    expect(parsed.concurrency).toEqual({
+      group: "verdant-production-migration-writer",
+      "cancel-in-progress": false,
+      queue: "max",
+    });
     expect(workflow).toContain("refs/heads/verdant-grow-diary");
     expect(workflow).toContain("EXPECTED_HEAD_SHA");
     expect(workflow).toContain("SOLO_FOUNDER_ACKNOWLEDGEMENT");
@@ -219,8 +230,23 @@ describe("pinned linked Quick Log diary production delivery", () => {
       "verify-linked-quicklog-diary-client-write-fence-preflight-artifact.mjs",
     );
     expect(workflow).toContain("node scripts/apply-linked-quicklog-diary-client-write-fence.mjs");
-    expect(workflow).toContain("cancel-in-progress: false");
     expect(readFileSync(VERIFIER, "utf8")).toContain("linked-quicklog-diary-client-write-fence");
+  });
+
+  it("requires a compatible live-client receipt before authorizing the SQL fence", () => {
+    const runbook = readFileSync(
+      resolve("docs/linked-quicklog-diary-client-write-fence-operator-runbook.md"),
+      "utf8",
+    );
+    const gate = runbook.indexOf("## Mandatory compatible-client delivery gate");
+    const apply = runbook.indexOf("Only after that authorization, dispatch **APPLY**");
+    expect(gate).toBeGreaterThan(-1);
+    expect(apply).toBeGreaterThan(gate);
+    expect(runbook).toContain("Missing or unverified client delivery is **BLOCKED**");
+    expect(runbook).toContain("zero affected rows");
+    expect(runbook).toContain("actual live client bundle");
+    expect(runbook).toContain("does not verify frontend deployment or browser behavior");
+    expect(runbook).toContain("compatible-client receipt");
   });
 
   it("refuses non-disposable database targets in the PG15 proof", () => {

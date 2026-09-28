@@ -156,6 +156,7 @@ import {
   QUICK_LOG_CLOSE_BLOCKED_HINT,
   buildQuickLogPostSaveMessage,
   buildQuickLogPostSaveDescription,
+  resolveQuickLogPostSaveTargetLabel,
   rotateQuickLogIdempotencyKey,
   shouldAllowQuickLogSave,
   shouldBlockQuickLogClose,
@@ -2037,8 +2038,8 @@ function QuickLogV2SheetForOwner({
     setPostSave({
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
       growId: confirmedScope.growId,
-      targetType: (confirmedScope.targetType ?? resolved.targetType) as "plant" | "tent",
-      targetId: (confirmedScope.targetId ?? resolved.targetId) as string,
+      targetType: confirmedScope.targetType,
+      targetId: confirmedScope.targetId,
       tentId: confirmedScope.tentId,
       action: submissionAction,
       message: buildQuickLogPostSaveMessage(submissionAction, photoAttached),
@@ -3004,10 +3005,7 @@ function QuickLogV2SheetForOwner({
                   data-testid="quick-log-post-save-description"
                 >
                   {buildQuickLogPostSaveDescription({
-                    targetName: resolvedTarget.ok
-                      ? (options.find((o) => `${o.type}:${o.id}` === form.selectedKey)?.label ??
-                        null)
-                      : null,
+                    targetName: resolveQuickLogPostSaveTargetLabel(postSave, options),
                     tentName: null,
                     growName:
                       postSave.growId && Array.isArray(grows)

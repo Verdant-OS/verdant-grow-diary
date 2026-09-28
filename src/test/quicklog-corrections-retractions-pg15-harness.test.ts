@@ -149,9 +149,14 @@ describe("Quick Log corrections/retractions PostgreSQL 15 runtime gate", () => {
         `raise exception 'existing harness role ${role} has unsafe attributes'`,
       );
     }
+    // Production's client roles are INHERIT and its service_role is BYPASSRLS.
+    expect(scaffold).toContain(
+      "create role service_role nologin nosuperuser nocreatedb nocreaterole inherit noreplication bypassrls",
+    );
+    expect(scaffold).not.toContain("noinherit");
     for (const boundedAttribute of [
       "not rolsuper",
-      "not rolinherit",
+      "rolinherit",
       "not rolcreaterole",
       "not rolcreatedb",
       "not rolcanlogin",

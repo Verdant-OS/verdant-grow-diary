@@ -33,10 +33,10 @@ import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityC
 const receipt = {
   data: {
     ok: true,
-    revision_id: "revision-a",
+    revision_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
     revision_no: 1,
-    grow_event_id: "event-a",
-    diary_entry_ids: ["diary-a"],
+    grow_event_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    diary_entry_ids: ["cccccccc-cccc-4ccc-8ccc-cccccccccccc"],
   },
   error: null,
 };
@@ -46,7 +46,7 @@ function mount() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const changed = vi.fn();
   const props = {
-    handle: { growEventId: "event-a" },
+    handle: { growEventId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
     currentNote: "Original",
     currentPlantId: "plant-a",
     onChanged: changed,
@@ -166,22 +166,34 @@ describe("revision confirmation recovery", () => {
     expect(mocks.success).not.toHaveBeenCalled();
   });
 
-  it.each(["thrown response", "malformed receipt"])(
-    "retains the key after a %s",
-    async (failure) => {
-      if (failure === "thrown response") mocks.rpc.mockRejectedValueOnce(new Error("Lost reply"));
-      else mocks.rpc.mockResolvedValueOnce({ data: { ok: true }, error: null });
-      mocks.rpc.mockResolvedValueOnce(receipt);
-      const view = mount();
-      correction();
-      await waitFor(() => expect(mocks.error).toHaveBeenCalled());
-      expect(mocks.error.mock.calls[0][0]).toMatch(/could not confirm/i);
-      const first = mocks.rpc.mock.calls[0][1];
-      fireEvent.click(screen.getByTestId("quicklog-correct-save"));
-      await waitFor(() => expect(view.changed).toHaveBeenCalledOnce());
-      expect(mocks.rpc.mock.calls[1][1]).toEqual(first);
-    },
-  );
+  it.each([
+    "thrown response",
+    "malformed receipt",
+    "invalid revision ID",
+    "invalid affected entry ID",
+  ])("retains the key after a %s", async (failure) => {
+    if (failure === "thrown response") mocks.rpc.mockRejectedValueOnce(new Error("Lost reply"));
+    else if (failure === "invalid revision ID") {
+      mocks.rpc.mockResolvedValueOnce({
+        data: { ...receipt.data, revision_id: "revision-a" },
+        error: null,
+      });
+    } else if (failure === "invalid affected entry ID") {
+      mocks.rpc.mockResolvedValueOnce({
+        data: { ...receipt.data, diary_entry_ids: ["diary-a"] },
+        error: null,
+      });
+    } else mocks.rpc.mockResolvedValueOnce({ data: { ok: true }, error: null });
+    mocks.rpc.mockResolvedValueOnce(receipt);
+    const view = mount();
+    correction();
+    await waitFor(() => expect(mocks.error).toHaveBeenCalled());
+    expect(mocks.error.mock.calls[0][0]).toMatch(/could not confirm/i);
+    const first = mocks.rpc.mock.calls[0][1];
+    fireEvent.click(screen.getByTestId("quicklog-correct-save"));
+    await waitFor(() => expect(view.changed).toHaveBeenCalledOnce());
+    expect(mocks.rpc.mock.calls[1][1]).toEqual(first);
+  });
 
   it("accepts a genuinely new correction with a new operation key", async () => {
     mocks.rpc.mockResolvedValue(receipt);

@@ -76,6 +76,8 @@ describe("Plant Detail blocked states", () => {
     expect(screen.getByRole("link", { name: /back to plants/i })).toBeInTheDocument();
     // Importantly, no implication of live data: data-source disclosure says no data.
     expect(screen.getByTestId("plant-detail-data-source-disclosure")).toBeInTheDocument();
+    // …scoped to this plant: one miss is not "the account has no plants".
+    expect(screen.queryByText(/No real plants yet/i)).not.toBeInTheDocument();
   });
 
   it("never shows the not-found state while loading or erroring", () => {

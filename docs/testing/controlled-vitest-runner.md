@@ -9,8 +9,9 @@ additional controlled command used for the full suite and the manual
 
 ## Guarantees
 
-- **`pool=forks`, `maxWorkers=8`, `minWorkers=2`** — matches the
-  Slice G.1j controlled command that ran the full suite green.
+- **`pool=forks`, `maxWorkers=8`** — compatible with the installed Vitest 4.
+  The v4 run record retains its historical `minWorkers=2` identity field for
+  fingerprint compatibility, but it is not passed to Vitest or enforced.
 - **Deterministic manifest** — same `src/**/*.{test,spec}.{ts,tsx}`
   include as `vitest.config.ts`, normalized to POSIX paths, sorted,
   duplicate-rejected, hashed.

@@ -1,4 +1,4 @@
-// Vitest 3.2.4-compatible reporter that emits append-only, structured
+// Vitest 4 reporter (with a legacy finish callback) that emits append-only, structured
 // JSONL events. Each completed test module is flushed as an independent
 // line so an interrupted batch never claims uncompleted work as green.
 //
@@ -321,10 +321,22 @@ export default class VerdantControlledReporter {
     }
   }
 
+  onTestRunEnd(testModules, errors) {
+    this._finish(testModules, errors, "onTestRunEnd");
+  }
+
   onFinished(files, errors) {
+    this._finish(files, errors, "onFinished");
+  }
+
+  _finish(files, errors, callback) {
+    // Vitest 4 calls onTestRunEnd. Keep the legacy callback for older receipts
+    // and tools, but never count the same batch twice if both hooks are called.
+    if (this._finished) return;
+    this._finished = true;
     for (const f of files || []) {
       try {
-        this._flushFile(f, "onFinished");
+        this._flushFile(f, callback);
       } catch (err) {
         console.error("[verdant-controlled-reporter] finish flush error:", err?.message ?? err);
       }

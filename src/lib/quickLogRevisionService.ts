@@ -149,7 +149,7 @@ export function decodeQuickLogRevisionDatabaseRows(
   return { ok: true, rows };
 }
 
-function parseRpcResult(data: unknown): QuickLogRevisionWriteResult {
+function parseRpcResult(data: unknown, handle: QuickLogEntryHandle): QuickLogRevisionWriteResult {
   if (!isRecord(data)) {
     return { ok: false, reason: "rpc_error" };
   }
@@ -171,13 +171,20 @@ function parseRpcResult(data: unknown): QuickLogRevisionWriteResult {
   ) {
     return { ok: false, reason: "rpc_error" };
   }
-  return {
+  const result: Extract<QuickLogRevisionWriteResult, { ok: true }> = {
     ok: true,
     revisionId: data.revision_id,
     revisionNo: data.revision_no,
     growEventId: data.grow_event_id,
     diaryEntryIds: data.diary_entry_ids,
   };
+  if (handle.growEventId && result.growEventId !== handle.growEventId) {
+    return { ok: false, reason: "rpc_error" };
+  }
+  if (handle.diaryEntryId && !result.diaryEntryIds.includes(handle.diaryEntryId)) {
+    return { ok: false, reason: "rpc_error" };
+  }
+  return result;
 }
 
 function rpcErrorReason(error: { code?: string | null }): string {
@@ -207,7 +214,7 @@ export async function retractQuickLogEntry(
   try {
     const { data, error } = await supabase.rpc(QUICKLOG_RETRACT_RPC, args);
     if (error) return { ok: false, reason: rpcErrorReason(error) };
-    return parseRpcResult(data);
+    return parseRpcResult(data, handle);
   } catch {
     return { ok: false, reason: "rpc_error" };
   }
@@ -237,7 +244,7 @@ export async function correctQuickLogEntry(
   try {
     const { data, error } = await supabase.rpc(QUICKLOG_CORRECT_RPC, args);
     if (error) return { ok: false, reason: rpcErrorReason(error) };
-    return parseRpcResult(data);
+    return parseRpcResult(data, handle);
   } catch {
     return { ok: false, reason: "rpc_error" };
   }

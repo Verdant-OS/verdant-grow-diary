@@ -413,7 +413,10 @@ export async function runManualReuseLockHarness({
     });
     let rejected = false;
     try {
-      executeSql(forward, env, { stage: "manual_reapply_control", spawnImpl });
+      executeSql(`\\set VERBOSITY sqlstate\n${forward}`, env, {
+        stage: "manual_reapply_control",
+        spawnImpl,
+      });
     } catch (error) {
       rejected = error instanceof Error && error.message.endsWith(":P0001");
     }

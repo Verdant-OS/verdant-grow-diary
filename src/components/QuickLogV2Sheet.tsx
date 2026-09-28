@@ -57,7 +57,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
-import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
+import { useQuickLogV2Save, type QuickLogV2SaveResult } from "@/hooks/useQuickLogV2Save";
 
 import {
   buildQuickLogV2TargetOptions,
@@ -1861,9 +1861,15 @@ function QuickLogV2SheetForOwner({
           ? "The saved note could not be confirmed. Retry to check the original submission."
           : reason === "receipt_mismatch"
             ? "The saved note differs from this submission. It has not been confirmed; check its Timeline before making another entry."
-            : reason === "save_failed"
-              ? QUICK_LOG_SAVE_FAILED_MESSAGE
-              : reasonToMessage(reason),
+            : reason === "receipt_target_moved"
+              ? buildReceiptTargetMovedMessage(res, {
+                  grows: Array.isArray(grows) ? grows : [],
+                  tents,
+                  plants,
+                })
+              : reason === "save_failed"
+                ? QUICK_LOG_SAVE_FAILED_MESSAGE
+                : reasonToMessage(reason),
       );
       setSaveStatus("");
       return;
@@ -3139,6 +3145,42 @@ function getSaveHelperMessage(input: {
   if (input.volumeMissing) return "Watering logs need a volume before they can save.";
   if (input.criticalContentMissing) return QUICK_LOG_V2_EMPTY_CONTENT_HELPER;
   return "Ready to save when this log matches what happened.";
+}
+
+type QuickLogNamedRecord = { id?: string | null; name?: string | null };
+
+function findQuickLogRecordName(
+  records: ReadonlyArray<QuickLogNamedRecord>,
+  id: string | null | undefined,
+): string | null {
+  if (typeof id !== "string" || id.trim().length === 0) return null;
+  const name = records.find((record) => record?.id === id)?.name;
+  return typeof name === "string" && name.trim().length > 0 ? name.trim() : null;
+}
+
+function buildReceiptTargetMovedMessage(
+  receipt: Pick<QuickLogV2SaveResult, "persistedGrowId" | "persistedTentId" | "persistedPlantId">,
+  lookup: {
+    grows: ReadonlyArray<QuickLogNamedRecord>;
+    tents: ReadonlyArray<QuickLogNamedRecord>;
+    plants: ReadonlyArray<QuickLogNamedRecord>;
+  },
+): string {
+  const parts = [
+    receipt.persistedGrowId
+      ? `Grow: ${findQuickLogRecordName(lookup.grows, receipt.persistedGrowId) ?? "Saved grow"}`
+      : null,
+    receipt.persistedTentId
+      ? `Tent: ${findQuickLogRecordName(lookup.tents, receipt.persistedTentId) ?? "Saved tent"}`
+      : null,
+    receipt.persistedPlantId
+      ? `Plant: ${findQuickLogRecordName(lookup.plants, receipt.persistedPlantId) ?? "Saved plant"}`
+      : null,
+  ].filter((part): part is string => Boolean(part));
+
+  return parts.length > 0
+    ? `The saved entry target differs from this submission. Saved target: ${parts.join(" · ")}. It has not been confirmed; check its Timeline before making another entry.`
+    : "The saved entry target differs from this submission. It has not been confirmed; check its Timeline before making another entry.";
 }
 
 function reasonToMessage(reason: string): string {

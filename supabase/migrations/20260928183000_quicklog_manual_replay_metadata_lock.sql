@@ -432,6 +432,19 @@ BEGIN
 END;
 $function$;
 
+REVOKE ALL ON FUNCTION public.quicklog_save_manual(
+  text, uuid, text, numeric, text, numeric, numeric, numeric,
+  timestamptz, jsonb, text, text
+) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.quicklog_save_manual(
+  text, uuid, text, numeric, text, numeric, numeric, numeric,
+  timestamptz, jsonb, text, text
+) FROM anon;
+GRANT EXECUTE ON FUNCTION public.quicklog_save_manual(
+  text, uuid, text, numeric, text, numeric, numeric, numeric,
+  timestamptz, jsonb, text, text
+) TO authenticated, service_role;
+
 DO $manual_metadata_lock_postcondition$
 DECLARE
   v_wrapper_oid oid := pg_catalog.to_regprocedure('public.quicklog_save_manual(text, uuid, text, numeric, text, numeric, numeric, numeric, timestamp with time zone, jsonb, text, text)');

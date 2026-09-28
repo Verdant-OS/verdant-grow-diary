@@ -154,6 +154,24 @@ beforeEach(() => {
   mocks.toastWarning.mockReset();
 });
 
+describe("AssignTentDialog move label", () => {
+  it("names the plant's tent as where it is moving from, never 'Previous Tent'", () => {
+    renderDialog();
+    expect(screen.getByTestId("assign-tent-previous-tent")).toHaveTextContent(
+      "Moving from: Current Tent",
+    );
+    expect(screen.queryByText(/Previous Tent/)).not.toBeInTheDocument();
+  });
+
+  it("QA repro: reopened after a move, it names the new tent as the one being left", () => {
+    render(<AssignTentDialog plantId="plant-1" growId="grow-1" currentTentId="tent-next" />);
+    expect(screen.getByTestId("assign-tent-previous-tent")).toHaveTextContent(
+      "Moving from: Next Tent",
+    );
+    expect(screen.queryByText(/Previous Tent/)).not.toBeInTheDocument();
+  });
+});
+
 describe("AssignTentDialog write outcomes", () => {
   it("reports full success only after assignment and timeline evidence both save", async () => {
     renderDialog();

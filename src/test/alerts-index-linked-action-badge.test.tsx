@@ -70,6 +70,10 @@ const insertSpy = vi.fn();
 const updateSpy = vi.fn();
 const deleteSpy = vi.fn();
 
+// The Alerts page reads plant stages for alert stage resolution (BUG-006).
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({ data: [], isError: false }),
+}));
 vi.mock("@/integrations/supabase/client", () => {
   const makeChain = (rows: unknown[]) => {
     const chain: Record<string, unknown> = {

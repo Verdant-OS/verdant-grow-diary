@@ -34,7 +34,8 @@ CI never receives `CURSOR_API_KEY` and never calls the Cursor API.
 
 ## Manual live proof (optional, separately authorized)
 
-Requires Node.js 22.13+, a `CURSOR_API_KEY` in the process environment (never
+Requires Node.js `^22.13.0 || >=24.0.0` (the package's `engines` range; Vitest 4
+does not support Node 23), a `CURSOR_API_KEY` in the process environment (never
 written to disk), and an explicit flag:
 
 ```bash

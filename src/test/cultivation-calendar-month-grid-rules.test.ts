@@ -244,6 +244,81 @@ describe("buildCultivationCalendarMonthGrid", () => {
     );
   });
 
+  it("paints a derived flower stage band without promoting it to logged facts or reviews", () => {
+    const grid = buildCultivationCalendarMonthGrid({
+      monthKey: "2026-03",
+      loggedGroups: [
+        {
+          dateKey: "2026-03-02",
+          events: [{ id: "water-1", kind: "watering", label: "Watering logged" }],
+        },
+      ],
+      projectedReviews: [
+        review({ id: "review-watering", scheduledAt: "2026-03-04T08:00:00.000Z" }),
+      ],
+      stageBandDateKeys: ["2026-03-02", "2026-03-03", "not-a-day", "2026-03-04"],
+    });
+
+    const inBand = grid.days.filter((day) => day.hasStageBand).map((day) => day.dateKey);
+    expect(inBand).toEqual(["2026-03-02", "2026-03-03", "2026-03-04"]);
+    expect(
+      grid.days.every((day) =>
+        day.hasStageBand ? day.stageBandPaletteKey === "flower" : day.stageBandPaletteKey === null,
+      ),
+    ).toBe(true);
+
+    const flipDay = cellFor(
+      {
+        monthKey: "2026-03",
+        loggedGroups: [
+          {
+            dateKey: "2026-03-02",
+            events: [{ id: "water-1", kind: "watering", label: "Watering logged" }],
+          },
+        ],
+        projectedReviews: [
+          review({ id: "review-watering", scheduledAt: "2026-03-04T08:00:00.000Z" }),
+        ],
+        stageBandDateKeys: ["2026-03-02", "2026-03-03", "2026-03-04"],
+      },
+      "2026-03-02",
+    );
+    expect(flipDay.hasStageBand).toBe(true);
+    expect(flipDay.hasLoggedFacts).toBe(true);
+    expect(flipDay.loggedFacts).toEqual([
+      { id: "water-1", kind: "watering", label: "Watering logged" },
+    ]);
+    expect(flipDay.hasAdvisoryReviews).toBe(false);
+
+    const reviewDay = cellFor(
+      {
+        monthKey: "2026-03",
+        loggedGroups: [],
+        projectedReviews: [
+          review({ id: "review-watering", scheduledAt: "2026-03-04T08:00:00.000Z" }),
+        ],
+        stageBandDateKeys: ["2026-03-02", "2026-03-03", "2026-03-04"],
+      },
+      "2026-03-04",
+    );
+    expect(reviewDay.hasStageBand).toBe(true);
+    expect(reviewDay.hasLoggedFacts).toBe(false);
+    expect(reviewDay.hasAdvisoryReviews).toBe(true);
+    expect(reviewDay.advisoryReviews[0]?.id).toBe("review-watering");
+
+    const outside = cellFor(
+      {
+        monthKey: "2026-03",
+        loggedGroups: [],
+        projectedReviews: [],
+        stageBandDateKeys: ["2026-03-02"],
+      },
+      "2026-03-01",
+    );
+    expect(outside.hasStageBand).toBe(false);
+    expect(outside.stageBandPaletteKey).toBeNull();
+  });
+
   it("keeps grower-facing suggestion copy advisory rather than due or action language", () => {
     const cell = cellFor(
       {

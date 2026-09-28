@@ -676,6 +676,21 @@ function metricFieldMatches(metric: MetricKey, field: string): boolean {
   return METRIC_ALIASES[metric].some((alias) => new RegExp(`\\b${alias}\\b`, "i").test(normalized));
 }
 
+/**
+ * A snapshot reading's value as this check would read it for `metric`: the
+ * field names the metric by any alias ("rh", "air_temp", "VPD") and the unit
+ * is one it knows, converted to the canonical unit (°C, %, kPa). Otherwise
+ * null. Stage-target grading reads readings the same way, so every reading
+ * that can back an environment claim is also graded (Codex review on #1683).
+ */
+export function canonicalSnapshotReadingValue(
+  metric: "temperature" | "humidity" | "vpd",
+  reading: { readonly field: string; readonly value: number; readonly unit?: string },
+): number | null {
+  if (!metricFieldMatches(metric, reading.field)) return null;
+  return toCanonicalMetricValue(metric, reading.value, reading.unit)?.value ?? null;
+}
+
 function trustworthySnapshotValuesForMetric(
   packet: AiDoctorReviewRequestPacket,
   metric: MetricKey,

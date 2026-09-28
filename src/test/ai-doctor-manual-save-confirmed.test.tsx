@@ -35,7 +35,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+vi.spyOn(globalThis, "fetch").mockImplementation((() => {
   throw new Error("fetch not allowed");
 }) as never);
 

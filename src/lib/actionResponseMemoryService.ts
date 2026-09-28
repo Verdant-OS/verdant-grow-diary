@@ -13,12 +13,13 @@
  * Query shape is CONSTANT (no per-card N+1):
  *   1. one bounded diary_entries read (grow-scoped, optionally plant-scoped);
  *   2. one batched action_queue read for the referenced action ids;
- *   3. at most one batched sensor_readings read for referenced snapshot ids.
+ *   3. at most one batched effective sensor read for referenced snapshot ids.
  * All joins/validation/dedup happen in the pure rules module.
  */
 
 import { supabase as defaultSupabase } from "@/integrations/supabase/client";
 import { ACTION_FOLLOWUP_EVENT_TYPE } from "@/lib/actionFollowupRules";
+import { requireEffectiveSensorReadings } from "@/lib/effectiveSensorReadingRules";
 import {
   buildActionResponseMemories,
   collectActionResponseCandidateRows,
@@ -70,9 +71,9 @@ export async function loadActionResponseMemories(
       .limit(RESPONSE_ROW_LIMIT);
     if (args.plantId) diaryQuery = diaryQuery.eq("plant_id", args.plantId);
     const { data: diaryData, error: diaryError } = await diaryQuery;
-    if (diaryError) return FAILED;
+    if (diaryError || !Array.isArray(diaryData)) return FAILED;
 
-    const rows = (diaryData ?? []) as unknown as ActionResponseDiaryRowInput[];
+    const rows = diaryData as unknown as ActionResponseDiaryRowInput[];
     const candidates = collectActionResponseCandidateRows(rows);
     if (candidates.length === 0) return { status: "ok", memories: [] };
 
@@ -88,8 +89,8 @@ export async function loadActionResponseMemories(
       .from("action_queue")
       .select("id,grow_id,tent_id,plant_id,status,suggested_change,completed_at")
       .in("id", actionIds);
-    if (actionError) return FAILED;
-    const actions = (actionData ?? []) as unknown as ActionResponseActionRowInput[];
+    if (actionError || !Array.isArray(actionData)) return FAILED;
+    const actions = actionData as unknown as ActionResponseActionRowInput[];
 
     // 3) At most one batched sensor lookup for referenced snapshot ids.
     //    Selection lists explicit columns only. raw_payload reaches the pure
@@ -105,13 +106,18 @@ export async function loadActionResponseMemories(
     ].slice(0, RESPONSE_SENSOR_BATCH_LIMIT);
     let sensorRows: ActionResponseSensorRowInput[] | undefined = [];
     if (snapshotIds.length > 0) {
-      const { data: sensorData, error: sensorError } = await client
-        .from("sensor_readings")
-        .select("id,tent_id,source,captured_at,raw_payload")
-        .in("id", snapshotIds);
-      sensorRows = sensorError
-        ? undefined
-        : ((sensorData ?? []) as unknown as ActionResponseSensorRowInput[]);
+      try {
+        const { data: sensorData, error: sensorError } = await client
+          .from("sensor_readings_effective" as "sensor_readings")
+          .select(
+            "id,user_id,tent_id,metric,value,quality,source,ts,captured_at,created_at,device_id,raw_payload,correction_valid",
+          )
+          .in("id", snapshotIds);
+        sensorRows = sensorError ? undefined : requireEffectiveSensorReadings(sensorData);
+      } catch {
+        // Optional evidence cannot erase an independently confirmed outcome.
+        sensorRows = undefined;
+      }
     }
 
     return {

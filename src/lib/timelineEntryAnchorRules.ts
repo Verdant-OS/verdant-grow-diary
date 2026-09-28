@@ -30,3 +30,27 @@ export function buildLinkedGrowEventTimelineAnchorId(details: unknown): string |
     buildTimelineEntryAnchorId(record.grow_event_id)
   );
 }
+
+/** Reserve only anchors for diary rows actually rendered after page/filter selection. */
+export function buildRenderedDiaryTimelineAnchorIds(
+  entries: readonly ({ id?: unknown; details?: unknown } | null | undefined)[] | null | undefined,
+): ReadonlySet<string> {
+  const anchors = new Set<string>();
+  for (const entry of entries ?? []) {
+    if (!entry) continue;
+    const primary = buildTimelineEntryAnchorId(entry.id);
+    if (!primary) continue;
+    anchors.add(primary);
+    const linked = buildLinkedGrowEventTimelineAnchorId(entry.details);
+    if (linked) anchors.add(linked);
+  }
+  return anchors;
+}
+
+/** A typed history card owns the event fragment only when no rendered diary row does. */
+export function resolveHistoryTimelineAnchorId(
+  anchorId: string | null | undefined,
+  reserved?: ReadonlySet<string> | null,
+): string | null {
+  return anchorId && !reserved?.has(anchorId) ? anchorId : null;
+}

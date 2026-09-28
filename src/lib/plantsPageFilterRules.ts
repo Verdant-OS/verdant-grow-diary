@@ -115,7 +115,15 @@ export function buildGrowFilterOptions(
   grows: ReadonlyArray<MinimalGrow>,
   plants: ReadonlyArray<MinimalPlant>,
   tentGrowById?: ReadonlyMap<string, string | null>,
+  options: {
+    /**
+     * False while the grows list is loading or failed. It is empty then, so
+     * no plant can be said to sit in an archived grow (Codex review on #1683).
+     */
+    growsListResolved?: boolean;
+  } = {},
 ): PlantsPageGrowOption[] {
+  const growsListResolved = options.growsListResolved ?? true;
   const activePlants = plants.filter((p) => !isInactive(p));
   const totalActive = activePlants.length;
 
@@ -143,12 +151,27 @@ export function buildGrowFilterOptions(
         ]
       : [];
 
+  // Active plants whose grow is not in the list (the grows list excludes
+  // archived grows) appear under "All grows" but under no grow option. Say
+  // so, so the per-option counts reconcile with the total (QA 2026-09-24,
+  // BUG-014: "All grows (72 plants)" vs ~18 across the listed grows).
+  const listedGrowIds = new Set(grows.map((g) => g.id));
+  const inUnlistedGrows = activePlants.filter((p) => {
+    if (isUnassignedToGrow(p, tentGrowById)) return false;
+    const growId = resolvePlantGrowId(p, tentGrowById);
+    return !growId || !listedGrowIds.has(growId);
+  }).length;
+  const allLabel =
+    growsListResolved && inUnlistedGrows > 0
+      ? `All grows (${pluralPlants(totalActive)} · ${inUnlistedGrows} in archived grows)`
+      : `All grows (${pluralPlants(totalActive)})`;
+
   return [
     {
       id: "",
       name: "All grows",
       plantCount: totalActive,
-      label: `All grows (${pluralPlants(totalActive)})`,
+      label: allLabel,
     },
     ...perGrow,
     ...unassigned,

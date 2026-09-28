@@ -6,7 +6,10 @@
  * content. No writes, no mock fallback — honest empty, never demo rows.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { EFFECTIVE_SENSOR_QUERY_VERSION } from "@/lib/effectiveSensorReadings";
+import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { useAuth } from "@/store/auth";
 import { loadActionResponseMemories } from "@/lib/actionResponseMemoryService";
 import type { ActionResponseMemory } from "@/lib/actionResponseMemoryRules";
@@ -27,33 +30,33 @@ export function useActionResponseMemory(args: UseActionResponseMemoryArgs): {
   reload: () => void;
 } {
   const { user } = useAuth();
-  const [state, setState] = useState<ActionResponseMemoryState>({ status: "idle" });
-  const [nonce, setNonce] = useState(0);
   const growId = args.growId ?? null;
   const plantId = args.plantId ?? null;
-
-  useEffect(() => {
-    if (!user || !growId) {
-      setState({ status: "idle" });
-      return;
-    }
-    let cancelled = false;
-    setState({ status: "loading" });
-    (async () => {
-      const result = await loadActionResponseMemories({ growId, plantId });
-      if (cancelled) return;
-      if (result.status === "ok") {
-        setState({ status: "ok", memories: result.memories });
-      } else {
-        setState({ status: "unavailable" });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user, growId, plantId, nonce]);
-
-  const reload = useCallback(() => setNonce((n) => n + 1), []);
+  const ownerId = user?.id ?? null;
+  const enabled = !!ownerId && !!growId;
+  const query = useQuery({
+    queryKey: ["action-response-memory", ownerId, growId, plantId, EFFECTIVE_SENSOR_QUERY_VERSION],
+    enabled,
+    retry: false,
+    queryFn: async () => {
+      const result = await loadActionResponseMemories({ growId: growId!, plantId });
+      if (result.status !== "ok") throw new Error("Action response history unavailable.");
+      return result.memories;
+    },
+  });
+  const pending = query.isPending || query.isFetching || query.fetchStatus === "paused";
+  const state: ActionResponseMemoryState = !enabled
+    ? { status: "idle" }
+    : pending
+      ? { status: "loading" }
+      : query.isError
+        ? { status: "unavailable" }
+        : { status: "ok", memories: query.data ?? [] };
+  const refetch = query.refetch;
+  const reload = useCallback(() => {
+    if (enabled) void refetch();
+  }, [enabled, refetch]);
+  useEffect(() => subscribeManualSensorCorrections(ownerId, reload), [ownerId, reload]);
 
   return { state, reload };
 }

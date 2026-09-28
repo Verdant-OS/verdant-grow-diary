@@ -1,8 +1,8 @@
 name: Vitest Controlled Full Suite (manual)
 
 # Manual, matrix-sharded, resumable full-suite runner.
-# Every shard runs identically to the Slice G.1j controlled command:
-#   bunx vitest run --pool=forks --maxWorkers=8 --minWorkers=2
+# Every shard uses the Vitest 4-compatible controlled command:
+#   bunx vitest run --pool=forks --maxWorkers=8
 # Sharding + per-file progress + strict aggregate coverage are enforced
 # by scripts/vitest-controlled/cli.mjs. This workflow does NOT replace
 # ci.yml PR gates.

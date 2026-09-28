@@ -21,6 +21,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { mergeTimelineSources } from "@/lib/timelineMergeRules";
+import { buildRenderedDiaryTimelineAnchorIds } from "@/lib/timelineEntryAnchorRules";
 import { findSupabaseTableWrites } from "@/test/helpers/supabaseTableWriteScan";
 
 const TIMELINE_SRC = readFileSync(resolve(__dirname, "../pages/Timeline.tsx"), "utf8");
@@ -165,6 +166,29 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
   it("feeds the merged read stream into both root-zone history panels", () => {
     expect(TIMELINE_SRC).toMatch(/<WateringHistoryPanel\s+rawEntries=\{recentLaneRawEntries\}/);
     expect(TIMELINE_SRC).toMatch(/<FeedingHistoryPanel\s+rawEntries=\{recentLaneRawEntries\}/);
+  });
+
+  it("derives anchor reservations from the post-filter diary page slice", () => {
+    expect(TIMELINE_SRC).toMatch(/from\s+["']@\/lib\/timelineEntryAnchorRules["']/);
+    expect(TIMELINE_SRC).toMatch(/buildRenderedDiaryTimelineAnchorIds\s*\(\s*filtered\s*\)/);
+    expect(TIMELINE_SRC).toMatch(/const renderedDiaryAnchorIds = useMemo\(/);
+  });
+
+  it("passes rendered diary anchor reservations into both typed history panels", () => {
+    const reservationProps = TIMELINE_SRC.match(
+      /reservedTimelineAnchorIds=\{renderedDiaryAnchorIds\}/g,
+    );
+    expect(reservationProps).toHaveLength(2);
+  });
+});
+
+describe("Timeline anchor ownership — filtered page contract", () => {
+  it("reserves anchors only from diary rows on the rendered page slice", () => {
+    const reserved = buildRenderedDiaryTimelineAnchorIds([
+      { id: "visible", details: { linked_grow_event_id: "event-visible" } },
+    ]);
+    expect([...reserved]).toEqual(["timeline-entry-visible", "timeline-entry-event-visible"]);
+    expect(reserved.has("timeline-entry-off-page")).toBe(false);
   });
 });
 

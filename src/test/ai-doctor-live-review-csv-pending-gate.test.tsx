@@ -145,6 +145,8 @@ vi.mock("@/hooks/useImportedSensorHistory", () => ({
 
 import PlantDetailAiDoctorLiveReview, {
   AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY,
+  AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_NOTE_COPY,
+  AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_RETRY_BLOCK_COPY,
   type PlantDetailAiDoctorLiveReviewProps,
 } from "@/components/PlantDetailAiDoctorLiveReview";
 
@@ -455,6 +457,9 @@ describe("accepted standard review visibility across the seven-day cutoff", () =
           "data-status",
           phase === "retry" ? "error" : phase,
         );
+        expect(
+          screen.getByTestId("plant-ai-doctor-live-review-stale-evidence-note"),
+        ).toHaveTextContent(AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_NOTE_COPY);
         expect(screen.getByTestId("plant-ai-doctor-live-review-confidence-copy").textContent).toBe(
           confidenceCopy,
         );
@@ -467,34 +472,49 @@ describe("accepted standard review visibility across the seven-day cutoff", () =
           const retry = screen.getByTestId("plant-ai-doctor-live-review-retry");
           expect(retry).toBeEnabled();
           fireEvent.click(retry);
-          await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
-          expect(invoke.mock.calls[1][1].body.packet).toEqual(acceptedBody.packet);
-          expect(invoke.mock.calls[1][1].body.evidence_acceptance).toEqual(
-            acceptedBody.evidence_acceptance,
+          expect(invoke).toHaveBeenCalledTimes(1);
+          expect(screen.getByTestId("plant-ai-doctor-live-review-failure")).toHaveTextContent(
+            AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_RETRY_BLOCK_COPY,
           );
+          expect(screen.queryByTestId("plant-ai-doctor-live-review-retry")).toBeNull();
         }
 
-        await screen.findByTestId("plant-ai-doctor-history-saved");
-        expect(screen.getByTestId("plant-ai-doctor-live-review-result-wrap")).toHaveTextContent(
-          validResult().summary,
-        );
-        vi.setSystemTime(new Date(now.getTime() + 240_000));
-        view.rerenderWithProviders(reviewElement(invoke, TENT_ID, persist));
-        expect(screen.getByTestId("plant-ai-doctor-live-review-result-wrap")).toHaveTextContent(
-          validResult().summary,
-        );
-        expect(screen.getByTestId("plant-ai-doctor-live-review-confidence-copy").textContent).toBe(
-          confidenceCopy,
-        );
-        expect(JSON.stringify(acceptedBody.packet)).toBe(frozenPacket);
-        expect(invoke).toHaveBeenCalledTimes(phase === "retry" ? 2 : 1);
-        expect(persist).toHaveBeenCalledTimes(1);
-        for (const event of ["ai_doctor_result_received", "ai_doctor_session_saved"]) {
+        if (phase === "retry") {
+          expect(screen.getByTestId("plant-ai-doctor-live-review")).toBeInTheDocument();
+        } else {
+          await screen.findByTestId("plant-ai-doctor-history-saved");
+          expect(screen.getByTestId("plant-ai-doctor-live-review-result-wrap")).toHaveTextContent(
+            validResult().summary,
+          );
+          vi.setSystemTime(new Date(now.getTime() + 240_000));
+          view.rerenderWithProviders(reviewElement(invoke, TENT_ID, persist));
+          expect(screen.getByTestId("plant-ai-doctor-live-review-result-wrap")).toHaveTextContent(
+            validResult().summary,
+          );
           expect(
-            trackFunnelEvent.mock.calls
-              .filter(([name]) => name === event)
-              .map(([, properties]) => properties),
-          ).toEqual([{ surface: "standard" }]);
+            screen.getByTestId("plant-ai-doctor-live-review-confidence-copy").textContent,
+          ).toBe(confidenceCopy);
+        }
+        expect(JSON.stringify(acceptedBody.packet)).toBe(frozenPacket);
+        expect(invoke).toHaveBeenCalledTimes(1);
+        expect(persist).toHaveBeenCalledTimes(phase === "retry" ? 0 : 1);
+        if (phase === "retry") {
+          expect(trackFunnelEvent).not.toHaveBeenCalledWith(
+            "ai_doctor_result_received",
+            expect.anything(),
+          );
+          expect(trackFunnelEvent).not.toHaveBeenCalledWith(
+            "ai_doctor_session_saved",
+            expect.anything(),
+          );
+        } else {
+          for (const event of ["ai_doctor_result_received", "ai_doctor_session_saved"]) {
+            expect(
+              trackFunnelEvent.mock.calls
+                .filter(([name]) => name === event)
+                .map(([, properties]) => properties),
+            ).toEqual([{ surface: "standard" }]);
+          }
         }
       } finally {
         cleanup();

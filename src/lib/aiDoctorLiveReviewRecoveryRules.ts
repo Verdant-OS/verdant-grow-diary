@@ -1,5 +1,7 @@
 import type { AiCreditedFailureReason } from "@/lib/aiCreditedResponseAdapter";
 
+const AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_CUTOFF_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** Stable identity for frozen review/recovery state across route-scope changes. */
 export function buildAiDoctorLiveReviewScopeKey(
   plantId: string,
@@ -36,6 +38,60 @@ export function isAiDoctorServiceUnavailableFailure(
   reason: AiCreditedFailureReason | null | undefined,
 ): boolean {
   return reason === "config";
+}
+
+export interface AiDoctorLiveReviewVisibilityInput {
+  allowed: boolean;
+  acceptedEligibilityAllowed: boolean;
+  mode: "standard" | "historical_review";
+  omittedImportedHistory: boolean;
+  omittedRootZoneHistory: boolean;
+  includedRootZoneHistory: boolean;
+  rootZoneBlocksReview: boolean;
+  evidenceCapturedAt?: string | null;
+  now: number | Date;
+}
+
+export interface AiDoctorLiveReviewVisibilityResult {
+  visible: boolean;
+  retryBlockedReason: "stale-evidence" | null;
+  showsStaleEvidenceNote: boolean;
+}
+
+function resolveNowMs(now: number | Date): number {
+  return typeof now === "number" ? now : now.getTime();
+}
+
+function evidenceIsPastCutoff(
+  evidenceCapturedAt: string | null | undefined,
+  now: number | Date,
+): boolean {
+  if (typeof evidenceCapturedAt !== "string" || evidenceCapturedAt.length === 0) return false;
+  const capturedAtMs = Date.parse(evidenceCapturedAt);
+  if (!Number.isFinite(capturedAtMs)) return false;
+  return resolveNowMs(now) - capturedAtMs > AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_CUTOFF_MS;
+}
+
+export function getAiDoctorLiveReviewVisibility(
+  input: AiDoctorLiveReviewVisibilityInput,
+): AiDoctorLiveReviewVisibilityResult {
+  const visible =
+    input.allowed ||
+    input.acceptedEligibilityAllowed ||
+    input.mode === "historical_review" ||
+    input.omittedImportedHistory ||
+    input.omittedRootZoneHistory ||
+    (input.includedRootZoneHistory && input.rootZoneBlocksReview);
+  const retryBlockedReason =
+    input.mode === "standard" && evidenceIsPastCutoff(input.evidenceCapturedAt, input.now)
+      ? "stale-evidence"
+      : null;
+
+  return {
+    visible,
+    retryBlockedReason,
+    showsStaleEvidenceNote: visible && retryBlockedReason === "stale-evidence",
+  };
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {

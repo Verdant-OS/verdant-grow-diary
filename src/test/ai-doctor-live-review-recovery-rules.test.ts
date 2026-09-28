@@ -3,6 +3,7 @@ import type { AiCreditedFailureReason } from "@/lib/aiCreditedResponseAdapter";
 import {
   buildAiDoctorLiveReviewScopeKey,
   canRetryAiDoctorLiveReviewFailure,
+  getAiDoctorLiveReviewVisibility,
   shouldReuseAiDoctorReviewIdempotencyKeyAfterResponse,
 } from "@/lib/aiDoctorLiveReviewRecoveryRules";
 
@@ -49,6 +50,69 @@ describe("canRetryAiDoctorLiveReviewFailure", () => {
   it.each(RETRYABILITY_CASES)("returns %s retryability as %s", (reason, expected) => {
     expect(canRetryAiDoctorLiveReviewFailure(reason)).toBe(expected);
     expect(canRetryAiDoctorLiveReviewFailure(reason)).toBe(expected);
+  });
+});
+
+describe("getAiDoctorLiveReviewVisibility", () => {
+  const baseInput = {
+    allowed: false,
+    acceptedEligibilityAllowed: false,
+    mode: "standard" as const,
+    omittedImportedHistory: false,
+    omittedRootZoneHistory: false,
+    includedRootZoneHistory: false,
+    rootZoneBlocksReview: false,
+    evidenceCapturedAt: "2026-09-23T12:00:00.000Z",
+    now: new Date("2026-09-23T12:00:00.000Z"),
+  };
+
+  it("keeps an accepted standard review visible when it was eligible at acceptance time", () => {
+    expect(
+      getAiDoctorLiveReviewVisibility({
+        ...baseInput,
+        acceptedEligibilityAllowed: true,
+      }),
+    ).toEqual({
+      visible: true,
+      retryBlockedReason: null,
+      showsStaleEvidenceNote: false,
+    });
+  });
+
+  it("shows the stale-evidence note and blocks retry for a standard review past the cutoff", () => {
+    expect(
+      getAiDoctorLiveReviewVisibility({
+        ...baseInput,
+        acceptedEligibilityAllowed: true,
+        now: new Date("2026-09-30T12:00:00.001Z"),
+      }),
+    ).toEqual({
+      visible: true,
+      retryBlockedReason: "stale-evidence",
+      showsStaleEvidenceNote: true,
+    });
+  });
+
+  it("does not stale-block historical reviews", () => {
+    expect(
+      getAiDoctorLiveReviewVisibility({
+        ...baseInput,
+        mode: "historical_review",
+        now: new Date("2026-09-30T12:00:00.001Z"),
+      }),
+    ).toEqual({
+      visible: true,
+      retryBlockedReason: null,
+      showsStaleEvidenceNote: false,
+    });
+  });
+
+  it("keeps the accepted review hidden when its standard sources were removed", () => {
+    expect(getAiDoctorLiveReviewVisibility(baseInput)).toEqual({
+      visible: false,
+      retryBlockedReason: null,
+      showsStaleEvidenceNote: false,
+    });
   });
 });
 

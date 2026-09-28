@@ -47,6 +47,12 @@ function recentCsv(agesInMinutes: readonly [number, number] = [2, 1]) {
 }
 type Csv = ReturnType<typeof recentCsv>;
 
+const HISTORY_VALUE_SUFFIX = {
+  temperature_c: " °C",
+  humidity_pct: "%",
+  vpd_kpa: " kPa",
+} as const;
+
 function largeCsv(): Csv {
   const minute = Math.floor(Date.now() / 60_000) * 60_000;
   const observations = Array.from({ length: 450 }, (_, index) => ({
@@ -336,7 +342,9 @@ async function assertHistory(page: Page, csv: Csv) {
         .filter({ hasText: shownAt })
         .filter({ hasText: metric });
       await expect(row).toHaveCount(1);
-      await expect(row.locator("td").nth(2)).toHaveText(String(observation[metric]));
+      await expect(row.locator("td").nth(2)).toHaveText(
+        `${observation[metric]}${HISTORY_VALUE_SUFFIX[metric]}`,
+      );
     }
   }
 }
@@ -752,7 +760,9 @@ test("a multi-batch CSV import reconciles a lost final reply beyond the read cap
           .filter({ hasText: shownAt })
           .filter({ hasText: metric });
         await expect(row).toHaveCount(1);
-        await expect(row.locator("td").nth(2)).toHaveText(String(latest[metric]));
+        await expect(row.locator("td").nth(2)).toHaveText(
+          `${latest[metric]}${HISTORY_VALUE_SUFFIX[metric]}`,
+        );
       }
     };
     await assertBoundedHistory();

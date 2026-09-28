@@ -57,7 +57,6 @@ import {
   manualEntryValueErrors,
   validateManualEntry,
   type ManualEntryInput,
-  type ManualReadingMetric,
 } from "@/lib/sensorReadingManualEntryRules";
 import {
   getManualSensorDeviceOptions,

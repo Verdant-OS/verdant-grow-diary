@@ -11,6 +11,9 @@ export interface QuickLogV2SaveResult {
   growEventId?: string | null;
   environmentEventId?: string | null;
   reused?: boolean;
+  persistedGrowId?: string | null;
+  persistedTentId?: string | null;
+  persistedPlantId?: string | null;
   /** Confirmed Note text; null represents a note-free observation. */
   persistedNote?: string | null;
   /** A recognized structured rejection before any logical event write. */
@@ -52,6 +55,7 @@ const DEFINITIVE_MANUAL_REJECTIONS = new Set([
   "invalid_logged_at",
   "target_not_owned",
   "grow_not_owned",
+  "plant_tent_grow_mismatch",
 ]);
 
 export function useQuickLogV2Save() {
@@ -63,7 +67,8 @@ export function useQuickLogV2Save() {
       payload: QuickLogV2SavePayload,
       options: QuickLogV2SaveOptions = {},
     ): Promise<QuickLogV2SaveResult> => {
-      const canContinue = () => payload.p_action !== "note" || options.canContinueNote?.() !== false;
+      const canContinue = () =>
+        payload.p_action !== "note" || options.canContinueNote?.() !== false;
       if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
       setSaving(true);
       setError(null);
@@ -81,7 +86,9 @@ export function useQuickLogV2Save() {
           setError(reason);
           return { ok: false, reason };
         }
-        const r = (data !== null && typeof data === "object" && !Array.isArray(data) ? data : {}) as RpcResponse;
+        const r = (
+          data !== null && typeof data === "object" && !Array.isArray(data) ? data : {}
+        ) as RpcResponse;
         if (payload.p_action === "note" ? r.ok !== true : !r.ok) {
           const reason = typeof r.reason === "string" && r.reason ? r.reason : "save_failed";
           setError(reason);
@@ -94,6 +101,9 @@ export function useQuickLogV2Save() {
           };
         }
         let persistedNote: string | null | undefined;
+        let persistedGrowId: string | null | undefined;
+        let persistedTentId: string | null | undefined;
+        let persistedPlantId: string | null | undefined;
         if (payload.p_action === "note") {
           if (!isUuid(r.grow_event_id)) {
             setError("receipt_unverified");
@@ -111,7 +121,7 @@ export function useQuickLogV2Save() {
             }
             const { data: event, error: readError } = await supabase
               .from("grow_events")
-              .select("id,note,plant_id,tent_id")
+              .select("id,note,grow_id,plant_id,tent_id")
               .eq("id", r.grow_event_id)
               .maybeSingle();
             if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
@@ -119,10 +129,21 @@ export function useQuickLogV2Save() {
               setError("receipt_unverified");
               return { ok: false, reason: "receipt_unverified" };
             }
+            persistedGrowId = event.grow_id ?? null;
+            persistedTentId = event.tent_id ?? null;
+            persistedPlantId = event.plant_id ?? null;
             const targetId = payload.p_target_type === "plant" ? event.plant_id : event.tent_id;
             if (event.id !== r.grow_event_id || targetId !== payload.p_target_id) {
               setError("receipt_mismatch");
-              return { ok: false, reason: "receipt_mismatch" };
+              return {
+                ok: false,
+                reason: "receipt_mismatch",
+                growEventId: event.id,
+                ...(persistedGrowId !== undefined ? { persistedGrowId } : {}),
+                ...(persistedTentId !== undefined ? { persistedTentId } : {}),
+                ...(persistedPlantId !== undefined ? { persistedPlantId } : {}),
+                persistedNote: event.note,
+              };
             }
             if (event.note !== payload.p_note) {
               setError("receipt_mismatch");
@@ -130,6 +151,9 @@ export function useQuickLogV2Save() {
                 ok: false,
                 reason: "receipt_mismatch",
                 growEventId: event.id,
+                ...(persistedGrowId !== undefined ? { persistedGrowId } : {}),
+                ...(persistedTentId !== undefined ? { persistedTentId } : {}),
+                ...(persistedPlantId !== undefined ? { persistedPlantId } : {}),
                 persistedNote: event.note,
               };
             }
@@ -145,6 +169,9 @@ export function useQuickLogV2Save() {
           growEventId: r.grow_event_id ?? null,
           environmentEventId: r.environment_event_id ?? null,
           reused: r.reused === true,
+          ...(persistedGrowId !== undefined ? { persistedGrowId } : {}),
+          ...(persistedTentId !== undefined ? { persistedTentId } : {}),
+          ...(persistedPlantId !== undefined ? { persistedPlantId } : {}),
           ...(persistedNote !== undefined ? { persistedNote } : {}),
         };
       } catch (thrown) {

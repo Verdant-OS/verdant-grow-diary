@@ -439,6 +439,26 @@ function QuickLogV2SheetForOwner({
     });
   }
 
+  function resolveConfirmedTimelineScope(
+    resolved: ResolvedQuickLogV2Target,
+    result: {
+      persistedGrowId?: string | null;
+      persistedTentId?: string | null;
+      persistedPlantId?: string | null;
+    },
+  ) {
+    const persistedPlantId = result.persistedPlantId ?? null;
+    const persistedTentId = result.persistedTentId ?? null;
+    return {
+      growId: result.persistedGrowId ?? resolved.growId ?? null,
+      targetType:
+        (persistedPlantId ? "plant" : persistedTentId ? "tent" : resolved.targetType) ?? null,
+      targetId: persistedPlantId ?? persistedTentId ?? resolved.targetId ?? null,
+      tentId: persistedTentId ?? resolved.tentId ?? null,
+      plantId: persistedPlantId ?? resolved.plantId ?? null,
+    };
+  }
+
   // Seed from open props on first paint so tent:/plant: defaultTargetKey is
   // not briefly empty — that vacancy previously let sole-plant auto-select
   // rewrite an explicit tent: open target before the open-reset effect ran.
@@ -1844,12 +1864,13 @@ function QuickLogV2SheetForOwner({
       if (exactSubmission && !canContinueNote()) return;
       const reason = res.reason || "save_failed";
       if (reason === "receipt_mismatch" && res.growEventId && res.persistedNote !== undefined) {
+        const confirmedScope = resolveConfirmedTimelineScope(resolved, res);
         const navigation = buildQuickLogTimelineNavTarget({
-          growId: resolved.growId ?? null,
-          targetType: resolved.targetType ?? null,
-          targetId: resolved.targetId ?? null,
-          tentId: resolved.tentId ?? null,
-          plantId: resolved.plantId ?? null,
+          growId: confirmedScope.growId,
+          targetType: confirmedScope.targetType,
+          targetId: confirmedScope.targetId,
+          tentId: confirmedScope.tentId,
+          plantId: confirmedScope.plantId,
           growEventId: res.growEventId,
         });
         if (navigation) setMismatchedReceipt({ note: res.persistedNote, navigation });
@@ -1870,6 +1891,7 @@ function QuickLogV2SheetForOwner({
     setExactRetryPending(false);
     setPersistedNote(res.persistedNote);
     rememberConfirmedPlantTarget(resolved, user?.id ?? null);
+    const confirmedScope = resolveConfirmedTimelineScope(resolved, res);
 
     // The core grow event is committed. Rotate immediately, before any
     // best-effort attachment work, so a rejected media promise can never
@@ -1886,11 +1908,11 @@ function QuickLogV2SheetForOwner({
     let photoAttached = false;
     let videoAttached = false;
 
-    if (uploadedPath && resolved.growId) {
+    if (uploadedPath && confirmedScope.growId) {
       const photoEntry = await createPhotoDiaryEntry({
-        growId: resolved.growId,
-        tentId: resolved.tentId ?? null,
-        plantId: resolved.plantId ?? null,
+        growId: confirmedScope.growId,
+        tentId: confirmedScope.tentId,
+        plantId: confirmedScope.plantId,
         photoPath: uploadedPath,
         noteRaw: submissionNote,
         action: submissionAction,
@@ -1917,9 +1939,9 @@ function QuickLogV2SheetForOwner({
     // Photo cleanup above can await storage after a failed companion write.
     // Recheck before starting the next write, not only after it resolves.
     if (exactSubmission && !canContinueNote()) return;
-    if (submissionVideoFile && submissionVideoMeta && resolved.growId) {
+    if (submissionVideoFile && submissionVideoMeta && confirmedScope.growId) {
       setSaveStatus("Uploading video…");
-      const upload = await uploadQuickLogVideo(resolved.growId, submissionVideoFile);
+      const upload = await uploadQuickLogVideo(confirmedScope.growId, submissionVideoFile);
       if (exactSubmission && !canContinueNote()) {
         if (upload.ok) {
           try {
@@ -1934,9 +1956,9 @@ function QuickLogV2SheetForOwner({
         mediaFailure = (upload as { message: string }).message;
       } else {
         const videoEntry = await createVideoDiaryEntry({
-          growId: resolved.growId,
-          tentId: resolved.tentId ?? null,
-          plantId: resolved.plantId ?? null,
+          growId: confirmedScope.growId,
+          tentId: confirmedScope.tentId,
+          plantId: confirmedScope.plantId,
           videoPath: upload.path,
           mime: submissionVideoMeta.mime,
           sizeBytes: submissionVideoMeta.sizeBytes,
@@ -2008,11 +2030,11 @@ function QuickLogV2SheetForOwner({
       );
     }
     showTimelineConfirmation(successMessage, {
-      growId: resolved.growId ?? null,
-      targetType: resolved.targetType as "plant" | "tent",
-      targetId: resolved.targetId as string,
-      tentId: resolved.tentId ?? null,
-      plantId: resolved.plantId ?? null,
+      growId: confirmedScope.growId,
+      targetType: confirmedScope.targetType,
+      targetId: confirmedScope.targetId,
+      tentId: confirmedScope.tentId,
+      plantId: confirmedScope.plantId,
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
     });
     applyQuickLogV2Refresh(queryClient, {
@@ -2033,10 +2055,10 @@ function QuickLogV2SheetForOwner({
     resetVideoSelection();
     setPostSave({
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
-      growId: resolved.growId ?? null,
-      targetType: resolved.targetType as "plant" | "tent",
-      targetId: resolved.targetId as string,
-      tentId: resolved.tentId ?? null,
+      growId: confirmedScope.growId,
+      targetType: (confirmedScope.targetType ?? resolved.targetType) as "plant" | "tent",
+      targetId: (confirmedScope.targetId ?? resolved.targetId) as string,
+      tentId: confirmedScope.tentId,
       action: submissionAction,
       message: buildQuickLogPostSaveMessage(submissionAction, photoAttached),
       savedAt: new Date().toISOString(),

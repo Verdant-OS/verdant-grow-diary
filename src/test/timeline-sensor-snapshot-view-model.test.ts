@@ -1,10 +1,43 @@
 import { describe, it, expect } from "vitest";
-import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
+import {
+  buildTimelineSensorSnapshotViewModel,
+  resolveTimelineCardSensorResolution,
+} from "@/lib/timelineSensorSnapshotViewModel";
 
 describe("buildTimelineSensorSnapshotViewModel", () => {
   it("returns none for null/undefined", () => {
     expect(buildTimelineSensorSnapshotViewModel(null).kind).toBe("none");
     expect(buildTimelineSensorSnapshotViewModel(undefined).kind).toBe("none");
+  });
+
+  describe("resolveTimelineCardSensorResolution", () => {
+    it("keeps canonical precedence while enabling manual validation for manual sources", () => {
+      const resolved = resolveTimelineCardSensorResolution({
+        source: "manual",
+        sensor_snapshot: { temp_c: 24, source: "manual" },
+        sensor: { temp: 10, source: "live" },
+        manual_sensor_snapshot: { temp_f: 100, source: "manual" },
+      });
+      expect(resolved.sensor).toEqual({ temp_c: 24, source: "manual" });
+      expect(resolved.useManualValidation).toBe(true);
+    });
+
+    it("uses manual validation for manual compatibility envelopes even when source is missing", () => {
+      const resolved = resolveTimelineCardSensorResolution({
+        manual_sensor_snapshot: { temp_f: 82 },
+      });
+      expect(resolved.sensor).toEqual({ temp_f: 82 });
+      expect(resolved.useManualValidation).toBe(true);
+    });
+
+    it("does not enable manual validation for non-manual snapshots", () => {
+      const resolved = resolveTimelineCardSensorResolution({
+        sensor_snapshot: { temp: 24, source: "live" },
+        source: "live",
+      });
+      expect(resolved.sensor).toEqual({ temp: 24, source: "live" });
+      expect(resolved.useManualValidation).toBe(false);
+    });
   });
 
   it("returns invalid for non-object input", () => {

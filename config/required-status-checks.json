@@ -96,7 +96,7 @@
     {
       "context": "Timeline local-day date filter (mocked)",
       "alwaysRuns": false,
-      "why": "The second job in mocked-e2e-unwired-closure.yml, added by #1702 when it wired e2e/timeline-local-day-date-filter.spec.ts and removed that spec's red exemption from the execution manifest. It runs on its own cold runner with zero retries and a report guard that requires exactly 3 passes. It reports as its own context, so the closure entry above does not cover it: without this entry a red Timeline proof would merge unseen, which is the ungated-lane gap this list exists to close (Copilot on #1702). It shares that workflow's trigger-level path filter, so alwaysRuns is false."
+      "why": "The second job in mocked-e2e-unwired-closure.yml, added by #1702 when it wired e2e/timeline-local-day-date-filter.spec.ts and removed that spec's red exemption from the execution manifest. It runs on its own runner with zero retries and a report guard that requires exactly 3 passes; the spec's own mocked warm-up (#1715) keeps the dev server's cold compile out of the scenarios. It reports as its own context, so the closure entry above does not cover it: without this entry a red Timeline proof would merge unseen, which is the ungated-lane gap this list exists to close (Copilot on #1702). It shares that workflow's trigger-level path filter, so alwaysRuns is false."
     }
   ],
   "mustBeGreen//": [

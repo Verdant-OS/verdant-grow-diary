@@ -6,6 +6,7 @@
  * Recommendations are never invented — only fields already stored render.
  */
 import { useEffect, useRef } from "react";
+import AlertReasonText from "@/components/AlertReasonText";
 import { Link } from "@/lib/react-router-compat";
 import {
   ArrowRight,
@@ -233,7 +234,10 @@ function AlertRowItem({
       </div>
       <p className="mt-2 font-medium leading-snug">{row.title}</p>
       {row.reason ? (
-        <p className="mt-1 text-xs text-muted-foreground leading-snug">{row.reason}</p>
+        <AlertReasonText
+          reason={row.reason}
+          className="mt-1 text-xs text-muted-foreground leading-snug"
+        />
       ) : null}
       {row.lastSeenAt ? (
         <p

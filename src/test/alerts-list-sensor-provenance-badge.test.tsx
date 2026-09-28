@@ -36,6 +36,10 @@ const baseAlert = {
 
 let currentAlerts: Array<typeof baseAlert> = [baseAlert];
 
+// The Alerts page reads plant stages for alert stage resolution (BUG-006).
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({ data: [], isError: false }),
+}));
 vi.mock("@/hooks/useScopedGrow", () => ({
   useScopedGrow: () => ({
     urlGrowId: null,

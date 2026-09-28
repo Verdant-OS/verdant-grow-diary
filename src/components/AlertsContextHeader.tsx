@@ -85,7 +85,11 @@ export default function AlertsContextHeader({
       <div className="flex items-start gap-2 flex-wrap">
         <p className="text-xs font-medium" data-testid={`${testId}-summary`}>
           <span className="text-muted-foreground">Alert context: </span>
-          {vm.stageLabel ? (
+          {vm.stagePending ? (
+            <span data-testid={`${testId}-stage-pending`}>
+              Stage not confirmed until tent and plant stages load.{" "}
+            </span>
+          ) : vm.stageLabel ? (
             <span data-testid={`${testId}-stage`}>
               Using <strong>{vm.stageLabel}</strong> targets.{" "}
             </span>

@@ -25,6 +25,19 @@ export function canRetryAiDoctorLiveReviewFailure(
   return true;
 }
 
+/**
+ * `config` is emitted only by the edge function when a server-side
+ * precondition (secret, key id, payments environment, provider key) is
+ * missing. Every `config` exit returns before the credit RPC, so no credit
+ * can have been spent. It is a Verdant-side outage, never a gap in the
+ * grower's plant context, and the copy must not suggest otherwise.
+ */
+export function isAiDoctorServiceUnavailableFailure(
+  reason: AiCreditedFailureReason | null | undefined,
+): boolean {
+  return reason === "config";
+}
+
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

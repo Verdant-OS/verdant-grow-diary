@@ -25,6 +25,14 @@ export interface TentRelRow {
   is_archived?: boolean | null;
 }
 
+/**
+ * Move dialog hint for the tent the plant is in while the dialog is open.
+ * It read "Previous Tent", which is only true after the move — so reopening
+ * the dialog after a move showed the NEW tent as "Previous Tent"
+ * (QA 2026-09-24).
+ */
+export const MOVE_PLANT_FROM_LABEL = "Moving from";
+
 export const PHENO_UNTAG_BEFORE_CROSS_GROW_MOVE_COPY = {
   bannerTitle: "Tagged to a pheno hunt",
   bannerBody:

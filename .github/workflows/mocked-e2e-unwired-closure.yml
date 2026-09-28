@@ -77,9 +77,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # #1702 repairs and wires the Timeline date proof. Keep it on its own runner:
-  # the first scenario must pass against a cold app without another spec warming
-  # Vite, retrying a failure, or extending the existing assertion/test budgets.
+  # #1702 repairs and wires the Timeline date proof. Keep it on its own runner: no
+  # other spec warms Vite for it, a failure is never retried, and the scenarios'
+  # assertion/test budgets are not extended. The spec's own fully mocked beforeAll
+  # visit (#1715) pays the dev server's one-time cold compile before the scenarios
+  # run, so this lane proves the local-day bounds, not cold-start latency.
   timeline-local-day:
     name: Timeline local-day date filter (mocked)
     runs-on: ubuntu-latest

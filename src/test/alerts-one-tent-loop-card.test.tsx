@@ -8,7 +8,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 
-const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((() => {
   throw new Error("fetch should not be called by the next-step card");
 }) as never);
 

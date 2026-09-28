@@ -430,7 +430,7 @@ jobs:
       # fails on `src/lib/cost/index.ts` -> `./costDomains` with "Module not
       # found". Test-only invocation; no production source changes.
       - name: Run AI Doctor provider usage wiring tests
-        run: deno test --allow-env --allow-read --unstable-sloppy-imports supabase/functions/ai-doctor-review/providerUsageWiring.test.ts
+        run: deno test --allow-env --allow-read --unstable-sloppy-imports supabase/functions/ai-doctor-review/providerUsageWiring.test.ts supabase/functions/ai-doctor-review/stageTargetGrading.test.ts
 
       # Stop-ship: operator-pasted GGS payloads must preserve strict source,
       # device/cohort, attestation, auth, ownership, and CORS boundaries before

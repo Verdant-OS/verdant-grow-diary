@@ -4,6 +4,7 @@ on:
   pull_request:
     paths: &quicklog_manual_reuse_paths
       - "supabase/migrations/20260927002000_quicklog_manual_reuse_fence.sql"
+      - "supabase/migrations/20260928183000_quicklog_manual_replay_metadata_lock.sql"
       - "supabase/migrations/20260818010000_quicklog_manual_delegate_forward_repair.sql"
       - "scripts/run-quicklog-manual-reuse-fence-pg15-harness.mjs"
       - "scripts/run-quicklog-manual-reuse-lock-pg15-harness.mjs"

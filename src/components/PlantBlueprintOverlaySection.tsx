@@ -18,6 +18,9 @@
  */
 
 import { useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { useNowTick } from "@/hooks/useNowTick";
 import { ProBlueprintOverlay } from "@/components/ProBlueprintOverlay";
 import { BlueprintTeaser } from "@/components/BlueprintTeaser";
 import PaywallCta from "@/components/PaywallCta";
@@ -67,17 +70,16 @@ export function PlantBlueprintOverlaySection({
 }: PlantBlueprintOverlaySectionProps) {
   // Hooks are called unconditionally (React rules), before any early return.
   const temperatureUnit = useTemperatureUnitPreference();
+  const now = useNowTick();
   const { entitlement, loading: entLoading, lookupFailed } = useMyEntitlements();
   const unlocked = !lookupFailed && canUseCapability(entitlement, "blueprint");
   // Only fetch live/logged data once unlocked — the locked teaser is static
   // (derived from stage alone), so free growers trigger no sensor/feeding query.
   const snapState = useLatestSensorSnapshot(
-    unlocked ? growId : null,
+    unlocked && tentId ? growId : null,
     unlocked && tentId ? [tentId] : [],
   );
-  const { observations } = useRootZoneObservations(
-    unlocked && plantId ? { kind: "plant", plantId } : null,
-  );
+  const rootZone = useRootZoneObservations(unlocked && plantId ? { kind: "plant", plantId } : null);
 
   // Paywall impression, once per mount. STRICTER than the render on purpose:
   // the locked branch also shows on lookupFailed (the section must show
@@ -117,15 +119,55 @@ export function PlantBlueprintOverlaySection({
   const vm = buildBlueprintOverlayViewModel(
     {
       stage,
-      snapshot: snapState.snapshot,
-      latestFeeding: selectLatestInputEcPh(observations),
+      snapshot: tentId ? snapState.snapshot : null,
+      sensorRead: snapState,
+      feedingRead: rootZone,
+      now,
+      hasTent: !!tentId,
+      latestFeeding: selectLatestInputEcPh(rootZone.observations),
       dli: null,
       isDay,
     },
     temperatureUnit,
   );
 
-  return <ProBlueprintOverlay vm={vm} className={className} />;
+  return (
+    <div className={className}>
+      <ProBlueprintOverlay vm={vm} />
+      {vm.retryEvidence && (
+        <BlueprintEvidenceRetry growId={growId} retryFeeding={rootZone.refetch} />
+      )}
+    </div>
+  );
+}
+
+function BlueprintEvidenceRetry({
+  growId,
+  retryFeeding,
+}: {
+  growId: string | null;
+  retryFeeding: () => Promise<unknown>;
+}) {
+  const client = useQueryClient();
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="mt-2"
+      onClick={() => {
+        void Promise.allSettled([
+          client.invalidateQueries({
+            predicate: (query) =>
+              query.queryKey[0] === "latest-sensor-snapshot" && query.queryKey[2] === growId,
+          }),
+          retryFeeding(),
+        ]);
+      }}
+    >
+      Retry evidence
+    </Button>
+  );
 }
 
 export default PlantBlueprintOverlaySection;

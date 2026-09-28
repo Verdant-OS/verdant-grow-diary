@@ -50,6 +50,7 @@ export default function FounderOwnerPrefsForm() {
   const [error, setError] = useState<string | null>(null);
   const saveButtonRef = useRef<HTMLButtonElement | null>(null);
   const wasSavingRef = useRef(false);
+  const focusSaveAfterRefetchRef = useRef(false);
 
   useEffect(() => {
     if (!row) return;
@@ -61,8 +62,9 @@ export default function FounderOwnerPrefsForm() {
 
   // After a save completes (saving true → false), return focus to the Save
   // button so keyboard users are not stranded and no focus trap develops
-  // around the transient disabled state. Fires before any refetch-triggered
-  // remount removes the button from the DOM.
+  // around the transient disabled state. This covers a failed save, where
+  // the form stays mounted; a successful save refetches, and the effect
+  // below restores focus once the form has remounted.
   useEffect(() => {
     if (wasSavingRef.current && !saving) {
       const btn = saveButtonRef.current;
@@ -70,6 +72,17 @@ export default function FounderOwnerPrefsForm() {
     }
     wasSavingRef.current = saving;
   }, [saving]);
+
+  // A successful save refetches the row. The refetch shows the loading state,
+  // which unmounts the form, so the Save button is a new node afterwards.
+  // Focus it once React has committed the remounted form: a
+  // requestAnimationFrame callback could run first and find no button.
+  useEffect(() => {
+    if (!focusSaveAfterRefetchRef.current || loading) return;
+    focusSaveAfterRefetchRef.current = false;
+    const btn = saveButtonRef.current;
+    if (btn && !btn.disabled) btn.focus();
+  }, [loading, row]);
 
   const previewName = useMemo(() => {
     if (!row) return null;
@@ -137,13 +150,10 @@ export default function FounderOwnerPrefsForm() {
       title: "Founder settings saved",
       description: "Your Founders Wall preferences are updated.",
     });
-    await refetch();
     // Return focus to the Save button after the row remounts, so keyboard
-    // users are not stranded on document.body during / after refetch.
-    requestAnimationFrame(() => {
-      const btn = saveButtonRef.current;
-      if (btn && !btn.disabled) btn.focus();
-    });
+    // users are not stranded on document.body after the refetch.
+    focusSaveAfterRefetchRef.current = true;
+    await refetch();
   }
 
   return (

@@ -102,6 +102,77 @@ describe("scanFunctionsTree (fixture)", () => {
   });
 });
 
+/**
+ * True when `script` runs the guard AND a guard failure fails the script. The guard is
+ * its own command, `node scripts/check-no-src-lib-imports.mjs` with optional arguments;
+ * it is not reached through `||`, which skips it when the command before succeeds; and
+ * every operator after it is `&&`. A later `;` or `||` lets another command's exit
+ * status replace the guard's: `guard; echo build` and `guard || true` both exit 0 when
+ * the guard fails. A bare mention (`echo check-no-src-lib-imports.mjs`) runs nothing
+ * (CodeRabbit, #1221 rounds 13 and 15). A script holding `#` is rejected outright: the
+ * shell drops a comment's text, which this split would still read as commands (round 16).
+ * A newline ends a command like `;`, so `guard\ntrue` is rejected too; a newline right
+ * after `&&` only continues the line (round 18).
+ */
+function invokesGuard(script: string | undefined): boolean {
+  if ((script ?? "").includes("#")) return false;
+  // Commands and the operators between them, alternating: [cmd, op, cmd, op, cmd].
+  const parts = (script ?? "").trim().split(/\s*(&&|\|\||;|\n)\s*/);
+  return parts.some(
+    (command, i) =>
+      i % 2 === 0 &&
+      /^node\s+(?:\.\/)?scripts\/check-no-src-lib-imports\.mjs(?:\s+[^|&;]*)?$/.test(command) &&
+      parts[i - 1] !== "||" &&
+      parts.slice(i + 1).every((op, k) => k % 2 === 1 || op === "&&"),
+  );
+}
+
+describe("invokesGuard — a script runs the guard, not merely names it (CodeRabbit, #1221 round 13)", () => {
+  it("accepts the guard as a command, alone or chained with &&", () => {
+    expect(invokesGuard("node scripts/check-no-src-lib-imports.mjs")).toBe(true);
+    expect(
+      invokesGuard(
+        "node scripts/a.mjs && node scripts/check-no-src-lib-imports.mjs && node scripts/b.mjs",
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a mention, a command after ||, a swallowed failure, and a missing script", () => {
+    expect(invokesGuard("echo check-no-src-lib-imports.mjs")).toBe(false);
+    expect(invokesGuard("echo node scripts/check-no-src-lib-imports.mjs")).toBe(false);
+    expect(invokesGuard("true || node scripts/check-no-src-lib-imports.mjs")).toBe(false);
+    expect(invokesGuard("node scripts/check-no-src-lib-imports.mjs || true")).toBe(false);
+    expect(invokesGuard(undefined)).toBe(false);
+  });
+
+  it("rejects a later `;` or `||` that replaces the guard's exit status (CodeRabbit, #1221 round 15)", () => {
+    // `false; echo build` exits 0: after `;` the last command's status is the script's.
+    expect(invokesGuard("node scripts/check-no-src-lib-imports.mjs; echo build")).toBe(false);
+    expect(
+      invokesGuard("node scripts/check-no-src-lib-imports.mjs && node scripts/b.mjs; echo x"),
+    ).toBe(false);
+    expect(
+      invokesGuard("node scripts/check-no-src-lib-imports.mjs && node scripts/b.mjs || true"),
+    ).toBe(false);
+    // A `;` BEFORE the guard is harmless: the guard runs, and its status is the script's.
+    expect(invokesGuard("echo start; node scripts/check-no-src-lib-imports.mjs")).toBe(true);
+  });
+
+  it("rejects a later command on a new line (CodeRabbit, #1221 round 18)", () => {
+    // A newline ends a shell command like `;`: `guard\ntrue` exits 0 when the guard fails.
+    expect(invokesGuard("node scripts/check-no-src-lib-imports.mjs\ntrue")).toBe(false);
+    expect(invokesGuard("node scripts/check-no-src-lib-imports.mjs &&\nnode scripts/b.mjs")).toBe(
+      true,
+    );
+    expect(invokesGuard("echo start\nnode scripts/check-no-src-lib-imports.mjs")).toBe(true);
+  });
+
+  it("rejects a guard behind a shell comment (CodeRabbit, #1221 round 16)", () => {
+    // After `#` the rest of the line is a comment, so the shell never runs the guard.
+    expect(invokesGuard("echo setup # && node scripts/check-no-src-lib-imports.mjs")).toBe(false);
+  });
+});
+
 describe("CI / package wiring cannot drop the guard", () => {
   const pkg = readFileSync(join(ROOT, "package.json"), "utf8");
   const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
@@ -110,11 +181,23 @@ describe("CI / package wiring cannot drop the guard", () => {
   const script = readFileSync(join(ROOT, "scripts/check-no-src-lib-imports.mjs"), "utf8");
 
   it("package.json prebuild + predeploy + check script invoke the guard", () => {
-    expect(pkg).toMatch(/check-no-src-lib-imports\.mjs/);
-    expect(pkg).toMatch(/"check:no-src-lib-imports"/);
-    expect(pkg).toMatch(/"prebuild":\s*"[^"]*check-no-src-lib-imports\.mjs/);
-    expect(pkg).toMatch(/"predeploy:functions":\s*"[^"]*check-no-src-lib-imports\.mjs/);
-    expect(pkg).toMatch(/"predeploy:functions:all":\s*"[^"]*check-no-src-lib-imports\.mjs/);
+    // Asserted on the PARSED manifest. The previous source regexes could not
+    // distinguish `scripts.prebuild` from any other key spelled "prebuild"
+    // elsewhere in the file, and matched a substring of the value rather than
+    // proving the guard is actually invoked by that script.
+    const scripts = JSON.parse(pkg).scripts as Record<string, string>;
+    // The script named after the guard must run it too; truthiness admitted "echo skip"
+    // (CodeRabbit, #1221 round 17).
+    for (const name of [
+      "check:no-src-lib-imports",
+      "prebuild",
+      "predeploy:functions",
+      "predeploy:functions:all",
+    ]) {
+      expect(invokesGuard(scripts[name]), `${name} must invoke the guard: ${scripts[name]}`).toBe(
+        true,
+      );
+    }
   });
 
   it("CI preflight, deployment-preview, and edge-shared-sync run the guard", () => {

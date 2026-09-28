@@ -302,7 +302,7 @@ describe("Sensors page reading-selection wiring", () => {
   });
 
   it("gates derived VPD and forwards stale/invalid trust flags", () => {
-    expect(source).toMatch(/selectLatestTrustedVpdInputs\(filtered\)/);
+    expect(source).toMatch(/selectSensorVpdDisplayEvidence\(filtered, previousVpdInputs\)/);
     expect(source).toMatch(/const displayedVpdKpa = latestObservedVpd \?\? derivedVpdKpa/);
     expect(source).toMatch(/displayedVpdKpa !== null/);
     expect(source).toMatch(/isStale:\s*metricTrust\.isStale/);

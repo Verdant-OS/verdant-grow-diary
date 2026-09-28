@@ -46,7 +46,7 @@ const INTENTIONAL_BYPASSES: ReadonlyArray<{
   marker: string;
 }> = [
   {
-    file: "pages/Timeline.tsx",
+    file: "lib/timelineInlineSnapshotViewModel.ts",
     why: "Timeline owns canonical and legacy diary sensor shapes plus Plant Quick Log's manual compatibility envelope; the explicit precedence is fenced below.",
     marker: "manualCompatSensor",
   },
@@ -103,11 +103,21 @@ describe("Quick Log v1 snapshot normalizer — intentional bypasses", () => {
   );
 
   it("keeps Timeline sensor precedence canonical, then legacy, then manual compatibility", () => {
-    const src = readSrc("pages/Timeline.tsx");
-    expect(src).toMatch(/const canonicalSensor = e\.details\?\.sensor_snapshot/);
-    expect(src).toMatch(/const legacySensor = e\.details\?\.sensor/);
-    expect(src).toMatch(/const manualCompatSensor = e\.details\?\.manual_sensor_snapshot/);
+    const src = readSrc("lib/timelineInlineSnapshotViewModel.ts");
+    expect(src).toMatch(/const canonicalSensor = readObject\(details\?\.sensor_snapshot\)/);
+    expect(src).toMatch(/const legacySensor = readObject\(details\?\.sensor\)/);
+    expect(src).toMatch(
+      /const manualCompatSensor = readObject\(details\?\.manual_sensor_snapshot\)/,
+    );
     expect(src).toMatch(/canonicalSensor \?\? legacySensor \?\? manualCompatSensor/);
+  });
+
+  it("keeps Timeline wired through the inline snapshot view-model and free of direct snapshot detail reads", () => {
+    const src = readSrc("pages/Timeline.tsx");
+    expect(src).toMatch(/from ["']@\/lib\/timelineInlineSnapshotViewModel["']/);
+    expect(src).not.toMatch(/details\?\.sensor_snapshot/);
+    expect(src).not.toMatch(/details\?\.sensor/);
+    expect(src).not.toMatch(/details\?\.manual_sensor_snapshot/);
   });
 });
 

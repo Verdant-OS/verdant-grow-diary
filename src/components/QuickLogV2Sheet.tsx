@@ -2191,10 +2191,11 @@ function QuickLogV2SheetForOwner({
     manualRetrySubmissionRef.current && feedingRetrySubmissionRef.current
       ? null
       : (manualRetrySubmissionRef.current ?? feedingRetrySubmissionRef.current)?.recovery.ownerId;
+  // A ref update does not repaint the button after a synchronous restoration.
+  // The handler retains the authoritative same-tick in-flight ref guard.
   const historyDiscardAllowed = canDiscardQuickLogHistoryDraft({
     historyCheckRequired,
-    inFlight:
-      recoveryStorageFence || saving || feedingSaving || wateringSaving || saveInFlightRef.current,
+    inFlight: recoveryStorageFence || saving || feedingSaving || wateringSaving,
     currentOwnerId: user?.id,
     draftOwnerId: historyDraftOwnerId,
   });

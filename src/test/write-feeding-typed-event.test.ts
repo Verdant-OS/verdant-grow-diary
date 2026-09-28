@@ -48,11 +48,15 @@ describe("typed Feed permanent refusal boundary", () => {
   );
   it("does not override an accepted receipt with a stray refusal reason", async () => {
     const { client } = makeClient({
-      data: { ok: true, grow_event_id: "feed-event", reason: "idempotency_key_retracted" },
+      data: {
+        ok: true,
+        grow_event_id: "aaaaaaaa-3333-4333-8333-333333333333",
+        reason: "idempotency_key_retracted",
+      },
     });
     expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
       ok: true,
-      eventId: "feed-event",
+      eventId: "aaaaaaaa-3333-4333-8333-333333333333",
       reused: false,
     });
   });

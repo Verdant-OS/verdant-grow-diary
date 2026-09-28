@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import type { QuickLogFeedingEventRpcArgs } from "@/lib/writeFeedingTypedEvent";
+import { claimPendingQuickLogNote } from "@/lib/quickLogPendingNoteStore";
 
 const owner = vi.hoisted(() => ({ id: "owner-a" }));
 const rpc = vi.fn();
@@ -146,12 +147,125 @@ describe("Feed permanent replay refusal recovery", () => {
     expect(screen.queryByTestId("qlv2-exact-retry-lock")).toBeNull();
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(rpc).toHaveBeenCalledTimes(1);
-    rpc.mockResolvedValue({ data: { ok: true, grow_event_id: "new-feed-event" }, error: null });
+    rpc.mockResolvedValue({
+      data: { ok: true, grow_event_id: "aaaaaaaa-1111-4111-8111-111111111111" },
+      error: null,
+    });
     fill();
     fireEvent.click(screen.getByTestId("qlv2-save"));
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
     expect(rpc.mock.calls[1][1].p_idempotency_key).not.toBe(original.p_idempotency_key);
   });
+
+  it.each(["none", "Note", "Feed"])(
+    "resolves refused journals separately when %s clearance is blocked",
+    async (blockedDraft) => {
+      const first = await refused();
+      const originalFeed = rpc.mock.calls[0][1];
+      const rawFeed = window.sessionStorage.getItem(storageKey());
+      first.unmount();
+      expect(
+        claimPendingQuickLogNote({
+          version: 1,
+          ownerId: owner.id,
+          createdAt: "2026-09-01T12:00:00.000Z",
+          historyCheckReason: "idempotency_key_retracted",
+          attachments: { photo: false, video: false },
+          payload: {
+            p_target_type: "plant",
+            p_target_id: "plant-b",
+            p_action: "note",
+            p_volume_ml: null,
+            p_note: "Refused Note for the other grow",
+            p_temperature_c: null,
+            p_humidity_pct: null,
+            p_vpd_kpa: null,
+            p_occurred_at: "2026-09-01T12:00:00.000Z",
+            p_details: { source: "manual" },
+            p_stage: null,
+            p_idempotency_key: "refused-note-other-grow-key",
+          },
+          resolved: {
+            ok: true,
+            targetType: "plant",
+            targetId: "plant-b",
+            plantId: "plant-b",
+            tentId: "tent-b",
+            growId: "grow-b",
+          },
+        }).status,
+      ).toBe("claimed");
+      sheet();
+      const discard = () =>
+        screen.getByRole("button", { name: "I checked Timeline; discard draft" });
+      expect(screen.getByTestId("qlv2-history-review-link")).toHaveAttribute(
+        "href",
+        expect.stringContaining("grow-b"),
+      );
+      expect(discard()).toBeEnabled();
+      const noteKey = `verdant:quick-log:pending-note:v1:${owner.id}`;
+      const rawNote = window.sessionStorage.getItem(noteKey);
+      const blockClearance = (key: string) => {
+        const original = Storage.prototype.removeItem;
+        return vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (
+          this: Storage,
+          removedKey,
+        ) {
+          if (removedKey === key) throw new Error("Storage temporarily unavailable");
+          original.call(this, removedKey);
+        });
+      };
+      if (blockedDraft === "Note") {
+        const blocked = blockClearance(noteKey);
+        fireEvent.click(discard());
+        expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/draft could not be removed/);
+        expect(window.sessionStorage.getItem(noteKey)).toBe(rawNote);
+        expect(window.sessionStorage.getItem(storageKey())).toBe(rawFeed);
+        expect(screen.getByTestId("qlv2-save")).toBeDisabled();
+        expect(rpc).toHaveBeenCalledTimes(1);
+        expect(toastSuccess).not.toHaveBeenCalled();
+        blocked.mockRestore();
+      }
+      fireEvent.click(discard());
+      expect(window.sessionStorage.getItem(noteKey)).toBeNull();
+      expect(window.sessionStorage.getItem(storageKey())).toBe(rawFeed);
+      expect(rpc).toHaveBeenCalledTimes(1);
+      expect(toastSuccess).not.toHaveBeenCalled();
+
+      // A deliberate Feed action discovers the remaining exact journal before
+      // dispatching any new request, and restores its own original Timeline.
+      fill();
+      fireEvent.click(screen.getByTestId("qlv2-save"));
+      await waitFor(() => assertHistoryReview());
+      await waitFor(() => expect(discard()).toBeEnabled());
+      expect(window.sessionStorage.getItem(storageKey())).toBe(rawFeed);
+      expect(rpc).toHaveBeenCalledTimes(1);
+      if (blockedDraft === "Feed") {
+        const blocked = blockClearance(storageKey());
+        fireEvent.click(discard());
+        expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/draft could not be removed/);
+        expect(window.sessionStorage.getItem(noteKey)).toBeNull();
+        expect(window.sessionStorage.getItem(storageKey())).toBe(rawFeed);
+        assertHistoryReview();
+        expect(rpc).toHaveBeenCalledTimes(1);
+        blocked.mockRestore();
+      }
+      fireEvent.click(discard());
+      expect(window.sessionStorage.getItem(storageKey())).toBeNull();
+      expect(screen.queryByTestId("qlv2-exact-retry-lock")).toBeNull();
+      expect(rpc).toHaveBeenCalledTimes(1);
+      expect(toastSuccess).not.toHaveBeenCalled();
+
+      rpc.mockResolvedValue({
+        data: { ok: true, grow_event_id: "aaaaaaaa-4444-4444-8444-444444444444" },
+        error: null,
+      });
+      fill();
+      fireEvent.click(screen.getByTestId("qlv2-save"));
+      await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
+      expect(rpc.mock.calls[1][1].p_idempotency_key).not.toBe(originalFeed.p_idempotency_key);
+    },
+  );
 
   it("restores an already refused claim discovered at Save without dispatching the newer draft", async () => {
     const first = await refused();
@@ -192,7 +306,10 @@ describe("Feed permanent replay refusal recovery", () => {
     expect(
       JSON.parse(window.sessionStorage.getItem(storageKey())!).historyCheckReason,
     ).toBeUndefined();
-    rpc.mockResolvedValue({ data: { ok: true, grow_event_id: "retried-feed" }, error: null });
+    rpc.mockResolvedValue({
+      data: { ok: true, grow_event_id: "aaaaaaaa-2222-4222-8222-222222222222" },
+      error: null,
+    });
     fireEvent.click(screen.getByTestId("qlv2-save-retry"));
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
     expect(rpc.mock.calls[1][1]).toEqual(original);

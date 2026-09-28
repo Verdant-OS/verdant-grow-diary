@@ -44,6 +44,16 @@ export interface PersistenceContext {
   now?: number;
 }
 
+/** Age-only staleness cannot establish that a missing, invalid or future observation is current. */
+export function hasConfirmedAlertObservationTime(
+  snapshot: Pick<SensorSnapshot, "ts"> | null | undefined,
+  now: number,
+): boolean {
+  if (typeof snapshot?.ts !== "string" || !Number.isFinite(now)) return false;
+  const capturedAt = Date.parse(snapshot.ts);
+  return Number.isFinite(capturedAt) && capturedAt <= now;
+}
+
 /** Why a snapshot may not back a persisted alert. `null` means it may. */
 export type PersistenceBlockReason =
   | "demo_data"
@@ -84,7 +94,8 @@ export function snapshotPersistenceBlockReason(
   // mint a row stamped as brand new. `snapshot.source` is therefore
   // intentionally NOT forwarded to isStale here.
   // Regression fence: src/test/environment-alert-persistence-live-window.test.ts
-  if (isStale(snapshot.ts, now)) return "outside_live_window";
+  if (!hasConfirmedAlertObservationTime(snapshot, now) || isStale(snapshot.ts, now))
+    return "outside_live_window";
   return null;
 }
 

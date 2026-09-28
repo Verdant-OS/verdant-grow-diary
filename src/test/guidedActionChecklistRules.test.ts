@@ -244,7 +244,7 @@ describe("buildGuidedActionChecklist", () => {
     expect(items.every((i) => !i.ctaHref.includes("/quick-log"))).toBe(true);
   });
 
-  it("routes sensor CTAs through daily-check with a plant in that tent", () => {
+  it("routes sensor CTAs through daily-check with a plant in that tent and growId when active", () => {
     const items = buildGuidedActionChecklist(
       makeInput({
         plants: [PLANT_A],
@@ -268,8 +268,23 @@ describe("buildGuidedActionChecklist", () => {
       }),
     );
     const sensor = items.find((i) => i.id === "sensor:t1");
-    expect(sensor?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=sensor");
+    expect(sensor?.ctaHref).toBe(
+      "/daily-check?plantId=p1&from=dashboard&method=sensor&growId=grow-a",
+    );
     expect(sensor?.ctaHref).not.toMatch(/\/quick-log/);
+  });
+
+  it("omits growId from sensor CTAs when no grow is active", () => {
+    const items = buildGuidedActionChecklist(
+      makeInput({
+        scopedGrowId: "",
+        plants: [PLANT_A],
+        tents: [TENT_1],
+        latestReadingByTent: { t1: null },
+      }),
+    );
+    const sensor = items.find((i) => i.id === "sensor:t1");
+    expect(sensor?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=sensor");
   });
 
   it("keeps tent-only sensor CTA on authenticated daily-check when the tent has no plants", () => {
@@ -281,7 +296,7 @@ describe("buildGuidedActionChecklist", () => {
       }),
     );
     const sensor = items.find((i) => i.id === "sensor:t1");
-    expect(sensor?.ctaHref).toBe("/daily-check?from=dashboard");
+    expect(sensor?.ctaHref).toBe("/daily-check?from=dashboard&growId=grow-a");
     expect(sensor?.ctaHref).not.toMatch(/\/quick-log/);
   });
 

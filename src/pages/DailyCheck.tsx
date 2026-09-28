@@ -107,7 +107,14 @@ import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { useAuth } from "@/store/auth";
 import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChangeContextRules";
 
-import { plantDetailPath, plantsPath, sensorsPath, tentsPath, timelinePath } from "@/lib/routes";
+import {
+  dashboardPath,
+  plantDetailPath,
+  plantsPath,
+  sensorsPath,
+  tentsPath,
+  timelinePath,
+} from "@/lib/routes";
 import {
   DAILY_CHECK_EMPTY_NO_TENT_TITLE,
   DAILY_CHECK_EMPTY_NO_TENT_BODY,
@@ -408,6 +415,11 @@ export default function DailyCheck() {
     [selectedPlant?.id, entrySource, urlGrowId],
   );
   const scopedBackAction = urlGrowId ? postSubmitActions.find((action) => action.primary) : null;
+  const dashboardBreadcrumbHref = useMemo(() => dashboardPath(urlGrowId), [urlGrowId]);
+  const backHref =
+    scopedBackAction?.key === "dashboard"
+      ? dashboardBreadcrumbHref
+      : (scopedBackAction?.href ?? "/");
 
   const loggedAtLabel = useMemo(() => formatDailyCheckLoggedAt(lastSubmittedAt), [lastSubmittedAt]);
   const savedItems = useMemo(
@@ -468,7 +480,7 @@ export default function DailyCheck() {
   return (
     <div className="mx-auto w-full min-w-0 max-w-2xl pb-24" data-testid="daily-grow-check-page">
       <Button asChild variant="ghost" size="sm" className="mb-3 min-h-11 whitespace-normal">
-        <Link to={scopedBackAction?.href ?? "/"}>
+        <Link to={backHref}>
           <ArrowLeft className="h-4 w-4" />{" "}
           {scopedBackAction && scopedBackAction.key !== "dashboard"
             ? scopedBackAction.label

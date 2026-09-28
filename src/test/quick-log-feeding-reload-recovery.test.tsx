@@ -88,6 +88,172 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
+describe("Feed permanent replay refusal recovery", () => {
+  const permanentReasons = [
+    "idempotency_key_unverified",
+    "idempotency_receipt_missing",
+    "idempotency_key_retracted",
+    "idempotency_key_conflict",
+  ];
+  async function refused(reason = "idempotency_key_retracted") {
+    rpc.mockResolvedValue({ data: { ok: false, reason }, error: null });
+    const view = sheet();
+    fill();
+    await uncertain();
+    return view;
+  }
+  function assertHistoryReview() {
+    expect(screen.getByTestId("qlv2-exact-retry-lock")).toHaveTextContent(
+      /Check Timeline in another tab/,
+    );
+    expect(screen.queryByTestId("qlv2-save-retry")).toBeNull();
+    expect(screen.getByTestId("qlv2-save")).toBeDisabled();
+    expect(screen.getByLabelText("Product 1 name")).toBeDisabled();
+    expect(screen.getByTestId("qlv2-history-review-link")).toHaveAttribute(
+      "href",
+      expect.stringContaining("grow-a"),
+    );
+    expect(toastSuccess).not.toHaveBeenCalled();
+  }
+
+  it.each(permanentReasons)("preserves %s and never offers same-key Retry", async (reason) => {
+    await refused(reason);
+    assertHistoryReview();
+    const pending = JSON.parse(window.sessionStorage.getItem(storageKey())!);
+    expect(pending.historyCheckReason).toBe(reason);
+    expect(pending.payload.idempotency_key).toBe(rpc.mock.calls[0][1].p_idempotency_key);
+    expect(pending.payload).toMatchObject({
+      grow_id: "grow-a",
+      tent_id: "tent-a",
+      plant_id: "plant-a",
+      volume_ml: 750,
+      products: [{ name: "Base A", amount: 2, unit: "ml_per_l" }],
+    });
+    fireEvent.click(screen.getByTestId("qlv2-save"));
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores the refusal on another target and discards locally only after explicit review", async () => {
+    const first = await refused();
+    const original = rpc.mock.calls[0][1];
+    first.unmount();
+    sheet("plant:plant-b");
+    assertHistoryReview();
+    expect(screen.getByLabelText("Applied volume (ml)")).toHaveValue("750");
+    expect(rpc).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+    expect(window.sessionStorage.getItem(storageKey())).toBeNull();
+    expect(screen.queryByTestId("qlv2-exact-retry-lock")).toBeNull();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledTimes(1);
+    rpc.mockResolvedValue({ data: { ok: true, grow_event_id: "new-feed-event" }, error: null });
+    fill();
+    fireEvent.click(screen.getByTestId("qlv2-save"));
+    await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
+    expect(rpc.mock.calls[1][1].p_idempotency_key).not.toBe(original.p_idempotency_key);
+  });
+
+  it("restores an already refused claim discovered at Save without dispatching the newer draft", async () => {
+    const first = await refused();
+    const raw = window.sessionStorage.getItem(storageKey())!;
+    first.unmount();
+    window.sessionStorage.removeItem(storageKey());
+    sheet("plant:plant-b");
+    fill();
+    window.sessionStorage.setItem(storageKey(), raw);
+    fireEvent.click(screen.getByTestId("qlv2-save"));
+    await waitFor(() => assertHistoryReview());
+    expect(window.sessionStorage.getItem(storageKey())).toBe(raw);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("isolates a refused Feed through owner A to B to A without resubmitting it", async () => {
+    const view = await refused();
+    const raw = window.sessionStorage.getItem(storageKey());
+    owner.id = "owner-b";
+    view.rerender(view.element());
+    expect(screen.queryByTestId("qlv2-exact-retry-lock")).toBeNull();
+    expect(window.sessionStorage.getItem(storageKey("owner-b"))).toBeNull();
+    owner.id = "owner-a";
+    view.rerender(view.element());
+    assertHistoryReview();
+    expect(window.sessionStorage.getItem(storageKey())).toBe(raw);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps an unknown server rejection retryable using the exact original key and payload", async () => {
+    rpc.mockResolvedValueOnce({ data: { ok: false, reason: "unknown_refusal" }, error: null });
+    sheet();
+    fill();
+    await uncertain();
+    const original = rpc.mock.calls[0][1];
+    expect(screen.getByTestId("qlv2-save-retry")).toBeEnabled();
+    expect(screen.queryByTestId("qlv2-history-review-link")).toBeNull();
+    expect(
+      JSON.parse(window.sessionStorage.getItem(storageKey())!).historyCheckReason,
+    ).toBeUndefined();
+    rpc.mockResolvedValue({ data: { ok: true, grow_event_id: "retried-feed" }, error: null });
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+    await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
+    expect(rpc.mock.calls[1][1]).toEqual(original);
+  });
+
+  it.each(["throws", "silently ignores"])("stays locked when discard %s", async (failure) => {
+    await refused();
+    assertHistoryReview();
+    const raw = window.sessionStorage.getItem(storageKey());
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      if (failure === "throws") throw new Error("storage blocked");
+    });
+    fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+    expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/draft could not be removed/);
+    assertHistoryReview();
+    expect(window.sessionStorage.getItem(storageKey())).toBe(raw);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("never clears a replacement journal when the grower discards the older refused draft", async () => {
+    await refused();
+    assertHistoryReview();
+    const replacement = JSON.parse(window.sessionStorage.getItem(storageKey())!);
+    replacement.payload.idempotency_key = "replacement-feed-save-key";
+    const raw = JSON.stringify(replacement);
+    window.sessionStorage.setItem(storageKey(), raw);
+    fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+    expect(window.sessionStorage.getItem(storageKey())).toBe(raw);
+    assertHistoryReview();
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["throws", "silently ignores"])(
+    "keeps the mounted refusal locked when marker storage %s",
+    async (failure) => {
+      const setItem = Storage.prototype.setItem;
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+        this: Storage,
+        key,
+        value,
+      ) {
+        if (!JSON.parse(value).historyCheckReason) setItem.call(this, key, value);
+        else if (failure === "throws") throw new Error("marker storage blocked");
+      });
+      await refused();
+      assertHistoryReview();
+      expect(
+        screen.getByRole("button", { name: "I checked Timeline; discard draft" }),
+      ).toBeEnabled();
+      expect(
+        JSON.parse(window.sessionStorage.getItem(storageKey())!).historyCheckReason,
+      ).toBeUndefined();
+      fireEvent.click(screen.getByTestId("qlv2-save"));
+      expect(rpc).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+      expect(window.sessionStorage.getItem(storageKey())).toBeNull();
+      expect(rpc).toHaveBeenCalledTimes(1);
+    },
+  );
+});
+
 describe("Feed exact recovery through the actual typed writer", () => {
   it("restores after remount on another plant and reuses one accepted RPC record", async () => {
     const ledger = acceptedThenLost();

@@ -207,16 +207,22 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
   it("rotates an abandoned history draft only after guarded exact journal clearance", () => {
     expect(HISTORY_DISCARD).not.toBe("");
     expect(HISTORY_DISCARD).toMatch(
-      /if \(!historyDiscardAllowed \|\| !pending \|\| saveInFlightRef\.current\) return;/,
+      /!historyDiscardAllowed\s*\|\|\s*saveInFlightRef\.current\s*\|\|\s*\(!pending && !pendingFeed\)\s*\|\|\s*\(pending && pendingFeed\)/,
     );
     expect(HISTORY_DISCARD).toMatch(
-      /if \(!clearPendingQuickLogNote\(pending\.recovery\)\) \{\s*setLocalError\(QUICK_LOG_HISTORY_DISCARD_FAILED\);\s*return;\s*\}/,
+      /if \(pending && !clearPendingQuickLogNote\(pending\.recovery\)\) \{\s*setLocalError\(QUICK_LOG_HISTORY_DISCARD_FAILED\);\s*return;\s*\}/,
+    );
+    expect(HISTORY_DISCARD).toMatch(
+      /if \(pendingFeed && !clearPendingQuickLogFeeding\(pendingFeed\.recovery\)\) \{\s*setLocalError\(QUICK_LOG_HISTORY_DISCARD_FAILED\);\s*return;\s*\}/,
     );
     const clearance = HISTORY_DISCARD.indexOf("clearPendingQuickLogNote(pending.recovery)");
     const rotation = HISTORY_DISCARD.indexOf(
       "saveIdempotencyKeyRef.current = newQuickLogSaveKey()",
     );
     expect(rotation).toBeGreaterThan(clearance);
+    expect(rotation).toBeGreaterThan(
+      HISTORY_DISCARD.indexOf("clearPendingQuickLogFeeding(pendingFeed.recovery)"),
+    );
     expect(
       HISTORY_DISCARD.match(/saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/g),
     ).toHaveLength(1);

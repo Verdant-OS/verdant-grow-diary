@@ -7,7 +7,7 @@ const root = resolve(__dirname, "../..");
 const migration = readFileSync(
   resolve(root, "supabase/migrations/20260927012000_quicklog_event_replay_active_receipt.sql"),
   "utf8",
-);
+).replace(/\r/g, "");
 const priorWrapper = readFileSync(
   resolve(root, "supabase/migrations/20260725024026_quicklog_dual_timestamp_foundation.sql"),
   "utf8",
@@ -41,22 +41,34 @@ describe("Quick Log event replay active-receipt migration", () => {
     expect(preflight).toMatch(/a\.attname = 'is_deleted'[\s\S]*?AND a\.attnotnull/);
   });
 
-  it("checks a locked, active event and diary mirror before either reuse path", () => {
+  it("checks a locked active event and nonblocking diary mirror before either reuse path", () => {
     const eventLock = migration.indexOf("FOR UPDATE OF ge;");
     const eventRefusal = migration.indexOf("'idempotency_key_retracted'");
-    const diaryLock = migration.indexOf("FOR UPDATE OF de;");
+    const diaryCheck = migration.indexOf("PERFORM 1\n      FROM public.diary_entries AS de");
     const diaryRefusal = migration.indexOf("'idempotency_receipt_missing'");
     const legacyReuse = migration.indexOf("v_is_exact_legacy_retry :=");
     const delegateCall = migration.indexOf("v_result := public.quicklog_save_event_pre_logged_at(");
     expect(eventLock).toBeGreaterThan(-1);
     expect(eventRefusal).toBeGreaterThan(eventLock);
-    expect(diaryLock).toBeGreaterThan(eventRefusal);
-    expect(diaryRefusal).toBeGreaterThan(diaryLock);
+    expect(diaryCheck).toBeGreaterThan(eventRefusal);
+    expect(diaryRefusal).toBeGreaterThan(diaryCheck);
     expect(legacyReuse).toBeGreaterThan(diaryRefusal);
     expect(delegateCall).toBeGreaterThan(legacyReuse);
     expect(migration).toMatch(/de\.retracted_at IS NULL/);
     expect(migration).toMatch(/de\.user_id = uid/);
     expect(migration).toMatch(/de\.grow_id = v_existing_grow_id/);
+    expect(migration).not.toContain("FOR UPDATE OF de;");
+  });
+
+  it("never waits for a diary row held by a diary-first correction, including legacy timestamp repair", () => {
+    const repairCandidates = migration.indexOf("WITH editable_mirrors AS (");
+    const skipLocked = migration.indexOf("FOR UPDATE OF de SKIP LOCKED");
+    const diaryUpdate = migration.indexOf("UPDATE public.diary_entries AS de");
+    expect(repairCandidates).toBeGreaterThan(migration.indexOf("v_is_reused :="));
+    expect(skipLocked).toBeGreaterThan(repairCandidates);
+    expect(diaryUpdate).toBeGreaterThan(skipLocked);
+    expect(migration).toContain("FROM editable_mirrors AS mirror");
+    expect(migration).toContain("WHERE de.id = mirror.id;");
   });
 
   it("keeps the migration additive and the public execute grant scoped", () => {

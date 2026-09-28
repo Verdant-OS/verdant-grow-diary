@@ -727,6 +727,31 @@ describe("remote applied-schema runner safety", () => {
     expect(delegateContract).toMatch(/has_function_privilege\(\s*'anon'/);
     expect(delegateContract).toMatch(/has_function_privilege\(\s*'authenticated'/);
     expect(delegateContract).toMatch(/has_function_privilege\(\s*'service_role'/);
+    expect(catalogSql).toContain("public.quicklog_correct_entry(text,text,jsonb,uuid,uuid,text)");
+    expect(catalogSql).toContain("public.quicklog_retract_entry(text,text,uuid,uuid,text)");
+    expect(catalogSql).toMatch(/select\s+count\(\*\)\s*=\s*7\s+from observed_functions/i);
+  });
+
+  it("counts every overload before selecting the seven pinned signatures", () => {
+    const catalogSql = emittedQuickLogCatalogSql();
+    const observedCatalog = catalogSql.slice(
+      catalogSql.indexOf("observed_functions as ("),
+      catalogSql.indexOf("observed_signature_functions as ("),
+    );
+    const pinnedCatalog = catalogSql.slice(
+      catalogSql.indexOf("observed_signature_functions as ("),
+      catalogSql.indexOf("manual_contract_function_ids(kind, oid) as ("),
+    );
+
+    expect(observedCatalog).toContain("p.proname in (");
+    expect(observedCatalog).toContain("'quicklog_correct_entry'");
+    expect(observedCatalog).toContain("'quicklog_retract_entry'");
+    expect(observedCatalog).not.toContain("p.oid::regprocedure::text in (");
+    expect(pinnedCatalog).toContain("where signature in (");
+    expect(pinnedCatalog).toContain(
+      "public.quicklog_correct_entry(text,text,jsonb,uuid,uuid,text)",
+    );
+    expect(pinnedCatalog).toContain("public.quicklog_retract_entry(text,text,uuid,uuid,text)");
   });
 
   it("requires every pinned index to be valid, ready, and live", () => {
@@ -780,9 +805,14 @@ describe("remote applied-schema runner safety", () => {
       ["target_indexes_contract"],
     ],
     [
-      "one of the five functions is missing",
+      "one of the seven correction/retraction functions is missing",
       { target_functions_contract: false, target_function_overloads_contract: false },
       ["target_functions_contract", "target_function_overloads_contract"],
+    ],
+    [
+      "an eighth overload exists while all seven pinned signatures remain valid",
+      { target_function_overloads_contract: false },
+      ["target_function_overloads_contract"],
     ],
     [
       "an unexpected role can execute a Quick Log function",

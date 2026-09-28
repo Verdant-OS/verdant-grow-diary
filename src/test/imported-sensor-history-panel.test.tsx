@@ -153,6 +153,29 @@ describe("ImportedSensorHistoryPanel", () => {
     expect(filters.textContent ?? "").not.toContain("co2_ppm");
   });
 
+  it("shows imported values with the canonical units on the reopened history table", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[
+            csvRow({ metric: "temperature_c", value: 24 }),
+            csvRow({ metric: "humidity_pct", value: 52 }),
+            csvRow({ metric: "vpd_kpa", value: 1.11 }),
+          ]}
+        />,
+      ),
+    );
+    const rows = screen.getByTestId("imported-history-recent-rows").querySelectorAll("tbody tr");
+    const values = Object.fromEntries(
+      Array.from(rows, (row) => [
+        row.querySelectorAll("td")[1].textContent,
+        row.querySelectorAll("td")[2].textContent,
+      ]),
+    );
+    expect(values).toEqual({ temperature_c: "24 °C", humidity_pct: "52%", vpd_kpa: "1.11 kPa" });
+  });
+
   it("never renders raw_payload or forbidden live-creation wording", () => {
     const { container } = render(
       wrap(<ImportedSensorHistoryPanel tentId="tent-A" readings={[csvRow()]} />),

@@ -158,6 +158,45 @@ export function describeQuickLogSaveFailure(
   };
 }
 
+type QuickLogNamedRecord = { id?: string | null; name?: string | null };
+type QuickLogNamedRecords = ReadonlyArray<QuickLogNamedRecord | null | undefined> | null;
+
+interface QuickLogPersistedTargetScope {
+  persistedGrowId?: string | null;
+  persistedTentId?: string | null;
+  persistedPlantId?: string | null;
+}
+
+interface QuickLogTargetNameLookup {
+  grows?: QuickLogNamedRecords;
+  tents?: QuickLogNamedRecords;
+  plants?: QuickLogNamedRecords;
+}
+
+function describePersistedTarget(
+  label: string,
+  id: string | null | undefined,
+  records: QuickLogNamedRecords | undefined,
+): string | null {
+  if (typeof id !== "string" || id.trim().length === 0) return null;
+  const name = Array.isArray(records) ? records.find((record) => record?.id === id)?.name : null;
+  return `${label}: ${typeof name === "string" && name.trim() ? name.trim() : `Saved ${label.toLowerCase()}`}`;
+}
+
+/** Describe only the verified event's scope, without inventing names or exposing raw IDs. */
+export function buildReceiptTargetMovedMessage(
+  receipt: QuickLogPersistedTargetScope | null | undefined,
+  lookup?: QuickLogTargetNameLookup | null,
+): string {
+  const parts = [
+    describePersistedTarget("Grow", receipt?.persistedGrowId, lookup?.grows),
+    describePersistedTarget("Tent", receipt?.persistedTentId, lookup?.tents),
+    describePersistedTarget("Plant", receipt?.persistedPlantId, lookup?.plants),
+  ].filter((part): part is string => part !== null);
+  const savedTarget = parts.length > 0 ? ` Saved target: ${parts.join(" · ")}.` : "";
+  return `The saved entry target differs from this submission.${savedTarget} It has not been confirmed; check its Timeline before making another entry.`;
+}
+
 /**
  * Classify a thrown/transport-level `quicklog_save_manual` failure into a
  * reason code the mapper above understands.

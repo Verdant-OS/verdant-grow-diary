@@ -457,7 +457,7 @@ describe("ASTRA-001 exact Note recovery", () => {
       },
       error: null,
     });
-    renderSheet();
+    const view = renderSheet();
     typeNote();
     save();
     await expectRetry();
@@ -483,6 +483,21 @@ describe("ASTRA-001 exact Note recovery", () => {
     );
     expect(screen.getByLabelText("Note (optional)")).toBeDisabled();
     expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeInTheDocument();
+    expect(photoEntryMock).not.toHaveBeenCalled();
+    expect(videoEntryMock).not.toHaveBeenCalled();
+    expect(navigationMock).not.toHaveBeenCalled();
+    const originalPayload = rpcMock.mock.calls[0][1];
+    view.unmount();
+    renderSheet("plant:44444444-4444-4444-8444-444444444444");
+    await expectRetry();
+    expect(screen.getByLabelText("Note (optional)")).toHaveValue(originalNote);
+    expect(screen.getByLabelText("Note (optional)")).toBeDisabled();
+    retry();
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(3));
+    await expectRetry();
+    expect(rpcMock.mock.calls[2][1]).toEqual(originalPayload);
+    expect(screen.queryByTestId("qlv2-review-saved-entry")).not.toBeInTheDocument();
+    expect(committed.size).toBe(1);
   });
 
   it("does not accept a reused success response without a persisted event id", async () => {
@@ -506,6 +521,47 @@ describe("ASTRA-001 exact Note recovery", () => {
     expect(receipt?.ok).toBe(false);
     expect(telemetryMock).not.toHaveBeenCalled();
   });
+
+  it.each(["33333333-3333-4333-8333-333333333333", "44444444-4444-4444-8444-444444444444"])(
+    "rejects a readback of another event without exposing its scope (%s)",
+    async (plantId) => {
+      rpcMock.mockResolvedValue({
+        data: { ok: true, reused: true, grow_event_id: confirmedEventId },
+        error: null,
+      });
+      readbackMock.mockResolvedValue({
+        data: {
+          id: "99999999-9999-4999-8999-999999999999",
+          note: originalNote,
+          grow_id: "66666666-6666-4666-8666-666666666666",
+          plant_id: plantId,
+          tent_id: "55555555-5555-4555-8555-555555555555",
+        },
+        error: null,
+      });
+      const { result } = renderHook(() => quickLogSaveHook.useQuickLogV2Save());
+      let receipt: Awaited<ReturnType<typeof result.current.save>> | undefined;
+      await act(async () => {
+        receipt = await result.current.save(
+          {
+            p_target_type: "plant",
+            p_target_id: "33333333-3333-4333-8333-333333333333",
+            p_action: "note",
+            p_volume_ml: null,
+            p_note: originalNote,
+            p_temperature_c: null,
+            p_humidity_pct: null,
+            p_vpd_kpa: null,
+            p_occurred_at: null,
+            p_idempotency_key: "exact-note-retry-key",
+          },
+          { verifyPersistedNote: true },
+        );
+      });
+      expect(receipt).toEqual({ ok: false, reason: "receipt_unverified" });
+      expect(telemetryMock).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     {
@@ -577,7 +633,7 @@ describe("ASTRA-001 exact Note recovery", () => {
       },
       error: null,
     });
-    const { result } = renderHook(() => useQuickLogV2Save());
+    const { result } = renderHook(() => quickLogSaveHook.useQuickLogV2Save());
     let receipt: Awaited<ReturnType<typeof result.current.save>> | undefined;
     await act(async () => {
       receipt = await result.current.save(
@@ -607,6 +663,49 @@ describe("ASTRA-001 exact Note recovery", () => {
     expect(receipt?.persistedNote).toBeUndefined();
   });
 
+  it.each(["88888888-8888-4888-8888-888888888888", null])(
+    "keeps a changed or removed tent target unconfirmed (%s)",
+    async (tentId) => {
+      rpcMock.mockResolvedValue({
+        data: { ok: true, reused: true, grow_event_id: confirmedEventId },
+        error: null,
+      });
+      readbackMock.mockResolvedValue({
+        data: {
+          id: confirmedEventId,
+          note: originalNote,
+          grow_id: "66666666-6666-4666-8666-666666666666",
+          plant_id: null,
+          tent_id: tentId,
+        },
+        error: null,
+      });
+      const { result } = renderHook(() => quickLogSaveHook.useQuickLogV2Save());
+      let receipt: Awaited<ReturnType<typeof result.current.save>> | undefined;
+      await act(async () => {
+        receipt = await result.current.save(
+          {
+            p_target_type: "tent",
+            p_target_id: "55555555-5555-4555-8555-555555555555",
+            p_action: "note",
+            p_volume_ml: null,
+            p_note: originalNote,
+            p_temperature_c: null,
+            p_humidity_pct: null,
+            p_vpd_kpa: null,
+            p_occurred_at: null,
+            p_idempotency_key: "exact-tent-note-retry-key",
+          },
+          { verifyPersistedNote: true },
+        );
+      });
+      expect(receipt).toMatchObject({ ok: false, reason: "receipt_target_moved" });
+      expect(receipt?.growEventId).toBeUndefined();
+      expect(receipt?.persistedNote).toBeUndefined();
+      expect(telemetryMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("keeps note mismatches on receipt_mismatch with saved-entry review metadata", async () => {
     rpcMock.mockResolvedValue({
       data: { ok: true, reused: true, grow_event_id: confirmedEventId },
@@ -622,7 +721,7 @@ describe("ASTRA-001 exact Note recovery", () => {
       },
       error: null,
     });
-    const { result } = renderHook(() => useQuickLogV2Save());
+    const { result } = renderHook(() => quickLogSaveHook.useQuickLogV2Save());
     let receipt: Awaited<ReturnType<typeof result.current.save>> | undefined;
     await act(async () => {
       receipt = await result.current.save(

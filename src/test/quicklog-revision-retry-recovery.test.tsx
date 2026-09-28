@@ -30,6 +30,8 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
 
+type Kind = "correction" | "retraction";
+
 const receipt = {
   data: {
     ok: true,
@@ -42,11 +44,15 @@ const receipt = {
 };
 const uncertain = { data: null, error: { code: "", message: "Failed to fetch" } };
 
-function mount() {
+function mount(
+  handle: { growEventId?: string; diaryEntryId?: string } = {
+    growEventId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  },
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const changed = vi.fn();
   const props = {
-    handle: { growEventId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+    handle,
     currentNote: "Original",
     currentPlantId: "plant-a",
     onChanged: changed,
@@ -60,13 +66,28 @@ function mount() {
   return { ...result, changed, refresh: () => result.rerender(ui()) };
 }
 
-function correction() {
-  fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));
-  fireEvent.click(screen.getByTestId("quicklog-correct-reason-typo"));
-  fireEvent.change(screen.getByTestId("quicklog-correct-note-input"), {
-    target: { value: "Corrected" },
-  });
-  fireEvent.click(screen.getByTestId("quicklog-correct-save"));
+function submitRevision(kind: Kind) {
+  if (kind === "correction") {
+    fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));
+    fireEvent.click(screen.getByTestId("quicklog-correct-reason-typo"));
+    fireEvent.change(screen.getByTestId("quicklog-correct-note-input"), {
+      target: { value: "Corrected" },
+    });
+    fireEvent.click(screen.getByTestId("quicklog-correct-save"));
+    return;
+  }
+
+  fireEvent.click(screen.getByTestId("quicklog-entry-retract-button"));
+  fireEvent.click(screen.getByTestId("quicklog-retract-reason-accidental"));
+  fireEvent.click(screen.getByTestId("quicklog-retract-confirm"));
+}
+
+function replayRevision(kind: Kind) {
+  fireEvent.click(
+    screen.getByTestId(
+      kind === "correction" ? "quicklog-correct-save" : "quicklog-retract-confirm",
+    ),
+  );
 }
 
 beforeEach(() => {
@@ -92,7 +113,7 @@ describe("revision confirmation recovery", () => {
   it("retries a correction with the exact operation key and refreshes only after a receipt", async () => {
     mocks.rpc.mockResolvedValueOnce(uncertain).mockResolvedValueOnce(receipt);
     const view = mount();
-    correction();
+    submitRevision("correction");
     await waitFor(() => expect(mocks.error).toHaveBeenCalled());
     expect(mocks.error.mock.calls[0][0]).toMatch(/could not confirm/i);
     expect(view.changed).not.toHaveBeenCalled();
@@ -108,7 +129,7 @@ describe("revision confirmation recovery", () => {
   it("retains an uncertain correction when the dialog is closed and reopened", async () => {
     mocks.rpc.mockResolvedValueOnce(uncertain).mockResolvedValueOnce(receipt);
     mount();
-    correction();
+    submitRevision("correction");
     await waitFor(() => expect(mocks.error).toHaveBeenCalled());
     const first = mocks.rpc.mock.calls[0][1];
     fireEvent.click(screen.getByTestId("quicklog-correct-cancel"));
@@ -122,9 +143,7 @@ describe("revision confirmation recovery", () => {
   it("replays retraction confirmation without sending a new logical operation", async () => {
     mocks.rpc.mockResolvedValueOnce(uncertain).mockResolvedValueOnce(receipt);
     const view = mount();
-    fireEvent.click(screen.getByTestId("quicklog-entry-retract-button"));
-    fireEvent.click(screen.getByTestId("quicklog-retract-reason-accidental"));
-    fireEvent.click(screen.getByTestId("quicklog-retract-confirm"));
+    submitRevision("retraction");
     await waitFor(() => expect(mocks.error).toHaveBeenCalled());
     expect(mocks.error.mock.calls[0][0]).toMatch(/could not confirm/i);
     const first = mocks.rpc.mock.calls[0][1];
@@ -144,7 +163,7 @@ describe("revision confirmation recovery", () => {
         }),
     );
     const view = mount();
-    correction();
+    submitRevision("correction");
     mocks.owner = "owner-b";
     view.refresh();
     await act(async () => finish(receipt));
@@ -157,7 +176,7 @@ describe("revision confirmation recovery", () => {
       .mockResolvedValueOnce(uncertain)
       .mockResolvedValueOnce({ data: { ok: false, reason: "forbidden" }, error: null });
     mount();
-    correction();
+    submitRevision("correction");
     await waitFor(() => expect(mocks.error).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByTestId("quicklog-correct-save"));
     await waitFor(() => expect(mocks.error).toHaveBeenCalledTimes(2));
@@ -186,7 +205,7 @@ describe("revision confirmation recovery", () => {
     } else mocks.rpc.mockResolvedValueOnce({ data: { ok: true }, error: null });
     mocks.rpc.mockResolvedValueOnce(receipt);
     const view = mount();
-    correction();
+    submitRevision("correction");
     await waitFor(() => expect(mocks.error).toHaveBeenCalled());
     expect(mocks.error.mock.calls[0][0]).toMatch(/could not confirm/i);
     const first = mocks.rpc.mock.calls[0][1];
@@ -198,7 +217,7 @@ describe("revision confirmation recovery", () => {
   it("accepts a genuinely new correction with a new operation key", async () => {
     mocks.rpc.mockResolvedValue(receipt);
     const view = mount();
-    correction();
+    submitRevision("correction");
     await waitFor(() => expect(view.changed).toHaveBeenCalledOnce());
     const first = mocks.rpc.mock.calls[0][1];
     fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));
@@ -217,7 +236,7 @@ describe("revision confirmation recovery", () => {
       .mockResolvedValueOnce({ data: { ok: false, reason: "invalid_changes" }, error: null })
       .mockResolvedValueOnce(receipt);
     const view = mount();
-    correction();
+    submitRevision("correction");
     await waitFor(() => expect(mocks.error).toHaveBeenCalled());
     expect(screen.getByTestId("quicklog-correct-note-input")).toBeEnabled();
     fireEvent.change(screen.getByTestId("quicklog-correct-note-input"), {
@@ -237,7 +256,7 @@ describe("revision confirmation recovery", () => {
         }),
     );
     const view = mount();
-    correction();
+    submitRevision("correction");
     view.unmount();
     await act(async () => finish(receipt));
     expect(mocks.success).not.toHaveBeenCalled();
@@ -267,4 +286,67 @@ describe("revision confirmation recovery", () => {
     await act(async () => finish(receipt));
     expect(view.changed).toHaveBeenCalledOnce();
   });
+
+  it.each<Kind>(["correction", "retraction"])(
+    "keeps the original %s request and toast when the receipt event mismatches",
+    async (kind) => {
+      mocks.rpc
+        .mockResolvedValueOnce({
+          data: { ...receipt.data, grow_event_id: "11111111-1111-4111-8111-111111111111" },
+          error: null,
+        })
+        .mockResolvedValueOnce(receipt);
+      const view = mount();
+
+      submitRevision(kind);
+      await waitFor(() => expect(mocks.error).toHaveBeenCalled());
+
+      expect(mocks.error.mock.calls[0][0]).toMatch(/could not confirm/i);
+      expect(view.changed).not.toHaveBeenCalled();
+      const first = mocks.rpc.mock.calls[0][1];
+
+      replayRevision(kind);
+      await waitFor(() => expect(view.changed).toHaveBeenCalledOnce());
+
+      expect(mocks.rpc).toHaveBeenCalledTimes(2);
+      expect(mocks.rpc.mock.calls[1][1]).toEqual(first);
+    },
+  );
+
+  it.each<Kind>(["correction", "retraction"])(
+    "keeps the original %s diary-root request and toast when the receipt omits the diary handle",
+    async (kind) => {
+      mocks.rpc
+        .mockResolvedValueOnce({
+          data: {
+            ...receipt.data,
+            grow_event_id: "11111111-1111-4111-8111-111111111111",
+            diary_entry_ids: ["99999999-9999-4999-8999-999999999999"],
+          },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: {
+            ...receipt.data,
+            grow_event_id: "11111111-1111-4111-8111-111111111111",
+            diary_entry_ids: ["cccccccc-cccc-4ccc-8ccc-cccccccccccc"],
+          },
+          error: null,
+        });
+      const view = mount({ diaryEntryId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" });
+
+      submitRevision(kind);
+      await waitFor(() => expect(mocks.error).toHaveBeenCalled());
+
+      expect(mocks.error.mock.calls[0][0]).toMatch(/could not confirm/i);
+      expect(view.changed).not.toHaveBeenCalled();
+      const first = mocks.rpc.mock.calls[0][1];
+
+      replayRevision(kind);
+      await waitFor(() => expect(view.changed).toHaveBeenCalledOnce());
+
+      expect(mocks.rpc).toHaveBeenCalledTimes(2);
+      expect(mocks.rpc.mock.calls[1][1]).toEqual(first);
+    },
+  );
 });

@@ -28,9 +28,11 @@ import {
   QUICKLOG_CATALOG_SEARCH_PATH_SQL,
   QUICKLOG_DEPENDENCY_CATALOG_EXPRESSIONS_SQL,
   QUICKLOG_DIARY_RETRACTED_INDEX_CONTRACT_EXPRESSION_SQL,
-  QUICKLOG_TARGET_FUNCTION_SECURITY_CONTRACT_EXPRESSION_SQL,
   QUICKLOG_TARGET_INDEXES_CONTRACT_EXPRESSION_SQL,
 } from "./apply-quicklog-corrections-retractions.mjs";
+import {
+  FUNCTION_SIGNATURES as QUICKLOG_REVISION_REPLAY_SIGNATURES,
+} from "./apply-quicklog-revision-idempotent-replay.mjs";
 import {
   manifestForScope,
   QUICKLOG_CORRECTIONS_CATALOG_CONTRACT,
@@ -77,12 +79,68 @@ const QUICKLOG_CATALOG_FAILURE_KEYS = new Set([
   "catalog_result_malformed",
 ]);
 
+const LEGACY_QUICKLOG_SIGNATURES = Object.freeze({
+  quicklog_revision_resolve_root: "public.quicklog_revision_resolve_root(uuid,uuid,uuid)",
+  quicklog_revision_sibling_env_ids:
+    "public.quicklog_revision_sibling_env_ids(uuid,public.grow_events)",
+  quicklog_revision_rebase_captured_at:
+    "public.quicklog_revision_rebase_captured_at(jsonb,timestamp with time zone,timestamp with time zone)",
+  quicklog_retract_entry: "public.quicklog_retract_entry(text,uuid,uuid,text)",
+  quicklog_correct_entry: "public.quicklog_correct_entry(text,jsonb,uuid,uuid,text)",
+});
+
+const QUICKLOG_CLIENT_FUNCTION_SIGNATURES = Object.freeze([
+  LEGACY_QUICKLOG_SIGNATURES.quicklog_retract_entry,
+  LEGACY_QUICKLOG_SIGNATURES.quicklog_correct_entry,
+  QUICKLOG_REVISION_REPLAY_SIGNATURES.keyedRetract,
+  QUICKLOG_REVISION_REPLAY_SIGNATURES.keyedCorrect,
+]);
+
 const quickLogFunctionFingerprintValues = Object.entries(EXPECTED_FUNCTION_DEFINITION_FINGERPRINTS)
-  .map(
-    ([name, value]) =>
-      `('${name}', '${value.md5}', ${value.bytes}, '${value.prosrcMd5}', ${value.prosrcBytes})`,
-  )
+  .map(([name, value]) => {
+    const signature = LEGACY_QUICKLOG_SIGNATURES[name];
+    return `('${signature}', '${name}', '${value.md5}', ${value.bytes}, '${value.prosrcMd5}', ${value.prosrcBytes})`;
+  })
   .join(",\n      ");
+
+const quickLogObservedSignaturesLiteral = [
+  ...Object.values(LEGACY_QUICKLOG_SIGNATURES),
+  QUICKLOG_REVISION_REPLAY_SIGNATURES.keyedCorrect,
+  QUICKLOG_REVISION_REPLAY_SIGNATURES.keyedRetract,
+]
+  .map((signature) => `'${signature}'`)
+  .join(",\n        ");
+
+const quickLogClientFunctionSignaturesLiteral = QUICKLOG_CLIENT_FUNCTION_SIGNATURES.map(
+  (signature) => `'${signature}'`,
+).join(", ");
+
+const QUICKLOG_TARGET_FUNCTION_SECURITY_CONTRACT_V2_SQL = `coalesce((
+    select count(*)=7 and bool_and(
+      case
+        when o.signature in (${quickLogClientFunctionSignaturesLiteral}) then acl.entries = array[
+          'authenticated|EXECUTE|f|postgres','postgres|EXECUTE|f|postgres','service_role|EXECUTE|f|postgres'
+        ]::text[]
+        else acl.entries = array['postgres|EXECUTE|f|postgres']::text[]
+      end
+      and not has_function_privilege('anon',o.oid,'EXECUTE')
+      and case
+        when o.signature in (${quickLogClientFunctionSignaturesLiteral}) then
+          has_function_privilege('authenticated',o.oid,'EXECUTE')
+          and has_function_privilege('service_role',o.oid,'EXECUTE')
+        else
+          not has_function_privilege('authenticated',o.oid,'EXECUTE')
+          and not has_function_privilege('service_role',o.oid,'EXECUTE')
+      end
+    )
+    from observed_signature_functions o
+    cross join lateral (
+      select array_agg(format('%s|%s|%s|%s',coalesce(grantee.rolname,'PUBLIC'),function_acl.privilege_type,function_acl.is_grantable,grantor.rolname) order by coalesce(grantee.rolname,'PUBLIC'),function_acl.privilege_type) entries
+      from aclexplode(coalesce(o.proacl,acldefault('f',o.proowner))) function_acl
+      left join pg_roles grantee on grantee.oid=function_acl.grantee
+      join pg_roles grantor on grantor.oid=function_acl.grantor
+    ) acl
+  ),false)`;
 
 /**
  * Catalog-only Quick Log schema-effect proof. This deliberately does not read
@@ -98,11 +156,12 @@ set local search_path = ${QUICKLOG_CATALOG_SEARCH_PATH_SQL};
 with target as (
   select c.* from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relname = 'quicklog_entry_revisions'
-), expected_functions(name, definition_md5, definition_bytes, prosrc_md5, prosrc_bytes) as (
+), expected_functions(signature, name, definition_md5, definition_bytes, prosrc_md5, prosrc_bytes) as (
   values
       ${quickLogFunctionFingerprintValues}
 ), observed_functions as (
   select p.*, n.nspname, r.rolname as owner_name, l.lanname,
+         p.oid::regprocedure::text as signature,
          md5(pg_get_functiondef(p.oid)) as definition_md5,
          octet_length(pg_get_functiondef(p.oid)) as definition_bytes,
          md5(p.prosrc) as prosrc_md5,
@@ -112,11 +171,11 @@ with target as (
   join pg_roles r on r.oid = p.proowner
   join pg_language l on l.oid = p.prolang
   where n.nspname = 'public'
-    and p.proname in (
-      'quicklog_revision_resolve_root', 'quicklog_revision_sibling_env_ids',
-      'quicklog_revision_rebase_captured_at', 'quicklog_retract_entry',
-      'quicklog_correct_entry'
+    and p.oid::regprocedure::text in (
+      ${quickLogObservedSignaturesLiteral}
     )
+), observed_signature_functions as (
+  select * from observed_functions
 ), manual_contract_function_ids(kind, oid) as (
   values
     (
@@ -247,15 +306,17 @@ ${QUICKLOG_DEPENDENCY_CATALOG_EXPRESSIONS_SQL},
         when 'quicklog_revision_rebase_captured_at' then o.lanname = 'plpgsql' and o.provolatile = 'i' and not o.prosecdef
         else o.lanname = 'plpgsql' and o.provolatile = 'v' and o.prosecdef
       end
-    ) from expected_functions e join observed_functions o on o.proname = e.name
+    ) from expected_functions e join observed_functions o on o.signature = e.signature
   ), false),
-  'target_function_overloads_contract', (select count(*) = 5 from observed_functions)
-    and to_regprocedure('public.quicklog_revision_resolve_root(uuid,uuid,uuid)') is not null
-    and to_regprocedure('public.quicklog_revision_sibling_env_ids(uuid,public.grow_events)') is not null
-    and to_regprocedure('public.quicklog_revision_rebase_captured_at(jsonb,timestamptz,timestamptz)') is not null
-    and to_regprocedure('public.quicklog_retract_entry(text,uuid,uuid,text)') is not null
-    and to_regprocedure('public.quicklog_correct_entry(text,jsonb,uuid,uuid,text)') is not null,
-  'target_function_security_contract', ${QUICKLOG_TARGET_FUNCTION_SECURITY_CONTRACT_EXPRESSION_SQL},
+  'target_function_overloads_contract', (select count(*) = 7 from observed_signature_functions)
+    and to_regprocedure('${LEGACY_QUICKLOG_SIGNATURES.quicklog_revision_resolve_root}') is not null
+    and to_regprocedure('${LEGACY_QUICKLOG_SIGNATURES.quicklog_revision_sibling_env_ids}') is not null
+    and to_regprocedure('${LEGACY_QUICKLOG_SIGNATURES.quicklog_revision_rebase_captured_at}') is not null
+    and to_regprocedure('${LEGACY_QUICKLOG_SIGNATURES.quicklog_retract_entry}') is not null
+    and to_regprocedure('${LEGACY_QUICKLOG_SIGNATURES.quicklog_correct_entry}') is not null
+    and to_regprocedure('${QUICKLOG_REVISION_REPLAY_SIGNATURES.keyedRetract}') is not null
+    and to_regprocedure('${QUICKLOG_REVISION_REPLAY_SIGNATURES.keyedCorrect}') is not null,
+  'target_function_security_contract', ${QUICKLOG_TARGET_FUNCTION_SECURITY_CONTRACT_V2_SQL},
   'manual_delegate_contract', coalesce((
     select count(*) = 2
       and bool_and(

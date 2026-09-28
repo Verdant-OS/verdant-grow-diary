@@ -726,6 +726,9 @@ describe("remote applied-schema runner safety", () => {
     expect(delegateContract).toMatch(/has_function_privilege\(\s*'anon'/);
     expect(delegateContract).toMatch(/has_function_privilege\(\s*'authenticated'/);
     expect(delegateContract).toMatch(/has_function_privilege\(\s*'service_role'/);
+    expect(catalogSql).toContain("public.quicklog_correct_entry(text,text,jsonb,uuid,uuid,text)");
+    expect(catalogSql).toContain("public.quicklog_retract_entry(text,text,uuid,uuid,text)");
+    expect(catalogSql).toMatch(/select\s+count\(\*\)\s*=\s*7\s+from observed_signature_functions/i);
   });
 
   it("requires every pinned index to be valid, ready, and live", () => {
@@ -779,7 +782,7 @@ describe("remote applied-schema runner safety", () => {
       ["target_indexes_contract"],
     ],
     [
-      "one of the five functions is missing",
+      "one of the seven correction/retraction functions is missing",
       { target_functions_contract: false, target_function_overloads_contract: false },
       ["target_functions_contract", "target_function_overloads_contract"],
     ],

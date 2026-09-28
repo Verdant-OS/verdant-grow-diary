@@ -8,7 +8,7 @@ import { isInactiveQuickLogPlant, type MinimalQuickLogPlant } from "@/lib/quickL
 export type QuickLogResolvedTarget = Readonly<{
   plantId: string;
   growId: string;
-  tentId: string;
+  tentId: string | null;
 }>;
 
 export type QuickLogTargetBlockReason =
@@ -38,7 +38,7 @@ export const QUICK_LOG_TARGET_BLOCKED_COPY: Readonly<Record<QuickLogTargetBlockR
   plant_not_found: "That plant is no longer available. Choose another plant.",
   plant_inactive: "That plant is archived or merged. Choose an active plant.",
   plant_grow_unassigned: "Assign this plant to a grow and tent before saving.",
-  plant_tent_unassigned: "Assign this plant to a grow and tent before saving.",
+  plant_tent_unassigned: "Assign this plant to a tent before saving.",
   prefill_grow_mismatch: "The Quick Log grow context changed. Reopen it from the plant.",
   prefill_tent_mismatch: "The Quick Log tent context changed. Reopen it from the plant.",
   prefill_target_pending: "Confirming this Quick Log target. Please wait.",
@@ -72,12 +72,14 @@ export interface ResolveQuickLogPrefillTargetInput {
   prefill?: QuickLogPrefillTargetRequest | null;
   plants?: ReadonlyArray<QuickLogTargetPlant> | null;
   tents?: ReadonlyArray<QuickLogTargetTent> | null;
+  requireTent?: boolean;
 }
 
 export interface ResolveQuickLogWriteTargetInput {
   activeGrowId?: string | null;
   selectedPlant?: QuickLogTargetPlant | null;
   selectedTent?: QuickLogTargetTent | null;
+  requireTent?: boolean;
 }
 
 export interface ResolveQuickLogEditorTargetInput {
@@ -98,7 +100,7 @@ function normalizeId(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-function ready(plantId: string, growId: string, tentId: string): QuickLogTargetResolution {
+function ready(plantId: string, growId: string, tentId: string | null): QuickLogTargetResolution {
   return {
     status: "ready",
     target: Object.freeze({ plantId, growId, tentId }),
@@ -191,7 +193,11 @@ export function resolveQuickLogPrefillTarget(
   const growId = normalizeId(plant.grow_id);
   if (!growId) return blocked("plant_grow_unassigned");
   const tentId = normalizeId(plant.tent_id);
-  if (!tentId) return blocked("plant_tent_unassigned");
+  if (!tentId) {
+    return input.requireTent === false
+      ? ready(requestedPlantId, growId, null)
+      : blocked("plant_tent_unassigned");
+  }
 
   const requestedGrowId = normalizeId(input.prefill?.growId);
   if (requestedGrowId && requestedGrowId !== growId) {
@@ -231,7 +237,12 @@ export function resolveQuickLogWriteTarget(
   const plantGrowId = normalizeId(plant.grow_id);
   if (!plantGrowId) return blocked("plant_grow_unassigned");
   const plantTentId = normalizeId(plant.tent_id);
-  if (!plantTentId) return blocked("plant_tent_unassigned");
+  if (!plantTentId) {
+    if (plantGrowId !== activeGrowId) return blocked("active_grow_mismatch");
+    return input.requireTent === false
+      ? ready(plantId, plantGrowId, null)
+      : blocked("plant_tent_unassigned");
+  }
   if (plantGrowId !== activeGrowId) return blocked("active_grow_mismatch");
 
   const tent = input.selectedTent;

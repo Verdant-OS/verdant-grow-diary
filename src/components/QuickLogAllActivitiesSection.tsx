@@ -82,6 +82,7 @@ import {
   type QuickLogActivityDraftBinding,
 } from "@/lib/quickLogActivityRules";
 import { QUICK_LOG_V2_OPEN_EVENT, buildQuickLogV2OpenIntent } from "@/lib/quickLogV2OpenIntent";
+import { quickLogActivityRequiresTent } from "@/lib/quickLogTentRequirementRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTypes";
@@ -115,6 +116,8 @@ export interface QuickLogAllActivitiesSectionProps {
   onBeforeStructuredWaterOpen?: () => void;
   /** Caller-owned fail-closed reason that must prevent every persistence path. */
   externalPersistenceBlockReason?: string | null;
+  /** Activity-specific tent requirement block shown only for tent-scoped saves. */
+  tentRequiredBlockReason?: string | null;
   /**
    * Optional grower-visible activity handoff. The editor is selected only;
    * it never writes or bypasses availability checks.
@@ -201,6 +204,7 @@ export default function QuickLogAllActivitiesSection({
   isSaveBlocked,
   onBeforeStructuredWaterOpen,
   externalPersistenceBlockReason = null,
+  tentRequiredBlockReason = null,
   requestedActivityId = null,
   requestedNote = null,
   onSaveSuccess,
@@ -349,9 +353,19 @@ export default function QuickLogAllActivitiesSection({
     [hasStructuredWaterTarget, plantStage, requestedActivity],
   );
 
+  const activityPersistenceBlockReason = useCallback(
+    (activityId: QuickLogActivityId | null | undefined) => {
+      if (externalPersistenceBlockReason) return externalPersistenceBlockReason;
+      return quickLogActivityRequiresTent(activityId) ? tentRequiredBlockReason : null;
+    },
+    [externalPersistenceBlockReason, tentRequiredBlockReason],
+  );
+  const requestedActivityBlockReason = activityPersistenceBlockReason(requestedActivity);
+
   const openStructuredWater = useCallback((): boolean => {
-    if (externalPersistenceBlockReason) {
-      setStructuredWaterError(externalPersistenceBlockReason);
+    const blockReason = activityPersistenceBlockReason("watering");
+    if (blockReason) {
+      setStructuredWaterError(blockReason);
       return false;
     }
     if (!growId) {
@@ -366,7 +380,7 @@ export default function QuickLogAllActivitiesSection({
     onBeforeStructuredWaterOpen?.();
     window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, { detail: intent }));
     return true;
-  }, [externalPersistenceBlockReason, growId, onBeforeStructuredWaterOpen, plantId, tentId]);
+  }, [activityPersistenceBlockReason, growId, onBeforeStructuredWaterOpen, plantId, tentId]);
 
   useEffect(() => {
     if (previousTargetKeyRef.current === currentTargetKey) return;
@@ -531,8 +545,9 @@ export default function QuickLogAllActivitiesSection({
       setErrorForActivity("photo");
       return;
     }
-    if (externalPersistenceBlockReason) {
-      setErrorReason(externalPersistenceBlockReason);
+    const blockReason = activityPersistenceBlockReason(selected?.id);
+    if (blockReason) {
+      setErrorReason(blockReason);
       setErrorForActivity(selected?.id ?? null);
       return;
     }
@@ -886,7 +901,7 @@ export default function QuickLogAllActivitiesSection({
     onSaveStart,
     onSaveEnd,
     isMutationBlocked,
-    externalPersistenceBlockReason,
+    activityPersistenceBlockReason,
     activeEnvCheckTempUnit,
     onSaveSuccess,
     guidedSymptomCheck,
@@ -939,13 +954,15 @@ export default function QuickLogAllActivitiesSection({
         </p>
       )}
 
-      {requestedActivityAvailability?.disabled && (
+      {(requestedActivityAvailability?.disabled || requestedActivityBlockReason) && (
         <p
           role="note"
           className="text-xs text-muted-foreground"
           data-testid={`${testIdPrefix}-requested-activity-blocked`}
         >
-          {requestedActivityAvailability.disabledReason ?? "This activity is not available."}
+          {requestedActivityBlockReason ??
+            requestedActivityAvailability?.disabledReason ??
+            "This activity is not available."}
         </p>
       )}
 
@@ -964,7 +981,10 @@ export default function QuickLogAllActivitiesSection({
         className="h-auto min-h-[44px] w-full items-start justify-start whitespace-normal px-3 py-2.5 text-left sm:items-center"
         onClick={handleStartSymptomCheck}
         disabled={
-          mutationBlocked || noContext || !hasSymptomPlant || !!externalPersistenceBlockReason
+          mutationBlocked ||
+          noContext ||
+          !hasSymptomPlant ||
+          !!activityPersistenceBlockReason("issue_observation")
         }
         aria-describedby={
           !hasSymptomPlant && !noContext
@@ -1365,7 +1385,7 @@ export default function QuickLogAllActivitiesSection({
               onClick={handleSave}
               disabled={
                 mutationBlocked ||
-                !!externalPersistenceBlockReason ||
+                !!activityPersistenceBlockReason(selected.id) ||
                 noContext ||
                 (selected.id === "photo" && photoAttachmentUncertain) ||
                 selectedAvailability?.disabled ||

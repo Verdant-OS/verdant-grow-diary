@@ -320,6 +320,20 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(onSaveSuccess).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps Note savable for an in-grow plant with no tent", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-note-no-tent" },
+      error: null,
+    });
+    mountSection({ tentId: null });
+    await saveWithNote("note", "tentless plant note");
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [rpcName, args] = rpcMock.mock.calls[0];
+    expect(rpcName).toBe("quicklog_save_manual");
+    expect(args.p_target_type).toBe("plant");
+    expect(args.p_target_id).toBe(PLANT);
+  });
+
   it("Note → quicklog_save_manual with p_action=note; dispatches + saved breakdown", async () => {
     rpcMock.mockResolvedValueOnce({
       data: { ok: true, grow_event_id: "e-note" },
@@ -444,6 +458,22 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     });
     // The event-route RPC is never used for photo — it cannot render an image.
     expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps Photo savable for an in-grow plant with no tent", async () => {
+    mountSection({ tentId: null });
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    const file = new File(["img-bytes"], "bud.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(diaryInsertMock).toHaveBeenCalledTimes(1));
+    const [, row] = diaryInsertMock.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(row.tent_id).toBeNull();
+    expect(row.plant_id).toBe(PLANT);
   });
 
   it("Photo upload failure surfaces the error and never writes a diary row", async () => {
@@ -1153,6 +1183,40 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     const [, args] = rpcMock.mock.calls[0];
     expect(args.p_event_type).toBe("observation");
     expect(args.p_details).toEqual({ subtype: "issue", event_type: "observation" });
+  });
+
+  it("keeps Issue / observation savable for an in-grow plant with no tent", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-obs-no-tent" },
+      error: null,
+    });
+    mountSection({ tentId: null });
+    await saveWithNote("issue_observation", "yellowing on lower leaf");
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [rpcName, args] = rpcMock.mock.calls[0];
+    expect(rpcName).toBe("quicklog_save_event");
+    expect(args.p_event_type).toBe("observation");
+    expect(args.p_tent_id).toBeNull();
+    expect(args.p_plant_id).toBe(PLANT);
+  });
+
+  it("blocks Water for an in-grow plant with no tent using the tent-only copy", async () => {
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    mountSection({
+      tentId: null,
+      tentRequiredBlockReason: "Assign this plant to a tent before saving.",
+    });
+    selectActivity("watering");
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("quick-log-all-activities-structured-water-error"),
+      ).toHaveTextContent("Assign this plant to a tent before saving."),
+    );
+    expect(events).toHaveLength(0);
+    expect(rpcMock).not.toHaveBeenCalled();
+    window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
   });
 });
 

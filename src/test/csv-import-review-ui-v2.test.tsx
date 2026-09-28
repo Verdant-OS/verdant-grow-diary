@@ -84,7 +84,7 @@ describe("CSV Import Review UI v2", () => {
     });
 
     it("does not call fetch when diary date / attach mode change", () => {
-      const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((() => {
         throw new Error("fetch should not be called");
       }) as never);
       render(

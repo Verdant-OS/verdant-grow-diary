@@ -54,6 +54,14 @@
  *     classifiers already treated as stage-unknown; the header now says
  *     "no active stage" instead of echoing the garbage token.)
  *
+ *  8. PLANTS (QA 2026-09-24, BUG-006): the plants in scope contribute one
+ *     more candidate under the same CONSENSUS (rule 3) and HARVEST CAP
+ *     (rule 4) rules. `plants.stage` is the stage the grower sets on the
+ *     plant itself, and it was ignored: a single Flower plant in a grow
+ *     still marked Veg had RH 60% judged by Veg (55–70%) and no alert,
+ *     although Flower targets are 40–55%. Rank ties go grow > tent > plant,
+ *     and omitting `plantStages` behaves exactly as before.
+ *
  * Net contract: tent stages can RESCUE a stale-trailing grow row (the
  * audited bug), but can never silently regress an actively-staged grow to
  * harvest/context-only, and never override the grow row in a mixed-stage
@@ -83,6 +91,8 @@ export interface ResolveAlertContextStageInput {
   growStage?: unknown;
   /** The grow's tents' stages (raw stored values; unknowns drop out). */
   tentStages?: ReadonlyArray<unknown> | null;
+  /** Stages of the active plants in the same scope (rule 8); optional. */
+  plantStages?: ReadonlyArray<unknown> | null;
 }
 
 export interface ResolvedAlertContextStage {
@@ -92,13 +102,35 @@ export interface ResolvedAlertContextStage {
    * `stage` is null. */
   normalizedStage: VpdStage;
   /** Which field supplied the winning stage. "grow" also covers ties. */
-  source: "grow" | "tent" | null;
+  source: "grow" | "tent" | "plant" | null;
 }
 
 function asRawStage(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+/** CONSENSUS candidate (rule 3): every recognized stage must agree, else abstain. */
+function consensusCandidate(stages: ReadonlyArray<unknown> | null | undefined): {
+  raw: string | null;
+  normalized: VpdStage;
+} {
+  let raw: string | null = null;
+  let normalized: VpdStage = "unknown";
+  for (const candidate of stages ?? []) {
+    const value = asRawStage(candidate);
+    if (!value) continue;
+    const stage = normalizeVpdStage(value);
+    if (stage === "unknown") continue;
+    if (normalized === "unknown") {
+      raw = value;
+      normalized = stage;
+    } else if (stage !== normalized) {
+      return { raw: null, normalized: "unknown" };
+    }
+  }
+  return { raw, normalized };
 }
 
 export function resolveAlertContextStage(
@@ -108,42 +140,30 @@ export function resolveAlertContextStage(
   const growNormalized = growRaw ? normalizeVpdStage(growRaw) : "unknown";
   const growKnown = growNormalized !== "unknown";
 
-  // Tent CONSENSUS candidate: all recognized tent stages must normalize to
-  // the same stage; disagreement means the tents abstain (rule 3).
-  let tentRaw: string | null = null;
-  let tentNormalized: VpdStage = "unknown";
-  for (const candidate of input.tentStages ?? []) {
-    const raw = asRawStage(candidate);
-    if (!raw) continue;
-    const normalized = normalizeVpdStage(raw);
-    if (normalized === "unknown") continue;
-    if (tentNormalized === "unknown") {
-      tentRaw = raw;
-      tentNormalized = normalized;
-    } else if (normalized !== tentNormalized) {
-      tentRaw = null;
-      tentNormalized = "unknown";
-      break;
+  // HARVEST CAP (rule 4): a leftover harvest/cure tent or plant must not
+  // switch an actively-staged grow's alerting off.
+  const capHarvest = (candidate: { raw: string | null; normalized: VpdStage }) =>
+    candidate.normalized === "harvest" && growKnown && growNormalized !== "harvest"
+      ? { raw: null, normalized: "unknown" as VpdStage }
+      : candidate;
+  const tent = capHarvest(consensusCandidate(input.tentStages));
+  const plant = capHarvest(consensusCandidate(input.plantStages));
+
+  // Most advanced wins; ties go grow > tent > plant (rules 5 and 8). An
+  // unknown grow ranks below every recognized stage, so a lone consensus
+  // stands.
+  let best: ResolvedAlertContextStage = growKnown
+    ? { stage: growRaw, normalizedStage: growNormalized, source: "grow" }
+    : { stage: null, normalizedStage: "unknown", source: null };
+  let bestRank = growKnown ? progressionRank(growNormalized) : -1;
+  for (const [candidate, source] of [
+    [tent, "tent"],
+    [plant, "plant"],
+  ] as const) {
+    if (candidate.raw !== null && progressionRank(candidate.normalized) > bestRank) {
+      best = { stage: candidate.raw, normalizedStage: candidate.normalized, source };
+      bestRank = progressionRank(candidate.normalized);
     }
   }
-
-  // HARVEST CAP (rule 4): a leftover harvest/cure tent must not switch an
-  // actively-staged grow's alerting off.
-  if (tentNormalized === "harvest" && growKnown && growNormalized !== "harvest") {
-    tentRaw = null;
-    tentNormalized = "unknown";
-  }
-
-  // Most advanced wins; grow wins ties (rule 5). An unknown grow ranks
-  // below every recognized stage, so a lone tent consensus stands.
-  if (
-    tentRaw !== null &&
-    progressionRank(tentNormalized) > (growKnown ? progressionRank(growNormalized) : -1)
-  ) {
-    return { stage: tentRaw, normalizedStage: tentNormalized, source: "tent" };
-  }
-  if (growKnown) {
-    return { stage: growRaw, normalizedStage: growNormalized, source: "grow" };
-  }
-  return { stage: null, normalizedStage: "unknown", source: null };
+  return best;
 }

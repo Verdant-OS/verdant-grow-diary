@@ -6,6 +6,18 @@
 // - Performs no real writes, AI calls, ingest, alerts, Action Queue changes,
 //   or device control.
 import { expect, test, type Page } from "@playwright/test";
+import { CURRENT_AGREEMENT_LIST } from "../src/constants/agreements";
+
+// AgreementReconsentGate renders inside the authenticated shell and queries
+// user_agreement_acceptances on mount. Without this fixture the catch-all below
+// answers `[]`, computeAgreementGaps reports both agreements missing, and the
+// modal opens over the page, intercepting clicks depending on whether the query
+// resolves before or after the interaction. Derived from the product registry
+// so an agreement bump cannot silently reintroduce the flake.
+const CURRENT_AGREEMENT_ROWS = CURRENT_AGREEMENT_LIST.map((agreement) => ({
+  agreement_type: agreement.type,
+  version: agreement.version,
+}));
 
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
@@ -83,21 +95,23 @@ async function mockSignedInSupabase(page: Page) {
   });
   await page.route(/\/rest\/v1\//, async (route, request) => {
     const pathname = new URL(request.url()).pathname;
-    const rows = pathname.endsWith("/rest/v1/tents")
-      ? [FAKE_TENT]
-      : pathname.endsWith("/rest/v1/plants")
-        ? [FAKE_PLANT]
-        : pathname.endsWith("/rest/v1/grows")
-          ? [
-              {
-                id: FAKE_GROW_ID,
-                name: "Mobile Proof Grow",
-                stage: "veg",
-                is_archived: false,
-                created_at: "2020-01-01T00:00:00.000Z",
-              },
-            ]
-          : [];
+    const rows = pathname.endsWith("/rest/v1/user_agreement_acceptances")
+      ? CURRENT_AGREEMENT_ROWS
+      : pathname.endsWith("/rest/v1/tents")
+        ? [FAKE_TENT]
+        : pathname.endsWith("/rest/v1/plants")
+          ? [FAKE_PLANT]
+          : pathname.endsWith("/rest/v1/grows")
+            ? [
+                {
+                  id: FAKE_GROW_ID,
+                  name: "Mobile Proof Grow",
+                  stage: "veg",
+                  is_archived: false,
+                  created_at: "2020-01-01T00:00:00.000Z",
+                },
+              ]
+            : [];
     await route.fulfill({
       status: 200,
       contentType: "application/json",

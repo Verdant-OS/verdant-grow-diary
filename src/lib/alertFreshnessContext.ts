@@ -62,6 +62,15 @@ export const ALERT_SAVE_BLOCK_MESSAGE: Record<PersistenceBlockReason, string> = 
   outside_live_window: `This reading is outside the ${FRESHNESS_WINDOW_LABEL}, so it cannot raise a new alert. Enter a fresh manual snapshot.`,
 };
 
+/**
+ * Why the manual "Save alert" action is unavailable while the tent or plant
+ * read behind the alert stage is not current (pending, placeholder, failed or
+ * refetching). The automatic path holds for the same reason (Codex review on
+ * #1683).
+ */
+export const ALERT_SAVE_STAGE_UNCONFIRMED_MESSAGE =
+  "Tent and plant stages aren't confirmed yet, so this alert can't be saved. Try again once they load.";
+
 /** Explanation for the current gate result, or null when saving is allowed. */
 export function describeAlertSaveBlock(ctx: PersistenceContext): string | null {
   const reason = snapshotPersistenceBlockReason(ctx);
@@ -199,6 +208,9 @@ export interface LatestSnapshotDetail {
 export interface AlertsHeaderContextViewModel {
   growName: string | null;
   stageLabel: string | null;
+  /** True while the stage cannot be known yet (its reads have no data);
+   * stageLabel is then null and the header says the stage is unconfirmed. */
+  stagePending: boolean;
   ranges: {
     temp: AlertsHeaderRange | null;
     rh: AlertsHeaderRange | null;
@@ -259,6 +271,9 @@ function buildVpdRange(targets: GrowTargets | null): AlertsHeaderRange | null {
 export interface BuildAlertsHeaderContextArgs {
   growName: string | null;
   stage: string | null;
+  /** True while the reads that decide the stage have no data (Codex review
+   * on #1683). Omitted means the stage is known. */
+  stagePending?: boolean;
   targets: GrowTargets | null;
   snapshot: SensorSnapshot | null;
   status: "idle" | "loading" | "ok" | "unavailable";
@@ -287,7 +302,8 @@ export function buildAlertsHeaderContext(
   const tempUnit: TemperatureUnitPreference = args.tempUnit ?? "celsius";
   return {
     growName: args.growName ?? null,
-    stageLabel: args.stage ? formatStageLabel(args.stage) : null,
+    stageLabel: !args.stagePending && args.stage ? formatStageLabel(args.stage) : null,
+    stagePending: args.stagePending === true,
     ranges: {
       temp: buildTempRange(args.targets, tempUnit),
       rh: buildRhRange(args.targets),

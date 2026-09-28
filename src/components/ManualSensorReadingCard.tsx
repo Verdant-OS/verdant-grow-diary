@@ -13,6 +13,7 @@ import {
   createManualDraftValues,
   editManualDraftValues,
   reexpressManualDraftTemperature,
+  restoreUnconfirmedManualDraftValues,
   STANDARD_MANUAL_CORRECTION_IDENTITY,
   type ManualDraftValues,
   type SensorsManualDraft,
@@ -43,7 +44,6 @@ import { toast } from "sonner";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
   AIR_TEMP_PLACEHOLDER,
-  celsiusToInputString,
   temperatureInputUnitFromPreference,
   TEMPERATURE_INPUT_UNITS,
   TEMPERATURE_UNIT_SYMBOL,
@@ -54,9 +54,9 @@ import { buildManualSaveSuccessLine } from "@/lib/manualSensorSaveConfirmation";
 import { useInsertSensorReadings } from "@/hooks/useInsertSensorReadings";
 import {
   buildManualReadingPayloads,
+  manualEntryValueErrors,
   validateManualEntry,
   type ManualEntryInput,
-  type ManualReadingMetric,
 } from "@/lib/sensorReadingManualEntryRules";
 import {
   getManualSensorDeviceOptions,
@@ -65,6 +65,7 @@ import {
 } from "@/lib/manualSensorSourceLabel";
 import { evaluateManualSnapshotAdvisor } from "@/lib/manualSensorSnapshotAdvisorRules";
 import {
+  applyManualEntryBlockingErrors,
   evaluateManualSensorSnapshotQuality,
   type ManualSensorSnapshotInput,
 } from "@/lib/manualSensorSnapshotQualityRules";
@@ -104,6 +105,12 @@ import {
   type ManualCorrectionRpcClient,
 } from "@/lib/manualSensorCorrectionService";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import {
+  correctionPrefillFromRestoredMetrics,
+  correctionToPrefill,
+  EMPTY,
+  recoveredCorrectionDraftValues,
+} from "@/lib/sensorCorrectionDraft";
 
 interface TentOption {
   id: string;
@@ -128,15 +135,6 @@ interface Props {
   session?: SensorsPageSessionController;
 }
 
-const EMPTY: ManualEntryInput = {
-  airTemp: "",
-  humidityPct: "",
-  vpdKpa: "",
-  co2Ppm: "",
-  soilMoisturePct: "",
-  ppfd: "",
-};
-
 const STANDARD_TARGET_CONTEXT = STANDARD_MANUAL_CORRECTION_IDENTITY;
 const subscribeWithoutSession = () => () => {};
 const readWithoutSession = () => null;
@@ -144,50 +142,6 @@ const CORRECTION_SAVE_UNCONFIRMED_MESSAGE =
   "Manual correction save is unconfirmed. Your readings are still here. Retry the same correction to confirm it.";
 const STANDARD_SAVE_UNCONFIRMED_MESSAGE =
   "Manual snapshot save is unconfirmed. Your readings are still here. Retry this snapshot to confirm it.";
-
-function correctionToPrefill(
-  ctx: ManualCorrectionContext | null | undefined,
-  unit: TemperatureInputUnit,
-): ManualEntryInput {
-  if (!ctx) return { ...EMPTY, airTempUnit: unit };
-  const v = ctx.originalValues;
-  const out: ManualEntryInput = { ...EMPTY, airTempUnit: unit };
-  if (typeof v.temperature_c === "number") {
-    // Stored value is canonical Celsius; render it in the grower's entry unit.
-    out.airTemp = celsiusToInputString(v.temperature_c, unit);
-  }
-  if (typeof v.humidity_pct === "number") out.humidityPct = String(v.humidity_pct);
-  if (typeof v.vpd_kpa === "number") out.vpdKpa = String(v.vpd_kpa);
-  if (typeof v.co2_ppm === "number") out.co2Ppm = String(v.co2_ppm);
-  if (typeof v.soil_moisture_pct === "number") out.soilMoisturePct = String(v.soil_moisture_pct);
-  if (typeof v.ppfd === "number") out.ppfd = String(v.ppfd);
-  return out;
-}
-
-function correctionPrefillFromRestoredMetrics(
-  correction: ManualCorrectionContext,
-  metrics: ReadonlyArray<ManualReadingMetric>,
-): ManualCorrectionContext {
-  return {
-    ...correction,
-    originalValues: Object.fromEntries(metrics.map((row) => [row.metric, row.value])),
-  };
-}
-
-/** Match standard snapshot restore: canonical °C digits + explicit C override. */
-function recoveredCorrectionDraftValues(
-  correction: ManualCorrectionContext,
-  metrics: ReadonlyArray<ManualReadingMetric>,
-): ManualDraftValues {
-  return {
-    ...createManualDraftValues(
-      correctionToPrefill(correctionPrefillFromRestoredMetrics(correction, metrics), "C"),
-      "C",
-    ),
-    hasEditedReading: true,
-    saveUnconfirmed: true,
-  };
-}
 
 export default function ManualSensorReadingCard({
   tents,
@@ -435,13 +389,30 @@ export default function ManualSensorReadingCard({
       else if (m.metric === "vpd_kpa") fields.vpd_kpa = m.value;
       else if (m.metric === "soil_moisture_pct") fields.soil_moisture_pct = m.value;
     }
+    // Percentages the grower typed but validation rejected (e.g. RH 101) must
+    // still reach the quality check, or the badge grades the remaining metrics
+    // as "Usable current reading" while the save is blocked (QA 2026-09-24,
+    // BUG-017). These are unit-free, so the typed number is the value.
+    for (const [raw, key] of [
+      [form.humidityPct, "humidity_pct"],
+      [form.soilMoisturePct, "soil_moisture_pct"],
+    ] as const) {
+      const typed = typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
+      if (!(key in fields) && Number.isFinite(typed)) fields[key] = typed;
+    }
     const snap: ManualSensorSnapshotInput = {
       source: "manual",
       captured_at: draftCapturedAt ?? new Date().toISOString(),
       ...fields,
     };
-    return evaluateManualSensorSnapshotQuality(snap);
-  }, [validation.metrics, draftCapturedAt]);
+    // Any other blocking error (VPD -1, CO₂ -5, PPFD 5000, a malformed
+    // temperature) drops its metric from validation.metrics, so it also
+    // forces the badge to invalid while the save is blocked.
+    return applyManualEntryBlockingErrors(
+      evaluateManualSensorSnapshotQuality(snap),
+      manualEntryValueErrors(validation),
+    );
+  }, [validation, draftCapturedAt, form.humidityPct, form.soilMoisturePct]);
 
   // Structured pre-save review (source: "manual", never live). Renders inside
   // the review prompt so the grower sees findings + normalized preview before
@@ -1197,9 +1168,13 @@ export default function ManualSensorReadingCard({
                     );
                     return;
                   }
-                  updateValues(() =>
-                    recoveredCorrectionDraftValues(restored.correction, restored.metrics),
-                  );
+                  updateValues((current) => {
+                    const recovered = recoveredCorrectionDraftValues(
+                      restored.correction,
+                      restored.metrics,
+                    );
+                    return restoreUnconfirmedManualDraftValues(current, recovered);
+                  });
                   setReviewOpen(false);
                 }}
               >

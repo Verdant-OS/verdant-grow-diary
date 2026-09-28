@@ -99,18 +99,15 @@ describe("restoreUnconfirmedManualDraftValues pending recovery", () => {
     expectNoSupabaseCalls();
   });
 
-  it("does not restore confirmed saved values as drafts", () => {
+  it("confirmed save clears the pending snapshot so nothing is restorable", () => {
     const record = pendingRecord();
     claimPendingManualSnapshot(record);
     expect(clearPendingManualSnapshot(record)).toBe(true);
-    const restored = restoreUnconfirmedManualDraftValues(
-      currentDraft(),
-      recoveredDraftFromRecord(record),
-    );
-
-    expect(restored.form).toMatchObject({ airTemp: "25", humidityPct: "60" });
-    expect(restored.saveUnconfirmed).toBe(true);
-    expect(readPendingManualSnapshot(ownerId)).toEqual({ status: "empty" });
+    const pending = readPendingManualSnapshot(ownerId);
+    expect(pending).toEqual({ status: "empty" });
+    const recovered =
+      pending.status === "pending" ? restoreManualSnapshotValues(pending.record) : null;
+    expect(recovered).toBeNull();
     expectNoSupabaseCalls();
   });
 
@@ -118,25 +115,20 @@ describe("restoreUnconfirmedManualDraftValues pending recovery", () => {
     ["missing", null],
     ["empty", ""],
     ["malformed", "{"],
-  ])("returns nothing for %s stored input and does not throw", (_label, raw) => {
+  ])("returns no restorable values for %s stored input", (_label, raw) => {
     if (raw !== null) sessionStorage.setItem(key, raw);
     const fallbackRecovered = recoveredDraftFromRecord(pendingRecord());
-    let restored: ReturnType<typeof restoreUnconfirmedManualDraftValues> | null = null;
-
-    expect(() => {
-      const pending = readPendingManualSnapshot(ownerId);
-      restored =
-        pending.status === "pending"
-          ? restoreUnconfirmedManualDraftValues(
-              currentDraft(),
-              recoveredDraftFromRecord(pending.record),
-            )
-          : null;
-      expect(restoreUnconfirmedManualDraftValues(currentDraft(), fallbackRecovered)).toMatchObject({
-        saveUnconfirmed: true,
-      });
-    }).not.toThrow();
-    expect(restored).toBeNull();
+    const pending = readPendingManualSnapshot(ownerId);
+    const recovered =
+      pending.status === "pending" ? restoreManualSnapshotValues(pending.record) : null;
+    expect(recovered).toBeNull();
+    const restoredFromFallback = restoreUnconfirmedManualDraftValues(
+      currentDraft(),
+      fallbackRecovered,
+    );
+    expect(restoredFromFallback.form).toEqual(fallbackRecovered.form);
+    expect(restoredFromFallback.tempUnitOverride).toBe(fallbackRecovered.tempUnitOverride);
+    expect(restoredFromFallback.saveUnconfirmed).toBe(true);
     expectNoSupabaseCalls();
   });
 });

@@ -107,6 +107,7 @@ import {
 } from "@/lib/manualSensorCorrectionService";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import {
+  correctionPrefillFromRestoredMetrics,
   correctionToPrefill,
   EMPTY,
   recoveredCorrectionDraftValues,
@@ -142,16 +143,6 @@ const CORRECTION_SAVE_UNCONFIRMED_MESSAGE =
   "Manual correction save is unconfirmed. Your readings are still here. Retry the same correction to confirm it.";
 const STANDARD_SAVE_UNCONFIRMED_MESSAGE =
   "Manual snapshot save is unconfirmed. Your readings are still here. Retry this snapshot to confirm it.";
-
-function correctionPrefillFromRestoredMetrics(
-  correction: ManualCorrectionContext,
-  metrics: ReadonlyArray<ManualReadingMetric>,
-): ManualCorrectionContext {
-  return {
-    ...correction,
-    originalValues: Object.fromEntries(metrics.map((row) => [row.metric, row.value])),
-  };
-}
 
 export default function ManualSensorReadingCard({
   tents,

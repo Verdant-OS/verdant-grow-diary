@@ -20,32 +20,93 @@ let insertError: { message: string; code?: string; details?: string } | null = n
 let insertFailureCall: number | null = null;
 let authUserId = "u-1";
 let existingRows: Array<Record<string, unknown>> = [];
+let lookupPageCap = 1000;
+let lookupCountAvailable = true;
+let lookupCalls: Array<{ timestamps: string[] | null; order: string[]; count?: string }> = [];
 let insertOverride: ((rows: unknown[]) => Promise<{ error: typeof insertError }>) | null = null;
-let lookupOverride: (() => Promise<{ data: Array<Record<string, unknown>>; error: null }>) | null =
-  null;
+let lookupOverride:
+  | (() => Promise<{
+      data: Array<Record<string, unknown>> | null;
+      error: { message: string } | null;
+    }>)
+  | null = null;
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
-      select: () => {
+      select: (_columns: string, options?: { count?: string }) => {
         let tentIds: string[] = [];
+        let timestamps: string[] | null = null;
+        const order: string[] = [];
+        let from = 0;
+        let to = Infinity;
+        let minCapturedAt = "";
+        let maxCapturedAt = "~";
         const chain: Record<string, unknown> = {
           in: (key: string, values: string[]) => {
             if (key === "tent_id") tentIds = values;
+            if (key === "captured_at") timestamps = values;
             return chain;
           },
-          gte: () => chain,
-          lte: () => chain,
+          gte: (_key: string, value: string) => {
+            minCapturedAt = value;
+            return chain;
+          },
+          lte: (_key: string, value: string) => {
+            maxCapturedAt = value;
+            return chain;
+          },
+          order: (key: string) => {
+            order.push(key);
+            return chain;
+          },
+          range: (start: number, end: number) => {
+            from = start;
+            to = end;
+            return chain;
+          },
           then: (
-            resolve: (result: { data: Array<Record<string, unknown>>; error: null }) => unknown,
-          ) =>
-            (lookupOverride
-              ? lookupOverride()
-              : Promise.resolve({
-                  data: existingRows.filter((r) => tentIds.includes(String(r.tent_id))),
-                  error: null,
-                })
-            ).then(resolve),
+            resolve: (result: {
+              data: Array<Record<string, unknown>> | null;
+              error: { message: string } | null;
+              count?: number | null;
+            }) => unknown,
+          ) => {
+            lookupCalls.push({ timestamps, order: [...order], count: options?.count });
+            return (
+              lookupOverride
+                ? lookupOverride()
+                : Promise.resolve({
+                    data: existingRows.filter(
+                      (r) =>
+                        tentIds.includes(String(r.tent_id)) &&
+                        (timestamps === null || timestamps.includes(String(r.captured_at))) &&
+                        String(r.captured_at) >= minCapturedAt &&
+                        String(r.captured_at) <= maxCapturedAt,
+                    ),
+                    error: null,
+                  })
+            ).then((result) => {
+              if (result.error || !result.data) {
+                resolve(result);
+                return;
+              }
+              resolve({
+                ...result,
+                count:
+                  options?.count === "exact" && lookupCountAvailable ? result.data.length : null,
+                data: [...result.data]
+                  .sort((a, b) => {
+                    for (const key of order) {
+                      const comparison = String(a[key]).localeCompare(String(b[key]));
+                      if (comparison) return comparison;
+                    }
+                    return 0;
+                  })
+                  .slice(from, Math.min(to + 1, from + lookupPageCap)),
+              });
+            });
+          },
         };
         return chain;
       },
@@ -82,6 +143,9 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     insertFailureCall = null;
     authUserId = "u-1";
     existingRows = [];
+    lookupPageCap = 1000;
+    lookupCountAvailable = true;
+    lookupCalls = [];
     insertOverride = null;
     lookupOverride = null;
   });
@@ -174,6 +238,65 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["sensor_readings"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["csv-timeline-context"] });
   });
+
+  it("fails open when presence lookup errors instead of blocking import", async () => {
+    lookupOverride = () =>
+      Promise.resolve({
+        data: null,
+        error: { message: "CSV presence lookup unavailable" },
+      });
+    render(withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />));
+    fireEvent.click(screen.getByTestId("x-button"));
+    const csv = "Timestamp,Temperature (C)\n2026-12-01T10:00:00Z,20\n";
+    fireEvent.change(screen.getByTestId("csv-import-file-input"), {
+      target: { files: [new File([csv], "fresh.csv", { type: "text/csv" })] },
+    });
+    await waitFor(() => expect(screen.getByTestId("csv-import-preview")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("csv-import-confirm"));
+    await waitFor(() => expect(insertSpy).toHaveBeenCalled());
+  });
+
+  it.each([
+    { available: true, expectedCalls: 1 },
+    { available: false, expectedCalls: 2 },
+  ])(
+    "recognizes sparse existing readings with count header available=$available",
+    async ({ available, expectedCalls }) => {
+      lookupCountAvailable = available;
+      const start = Date.parse("2026-01-01T00:00:00Z");
+      existingRows = Array.from({ length: 10000 }, (_, index) => ({
+        tent_id: "t1",
+        source: "csv",
+        metric: "temperature_c",
+        captured_at: new Date(start + index * 60000).toISOString(),
+      }));
+      const timestamps = [1000, 5000, 9000].map((index) => String(existingRows[index].captured_at));
+      existingRows.reverse();
+      lookupPageCap = 125;
+      insertError = {
+        code: "23505",
+        message: 'duplicate key value violates unique constraint "sensor_readings_dedupe_uidx"',
+      };
+      render(withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />));
+      fireEvent.click(screen.getByTestId("x-button"));
+      const csv =
+        "Timestamp,Temperature (C)\n" + timestamps.map((timestamp) => `${timestamp},20`).join("\n");
+      fireEvent.change(screen.getByTestId("csv-import-file-input"), {
+        target: { files: [new File([csv], "sparse.csv", { type: "text/csv" })] },
+      });
+      await waitFor(() => expect(screen.getByTestId("csv-import-preview")).toBeTruthy());
+      fireEvent.click(screen.getByTestId("csv-import-confirm"));
+      await waitFor(() => expect(screen.getByTestId("csv-import-done")).toBeTruthy());
+      expect(insertSpy).not.toHaveBeenCalled();
+      expect(trackFunnelEvent).toHaveBeenCalledWith("csv_import_completed", { rows: 0 });
+      expect(lookupCalls).toHaveLength(expectedCalls);
+      for (const call of lookupCalls) {
+        expect(call.count).toBe("exact");
+        expect(call.timestamps).toEqual(timestamps);
+        expect(call.order).toEqual(["tent_id", "source", "metric", "captured_at"]);
+      }
+    },
+  );
 
   it("Cancel does not insert (test 8)", async () => {
     const qc = new QueryClient();
@@ -410,14 +533,16 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
   it.each(["lookup", "first batch"] as const)(
     "ends the old %s operation across an account round trip",
     async (pendingAt) => {
-      let finishLookup!: (value: { data: Array<Record<string, unknown>>; error: null }) => void;
+      const finishLookups: Array<
+        (value: { data: Array<Record<string, unknown>>; error: null }) => void
+      > = [];
       let finishBatch!: (value: { error: null }) => void;
       const lookupStarted = vi.fn();
       if (pendingAt === "lookup") {
         lookupOverride = () => {
           lookupStarted();
           return new Promise((resolve) => {
-            finishLookup = resolve;
+            finishLookups.push(resolve);
           });
         };
       } else {
@@ -433,7 +558,7 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
       );
       fireEvent.click(screen.getByTestId("x-button"));
       const csvRows = Array.from(
-        { length: 251 },
+        { length: pendingAt === "lookup" ? 801 : 251 },
         (_, index) => `${new Date(Date.UTC(2026, 5, 1, 10, 0, index)).toISOString()},25,50`,
       );
       fireEvent.change(screen.getByTestId("csv-import-file-input"), {
@@ -448,8 +573,11 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
       await waitFor(() => expect(screen.getByTestId("csv-import-preview")).toBeTruthy());
       fireEvent.click(screen.getByTestId("csv-import-confirm"));
       await waitFor(() =>
-        expect(pendingAt === "lookup" ? lookupStarted : insertSpy).toHaveBeenCalledTimes(1),
+        expect(pendingAt === "lookup" ? lookupStarted : insertSpy).toHaveBeenCalledTimes(
+          pendingAt === "lookup" ? 4 : 1,
+        ),
       );
+      const startedLookups = lookupCalls.length;
       if (pendingAt === "first batch") expect(insertSpy.mock.calls[0][0]).toHaveLength(500);
       authUserId = "u-2";
       rerender(
@@ -461,12 +589,13 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
       );
       fireEvent.click(screen.getByTestId("x-button"));
       expect(screen.getByTestId("csv-import-entry")).toBeTruthy();
-      lookupOverride = null;
       insertOverride = null;
       await act(async () => {
-        if (pendingAt === "lookup") finishLookup({ data: [], error: null });
-        else finishBatch({ error: null });
+        if (pendingAt === "lookup") {
+          for (const finishLookup of finishLookups) finishLookup({ data: [], error: null });
+        } else finishBatch({ error: null });
       });
+      expect(lookupCalls).toHaveLength(startedLookups);
       expect(insertSpy).toHaveBeenCalledTimes(pendingAt === "lookup" ? 0 : 1);
       expect(screen.getByTestId("csv-import-entry")).toBeTruthy();
       expect(screen.queryByTestId("csv-import-done")).toBeNull();

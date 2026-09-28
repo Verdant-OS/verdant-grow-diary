@@ -1306,6 +1306,125 @@ describe("Timeline mounted read-state boundary", () => {
     expect(allInvalid).not.toHaveTextContent("115°F");
     expect(allInvalid).not.toHaveTextContent("150% RH");
     expect(allInvalid).not.toHaveTextContent("Soil 101%");
+    expect(allInvalid).not.toHaveTextContent("VPD 20");
+    expect(within(allInvalid as HTMLElement).queryByTestId("timeline-vpd-stage-hint")).toBeNull();
+  });
+
+  it("hides implausible manual VPD and CO2 without dropping valid temperature and humidity", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-invalid-vpd-co2", "Manual VPD and CO2 need review"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: {
+                  temp_f: 76,
+                  rh: 55,
+                  vpd: 20,
+                  co2: 10001,
+                  source: "manual",
+                  ts: new Date().toISOString(),
+                },
+              },
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      }
+      return defaultResult(spec);
+    });
+    renderTimeline();
+    const entry = (await screen.findByText("Manual VPD and CO2 need review")).closest(
+      '[data-testid="timeline-entry"]',
+    ) as HTMLElement;
+    expect(entry).toHaveTextContent("76°F");
+    expect(entry).toHaveTextContent("55% RH");
+    expect(entry).not.toHaveTextContent("VPD 20");
+    expect(entry).not.toHaveTextContent("CO₂ 10001");
+    expect(within(entry).getByTestId("timeline-manual-snapshot-invalid")).toHaveTextContent(
+      "Review manual snapshot",
+    );
+    expect(within(entry).queryByTestId("timeline-vpd-stage-hint")).toBeNull();
+  });
+
+  it.each([
+    [
+      "manual with generic temperature",
+      "sensor_snapshot",
+      { temp: 24, rh: 150, soil: 101, vpd: 20, co2: 10001, source: "manual" },
+    ],
+    ["missing source", "sensor_snapshot", { rh: 150, soil: 101, vpd: 20, co2: 10001 }],
+    [
+      "user source alias",
+      "sensor_snapshot",
+      { temp_f: 76, rh: 150, soil: 101, vpd: 20, co2: 10001, source: "user" },
+    ],
+    [
+      "legacy sensor envelope",
+      "sensor",
+      { temp: 24, rh: 150, soil: 101, vpd: 20, co2: 10001, source: "manual" },
+    ],
+  ])("validates %s using the manual source badge classifier", async (label, envelope, snapshot) => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-legacy-invalid", `Legacy invalid: ${label}`),
+              details: {
+                event_type: "observation",
+                [envelope as string]: {
+                  ...(snapshot as Record<string, unknown>),
+                  ts: new Date().toISOString(),
+                },
+              },
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      }
+      return defaultResult(spec);
+    });
+    renderTimeline();
+    const entry = (await screen.findByText(`Legacy invalid: ${label}`)).closest(
+      '[data-testid="timeline-entry"]',
+    ) as HTMLElement;
+    for (const hidden of ["150% RH", "Soil 101%", "VPD 20", "CO₂ 10001"])
+      expect(entry).not.toHaveTextContent(hidden);
+    expect(within(entry).getByTestId("timeline-sensor-source-badge-manual")).toHaveTextContent(
+      "Source: manual",
+    );
+    expect(within(entry).getByTestId("timeline-manual-snapshot-invalid")).toHaveTextContent(
+      "Review manual snapshot",
+    );
+    expect(within(entry).queryByTestId("timeline-vpd-stage-hint")).toBeNull();
+  });
+
+  it("does not accuse an empty manual snapshot of invalid readings", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries")
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-empty-manual", "Empty manual envelope"),
+              details: { event_type: "observation", manual_sensor_snapshot: { source: "manual" } },
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      return defaultResult(spec);
+    });
+    renderTimeline();
+    const entry = (await screen.findByText("Empty manual envelope")).closest(
+      '[data-testid="timeline-entry"]',
+    ) as HTMLElement;
+    expect(within(entry).queryByTestId("timeline-manual-snapshot-invalid")).toBeNull();
+    expect(entry).not.toHaveTextContent("Review manual snapshot");
   });
 
   it("renders a pH-and-EC-only Plant Quick Log snapshot without inventing room metrics", async () => {

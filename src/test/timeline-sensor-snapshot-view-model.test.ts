@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildTimelineSensorSnapshotViewModel,
   resolveTimelineCardSensorResolution,
+  resolveTimelineCardVpdStageValue,
 } from "@/lib/timelineSensorSnapshotViewModel";
 
 describe("buildTimelineSensorSnapshotViewModel", () => {
@@ -48,12 +49,142 @@ describe("buildTimelineSensorSnapshotViewModel", () => {
       expect(resolved.useManualValidation).toBe(expected);
     });
 
-    it("keeps legacy generic temp/rh/soil snapshots on the raw chip path", () => {
+    it("validates legacy generic temp/rh/soil snapshots like their manual badge", () => {
       const resolved = resolveTimelineCardSensorResolution({
         sensor_snapshot: { temp: 27.8, rh: 55, soil: 42, source: "manual" },
         source: "manual",
       });
-      expect(resolved.useManualValidation).toBe(false);
+      expect(resolved.useManualValidation).toBe(true);
+    });
+    it.each([undefined, "manual", "user", "entry", "log", " MANUAL "])(
+      "uses badge source normalization for legacy source %s",
+      (source) => {
+        const resolved = resolveTimelineCardSensorResolution({ sensor: { source, rh: 150 } });
+        expect(resolved.useManualValidation).toBe(true);
+      },
+    );
+    it.each([null, undefined])("resolves an absent envelope %s without throwing", (details) => {
+      expect(resolveTimelineCardSensorResolution(details)).toEqual({
+        sensor: undefined,
+        useManualValidation: false,
+      });
+    });
+  });
+
+  it.each([0.19, 3.01, 20, -1])(
+    "hides out-of-range manual VPD %s kPa with review evidence",
+    (vpd) => {
+      const vm = buildTimelineSensorSnapshotViewModel(
+        { temp_f: 76, rh: 55, vpd },
+        { validateManualCompatibility: true },
+      );
+      expect(vm.kind).toBe("chips");
+      if (vm.kind !== "chips") return;
+      expect(vm.chips.map((chip) => chip.metric)).toEqual(["temp_f", "rh"]);
+      expect(vm.errors.some((error) => error.includes("VPD"))).toBe(true);
+    },
+  );
+
+  it.each([0.2, 3])("keeps the valid manual VPD boundary %s kPa", (vpd) => {
+    const vm = buildTimelineSensorSnapshotViewModel({ vpd }, { validateManualCompatibility: true });
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips[0]?.value).toBe(vpd);
+    expect(vm.errors).toEqual([]);
+  });
+
+  it.each([-1, 10001])("hides implausible manual CO2 %s ppm with review evidence", (co2) => {
+    const vm = buildTimelineSensorSnapshotViewModel(
+      { rh: 55, co2 },
+      { validateManualCompatibility: true },
+    );
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.metric)).toEqual(["rh"]);
+    expect(vm.errors.some((error) => error.includes("CO₂"))).toBe(true);
+  });
+
+  it.each([0, 10000])("keeps the canonical plausible CO2 boundary %s ppm", (co2) => {
+    const vm = buildTimelineSensorSnapshotViewModel({ co2 }, { validateManualCompatibility: true });
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips[0]?.value).toBe(co2);
+    expect(vm.errors).toEqual([]);
+  });
+
+  it("validates known legacy Celsius without changing existing display precision", () => {
+    const vm = buildTimelineSensorSnapshotViewModel(
+      { temp: 27.78, rh: 55, vpd: 1.234, co2: 850.6 },
+      { validateManualCompatibility: true, genericTempUnit: "C" },
+    );
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.display)).toEqual([
+      "82.0°F",
+      "55%",
+      "1.234 kPa",
+      "850.6 ppm",
+    ]);
+  });
+
+  it("does not infer a generic temperature unit while still validating other metrics", () => {
+    const vm = buildTimelineSensorSnapshotViewModel(
+      { temp: 24, rh: 55, soil: 101 },
+      { validateManualCompatibility: true },
+    );
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.metric)).toEqual(["rh"]);
+    expect(vm.errors).toContain("Soil moisture must be between 0% and 100%.");
+    expect(vm.warnings).toContain(
+      "Temperature unit unverified; the generic temperature was not shown.",
+    );
+  });
+
+  it.each([{}, { source: "manual", ts: "2026-09-28T00:00:00Z" }, { temp_f: null, rh: undefined }])(
+    "does not produce invalid-readings copy for an empty envelope %j",
+    (snapshot) => {
+      expect(
+        buildTimelineSensorSnapshotViewModel(snapshot, { validateManualCompatibility: true }),
+      ).toEqual({ kind: "none" });
+    },
+  );
+
+  describe("stage-hint evidence fence", () => {
+    const sensor = Object.freeze({ vpd: 1.2, temp_f: 76, rh: 55 });
+    const eligible = {
+      sensor,
+      useManualValidation: true,
+      sensorViewModel: buildTimelineSensorSnapshotViewModel(sensor, {
+        validateManualCompatibility: true,
+      }),
+      canAssessStage: true,
+      hasFutureTimestamp: false,
+    };
+    it("is deterministic and does not mutate eligible inputs", () => {
+      const before = JSON.stringify(eligible);
+      expect(resolveTimelineCardVpdStageValue(eligible)).toBe(1.2);
+      expect(resolveTimelineCardVpdStageValue(eligible)).toBe(1.2);
+      expect(JSON.stringify(eligible)).toBe(before);
+    });
+    it.each([null, undefined])("fails closed for missing inputs %s", (input) => {
+      expect(resolveTimelineCardVpdStageValue(input)).toBeNull();
+    });
+    it.each([
+      { canAssessStage: false },
+      { hasFutureTimestamp: true },
+      { sensor: null },
+      { sensorViewModel: { kind: "none" } as const },
+      {
+        sensorViewModel: buildTimelineSensorSnapshotViewModel(
+          { rh: 55 },
+          { validateManualCompatibility: true },
+        ),
+      },
+      { sensor: { vpd: 20 } },
+      { sensor: { vpd: 0.199 } },
+    ])("rejects inadmissible stage evidence %j", (override) => {
+      expect(resolveTimelineCardVpdStageValue({ ...eligible, ...override })).toBeNull();
     });
   });
 

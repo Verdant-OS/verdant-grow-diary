@@ -7,9 +7,8 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import PlantSensorSourceBreakdownCard, {
-  buildPlantSensorSourceReadings,
-} from "@/components/PlantSensorSourceBreakdownCard";
+import PlantSensorSourceBreakdownCard from "@/components/PlantSensorSourceBreakdownCard";
+import { buildPlantSensorSourceReadings } from "@/lib/plantSensorSourceHistoryRules";
 
 function withProviders(node: React.ReactNode) {
   const qc = new QueryClient({

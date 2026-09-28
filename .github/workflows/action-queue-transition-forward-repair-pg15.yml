@@ -8,6 +8,7 @@ on:
       - "scripts/verify-quicklog-corrections-preflight-artifact.mjs"
       - "scripts/lib/candidateNumberToolRuntime.mjs"
       - "scripts/lib/productionSupabaseTls.mjs"
+      - "scripts/lib/supabaseMigrationLedgerShape.mjs"
       - "scripts/lib/solo-founder-production-authorization.mjs"
       - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
       - "scripts/verify-solo-founder-production-authorization.mjs"

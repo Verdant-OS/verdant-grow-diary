@@ -67,8 +67,9 @@ describe("startYourRoomRules", () => {
       grow_id: "g1",
       tent_id: "t1",
       stage: "veg",
-      health: "healthy",
     });
+    // Not assessed: no health is sent, so the column default applies (BUG-009).
+    expect(p).not.toHaveProperty("health");
   });
 
   it("step progression grow→tent→plant→done", () => {

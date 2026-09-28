@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
 import { MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import {
   completeManualSensorTimelineRows,
   diaryEntryBelongsInTimelineMeasurements,
@@ -231,8 +232,86 @@ describe("manualSensorReadingsToTimelineEntries", () => {
       [...rows, metricRow("soil_moisture_pct", 101)],
       now,
     );
-    expect(badSoil.details.sensor_snapshot).not.toHaveProperty("soil");
+    expect(badSoil.details.sensor_snapshot).toHaveProperty("soil", 101);
+    const vm = buildTimelineSensorSnapshotViewModel(badSoil.details.sensor_snapshot, {
+      validateManualCompatibility: true,
+    });
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.metric)).toEqual(["temp_f"]);
+    expect(vm.errors).toContain("Soil moisture must be between 0% and 100%.");
   });
+
+  it("keeps valid metrics visible while preserving invalid metrics for disclosure context", () => {
+    const [receipt] = manualSensorReadingsToTimelineEntries(
+      [metricRow("temperature_c", fahrenheitToCelsius(500)), metricRow("humidity_pct", 58)],
+      NOW,
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt.note).not.toContain("°F");
+    expect(receipt.note).toContain("58% RH");
+    expect(receipt.details.sensor_snapshot).toMatchObject({
+      source: "manual",
+      rh: 58,
+    });
+    expect(receipt.details.sensor_snapshot).toHaveProperty("temp_c");
+    const vm = buildTimelineSensorSnapshotViewModel(receipt.details.sensor_snapshot, {
+      validateManualCompatibility: true,
+    });
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.display)).toEqual(["58%"]);
+    expect(vm.errors).toContain(
+      "Air temperature is outside the realistic 40–110°F grow-room range.",
+    );
+  });
+
+  it("keeps an all-invalid capture as a timeline row with manual-review disclosure context", () => {
+    const [receipt] = manualSensorReadingsToTimelineEntries(
+      [metricRow("temperature_c", fahrenheitToCelsius(500))],
+      NOW,
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt.note).toBe("Manual sensor snapshot");
+    expect(receipt.details.sensor_snapshot).toMatchObject({
+      source: "manual",
+      temp_c: fahrenheitToCelsius(500),
+    });
+    const vm = buildTimelineSensorSnapshotViewModel(receipt.details.sensor_snapshot, {
+      validateManualCompatibility: true,
+    });
+    expect(vm.kind).toBe("invalid");
+    if (vm.kind !== "invalid") return;
+    expect(vm.message).toBe("Review manual snapshot — invalid readings were not shown.");
+    expect(vm.errors).toContain(
+      "Air temperature is outside the realistic 40–110°F grow-room range.",
+    );
+  });
+
+  it.each([38, 115])(
+    "keeps saved %s°F manual readings in history and discloses them as invalid",
+    (tempF) => {
+      const [receipt] = manualSensorReadingsToTimelineEntries(
+        [metricRow("temperature_c", fahrenheitToCelsius(tempF)), metricRow("humidity_pct", 48)],
+        NOW,
+      );
+      expect(receipt).toBeDefined();
+      expect(receipt.details.sensor_snapshot).toMatchObject({
+        source: "manual",
+        temp_c: fahrenheitToCelsius(tempF),
+        rh: 48,
+      });
+      const vm = buildTimelineSensorSnapshotViewModel(receipt.details.sensor_snapshot, {
+        validateManualCompatibility: true,
+      });
+      expect(vm.kind).toBe("chips");
+      if (vm.kind !== "chips") return;
+      expect(vm.chips.map((chip) => chip.display)).toEqual(["48%"]);
+      expect(vm.errors).toContain(
+        "Air temperature is outside the realistic 40–110°F grow-room range.",
+      );
+    },
+  );
 
   it("excludes live/csv/demo rows so Sensors live data is not a Timeline measurement receipt", () => {
     const tempC = fahrenheitToCelsius(74);

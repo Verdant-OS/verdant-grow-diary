@@ -218,6 +218,8 @@
     "sb:functions:deploy": "supabase functions deploy",
     "test:edge:sensor-ingest-webhook": "bunx deno test --no-lock --allow-env --allow-net=esm.sh,deno.land,jsr.io,npm.jsr.io supabase/functions/sensor-ingest-webhook/auth.test.ts supabase/functions/sensor-ingest-webhook/cors_e2e_test.ts supabase/functions/sensor-ingest-webhook/handler_e2e_test.ts supabase/functions/ecowitt-ingest/handler_e2e_test.ts supabase/functions/mint-bridge-token/handler_e2e_test.ts supabase/functions/revoke-bridge-token/handler_e2e_test.ts",
     "test:edge:operator-ggs-real-payload-commit": "bunx deno test --no-lock supabase/functions/operator-ggs-real-payload-commit/handler.test.ts supabase/functions/operator-ggs-real-payload-commit/productionDeps.test.ts",
+    "test:edge:colocated-unit": "FOUNDER_SLOTS_SKIP_SERVE=1 deno test --no-lock --allow-env --allow-read supabase/functions/ai-cultivar-qa/grounding.test.ts supabase/functions/founder-slots-remaining/error_code_test.ts supabase/functions/founder-slots-remaining/import_failure_test.ts supabase/functions/founder-slots-remaining/metric_idempotency_test.ts supabase/functions/founder-slots-remaining/metric_persistence_test.ts supabase/functions/founder-slots-remaining/release_provenance_test.ts supabase/functions/founder-slots-remaining/request_id_echo_test.ts supabase/functions/handle-email-unsubscribe/contract.test.ts supabase/functions/paddle-webhook/security.test.ts supabase/functions/pi-ingest-readings/bridgeCredentialLookup.test.ts supabase/functions/pi-ingest-readings/bridgeCredentialRow.test.ts supabase/functions/pi-ingest-readings/commitBatch.test.ts supabase/functions/pi-ingest-readings/idempotencyLookup.test.ts supabase/functions/pi-ingest-readings/index.test.ts supabase/functions/pi-ingest-readings/secretResolver.test.ts supabase/functions/pi-ingest-readings/tentOwnerLookup.test.ts supabase/functions/save-founder-prefs/validate_test.ts supabase/functions/send-transactional-email/contract.test.ts supabase/functions/edge-metrics-alert-check/index.test.ts",
+    "e2e:mocked-closure": "playwright test e2e/analytics-consent-gate.spec.ts e2e/checkout-recovery-plan-slug-fallback-analytics.spec.ts e2e/checkout-recovery-plan-slug-fallback-telemetry.spec.ts e2e/dashboard-mobile-overflow.spec.ts e2e/founder-owner-prefs.spec.ts e2e/grow-help-toolkit.spec.ts e2e/one-tent-loop-interaction-counter.spec.ts e2e/pheno-comparison-responsive.spec.ts e2e/pheno-hunt-showcase-hydration.spec.ts e2e/plant-detail-quicklog-watering-readpath.spec.ts e2e/post-claude-route-access.spec.ts e2e/pricing-checkout-recovery.spec.ts e2e/public-quick-log-starter.spec.ts e2e/sensors-truth-closure.spec.ts e2e/tents-mobile-overflow.spec.ts --project=chromium-mocked",
     "sb:verify": "tsx scripts/verify-seed.ts",
     "test:sensor-safety": "vitest run src/test/csv-sensor-import.test.ts src/test/manual-sensor-freshness-and-delta.test.ts src/test/manual-sensor-chronology-delta.test.ts src/test/plant-manual-sensor-freshness-card.test.tsx",
     "test:static-safety": "vitest run src/test/utils/stripSourceComments.test.ts src/test/action-queue-provenance.test.ts src/test/action-queue-alert-context-chip.test.tsx src/test/action-queue-safety.test.ts src/test/v0-operating-loop-ci-guardrails.test.ts src/test/live-sensor-server-gate.test.ts src/test/premium-live-sensor-gate.test.tsx src/test/premium-live-sensor-gate-hardening.test.tsx",
@@ -304,7 +306,7 @@
     "test:full:shard1": "vitest run --reporter=dot --shard=1/4",
     "test:full:shard2": "vitest run --reporter=dot --shard=2/4",
     "test:full:shard3": "vitest run --reporter=dot --shard=3/4",
-    "test:full:shard4": "NODE_OPTIONS=--max-old-space-size=6144 vitest run --reporter=dot --shard=4/4 --pool=forks --poolOptions.forks.singleFork=true",
+    "test:full:shard4": "NODE_OPTIONS=--max-old-space-size=6144 vitest run --reporter=dot --shard=4/4 --pool=forks --maxWorkers=1 --no-isolate",
     "test:full:sharded": "bun run test:full:shard1 && bun run test:full:shard2 && bun run test:full:shard3 && bun run test:full:shard4",
     "verify:full:sharded": "bun run typecheck && bun run test:full:sharded",
     "test:scanner-guardrails": "vitest run src/test/scanner-guardrail-harness.test.ts src/test/scanner-guardrails-ci-contract.test.ts src/test/clean-scanner-guardrail-artifacts.test.ts src/test/shelly-ht-retirement.test.ts src/test/ecowitt-only-sensor-direction.test.ts src/test/sensor-intelligence-safety.test.ts src/test/vpd-stage-normalization-ownership.test.ts src/test/typed-watering-write-feature-flag.test.ts src/test/watering-history.test.ts src/test/feeding-history.test.ts src/test/photo-history.test.ts src/test/piIngestBridgeCredentialEncryptedStorage.test.ts src/test/piIngestBridgeSecretStrategy.test.ts src/test/piIngestServerSecretResolverContract.test.ts src/test/piIngestServerSecretResolverImplementationPlan.test.ts src/test/piIngestBridgeCredentialsSafeViewLintFix.test.ts src/test/piIngestEdgeSkeletonAudit.test.ts src/test/piIngestSecretKeyManagementContract.test.ts src/test/piIngestSecretResolutionPlan.test.ts src/test/manual-sensor-snapshot-change-context.test.tsx --reporter=dot",
@@ -427,7 +429,7 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.1.5",
-    "vitest": "^3.2.6",
+    "vitest": "^4.1.11",
     "vitest-axe": "^0.1.0"
   },
   "version": "0.0.0",
@@ -447,11 +449,12 @@
     "esbuild": "0.28.1",
     "fast-uri": "3.1.6",
     "form-data": "4.0.6",
-    "js-yaml": "4.3.1",
+    "js-yaml": "4.3.2",
     "lodash": "4.18.1",
     "flatted": "3.4.2",
     "glob": "10.5.0",
-    "hono": "4.12.34",
-    "nanoid": "3.3.18"
+    "hono": "4.13.5",
+    "nanoid": "3.3.18",
+    "qs": "6.16.0"
   }
 }

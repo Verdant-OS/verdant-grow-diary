@@ -164,7 +164,7 @@ describe("ContextualPhenoComparisonPanel v0.3 empty states", () => {
   });
 
   it("does not call fetch during render of the empty-state panel", () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       throw new Error("fetch must not be called");
     });
     renderEmptyStatePanel();

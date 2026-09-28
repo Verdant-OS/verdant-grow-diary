@@ -90,6 +90,41 @@ export interface AiDoctorSensorEvidence {
   label: string;
 }
 
+/**
+ * Grower-facing labels for the sensor-evidence panel. "healthy" is an
+ * evidence-quality mode (a fresh, valid reading AI Doctor may use), never a
+ * claim that the environment or plant is healthy — an RH 95% reading in
+ * flower can be usable evidence of a problem (QA 2026-09-24, BUG-008/017).
+ * Raw status/reason tokens stay in data-* attributes, not visible copy.
+ */
+export const AI_DOCTOR_SENSOR_EVIDENCE_MODE_LABELS: Record<AiDoctorSensorEvidenceMode, string> = {
+  healthy: "Usable",
+  cautionary: "Cautionary",
+  unsafe: "Not usable",
+  missing: "Missing",
+  unknown: "Unknown",
+};
+
+export const AI_DOCTOR_SENSOR_EVIDENCE_STATUS_LABELS: Record<
+  import("@/lib/sensorSnapshotStatusContract").SnapshotStatus,
+  string
+> = {
+  usable: "Current reading, usable by AI Doctor",
+  stale: "Older reading, context only",
+  invalid: "Rejected as invalid",
+  needs_review: "Needs review before use",
+  no_data: "No reading yet",
+};
+
+export function formatAiDoctorSensorEvidenceStatus(
+  status: import("@/lib/sensorSnapshotStatusContract").SnapshotStatus | null | undefined,
+): string {
+  return status &&
+    Object.prototype.hasOwnProperty.call(AI_DOCTOR_SENSOR_EVIDENCE_STATUS_LABELS, status)
+    ? AI_DOCTOR_SENSOR_EVIDENCE_STATUS_LABELS[status]
+    : "Unknown";
+}
+
 const TOTAL_SIGNALS = 5;
 
 const MISSING_BULLETS: Record<AiDoctorMissingKind, string> = {

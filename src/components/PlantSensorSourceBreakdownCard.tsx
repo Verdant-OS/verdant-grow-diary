@@ -18,12 +18,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  summarizeSensorSources,
-  type SensorSourceSummaryReading,
-} from "@/lib/sensorSourceSummaryRules";
+import { summarizeSensorSources } from "@/lib/sensorSourceSummaryRules";
 import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
 import SensorSourceInlineLegend from "@/components/SensorSourceInlineLegend";
+import { Button } from "@/components/ui/button";
+import { contextEvidenceReadStatus } from "@/lib/aiDoctorContextReadStateRules";
+import { buildPlantSensorSourceReadings } from "@/lib/plantSensorSourceHistoryRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 interface Props {
@@ -46,36 +46,6 @@ interface DiaryRow {
   details: unknown;
 }
 
-function extractSnapshot(details: unknown): SensorSourceSummaryReading | null {
-  if (!details || typeof details !== "object") return null;
-  const d = details as Record<string, unknown>;
-  const raw = d.sensor_snapshot ?? d.sensor;
-  if (!raw || typeof raw !== "object") return null;
-  const snap = raw as { source?: unknown; ts?: unknown };
-  const source = typeof snap.source === "string" && snap.source.trim() !== "" ? snap.source : null;
-  const ts = typeof snap.ts === "string" && snap.ts ? snap.ts : null;
-  return { source, captured_at: ts };
-}
-
-export function buildPlantSensorSourceReadings(
-  rows: ReadonlyArray<DiaryRow>,
-): SensorSourceSummaryReading[] {
-  const out: SensorSourceSummaryReading[] = [];
-  for (const r of rows) {
-    const snap = extractSnapshot(r.details);
-    if (!snap) continue;
-    // Quick Log snapshots with no explicit source are intrinsically
-    // grower-entered → inject "manual" so unknown/unrecognised explicit
-    // source strings can still be surfaced as "invalid" downstream.
-    out.push({
-      source: snap.source ?? "manual",
-      captured_at: snap.captured_at ?? r.entry_at ?? null,
-      ts: r.entry_at,
-    });
-  }
-  return out;
-}
-
 export const PLANT_SENSOR_SOURCE_HISTORY_LIMIT = 200;
 
 async function fetchPlantDiaryRows(plantId: string): Promise<DiaryRow[]> {
@@ -85,7 +55,8 @@ async function fetchPlantDiaryRows(plantId: string): Promise<DiaryRow[]> {
     return query.order("entry_at", { ascending: false }).limit(PLANT_SENSOR_SOURCE_HISTORY_LIMIT);
   });
   if (error) throw error;
-  return (data ?? []) as DiaryRow[];
+  if (!Array.isArray(data)) throw new Error("Sensor source history unavailable");
+  return data as DiaryRow[];
 }
 
 export default function PlantSensorSourceBreakdownCard({
@@ -95,14 +66,18 @@ export default function PlantSensorSourceBreakdownCard({
   rows: providedRows,
 }: Props) {
   const enabled = !!plantId && providedRows == null;
-  const { data: fetched = [] } = useQuery({
-    queryKey: ["plant_sensor_source_history", plantId ?? null],
+  const query = useQuery({
+    queryKey: ["diary_entries", "plant_sensor_source_history", plantId ?? null],
     enabled,
     queryFn: () => fetchPlantDiaryRows(plantId as string),
   });
-  const rows = providedRows ?? fetched;
+  const readStatus =
+    providedRows != null ? "success" : contextEvidenceReadStatus(query.status, query.fetchStatus);
 
-  const readings = useMemo(() => buildPlantSensorSourceReadings(rows), [rows]);
+  const readings = useMemo(
+    () => buildPlantSensorSourceReadings(providedRows ?? query.data ?? []),
+    [providedRows, query.data],
+  );
 
   // When the plant has no sensor-derived diary entries at all in the
   // selected range we render an honest empty state — never invent a
@@ -116,12 +91,52 @@ export default function PlantSensorSourceBreakdownCard({
 
   if (!plantId) return null;
 
+  if (readStatus !== "success") {
+    return (
+      <section className={className} aria-label="Plant sensor source breakdown">
+        <div
+          role={readStatus === "error" ? "alert" : "status"}
+          className="rounded-2xl border border-border/50 p-4 space-y-2"
+        >
+          <p>
+            {readStatus === "error"
+              ? "Sensor source history unavailable"
+              : readStatus === "paused"
+                ? "Waiting for connection to load sensor source history"
+                : readStatus === "refreshing"
+                  ? "Refreshing sensor source history…"
+                  : "Loading sensor source history…"}
+          </p>
+          {query.data != null && (
+            <p className="text-xs text-muted-foreground">
+              Previously loaded counts are withheld until this history read is confirmed.
+            </p>
+          )}
+          {(readStatus === "error" || readStatus === "paused") && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={query.isFetching}
+              onClick={() => void query.refetch()}
+            >
+              Retry
+            </Button>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       className={className}
       data-testid="plant-sensor-source-breakdown"
       aria-label="Plant sensor source breakdown"
     >
+      <p className="text-xs text-muted-foreground mb-2">
+        Based on up to {PLANT_SENSOR_SOURCE_HISTORY_LIMIT} latest diary entries for this plant.
+        Source history does not confirm current sensor health.
+      </p>
       {summary.isEmpty ? (
         <div className="rounded-2xl border border-border/50 bg-secondary/20 p-4">
           <div className="mb-2 flex items-center justify-between gap-2 flex-wrap">

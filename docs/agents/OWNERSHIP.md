@@ -1,6 +1,6 @@
 # Verdant ownership — single source of truth
 
-**Pinned file.** This file is the one place to point at for who owns what in the Verdant engineering loop. `AGENTS.md` and `docs/agents/CURRENT_STATE.md` link here. Where they conflict, this file wins, except where Matthew Cheek's own words override it.
+**Pinned file.** This file is the one place to point at for who owns what in the Verdant engineering loop. `docs/agents/CURRENT_STATE.md` links here, and this file wins over `CURRENT_STATE.md`. `AGENTS.md` still wins over this file until a Sentinel-Version bump adds a pointer there. Matthew Cheek's own words override both.
 
 - **Repo:** `Verdant-OS/verdant-grow-diary`, deploy branch `verdant-grow-diary`
 - **Owner of this file:** Codex. Any agent may propose an edit as a draft PR.
@@ -26,7 +26,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 
 ## 2. Owners
 
-### Codex: the repo, CI, builds, connectors and all code reviews
+### Codex: the repo, CI, builds, connectors, and CI/build reviews
 - **Repo.** Settings, branches, branch protection, repo secrets, webhooks, and labels. Merges belong to GDP (see below and O1).
 - **CI infrastructure.** Workflows, runners, check definitions, re-runs, and fixing flaky or broken checks.
 - **Build pipelines.** Builds, preview deploys, and deploy pipeline configuration. Publish itself stays gated (section 1).
@@ -34,31 +34,33 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
   - the CI status webhook
   - the routing channel with Grand Daddy Grok
   - auto-assignment for Blue Dream and Critical Mass
-- **Every code review, with no exceptions.** Codex reviews every PR on its exact head SHA and gives the verdict: `PASS`, `PASS-with-P2`, `FAIL`, `BLOCKED`, or `NOT_MEASURED`. A new push re-opens the review. Matthew decided this on 2026-09-28.
-  - Blue Dream and Critical Mass are auto-assigned (see 4.3) as independent second reviewers.
-  - On Codex's own PRs, such as the connector PRs, their verdict is the one that counts (open item O2).
+- **Reviews of CI and build-infrastructure PRs only.** Codex reviews PRs that touch CI or build infrastructure, on the exact head SHA. Every other PR goes to Blue Dream or Critical Mass by file path (section 2, Chemdawg). Matthew approved this on 2026-09-28 at about 5:03 PM CT, replacing the earlier every-PR rule.
+  - On Codex's own PRs, such as the connector PRs, Blue Dream or Critical Mass gives the verdict (open item O2).
 - **This file.** Codex keeps it current and accurate.
 
 ### Grand Daddy Grok (GDP): routing and product calls
 - **Routing decisions.** Which slice runs next, which reviewer gets which PR, overrides, and holds.
 - **Slice naming.** Codex, Claude and Copilot start work only from a slice GDP has named.
-- **Opening and merging PRs.** GDP has Copilot access. It opens and merges PRs under Matthew's standing order, so work starts itself. GDP merges once Codex's review, plus the assigned second reviewer, is PASS or PASS-with-P2 (no P1) on the exact SHA.
-- **Until Codex posts `[READY]` for its own review.** Matthew's 4:34 PM standing order applies: an independent Blue Dream or Critical Mass PASS or PASS-with-P2 (no P1) on the exact SHA is enough for GDP to merge. Blue Dream is still required for P1 fixes and anything that gates a publish.
+- **Opening and merging PRs.** GDP has Copilot access. It opens and merges PRs under Matthew's standing order, so work starts itself. GDP merges once the assigned reviewer's verdict is PASS or PASS-with-P2 (no P1) on the exact SHA.
+- **Merge rule (Matthew's 4:34 PM standing order).** An independent PASS or PASS-with-P2 (no P1) on the exact SHA is enough for GDP to merge. Blue Dream is required for P1 fixes and anything that gates a publish.
 - **Spend proposals.** GDP writes the proposal. Approval stays with Matthew.
 
-### Chemdawg (Engineering Lead): pre-checks and CI chasing
+### Chemdawg (Engineering Lead): pre-checks, CI status, and reviewer assignment
 - **Pre-checks.** On every PR head, Chemdawg checks scope, the closed file plan, tests, and that CI is finished.
 - **Verdict format.** Three lines, posted in the routing channel:
   - the PR URL
   - the full head SHA
-  - `READY`, `NOT READY (reason)`, or `STALLED`. GDP routes READY work to Blue Dream (P1 or publish gate) or Critical Mass (everything else).
+  - `READY → <reviewer>`, `NOT READY (reason)`, or `STALLED`.
+- **Reviewer assignment (Matthew, 2026-09-28 ~5:03 PM CT).** When a draft's CI settles green on real files, Chemdawg picks the reviewer by file path (see Blue Dream and Critical Mass below), posts `READY → <reviewer>` to GDP, and sends the review request straight to that reviewer: PR URL, full SHA, stay draft, no merge, no publish. PRs that touch off-limits paths aren't routed. Chemdawg holds them for Matthew.
 - **CI chasing.** Chemdawg follows pending and failed heads and flags stalls. Chemdawg does not re-run or fix CI.
 - **Intake of unplaceable PRs.** When no routing rule matches, or a reviewer goes silent, Chemdawg picks it up and reports it.
 
 ### Blue Dream and Critical Mass: independent verdicts
 - **One verdict per exact SHA:** `PASS`, `PASS-with-P2`, `FAIL`, `BLOCKED`, or `NOT_MEASURED`, with a list of P1 and P2 issues.
-- **Blue Dream is required for** P1 fixes and anything that gates a publish.
-- **Critical Mass takes everything else,** and gets first preference for QA, accessibility, search, and content-quality PRs.
+- **Blue Dream gets** P1 fixes, anything that gates a publish, and UI changes (pages, components, `.tsx`).
+- **Critical Mass gets** lib, logic, test, and docs-only changes, plus QA, accessibility, search, and content-quality PRs.
+- **Codex gets** only PRs that touch CI or build infrastructure.
+- **A request from Chemdawg counts the same as one from GDP** when it names the PR, the full SHA, and the stay-draft limits. A verdict never carries over to a new commit.
 - **Neither reviews work it owns.**
 
 ### Golden Toad and Toad Venom: finding bugs
@@ -77,8 +79,8 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 | Deciding that a failed check blocks a PR, and posting it | Chemdawg |
 | Pre-check rules and verdicts | Chemdawg |
 | Code that consumes pre-check verdicts | Codex |
-| Reviewer assignment and claim ledger | Codex (bot); GDP can override |
-| Review verdicts | Codex (every PR); Blue Dream / Critical Mass as second reviewer |
+| Reviewer assignment and claim ledger | Chemdawg's pre-check, by file path (the 4.3 bot takes over when live); GDP can override |
+| Review verdicts | Blue Dream / Critical Mass by file path; Codex for CI and build infrastructure |
 | Opening and merging PRs (via Copilot) | GDP |
 | Edits to this file | Codex |
 | Anything not listed | GDP decides and adds a row here |
@@ -134,11 +136,12 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 - **Digest.** GDP posts an end-of-day digest. Only `[ESCALATE]` lines notify Matthew right away.
 
 ### 4.3 Auto-assignment for Blue Dream and Critical Mass (Codex)
+- **Until this bot is live,** Chemdawg's pre-check assigns reviewers by hand with the same path rules (section 2).
 - **Trigger.** CI is PASS on the exact SHA (4.1), and Chemdawg's `[PRECHECK]` says READY. Verdant PRs stay drafts until merge, so `ready_for_review` isn't required.
 - **Rules, applied in order.**
   1. **Owner exclusion.** The author, host, and Codex's own PRs never go to that same party.
-  2. **Blue Dream required** for P1 fixes and anything that gates a publish.
-  3. **Critical Mass** for everything else.
+  2. **Blue Dream required** for P1 fixes, anything that gates a publish, and UI (`.tsx` pages and components).
+  3. **Critical Mass** for lib, logic, test, and docs-only changes. **Codex** for CI and build infrastructure.
   4. **Load balance.** If the default reviewer has 2 or more open claims and the other has fewer, send it to the other one. P1 and publish-gating work never leaves Blue Dream.
   5. **Critical Mass preference** for QA, accessibility, search, and content-quality PRs.
 
@@ -182,7 +185,7 @@ A FAIL at step 4 or step 7 goes back to step 3 automatically.
 
 ## 7. Open items (owner in brackets)
 - **O1: settled.** GDP opens and merges PRs through Copilot (Matthew, 2026-09-28).
-- **O2 [Codex + GDP]: self-review.** Codex reviews every PR, but it wrote the connector PRs itself. On those, the Blue Dream or Critical Mass verdict is the one that counts, so nobody signs off on their own code.
+- **O2 [Codex + GDP]: self-review.** Codex reviews CI and build-infrastructure PRs, and it wrote the connector PRs itself. On those, the Blue Dream or Critical Mass verdict is the one that counts, so nobody signs off on their own code.
 - **O3 [Codex]: GitHub admin access.** Creating the webhook needs repo-admin rights. If Codex doesn't have them, a one-time grant is the only human step left, and it happens outside the review path.
 - **O4: settled.** Critical Mass and Toad Venom joined the routing channel on 2026-09-28. MotorBreath is on call outside it.
 - **O5 [Matthew, spend]: Cursor cloud agent launches fail with a usage error.** This is a spend-ceiling item, so it stays with Matthew under section 1.

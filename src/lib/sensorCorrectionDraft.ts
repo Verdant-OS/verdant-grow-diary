@@ -31,7 +31,7 @@ export function correctionToPrefill(
   return out;
 }
 
-function correctionPrefillFromRestoredMetrics(
+export function correctionPrefillFromRestoredMetrics(
   correction: ManualCorrectionContext,
   metrics: ReadonlyArray<ManualReadingMetric>,
 ): ManualCorrectionContext {

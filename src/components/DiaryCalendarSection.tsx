@@ -42,6 +42,7 @@ import {
   resolveCultivationCalendarStagePalette,
   type CultivationCalendarHistoryFact,
 } from "@/lib/cultivationCalendarProjectionRules";
+import { deriveFlowerWindowCalendar } from "@/lib/flowerWindowCalendarRules";
 import {
   readPersistedDiaryCalendarFilter,
   writePersistedDiaryCalendarFilter,
@@ -104,6 +105,13 @@ export interface DiaryCalendarSectionProps {
   dayLimit?: number;
   /** Injectable "today" for deterministic tests. Defaults to new Date(). */
   now?: Date;
+  /** Plant start for Plant day N. Never used as flower age. */
+  plantStartedAt?: string | number | Date | null;
+  /** True flower flip / flower start. Required for Flower day N and the band. */
+  flowerFlipAt?: string | number | Date | null;
+  /** Grower SET flowering duration, or a labeled suggested duration. */
+  flowerDurationDays?: number | null;
+  flowerDurationKind?: "grower_set" | "suggested" | null;
 }
 
 export default function DiaryCalendarSection({
@@ -111,6 +119,10 @@ export default function DiaryCalendarSection({
   activeStage = null,
   dayLimit = 12,
   now,
+  plantStartedAt = null,
+  flowerFlipAt = null,
+  flowerDurationDays = null,
+  flowerDurationKind = null,
 }: DiaryCalendarSectionProps) {
   // Preserve one stable clock for normal app renders, while allowing tests to
   // inject a precise instant. The history projector never reads ambient time.
@@ -145,6 +157,17 @@ export default function DiaryCalendarSection({
     () => buildCultivationCalendarProjectedReviewBlocks(historyFacts, calendarNow),
     [historyFacts, calendarNow],
   );
+  const flowerWindow = useMemo(
+    () =>
+      deriveFlowerWindowCalendar({
+        plantStartedAt,
+        flowerFlipAt,
+        durationDays: flowerDurationDays,
+        durationKind: flowerDurationKind,
+        now: calendarNow,
+      }),
+    [calendarNow, flowerDurationDays, flowerDurationKind, flowerFlipAt, plantStartedAt],
+  );
   const [filter, setFilterState] = useState<DiaryCalendarFilter>(
     () => readPersistedDiaryCalendarFilter() ?? "all",
   );
@@ -166,6 +189,11 @@ export default function DiaryCalendarSection({
   // snap to the newest month with matching events under the active filter.
   useEffect(() => {
     if (allGroups.length === 0) {
+      if (flowerWindow.bandDateKeys.length > 0) {
+        const bandMonth = flowerWindow.bandDateKeys[0]?.slice(0, 7) ?? null;
+        if (visibleMonth === null && bandMonth) setVisibleMonth(bandMonth);
+        return;
+      }
       if (visibleMonth !== null) setVisibleMonth(null);
       return;
     }
@@ -175,7 +203,7 @@ export default function DiaryCalendarSection({
     // Note: we intentionally do not auto-shift away from an empty month
     // chosen by explicit prev/next navigation — empty state will explain.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allGroups]);
+  }, [allGroups, flowerWindow.bandDateKeys]);
 
   // Month-scoped view of the full dataset (before kind filter).
   const monthGroupsAll = useMemo(
@@ -275,6 +303,8 @@ export default function DiaryCalendarSection({
   const effectiveOpenDay = openDay === null || openDayStillVisible ? openDay : null;
 
   const hasAnyEntries = allGroups.length > 0;
+  const hasFlowerWindowBand = flowerWindow.bandDateKeys.length > 0;
+  const showMonthGrid = Boolean(visibleMonth) && (hasAnyEntries || hasFlowerWindowBand);
   const monthLabel = visibleMonth ? formatDiaryCalendarMonthLabel(visibleMonth) : "";
   const activeStagePalette = resolveCultivationCalendarStagePalette(activeStage);
   const nextProjectedReview = visibleProjectedReviews[0] ?? null;
@@ -344,7 +374,7 @@ export default function DiaryCalendarSection({
         </div>
       )}
 
-      {hasAnyEntries && visibleMonth && (
+      {showMonthGrid && (
         <div
           className="mb-3 flex items-center justify-between gap-2"
           data-testid="diary-calendar-month-nav"
@@ -442,7 +472,7 @@ export default function DiaryCalendarSection({
         </div>
       )}
 
-      {hasAnyEntries && visibleMonth && (
+      {showMonthGrid && (
         <div className="mb-4" data-testid="cultivation-calendar-overview">
           <CultivationCalendarMonthGrid
             monthKey={visibleMonth}
@@ -451,6 +481,10 @@ export default function DiaryCalendarSection({
             activeStage={activeStage}
             now={calendarNow}
             onOpenEvent={openEventDrawer}
+            flowerWindowBandDateKeys={flowerWindow.bandDateKeys}
+            plantDayLabel={flowerWindow.plantDayLabel}
+            flowerDayLabel={flowerWindow.flowerDayLabel}
+            durationHonestyLabel={flowerWindow.durationHonestyLabel}
           />
         </div>
       )}

@@ -502,3 +502,50 @@ describe("determinism and truth boundary", () => {
     );
   });
 });
+
+describe("sensor evidence targeting and quality", () => {
+  it.each(["other-tent", null, undefined])(
+    "withholds a sensor from %s without erasing the grower's outcome",
+    (sensorTent) => {
+      const [memory] = buildActionResponseMemories({
+        responseRows: [responseRow({ detailsOver: { sensor_snapshot_id: "snap-1" } })],
+        actions: [action()],
+        sensorRows: [{ id: "snap-1", tent_id: sensorTent, source: "manual", captured_at: T0 }],
+      });
+      expect(memory.sensor.state).toBe("unavailable");
+      expect(memory.response.outcome).toBe("improved");
+      expect(memory.response.note).toBe("Leaves perked up overnight.");
+    },
+  );
+  it("withholds sensor evidence when neither the action nor response establishes its tent", () => {
+    const [memory] = buildActionResponseMemories({
+      responseRows: [responseRow({ tent_id: null, detailsOver: { sensor_snapshot_id: "snap-1" } })],
+      actions: [action({ tent_id: null })],
+      sensorRows: [{ id: "snap-1", tent_id: "tent-1", source: "manual", captured_at: T0 }],
+    });
+    expect(memory.sensor.state).toBe("unavailable");
+  });
+  it("accepts a matching response tent when the action has no tent", () => {
+    const [memory] = buildActionResponseMemories({
+      responseRows: [responseRow({ detailsOver: { sensor_snapshot_id: "snap-1" } })],
+      actions: [action({ tent_id: null })],
+      sensorRows: [{ id: "snap-1", tent_id: "tent-1", source: "manual", captured_at: T0 }],
+    });
+    expect(memory.sensor.state).toBe("available");
+  });
+  it.each(["live", "manual", "csv"])(
+    "retains %s source but does not trust flagged quality",
+    (source) => {
+      for (const quality of ["stale", "invalid"] as const) {
+        const [memory] = buildActionResponseMemories({
+          responseRows: [responseRow({ detailsOver: { sensor_snapshot_id: "snap-1" } })],
+          actions: [action()],
+          sensorRows: [{ id: "snap-1", tent_id: "tent-1", source, captured_at: T0, quality }],
+        });
+        expect(memory.sensor.source).toBe(source);
+        expect(memory.sensor.trustState).toBe(quality);
+        expect(memory.response.outcome).toBe("improved");
+      }
+    },
+  );
+});

@@ -72,8 +72,43 @@ export interface ManualHandheldReadings {
   runoffEc?: string;
   ppfdCanopy?: string;
   lightDistance?: string;
+  /**
+   * Unit the note's label declared for the EC value ("Feed/Input EC (mS/cm)"
+   * → "mS/cm"). Absent when the label named none — pre-#13 rows were written
+   * as "Input EC/PPM", so their unit was never recorded.
+   */
+  inputEcUnit?: string;
+  runoffEcUnit?: string;
   /** Any other "Label: value" pairs found inside the hardware block. */
   other?: ReadonlyArray<{ label: string; value: string }>;
+}
+
+const EC_UNIT_FIELD = { inputEc: "inputEcUnit", runoffEc: "runoffEcUnit" } as const;
+
+const EC_UNIT_SPELLINGS: Record<string, string> = {
+  "ms/cm": "mS/cm",
+  "us/cm": "µS/cm",
+  ppm: "ppm",
+  "ppm-500": "PPM-500",
+  "ppm 500": "PPM-500",
+  "ppm-700": "PPM-700",
+  "ppm 700": "PPM-700",
+};
+
+/**
+ * The unit in a label's trailing "(…)" suffix, with case and spacing drift
+ * canonicalised ("(MS/CM)" → "mS/cm"). An unrecognised unit is kept as
+ * written, never guessed. Null when the label declares no unit.
+ */
+function declaredEcUnit(label: string): string | null {
+  const suffix = /\(([^)]*)\)\s*$/u.exec(label)?.[1]?.trim();
+  if (!suffix) return null;
+  const key = suffix
+    .toLowerCase()
+    .replace(/[µμ]/gu, "u")
+    .replace(/\s*\/\s*/gu, "/")
+    .replace(/\s+/gu, " ");
+  return EC_UNIT_SPELLINGS[key] ?? suffix;
 }
 
 const LABEL_TO_KEY: Record<string, keyof ManualHandheldReadings> = {
@@ -116,7 +151,9 @@ function normalizeHardwareReadingLabel(label: string): string {
  * post-patch unit-disambiguated form (`Feed/Input pH`,
  * `Feed/Input EC (mS/cm)`). Display-unit suffixes in parens are stripped
  * before lookup so writers can evolve unit copy without breaking
- * round-trip. Unknown labels still flow through to `other[]`.
+ * round-trip; an EC label's declared unit is kept beside its value
+ * (`inputEcUnit` / `runoffEcUnit`) so display never has to guess it.
+ * Unknown labels still flow through to `other[]`.
  */
 export function parseManualHandheldReadings(
   note: string | null | undefined,
@@ -136,6 +173,12 @@ export function parseManualHandheldReadings(
     const key = LABEL_TO_KEY[normalized] ?? LABEL_TO_KEY[label.toLowerCase()];
     if (key && key !== "other") {
       (out as Record<string, string>)[key] = value;
+      if (key === "inputEc" || key === "runoffEc") {
+        // The unit travels with the line that supplied the value.
+        const unit = declaredEcUnit(label);
+        if (unit) out[EC_UNIT_FIELD[key]] = unit;
+        else delete out[EC_UNIT_FIELD[key]];
+      }
     } else {
       other.push({ label, value });
     }

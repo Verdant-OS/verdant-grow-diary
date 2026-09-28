@@ -91,7 +91,7 @@ describe("SensorsIngestNormalizer — read-only safety", () => {
     // accidental write attempts even if the page mistakenly chains one.
     supabaseSpies.from.mockImplementation(() => writeMethodSpies);
 
-    fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       throw new Error("fetch must not be called by the normalizer screen");
     }) as never;
 

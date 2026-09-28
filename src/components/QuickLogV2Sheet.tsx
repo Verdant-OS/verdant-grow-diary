@@ -60,6 +60,7 @@ import {
   buildQuickLogTimelineNavTarget,
   QUICK_LOG_TIMELINE_CTA_LABEL,
 } from "@/lib/quickLogTimelineNavigationTarget";
+import { resolveQuickLogConfirmedScope } from "@/lib/quickLogConfirmedScopeRules";
 import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -1999,12 +2000,13 @@ function QuickLogV2SheetForOwner({
         setHistoryCheckRequired(false);
       }
       if (reason === "receipt_mismatch" && res.growEventId && res.persistedNote !== undefined) {
+        const confirmedScope = resolveQuickLogConfirmedScope(resolved, res);
         const navigation = buildQuickLogTimelineNavTarget({
-          growId: resolved.growId ?? null,
-          targetType: resolved.targetType ?? null,
-          targetId: resolved.targetId ?? null,
-          tentId: resolved.tentId ?? null,
-          plantId: resolved.plantId ?? null,
+          growId: confirmedScope.growId,
+          targetType: confirmedScope.targetType,
+          targetId: confirmedScope.targetId,
+          tentId: confirmedScope.tentId,
+          plantId: confirmedScope.plantId,
           growEventId: res.growEventId,
         });
         if (navigation) setMismatchedReceipt({ note: res.persistedNote, navigation });
@@ -2026,6 +2028,7 @@ function QuickLogV2SheetForOwner({
     setHistoryCheckRequired(false);
     setPersistedNote(res.persistedNote);
     rememberConfirmedPlantTarget(resolved, user?.id ?? null);
+    const confirmedScope = resolveQuickLogConfirmedScope(resolved, res);
 
     // The core grow event is committed. Rotate immediately, before any
     // best-effort attachment work, so a rejected media promise can never
@@ -2042,11 +2045,11 @@ function QuickLogV2SheetForOwner({
     let photoAttached = false;
     let videoAttached = false;
 
-    if (uploadedPath && resolved.growId) {
+    if (uploadedPath && confirmedScope.growId) {
       const photoEntry = await createPhotoDiaryEntry({
-        growId: resolved.growId,
-        tentId: resolved.tentId ?? null,
-        plantId: resolved.plantId ?? null,
+        growId: confirmedScope.growId,
+        tentId: confirmedScope.tentId,
+        plantId: confirmedScope.plantId,
         photoPath: uploadedPath,
         noteRaw: submissionNote,
         action: submissionAction,
@@ -2073,9 +2076,9 @@ function QuickLogV2SheetForOwner({
     // Photo cleanup above can await storage after a failed companion write.
     // Recheck before starting the next write, not only after it resolves.
     if (exactSubmission && !canContinueNote()) return;
-    if (submissionVideoFile && submissionVideoMeta && resolved.growId) {
+    if (submissionVideoFile && submissionVideoMeta && confirmedScope.growId) {
       setSaveStatus("Uploading video…");
-      const upload = await uploadQuickLogVideo(resolved.growId, submissionVideoFile);
+      const upload = await uploadQuickLogVideo(confirmedScope.growId, submissionVideoFile);
       if (exactSubmission && !canContinueNote()) {
         if (upload.ok) {
           try {
@@ -2090,9 +2093,9 @@ function QuickLogV2SheetForOwner({
         mediaFailure = (upload as { message: string }).message;
       } else {
         const videoEntry = await createVideoDiaryEntry({
-          growId: resolved.growId,
-          tentId: resolved.tentId ?? null,
-          plantId: resolved.plantId ?? null,
+          growId: confirmedScope.growId,
+          tentId: confirmedScope.tentId,
+          plantId: confirmedScope.plantId,
           videoPath: upload.path,
           mime: submissionVideoMeta.mime,
           sizeBytes: submissionVideoMeta.sizeBytes,
@@ -2172,11 +2175,11 @@ function QuickLogV2SheetForOwner({
       );
     }
     showTimelineConfirmation(successMessage, {
-      growId: resolved.growId ?? null,
-      targetType: resolved.targetType as "plant" | "tent",
-      targetId: resolved.targetId as string,
-      tentId: resolved.tentId ?? null,
-      plantId: resolved.plantId ?? null,
+      growId: confirmedScope.growId,
+      targetType: confirmedScope.targetType,
+      targetId: confirmedScope.targetId,
+      tentId: confirmedScope.tentId,
+      plantId: confirmedScope.plantId,
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
     });
     applyQuickLogV2Refresh(queryClient, {
@@ -2197,10 +2200,10 @@ function QuickLogV2SheetForOwner({
     resetVideoSelection();
     setPostSave({
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
-      growId: resolved.growId ?? null,
-      targetType: resolved.targetType as "plant" | "tent",
-      targetId: resolved.targetId as string,
-      tentId: resolved.tentId ?? null,
+      growId: confirmedScope.growId,
+      targetType: (confirmedScope.targetType ?? resolved.targetType) as "plant" | "tent",
+      targetId: (confirmedScope.targetId ?? resolved.targetId) as string,
+      tentId: confirmedScope.tentId,
       action: submissionAction,
       message: buildQuickLogPostSaveMessage(submissionAction, photoAttached),
       savedAt: new Date().toISOString(),

@@ -1,4 +1,6 @@
-import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { SENSOR_TRUTH_FUTURE_SKEW_MS } from "@/constants/sensorTruthRanges";
+import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
+import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -113,10 +115,13 @@ import {
 } from "@/lib/growDiaryTimelineRules";
 import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayRules";
 import {
+  completeManualSensorTimelineRows,
   diaryEntryBelongsInTimelineMeasurements,
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
+  TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
+  timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
 import {
   effectiveSensorReadingsQuery,
@@ -222,8 +227,6 @@ import {
   type TimelineCoreReadState,
   type TimelineSupplementalReadSource,
 } from "@/lib/timelinePageReadStateRules";
-
-const TIMELINE_SNAPSHOT_STALE_MS = LIVE_CURRENT_STATE_STALE_MS;
 
 // URL query params mirroring the Pro date-range filter, matching the
 // ?start/?end convention of the environment summary report.
@@ -437,6 +440,7 @@ export default function Timeline() {
   // Tent Manual Snapshots live in `sensor_readings`, not diary_entries.
   // Read-side receipts only — never a second write path.
   const [manualSensorMeasurementEntries, setManualSensorMeasurementEntries] = useState<Entry[]>([]);
+  const [manualSensorHistoryLimited, setManualSensorHistoryLimited] = useState(false);
   // Keyset pagination (audit M1): the diary is unbounded but the page used
   // to silently cap at the newest 100 rows and report "Showing 100 of 100".
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
@@ -617,6 +621,7 @@ export default function Timeline() {
     if (!user || !activeGrowId) {
       setEntries([]);
       setManualSensorMeasurementEntries([]);
+      setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
       setGrowEventsTotal(null);
@@ -637,6 +642,7 @@ export default function Timeline() {
     if (!activeReadKey) {
       setEntries([]);
       setManualSensorMeasurementEntries([]);
+      setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
       setGrowEventsTotal(null);
@@ -659,6 +665,7 @@ export default function Timeline() {
     setLoadingOlder(false);
     setCoreRead({ status: "loading", readKey: requestedReadKey });
     setPartialReadSources([]);
+    setManualSensorHistoryLimited(false);
     setSupplementalLoading(true);
     setLoadOlderError(false);
 
@@ -721,6 +728,7 @@ export default function Timeline() {
       // and is never allowed to hold the diary or watering history hostage.
       setEntries(coreRows);
       setManualSensorMeasurementEntries([]);
+      setManualSensorHistoryLimited(false);
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
       setGrowEvents(nextGrowEvents);
       setGrowEventsTotal(
@@ -858,6 +866,7 @@ export default function Timeline() {
               if (tentsResult.error || !Array.isArray(tentsResult.data)) {
                 markPartial("manual_sensor_readings");
                 setManualSensorMeasurementEntries([]);
+                setManualSensorHistoryLimited(false);
                 return;
               }
               const tentIds = tentsResult.data
@@ -865,6 +874,7 @@ export default function Timeline() {
                 .filter((id): id is string => Boolean(id));
               if (tentIds.length === 0) {
                 setManualSensorMeasurementEntries([]);
+                setManualSensorHistoryLimited(false);
                 return;
               }
               let sensorQuery = effectiveSensorReadingsQuery()
@@ -873,7 +883,7 @@ export default function Timeline() {
                 .eq("source", "manual")
                 .order("captured_at", { ascending: false, nullsFirst: false })
                 .order("ts", { ascending: false })
-                .limit(200);
+                .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
               if (timelineDateRangeBounds.startIso) {
                 sensorQuery = sensorQuery.gte("ts", timelineDateRangeBounds.startIso);
               }
@@ -885,12 +895,13 @@ export default function Timeline() {
               if (sensorResult.error || !Array.isArray(sensorResult.data)) {
                 markPartial("manual_sensor_readings");
                 setManualSensorMeasurementEntries([]);
+                setManualSensorHistoryLimited(false);
                 return;
               }
-              let receipts = manualSensorReadingsToTimelineEntries(
+              const manualPage = completeManualSensorTimelineRows(
                 requireEffectiveSensorReadings(sensorResult.data),
-                new Date(),
               );
+              let receipts = manualSensorReadingsToTimelineEntries(manualPage.rows, new Date());
               if (timelineDateRangeBounds.startIso) {
                 receipts = receipts.filter(
                   (row) => row.entry_at >= timelineDateRangeBounds.startIso!,
@@ -902,10 +913,12 @@ export default function Timeline() {
                 );
               }
               setManualSensorMeasurementEntries(receipts as Entry[]);
+              setManualSensorHistoryLimited(manualPage.hasOlderRows);
             } catch {
               if (!isCurrentRequest()) return;
               markPartial("manual_sensor_readings");
               setManualSensorMeasurementEntries([]);
+              setManualSensorHistoryLimited(false);
             }
           })(),
         );
@@ -1657,6 +1670,20 @@ export default function Timeline() {
           >
             Try again
           </Button>
+        </div>
+      )}
+
+      {manualSensorHistoryLimited && (
+        <div
+          className="glass mb-4 rounded-2xl border border-amber-500/30 p-4"
+          role="status"
+          data-testid="timeline-manual-history-limit"
+        >
+          <p className="font-medium">Manual reading history is limited</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            This Timeline view shows only the newest complete manual captures. Older manual readings
+            are not shown here.
+          </p>
         </div>
       )}
 
@@ -2416,6 +2443,27 @@ export default function Timeline() {
                           const manualCompatSensor = e.details?.manual_sensor_snapshot;
                           const sensor = (canonicalSensor ?? legacySensor ?? manualCompatSensor) as
                             Record<string, unknown> | undefined;
+                          const rawSource =
+                            typeof sensor?.source === "string" && sensor.source.trim().length > 0
+                              ? sensor.source
+                              : typeof e.details?.source === "string"
+                                ? e.details.source
+                                : null;
+                          // Resolve freshness from the same provenance as the badge,
+                          // including manual aliases and its missing-source fallback.
+                          // Persisted live claims and unknown sources stay invalid.
+                          const snapshotStaleMs = resolveCurrentStateStaleWindowMs(
+                            classifyTimelineSensorSource({
+                              rawSource,
+                              fallback: "manual",
+                              context: "persisted_snapshot",
+                            }).kind,
+                          );
+                          // Diary event time does not establish snapshot observation time.
+                          // Missing capture time must remain unverified in both views.
+                          const rawCapturedAt = sensor?.ts ?? sensor?.captured_at;
+                          const snapshotCapturedAt =
+                            typeof rawCapturedAt === "string" ? rawCapturedAt.trim() : "";
                           const usesManualCompatSensor =
                             canonicalSensor == null &&
                             legacySensor == null &&
@@ -2645,10 +2693,12 @@ export default function Timeline() {
                               )}
                               {sensor && (
                                 <TimelineSnapshotClock
+                                  recheckAt={
+                                    new Date(snapshotCapturedAt).getTime() -
+                                    SENSOR_TRUTH_FUTURE_SKEW_MS
+                                  }
                                   changesAt={
-                                    new Date(
-                                      typeof sensor.ts === "string" ? sensor.ts : e.entry_at,
-                                    ).getTime() + TIMELINE_SNAPSHOT_STALE_MS
+                                    new Date(snapshotCapturedAt).getTime() + snapshotStaleMs
                                   }
                                 >
                                   {(nowMs) => {
@@ -2665,14 +2715,14 @@ export default function Timeline() {
                                       co2?: number;
                                       soil?: number;
                                     };
-                                    const snapTs =
-                                      typeof sensor.ts === "string" ? sensor.ts : e.entry_at;
+                                    const snapTs = snapshotCapturedAt;
+                                    const hasFutureTimestamp =
+                                      classifySnapshotTimestamp(snapTs, nowMs) === "future";
                                     const snapAgeMs = snapTs
                                       ? nowMs - new Date(snapTs).getTime()
                                       : Number.POSITIVE_INFINITY;
                                     const snapStale =
-                                      !Number.isFinite(snapAgeMs) ||
-                                      snapAgeMs > TIMELINE_SNAPSHOT_STALE_MS;
+                                      !Number.isFinite(snapAgeMs) || snapAgeMs > snapshotStaleMs;
                                     const rawVpd =
                                       typeof sensor.vpd === "number" && Number.isFinite(sensor.vpd)
                                         ? sensor.vpd
@@ -2682,18 +2732,24 @@ export default function Timeline() {
                                       stage: resolveTimelineDiaryEntryStage(e),
                                       stale: snapStale,
                                     });
-                                    const rawSource =
-                                      typeof sensor.source === "string" ? sensor.source : null;
                                     const sourceBadge = classifyTimelineSensorSource({
                                       rawSource,
                                       capturedAt: snapTs ?? null,
                                       now: nowMs,
-                                      staleMs: TIMELINE_SNAPSHOT_STALE_MS,
+                                      staleMs: snapshotStaleMs,
                                       // Persisted Quick Log snapshots are
                                       // intrinsically grower-entered.
                                       fallback: "manual",
                                       context: "persisted_snapshot",
                                     });
+                                    const manualHistoryNotice = timelineManualSnapshotHistoryNotice(
+                                      {
+                                        sourceKind: sourceBadge.kind,
+                                        capturedAt: snapTs || null,
+                                        nowMs,
+                                        staleMs: snapshotStaleMs,
+                                      },
+                                    );
                                     return (
                                       <div
                                         className="mt-2 flex flex-wrap items-center gap-1.5"
@@ -2704,6 +2760,14 @@ export default function Timeline() {
                                           Manual snapshot
                                         </span>
                                         <TimelineSensorSourceBadge badge={sourceBadge} />
+                                        {manualHistoryNotice && (
+                                          <span
+                                            className="text-[11px] text-muted-foreground"
+                                            data-testid="timeline-manual-history-notice"
+                                          >
+                                            {manualHistoryNotice}
+                                          </span>
+                                        )}
                                         {sensorViewModel?.kind === "invalid" && (
                                           <span
                                             className="text-[11px] text-destructive"
@@ -2775,14 +2839,21 @@ export default function Timeline() {
                                           legacyDisplaySensor.soil != null && (
                                             <SnapChip>Soil {legacyDisplaySensor.soil}%</SnapChip>
                                           )}
-                                        {rawVpd != null && sourceBadge.canAssessStage && (
-                                          <span
-                                            className="text-[11px] text-muted-foreground"
-                                            data-testid="timeline-vpd-stage-hint"
-                                          >
-                                            {vpdClassification.label}
+                                        {hasFutureTimestamp && (
+                                          <span className="text-[11px] text-muted-foreground">
+                                            Future timestamp — freshness cannot be verified.
                                           </span>
                                         )}
+                                        {rawVpd != null &&
+                                          sourceBadge.canAssessStage &&
+                                          !hasFutureTimestamp && (
+                                            <span
+                                              className="text-[11px] text-muted-foreground"
+                                              data-testid="timeline-vpd-stage-hint"
+                                            >
+                                              {vpdClassification.label}
+                                            </span>
+                                          )}
                                       </div>
                                     );
                                   }}

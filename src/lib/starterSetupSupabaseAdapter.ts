@@ -94,7 +94,7 @@ export const starterSetupSupabaseAdapter: StarterSetupDataAccess = {
         grow_id: growId,
         tent_id: tentId,
         stage: "seedling",
-        health: "healthy",
+        // No health: not assessed; the column default applies (BUG-009).
       } as never)
       .select("id, name")
       .single();

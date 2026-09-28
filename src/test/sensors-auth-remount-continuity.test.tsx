@@ -66,6 +66,8 @@ vi.mock("@/components/BrandLogo", () => ({ default: () => null }));
 vi.mock("@/components/QuickLog", () => ({ default: () => null }));
 vi.mock("@/components/QuickLogV2Sheet", () => ({ default: () => null }));
 
+// The Sensors page reads active plants for its stage (BUG-006 follow-up).
+vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: [], isError: false }) }));
 vi.mock("@/hooks/useGrowData", () => ({
   clearGrowDataMeta: vi.fn(),
   useGrowTents: () => ({ data: state.tents, isSuccess: true, isError: false, isLoading: false }),

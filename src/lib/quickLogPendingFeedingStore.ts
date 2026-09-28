@@ -1,6 +1,9 @@
 import type { FeedingTypedEventInput } from "./writeFeedingTypedEvent";
 import type { ResolvedQuickLogV2Target } from "./quickLogV2Rules";
-import { buildFeedingFormPayload } from "./quickLogFeedingFormViewModel";
+import {
+  buildFeedingFormPayload,
+  isFeedingNumericRangeReason,
+} from "./quickLogFeedingFormViewModel";
 import { buildFeedingRecoveryForm } from "./quickLogFeedingRecoveryViewModel";
 
 export interface PendingQuickLogFeeding {
@@ -142,14 +145,18 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogF
     return false;
   // Reuse existing pure product/amount/secret/volume checks without initializing
   // the live writer client. The shape above is checked before form projection.
+  // A value outside the mirrored server bounds is still a well-formed pending
+  // record (an earlier build could dispatch it); it must restore so the
+  // server's definitive rejection can release it, never read as blocked.
   const record = value as unknown as PendingQuickLogFeeding;
-  return buildFeedingFormPayload({
+  const projected = buildFeedingFormPayload({
     growId: p.grow_id,
     tentId: r.tentId as string | null,
     plantId: r.plantId as string | null,
     idempotencyKey: p.idempotency_key,
     form: buildFeedingRecoveryForm(record).feedingForm,
-  }).ok;
+  });
+  return projected.ok || isFeedingNumericRangeReason(projected.reason);
 }
 
 function sameRecord(a: PendingQuickLogFeeding, b: PendingQuickLogFeeding): boolean {

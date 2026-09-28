@@ -7,6 +7,7 @@
  * control.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { formatAiDoctorSensorEvidenceStatus } from "@/lib/plantDetailAiDoctorReadiness";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import React from "react";
@@ -258,12 +259,13 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
         expect(panel.getAttribute("data-counts-as-healthy")).toBe(
           c.status === "usable" ? "true" : "false",
         );
+        // Grower-facing label; the raw token stays in data-status only.
         expect(
           screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-status").textContent,
-        ).toContain(c.status);
-        expect(
-          screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-reason").textContent,
-        ).toBeTruthy();
+        ).toBe(formatAiDoctorSensorEvidenceStatus(c.status));
+        expect(panel.getAttribute("data-reason")).toBeTruthy();
+        expect(screen.queryByTestId("plant-detail-ai-doctor-sensor-evidence-reason")).toBeNull();
+        expect(panel.textContent).not.toMatch(/fresh_accept|none_accepted|no_rows|status:|reason:/);
 
         if (c.nextActionLabel) {
           const btn = screen.getByTestId(

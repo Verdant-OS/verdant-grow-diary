@@ -56,9 +56,16 @@ export async function fetchPlants(
   if (growId && !tentId) {
     // BUG-A: resolve the grow's plants through tent rollup too, so plants
     // whose own grow_id is null but whose tent belongs to the grow don't
-    // vanish from grow-scoped views. Tent-fetch failure degrades to the
-    // legacy own-grow_id filter (never a silent empty grid).
-    const { data: tents } = await supabase.from("tents").select("id").eq("grow_id", growId);
+    // vanish from grow-scoped views. A grow with no tents degrades to the
+    // own-grow_id filter. A failed tent lookup fails the read instead: a
+    // partial list would drop those plants while reading as current, and
+    // their stages decide alert targets (Codex review on #1683; Grow Detail's
+    // plant count likewise reports "unavailable" rather than undercounting).
+    const { data: tents, error: tentsError } = await supabase
+      .from("tents")
+      .select("id")
+      .eq("grow_id", growId);
+    if (tentsError) fail("fetchPlants", tentsError);
     q = q.or(
       buildGrowScopedPlantsOrFilter(
         growId,

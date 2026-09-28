@@ -11,8 +11,8 @@ import {
 } from "@/lib/sensorSourceDisplayCanon";
 import type { SensorReadingSource } from "@/mock";
 
-describe("inherited object keys are never sensor sources", () => {
-  it.each(Object.getOwnPropertyNames(Object.prototype))("rejects the inherited token %s", (raw) => {
+describe("Object.prototype property names are never sensor sources", () => {
+  it.each(Object.getOwnPropertyNames(Object.prototype))("rejects the prototype token %s", (raw) => {
     expect(normalizeSensorSource(raw)).toBe("invalid");
     expect(resolveSensorSourceDisplayCanon(raw)).toMatchObject({
       canonical: "invalid",
@@ -29,6 +29,19 @@ describe("inherited object keys are never sensor sources", () => {
       vendor: "ecowitt",
       vendorPromoted: false,
     });
+  });
+
+  it("preserves known sources and deterministically rejects non-string or empty inputs", () => {
+    const known = ["live", "manual", "csv", "demo", "stale", "invalid"] as const;
+    for (const source of known) {
+      expect(normalizeSensorSource(` ${source.toUpperCase()} `)).toBe(source);
+      expect(normalizeSensorSource(source)).toBe(normalizeSensorSource(source));
+    }
+    const untrusted: unknown[] = [null, undefined, "", "  ", 0, false, {}, [], Symbol("source")];
+    for (const value of untrusted) {
+      expect(normalizeSensorSource(value)).toBe("invalid");
+      expect(normalizeSensorSource(value)).toBe(normalizeSensorSource(value));
+    }
   });
 
   it.each([" CONSTRUCTOR ", " __PROTO__ "])("rejects normalized inherited token %s", (raw) => {

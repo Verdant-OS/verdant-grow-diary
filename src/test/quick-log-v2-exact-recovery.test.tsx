@@ -293,6 +293,9 @@ describe("ASTRA-001 exact Note recovery", () => {
         grow_id: "66666666-6666-4666-8666-666666666666",
         plant_id: payload.p_target_id,
         tent_id: "88888888-8888-4888-8888-888888888888",
+        event_type: "observation",
+        source: "manual",
+        is_deleted: false,
       });
       return {
         data: { ok: true, grow_event_id: confirmedEventId, reused: false },

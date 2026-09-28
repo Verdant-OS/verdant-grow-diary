@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractResolver,
   pinnedManualSql,
+  pinnedForwardSql,
   runManualReuseLockHarness,
 } from "../../scripts/run-quicklog-manual-reuse-lock-pg15-harness.mjs";
 
@@ -45,6 +46,30 @@ describe("manual replay versus revision locking proof", () => {
     expect(() =>
       pinnedManualSql(accepted.replace("FOR UPDATE OF ge;", "FOR UPDATE OF ge SKIP LOCKED;")),
     ).toThrow("manual_migration_fingerprint_mismatch");
+  });
+
+  it("refuses altered forward-repair bytes", () => {
+    const forward = pinnedForwardSql();
+    expect(() =>
+      pinnedForwardSql(forward.replace("FOR UPDATE OF de SKIP LOCKED", "FOR UPDATE OF de")),
+    ).toThrow("forward_migration_fingerprint_mismatch");
+  });
+
+  it("keeps the accepted wrapper outside the metadata update byte-identical", () => {
+    const oldSql = pinnedManualSql();
+    const newSql = pinnedForwardSql();
+    const prefix = "CREATE OR REPLACE FUNCTION public.quicklog_save_manual(";
+    const oldStart = oldSql.indexOf(prefix);
+    const newStart = newSql.indexOf(prefix);
+    const metadataStart = oldSql.indexOf("    UPDATE public.diary_entries AS de", oldStart);
+    const newMetadataStart = newSql.indexOf("    -- A revision requested by diary id", newStart);
+    expect(newSql.slice(newStart, newMetadataStart)).toBe(oldSql.slice(oldStart, metadataStart));
+    const remainder = "    IF NOT v_is_reused";
+    const oldEnd = oldSql.indexOf("\n$function$;", oldStart) + "\n$function$;".length;
+    const newEnd = newSql.indexOf("\n$function$;", newStart) + "\n$function$;".length;
+    expect(newSql.slice(newSql.indexOf(remainder, newMetadataStart), newEnd)).toBe(
+      oldSql.slice(oldSql.indexOf(remainder, metadataStart), oldEnd),
+    );
   });
 
   it.each([null, "", "CREATE OR REPLACE FUNCTION public.quicklog_revision_resolve_root( broken"])(

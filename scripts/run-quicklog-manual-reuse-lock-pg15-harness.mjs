@@ -21,6 +21,8 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const MANUAL_MIGRATION = "20260927002000_quicklog_manual_reuse_fence.sql";
 export const MANUAL_SHA256 = "5017b8f697f77a358df43d38fae486a21cabf92a65aa3af439bc750d221d6b1b";
+export const FORWARD_MIGRATION = "20260928183000_quicklog_manual_replay_metadata_lock.sql";
+export const FORWARD_SHA256 = "a5ddf7c836509db2e357dc787ed3c3b548d2b08412d3c89826928c9ac4cebfab";
 const owner = "11111111-1111-4111-8111-111111111111";
 const plant = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -33,6 +35,12 @@ const sqlFile = (name) =>
 export function pinnedManualSql(sql = sqlFile(MANUAL_MIGRATION)) {
   if (typeof sql !== "string" || createHash("sha256").update(sql).digest("hex") !== MANUAL_SHA256)
     throw new Error("manual_migration_fingerprint_mismatch");
+  return sql;
+}
+
+export function pinnedForwardSql(sql = sqlFile(FORWARD_MIGRATION)) {
+  if (typeof sql !== "string" || createHash("sha256").update(sql).digest("hex") !== FORWARD_SHA256)
+    throw new Error("forward_migration_fingerprint_mismatch");
   return sql;
 }
 
@@ -218,6 +226,112 @@ and (select count(*)=1 from public.quicklog_idempotency where user_id='${owner}'
   }
 }
 
+function manualReceipt(env, key, spawnImpl, changed = false) {
+  const sql = changed
+    ? callSql(key).replace("'manual lock proof'", "'changed request'")
+    : callSql(key);
+  return JSON.parse(
+    executeSql(`${beginSql} set local role authenticated; select ${sql}; commit;`, env, {
+      stage: "manual_contract_receipt",
+      spawnImpl,
+    }),
+  );
+}
+
+function freshEvent(env, key, spawnImpl) {
+  const receipt = manualReceipt(env, key, spawnImpl);
+  if (receipt.ok !== true || receipt.reused !== false || !UUID.test(receipt.grow_event_id))
+    throw new Error("manual_contract_fixture_rejected");
+  return receipt.grow_event_id;
+}
+
+function assertLegacyBackfill(env, stamp, spawnImpl) {
+  const key = `manual-backfill-${stamp}`;
+  const event = freshEvent(env, key, spawnImpl);
+  executeSql(
+    `update public.diary_entries set logged_at=null, details=(details-'logged_at')${stamp === "invalid" ? "||jsonb_build_object('logged_at','invalid')" : ""} where user_id='${owner}' and details->>'linked_grow_event_id'='${event}';`,
+    env,
+    { stage: "manual_sequential_legacy_metadata", spawnImpl },
+  );
+  const receipt = manualReceipt(env, key, spawnImpl);
+  if (receipt.ok !== true || receipt.reused !== true || receipt.grow_event_id !== event)
+    throw new Error("manual_backfill_receipt_rejected");
+  const restored = executeSql(
+    `select count(*)=1 and bool_and(logged_at='2026-01-01T09:59:00Z'::timestamptz and public.quicklog_try_parse_logged_at(details->>'logged_at')=logged_at) from public.diary_entries where user_id='${owner}' and details->>'linked_grow_event_id'='${event}';`,
+    env,
+    { stage: "manual_legacy_metadata_restored", spawnImpl },
+  );
+  if (restored !== "t") throw new Error("manual_legacy_backfill_rejected");
+}
+
+function assertRetractedSibling(env, spawnImpl) {
+  const key = "manual-retracted-sibling";
+  const event = freshEvent(env, key, spawnImpl);
+  const diary = executeSql(
+    `insert into public.diary_entries(user_id,grow_id,note,details,retracted_at) select user_id,grow_id,'retracted sibling',jsonb_build_object('linked_grow_event_id',id,'preserve','original'),now() from public.grow_events where id='${event}' returning id;`,
+    env,
+    { stage: "manual_retracted_sibling_fixture", spawnImpl },
+  );
+  if (!UUID.test(diary)) throw new Error("manual_retracted_sibling_fixture_rejected");
+  executeSql(
+    `update public.diary_entries set logged_at=null, details=details-'logged_at' where id='${diary}';`,
+    env,
+    { stage: "manual_retracted_sibling_legacy_metadata", spawnImpl },
+  );
+  const snapshotSql = `select jsonb_build_object('logged_at',logged_at,'details',details,'retracted_at',retracted_at)::text from public.diary_entries where id='${diary}';`;
+  const before = executeSql(snapshotSql, env, {
+    stage: "manual_retracted_sibling_before",
+    spawnImpl,
+  });
+  const receipt = manualReceipt(env, key, spawnImpl);
+  if (
+    receipt.ok !== true ||
+    receipt.reused !== true ||
+    receipt.grow_event_id !== event ||
+    executeSql(snapshotSql, env, { stage: "manual_retracted_sibling_after", spawnImpl }) !== before
+  )
+    throw new Error("manual_retracted_sibling_changed");
+}
+
+function assertRefusalFences(env, spawnImpl) {
+  const reasons = [
+    "idempotency_key_conflict",
+    "idempotency_key_unverified",
+    "idempotency_key_retracted",
+    "idempotency_receipt_missing",
+  ];
+  for (const [index, reason] of reasons.entries()) {
+    const key = `manual-forward-fence-${index}`;
+    const event = freshEvent(env, key, spawnImpl);
+    if (reason === "idempotency_key_unverified")
+      executeSql(
+        `update public.quicklog_idempotency set request_hash=null where user_id='${owner}' and idempotency_key='${key}';`,
+        env,
+        { stage: "manual_hashless_fence_fixture", spawnImpl },
+      );
+    if (reason === "idempotency_key_retracted")
+      executeSql(`update public.grow_events set is_deleted=true where id='${event}';`, env, {
+        stage: "manual_retracted_fence_fixture",
+        spawnImpl,
+      });
+    if (reason === "idempotency_receipt_missing")
+      executeSql(
+        `update public.diary_entries set retracted_at=now() where user_id='${owner}' and details->>'linked_grow_event_id'='${event}';`,
+        env,
+        { stage: "manual_missing_fence_fixture", spawnImpl },
+      );
+    const receipt = manualReceipt(env, key, spawnImpl, reason === "idempotency_key_conflict");
+    if (receipt.ok !== false || receipt.reason !== reason)
+      throw new Error("manual_forward_refusal_fence_rejected");
+    const single = executeSql(
+      `select (select count(*)=1 from public.grow_events where id='${event}') and (select count(*)=1 from public.quicklog_idempotency where user_id='${owner}' and idempotency_key='${key}');`,
+      env,
+      { stage: "manual_refusal_rows_preserved", spawnImpl },
+    );
+    if (single !== "t") throw new Error("manual_refusal_rows_changed");
+  }
+}
+
 export async function runManualReuseLockHarness({
   url = process.env.QUICKLOG_MANUAL_REUSE_PG15_URL,
   containerId = process.env.QUICKLOG_MANUAL_REUSE_PG15_CONTAINER,
@@ -233,6 +347,7 @@ export async function runManualReuseLockHarness({
   let stage = "pinned_source";
   try {
     pinnedManualSql();
+    const forward = pinnedForwardSql();
     const resolver = extractResolver(
       sqlFile("20260811090000_quicklog_corrections_retractions.sql"),
     );
@@ -262,8 +377,58 @@ export async function runManualReuseLockHarness({
       spawnImpl,
       spawnAsyncImpl,
     );
+    stage = "forward_migration";
+    const identitySql =
+      "select jsonb_build_object('owner',proowner,'acl',proacl::text,'config',proconfig,'security_definer',prosecdef)::text from pg_proc where oid='public.quicklog_save_manual(text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb, text, text)'::regprocedure;";
+    const identity = executeSql(identitySql, env, {
+      stage: "manual_wrapper_identity_before",
+      spawnImpl,
+    });
+    executeSql(forward, env, { stage: "manual_forward_migration", spawnImpl });
+    if (
+      executeSql(identitySql, env, { stage: "manual_wrapper_identity_after", spawnImpl }) !==
+      identity
+    )
+      throw new Error("manual_wrapper_privileges_changed");
+    stage = "corrected_races";
+    for (const [index, stamp] of ["complete", "missing", "invalid"].entries())
+      await assertRace(
+        env,
+        { stamp, expectedDeadlock: false, index: index + 4 },
+        spawnImpl,
+        spawnAsyncImpl,
+      );
+    stage = "sequential_legacy_backfill";
+    for (const stamp of ["missing", "invalid"]) assertLegacyBackfill(env, stamp, spawnImpl);
+    stage = "retracted_sibling_unchanged";
+    assertRetractedSibling(env, spawnImpl);
+    stage = "refusal_fences";
+    assertRefusalFences(env, spawnImpl);
+    stage = "preflight_drift_rejection";
+    const sourceSql =
+      "select md5(replace(prosrc, E'\\r', '')) from pg_proc where oid='public.quicklog_save_manual(text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb, text, text)'::regprocedure;";
+    const repairedSource = executeSql(sourceSql, env, {
+      stage: "manual_repaired_source_before_rejection",
+      spawnImpl,
+    });
+    let rejected = false;
+    try {
+      executeSql(forward, env, { stage: "manual_reapply_control", spawnImpl });
+    } catch (error) {
+      rejected = error instanceof Error && error.message.endsWith(":P0001");
+    }
+    if (
+      !rejected ||
+      executeSql(sourceSql, env, { stage: "manual_repaired_source_after_rejection", spawnImpl }) !==
+        repairedSource ||
+      executeSql(identitySql, env, {
+        stage: "manual_wrapper_identity_after_rejection",
+        spawnImpl,
+      }) !== identity
+    )
+      throw new Error("manual_unrecognized_source_not_rejected");
     process.stdout.write(
-      "Manual replay lock PG15: 3 passed, 0 failed (complete metadata serialized; missing/invalid metadata deadlock controls detected)\n",
+      "Manual replay lock PG15: 11 passed, 0 failed (3 baseline races; 3 corrected races; 2 legacy backfills; retracted sibling unchanged; 4 refusal fences; preflight drift rejected)\n",
     );
     return 0;
   } catch {

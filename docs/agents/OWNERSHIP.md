@@ -16,9 +16,11 @@ Matthew Cheek owns nothing in the review path, and he is never a blocker.
 
 His standing order (confirmed 2026-09-28, 4:34 PM CT) keeps only four things with him. None of them is part of code review:
 1. Production database changes. The knk lock stays on.
-2. Changes to the spend ceiling.
-3. Anything that gates a publish, including the 8:45 PM CT publish decision.
-4. Human-only sign-in steps: passkeys, 2FA, and the Google account chooser.
+2. Spend ceiling changes.
+3. Anything that gates a publish.
+4. The 8:45 PM CT publish decision.
+
+Separately, some sign-in screens only a person can pass: passkeys, 2FA, and the Google account chooser. Those go to him when the screen requires it (standing since 2026-09-14).
 
 Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 
@@ -41,7 +43,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 - **Routing decisions.** Which slice runs next, which reviewer gets which PR, overrides, and holds.
 - **Slice naming.** Codex, Claude and Copilot start work only from a slice GDP has named.
 - **Opening and merging PRs.** GDP has Copilot access. It opens and merges PRs under Matthew's standing order, so work starts itself. GDP merges once Codex's review, plus the assigned second reviewer, is PASS or PASS-with-P2 (no P1) on the exact SHA.
-- **Until Codex's review is running.** Matthew's 4:34 PM standing order applies: an independent Blue Dream or Critical Mass PASS or PASS-with-P2 (no P1) on the exact SHA is enough for GDP to merge. Blue Dream is still required for P1 fixes and anything that gates a publish.
+- **Until Codex posts `[READY]` for its own review.** Matthew's 4:34 PM standing order applies: an independent Blue Dream or Critical Mass PASS or PASS-with-P2 (no P1) on the exact SHA is enough for GDP to merge. Blue Dream is still required for P1 fixes and anything that gates a publish.
 - **Spend proposals.** GDP writes the proposal. Approval stays with Matthew.
 
 ### Chemdawg (Engineering Lead): pre-checks and CI chasing
@@ -49,7 +51,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 - **Verdict format.** Three lines, posted in the routing channel:
   - the PR URL
   - the full head SHA
-  - `READY FOR BLUE DREAM`, `NOT READY (reason)`, or `STALLED`
+  - `READY`, `NOT READY (reason)`, or `STALLED`. GDP routes READY work to Blue Dream (P1 or publish gate) or Critical Mass (everything else).
 - **CI chasing.** Chemdawg follows pending and failed heads and flags stalls. Chemdawg does not re-run or fix CI.
 - **Intake of unplaceable PRs.** When no routing rule matches, or a reviewer goes silent, Chemdawg picks it up and reports it.
 
@@ -114,7 +116,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 - **Post tags.** Every post names the PR and the full SHA:
   ```
   [CI]       #N @sha PASS|FAIL                      (webhook)
-  [PRECHECK] #N @sha READY FOR BLUE DREAM | NOT READY (reason) | STALLED   (Chemdawg)
+  [PRECHECK] #N @sha READY | NOT READY (reason) | STALLED   (Chemdawg)
   [ROUTE]    #N @sha -> Blue Dream | Critical Mass (reason)   (bot / GDP)
   [CLAIM]    <reviewer> claims #N @sha
   [VERDICT]  <reviewer>: #N @sha PASS | PASS-with-P2 | FAIL | BLOCKED | NOT_MEASURED

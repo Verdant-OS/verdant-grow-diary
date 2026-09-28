@@ -158,11 +158,17 @@ describe("canonical Vitest batch file discovery", () => {
     expect(result.stderr).toContain("No test files discovered");
   });
 
-  it("preserves a failing Vitest subprocess as a failing batch", () => {
+  it.each([false, true])("keeps a failed batch failing with bounded retry enabled=%s", (retry) => {
     const input = fixture();
-    const result = schedule(input.root, ["--batches=16", "--batch=0"], 1);
+    const result = schedule(
+      input.root,
+      ["--batches=16", "--batch=0", ...(retry ? ["--retry-failed-chunk-once"] : [])],
+      1,
+    );
     expect(result.status).toBe(1);
     expect(result.stdout).toContain('"status":"fail"');
+    expect(result.calls).toHaveLength(retry ? 2 : 1);
+    if (retry) expect(result.calls[1]).toEqual(result.calls[0]);
   });
 
   it("matches the repository's actual configured Vitest file inventory", () => {

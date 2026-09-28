@@ -1,6 +1,3 @@
-import { SENSOR_TRUTH_FUTURE_SKEW_MS } from "@/constants/sensorTruthRanges";
-import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
-import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -121,14 +118,12 @@ import {
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
   TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
-  timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
 import {
   effectiveSensorReadingsQuery,
   requireEffectiveSensorReadings,
 } from "@/lib/effectiveSensorReadings";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
-import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
 import {
   mapGrowEventsToRecentRawEntries,
   type GrowEventRowForRecent,
@@ -176,11 +171,8 @@ import {
 import TimelineEvidenceDetailPreview from "@/components/TimelineEvidenceDetailPreview";
 import TimelineSnapshotClock from "@/components/TimelineSnapshotClock";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
-import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
-import {
-  classifyTimelineSensorSource,
-  type TimelineSensorSourceKind,
-} from "@/lib/timelineSensorSourceBadgeRules";
+import { type TimelineSensorSourceKind } from "@/lib/timelineSensorSourceBadgeRules";
+import { buildTimelineInlineSnapshotViewModel } from "@/lib/timelineInlineSnapshotViewModel";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 import { SENSOR_SOURCE_KINDS, SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
@@ -2435,39 +2427,7 @@ export default function Timeline() {
                           const et = getEventType(effectiveCareType);
                           const Icon = et.icon;
                           const plantName = e.details?.plant_name as string | undefined;
-                          // Canonical snapshots win, followed by the legacy
-                          // `sensor` shape and Plant Quick Log's compatibility
-                          // envelope. No persisted row is rewritten.
-                          const canonicalSensor = e.details?.sensor_snapshot;
-                          const legacySensor = e.details?.sensor;
-                          const manualCompatSensor = e.details?.manual_sensor_snapshot;
-                          const sensor = (canonicalSensor ?? legacySensor ?? manualCompatSensor) as
-                            Record<string, unknown> | undefined;
-                          const rawSource =
-                            typeof sensor?.source === "string" && sensor.source.trim().length > 0
-                              ? sensor.source
-                              : typeof e.details?.source === "string"
-                                ? e.details.source
-                                : null;
-                          // Resolve freshness from the same provenance as the badge,
-                          // including manual aliases and its missing-source fallback.
-                          // Persisted live claims and unknown sources stay invalid.
-                          const snapshotStaleMs = resolveCurrentStateStaleWindowMs(
-                            classifyTimelineSensorSource({
-                              rawSource,
-                              fallback: "manual",
-                              context: "persisted_snapshot",
-                            }).kind,
-                          );
-                          // Diary event time does not establish snapshot observation time.
-                          // Missing capture time must remain unverified in both views.
-                          const rawCapturedAt = sensor?.ts ?? sensor?.captured_at;
-                          const snapshotCapturedAt =
-                            typeof rawCapturedAt === "string" ? rawCapturedAt.trim() : "";
-                          const usesManualCompatSensor =
-                            canonicalSensor == null &&
-                            legacySensor == null &&
-                            manualCompatSensor != null;
+                          const inlineSnapshotView = buildTimelineInlineSnapshotViewModel(e);
                           const remindAt = e.details?.remind_at as string | undefined;
                           const eventTypeValue = effectiveCareType;
                           // Learning-loop rows (follow-up / outcome / decision) carry join
@@ -2691,65 +2651,15 @@ export default function Timeline() {
                                   Remind {format(new Date(remindAt), "PPp")}
                                 </div>
                               )}
-                              {sensor && (
+                              {inlineSnapshotView && (
                                 <TimelineSnapshotClock
-                                  recheckAt={
-                                    new Date(snapshotCapturedAt).getTime() -
-                                    SENSOR_TRUTH_FUTURE_SKEW_MS
-                                  }
-                                  changesAt={
-                                    new Date(snapshotCapturedAt).getTime() + snapshotStaleMs
-                                  }
+                                  recheckAt={inlineSnapshotView.recheckAtMs ?? undefined}
+                                  changesAt={inlineSnapshotView.changesAtMs}
                                 >
                                   {(nowMs) => {
-                                    const sensorViewModel = usesManualCompatSensor
-                                      ? buildTimelineSensorSnapshotViewModel(sensor, {
-                                          preferUnit: "F",
-                                          validateManualCompatibility: true,
-                                        })
-                                      : null;
-                                    const legacyDisplaySensor = sensor as {
-                                      temp?: number;
-                                      rh?: number;
-                                      vpd?: number;
-                                      co2?: number;
-                                      soil?: number;
-                                    };
-                                    const snapTs = snapshotCapturedAt;
-                                    const hasFutureTimestamp =
-                                      classifySnapshotTimestamp(snapTs, nowMs) === "future";
-                                    const snapAgeMs = snapTs
-                                      ? nowMs - new Date(snapTs).getTime()
-                                      : Number.POSITIVE_INFINITY;
-                                    const snapStale =
-                                      !Number.isFinite(snapAgeMs) || snapAgeMs > snapshotStaleMs;
-                                    const rawVpd =
-                                      typeof sensor.vpd === "number" && Number.isFinite(sensor.vpd)
-                                        ? sensor.vpd
-                                        : null;
-                                    const vpdClassification = classifyVpdAgainstStage({
-                                      value: rawVpd,
-                                      stage: resolveTimelineDiaryEntryStage(e),
-                                      stale: snapStale,
-                                    });
-                                    const sourceBadge = classifyTimelineSensorSource({
-                                      rawSource,
-                                      capturedAt: snapTs ?? null,
-                                      now: nowMs,
-                                      staleMs: snapshotStaleMs,
-                                      // Persisted Quick Log snapshots are
-                                      // intrinsically grower-entered.
-                                      fallback: "manual",
-                                      context: "persisted_snapshot",
-                                    });
-                                    const manualHistoryNotice = timelineManualSnapshotHistoryNotice(
-                                      {
-                                        sourceKind: sourceBadge.kind,
-                                        capturedAt: snapTs || null,
-                                        nowMs,
-                                        staleMs: snapshotStaleMs,
-                                      },
-                                    );
+                                    const liveInlineSnapshotView =
+                                      buildTimelineInlineSnapshotViewModel(e, { nowMs });
+                                    if (!liveInlineSnapshotView) return null;
                                     return (
                                       <div
                                         className="mt-2 flex flex-wrap items-center gap-1.5"
@@ -2759,16 +2669,18 @@ export default function Timeline() {
                                           <Gauge className="h-3 w-3" />
                                           Manual snapshot
                                         </span>
-                                        <TimelineSensorSourceBadge badge={sourceBadge} />
-                                        {manualHistoryNotice && (
+                                        <TimelineSensorSourceBadge
+                                          badge={liveInlineSnapshotView.sourceBadge}
+                                        />
+                                        {liveInlineSnapshotView.historyNotice && (
                                           <span
                                             className="text-[11px] text-muted-foreground"
                                             data-testid="timeline-manual-history-notice"
                                           >
-                                            {manualHistoryNotice}
+                                            {liveInlineSnapshotView.historyNotice}
                                           </span>
                                         )}
-                                        {sensorViewModel?.kind === "invalid" && (
+                                        {liveInlineSnapshotView.validationState === "invalid" && (
                                           <span
                                             className="text-[11px] text-destructive"
                                             data-testid="timeline-manual-snapshot-invalid"
@@ -2777,83 +2689,30 @@ export default function Timeline() {
                                             shown.
                                           </span>
                                         )}
-                                        {sensorViewModel?.kind === "chips" &&
-                                          sensorViewModel.errors.length > 0 && (
-                                            <span
-                                              className="text-[11px] text-destructive"
-                                              data-testid="timeline-manual-snapshot-invalid"
-                                            >
-                                              Review manual snapshot — invalid readings were not
-                                              shown.
-                                            </span>
-                                          )}
-                                        {sensorViewModel?.kind === "chips" &&
-                                          sensorViewModel.errors.length === 0 &&
-                                          sensorViewModel.warnings.length > 0 && (
-                                            <span
-                                              className="text-[11px] text-warning-foreground"
-                                              data-testid="timeline-manual-snapshot-warning"
-                                            >
-                                              Check manual snapshot — a reading may need
-                                              confirmation.
-                                            </span>
-                                          )}
-                                        {sensorViewModel?.kind === "chips" &&
-                                          sensorViewModel.chips.map((chip) => (
-                                            <SnapChip key={chip.metric}>
-                                              {chip.metric === "rh"
-                                                ? `${chip.value}% RH`
-                                                : chip.metric === "ph"
-                                                  ? `pH ${chip.value}`
-                                                  : chip.metric === "ec"
-                                                    ? `EC ${chip.value} mS/cm`
-                                                    : chip.metric === "vpd"
-                                                      ? `VPD ${chip.value}`
-                                                      : chip.metric === "co2"
-                                                        ? `CO₂ ${chip.value}`
-                                                        : chip.metric === "soil_moisture"
-                                                          ? `Soil ${chip.value}%`
-                                                          : chip.display}
-                                            </SnapChip>
-                                          ))}
-                                        {!usesManualCompatSensor &&
-                                          legacyDisplaySensor.temp != null && (
-                                            <SnapChip>
-                                              {((legacyDisplaySensor.temp * 9) / 5 + 32).toFixed(1)}
-                                              °F
-                                            </SnapChip>
-                                          )}
-                                        {!usesManualCompatSensor &&
-                                          legacyDisplaySensor.rh != null && (
-                                            <SnapChip>{legacyDisplaySensor.rh}% RH</SnapChip>
-                                          )}
-                                        {!usesManualCompatSensor &&
-                                          legacyDisplaySensor.vpd != null && (
-                                            <SnapChip>VPD {legacyDisplaySensor.vpd}</SnapChip>
-                                          )}
-                                        {!usesManualCompatSensor &&
-                                          legacyDisplaySensor.co2 != null && (
-                                            <SnapChip>CO₂ {legacyDisplaySensor.co2}</SnapChip>
-                                          )}
-                                        {!usesManualCompatSensor &&
-                                          legacyDisplaySensor.soil != null && (
-                                            <SnapChip>Soil {legacyDisplaySensor.soil}%</SnapChip>
-                                          )}
-                                        {hasFutureTimestamp && (
+                                        {liveInlineSnapshotView.validationState === "warning" && (
+                                          <span
+                                            className="text-[11px] text-warning-foreground"
+                                            data-testid="timeline-manual-snapshot-warning"
+                                          >
+                                            Check manual snapshot — a reading may need confirmation.
+                                          </span>
+                                        )}
+                                        {liveInlineSnapshotView.chips.map((chip) => (
+                                          <SnapChip key={chip}>{chip}</SnapChip>
+                                        ))}
+                                        {liveInlineSnapshotView.hasFutureTimestamp && (
                                           <span className="text-[11px] text-muted-foreground">
                                             Future timestamp — freshness cannot be verified.
                                           </span>
                                         )}
-                                        {rawVpd != null &&
-                                          sourceBadge.canAssessStage &&
-                                          !hasFutureTimestamp && (
-                                            <span
-                                              className="text-[11px] text-muted-foreground"
-                                              data-testid="timeline-vpd-stage-hint"
-                                            >
-                                              {vpdClassification.label}
-                                            </span>
-                                          )}
+                                        {liveInlineSnapshotView.vpdStageHint && (
+                                          <span
+                                            className="text-[11px] text-muted-foreground"
+                                            data-testid="timeline-vpd-stage-hint"
+                                          >
+                                            {liveInlineSnapshotView.vpdStageHint}
+                                          </span>
+                                        )}
                                       </div>
                                     );
                                   }}

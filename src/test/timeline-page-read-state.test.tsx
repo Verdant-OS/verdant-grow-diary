@@ -943,6 +943,47 @@ describe("Timeline mounted read-state boundary", () => {
     expect(screen.getAllByTestId("timeline-manual-snapshot")).toHaveLength(1);
   });
 
+  it("keeps the Manual pill while rendering an invalid source badge for blank nested source plus live entry source", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-invalid-live-fallback", "Blank nested source"),
+              details: {
+                event_type: "quick_log",
+                source: "live",
+                sensor_snapshot: {
+                  source: " ",
+                  ts: "2026-09-01T12:00:00.000Z",
+                  temp: 24,
+                  rh: 55,
+                  vpd: 1.1,
+                },
+              },
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    const entry = (await screen.findByText("Blank nested source")).closest(
+      '[data-testid="timeline-entry"]',
+    );
+    expect(entry).not.toBeNull();
+    const snapshot = within(entry as HTMLElement).getByTestId("timeline-manual-snapshot");
+    expect(snapshot).toHaveTextContent("Manual snapshot");
+    expect(within(snapshot).getByTestId("timeline-sensor-source-badge-invalid")).toHaveTextContent(
+      "Source: invalid",
+    );
+    expect(within(snapshot).queryByTestId("timeline-sensor-source-badge-manual")).toBeNull();
+  });
+
   it("preserves canonical and legacy snapshot precedence, aliases, and formatting", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries") {

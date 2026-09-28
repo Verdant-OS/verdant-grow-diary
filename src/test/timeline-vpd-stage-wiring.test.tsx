@@ -11,23 +11,32 @@ import { resolve } from "node:path";
 import { classifyVpdAgainstStage, vpdMetricChipStatus } from "@/lib/vpdStageTargetRules";
 
 const SRC = readFileSync(resolve(__dirname, "../pages/Timeline.tsx"), "utf8");
+const INLINE_VM_SRC = readFileSync(
+  resolve(__dirname, "../lib/timelineInlineSnapshotViewModel.ts"),
+  "utf8",
+);
 
 describe("Timeline — stage-aware VPD wiring (static)", () => {
-  it("imports classifyVpdAgainstStage from the canonical rules module", () => {
-    expect(SRC).toMatch(/classifyVpdAgainstStage/);
-    expect(SRC).toMatch(/from\s+["']@\/lib\/vpdStageTargetRules["']/);
+  it("wires Timeline through the inline snapshot view-model", () => {
+    expect(SRC).toMatch(/buildTimelineInlineSnapshotViewModel/);
+    expect(SRC).toMatch(/liveInlineSnapshotView\.vpdStageHint/);
+  });
+
+  it("imports classifyVpdAgainstStage from the canonical rules module inside the view-model", () => {
+    expect(INLINE_VM_SRC).toMatch(/classifyVpdAgainstStage/);
+    expect(INLINE_VM_SRC).toMatch(/from\s+["']@\/lib\/vpdStageTargetRules["']/);
   });
 
   it("passes the validated effective diary stage and a stale flag to the classifier", () => {
-    expect(SRC).toMatch(
-      /classifyVpdAgainstStage\(\s*\{[\s\S]{0,300}stage:\s*resolveTimelineDiaryEntryStage\(e\)/,
+    expect(INLINE_VM_SRC).toMatch(
+      /classifyVpdAgainstStage\(\s*\{[\s\S]{0,300}stage:\s*resolveTimelineDiaryEntryStage\(\{/,
     );
-    expect(SRC).toMatch(/stale:\s*snapStale/);
+    expect(INLINE_VM_SRC).toMatch(/stale:\s*snapStale/);
   });
 
   it("still renders VPD for legacy and manual compatibility snapshots", () => {
-    expect(SRC).toMatch(/SnapChip>VPD\s*\{legacyDisplaySensor\.vpd\}/);
-    expect(SRC).toMatch(/chip\.metric === ["']vpd["']/);
+    expect(INLINE_VM_SRC).toMatch(/chips\.push\(`VPD \$\{sensor\.vpd\}`\)/);
+    expect(INLINE_VM_SRC).toMatch(/metric === ["']vpd["']/);
   });
 
   it("renders the stage-aware VPD hint test hook", () => {
@@ -35,14 +44,16 @@ describe("Timeline — stage-aware VPD wiring (static)", () => {
   });
 
   it("gates stage interpretation on corroborated snapshot provenance", () => {
-    expect(SRC).toMatch(/context:\s*["']persisted_snapshot["']/);
-    expect(SRC).toMatch(/value:\s*rawVpd/);
-    expect(SRC).toMatch(/rawVpd\s*!=\s*null\s*&&\s*sourceBadge\.canAssessStage/);
+    expect(INLINE_VM_SRC).toMatch(/context:\s*["']persisted_snapshot["']/);
+    expect(INLINE_VM_SRC).toMatch(/value:\s*rawVpd/);
+    expect(INLINE_VM_SRC).toMatch(/rawVpd\s*!=\s*null\s*&&\s*sourceBadge\.canAssessStage/);
   });
 
   it("does not duplicate hardcoded VPD target ranges in JSX", () => {
     expect(SRC).not.toMatch(/vpd\s*[<>]=?\s*0?\.[0-9]/i);
     expect(SRC).not.toMatch(/vpd\s*[<>]=?\s*1\.[0-9]/i);
+    expect(INLINE_VM_SRC).not.toMatch(/vpd\s*[<>]=?\s*0?\.[0-9]/i);
+    expect(INLINE_VM_SRC).not.toMatch(/vpd\s*[<>]=?\s*1\.[0-9]/i);
   });
 });
 
@@ -82,14 +93,22 @@ describe("Timeline — classifier behavior (via shared helper)", () => {
 describe("Timeline — safety contract", () => {
   it("contains no service_role / automation / device-control strings", () => {
     expect(SRC).not.toMatch(/service_role/);
+    expect(INLINE_VM_SRC).not.toMatch(/service_role/);
     expect(SRC).not.toMatch(
       /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b|device_command|autopilot/i,
     );
+    expect(INLINE_VM_SRC).not.toMatch(
+      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b|device_command|autopilot/i,
+    );
     expect(SRC).not.toMatch(/ai[\s_-]?coach|ai_doctor/i);
+    expect(INLINE_VM_SRC).not.toMatch(/ai[\s_-]?coach|ai_doctor/i);
   });
 
   it("does not write to alerts / action_queue / sensor_readings", () => {
     expect(SRC).not.toMatch(
+      /\.from\(["'](alerts|action_queue|sensor_readings)["']\)\s*\.(insert|update|delete|upsert)/,
+    );
+    expect(INLINE_VM_SRC).not.toMatch(
       /\.from\(["'](alerts|action_queue|sensor_readings)["']\)\s*\.(insert|update|delete|upsert)/,
     );
   });

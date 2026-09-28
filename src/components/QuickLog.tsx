@@ -853,6 +853,7 @@ export default function QuickLog({
       const targetGrow = grows.find((grow) => grow.id === target.growId) ?? null;
       if (
         !targetPlant ||
+        (target.tentId !== null && !targetTent) ||
         !targetGrow ||
         targetPlant.grow_id !== target.growId ||
         (targetPlant.tent_id ?? null) !== (target.tentId ?? null) ||
@@ -1290,9 +1291,10 @@ export default function QuickLog({
       toast.message(UNSUPPORTED_EVENT_TYPE_COPY);
       return;
     }
-    const saveTargetResolution = legacyQuickLogEventRequiresTent(effectiveEventType)
-      ? strictEditorTarget
-      : editorTarget;
+    const saveTargetResolution =
+      legacyQuickLogEventRequiresTent(effectiveEventType) || snapshot
+        ? strictEditorTarget
+        : editorTarget;
     if (
       saveTargetResolution.status !== "ready" ||
       !selectedPlant ||
@@ -1618,7 +1620,8 @@ export default function QuickLog({
   // is attachable. Usable-but-non-attachable rows render a disabled,
   // unchecked toggle and save as manual logs only.
   const snapshotAttachable = stripView.trustBadge.attachable;
-  const attachDisabled = saveLocked || !resolvedTarget || !snapshotUsable || !snapshotAttachable;
+  const attachDisabled =
+    saveLocked || !resolvedTarget?.tentId || !snapshotUsable || !snapshotAttachable;
   const showMismatch = !!(
     prefill?.plantId &&
     selectedPlant &&
@@ -1643,11 +1646,13 @@ export default function QuickLog({
     (resolvedTarget ? (resolvedTargetPlant?.name ?? "Assigned plant") : "Choose a plant");
   const targetTentName =
     inFlightSaveContext?.tentName ??
-    (resolvedTarget ? (resolvedTargetTent?.name ?? "Assigned tent") : "Plant required before save");
+    (resolvedTarget
+      ? (resolvedTargetTent?.name ?? "No tent assigned")
+      : "Plant required before save");
   const targetGrowName =
     inFlightSaveContext?.growName ??
     (resolvedTarget ? (resolvedTargetGrow?.name ?? "Assigned grow") : "No setup selected");
-  const mainFormRequiresTent = legacyQuickLogEventRequiresTent(displayedEventType);
+  const mainFormRequiresTent = legacyQuickLogEventRequiresTent(displayedEventType) || snapshot;
   const mainFormTarget =
     inFlightSaveContext === null && mainFormRequiresTent ? strictEditorTarget : editorTarget;
   const mainFormResolvedTarget =
@@ -1655,9 +1660,7 @@ export default function QuickLog({
       ? mainFormTarget.target
       : (inFlightSaveContext?.target ?? null);
   const allActivitiesTentRequiredBlockReason =
-    editorTarget.status !== "ready" &&
-    strictEditorTarget.status === "blocked" &&
-    strictEditorTarget.reason === "plant_tent_unassigned"
+    strictEditorTarget.status === "blocked" && strictEditorTarget.reason === "plant_tent_unassigned"
       ? QUICK_LOG_TARGET_BLOCKED_COPY[strictEditorTarget.reason]
       : null;
   const editorTargetBlocked =
@@ -2166,14 +2169,14 @@ export default function QuickLog({
                     Retry
                   </Button>
                 </div>
-              ) : showTargetError && editorTarget.status === "blocked" ? (
+              ) : showTargetError && mainFormTarget.status === "blocked" ? (
                 <p
                   id="quick-log-target-error"
                   role="alert"
                   className="text-[11px] text-destructive"
                   data-testid="quick-log-target-error"
                 >
-                  {QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]}
+                  {QUICK_LOG_TARGET_BLOCKED_COPY[mainFormTarget.reason]}
                 </p>
               ) : !selectedPlant ? (
                 <p

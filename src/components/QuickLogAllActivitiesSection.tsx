@@ -361,6 +361,7 @@ export default function QuickLogAllActivitiesSection({
     [externalPersistenceBlockReason, tentRequiredBlockReason],
   );
   const requestedActivityBlockReason = activityPersistenceBlockReason(requestedActivity);
+  const selectedActivityBlockReason = activityPersistenceBlockReason(selected?.id);
 
   const openStructuredWater = useCallback((): boolean => {
     const blockReason = activityPersistenceBlockReason("watering");
@@ -943,14 +944,14 @@ export default function QuickLogAllActivitiesSection({
         </p>
       )}
 
-      {externalPersistenceBlockReason && (
+      {selectedActivityBlockReason && (
         <p
           role="status"
           aria-live="polite"
           className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 text-xs text-muted-foreground"
           data-testid={`${testIdPrefix}-persistence-block`}
         >
-          {externalPersistenceBlockReason}
+          {selectedActivityBlockReason}
         </p>
       )}
 

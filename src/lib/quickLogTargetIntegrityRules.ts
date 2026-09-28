@@ -193,11 +193,7 @@ export function resolveQuickLogPrefillTarget(
   const growId = normalizeId(plant.grow_id);
   if (!growId) return blocked("plant_grow_unassigned");
   const tentId = normalizeId(plant.tent_id);
-  if (!tentId) {
-    return input.requireTent === false
-      ? ready(requestedPlantId, growId, null)
-      : blocked("plant_tent_unassigned");
-  }
+  if (!tentId && input.requireTent !== false) return blocked("plant_tent_unassigned");
 
   const requestedGrowId = normalizeId(input.prefill?.growId);
   if (requestedGrowId && requestedGrowId !== growId) {
@@ -207,6 +203,8 @@ export function resolveQuickLogPrefillTarget(
   if (requestedTentId && requestedTentId !== tentId) {
     return blocked("prefill_tent_mismatch");
   }
+
+  if (!tentId) return ready(requestedPlantId, growId, null);
 
   const tent = (input.tents ?? []).find((candidate) => normalizeId(candidate.id) === tentId);
   if (!tent) return blocked("tent_not_found");
@@ -239,6 +237,9 @@ export function resolveQuickLogWriteTarget(
   const plantTentId = normalizeId(plant.tent_id);
   if (!plantTentId) {
     if (plantGrowId !== activeGrowId) return blocked("active_grow_mismatch");
+    if (input.requireTent === false && normalizeId(input.selectedTent?.id)) {
+      return blocked("selected_tent_mismatch");
+    }
     return input.requireTent === false
       ? ready(plantId, plantGrowId, null)
       : blocked("plant_tent_unassigned");

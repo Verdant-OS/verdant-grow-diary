@@ -70,6 +70,20 @@ function renderRoute(source = "dashboard") {
   );
 }
 
+function renderRouteWithoutGrow(source = "dashboard") {
+  render(
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <MemoryRouter initialEntries={[`/daily-check?plantId=${PLANT}&from=${source}`]}>
+        <DailyCheck />
+        <WaterSheetHost />
+        <Probe />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe("Soft P2 weekly batch: Daily Check return", () => {
   it("D cancel/back keeps growId when the watering diary CTA query is already correct", async () => {
     render(
@@ -93,8 +107,11 @@ describe("Soft P2 weekly batch: Daily Check return", () => {
     expect(urlBefore.searchParams.get("method")).toBe("watering");
     await screen.findByTestId("daily-check-all-activities-picker-watering");
     expect(screen.getByTestId("destination").textContent).toBe(before);
+    const dashboardHref = screen.getByRole("link", { name: "Dashboard" }).getAttribute("href");
+    expect(dashboardHref).toBe(`/dashboard?growId=${GROW}`);
     await act(async () => fireEvent.click(screen.getByRole("link", { name: "Dashboard" })));
     const url = new URL(screen.getByTestId("destination").textContent!, "https://fixture.invalid");
+    expect(url.pathname).toBe("/dashboard");
     expect(url.searchParams.get("growId")).toBe(GROW);
   });
 
@@ -130,5 +147,15 @@ describe("Soft P2 weekly batch: Daily Check return", () => {
       const href = screen.getByTestId(`daily-grow-check-post-submit-${key}`).getAttribute("href")!;
       expect(new URL(href, "https://fixture.invalid").searchParams.get("growId")).toBe(GROW);
     }
+  });
+
+  it("Dashboard breadcrumb falls back to root when growId is absent", async () => {
+    renderRouteWithoutGrow();
+    const dashboardLink = screen.getByRole("link", { name: "Dashboard" });
+    expect(dashboardLink.getAttribute("href")).toBe("/");
+    await act(async () => fireEvent.click(dashboardLink));
+    const url = new URL(screen.getByTestId("destination").textContent!, "https://fixture.invalid");
+    expect(url.pathname).toBe("/");
+    expect(url.searchParams.get("growId")).toBeNull();
   });
 });

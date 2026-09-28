@@ -2,6 +2,36 @@
 
 # Verdant — Current Operating State
 
+## Current verification/review decision — 2026-09-28
+
+Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
+E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
+disposable test account owns the fixture grow and its selected tent/plant;
+tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
+use the KEEP account. Stop a write if identity, ownership or tagging cannot
+be verified; report that exact safety gap rather than proposing another host.
+Local/CI fixtures validate code, not production. This does not authorize merge,
+ready, auto-merge, Publish, production APPLY, real charges, role/auth changes,
+device control or Action Queue operations. Existing owner locks remain.
+See docs/production-only-verification-runbook.md.
+
+Earlier non-production smoke-host requests are superseded, not a current
+blocker. Existing CI dependencies require separate reviewed slices.
+
+Acceptance routing: **Blue Dream** reviews .tsx outside src/test/, P1s and
+publish gates; **Critical Mass** reviews everything else. Codex builds CI/infra
+without accepting its own work. Claude may add peer observations but is not
+the acceptance reviewer. GDP merges on an independent PASS at the exact head
+SHA. Historical receipts keep their original reviewer.
+
+OWNERSHIP.md controls ownership. HOLD #1250; #1369 REVIEW ONLY;
+#1735/#1737 untouchable; #1740 NEVER MERGE; #1742/#1658 locked;
+#1741/#1745 retain protected database-approval holds. No Publish, production
+APPLY, device or Action Queue operation was performed in this docs change.
+Live acceptance remains NOT_MEASURED here.
+
+### Historical operating receipts — unchanged below
+
 **Last updated:** 2026-09-24 UTC (~11:25 UTC; tip, live and board measured 11:14–11:17 UTC)
 **Updated by:** Claude (2026-09-24 late morning, restamp on **deploy tip
 `b0bfdb028600b63ec7b8bff914632a20b06020b7`**, the `#1685` squash. **Four commits** merged since the

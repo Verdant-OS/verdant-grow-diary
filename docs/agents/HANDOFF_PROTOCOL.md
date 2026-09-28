@@ -1,6 +1,6 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-09-28.1**
+**Sentinel-Version: 2026-09-28.2**
 
 Operating order is sequential for a given slice. Parallel implementation of the **same**
 slice by multiple agents is the failure this protocol exists to prevent.
@@ -21,8 +21,16 @@ Every assigned slice names:
 1. **One owner** — the peer who delivers the slice
 2. **One independent reviewer** — a **different** peer who reviews that work
 
-The owner cannot be their own reviewer. Grok, Claude, or Codex may fill either seat.
-Record both names in `CURRENT_STATE.md` and in the handoff block when known.
+The owner cannot be their own reviewer.
+
+Acceptance routing: **Blue Dream** reviews .tsx outside src/test/, P1s and
+publish gates; **Critical Mass** reviews everything else. Codex builds CI/infra
+without accepting its own work. Claude may add peer observations but is not
+the acceptance reviewer. GDP merges on an independent PASS at the exact head
+SHA. Historical receipts keep their original reviewer.
+
+Record the acceptance seat, exact reviewed head and completed/NOT_MEASURED
+review state in the handoff.
 
 Preferred research → architecture → build path (not rank; any peer may own any stage
 when assigned):
@@ -57,7 +65,7 @@ sentinel_version:
 date:
 
 slice_owner:
-independent_reviewer:
+independent_reviewer: Blue Dream or Critical Mass, selected by scope/priority
 
 completed:
   - what was actually done, not what was attempted
@@ -85,9 +93,21 @@ files_touched:
   - paths, or "none"
 ```
 
-`slice_owner` and `independent_reviewer` must name different peers among Grok, Claude,
-and Codex (or Security/Gemini when those roles own the review seat). Omit only when the
-slice has not yet been assigned; do not invent an owner.
+The owner and acceptance reviewer must be independent. Route to Blue Dream
+for .tsx outside src/test/, any P1 or a publish gate; otherwise Critical Mass.
+Security/Gemini/Claude observations do not replace that acceptance. Name the
+exact head SHA; routing is not a completed PASS. State NOT_MEASURED if unassigned.
+
+Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
+E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
+disposable test account owns the fixture grow and its selected tent/plant;
+tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
+use the KEEP account. Stop a write if identity, ownership or tagging cannot
+be verified; report that exact safety gap rather than proposing another host.
+Local/CI fixtures validate code, not production. This does not authorize merge,
+ready, auto-merge, Publish, production APPLY, real charges, role/auth changes,
+device control or Action Queue operations. Existing owner locks remain.
+See docs/production-only-verification-runbook.md.
 ---
 
 ## Rules that make handoffs trustworthy

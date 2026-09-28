@@ -1,4 +1,8 @@
 name: Required core schema present
+# Hosted acceptance uses https://verdantgrowdiary.com only (2026-09-28).
+# Existing CI/diagnostic bindings remain unchanged and supply no live acceptance.
+# Any target/status-message alignment requires a separate reviewed CI slice.
+# See docs/production-only-verification-runbook.md; no dispatch/APPLY here.
 
 on:
   pull_request:

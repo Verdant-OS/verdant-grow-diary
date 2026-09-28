@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-09-28.1**
+**Sentinel-Version: 2026-09-28.2**
 
 Ownership and routing: see `docs/agents/OWNERSHIP.md`. It wins on conflicts.
 
@@ -62,6 +62,19 @@ outcome cannot be measured, report the blocker instead of claiming success.
 Use small, scoped changes. Avoid broad rewrites.
 
 ---
+
+## Production verification target — 2026-09-28
+
+Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
+E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
+disposable test account owns the fixture grow and its selected tent/plant;
+tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
+use the KEEP account. Stop a write if identity, ownership or tagging cannot
+be verified; report that exact safety gap rather than proposing another host.
+Local/CI fixtures validate code, not production. This does not authorize merge,
+ready, auto-merge, Publish, production APPLY, real charges, role/auth changes,
+device control or Action Queue operations. Existing owner locks remain.
+See docs/production-only-verification-runbook.md.
 
 ## Multi-Agent Coordination
 
@@ -589,6 +602,12 @@ and no competing Timeline / Alerts / Action Queue rewrite).
 Every assigned slice names **one owner** and a **different peer** as **independent
 reviewer**. The owner cannot review their own work. **No code ships without peer
 review** — an owned slice without a named independent reviewer is incomplete.
+
+Acceptance routing: **Blue Dream** reviews .tsx outside src/test/, P1s and
+publish gates; **Critical Mass** reviews everything else. Codex builds CI/infra
+without accepting its own work. Claude may add peer observations but is not
+the acceptance reviewer. GDP merges on an independent PASS at the exact head
+SHA. Historical receipts keep their original reviewer.
 
 Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The preferred sequence is:
 

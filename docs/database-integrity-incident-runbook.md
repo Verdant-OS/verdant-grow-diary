@@ -25,8 +25,10 @@ similar constraint) destroys forensic evidence and makes real recovery harder.
    failing SQL text (including any `-- comment` lines) for the incident
    record before they roll off.
 3. **Confirm the environment.** Verify whether the affected database is
-   production, staging, or local dev. Never run recovery steps against the
-   wrong project ref.
+   the pinned production target for https://verdantgrowdiary.com. Historical
+   local/CI evidence retains its actual target and cannot substitute for live
+   verification. Never run recovery against the wrong project ref; this
+   verification task authorizes no repair/APPLY.
 4. **Do not run any repair script that inserts into `grows`, `tents`,
    `plants`, `action_queue`, or related tables.** No "one-shot" placeholders.
 

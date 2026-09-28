@@ -21,8 +21,11 @@ name: Quick Log Playwright smoke
 # Required repository secrets / vars (configure in GitHub → Settings):
 #   secrets.E2E_TEST_EMAIL
 #   secrets.E2E_TEST_PASSWORD
-#   vars.E2E_BASE_URL              (e.g. https://<preview-or-staging>.example)
-#   vars.E2E_GROW_1_PLANT_URL      (full URL of a Grow #1 plant page)
+#   vars.E2E_BASE_URL              (https://verdantgrowdiary.com only)
+#   vars.E2E_GROW_1_PLANT_URL      (production URL in the test fixture's own grow)
+# Before writes, verify fixture/account ownership; tag [smoke <timestamp>].
+# Never customer data or the KEEP account. Any missing harness guard needs a
+# separate reviewed CI slice; this comment changes no executable settings.
 #   vars.E2E_GROW_1_SECOND_PLANT_NAME (optional; defaults to "E2E Test Plant 2")
 #
 # PR-comment controls (workflow_dispatch only; push/pull_request use the

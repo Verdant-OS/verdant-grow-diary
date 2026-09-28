@@ -1,6 +1,23 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-09-28.1**
+**Sentinel-Version: 2026-09-28.2**
+
+Acceptance routing: **Blue Dream** reviews .tsx outside src/test/, P1s and
+publish gates; **Critical Mass** reviews everything else. Codex builds CI/infra
+without accepting its own work. Claude may add peer observations but is not
+the acceptance reviewer. GDP merges on an independent PASS at the exact head
+SHA. Historical receipts keep their original reviewer.
+
+Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
+E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
+disposable test account owns the fixture grow and its selected tent/plant;
+tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
+use the KEEP account. Stop a write if identity, ownership or tagging cannot
+be verified; report that exact safety gap rather than proposing another host.
+Local/CI fixtures validate code, not production. This does not authorize merge,
+ready, auto-merge, Publish, production APPLY, real charges, role/auth changes,
+device control or Action Queue operations. Existing owner locks remain.
+See docs/production-only-verification-runbook.md.
 
 Multi-agent work on Verdant runs under one shared constitution plus a small
 platform-specific bootstrap per agent. A single file cannot reach every AI platform

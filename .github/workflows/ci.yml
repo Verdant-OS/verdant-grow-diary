@@ -388,12 +388,11 @@ jobs:
       - name: Gamification direct-insert scan + static tests
         run: bun run test:security-gamification
 
-      # NOTE: Gamification RLS live verification and award_nugs staging smoke
-      # are intentionally NOT in this PR-default workflow. They require
-      # privileged staging credentials (DB URL / service role / anon key) and
-      # must not be reachable from untrusted PRs. They live in the separate
-      # manual workflow .github/workflows/gamification-staging-smoke.yml,
-      # gated on workflow_dispatch + push-to-main only.
+      # Legacy gamification setup is not production acceptance and stays out
+      # of PR-default jobs. Current hosted verification is verdantgrowdiary.com.
+      # The dormant gamification-staging-smoke.yml needs separate fixture-safety
+      # and effective-gating review; never repoint privileged setup to production.
+      # This comment changes no job, trigger or credential binding.
 
       # Stop-ship: every Shelly H&T edge function declared in
       # supabase/config.toml must have its source file in the repo.
@@ -468,10 +467,10 @@ jobs:
       - name: Edge Function colocated Deno unit tests
         run: bun run test:edge:colocated-unit
 
-      # Optional: QuickLog RPC runtime harnesses. Only runs when staging
-      # Supabase credentials are configured as repo/org secrets. The
-      # orchestrator script also skips cleanly when env is missing, so this
-      # step is safe to leave wired even for forked PRs.
+      # Existing conditional QuickLog RPC setup validates repository behavior.
+      # Production smoke is verdantgrowdiary.com with fixture ownership/tag guards.
+      # Audit privileged setup in a separate CI slice before any production run.
+      # A skip is not live acceptance; executable settings remain unchanged.
       - name: QuickLog RPC runtime harnesses (conditional)
         if: ${{ env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SUPABASE_ANON_KEY != '' }}
         env:

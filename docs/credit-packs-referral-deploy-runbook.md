@@ -99,7 +99,12 @@ These don't block the pack launch, but the dependent features need them:
 
 ---
 
-## 6. Smoke test (sandbox) before flipping live
+## 6. Provider-sandbox smoke on the production app
+
+Verify only at https://verdantgrowdiary.com using the test-fixture account;
+never the KEEP account or customer data. Provider sandbox is payment mode,
+not a smoke host. No real charge or payment-mode switch is authorized here.
+See docs/production-only-verification-runbook.md.
 
 - [ ] Buy a 50-pack in sandbox → webhook logs `processed:grant_credit_pack` → a row appears in `ai_credit_grants`.
 - [ ] Exhaust the monthly allowance, run one more AI Doctor review → it succeeds, `funded_by='pack'`, and the badge shows the pack balance (not "0").

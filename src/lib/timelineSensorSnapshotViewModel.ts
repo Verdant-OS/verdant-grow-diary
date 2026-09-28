@@ -123,15 +123,20 @@ export function resolveTimelineCardSensorResolution(
     "temp_c",
     "temperature_f",
     "temperature_c",
+    "rh",
+    "soil",
     "humidity_percent",
     "vpd_kpa",
     "co2_ppm",
     "soil_moisture_pct",
   ] as const;
   const hasManualSpecificKey = manualSpecificKeys.some((key) => key in sensor);
+  const hasLegacyGenericTempKey = "temp" in sensor || "temperature" in sensor;
   return {
     sensor,
-    useManualValidation: sensor === manualCompat || (source === "manual" && hasManualSpecificKey),
+    useManualValidation:
+      sensor === manualCompat ||
+      (source === "manual" && hasManualSpecificKey && !hasLegacyGenericTempKey),
   };
 }
 

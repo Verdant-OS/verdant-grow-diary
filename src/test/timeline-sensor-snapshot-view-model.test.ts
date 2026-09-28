@@ -38,6 +38,23 @@ describe("buildTimelineSensorSnapshotViewModel", () => {
       expect(resolved.sensor).toEqual({ temp: 24, source: "live" });
       expect(resolved.useManualValidation).toBe(false);
     });
+
+    it.each([
+      [{ sensor_snapshot: { rh: 150, source: "manual" }, source: "manual" }, true],
+      [{ sensor_snapshot: { soil: 150, source: "manual" }, source: "manual" }, true],
+      [{ sensor_snapshot: { rh: 55, source: "manual" }, source: "manual" }, true],
+    ])("enables manual validation for canonical manual rh/soil keys", (details, expected) => {
+      const resolved = resolveTimelineCardSensorResolution(details);
+      expect(resolved.useManualValidation).toBe(expected);
+    });
+
+    it("keeps legacy generic temp/rh/soil snapshots on the raw chip path", () => {
+      const resolved = resolveTimelineCardSensorResolution({
+        sensor_snapshot: { temp: 27.8, rh: 55, soil: 42, source: "manual" },
+        source: "manual",
+      });
+      expect(resolved.useManualValidation).toBe(false);
+    });
   });
 
   it("returns invalid for non-object input", () => {

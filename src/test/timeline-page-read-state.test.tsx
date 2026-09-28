@@ -574,6 +574,90 @@ describe("Timeline mounted read-state boundary", () => {
     expect(screen.queryByTestId("timeline-partial-read-warning")).not.toBeInTheDocument();
   });
 
+  it("discloses invalid sensor_readings_effective humidity/soil captures and hides raw invalid chips", async () => {
+    const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const now = Date.now();
+    const humidityOnlyCapturedAt = new Date(now - 60_000).toISOString();
+    const soilOnlyCapturedAt = new Date(now - 120_000).toISOString();
+    const mixedCapturedAt = new Date(now - 180_000).toISOString();
+    const effectiveRow = (
+      id: string,
+      metric: string,
+      value: number,
+      capturedAt: string,
+      quality: string = "ok",
+    ) => ({
+      id,
+      user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      tent_id: tent,
+      metric,
+      value,
+      source: "manual",
+      quality,
+      ts: capturedAt,
+      captured_at: capturedAt,
+      created_at: capturedAt,
+      device_id: null,
+      raw_payload: null,
+      correction_valid: true,
+      corrected_at: capturedAt,
+    });
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: [], error: null, count: 0 };
+      if (spec.table === "tents") return { data: [{ id: tent }], error: null };
+      if (spec.table === "sensor_readings_effective") {
+        return {
+          data: [
+            effectiveRow(
+              "00000000-0000-4000-8000-000000000001",
+              "humidity_pct",
+              150,
+              humidityOnlyCapturedAt,
+            ),
+            effectiveRow(
+              "00000000-0000-4000-8000-000000000002",
+              "soil_moisture_pct",
+              150,
+              soilOnlyCapturedAt,
+            ),
+            effectiveRow(
+              "00000000-0000-4000-8000-000000000003",
+              "humidity_pct",
+              55,
+              mixedCapturedAt,
+            ),
+            effectiveRow(
+              "00000000-0000-4000-8000-000000000004",
+              "soil_moisture_pct",
+              150,
+              mixedCapturedAt,
+            ),
+          ],
+          error: null,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Manual sensor snapshot: 55% RH")).toBeInTheDocument();
+    expect(screen.getAllByText("Manual sensor snapshot")).toHaveLength(2);
+    expect(screen.getAllByTestId("timeline-manual-snapshot-invalid")).toHaveLength(3);
+    expect(screen.queryByText("150% RH")).not.toBeInTheDocument();
+    expect(screen.queryByText("Soil 150%")).not.toBeInTheDocument();
+
+    const mixedEntry = screen
+      .getByText("Manual sensor snapshot: 55% RH")
+      .closest('[data-testid="timeline-entry"]');
+    expect(mixedEntry).not.toBeNull();
+    expect(
+      within(mixedEntry as HTMLElement).getByTestId("timeline-manual-snapshot-invalid"),
+    ).toHaveTextContent("Review manual snapshot");
+    expect(mixedEntry).toHaveTextContent("55% RH");
+    expect(mixedEntry).not.toHaveTextContent("Soil 150%");
+  });
+
   it("discloses invalid correction evidence as partial history and retains diary entries", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "tents")

@@ -1110,6 +1110,120 @@ describe("Timeline mounted read-state boundary", () => {
     expect(ecMismatchEntry).toHaveTextContent("48% RH");
   });
 
+  it("validates canonical manual sensor_snapshot cards and never renders invalid chips as healthy values", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-canonical-invalid-rh-soil", "Canonical invalid RH/soil"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: { temp_c: 24, rh: 150, soil: 101, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-canonical-90c", "Canonical 90C / 55% RH"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: { temp_c: 90, rh: 55, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-canonical-38f", "Canonical 38F / 48% RH"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: { temp_f: 38, rh: 48, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-canonical-115f", "Canonical 115F / 48% RH"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: { temp_f: 115, rh: 48, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-canonical-39f", "Canonical 39F / 48% RH"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: { temp_f: 39, rh: 48, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-canonical-111f", "Canonical 111F / 48% RH"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: { temp_f: 111, rh: 48, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-canonical-all-invalid", "Canonical all-invalid capture"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: {
+                  temp_f: 115,
+                  rh: 150,
+                  soil: 101,
+                  vpd: 20,
+                  source: "manual",
+                },
+              },
+            },
+          ],
+          error: null,
+          count: 7,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    const invalidRhSoil = (await screen.findByText("Canonical invalid RH/soil")).closest(
+      '[data-testid="timeline-entry"]',
+    );
+    expect(
+      within(invalidRhSoil as HTMLElement).getByTestId("timeline-manual-snapshot-invalid"),
+    ).toHaveTextContent("Review manual snapshot");
+    expect(invalidRhSoil).toHaveTextContent("75.2°F");
+    expect(invalidRhSoil).not.toHaveTextContent("150% RH");
+    expect(invalidRhSoil).not.toHaveTextContent("Soil 101%");
+
+    const ninetyC = screen
+      .getByText("Canonical 90C / 55% RH")
+      .closest('[data-testid="timeline-entry"]');
+    expect(
+      within(ninetyC as HTMLElement).getByTestId("timeline-manual-snapshot-invalid"),
+    ).toHaveTextContent("Review manual snapshot");
+    expect(ninetyC).toHaveTextContent("55% RH");
+    expect(ninetyC).not.toHaveTextContent("194°F");
+
+    for (const [label, hiddenTemp] of [
+      ["Canonical 38F / 48% RH", "38°F"],
+      ["Canonical 115F / 48% RH", "115°F"],
+      ["Canonical 39F / 48% RH", "39°F"],
+      ["Canonical 111F / 48% RH", "111°F"],
+    ] as const) {
+      const entry = screen.getByText(label).closest('[data-testid="timeline-entry"]');
+      expect(
+        within(entry as HTMLElement).getByTestId("timeline-manual-snapshot-invalid"),
+      ).toHaveTextContent("Review manual snapshot");
+      expect(entry).toHaveTextContent("48% RH");
+      expect(entry).not.toHaveTextContent(hiddenTemp);
+    }
+
+    const allInvalid = screen
+      .getByText("Canonical all-invalid capture")
+      .closest('[data-testid="timeline-entry"]');
+    expect(
+      within(allInvalid as HTMLElement).getByTestId("timeline-manual-snapshot-invalid"),
+    ).toHaveTextContent("Review manual snapshot");
+    expect(allInvalid).not.toHaveTextContent("115°F");
+    expect(allInvalid).not.toHaveTextContent("150% RH");
+    expect(allInvalid).not.toHaveTextContent("Soil 101%");
+  });
+
   it("renders a pH-and-EC-only Plant Quick Log snapshot without inventing room metrics", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries") {

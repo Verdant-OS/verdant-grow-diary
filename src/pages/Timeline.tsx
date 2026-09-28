@@ -176,7 +176,10 @@ import {
 import TimelineEvidenceDetailPreview from "@/components/TimelineEvidenceDetailPreview";
 import TimelineSnapshotClock from "@/components/TimelineSnapshotClock";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
-import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
+import {
+  buildTimelineSensorSnapshotViewModel,
+  resolveTimelineCardSensorResolution,
+} from "@/lib/timelineSensorSnapshotViewModel";
 import {
   classifyTimelineSensorSource,
   type TimelineSensorSourceKind,
@@ -2438,11 +2441,10 @@ export default function Timeline() {
                           // Canonical snapshots win, followed by the legacy
                           // `sensor` shape and Plant Quick Log's compatibility
                           // envelope. No persisted row is rewritten.
-                          const canonicalSensor = e.details?.sensor_snapshot;
-                          const legacySensor = e.details?.sensor;
-                          const manualCompatSensor = e.details?.manual_sensor_snapshot;
-                          const sensor = (canonicalSensor ?? legacySensor ?? manualCompatSensor) as
-                            Record<string, unknown> | undefined;
+                          const { sensor, useManualValidation } =
+                            resolveTimelineCardSensorResolution(
+                              (e.details as Record<string, unknown> | null | undefined) ?? null,
+                            );
                           const rawSource =
                             typeof sensor?.source === "string" && sensor.source.trim().length > 0
                               ? sensor.source
@@ -2464,10 +2466,6 @@ export default function Timeline() {
                           const rawCapturedAt = sensor?.ts ?? sensor?.captured_at;
                           const snapshotCapturedAt =
                             typeof rawCapturedAt === "string" ? rawCapturedAt.trim() : "";
-                          const usesManualCompatSensor =
-                            canonicalSensor == null &&
-                            legacySensor == null &&
-                            manualCompatSensor != null;
                           const remindAt = e.details?.remind_at as string | undefined;
                           const eventTypeValue = effectiveCareType;
                           // Learning-loop rows (follow-up / outcome / decision) carry join
@@ -2702,7 +2700,7 @@ export default function Timeline() {
                                   }
                                 >
                                   {(nowMs) => {
-                                    const sensorViewModel = usesManualCompatSensor
+                                    const sensorViewModel = useManualValidation
                                       ? buildTimelineSensorSnapshotViewModel(sensor, {
                                           preferUnit: "F",
                                           validateManualCompatibility: true,
@@ -2816,26 +2814,25 @@ export default function Timeline() {
                                                           : chip.display}
                                             </SnapChip>
                                           ))}
-                                        {!usesManualCompatSensor &&
+                                        {!useManualValidation &&
                                           legacyDisplaySensor.temp != null && (
                                             <SnapChip>
                                               {((legacyDisplaySensor.temp * 9) / 5 + 32).toFixed(1)}
                                               °F
                                             </SnapChip>
                                           )}
-                                        {!usesManualCompatSensor &&
-                                          legacyDisplaySensor.rh != null && (
-                                            <SnapChip>{legacyDisplaySensor.rh}% RH</SnapChip>
-                                          )}
-                                        {!usesManualCompatSensor &&
+                                        {!useManualValidation && legacyDisplaySensor.rh != null && (
+                                          <SnapChip>{legacyDisplaySensor.rh}% RH</SnapChip>
+                                        )}
+                                        {!useManualValidation &&
                                           legacyDisplaySensor.vpd != null && (
                                             <SnapChip>VPD {legacyDisplaySensor.vpd}</SnapChip>
                                           )}
-                                        {!usesManualCompatSensor &&
+                                        {!useManualValidation &&
                                           legacyDisplaySensor.co2 != null && (
                                             <SnapChip>CO₂ {legacyDisplaySensor.co2}</SnapChip>
                                           )}
-                                        {!usesManualCompatSensor &&
+                                        {!useManualValidation &&
                                           legacyDisplaySensor.soil != null && (
                                             <SnapChip>Soil {legacyDisplaySensor.soil}%</SnapChip>
                                           )}
@@ -2845,6 +2842,11 @@ export default function Timeline() {
                                           </span>
                                         )}
                                         {rawVpd != null &&
+                                          (!useManualValidation ||
+                                            (sensorViewModel?.kind === "chips" &&
+                                              sensorViewModel.chips.some(
+                                                (chip) => chip.metric === "vpd",
+                                              ))) &&
                                           sourceBadge.canAssessStage &&
                                           !hasFutureTimestamp && (
                                             <span

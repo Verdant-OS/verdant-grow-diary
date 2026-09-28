@@ -97,6 +97,18 @@ describe("completeManualSensorTimelineRows", () => {
     expect(page.rows).toEqual(newer);
     expect(page.hasOlderRows).toBe(true);
   });
+
+  it("marks hasOlderRows when the bounded query returns exactly 201 rows", () => {
+    const rows = [
+      ...Array.from({ length: TIMELINE_MANUAL_SENSOR_ROW_LIMIT }, () =>
+        metricRow("temperature_c", 24, "manual", { ts: CAPTURED }),
+      ),
+      metricRow("humidity_pct", 55, "manual", { ts: "2026-09-08T18:46:00.000Z" }),
+    ];
+    const page = completeManualSensorTimelineRows(rows);
+    expect(page.rows).toHaveLength(TIMELINE_MANUAL_SENSOR_ROW_LIMIT);
+    expect(page.hasOlderRows).toBe(true);
+  });
 });
 
 describe("manualSensorReadingsToTimelineEntries", () => {
@@ -312,6 +324,49 @@ describe("manualSensorReadingsToTimelineEntries", () => {
       );
     },
   );
+
+  it("keeps invalid RH/soil/VPD in sensor_snapshot for disclosure but excludes them from receipt note", () => {
+    const [receipt] = manualSensorReadingsToTimelineEntries(
+      [
+        metricRow("temperature_c", fahrenheitToCelsius(76)),
+        metricRow("humidity_pct", 150),
+        metricRow("soil_moisture_pct", 101),
+        metricRow("vpd_kpa", 20),
+      ],
+      NOW,
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt.details.sensor_snapshot).toMatchObject({
+      source: "manual",
+      temp_c: fahrenheitToCelsius(76),
+      rh: 150,
+      soil: 101,
+      vpd_kpa: 20,
+    });
+    expect(receipt.note).toContain("76°F");
+    expect(receipt.note).not.toContain("150% RH");
+    expect(receipt.note).not.toContain("101% soil moisture");
+    expect(receipt.note).not.toContain("20 kPa VPD");
+  });
+
+  it.each([
+    [39, false],
+    [40, true],
+    [110, true],
+    [111, false],
+  ])("applies the 40–110°F bounds to note rendering at %s°F", (tempF, shouldRender) => {
+    const [receipt] = manualSensorReadingsToTimelineEntries(
+      [metricRow("temperature_c", fahrenheitToCelsius(tempF)), metricRow("humidity_pct", 48)],
+      NOW,
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt.note).toContain("48% RH");
+    if (shouldRender) {
+      expect(receipt.note).toContain(`${tempF}°F`);
+    } else {
+      expect(receipt.note).not.toContain(`${tempF}°F`);
+    }
+  });
 
   it("excludes live/csv/demo rows so Sensors live data is not a Timeline measurement receipt", () => {
     const tempC = fahrenheitToCelsius(74);

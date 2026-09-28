@@ -54,6 +54,11 @@ export type TimelineSensorSnapshotViewModel =
       isLive: boolean;
     };
 
+export type TimelineCardSensorResolution = {
+  sensor: Record<string, unknown> | undefined;
+  useManualValidation: boolean;
+};
+
 const UNAVAILABLE_MESSAGE = "Sensor snapshot unavailable";
 const MANUAL_REVIEW_MESSAGE = "Review manual snapshot — invalid readings were not shown.";
 
@@ -87,6 +92,47 @@ function readSource(raw: unknown): SensorReadingSource | null {
     return v;
   }
   return null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+/**
+ * Resolve the snapshot payload used on Timeline cards plus whether it must go
+ * through manual compatibility validation (instead of raw chip rendering).
+ */
+export function resolveTimelineCardSensorResolution(
+  details: Record<string, unknown> | null | undefined,
+): TimelineCardSensorResolution {
+  const canonical = asRecord(details?.sensor_snapshot);
+  const legacy = asRecord(details?.sensor);
+  const manualCompat = asRecord(details?.manual_sensor_snapshot);
+  const sensor = canonical ?? legacy ?? manualCompat ?? undefined;
+  if (!sensor) return { sensor: undefined, useManualValidation: false };
+
+  const sourceRaw =
+    typeof sensor.source === "string" && sensor.source.trim().length > 0
+      ? sensor.source
+      : typeof details?.source === "string"
+        ? details.source
+        : null;
+  const source = sourceRaw?.trim().toLowerCase() ?? null;
+  const manualSpecificKeys = [
+    "temp_f",
+    "temp_c",
+    "temperature_f",
+    "temperature_c",
+    "humidity_percent",
+    "vpd_kpa",
+    "co2_ppm",
+    "soil_moisture_pct",
+  ] as const;
+  const hasManualSpecificKey = manualSpecificKeys.some((key) => key in sensor);
+  return {
+    sensor,
+    useManualValidation: sensor === manualCompat || (source === "manual" && hasManualSpecificKey),
+  };
 }
 
 /**

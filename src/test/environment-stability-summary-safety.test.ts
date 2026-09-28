@@ -30,12 +30,12 @@ describe("Environment Stability Summary v1 — safety + wiring", () => {
     expect(CARD_SRC).not.toMatch(/fetch\(|supabase|service_role/);
   });
 
-  it("Tent Detail renders EnvironmentStabilityCard with tent stage", () => {
+  it("Tent Detail renders EnvironmentStabilityCard with the resolved tent stage", () => {
     expect(TENT_SRC).toMatch(
       /import\s+EnvironmentStabilityCard\s+from\s+["']@\/components\/EnvironmentStabilityCard["']/,
     );
     expect(TENT_SRC).toMatch(
-      /<EnvironmentStabilityCard[\s\S]*?testId=["']tent-detail-environment-stability["'][\s\S]*?stage:\s*tent\.stage/,
+      /<EnvironmentStabilityCard[\s\S]*?testId=["']tent-detail-environment-stability["'][\s\S]*?stage:\s*envStage/,
     );
   });
 

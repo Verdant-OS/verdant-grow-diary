@@ -176,9 +176,8 @@ Deno.test("disallowed origin — OPTIONS still CORS-tagged with canonical origin
 });
 
 // Regression: Lovable's live EDITOR preview iframe (id-preview--<project
-// uuid>.lovable.app) is a different host than the published
-// verdantgrowdiary-com.lovable.app site and was previously absent from
-// ALLOWED_ORIGINS, so preflight (and therefore the real POST) failed
+// uuid>.lovable.app) is a different host than the published site and was
+// previously absent from ALLOWED_ORIGINS, so preflight (and therefore the real POST) failed
 // browser-side as an opaque "Failed to fetch" / status 0, with no
 // distinguishing signal on either side. This must echo the PREVIEW origin
 // itself, not the canonical fallback — the prior test proves the fallback
@@ -218,6 +217,23 @@ Deno.test(
     assertStringIncludes(await res.text(), "unauthorized");
   },
 );
+
+// QA 2026-09-24 (#1683): the old published Lovable host now answers HTTP 404
+// "No Lovable project found at this address", so it was dropped from
+// ALLOWED_ORIGINS. Built from parts so the repo-wide "no dead host in
+// supabase/functions" guard (src/test/edge-functions-no-dead-lovable-origin)
+// stays meaningful.
+const RETIRED_LOVABLE_ORIGIN = "https://" + ["verdantgrowdiary-com", "lovable", "app"].join(".");
+
+Deno.test("retired Lovable host — no longer echoed, gets the canonical fallback", async () => {
+  const req = new Request(ENDPOINT, {
+    method: "OPTIONS",
+    headers: { origin: RETIRED_LOVABLE_ORIGIN },
+  });
+  const res = await handleRequest(req);
+  assertEquals(res.status, 204);
+  assertEquals(res.headers.get("Access-Control-Allow-Origin"), ORIGIN);
+});
 
 Deno.test({
   name: "idempotency-key — duplicate requests both return CORS + no token leak",

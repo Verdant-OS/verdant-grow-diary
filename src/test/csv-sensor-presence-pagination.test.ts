@@ -18,6 +18,53 @@ const history = Array.from({ length: 10000 }, (_, index) => ({
 }));
 
 describe("CSV candidate timestamp lookup", () => {
+  it("returns an empty set without querying when every timestamp is invalid", async () => {
+    const readPage = vi.fn(async () => []);
+    expect(
+      await collectCandidateCsvSensorPresenceKeys(
+        [null, undefined, "invalid", "   "],
+        readPage,
+        () => true,
+      ),
+    ).toEqual(new Set());
+    expect(readPage).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty set when ownership ends before the first timestamp batch", async () => {
+    const readPage = vi.fn(async () => history.slice(0, 1));
+    expect(
+      await collectCandidateCsvSensorPresenceKeys([history[0].captured_at], readPage, () => false),
+    ).toEqual(new Set());
+    expect(readPage).not.toHaveBeenCalled();
+  });
+
+  it("discards keys from batches that completed before ownership ends in a later batch", async () => {
+    // Enough batches that the last one can only start after a worker has
+    // stored an earlier batch's keys, whatever the lookup concurrency.
+    const batchCount = 8;
+    const rows = history.slice(0, CSV_PRESENCE_TIMESTAMP_BATCH_SIZE * (batchCount - 1) + 1);
+    const lastTimestamp = rows.at(-1)!.captured_at;
+    let active = true;
+    let completedBatches = 0;
+    let completedBeforeCancel = -1;
+    const readPage = vi.fn(async (batch: readonly string[], from: number, to: number) => {
+      const page = rows.filter((row) => batch.includes(row.captured_at)).slice(from, to + 1);
+      if (page.length === 0) completedBatches += 1;
+      if (active && batch.includes(lastTimestamp)) {
+        completedBeforeCancel = completedBatches;
+        active = false;
+      }
+      return page;
+    });
+    const keys = await collectCandidateCsvSensorPresenceKeys(
+      rows.map((row) => row.captured_at),
+      readPage,
+      () => active,
+    );
+    expect(completedBeforeCancel).toBeGreaterThan(0);
+    expect(keys).toEqual(new Set());
+  });
+
   it("reads only sparse candidate timestamps while honoring smaller server pages", async () => {
     const candidates = [history[1000], history[5000], history[9000]];
     const timestamps = candidates.map((row) => row.captured_at);
@@ -112,6 +159,33 @@ describe("CSV presence pagination", () => {
       allDuplicates: true,
     });
     expect(insertBatch).not.toHaveBeenCalled();
+  });
+
+  it("reconciles sparse duplicates via candidate timestamp lookup like production", async () => {
+    const candidates = [history[1000], history[5000], history[9000]];
+    const insertBatch = vi.fn(async () => ({ error: null }));
+    const readPage = vi.fn(async (batch: readonly string[], from: number) =>
+      history.filter((row) => batch.includes(row.captured_at)).slice(from, from + 2),
+    );
+    const result = await runDuplicateAwareCsvHistoryImport({
+      rows: candidates,
+      vendorLabel: "environment",
+      insertBatch,
+      fetchExistingKeys: async () =>
+        collectCandidateCsvSensorPresenceKeys(
+          candidates.map((row) => row.captured_at),
+          readPage,
+          () => true,
+        ),
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      insertedRows: 0,
+      duplicateRows: 3,
+      allDuplicates: true,
+    });
+    expect(insertBatch).not.toHaveBeenCalled();
+    expect(readPage.mock.calls.every(([batch]) => batch.length === 3)).toBe(true);
   });
   it("continues through short server-capped pages until an empty page", async () => {
     const rows = history.slice(0, 7);

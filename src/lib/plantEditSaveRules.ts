@@ -14,6 +14,11 @@
  * No React, no Supabase, no I/O. Safe to unit-test in isolation.
  */
 
+import {
+  PLANT_HEALTH_CLEAR_UNAVAILABLE_MESSAGE,
+  isPlantHealthClearRejected,
+} from "@/lib/plantHealthRules";
+
 export interface PlantEditTentOption {
   id: string;
   name: string;
@@ -78,6 +83,8 @@ const FALLBACK_SAVE_ERROR = "Could not save changes. Please try again.";
  */
 export function formatPlantEditSaveError(error: PlantEditSaveErrorLike | null | undefined): string {
   const message = typeof error?.message === "string" ? error.message.trim() : "";
+  // A health clear before 20260924120000 is applied: explain, don't echo SQL.
+  if (isPlantHealthClearRejected(message)) return PLANT_HEALTH_CLEAR_UNAVAILABLE_MESSAGE;
   if (message) return message;
   return FALLBACK_SAVE_ERROR;
 }

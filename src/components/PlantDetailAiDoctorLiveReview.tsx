@@ -11,8 +11,9 @@
  *  - A successful review delegates one saved-session snapshot to the
  *    existing ownership-checked persistence helper. It never writes alerts,
  *    Action Queue rows, sensor readings, or device commands.
- *  - Failure / timeout / invalid / missing-config all render the same
- *    calm failure copy. Fail closed.
+ *  - Failure / timeout / invalid render the same calm failure copy. A
+ *    server missing-config failure renders an honest "unavailable" copy
+ *    instead, because it is never a gap in the grower's context. Fail closed.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/lib/react-router-compat";
@@ -68,8 +69,10 @@ import { evaluateAiDoctorReviewEligibility } from "@/lib/aiDoctorReviewEligibili
 import {
   buildAiDoctorLiveReviewScopeKey,
   canRetryAiDoctorLiveReviewFailure,
+  isAiDoctorServiceUnavailableFailure,
 } from "@/lib/aiDoctorLiveReviewRecoveryRules";
 import { resolveAiDoctorImportedHistoryRecovery } from "@/lib/aiDoctorImportedHistoryRecoveryRules";
+import { applyStageTargetSeverityToPacket } from "@/lib/aiDoctorPacketStageTargetRules";
 import {
   AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE,
   buildAiDoctorPostValueUpgradeViewModel,
@@ -82,6 +85,8 @@ const NO_ROOT_ZONE_OBSERVATIONS: never[] = [];
 export const AI_DOCTOR_LIVE_REVIEW_LOADING_COPY = "Preparing cautious AI Doctor review…";
 export const AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY =
   "AI Doctor review could not be safely displayed. Add more context or try again later.";
+export const AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY =
+  "AI Doctor is unavailable right now because of a problem on Verdant's side, not your plant's context. No AI credit was used. Try again later.";
 export const AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY =
   "Context is partial — review may have limited confidence.";
 export const AI_DOCTOR_LIVE_REVIEW_STRONG_COPY = "Context is strong enough for a cautious review.";
@@ -134,6 +139,7 @@ export default function PlantDetailAiDoctorLiveReview({
 
 interface AcceptedAiDoctorReviewRequest {
   scopeKey: string;
+  acceptedAtMs: number;
   packet: AiDoctorReviewRequestPacket;
   sensorClassification: Classification | null;
   evidenceAcceptance: AiDoctorReviewEvidenceAcceptance;
@@ -167,6 +173,7 @@ function PlantDetailAiDoctorLiveReviewScope({
   const [rootZoneOmissionScope, setRootZoneOmissionScope] = useState<string | null>(null);
   const [acceptedReviewRequest, setAcceptedReviewRequest] =
     useState<AcceptedAiDoctorReviewRequest | null>(null);
+  const [, setContextRevision] = useState(0);
   const historyOmissionAcknowledged = historyOmissionScope === historyScopeKey;
   const rootZoneOmissionAcknowledged = rootZoneOmissionScope === historyScopeKey;
   const queryClient = useQueryClient();
@@ -257,17 +264,19 @@ function PlantDetailAiDoctorLiveReviewScope({
   const sensorContextBlocked =
     currentSensorPending || queryHistoryRecovery.blocksReview || queryRootZoneRecovery.blocksReview;
 
-  const context = useMemo(
-    () =>
+  const evaluateContext = useCallback(
+    (now?: number) =>
       evaluateAiDoctorContextFromSources({
         plant,
         timelineItems: evidenceItems,
         rootZoneObservations: queryRootZoneObservations,
         currentSensorRows,
         tentId,
+        now,
       }),
     [plant, evidenceItems, queryRootZoneObservations, currentSensorRows, tentId],
   );
+  const context = evaluateContext();
 
   // Row-level, provenance-aware classification. The ingest audit only knows
   // counts/source transport and cannot distinguish a UI test packet from a
@@ -284,19 +293,23 @@ function PlantDetailAiDoctorLiveReviewScope({
   // server. The start handler builds it once more with click-time freshness,
   // so a tab left open cannot silently preserve an out-of-date sensor state.
   const buildReviewPacket = useCallback(
-    (classification: Classification | null, now?: Date) =>
-      buildAiDoctorReviewRequestPacket({
-        plant,
-        timelineItems: evidenceItems,
-        context,
-        csvHistoryRows: queryTentSensorRows,
-        currentSensorRows,
-        rootZoneObservations: queryRootZoneObservations,
-        now,
-        hasFreshLiveSensorReadings: currentSensorEvidenceIsFreshLive(currentSensorRows, {
+    (classification: Classification | null, now?: Date, reviewContext = context) =>
+      // Grade the current reading against the plant's own stage targets so
+      // an out-of-target reading never reaches the model as "ok" (BUG-008).
+      applyStageTargetSeverityToPacket(
+        buildAiDoctorReviewRequestPacket({
+          plant,
+          timelineItems: evidenceItems,
+          context: reviewContext,
+          csvHistoryRows: queryTentSensorRows,
+          currentSensorRows,
+          rootZoneObservations: queryRootZoneObservations,
           now,
+          hasFreshLiveSensorReadings: currentSensorEvidenceIsFreshLive(currentSensorRows, {
+            now,
+          }),
         }),
-      }),
+      ),
     [
       plant,
       evidenceItems,
@@ -438,13 +451,23 @@ function PlantDetailAiDoctorLiveReviewScope({
     lookupFailed: entitlementLookupFailed,
   } = useMyEntitlements();
   const canRetryReview = canRetryAiDoctorLiveReviewFailure(review.reason);
-  // Preserve the existing same-scope guard when unrelated plant/timeline
-  // context disappears. The narrow exception is a request that was accepted
-  // with root-zone history: a later background refresh cannot hide that
-  // already-started paid request while its frozen packet is still in flight.
+  // Keep the start gate on current time. Accepted visibility also checks the
+  // current sources at acceptance time, so aging alone cannot hide a review.
+  // Real source removal still revokes ordinary context; newly valid current
+  // context and the existing historical/omission/root-zone exceptions remain.
+  const activeReviewEligibility = activeReviewRequest
+    ? evaluateAiDoctorReviewEligibility({
+        context: evaluateContext(activeReviewRequest.acceptedAtMs),
+        hasPlantProfile: plant !== null,
+        importedHistory: candidatePacket.imported_sensor_history,
+        historicalRows: queryTentSensorRows,
+        missingLiveSensorReadings: candidatePacket.missingLiveSensorReadings === true,
+      })
+    : null;
   const activeReviewVisible =
     activeReviewRequest !== null &&
     (allowed ||
+      activeReviewEligibility?.allowed === true ||
       activeReviewRequest.mode === "historical_review" ||
       activeReviewRequest.omittedImportedHistory ||
       activeReviewRequest.omittedRootZoneHistory ||
@@ -695,19 +718,28 @@ function PlantDetailAiDoctorLiveReviewScope({
     if (!packet || pendingAcceptedReviewStartRef.current === historyScopeKey) return;
 
     const acceptedAt = new Date();
+    const acceptedContext = evaluateContext(acceptedAt.getTime());
     const acceptedSensorClassification =
       sensorClassificationOverride !== undefined
         ? sensorClassificationOverride
         : classifyAiDoctorCurrentSensorEvidence(currentSensorRows, { now: acceptedAt });
-    const acceptedPacket = buildReviewPacket(acceptedSensorClassification, acceptedAt);
+    const acceptedPacket = buildReviewPacket(
+      acceptedSensorClassification,
+      acceptedAt,
+      acceptedContext,
+    );
     const acceptedEligibility = evaluateAiDoctorReviewEligibility({
-      context,
+      context: acceptedContext,
       hasPlantProfile: plant !== null,
       importedHistory: acceptedPacket.imported_sensor_history,
       historicalRows: queryTentSensorRows,
       missingLiveSensorReadings: acceptedPacket.missingLiveSensorReadings === true,
     });
-    if (!acceptedEligibility.allowed) return;
+    if (!acceptedEligibility.allowed) {
+      // Re-render the current eligibility instead of leaving an expired start action visible.
+      setContextRevision((revision) => revision + 1);
+      return;
+    }
     const acceptedMode =
       acceptedEligibility.mode === "historical_review" ? "historical_review" : "standard";
     const acceptedEvidenceAcceptance = buildEvidenceAcceptanceForPacket(
@@ -719,13 +751,19 @@ function PlantDetailAiDoctorLiveReviewScope({
     pendingAcceptedReviewStartRef.current = historyScopeKey;
     setAcceptedReviewRequest({
       scopeKey: historyScopeKey,
+      acceptedAtMs: acceptedAt.getTime(),
       packet: acceptedPacket,
       sensorClassification: acceptedSensorClassification,
       evidenceAcceptance: acceptedEvidenceAcceptance,
       mode: acceptedMode,
-      readiness: context.readiness,
+      readiness: acceptedContext.readiness,
       includedRootZoneHistory: queryRootZoneObservations.length > 0,
-      confidenceCopy: candidateConfidenceCopy,
+      confidenceCopy:
+        acceptedMode === "historical_review"
+          ? AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY
+          : acceptedContext.readiness === "partial"
+            ? AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY
+            : AI_DOCTOR_LIVE_REVIEW_STRONG_COPY,
       omittedImportedHistory: historyRecovery.state === "omitted_by_choice",
       omittedRootZoneHistory: rootZoneRecovery.state === "omitted_by_choice",
     });
@@ -932,10 +970,15 @@ function PlantDetailAiDoctorLiveReviewScope({
           <p
             className="text-xs text-amber-200"
             data-testid="plant-ai-doctor-live-review-failure"
+            data-failure-kind={
+              isAiDoctorServiceUnavailableFailure(review.reason) ? "service_unavailable" : "review"
+            }
             role="status"
             aria-live="polite"
           >
-            {AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY}
+            {isAiDoctorServiceUnavailableFailure(review.reason)
+              ? AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY
+              : AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY}
           </p>
         )
       ) : null}

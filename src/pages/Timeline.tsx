@@ -1,4 +1,6 @@
-import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { SENSOR_TRUTH_FUTURE_SKEW_MS } from "@/constants/sensorTruthRanges";
+import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
+import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -113,10 +115,13 @@ import {
 } from "@/lib/growDiaryTimelineRules";
 import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayRules";
 import {
+  completeManualSensorTimelineRows,
   diaryEntryBelongsInTimelineMeasurements,
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
+  TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
+  timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
 import {
   effectiveSensorReadingsQuery,
@@ -168,8 +173,8 @@ import {
   PHOTO_NON_DIAGNOSTIC_TESTID,
   shouldShowPhotoNonDiagnosticLabel,
 } from "@/lib/photoEventNonDiagnosticLabelRules";
-import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
-import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
+import TimelineEvidenceDetailPreview from "@/components/TimelineEvidenceDetailPreview";
+import TimelineSnapshotClock from "@/components/TimelineSnapshotClock";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
 import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import {
@@ -211,6 +216,7 @@ import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoSc
 import { useTimelineHashAnchorHandoff } from "@/hooks/useTimelineHashAnchorHandoff";
 import {
   buildLinkedGrowEventTimelineAnchorId,
+  buildRenderedDiaryTimelineAnchorIds,
   buildTimelineEntryAnchorId,
 } from "@/lib/timelineEntryAnchorRules";
 import {
@@ -221,8 +227,6 @@ import {
   type TimelineCoreReadState,
   type TimelineSupplementalReadSource,
 } from "@/lib/timelinePageReadStateRules";
-
-const TIMELINE_SNAPSHOT_STALE_MS = LIVE_CURRENT_STATE_STALE_MS;
 
 // URL query params mirroring the Pro date-range filter, matching the
 // ?start/?end convention of the environment summary report.
@@ -436,6 +440,7 @@ export default function Timeline() {
   // Tent Manual Snapshots live in `sensor_readings`, not diary_entries.
   // Read-side receipts only — never a second write path.
   const [manualSensorMeasurementEntries, setManualSensorMeasurementEntries] = useState<Entry[]>([]);
+  const [manualSensorHistoryLimited, setManualSensorHistoryLimited] = useState(false);
   // Keyset pagination (audit M1): the diary is unbounded but the page used
   // to silently cap at the newest 100 rows and report "Showing 100 of 100".
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
@@ -616,6 +621,7 @@ export default function Timeline() {
     if (!user || !activeGrowId) {
       setEntries([]);
       setManualSensorMeasurementEntries([]);
+      setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
       setGrowEventsTotal(null);
@@ -636,6 +642,7 @@ export default function Timeline() {
     if (!activeReadKey) {
       setEntries([]);
       setManualSensorMeasurementEntries([]);
+      setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
       setGrowEventsTotal(null);
@@ -658,6 +665,7 @@ export default function Timeline() {
     setLoadingOlder(false);
     setCoreRead({ status: "loading", readKey: requestedReadKey });
     setPartialReadSources([]);
+    setManualSensorHistoryLimited(false);
     setSupplementalLoading(true);
     setLoadOlderError(false);
 
@@ -720,6 +728,7 @@ export default function Timeline() {
       // and is never allowed to hold the diary or watering history hostage.
       setEntries(coreRows);
       setManualSensorMeasurementEntries([]);
+      setManualSensorHistoryLimited(false);
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
       setGrowEvents(nextGrowEvents);
       setGrowEventsTotal(
@@ -857,6 +866,7 @@ export default function Timeline() {
               if (tentsResult.error || !Array.isArray(tentsResult.data)) {
                 markPartial("manual_sensor_readings");
                 setManualSensorMeasurementEntries([]);
+                setManualSensorHistoryLimited(false);
                 return;
               }
               const tentIds = tentsResult.data
@@ -864,6 +874,7 @@ export default function Timeline() {
                 .filter((id): id is string => Boolean(id));
               if (tentIds.length === 0) {
                 setManualSensorMeasurementEntries([]);
+                setManualSensorHistoryLimited(false);
                 return;
               }
               let sensorQuery = effectiveSensorReadingsQuery()
@@ -872,7 +883,7 @@ export default function Timeline() {
                 .eq("source", "manual")
                 .order("captured_at", { ascending: false, nullsFirst: false })
                 .order("ts", { ascending: false })
-                .limit(200);
+                .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
               if (timelineDateRangeBounds.startIso) {
                 sensorQuery = sensorQuery.gte("ts", timelineDateRangeBounds.startIso);
               }
@@ -884,12 +895,13 @@ export default function Timeline() {
               if (sensorResult.error || !Array.isArray(sensorResult.data)) {
                 markPartial("manual_sensor_readings");
                 setManualSensorMeasurementEntries([]);
+                setManualSensorHistoryLimited(false);
                 return;
               }
-              let receipts = manualSensorReadingsToTimelineEntries(
+              const manualPage = completeManualSensorTimelineRows(
                 requireEffectiveSensorReadings(sensorResult.data),
-                new Date(),
               );
+              let receipts = manualSensorReadingsToTimelineEntries(manualPage.rows, new Date());
               if (timelineDateRangeBounds.startIso) {
                 receipts = receipts.filter(
                   (row) => row.entry_at >= timelineDateRangeBounds.startIso!,
@@ -901,10 +913,12 @@ export default function Timeline() {
                 );
               }
               setManualSensorMeasurementEntries(receipts as Entry[]);
+              setManualSensorHistoryLimited(manualPage.hasOlderRows);
             } catch {
               if (!isCurrentRequest()) return;
               markPartial("manual_sensor_readings");
               setManualSensorMeasurementEntries([]);
+              setManualSensorHistoryLimited(false);
             }
           })(),
         );
@@ -1199,6 +1213,11 @@ export default function Timeline() {
     effectiveStartDate,
     effectiveEndDate,
   ]);
+
+  const renderedDiaryAnchorIds = useMemo(
+    () => buildRenderedDiaryTimelineAnchorIds(filtered),
+    [filtered],
+  );
 
   function clearEvidenceFilters() {
     setSearchQuery("");
@@ -1651,6 +1670,20 @@ export default function Timeline() {
           >
             Try again
           </Button>
+        </div>
+      )}
+
+      {manualSensorHistoryLimited && (
+        <div
+          className="glass mb-4 rounded-2xl border border-amber-500/30 p-4"
+          role="status"
+          data-testid="timeline-manual-history-limit"
+        >
+          <p className="font-medium">Manual reading history is limited</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            This Timeline view shows only the newest complete manual captures. Older manual readings
+            are not shown here.
+          </p>
         </div>
       )}
 
@@ -2214,12 +2247,14 @@ export default function Timeline() {
         <DiaryCalendarSection
           rawEntries={recentLaneRawEntries}
           activeStage={activeGrow?.stage ?? null}
+          plantStartedAt={activeGrow?.started_at ?? null}
         />
       </div>
 
       <div className="mt-4">
         <WateringHistoryPanel
           rawEntries={recentLaneRawEntries}
+          reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2230,6 +2265,7 @@ export default function Timeline() {
       <div className="mt-4">
         <FeedingHistoryPanel
           rawEntries={recentLaneRawEntries}
+          reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2407,6 +2443,27 @@ export default function Timeline() {
                           const manualCompatSensor = e.details?.manual_sensor_snapshot;
                           const sensor = (canonicalSensor ?? legacySensor ?? manualCompatSensor) as
                             Record<string, unknown> | undefined;
+                          const rawSource =
+                            typeof sensor?.source === "string" && sensor.source.trim().length > 0
+                              ? sensor.source
+                              : typeof e.details?.source === "string"
+                                ? e.details.source
+                                : null;
+                          // Resolve freshness from the same provenance as the badge,
+                          // including manual aliases and its missing-source fallback.
+                          // Persisted live claims and unknown sources stay invalid.
+                          const snapshotStaleMs = resolveCurrentStateStaleWindowMs(
+                            classifyTimelineSensorSource({
+                              rawSource,
+                              fallback: "manual",
+                              context: "persisted_snapshot",
+                            }).kind,
+                          );
+                          // Diary event time does not establish snapshot observation time.
+                          // Missing capture time must remain unverified in both views.
+                          const rawCapturedAt = sensor?.ts ?? sensor?.captured_at;
+                          const snapshotCapturedAt =
+                            typeof rawCapturedAt === "string" ? rawCapturedAt.trim() : "";
                           const usesManualCompatSensor =
                             canonicalSensor == null &&
                             legacySensor == null &&
@@ -2634,69 +2691,84 @@ export default function Timeline() {
                                   Remind {format(new Date(remindAt), "PPp")}
                                 </div>
                               )}
-                              {sensor &&
-                                (() => {
-                                  const sensorViewModel = usesManualCompatSensor
-                                    ? buildTimelineSensorSnapshotViewModel(sensor, {
-                                        preferUnit: "F",
-                                        validateManualCompatibility: true,
-                                      })
-                                    : null;
-                                  const legacyDisplaySensor = sensor as {
-                                    temp?: number;
-                                    rh?: number;
-                                    vpd?: number;
-                                    co2?: number;
-                                    soil?: number;
-                                  };
-                                  const snapTs =
-                                    typeof sensor.ts === "string" ? sensor.ts : e.entry_at;
-                                  const snapAgeMs = snapTs
-                                    ? Date.now() - new Date(snapTs).getTime()
-                                    : Number.POSITIVE_INFINITY;
-                                  const snapStale =
-                                    !Number.isFinite(snapAgeMs) ||
-                                    snapAgeMs > TIMELINE_SNAPSHOT_STALE_MS;
-                                  const rawVpd =
-                                    typeof sensor.vpd === "number" && Number.isFinite(sensor.vpd)
-                                      ? sensor.vpd
+                              {sensor && (
+                                <TimelineSnapshotClock
+                                  recheckAt={
+                                    new Date(snapshotCapturedAt).getTime() -
+                                    SENSOR_TRUTH_FUTURE_SKEW_MS
+                                  }
+                                  changesAt={
+                                    new Date(snapshotCapturedAt).getTime() + snapshotStaleMs
+                                  }
+                                >
+                                  {(nowMs) => {
+                                    const sensorViewModel = usesManualCompatSensor
+                                      ? buildTimelineSensorSnapshotViewModel(sensor, {
+                                          preferUnit: "F",
+                                          validateManualCompatibility: true,
+                                        })
                                       : null;
-                                  const vpdClassification = classifyVpdAgainstStage({
-                                    value: rawVpd,
-                                    stage: resolveTimelineDiaryEntryStage(e),
-                                    stale: snapStale,
-                                  });
-                                  const rawSource =
-                                    typeof sensor.source === "string" ? sensor.source : null;
-                                  const sourceBadge = classifyTimelineSensorSource({
-                                    rawSource,
-                                    capturedAt: snapTs ?? null,
-                                    staleMs: TIMELINE_SNAPSHOT_STALE_MS,
-                                    // Persisted Quick Log snapshots are
-                                    // intrinsically grower-entered.
-                                    fallback: "manual",
-                                    context: "persisted_snapshot",
-                                  });
-                                  return (
-                                    <div
-                                      className="mt-2 flex flex-wrap items-center gap-1.5"
-                                      data-testid="timeline-manual-snapshot"
-                                    >
-                                      <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
-                                        <Gauge className="h-3 w-3" />
-                                        Manual snapshot
-                                      </span>
-                                      <TimelineSensorSourceBadge badge={sourceBadge} />
-                                      {sensorViewModel?.kind === "invalid" && (
-                                        <span
-                                          className="text-[11px] text-destructive"
-                                          data-testid="timeline-manual-snapshot-invalid"
-                                        >
-                                          Review manual snapshot — invalid readings were not shown.
+                                    const legacyDisplaySensor = sensor as {
+                                      temp?: number;
+                                      rh?: number;
+                                      vpd?: number;
+                                      co2?: number;
+                                      soil?: number;
+                                    };
+                                    const snapTs = snapshotCapturedAt;
+                                    const hasFutureTimestamp =
+                                      classifySnapshotTimestamp(snapTs, nowMs) === "future";
+                                    const snapAgeMs = snapTs
+                                      ? nowMs - new Date(snapTs).getTime()
+                                      : Number.POSITIVE_INFINITY;
+                                    const snapStale =
+                                      !Number.isFinite(snapAgeMs) || snapAgeMs > snapshotStaleMs;
+                                    const rawVpd =
+                                      typeof sensor.vpd === "number" && Number.isFinite(sensor.vpd)
+                                        ? sensor.vpd
+                                        : null;
+                                    const vpdClassification = classifyVpdAgainstStage({
+                                      value: rawVpd,
+                                      stage: resolveTimelineDiaryEntryStage(e),
+                                      stale: snapStale,
+                                    });
+                                    const sourceBadge = classifyTimelineSensorSource({
+                                      rawSource,
+                                      capturedAt: snapTs ?? null,
+                                      now: nowMs,
+                                      staleMs: snapshotStaleMs,
+                                      // Persisted Quick Log snapshots are
+                                      // intrinsically grower-entered.
+                                      fallback: "manual",
+                                      context: "persisted_snapshot",
+                                    });
+                                    const manualHistoryNotice = timelineManualSnapshotHistoryNotice(
+                                      {
+                                        sourceKind: sourceBadge.kind,
+                                        capturedAt: snapTs || null,
+                                        nowMs,
+                                        staleMs: snapshotStaleMs,
+                                      },
+                                    );
+                                    return (
+                                      <div
+                                        className="mt-2 flex flex-wrap items-center gap-1.5"
+                                        data-testid="timeline-manual-snapshot"
+                                      >
+                                        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                                          <Gauge className="h-3 w-3" />
+                                          Manual snapshot
                                         </span>
-                                      )}
-                                      {sensorViewModel?.kind === "chips" &&
-                                        sensorViewModel.errors.length > 0 && (
+                                        <TimelineSensorSourceBadge badge={sourceBadge} />
+                                        {manualHistoryNotice && (
+                                          <span
+                                            className="text-[11px] text-muted-foreground"
+                                            data-testid="timeline-manual-history-notice"
+                                          >
+                                            {manualHistoryNotice}
+                                          </span>
+                                        )}
+                                        {sensorViewModel?.kind === "invalid" && (
                                           <span
                                             className="text-[11px] text-destructive"
                                             data-testid="timeline-manual-snapshot-invalid"
@@ -2705,67 +2777,88 @@ export default function Timeline() {
                                             shown.
                                           </span>
                                         )}
-                                      {sensorViewModel?.kind === "chips" &&
-                                        sensorViewModel.errors.length === 0 &&
-                                        sensorViewModel.warnings.length > 0 && (
-                                          <span
-                                            className="text-[11px] text-warning-foreground"
-                                            data-testid="timeline-manual-snapshot-warning"
-                                          >
-                                            Check manual snapshot — a reading may need confirmation.
+                                        {sensorViewModel?.kind === "chips" &&
+                                          sensorViewModel.errors.length > 0 && (
+                                            <span
+                                              className="text-[11px] text-destructive"
+                                              data-testid="timeline-manual-snapshot-invalid"
+                                            >
+                                              Review manual snapshot — invalid readings were not
+                                              shown.
+                                            </span>
+                                          )}
+                                        {sensorViewModel?.kind === "chips" &&
+                                          sensorViewModel.errors.length === 0 &&
+                                          sensorViewModel.warnings.length > 0 && (
+                                            <span
+                                              className="text-[11px] text-warning-foreground"
+                                              data-testid="timeline-manual-snapshot-warning"
+                                            >
+                                              Check manual snapshot — a reading may need
+                                              confirmation.
+                                            </span>
+                                          )}
+                                        {sensorViewModel?.kind === "chips" &&
+                                          sensorViewModel.chips.map((chip) => (
+                                            <SnapChip key={chip.metric}>
+                                              {chip.metric === "rh"
+                                                ? `${chip.value}% RH`
+                                                : chip.metric === "ph"
+                                                  ? `pH ${chip.value}`
+                                                  : chip.metric === "ec"
+                                                    ? `EC ${chip.value} mS/cm`
+                                                    : chip.metric === "vpd"
+                                                      ? `VPD ${chip.value}`
+                                                      : chip.metric === "co2"
+                                                        ? `CO₂ ${chip.value}`
+                                                        : chip.metric === "soil_moisture"
+                                                          ? `Soil ${chip.value}%`
+                                                          : chip.display}
+                                            </SnapChip>
+                                          ))}
+                                        {!usesManualCompatSensor &&
+                                          legacyDisplaySensor.temp != null && (
+                                            <SnapChip>
+                                              {((legacyDisplaySensor.temp * 9) / 5 + 32).toFixed(1)}
+                                              °F
+                                            </SnapChip>
+                                          )}
+                                        {!usesManualCompatSensor &&
+                                          legacyDisplaySensor.rh != null && (
+                                            <SnapChip>{legacyDisplaySensor.rh}% RH</SnapChip>
+                                          )}
+                                        {!usesManualCompatSensor &&
+                                          legacyDisplaySensor.vpd != null && (
+                                            <SnapChip>VPD {legacyDisplaySensor.vpd}</SnapChip>
+                                          )}
+                                        {!usesManualCompatSensor &&
+                                          legacyDisplaySensor.co2 != null && (
+                                            <SnapChip>CO₂ {legacyDisplaySensor.co2}</SnapChip>
+                                          )}
+                                        {!usesManualCompatSensor &&
+                                          legacyDisplaySensor.soil != null && (
+                                            <SnapChip>Soil {legacyDisplaySensor.soil}%</SnapChip>
+                                          )}
+                                        {hasFutureTimestamp && (
+                                          <span className="text-[11px] text-muted-foreground">
+                                            Future timestamp — freshness cannot be verified.
                                           </span>
                                         )}
-                                      {sensorViewModel?.kind === "chips" &&
-                                        sensorViewModel.chips.map((chip) => (
-                                          <SnapChip key={chip.metric}>
-                                            {chip.metric === "rh"
-                                              ? `${chip.value}% RH`
-                                              : chip.metric === "ph"
-                                                ? `pH ${chip.value}`
-                                                : chip.metric === "ec"
-                                                  ? `EC ${chip.value} mS/cm`
-                                                  : chip.metric === "vpd"
-                                                    ? `VPD ${chip.value}`
-                                                    : chip.metric === "co2"
-                                                      ? `CO₂ ${chip.value}`
-                                                      : chip.metric === "soil_moisture"
-                                                        ? `Soil ${chip.value}%`
-                                                        : chip.display}
-                                          </SnapChip>
-                                        ))}
-                                      {!usesManualCompatSensor &&
-                                        legacyDisplaySensor.temp != null && (
-                                          <SnapChip>
-                                            {((legacyDisplaySensor.temp * 9) / 5 + 32).toFixed(1)}°F
-                                          </SnapChip>
-                                        )}
-                                      {!usesManualCompatSensor &&
-                                        legacyDisplaySensor.rh != null && (
-                                          <SnapChip>{legacyDisplaySensor.rh}% RH</SnapChip>
-                                        )}
-                                      {!usesManualCompatSensor &&
-                                        legacyDisplaySensor.vpd != null && (
-                                          <SnapChip>VPD {legacyDisplaySensor.vpd}</SnapChip>
-                                        )}
-                                      {!usesManualCompatSensor &&
-                                        legacyDisplaySensor.co2 != null && (
-                                          <SnapChip>CO₂ {legacyDisplaySensor.co2}</SnapChip>
-                                        )}
-                                      {!usesManualCompatSensor &&
-                                        legacyDisplaySensor.soil != null && (
-                                          <SnapChip>Soil {legacyDisplaySensor.soil}%</SnapChip>
-                                        )}
-                                      {rawVpd != null && sourceBadge.canAssessStage && (
-                                        <span
-                                          className="text-[11px] text-muted-foreground"
-                                          data-testid="timeline-vpd-stage-hint"
-                                        >
-                                          {vpdClassification.label}
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })()}
+                                        {rawVpd != null &&
+                                          sourceBadge.canAssessStage &&
+                                          !hasFutureTimestamp && (
+                                            <span
+                                              className="text-[11px] text-muted-foreground"
+                                              data-testid="timeline-vpd-stage-hint"
+                                            >
+                                              {vpdClassification.label}
+                                            </span>
+                                          )}
+                                      </div>
+                                    );
+                                  }}
+                                </TimelineSnapshotClock>
+                              )}
                               {detailLines.length > 0 && (
                                 <div
                                   className="mt-2 flex flex-wrap gap-1.5"
@@ -2876,12 +2969,12 @@ export default function Timeline() {
           onNavigate={(i) => setLightboxPhotoId(lightboxItems[i]?.id ?? null)}
         />
       )}
-      <TimelineEvidenceDetailDrawer
+      <TimelineEvidenceDetailPreview
         open={!!detailEntryId}
-        viewModel={(() => {
+        entry={(() => {
           const row = displayEntries.find((r) => r.id === detailEntryId);
           return row
-            ? buildTimelineEvidenceDetailViewModel({
+            ? {
                 id: row.id,
                 note: row.note,
                 photo_url: row.photo_url,
@@ -2890,7 +2983,7 @@ export default function Timeline() {
                 plant_id: row.plant_id,
                 tent_id: row.tent_id,
                 details: row.details,
-              })
+              }
             : null;
         })()}
         onClose={() => setDetailEntryId(null)}

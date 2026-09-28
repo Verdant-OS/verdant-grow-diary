@@ -16,7 +16,7 @@ import TentBridgeTokensCard from "@/components/TentBridgeTokensCard";
 
 type SelectResult = { data: unknown; error: unknown };
 
-const bridgeTokensSelectSpy: ReturnType<typeof vi.fn> = vi.fn(async (): Promise<SelectResult> => ({
+const bridgeTokensSelectSpy = vi.fn(async (): Promise<SelectResult> => ({
   data: [],
   error: null,
 }));

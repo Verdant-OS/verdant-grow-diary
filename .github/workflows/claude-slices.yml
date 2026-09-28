@@ -320,9 +320,20 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Checkout base for read-only workflow validation
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
           persist-credentials: false
+      - name: Extract only the workflow from the verified PR head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git fetch --no-tags origin "refs/pull/$PR_NUMBER/head"
+          test "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA"
+          git show "$HEAD_SHA:.github/workflows/claude-slices.yml" > "$RUNNER_TEMP/claude-slices.yml"
       - name: Check workflow syntax with checksum-verified actionlint
         run: |
           archive="$RUNNER_TEMP/actionlint.tar.gz"
@@ -331,7 +342,7 @@ jobs:
             --output "$archive"
           printf '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  %s\n' "$archive" | sha256sum --check --status
           tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
-          "$RUNNER_TEMP/actionlint" -shellcheck= .github/workflows/claude-slices.yml
+          "$RUNNER_TEMP/actionlint" -shellcheck= "$RUNNER_TEMP/claude-slices.yml"
       - name: Prepare locked-path policy
         run: *locked_path_policy
       - name: Test locked and allowed paths, empty diffs and mixed diffs

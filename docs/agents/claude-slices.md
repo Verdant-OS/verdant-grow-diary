@@ -106,7 +106,9 @@ do not operate on the Action Queue.
 with `claude/`. It checks out the exact base, fetches the PR head, verifies that
 head SHA, and compares against the merge base without executing PR code. A
 locked path fails the real check. `claude-configuration` runs checksum-verified
-actionlint and focused policy regressions on PRs, including this Codex draft.
+actionlint and focused policy regressions on PRs, including this Codex draft. It
+also checks out the base, verifies the PR head and extracts only the workflow
+file for actionlint; it does not check out or execute PR application code.
 Neither job impersonates an existing required check.
 
 The builder's GitHub permissions are limited to Contents, Pull requests, Issues

@@ -275,7 +275,8 @@ export async function runEventReplayLockHarness({
     stage = "scaffold";
     resetScaffold(env, spawnImpl);
     executeSql(
-      `alter table public.grow_events add column is_deleted boolean not null default false;
+      `begin;
+alter table public.grow_events add column is_deleted boolean not null default false;
 alter table public.diary_entries add column retracted_at timestamptz;
 ${delegate}
 alter function public.quicklog_save_event(${eventSignature}) rename to quicklog_save_event_pre_logged_at;
@@ -285,12 +286,24 @@ revoke all on function public.quicklog_save_event(${eventSignature}) from public
 grant execute on function public.quicklog_save_event(${eventSignature}) to authenticated,service_role;
 ${hash}
 ${resolver}
+-- The real INSERT triggers stamp logged_at from this transaction context.
+set local verdant.quicklog_logged_at = '${logged}';
 insert into public.grow_events(id,user_id,grow_id,event_type,occurred_at,logged_at,note) values ('${event}','${owner}','${grow}','note','${occurred}','${logged}','lock proof');
 insert into public.diary_entries(id,user_id,grow_id,note,details,logged_at) values ('${diary}','${owner}','${grow}','lock proof',jsonb_build_object('linked_grow_event_id','${event}'),'${logged}');
-insert into public.quicklog_idempotency(user_id,idempotency_key,grow_event_id,request_hash) values ('${owner}','${key}','${event}',public.quicklog_event_request_hash_pre_logged_at('${grow}','note',null,null,'lock proof',null,'${occurred}'::timestamptz,null,'{}'::jsonb,null,null));`,
+insert into public.quicklog_idempotency(user_id,idempotency_key,grow_event_id,request_hash) values ('${owner}','${key}','${event}',public.quicklog_event_request_hash_pre_logged_at('${grow}','note',null,null,'lock proof',null,'${occurred}'::timestamptz,null,'{}'::jsonb,null,null));
+commit;`,
       env,
       { stage: "real_function_fixture", spawnImpl },
     );
+    if (
+      executeSql(
+        `select (select logged_at='${logged}'::timestamptz from public.grow_events where id='${event}')
+and (select logged_at='${logged}'::timestamptz from public.diary_entries where id='${diary}');`,
+        env,
+        { stage: "fixture_timestamp", spawnImpl },
+      ) !== "t"
+    )
+      throw new Error("fixture_timestamp_rejected");
     stage = "migration";
     executeSql(migration, env, { stage: "pinned_event_replay_migration", spawnImpl });
     stage = "sequential_backfill";

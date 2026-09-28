@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
-import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
+import * as quickLogSaveHook from "@/hooks/useQuickLogV2Save";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 
 vi.setConfig({ testTimeout: 15_000 });
@@ -487,7 +487,7 @@ describe("ASTRA-001 exact Note recovery", () => {
 
   it("does not accept a reused success response without a persisted event id", async () => {
     rpcMock.mockResolvedValue({ data: { ok: true, reused: true }, error: null });
-    const { result } = renderHook(() => useQuickLogV2Save());
+    const { result } = renderHook(() => quickLogSaveHook.useQuickLogV2Save());
     let receipt: Awaited<ReturnType<typeof result.current.save>> | undefined;
     await act(async () => {
       receipt = await result.current.save({
@@ -534,7 +534,7 @@ describe("ASTRA-001 exact Note recovery", () => {
       error: null,
     });
     readbackMock.mockResolvedValue({ data: event, error: null });
-    const { result } = renderHook(() => useQuickLogV2Save());
+    const { result } = renderHook(() => quickLogSaveHook.useQuickLogV2Save());
     let receipt: Awaited<ReturnType<typeof result.current.save>> | undefined;
     await act(async () => {
       receipt = await result.current.save(
@@ -1629,4 +1629,51 @@ describe("fresh Note acknowledgement integrity", () => {
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(telemetryMock).not.toHaveBeenCalled();
   });
+});
+
+describe("post-save card preserves authoritative null targets", () => {
+  it.each(["88888888-8888-4888-8888-888888888888", null])(
+    "does not borrow the draft plant or tent for verified grow %j",
+    async (persistedGrowId) => {
+      // Exercise the sheet boundary with a sparse, successful receipt; the
+      // preceding cases continue to exercise the real hook's validation.
+      const saveConfirmed = vi.fn().mockResolvedValue({
+        ok: true,
+        growEventId: confirmedEventId,
+        persistedGrowId,
+        persistedPlantId: null,
+        persistedTentId: null,
+        persistedNote: originalNote,
+      });
+      vi.spyOn(quickLogSaveHook, "useQuickLogV2Save").mockReturnValue({
+        save: saveConfirmed,
+        saving: false,
+        error: null,
+      });
+      renderSheet();
+      typeNote();
+      save();
+
+      await screen.findByTestId("qlv2-post-save");
+      expect(screen.getByTestId("quick-log-post-save-description")).toHaveTextContent(
+        /^Added to your diary\.$/,
+      );
+      expect(screen.queryByTestId("qlv2-save")).not.toBeInTheDocument();
+      expect(saveConfirmed).toHaveBeenCalledTimes(1);
+      const view = screen.getByTestId("quick-log-post-save-view");
+      if (persistedGrowId === null) {
+        expect(view).toBeDisabled();
+        fireEvent.click(view);
+        expect(navigationMock).not.toHaveBeenCalled();
+      } else {
+        expect(view).toBeEnabled();
+        fireEvent.click(view);
+        expect(navigationMock).toHaveBeenCalledTimes(1);
+        expect(navigationMock.mock.calls[0][0].href).toBe(
+          `/timeline?growId=${persistedGrowId}#timeline-entry-${confirmedEventId}`,
+        );
+      }
+      expect(saveConfirmed).toHaveBeenCalledTimes(1);
+    },
+  );
 });

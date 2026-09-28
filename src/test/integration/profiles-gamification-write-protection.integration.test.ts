@@ -119,6 +119,7 @@ function createTestRpc(): void {
   // rights. Never shipped as a production migration. Dropped in afterAll.
   const sql = `
     BEGIN;
+    DROP FUNCTION IF EXISTS public.${TEST_RPC_NAME}(uuid, text, int, int);
     CREATE FUNCTION public.${TEST_RPC_NAME}(
       _profile_user_id uuid, _tier text, _level int, _nugs int
     ) RETURNS integer
@@ -186,6 +187,9 @@ d("profiles gamification write protection (local DB)", () => {
     userB = await createTestUser(admin, "b");
     createTestRpc();
     rpcCreated = true;
+    // Leave the first fixture in place as an interrupted prior run would.
+    // Replacement must succeed transactionally before any passing RPC proof.
+    createTestRpc();
     await requireRpcWitness(userA);
   }, 45_000);
 

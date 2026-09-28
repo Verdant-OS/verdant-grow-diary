@@ -155,9 +155,10 @@ BEGIN
   END IF;
 
   -- A prior key may only return success while its event and diary receipt
-  -- are still active. Hold the event and one active mirror through this
-  -- transaction so a concurrent correction/retraction cannot turn an
-  -- already-retracted receipt into a successful replay.
+  -- are still active. Hold the event through this transaction: every
+  -- correction/retraction locks that event before writing. Do not wait for
+  -- the diary row, because a diary-first revision can hold it while waiting
+  -- for our event lock.
   IF v_existing_event_id IS NOT NULL THEN
     IF v_existing_deleted THEN
       INSERT INTO public.quicklog_audit_events
@@ -184,8 +185,7 @@ BEGIN
          ) = v_existing_event_id
        )
      ORDER BY de.id
-     LIMIT 1
-     FOR UPDATE OF de;
+     LIMIT 1;
     IF NOT FOUND THEN
       INSERT INTO public.quicklog_audit_events
         (user_id, idempotency_key, grow_event_id, status, reason)
@@ -399,6 +399,31 @@ BEGIN
         MESSAGE = 'quicklog_dual_timestamp_event_missing';
     END IF;
 
+    -- Keep the timestamp foundation's sequential backfill behavior, but
+    -- never wait on a mirror held by a diary-first revision. Fresh rows are
+    -- ours already; their required timestamp postcondition remains below.
+    WITH editable_mirrors AS (
+      SELECT de.id
+      FROM public.diary_entries AS de
+      WHERE de.user_id = uid
+        AND de.grow_id = v_grow_id
+        AND (
+          public.quicklog_try_parse_uuid(
+            de.details->>'linked_grow_event_id'
+          ) = v_event_id
+          OR public.quicklog_try_parse_uuid(
+            de.details->>'grow_event_id'
+          ) = v_event_id
+        )
+        AND (
+          NOT v_is_reused
+          OR de.logged_at IS DISTINCT FROM v_logged_at
+          OR public.quicklog_try_parse_logged_at(
+               de.details->>'logged_at'
+             ) IS DISTINCT FROM v_logged_at
+        )
+      FOR UPDATE OF de SKIP LOCKED
+    )
     UPDATE public.diary_entries AS de
        SET logged_at = v_logged_at,
            details = (
@@ -419,23 +444,8 @@ BEGIN
                )
              END
            ) || jsonb_build_object('logged_at', v_logged_at)
-     WHERE de.user_id = uid
-       AND de.grow_id = v_grow_id
-       AND (
-         public.quicklog_try_parse_uuid(
-           de.details->>'linked_grow_event_id'
-         ) = v_event_id
-         OR public.quicklog_try_parse_uuid(
-           de.details->>'grow_event_id'
-          ) = v_event_id
-       )
-       AND (
-         NOT v_is_reused
-         OR de.logged_at IS DISTINCT FROM v_logged_at
-         OR public.quicklog_try_parse_logged_at(
-              de.details->>'logged_at'
-            ) IS DISTINCT FROM v_logged_at
-       );
+      FROM editable_mirrors AS mirror
+     WHERE de.id = mirror.id;
     IF NOT v_is_reused
        AND NOT EXISTS (
       SELECT 1

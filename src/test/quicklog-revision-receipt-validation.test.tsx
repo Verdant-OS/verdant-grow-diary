@@ -47,6 +47,17 @@ beforeEach(() => {
 
 describe.each<Kind>(["correction", "retraction"])("%s receipt validation", (kind) => {
   it.each([
+    ["null data", null],
+    ["non-object data", "not an object"],
+    ["array data", [receipt()]],
+  ])("does not confirm a save with %s", async (_label, data) => {
+    rpc.mockResolvedValue({ data, error: null });
+
+    await expect(submit(kind)).resolves.toEqual({ ok: false, reason: "rpc_error" });
+    expect(rpc).toHaveBeenCalledOnce();
+  });
+
+  it.each([
     ["missing revision ID", { revision_id: undefined }],
     ["null revision ID", { revision_id: null }],
     ["whitespace revision ID", { revision_id: "   " }],
@@ -66,8 +77,60 @@ describe.each<Kind>(["correction", "retraction"])("%s receipt validation", (kind
       rpc.mockResolvedValue({ data: receipt(overrides), error: null });
 
       await expect(submit(kind)).resolves.toEqual({ ok: false, reason: "rpc_error" });
+      expect(rpc).toHaveBeenCalledOnce();
     },
   );
+
+  it.each([
+    ["missing revision number", { revision_no: undefined }],
+    ["zero revision number", { revision_no: 0 }],
+    ["fractional revision number", { revision_no: 1.5 }],
+    ["non-numeric revision number", { revision_no: "2" }],
+  ] satisfies [string, Record<string, unknown>][])(
+    "does not confirm a save with %s",
+    async (_label, overrides) => {
+      rpc.mockResolvedValue({ data: receipt(overrides), error: null });
+
+      await expect(submit(kind)).resolves.toEqual({ ok: false, reason: "rpc_error" });
+      expect(rpc).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("does not confirm a diary-root request when diary_entry_ids are missing", async () => {
+    rpc.mockResolvedValue({
+      data: receipt({ diary_entry_ids: undefined }),
+      error: null,
+    });
+
+    await expect(submit(kind, { diaryEntryId: DIARY_ID })).resolves.toEqual({
+      ok: false,
+      reason: "rpc_error",
+    });
+    expect(rpc).toHaveBeenCalledOnce();
+  });
+
+  it("does not confirm a request when grow_event_id does not match the originating handle", async () => {
+    rpc.mockResolvedValue({
+      data: receipt({ grow_event_id: SECOND_DIARY_ID }),
+      error: null,
+    });
+
+    await expect(submit(kind)).resolves.toEqual({ ok: false, reason: "rpc_error" });
+    expect(rpc).toHaveBeenCalledOnce();
+  });
+
+  it("does not confirm a request when the originating diary handle is absent from diary_entry_ids", async () => {
+    rpc.mockResolvedValue({
+      data: receipt({ diary_entry_ids: [SECOND_DIARY_ID] }),
+      error: null,
+    });
+
+    await expect(submit(kind, { diaryEntryId: DIARY_ID })).resolves.toEqual({
+      ok: false,
+      reason: "rpc_error",
+    });
+    expect(rpc).toHaveBeenCalledOnce();
+  });
 
   it("confirms a valid revision with all linked diary IDs", async () => {
     rpc.mockResolvedValue({
@@ -82,6 +145,7 @@ describe.each<Kind>(["correction", "retraction"])("%s receipt validation", (kind
       growEventId: EVENT_ID,
       diaryEntryIds: [DIARY_ID, SECOND_DIARY_ID],
     });
+    expect(rpc).toHaveBeenCalledOnce();
   });
 
   it("accepts a grow-event revision without a diary companion", async () => {
@@ -94,6 +158,7 @@ describe.each<Kind>(["correction", "retraction"])("%s receipt validation", (kind
       growEventId: EVENT_ID,
       diaryEntryIds: [],
     });
+    expect(rpc).toHaveBeenCalledOnce();
   });
 
   it("accepts a standalone diary revision with no grow event", async () => {
@@ -106,12 +171,30 @@ describe.each<Kind>(["correction", "retraction"])("%s receipt validation", (kind
       growEventId: null,
       diaryEntryIds: [DIARY_ID],
     });
+    expect(rpc).toHaveBeenCalledOnce();
+  });
+
+  it("accepts a replayed receipt when it still matches the originating request", async () => {
+    rpc.mockResolvedValue({
+      data: receipt({ reused: true }),
+      error: null,
+    });
+
+    await expect(submit(kind, { growEventId: EVENT_ID, diaryEntryId: DIARY_ID })).resolves.toEqual({
+      ok: true,
+      revisionId: REVISION_ID,
+      revisionNo: 2,
+      growEventId: EVENT_ID,
+      diaryEntryIds: [DIARY_ID],
+    });
+    expect(rpc).toHaveBeenCalledOnce();
   });
 
   it("preserves a definitive server rejection", async () => {
     rpc.mockResolvedValue({ data: { ok: false, reason: "invalid_note" }, error: null });
 
     await expect(submit(kind)).resolves.toEqual({ ok: false, reason: "invalid_note" });
+    expect(rpc).toHaveBeenCalledOnce();
   });
 });
 

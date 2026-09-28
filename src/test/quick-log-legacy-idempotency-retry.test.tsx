@@ -72,14 +72,14 @@ vi.mock("sonner", () => ({
 
 Element.prototype.scrollIntoView ??= () => undefined;
 
-function renderQuickLog() {
+function renderQuickLog(onOpenChange = vi.fn()) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   const ui = (
     <QuickLog
       open
-      onOpenChange={vi.fn()}
+      onOpenChange={onOpenChange}
       prefill={{ plantId: "plant-1", growId: "grow-1", eventType: "observation" }}
     />
   );
@@ -111,6 +111,57 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("QuickLog legacy failed-save idempotency", () => {
+  it.each([
+    "idempotency_key_unverified",
+    "idempotency_receipt_missing",
+    "idempotency_key_retracted",
+    "idempotency_key_conflict",
+  ])("does not rotate or resubmit a history-review draft after %s", async (reason) => {
+    saveMock.mockResolvedValue({ ok: false, reason });
+    renderQuickLog();
+    await typeNote("Possibly saved original.");
+    await clickSave();
+    await screen.findByTestId("quick-log-save-error");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(screen.queryByText("Saving…")).not.toBeInTheDocument();
+    await typeNote("Edited duplicate attempt.");
+    await clickSave();
+    expect(screen.getByRole("dialog").querySelector("textarea")).toHaveValue(
+      "Possibly saved original.",
+    );
+    expect(saveMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires explicit history review to discard the draft before starting a fresh key", async () => {
+    saveMock
+      .mockResolvedValueOnce({ ok: false, reason: "idempotency_key_unverified" })
+      .mockResolvedValueOnce({ ok: true, growEventId: "event-after-review" });
+    renderQuickLog();
+    await typeNote("Possibly saved original.");
+    await clickSave();
+    await screen.findByTestId("quick-log-save-error");
+    const refusedKey = payloadKey(0);
+    fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+    expect(screen.getByRole("dialog").querySelector("textarea")).toHaveValue("");
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    await typeNote("Deliberately new entry after review.");
+    await clickSave();
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    expect(payloadKey(1)).not.toBe(refusedKey);
+  });
+
+  it("cannot abandon an unreviewed historical refusal by pressing Escape", async () => {
+    saveMock.mockResolvedValue({ ok: false, reason: "idempotency_receipt_missing" });
+    const onOpenChange = vi.fn();
+    renderQuickLog(onOpenChange);
+    await typeNote("Possibly saved original.");
+    await clickSave();
+    await screen.findByTestId("quick-log-save-error");
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(saveMock).toHaveBeenCalledTimes(1);
+  });
+
   it("reuses the idempotency key on an unedited retry after save_failed", async () => {
     saveMock
       .mockResolvedValueOnce({ ok: false, reason: "save_failed" })

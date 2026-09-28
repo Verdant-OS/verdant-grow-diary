@@ -12,6 +12,7 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyQuickLogThrownSaveError,
+  canDiscardQuickLogHistoryDraft,
   describeQuickLogSaveFailure,
   quickLogDraftPreservedFailureMessage,
   quickLogReasonToOperatorMessage,
@@ -21,6 +22,32 @@ import {
 
 const GENERIC_MESSAGE = quickLogReasonToOperatorMessage("some_unknown_reason_code");
 const GENERIC_RECOVERY = quickLogSaveRecoveryAction("some_unknown_reason_code");
+
+describe("explicit history-review draft resolution", () => {
+  const input = {
+    historyCheckRequired: true,
+    inFlight: false,
+    currentOwnerId: "owner-1",
+    draftOwnerId: "owner-1",
+  };
+  it("allows only the current owner of an idle history-review draft, deterministically", () => {
+    expect(canDiscardQuickLogHistoryDraft(input)).toBe(true);
+    expect(canDiscardQuickLogHistoryDraft(input)).toBe(canDiscardQuickLogHistoryDraft(input));
+  });
+  it.each([
+    null,
+    undefined,
+    { ...input, historyCheckRequired: false },
+    { ...input, inFlight: true },
+    { ...input, currentOwnerId: null },
+    { ...input, currentOwnerId: "" },
+    { ...input, currentOwnerId: "   ", draftOwnerId: "   " },
+    { ...input, currentOwnerId: "other-owner" },
+    { ...input, draftOwnerId: undefined },
+  ])("refuses unresolved or foreign context %j", (context) => {
+    expect(canDiscardQuickLogHistoryDraft(context)).toBe(false);
+  });
+});
 
 /** Every soft-failure reason the deployed wrapper + delegate can return. */
 const SERVER_REASONS = [

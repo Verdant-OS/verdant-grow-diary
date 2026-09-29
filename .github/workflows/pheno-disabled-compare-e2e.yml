@@ -14,9 +14,14 @@ on:
       - "e2e/lib/phenoDisabledCompareHelpers.ts"
       - "scripts/e2e/run-pheno-disabled-compare-e2e.mjs"
       - ".github/workflows/pheno-disabled-compare-e2e.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   pheno-disabled-compare-e2e:

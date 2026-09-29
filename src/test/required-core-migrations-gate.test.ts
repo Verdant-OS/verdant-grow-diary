@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { rootCertificates } from "node:tls";
+import { load as loadYaml } from "js-yaml";
 import { afterEach, describe, expect, it } from "vitest";
 import { PRODUCTION_SUPABASE_CA_FILENAME } from "../../scripts/lib/productionSupabaseTls.mjs";
 import {
@@ -1547,6 +1548,10 @@ describe("remote applied-schema runner safety", () => {
 
 describe("required-core-migrations workflow trust boundary", () => {
   const workflow = readFileSync(WORKFLOW_PATH, "utf8");
+  const workflowConfig = loadYaml(workflow) as {
+    on: { push: { branches: string[] }; pull_request: unknown };
+    jobs: Record<string, { if?: string; environment?: string; steps: { run?: string }[] }>;
+  };
   const manifestStart = workflow.indexOf("  manifest-and-files:");
   const sandboxStart = workflow.indexOf("  verify-sandbox:");
   const productionStart = workflow.indexOf("  verify-production:");
@@ -1573,10 +1578,11 @@ describe("required-core-migrations workflow trust boundary", () => {
     expect(manifestBlock).toContain("src/test/required-core-migrations-gate.test.ts");
   });
 
-  it("allows sandbox remote access only on the deploy branch or manual dispatch", () => {
-    expect(sandboxBlock).toContain(
-      "github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary'",
+  it("allows sandbox remote access only by manual dispatch from the deploy branch", () => {
+    expect(workflowConfig.jobs["verify-sandbox"].if).toBe(
+      "${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox' }}",
     );
+    expect(sandboxBlock).not.toContain("github.event_name == 'push'");
     expect(sandboxBlock).toContain(
       "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox'",
     );
@@ -1584,6 +1590,21 @@ describe("required-core-migrations workflow trust boundary", () => {
     expect(sandboxBlock).toContain("environment: verdant-sandbox");
     expect(sandboxBlock.match(/secrets\.SUPABASE_DB_URL_SANDBOX/g)).toHaveLength(2);
     expect(sandboxBlock).not.toMatch(/SUPABASE_DB_URL:\s*\$\{\{\s*secrets\.SUPABASE_DB_URL\s*\}\}/);
+  });
+
+  it("keeps the manifest and focused tests offline on deploy pushes and pull requests", () => {
+    const manifest = workflowConfig.jobs["manifest-and-files"];
+    expect(workflowConfig.on.push.branches).toContain("verdant-grow-diary");
+    expect(workflowConfig.on.pull_request).toBeDefined();
+    expect(manifest.if).toBeUndefined();
+    expect(manifest.environment).toBeUndefined();
+    expect(JSON.stringify(manifest)).not.toContain("secrets.");
+    expect(manifest.steps.map((step) => step.run)).toContain(
+      "node scripts/assert-required-core-migrations.mjs",
+    );
+    expect(
+      manifest.steps.some((step) => step.run?.includes("required-core-migrations-gate.test.ts")),
+    ).toBe(true);
   });
 
   it("allows production remote access only by manual dispatch from the deploy branch", () => {

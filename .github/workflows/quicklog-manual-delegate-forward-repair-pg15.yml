@@ -22,6 +22,7 @@ on:
       - "supabase/migrations/20260722165149_922e7389-1a95-4bc4-8efb-12f3a98e33f7.sql"
       - "supabase/migrations/20260723000000_quicklog_manual_always_mirror_diary.sql"
       - "supabase/migrations/20260725024026_quicklog_dual_timestamp_foundation.sql"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - verdant-grow-diary
@@ -30,6 +31,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   pg15_runtime:

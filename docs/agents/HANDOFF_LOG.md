@@ -367,15 +367,15 @@ branch: chore/coderabbit-config
 base: verdant-grow-diary
 checkout: git fetch origin chore/coderabbit-config verdant-grow-diary && git switch chore/coderabbit-config && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1355
-head_sha: d5c708740c5b8d91e5c5844d1ea92ef6789442ef
-state: Pushed merge-from-base update. Local focused PASS: 39 passed / 0 failed / 0 skipped. Actual typecheck PASS. New-head hosted failures: Lockfile policy, dependency audit, typecheck, build, tests.
-next_action: Resolve the locked dependency/CI blocker through its authorized owner, then continue on this same branch and remeasure current-head CI.
-files: This repair otherwise preserves feature blobs and imports the base; original PR paths: .coderabbit.yaml
+head_sha: 9eae24dd35c930b33739b16c324fcc7c700d5a60
+state: Normal-pushed 2026-09-29 08:38 UTC from d5c708740c5b8d91e5c5844d1ea92ef6789442ef, clean merge of deploy61821446ebd7e4fb30a36a5a95b7526a34515df5. Sole feature file .coderabbit.yaml; one stale approval comment corrected to OWNERSHIP independent-review/GDP routing, parsed YAML configuration byte-equivalent in resolved JSON to predecessor. Local1 file39 PASS / 0 FAIL / 0 SKIP, canonical typecheck0 diagnostics, YAML parse/effective equality/whitespace PASS. Predecessor fast-uri FAIL log read, locked dependency repair remains BLOCKED. New-head CI pending, independent Critical Mass/hosted config acceptance NOT_MEASURED. Stay draft, auto-merge off, no force/rewrite.
+next_action: Read exact-head terminal CI and route to Critical Mass when eligible. Do not inherit old-head checks or waive the locked dependency gate.
+files: Existing sole feature path .coderabbit.yaml, with one approval-routing comment corrected; parsed configuration unchanged. Base history imported without manual locked-path changes.
 blockers: Current CI is not full acceptance. fast-uri / nested undici repair is locked; any auth, SQL, supabase, Action Queue or device need stops this item. No force/rewrite.
 artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1355; current check links are on that exact head. Supplemental local receipt C:/Users/G8/Downloads/CHEM-REPAIR-1355-2026-09-28-result.json.
 reviewer_seat: Critical Mass
 claimed_by: Codex, 2026-09-28 18:46 CT
-last_updated: 2026-09-28 18:46 CT, by Codex
+last_updated: 2026-09-29 03:38 CT, by Codex
 ```
 
 ### CHEM-INVENTORY-REPAIR-001-PR-1494
@@ -467,15 +467,15 @@ branch: codex/operator-effective-read-truth-20260923
 base: verdant-grow-diary
 checkout: git fetch origin codex/operator-effective-read-truth-20260923 verdant-grow-diary && git switch codex/operator-effective-read-truth-20260923 && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1651
-head_sha: 0ca4487f016877b8db872fa9eeba0205e07c433b
-state: Pushed merge-from-base update. Local focused PASS: 155 passed / 0 failed / 0 skipped. Actual typecheck PASS. New-head hosted failures: Lockfile policy, dependency audit, typecheck, build, tests; Nested static proofs and production isolation; GA E2E (webkit).
-next_action: Resolve the locked dependency/CI blocker through its authorized owner, then continue on this same branch and remeasure current-head CI.
+head_sha: 7f31a8d4eaaf217bab6897fbaacdb7bf0edf48c6
+state: Normal-pushed 2026-09-29 08:38 UTC from0ca4487f016877b8db872fa9eeba0205e07c433b, clean merge of deploy61821446ebd7e4fb30a36a5a95b7526a34515df5. All eleven feature blobs byte-unchanged. Local7 files155 PASS / 0 FAIL / 0 SKIP, actual installed TypeScript0 diagnostics, scoped lint0 errors/0 warnings, unchanged MCP bundle check/whitespace PASS. Original shim/Bun startup failures retained, direct Node tools pass without install/lockfile edit. Predecessor root fast-uri/nested undici/GA hydration failed logs read; current new-head job109325182441 already FAILS undici GHSA-3wwx-pv8p-q78v, log read. Existing #1751 owns GA hydration fix, fresh10/10 Chromium and WebKit; no duplicate edit. New-head terminal required CI/Blue Dream/live Edge acceptance NOT_MEASURED. Stay draft, auto-merge off, no force/rewrite.
+next_action: Read exact-head terminal CI; GDP integrates shared #1751 analytics repair, authorized dependency owner addresses locked advisories. Blue Dream reviews this exact head, no self-acceptance.
 files: This repair otherwise preserves feature blobs and imports the base; original PR paths: scripts/sync-mcp-edge-bundle.mjs; src/hooks/useOperatorAccountReadModels.ts; src/lib/operatorAccountReadModels.ts; src/test/grow-walk-context-read-models.test.ts; src/test/mcp-ecowitt-provenance-fence.test.ts; src/test/mcp-effective-bundle-parity.test.ts; src/test/operator-account-read-models-hook.test.tsx; src/test/operator-account-read-models.test.ts; src/test/operator-effective-sensor-readings.test.ts; src/test/sensor-history-read-cap-backstop-sql.test.ts; supabase/functions/mcp/index.ts
 blockers: Current CI is not full acceptance. fast-uri / nested undici repair is locked; any auth, SQL, supabase, Action Queue or device need stops this item. No force/rewrite.
 artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1651; current check links are on that exact head. Supplemental local receipt C:/Users/G8/Downloads/CHEM-REPAIR-1651-2026-09-28-result.json.
 reviewer_seat: Blue Dream
 claimed_by: Codex, 2026-09-28 18:46 CT
-last_updated: 2026-09-28 18:46 CT, by Codex
+last_updated: 2026-09-29 03:38 CT, by Codex
 ```
 
 ### CHEM-INVENTORY-REPAIR-001-PR-1652

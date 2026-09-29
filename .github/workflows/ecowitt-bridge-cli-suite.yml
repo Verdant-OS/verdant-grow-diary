@@ -26,6 +26,7 @@ on:
       - "docs/schemas/ecowitt-soil-channel-map.schema.json"
       - "examples/ecowitt-bridge/**"
       - ".github/workflows/ecowitt-bridge-cli-suite.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main, verdant-grow-diary]
     paths:
@@ -40,6 +41,10 @@ on:
       - "src/test/ecowitt-soil-channel-map-schema.test.ts"
       - "fixtures/home-assistant-ecowitt-mqtt/**"
       - "fixtures/ecowitt-bridge-config/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   bridge-cli-suite:

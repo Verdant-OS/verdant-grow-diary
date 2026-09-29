@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 /**
  * Analytics is consent-gated in the app: nothing gtag-related loads until the
@@ -8,6 +8,26 @@ import type { Page } from "@playwright/test";
  * Keep this key in sync with src/lib/analyticsConsent.ts.
  */
 export const ANALYTICS_CONSENT_STORAGE_KEY = "verdant.analytics-consent.v1";
+
+/**
+ * An SSR response does not mean the cold Vite client graph has hydrated.
+ * Use a fresh, unconsented page during suite setup so compile time cannot
+ * consume the behavioral assertions' normal timeout. The visible banner is
+ * an existing client-effect boundary; no consent or analytics is enabled.
+ */
+export async function waitForAnalyticsClientReady(
+  page: Page,
+  url: string,
+  timeoutMs = 110_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  const remaining = () => Math.max(1, deadline - Date.now());
+  await page.route("https://www.googletagmanager.com/**", (route) => route.abort());
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: remaining() });
+  await expect(page.getByTestId("analytics-consent-banner")).toBeVisible({
+    timeout: remaining(),
+  });
+}
 
 type PersistedAnalyticsConsentDecision = "granted" | "denied";
 

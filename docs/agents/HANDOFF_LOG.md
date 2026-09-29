@@ -10,6 +10,26 @@ Owner locks remain binding even when a block is unclaimed or older than 24 hours
 Remote heads below are observations at their named times; confirm them before resuming.
 An unpushed candidate is not a remote head and must never be treated as hosted CI evidence.
 
+## CHEM-ACTIONS-READONLY-PROOF-001
+
+```text
+TASK CHEM-ACTIONS-READONLY-PROOF-001  priority: P2  status: OPEN
+goal: Measure the real fixture-owned Actions list, successful empty versus row readback, read-only refresh and grower-approval framing on production. No Action Queue mutation or device operation.
+branch: codex/chem-actions-readonly-proof-001
+base: codex/chem-signedin-performance-001 at 35e7def61992753d34fb04c10a99febfcce5e130
+checkout: git fetch origin codex/chem-signedin-performance-001 && git switch codex/chem-actions-readonly-proof-001 && git merge origin/codex/chem-signedin-performance-001
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1800
+head_sha: b25e8cfa93b2ba4fd8e1c3c0bf2194afcf00cbfd
+state: Four-file stay-draft (+810/-0) normal-pushed. Terminal production run36540923804/job109315857747 PASS: hosted3 files267 PASS / 0 FAIL / 0 SKIP; browser2 PASS / 0 FAIL / 0 SKIP / zero retries includes normal sign-in and owned Actions readback/refresh. Receipt proves four real rows before/after, all six checks and clean appSHA61821446ebd7e4fb30a36a5a95b7526a34515df5; elapsed1317.959747ms for whole sequence; zero blocked writes/runtime errors, two existing fixture operator reads. Artifact11020881186 downloaded, digest2b175b38203a523059f47ba888df09332c82bfd4be7eda5a7058f0fbd0b784e2 matches. Final local267 PASS includes97 new cases; initial86 PASS/11 FAIL from malformed UUID helper retained and corrected. Canonical/E2E types0, lint0/0, format/import/docs guards PASS. SeparateV026/26; static AQ/docs102 PASS/0 FAIL/16 SKIP, policy-detector skips are not runtime proof. Canonical build PASS; two generated build stamps restored to HEAD without changing the four-file diff. Fresh72 open heads, no other-owner/deploy drift.
+next_action: Obtain Critical Mass exact-head acceptance, integrate parent serially through GDP, then normal-retarget and run fresh standalone required checks. Continue the full goal's remaining live Timeline, auth/reset, credit-denial and core-loop acceptance.
+files: e2e/lib/actionsReadonlyProofRules.ts; e2e/actions-readonly-proof.spec.ts; src/test/actions-production-readonly-proof.test.ts; .github/workflows/actions-readonly-proof.yml
+blockers: Transition/device/security/full-core-loop acceptance excluded and remains NOT_MEASURED. Archived Quick Log write fixture remains separate; no fixture replacement or unarchive. All35 standalone Main contexts absent on this stack; two census jobs still pending at08:12 UTC, zero supplemental FAIL. Existing16 source-policy skips remain a coverage gap, not a hosted policy FAIL; locked AQ/RLS paths untouched. Parent stack requires independent review/integration and fresh standalone checks.
+artifacts: #1793 read-only identity/mutation barrier reused byte unchanged; run36540923804; Downloads CHEM-actions-production-receipt-2026-09-29.json and CHEM-actions-proof-* logs. Sanitized finite receipts only; no ids, action content, tokens or account responses exported. PR attachment UI hit100-identity limit; draft creation/head/body verified and no duplicate created.
+reviewer_seat: Critical Mass (new .ts test/proof and CI files; no own review)
+claimed_by: Codex, 2026-09-29 03:03 CT, before implementation
+last_updated: 2026-09-29 03:12 CT, by Codex
+```
+
 ## Template
 
 ```text

@@ -2,6 +2,19 @@
 
 # Verdant — Current Operating State
 
+## Operating jobs — 2026-09-29 00:53:48 UTC
+
+- **PASS, source identity:** #1767 merged as `6fb27c5aec715c14213dd79cdb5077351e40dea0`; deploy Sentinel is 2026-09-28.1. The 2026-09-28.2 operating amendment remains pending. The latest user amendment permits own low-risk Phase 1 integration on exact-head required-check success; no Phase 2 declaration.
+- **PASS, required contexts / NOT_MEASURED, landing:** #1778 and #1779 have 35/35 required contexts SUCCESS at their exact heads. Both have actual merge-queue refs, with #1779 following #1778. Their queue-head required checks are still pending; neither is claimed merged. #1780 also has 35/35 and was submitted to the queue. Additional dependency FAILs remain visible; no waiver or independent PASS is claimed.
+- **PASS locally / NOT_MEASURED, final CI:** concurrency draft #1782 changes 69 PR workflow files and one resolved-YAML regression file. Five focused files: 57 passed / 0 failed / 0 skipped; typecheck 0; lint 0 errors / 0 warnings. Fifty-eight concurrency groups and 69 ready-for-review triggers were checked; overlapping checks are not a unique-test total.
+- **PASS, cancellation / NOT_MEASURED, aggregate improvement:** controlled pushes at 00:27:21 and 00:29:46 UTC (2m25s apart) changed queued workflow runs from 130 before to 189 at 00:40:10. The first controlled commit finished with 63 cancelled, 5 success, 3 skipped. Concurrent PRs and queue runs prevent a causal runtime/cost conclusion.
+- **FAIL, fixture contract:** #1782 Quick Log job 109199183114 reports fixture check 1 passed / 1 failed / 0 skipped. `e2e/lib/fixtureSafety.ts:224` refuses a production URL before write-producing smoke. The smoke step was skipped. Fix the production-fixture contract separately while keeping positive identity/ownership/tagging fences; do not change the production CI variables or request another host.
+- **PASS, proposals / NOT_MEASURED, deployment or access:** #1780 contains the promotion/rollback runbook; #1787 contains scoped-identity setup; #1788 contains a separate suite-consolidation proposal. Zero permissions were granted and no deployment changed. Native Vercel check selection was not exposed by the connector, and the browser redirected to sign-in. Matthew owns dashboard configuration and scoped identity setup.
+- **PASS, discovery only:** configured Vitest lists 3,153 files; legacy two-root discovery lists 3,127, missing 26 with no extras. This executed zero tests. #1757 owns discovery; no job was removed in the consolidation proposal.
+- **PASS, required CI / NOT_MEASURED, publish acceptance:** #1754 at `0384753ae911eca2a989694f8514f116dc903757` has 35/35 required SUCCESS; full record 87 SUCCESS / 4 SKIPPED / 2 dependency FAIL. Local 11 files / 242 passed / 0 failed / 0 skipped. Fresh Blue Dream acceptance is still needed for the 20:15 CT publish gate.
+- **BLOCKED, locked scope:** high fast-uri and moderate nested undici findings remain; no lockfile, exception or audit bypass was edited. Production database, Publish, HOLD #1250, device and Action Queue locks remain.
+- **BLOCKED, single governance landing:** #1777 and GDP #1781 overlap thirteen files at the same proposed 2026-09-28.2 version. #1781 lacks the new ACK field and HANDOFF_LOG required by #1779. Keep GDP's held branch untouched and reconcile one amendment before landing. Earlier measurements below remain historical.
+
 ## Release and coverage measurement — 2026-09-28 23:46:17 UTC
 
 - **PASS, release identity only:** live `/version.json` reports
@@ -84,7 +97,6 @@ Current coverage blocks: [HANDOFF_LOG.md](HANDOFF_LOG.md).
 Owner/reviewer seats: [OWNERSHIP.md](OWNERSHIP.md).
 These measured facts do not change the durable rules or any historical review SHA.
 
-
 ## Current verification/review decision — 2026-09-28
 
 Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
@@ -93,19 +105,23 @@ disposable test account owns the fixture grow and its selected tent/plant;
 tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
 use the KEEP account. Stop a write if identity, ownership or tagging cannot
 be verified; report that exact safety gap rather than proposing another host.
-Local/CI fixtures validate code, not production. This does not authorize merge,
-ready, auto-merge, Publish, production APPLY, real charges, role/auth changes,
-device control or Action Queue operations. Existing owner locks remain.
+Local/CI fixtures validate code, not production. Repository integration follows
+the explicit merge phases in AGENTS.md; it is not production acceptance. No
+Publish, production APPLY, real charge, role/auth change, device control or
+Action Queue operation is authorized here. Existing owner locks remain.
 See docs/production-only-verification-runbook.md.
 
 Earlier non-production smoke-host requests are superseded, not a current
 blocker. Existing CI dependencies require separate reviewed slices.
 
-Acceptance routing: **Blue Dream** reviews .tsx outside src/test/, P1s and
-publish gates; **Critical Mass** reviews everything else. Codex builds CI/infra
-without accepting its own work. Claude may add peer observations but is not
-the acceptance reviewer. GDP merges on an independent PASS at the exact head
-SHA. Historical receipts keep their original reviewer.
+Independent acceptance routing: **Blue Dream** reviews .tsx outside src/test/,
+P1s and publish gates; **Critical Mass** reviews everything else. An author cannot
+give its own work an independent PASS. Claude may add peer observations but is not
+the acceptance reviewer. Matthew's Phase 1 exception permits Codex to integrate
+its own low-risk PRs through the PR flow after every required check is SUCCESS
+at the exact head SHA. High-risk work remains draft for GDP review and merge;
+publish gates remain with Matthew. Phase 2 requires Matthew's explicit confirmation
+that CI is proven. Historical receipts keep their original reviewer.
 
 OWNERSHIP.md controls ownership. HOLD #1250; #1369 REVIEW ONLY;
 #1735/#1737 untouchable; #1740 NEVER MERGE; #1742/#1658 locked;

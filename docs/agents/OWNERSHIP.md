@@ -34,7 +34,7 @@ not make any task belong to one agent. Any agent may resume an open task from
 
 ### Codex: the repo, CI, builds, connectors, and CI/build reviews
 
-- **Repo.** Settings, branches, branch protection, repo secrets, webhooks, and labels. Merges belong to GDP (see below and O1).
+- **Repo.** CI, builds and repository integration. Matthew configures the separate scoped identity, branch rulesets and code-owner protections. Secrets and production operations need their own explicit authorization. Phase 1 permits Codex to integrate its own low-risk PRs through the PR flow after every required check succeeds at the exact head SHA; high-risk PRs remain draft for GDP review and merge.
 - **CI infrastructure.** Workflows, runners, check definitions, re-runs, and fixing flaky or broken checks.
 - **Build pipelines.** Builds and deploy pipeline configuration, including making Vercel's Deployment Checks pass. There are no preview or staging targets. Promotion to production stays with the Vercel team owner, and the publish decision stays with Matthew (section 1).
 - **The three connectors** (section 4). Codex builds, runs, and fixes them:
@@ -42,14 +42,14 @@ not make any task belong to one agent. Any agent may resume an open task from
   - the routing channel with Grand Daddy Grok
   - auto-assignment for Blue Dream and Critical Mass
 - **Reviews of CI and build-infrastructure PRs only.** Codex reviews PRs that touch CI or build infrastructure, on the exact head SHA. Every other PR goes to Blue Dream or Critical Mass by file path (section 2, Chemdawg). Matthew approved this on 2026-09-28 at about 5:03 PM CT, replacing the earlier every-PR rule.
-  - On Codex's own PRs, such as the connector PRs, Blue Dream or Critical Mass gives the verdict (open item O2).
+  - An independent verdict on Codex's own work can come only from another seat. Phase 1 permits eligible integration on required-check success without claiming such a verdict; publish gates and high-risk work retain their fences (open item O2).
 - **This file.** Codex keeps it current and accurate.
 
 ### Grand Daddy Grok (GDP): routing and product calls
 
 - **Routing decisions.** Which slice runs next, which reviewer gets which PR, overrides, and holds.
-- **Slice naming.** Codex, Claude and Copilot start work only from a slice GDP has named.
-- **Opening and merging PRs.** GDP has Copilot access. It opens and merges PRs under Matthew's standing order, so work starts itself. GDP merges once the assigned reviewer's verdict is PASS or PASS-with-P2 (no P1) on the exact SHA.
+- **Slice naming.** GDP routes priorities and named slices. Codex may start authorized repository repairs and resume a claimed handoff without waiting for another GDP paste. One task uses one branch and one current holder.
+- **Opening and merging PRs.** GDP has Copilot access and retains high-risk review and merge. Codex's own low-risk PRs use the Phase 1 exception in AGENTS.md. All other assigned review requirements still apply at the exact SHA.
 - **Merge rule (Matthew's 4:34 PM standing order).** An independent PASS or PASS-with-P2 (no P1) on the exact SHA is enough for GDP to merge. Blue Dream is required for P1 fixes and anything that gates a publish.
 - **Spend proposals.** GDP writes the proposal. Approval stays with Matthew.
 
@@ -84,25 +84,25 @@ not make any task belong to one agent. Any agent may resume an open task from
 
 ### Tie-breakers
 
-| Item                                                     | Owner                                                                                   |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Webhook creation, secret, receiver code                  | Codex                                                                                   |
-| Re-running or fixing a failed check                      | Codex                                                                                   |
-| Deciding that a failed check blocks a PR, and posting it | Chemdawg                                                                                |
-| Pre-check rules and verdicts                             | Chemdawg                                                                                |
-| Code that consumes pre-check verdicts                    | Codex                                                                                   |
-| Reviewer assignment and claim ledger                     | Chemdawg's pre-check, by file path (the 4.3 bot takes over when live); GDP can override |
-| Review verdicts                                          | Blue Dream / Critical Mass by file path; Codex for CI and build infrastructure          |
-| Opening and merging PRs (via Copilot)                    | GDP                                                                                     |
-| Edits to this file                                       | Codex                                                                                   |
-| Anything not listed                                      | GDP decides and adds a row here                                                         |
+| Item                                                     | Owner                                                                                        |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Webhook creation, secret, receiver code                  | Codex                                                                                        |
+| Re-running or fixing a failed check                      | Codex                                                                                        |
+| Deciding that a failed check blocks a PR, and posting it | Chemdawg                                                                                     |
+| Pre-check rules and verdicts                             | Chemdawg                                                                                     |
+| Code that consumes pre-check verdicts                    | Codex                                                                                        |
+| Reviewer assignment and claim ledger                     | Chemdawg's pre-check, by file path (the 4.3 bot takes over when live); GDP can override      |
+| Review verdicts                                          | Blue Dream / Critical Mass by file path; Codex for CI and build infrastructure               |
+| Opening and merging PRs                                  | Codex for its own eligible Phase 1 low-risk PRs; GDP for high-risk and other assigned merges |
+| Edits to this file                                       | Codex                                                                                        |
+| Anything not listed                                      | GDP decides and adds a row here                                                              |
 
 ## 3. Standing locks (unchanged)
 
 - **knk:** no production database access. This lock is Matthew's alone to lift.
-- **HOLD #1250:** stays on hold.
+- **HOLD #1250:** stays on hold. Never touch its branch `copilot/fix-migration-drift-issue` or any file in that PR's diff.
 - **Untouchable drafts:** #1625, #1727, #1737, #1735, #1369. Nothing auto-assigns, merges, or edits them.
-- **Off-limits without a named GDP slice:** migrations/SQL, `supabase/`, RLS, auth, Edge functions, Action Queue, lockfiles, device control.
+- **Off-limits without Matthew's explicit approval:** migrations/SQL, `supabase/`, RLS, auth, Edge functions, Action Queue, lockfiles, device control. A named GDP slice alone does not lift this fence.
 
 ## 4. Connector spec
 
@@ -153,7 +153,7 @@ not make any task belong to one agent. Any agent may resume an open task from
 ### 4.3 Auto-assignment for Blue Dream and Critical Mass (Codex)
 
 - **Until this bot is live,** Chemdawg's pre-check assigns reviewers by hand with the same path rules (section 2).
-- **Trigger.** CI is PASS on the exact SHA (4.1), and Chemdawg's `[PRECHECK]` says READY. Verdant PRs stay drafts until merge, so `ready_for_review` isn't required.
+- **Trigger.** CI is PASS on the exact SHA (4.1), and Chemdawg's `[PRECHECK]` says READY. High-risk PRs remain draft for GDP. Eligible Codex Phase 1 PRs may become ready; workflows that skip redundant draft checks also handle `ready_for_review`. Every required check must succeed before merge.
 - **Rules, applied in order.**
   1. **Owner exclusion.** The author, host, and Codex's own PRs never go to that same party.
   2. **Blue Dream required** for P1 fixes, anything that gates a publish, and UI (`.tsx` pages and components).
@@ -179,7 +179,9 @@ not make any task belong to one agent. Any agent may resume an open task from
 2. Routing integration: parser, tags, and digest. About 1 to 2 hours (estimate), since the channel itself is live.
 3. Auto-assignment, about 4 to 8 hours (estimate).
 
-Codex builds each one as a draft PR. GDP merges it after a Blue Dream or Critical Mass PASS, and Codex posts `[READY]` when the connector is live.
+Codex builds each one as a draft PR. Eligible low-risk integration follows Phase 1;
+high-risk work remains with GDP. An independent reviewer verdict is reported only
+when actually obtained. Codex posts `[READY]` only when the connector is measured live.
 
 ## 5. The loop, end to end (no human step)
 
@@ -190,7 +192,7 @@ Codex builds each one as a draft PR. GDP merges it after a Blue Dream or Critica
 5. `[PRECHECK]`
 6. `[ROUTE]` and `[CLAIM]`
 7. `[VERDICT]`
-8. GDP merge call
+8. Eligible Codex Phase 1 integration or GDP merge call under the applicable fence
 9. `[MERGE]`
 10. Next sweep
 
@@ -205,8 +207,8 @@ A FAIL at step 4 or step 7 goes back to step 3 automatically.
 
 ## 7. Open items (owner in brackets)
 
-- **O1: settled.** GDP opens and merges PRs through Copilot (Matthew, 2026-09-28).
-- **O2 [Codex + GDP]: self-review.** Codex reviews CI and build-infrastructure PRs, and it wrote the connector PRs itself. On those, the Blue Dream or Critical Mass verdict is the one that counts, so nobody signs off on their own code.
-- **O3 [Codex]: GitHub admin access.** Creating the webhook needs repo-admin rights. If Codex doesn't have them, a one-time grant is the only human step left, and it happens outside the review path.
+- **O1: updated by Matthew's 2026-09-28 operating amendment.** Codex may merge its own eligible low-risk PRs on exact-head required-check success in Phase 1. GDP retains high-risk review and merge. Phase 2 requires Matthew's explicit confirmation that CI is proven.
+- **O2 [Codex + GDP]: review truth.** Codex cannot give its own code an independent PASS. Phase 1 integration is an explicit authority exception, not independent review. Blue Dream's publish-gate acceptance and all named owner locks remain.
+- **O3 [Matthew + Codex]: scoped identity.** The current connector acts as Matthew's admin account. Matthew creates a separate scoped identity and protections; Codex then measures allowed and refused operations. No permissions have been granted by the setup document, and code-owner review does not itself reject file pushes.
 - **O4: settled.** Critical Mass and Toad Venom joined the routing channel on 2026-09-28. MotorBreath is on call outside it.
 - **O5 [Matthew, spend]: Cursor cloud agent launches fail with a usage error.** This is a spend-ceiling item, so it stays with Matthew under section 1.

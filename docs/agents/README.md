@@ -2,11 +2,14 @@
 
 **Sentinel-Version: 2026-09-28.2**
 
-Acceptance routing: **Blue Dream** reviews .tsx outside src/test/, P1s and
-publish gates; **Critical Mass** reviews everything else. Codex builds CI/infra
-without accepting its own work. Claude may add peer observations but is not
-the acceptance reviewer. GDP merges on an independent PASS at the exact head
-SHA. Historical receipts keep their original reviewer.
+Independent acceptance routing: **Blue Dream** reviews .tsx outside src/test/,
+P1s and publish gates; **Critical Mass** reviews everything else. An author cannot
+give its own work an independent PASS. Claude may add peer observations but is not
+the acceptance reviewer. Matthew's Phase 1 exception permits Codex to integrate
+its own low-risk PRs through the PR flow after every required check is SUCCESS
+at the exact head SHA. High-risk work remains draft for GDP review and merge;
+publish gates remain with Matthew. Phase 2 requires Matthew's explicit confirmation
+that CI is proven. Historical receipts keep their original reviewer.
 
 Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
 E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
@@ -14,9 +17,10 @@ disposable test account owns the fixture grow and its selected tent/plant;
 tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
 use the KEEP account. Stop a write if identity, ownership or tagging cannot
 be verified; report that exact safety gap rather than proposing another host.
-Local/CI fixtures validate code, not production. This does not authorize merge,
-ready, auto-merge, Publish, production APPLY, real charges, role/auth changes,
-device control or Action Queue operations. Existing owner locks remain.
+Local/CI fixtures validate code, not production. Repository integration follows
+the explicit merge phases in AGENTS.md; it is not production acceptance. No
+Publish, production APPLY, real charge, role/auth change, device control or
+Action Queue operation is authorized here. Existing owner locks remain.
 See docs/production-only-verification-runbook.md.
 
 Multi-agent work on Verdant runs under one shared constitution plus a small

@@ -13,7 +13,8 @@ can reject content drift as well as version drift.
 _Amended 2026-09-28 (Matthew Cheek): added Release and Environment Rules and Agent
 Handoff / Coverage; open tasks are resumable by any agent from `docs/agents/HANDOFF_LOG.md`._
 
-Ownership and routing: see `docs/agents/OWNERSHIP.md`. It wins on conflicts.
+Ownership and review routing: see `docs/agents/OWNERSHIP.md`. It wins on those
+points; Matthew Cheek's explicit instructions and the merge phases below control.
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -97,13 +98,20 @@ Use small, scoped changes. Avoid broad rewrites.
   comes before more testing. Public-page probes against a live build that doesn't contain
   the fix measure nothing; report them `NOT_MEASURED`. Signed-in verification starts after
   the fix is live.
-- **Git and merges.** No force-push and no history rewrite. Update branches only by merging
-  from base. Every PR opens as a draft. GDP merges on the assigned reviewer's `PASS` or
-  `PASS-with-P2` (no P1) at the exact head SHA. Owners and reviewer routing are defined in
-  `docs/agents/OWNERSHIP.md`, which wins on those points.
-- **One task, one branch, one holder.** Every task is built on its own branch, named
-  `<agent>/<task-id>-<yyyymmdd>` (lowercase; the prefix is the agent that created it and
-  never changes). There is no shared working branch. Only the agent currently holding a
+- **Git and merges.** Never push directly to `verdant-grow-diary` or `main`, force-push,
+  or rewrite history. Update branches by merging from base. Open PRs as drafts.
+  In **Phase 1**, Codex may mark ready and merge its own low-risk PRs through the PR flow
+  only after every required check is SUCCESS at the exact head SHA. A skipped, missing,
+  pending or failed required check is not green. No independent reviewer PASS is implied
+  by this exception. High-risk PRs stay draft for GDP review and merge: migrations or SQL,
+  `supabase/`, schema, auth, RLS, Edge functions, the production database, or HOLD #1250.
+  Off-limits paths still require Matthew's explicit approval before editing.
+  **Phase 2** begins only when Matthew explicitly confirms CI is proven; Codex cannot
+  enter it on its own judgment. Production database changes, spend, publish gates and
+  the publish decision remain with Matthew in both phases.
+- **One task, one branch, one holder.** New Codex branches use
+  `codex/<task-id>-<slug>` in lowercase. There is no shared working branch.
+  Only the agent currently holding a
   branch, per `docs/agents/HANDOFF_LOG.md`, pushes to it, and no agent edits files on
   another holder's branch. The task goes with the branch: whoever holds the branch holds
   the task. Preserve the original names of existing branches when resuming them.
@@ -676,15 +684,20 @@ not exclusivity. Standing collision fences in `CURRENT_STATE.md` still bind (for
 example remaining Tranche A edit points for Codex, Tranche B+ product code for Claude,
 and no competing Timeline / Alerts / Action Queue rewrite).
 
-Every slice names an **independent reviewer**, and at any moment one agent holds the
-claim to build it. No agent that touched the slice can review it. **No code ships without
-peer review**; a slice without a named independent reviewer is incomplete.
+Every slice names its independent review route, and at any moment one agent holds the
+claim to build it. An agent that touched a slice cannot give it an independent PASS.
+The explicit Phase 1 exception above permits Codex to integrate its own low-risk PR
+after all required checks succeed; it does not manufacture peer review. High-risk
+work, publish gates and named owner locks retain their review and acceptance fences.
 
-Acceptance routing: **Blue Dream** reviews .tsx outside src/test/, P1s and
-publish gates; **Critical Mass** reviews everything else. Codex builds CI/infra
-without accepting its own work. Claude may add peer observations but is not
-the acceptance reviewer. GDP merges on an independent PASS at the exact head
-SHA. Historical receipts keep their original reviewer.
+Independent acceptance routing: **Blue Dream** reviews .tsx outside src/test/,
+P1s and publish gates; **Critical Mass** reviews everything else. An author cannot
+give its own work an independent PASS. Claude may add peer observations but is not
+the acceptance reviewer. Matthew's Phase 1 exception permits Codex to integrate
+its own low-risk PRs through the PR flow after every required check is SUCCESS
+at the exact head SHA. High-risk work remains draft for GDP review and merge;
+publish gates remain with Matthew. Phase 2 requires Matthew's explicit confirmation
+that CI is proven. Historical receipts keep their original reviewer.
 
 Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The preferred sequence is:
 

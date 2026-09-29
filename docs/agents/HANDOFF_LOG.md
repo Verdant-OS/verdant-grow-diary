@@ -38,6 +38,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### GDP-1754-NONLIVE-SNAPSHOT-VALIDATE-001
+
+```text
+TASK GDP-1754-NONLIVE-SNAPSHOT-VALIDATE-001  priority: P1  status: OPEN
+goal: Range-validate non-manual snapshot history on mounted Timeline cards without pretending unknown, stale or invalid evidence is healthy.
+branch: codex/gdp-1754-nonlive-snapshot-validate-001
+base: verdant-grow-diary at 61821446ebd7e4fb30a36a5a95b7526a34515df5
+checkout: git fetch origin verdant-grow-diary && git switch codex/gdp-1754-nonlive-snapshot-validate-001 && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1794
+head_sha: 7866ad8d3281cadb46efa9ef32222cfe79541c59, normal push and draft body read back 2026-09-29 00:14 CT
+state: Pushed stay-draft, five files (+387/-57). Every persisted source uses the existing metric validator; valid readings and history remain, neutral non-manual review copy replaces the raw bypass, and stage interpretation requires a displayed valid VPD chip. Fifteen related files / 333 PASS / 0 FAIL / 0 SKIP including 44 new cases. First head cb27310a's hosted shards 7/32 and 14/32 failed three static resolver/explicit-validation pins; failed logs read, original direct resolver wiring preserved within scope, unchanged audit tests now pass. Intermediate local correction 1 FAIL / 186 PASS retained. Exact-base mounted reproduction 5 FAIL / 0 PASS / 44 excluded; final validation-disabled mutation 5 FAIL / 0 PASS / 50 excluded, byte-for-byte restore then 5 PASS / 0 FAIL / 50 excluded. Stable final Bun typecheck 0 diagnostics, ESLint 5 files 0 errors/1 base-existing hook warning, format/whitespace/three docs-safety categories/import guard PASS. Earlier 304/158 runs belong to cb27310a and overlap the final set, not unique sums. New exact-head CI in progress; predecessor success is not inherited.
+next_action: Finish fresh exact-head CI measurement, retain any failed-job logs, and route the stay-draft to Blue Dream for independent P1 acceptance. #1763's distinct freshness extraction needs its later refresh to preserve this fix. No merge or promotion by Codex.
+files: Closed: src/pages/Timeline.tsx; src/lib/timelineSensorSnapshotViewModel.ts; src/test/timeline-sensor-snapshot-view-model.test.ts; src/test/timeline-page-read-state.test.tsx; src/test/timeline-vpd-stage-wiring.test.tsx. No SQL, auth, Supabase or held branch changes.
+blockers: Publish remains Matthew-owned. #1763 overlaps the view model; #1737 remains untouchable. Independent Blue Dream acceptance and live fix acceptance remain NOT_MEASURED.
+artifacts: PR #1794; GDP #1754 owner override comment 5882244703; Downloads GDP-1754-nonlive-final-2026-09-29.md and GDP-1754-final-regressions-2026-09-29.json, baseline/mutation/final logs. Earlier cb27310a receipt preserved in GDP-1754-nonlive-validation-2026-09-29.md. Failed predecessor jobs 109264969705/109264969632 (static pins), 109264968745 (fast-uri 1239943/1239946), 109264968992 (undici GHSA-3wwx-pv8p-q78v), logs read. Dependency files remain locked. Latest public version identity is 61821446 dirty:false; frontend identity only. Hosted behavior after this new fix NOT_MEASURED. All 65 prior head/base pairs unchanged before first push; #1763/#1741/#1740/#1737/#1618 overlaps surfaced and unchanged. Unpushed P2 CO2 receipt work not imported.
+reviewer_seat: Blue Dream (P1 / mounted .tsx proof)
+claimed_by: Codex, 2026-09-29 00:00 CT (implementation resumed after next-day boundary)
+last_updated: 2026-09-29 00:14 CT, by Codex
+```
+
 ### CHEM-SIGNEDIN-PERFORMANCE-001
 
 ```text
@@ -607,26 +627,6 @@ artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1760; C:/Users/
 reviewer_seat: Blue Dream (P1 / .tsx)
 claimed_by: Codex, 2026-09-28 23:41 CT (implementation/integration continuation)
 last_updated: 2026-09-28 23:53 CT, by Codex
-```
-
-### GDP-1754-NONLIVE-SNAPSHOT-VALIDATE-001
-
-```text
-TASK GDP-1754-NONLIVE-SNAPSHOT-VALIDATE-001  priority: P1  status: OPEN
-goal: Range-validate non-manual snapshot history on mounted Timeline cards without pretending unknown, stale or invalid evidence is healthy.
-branch: NOT_MEASURED — not created
-base: verdant-grow-diary
-checkout: NOT_APPLICABLE — prepare one narrow follow-up after the recorded owner ship-as-is decision
-pr: NOT_MEASURED — not opened
-head_sha: NOT_MEASURED — no new implementation
-state: Source and mounted reproduction at deploy 95464496 confirm the remaining P1. Five temporary diagnostic cases (csv/demo/stale/invalid/live claims) FAIL, 0 PASS, 44 existing cases skipped by the title filter. Actual rendered text includes 150% RH, VPD 20, CO2 10001 and Soil 101%, while preserving valid 75.2F temperature. Persisted live is correctly labelled invalid but still renders invalid metric chips. Temporary test copy archived in Downloads and removed from the checkout; no product change made tonight.
-next_action: First slice tomorrow: implement one pure validated metric path for every persisted snapshot source, keeping provenance, historical records, temperature convention and stage/freshness fences. Add mounted source-matrix regressions, reconcile the preserved local P2 alias assertions, then obtain Blue Dream exact-head acceptance.
-files: Planned pure Timeline view model/rules and focused mounted/rules tests; no SQL, auth, Supabase or locked Timeline branch changes.
-blockers: Publish remains Matthew-owned. #1763 overlaps the view model; #1737 remains untouchable. Independent Blue Dream acceptance and live fix acceptance remain NOT_MEASURED.
-artifacts: GDP #1754 owner override comment 5882244703; Downloads CHEM-timeline-nonmanual-mounted-red-2026-09-28.log, CHEM-timeline-nonmanual-added-cases-2026-09-28.txt and archived diagnostic test. Live source identity 95464496 is measured; hosted Timeline behavior NOT_MEASURED.
-reviewer_seat: Blue Dream (P1 / mounted .tsx proof)
-claimed_by: Codex, 2026-09-28 21:22 CT (next source audit only)
-last_updated: 2026-09-28 21:35 CT, by Codex
 ```
 
 ## Closed

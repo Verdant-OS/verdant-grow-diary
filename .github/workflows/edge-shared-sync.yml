@@ -2,11 +2,16 @@ name: edge-shared-sync
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     # Run on every PR — do not path-filter. A PR that only touches
     # unrelated files can still regress edge-function imports (e.g. a
     # merge of stale mirror state), so the gate must always run.
   push:
     branches: [main, verdant-grow-diary]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:

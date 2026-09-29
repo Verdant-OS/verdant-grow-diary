@@ -73,6 +73,18 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 const clients: QueryClient[] = [];
 const queryPrefix = ["plant-detail", "eligible-tents", "plant-fixture"];
+const browserMethodNames = [
+  "scrollIntoView",
+  "hasPointerCapture",
+  "setPointerCapture",
+  "releasePointerCapture",
+] as const;
+const browserMethodDescriptors = new Map(
+  browserMethodNames.map((name) => [
+    name,
+    Object.getOwnPropertyDescriptor(HTMLElement.prototype, name),
+  ]),
+);
 
 beforeEach(() => {
   Object.assign(state, {
@@ -92,10 +104,23 @@ beforeEach(() => {
   HTMLElement.prototype.releasePointerCapture = () => undefined;
 });
 
-afterEach(() => {
-  cleanup();
-  clients.splice(0).forEach((client) => client.clear());
-});
+function cleanupDialogFixture() {
+  try {
+    cleanup();
+  } finally {
+    clients.splice(0).forEach((client) => client.clear());
+    for (const name of browserMethodNames) {
+      const descriptor = browserMethodDescriptors.get(name);
+      if (descriptor) {
+        Object.defineProperty(HTMLElement.prototype, name, descriptor);
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, name);
+      }
+    }
+  }
+}
+
+afterEach(cleanupDialogFixture);
 
 function openDialog() {
   const client = new QueryClient({
@@ -124,6 +149,18 @@ function expectNoMoveOrEmptyClaim() {
 }
 
 describe("Move Plant eligible-tent read honesty", () => {
+  it("restores browser method descriptors after dialog cleanup", async () => {
+    openDialog();
+    await screen.findByTestId("assign-tent-select");
+    cleanupDialogFixture();
+    cleanupDialogFixture();
+    for (const name of browserMethodNames) {
+      expect(Object.getOwnPropertyDescriptor(HTMLElement.prototype, name)).toEqual(
+        browserMethodDescriptors.get(name),
+      );
+    }
+  });
+
   it("reports a failed first read as unavailable, with Retry and no empty or creation claim", async () => {
     state.readError = true;
     openDialog();

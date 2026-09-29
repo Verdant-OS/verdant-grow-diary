@@ -5,6 +5,7 @@ name: Native Save Retrieve Local
 on:
   pull_request:
     branches: [main, verdant-grow-diary, "codex/native-save-retrieve-proof-*"]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:

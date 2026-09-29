@@ -288,33 +288,36 @@ describe("revision confirmation recovery", () => {
   });
 
   it.each<Kind>(["correction", "retraction"])(
-    "keeps the original %s request and toast when the receipt event mismatches",
+    "treats a %s event-handle mismatch receipt as terminal and blocks replay",
     async (kind) => {
       mocks.rpc
         .mockResolvedValueOnce({
           data: { ...receipt.data, grow_event_id: "11111111-1111-4111-8111-111111111111" },
           error: null,
         })
-        .mockResolvedValueOnce(receipt);
+        .mockResolvedValueOnce({
+          data: { ...receipt.data, grow_event_id: "11111111-1111-4111-8111-111111111111" },
+          error: null,
+        });
       const view = mount();
 
       submitRevision(kind);
       await waitFor(() => expect(mocks.error).toHaveBeenCalled());
 
-      expect(mocks.error.mock.calls[0][0]).toMatch(/could not confirm/i);
+      expect(mocks.error.mock.calls[0][0]).toMatch(/refresh the page/i);
       expect(view.changed).not.toHaveBeenCalled();
-      const first = mocks.rpc.mock.calls[0][1];
+      expect(mocks.rpc).toHaveBeenCalledTimes(1);
 
       replayRevision(kind);
-      await waitFor(() => expect(view.changed).toHaveBeenCalledOnce());
-
-      expect(mocks.rpc).toHaveBeenCalledTimes(2);
-      expect(mocks.rpc.mock.calls[1][1]).toEqual(first);
+      await waitFor(() => expect(mocks.error).toHaveBeenCalledTimes(2));
+      expect(mocks.error.mock.calls[1][0]).toMatch(/refresh the page/i);
+      expect(mocks.rpc).toHaveBeenCalledTimes(1);
+      expect(view.changed).not.toHaveBeenCalled();
     },
   );
 
   it.each<Kind>(["correction", "retraction"])(
-    "keeps the original %s diary-root request and toast when the receipt omits the diary handle",
+    "treats a %s diary-handle mismatch receipt as terminal and blocks replay",
     async (kind) => {
       mocks.rpc
         .mockResolvedValueOnce({
@@ -329,7 +332,7 @@ describe("revision confirmation recovery", () => {
           data: {
             ...receipt.data,
             grow_event_id: "11111111-1111-4111-8111-111111111111",
-            diary_entry_ids: ["cccccccc-cccc-4ccc-8ccc-cccccccccccc"],
+            diary_entry_ids: ["99999999-9999-4999-8999-999999999999"],
           },
           error: null,
         });
@@ -338,15 +341,15 @@ describe("revision confirmation recovery", () => {
       submitRevision(kind);
       await waitFor(() => expect(mocks.error).toHaveBeenCalled());
 
-      expect(mocks.error.mock.calls[0][0]).toMatch(/could not confirm/i);
+      expect(mocks.error.mock.calls[0][0]).toMatch(/refresh the page/i);
       expect(view.changed).not.toHaveBeenCalled();
-      const first = mocks.rpc.mock.calls[0][1];
+      expect(mocks.rpc).toHaveBeenCalledTimes(1);
 
       replayRevision(kind);
-      await waitFor(() => expect(view.changed).toHaveBeenCalledOnce());
-
-      expect(mocks.rpc).toHaveBeenCalledTimes(2);
-      expect(mocks.rpc.mock.calls[1][1]).toEqual(first);
+      await waitFor(() => expect(mocks.error).toHaveBeenCalledTimes(2));
+      expect(mocks.error.mock.calls[1][0]).toMatch(/refresh the page/i);
+      expect(mocks.rpc).toHaveBeenCalledTimes(1);
+      expect(view.changed).not.toHaveBeenCalled();
     },
   );
 });

@@ -747,11 +747,41 @@ describe("remote applied-schema runner safety", () => {
     expect(observedCatalog).toContain("'quicklog_correct_entry'");
     expect(observedCatalog).toContain("'quicklog_retract_entry'");
     expect(observedCatalog).not.toContain("p.oid::regprocedure::text in (");
-    expect(pinnedCatalog).toContain("where signature in (");
+    expect(pinnedCatalog).toContain("where oid in (");
     expect(pinnedCatalog).toContain(
       "public.quicklog_correct_entry(text,text,jsonb,uuid,uuid,text)",
     );
     expect(pinnedCatalog).toContain("public.quicklog_retract_entry(text,text,uuid,uuid,text)");
+  });
+
+  it("matches schema-qualified Quick Log signatures by function OID", () => {
+    const catalogSql = emittedQuickLogCatalogSql();
+    const pinnedCatalog = catalogSql.slice(
+      catalogSql.indexOf("observed_signature_functions as ("),
+      catalogSql.indexOf("manual_contract_function_ids(kind, oid) as ("),
+    );
+    const legacyContract = catalogSql.slice(
+      catalogSql.indexOf("'target_functions_contract'"),
+      catalogSql.indexOf("'target_function_overloads_contract'"),
+    );
+    const securityContract = catalogSql.slice(
+      catalogSql.indexOf("'target_function_security_contract'"),
+      catalogSql.indexOf("'manual_delegate_contract'"),
+    );
+
+    expect(pinnedCatalog).toContain("where oid in (");
+    expect(pinnedCatalog).toContain(
+      "to_regprocedure('public.quicklog_revision_resolve_root(uuid,uuid,uuid)')",
+    );
+    expect(pinnedCatalog).toContain(
+      "to_regprocedure('public.quicklog_correct_entry(text,text,jsonb,uuid,uuid,text)')",
+    );
+    expect(legacyContract).toContain("o.oid = to_regprocedure(e.signature)");
+    expect(securityContract).toContain("when o.oid in (");
+    expect(securityContract).toContain(
+      "to_regprocedure('public.quicklog_retract_entry(text,uuid,uuid,text)')",
+    );
+    expect(catalogSql).not.toMatch(/\bo\.signature\s*(?:=|in)\b/);
   });
 
   it("requires every pinned index to be valid, ready, and live", () => {

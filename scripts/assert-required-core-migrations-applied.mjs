@@ -101,29 +101,29 @@ const quickLogFunctionFingerprintValues = Object.entries(EXPECTED_FUNCTION_DEFIN
   })
   .join(",\n      ");
 
-const quickLogObservedSignaturesLiteral = [
+const quickLogObservedFunctionIdsSql = [
   ...Object.values(LEGACY_QUICKLOG_SIGNATURES),
   QUICKLOG_REVISION_REPLAY_SIGNATURES.keyedCorrect,
   QUICKLOG_REVISION_REPLAY_SIGNATURES.keyedRetract,
 ]
-  .map((signature) => `'${signature}'`)
+  .map((signature) => `to_regprocedure('${signature}')`)
   .join(",\n        ");
 
-const quickLogClientFunctionSignaturesLiteral = QUICKLOG_CLIENT_FUNCTION_SIGNATURES.map(
-  (signature) => `'${signature}'`,
+const quickLogClientFunctionIdsSql = QUICKLOG_CLIENT_FUNCTION_SIGNATURES.map(
+  (signature) => `to_regprocedure('${signature}')`,
 ).join(", ");
 
 const QUICKLOG_TARGET_FUNCTION_SECURITY_CONTRACT_V2_SQL = `coalesce((
     select count(*)=7 and bool_and(
       case
-        when o.signature in (${quickLogClientFunctionSignaturesLiteral}) then acl.entries = array[
+        when o.oid in (${quickLogClientFunctionIdsSql}) then acl.entries = array[
           'authenticated|EXECUTE|f|postgres','postgres|EXECUTE|f|postgres','service_role|EXECUTE|f|postgres'
         ]::text[]
         else acl.entries = array['postgres|EXECUTE|f|postgres']::text[]
       end
       and not has_function_privilege('anon',o.oid,'EXECUTE')
       and case
-        when o.signature in (${quickLogClientFunctionSignaturesLiteral}) then
+        when o.oid in (${quickLogClientFunctionIdsSql}) then
           has_function_privilege('authenticated',o.oid,'EXECUTE')
           and has_function_privilege('service_role',o.oid,'EXECUTE')
         else
@@ -159,7 +159,6 @@ with target as (
       ${quickLogFunctionFingerprintValues}
 ), observed_functions as (
   select p.*, n.nspname, r.rolname as owner_name, l.lanname,
-         p.oid::regprocedure::text as signature,
          md5(pg_get_functiondef(p.oid)) as definition_md5,
          octet_length(pg_get_functiondef(p.oid)) as definition_bytes,
          md5(p.prosrc) as prosrc_md5,
@@ -176,8 +175,8 @@ with target as (
     )
 ), observed_signature_functions as (
   select * from observed_functions
-  where signature in (
-    ${quickLogObservedSignaturesLiteral}
+  where oid in (
+    ${quickLogObservedFunctionIdsSql}
   )
 ), manual_contract_function_ids(kind, oid) as (
   values
@@ -309,7 +308,7 @@ ${QUICKLOG_DEPENDENCY_CATALOG_EXPRESSIONS_SQL},
         when 'quicklog_revision_rebase_captured_at' then o.lanname = 'plpgsql' and o.provolatile = 'i' and not o.prosecdef
         else o.lanname = 'plpgsql' and o.provolatile = 'v' and o.prosecdef
       end
-    ) from expected_functions e join observed_functions o on o.signature = e.signature
+    ) from expected_functions e join observed_functions o on o.oid = to_regprocedure(e.signature)
   ), false),
   'target_function_overloads_contract', (select count(*) = 7 from observed_functions)
     and to_regprocedure('${LEGACY_QUICKLOG_SIGNATURES.quicklog_revision_resolve_root}') is not null

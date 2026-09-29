@@ -286,6 +286,8 @@ describe("evaluatePolicy", () => {
     ["postcss", "8.5.18-rc.0"],
     ["brace-expansion", "1.1.17"],
     ["fast-uri", "3.1.5"],
+    ["fast-uri", "3.1.6"],
+    ["undici", "6.28.0"],
   ])("fails when the npm graph regresses the %s security floor", (packageName, version) => {
     const files = policyFiles();
     const stale = JSON.parse(files[at("package-lock.json")]);
@@ -302,6 +304,14 @@ describe("evaluatePolicy", () => {
     delete current.packages["node_modules/rollup"];
     files[at("package-lock.json")] = JSON.stringify(current);
     expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+  });
+
+  it("rejects an outdated undici in the canonical Bun graph", () => {
+    const files = policyFiles();
+    const stale = JSON.parse(files[at("bun.lock")]);
+    stale.packages.undici = ["undici@6.28.0", "", {}];
+    files[at("bun.lock")] = JSON.stringify(stale);
+    expect(evaluate(files).errors.join(" ")).toContain("bun.lock security floor for undici");
   });
 
   it("accepts removal of optional Rollup from the canonical Bun graph", () => {

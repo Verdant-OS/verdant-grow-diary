@@ -27,7 +27,7 @@ export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
   vite: "6.4.3",
   postcss: "8.5.18",
   "brace-expansion": "1.1.18",
-  "fast-uri": "3.1.6",
+  "fast-uri": "3.1.8",
   "form-data": "4.0.6",
   "js-yaml": "4.3.2",
   qs: "6.16.0",
@@ -40,6 +40,7 @@ export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
 // Absence is safe; every copy must still be patched if it returns transitively.
 export const PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS = Object.freeze({
   rollup: "4.59.0",
+  undici: "6.28.1",
 });
 export const BUN_LOCK_OPTIONAL_SECURITY_FLOORS = PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS;
 export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({

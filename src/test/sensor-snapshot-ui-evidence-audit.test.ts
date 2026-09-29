@@ -47,8 +47,13 @@ const INTENTIONAL_BYPASSES: ReadonlyArray<{
 }> = [
   {
     file: "pages/Timeline.tsx",
-    why: "Timeline owns canonical and legacy diary sensor shapes plus Plant Quick Log's manual compatibility envelope; the explicit precedence is fenced below.",
-    marker: "manualCompatSensor",
+    why: "Timeline delegates canonical, legacy and manual compatibility sensor precedence to its pure view model; the page wiring is fenced below.",
+    marker: "resolveTimelineCardSensorResolution",
+  },
+  {
+    file: "lib/timelineSensorSnapshotViewModel.ts",
+    why: "The pure Timeline view model resolves canonical and legacy diary shapes plus Plant Quick Log's manual compatibility envelope; it does not use the v1 companion normalizer.",
+    marker: "details?.manual_sensor_snapshot",
   },
   {
     file: "components/EcowittLatestSnapshotCard.tsx",
@@ -103,11 +108,24 @@ describe("Quick Log v1 snapshot normalizer — intentional bypasses", () => {
   );
 
   it("keeps Timeline sensor precedence canonical, then legacy, then manual compatibility", () => {
-    const src = readSrc("pages/Timeline.tsx");
-    expect(src).toMatch(/const canonicalSensor = e\.details\?\.sensor_snapshot/);
-    expect(src).toMatch(/const legacySensor = e\.details\?\.sensor/);
-    expect(src).toMatch(/const manualCompatSensor = e\.details\?\.manual_sensor_snapshot/);
-    expect(src).toMatch(/canonicalSensor \?\? legacySensor \?\? manualCompatSensor/);
+    const src = readSrc("lib/timelineSensorSnapshotViewModel.ts");
+    const page = readSrc("pages/Timeline.tsx");
+    expect(src).toMatch(/const canonical = asRecord\(details\?\.sensor_snapshot\)/);
+    expect(src).toMatch(/const legacy = asRecord\(details\?\.sensor\)/);
+    expect(src).toMatch(/const manualCompat = asRecord\(details\?\.manual_sensor_snapshot\)/);
+    expect(src).toMatch(/canonical \?\? legacy \?\? manualCompat/);
+    expect(page).toMatch(
+      /resolveTimelineCardSensorResolution\(\s*\(e\.details\s+as\s+Record<string,\s*unknown>\s*\|\s*null\s*\|\s*undefined\)\s*\?\?\s*null/,
+    );
+    expect(page).toMatch(/validateManualCompatibility:\s*true/);
+  });
+
+  it("keeps the Timeline sensor resolver free of writes and runtime dependencies", () => {
+    const src = readSrc("lib/timelineSensorSnapshotViewModel.ts");
+    expect(src).not.toMatch(/from\s+["'](?:react|@\/integrations\/supabase)/);
+    expect(src).not.toMatch(/\b(?:supabase|service_role)\b/i);
+    expect(src).not.toMatch(/\.(?:from|insert|update|upsert|rpc)\s*\(/);
+    expect(src).not.toMatch(/\b(?:fetch|setInterval|setTimeout)\s*\(/);
   });
 });
 

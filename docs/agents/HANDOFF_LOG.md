@@ -47,15 +47,15 @@ branch: codex/chem-production-quicklog-fixture-001
 base: verdant-grow-diary at 61821446ebd7e4fb30a36a5a95b7526a34515df5
 checkout: git fetch origin codex/chem-production-quicklog-fixture-001 verdant-grow-diary && git switch codex/chem-production-quicklog-fixture-001 && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1792
-head_sha: 6ba962d2c6c6485a6ff37897309447560eb24a77, remote confirmed 2026-09-28 22:13 CT
-state: Pushed draft, 9 files (+908/-49). 57 new cases; 7-file related run 251 PASS / 0 FAIL / 0 SKIP, including 67 existing docs-safety and 26 V0 cases. Project and targeted E2E typechecks: 0 diagnostics. Lint 9 files 0 errors/0 warnings; format 9 files, 3 docs-safety scanners, whitespace PASS. Playwright discovery lists 3 tests only; zero browser execution locally. Baseline integration reproduction: 2 FAIL / 0 PASS / 53 excluded. Intermediate synthetic-projection mismatch retained: 223 PASS / 1 FAIL; final proof is PASS. No unique-test sum across repeats.
+head_sha: 34f8beae3334cceb6f914df904a6842c90005eb4, remote confirmed 2026-09-28 22:26 CT
+state: Pushed draft, 9 files (+1020/-46). Current related run: 7 files / 257 PASS / 0 FAIL / 0 SKIP, including 63 new cases, 67 existing docs-safety and 26 V0 cases. Project and targeted E2E typechecks: 0 diagnostics. Lint 9 files 0 errors/0 warnings; format 9 files, 3 docs-safety scanners, whitespace PASS. Playwright discovery lists 3 tests only; zero browser execution locally. Previous head 6ba962d2 hosted fixture check: 1 PASS / 1 FAIL / 0 SKIP, one automatic retry; checklist step skipped before notes could be written. Its guard rejected the existing legitimate tentId query and optional grow-name setting. New head binds query IDs to positively owned rows and derives an omitted grow name only from the verified owned grow; CI variables remain unchanged. Follow-up red proof: 2 FAIL / 0 PASS / 57 excluded; both regressions now PASS. Earlier baseline 2 FAIL / 0 PASS / 53 excluded and intermediate 223 PASS / 1 FAIL remain retained. No unique-test sum across repeats.
 next_action: Read exact-head CI and Blue Dream acceptance; inspect any runtime refusal without relaxing account, ownership, in-flight/empty-read or smoke-tag fences.
 files: e2e/lib/productionQuickLogFixtureRules.ts; e2e/lib/productionQuickLogFixtureProof.ts; e2e/lib/fixtureSafety.ts (Quick Log entry and opt-in QA marker only); e2e/fixture-safety.spec.ts; e2e/quicklog-smoke.spec.ts; e2e/scripts/print-fixture-config-checklist.ts; src/test/production-quicklog-fixture.test.ts; src/test/quicklog-e2e-fixture-safety.test.ts; src/test/quicklog-e2e-bootstrap-safety.test.ts
-blockers: Hosted fixture ownership, production smoke and Blue Dream acceptance remain NOT_MEASURED. Runtime requires all three names, while the unchanged workflow precheck/summary calls grow optional. Account hint must be absent or the approved email. Auth, Pheno, workflow/variable/secret configuration, bootstrap and production database changes remain outside this repair.
-artifacts: PR #1792; Downloads CHEM-production-quicklog-fixture tests, red, eslint and live-identity receipts dated 2026-09-28. Observer issues no network request and reads no credentials; normal app getUser and complete row reads supply the proof.
+blockers: Current-head hosted fixture ownership, production smoke and Blue Dream acceptance remain NOT_MEASURED. Root fast-uri and nested undici audits failed on the previous head and require locked dependency files. Account hint must be absent or the approved email; configured plant/tent names and the verified grow name must carry the fixture marker. Auth, Pheno, workflow/variable/secret configuration, bootstrap and production database changes remain outside this repair.
+artifacts: PR #1792; Downloads CHEM-production-quicklog-context tests, red and eslint receipts plus the earlier fixture/live-identity receipts dated 2026-09-28. Observer issues no network request and reads no credentials; normal app getUser and complete row reads supply the proof. Previous QuickLog failed job: 109238860866; logs read before correction.
 reviewer_seat: Blue Dream (P1 write-smoke fence); Codex is author, not independent acceptance reviewer
 claimed_by: Codex, 2026-09-28 22:02 CT
-last_updated: 2026-09-28 22:13 CT, by Codex
+last_updated: 2026-09-28 22:26 CT, by Codex
 ```
 
 ### CHEM-REQUIRED-AUDIT-PR-EVIDENCE-001
@@ -550,24 +550,6 @@ last_updated: 2026-09-28 20:41 CT, by Codex
 reviewer_seat: Critical Mass
 ```
 
-### CHEM-1773-UNKNOWN-FRESHNESS
-
-```text
-TASK CHEM-1773-UNKNOWN-FRESHNESS  priority: P2  status: CLOSED
-goal: Block standard retry when accepted evidence freshness cannot be established.
-branch: copilot/ai-doctor-retry-guard-helper
-base: verdant-grow-diary
-checkout: git fetch origin copilot/ai-doctor-retry-guard-helper verdant-grow-diary && git switch copilot/ai-doctor-retry-guard-helper && git merge origin/verdant-grow-diary
-state: Owner merge observed: #1773 landed as 61821446ebd7e4fb30a36a5a95b7526a34515df5 from c2fa6e134e7637ed229339a41517eecf22b8d94d. Supplied correction patch sha256 66d2e98e307db02088afb1df7d9605726d3926e7ce4dbf8230f1bf359360dd9b retained. Earlier exact-head local validation: 16 files / 360 PASS / 0 FAIL / 0 SKIP; tsgo 0, lint 0/0, format 5 files. Codex did not merge or issue independent acceptance. Production behavior NOT_MEASURED.
-next_action: Repository implementation task closed at owner merge 61821446; release verification continues in CHEM-RELEASE-001. Preserve accepted visibility and historical-review exemption.
-files: src/components/PlantDetailAiDoctorLiveReview.tsx; src/lib/aiDoctorLiveReviewRecoveryRules.ts; the existing three focused AI Doctor tests.
-blockers: Live credit/runtime acceptance and independent review receipt remain NOT_MEASURED; a merged commit is not production acceptance.
-artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1773; C:/Users/G8/Downloads/CHEM-1773-current-head-regression-2026-09-28.log
-reviewer_seat: Blue Dream (component and .tsx tests)
-claimed_by: Codex, 2026-09-28 20:41 CT (verification follow-up; preserve the submitted correction)
-last_updated: 2026-09-28 22:13 CT, by Codex
-```
-
 ### CHEM-1769-SENSOR-HISTORY-REPAIR
 
 ```text
@@ -628,6 +610,24 @@ last_updated: 2026-09-28 21:35 CT, by Codex
 ```
 
 ## Closed
+
+### CHEM-1773-UNKNOWN-FRESHNESS
+
+```text
+TASK CHEM-1773-UNKNOWN-FRESHNESS  priority: P2  status: CLOSED
+goal: Block standard retry when accepted evidence freshness cannot be established.
+branch: copilot/ai-doctor-retry-guard-helper
+base: verdant-grow-diary
+checkout: git fetch origin copilot/ai-doctor-retry-guard-helper verdant-grow-diary && git switch copilot/ai-doctor-retry-guard-helper && git merge origin/verdant-grow-diary
+state: Owner merge observed: #1773 landed as 61821446ebd7e4fb30a36a5a95b7526a34515df5 from c2fa6e134e7637ed229339a41517eecf22b8d94d. Supplied correction patch sha256 66d2e98e307db02088afb1df7d9605726d3926e7ce4dbf8230f1bf359360dd9b retained. Earlier exact-head local validation: 16 files / 360 PASS / 0 FAIL / 0 SKIP; tsgo 0, lint 0/0, format 5 files. Codex did not merge or issue independent acceptance. Production behavior NOT_MEASURED.
+next_action: Repository implementation task closed at owner merge 61821446; release verification continues in CHEM-RELEASE-001. Preserve accepted visibility and historical-review exemption.
+files: src/components/PlantDetailAiDoctorLiveReview.tsx; src/lib/aiDoctorLiveReviewRecoveryRules.ts; the existing three focused AI Doctor tests.
+blockers: Live credit/runtime acceptance and independent review receipt remain NOT_MEASURED; a merged commit is not production acceptance.
+artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1773; C:/Users/G8/Downloads/CHEM-1773-current-head-regression-2026-09-28.log
+reviewer_seat: Blue Dream (component and .tsx tests)
+claimed_by: Codex, 2026-09-28 20:41 CT (verification follow-up; preserve the submitted correction)
+last_updated: 2026-09-28 22:13 CT, by Codex
+```
 
 ### GDP-1754-VPD-LEGACY-VALIDATE-001
 

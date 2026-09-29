@@ -354,6 +354,8 @@ export const QUICKLOG_REVISION_FAILURE_COPY: Record<string, string> = {
   forbidden: "You do not have permission to change this entry.",
   invalid_idempotency_key: "This change could not be identified. Close and reopen the entry.",
   idempotency_conflict: "This change could not be confirmed. Close and reopen the entry.",
+  receipt_mismatch:
+    "This change could not be confirmed for this entry. Refresh the page before trying again.",
   rpc_error:
     "We could not confirm whether this change saved. Try again to confirm the same change.",
 };

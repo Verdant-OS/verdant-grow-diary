@@ -1,0 +1,76 @@
+# Scheduled read-only audit: which open PRs touch the same files.
+# Evidence for the by-hand collision check in docs/agents/CURRENT_STATE.md.
+# Read-only (gh pr list / gh api). Never comments, labels, assigns, merges, or edits PRs.
+# Not a required check. DO NOT ADD THIS JOB TO THE REQUIRED CONTEXTS.
+name: PR file-overlap audit
+
+on:
+  schedule:
+    # 14:20 UTC daily — 15 min after merge-queue snapshot, same US-morning window
+    - cron: "20 14 * * *"
+  workflow_dispatch:
+    inputs:
+      fail_on_hot:
+        description: "Fail the job when two open PRs touch the same hot-path file"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: open-PR file overlap
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Audit open PRs for shared files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_OVERLAP_BASE_BRANCH: verdant-grow-diary
+        run: |
+          set -euo pipefail
+          EXTRA=()
+          if [ "${{ github.event.inputs.fail_on_hot || 'false' }}" = "true" ]; then
+            EXTRA+=(--fail-on-hot)
+          fi
+          node scripts/ci/pr-file-overlap-audit.mjs \
+            --json-out pr-file-overlap-audit.json \
+            --text-out pr-file-overlap-audit.txt \
+            "${EXTRA[@]}"
+
+      - name: Job summary
+        if: always()
+        run: |
+          if [ -f pr-file-overlap-audit.txt ]; then
+            { echo '```'; cat pr-file-overlap-audit.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload audit artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pr-file-overlap-audit
+          path: |
+            pr-file-overlap-audit.txt
+            pr-file-overlap-audit.json
+          if-no-files-found: ignore
+          retention-days: 14

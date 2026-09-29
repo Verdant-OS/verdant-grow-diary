@@ -38,6 +38,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001
+
+```text
+TASK CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001  priority: P2  status: OPEN
+goal: Measure real Settings browser-preference save/reload, own-account readback and analytics refusal on production without backend mutations. Do not infer billing/credit/security acceptance from read-only UI.
+branch: codex/chem-settings-account-consent-proof-001
+base: codex/chem-signedin-performance-001 at 35e7def61992753d34fb04c10a99febfcce5e130
+checkout: git fetch origin codex/chem-signedin-performance-001 && git switch codex/chem-settings-account-consent-proof-001 && git merge origin/codex/chem-signedin-performance-001
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1799
+head_sha: 3b81addb65fbe17f206193e3cf4643861def3132, normal push and draft/base/body read back 2026-09-29 02:51 CT
+state: Pushed four-file stay-draft (+706/-0). Local 9 files / 369 PASS / 0 FAIL / 0 SKIP includes 66 new cases; separate V0 26/26 and docs-safety 67/67, not additive unique totals. Canonical and explicit E2E typechecks 0 diagnostics, final 3-file scoped lint 0 errors/0 warnings after one unsafe-finally correction. Format, whitespace, import and three strict docs scanners PASS. Existing parent read-only barrier reused unchanged; normal fixture auth bootstrap only. Fresh audit of 70 open heads and 15 recent closed PRs; no competing settings/account/consent paths. Archived QuickLog fixture cannot authorize writes. AI credit-limit hosted denial still needs genuine exhausted fixture credit state and usable review evidence; no model spend or fake denial planned.
+next_action: Critical Mass reviews the exact current head. Current proof run36538876591/job109309263434 terminal SUCCESS: hosted safety236/236; browser4 PASS / 0 FAIL / 0 SKIP / zero retries. Artifact11019502703 digest verified; all three receipts PASS at appSHA61821446. GDP serializes parent integration/normal retarget for fresh required CI. Account preferences and legal-acceptance writes are outside the grow-only smoke write scope; do not click those controls.
+files: e2e/lib/settingsAccountProofRules.ts; e2e/settings-account-consent-proof.spec.ts; src/test/settings-account-production-proof.test.ts; .github/workflows/settings-account-consent-proof.yml
+blockers: Full required CI does not run on the parent stack; independent Critical Mass review and fresh standalone CI after parent integration required. No merge, ready, auto-merge, Publish, production SQL, auth/Edge/Supabase changes, lockfile, customer or KEEP writes.
+artifacts: Existing #1793 proof source and terminal run 36536846789. Predecessor 1df2e35d run36538588974 had browser2 PASS/2 FAIL from premature teardown; all UI checks completed, transport correctly blocked PASS. +11-line current fix settles pending auth/role reads before reload/close, retaining final fence. Current run terminal PASS; no writes, application errors or analytics requests. Downloads CHEM-settings-proof-* validation logs. Task attachment failed because app attachment identity count exceeds 100; PR exists and URL/head read back, no duplicate PR created. Receipts supplement, not replace full feature/core-loop acceptance.
+reviewer_seat: Critical Mass (test/proof/CI .ts and .yml; Codex cannot review its own work)
+claimed_by: Codex, 2026-09-29 before the 02:41 CT first regression run (claim written before implementation)
+last_updated: 2026-09-29 02:51 CT, by Codex
+```
+
 ### CHEM-MOVE-TENT-READ-HONESTY-001
 
 ```text

@@ -645,7 +645,7 @@ import re as _re_inline
 # leak the embedded credential).
 _INLINE_REDACT_PATTERNS = [
     _re_inline.compile(r"vbt_[A-Za-z0-9_\-]{6,}"),
-    _re_inline.compile(r"eyJ[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}"),
+    _re_inline.compile(r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}"),
     _re_inline.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{6,}"),
 ]
 
@@ -1066,9 +1066,9 @@ class ListenerRuntime:
         self.interval = _positive_setting("ECOWITT_REPLAY_INTERVAL_SECONDS", 2)
         self.cleaner = lambda value: sanitize(value, secrets=_delivery_secrets() +
             tuple(os.environ[t.token_env] for t in self.tents if os.environ.get(t.token_env)))
-        self.spool = JsonlSpool(root, clock=lambda: _utc_now(), max_bytes=max_bytes, max_days=max_days,
+        self.spool = JsonlSpool(root, clock=_utc_now, max_bytes=max_bytes, max_days=max_days,
                                warn=lambda message: print("[verdant-testbench] " + message), cleaner=self.cleaner, lock=self.lock)
-        self.health = HealthState(root / "state.json", [t.tent_id for t in self.tents], clock=lambda: _utc_now(),
+        self.health = HealthState(root / "state.json", [t.tent_id for t in self.tents], clock=_utc_now,
             quiet_seconds=_positive_setting("ECOWITT_QUIET_SECONDS", 600),
             failure_seconds=_positive_setting("ECOWITT_FORWARD_FAILURE_SECONDS", 600),
             alert_interval=_positive_setting("ECOWITT_ALERT_INTERVAL_SECONDS", 60),

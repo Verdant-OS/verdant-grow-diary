@@ -24,8 +24,9 @@ UNITS = {"temp_f": "F", "humidity_percent": "%", "soil_moisture_pct": "%",
          "soil_temp_f": "F", "soil_temp_c": "C", "co2_ppm": "ppm", "ec_ms_cm": "mS/cm"}
 SECRET_KEYS = {"passkey", "mac", "authorization", "password", "secret", "api_key",
                "apikey", "service" + "_" + "role"}
+# A fixed token boundary prevents retrying at every eyJ inside a long word.
 SECRET_PATTERN = re.compile(r"vbt_[A-Za-z0-9_-]+|\bbearer\s+[^\s\"'<>]+|"
-                            r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", re.I)
+                            r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", re.I)
 
 
 class ConfigError(ValueError):

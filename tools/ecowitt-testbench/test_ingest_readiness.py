@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
+import unittest.mock as mock
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest import mock
 
 import ecowitt_listener as listener
 from test_multitent import TENT_A, TENT_B, TOKEN_A, TOKEN_B, tent
@@ -51,6 +53,19 @@ class ListenerIntegrationTests(unittest.TestCase):
 
     def test_case_insensitive_legacy_field_lookup(self):
         self.assertEqual(listener.normalize_metrics({"TEMP1F": "77", "HUMIDITY1": "55"})["temp_f"], 77)
+
+    def test_repeated_jwt_prefixes_cannot_stall_redaction(self):
+        # A gateway request can carry up to 64 KiB. Check both disk and debug
+        # redaction in a bounded child, so a regression cannot hang this suite.
+        script = (
+            "from ecowitt_multitent import sanitize; "
+            "from ecowitt_listener import _scrub_inline_secrets; "
+            "value = 'eyJ' * 20000; "
+            "assert sanitize(value) == value; "
+            "assert _scrub_inline_secrets(value) == value"
+        )
+        subprocess.run([sys.executable, "-c", script], cwd=Path(__file__).parent,
+                       timeout=5, check=True, capture_output=True, text=True)
 
     def test_stuck_percent_is_invalid_even_on_fresh_physical_packet(self):
         for field in ("humidity1", "humidity8", "soilmoisture1", "soilmoisture8"):

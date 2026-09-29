@@ -212,6 +212,13 @@ class MultiTentTests(unittest.TestCase):
             self.assertNotIn(secret, dumped)
         self.assertNotIn("PASSKEY", safe)
 
+    def test_jwt_redaction_handles_token_boundaries_without_scrubbing_plain_text(self):
+        jwt = ".".join(("eyJ" + "synthetic_header", "synthetic_payload", "synthetic_signature"))
+        for prefix, suffix in (("(", ")"), ("note=", ";"), ("path/", "/"), ("", "")):
+            with self.subTest(prefix=prefix):
+                self.assertEqual(sanitize(prefix + jwt + suffix), prefix + "[REDACTED]" + suffix)
+        self.assertEqual(sanitize("ordinary non-credential text"), "ordinary non-credential text")
+
     def test_two_temperature_units_never_create_duplicate_canonical_metric(self):
         tents, aliases = self.load({"tents": [tent()], "aliases": [
             {"field": "synthetic_temperature_input", "metric": "soil_temp_c", "channel": 1, "unit": "C"}]})

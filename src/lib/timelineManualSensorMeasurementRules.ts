@@ -138,7 +138,6 @@ function toSensorReadingRow(row: ManualSensorTimelineMetricRow): SensorReadingRo
   const valueNum = typeof row.value === "number" ? row.value : Number(row.value);
   if (!Number.isFinite(valueNum) || !row.tent_id || !row.ts) return null;
   if (!isTimelineManualSensorPersistedQualityUsable(row.quality)) return null;
-  if (!classifyManualMetric(row.metric, valueNum).valid) return null;
   return {
     id: "",
     tent_id: row.tent_id,
@@ -178,7 +177,8 @@ function formatFinite(n: number): string {
 /**
  * Group per-metric manual `sensor_readings` into Timeline measurement receipts.
  * Live/csv/demo/stale/invalid sources are excluded. Groups with no observed
- * metrics are dropped. Never invents temperature or humidity.
+ * metrics are dropped. Never invents temperature or humidity, and never
+ * presents invalid metric values as healthy measurements.
  */
 export function manualSensorReadingsToTimelineEntries(
   rows: readonly ManualSensorTimelineMetricRow[] | null | undefined,
@@ -205,10 +205,23 @@ export function manualSensorReadingsToTimelineEntries(
     // reading belongs in history. Invalid/future groups still fail closed.
     if (reading.status !== "usable" && reading.status !== "stale") continue;
 
-    const tempF = observed.includes("temp") ? tempFFromC(reading.temp) : null;
-    const humidityPct = observed.includes("rh") ? reading.rh : null;
-    const vpdKpa = observed.includes("vpd") ? reading.vpd : null;
-    const soilPct = observed.includes("soil") ? reading.soil : null;
+    const hasTempMetric = observed.includes("temp") && Number.isFinite(reading.temp);
+    const hasHumidityMetric = observed.includes("rh") && Number.isFinite(reading.rh);
+    const hasVpdMetric = observed.includes("vpd") && Number.isFinite(reading.vpd);
+    const hasSoilMetric = observed.includes("soil") && Number.isFinite(reading.soil);
+
+    const tempMetricValid =
+      hasTempMetric && classifyManualMetric("temperature_c", reading.temp).valid;
+    const humidityMetricValid =
+      hasHumidityMetric && classifyManualMetric("humidity_pct", reading.rh).valid;
+    const vpdMetricValid = hasVpdMetric && classifyManualMetric("vpd_kpa", reading.vpd).valid;
+    const soilMetricValid =
+      hasSoilMetric && classifyManualMetric("soil_moisture_pct", reading.soil).valid;
+
+    const tempF = tempMetricValid ? tempFFromC(reading.temp) : null;
+    const humidityPct = humidityMetricValid ? reading.rh : null;
+    const vpdKpa = vpdMetricValid ? reading.vpd : null;
+    const soilPct = soilMetricValid ? reading.soil : null;
 
     const snapshot: Record<string, unknown> = { source: "manual", ts: capturedAt };
     if (tempF !== null) snapshot.temp_f = tempF;
@@ -216,12 +229,12 @@ export function manualSensorReadingsToTimelineEntries(
     if (soilPct !== null) snapshot.soil_moisture_pct = soilPct;
 
     const sensorSnapshot: Record<string, unknown> = { source: "manual", ts: capturedAt };
-    if (observed.includes("temp") && Number.isFinite(reading.temp)) {
+    if (hasTempMetric) {
       sensorSnapshot.temp_c = reading.temp;
     }
-    if (humidityPct !== null) sensorSnapshot.rh = humidityPct;
-    if (vpdKpa !== null) sensorSnapshot.vpd_kpa = vpdKpa;
-    if (soilPct !== null) sensorSnapshot.soil = soilPct;
+    if (hasHumidityMetric) sensorSnapshot.rh = reading.rh;
+    if (hasVpdMetric) sensorSnapshot.vpd_kpa = reading.vpd;
+    if (hasSoilMetric) sensorSnapshot.soil = reading.soil;
 
     const receipt: TimelineManualSensorReceipt = {
       id: `${TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX}${reading.tentId}:${capturedAt}`,

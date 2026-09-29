@@ -129,6 +129,48 @@ describe("buildImportedSensorHistoryViewModel — empty + summary", () => {
     expect(vm.recentRows[9].capturedAt).toBe("2026-06-01T00:50:00.000Z");
   });
 
+  it("keeps canonical CSV values with their stored units in history", () => {
+    const readings = [
+      row({ metric: "temperature_c", value: 24 }),
+      row({ metric: "humidity_pct", value: 52 }),
+      row({ metric: "vpd_kpa", value: 1.11 }),
+      row({ metric: "co2_ppm", value: 800 }),
+      row({ metric: "soil_moisture_pct", value: 43 }),
+      row({ metric: "ppfd", value: 600 }),
+      row({ metric: "soil_temp_c", value: 18 }),
+      row({ metric: "ec", value: 1.8 }),
+    ];
+    const vm = buildImportedSensorHistoryViewModel({ readings });
+    expect(Object.fromEntries(vm.recentRows.map((r) => [r.metric, r.displayValue]))).toEqual({
+      temperature_c: "24 °C",
+      humidity_pct: "52%",
+      vpd_kpa: "1.11 kPa",
+      co2_ppm: "800 ppm",
+      soil_moisture_pct: "43%",
+      ppfd: "600 µmol/m²/s",
+      soil_temp_c: "18 °C",
+      ec: "1.8 mS/cm",
+    });
+    expect(buildImportedSensorHistoryViewModel({ readings }).recentRows).toEqual(vm.recentRows);
+  });
+
+  it("does not invent units for unknown metrics or missing values", () => {
+    const vm = buildImportedSensorHistoryViewModel({
+      readings: [
+        row({ metric: "unmapped_metric", value: 7 }),
+        row({ metric: "__proto__", value: 8 }),
+        row({ metric: "temperature_c", value: null }),
+        row({ metric: "humidity_pct", value: Number.NaN }),
+      ],
+    });
+    expect(Object.fromEntries(vm.recentRows.map((r) => [r.metric, r.displayValue]))).toEqual({
+      unmapped_metric: "7",
+      temperature_c: "—",
+      humidity_pct: "—",
+      ["__proto__"]: "8",
+    });
+  });
+
   it("default limit is 25", () => {
     expect(IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT).toBe(25);
   });

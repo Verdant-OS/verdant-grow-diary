@@ -22,8 +22,8 @@ import {
 
 const ROOT = resolve(__dirname, "../..");
 const TIMELINE_PAGE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
-const TIMELINE_INLINE_SNAPSHOT_VM = readFileSync(
-  resolve(ROOT, "src/lib/timelineInlineSnapshotViewModel.ts"),
+const TIMELINE_SENSOR_VIEW_MODEL = readFileSync(
+  resolve(ROOT, "src/lib/timelineSensorSnapshotViewModel.ts"),
   "utf8",
 );
 const PLANT_TIMELINE = readFileSync(
@@ -42,7 +42,13 @@ const TIMELINE_DETAIL_PRESENTATION_RULES = readFileSync(
 
 describe("Grow Timeline · sensor_snapshot wiring", () => {
   it("reads the canonical `sensor_snapshot` key QuickLog writes", () => {
-    expect(TIMELINE_INLINE_SNAPSHOT_VM).toMatch(/details\?\.sensor_snapshot/);
+    expect(TIMELINE_SENSOR_VIEW_MODEL).toMatch(/asRecord\(details\?\.sensor_snapshot\)/);
+    expect(TIMELINE_PAGE).toMatch(
+      /import\s*\{[^}]*resolveTimelineCardSensorResolution[^}]*\}\s*from\s*"@\/lib\/timelineSensorSnapshotViewModel"/,
+    );
+    expect(TIMELINE_PAGE).toMatch(
+      /const\s*\{\s*sensor,\s*useManualValidation\s*\}\s*=\s*resolveTimelineCardSensorResolution\(\s*\(e\.details\s+as\s+Record<string,\s*unknown>\s*\|\s*null\s*\|\s*undefined\)\s*\?\?\s*null/,
+    );
   });
 
   it("hides both `sensor` and `sensor_snapshot` from the misc extras strip", () => {

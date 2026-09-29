@@ -1,6 +1,6 @@
 # Role — Codex: Implementation and Integration Lead
 
-**Sentinel-Version: 2026-09-25.1**
+**Sentinel-Version: 2026-09-28.1**
 
 > **DERIVED, NOT AUTHORITATIVE.** The full prompt-pack text for this role was not
 > available in the repository or supplied attachments. This role is derived from the

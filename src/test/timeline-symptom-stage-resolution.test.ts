@@ -9,6 +9,10 @@ import {
 
 const ROOT = process.cwd();
 const TIMELINE_SOURCE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
+const TIMELINE_INLINE_SNAPSHOT_VM_SOURCE = readFileSync(
+  resolve(ROOT, "src/lib/timelineInlineSnapshotViewModel.ts"),
+  "utf8",
+);
 const TIMELINE_MEMORY_SOURCE = readFileSync(
   resolve(ROOT, "src/hooks/useTimelineMemory.ts"),
   "utf8",
@@ -153,8 +157,11 @@ describe("guided Symptom Check timeline stage resolution", () => {
   it("wires the same resolver into Timeline counts, filtering, grouping, and display", () => {
     expect(TIMELINE_SOURCE).toContain("resolveTimelineDiaryEntryStage");
     expect(
-      TIMELINE_SOURCE.match(/resolveTimelineDiaryEntryStage\(e\)/g)?.length ?? 0,
+      (TIMELINE_SOURCE.match(/resolveTimelineDiaryEntryStage\(e\)/g)?.length ?? 0) +
+        (TIMELINE_INLINE_SNAPSHOT_VM_SOURCE.match(/resolveTimelineDiaryEntryStage\(\{/g)?.length ??
+          0),
     ).toBeGreaterThanOrEqual(7);
+    expect(TIMELINE_INLINE_SNAPSHOT_VM_SOURCE).toContain("resolveTimelineDiaryEntryStage");
     expect(TIMELINE_SOURCE).not.toContain("normalizeQuickLogStage(e.stage)");
     expect(TIMELINE_SOURCE).not.toContain('const key = e.stage || "unknown"');
     expect(TIMELINE_SOURCE).not.toContain("stageLabel(e.stage)");

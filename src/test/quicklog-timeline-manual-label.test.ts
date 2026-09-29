@@ -22,6 +22,10 @@ import {
 
 const ROOT = resolve(__dirname, "../..");
 const TIMELINE_PAGE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
+const TIMELINE_INLINE_SNAPSHOT_VM = readFileSync(
+  resolve(ROOT, "src/lib/timelineInlineSnapshotViewModel.ts"),
+  "utf8",
+);
 const PLANT_TIMELINE = readFileSync(
   resolve(ROOT, "src/components/PlantRelativeTimelineSection.tsx"),
   "utf8",
@@ -38,7 +42,7 @@ const TIMELINE_DETAIL_PRESENTATION_RULES = readFileSync(
 
 describe("Grow Timeline · sensor_snapshot wiring", () => {
   it("reads the canonical `sensor_snapshot` key QuickLog writes", () => {
-    expect(TIMELINE_PAGE).toMatch(/details\?\.sensor_snapshot/);
+    expect(TIMELINE_INLINE_SNAPSHOT_VM).toMatch(/details\?\.sensor_snapshot/);
   });
 
   it("hides both `sensor` and `sensor_snapshot` from the misc extras strip", () => {

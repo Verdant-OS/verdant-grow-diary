@@ -22,6 +22,7 @@
   integrate those prefixes serially rather than dropping either receipt.
 
 ## Historical repository receipt — 2026-09-28 21:11–21:12 UTC
+
 **Last updated:** 2026-09-28 UTC; repository tip and open-PR inventory re-read at
 21:11–21:12 UTC. This stamp's own SHA and time are its Git commit, not a prediction.
 

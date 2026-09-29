@@ -14,6 +14,7 @@ import {
   type ProductionFixtureEvidence,
 } from "../../e2e/lib/productionQuickLogFixtureRules";
 import { observeProductionQuickLogFixture } from "../../e2e/lib/productionQuickLogFixtureProof";
+import { measureQuickLogSavePerformance } from "../../e2e/lib/signedInPerformanceProbe";
 import {
   validateFixtureEnv,
   validatePhenoWriteFixtureEnv,
@@ -116,6 +117,172 @@ function harness() {
   };
 }
 afterEach(() => vi.useRealTimers());
+
+describe("Quick Log timing fixture continuity", () => {
+  const identity = {
+    origin: "https://verdantgrowdiary.com",
+    commit: "a".repeat(40),
+    dirty: false as const,
+  };
+  const context = {
+    origin: identity.origin,
+    expectedSha: identity.commit,
+    fixtureVerified: true,
+  };
+  const changes = [
+    "account changed",
+    "identity rejected",
+    "plant archived",
+    "plant ownership changed",
+    "ownership read pending",
+    "ownership request failed",
+  ] as const;
+
+  for (const phase of ["save", "final deployment read"] as const) {
+    it.each(changes)("withholds timing after %s during " + phase, async (change) => {
+      const h = harness();
+      h.populate();
+      await h.proof.assertInitial(env);
+      const invalidate = () => {
+        if (change === "account changed")
+          h.emit("/auth/v1/user", { id: foreign, email: "cheekhimself@gmail.com" });
+        else if (change === "identity rejected") h.emit("/auth/v1/user", null, 401);
+        else if (change === "plant archived" || change === "plant ownership changed")
+          h.emit("/rest/v1/plants", [
+            {
+              ...evidence().plants[0],
+              ...(change === "plant archived" ? { is_archived: true } : { user_id: foreign }),
+            },
+          ]);
+        else {
+          const request = h.startRead("/rest/v1/plants?select=*");
+          if (change === "ownership request failed") h.failRead(request);
+        }
+      };
+      let reads = 0;
+      const run = vi.fn(async () => {
+        if (phase === "save") invalidate();
+      });
+      const result = await measureQuickLogSavePerformance(context, {
+        target,
+        readTarget: async () => ({ ...target }),
+        assertTarget: (value) => h.proof.assertTarget(value, expected, expected.plant),
+        readIdentity: async () => {
+          if (++reads === 2 && phase === "final deployment read") invalidate();
+          return identity;
+        },
+        run,
+        clock: vi.fn().mockReturnValueOnce(10).mockReturnValueOnce(35),
+      });
+      expect(result.receipt).toMatchObject({
+        status: "BLOCKED",
+        reason: "operation_postcondition_failed",
+        elapsedMs: null,
+        verification: null,
+      });
+      expect(run).toHaveBeenCalledOnce();
+      expect(result.error).toBeInstanceOf(Error);
+      expect(JSON.stringify(result.receipt)).not.toContain(owner);
+      expect(JSON.stringify(result.receipt)).not.toContain(foreign);
+      h.proof.dispose();
+    });
+  }
+
+  it.each(["plantId", "tentId", "growId"] as const)(
+    "rejects a changed displayed %s after confirmation even if ownership checks would pass",
+    async (field) => {
+      let saved = false;
+      const result = await measureQuickLogSavePerformance(context, {
+        target,
+        readTarget: async () => ({ ...target, ...(saved ? { [field]: foreign } : {}) }),
+        assertTarget: async () => {},
+        readIdentity: async () => identity,
+        run: async () => {
+          saved = true;
+        },
+        clock: vi.fn().mockReturnValueOnce(10).mockReturnValueOnce(35),
+      });
+      expect(result.receipt).toMatchObject({
+        status: "BLOCKED",
+        reason: "operation_postcondition_failed",
+        elapsedMs: null,
+      });
+    },
+  );
+
+  it("withholds timing when the post-save target card cannot be read", async () => {
+    const result = await measureQuickLogSavePerformance(context, {
+      target,
+      readTarget: vi
+        .fn()
+        .mockResolvedValueOnce({ ...target })
+        .mockRejectedValueOnce(new Error("private-missing-card-detail")),
+      assertTarget: async () => {},
+      readIdentity: async () => identity,
+      run: async () => {},
+      clock: vi.fn().mockReturnValueOnce(10).mockReturnValueOnce(35),
+    });
+    expect(result.receipt).toMatchObject({
+      status: "BLOCKED",
+      reason: "operation_postcondition_failed",
+      elapsedMs: null,
+      verification: null,
+    });
+    expect(JSON.stringify(result.receipt)).not.toContain("private-missing-card-detail");
+  });
+
+  it("records unchanged owned-active fixture timing with checks outside the clock interval", async () => {
+    const h = harness();
+    h.populate();
+    await h.proof.assertInitial(env);
+    const order: string[] = [];
+    const result = await measureQuickLogSavePerformance(context, {
+      target,
+      readTarget: async () => {
+        order.push("target");
+        return { ...target };
+      },
+      assertTarget: async (value) => {
+        order.push("ownership");
+        await h.proof.assertTarget(value, expected, expected.plant);
+      },
+      readIdentity: async () => {
+        order.push("deployment");
+        return identity;
+      },
+      run: async () => {
+        order.push("save");
+      },
+      clock: vi
+        .fn()
+        .mockImplementationOnce(() => {
+          order.push("clock");
+          return 10;
+        })
+        .mockImplementationOnce(() => {
+          order.push("clock");
+          return 35;
+        }),
+    });
+    expect(result.receipt).toMatchObject({
+      status: "PASS",
+      elapsedMs: 25,
+      verification: "owned-active-fixture",
+    });
+    expect(order).toEqual([
+      "deployment",
+      "target",
+      "ownership",
+      "clock",
+      "save",
+      "clock",
+      "deployment",
+      "target",
+      "ownership",
+    ]);
+    h.proof.dispose();
+  });
+});
 
 describe("production Quick Log fixture policy", () => {
   it("accepts the production fixture URL with its explicit tent context", () => {

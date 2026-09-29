@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import type { FixtureTarget } from "./productionQuickLogFixtureRules";
 import {
   buildPerformanceReceipt,
   performanceContextIssue,
@@ -53,6 +54,18 @@ export async function measureSignedInPerformance(
     error,
   });
   if (performanceContextIssue(context)) return result();
+  if (
+    context.operation === "quicklog-save-confirmed" &&
+    typeof dependencies.assertComplete !== "function"
+  )
+    return {
+      receipt: {
+        ...result().receipt,
+        reason: "operation_postcondition_missing",
+        verification: null,
+      },
+      error: null,
+    };
   before = await dependencies.readIdentity().catch(() => null);
   if (
     !before ||
@@ -104,9 +117,45 @@ export async function measureSignedInPerformance(
         status: "BLOCKED",
         reason: "operation_postcondition_failed",
         elapsedMs: null,
+        verification: null,
       },
       error: cause,
     };
   }
   return result();
+}
+
+/** The same displayed target and owned-active proof must survive the save and
+ * final metadata read. Both checks stay outside the measured interval.
+ */
+export async function measureQuickLogSavePerformance(
+  context: Omit<PerformanceContext, "operation">,
+  dependencies: Pick<
+    Parameters<typeof measureSignedInPerformance>[1],
+    "readIdentity" | "run" | "clock"
+  > & {
+    target: FixtureTarget;
+    readTarget: () => Promise<FixtureTarget>;
+    assertTarget: (target: FixtureTarget) => Promise<void>;
+  },
+) {
+  const expectedTarget = { ...dependencies.target };
+  const assertUnchangedTarget = async () => {
+    const target = await dependencies.readTarget();
+    if (
+      target.plantId !== expectedTarget.plantId ||
+      target.tentId !== expectedTarget.tentId ||
+      target.growId !== expectedTarget.growId
+    )
+      throw new Error("quicklog_performance_target_changed");
+    await dependencies.assertTarget(target);
+  };
+  return measureSignedInPerformance(
+    { ...context, operation: "quicklog-save-confirmed" },
+    {
+      ...dependencies,
+      assertReady: assertUnchangedTarget,
+      assertComplete: assertUnchangedTarget,
+    },
+  );
 }

@@ -197,6 +197,24 @@ describe("signed-in performance execution fence", () => {
     expect(d.run).toHaveBeenCalledTimes(1);
     expect(d.readIdentity).toHaveBeenCalledTimes(2);
   });
+  it.each([undefined, null, false])(
+    "refuses a Quick Log save when post-save fixture revalidation is %j",
+    async (assertComplete) => {
+      const d = deps();
+      const result = await measureSignedInPerformance(
+        { ...context, operation: "quicklog-save-confirmed" },
+        { ...d, assertComplete } as unknown as Parameters<typeof measureSignedInPerformance>[1],
+      );
+      expect(result.receipt).toMatchObject({
+        status: "BLOCKED",
+        reason: "operation_postcondition_missing",
+        elapsedMs: null,
+      });
+      expect(d.run).not.toHaveBeenCalled();
+      expect(d.clock).not.toHaveBeenCalled();
+      expect(d.readIdentity).not.toHaveBeenCalled();
+    },
+  );
   it("does not request metadata or execute without owned fixture proof", async () => {
     const d = deps();
     const result = await measureSignedInPerformance({ ...context, fixtureVerified: false }, d);

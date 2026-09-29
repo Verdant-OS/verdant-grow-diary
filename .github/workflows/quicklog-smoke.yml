@@ -97,12 +97,14 @@ on:
     paths:
       - "e2e/**"
       - "playwright.config.ts"
+      - "scripts/check-playwright-failure-media.mjs"
       - ".github/workflows/quicklog-smoke.yml"
   pull_request:
     branches: [verdant-grow-diary]
     paths:
       - "e2e/**"
       - "playwright.config.ts"
+      - "scripts/check-playwright-failure-media.mjs"
       - ".github/workflows/quicklog-smoke.yml"
     types: [opened, synchronize, reopened, ready_for_review]
 
@@ -484,6 +486,8 @@ jobs:
       # run_attempt (bumps on re-run) and a short commit SHA for at-a-glance
       # traceability from the Artifacts dropdown.
       ARTIFACT_SUFFIX: run-${{ github.run_id }}-attempt-${{ github.run_attempt }}-sha-${{ github.sha }}
+      # Includes login setup and the separate fixture-verification command.
+      E2E_DISABLE_FAILURE_MEDIA: "true"
       E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
       E2E_GROW_1_PLANT_URL: ${{ vars.E2E_GROW_1_PLANT_URL }}
       E2E_GROW_1_SECOND_PLANT_NAME: ${{ vars.E2E_GROW_1_SECOND_PLANT_NAME }}
@@ -672,6 +676,11 @@ jobs:
 
           exit "$status"
 
+      - name: Verify Quick Log media boundary
+        id: media_boundary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        run: node scripts/check-playwright-failure-media.mjs
+
       - name: Summarize failed step metadata in Job Summary
         if: failure()
         shell: bash
@@ -803,6 +812,7 @@ jobs:
         if: >-
           always()
           && steps.e2e_config.outputs.should_run == 'true'
+          && steps.media_boundary.outcome == 'success'
           && (github.event_name != 'workflow_dispatch' || inputs.upload_html_report != 'false')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -1210,7 +1220,7 @@ jobs:
 
       - name: Upload smoke artifacts
         id: upload_smoke_bundle
-        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        if: always() && steps.e2e_config.outputs.should_run == 'true' && steps.media_boundary.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: quicklog-smoke-artifacts-${{ env.ARTIFACT_SUFFIX }}
@@ -1336,6 +1346,7 @@ jobs:
         if: >-
           always()
           && steps.e2e_config.outputs.should_run == 'true'
+          && env.E2E_DISABLE_FAILURE_MEDIA != 'true'
           && steps.trace_files.outputs.present == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -1482,7 +1493,7 @@ jobs:
       - name: Upload Playwright media (screenshots/videos)
         id: upload_playwright_media
 
-        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        if: always() && steps.e2e_config.outputs.should_run == 'true' && env.E2E_DISABLE_FAILURE_MEDIA != 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: quicklog-playwright-media-${{ env.ARTIFACT_SUFFIX }}
@@ -1570,7 +1581,7 @@ jobs:
 
       - name: Upload per-test failure artifacts
         id: upload_per_test_artifacts
-        if: always() && steps.e2e_config.outputs.should_run == 'true' && env.PR_COMMENT_CONTEXT_OK == 'true' && env.PR_COMMENT_DISABLED != 'true'
+        if: always() && steps.e2e_config.outputs.should_run == 'true' && env.PR_COMMENT_CONTEXT_OK == 'true' && env.PR_COMMENT_DISABLED != 'true' && env.E2E_DISABLE_FAILURE_MEDIA != 'true'
         shell: bash
         run: |
           # One dedicated artifact per failed/flaky test, so the PR comment
@@ -1745,7 +1756,11 @@ jobs:
             else
               echo "- Playwright traces: intentionally disabled/unavailable for this authenticated run"
             fi
-            echo "- [Playwright media (screenshots/videos)](${pw_media_url})"
+            if [ "${E2E_DISABLE_FAILURE_MEDIA}" = "true" ]; then
+              echo "- Playwright media: disabled for this authenticated proof; no media upload."
+            else
+              echo "- [Playwright media (screenshots/videos)](${pw_media_url})"
+            fi
             echo "- [Smoke report JSON](${smoke_json_url})"
             echo "- [Smoke report TXT](${smoke_txt_url})"
             echo ""
@@ -1823,7 +1838,11 @@ jobs:
               else
                 echo "- Playwright traces artifact: not uploaded — trace intentionally disabled/unavailable"
               fi
-              echo "- Playwright media artifact: \`quicklog-playwright-media\` (retention: 30 days)"
+              if [ "${E2E_DISABLE_FAILURE_MEDIA}" = "true" ]; then
+                echo "- Playwright media artifact: not uploaded — media disabled for this proof."
+              else
+                echo "- Playwright media artifact: \`quicklog-playwright-media\` (retention: 30 days)"
+              fi
               echo "- Smoke report JSON artifact: \`quicklog-smoke-report-json\` (retention: 30 days)"
               echo "- Smoke report TXT artifact: \`quicklog-smoke-report-txt\` (retention: 30 days)"
               echo "- Run artifacts page: ${ARTIFACTS_URL}"

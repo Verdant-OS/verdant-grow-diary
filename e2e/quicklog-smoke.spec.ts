@@ -7,7 +7,7 @@ import { validateQuickLogFixturePage } from "./lib/fixtureSafety";
 import { observeProductionQuickLogFixture } from "./lib/productionQuickLogFixtureProof";
 import { buildQuickLogSmokeNote } from "./lib/productionQuickLogFixtureRules";
 import {
-  measureSignedInPerformance,
+  measureQuickLogSavePerformance,
   readLivePerformanceIdentity,
 } from "./lib/signedInPerformanceProbe";
 import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
@@ -154,7 +154,7 @@ async function acceptReconsentGateIfShown(page: import("@playwright/test").Page)
   await gate.waitFor({ state: "hidden", timeout: 15_000 });
 }
 
-if (MEASURE_PERFORMANCE) test.use({ trace: "off", video: "off" });
+if (MEASURE_PERFORMANCE) test.use({ trace: "off", video: "off", screenshot: "off" });
 
 test.describe("Quick Log smoke checklist", () => {
   if (MEASURE_PERFORMANCE) {
@@ -383,17 +383,9 @@ test.describe("Quick Log smoke checklist", () => {
       });
 
       await report.run(15, "Save uses displayed target", async () => {
-        await productionProof.assertTarget(
-          await readTargetTuple(dialog),
-          fixture.expected,
-          TARGET_NAME,
-        );
-        const displayedTargetId = await dialog
-          .getByTestId("quick-log-target-card")
-          .getAttribute("data-target-plant-id");
-        if (!isSafeTargetId(displayedTargetId)) {
-          throw new Error("Displayed Quick Log target is missing or invalid before Save.");
-        }
+        const displayedTarget = await readTargetTuple(dialog);
+        await productionProof.assertTarget(displayedTarget, fixture.expected, TARGET_NAME);
+        const displayedTargetId = displayedTarget.plantId;
         const saveAndConfirm = async () => {
           observedRpcTargetId = null;
           await dialog.getByTestId("quick-log-save").click();
@@ -403,21 +395,18 @@ test.describe("Quick Log smoke checklist", () => {
           });
         };
         if (MEASURE_PERFORMANCE) {
-          const result = await measureSignedInPerformance(
+          const result = await measureQuickLogSavePerformance(
             {
-              operation: "quicklog-save-confirmed",
               origin: new URL(page.url()).origin,
               expectedSha: process.env.E2E_EXPECTED_SHA ?? "",
               fixtureVerified: true,
             },
             {
               readIdentity: () => readLivePerformanceIdentity(page),
-              assertReady: async () => {
-                const target = await readTargetTuple(dialog);
-                await productionProof.assertTarget(target, fixture.expected, TARGET_NAME);
-                if (target.plantId !== displayedTargetId)
-                  throw new Error("Quick Log target changed during performance preflight.");
-              },
+              target: displayedTarget,
+              readTarget: () => readTargetTuple(dialog),
+              assertTarget: (target) =>
+                productionProof.assertTarget(target, fixture.expected, TARGET_NAME),
               run: saveAndConfirm,
             },
           );

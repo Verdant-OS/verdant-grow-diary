@@ -60,7 +60,7 @@ not make any task belong to one agent. Any agent may resume an open task from
   - the PR URL
   - the full head SHA
   - `READY → <reviewer>`, `NOT READY (reason)`, or `STALLED`.
-- **Reviewer assignment (Matthew, 2026-09-28 ~5:03 PM CT).** When a draft's CI settles green on real files, Chemdawg picks the reviewer by file path (see Blue Dream and Critical Mass below), posts `READY → <reviewer>` to GDP, and sends the review request straight to that reviewer: PR URL, full SHA, stay draft, no merge, no publish. PRs that touch off-limits paths aren't routed. Chemdawg holds them for Matthew.
+- **Reviewer assignment (Matthew, 2026-09-28 ~5:03 PM CT).** When a draft's CI settles green on real files, Chemdawg picks the reviewer by file path (see Blue Dream and Critical Mass below), posts `READY → <reviewer>` to GDP, and sends the review request straight to that reviewer: PR URL, full SHA, stay draft, no merge, no publish. PRs that touch off-limits paths, migrations included, are still routed by path for review. Chemdawg holds only their merge for Matthew (HOLD-CHEEK, section 4.3).
 - **CI chasing.** Chemdawg follows pending and failed heads and flags stalls. Chemdawg does not re-run or fix CI.
 - **Intake of unplaceable PRs.** When no routing rule matches, or a reviewer goes silent, Chemdawg picks it up and reports it.
 
@@ -156,13 +156,14 @@ not make any task belong to one agent. Any agent may resume an open task from
 - **Trigger.** CI is PASS on the exact SHA (4.1), and Chemdawg's `[PRECHECK]` says READY. High-risk PRs remain draft for GDP. Eligible Codex Phase 1 PRs may become ready; workflows that skip redundant draft checks also handle `ready_for_review`. Every required check must succeed before merge.
 - **Rules, applied in order.**
   1. **Owner exclusion.** The author, host, and Codex's own PRs never go to that same party.
-  2. **Blue Dream required** for P1 fixes, anything that gates a publish, and UI (`.tsx` pages and components).
+  2. **Blue Dream required** for P1 fixes, anything that gates a publish, and UI (`.tsx` pages and components). Any PR that changes a `.tsx` file goes to Blue Dream for review.
   3. **Critical Mass** for lib, logic, test, and docs-only changes. **Codex** for CI and build infrastructure.
-  4. **Load balance.** If the default reviewer has 2 or more open claims and the other has fewer, send it to the other one. P1 and publish-gating work never leaves Blue Dream.
+  4. **Load balance.** If the default reviewer has 2 or more open claims and the other has fewer, send it to the other one. P1 and publish-gating work never leaves Blue Dream. UI work never moves off Blue Dream for load balancing.
   5. **Critical Mass preference** for QA, accessibility, search, and content-quality PRs.
 
   Unknown priority counts as high and goes to Blue Dream.
 
+  **HOLD-CHEEK holds the merge, not the review.** A HOLD-CHEEK PR still gets its independent review, the same as any other PR. That includes migration PRs, which are routed by path like any other PR. Only the merge waits for Matthew Cheek.
 - **Claim ledger.** One row per PR and SHA: reviewer, time, and state (claimed, verdict, released). A new push releases the claim and re-routes the PR.
 - **Conflicts.**
   - If both reviewers claim a PR, the first claim wins.
@@ -171,7 +172,7 @@ not make any task belong to one agent. Any agent may resume an open task from
   - If CI is green but the pre-check says NOT READY, nothing is assigned.
 - **Overrides** (GDP, posted in the channel): `REASSIGN #N to Blue Dream|Critical Mass`, `HOLD #N`, `RELEASE #N`. An override lasts for that SHA unless it says "sticky".
 - **Next step fires on its own.** A `[VERDICT]` PASS or PASS-with-P2 (no P1) wakes GDP to make the merge call. A FAIL wakes the slice owner (Copilot or Codex) to push a fix. That new push starts the loop again at 4.1.
-- **Never** assigns HOLD or untouchable PRs.
+- **Never** assigns PRs on hold (a GDP `HOLD #N` override or HOLD #1250) or untouchable PRs. HOLD-CHEEK is different: it holds only the merge, so those PRs are still assigned.
 
 ### 4.4 Build order
 

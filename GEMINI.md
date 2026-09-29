@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-09-28.2**
+**Sentinel-Version: 2026-09-28.3**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-09-28.2**
+**Sentinel-Version: 2026-09-28.3**
 
 _Amended 2026-09-28 (Matthew Cheek): added Release and Environment Rules and Agent
 Handoff / Coverage; open tasks are resumable by any agent from `docs/agents/HANDOFF_LOG.md`._
@@ -690,7 +690,7 @@ The explicit Phase 1 exception above permits Codex to integrate its own low-risk
 after all required checks succeed; it does not manufacture peer review. High-risk
 work, publish gates and named owner locks retain their review and acceptance fences.
 
-Independent acceptance routing: **Blue Dream** reviews .tsx outside src/test/,
+Independent acceptance routing: **Blue Dream** reviews any .tsx file,
 P1s and publish gates; **Critical Mass** reviews everything else. An author cannot
 give its own work an independent PASS. Claude may add peer observations but is not
 the acceptance reviewer. Matthew's Phase 1 exception permits Codex to integrate

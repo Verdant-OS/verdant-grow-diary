@@ -1,6 +1,6 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-09-28.2**
+**Sentinel-Version: 2026-09-28.3**
 
 Operating order is sequential for a given slice. Parallel implementation of the **same**
 slice by multiple agents is the failure this protocol exists to prevent.
@@ -27,7 +27,7 @@ No agent that touched a slice can review it. Use the HANDOFF block below for a d
 transfer between roles; use the log block for day-to-day coverage. Keep the same branch,
 confirm its remote head, and merge from base; never rename, recreate or force-push it.
 
-Independent acceptance routing: **Blue Dream** reviews .tsx outside src/test/,
+Independent acceptance routing: **Blue Dream** reviews any .tsx file,
 P1s and publish gates; **Critical Mass** reviews everything else. An author cannot
 give its own work an independent PASS. Claude may add peer observations but is not
 the acceptance reviewer. Matthew's Phase 1 exception permits Codex to integrate

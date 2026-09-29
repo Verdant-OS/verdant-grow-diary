@@ -1,8 +1,8 @@
 # Role — Claude: Knowledge Library and Product Specification Architect
 
-**Sentinel-Version: 2026-09-28.2**
+**Sentinel-Version: 2026-09-28.3**
 
-Independent acceptance routing: **Blue Dream** reviews .tsx outside src/test/,
+Independent acceptance routing: **Blue Dream** reviews any .tsx file,
 P1s and publish gates; **Critical Mass** reviews everything else. An author cannot
 give its own work an independent PASS. Claude may add peer observations but is not
 the acceptance reviewer. Matthew's Phase 1 exception permits Codex to integrate

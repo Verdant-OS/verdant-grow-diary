@@ -5,6 +5,7 @@ import type { Page, Request, Response, Route, WebSocketRoute } from "@playwright
 import {
   classifyBlockedReadonlyRequest,
   installSignedInReadonlyProof,
+  isFixtureOperatorRoleRead,
 } from "../../e2e/lib/signedInReadonlyProof";
 import { QUICKLOG_SMOKE_BACKEND_ORIGIN } from "../../e2e/lib/productionQuickLogFixtureRules";
 
@@ -30,8 +31,8 @@ async function harness() {
     off: (event: string) => listeners.delete(event),
   } as unknown as Page;
   const proof = await installSignedInReadonlyProof(page);
-  const request = (method = "GET", target = identityUrl) =>
-    ({ method: () => method, url: () => target }) as Request;
+  const request = (method = "GET", target = identityUrl, body?: unknown) =>
+    ({ method: () => method, url: () => target, postDataJSON: () => body }) as Request;
   const emit = (body: unknown = account, status = 200, target = identityUrl, method = "GET") => {
     const req = request(method, target);
     listeners.get("response")?.({
@@ -41,8 +42,13 @@ async function harness() {
       json: async () => body,
     } as unknown as Response);
   };
-  async function route(method: string, target = "https://verdantgrowdiary.com/asset.js") {
-    const value = { request: () => request(method, target), abort: vi.fn(), continue: vi.fn() };
+  async function route(
+    method: string,
+    target = "https://verdantgrowdiary.com/asset.js",
+    body?: unknown,
+  ) {
+    const req = request(method, target, body);
+    const value = { request: () => req, abort: vi.fn(), continue: vi.fn() };
     await handler!(value as unknown as Route);
     return value;
   }
@@ -54,6 +60,13 @@ async function harness() {
     route,
     listeners,
     request,
+    respond: (req: Request, body: unknown, status = 200) =>
+      listeners.get("response")?.({
+        request: () => req,
+        url: () => req.url(),
+        status: () => status,
+        json: async () => body,
+      } as unknown as Response),
     navigate: (value: string) => {
       url = value;
     },
@@ -66,6 +79,104 @@ async function harness() {
 }
 
 describe("signed-in read-only production proof", () => {
+  it("permits the existing boolean operator lookup for the positively proved fixture account", async () => {
+    const h = await harness();
+    h.emit();
+    await h.proof.assertReady();
+    const route = await h.route("POST", QUICKLOG_SMOKE_BACKEND_ORIGIN + "/rest/v1/rpc/has_role", {
+      _user_id: account.id,
+      _role: "operator",
+    });
+    expect(route.continue).toHaveBeenCalledOnce();
+    expect(route.abort).not.toHaveBeenCalled();
+    expect(h.proof.blockedWrites()).toBe(0);
+    await expect(h.proof.assertReady()).rejects.toThrow("proof_unavailable");
+    h.respond(route.request(), false);
+    h.listeners.get("requestfinished")?.(route.request());
+    await expect(h.proof.waitForAccount()).resolves.toBeUndefined();
+    expect(h.proof.allowedRoleReads()).toBe(1);
+  });
+  it.each([
+    null,
+    undefined,
+    {},
+    [],
+    { _user_id: account.id, _role: "customer" },
+    { _user_id: "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb", _role: "operator" },
+    { _user_id: account.id, _role: "operator", extra: true },
+  ])("refuses unapproved role arguments %j", (body) => {
+    expect(
+      isFixtureOperatorRoleRead(
+        "POST",
+        QUICKLOG_SMOKE_BACKEND_ORIGIN + "/rest/v1/rpc/has_role",
+        body,
+        account.id,
+      ),
+    ).toBe(false);
+  });
+  it.each(["GET", "PUT", "PATCH", "DELETE"])("does not exempt role requests using %s", (method) => {
+    expect(
+      isFixtureOperatorRoleRead(
+        method,
+        QUICKLOG_SMOKE_BACKEND_ORIGIN + "/rest/v1/rpc/has_role",
+        { _user_id: account.id, _role: "operator" },
+        account.id,
+      ),
+    ).toBe(false);
+  });
+  it.each([null, "", "invalid"])(
+    "does not exempt a role lookup without a proved account id %j",
+    (id) => {
+      expect(
+        isFixtureOperatorRoleRead(
+          "POST",
+          QUICKLOG_SMOKE_BACKEND_ORIGIN + "/rest/v1/rpc/has_role",
+          { _user_id: account.id, _role: "operator" },
+          id,
+        ),
+      ).toBe(false);
+    },
+  );
+  it.each([
+    "https://evil.example/rest/v1/rpc/has_role",
+    QUICKLOG_SMOKE_BACKEND_ORIGIN + "/rest/v1/rpc/has_role?injected=true",
+    QUICKLOG_SMOKE_BACKEND_ORIGIN + "/rest/v1/rpc/other",
+  ])("does not exempt another endpoint %s", (endpoint) => {
+    expect(
+      isFixtureOperatorRoleRead(
+        "POST",
+        endpoint,
+        { _user_id: account.id, _role: "operator" },
+        account.id,
+      ),
+    ).toBe(false);
+  });
+  it.each([null, {}, "true", 1])(
+    "invalidates a permitted role request with non-boolean response %j",
+    async (body) => {
+      const h = await harness();
+      h.emit();
+      await h.proof.assertReady();
+      const route = await h.route("POST", QUICKLOG_SMOKE_BACKEND_ORIGIN + "/rest/v1/rpc/has_role", {
+        _user_id: account.id,
+        _role: "operator",
+      });
+      h.respond(route.request(), body);
+      h.listeners.get("requestfinished")?.(route.request());
+      await expect(h.proof.assertReady()).rejects.toThrow("proof_unavailable");
+    },
+  );
+  it("invalidates a failed permitted role request", async () => {
+    const h = await harness();
+    h.emit();
+    await h.proof.assertReady();
+    const route = await h.route("POST", QUICKLOG_SMOKE_BACKEND_ORIGIN + "/rest/v1/rpc/has_role", {
+      _user_id: account.id,
+      _role: "operator",
+    });
+    h.listeners.get("requestfailed")?.(route.request());
+    await expect(h.proof.assertReady()).rejects.toThrow("proof_unavailable");
+  });
   it.each([
     ["/auth/v1/token?private=discarded", "backend-auth"],
     ["/rest/v1/rpc/has_role?private=discarded", "backend-rpc:has_role"],
@@ -287,7 +398,7 @@ describe("read-only performance lane wiring", () => {
     expect(source).toContain('video: "off"');
     expect(source).toContain('screenshot: "off"');
     expect(source).toContain('serviceWorkers: "block"');
-    expect(source).toContain("assertComplete: proof.assertReady");
+    expect(source).toContain("assertComplete: proof.waitForAccount");
     expect(source).not.toContain("validateQuickLogFixturePage");
   });
 });

@@ -18,7 +18,8 @@ test.use({ trace: "off", video: "off", screenshot: "off", serviceWorkers: "block
 
 // Uses existing auth setup. This proof verifies only the fixture account, not
 // an active owned plant. Quick Log's separate write proof remains unchanged.
-// Automatic HTTP writes and WebSockets are blocked before navigation; no fake responses.
+// HTTP mutations and WebSockets are blocked; only the proved fixture's existing
+// operator role SELECT is permitted through its normal POST transport.
 test.describe("signed-in route performance evidence", () => {
   test.describe.configure({ retries: 0 });
   test.skip(
@@ -60,8 +61,8 @@ test.describe("signed-in route performance evidence", () => {
         context.accountVerified = true;
         const result = await measureSignedInPerformance(context, {
           readIdentity: () => readLivePerformanceIdentity(page),
-          assertReady: proof.assertReady,
-          assertComplete: proof.assertReady,
+          assertReady: proof.waitForAccount,
+          assertComplete: proof.waitForAccount,
           run: async () => {
             await page.goto(PERFORMANCE_ORIGIN + target.route);
             await expect(page).toHaveURL(PERFORMANCE_ORIGIN + target.route);
@@ -103,6 +104,7 @@ test.describe("signed-in route performance evidence", () => {
               ...receipt,
               blockedWrites: proof.blockedWrites(),
               blockedRequests: proof.blockedRequests(),
+              allowedRoleReads: proof.allowedRoleReads(),
             },
             null,
             2,

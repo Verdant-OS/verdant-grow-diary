@@ -8,6 +8,7 @@ on:
       - "scripts/verify-supabase-migrations-complete.mjs"
       - ".github/workflows/supabase-migrations-sync-check.yml"
       - "docs/contributing-supabase-migrations.md"
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 concurrency:

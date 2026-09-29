@@ -280,10 +280,12 @@ dead letters before changing credentials or choosing a deliberate replay.
 
 ## I. Listener health and incident alerts
 
-`GET /health` returns `200` while delivery health is within its grace
-period, or `503` with `gateway_quiet`, `forward_failure` or
-`local_delivery_state_error`. These are listener delivery conditions;
-they do not classify sensor readings as healthy.
+`GET /health` returns `200` while the listener is available, including
+after a gateway quiet period. Quiet delivery still reports `ok: false`
+and `gateway_quiet` in the response; the HTTP status does not classify
+sensor readings as healthy. Sustained `forward_failure` or
+`local_delivery_state_error` still returns `503`, including when the
+gateway is also quiet. `GET /status` retains the same delivery warnings.
 `last_packet_received_at` records gateway-shaped, non-loopback traffic.
 Each tent has a persistent `last_forward_ok_at` and first failure time.
 A 2xx acknowledgement updates the forward time even if no row was inserted.

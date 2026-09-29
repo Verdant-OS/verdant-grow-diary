@@ -1208,7 +1208,10 @@ def health() -> Any:
             status["ok"] = False
             status["reasons"].append(runtime.last_local_error)
         status.update(vendor=VENDOR, port=PORT)
-        return jsonify(status), 200 if status["ok"] else 503
+        # An idle gateway does not make the listener unavailable. Keep its
+        # delivery warning in the body; real delivery/local errors stay 503.
+        unavailable = any(reason != "gateway_quiet" for reason in status["reasons"])
+        return jsonify(status), 503 if unavailable else 200
     except (OSError, ValueError, KeyError, TypeError):
         return jsonify({"ok": False, "reasons": ["local_delivery_state_error"]}), 503
 

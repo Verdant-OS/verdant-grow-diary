@@ -159,15 +159,33 @@ class ListenerIntegrationTests(unittest.TestCase):
         remote = self.client.get("/status", environ_overrides={"REMOTE_ADDR": "198.51.100.3"})
         self.assertEqual(remote.status_code, 403)
 
-    def test_health_quiet_503_and_packet_recovery(self):
+    def test_health_quiet_stays_live_without_claiming_delivery_is_healthy(self):
         self.post()
         self.now += timedelta(minutes=11)
         response = self.client.get("/health")
-        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.get_json()["ok"])
         self.assertIn("gateway_quiet", response.get_json()["reasons"])
         self.packet["dateutc"] = "2026-09-28 12:11:00"
         self.post()
         self.assertEqual(self.client.get("/health").status_code, 200)
+
+    def test_health_without_initial_traffic_stays_live_but_reports_quiet(self):
+        listener.get_runtime()
+        self.now += timedelta(minutes=11)
+        response = self.client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.get_json()["ok"])
+        self.assertEqual(response.get_json()["reasons"], ["gateway_quiet"])
+        self.requests.post.assert_not_called()
+
+    def test_quiet_does_not_hide_a_sustained_forward_failure(self):
+        runtime = listener.get_runtime()
+        runtime.health.forward_result(TENT_A, False)
+        self.now += timedelta(minutes=11)
+        response = self.client.get("/health")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.get_json()["reasons"], ["forward_failure", "gateway_quiet"])
 
     def test_invalid_or_future_timestamp_never_enters_spool(self):
         for value in (None, "garbage", "2026-09-28 12:06:00"):

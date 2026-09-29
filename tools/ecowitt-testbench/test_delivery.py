@@ -100,6 +100,26 @@ class DeliveryTests(DeliveryFixture):
         self.assertEqual(spool.stats["dropped_count"], 1)
         self.assertLessEqual(sum(p.stat().st_size for p in self.root.iterdir()), 600)
 
+    def test_bulk_size_eviction_compacts_once_and_preserves_newest_entries(self):
+        spool = self.spool()
+        for n in range(20):
+            spool.enqueue(str(n), self.reading(n))
+        spool.max_bytes = 1200
+        with mock.patch.object(spool, "_compact", wraps=spool._compact) as compact, \
+             mock.patch.object(spool, "_disk_bytes", wraps=spool._disk_bytes) as disk_bytes:
+            spool.enforce_limits()
+            self.assertEqual(compact.call_count, 1)
+            self.assertLessEqual(disk_bytes.call_count, 3)
+        kept = list(spool.entries)
+        self.assertTrue(kept)
+        self.assertEqual(kept[-1], "19")
+        self.assertEqual(kept, [str(n) for n in range(20 - len(kept), 20)])
+        self.assertEqual(spool.stats["dropped_count"], 20 - len(kept))
+        self.assertLessEqual(spool._disk_bytes(), spool.max_bytes)
+        restored = self.spool(max_bytes=1200)
+        self.assertEqual(list(restored.entries), kept)
+        self.assertEqual(restored.stats["dropped_count"], spool.stats["dropped_count"])
+
     def test_dead_letter_is_bounded(self):
         spool = self.spool()
         for n in range(8):

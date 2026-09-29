@@ -259,6 +259,25 @@ class MultiTentTests(unittest.TestCase):
             self.assertNotIn(secret, dumped)
         self.assertNotIn("PASSKEY", safe)
 
+    def test_sanitizer_rejects_unsupported_values_without_repr_or_serialization_errors(self):
+        class Untrusted:
+            def __str__(self):
+                raise AssertionError("unsupported values must not be stringified")
+        raw = {"bytes": b"synthetic-private", "set": {"synthetic-private"},
+               "object": Untrusted(), "nested": [Untrusted(), (None, True, 7, 7.5)]}
+        expected = {"bytes": None, "set": None, "object": None,
+                    "nested": [None, [None, True, 7, 7.5]]}
+        self.assertEqual(sanitize(raw), expected)
+        self.assertEqual(json.loads(json.dumps(sanitize(raw), allow_nan=False)), expected)
+
+    def test_unsupported_reading_is_invalid_without_losing_other_metrics(self):
+        tents, aliases = self.load([tent(air_channels=[1])])
+        packets, _ = route_packet({"temp1f": object(), "humidity1": "50"}, tents, aliases)
+        self.assertTrue(packets[0]["invalid"])
+        self.assertNotIn("temp_f", packets[0]["metrics"])
+        self.assertEqual(packets[0]["metrics"]["humidity_percent"], 50)
+        self.assertIsNone(packets[0]["metadata"]["raw_payload"]["temp1f"])
+
     def test_jwt_redaction_handles_token_boundaries_without_scrubbing_plain_text(self):
         jwt = ".".join(("eyJ" + "synthetic_header", "synthetic_payload", "synthetic_signature"))
         for prefix, suffix in (("(", ")"), ("note=", ";"), ("path/", "/"), ("", "")):

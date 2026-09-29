@@ -57,10 +57,12 @@ jobs:
 
   # Configure this GitHub environment with required reviewers/branch
   # restrictions and an environment-scoped SUPABASE_DB_URL secret.
+  # Production-only verification policy forbids push-triggered non-production
+  # database probes. Keep this legacy lane manual; offline checks still run on push.
   verify-sandbox:
     name: Verify pinned Verdant sandbox schema
     needs: manifest-and-files
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox' }}
     runs-on: ubuntu-latest
     environment: verdant-sandbox
     steps:

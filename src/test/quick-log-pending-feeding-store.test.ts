@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   claimPendingQuickLogFeeding,
   clearPendingQuickLogFeeding,
+  markPendingQuickLogFeedingHistoryCheck,
   readPendingQuickLogFeeding,
   type PendingQuickLogFeeding,
 } from "@/lib/quickLogPendingFeedingStore";
@@ -37,6 +38,111 @@ function record(): PendingQuickLogFeeding {
 const key = (owner = "owner-a") => `verdant:quick-log:pending-feeding:v1:${owner}`;
 beforeEach(() => window.sessionStorage.clear());
 afterEach(() => vi.restoreAllMocks());
+
+describe("durable Feed history-review refusal", () => {
+  it.each([
+    "idempotency_key_unverified",
+    "idempotency_receipt_missing",
+    "idempotency_key_retracted",
+    "idempotency_key_conflict",
+  ] as const)("marks only the original %s claim and retains its complete identity", (reason) => {
+    const original = record();
+    claimPendingQuickLogFeeding(original);
+    const marked = { ...record(), historyCheckReason: reason };
+    expect(markPendingQuickLogFeedingHistoryCheck(original, reason)).toEqual({
+      status: "marked",
+      record: marked,
+    });
+    expect(original).toEqual(record());
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "pending", record: marked });
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "pending", record: marked });
+    expect(markPendingQuickLogFeedingHistoryCheck(marked, reason)).toEqual({
+      status: "marked",
+      record: marked,
+    });
+    expect(clearPendingQuickLogFeeding(original)).toBe(false);
+    expect(clearPendingQuickLogFeeding(marked)).toBe(true);
+  });
+
+  it.each([null, undefined, "", "rpc:error", "plant_tent_grow_mismatch", "unknown", 42, {}])(
+    "rejects unknown refusal %s without replacing the original claim",
+    (reason) => {
+      const original = record();
+      claimPendingQuickLogFeeding(original);
+      const raw = window.sessionStorage.getItem(key());
+      expect(markPendingQuickLogFeedingHistoryCheck(original, reason)).toEqual({
+        status: "blocked",
+      });
+      expect(window.sessionStorage.getItem(key())).toBe(raw);
+    },
+  );
+
+  it.each([null, undefined])("rejects absent record %s without throwing", (value) => {
+    expect(markPendingQuickLogFeedingHistoryCheck(value, "idempotency_key_retracted")).toEqual({
+      status: "blocked",
+    });
+    expect(window.sessionStorage.getItem(key())).toBeNull();
+  });
+
+  it("refuses to create an unclaimed record", () => {
+    expect(markPendingQuickLogFeedingHistoryCheck(record(), "idempotency_key_retracted")).toEqual({
+      status: "blocked",
+    });
+    expect(window.sessionStorage.getItem(key())).toBeNull();
+  });
+
+  it.each(["key", "payload", "target", "owner"])("cannot mark a changed %s identity", (field) => {
+    const original = record();
+    claimPendingQuickLogFeeding(original);
+    const changed = record();
+    if (field === "key") changed.payload.idempotency_key = "another-feeding-save";
+    if (field === "payload") changed.payload.volume_ml = 900;
+    if (field === "owner") changed.ownerId = "owner-b";
+    if (field === "target") {
+      changed.payload.plant_id = "plant-b";
+      changed.resolved.plantId = "plant-b";
+      changed.resolved.targetId = "plant-b";
+    }
+    expect(markPendingQuickLogFeedingHistoryCheck(changed, "idempotency_key_retracted")).toEqual({
+      status: "blocked",
+    });
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "pending", record: original });
+    expect(readPendingQuickLogFeeding("owner-b")).toEqual({ status: "empty" });
+  });
+
+  it.each([null, "rpc:error", 42])("fails closed on a corrupt stored marker %s", (reason) => {
+    const raw = JSON.stringify({ ...record(), historyCheckReason: reason });
+    window.sessionStorage.setItem(key(), raw);
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "blocked" });
+    expect(window.sessionStorage.getItem(key())).toBe(raw);
+  });
+
+  it.each(["getItem", "setItem"] as const)(
+    "does not report a durable marker when %s throws",
+    (method) => {
+      const original = record();
+      claimPendingQuickLogFeeding(original);
+      vi.spyOn(Storage.prototype, method).mockImplementation(() => {
+        throw new Error("blocked");
+      });
+      expect(markPendingQuickLogFeedingHistoryCheck(original, "idempotency_key_retracted")).toEqual(
+        {
+          status: "blocked",
+        },
+      );
+    },
+  );
+
+  it("detects a silently ignored marker write and preserves the old unmarked claim", () => {
+    const original = record();
+    claimPendingQuickLogFeeding(original);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {});
+    expect(markPendingQuickLogFeedingHistoryCheck(original, "idempotency_key_retracted")).toEqual({
+      status: "blocked",
+    });
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "pending", record: original });
+  });
+});
 
 describe("owner-scoped exact pending Feed", () => {
   it("returns empty only for a readable empty owner slot", () => {

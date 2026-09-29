@@ -4,6 +4,7 @@ import {
   readPendingQuickLogNote,
   claimPendingQuickLogNote,
   clearPendingQuickLogNote,
+  markPendingQuickLogNoteHistoryCheck,
   NOTE_RECOVERY_UNAVAILABLE,
   NOTE_RECOVERY_PENDING,
   NOTE_RECOVERY_CLEAR_FAILED,
@@ -23,6 +24,7 @@ import {
   readPendingQuickLogFeeding,
   claimPendingQuickLogFeeding,
   clearPendingQuickLogFeeding,
+  markPendingQuickLogFeedingHistoryCheck,
   FEEDING_RECOVERY_UNAVAILABLE,
   FEEDING_RECOVERY_PENDING,
   FEEDING_RECOVERY_CLEAR_FAILED,
@@ -479,11 +481,15 @@ function QuickLogV2SheetForOwner({
   const [wateringSaving, setWateringSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(
     initialNote
-      ? NOTE_RECOVERY_PENDING
+      ? initialNote.historyCheckReason
+        ? quickLogReasonToOperatorMessage(initialNote.historyCheckReason)
+        : NOTE_RECOVERY_PENDING
       : initialWatering
         ? WATERING_RECOVERY_PENDING
         : initialFeeding
-          ? FEEDING_RECOVERY_PENDING
+          ? initialFeeding.historyCheckReason
+            ? quickLogReasonToOperatorMessage(initialFeeding.historyCheckReason)
+            : FEEDING_RECOVERY_PENDING
           : null,
   );
   const [saveStatus, setSaveStatus] = useState<string>("");
@@ -501,6 +507,10 @@ function QuickLogV2SheetForOwner({
   const [exactRetryPending, setExactRetryPending] = useState(
     Boolean(initialNote || initialFeeding),
   );
+  const historyCheckRequiredRef = useRef(
+    Boolean(initialNote?.historyCheckReason || initialFeeding?.historyCheckReason),
+  );
+  const [historyCheckRequired, setHistoryCheckRequired] = useState(historyCheckRequiredRef.current);
   const [persistedNote, setPersistedNote] = useState<string | null | undefined>(undefined);
   const [mismatchedReceipt, setMismatchedReceipt] = useState<{
     note: string | null;
@@ -828,18 +838,33 @@ function QuickLogV2SheetForOwner({
   const everyResponseCheckOverflows = RESPONSE_CHECK_STATUSES.every((status) =>
     responseCheckOverflowByStatus.get(status),
   );
-  const saveHelper = wateringRetryPending
-    ? "Retry checks the original watering record. Closing or reloading keeps it available in this tab; confirm it before logging another."
-    : getSaveHelperMessage({
-        contextBlocked,
-        isLoadingContext,
-        hasFetchError,
-        hasNoTargets,
-        selectedTargetMissing,
-        volumeMissing,
-        criticalContentMissing,
-        saving: saving || feedingSaving || wateringSaving,
-      });
+  const historyReviewResolved =
+    manualRetrySubmissionRef.current?.resolved ??
+    feedingRetrySubmissionRef.current?.resolved ??
+    resolvedTarget;
+  const historyReviewNavigation =
+    historyCheckRequired && historyReviewResolved.ok
+      ? buildQuickLogTimelineNavTarget({
+          growId: historyReviewResolved.growId ?? null,
+          targetType: historyReviewResolved.targetType ?? null,
+          targetId: historyReviewResolved.targetId ?? null,
+          tentId: historyReviewResolved.tentId ?? null,
+        })
+      : null;
+  const saveHelper = historyCheckRequired
+    ? QUICK_LOG_HISTORY_REVIEW_HELPER
+    : wateringRetryPending
+      ? "Retry checks the original watering record. Closing or reloading keeps it available in this tab; confirm it before logging another."
+      : getSaveHelperMessage({
+          contextBlocked,
+          isLoadingContext,
+          hasFetchError,
+          hasNoTargets,
+          selectedTargetMissing,
+          volumeMissing,
+          criticalContentMissing,
+          saving: saving || feedingSaving || wateringSaving,
+        });
 
   function resetPhotoSelection() {
     setPhotoFile(null);
@@ -904,6 +929,7 @@ function QuickLogV2SheetForOwner({
       setPostSave(null);
       setWateringRetryPending(false);
       setExactRetryPending(false);
+      setHistoryCheckRequired(false);
       setPersistedNote(undefined);
       setMismatchedReceipt(null);
       manualRetrySubmissionRef.current = null;
@@ -1281,11 +1307,17 @@ function QuickLogV2SheetForOwner({
     setForm(restoredNoteForm(record));
     manualTempEntryUnitRef.current = "celsius";
     setExactRetryPending(true);
+    historyCheckRequiredRef.current = Boolean(record.historyCheckReason);
+    setHistoryCheckRequired(Boolean(record.historyCheckReason));
     keepSubmissionLockedRef.current = true;
     submissionLockedRef.current = true;
     setSubmissionLocked(true);
     setRestoredMediaPending(record.attachments.photo || record.attachments.video);
-    setLocalError(NOTE_RECOVERY_PENDING);
+    setLocalError(
+      record.historyCheckReason
+        ? quickLogReasonToOperatorMessage(record.historyCheckReason)
+        : NOTE_RECOVERY_PENDING,
+    );
     resetPhotoSelection();
     resetVideoSelection();
   }
@@ -1318,14 +1350,20 @@ function QuickLogV2SheetForOwner({
     setFeedingForm(restored.feedingForm);
     feedingTempEntryUnitRef.current = "celsius";
     setExactRetryPending(true);
+    historyCheckRequiredRef.current = Boolean(record.historyCheckReason);
+    setHistoryCheckRequired(historyCheckRequiredRef.current);
     keepSubmissionLockedRef.current = true;
     submissionLockedRef.current = true;
     setSubmissionLocked(true);
-    setLocalError(FEEDING_RECOVERY_PENDING);
+    setLocalError(
+      record.historyCheckReason
+        ? quickLogReasonToOperatorMessage(record.historyCheckReason)
+        : FEEDING_RECOVERY_PENDING,
+    );
   }
 
   const handleSave = async () => {
-    if (recoveryStorageFence) return;
+    if (recoveryStorageFence || historyCheckRequiredRef.current) return;
     const lifetime = noteLifetimeRef.current;
     if (videoValidationInFlightRef.current) {
       setLocalError("Wait for the video check to finish before saving.");
@@ -1466,6 +1504,28 @@ function QuickLogV2SheetForOwner({
       if (!canContinueNote()) return;
       setFeedingSaving(false);
       if (result.ok !== true) {
+        if (quickLogSaveRequiresHistoryCheck(result.reason)) {
+          const marked = markPendingQuickLogFeedingHistoryCheck(
+            exactFeedingSubmission.recovery,
+            result.reason,
+          );
+          if (marked.status === "marked") {
+            feedingRetrySubmissionRef.current = {
+              ...exactFeedingSubmission,
+              recovery: marked.record,
+            };
+          }
+          // Storage failure cannot reopen same-key Retry on this mounted sheet.
+          // Explicit discard still requires clearing the unchanged exact journal.
+          historyCheckRequiredRef.current = true;
+          setHistoryCheckRequired(true);
+          setExactRetryPending(true);
+          const message = quickLogReasonToOperatorMessage(result.reason);
+          setLocalError(message);
+          toast.error(message);
+          setSaveStatus("");
+          return;
+        }
         // Writer validation can reject before issuing an RPC. That draft is
         // safe to correct. So is an explicit server validation rejection:
         // the server answered that nothing was saved, even for a restored
@@ -1848,6 +1908,21 @@ function QuickLogV2SheetForOwner({
       }
       if (exactSubmission && !canContinueNote()) return;
       const reason = res.reason || "save_failed";
+      if (quickLogSaveRequiresHistoryCheck(reason) && exactManualSubmission) {
+        const marked = markPendingQuickLogNoteHistoryCheck(exactManualSubmission.recovery, reason);
+        if (marked.status === "marked") {
+          manualRetrySubmissionRef.current = {
+            ...exactManualSubmission,
+            recovery: marked.record,
+          };
+        }
+        // Even when storage fails, keep this mounted sheet fail-closed.
+        historyCheckRequiredRef.current = true;
+        setHistoryCheckRequired(true);
+      } else {
+        historyCheckRequiredRef.current = false;
+        setHistoryCheckRequired(false);
+      }
       if (reason === "receipt_mismatch" && res.growEventId && res.persistedNote !== undefined) {
         const confirmedScope = resolveQuickLogConfirmedScope(resolved, res);
         const navigation = buildQuickLogTimelineNavTarget({
@@ -1880,6 +1955,7 @@ function QuickLogV2SheetForOwner({
     }
 
     setExactRetryPending(false);
+    setHistoryCheckRequired(false);
     setPersistedNote(res.persistedNote);
     rememberConfirmedPlantTarget(resolved, user?.id ?? null);
     const confirmedScope = resolveQuickLogConfirmedScope(resolved, res);
@@ -2113,6 +2189,41 @@ function QuickLogV2SheetForOwner({
     setLocalError(null);
   }
 
+  const historyDraftOwnerId =
+    manualRetrySubmissionRef.current && feedingRetrySubmissionRef.current
+      ? null
+      : (manualRetrySubmissionRef.current ?? feedingRetrySubmissionRef.current)?.recovery.ownerId;
+  // A ref update does not repaint the button after a synchronous restoration.
+  // The handler retains the authoritative same-tick in-flight ref guard.
+  const historyDiscardAllowed = canDiscardQuickLogHistoryDraft({
+    historyCheckRequired,
+    inFlight: recoveryStorageFence || saving || feedingSaving || wateringSaving,
+    currentOwnerId: user?.id,
+    draftOwnerId: historyDraftOwnerId,
+  });
+  function handleDiscardHistoryDraft() {
+    const pending = manualRetrySubmissionRef.current;
+    const pendingFeed = feedingRetrySubmissionRef.current;
+    if (
+      !historyDiscardAllowed ||
+      saveInFlightRef.current ||
+      (!pending && !pendingFeed) ||
+      (pending && pendingFeed)
+    )
+      return;
+    if (pending && !clearPendingQuickLogNote(pending.recovery)) {
+      setLocalError(QUICK_LOG_HISTORY_DISCARD_FAILED);
+      return;
+    }
+    if (pendingFeed && !clearPendingQuickLogFeeding(pendingFeed.recovery)) {
+      setLocalError(QUICK_LOG_HISTORY_DISCARD_FAILED);
+      return;
+    }
+    // Explicit abandonment after history review, never a confirmed server receipt.
+    saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+    handleLogAnother();
+  }
+
   function handleLogAnother() {
     if (recoveryStorageFence) return;
     setRestoredMediaPending(false);
@@ -2135,6 +2246,8 @@ function QuickLogV2SheetForOwner({
     wateringTempEntryUnitRef.current = null;
     setWateringRetryPending(false);
     setExactRetryPending(false);
+    historyCheckRequiredRef.current = false;
+    setHistoryCheckRequired(false);
     setPersistedNote(undefined);
     setMismatchedReceipt(null);
     manualRetrySubmissionRef.current = null;
@@ -2195,7 +2308,11 @@ function QuickLogV2SheetForOwner({
   function handleSheetOpenChange(next: boolean) {
     if (!next) {
       if (manualRetrySubmissionRef.current || feedingRetrySubmissionRef.current) {
-        toast.message("Resolve the original save with Retry before closing or making changes.");
+        toast.message(
+          historyCheckRequired
+            ? QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY
+            : "Resolve the original save with Retry before closing or making changes.",
+        );
         return;
       }
       const blocked = shouldBlockQuickLogClose({
@@ -2905,8 +3022,37 @@ function QuickLogV2SheetForOwner({
               data-testid="qlv2-exact-retry-lock"
               className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm"
             >
-              The first result is unresolved. Retry sends the exact original entry. Resolve it
-              before changing the draft or closing; then choose Log another for a new entry.
+              {historyCheckRequired ? (
+                <>
+                  {QUICK_LOG_HISTORY_REVIEW_LOCK_COPY}
+                  {historyReviewNavigation && (
+                    <a
+                      className="block underline"
+                      data-testid="qlv2-history-review-link"
+                      href={historyReviewNavigation.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {QUICK_LOG_HISTORY_REVIEW_LINK_LABEL}
+                    </a>
+                  )}
+                  <span className="block mt-2">{QUICK_LOG_HISTORY_DISCARD_HELPER}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2"
+                    disabled={!historyDiscardAllowed}
+                    onClick={handleDiscardHistoryDraft}
+                  >
+                    {QUICK_LOG_HISTORY_DISCARD_LABEL}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  The first result is unresolved. Retry sends the exact original entry. Resolve it
+                  before changing the draft or closing; then choose Log another for a new entry.
+                </>
+              )}
             </p>
           )}
 
@@ -2951,7 +3097,7 @@ function QuickLogV2SheetForOwner({
                   Try again
                 </Button>
               )}
-              {!postSave && (
+              {!postSave && !historyCheckRequired && (
                 <Button
                   type="button"
                   size="sm"
@@ -3104,6 +3250,7 @@ function QuickLogV2SheetForOwner({
                       feedingSaving ||
                       wateringSaving ||
                       videoChecking ||
+                      historyCheckRequired ||
                       (contextBlocked && !retryPending) ||
                       (selectedTargetMissing && !retryPending) ||
                       (selectedTargetStale && !retryPending) ||

@@ -6,11 +6,15 @@ import {
   classifyBlockedReadonlyRequest,
   installSignedInReadonlyProof,
   isFixtureOperatorRoleRead,
+  isFixtureDiaryPhotoSignRead,
+  isCompleteFixtureDiaryPhotoSignResponse,
 } from "../../e2e/lib/signedInReadonlyProof";
 import { QUICKLOG_SMOKE_BACKEND_ORIGIN } from "../../e2e/lib/productionQuickLogFixtureRules";
 
 const account = { id: "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa", email: "cheekhimself@gmail.com" };
 const identityUrl = QUICKLOG_SMOKE_BACKEND_ORIGIN + "/auth/v1/user";
+const photoEndpoint = QUICKLOG_SMOKE_BACKEND_ORIGIN + "/storage/v1/object/sign/diary-photos";
+const photoPath = account.id + "/grow/photo.jpg";
 async function harness() {
   const listeners = new Map<string, (value: unknown) => void>();
   let handler: (route: Route) => Promise<void>;
@@ -79,6 +83,148 @@ async function harness() {
 }
 
 describe("signed-in read-only production proof", () => {
+  it("permits only the proved fixture's normal diary-photo display signing read", async () => {
+    const h = await harness();
+    h.emit();
+    await h.proof.assertReady();
+    const path = account.id + "/grow/photo.jpg";
+    const request = await h.route(
+      "POST",
+      QUICKLOG_SMOKE_BACKEND_ORIGIN + "/storage/v1/object/sign/diary-photos",
+      {
+        paths: [path],
+        expiresIn: 3600,
+      },
+    );
+    expect(request.continue).toHaveBeenCalledOnce();
+    expect(request.abort).not.toHaveBeenCalled();
+    await expect(h.proof.assertReady()).rejects.toThrow("proof_unavailable");
+    h.respond(request.request(), [
+      {
+        path,
+        error: null,
+        signedURL: "/object/sign/diary-photos/" + path + "?token=synthetic-test-only",
+      },
+    ]);
+    h.listeners.get("requestfinished")?.(request.request());
+    await expect(h.proof.assertReady()).resolves.toBeUndefined();
+    expect(h.proof.blockedRequests()).toEqual([]);
+    expect(h.proof.allowedPhotoReads()).toBe(1);
+  });
+  it.each([
+    null,
+    undefined,
+    [],
+    {},
+    { paths: [], expiresIn: 3600 },
+    { paths: [photoPath], expiresIn: 0 },
+    { paths: [photoPath], expiresIn: "3600" },
+    { paths: [photoPath], expiresIn: 3600, transform: { width: 1 } },
+    { paths: [photoPath, photoPath], expiresIn: 3600 },
+    { paths: ["bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb/grow/photo.jpg"], expiresIn: 3600 },
+    { paths: [account.id + "/../photo.jpg"], expiresIn: 3600 },
+    { paths: [account.id + "/%2e%2e/photo.jpg"], expiresIn: 3600 },
+    { paths: [photoPath + "?private=true"], expiresIn: 3600 },
+    { paths: [null], expiresIn: 3600 },
+    {
+      paths: Array.from({ length: 101 }, (_, i) => account.id + "/grow/" + i + ".jpg"),
+      expiresIn: 3600,
+    },
+  ])("rejects unapproved photo signing arguments %#", (body) => {
+    expect(isFixtureDiaryPhotoSignRead("POST", photoEndpoint, body, account.id)).toBe(false);
+  });
+  it.each([
+    ["PUT", photoEndpoint, account.id],
+    ["POST", photoEndpoint + "?extra=true", account.id],
+    [
+      "POST",
+      QUICKLOG_SMOKE_BACKEND_ORIGIN + "/storage/v1/object/upload/sign/diary-photos",
+      account.id,
+    ],
+    ["POST", QUICKLOG_SMOKE_BACKEND_ORIGIN + "/storage/v1/object/sign/another-bucket", account.id],
+    ["POST", "https://evil.example/storage/v1/object/sign/diary-photos", account.id],
+    ["POST", photoEndpoint, null],
+    ["POST", photoEndpoint, "invalid"],
+  ])("rejects unapproved photo endpoint, method or identity %#", (method, url, id) => {
+    expect(
+      isFixtureDiaryPhotoSignRead(method, url, { paths: [photoPath], expiresIn: 3600 }, id),
+    ).toBe(false);
+  });
+  it.each([
+    null,
+    {},
+    [],
+    [
+      {
+        path: photoPath,
+        error: "unavailable",
+        signedURL: "/object/sign/diary-photos/" + photoPath + "?token=synthetic",
+      },
+    ],
+    [{ path: "other", error: null, signedURL: "invalid" }],
+    [{ path: photoPath, error: null, signedURL: null }],
+    [{ path: photoPath, error: null, signedURL: "https://evil.example/private?token=synthetic" }],
+    [{ path: photoPath, error: null, signedURL: "/object/sign/diary-photos/" + photoPath }],
+    [
+      {
+        path: photoPath,
+        error: null,
+        signedURL: "/object/sign/diary-photos/" + photoPath + "?token=synthetic&extra=1",
+      },
+    ],
+    [
+      {
+        path: photoPath,
+        error: null,
+        signedURL: "/object/sign/diary-photos/" + photoPath + "?token=synthetic#fragment",
+      },
+    ],
+  ])("invalidates a missing, incomplete or invalid photo response %#", async (body) => {
+    const h = await harness();
+    h.emit();
+    await h.proof.assertReady();
+    const request = await h.route("POST", photoEndpoint, { paths: [photoPath], expiresIn: 3600 });
+    h.respond(request.request(), body);
+    h.listeners.get("requestfinished")?.(request.request());
+    await expect(h.proof.assertReady()).rejects.toThrow("proof_unavailable");
+  });
+  it("invalidates failed photo transport and does not permit signing after disposal", async () => {
+    const h = await harness();
+    h.emit();
+    await h.proof.assertReady();
+    const body = { paths: [photoPath], expiresIn: 3600 };
+    const request = await h.route("POST", photoEndpoint, body);
+    h.listeners.get("requestfailed")?.(request.request());
+    await expect(h.proof.assertReady()).rejects.toThrow("proof_unavailable");
+    h.proof.dispose();
+    const after = await h.route("POST", photoEndpoint, body);
+    expect(after.abort).toHaveBeenCalledOnce();
+    expect(after.continue).not.toHaveBeenCalled();
+    expect(h.proof.allowedPhotoReads()).toBe(1);
+    expect(h.proof.blockedRequests()).toEqual([
+      { method: "POST", capability: "backend-storage:diary-photo-sign" },
+    ]);
+  });
+  it("is deterministic, bounded and does not mutate the request or response", () => {
+    const body = { paths: [photoPath], expiresIn: 3600 };
+    const response = [
+      {
+        path: photoPath,
+        error: null,
+        signedURL: "/object/sign/diary-photos/" + photoPath + "?token=synthetic",
+      },
+    ];
+    const before = JSON.stringify({ body, response });
+    for (let i = 0; i < 2; i++) {
+      expect(isFixtureDiaryPhotoSignRead("POST", photoEndpoint, body, account.id)).toBe(true);
+      expect(isCompleteFixtureDiaryPhotoSignResponse(response, body.paths)).toBe(true);
+    }
+    expect(JSON.stringify({ body, response })).toBe(before);
+    expect(isCompleteFixtureDiaryPhotoSignResponse(response, [])).toBe(false);
+    expect(
+      isCompleteFixtureDiaryPhotoSignResponse([...response, ...response], [photoPath, "missing"]),
+    ).toBe(false);
+  });
   it("permits the existing boolean operator lookup for the positively proved fixture account", async () => {
     const h = await harness();
     h.emit();

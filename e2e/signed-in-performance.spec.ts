@@ -19,7 +19,8 @@ test.use({ trace: "off", video: "off", screenshot: "off", serviceWorkers: "block
 // Uses existing auth setup. This proof verifies only the fixture account, not
 // an active owned plant. Quick Log's separate write proof remains unchanged.
 // HTTP mutations and WebSockets are blocked; only the proved fixture's existing
-// operator role SELECT is permitted through its normal POST transport.
+// operator role SELECT and owner-scoped diary-photo display read are permitted
+// through their existing POST transport; no tokens or paths enter receipts.
 test.describe("signed-in route performance evidence", () => {
   test.describe.configure({ retries: 0 });
   test.skip(
@@ -105,6 +106,7 @@ test.describe("signed-in route performance evidence", () => {
               blockedWrites: proof.blockedWrites(),
               blockedRequests: proof.blockedRequests(),
               allowedRoleReads: proof.allowedRoleReads(),
+              allowedPhotoReads: proof.allowedPhotoReads(),
             },
             null,
             2,

@@ -530,6 +530,134 @@ describe("Timeline mounted read-state boundary", () => {
     );
   });
 
+  it("discloses the manual row limit without showing a cut capture as a complete receipt", async () => {
+    const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const readings = Array.from({ length: 67 }, (_, index) => {
+      const capturedAt = new Date(Date.now() - (index + 1) * 60_000).toISOString();
+      return [
+        { tent_id: tent, metric: "temperature_c", value: 24, captured_at: capturedAt },
+        { tent_id: tent, metric: "humidity_pct", value: 58, captured_at: capturedAt },
+        {
+          tent_id: tent,
+          metric: "soil_moisture_pct",
+          value: index === 66 ? 41 : 40,
+          captured_at: capturedAt,
+        },
+      ].map((row, metricIndex) => ({
+        ...row,
+        id: `00000000-0000-4000-8000-${String(index * 3 + metricIndex).padStart(12, "0")}`,
+        user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        source: "manual",
+        quality: "ok",
+        ts: capturedAt,
+        created_at: capturedAt,
+        device_id: null,
+        raw_payload: null,
+        correction_valid: true,
+      }));
+    }).flat();
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "tents") return { data: [{ id: tent }], error: null };
+      if (spec.table === "sensor_readings_effective") return { data: readings, error: null };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByTestId("timeline-manual-history-limit")).toHaveTextContent(
+      "Older manual readings are not shown here",
+    );
+    expect(
+      screen.getAllByText("Manual sensor snapshot: 75.2°F, 58% RH, 40% soil moisture"),
+    ).toHaveLength(66);
+    expect(screen.queryByText(/41% soil moisture/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-partial-read-warning")).not.toBeInTheDocument();
+  });
+
+  it("discloses invalid sensor_readings_effective humidity/soil captures and hides raw invalid chips", async () => {
+    const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const now = Date.now();
+    const humidityOnlyCapturedAt = new Date(now - 60_000).toISOString();
+    const soilOnlyCapturedAt = new Date(now - 120_000).toISOString();
+    const mixedCapturedAt = new Date(now - 180_000).toISOString();
+    const effectiveRow = (
+      id: string,
+      metric: string,
+      value: number,
+      capturedAt: string,
+      quality: string = "ok",
+    ) => ({
+      id,
+      user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      tent_id: tent,
+      metric,
+      value,
+      source: "manual",
+      quality,
+      ts: capturedAt,
+      captured_at: capturedAt,
+      created_at: capturedAt,
+      device_id: null,
+      raw_payload: null,
+      correction_valid: true,
+      corrected_at: capturedAt,
+    });
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: [], error: null, count: 0 };
+      if (spec.table === "tents") return { data: [{ id: tent }], error: null };
+      if (spec.table === "sensor_readings_effective") {
+        return {
+          data: [
+            effectiveRow(
+              "00000000-0000-4000-8000-000000000001",
+              "humidity_pct",
+              150,
+              humidityOnlyCapturedAt,
+            ),
+            effectiveRow(
+              "00000000-0000-4000-8000-000000000002",
+              "soil_moisture_pct",
+              150,
+              soilOnlyCapturedAt,
+            ),
+            effectiveRow(
+              "00000000-0000-4000-8000-000000000003",
+              "humidity_pct",
+              55,
+              mixedCapturedAt,
+            ),
+            effectiveRow(
+              "00000000-0000-4000-8000-000000000004",
+              "soil_moisture_pct",
+              150,
+              mixedCapturedAt,
+            ),
+          ],
+          error: null,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Manual sensor snapshot: 55% RH")).toBeInTheDocument();
+    expect(screen.getAllByText("Manual sensor snapshot")).toHaveLength(2);
+    expect(screen.getAllByTestId("timeline-manual-snapshot-invalid")).toHaveLength(3);
+    expect(screen.queryByText("150% RH")).not.toBeInTheDocument();
+    expect(screen.queryByText("Soil 150%")).not.toBeInTheDocument();
+
+    const mixedEntry = screen
+      .getByText("Manual sensor snapshot: 55% RH")
+      .closest('[data-testid="timeline-entry"]');
+    expect(mixedEntry).not.toBeNull();
+    expect(
+      within(mixedEntry as HTMLElement).getByTestId("timeline-manual-snapshot-invalid"),
+    ).toHaveTextContent("Review manual snapshot");
+    expect(mixedEntry).toHaveTextContent("55% RH");
+    expect(mixedEntry).not.toHaveTextContent("Soil 150%");
+  });
+
   it("discloses invalid correction evidence as partial history and retains diary entries", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "tents")
@@ -879,7 +1007,7 @@ describe("Timeline mounted read-state boundary", () => {
     expect(screen.getByText("Manual room check")).toBeInTheDocument();
   });
 
-  it("excludes a stale Plant Quick Log persist snapshot from Measurements", async () => {
+  it("retains an old Plant Quick Log snapshot with unverified capture time in Measurements", async () => {
     mockPlantQuickLogPersistQueries("2026-07-20T13:00:00.000Z");
 
     renderTimeline("/timeline?sensorSources=manual");
@@ -887,8 +1015,16 @@ describe("Timeline mounted read-state boundary", () => {
     await expectPlantQuickLogPersistCardVisibleOnce();
 
     fireEvent.click(screen.getByRole("button", { name: /^Measurements/ }));
-    expect(screen.queryByText("Manual room check")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("timeline-manual-snapshot")).toBeNull();
+    const entry = (await screen.findByText("Manual room check")).closest(
+      '[data-testid="timeline-entry"]',
+    );
+    expect(entry).not.toBeNull();
+    const snapshot = within(entry as HTMLElement).getByTestId("timeline-manual-snapshot");
+    expect(snapshot).toHaveTextContent("Capture time unverified — not current.");
+    expect(within(snapshot).getByTestId("timeline-sensor-source-badge-manual")).toHaveTextContent(
+      "Source: manual",
+    );
+    expect(screen.getAllByTestId("timeline-manual-snapshot")).toHaveLength(1);
   });
 
   it("preserves canonical and legacy snapshot precedence, aliases, and formatting", async () => {
@@ -1056,6 +1192,239 @@ describe("Timeline mounted read-state boundary", () => {
     ).toHaveTextContent("Review manual snapshot");
     expect(ecMismatchEntry).not.toHaveTextContent("EC 20 mS/cm");
     expect(ecMismatchEntry).toHaveTextContent("48% RH");
+  });
+
+  it("validates canonical manual sensor_snapshot cards and never renders invalid chips as healthy values", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-canonical-invalid-rh-soil", "Canonical invalid RH/soil"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: { temp_c: 24, rh: 150, soil: 101, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-canonical-90c", "Canonical 90C / 55% RH"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: { temp_c: 90, rh: 55, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-canonical-38f", "Canonical 38F / 48% RH"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: { temp_f: 38, rh: 48, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-canonical-115f", "Canonical 115F / 48% RH"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: { temp_f: 115, rh: 48, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-canonical-39f", "Canonical 39F / 48% RH"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: { temp_f: 39, rh: 48, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-canonical-111f", "Canonical 111F / 48% RH"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: { temp_f: 111, rh: 48, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-canonical-all-invalid", "Canonical all-invalid capture"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: {
+                  temp_f: 115,
+                  rh: 150,
+                  soil: 101,
+                  vpd: 20,
+                  source: "manual",
+                },
+              },
+            },
+          ],
+          error: null,
+          count: 7,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    const invalidRhSoil = (await screen.findByText("Canonical invalid RH/soil")).closest(
+      '[data-testid="timeline-entry"]',
+    );
+    expect(
+      within(invalidRhSoil as HTMLElement).getByTestId("timeline-manual-snapshot-invalid"),
+    ).toHaveTextContent("Review manual snapshot");
+    expect(invalidRhSoil).toHaveTextContent("75.2°F");
+    expect(invalidRhSoil).not.toHaveTextContent("150% RH");
+    expect(invalidRhSoil).not.toHaveTextContent("Soil 101%");
+
+    const ninetyC = screen
+      .getByText("Canonical 90C / 55% RH")
+      .closest('[data-testid="timeline-entry"]');
+    expect(
+      within(ninetyC as HTMLElement).getByTestId("timeline-manual-snapshot-invalid"),
+    ).toHaveTextContent("Review manual snapshot");
+    expect(ninetyC).toHaveTextContent("55% RH");
+    expect(ninetyC).not.toHaveTextContent("194°F");
+
+    for (const [label, hiddenTemp] of [
+      ["Canonical 38F / 48% RH", "38°F"],
+      ["Canonical 115F / 48% RH", "115°F"],
+      ["Canonical 39F / 48% RH", "39°F"],
+      ["Canonical 111F / 48% RH", "111°F"],
+    ] as const) {
+      const entry = screen.getByText(label).closest('[data-testid="timeline-entry"]');
+      expect(
+        within(entry as HTMLElement).getByTestId("timeline-manual-snapshot-invalid"),
+      ).toHaveTextContent("Review manual snapshot");
+      expect(entry).toHaveTextContent("48% RH");
+      expect(entry).not.toHaveTextContent(hiddenTemp);
+    }
+
+    const allInvalid = screen
+      .getByText("Canonical all-invalid capture")
+      .closest('[data-testid="timeline-entry"]');
+    expect(
+      within(allInvalid as HTMLElement).getByTestId("timeline-manual-snapshot-invalid"),
+    ).toHaveTextContent("Review manual snapshot");
+    expect(allInvalid).not.toHaveTextContent("115°F");
+    expect(allInvalid).not.toHaveTextContent("150% RH");
+    expect(allInvalid).not.toHaveTextContent("Soil 101%");
+    expect(allInvalid).not.toHaveTextContent("VPD 20");
+    expect(within(allInvalid as HTMLElement).queryByTestId("timeline-vpd-stage-hint")).toBeNull();
+  });
+
+  it("hides implausible manual VPD and CO2 without dropping valid temperature and humidity", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-invalid-vpd-co2", "Manual VPD and CO2 need review"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: {
+                  temp_f: 76,
+                  rh: 55,
+                  vpd: 20,
+                  co2: 10001,
+                  source: "manual",
+                  ts: new Date().toISOString(),
+                },
+              },
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      }
+      return defaultResult(spec);
+    });
+    renderTimeline();
+    const entry = (await screen.findByText("Manual VPD and CO2 need review")).closest(
+      '[data-testid="timeline-entry"]',
+    ) as HTMLElement;
+    expect(entry).toHaveTextContent("76°F");
+    expect(entry).toHaveTextContent("55% RH");
+    expect(entry).not.toHaveTextContent("VPD 20");
+    expect(entry).not.toHaveTextContent("CO₂ 10001");
+    expect(within(entry).getByTestId("timeline-manual-snapshot-invalid")).toHaveTextContent(
+      "Review manual snapshot",
+    );
+    expect(within(entry).queryByTestId("timeline-vpd-stage-hint")).toBeNull();
+  });
+
+  it.each([
+    [
+      "manual with generic temperature",
+      "sensor_snapshot",
+      { temp: 24, rh: 150, soil: 101, vpd: 20, co2: 10001, source: "manual" },
+    ],
+    ["missing source", "sensor_snapshot", { rh: 150, soil: 101, vpd: 20, co2: 10001 }],
+    [
+      "user source alias",
+      "sensor_snapshot",
+      { temp_f: 76, rh: 150, soil: 101, vpd: 20, co2: 10001, source: "user" },
+    ],
+    [
+      "legacy sensor envelope",
+      "sensor",
+      { temp: 24, rh: 150, soil: 101, vpd: 20, co2: 10001, source: "manual" },
+    ],
+  ])("validates %s using the manual source badge classifier", async (label, envelope, snapshot) => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-legacy-invalid", `Legacy invalid: ${label}`),
+              details: {
+                event_type: "observation",
+                [envelope as string]: {
+                  ...(snapshot as Record<string, unknown>),
+                  ts: new Date().toISOString(),
+                },
+              },
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      }
+      return defaultResult(spec);
+    });
+    renderTimeline();
+    const entry = (await screen.findByText(`Legacy invalid: ${label}`)).closest(
+      '[data-testid="timeline-entry"]',
+    ) as HTMLElement;
+    for (const hidden of ["150% RH", "Soil 101%", "VPD 20", "CO₂ 10001"])
+      expect(entry).not.toHaveTextContent(hidden);
+    expect(within(entry).getByTestId("timeline-sensor-source-badge-manual")).toHaveTextContent(
+      "Source: manual",
+    );
+    expect(within(entry).getByTestId("timeline-manual-snapshot-invalid")).toHaveTextContent(
+      "Review manual snapshot",
+    );
+    expect(within(entry).queryByTestId("timeline-vpd-stage-hint")).toBeNull();
+  });
+
+  it("does not accuse an empty manual snapshot of invalid readings", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries")
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-empty-manual", "Empty manual envelope"),
+              details: { event_type: "observation", manual_sensor_snapshot: { source: "manual" } },
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      return defaultResult(spec);
+    });
+    renderTimeline();
+    const entry = (await screen.findByText("Empty manual envelope")).closest(
+      '[data-testid="timeline-entry"]',
+    ) as HTMLElement;
+    expect(within(entry).queryByTestId("timeline-manual-snapshot-invalid")).toBeNull();
+    expect(entry).not.toHaveTextContent("Review manual snapshot");
   });
 
   it("renders a pH-and-EC-only Plant Quick Log snapshot without inventing room metrics", async () => {

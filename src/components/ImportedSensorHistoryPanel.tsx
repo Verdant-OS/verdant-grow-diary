@@ -290,7 +290,7 @@ export default function ImportedSensorHistoryPanel({
                   >
                     <td className="py-1 pr-2">{formatTimestamp(r.capturedAt)}</td>
                     <td className="py-1 pr-2">{r.metric}</td>
-                    <td className="py-1">{r.value ?? "—"}</td>
+                    <td className="py-1">{r.displayValue}</td>
                   </tr>
                 ))}
               </tbody>

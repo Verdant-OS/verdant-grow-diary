@@ -86,6 +86,8 @@ const GROW_A = {
   stage: "vegetative",
   started_at: "2026-01-01T00:00:00.000Z",
 };
+const TENT_ID = "11111111-1111-4111-8111-111111111111";
+const OWNER_ID = "22222222-2222-4222-8222-222222222222";
 
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
@@ -212,6 +214,75 @@ describe("Timeline page — inline manual snapshot ages while idle", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("keeps an old manual measurement visible with soil and a not-current notice", async () => {
+    const oldCapture = new Date(NOW.getTime() - 3 * MANUAL_CURRENT_STATE_STALE_MS).toISOString();
+    const row = {
+      ...MANUAL_SNAPSHOT_ROW,
+      entry_at: oldCapture,
+      details: {
+        source: "manual",
+        sensor_snapshot: { source: "manual", ts: oldCapture, temp: 24, rh: 55, soil: 42 },
+      },
+    };
+    harness.executeQuery.mockImplementation((spec) => ({
+      data: spec.table === "diary_entries" ? [row] : [],
+      error: null,
+    }));
+
+    render(
+      <MemoryRouter initialEntries={["/timeline"]}>
+        <Timeline />
+      </MemoryRouter>,
+    );
+
+    const snapshot = await screen.findByTestId("timeline-manual-snapshot");
+    expect(snapshot).toHaveTextContent("Soil 42%");
+    expect(snapshot).toHaveTextContent("Historical manual reading — not current.");
+    expect(harness.insert).not.toHaveBeenCalled();
+    expect(harness.update).not.toHaveBeenCalled();
+    expect(harness.delete).not.toHaveBeenCalled();
+  });
+
+  it("renders an old soil reading from the effective sensor read as historical evidence", async () => {
+    const oldCapture = new Date(NOW.getTime() - 3 * MANUAL_CURRENT_STATE_STALE_MS).toISOString();
+    const soilRow = {
+      id: "33333333-3333-4333-8333-333333333333",
+      user_id: OWNER_ID,
+      tent_id: TENT_ID,
+      metric: "soil_moisture_pct",
+      value: 42,
+      source: "manual",
+      quality: "ok",
+      ts: oldCapture,
+      captured_at: oldCapture,
+      created_at: oldCapture,
+      device_id: null,
+      raw_payload: null,
+      correction_valid: true,
+    };
+    harness.executeQuery.mockImplementation((spec) => {
+      if (spec.table === "tents") return { data: [{ id: TENT_ID }], error: null };
+      if (spec.table === "sensor_readings_effective") return { data: [soilRow], error: null };
+      return { data: [], error: null };
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/timeline"]}>
+        <Timeline />
+      </MemoryRouter>,
+    );
+
+    const snapshot = await screen.findByTestId("timeline-manual-snapshot");
+    expect(snapshot).toHaveTextContent("Soil 42%");
+    expect(snapshot).toHaveTextContent("Historical manual reading — not current.");
+    expect(
+      harness.capturedQueries.some((query) => query.table === "sensor_readings_effective"),
+    ).toBe(true);
+    expect(harness.insert).not.toHaveBeenCalled();
+    expect(harness.update).not.toHaveBeenCalled();
+    expect(harness.delete).not.toHaveBeenCalled();
   });
 
   it.each(["ts", "captured_at"])(

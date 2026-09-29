@@ -2,6 +2,12 @@
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-09-29T04:52:32 UTC
+
+- **PASS, required CI / FAIL, additional audits:** #1760 remains draft at `074daa6270dd190ef2a214e931d8b9d0a847df66`, base `61821446`, with 35/35 required contexts SUCCESS and zero required failure, missing or pending. Main CI `109259988370` completes successfully; separate logged sets include 248 Deno tests, 20 files / 332 scanner tests and 1 file / 6 tests, with zero failures in each shown summary, followed by a passing build summary. These overlapping executions are not a unique-test sum. Root fast-uri and nested undici audits remain FAIL and locked.
+- **PASS, single infrastructure retry / BLOCKED, partial proof:** local DB retry `109260510539` succeeds after the initial axe-core integrity failure. Its logs retain profiles-gamification RPC paths BLOCKED because local exec_sql is unavailable, even though the enclosing Vitest runs pass. Do not describe those paths as verified. Separate harness summaries include support forms 165 PASS / 0 FAIL, restricted-role Phase 1 10 PASS / 0 FAIL / 0 BLOCKED and Quick Log dual-timestamp 67 PASS / 0 FAIL; repeated harness runs are not unique tests. This is disposable local-backend proof only, not production.
+- **NOT_MEASURED, acceptance:** Blue Dream exact-head acceptance and live Dashboard/Daily Check remain open. No ready, auto-merge, merge, Publish or production operation. Earlier partial-CI and failed-install receipts remain dated history. HOLD #1250; Timeline successor remains first slice tomorrow; goal remains active.
+
 ## Follow-up observation — 2026-09-29T04:46:20 UTC
 
 - **PASS, normal integration:** existing draft #1760 is now `074daa6270dd190ef2a214e931d8b9d0a847df66`, a clean merge of deploy `61821446ebd7e4fb30a36a5a95b7526a34515df5` into predecessor `b2007583d70046519852f29104fb1972a43b0a3e`. Zero conflicts, no history rewrite. Final diff remains 12 client/test files (+255/-26); all twelve feature blobs are byte-identical to the predecessor. Selected-grow links still require the plant's own matching grow; legacy null-grow plants retain unscoped working links. No held or off-limits repair.

@@ -18,6 +18,7 @@ on:
       - "fixtures/ecowitt-bridge-config/**"
       - "docs/schemas/ecowitt-soil-channel-map.schema.json"
       - ".github/workflows/ecowitt-config-validate-contract.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main, verdant-grow-diary]
     paths:
@@ -28,6 +29,10 @@ on:
       - "examples/ecowitt-bridge/**"
       - "fixtures/ecowitt-bridge-config/**"
       - "docs/schemas/ecowitt-soil-channel-map.schema.json"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   contract:

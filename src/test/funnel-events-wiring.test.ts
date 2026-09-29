@@ -557,6 +557,12 @@ describe("ordering and safety constraints at the seams", () => {
       acceptedRequest,
     );
     const track = src.indexOf('trackFunnelEvent("historical_ai_review_started")', historicalGate);
+    const retryHandler = src.indexOf("const handleRetryReview = () => {", handler);
+    const staleRetryGuard = src.indexOf(
+      'if (activeReviewVisibility.retryBlockedReason === "stale-evidence") {',
+      retryHandler,
+    );
+    const retryInvoke = src.indexOf("review.retry();", staleRetryGuard);
     const handlerEnd = src.indexOf("const confidenceCopy", handler);
 
     expect(startBinding).toBeGreaterThan(-1);
@@ -573,11 +579,16 @@ describe("ordering and safety constraints at the seams", () => {
     expect(acceptedRequest).toBeGreaterThan(acceptedMode);
     expect(historicalGate).toBeGreaterThan(acceptedRequest);
     expect(track).toBeGreaterThan(historicalGate);
+    expect(retryHandler).toBeGreaterThan(track);
+    expect(staleRetryGuard).toBeGreaterThan(retryHandler);
+    expect(retryInvoke).toBeGreaterThan(staleRetryGuard);
     expect(src.slice(handler, handlerEnd)).not.toContain("startReview()");
     expect(src).toMatch(
-      /onClick=\{review\.status === "error" \? review\.retry : handleInitialStart\}/,
+      /onClick=\{review\.status === "error" \? handleRetryReview : handleInitialStart\}/,
     );
-    expect(src).toMatch(/activeReviewRequest\s*\?\s*review\.status === "error" && canRetryReview/);
+    expect(src).toMatch(
+      /activeReviewRequest\s*\?\s*review\.status === "error" && canRetryReview && retryBlockedReason === null/,
+    );
     expect(src).toMatch(
       /allowed\s*&&\s*historyRecovery\.state !== "decision_required"\s*&&\s*rootZoneRecovery\.state !== "decision_required"\s*&&\s*review\.status === "idle"/,
     );

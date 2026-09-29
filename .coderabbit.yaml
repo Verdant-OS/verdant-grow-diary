@@ -18,7 +18,8 @@
 # repo-wide path instruction below (visible warning comments, never a merge gate). The
 # built-in pre-merge checks (title, description, docstrings, linked issues) do run on
 # Essentials — verified on PR #1355.
-# CodeRabbit never approves or merges; Cheek approves, merges go through the merge queue.
+# CodeRabbit supplies supplemental findings; independent acceptance follows OWNERSHIP.md.
+# GDP owns merging after exact-head review; routine code review does not wait on Cheek.
 
 language: en-US
 early_access: true

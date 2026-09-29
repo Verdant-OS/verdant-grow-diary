@@ -1,5 +1,6 @@
 import { test, expect } from "./lib/authedTest";
 import { validateQuickLogFixturePage } from "./lib/fixtureSafety";
+import { observeProductionQuickLogFixture } from "./lib/productionQuickLogFixtureProof";
 
 /**
  * Disposable E2E fixture safety check.
@@ -26,10 +27,15 @@ test("disposable E2E fixture is configured and visible on the target plant page"
     E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: process.env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
   };
 
-  await page.goto(env.E2E_GROW_1_PLANT_URL!);
+  const productionProof = observeProductionQuickLogFixture(page);
+  try {
+    await page.goto(env.E2E_GROW_1_PLANT_URL!);
 
-  // Confirm we are not bounced back to /auth.
-  await expect.poll(() => page.url(), { timeout: 20_000 }).not.toContain("/auth");
+    // Confirm we are not bounced back to /auth.
+    await expect.poll(() => page.url(), { timeout: 20_000 }).not.toContain("/auth");
 
-  await validateQuickLogFixturePage(page, env);
+    await validateQuickLogFixturePage(page, env, productionProof);
+  } finally {
+    productionProof.dispose();
+  }
 });

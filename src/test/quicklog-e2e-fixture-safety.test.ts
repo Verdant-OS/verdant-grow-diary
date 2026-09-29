@@ -241,7 +241,9 @@ describe("E2E fixture safety: source-level guardrails", () => {
     );
     expect(goto).toBeGreaterThan(0);
     expect(validate).toBeGreaterThan(goto);
-    expect(smoke.slice(goto, validate)).toMatch(/await page\.goto\(PLANT_URL!\);\s*$/);
+    expect(smoke.slice(goto, validate)).toMatch(
+      /await page\.goto\(PLANT_URL!\);\s*const fixture =\s*$/,
+    );
     expect(validate).toBeLessThan(reconsent);
     expect(validate).toBeLessThan(openQuickLog);
     expect(validate).toBeLessThan(firstSave);
@@ -261,7 +263,9 @@ describe("E2E fixture safety: source-level guardrails", () => {
     );
 
     const fixtureGoto = fixtureSpec.indexOf("await page.goto(env.E2E_GROW_1_PLANT_URL!)");
-    const fixtureValidate = fixtureSpec.indexOf("await validateQuickLogFixturePage(page, env)");
+    const fixtureValidate = fixtureSpec.indexOf(
+      "await validateQuickLogFixturePage(page, env, productionProof)",
+    );
     expect(fixtureSpec).toMatch(
       /import\s*\{[^}]*validateQuickLogFixturePage[^}]*\}\s*from\s*["']\.\/lib\/fixtureSafety["']/s,
     );

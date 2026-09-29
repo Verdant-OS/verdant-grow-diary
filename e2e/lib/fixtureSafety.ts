@@ -21,6 +21,7 @@
  *   - never reads or logs secret values
  */
 import type { Page } from "@playwright/test";
+import type { ProductionQuickLogFixtureProof } from "./productionQuickLogFixtureProof";
 import { isForbiddenRealGrowName as isForbiddenRealGrowNameImpl } from "../../scripts/e2e/real-grow-denylist.mjs";
 
 export type FixtureSafetyEnv = Readonly<{
@@ -133,12 +134,12 @@ export function validateFixtureEnv(env: FixtureSafetyEnv): FixtureEnvValidation 
 export function pageTextMatchesFixture(
   pageText: string,
   expected: FixtureEnvValidation["expected"],
-  options: { accountHint?: string } = {},
+  options: { accountHint?: string; allowQaMarker?: boolean } = {},
 ): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
   const text = pageText ?? "";
 
-  if (!/E2E|Test/i.test(text)) {
+  if (!(options.allowQaMarker ? /\b(?:E2E|Test|QA)\b/i : /E2E|Test/i).test(text)) {
     errors.push(
       "Target page does not contain 'E2E' or 'Test' markers — refusing to treat as fixture data.",
     );
@@ -218,11 +219,12 @@ export async function validateQuickLogFixturePage(
     E2E_FIXTURE_EXPECTED_PLANT_NAME: process.env.E2E_FIXTURE_EXPECTED_PLANT_NAME,
     E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: process.env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
   },
+  productionProof?: ProductionQuickLogFixtureProof,
 ): Promise<FixtureEnvValidation> {
-  const envCheck = validateFixtureEnv(env);
-  if (!envCheck.ok) {
-    throw new Error(`Fixture env validation failed:\n - ${envCheck.errors.join("\n - ")}`);
-  }
+  // This explicit owner-approved production lane is separate from the generic
+  // fixture validator. Pheno and bootstrap retain their existing host fences.
+  if (!productionProof) throw new Error("production_fixture_observer_required");
+  const envCheck = await productionProof.assertInitial(env);
 
   if (page.url().includes("/auth")) {
     throw new Error(
@@ -269,7 +271,9 @@ export async function validateQuickLogFixturePage(
 
   const bodyText = (await page.locator("body").innerText()).slice(0, 50_000);
   const pageCheck = pageTextMatchesFixture(bodyText, envCheck.expected, {
-    accountHint: env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
+    // Account ownership was checked against the server response above; an
+    // incidental email in page text cannot substitute for that proof.
+    allowQaMarker: true,
   });
   if (!pageCheck.ok) {
     throw new Error(

@@ -163,19 +163,19 @@ last_updated: 2026-09-28 22:13 CT, by Codex
 ```text
 TASK CHEM-RELEASE-001  priority: publish-gate  status: OPEN
 goal: Prepare one owner promotion packet from the measured live SHA to a reviewed deploy target.
-branch: codex/chem-release-001-20260928 (planned; not created)
+branch: codex/chem-release-001-20260928 (existing local branch, resumed; no history rewrite)
 base: verdant-grow-diary
-checkout: git fetch origin && git switch -c codex/chem-release-001-20260928 origin/verdant-grow-diary (first creation only; later resume that same branch)
-pr: NOT_MEASURED — not opened yet
-head_sha: NOT_MEASURED — no release writer branch; deploy 61821446ebd7e4fb30a36a5a95b7526a34515df5 confirmed 22:09 CT
-state: Earlier differing endpoint observations remain dated history. At 04:04:25 UTC /version.json reports commit 61821446ebd7e4fb30a36a5a95b7526a34515df5, HTTP 200, dirty:false, buildTime 03:02:39.564Z, cache HIT/Age 66, matching deploy tip verified 04:06:21 UTC. Frontend identity only; Timeline non-live validation, live AI Doctor behavior, runtime/schema/Edge/payments/full-loop acceptance NOT_MEASURED. No Codex Publish/promote.
-next_action: Use current identity receipt in owner release packet; measure live product loop only on approved active fixture. Preserve earlier differing receipts without inferring rollback or deployment cause.
-files: Planned: docs/agents/PUBLISH_READINESS_2026-09-28.md only.
-blockers: Matthew owns production promotion and acceptance of the known #1754 P1-A owner override. Vercel native checks selection remains NOT_MEASURED. Locked dependency audits remain FAIL. No Publish, SQL/APPLY/PREFLIGHT, production dispatch or live write by Codex.
-artifacts: https://verdantgrowdiary.com/version.json; https://github.com/Verdant-OS/verdant-grow-diary/pull/1754; https://github.com/Verdant-OS/verdant-grow-diary/pull/1778
+checkout: git fetch origin verdant-grow-diary && git switch codex/chem-release-001-20260928 && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1795
+head_sha: 69a54f84aef49846847cb5d6f3315f9470c0cc89, remote and draft/base confirmed 2026-09-29 00:31 CT; base 61821446ebd7e4fb30a36a5a95b7526a34515df5
+state: Pushed stay-draft, one Markdown file +190/-0. Existing local branch was fast-forwarded normally from 6ca97026 to deploy 61821446; no branch recreation or history rewrite. Public response at 05:27:31.9666602 UTC is HTTP 200, commit 61821446, dirty:false, buildTime 03:02:39.564Z, cache HIT/Age 5052. All 149 target check records read over two pages; current 35/35 required SUCCESS does not erase the post-merge audit FAIL about late local-DB proof. Root fast-uri audit FAIL, provider Supabase Preview FAIL (remote migration versions absent locally); external-provider Actions log returns 404. GitHub Vercel pending status remains discrepant with the matching public response; allocation/native Deployment Checks NOT_MEASURED. Packet records eleven intervening commits, #1754 owner override, exact-head #1794 repair, archived fixture refusal and unapproved historical rollback candidate. Docs validation: 1 file / 67 PASS / 0 FAIL / 0 SKIP; 3 scanner categories, Prettier and whitespace PASS. New-head hosted CI/independent acceptance NOT_MEASURED; no production operation.
+next_action: Critical Mass reviews document at 69a54f84aef49846847cb5d6f3315f9470c0cc89; measure its own current-head CI without inheriting the base. Blue Dream reviews #1794's exact repair head. Matthew retains product publish/acceptance and the native deployment-check decision. No new promotion requested merely to close a zero advertised commit gap.
+files: Closed: docs/agents/PUBLISH_READINESS_2026-09-28.md only. Operational log/checkpoint updates remain in existing #1777, not this packet's diff.
+blockers: Complete product acceptance BLOCKED: remaining Timeline exception not yet independently accepted/landed, archived active-smoke fixture, additional audit FAILs and uninspected native deployment gates. No Publish, SQL/APPLY/PREFLIGHT, production dispatch or live write by Codex.
+artifacts: PR #1795; repo docs/agents/PUBLISH_READINESS_2026-09-28.md; Downloads CHEM-release-checkpoint-2026-09-29.md, CHEM-release-target-checks-2026-09-29.json and CHEM-release-docs-safety-2026-09-29.log. Separate #1780 promotion runbook and all historical receipts preserved.
 reviewer_seat: Critical Mass for the named docs-only packet; Blue Dream retains the product publish gate
-claimed_by: Codex, 2026-09-28 18:46 CT
-last_updated: 2026-09-28 23:12 CT, by Codex
+claimed_by: Codex, 2026-09-29 00:30 CT (release packet resumed)
+last_updated: 2026-09-29 00:32 CT, by Codex
 ```
 
 ### GDP-1766-RECEIPT-TARGET-MISMATCH

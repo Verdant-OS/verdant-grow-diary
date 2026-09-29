@@ -2,6 +2,9 @@
 
 **Sentinel-Version: 2026-09-28.2**
 
+_Amended 2026-09-28 (Matthew Cheek): added Release and Environment Rules and Agent
+Handoff / Coverage; open tasks are resumable by any agent from `docs/agents/HANDOFF_LOG.md`._
+
 Ownership and routing: see `docs/agents/OWNERSHIP.md`. It wins on conflicts.
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
@@ -52,7 +55,7 @@ Automation last.
 Default workflow:
 
 ```text
-Build -> Audit -> Fix -> Test -> Publish -> Measure
+Build -> Audit -> Fix -> CI Test -> Publish -> Measure on live -> Fix
 ```
 
 A merge is not a deployment. Green CI is not proof of indexing. A public estimate is not
@@ -63,18 +66,50 @@ Use small, scoped changes. Avoid broad rewrites.
 
 ---
 
-## Production verification target — 2026-09-28
+## Release and Environment Rules
 
-Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
-E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
-disposable test account owns the fixture grow and its selected tent/plant;
-tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
-use the KEEP account. Stop a write if identity, ownership or tagging cannot
-be verified; report that exact safety gap rather than proposing another host.
-Local/CI fixtures validate code, not production. This does not authorize merge,
-ready, auto-merge, Publish, production APPLY, real charges, role/auth changes,
-device control or Action Queue operations. Existing owner locks remain.
-See docs/production-only-verification-runbook.md.
+- **Production only.** Verdant has no sandbox, staging, preview, or non-production smoke
+  environment. Build, verify, and smoke against production
+  (`https://verdantgrowdiary.com`). Smoke writes go only to the fixture account's own
+  grow, tagged `[smoke <timestamp>]`. Never touch customer data or use the KEEP account.
+  Verify the fixture identity and ownership before a write. A task that asks for a
+  non-production target is out of date; report it instead of building one.
+- **CI probes production or nothing.** No push-triggered job may probe a non-production
+  database. The production schema verifier runs only by manual dispatch from the deploy
+  branch, in its protected environment. A red check that probes a retired environment is
+  a CI defect to fix, not a schema verdict.
+- **How a release reaches users.** Vercel's GitHub integration builds a production
+  deployment for every push to `verdant-grow-diary`. It goes live only after Vercel's
+  Deployment Checks pass, or when the Vercel team owner promotes it. No agent holds a
+  Vercel CLI login or token. Agents never publish, promote, or roll back. They prepare a
+  release packet (live SHA, target SHA, commits, checks at the target, the deployment URL,
+  the rollback target) and hand over one promotion step. A merge is not a release until
+  `/version.json` on live reports the SHA.
+- **Ship before test.** Once CI is green and the reviewer has passed a fix, getting it live
+  comes before more testing. Public-page probes against a live build that doesn't contain
+  the fix measure nothing; report them `NOT_MEASURED`. Signed-in verification starts after
+  the fix is live.
+- **Git and merges.** No force-push and no history rewrite. Update branches only by merging
+  from base. Every PR opens as a draft. GDP merges on the assigned reviewer's `PASS` or
+  `PASS-with-P2` (no P1) at the exact head SHA. Owners and reviewer routing are defined in
+  `docs/agents/OWNERSHIP.md`, which wins on those points.
+- **One task, one branch, one holder.** Every task is built on its own branch, named
+  `<agent>/<task-id>-<yyyymmdd>` (lowercase; the prefix is the agent that created it and
+  never changes). There is no shared working branch. Only the agent currently holding a
+  branch, per `docs/agents/HANDOFF_LOG.md`, pushes to it, and no agent edits files on
+  another holder's branch. The task goes with the branch: whoever holds the branch holds
+  the task. Preserve the original names of existing branches when resuming them.
+- **Matthew Cheek keeps four decisions:** production database changes, the spend ceiling,
+  anything that gates a publish, and the publish decision itself. Everything else runs
+  without waiting on him.
+- **Off-limits without Matthew's approval:** migrations and SQL, `supabase/`, RLS, auth,
+  Edge functions, the Action Queue, lockfiles, and device control. If a fix needs one,
+  stop that item, write it up as an escalation, and move on.
+- **Standing locks** (the production database lock, named PR holds such as HOLD #1250)
+  are listed in `docs/agents/CURRENT_STATE.md` and bind every agent until removed there.
+
+Local/CI fixtures validate code, not production. See
+`docs/production-only-verification-runbook.md` for fixture identity, tagging and receipts.
 
 ## Multi-Agent Coordination
 
@@ -84,6 +119,39 @@ This repo is worked on by more than one AI agent (Codex, Claude Code, Grok, Lova
 - If you discover another agent already has open, unmerged work in your target area, stop and report the collision rather than silently building a competing version.
 - Only one implementation of a given feature should ever be merged. If two exist, surface the collision in your report instead of resolving it unilaterally.
 - Clean up your own disposable worktrees/branches once work lands or is abandoned. Don't leave scratch checkouts behind for someone else to find and puzzle over later.
+
+---
+
+## Agent Handoff / Coverage
+
+Work belongs to the task, not to the agent doing it. Any agent can be cut off at any time
+(token limit, outage, session end), so every open task must be resumable by a different
+agent from one written block.
+
+- **One place to look.** Every in-flight task has a handoff block in
+  `docs/agents/HANDOFF_LOG.md`. The log is not a versioned governance file; editing it
+  needs no `Sentinel-Version` bump.
+- **What a block holds.** Task id and priority, goal, branch, base, the exact checkout
+  command, PR and exact head SHA, current state, next action, files touched, blockers,
+  where artifacts live, the independent reviewer seat, `claimed_by`, and `last_updated`
+  (date, time, zone). Use the template at the top of the log.
+- **When to update it.** At least once a day while the task is open, and always before the
+  agent stops, hands off, or expects to run out of budget. A block older than 24 hours, or
+  with no `claimed_by`, is open for anyone.
+- **Anyone may resume.** The handoff block is the only context a resuming agent needs.
+  Before resuming, set `claimed_by` to yourself with the time; from then on you hold the
+  branch and the previous holder stops pushing. Run the block's checkout command, confirm
+  `git rev-parse origin/<branch>` matches the block's head SHA, then merge from base and
+  continue on the same branch. Never rename, recreate, or force-push it.
+- **Coverage on startup.** After `SENTINEL_ACK`, read `docs/agents/HANDOFF_LOG.md`. If you
+  have no assigned task, or your assigned task is lower priority, resume the
+  highest-priority open block. Priority order: publish gate, then P1, then P2, then
+  everything else. Ties go to the oldest `last_updated`.
+- **Role seats still hold.** Resuming a task does not change who merges, who reviews, or
+  who owns CI; those stay as `docs/agents/OWNERSHIP.md` lists them. An agent that touched
+  a task can never be its independent reviewer.
+- **Closing.** When a task merges, is superseded, or is dropped, mark the block `CLOSED`
+  with the reason and the final SHA, and move it to the log's Closed section the same day.
 
 ---
 
@@ -589,8 +657,9 @@ assigned role and read its file.
 - Security reviewer must read `docs/agents/roles/security.md`.
 - Council Chair must read `docs/agents/roles/council-chair.md`.
 
-Do not adopt another agent's **owned** slice unless Cheek explicitly reassigns it or
-`CURRENT_STATE.md` marks that work done and unassigned.
+Any agent may resume an open task from its block in `docs/agents/HANDOFF_LOG.md` under
+Agent Handoff / Coverage. Claim it in the log first. Do not start a second implementation
+of a task someone else has claimed within the last 24 hours.
 
 Codex, Claude, and Grok are **peers**: none outranks the others (Cheek, 2026-08-20,
 refined). Explicit task ownership controls who researches, architects, implements,
@@ -599,9 +668,9 @@ not exclusivity. Standing collision fences in `CURRENT_STATE.md` still bind (for
 example remaining Tranche A edit points for Codex, Tranche B+ product code for Claude,
 and no competing Timeline / Alerts / Action Queue rewrite).
 
-Every assigned slice names **one owner** and a **different peer** as **independent
-reviewer**. The owner cannot review their own work. **No code ships without peer
-review** — an owned slice without a named independent reviewer is incomplete.
+Every slice names an **independent reviewer**, and at any moment one agent holds the
+claim to build it. No agent that touched the slice can review it. **No code ships without
+peer review**; a slice without a named independent reviewer is incomplete.
 
 Acceptance routing: **Blue Dream** reviews .tsx outside src/test/, P1s and
 publish gates; **Critical Mass** reviews everything else. Codex builds CI/infra
@@ -619,7 +688,7 @@ That sequence is a preferred path, not rank. The current task may require only a
 subset of those stages. Do not create parallel implementations of the same slice.
 
 The only action permitted before the gate below is read-only acquisition of
-`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and the assigned role file so the
+`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
 acknowledgment can be truthful. Listing files solely to locate those three documents, or
 using a platform context-discovery command such as `grok inspect`, is also permitted.
 No application-code inspection, network mutation, recommendation, or repository write is
@@ -636,6 +705,7 @@ agent:
 assigned_role:
 sentinel_version:
 files_read:
+open_handoffs_checked:
 current_task:
 scope:
 out_of_scope:
@@ -737,6 +807,8 @@ snapshots can differ.
   `/quick-log` (Quick Log
   starter — saves a draft locally), `/tools/vpd-calculator`, `/pheno-comparison`,
   `/welcome`, and `/internal/demo-proof-walkthrough`.
+  These count as evidence only when live `/version.json` reports the SHA under test;
+  otherwise report `NOT_MEASURED`.
 - **Governance edit gate.** If you change any of the **twelve versioned governance
   files** — `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.grok/rules/verdant-grok-role.md`,
   `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, and the six

@@ -14,14 +14,18 @@ rules do **not** erase collision fences (Tranche A remaining edit points = Codex
 reassigned; Tranche B+ product code = Claude until reassigned; no competing Timeline /
 Alerts / Action Queue rewrite).
 
-### One owner + independent reviewer (standing rule)
+### Claim + independent reviewer (standing rule)
 
-Every assigned slice names:
+Tasks are not owned by agents. Every open task has a coverage block in
+`docs/agents/HANDOFF_LOG.md` (see `AGENTS.md`, Agent Handoff / Coverage), and any agent
+may resume it after setting `claimed_by`. Every slice names:
 
-1. **One owner** — the peer who delivers the slice
-2. **One independent reviewer** — a **different** peer who reviews that work
+1. **The current claim**: the agent building it now, recorded in the log
+2. **One independent reviewer**: an agent that has not touched the slice
 
-The owner cannot be their own reviewer.
+No agent that touched a slice can review it. Use the HANDOFF block below for a deliberate
+transfer between roles; use the log block for day-to-day coverage. Keep the same branch,
+confirm its remote head, and merge from base; never rename, recreate or force-push it.
 
 Acceptance routing: **Blue Dream** reviews .tsx outside src/test/, P1s and
 publish gates; **Critical Mass** reviews everything else. Codex builds CI/infra
@@ -66,6 +70,8 @@ date:
 
 slice_owner:
 independent_reviewer: Blue Dream or Critical Mass, selected by scope/priority
+claimed_by:
+last_updated:
 
 completed:
   - what was actually done, not what was attempted

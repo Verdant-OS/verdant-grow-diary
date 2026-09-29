@@ -57,6 +57,9 @@ HISTORICAL — never active instructions
 | Security      | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/security.md`              |
 | Council Chair | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/council-chair.md`         |
 
+Every agent also reads `docs/agents/HANDOFF_LOG.md` right after `SENTINEL_ACK` and
+resumes the highest-priority open block if it has no higher-priority assignment.
+
 Grok is Verdant's **Product Intelligence, Adversarial Audit, and Implementation Lead**
 (Cheek, 2026-08-20, refined): equally empowered to research, audit the live app,
 implement assigned slices, test, and independently review. Codex, Claude, and Grok

@@ -11,10 +11,12 @@
 ## 1. The one rule about Matthew
 
 Matthew Cheek owns nothing in the review path, and he is never a blocker.
+
 - No step in this loop waits on Matthew to approve, review, merge, relay, or pass anything along.
 - If a step would need him, the step's owner finds another route, or records it under section 7 (Open items).
 
 His standing order (confirmed 2026-09-28, 4:34 PM CT) keeps only four things with him. None of them is part of code review:
+
 1. Production database changes. The knk lock stays on.
 2. Spend ceiling changes.
 3. Anything that gates a publish.
@@ -26,10 +28,15 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 
 ## 2. Owners
 
+These are **role** owners: who merges, who reviews, who runs CI and connectors. They do
+not make any task belong to one agent. Any agent may resume an open task from
+`docs/agents/HANDOFF_LOG.md`; the merge and review seats below still apply to it.
+
 ### Codex: the repo, CI, builds, connectors, and CI/build reviews
+
 - **Repo.** Settings, branches, branch protection, repo secrets, webhooks, and labels. Merges belong to GDP (see below and O1).
 - **CI infrastructure.** Workflows, runners, check definitions, re-runs, and fixing flaky or broken checks.
-- **Build pipelines.** Builds, preview deploys, and deploy pipeline configuration. Publish itself stays gated (section 1).
+- **Build pipelines.** Builds and deploy pipeline configuration, including making Vercel's Deployment Checks pass. There are no preview or staging targets. Promotion to production stays with the Vercel team owner, and the publish decision stays with Matthew (section 1).
 - **The three connectors** (section 4). Codex builds, runs, and fixes them:
   - the CI status webhook
   - the routing channel with Grand Daddy Grok
@@ -39,6 +46,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 - **This file.** Codex keeps it current and accurate.
 
 ### Grand Daddy Grok (GDP): routing and product calls
+
 - **Routing decisions.** Which slice runs next, which reviewer gets which PR, overrides, and holds.
 - **Slice naming.** Codex, Claude and Copilot start work only from a slice GDP has named.
 - **Opening and merging PRs.** GDP has Copilot access. It opens and merges PRs under Matthew's standing order, so work starts itself. GDP merges once the assigned reviewer's verdict is PASS or PASS-with-P2 (no P1) on the exact SHA.
@@ -46,6 +54,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 - **Spend proposals.** GDP writes the proposal. Approval stays with Matthew.
 
 ### Chemdawg (Engineering Lead): pre-checks, CI status, and reviewer assignment
+
 - **Pre-checks.** On every PR head, Chemdawg checks scope, the closed file plan, tests, and that CI is finished.
 - **Verdict format.** Three lines, posted in the routing channel:
   - the PR URL
@@ -56,6 +65,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 - **Intake of unplaceable PRs.** When no routing rule matches, or a reviewer goes silent, Chemdawg picks it up and reports it.
 
 ### Blue Dream and Critical Mass: independent verdicts
+
 - **One verdict per exact SHA:** `PASS`, `PASS-with-P2`, `FAIL`, `BLOCKED`, or `NOT_MEASURED`, with a list of P1 and P2 issues.
 - **Blue Dream gets** P1 fixes, anything that gates a publish, and UI changes (pages, components, `.tsx`).
 - **Critical Mass gets** lib, logic, test, and docs-only changes, plus QA, accessibility, search, and content-quality PRs.
@@ -64,6 +74,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 - **Neither reviews work it owns.**
 
 ### Golden Toad and Toad Venom: finding bugs
+
 - Fixture-break sweeps run every day, all day, at :03 and :33 past the hour.
 - Ranked FAILs go to GDP, who opens them as fix slices right away.
 - Golden Toad uses only the cheekhimself fixture account, never the KEEP account (matt@). Toad Venom never signs in as the owner.
@@ -72,20 +83,22 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 - If the fixture is signed out, a sweep stops with AUTH_NEEDED and does not try a saved password.
 
 ### Tie-breakers
-| Item | Owner |
-|---|---|
-| Webhook creation, secret, receiver code | Codex |
-| Re-running or fixing a failed check | Codex |
-| Deciding that a failed check blocks a PR, and posting it | Chemdawg |
-| Pre-check rules and verdicts | Chemdawg |
-| Code that consumes pre-check verdicts | Codex |
-| Reviewer assignment and claim ledger | Chemdawg's pre-check, by file path (the 4.3 bot takes over when live); GDP can override |
-| Review verdicts | Blue Dream / Critical Mass by file path; Codex for CI and build infrastructure |
-| Opening and merging PRs (via Copilot) | GDP |
-| Edits to this file | Codex |
-| Anything not listed | GDP decides and adds a row here |
+
+| Item                                                     | Owner                                                                                   |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Webhook creation, secret, receiver code                  | Codex                                                                                   |
+| Re-running or fixing a failed check                      | Codex                                                                                   |
+| Deciding that a failed check blocks a PR, and posting it | Chemdawg                                                                                |
+| Pre-check rules and verdicts                             | Chemdawg                                                                                |
+| Code that consumes pre-check verdicts                    | Codex                                                                                   |
+| Reviewer assignment and claim ledger                     | Chemdawg's pre-check, by file path (the 4.3 bot takes over when live); GDP can override |
+| Review verdicts                                          | Blue Dream / Critical Mass by file path; Codex for CI and build infrastructure          |
+| Opening and merging PRs (via Copilot)                    | GDP                                                                                     |
+| Edits to this file                                       | Codex                                                                                   |
+| Anything not listed                                      | GDP decides and adds a row here                                                         |
 
 ## 3. Standing locks (unchanged)
+
 - **knk:** no production database access. This lock is Matthew's alone to lift.
 - **HOLD #1250:** stays on hold.
 - **Untouchable drafts:** #1625, #1727, #1737, #1735, #1369. Nothing auto-assigns, merges, or edits them.
@@ -94,6 +107,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 ## 4. Connector spec
 
 ### 4.1 CI status webhook (Codex)
+
 - **Purpose.** Report a PR's CI result the moment its checks settle, on any Verdant PR, with no hand-kept PR lists.
 - **Trigger.** A repo webhook on `check_suite.completed`, plus `pull_request` events `opened`, `synchronize`, `ready_for_review`, and `closed`. There is no per-check `check_run` event: a full run has 90 to 98 checks.
 - **Auth.** GitHub signs each delivery with an HMAC-SHA256 in `X-Hub-Signature-256`, keyed by a shared secret stored as a Grok Bot secret. Deliveries with a bad signature, from another repo, or from a fork are dropped.
@@ -113,6 +127,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 - **Retires** Chemdawg's per-PR watch routine once it is live.
 
 ### 4.2 Routing channel with Grand Daddy Grok (Codex runs the integration)
+
 - **Status: live.** The Grok Bot group chat "Engineering Lead, Matthew Cheek" is the routing channel.
 - **Members.** GDP, Chemdawg, Blue Dream, Golden Toad, Critical Mass, and Toad Venom (six, the channel maximum). MotorBreath stays on call outside the channel for CI command packs. Matthew reads the channel, and nothing in it waits on him.
 - **Post tags.** Every post names the PR and the full SHA:
@@ -136,6 +151,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 - **Digest.** GDP posts an end-of-day digest. Only `[ESCALATE]` lines notify Matthew right away.
 
 ### 4.3 Auto-assignment for Blue Dream and Critical Mass (Codex)
+
 - **Until this bot is live,** Chemdawg's pre-check assigns reviewers by hand with the same path rules (section 2).
 - **Trigger.** CI is PASS on the exact SHA (4.1), and Chemdawg's `[PRECHECK]` says READY. Verdant PRs stay drafts until merge, so `ready_for_review` isn't required.
 - **Rules, applied in order.**
@@ -146,6 +162,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
   5. **Critical Mass preference** for QA, accessibility, search, and content-quality PRs.
 
   Unknown priority counts as high and goes to Blue Dream.
+
 - **Claim ledger.** One row per PR and SHA: reviewer, time, and state (claimed, verdict, released). A new push releases the claim and re-routes the PR.
 - **Conflicts.**
   - If both reviewers claim a PR, the first claim wins.
@@ -157,6 +174,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 - **Never** assigns HOLD or untouchable PRs.
 
 ### 4.4 Build order
+
 1. Webhook, about 2 to 4 hours (estimate).
 2. Routing integration: parser, tags, and digest. About 1 to 2 hours (estimate), since the channel itself is live.
 3. Auto-assignment, about 4 to 8 hours (estimate).
@@ -164,6 +182,7 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 Codex builds each one as a draft PR. GDP merges it after a Blue Dream or Critical Mass PASS, and Codex posts `[READY]` when the connector is live.
 
 ## 5. The loop, end to end (no human step)
+
 1. Toad sweep or grower report
 2. GDP names a slice
 3. Copilot or Codex opens a draft
@@ -178,12 +197,14 @@ Codex builds each one as a draft PR. GDP merges it after a Blue Dream or Critica
 A FAIL at step 4 or step 7 goes back to step 3 automatically.
 
 ## 6. Self-starting handoffs
+
 - **Repo only.** Every change to this file, the spec, or a connector lands as a commit in the repo, never as a local scratch file. If it isn't in the repo, it isn't decided. Agents point at `docs/agents/OWNERSHIP.md` instead of passing files around.
 - **When this file or the connector spec changes on `verdant-grow-diary`:** a merge watcher posts `[SPEC]` in the routing channel, naming the next owner and action. GDP names the Codex slice without waiting on anyone.
 - **When a connector PR merges:** the same watcher posts `[READY]` and wakes the next dependent build. Webhook live starts the routing integration; routing live starts auto-assignment; webhook live also retires the per-PR watch list.
 - **When a new Copilot or Codex draft opens:** the watcher adds it to Chemdawg's pre-check intake, so no PR has to be added by hand.
 
 ## 7. Open items (owner in brackets)
+
 - **O1: settled.** GDP opens and merges PRs through Copilot (Matthew, 2026-09-28).
 - **O2 [Codex + GDP]: self-review.** Codex reviews CI and build-infrastructure PRs, and it wrote the connector PRs itself. On those, the Blue Dream or Critical Mass verdict is the one that counts, so nobody signs off on their own code.
 - **O3 [Codex]: GitHub admin access.** Creating the webhook needs repo-admin rights. If Codex doesn't have them, a one-time grant is the only human step left, and it happens outside the review path.

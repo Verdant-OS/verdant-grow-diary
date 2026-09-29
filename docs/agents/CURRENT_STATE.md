@@ -2,6 +2,89 @@
 
 # Verdant — Current Operating State
 
+## Release and coverage measurement — 2026-09-28 23:46:17 UTC
+
+- **PASS, release identity only:** live `/version.json` reports
+  `566315cedd80e8d2a9ba3d312b5c466fdb568fa3`, `dirty:false`; its build time is
+  `2026-09-28T18:32:56.291Z`. The response does not prove an RPC, migration,
+  deployment platform or signed-in product result.
+- **PASS, source history:** deploy tip
+  `6ca97026437ab556f7fbac752abfbe8085c1f271` is four merged commits ahead:
+  #1752 `13c28a14c28fc27342a4c5d46dbb094642dcacde`,
+  #1744 `bed36ab5d447136100fa776882a69af0b5ce2de7`,
+  #1684 `3c8113eae50bee83a7f7fe4086ab53879817784a`,
+  #1762 `6ca97026437ab556f7fbac752abfbe8085c1f271`.
+- **NOT_MEASURED, publisher control plane:** the supplied founder handoff reports
+  seven failed Vercel Production gates since September 26 and last success
+  `4ddb2322`. Codex has not independently measured that dashboard count,
+  Deployment Checks list or production deployment URL. Vercel promotion is the
+  owner's release lane; no agent publishes, promotes or rolls back.
+- **PASS, bounded inventory read:** at 23:40 UTC, all pages of the current-head
+  check results were read for 61 open PRs. Seventeen heads had failures,
+  seventeen had pending checks, and thirty-five had all 35 source-pinned required
+  contexts successful. Categories overlap. This is not independent review,
+  live ruleset inspection or merge readiness. #1778 opened after that snapshot.
+- **PASS locally / NOT_MEASURED acceptance:** #1754 is now
+  `0384753ae911eca2a989694f8514f116dc903757`, after merging the deploy base and
+  repairing invalid VPD/CO2 and legacy manual validation. Eleven focused files:
+  242 passed, 0 failed, 0 skipped; actual typecheck: 0 diagnostics. Fresh CI and
+  Blue Dream review at that exact head are not replaced by the old 4c40dfcc receipt.
+  Blue Dream PASS is needed by 8:15 p.m. America/Chicago for tonight's publish.
+- **FAIL / in progress, #1754 hosted checks at 23:58 UTC:** 92 records at that
+  exact head: 42 success, 4 skipped, 32 queued, 12 in progress, 2 failed.
+  The root job 109183930277 fails on high `fast-uri` advisories; nested job
+  109183929756 fails on moderate `undici` GHSA-3wwx-pv8p-q78v. Both logs were
+  read. These are check records, not unique tests; no current acceptance review
+  is posted. Dependency changes remain locked.
+- **PASS locally / NOT_MEASURED acceptance:** #1778 is the separate two-file
+  core CI draft at `4e6710b9872e4c75cb478ea342f083796a561c7a`.
+  `verify-sandbox` becomes manual-only; `verify-production` is unchanged.
+  Two files: 167 passed, 0 failed, 0 skipped; actual typecheck: 0 diagnostics.
+  Critical Mass owns the named CI slice's acceptance; GDP owns merge.
+- **FAIL, retired core probe; no production verdict:** run 36489973074 at
+  `bed36ab5d447136100fa776882a69af0b5ce2de7` failed its exact catalog query
+  (psql 1, runner 5). The production job was skipped.
+- **PASS, sandbox money probe only:** run 36489972966 at that same source head
+  reported 17 expected / 17 applied / 0 missing. Its production job was skipped.
+  The conditional same-cause money repair does not apply. Its automatic
+  non-production trigger remains a separate policy follow-up; #1778 does not change it.
+- **BLOCKED, dependency scope:** fresh repaired-head logs identify high
+  `fast-uri` advisories 1239943/1239946 and the nested-static lane's separate
+  moderate `undici` advisory GHSA-3wwx-pv8p-q78v. Existing dependency/lockfile
+  locks prevent a repair in these slices. No exception, audit bypass or lock edit
+  was made. Earlier successful local audits are historical, not current acceptance.
+- **PASS locally / NOT_MEASURED acceptance:** #1757 is
+  `f2b13c0609bacae468902d1adc9634c2b1ecc6d7`, a two-file discovery diff after
+  merging base. Nine focused tests passed; helper checks 29/29 and workflow-safety
+  checks 6/6; typecheck: 0 diagnostics. These are separate overlapping checks,
+  not a summed unique-test count. Empty #1765 is proposed for GDP closure only.
+- **BLOCKED, governance sequencing:** #1767 remains open at
+  `54c6c3281aea83c868b83cb25e248f53bd8da2d9`. Existing #1777 carries the
+  production-only docs draft; the final 2026-09-28.2 amendment and initial
+  `HANDOFF_LOG.md` are prepared locally behind #1767. #1696 is not updated
+  until #1767 lands. Historical receipts below are preserved.
+- **PASS locally / NOT_MEASURED acceptance, startup-gate compatibility:** separate
+  CI draft #1779 is `a8c4b29740dbdec01f0d7b4b281bbe80f9d41130`. The old checker
+  failed on the new `open_handoffs_checked` field. The version-aware repair passes
+  26 governance tests, 0 failed, 0 skipped, and accepts the prepared 2026-09-28.2
+  documents against #1767's exact head. Its candidate validation does not replace
+  the checker currently on the deploy branch. #1779 must land before the final
+  #1777 amendment; #1767 still lands first. Critical Mass reviews #1779.
+- **NOT_MEASURED, production acceptance:** no repaired draft has been declared
+  deployed. Signed-in save/readback, hosted schema and Edge acceptance remain
+  unmeasured. Fixture-only smoke uses `cheekhimself@gmail.com`, never matt@/KEEP;
+  tag records `[smoke <timestamp>]`. The proposed plus-alias signup is unconfirmed
+  and no fixture user has been created.
+- **Locks:** production database (knk), HOLD #1250; do not edit #1625, #1727,
+  #1735, #1737 or #1369 (REVIEW ONLY). #1740 NEVER MERGE; #1742/#1658 locked;
+  #1741/#1745 retain database-approval holds. No ready, auto-merge, merge, Publish,
+  production SQL/APPLY/PREFLIGHT, device or Action Queue operation was performed.
+
+Current coverage blocks: [HANDOFF_LOG.md](HANDOFF_LOG.md).
+Owner/reviewer seats: [OWNERSHIP.md](OWNERSHIP.md).
+These measured facts do not change the durable rules or any historical review SHA.
+
+
 ## Current verification/review decision — 2026-09-28
 
 Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep

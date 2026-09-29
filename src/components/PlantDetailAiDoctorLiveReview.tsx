@@ -69,7 +69,9 @@ import { evaluateAiDoctorReviewEligibility } from "@/lib/aiDoctorReviewEligibili
 import {
   buildAiDoctorLiveReviewScopeKey,
   canRetryAiDoctorLiveReviewFailure,
+  getAiDoctorLiveReviewVisibility,
   isAiDoctorServiceUnavailableFailure,
+  type AiDoctorLiveReviewVisibilityResult,
 } from "@/lib/aiDoctorLiveReviewRecoveryRules";
 import { resolveAiDoctorImportedHistoryRecovery } from "@/lib/aiDoctorImportedHistoryRecoveryRules";
 import { applyStageTargetSeverityToPacket } from "@/lib/aiDoctorPacketStageTargetRules";
@@ -87,6 +89,12 @@ export const AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY =
   "AI Doctor review could not be safely displayed. Add more context or try again later.";
 export const AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY =
   "AI Doctor is unavailable right now because of a problem on Verdant's side, not your plant's context. No AI credit was used. Try again later.";
+export const AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_NOTE_COPY =
+  "This review used evidence that was current when it started.";
+export const AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_RETRY_BLOCK_COPY =
+  "Evidence is older than 7 days. Capture a fresh reading to retry.";
+export const AI_DOCTOR_LIVE_REVIEW_UNKNOWN_EVIDENCE_RETRY_BLOCK_COPY =
+  "Evidence freshness could not be established. Capture a fresh reading to retry.";
 export const AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY =
   "Context is partial — review may have limited confidence.";
 export const AI_DOCTOR_LIVE_REVIEW_STRONG_COPY = "Context is strong enough for a cautious review.";
@@ -173,6 +181,8 @@ function PlantDetailAiDoctorLiveReviewScope({
   const [rootZoneOmissionScope, setRootZoneOmissionScope] = useState<string | null>(null);
   const [acceptedReviewRequest, setAcceptedReviewRequest] =
     useState<AcceptedAiDoctorReviewRequest | null>(null);
+  const [retryBlockedReason, setRetryBlockedReason] =
+    useState<AiDoctorLiveReviewVisibilityResult["retryBlockedReason"]>(null);
   const [, setContextRevision] = useState(0);
   const historyOmissionAcknowledged = historyOmissionScope === historyScopeKey;
   const rootZoneOmissionAcknowledged = rootZoneOmissionScope === historyScopeKey;
@@ -455,23 +465,59 @@ function PlantDetailAiDoctorLiveReviewScope({
   // current sources at acceptance time, so aging alone cannot hide a review.
   // Real source removal still revokes ordinary context; newly valid current
   // context and the existing historical/omission/root-zone exceptions remain.
-  const activeReviewEligibility = activeReviewRequest
-    ? evaluateAiDoctorReviewEligibility({
-        context: evaluateContext(activeReviewRequest.acceptedAtMs),
-        hasPlantProfile: plant !== null,
-        importedHistory: candidatePacket.imported_sensor_history,
-        historicalRows: queryTentSensorRows,
-        missingLiveSensorReadings: candidatePacket.missingLiveSensorReadings === true,
-      })
-    : null;
-  const activeReviewVisible =
-    activeReviewRequest !== null &&
-    (allowed ||
-      activeReviewEligibility?.allowed === true ||
-      activeReviewRequest.mode === "historical_review" ||
-      activeReviewRequest.omittedImportedHistory ||
-      activeReviewRequest.omittedRootZoneHistory ||
-      (activeReviewRequest.includedRootZoneHistory && queryRootZoneRecovery.blocksReview));
+  const activeReviewAcceptedContext = useMemo(
+    () => (activeReviewRequest ? evaluateContext(activeReviewRequest.acceptedAtMs) : null),
+    [activeReviewRequest, evaluateContext],
+  );
+  const activeReviewEligibility = useMemo(
+    () =>
+      activeReviewRequest && activeReviewAcceptedContext
+        ? evaluateAiDoctorReviewEligibility({
+            context: activeReviewAcceptedContext,
+            hasPlantProfile: plant !== null,
+            importedHistory: candidatePacket.imported_sensor_history,
+            historicalRows: queryTentSensorRows,
+            missingLiveSensorReadings: candidatePacket.missingLiveSensorReadings === true,
+          })
+        : null,
+    [
+      activeReviewAcceptedContext,
+      activeReviewRequest,
+      candidatePacket.imported_sensor_history,
+      candidatePacket.missingLiveSensorReadings,
+      plant,
+      queryTentSensorRows,
+    ],
+  );
+  const activeReviewVisibilityNow = Date.now();
+  const activeReviewVisibility = useMemo(
+    () =>
+      activeReviewRequest
+        ? getAiDoctorLiveReviewVisibility({
+            allowed,
+            acceptedEligibilityAllowed: activeReviewEligibility?.allowed === true,
+            mode: activeReviewRequest.mode,
+            omittedImportedHistory: activeReviewRequest.omittedImportedHistory,
+            omittedRootZoneHistory: activeReviewRequest.omittedRootZoneHistory,
+            includedRootZoneHistory: activeReviewRequest.includedRootZoneHistory,
+            rootZoneBlocksReview: queryRootZoneRecovery.blocksReview,
+            evidenceCapturedAt: activeReviewRequest.packet.recentSensorSnapshot?.capturedAt ?? null,
+            now: activeReviewVisibilityNow,
+          })
+        : {
+            visible: false,
+            retryBlockedReason: null,
+            showsStaleEvidenceNote: false,
+          },
+    [
+      activeReviewRequest,
+      activeReviewEligibility?.allowed,
+      activeReviewVisibilityNow,
+      allowed,
+      queryRootZoneRecovery.blocksReview,
+    ],
+  );
+  const activeReviewVisible = activeReviewVisibility.visible;
 
   // If a background/refocus refetch succeeds before the grower starts, the
   // earlier omission choice is no longer relevant. Once a review has begun,
@@ -495,6 +541,15 @@ function PlantDetailAiDoctorLiveReviewScope({
       setRootZoneOmissionScope(null);
     }
   }, [historyScopeKey, review.status, rootZoneHistory.isError, rootZoneOmissionScope]);
+  useEffect(() => {
+    if (retryBlockedReason === null) return;
+    if (
+      review.status !== "error" ||
+      activeReviewVisibility.retryBlockedReason !== retryBlockedReason
+    ) {
+      setRetryBlockedReason(null);
+    }
+  }, [activeReviewVisibility.retryBlockedReason, retryBlockedReason, review.status]);
 
   // Credit denials have no newly saved result, so they return to the same
   // plant-scoped reviewer. The post-value handoff below uses the durable
@@ -686,11 +741,19 @@ function PlantDetailAiDoctorLiveReviewScope({
   const showRootZoneRecovery =
     rootZoneRecovery.state === "decision_required" || showRootZoneOmission;
   const showReviewAction = activeReviewRequest
-    ? review.status === "error" && canRetryReview
+    ? review.status === "error" && canRetryReview && retryBlockedReason === null
     : allowed &&
       historyRecovery.state !== "decision_required" &&
       rootZoneRecovery.state !== "decision_required" &&
       review.status === "idle";
+  const liveReviewFailureCopy =
+    retryBlockedReason === "stale-evidence"
+      ? AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_RETRY_BLOCK_COPY
+      : retryBlockedReason === "unknown-evidence-freshness"
+        ? AI_DOCTOR_LIVE_REVIEW_UNKNOWN_EVIDENCE_RETRY_BLOCK_COPY
+        : isAiDoctorServiceUnavailableFailure(review.reason)
+          ? AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY
+          : AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY;
 
   if (!allowed && !showHistoryRecovery && !showRootZoneRecovery && !activeReviewVisible)
     return null;
@@ -716,6 +779,7 @@ function PlantDetailAiDoctorLiveReviewScope({
   const handleInitialStart = () => {
     if (!review.canStart) return;
     if (!packet || pendingAcceptedReviewStartRef.current === historyScopeKey) return;
+    setRetryBlockedReason(null);
 
     const acceptedAt = new Date();
     const acceptedContext = evaluateContext(acceptedAt.getTime());
@@ -780,6 +844,18 @@ function PlantDetailAiDoctorLiveReviewScope({
       trackFunnelEvent("historical_ai_review_started");
     }
   };
+  const handleRetryReview = () => {
+    if (activeReviewVisibility.retryBlockedReason === "stale-evidence") {
+      setRetryBlockedReason("stale-evidence");
+      return;
+    }
+    if (activeReviewVisibility.retryBlockedReason === "unknown-evidence-freshness") {
+      setRetryBlockedReason("unknown-evidence-freshness");
+      return;
+    }
+    setRetryBlockedReason(null);
+    review.retry();
+  };
   const confidenceCopy = activeReviewRequest?.confidenceCopy ?? candidateConfidenceCopy;
   // Before start, disclose the exact sanitized history from the allowed packet
   // that could reach AI Doctor. Once a review begins, stay pinned to its
@@ -815,7 +891,7 @@ function PlantDetailAiDoctorLiveReviewScope({
         {showReviewAction ? (
           <button
             type="button"
-            onClick={review.status === "error" ? review.retry : handleInitialStart}
+            onClick={review.status === "error" ? handleRetryReview : handleInitialStart}
             disabled={!review.canStart}
             data-testid={
               review.status === "error"
@@ -837,6 +913,14 @@ function PlantDetailAiDoctorLiveReviewScope({
       >
         {confidenceCopy}
       </p>
+      {activeReviewVisibility.showsStaleEvidenceNote ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="plant-ai-doctor-live-review-stale-evidence-note"
+        >
+          {AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_NOTE_COPY}
+        </p>
+      ) : null}
 
       <AiDoctorImportedHistoryDisclosurePanel context={importedHistoryDisclosureContext} />
 
@@ -962,10 +1046,17 @@ function PlantDetailAiDoctorLiveReviewScope({
             data-testid="plant-ai-doctor-live-review-credit-denied"
           />
         ) : review.reason === "upstream_credit_exhausted" ? (
-          <AiCreditServiceDegradedNotice
-            surface="doctor"
-            data-testid="plant-ai-doctor-live-review-upstream-credit-exhausted"
-          />
+          <>
+            <AiCreditServiceDegradedNotice
+              surface="doctor"
+              data-testid="plant-ai-doctor-live-review-upstream-credit-exhausted"
+            />
+            {retryBlockedReason !== null ? (
+              <p role="status" data-testid="plant-ai-doctor-live-review-evidence-retry-block">
+                {liveReviewFailureCopy}
+              </p>
+            ) : null}
+          </>
         ) : (
           <p
             className="text-xs text-amber-200"
@@ -976,9 +1067,7 @@ function PlantDetailAiDoctorLiveReviewScope({
             role="status"
             aria-live="polite"
           >
-            {isAiDoctorServiceUnavailableFailure(review.reason)
-              ? AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY
-              : AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY}
+            {liveReviewFailureCopy}
           </p>
         )
       ) : null}

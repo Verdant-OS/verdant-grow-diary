@@ -5,7 +5,7 @@ name: Settings account consent production proof
 on:
   workflow_dispatch:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "e2e/lib/settingsAccountProofRules.ts"
       - "e2e/lib/signedInReadonlyProof.ts"

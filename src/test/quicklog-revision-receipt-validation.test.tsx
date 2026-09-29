@@ -115,7 +115,7 @@ describe.each<Kind>(["correction", "retraction"])("%s receipt validation", (kind
       error: null,
     });
 
-    await expect(submit(kind)).resolves.toEqual({ ok: false, reason: "rpc_error" });
+    await expect(submit(kind)).resolves.toEqual({ ok: false, reason: "receipt_mismatch" });
     expect(rpc).toHaveBeenCalledOnce();
   });
 
@@ -127,7 +127,7 @@ describe.each<Kind>(["correction", "retraction"])("%s receipt validation", (kind
 
     await expect(submit(kind, { diaryEntryId: DIARY_ID })).resolves.toEqual({
       ok: false,
-      reason: "rpc_error",
+      reason: "receipt_mismatch",
     });
     expect(rpc).toHaveBeenCalledOnce();
   });

@@ -18,6 +18,8 @@ def utc_now() -> datetime:
 
 
 def parse_time(value: str) -> datetime:
+    if not isinstance(value, str):
+        raise ValueError("Local state timestamp is invalid; no payload echoed")
     result = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if result.tzinfo is None:
         raise ValueError("Local state timestamp must contain UTC offset")

@@ -33,8 +33,9 @@ class ConfigError(ValueError):
 
 
 def credential_key(key: str) -> bool:
-    lower = key.lower()
-    return lower in SECRET_KEYS or any(word in lower for word in ("token", "password", "secret", "api_key"))
+    lower = key.lower().replace("-", "_")
+    return lower in SECRET_KEYS or any(word in lower for word in (
+        "token", "password", "secret", "api_key", "apikey", "passkey", "authorization"))
 
 
 def sanitize(value: Any, *, secrets: tuple[str, ...] = ()) -> Any:

@@ -32,6 +32,13 @@ class MultiTentTests(unittest.TestCase):
         self.path.write_text(json.dumps(config), encoding="utf-8")
         return load_tent_map(self.path, ENV if env is None else env)
 
+    def test_prefixed_or_numbered_credential_keys_are_removed_from_unknown_fields(self):
+        raw = {key: "synthetic-private-value" for key in (
+            "X-API-Key", "apiKey2", "PASSKEY1", "Proxy-Authorization")}
+        raw["temperature_channel_note"] = "keep this non-credential field"
+        self.assertEqual(sanitize(raw), {
+            "temperature_channel_note": "keep this non-credential field"})
+
     def test_two_tents_route_without_cross_attribution(self):
         tents, aliases = self.load([tent(air_channels=[1], soil_channels=[1],
                                         soil_temp_channels=[1], co2=True),

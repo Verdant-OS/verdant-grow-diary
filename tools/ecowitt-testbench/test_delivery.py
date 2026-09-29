@@ -125,6 +125,20 @@ class DeliveryTests(DeliveryFixture):
             self.spool()
         self.assertNotIn("never-print", str(caught.exception))
 
+    def test_non_string_saved_timestamps_fail_closed_without_echoing_payload(self):
+        for field, value in (("created_at", None), ("next_attempt_at", False)):
+            with self.subTest(field=field):
+                (self.root / "queue.jsonl").unlink(missing_ok=True)
+                spool = self.spool()
+                entry = spool.enqueue("id", self.reading())
+                entry[field] = value
+                (self.root / "queue.jsonl").write_text(
+                    json.dumps({"op": "put", "entry": entry}) + "\n")
+                with self.assertRaises(ValueError) as caught:
+                    self.spool()
+                self.assertIn("invalid complete record", str(caught.exception))
+                (self.root / "queue.jsonl").unlink()
+
     def test_credentials_never_written_even_nested(self):
         reading = self.reading()
         reading["metadata"]["raw_payload"]["PASSKEY"] = "synthetic-passkey"

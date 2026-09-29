@@ -11,6 +11,7 @@ on:
       - "scripts/lib/candidateNumberToolRuntime.mjs"
       - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
       - "scripts/lib/productionSupabaseTls.mjs"
+      - "scripts/lib/supabaseMigrationLedgerShape.mjs"
       - ".github/workflows/apply-quicklog-corrections-retractions.yml"
       - ".github/workflows/quicklog-corrections-retractions-pg15.yml"
       - ".github/workflows/required-core-migrations.yml"
@@ -21,6 +22,7 @@ on:
       - "scripts/required-core-migrations.mjs"
       - "src/test/required-core-migrations-gate.test.ts"
       - "src/test/production-supabase-tls.test.ts"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - verdant-grow-diary
@@ -29,6 +31,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   pg15_runtime:

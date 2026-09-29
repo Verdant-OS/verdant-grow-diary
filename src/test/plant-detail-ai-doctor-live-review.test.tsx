@@ -72,6 +72,7 @@ import PlantDetailAiDoctorLiveReview, {
   AI_DOCTOR_HISTORY_SAVE_FAILED_COPY,
   AI_DOCTOR_LIVE_REVIEW_LOADING_COPY,
   AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY,
+  AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY,
   AI_DOCTOR_LIVE_REVIEW_VALIDATED_LABEL,
 } from "@/components/PlantDetailAiDoctorLiveReview";
 import { buildAiDoctorSessionPersistenceFailureDiagnostic } from "@/lib/aiDoctorSessionPersistenceFailureRules";
@@ -202,6 +203,48 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     // No approve/reject buttons rendered.
     expect(screen.queryByText(/approve/i)).toBeNull();
     expect(screen.queryByText(/reject/i)).toBeNull();
+  });
+
+  it("sends the model a stage-graded snapshot: RH 95% in flower is a warning, not ok (BUG-008)", async () => {
+    const timeline = strongTimeline();
+    const snapshot = timeline[0] as Extract<TimelineMemoryItem, { kind: "manual_sensor_snapshot" }>;
+    snapshot.card = {
+      ...snapshot.card,
+      severity: "ok",
+      readings: [
+        { field: "temperature_c", value: 23.9, unit: "C" },
+        { field: "humidity_pct", value: 95, unit: "%" },
+      ],
+    } as unknown as ManualSnapshotTimelineCard;
+    itemsRef.current = timeline;
+    const invoke = vi.fn().mockResolvedValue({
+      data: { ok: true, result: validResult() },
+      error: null,
+    });
+    render(<PlantDetailAiDoctorLiveReview plantId="p1" plant={strongPlant} invoke={invoke} />);
+    await screen.findByTestId("plant-ai-doctor-live-review");
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+
+    const [fn, init] = invoke.mock.calls[0] as [
+      string,
+      {
+        body: {
+          packet: {
+            recentSensorSnapshot: { severity: string } | null;
+            recentSensorSnapshotAnnotation: { safetyNotes: string[] } | null;
+          };
+        };
+      },
+    ];
+    expect(fn).toBe("ai-doctor-review");
+    const sent = init.body.packet;
+    expect(sent.recentSensorSnapshot?.severity).toBe("warning");
+    expect(sent.recentSensorSnapshotAnnotation?.safetyNotes).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^Current humidity 95% is above the flower target range/),
+      ]),
+    );
   });
 
   it("shows a durable saved-history receipt and links the exact session", async () => {
@@ -501,6 +544,34 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     await waitFor(() =>
       expect(screen.getByTestId("plant-ai-doctor-live-review-validated-label")).toBeTruthy(),
     );
+  });
+
+  it("says AI Doctor is unavailable, not that context is missing, on a server config failure", async () => {
+    itemsRef.current = strongTimeline();
+    const invoke = vi.fn().mockResolvedValue({
+      data: { ok: false, reason: "config" },
+      error: null,
+    });
+    render(<PlantDetailAiDoctorLiveReview plantId="p1" plant={strongPlant} invoke={invoke} />);
+    fireEvent.click(await screen.findByTestId("plant-ai-doctor-live-review-start"));
+    const failure = await screen.findByTestId("plant-ai-doctor-live-review-failure");
+    expect(failure.textContent).toBe(AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY);
+    expect(failure).toHaveAttribute("data-failure-kind", "service_unavailable");
+    expect(failure.textContent).not.toContain("Add more context");
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the review failure copy for failures that are not server config", async () => {
+    itemsRef.current = strongTimeline();
+    const invoke = vi.fn().mockResolvedValue({
+      data: { ok: false, reason: "timeout" },
+      error: null,
+    });
+    render(<PlantDetailAiDoctorLiveReview plantId="p1" plant={strongPlant} invoke={invoke} />);
+    fireEvent.click(await screen.findByTestId("plant-ai-doctor-live-review-start"));
+    const failure = await screen.findByTestId("plant-ai-doctor-live-review-failure");
+    expect(failure.textContent).toBe(AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY);
+    expect(failure).toHaveAttribute("data-failure-kind", "review");
   });
 
   it("falls into calm failure when server returns contract-invalid content", async () => {

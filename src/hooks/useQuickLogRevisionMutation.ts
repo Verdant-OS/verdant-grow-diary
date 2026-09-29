@@ -25,6 +25,7 @@ interface PendingRevision {
 export function useQuickLogRevisionMutation(ownerId: string | null, handle: QuickLogEntryHandle) {
   const [busy, setBusy] = useState(false);
   const [unconfirmed, setUnconfirmed] = useState(false);
+  const [blockedByReceiptMismatch, setBlockedByReceiptMismatch] = useState(false);
   const pending = useRef<PendingRevision | null>(null);
   const inFlight = useRef(false);
   const alive = useRef(true);
@@ -43,6 +44,7 @@ export function useQuickLogRevisionMutation(ownerId: string | null, handle: Quic
   ): Promise<QuickLogRevisionWriteResult | null> => {
     if (inFlight.current || !alive.current) return null;
     if (!ownerId) return { ok: false, reason: "not_authenticated" };
+    if (blockedByReceiptMismatch) return { ok: false, reason: "receipt_mismatch" };
     if (pending.current && pending.current.kind !== kind) {
       return { ok: false, reason: "rpc_error" };
     }
@@ -74,14 +76,17 @@ export function useQuickLogRevisionMutation(ownerId: string | null, handle: Quic
       if (alive.current) setBusy(false);
     }
     if (!alive.current) return null;
+    const receiptMismatch = !result.ok && result.reason === "receipt_mismatch";
     // A later rejection cannot disprove an earlier ambiguous commit.
     const unknown =
       !result.ok &&
+      !receiptMismatch &&
       (pending.current !== null ||
         result.reason === "rpc_error" ||
         !Object.hasOwn(QUICKLOG_REVISION_FAILURE_COPY, result.reason));
     pending.current = unknown ? request : null;
     setUnconfirmed(unknown);
+    setBlockedByReceiptMismatch(receiptMismatch);
     return unknown ? { ok: false, reason: "rpc_error" } : result;
   };
   return { busy, unconfirmed, pendingKind: unconfirmed ? pending.current?.kind : null, submit };

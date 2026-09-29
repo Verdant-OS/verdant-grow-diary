@@ -274,6 +274,37 @@ describe("Plants page async-state contract", () => {
     expect(screen.queryByTestId("plants-empty-unconfirmed")).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["loading", { loading: true, error: null }],
+    ["failed", { loading: false, error: "network" }],
+  ])("labels no plant as in an archived grow while the grows list is %s", (_state, grows) => {
+    // Codex review on #1683: an unresolved grows list is empty, which made
+    // every assigned plant read as "in archived grows".
+    mocks.scope.urlGrowId = null;
+    mocks.scope.scopedGrowName = null;
+    mocks.scope.isValidScopedGrow = false;
+    mocks.growsState.grows = [];
+    mocks.growsState.loading = grows.loading;
+    mocks.growsState.error = grows.error;
+    mocks.queries.workspace = successfulQuery([mocks.plant, mocks.plantB]);
+    mocks.queries.archivedByGrow.set("all", successfulQuery([mocks.plant, mocks.plantB]));
+    renderPlants();
+    const all = screen.getByTestId("plants-grow-filter-option-all");
+    expect(all.textContent).toBe("All grows (2 plants)");
+  });
+
+  it("names plants in grows missing from a loaded grows list", () => {
+    mocks.scope.urlGrowId = null;
+    mocks.scope.scopedGrowName = null;
+    mocks.scope.isValidScopedGrow = false;
+    mocks.growsState.grows = [{ id: "grow-a", name: "Grow A" }];
+    mocks.queries.workspace = successfulQuery([mocks.plant, mocks.plantB]);
+    mocks.queries.archivedByGrow.set("all", successfulQuery([mocks.plant, mocks.plantB]));
+    renderPlants();
+    const all = screen.getByTestId("plants-grow-filter-option-all");
+    expect(all.textContent).toBe("All grows (2 plants · 1 in archived grows)");
+  });
+
   it("retries only the selected failed supplemental query", () => {
     const failedTents = { ...mocks.makeQuery(undefined), isError: true };
     mocks.queries.tents = failedTents;

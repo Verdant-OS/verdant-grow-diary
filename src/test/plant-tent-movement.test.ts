@@ -5,7 +5,7 @@
  *  - pure rules in src/lib/plantTentMovementRules.ts
  *  - static guardrails for AssignTentDialog: writes a movement event to
  *    diary_entries but never to sensor_readings / alerts / action_queue.
- *  - grower-native labels: Move Plant, Current Tent, Previous Tent.
+ *  - grower-native labels: Move Plant, Current Tent, Moving from.
  *  - Add Tent / Add Plant entry points still exist.
  *  - Archive preferred over hard delete on tents/plants UI surfaces.
  *
@@ -171,10 +171,13 @@ describe("AssignTentDialog · movement timeline event", () => {
     );
   });
 
-  it("uses grower-native labels (Move Plant / Current Tent / Previous Tent)", () => {
+  it("uses grower-native labels (Move Plant / Current Tent / Moving from)", () => {
     expect(DIALOG).toContain("Move Plant");
     expect(DIALOG).toContain("Current Tent");
-    expect(DIALOG).toContain("Previous Tent");
+    // "Previous Tent" named the plant's CURRENT tent (QA 2026-09-24); the
+    // rendered label is asserted in assign-tent-partial-failure-honesty.
+    expect(DIALOG).toContain("{MOVE_PLANT_FROM_LABEL}: {current[0].name}");
+    expect(DIALOG).not.toContain("Previous Tent");
   });
 });
 

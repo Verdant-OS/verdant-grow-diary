@@ -83,9 +83,13 @@ until terminal.
 [Job 109499761284](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/36595650327/job/109499761284)
 records **1 passed / 1 failed / 0 skipped** in fixture verification, with one
 automatic retry; fixture step FAILURE, write-smoke step SKIPPED. The job's
-summary explicitly reports no diary entries written. The earlier archived-plant
-artifact remains historical; this current result is a failed fixture
-prerequisite, not successful live save/retrieve. Production-only verification
+summary explicitly reports no diary entries written. Current artifact
+`11055472348` was downloaded and read: its page snapshot shows **Plant archived**
+for configured plant `1d0fac37-1eea-4924-94fa-2e725da288c3`. The workflow run's
+`head_sha` is the current #1792 head above; artifact names use its generated
+PR merge SHA `d56e29a1b95d0d8734219d01a9792cb6585f739a`. This is a confirmed
+inactive-fixture prerequisite, not successful live save/retrieve.
+Production-only verification
 and the disposable fixture ownership/tagging fences remain enforced.
 
 **BLOCKED, interactive live inspection:** the current browser session reaches

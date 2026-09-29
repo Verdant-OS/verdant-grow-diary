@@ -1,5 +1,135 @@
 # Verdant release checkpoint — September 28, 2026
 
+## Current addendum — September 29, 2026, 21:09–21:13 UTC
+
+This addendum supersedes the current-state claims in the earlier packet below.
+The earlier observations remain dated history. **BLOCKED, complete production
+acceptance:** the Timeline repair is still open, the authenticated fixture smoke
+fails its prerequisite, and new proof heads have not completed CI or live
+acceptance. The autonomous goal remains active.
+
+### Live-to-tip gap and current gates
+
+**PASS, public frontend identity:** HTTP 200 from
+[production version.json](https://verdantgrowdiary.com/version.json) at
+`2026-09-29T21:09:49.2134528Z` advertises
+`61821446ebd7e4fb30a36a5a95b7526a34515df5`, `dirty:false`, build time
+`2026-09-29T03:02:39.564Z`. **PASS, deploy source identity:** `git ls-remote
+origin refs/heads/verdant-grow-diary` returns
+`0a452d3e14a9f0653aae2db20ce10815672ad602`.
+
+The complete GitHub comparison from that advertised live SHA to that tip is
+**one commit and one file**: `0a452d3e14a9f0653aae2db20ce10815672ad602`,
+[#1355](https://github.com/Verdant-OS/verdant-grow-diary/pull/1355), adds
+`.coderabbit.yaml` (369 added / 0 removed lines). It is review configuration;
+there is no application or database delta in this particular gap. The older
+eleven-commit comparison below ends at the currently advertised live build.
+Native deployment checks, traffic allocation, publisher approval, production
+schema and Edge identity remain **NOT_MEASURED** by this addendum.
+
+**PASS, required tip checks:** all pages of the tip's check-runs were read at
+`2026-09-29T21:11:03.6822532Z`: 148 records, 85 latest unique check names,
+**35/35 required SUCCESS**, zero missing, failed or pending required contexts.
+The complete latest-name counts are 75 SUCCESS, 3 FAIL, 1 cancelled, 2 queued
+and 4 SKIPPED. These are check contexts, not unique tests. Required names come
+from `config/required-status-checks.json` at this source tip.
+
+| Additional tip gate  | Status       | Exact evidence                                                                                                                                                                                                                                                                                  |
+| -------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dependency audit     | FAIL         | [Job 109493944077](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/36593959300/job/109493944077) reports high fast-uri advisories 1239943/1239946 and exits 1. Open #1804 proposes a dependency repair in its separate owner lane; this packet grants no waiver or lockfile edit. |
+| Required-check audit | FAIL         | [Job 109493944435](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/36593959418/job/109493944435) records that `test:security-db-local` started after the #1355 merge at `2026-09-29T15:56:01Z`; a later SUCCESS does not erase the timing finding.                                |
+| Merge-queue snapshot | FAIL         | [Job 109577297605](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/36618419905/job/109577297605) reports GitHub GraphQL HTTP 502 at `2026-09-29T21:02:59Z`, exit 2. This observed failure is infrastructure, not a product verdict.                                               |
+| Additional build     | NOT_MEASURED | [Job 109562844285](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/36614176805/job/109562844285) is cancelled. Its cancellation is not a successful build.                                                                                                                        |
+
+The failed logs above were read before classification. No blind rerun, production
+dispatch or check bypass was performed.
+
+### Product repairs and proof branches
+
+**FAIL, live Timeline gap:** #1754's remaining non-manual persisted-metric P1
+is still in the advertised live build. Its repair
+[#1794](https://github.com/Verdant-OS/verdant-grow-diary/pull/1794) is open at
+`ea56602857960449ced06d24547352785c62752a`, based on `0a452d3e`. That head has
+**35/35 required SUCCESS** at 21:11 UTC, but two supplemental audits FAIL
+(dependency and nested static proofs), two census jobs are cancelled, and one
+check remains queued. Blue Dream acceptance of that exact head and production
+value readback remain **NOT_MEASURED**. A bot security summary or acceptance on
+an older head cannot satisfy that gate.
+
+**PASS, stacked-merge classification:** #1745 merged into
+`codex/quicklog-active-replay-fence-20260926` as `851239d4170e90f2121129b42ad229bc70f6343f`;
+#1749 merged into `codex/quicklog-manual-lineage-fence-20260927` as
+`19d767d0c62179b224cabb9c45f2544cf0894645`. Neither merge landed on
+`verdant-grow-diary`. Their production behavior remains **NOT_MEASURED**;
+their MERGED PR labels do not mean they reached the live build. The production
+database lock and serialized Quick Log landing order remain.
+
+The following branch repairs were normal-pushed and remain draft. The counts
+are separate local runs already completed at the listed heads; overlapping
+cases are not summed as unique tests. New-head hosted CI is **NOT_MEASURED**
+until terminal.
+
+| PR / exact head                                                                                                | Repair                                                                                                                                                              | Local validation                                                                                                | CI at 21:11 UTC                                                                                 |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| [#1756](https://github.com/Verdant-OS/verdant-grow-diary/pull/1756) `cc66ceaf1aec7dbc43aeb7d879ee4b0d6dd3ac8a` | Resolve protected function signatures through `to_regprocedure` and compare OIDs; regression rejects the old schema-sensitive text comparison. No migration edited. | PASS: 1 focused file / 145 passed / 0 failed / 0 skipped. Earlier typecheck, scoped lint and formatting passed. | NOT_MEASURED: 34 required pending, 1 not yet reported; 13 checks running and 49 queued overall. |
+| [#1793](https://github.com/Verdant-OS/verdant-grow-diary/pull/1793) `038583772a7c924eb481480e76222cfd69d5e5a8` | Report a valid preflight deployment-SHA mismatch accurately before timed navigation; add the missing `ready_for_review` trigger. Exact-SHA gate stays enforced.     | PASS: 3 files / 168 passed / 0 failed / 0 skipped; typecheck 0 diagnostics; scoped lint 0 errors / 0 warnings.  | NOT_MEASURED: 34 required queued, 1 not yet reported; no failed check observed.                 |
+| [#1799](https://github.com/Verdant-OS/verdant-grow-diary/pull/1799) `a42789a6e9e596ee2318021650a8dd17e6782beb` | Merge updated #1793 parent; add Settings proof's missing `ready_for_review` trigger.                                                                                | PASS: 4 files / 234 passed / 0 failed / 0 skipped; typecheck 0 diagnostics.                                     | NOT_MEASURED: 35 required not yet reported; 11 supplemental checks queued.                      |
+| [#1800](https://github.com/Verdant-OS/verdant-grow-diary/pull/1800) `f7e60c3d7bf87000208fc94fdf4deb9237adfa30` | Merge updated #1793 parent; add read-only Actions proof's missing `ready_for_review` trigger. No Action Queue operation.                                            | PASS: 4 files / 265 passed / 0 failed / 0 skipped; typecheck 0 diagnostics.                                     | NOT_MEASURED: 34 required queued, 1 not yet reported; no failed check observed.                 |
+
+### Live smoke, next owners and rollback
+
+**BLOCKED, write smoke:** #1792 is now at
+`6df743e4358fa78c9c567a37dd32bf351426a806`.
+[Job 109499761284](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/36595650327/job/109499761284)
+records **1 passed / 1 failed / 0 skipped** in fixture verification, with one
+automatic retry; fixture step FAILURE, write-smoke step SKIPPED. The job's
+summary explicitly reports no diary entries written. The earlier archived-plant
+artifact remains historical; this current result is a failed fixture
+prerequisite, not successful live save/retrieve. Production-only verification
+and the disposable fixture ownership/tagging fences remain enforced.
+
+**BLOCKED, interactive live inspection:** the current browser session reaches
+the sign-in page when opening the production Timeline. It provides no
+authenticated saved-value readback. Signup/sign-in/reset, Actions,
+Settings/account/consent and the full core loop therefore remain
+**NOT_MEASURED** to their complete requested scope. No user data, fixture state,
+credentials, production database or Action Queue state was changed.
+
+Next: Codex finishes the queued repairs and fixture diagnosis; Chemdawg routes
+the completed heads; Blue Dream reviews the Timeline/P1 and publish gates;
+Critical Mass reviews this document; GDP owns landing reviewed heads. Matthew
+owns the production-database and publish decisions. Open #1804 owns dependency
+repair and #1806 owns CI-load reduction; this packet does not compete with them.
+
+**NOT_MEASURED, approved rollback target:** the currently observed serving build
+`61821446ebd7e4fb30a36a5a95b7526a34515df5` is an identity observation, not an
+approved rollback receipt. The older `566315ce` candidate below remains
+unapproved. Artifact availability, hosted compatibility and owner approval
+must be established before rollback. This one-file documentation update has no
+runtime effect and can be reverted independently.
+
+### Addendum validation and collision audit
+
+**PASS, local documentation validation:** `node scripts/assert-docs-safety.mjs`
+passes automated-phenotyping, release and sensor categories. `node
+node_modules/vitest/vitest.mjs run
+src/test/assert-automated-phenotyping-docs-safety.test.ts
+src/test/release-docs-safety-scanner.test.ts --reporter=dot` reports **2 files /
+73 passed / 0 failed / 0 skipped**, Vitest 4.1.11. One-file Prettier and
+`git diff --check` pass. No new test cases were added for this documentation
+change. Typecheck, application lint, build and full-suite execution were not
+repeated for this Markdown-only addendum; those new-commit outcomes remain
+**NOT_MEASURED**. Hosted CI and independent document acceptance on the new
+document head are also **NOT_MEASURED** until separately verified.
+
+**PASS, collisions:** all **74** current open PR heads and complete paginated
+file lists were read. Only #1795 changes this packet path. #1777 retains the
+ongoing operational record; #1780 retains the promotion runbook; #1808's
+historical-state archive does not overlap this file. This addendum changes only
+`docs/agents/PUBLISH_READINESS_2026-09-28.md` and preserves the earlier packet.
+
+## Historical packet — September 29, 2026, 05:27–05:30 UTC
+
 Measured September 29, 2026, 05:27–05:30 UTC (00:27–00:30 America/Chicago).
 This is the September 28 release's follow-up packet, not a new promotion request.
 

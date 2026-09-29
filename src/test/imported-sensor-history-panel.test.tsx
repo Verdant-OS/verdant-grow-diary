@@ -175,7 +175,7 @@ describe("ImportedSensorHistoryPanel", () => {
     );
     expect(values).toEqual({
       temperature_c: "24.4 °C",
-      humidity_pct: "52.0%",
+      humidity_pct: "52%",
       vpd_kpa: "1.11 kPa",
     });
   });
@@ -190,9 +190,35 @@ describe("ImportedSensorHistoryPanel", () => {
       ),
     );
     const table = screen.getByTestId("imported-history-recent-rows");
-    expect(table).toHaveTextContent("150.0%");
+    expect(table).toHaveTextContent("150%");
     expect(screen.getByTestId("imported-history-out-of-range-note")).toHaveTextContent(
       "Humidity is out of range.",
+    );
+  });
+
+  it("keeps whole readings compact and discloses a raw value rounded to the boundary", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[
+            csvRow({ metric: "temperature_c", value: 24 }),
+            csvRow({ metric: "vpd_kpa", value: 1.2 }),
+            csvRow({ metric: "humidity_pct", value: 100.04 }),
+          ]}
+        />,
+      ),
+    );
+    const table = screen.getByTestId("imported-history-recent-rows");
+    expect(table).toHaveTextContent("24 °C");
+    expect(table).toHaveTextContent("1.2 kPa");
+    expect(table).toHaveTextContent("100%");
+    expect(screen.getByTestId("imported-history-out-of-range-note")).toHaveTextContent(
+      "Humidity is out of range.",
+    );
+    expect(screen.getByTestId("imported-history-source-badge")).toHaveTextContent("Source: CSV");
+    expect(screen.getByTestId("imported-history-not-live-badge")).toHaveTextContent(
+      "Not live data",
     );
   });
 

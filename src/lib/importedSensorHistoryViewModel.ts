@@ -72,7 +72,7 @@ export interface ImportedSensorHistoryDisplayRow {
   capturedAt: string;
   metric: string;
   value: number | null;
-  /** Canonical stored value with a unit only for known CSV metric keys. */
+  /** Display-only rounded value; `value` retains the stored precision. Units are known CSV keys only. */
   displayValue: string;
   /** Plain-language row warning when the stored value is outside plausibility bounds. */
   outOfRangeNote: string | null;
@@ -129,12 +129,12 @@ function formatImportedValue(metric: string, value: number | null): string {
   switch (metric) {
     case "temperature_c":
     case "soil_temp_c":
-      return `${value.toFixed(1)} °C`;
+      return `${Number(value.toFixed(1))} °C`;
     case "humidity_pct":
     case "soil_moisture_pct":
-      return `${value.toFixed(1)}%`;
+      return `${Number(value.toFixed(1))}%`;
     case "vpd_kpa":
-      return `${value.toFixed(2)} kPa`;
+      return `${Number(value.toFixed(2))} kPa`;
     case "co2_ppm":
       return `${Math.round(value)} ppm`;
     case "ppfd":

@@ -144,17 +144,55 @@ describe("buildImportedSensorHistoryViewModel — empty + summary", () => {
     const rowsByMetric = Object.fromEntries(vm.recentRows.map((r) => [r.metric, r]));
     expect(Object.fromEntries(vm.recentRows.map((r) => [r.metric, r.displayValue]))).toEqual({
       temperature_c: "24.4 °C",
-      humidity_pct: "52.0%",
+      humidity_pct: "52%",
       vpd_kpa: "1.11 kPa",
       co2_ppm: "801 ppm",
-      soil_moisture_pct: "43.0%",
+      soil_moisture_pct: "43%",
       ppfd: "601 µmol/m²/s",
-      soil_temp_c: "18.0 °C",
+      soil_temp_c: "18 °C",
       ec: "1.8 mS/cm",
     });
     expect(rowsByMetric.temperature_c?.value).toBe(24.444444444444443);
     expect(buildImportedSensorHistoryViewModel({ readings }).recentRows).toEqual(vm.recentRows);
   });
+
+  it.each([
+    ["temperature_c", 24, "24 °C"],
+    ["humidity_pct", 58, "58%"],
+    ["soil_moisture_pct", 43, "43%"],
+    ["soil_temp_c", 18, "18 °C"],
+    ["vpd_kpa", 1.2, "1.2 kPa"],
+    ["co2_ppm", 600, "600 ppm"],
+    ["ppfd", 400, "400 µmol/m²/s"],
+  ] as const)("keeps compact %s display without changing stored %s", (metric, value, display) => {
+    const readings = [row({ metric, value })];
+    const vm = buildImportedSensorHistoryViewModel({ readings });
+    expect(vm.recentRows[0]).toMatchObject({ metric, value, displayValue: display });
+    expect(readings[0].value).toBe(value);
+    expect(buildImportedSensorHistoryViewModel({ readings })).toEqual(vm);
+  });
+
+  it.each([
+    [100.04, "100%"],
+    [-0.04, "0%"],
+  ] as const)("keeps raw humidity %s out of range after display rounding", (value, display) => {
+    const vm = buildImportedSensorHistoryViewModel({
+      readings: [row({ metric: "humidity_pct", value })],
+    });
+    expect(vm.recentRows[0]).toMatchObject({
+      value,
+      displayValue: display,
+      outOfRangeNote: "Humidity is out of range.",
+    });
+  });
+
+  it.each([null, undefined, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    "keeps a missing or non-finite value %s unknown",
+    (value) => {
+      const vm = buildImportedSensorHistoryViewModel({ readings: [row({ value })] });
+      expect(vm.recentRows[0]).toMatchObject({ value: null, displayValue: "—" });
+    },
+  );
 
   it("does not invent units for unknown metrics or missing values", () => {
     const vm = buildImportedSensorHistoryViewModel({

@@ -10,6 +10,42 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUserRead = (request: Request) =>
   request.method() === "GET" && request.url().split("?")[0] === userEndpoint;
 
+export type BlockedReadonlyRequest = {
+  method: "POST" | "PUT" | "PATCH" | "DELETE" | "WEBSOCKET" | "OTHER";
+  capability:
+    | "backend-auth"
+    | "backend-rpc:has_role"
+    | "backend-rpc"
+    | "backend-table"
+    | "backend-function"
+    | "websocket"
+    | "other";
+};
+/** A finite diagnostic vocabulary: no URL, query, row id or payload is exported. */
+export function classifyBlockedReadonlyRequest(
+  method: unknown,
+  target: unknown,
+): BlockedReadonlyRequest {
+  const safeMethod: BlockedReadonlyRequest["method"] =
+    method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE"
+      ? method
+      : "OTHER";
+  let capability: BlockedReadonlyRequest["capability"] = "other";
+  try {
+    const url = new URL(typeof target === "string" ? target : "");
+    if (url.origin === QUICKLOG_SMOKE_BACKEND_ORIGIN) {
+      if (url.pathname.startsWith("/auth/")) capability = "backend-auth";
+      else if (url.pathname === "/rest/v1/rpc/has_role") capability = "backend-rpc:has_role";
+      else if (url.pathname.startsWith("/rest/v1/rpc/")) capability = "backend-rpc";
+      else if (url.pathname.startsWith("/rest/")) capability = "backend-table";
+      else if (url.pathname.startsWith("/functions/")) capability = "backend-function";
+    }
+  } catch {
+    /* Invalid targets remain an opaque diagnostic. */
+  }
+  return { method: safeMethod, capability };
+}
+
 /** Normal app identity reads only. No credentials, payloads or row data in receipts.
  * All non-read HTTP methods and WebSockets are blocked before the first navigation.
  * POST read RPCs are deliberately blocked too: no inferred SQL purity exemption.
@@ -19,6 +55,7 @@ export async function installSignedInReadonlyProof(page: Page) {
   let invalidated = false;
   let disposed = false;
   let blockedWrites = 0;
+  const blockedRequests: BlockedReadonlyRequest[] = [];
   const pendingReads = new Set<Request>();
   const pendingBodies = new Set<Promise<void>>();
   const context = page.context();
@@ -81,6 +118,8 @@ export async function installSignedInReadonlyProof(page: Page) {
     const request = route.request();
     if (!["GET", "HEAD", "OPTIONS"].includes(request.method())) {
       blockedWrites += 1;
+      if (blockedRequests.length < 64)
+        blockedRequests.push(classifyBlockedReadonlyRequest(request.method(), request.url()));
       await route.abort("blockedbyclient");
       return;
     }
@@ -104,12 +143,15 @@ export async function installSignedInReadonlyProof(page: Page) {
   await context.route("**/*", routeHandler);
   await context.routeWebSocket("**/*", (socket) => {
     blockedWrites += 1;
+    if (blockedRequests.length < 64)
+      blockedRequests.push({ method: "WEBSOCKET", capability: "websocket" });
     socket.close();
   });
   return {
     waitForAccount,
     assertReady,
     blockedWrites: () => blockedWrites,
+    blockedRequests: () => blockedRequests.map((item) => ({ ...item })),
     dispose: () => {
       disposed = true;
       page.off("request", requestListener);

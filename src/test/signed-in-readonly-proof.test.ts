@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import { load } from "js-yaml";
 import type { Page, Request, Response, Route, WebSocketRoute } from "@playwright/test";
-import { installSignedInReadonlyProof } from "../../e2e/lib/signedInReadonlyProof";
+import {
+  classifyBlockedReadonlyRequest,
+  installSignedInReadonlyProof,
+} from "../../e2e/lib/signedInReadonlyProof";
 import { QUICKLOG_SMOKE_BACKEND_ORIGIN } from "../../e2e/lib/productionQuickLogFixtureRules";
 
 const account = { id: "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa", email: "cheekhimself@gmail.com" };
@@ -63,6 +66,26 @@ async function harness() {
 }
 
 describe("signed-in read-only production proof", () => {
+  it.each([
+    ["/auth/v1/token?private=discarded", "backend-auth"],
+    ["/rest/v1/rpc/has_role?private=discarded", "backend-rpc:has_role"],
+    ["/rest/v1/rpc/private_not_exported", "backend-rpc"],
+    ["/rest/v1/plants?private=discarded", "backend-table"],
+    ["/functions/v1/private_not_exported", "backend-function"],
+  ])("records only the request class for %s", (endpoint, capability) => {
+    const result = classifyBlockedReadonlyRequest("POST", QUICKLOG_SMOKE_BACKEND_ORIGIN + endpoint);
+    expect(result).toEqual({ method: "POST", capability });
+    expect(JSON.stringify(result)).not.toContain("private");
+  });
+  it.each([null, undefined, "invalid", "https://evil.example/rest/v1/rpc/has_role"])(
+    "handles unknown request target %j without exporting it",
+    (target) => {
+      expect(classifyBlockedReadonlyRequest("private-method", target)).toEqual({
+        method: "OTHER",
+        capability: "other",
+      });
+    },
+  );
   it("accepts only the normal server-validated fixture account without requiring plant rows", async () => {
     const h = await harness();
     h.emit({ ...account, token_like_unused_field: "private-unused" });

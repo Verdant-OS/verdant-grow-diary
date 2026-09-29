@@ -43,6 +43,11 @@ on:
       - ".lovable/mcp/manifest.json"
       - "supabase/migrations/**"
       - ".github/workflows/mcp-local-rls-integration.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   mcp-local-rls:

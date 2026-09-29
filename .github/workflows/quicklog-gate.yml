@@ -24,6 +24,10 @@ on:
   pull_request:
     branches: [verdant-grow-diary]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   quicklog-gate:
     name: Typecheck, then targeted Quick Log tests

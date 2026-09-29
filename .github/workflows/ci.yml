@@ -14,6 +14,10 @@ on:
     branches: [main, verdant-grow-diary]
   merge_group:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Preflight: verify the edge shared-lib mirror
   # (`supabase/functions/_shared/lib` + `.sync-manifest.json`) is in sync

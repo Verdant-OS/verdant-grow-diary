@@ -11,6 +11,10 @@ on:
       - "src/test/ggs-sentinel-*.test.tsx"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   one-tent-loop-smoke:
     name: One-Tent Loop smoke audit

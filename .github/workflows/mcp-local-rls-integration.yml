@@ -44,6 +44,10 @@ on:
       - "supabase/migrations/**"
       - ".github/workflows/mcp-local-rls-integration.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   mcp-local-rls:
     name: MCP RLS harness (local Supabase)

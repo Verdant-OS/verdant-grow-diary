@@ -29,6 +29,10 @@ on:
       - "fixtures/ecowitt-bridge-config/**"
       - "docs/schemas/ecowitt-soil-channel-map.schema.json"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   contract:
     runs-on: ubuntu-latest

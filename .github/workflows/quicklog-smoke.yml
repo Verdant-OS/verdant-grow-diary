@@ -105,6 +105,10 @@ on:
       - "playwright.config.ts"
       - ".github/workflows/quicklog-smoke.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Temporary, branch-pinned proof lane. This intentionally uses local immutable
   # harness code and existing end-user E2E credentials against the fixed, publicly

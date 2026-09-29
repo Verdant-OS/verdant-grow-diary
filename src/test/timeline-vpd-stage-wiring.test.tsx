@@ -36,8 +36,15 @@ describe("Timeline — stage-aware VPD wiring (static)", () => {
 
   it("gates stage interpretation on corroborated snapshot provenance", () => {
     expect(SRC).toMatch(/context:\s*["']persisted_snapshot["']/);
-    expect(SRC).toMatch(/value:\s*rawVpd/);
-    expect(SRC).toMatch(/rawVpd\s*!=\s*null\s*&&\s*sourceBadge\.canAssessStage/);
+    expect(SRC).toMatch(/value:\s*stageVpd/);
+    expect(SRC).toMatch(/const stageVpd = resolveTimelineCardVpdStageValue\(/);
+    expect(SRC).toMatch(/canAssessStage:\s*sourceBadge\.canAssessStage/);
+    expect(SRC).toMatch(/hasFutureTimestamp,/);
+    const hintGate = SRC.match(
+      /\{stageVpd\s*!=\s*null\s*&&([\s\S]{0,700}?)data-testid="timeline-vpd-stage-hint"/,
+    )?.[1];
+    expect(hintGate).toBeDefined();
+    expect(hintGate).not.toMatch(/useManualValidation|chips\.some|canAssessStage/);
   });
 
   it("does not duplicate hardcoded VPD target ranges in JSX", () => {

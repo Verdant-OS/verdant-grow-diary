@@ -38,6 +38,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CHEM-REQUIRED-AUDIT-PR-EVIDENCE-001
+
+```text
+TASK CHEM-REQUIRED-AUDIT-PR-EVIDENCE-001  priority: P1  status: OPEN
+goal: Repair the post-merge audit false failure on #1776 without weakening required merge-group checks or accepting results completed after the merge.
+branch: codex/chem-required-audit-pr-evidence-001
+base: verdant-grow-diary at 95464496a4dcc802710c2c08e303ffee15182a7d
+checkout: git fetch origin codex/chem-required-audit-pr-evidence-001 verdant-grow-diary && git switch codex/chem-required-audit-pr-evidence-001 && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1791
+head_sha: 171cd0a2624cf2200e26429335994057da9746fc, verified 2026-09-28 21:46 CT
+state: Pushed draft, three files (+260/-3). 27 added cases; 3-file related run 189 PASS / 0 FAIL / 0 SKIP (includes 96 audit cases and 67 docs-safety cases). Red regression retained: 16 FAIL / 80 PASS. Project typecheck 0 diagnostics; code-file lint 0 errors/0 warnings; format and whitespace PASS. Downloaded #1776 evidence replays FAIL before/PASS after; ruleset drift remains BLOCKED, not measured. At 21:46 CT required contexts 0 SUCCESS / 34 pending / 1 missing; no terminal CI or independent acceptance claim.
+next_action: Read terminal exact-head CI and Blue Dream acceptance. Required merge-group gates and any failed/in-flight landed evidence still take precedence; late results cannot count.
+files: config/required-status-checks.json; scripts/lib/requiredCheckAuditRules.mjs; src/test/required-check-audit-rules.test.ts
+blockers: Independent Blue Dream acceptance and terminal CI remain NOT_MEASURED. No merge, ready, Publish, APPLY or workflow dispatch.
+artifacts: C:/Users/G8/Downloads/CHEM-required-audit-1776-evidence-2026-09-28.json; job 109225824129 failure log; pre-merge security job 109198567370.
+reviewer_seat: Blue Dream (P1 release evidence); Codex is author, not independent acceptance reviewer
+claimed_by: Codex, 2026-09-28 21:43 CT
+last_updated: 2026-09-28 21:47 CT, by Codex
+```
+
 ### CHEM-FREE-LIMITED-EXPORT-CONTRACT-001
 
 ```text
@@ -48,14 +68,14 @@ base: verdant-grow-diary at 95464496a4dcc802710c2c08e303ffee15182a7d
 checkout: git fetch origin codex/chem-free-limited-export-contract-001 verdant-grow-diary && git switch codex/chem-free-limited-export-contract-001 && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1790
 head_sha: 13499d8304877c04b2292746ea8307d35b30071e, verified 2026-09-28 21:32 CT
-state: Pushed draft, one new test file (+247/-0), 10 added cases. Related local run: 6 files / 66 PASS / 0 FAIL / 0 SKIP; project typecheck 0 diagnostics, changed-file lint 0/0, format and whitespace PASS. Separate pre-commit safety test 67/67. New-head required CI queued at 21:34 CT; independent acceptance NOT_MEASURED.
+state: Pushed draft, one new test file (+247/-0), 10 added cases. Related local run: 6 files / 66 PASS / 0 FAIL / 0 SKIP; project typecheck 0 diagnostics, changed-file lint 0/0, format and whitespace PASS. Separate pre-commit safety test 67/67. At 21:46 CT required contexts 10 SUCCESS / 25 pending / 0 failed / 0 missing; native job in progress. Root fast-uri and nested undici audit logs read; both FAIL. Independent acceptance NOT_MEASURED.
 next_action: Read terminal exact-head CI and Blue Dream acceptance. No product implementation or entitlement terms changed; production export behavior remains NOT_MEASURED.
 files: src/test/free-limited-export-contract.test.tsx (new only)
-blockers: Hosted CI and independent acceptance are not measured until the draft exists. No product-terms change or production verification implied.
+blockers: Hosted CI is unfinished and independent acceptance NOT_MEASURED. Dependency repairs need locked files and are stop-and-report items. No product-terms change or production verification implied.
 artifacts: PR #1790; Downloads CHEM-free-limited-export-*-2026-09-28 receipts, including six-file test log and ESLint JSON.
 reviewer_seat: Blue Dream (.tsx); Codex is author, not independent acceptance reviewer
 claimed_by: Codex, 2026-09-28 21:28 CT
-last_updated: 2026-09-28 21:35 CT, by Codex
+last_updated: 2026-09-28 21:47 CT, by Codex
 ```
 
 ### CHEM-1738-RETRACTION-STATE-PROOF
@@ -68,14 +88,14 @@ base: verdant-grow-diary
 checkout: git fetch origin codex/native-retraction-chip-state-proof-20260927 verdant-grow-diary && git switch codex/native-retraction-chip-state-proof-20260927 && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1738
 head_sha: 15e7fb79304f800128f2a409ac7b26a8e9938059
-state: Existing draft normal-pushed afcd4f8f2cf2d99947f179c2765e26275667c87a -> 15e7fb79304f800128f2a409ac7b26a8e9938059, a clean base merge from 8b73b25a879e8d1fc526fdd7035ae1d368eab3f6. One-file +8/-2 observation is unchanged. Local related units 4 files / 83 PASS / 0 FAIL / 0 SKIP; project and browser-file typechecks 0 diagnostics; ESLint 1 file 0/0; Prettier and whitespace PASS. New-head hosted native outcome NOT_MEASURED.
+state: Existing draft normal-pushed afcd4f8f2cf2d99947f179c2765e26275667c87a -> 15e7fb79304f800128f2a409ac7b26a8e9938059, a clean base merge from 8b73b25a879e8d1fc526fdd7035ae1d368eab3f6. One-file +8/-2 observation is unchanged. Local related units 4 files / 83 PASS / 0 FAIL / 0 SKIP; project and browser-file typechecks 0 diagnostics; ESLint 1 file 0/0; Prettier and whitespace PASS. At 21:46 CT required contexts 18 SUCCESS / 17 pending / 0 failed / 0 missing; native job in progress. Root audit FAIL (fast-uri); GA webkit FAIL: 6 passed / 1 failed / 1 flaky as reported by Playwright, consent banner absent and bootstrap config timeout. Logs read; cause not confirmed and no blind rerun or flake verdict.
 next_action: Read new-head native CI before acceptance. Deploy advanced one commit afterward (#1776 at 95464496); retain that freshness distinction and use a normal base merge if further updating. No re-click, forced confirmation, retries or flake claim.
 files: e2e-local/native-revision-recovery.spec.ts only.
 blockers: New-head native execution and independent acceptance remain NOT_MEASURED; local Docker is unavailable. Locked database/owner paths are not changed.
 artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1738; C:/Users/G8/Downloads/CHEM-1738-current-base-related-2026-09-28.log; C:/Users/G8/Downloads/CHEM-1738-current-base-typecheck-2026-09-28.log; downloaded native failure video/receipt from #1782.
 reviewer_seat: Critical Mass (tests-only .ts); Blue Dream retains any product/P1 finding
 claimed_by: Codex, 2026-09-28 21:18 CT
-last_updated: 2026-09-28 21:22 CT, by Codex
+last_updated: 2026-09-28 21:47 CT, by Codex
 ```
 
 ### CHEM-RELEASE-001
@@ -536,14 +556,14 @@ goal: Preserve display-only rounding and invalid-reading disclosure while repair
 branch: copilot/imported-sensor-history-display-fix
 base: verdant-grow-diary
 checkout: git fetch origin copilot/imported-sensor-history-display-fix verdant-grow-diary && git switch copilot/imported-sensor-history-display-fix && git merge origin/verdant-grow-diary
-state: Draft 919ab0853611be50f4d04848a642844fbecd933f retains the compact-format repair. Local 7 files / 153 PASS / 0 FAIL / 0 SKIP, including 15 added cases; typecheck 0, lint 0/0 and formatting PASS. New-head native job 109222694539 PASS: 21/21, 0 failed, 0 skipped, 1 worker. At 21:34 CT required contexts 23 SUCCESS / 12 pending / 0 failed / 0 missing. Root fast-uri and nested undici dependency audits FAIL; both current failed logs read.
-next_action: Finish required exact-head CI and Blue Dream acceptance. Native browser proof is disposable local-backend evidence, not production acceptance. Do not waive or edit locked dependency files.
+state: Draft 919ab0853611be50f4d04848a642844fbecd933f retains the compact-format repair. Local 7 files / 153 PASS / 0 FAIL / 0 SKIP, including 15 added cases; typecheck 0, lint 0/0 and formatting PASS. New-head native job 109222694539 PASS: 21/21, 0 failed, 0 skipped, 1 worker. At 21:46 CT all 35 required contexts SUCCESS. Root fast-uri and nested undici dependency audits FAIL; both current failed logs read.
+next_action: Obtain Blue Dream acceptance of the current head, retaining the optional dependency failures as stop-and-report items. Native browser proof is disposable local-backend evidence, not production acceptance. Do not waive or edit locked dependency files.
 files: src/components/ImportedSensorHistoryPanel.tsx; src/lib/importedSensorHistoryViewModel.ts; src/test/imported-sensor-history-panel.test.tsx; src/test/imported-sensor-history-view-model.test.ts; src/test/csv-history-ai-doctor-full-chain.test.tsx (two displayed VPD expectations only; raw/storage assertions retained).
-blockers: Old native browser run remains 14 PASS / 7 FAIL. New native execution NOT_MEASURED. Root fast-uri and nested undici repairs remain locked; no dependency waiver, SQL, Supabase, auth, Edge, harness or Action Queue edit.
+blockers: Historical native browser run remains 14 PASS / 7 FAIL; current-head native execution is now PASS 21/21. Independent acceptance NOT_MEASURED. Root fast-uri and nested undici repairs remain locked; no dependency waiver, SQL, Supabase, auth, Edge, harness or Action Queue edit.
 artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1769; C:/Users/G8/Downloads/CHEM-1769-repair-handoff-2026-09-28.md; final seven-file test, typecheck, lint and formatter receipts in Downloads.
 reviewer_seat: Blue Dream (component and .tsx tests)
 claimed_by: Codex, 2026-09-28 20:59 CT
-last_updated: 2026-09-28 21:35 CT, by Codex
+last_updated: 2026-09-28 21:47 CT, by Codex
 head_sha: 919ab0853611be50f4d04848a642844fbecd933f
 ```
 

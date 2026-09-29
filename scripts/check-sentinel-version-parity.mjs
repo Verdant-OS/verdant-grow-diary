@@ -80,10 +80,33 @@ STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
 
 Do not continue until the context issue is resolved.`;
 
-const REQUIRED_COVERAGE_STARTUP_GATE = REQUIRED_STARTUP_GATE.replace(
-  "files_read:\ncurrent_task:",
-  "files_read:\nopen_handoffs_checked:\ncurrent_task:",
-);
+const REQUIRED_COVERAGE_STARTUP_GATE = `MANDATORY STARTUP GATE
+
+Before analysis, research, commands, edits, writes, outreach, deployment,
+or recommendations, return:
+
+\`\`\`text
+SENTINEL_ACK
+agent:
+assigned_role:
+sentinel_version:
+files_read:
+open_handoffs_checked:
+current_task:
+scope:
+out_of_scope:
+conflicts_found:
+data_access_status:
+write_permission:
+\`\`\`
+
+If a required file is missing or conflicting, return:
+
+\`\`\`text
+STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
+\`\`\`
+
+Do not continue until the context issue is resolved.`;
 
 /**
  * CURRENT_STATE.md is deliberately absent from this list. It was imported here until
@@ -179,6 +202,13 @@ function requiresHandoffAck(version) {
   if (!version) return false;
   const [date, revision] = version.split(".");
   return date > "2026-09-28" || (date === "2026-09-28" && Number(revision) >= 3);
+}
+
+/** Dates sort lexically; revisions compare numerically without integer rounding. */
+function versionAdvanced(version, baseVersion) {
+  const [date, revision] = version.split(".");
+  const [baseDate, baseRevision] = baseVersion.split(".");
+  return date > baseDate || (date === baseDate && BigInt(revision) > BigInt(baseRevision));
 }
 
 /**
@@ -405,6 +435,21 @@ if (!base) {
     notes.push(message);
   }
 } else {
+  // A coordinated downgrade must not restore the legacy gate or remove coverage.
+  // Check even version-only edits, which the normalized-content loop skips.
+  const baseCanonicalText = contentAt(base.sha, CANONICAL);
+  const baseCanonicalVersion = baseCanonicalText === null ? null : versionIn(baseCanonicalText);
+  if (
+    canonicalVersion &&
+    baseCanonicalVersion &&
+    canonicalVersion !== baseCanonicalVersion &&
+    !versionAdvanced(canonicalVersion, baseCanonicalVersion)
+  ) {
+    problems.push(
+      `${CANONICAL}: Sentinel-Version downgrade from ${baseCanonicalVersion} to ` +
+        `${canonicalVersion} is forbidden. The canonical version must increase against ${base.ref}.`,
+    );
+  }
   let changedFiles = 0;
   for (const path of ALL) {
     const entry = head.get(path);

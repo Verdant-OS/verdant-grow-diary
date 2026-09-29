@@ -1,5 +1,7 @@
 import type { AiCreditedFailureReason } from "@/lib/aiCreditedResponseAdapter";
 
+const AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_CUTOFF_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** Stable identity for frozen review/recovery state across route-scope changes. */
 export function buildAiDoctorLiveReviewScopeKey(
   plantId: string,
@@ -23,6 +25,82 @@ export function canRetryAiDoctorLiveReviewFailure(
   if (reason == null || reason === "credit_denied") return false;
 
   return true;
+}
+
+/**
+ * `config` is emitted only by the edge function when a server-side
+ * precondition (secret, key id, payments environment, provider key) is
+ * missing. Every `config` exit returns before the credit RPC, so no credit
+ * can have been spent. It is a Verdant-side outage, never a gap in the
+ * grower's plant context, and the copy must not suggest otherwise.
+ */
+export function isAiDoctorServiceUnavailableFailure(
+  reason: AiCreditedFailureReason | null | undefined,
+): boolean {
+  return reason === "config";
+}
+
+export interface AiDoctorLiveReviewVisibilityInput {
+  allowed: boolean;
+  acceptedEligibilityAllowed: boolean;
+  mode: "standard" | "historical_review";
+  omittedImportedHistory: boolean;
+  omittedRootZoneHistory: boolean;
+  includedRootZoneHistory: boolean;
+  rootZoneBlocksReview: boolean;
+  evidenceCapturedAt?: string | null;
+  now: number | Date;
+}
+
+export interface AiDoctorLiveReviewVisibilityResult {
+  visible: boolean;
+  retryBlockedReason: "stale-evidence" | "unknown-evidence-freshness" | null;
+  showsStaleEvidenceNote: boolean;
+}
+
+function resolveNowMs(now: number | Date): number {
+  return typeof now === "number" ? now : now.getTime();
+}
+
+function evidenceRetryBlockedReason(
+  evidenceCapturedAt: string | null | undefined,
+  now: number | Date,
+): AiDoctorLiveReviewVisibilityResult["retryBlockedReason"] {
+  // Unknown freshness cannot authorize another standard request. Keep it
+  // separate from confirmed age so the UI never claims unknown evidence was current.
+  if (typeof evidenceCapturedAt !== "string" || evidenceCapturedAt.trim().length === 0) {
+    return "unknown-evidence-freshness";
+  }
+  const capturedAtMs = Date.parse(evidenceCapturedAt);
+  const nowMs = resolveNowMs(now);
+  if (!Number.isFinite(capturedAtMs) || !Number.isFinite(nowMs)) {
+    return "unknown-evidence-freshness";
+  }
+  return nowMs - capturedAtMs > AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_CUTOFF_MS
+    ? "stale-evidence"
+    : null;
+}
+
+export function getAiDoctorLiveReviewVisibility(
+  input: AiDoctorLiveReviewVisibilityInput,
+): AiDoctorLiveReviewVisibilityResult {
+  const visible =
+    input.allowed ||
+    input.acceptedEligibilityAllowed ||
+    input.mode === "historical_review" ||
+    input.omittedImportedHistory ||
+    input.omittedRootZoneHistory ||
+    (input.includedRootZoneHistory && input.rootZoneBlocksReview);
+  const retryBlockedReason =
+    input.mode === "standard"
+      ? evidenceRetryBlockedReason(input.evidenceCapturedAt, input.now)
+      : null;
+
+  return {
+    visible,
+    retryBlockedReason,
+    showsStaleEvidenceNote: visible && retryBlockedReason === "stale-evidence",
+  };
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {

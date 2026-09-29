@@ -26,7 +26,6 @@ export const MAX_OPERATOR_GGS_REQUEST_BODY_BYTES = 64 * 1024;
 const ALLOWED_ORIGINS = new Set([
   "https://verdantgrowdiary.com",
   "https://www.verdantgrowdiary.com",
-  "https://verdantgrowdiary-com.lovable.app",
   "https://id-preview--66255e7b-892c-4be5-8686-ab1cfc3666db.lovable.app",
   "http://localhost:5173",
   "http://localhost:3000",

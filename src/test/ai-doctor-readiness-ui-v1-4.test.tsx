@@ -45,7 +45,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((() => {
   throw new Error("fetch not allowed in v1.4 readiness test");
 }) as never);
 

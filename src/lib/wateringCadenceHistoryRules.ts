@@ -26,6 +26,12 @@ export interface WateringCadenceHistoryOptions {
   /** Injectable clock for deterministic tests. */
   readonly now?: number;
   readonly recentCap?: number;
+  /**
+   * IANA zone for absolute labels. Omitted = the viewer's own zone (QA
+   * 2026-09-24: a morning watering read "8:26 AM UTC" on the plant page).
+   * Injectable so tests are deterministic.
+   */
+  readonly timeZone?: string;
 }
 
 export interface WateringCadenceLastWatering {
@@ -103,10 +109,7 @@ export function formatWateringCadenceDuration(ms: number): string {
   return `${weeks}w`;
 }
 
-export function formatWateringCadenceRelative(
-  occurredMs: number,
-  nowMs: number,
-): string {
+export function formatWateringCadenceRelative(occurredMs: number, nowMs: number): string {
   const age = Math.max(0, nowMs - occurredMs);
   const core = formatWateringCadenceDuration(age);
   if (core === "just now") return "just now";
@@ -114,18 +117,23 @@ export function formatWateringCadenceRelative(
   return `${core} ago`;
 }
 
-function formatAbsoluteUtc(iso: string): string {
+const ABSOLUTE_LABEL_FORMAT: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZoneName: "short",
+};
+
+/** Local wall-clock label with the zone named, e.g. "Sep 24, 4:26 AM EDT". */
+export function formatWateringCadenceAbsolute(iso: string, timeZone?: string): string {
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return iso;
   try {
-    return new Date(iso).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      timeZone: "UTC",
-      timeZoneName: "short",
-    });
+    return date.toLocaleString("en-US", { ...ABSOLUTE_LABEL_FORMAT, timeZone });
   } catch {
-    return iso;
+    // Unknown zone name: fall back to the viewer's zone rather than UTC.
+    return date.toLocaleString("en-US", ABSOLUTE_LABEL_FORMAT);
   }
 }
 
@@ -195,7 +203,7 @@ export function buildWateringCadenceHistory(
   const lastWatering: WateringCadenceLastWatering = {
     occurredAt: newest.occurredAt,
     relativeLabel: formatWateringCadenceRelative(newest.occurredMs, now),
-    absoluteLabel: formatAbsoluteUtc(newest.occurredAt),
+    absoluteLabel: formatWateringCadenceAbsolute(newest.occurredAt, options.timeZone),
     volumeLabel: volumeLabel(newest.volumeMl),
     sourceLabel: newest.sourceLabel,
   };
@@ -212,7 +220,7 @@ export function buildWateringCadenceHistory(
   const recentWaterings: WateringCadenceRecentRow[] = waterings.slice(0, cap).map((w) => ({
     id: w.id,
     relativeLabel: formatWateringCadenceRelative(w.occurredMs, now),
-    absoluteLabel: formatAbsoluteUtc(w.occurredAt),
+    absoluteLabel: formatWateringCadenceAbsolute(w.occurredAt, options.timeZone),
     volumeLabel: volumeLabel(w.volumeMl),
     sourceLabel: w.sourceLabel,
   }));
@@ -231,13 +239,16 @@ export function buildWateringCadenceHistory(
 
 /** Map irrigation ledger rows into cadence inputs without dropping feed provenance. */
 export function cadenceEventsFromIrrigationLedger(
-  rows: readonly {
-    id: string;
-    kind: "watering" | "feeding";
-    occurredAt: string | null;
-    volumeMl: number | null;
-    sourceLabel: string;
-  }[] | null | undefined,
+  rows:
+    | readonly {
+        id: string;
+        kind: "watering" | "feeding";
+        occurredAt: string | null;
+        volumeMl: number | null;
+        sourceLabel: string;
+      }[]
+    | null
+    | undefined,
 ): WateringCadenceEventInput[] {
   if (!Array.isArray(rows)) return [];
   return rows.map((row) => ({

@@ -35,6 +35,7 @@ on:
       - "scripts/verify-paddle-craft-catalog.report.test.mjs"
       - "package.json"
       - ".github/workflows/paddle-craft-catalog-preflight.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
   schedule:
     # Nightly, so an out-of-band archive/delete in the Paddle dashboard

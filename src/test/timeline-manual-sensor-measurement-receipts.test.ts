@@ -5,22 +5,25 @@
  * Does not invent live metrics. Rows are insert-equivalent fixtures.
  */
 import { describe, expect, it } from "vitest";
-import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
+import { MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import {
+  completeManualSensorTimelineRows,
   diaryEntryBelongsInTimelineMeasurements,
   diaryEntryHasMeasurementEvidence,
   isTimelineManualSensorPersistedQualityUsable,
-  isTimelineManualSensorReceiptFresh,
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
   TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX,
+  TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
+  timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
 
 const TENT = "11111111-1111-4111-8111-111111111111";
 const CAPTURED = "2026-09-09T18:46:00.000Z";
-/** Inside the Timeline "Stale snapshot" window (15 minutes). */
+/** A recent reading, before it becomes historical. */
 const NOW = new Date("2026-09-09T18:51:00.000Z");
 
 function metricRow(
@@ -41,6 +44,73 @@ function metricRow(
   };
 }
 
+describe("completeManualSensorTimelineRows", () => {
+  it("retains all rows when the bounded query proves it reached the end", () => {
+    const rows = Array.from({ length: TIMELINE_MANUAL_SENSOR_ROW_LIMIT }, () =>
+      metricRow("temperature_c", 24),
+    );
+    expect(completeManualSensorTimelineRows(rows)).toEqual({ rows, hasOlderRows: false });
+    expect(completeManualSensorTimelineRows(null)).toEqual({ rows: [], hasOlderRows: false });
+  });
+
+  it("never renders a capture cut by the metric-row cap", () => {
+    const rows = Array.from({ length: 67 }, (_, index) => {
+      const capturedAt = new Date(Date.parse(CAPTURED) - index * 60_000).toISOString();
+      return [
+        metricRow("temperature_c", 24, "manual", { ts: capturedAt }),
+        metricRow("humidity_pct", 55, "manual", { ts: capturedAt }),
+        metricRow("soil_moisture_pct", 40, "manual", { ts: capturedAt }),
+      ];
+    }).flat();
+    const page = completeManualSensorTimelineRows(rows);
+    expect(page.hasOlderRows).toBe(true);
+    expect(page.rows).toHaveLength(198);
+    expect(manualSensorReadingsToTimelineEntries(page.rows, NOW)).toHaveLength(66);
+    expect(page.rows.some((row) => row.captured_at === rows[200].captured_at)).toBe(false);
+    expect(completeManualSensorTimelineRows(rows)).toEqual(page);
+  });
+
+  it("keeps 200 complete rows when the lookahead belongs to an older capture", () => {
+    const current = Array.from({ length: TIMELINE_MANUAL_SENSOR_ROW_LIMIT }, () =>
+      metricRow("temperature_c", 24),
+    );
+    const older = metricRow("humidity_pct", 55, "manual", {
+      ts: "2026-09-08T18:46:00.000Z",
+    });
+    expect(completeManualSensorTimelineRows([...current, older])).toEqual({
+      rows: current,
+      hasOlderRows: true,
+    });
+  });
+
+  it("matches the receipt grouping time when captured_at is absent on the lookahead", () => {
+    const newer = Array.from({ length: TIMELINE_MANUAL_SENSOR_ROW_LIMIT - 1 }, (_, index) =>
+      metricRow("temperature_c", 24, "manual", {
+        ts: new Date(
+          Date.parse(CAPTURED) + (TIMELINE_MANUAL_SENSOR_ROW_LIMIT - index) * 60_000,
+        ).toISOString(),
+      }),
+    );
+    const boundary = metricRow("temperature_c", 24);
+    const lookahead = { ...metricRow("humidity_pct", 55), captured_at: null };
+    const page = completeManualSensorTimelineRows([...newer, boundary, lookahead]);
+    expect(page.rows).toEqual(newer);
+    expect(page.hasOlderRows).toBe(true);
+  });
+
+  it("marks hasOlderRows when the bounded query returns exactly 201 rows", () => {
+    const rows = [
+      ...Array.from({ length: TIMELINE_MANUAL_SENSOR_ROW_LIMIT }, () =>
+        metricRow("temperature_c", 24, "manual", { ts: CAPTURED }),
+      ),
+      metricRow("humidity_pct", 55, "manual", { ts: "2026-09-08T18:46:00.000Z" }),
+    ];
+    const page = completeManualSensorTimelineRows(rows);
+    expect(page.rows).toHaveLength(TIMELINE_MANUAL_SENSOR_ROW_LIMIT);
+    expect(page.hasOlderRows).toBe(true);
+  });
+});
+
 describe("manualSensorReadingsToTimelineEntries", () => {
   it("uses the effective corrected value in the receipt note, not a stale raw reading", () => {
     const correctedTempC = fahrenheitToCelsius(77);
@@ -53,7 +123,7 @@ describe("manualSensorReadingsToTimelineEntries", () => {
   });
 
   it("uses captured_at for receipt entry_at when ts differs from the observation time", () => {
-    const now = new Date("2026-07-15T20:00:00.000Z");
+    const now = new Date("2026-07-16T05:05:00.000Z");
     const ts = "2026-07-15T19:55:00.000Z";
     const capturedAt = "2026-07-16T05:00:00.000Z";
     const tempC = fahrenheitToCelsius(76);
@@ -71,7 +141,7 @@ describe("manualSensorReadingsToTimelineEntries", () => {
   it("post-filter on entry_at drops receipts whose captured_at sits outside the active window", () => {
     const startIso = "2026-07-15T05:00:00.000Z";
     const endIso = "2026-07-16T04:59:59.999Z";
-    const now = new Date("2026-07-15T20:00:00.000Z");
+    const now = new Date("2026-07-16T05:05:00.000Z");
     const ts = "2026-07-15T19:55:00.000Z";
     const capturedAt = "2026-07-16T05:00:00.000Z";
     const tempC = fahrenheitToCelsius(76);
@@ -82,9 +152,36 @@ describe("manualSensorReadingsToTimelineEntries", () => {
       ],
       now,
     );
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0].entry_at).toBe(capturedAt);
     receipts = receipts.filter((row) => row.entry_at >= startIso && row.entry_at <= endIso);
     expect(receipts).toEqual([]);
   });
+
+  it.each([
+    [5 * 60 * 1000, 1],
+    [5 * 60 * 1000 + 1, 0],
+    [9 * 60 * 60 * 1000, 0],
+  ])(
+    "applies future capture validity at +%i ms instead of trusting a fresh ts",
+    (offsetMs, count) => {
+      const now = new Date("2026-07-15T20:00:00.000Z");
+      const ts = "2026-07-15T19:55:00.000Z";
+      const capturedAt = new Date(now.getTime() + offsetMs).toISOString();
+      const receipts = manualSensorReadingsToTimelineEntries(
+        [
+          metricRow("temperature_c", fahrenheitToCelsius(76), "manual", {
+            ts,
+            captured_at: capturedAt,
+          }),
+          metricRow("humidity_pct", 58, "manual", { ts, captured_at: capturedAt }),
+        ],
+        now,
+      );
+      expect(receipts).toHaveLength(count);
+      if (count === 1) expect(receipts[0].entry_at).toBe(capturedAt);
+    },
+  );
 
   it("includes a grouped manual temp+RH snapshot in the Measurements query/view", () => {
     const tempC = fahrenheitToCelsius(76);
@@ -117,6 +214,160 @@ describe("manualSensorReadingsToTimelineEntries", () => {
     expect(receipt.id.startsWith(TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX)).toBe(true);
   });
 
+  it("retains an older manual reading and presents only observed soil moisture", () => {
+    const now = new Date("2026-09-12T18:51:00.000Z");
+    const rows = [
+      metricRow("temperature_c", fahrenheitToCelsius(76)),
+      metricRow("humidity_pct", 58),
+      metricRow("soil_moisture_pct", 42),
+    ];
+    const receipts = manualSensorReadingsToTimelineEntries(rows, now);
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0].entry_at).toBe(CAPTURED);
+    expect(receipts[0].note).toContain("42% soil moisture");
+    expect(receipts[0].details.manual_sensor_snapshot).toMatchObject({
+      source: "manual",
+      soil_moisture_pct: 42,
+    });
+    expect(receipts[0].details.sensor_snapshot).toMatchObject({ source: "manual", soil: 42 });
+    expect(diaryEntryBelongsInTimelineMeasurements(receipts[0], now)).toBe(true);
+    expect(manualSensorReadingsToTimelineEntries(rows, now)).toEqual(receipts);
+  });
+
+  it("does not invent soil moisture or present an out-of-range soil metric as valid", () => {
+    const now = new Date("2026-09-12T18:51:00.000Z");
+    const rows = [metricRow("temperature_c", fahrenheitToCelsius(76))];
+    const [withoutSoil] = manualSensorReadingsToTimelineEntries(rows, now);
+    expect(withoutSoil.note).not.toContain("soil moisture");
+    expect(withoutSoil.details.sensor_snapshot).not.toHaveProperty("soil");
+    const [badSoil] = manualSensorReadingsToTimelineEntries(
+      [...rows, metricRow("soil_moisture_pct", 101)],
+      now,
+    );
+    expect(badSoil.details.sensor_snapshot).toHaveProperty("soil", 101);
+    const vm = buildTimelineSensorSnapshotViewModel(badSoil.details.sensor_snapshot, {
+      validateManualCompatibility: true,
+    });
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.metric)).toEqual(["temp_f"]);
+    expect(vm.errors).toContain("Soil moisture must be between 0% and 100%.");
+  });
+
+  it("keeps valid metrics visible while preserving invalid metrics for disclosure context", () => {
+    const [receipt] = manualSensorReadingsToTimelineEntries(
+      [metricRow("temperature_c", fahrenheitToCelsius(500)), metricRow("humidity_pct", 58)],
+      NOW,
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt.note).not.toContain("°F");
+    expect(receipt.note).toContain("58% RH");
+    expect(receipt.details.sensor_snapshot).toMatchObject({
+      source: "manual",
+      rh: 58,
+    });
+    expect(receipt.details.sensor_snapshot).toHaveProperty("temp_c");
+    const vm = buildTimelineSensorSnapshotViewModel(receipt.details.sensor_snapshot, {
+      validateManualCompatibility: true,
+    });
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.display)).toEqual(["58%"]);
+    expect(vm.errors).toContain(
+      "Air temperature is outside the realistic 40–110°F grow-room range.",
+    );
+  });
+
+  it("keeps an all-invalid capture as a timeline row with manual-review disclosure context", () => {
+    const [receipt] = manualSensorReadingsToTimelineEntries(
+      [metricRow("temperature_c", fahrenheitToCelsius(500))],
+      NOW,
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt.note).toBe("Manual sensor snapshot");
+    expect(receipt.details.sensor_snapshot).toMatchObject({
+      source: "manual",
+      temp_c: fahrenheitToCelsius(500),
+    });
+    const vm = buildTimelineSensorSnapshotViewModel(receipt.details.sensor_snapshot, {
+      validateManualCompatibility: true,
+    });
+    expect(vm.kind).toBe("invalid");
+    if (vm.kind !== "invalid") return;
+    expect(vm.message).toBe("Review manual snapshot — invalid readings were not shown.");
+    expect(vm.errors).toContain(
+      "Air temperature is outside the realistic 40–110°F grow-room range.",
+    );
+  });
+
+  it.each([38, 115])(
+    "keeps saved %s°F manual readings in history and discloses them as invalid",
+    (tempF) => {
+      const [receipt] = manualSensorReadingsToTimelineEntries(
+        [metricRow("temperature_c", fahrenheitToCelsius(tempF)), metricRow("humidity_pct", 48)],
+        NOW,
+      );
+      expect(receipt).toBeDefined();
+      expect(receipt.details.sensor_snapshot).toMatchObject({
+        source: "manual",
+        temp_c: fahrenheitToCelsius(tempF),
+        rh: 48,
+      });
+      const vm = buildTimelineSensorSnapshotViewModel(receipt.details.sensor_snapshot, {
+        validateManualCompatibility: true,
+      });
+      expect(vm.kind).toBe("chips");
+      if (vm.kind !== "chips") return;
+      expect(vm.chips.map((chip) => chip.display)).toEqual(["48%"]);
+      expect(vm.errors).toContain(
+        "Air temperature is outside the realistic 40–110°F grow-room range.",
+      );
+    },
+  );
+
+  it("keeps invalid RH/soil/VPD in sensor_snapshot for disclosure but excludes them from receipt note", () => {
+    const [receipt] = manualSensorReadingsToTimelineEntries(
+      [
+        metricRow("temperature_c", fahrenheitToCelsius(76)),
+        metricRow("humidity_pct", 150),
+        metricRow("soil_moisture_pct", 101),
+        metricRow("vpd_kpa", 20),
+      ],
+      NOW,
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt.details.sensor_snapshot).toMatchObject({
+      source: "manual",
+      temp_c: fahrenheitToCelsius(76),
+      rh: 150,
+      soil: 101,
+      vpd_kpa: 20,
+    });
+    expect(receipt.note).toContain("76°F");
+    expect(receipt.note).not.toContain("150% RH");
+    expect(receipt.note).not.toContain("101% soil moisture");
+    expect(receipt.note).not.toContain("20 kPa VPD");
+  });
+
+  it.each([
+    [39, false],
+    [40, true],
+    [110, true],
+    [111, false],
+  ])("applies the 40–110°F bounds to note rendering at %s°F", (tempF, shouldRender) => {
+    const [receipt] = manualSensorReadingsToTimelineEntries(
+      [metricRow("temperature_c", fahrenheitToCelsius(tempF)), metricRow("humidity_pct", 48)],
+      NOW,
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt.note).toContain("48% RH");
+    if (shouldRender) {
+      expect(receipt.note).toContain(`${tempF}°F`);
+    } else {
+      expect(receipt.note).not.toContain(`${tempF}°F`);
+    }
+  });
+
   it("excludes live/csv/demo rows so Sensors live data is not a Timeline measurement receipt", () => {
     const tempC = fahrenheitToCelsius(74);
     const rows = [
@@ -143,24 +394,23 @@ describe("manualSensorReadingsToTimelineEntries", () => {
     }
   });
 
-  it("excludes a quality-ok manual the evidence drawer would badge Stale snapshot (Toad Pin 1)", () => {
+  it("retains a quality-ok manual after its current-state freshness expires (Toad Pin 1)", () => {
     const tempC = fahrenheitToCelsius(72);
     const capturedAt = "2026-09-10T00:37:25.988+00:00";
     const now = new Date("2026-09-10T05:01:00.000Z");
-    expect(now.getTime() - Date.parse(capturedAt)).toBeGreaterThan(LIVE_CURRENT_STATE_STALE_MS);
-    expect(isTimelineManualSensorReceiptFresh(capturedAt, now)).toBe(false);
-    expect(
-      manualSensorReadingsToTimelineEntries(
-        [
-          metricRow("temperature_c", tempC, "manual", { ts: capturedAt, quality: "ok" }),
-          metricRow("humidity_pct", 56, "manual", { ts: capturedAt, quality: "ok" }),
-        ],
-        now,
-      ),
-    ).toEqual([]);
+    const receipts = manualSensorReadingsToTimelineEntries(
+      [
+        metricRow("temperature_c", tempC, "manual", { ts: capturedAt, quality: "ok" }),
+        metricRow("humidity_pct", 56, "manual", { ts: capturedAt, quality: "ok" }),
+      ],
+      now,
+    );
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0].entry_at).toBe(capturedAt);
+    expect(diaryEntryBelongsInTimelineMeasurements(receipts[0], now)).toBe(true);
   });
 
-  it("excludes a diary-shaped Pin 1 row from Measurements even when evidence keys still match", () => {
+  it("retains diary-shaped Pin 1 evidence in Measurements as history", () => {
     const capturedAt = "2026-09-10T00:37:25.988+00:00";
     const now = new Date("2026-09-10T05:01:00.000Z");
     const pin1Diary = {
@@ -185,7 +435,7 @@ describe("manualSensorReadingsToTimelineEntries", () => {
       },
     };
     expect(diaryEntryHasMeasurementEvidence(pin1Diary)).toBe(true);
-    expect(diaryEntryBelongsInTimelineMeasurements(pin1Diary, now)).toBe(false);
+    expect(diaryEntryBelongsInTimelineMeasurements(pin1Diary, now)).toBe(true);
 
     const pin1Sibling = {
       ...pin1Diary,
@@ -207,10 +457,10 @@ describe("manualSensorReadingsToTimelineEntries", () => {
         },
       },
     };
-    expect(diaryEntryBelongsInTimelineMeasurements(pin1Sibling, now)).toBe(false);
+    expect(diaryEntryBelongsInTimelineMeasurements(pin1Sibling, now)).toBe(true);
   });
 
-  it("excludes Golden Toad Pin1 live QL persist shape (manual_sensor_snapshot, no ts, no sensor_snapshot)", () => {
+  it("retains old Quick Log manual envelopes while capture-time verification stays separate", () => {
     const capturedAt = "2026-09-10T00:37:25.988+00:00";
     const now = new Date("2026-09-10T05:01:00.000Z");
     const livePairs = [
@@ -239,11 +489,11 @@ describe("manualSensorReadingsToTimelineEntries", () => {
         },
       };
       expect(diaryEntryHasMeasurementEvidence(liveRow)).toBe(true);
-      expect(diaryEntryBelongsInTimelineMeasurements(liveRow, now)).toBe(false);
+      expect(diaryEntryBelongsInTimelineMeasurements(liveRow, now)).toBe(true);
     }
   });
 
-  it("excludes a QL v2 companion snap that stores captured_at instead of ts", () => {
+  it("retains a QL v2 companion snap that stores captured_at instead of ts", () => {
     const capturedAt = "2026-09-10T00:37:25.988+00:00";
     const now = new Date("2026-09-10T05:01:00.000Z");
     expect(
@@ -264,12 +514,11 @@ describe("manualSensorReadingsToTimelineEntries", () => {
         },
         now,
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("still includes a quality-ok manual inside the Stale snapshot window", () => {
+  it("still includes a quality-ok recent manual", () => {
     const tempC = fahrenheitToCelsius(72);
-    expect(isTimelineManualSensorReceiptFresh(CAPTURED, NOW)).toBe(true);
     expect(
       manualSensorReadingsToTimelineEntries(
         [metricRow("temperature_c", tempC), metricRow("humidity_pct", 56)],
@@ -364,6 +613,41 @@ describe("manualSensorReadingsToTimelineEntries", () => {
         NOW,
       ),
     ).toEqual([]);
+  });
+});
+
+describe("timelineManualSnapshotHistoryNotice", () => {
+  const capturedMs = Date.parse(CAPTURED);
+  const input = {
+    sourceKind: "manual",
+    capturedAt: CAPTURED,
+    staleMs: MANUAL_CURRENT_STATE_STALE_MS,
+  };
+
+  it("changes from current to clearly historical at the manual freshness boundary", () => {
+    expect(
+      timelineManualSnapshotHistoryNotice({
+        ...input,
+        nowMs: capturedMs + MANUAL_CURRENT_STATE_STALE_MS,
+      }),
+    ).toBeNull();
+    expect(
+      timelineManualSnapshotHistoryNotice({
+        ...input,
+        nowMs: capturedMs + MANUAL_CURRENT_STATE_STALE_MS + 1,
+      }),
+    ).toBe("Historical manual reading — not current.");
+  });
+
+  it("does not infer current time from a missing or malformed observation timestamp", () => {
+    for (const capturedAt of [null, "not-a-date"]) {
+      expect(timelineManualSnapshotHistoryNotice({ ...input, capturedAt, nowMs: capturedMs })).toBe(
+        "Capture time unverified — not current.",
+      );
+    }
+    expect(
+      timelineManualSnapshotHistoryNotice({ ...input, sourceKind: "live", nowMs: capturedMs }),
+    ).toBeNull();
   });
 });
 

@@ -16,6 +16,7 @@ import QuickLogEntryIntegrityControls, {
   QuickLogEditedBadge,
 } from "@/components/QuickLogEntryIntegrityControls";
 import { buildFeedingHistory, type FeedingHistoryRow } from "@/lib/feedingHistoryRules";
+import { feedingProductUnitDisplay } from "@/lib/quickLogFeedingFormViewModel";
 import {
   buildEcCompensationPreview,
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
@@ -161,7 +162,7 @@ function Row({
               {n.amount !== null && (
                 <span className="text-muted-foreground">
                   {n.amount}
-                  {n.unit ? ` ${n.unit}` : ""}
+                  {n.unit ? ` ${feedingProductUnitDisplay(n.unit)}` : ""}
                 </span>
               )}
             </li>

@@ -8,6 +8,7 @@ on:
       - "e2e/lib/coreLinkFormCensus.ts"
       - "playwright.config.ts"
       - ".github/workflows/core-link-form-census.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - verdant-grow-diary
@@ -25,8 +26,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: core-link-form-census-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   focused-rules:
@@ -51,15 +52,21 @@ jobs:
     name: Browser census (${{ matrix.lane }})
     needs: focused-rules
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # Authenticated: two 30-minute batch waves, three minutes of delayed-read
+    # regressions, and twelve minutes for setup, teardown, and evidence upload.
+    # Public: five sequential seven-minute batches also fit this job budget.
+    # Per-test timeouts, worker counts, assertions, and zero retries stay unchanged.
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
         include:
           - lane: public
             grep: scheduled public
+            workers: 1
           - lane: authenticated
             grep: scheduled authenticated
+            workers: 2
     env:
       PLAYWRIGHT_RETRIES: "0"
     steps:
@@ -91,6 +98,7 @@ jobs:
           --project=chromium-mocked
           e2e/core-link-form-census.spec.ts
           --grep "${{ matrix.grep }}"
+          --workers "${{ matrix.workers }}"
           --reporter=list
       - name: Upload failure evidence
         if: failure()

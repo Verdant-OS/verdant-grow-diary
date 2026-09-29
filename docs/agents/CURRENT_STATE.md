@@ -2,6 +2,14 @@
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-09-29T03:13 UTC
+
+- **PASS, source identity:** owner merge #1773 is now deploy `61821446ebd7e4fb30a36a5a95b7526a34515df5`, preserving the unknown-evidence-freshness correction from `c2fa6e13`. Codex performed no merge; live AI Doctor behavior and independent acceptance receipt remain NOT_MEASURED.
+- **PASS, required CI / FAIL, additional audits:** #1790 (`13499d83`), #1791 (`171cd0a2`) and #1738 (`15e7fb79`) each have all 35 required contexts SUCCESS at the exact head. Their native local-backend jobs each report 21 PASS / 0 FAIL / 0 SKIP / 0 retries. These overlap; they are not 63 unique tests or production proof. #1790/#1791 still fail fast-uri and nested undici audits; #1738 still fails fast-uri and GA WebKit (6 passed / 1 failed / 1 flaky runner classification). The earlier native retraction failure is retained; a later pass does not prove a flake cause.
+- **PASS locally / NOT_MEASURED hosted:** new P1 draft #1792 at `6ba962d2c6c6485a6ff37897309447560eb24a77`, based on `61821446`, repairs the production-only Quick Log fixture lane with positive server identity, plant/tent/grow ownership, empty/in-flight-read fences and tagged notes. Nine files (+908/-49), 57 new cases. Related run: 7 files / 251 PASS / 0 FAIL / 0 SKIP; project and targeted E2E typechecks 0 diagnostics; lint 9 files 0 errors/0 warnings; format 9 files and 3 docs-safety scanners PASS. Playwright discovery lists 3 tests; no browser execution or manual production write was performed. Blue Dream acceptance and actual fixture ownership remain NOT_MEASURED.
+- **FAIL, stable live/deploy match:** source is `61821446`. The earlier endpoint receipt at 02:34:39Z returned `95464496` (cache MISS, Age 0). The fresh 03:10:56Z read returned `5feb5471` (cache MISS, Age 0); the 03:11:43Z repeat returned `5feb5471` (cache HIT, Age 47), HTTP 200 and dirty:false. This proves differing observations, not a rollback cause or stable deployment identity. Preserve both receipts; production acceptance remains NOT_MEASURED and the release decision remains Matthew-owned.
+- **BLOCKED, locked repairs:** fast-uri/undici require locked dependency files; no audit waiver, lockfile, production SQL/APPLY/PREFLIGHT, secret/configuration change, Publish, device or Action Queue action. HOLD #1250 and named owner locks remain. Phase 2 is not declared. CHEM-GOAL-3DAY-001 remains active.
+
 ## Updated operating observation — 2026-09-29T01:12:45.079Z
 
 - **PASS, source identity:** #1781 merged at 00:48:36 UTC as `0755bfcc0d7ee9d4c88ee716384c28b9beb51cce`. Shipped Sentinel is 2026-09-28.2 with the exact legacy ACK. Its any-.tsx and HOLD-CHEEK-review routing remains intact. The coverage amendment in #1777 now proposes 2026-09-28.3. Earlier observations below are historical.
@@ -140,7 +148,6 @@ APPLY, device or Action Queue operation was performed in this docs change.
 Live acceptance remains NOT_MEASURED here.
 
 ### Historical operating receipts — unchanged below
-
 **Last updated:** 2026-09-24 UTC (~11:25 UTC; tip, live and board measured 11:14–11:17 UTC)
 **Updated by:** Claude (2026-09-24 late morning, restamp on **deploy tip
 `b0bfdb028600b63ec7b8bff914632a20b06020b7`**, the `#1685` squash. **Four commits** merged since the

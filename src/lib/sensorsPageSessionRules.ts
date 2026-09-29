@@ -160,6 +160,21 @@ export function editManualDraftValues(
   });
 }
 
+/** Restoring a pending correction changes the draft without confirming its save. */
+export function restoreUnconfirmedManualDraftValues(
+  values: ManualDraftValues,
+  recovered: ManualDraftValues,
+): ManualDraftValues {
+  const edited = editManualDraftValues(values, {
+    form: recovered.form,
+    tempUnitOverride: recovered.tempUnitOverride,
+    hasEditedReading: recovered.hasEditedReading,
+    devicePreset: recovered.devicePreset,
+    deviceCustom: recovered.deviceCustom,
+  });
+  return immutableCopy({ ...edited, saveUnconfirmed: true });
+}
+
 /** Changing display units is not a new observation or a new retry identity. */
 export function reexpressManualDraftTemperature(
   values: ManualDraftValues,

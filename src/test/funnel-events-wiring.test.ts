@@ -548,13 +548,21 @@ describe("ordering and safety constraints at the seams", () => {
       "if (!packet || pendingAcceptedReviewStartRef.current === historyScopeKey) return;",
       canStartGate,
     );
-    const acceptedGate = src.indexOf("if (!acceptedEligibility.allowed) return;", requestGate);
+    const acceptedGate = src.indexOf("if (!acceptedEligibility.allowed) {", requestGate);
+    const rejectedReturn = src.indexOf("return;", acceptedGate);
+    const acceptedMode = src.indexOf("const acceptedMode =", acceptedGate);
     const acceptedRequest = src.indexOf("setAcceptedReviewRequest({", acceptedGate);
     const historicalGate = src.indexOf(
       'acceptedEligibility.mode === "historical_review" &&',
       acceptedRequest,
     );
     const track = src.indexOf('trackFunnelEvent("historical_ai_review_started")', historicalGate);
+    const retryHandler = src.indexOf("const handleRetryReview = () => {", handler);
+    const staleRetryGuard = src.indexOf(
+      'if (activeReviewVisibility.retryBlockedReason === "stale-evidence") {',
+      retryHandler,
+    );
+    const retryInvoke = src.indexOf("review.retry();", staleRetryGuard);
     const handlerEnd = src.indexOf("const confidenceCopy", handler);
 
     expect(startBinding).toBeGreaterThan(-1);
@@ -565,14 +573,22 @@ describe("ordering and safety constraints at the seams", () => {
     expect(canStartGate).toBeGreaterThan(handler);
     expect(requestGate).toBeGreaterThan(canStartGate);
     expect(acceptedGate).toBeGreaterThan(requestGate);
-    expect(acceptedRequest).toBeGreaterThan(acceptedGate);
+    expect(rejectedReturn).toBeGreaterThan(acceptedGate);
+    expect(acceptedMode).toBeGreaterThan(rejectedReturn);
+    expect(src.slice(acceptedGate, acceptedMode)).toMatch(/return;\s*\}\s*$/);
+    expect(acceptedRequest).toBeGreaterThan(acceptedMode);
     expect(historicalGate).toBeGreaterThan(acceptedRequest);
     expect(track).toBeGreaterThan(historicalGate);
+    expect(retryHandler).toBeGreaterThan(track);
+    expect(staleRetryGuard).toBeGreaterThan(retryHandler);
+    expect(retryInvoke).toBeGreaterThan(staleRetryGuard);
     expect(src.slice(handler, handlerEnd)).not.toContain("startReview()");
     expect(src).toMatch(
-      /onClick=\{review\.status === "error" \? review\.retry : handleInitialStart\}/,
+      /onClick=\{review\.status === "error" \? handleRetryReview : handleInitialStart\}/,
     );
-    expect(src).toMatch(/activeReviewRequest\s*\?\s*review\.status === "error" && canRetryReview/);
+    expect(src).toMatch(
+      /activeReviewRequest\s*\?\s*review\.status === "error" && canRetryReview && retryBlockedReason === null/,
+    );
     expect(src).toMatch(
       /allowed\s*&&\s*historyRecovery\.state !== "decision_required"\s*&&\s*rootZoneRecovery\.state !== "decision_required"\s*&&\s*review\.status === "idle"/,
     );

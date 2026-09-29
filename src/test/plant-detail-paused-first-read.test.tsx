@@ -205,7 +205,10 @@ describe("Plant Detail first paused read", () => {
     expectWaiting();
     act(() => onlineManager.setOnline(true));
     expect(await screen.findByText("Plant not found")).toBeVisible();
-    expect(screen.getByText("No real plants yet")).toBeVisible();
+    // One missing plant is not evidence that the account has no plants.
+    expect(screen.queryByText("No real plants yet")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Add your first plant/)).not.toBeInTheDocument();
+    expect(screen.getByText("This plant isn't available")).toBeVisible();
     expect(fixture.fetchPlant).toHaveBeenCalledExactlyOnceWith(plant.id);
   });
   it("shows a failed read with Retry after reconnect and retries the same plant", async () => {

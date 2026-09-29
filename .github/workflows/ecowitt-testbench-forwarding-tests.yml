@@ -18,7 +18,12 @@ on:
       - "src/test/ecowitt-windows-testbench-static-safety.test.ts"
       - "src/test/ecowitt-custom-http-bridge-ingest-readiness.test.ts"
       - ".github/workflows/ecowitt-testbench-forwarding-tests.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   forwarding-tests:

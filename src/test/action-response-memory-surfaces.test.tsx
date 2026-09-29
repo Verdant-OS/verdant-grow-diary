@@ -6,7 +6,7 @@
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import {
   buildActionResponseMemories,
@@ -175,10 +175,10 @@ describe("5. surfaces agree on outcome and evidence state", () => {
 });
 
 describe("6-7. Plant Detail component behavior (loading/empty/failure states)", () => {
-  async function renderPlantCard(state: unknown) {
+  async function renderPlantCard(state: unknown, reload = vi.fn()) {
     vi.resetModules();
     vi.doMock("@/hooks/useActionResponseMemory", () => ({
-      useActionResponseMemory: () => ({ state, reload: () => {} }),
+      useActionResponseMemory: () => ({ state, reload }),
     }));
     vi.doMock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
     const { default: PlantDetailRecentActionResponse } =
@@ -211,17 +211,29 @@ describe("6-7. Plant Detail component behavior (loading/empty/failure states)", 
     expect(screen.getByTestId("action-response-memory-note")).toBeTruthy();
   });
 
-  it("renders nothing while loading, when empty, and when unavailable", async () => {
-    for (const state of [
-      { status: "loading" },
-      { status: "idle" },
-      { status: "unavailable" },
-      { status: "ok", memories: [] },
-    ]) {
+  it("renders nothing when idle or successfully empty", async () => {
+    for (const state of [{ status: "idle" }, { status: "ok", memories: [] }]) {
       const { container, unmount } = await renderPlantCard(state);
       expect(container.textContent).toBe("");
       unmount();
     }
+  });
+
+  it("labels an unresolved read as loading rather than empty", async () => {
+    await renderPlantCard({ status: "loading" });
+    expect(screen.getByRole("status").textContent).toBe("Loading action response history…");
+    expect(screen.queryByTestId("action-response-memory-outcome")).toBeNull();
+  });
+
+  it("shows an unavailable read with a retry of that read", async () => {
+    const reload = vi.fn();
+    await renderPlantCard({ status: "unavailable" }, reload);
+    expect(screen.getByRole("status").textContent).toBe(
+      "Action response history is unavailable right now.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry action response history" }));
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("action-response-memory-outcome")).toBeNull();
   });
 });
 

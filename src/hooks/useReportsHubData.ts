@@ -17,7 +17,14 @@
  *  - Read-only: no .insert/.update/.delete/.upsert/.rpc.
  *  - No ai-coach call. No device-control. No service_role. RLS enforces ownership.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  EFFECTIVE_SENSOR_QUERY_VERSION,
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+} from "@/lib/effectiveSensorReadings";
+import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
@@ -194,9 +201,10 @@ async function loadReportsHubSensorPage(input: {
   // diagnostic-heavy tents don't force paging through excluded rows.
   // `isReportsHubSensorContextRow` remains the eligibility authority
   // (observation time + diagnostic provenance are client-side checks).
-  let query = supabase
-    .from("sensor_readings")
-    .select("ts,captured_at,source,raw_payload")
+  let query = effectiveSensorReadingsQuery()
+    .select(
+      "id,user_id,tent_id,metric,value,ts,captured_at,created_at,device_id,source,quality,raw_payload,correction_valid",
+    )
     .in("tent_id", input.tentIds)
     .in("source", rawSensorSourceValuesFor(["live", "manual", "csv"]));
   // Use physical observation time for the learning summary. Legacy rows with
@@ -217,7 +225,7 @@ async function loadReportsHubSensorPage(input: {
     .order("ts", { ascending: false })
     .range(input.from, input.from + REPORTS_HUB_SENSOR_PAGE_SIZE - 1);
   if (error) throw error;
-  return (data ?? []) as ReportsHubSensorRow[];
+  return requireEffectiveSensorReadings(data);
 }
 
 /**
@@ -283,188 +291,225 @@ async function loadReportsHubSensorSummary(
   return { latestSensorCapturedAt, recentSensorReadingCount };
 }
 
-export function useReportsHubData(growId: string | null | undefined): ReportsHubData {
+export function useReportsHubData(
+  growId: string | null | undefined,
+): ReportsHubData & { retry: () => void } {
   const { user } = useAuth();
-  const [state, setState] = useState<ReportsHubData>(EMPTY_REPORTS_HUB_DATA);
+  const query = useQuery<ReportsHubData>({
+    queryKey: ["reports-hub", user?.id ?? "anon", growId ?? "none", EFFECTIVE_SENSOR_QUERY_VERSION],
+    enabled: !!user && !!growId,
+    retry: false,
+    queryFn: async () => {
+      if (!user || !growId) return EMPTY_REPORTS_HUB_DATA;
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const load = useCallback(async () => {
-    if (!user || !growId) {
-      setState({ ...EMPTY_REPORTS_HUB_DATA, status: "idle" });
-      return;
-    }
-    setState((prev) => ({ ...prev, status: "loading" }));
+      try {
+        // Resolve tent ids for sensor lookup. Candidates are this grow's
+        // linked tents plus UNASSIGNED tents (grow_id null); the pure helper
+        // admits an unassigned candidate only when it hosts this grow's
+        // active plants, and a tent linked to another grow is never a
+        // candidate — see resolveReportsHubSensorTentIds (live audit #16).
+        const [tentRowsRes, plantTentRowsRes] = await Promise.all([
+          supabase.from("tents").select("id,grow_id").or(`grow_id.eq.${growId},grow_id.is.null`),
+          supabase
+            .from("plants")
+            .select("tent_id")
+            .eq("grow_id", growId)
+            .eq("is_archived", false)
+            .not("tent_id", "is", null),
+        ]);
+        for (const response of [tentRowsRes, plantTentRowsRes]) {
+          if (response.error || !Array.isArray(response.data)) {
+            throw new Error("reports_hub_scope_unavailable");
+          }
+        }
+        const tentIds = resolveReportsHubSensorTentIds(
+          tentRowsRes.data as { id?: string | null; grow_id?: string | null }[] | null,
+          plantTentRowsRes.data as { tent_id?: string | null }[] | null,
+          growId,
+        );
 
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const completedCutoffIso = new Date(
+          Date.now() - PENDING_OUTCOME_REVIEW_THRESHOLD_MS,
+        ).toISOString();
 
-    try {
-      // Resolve tent ids for sensor lookup. Candidates are this grow's
-      // linked tents plus UNASSIGNED tents (grow_id null); the pure helper
-      // admits an unassigned candidate only when it hosts this grow's
-      // active plants, and a tent linked to another grow is never a
-      // candidate — see resolveReportsHubSensorTentIds (live audit #16).
-      const [tentRowsRes, plantTentRowsRes] = await Promise.all([
-        supabase.from("tents").select("id,grow_id").or(`grow_id.eq.${growId},grow_id.is.null`),
-        supabase
-          .from("plants")
-          .select("tent_id")
-          .eq("grow_id", growId)
-          .eq("is_archived", false)
-          .not("tent_id", "is", null),
-      ]);
-      if (tentRowsRes.error) throw tentRowsRes.error;
-      if (plantTentRowsRes.error) throw plantTentRowsRes.error;
-      const tentIds = resolveReportsHubSensorTentIds(
-        tentRowsRes.data as { id?: string | null; grow_id?: string | null }[] | null,
-        plantTentRowsRes.data as { tent_id?: string | null }[] | null,
-        growId,
-      );
+        const [
+          outcomeRes,
+          alertsOpenRes,
+          alertsCritRes,
+          alertsWarnRes,
+          diaryTotalRes,
+          diary7dRes,
+          activityDiaryRowsRes,
+          activitySpineRowsRes,
+          sensorSummary,
+          firstOpenAlertRes,
+          completedActionsRes,
+        ] = await Promise.all([
+          supabase
+            .from("diary_entries")
+            .select("id,entry_at,created_at,note,details")
+            .eq("grow_id", growId)
+            .eq("details->>event_type", "action_outcome")
+            .order("entry_at", { ascending: false })
+            .limit(50),
+          supabase
+            .from("alerts")
+            .select("id", { count: "exact", head: true })
+            .eq("grow_id", growId)
+            .eq("status", "open"),
+          supabase
+            .from("alerts")
+            .select("id", { count: "exact", head: true })
+            .eq("grow_id", growId)
+            .eq("status", "open")
+            .eq("severity", "critical"),
+          supabase
+            .from("alerts")
+            .select("id", { count: "exact", head: true })
+            .eq("grow_id", growId)
+            .eq("status", "open")
+            .eq("severity", "warning"),
+          fetchReportsHubDiaryTotal(growId),
+          fetchReportsHubDiaryLast7d(growId, sevenDaysAgo),
+          // Bounded row windows for the diary + grow_events spine merge. The
+          // spine is the canonical Quick Log record; companion diary rows are
+          // deduped by linkage and identical (plant_id, timestamp) pairs.
+          fetchReportsHubActivityDiaryRows(growId),
+          supabase
+            .from("grow_events")
+            .select(
+              "id,tent_id,plant_id,event_type,occurred_at,created_at,source,is_deleted,deleted_at",
+            )
+            .eq("grow_id", growId)
+            .eq("source", "manual")
+            .eq("is_deleted", false)
+            .order("occurred_at", { ascending: false })
+            .limit(REPORTS_HUB_ACTIVITY_MERGE_WINDOW),
+          tentIds.length > 0
+            ? loadReportsHubSensorSummary(tentIds, sevenDaysAgo)
+            : Promise.resolve({
+                latestSensorCapturedAt: null,
+                recentSensorReadingCount: 0,
+              }),
+          supabase
+            .from("alerts")
+            .select("id,severity,created_at")
+            .eq("grow_id", growId)
+            .eq("status", "open")
+            .order("created_at", { ascending: false })
+            .limit(1),
+          supabase
+            .from("action_queue")
+            .select("id,status,completed_at,suggested_change,grow_id")
+            .eq("grow_id", growId)
+            .eq("status", "completed")
+            .lte("completed_at", completedCutoffIso)
+            .order("completed_at", { ascending: true })
+            .limit(50),
+        ]);
 
-      const completedCutoffIso = new Date(
-        Date.now() - PENDING_OUTCOME_REVIEW_THRESHOLD_MS,
-      ).toISOString();
+        // A failed or unresolved read cannot establish an empty report. Every
+        // row source and exact count below contributes to the displayed summary.
+        for (const response of [
+          outcomeRes,
+          activityDiaryRowsRes,
+          activitySpineRowsRes,
+          firstOpenAlertRes,
+          completedActionsRes,
+        ]) {
+          if (response.error || !Array.isArray(response.data)) {
+            throw new Error("reports_hub_rows_unavailable");
+          }
+        }
+        for (const response of [
+          alertsOpenRes,
+          alertsCritRes,
+          alertsWarnRes,
+          diaryTotalRes,
+          diary7dRes,
+        ]) {
+          if (
+            response.error ||
+            typeof response.count !== "number" ||
+            !Number.isSafeInteger(response.count) ||
+            response.count < 0
+          ) {
+            throw new Error("reports_hub_count_unavailable");
+          }
+        }
+        const outcomeRows = outcomeRes.data as RawGrowOutcomeRow[];
 
-      const [
-        outcomeRes,
-        alertsOpenRes,
-        alertsCritRes,
-        alertsWarnRes,
-        diaryTotalRes,
-        diary7dRes,
-        activityDiaryRowsRes,
-        activitySpineRowsRes,
-        sensorSummary,
-        firstOpenAlertRes,
-        completedActionsRes,
-      ] = await Promise.all([
-        supabase
-          .from("diary_entries")
-          .select("id,entry_at,created_at,note,details")
-          .eq("grow_id", growId)
-          .eq("details->>event_type", "action_outcome")
-          .order("entry_at", { ascending: false })
-          .limit(50),
-        supabase
-          .from("alerts")
-          .select("id", { count: "exact", head: true })
-          .eq("grow_id", growId)
-          .eq("status", "open"),
-        supabase
-          .from("alerts")
-          .select("id", { count: "exact", head: true })
-          .eq("grow_id", growId)
-          .eq("status", "open")
-          .eq("severity", "critical"),
-        supabase
-          .from("alerts")
-          .select("id", { count: "exact", head: true })
-          .eq("grow_id", growId)
-          .eq("status", "open")
-          .eq("severity", "warning"),
-        fetchReportsHubDiaryTotal(growId),
-        fetchReportsHubDiaryLast7d(growId, sevenDaysAgo),
-        // Bounded row windows for the diary + grow_events spine merge. The
-        // spine is the canonical Quick Log record; companion diary rows are
-        // deduped by linkage and identical (plant_id, timestamp) pairs.
-        fetchReportsHubActivityDiaryRows(growId),
-        supabase
-          .from("grow_events")
-          .select(
-            "id,tent_id,plant_id,event_type,occurred_at,created_at,source,is_deleted,deleted_at",
-          )
-          .eq("grow_id", growId)
-          .eq("source", "manual")
-          .eq("is_deleted", false)
-          .order("occurred_at", { ascending: false })
-          .limit(REPORTS_HUB_ACTIVITY_MERGE_WINDOW),
-        tentIds.length > 0
-          ? loadReportsHubSensorSummary(tentIds, sevenDaysAgo)
-          : Promise.resolve({
-              latestSensorCapturedAt: null,
-              recentSensorReadingCount: 0,
-            }),
-        supabase
-          .from("alerts")
-          .select("id,severity,created_at")
-          .eq("grow_id", growId)
-          .eq("status", "open")
-          .order("created_at", { ascending: false })
-          .limit(1),
-        supabase
-          .from("action_queue")
-          .select("id,status,completed_at,suggested_change,grow_id")
-          .eq("grow_id", growId)
-          .eq("status", "completed")
-          .lte("completed_at", completedCutoffIso)
-          .order("completed_at", { ascending: true })
-          .limit(50),
-      ]);
-
-      const outcomeRows = (outcomeRes.data ?? []) as RawGrowOutcomeRow[];
-
-      // Merge the manual grow_events spine into the diary activity numbers.
-      // Row-fetch failure degrades to the plain diary counts (never inflates);
-      // a saturated window clamps against the exact per-table counts.
-      let diaryEntriesTotal = diaryTotalRes.count ?? 0;
-      let diaryEntriesLast7d = diary7dRes.count ?? 0;
-      if (!activityDiaryRowsRes.error && !activitySpineRowsRes.error) {
-        const activityDiaryRows = (activityDiaryRowsRes.data ??
-          []) as ConnectedActivationDiaryEntryRow[];
-        const activitySpineRows = (activitySpineRowsRes.data ??
-          []) as ConnectedActivationGrowEventRow[];
-        const mergedTotal = countMergedManualGrowActivity({
-          diaryEntries: activityDiaryRows,
-          growEvents: activitySpineRows,
+        // Merge the manual grow_events spine into the diary activity numbers.
+        // All reads have succeeded; a saturated window clamps against the
+        // exact per-table counts rather than presenting a failed read as zero.
+        let diaryEntriesTotal = diaryTotalRes.count ?? 0;
+        let diaryEntriesLast7d = diary7dRes.count ?? 0;
+        if (!activityDiaryRowsRes.error && !activitySpineRowsRes.error) {
+          const activityDiaryRows = (activityDiaryRowsRes.data ??
+            []) as ConnectedActivationDiaryEntryRow[];
+          const activitySpineRows = (activitySpineRowsRes.data ??
+            []) as ConnectedActivationGrowEventRow[];
+          const mergedTotal = countMergedManualGrowActivity({
+            diaryEntries: activityDiaryRows,
+            growEvents: activitySpineRows,
+          });
+          const merged7d = countMergedManualGrowActivity({
+            diaryEntries: activityDiaryRows,
+            growEvents: activitySpineRows,
+            since: sevenDaysAgo,
+          });
+          const windowSaturated =
+            activityDiaryRows.length >= REPORTS_HUB_ACTIVITY_MERGE_WINDOW ||
+            activitySpineRows.length >= REPORTS_HUB_ACTIVITY_MERGE_WINDOW;
+          diaryEntriesTotal = windowSaturated
+            ? Math.max(mergedTotal, diaryEntriesTotal)
+            : mergedTotal;
+          diaryEntriesLast7d = windowSaturated ? Math.max(merged7d, diaryEntriesLast7d) : merged7d;
+        }
+        const pendingReviews = findPendingOutcomeReviews({
+          completedActions: (completedActionsRes.data ?? []) as never,
+          outcomes: (outcomeRes.data ?? []) as never,
+          now: Date.now(),
         });
-        const merged7d = countMergedManualGrowActivity({
-          diaryEntries: activityDiaryRows,
-          growEvents: activitySpineRows,
-          since: sevenDaysAgo,
-        });
-        const windowSaturated =
-          activityDiaryRows.length >= REPORTS_HUB_ACTIVITY_MERGE_WINDOW ||
-          activitySpineRows.length >= REPORTS_HUB_ACTIVITY_MERGE_WINDOW;
-        diaryEntriesTotal = windowSaturated
-          ? Math.max(mergedTotal, diaryEntriesTotal)
-          : mergedTotal;
-        diaryEntriesLast7d = windowSaturated ? Math.max(merged7d, diaryEntriesLast7d) : merged7d;
+        const firstAlert = (firstOpenAlertRes.data?.[0] ?? null) as {
+          id?: string;
+          severity?: string;
+          created_at?: string;
+        } | null;
+
+        return {
+          status: "ready",
+          outcomeSummary: summarizeGrowOutcomes(outcomeRows),
+          outcomeLearning: buildActionOutcomeLearningReport(outcomeRows),
+          alertsOpen: alertsOpenRes.count ?? 0,
+          alertsCritical: alertsCritRes.count ?? 0,
+          alertsWarning: alertsWarnRes.count ?? 0,
+          firstOpenAlertId: firstAlert?.id ?? null,
+          firstOpenAlertSeverity: firstAlert?.severity ?? null,
+          firstOpenAlertCreatedAt: firstAlert?.created_at ?? null,
+          latestSensorCapturedAt: sensorSummary.latestSensorCapturedAt,
+          recentSensorReadingCount: sensorSummary.recentSensorReadingCount,
+          diaryEntriesTotal,
+          diaryEntriesLast7d,
+          pendingOutcomeReviewCount: pendingReviews.length,
+          firstPendingActionId: pendingReviews[0]?.action_queue_id ?? null,
+          oldestPendingCompletedAt: pendingReviews[0]?.completed_at ?? null,
+        };
+      } catch {
+        throw new Error("reports_hub_unavailable");
       }
-      const pendingReviews = findPendingOutcomeReviews({
-        completedActions: (completedActionsRes.data ?? []) as never,
-        outcomes: (outcomeRes.data ?? []) as never,
-        now: Date.now(),
-      });
-      const firstAlert = (firstOpenAlertRes.data?.[0] ?? null) as {
-        id?: string;
-        severity?: string;
-        created_at?: string;
-      } | null;
-
-      setState({
-        status: "ready",
-        outcomeSummary: summarizeGrowOutcomes(outcomeRows),
-        outcomeLearning: buildActionOutcomeLearningReport(outcomeRows),
-        alertsOpen: alertsOpenRes.count ?? 0,
-        alertsCritical: alertsCritRes.count ?? 0,
-        alertsWarning: alertsWarnRes.count ?? 0,
-        firstOpenAlertId: firstAlert?.id ?? null,
-        firstOpenAlertSeverity: firstAlert?.severity ?? null,
-        firstOpenAlertCreatedAt: firstAlert?.created_at ?? null,
-        latestSensorCapturedAt: sensorSummary.latestSensorCapturedAt,
-        recentSensorReadingCount: sensorSummary.recentSensorReadingCount,
-        diaryEntriesTotal,
-        diaryEntriesLast7d,
-        pendingOutcomeReviewCount: pendingReviews.length,
-        firstPendingActionId: pendingReviews[0]?.action_queue_id ?? null,
-        oldestPendingCompletedAt: pendingReviews[0]?.completed_at ?? null,
-      });
-    } catch {
-      setState({ ...EMPTY_REPORTS_HUB_DATA, status: "unavailable" });
-    }
-  }, [user, growId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  return state;
+    },
+  });
+  const ownerId = user?.id ?? null;
+  const refetch = query.refetch;
+  const retry = useCallback(() => {
+    if (ownerId && growId) void refetch();
+  }, [ownerId, growId, refetch]);
+  useEffect(() => subscribeManualSensorCorrections(ownerId, retry), [ownerId, retry]);
+  if (!user || !growId) return { ...EMPTY_REPORTS_HUB_DATA, retry };
+  if (query.isPending || query.isFetching || query.fetchStatus === "paused")
+    return { ...EMPTY_REPORTS_HUB_DATA, status: "loading", retry };
+  if (query.isError) return { ...EMPTY_REPORTS_HUB_DATA, status: "unavailable", retry };
+  return { ...query.data, retry };
 }

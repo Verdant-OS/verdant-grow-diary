@@ -18,10 +18,11 @@ import { NextRunPlaybook } from "@/components/NextRunPlaybook";
 import { summarizeGrowLearning } from "@/lib/growLearningReviewViewModel";
 import { buildNextRunPlaybook } from "@/lib/nextRunPlaybookRules";
 import { growDetailPath } from "@/lib/routes";
+import { Button } from "@/components/ui/button";
 
 export default function GrowLearning() {
   const { growId } = useParams<{ growId: string }>();
-  const { state } = usePlantMemoryEpisodes({
+  const { state, reload } = usePlantMemoryEpisodes({
     growId: growId ?? null,
     includeSensorEvidence: true,
   });
@@ -52,13 +53,18 @@ export default function GrowLearning() {
           Loading learning review…
         </p>
       ) : state.status === "unavailable" ? (
-        <p
-          role="status"
-          className="text-sm text-muted-foreground"
-          data-testid="grow-learning-unavailable"
-        >
-          The learning review is unavailable right now. Try again shortly.
-        </p>
+        <div className="space-y-2">
+          <p
+            role="status"
+            className="text-sm text-muted-foreground"
+            data-testid="grow-learning-unavailable"
+          >
+            The learning review is unavailable right now. Try again shortly.
+          </p>
+          <Button variant="outline" size="sm" onClick={reload}>
+            Retry learning review
+          </Button>
+        </div>
       ) : state.episodes.length === 0 ? (
         <p className="text-sm text-muted-foreground" data-testid="grow-learning-empty">
           No completed actions yet for this grow. Once you complete an action from the Action Queue,

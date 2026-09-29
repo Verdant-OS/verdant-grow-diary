@@ -24,6 +24,11 @@ import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
 import { compareSnapshotToTargets } from "@/lib/environmentTargetComparison";
 import { resolveAlertContextStage } from "@/lib/alertStageResolution";
+import {
+  type AlertStagePlant,
+  isCurrentReadForAlertWrite,
+  resolveGrowPlantStages,
+} from "@/lib/alertPlantStageScopeRules";
 import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 
 interface Props {
@@ -32,29 +37,40 @@ interface Props {
    * resolved from this PLUS the grow's tents' stages, so a stale
    * `grows.stage` cannot drive outdated stage bands (live audit #14). */
   stage?: string | null;
+  /**
+   * Active plants (any grow), QA 2026-09-24 BUG-006. The ones that resolve
+   * to this grow, by their own grow_id or else through one of this grow's
+   * tents, add their stages. `null` means there is no current, successful
+   * plant read (pending or failed): persistence waits. Omitted keeps the
+   * grow + tent resolution.
+   */
+  plants?: ReadonlyArray<AlertStagePlant> | null;
 }
 
-export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
+export default function AlertsAutoPersistForGrow({ growId, stage, plants }: Props) {
   const safeGrowId = growId ?? null;
   const tentsQuery = useGrowTents(safeGrowId ?? undefined);
   const tents = tentsQuery.data ?? [];
-  // Persistence is gated on the tent read having SETTLED (success or
-  // error): while the query is pending, `tents` is a placeholder empty
-  // array and the resolver would fall back to the grow row alone — an
-  // alert persisted against a stale grow stage in that window would not
-  // be removed when the tent stages arrive. After an error, proceeding
-  // with the grow row alone matches the pre-resolver behavior.
-  const tentsSettled = tentsQuery.isFetched;
+  // Persistence needs a current, successful tent read. While it is pending
+  // or has failed, `tents` is empty: the stage would fall back to the grow
+  // row alone and a grow-less plant, placed in this grow only through its
+  // tent, would drop out. A refetch may be replacing stale tent rows. An
+  // alert persisted in any of those windows is not removed when the tent
+  // stages arrive (Codex review on #1683).
+  const tentsCurrent = isCurrentReadForAlertWrite(tentsQuery);
   const tentIds = tents.map((t) => t.id);
   const sensorState = useLatestSensorSnapshot(safeGrowId, tentIds);
   const snapshot = buildSensorSnapshotReadState(sensorState).confirmedSnapshot;
   const targetsState = useGrowTargets(safeGrowId);
   // Stage precedence lives in resolveAlertContextStage: grow stage + tent
   // stages, most advanced known stage wins on disagreement.
+  const plantStages = safeGrowId ? resolveGrowPlantStages(plants, safeGrowId, tents) : plants;
   const resolvedStage = resolveAlertContextStage({
     growStage: stage,
     tentStages: tents.map((t) => t.stage),
+    plantStages: plantStages ?? null,
   }).stage;
+  const plantsSettled = plants !== null;
 
   usePersistEnvironmentAlerts({
     growId: safeGrowId,
@@ -68,7 +84,7 @@ export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
       snapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
-    enabled: !!safeGrowId && tentsSettled,
+    enabled: !!safeGrowId && tentsCurrent && plantsSettled,
     stage: resolvedStage,
   });
 

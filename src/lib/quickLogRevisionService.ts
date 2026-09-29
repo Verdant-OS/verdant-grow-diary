@@ -11,6 +11,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
+import { isUuid } from "@/lib/isUuid";
 import type { Database, Json } from "@/integrations/supabase/types";
 import {
   parseQuickLogRevisionRow,
@@ -148,7 +149,7 @@ export function decodeQuickLogRevisionDatabaseRows(
   return { ok: true, rows };
 }
 
-function parseRpcResult(data: unknown): QuickLogRevisionWriteResult {
+function parseRpcResult(data: unknown, handle: QuickLogEntryHandle): QuickLogRevisionWriteResult {
   if (!isRecord(data)) {
     return { ok: false, reason: "rpc_error" };
   }
@@ -159,26 +160,31 @@ function parseRpcResult(data: unknown): QuickLogRevisionWriteResult {
     };
   }
   if (
-    typeof data.revision_id !== "string" ||
-    data.revision_id.length === 0 ||
+    !isUuid(data.revision_id) ||
     typeof data.revision_no !== "number" ||
     !Number.isInteger(data.revision_no) ||
     data.revision_no < 1 ||
-    !isNullableString(data.grow_event_id) ||
+    (data.grow_event_id !== null && !isUuid(data.grow_event_id)) ||
     !Array.isArray(data.diary_entry_ids) ||
-    !data.diary_entry_ids.every(
-      (value): value is string => typeof value === "string" && value.length > 0,
-    )
+    !data.diary_entry_ids.every(isUuid) ||
+    (data.grow_event_id === null && data.diary_entry_ids.length === 0)
   ) {
     return { ok: false, reason: "rpc_error" };
   }
-  return {
+  const result: Extract<QuickLogRevisionWriteResult, { ok: true }> = {
     ok: true,
     revisionId: data.revision_id,
     revisionNo: data.revision_no,
     growEventId: data.grow_event_id,
     diaryEntryIds: data.diary_entry_ids,
   };
+  if (handle.growEventId && result.growEventId !== handle.growEventId) {
+    return { ok: false, reason: "receipt_mismatch" };
+  }
+  if (handle.diaryEntryId && !result.diaryEntryIds.includes(handle.diaryEntryId)) {
+    return { ok: false, reason: "receipt_mismatch" };
+  }
+  return result;
 }
 
 function rpcErrorReason(error: { code?: string | null }): string {
@@ -208,7 +214,7 @@ export async function retractQuickLogEntry(
   try {
     const { data, error } = await supabase.rpc(QUICKLOG_RETRACT_RPC, args);
     if (error) return { ok: false, reason: rpcErrorReason(error) };
-    return parseRpcResult(data);
+    return parseRpcResult(data, handle);
   } catch {
     return { ok: false, reason: "rpc_error" };
   }
@@ -238,7 +244,7 @@ export async function correctQuickLogEntry(
   try {
     const { data, error } = await supabase.rpc(QUICKLOG_CORRECT_RPC, args);
     if (error) return { ok: false, reason: rpcErrorReason(error) };
-    return parseRpcResult(data);
+    return parseRpcResult(data, handle);
   } catch {
     return { ok: false, reason: "rpc_error" };
   }

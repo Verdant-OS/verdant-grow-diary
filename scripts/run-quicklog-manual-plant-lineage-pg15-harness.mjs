@@ -6,6 +6,12 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  MANUAL_DELIVERY_ORDER,
+  validManualDeliveryOrder,
+  assertManualDeliveryStep,
+} from "./lib/quicklogManualDeliveryOrder.mjs";
+export { MANUAL_DELIVERY_ORDER, validManualDeliveryOrder };
+import {
   attestDisposableTarget,
   disposableConnection,
   executeSql,
@@ -24,14 +30,70 @@ const otherOwnedGrow = "33333333-3333-4333-8333-333333333333";
 const otherOwnedTent = "44444444-4444-4444-8444-444444444444";
 const migration = "20260927160000_quicklog_manual_plant_tent_lineage.sql";
 const migrationSha256 = "843bfd62f72b712dccfa9e4a58150e88cf5d2bc045323562abf0af8c54f30014";
+const deliveryFiles = Object.freeze([
+  {
+    file: "20260927002000_quicklog_manual_reuse_fence.sql",
+    sha256: "5017b8f697f77a358df43d38fae486a21cabf92a65aa3af439bc750d221d6b1b",
+  },
+  { file: migration, sha256: migrationSha256 },
+  {
+    file: "20260928183000_quicklog_manual_replay_metadata_lock.sql",
+    sha256: "ef8e208bb306b8aed8d29be4ecca72344cfc1f0dc7de236de48c12aa6b4f14a7",
+  },
+]);
+
+export function loadManualDeliverySql(migrationRoot = resolve(root, "supabase/migrations")) {
+  return deliveryFiles.map(({ file, sha256 }) => {
+    const sql = sqlFile(file, migrationRoot);
+    if (createHash("sha256").update(sql).digest("hex") !== sha256) {
+      throw new Error("migration_fingerprint_mismatch");
+    }
+    return sql;
+  });
+}
+
+export function deliverManualMigration({ order, completed, version, sql, env, spawnImpl }) {
+  const next = assertManualDeliveryStep({ order, completed, version });
+  const position = MANUAL_DELIVERY_ORDER.indexOf(version);
+  if (
+    typeof sql !== "string" ||
+    createHash("sha256").update(sql).digest("hex") !== deliveryFiles[position].sha256
+  ) {
+    throw new Error("migration_fingerprint_mismatch");
+  }
+  executeSql(sql, env, { stage: `manual_delivery_${version}`, spawnImpl });
+  return next;
+}
+
+// Fingerprint every relation's data and catalog definition in the disposable scaffold.
+// The rejected delivery must run no SQL; these read-only snapshots prove that against PG15.
+export const DELIVERY_DATABASE_SNAPSHOT_SQL = `select md5(jsonb_build_object(
+  'relations', (select jsonb_agg(to_jsonb(c) order by c.oid) from pg_class c
+    join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','auth','supabase_migrations')),
+  'columns', (select jsonb_agg(to_jsonb(a) order by a.attrelid,a.attnum) from pg_attribute a
+    join pg_class c on c.oid=a.attrelid join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname in ('public','auth','supabase_migrations')),
+  'functions', (select jsonb_agg(to_jsonb(p) order by p.oid) from pg_proc p
+    join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','auth','supabase_migrations')),
+  'constraints', (select jsonb_agg(to_jsonb(k) order by k.oid) from pg_constraint k
+    join pg_namespace n on n.oid=k.connamespace where n.nspname in ('public','auth','supabase_migrations')),
+  'triggers', (select jsonb_agg(to_jsonb(t) order by t.oid) from pg_trigger t
+    join pg_class c on c.oid=t.tgrelid join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname in ('public','auth','supabase_migrations')),
+  'policies', (select jsonb_agg(to_jsonb(p) order by p.oid) from pg_policy p
+    join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname in ('public','auth','supabase_migrations')),
+  'data', (select jsonb_agg(jsonb_build_object('table',format('%I.%I',n.nspname,c.relname),
+    'rows',query_to_xml(format('select to_jsonb(t) from %I.%I t order by to_jsonb(t)::text',n.nspname,c.relname),
+      true,false,'')::text) order by n.nspname,c.relname)
+    from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where c.relkind in ('r','p') and n.nspname in ('public','auth','supabase_migrations'))
+)::text);`;
 const signature =
   "text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb, text, text";
 
-function sqlFile(name) {
-  const sql = readFileSync(resolve(root, "supabase/migrations", name), "utf8").replace(
-    /\r\n/g,
-    "\n",
-  );
+function sqlFile(name, migrationRoot = resolve(root, "supabase/migrations")) {
+  const sql = readFileSync(resolve(migrationRoot, name), "utf8").replace(/\r\n/g, "\n");
   if (!/^BEGIN;\n/m.test(sql) || !/COMMIT;\s*(?:NOTIFY pgrst, 'reload schema';\s*)?$/.test(sql)) {
     throw new Error("migration_shape_rejected");
   }
@@ -127,8 +189,13 @@ export async function runPlantLineageHarness({
   url = process.env.QUICKLOG_MANUAL_LINEAGE_PG15_URL,
   containerId = process.env.QUICKLOG_MANUAL_LINEAGE_PG15_CONTAINER,
   containerRuntime = process.env.QUICKLOG_MANUAL_LINEAGE_PG15_CONTAINER_RUNTIME,
+  deliveryOrder = MANUAL_DELIVERY_ORDER,
   spawnImpl = spawnSync,
 } = {}) {
+  if (!validManualDeliveryOrder(deliveryOrder)) {
+    process.stderr.write("Quick Log plant lineage PG15 harness failed: delivery_order_rejected\n");
+    return 1;
+  }
   const connection = validateLocalTarget({ url, containerId, containerRuntime });
   if (!connection) {
     process.stderr.write("Quick Log plant lineage PG15 harness failed: database_target_rejected\n");
@@ -136,6 +203,8 @@ export async function runPlantLineageHarness({
   }
   const env = psqlEnvironment(connection, containerId, containerRuntime);
   try {
+    // Validate every immutable input before even the disposable reset.
+    const [reuseSql, lineageSql, metadataSql] = loadManualDeliverySql();
     attestDisposableTarget(env, spawnImpl);
     resetScaffold(env, spawnImpl);
     executeSql(sqlFile("20260818010000_quicklog_manual_delegate_forward_repair.sql"), env, {
@@ -151,10 +220,43 @@ export async function runPlantLineageHarness({
       stage: "diary_retraction_fixture",
       spawnImpl,
     });
-    const sql = sqlFile(migration);
-    if (createHash("sha256").update(sql).digest("hex") !== migrationSha256) {
-      throw new Error("migration_fingerprint_mismatch");
+    const reverseBefore = executeSql(DELIVERY_DATABASE_SNAPSHOT_SQL, env, {
+      stage: "reverse_order_database_before",
+      spawnImpl,
+    });
+    let reverseRejected = false;
+    try {
+      deliverManualMigration({
+        order: deliveryOrder,
+        completed: [],
+        version: MANUAL_DELIVERY_ORDER[2],
+        sql: metadataSql,
+        env,
+        spawnImpl,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "delivery_order_rejected")
+        reverseRejected = true;
+      else throw error;
     }
+    if (!reverseRejected) throw new Error("reverse_order_accepted");
+    // Defense in depth: bypassing the delivery gate still cannot commit 183000
+    // before its required parent. Stop at its first error, as an operator must.
+    let reverseSqlRejected = false;
+    try {
+      executeSql(metadataSql, env, { stage: "reverse_metadata_before_parent", spawnImpl });
+    } catch {
+      reverseSqlRejected = true;
+    }
+    if (!reverseSqlRejected) throw new Error("reverse_sql_accepted");
+    const reverseAfter = executeSql(DELIVERY_DATABASE_SNAPSHOT_SQL, env, {
+      stage: "reverse_order_database_after",
+      spawnImpl,
+    });
+    if (!/^[0-9a-f]{32}$/.test(reverseBefore) || reverseAfter !== reverseBefore) {
+      throw new Error("reverse_order_changed_database");
+    }
+    const sql = lineageSql;
     let rejectedWithoutParent = false;
     try {
       executeSql(sql, env, { stage: "lineage_before_parent", spawnImpl });
@@ -169,8 +271,12 @@ export async function runPlantLineageHarness({
       env,
       spawnImpl,
     );
-    executeSql(sqlFile("20260927002000_quicklog_manual_reuse_fence.sql"), env, {
-      stage: "manual_reuse_parent",
+    let completed = deliverManualMigration({
+      order: deliveryOrder,
+      completed: [],
+      version: MANUAL_DELIVERY_ORDER[0],
+      sql: reuseSql,
+      env,
       spawnImpl,
     });
     setupSameOwnerRls(env, spawnImpl);
@@ -196,7 +302,32 @@ export async function runPlantLineageHarness({
       env,
       { stage: "delegate_identity_before", spawnImpl },
     );
-    executeSql(sql, env, { stage: "plant_lineage_apply", spawnImpl });
+    completed = deliverManualMigration({
+      order: deliveryOrder,
+      completed,
+      version: MANUAL_DELIVERY_ORDER[1],
+      sql,
+      env,
+      spawnImpl,
+    });
+    deliverManualMigration({
+      order: deliveryOrder,
+      completed,
+      version: MANUAL_DELIVERY_ORDER[2],
+      sql: metadataSql,
+      env,
+      spawnImpl,
+    });
+    requireTrue(
+      "full_chain_wrapper_identity_and_grants",
+      `select md5(replace(prosrc, E'\\r', ''))='1875cf01f7d1aa843d4b8ad080f9bcb2'
+        and not has_function_privilege('anon', oid, 'EXECUTE')
+        and has_function_privilege('authenticated', oid, 'EXECUTE')
+        and has_function_privilege('service_role', oid, 'EXECUTE')
+       from pg_proc where oid='public.quicklog_save_manual(${signature})'::regprocedure;`,
+      env,
+      spawnImpl,
+    );
 
     const rejected = call("plant-lineage-rejected-0001", env, spawnImpl);
     if (rejected.ok !== false || rejected.reason !== "plant_tent_grow_mismatch") {
@@ -271,7 +402,9 @@ export async function runPlantLineageHarness({
     );
     return 1;
   }
-  process.stdout.write("Quick Log plant lineage PG15 harness PASS\n");
+  process.stdout.write(
+    "Quick Log plant lineage PG15 harness PASS: full chain 002000 -> 160000 -> 183000; reverse refused, database unchanged\n",
+  );
   return 0;
 }
 

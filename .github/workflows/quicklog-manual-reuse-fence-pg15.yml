@@ -10,6 +10,7 @@ on:
       - "supabase/migrations/20260811090000_quicklog_corrections_retractions.sql"
       - "scripts/run-quicklog-manual-reuse-fence-pg15-harness.mjs"
       - "scripts/run-quicklog-manual-plant-lineage-pg15-harness.mjs"
+      - "scripts/lib/quicklogManualDeliveryOrder.mjs"
       - "scripts/run-quicklog-manual-reuse-lock-pg15-harness.mjs"
       - "scripts/run-quicklog-manual-delegate-forward-repair-pg15-harness.mjs"
       - "src/test/quicklog-manual-reuse-fence-pg15-harness.test.ts"
@@ -83,7 +84,7 @@ jobs:
           QUICKLOG_MANUAL_REUSE_PG15_CONTAINER: ${{ job.services.postgres.id }}
         run: node scripts/run-quicklog-manual-reuse-fence-pg15-harness.mjs
 
-      - name: Prove plant/tent lineage fence against the disposable database
+      - name: Prove ordered full manual chain and unchanged database after reverse refusal
         env:
           QUICKLOG_MANUAL_LINEAGE_PG15_CONTAINER: ${{ job.services.postgres.id }}
         run: node scripts/run-quicklog-manual-plant-lineage-pg15-harness.mjs

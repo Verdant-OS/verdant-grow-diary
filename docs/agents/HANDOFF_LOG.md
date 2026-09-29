@@ -38,6 +38,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CHEM-1672-1694-TENT-AGING-INTEGRATION
+
+```text
+TASK CHEM-1672-1694-TENT-AGING-INTEGRATION  priority: P2  status: OPEN
+goal: Bring the existing Tent Detail idle-aging implementation and its tests-only child onto current deploy without changing either owned feature diff.
+branch: codex/tent-detail-snapshot-aging-20260923; child cursor/missing-test-coverage-740e
+base: verdant-grow-diary at 61821446ebd7e4fb30a36a5a95b7526a34515df5; #1694 remains based on #1672
+checkout: git fetch origin codex/tent-detail-snapshot-aging-20260923 verdant-grow-diary && git merge --ff-only origin/codex/tent-detail-snapshot-aging-20260923 && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1672; https://github.com/Verdant-OS/verdant-grow-diary/pull/1694
+head_sha: #1672 9b0053e79e38b9c7585c6e7cf6bdeb48935a53f2; #1694 450d998ad5e6759f25964f9a144a9ebdb48767eb, normal pushes and draft/base/body read back 2026-09-29 01:20 CT
+state: Pushed stay-drafts. Parent merges old 89552fe7 and deploy 61821446; child merges old b94a4631 and new parent 9b0053e7. Zero conflicts. Parent remains two files (+137/-1), child two tests (+31/-0); all four predecessor feature/test blobs unchanged. Parent 7 files / 136 PASS / 0 FAIL / 0 SKIP; child 7 files / 139 PASS / 0 FAIL / 0 SKIP, overlapping sets not 275 unique cases. Both canonical typechecks 0 diagnostics; scoped lint 2 files each 0 errors/0 warnings, format/whitespace/three scanner categories/import guard PASS. Dependency command-shim setup failure and CRLF-only first format failures retained; existing shared dependencies reused, no install/lockfile edit. Automatic lint-staged pre-commit hooks skipped for pure base merges after explicit validation, preserving base files. Final source and parent checkouts clean.
+next_action: Blue Dream reviews the exact heads; GDP lands #1672 first. At 06:22:50 UTC parent all 35 required SUCCESS, zero required failure/missing/pending; Main CI 109282458900 terminal SUCCESS. Root 109282411050 FAIL high fast-uri and nested 109282410911 FAIL moderate undici; failed logs read, locked repair, no rerun/waiver. Earlier partial snapshot retained. Child has all 35 required contexts missing because Main CI excludes its stacked base; after parent landing retarget normally for fresh standalone CI. Do not inherit old checks, merge in parallel or claim live acceptance.
+files: Parent closed: src/pages/TentDetail.tsx; src/test/tent-detail-snapshot-aging.test.tsx. Child closed: src/test/tent-detail-real-sensor-readings.test.ts; src/test/tent-detail-snapshot-aging.test.tsx. Base-only changes are integration ancestry, not authored repairs.
+blockers: No locked-file repair authorized. Main CI's branch filter excludes stacked child; parent must land before child retarget/standalone required checks. Live Tent Detail acceptance NOT_MEASURED; existing production write fixture remains archived.
+artifacts: Existing PRs and Downloads CHEM-tent-aging-integration-2026-09-29.md, parent/child regression/typecheck/ESLint receipts and dated CI JSON. Full 69-open-PR path audit refreshed, parent-child overlap intentional; recent merge history checked. Old parent 95 records / 92 latest names zero FAIL; old child 33 records zero FAIL. Existing clean parent checkout fast-forwarded from ancestor fd7c3928 without local-only commits. Restricted fetch mapping required explicit remote refs; failed tracking setup recovered with a non-tracking local child branch, preserving the pushed Pricing branch.
+reviewer_seat: Blue Dream (product and test .tsx per OWNERSHIP); GDP owns landing
+claimed_by: Codex, 2026-09-29 01:14 CT
+last_updated: 2026-09-29 01:22 CT, by Codex
+```
+
 ### CHEM-PRICING-PACK-RETRY-ELIGIBILITY-001
 
 ```text

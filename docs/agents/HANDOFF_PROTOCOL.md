@@ -103,7 +103,7 @@ files_touched:
 ```
 
 The owner and acceptance reviewer must be independent. Route to Blue Dream
-for .tsx outside src/test/, any P1 or a publish gate; otherwise Critical Mass.
+for any .tsx file, any P1 or a publish gate; otherwise Critical Mass.
 Security/Gemini/Claude observations do not replace that acceptance. Name the
 exact head SHA; routing is not a completed PASS. State NOT_MEASURED if unassigned.
 

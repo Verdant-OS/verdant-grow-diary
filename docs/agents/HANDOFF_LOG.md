@@ -87,15 +87,15 @@ branch: codex/chem-release-001-20260928 (planned; not created)
 base: verdant-grow-diary
 checkout: git fetch origin && git switch -c codex/chem-release-001-20260928 origin/verdant-grow-diary (first creation only; later resume that same branch)
 pr: NOT_MEASURED — not opened yet
-head_sha: NOT_MEASURED — branch not created; deploy tip 6fb27c5aec715c14213dd79cdb5077351e40dea0 at the latest remote read
-state: Live identity PASS only: 566315cedd80e8d2a9ba3d312b5c466fdb568fa3, dirty:false, observed 00:03:53 UTC. Deploy tip 6fb27c5a is five merged commits ahead. Production deployment at 6ca97026 was READY, which is not live acceptance.
+head_sha: NOT_MEASURED — no new release writer branch; deploy tip 0755bfcc0d7ee9d4c88ee716384c28b9beb51cce at current read
+state: Live /version.json now reports 6ca97026437ab556f7fbac752abfbe8085c1f271, dirty:false, buildTime 2026-09-28T23:05:10.630Z, observed 2026-09-29T01:12:45.079Z. This is release identity only; how it was promoted and product acceptance were not measured. Deploy source is two docs merges ahead (1767 and 1781).
 next_action: Use the completed promotion runbook #1780 and measured release packet; Matthew selects native Deployment Checks and owns promotion. Do not create a second promotion writer without evidence native checks are insufficient.
 files: Planned: docs/agents/PUBLISH_READINESS_2026-09-28.md only.
 blockers: #1754 Blue Dream acceptance; locked fast-uri/undici dependency failures; queue completion. Vercel dashboard redirected to sign-in, so native check selection remains NOT_MEASURED. No production action or signup performed.
 artifacts: https://verdantgrowdiary.com/version.json; https://github.com/Verdant-OS/verdant-grow-diary/pull/1754; https://github.com/Verdant-OS/verdant-grow-diary/pull/1778
 reviewer_seat: Critical Mass for the named docs-only packet; Blue Dream retains the product publish gate
 claimed_by: Codex, 2026-09-28 18:46 CT
-last_updated: 2026-09-28 19:53 CT, by Codex
+last_updated: 2026-09-28 20:12 CT, by Codex
 ```
 
 ### GDP-1766-RECEIPT-TARGET-MISMATCH
@@ -213,7 +213,7 @@ next_action: Confirm standalone base/parent disposition and inspect current-head
 files: This repair otherwise preserves feature blobs and imports the base; original PR paths: src/test/an-verdant-feeding-demo-page.test.tsx; src/test/an-verdant-feeding-demo-route-snapshot.test.ts; src/test/an-verdant-feeding-demo-rules.test.ts
 blockers: Current CI is not full acceptance. fast-uri / nested undici repair is locked; any auth, SQL, supabase, Action Queue or device need stops this item. No force/rewrite.
 artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1618; current check links are on that exact head. Supplemental local receipt C:/Users/G8/Downloads/CHEM-REPAIR-1618-2026-09-28-result.json.
-reviewer_seat: Critical Mass
+reviewer_seat: Blue Dream
 claimed_by: Codex, 2026-09-28 18:46 CT
 last_updated: 2026-09-28 18:46 CT, by Codex
 ```
@@ -273,7 +273,7 @@ next_action: Resolve the locked dependency/CI blocker through its authorized own
 files: This repair otherwise preserves feature blobs and imports the base; original PR paths: scripts/sync-mcp-edge-bundle.mjs; src/hooks/useOperatorAccountReadModels.ts; src/lib/operatorAccountReadModels.ts; src/test/grow-walk-context-read-models.test.ts; src/test/mcp-ecowitt-provenance-fence.test.ts; src/test/mcp-effective-bundle-parity.test.ts; src/test/operator-account-read-models-hook.test.tsx; src/test/operator-account-read-models.test.ts; src/test/operator-effective-sensor-readings.test.ts; src/test/sensor-history-read-cap-backstop-sql.test.ts; supabase/functions/mcp/index.ts
 blockers: Current CI is not full acceptance. fast-uri / nested undici repair is locked; any auth, SQL, supabase, Action Queue or device need stops this item. No force/rewrite.
 artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1651; current check links are on that exact head. Supplemental local receipt C:/Users/G8/Downloads/CHEM-REPAIR-1651-2026-09-28-result.json.
-reviewer_seat: Critical Mass
+reviewer_seat: Blue Dream
 claimed_by: Codex, 2026-09-28 18:46 CT
 last_updated: 2026-09-28 18:46 CT, by Codex
 ```
@@ -402,20 +402,20 @@ last_updated: 2026-09-28 18:46 CT, by Codex
 
 ```text
 TASK SENTINEL-AMENDMENT-2026-09-28.2  priority: P2  status: OPEN
-goal: Carry founder's final Release and Environment Rules and resumable coverage log in the existing governance draft.
+goal: Persist Matthew operating phases, production-only verification and coverage as Sentinel 2026-09-28.3, preserving shipped 2026-09-28.2 routing.
 branch: codex/chem-production-only-docs-20260928
 base: verdant-grow-diary
 checkout: git fetch origin codex/chem-production-only-docs-20260928 verdant-grow-diary && git switch codex/chem-production-only-docs-20260928 && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1777
 head_sha: ddac4941148e30136dbabed61373be9168d603a3 (remote observation; final amendment locally unpushed)
-state: Remote #1777 last observed at ddac4941148e30136dbabed61373be9168d603a3. Deploy 6fb27c5a merged locally as e8d9dc40d3c8a3790efdfa86ca7585a1ce83bbca; the pending amendment now includes exact Phase 1/2 authority, Codex task-slug naming, fresh handoffs and production-only verification. A new candidate push will invalidate the old-head CI; read the PR metadata before resuming.
-next_action: Validate and push this existing draft, then coordinate one coherent 2026-09-28.2 landing with GDP #1781. Do not independently merge both version bumps or edit GDP's active branch.
+state: Existing #1777 last observed remote ddac4941148e30136dbabed61373be9168d603a3. Shipped #1781 base 0755bfcc0d7ee9d4c88ee716384c28b9beb51cce merged locally; all accepted any-.tsx and HOLD-CHEEK-review routing retained. Current amendment is 2026-09-28.3. This observation precedes its final normal push; read PR metadata for the new exact head.
+next_action: Validate and normal-push this existing draft. Land checker #1779 before this coverage amendment; fresh exact-head required CI is mandatory. GDP #1781 is already merged, not a competing open amendment.
 files: Existing #1777 paths plus docs/agents/OWNERSHIP.md and docs/agents/HANDOFF_LOG.md; no executable CI change.
-blockers: #1777/#1781 same-version collision and #1779 ordering. Matthew's operating update governs current actions while the durable amendment remains draft.
+blockers: Checker #1779 new-head CI and review remain open; old-head results do not cover either new push. Historical CURRENT_STATE formatting failure predates this diff; preserve its receipt body.
 artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1777; https://github.com/Verdant-OS/verdant-grow-diary/pull/1767. Founder amendment is included in AGENTS.md; shared /workspace paths are not required to resume.
 reviewer_seat: Critical Mass
 claimed_by: Codex, 2026-09-28 18:46 CT
-last_updated: 2026-09-28 19:53 CT, by Codex
+last_updated: 2026-09-28 20:12 CT, by Codex
 ```
 
 ### CHEM-1696-RECEIPT-RESTAMP
@@ -454,18 +454,18 @@ No stale or unclaimed block releases these locks. Follow OWNERSHIP for role seat
 
 ```text
 TASK CHEM-SENTINEL-HANDOFF-GATE-001  priority: P2  status: OPEN
-goal: Make the Sentinel validator accept the required coverage field from 2026-09-28.2 while preserving the exact legacy gate.
+goal: Accept shipped 2026-09-28.2, enforce coverage from 2026-09-28.3, reject version downgrades and pin the exact coverage block independently.
 branch: codex/chem-sentinel-handoff-gate-20260928
 base: verdant-grow-diary
 checkout: git fetch origin && git switch codex/chem-sentinel-handoff-gate-20260928 && git merge origin/verdant-grow-diary
-state: Ready #1779 at a8c4b29740dbdec01f0d7b4b281bbe80f9d41130; 35/35 required PASS, 26 local Node tests PASS. Actual queue ref 0bad13a71402f5296849c1170695f03a2b98bc7c follows #1778. Merge-group checks are pending; no completed merge or independent PASS claimed.
-next_action: Observe terminal queue checks and landing. Reconcile the two same-version #1777/#1781 amendments before either governance proposal lands.
+state: Draft #1779 normal-pushed at d35115453371725d788a858d670ce0d8674bafff. Removed stale queue entry in GitHub UI before pushing. PASS: 31 Node tests / 0 failed / 0 skipped; downgrade regression previously 0 passed / 3 failed. Current-head hosted CI NOT_MEASURED until completion; old a8c4b297 35/35 is historical.
+next_action: Inspect new-head CI and confirm the repaired bot findings. Submit only after every required check is SUCCESS; no independent self-PASS. Checker must precede #1777 coverage amendment.
 files: scripts/check-sentinel-version-parity.mjs; scripts/check-sentinel-version-parity.test.mjs
-blockers: Two unchanged dependency jobs FAIL. #1781's light version bump lacks the 2026-09-28.2 coverage gate; #1777/#1781 overlap at the same version. GDP must coordinate their single landing; do not merge both independently.
+blockers: Fresh exact-head CI pending; locked dependency failures remain visible without waiver. No same-version governance collision remains after #1781 merged.
 artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1779; https://github.com/Verdant-OS/verdant-grow-diary/pull/1777
 reviewer_seat: Critical Mass
 claimed_by: Codex, 2026-09-28 18:54 America/Chicago
-last_updated: 2026-09-28 19:53 CT, by Codex
+last_updated: 2026-09-28 20:12 CT, by Codex
 ```
 
 ## Closed

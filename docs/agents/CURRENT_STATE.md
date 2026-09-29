@@ -2,6 +2,16 @@
 
 # Verdant — Current Operating State
 
+## Updated operating observation — 2026-09-29T01:12:45.079Z
+
+- **PASS, source identity:** #1781 merged at 00:48:36 UTC as `0755bfcc0d7ee9d4c88ee716384c28b9beb51cce`. Shipped Sentinel is 2026-09-28.2 with the exact legacy ACK. Its any-.tsx and HOLD-CHEEK-review routing remains intact. The coverage amendment in #1777 now proposes 2026-09-28.3. Earlier observations below are historical.
+- **PASS, release identity only:** current live /version.json is `6ca97026437ab556f7fbac752abfbe8085c1f271`, dirty:false, buildTime 2026-09-28T23:05:10.630Z. No production promotion was performed by Codex; product, database and Edge acceptance remain NOT_MEASURED.
+- **PASS locally / NOT_MEASURED new CI:** #1779 was returned to draft and removed from the queue before normal-pushing `d35115453371725d788a858d670ce0d8674bafff`. Thirty-one focused tests pass, zero fail, zero skip. The three downgrade cases fail on the pre-repair checker; the shipped-28.2 compatibility case also reproduced failure in an isolated old-script copy. Explicit coverage literals remove the shared-replacement risk. Fresh CI must finish; old-head 35/35 does not cover this push.
+- **PASS, required contexts / NOT_MEASURED landing:** #1778 and #1780 were still open and ready at the latest PR read, with their earlier exact-head 35/35 required success. No completed merge is claimed.
+- **NOT_MEASURED, publish acceptance:** #1754 remains at `0384753ae911eca2a989694f8514f116dc903757` with 242 focused passing tests and 35/35 required success. No fresh Blue Dream PASS appeared in the current PR discussion read. The 20:15 CT gate and 20:45 CT publish decision remain Matthew-owned.
+- **NOT_MEASURED, supplied correction:** Matthew supplied #1773 unknown-evidence-freshness behavior and patch SHA256 `66d2e98e307db02088afb1df7d9605726d3926e7ce4dbf8230f1bf359360dd9b`. Reported 29 new test cases are not treated as current execution, review or hosted acceptance until verified.
+- **BLOCKED, owner lanes:** dependency/lockfile repairs, Vercel dashboard selection/authentication, scoped identity creation, and held production database changes remain owner-controlled. Zero permissions were granted. Phase 2 is not declared. HOLD #1250 and named locks remain.
+
 ## Operating jobs — 2026-09-29 00:53:48 UTC
 
 - **PASS, source identity:** #1767 merged as `6fb27c5aec715c14213dd79cdb5077351e40dea0`; deploy Sentinel is 2026-09-28.1. The 2026-09-28.2 operating amendment remains pending. The latest user amendment permits own low-risk Phase 1 integration on exact-head required-check success; no Phase 2 declaration.
@@ -114,7 +124,7 @@ See docs/production-only-verification-runbook.md.
 Earlier non-production smoke-host requests are superseded, not a current
 blocker. Existing CI dependencies require separate reviewed slices.
 
-Independent acceptance routing: **Blue Dream** reviews .tsx outside src/test/,
+Independent acceptance routing: **Blue Dream** reviews any .tsx file,
 P1s and publish gates; **Critical Mass** reviews everything else. An author cannot
 give its own work an independent PASS. Claude may add peer observations but is not
 the acceptance reviewer. Matthew's Phase 1 exception permits Codex to integrate

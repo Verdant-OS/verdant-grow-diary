@@ -164,6 +164,7 @@ not make any task belong to one agent. Any agent may resume an open task from
   Unknown priority counts as high and goes to Blue Dream.
 
   **HOLD-CHEEK holds the merge, not the review.** A HOLD-CHEEK PR still gets its independent review, the same as any other PR. That includes migration PRs, which are routed by path like any other PR. Only the merge waits for Matthew Cheek.
+
 - **Claim ledger.** One row per PR and SHA: reviewer, time, and state (claimed, verdict, released). A new push releases the claim and re-routes the PR.
 - **Conflicts.**
   - If both reviewers claim a PR, the first claim wins.

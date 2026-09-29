@@ -65,6 +65,8 @@ export interface ImportedSensorHistoryDisplayRow {
   capturedAt: string;
   metric: string;
   value: number | null;
+  /** Canonical stored value with a unit only for known CSV metric keys. */
+  displayValue: string;
 }
 
 export interface ImportedSensorHistoryMetricOption {
@@ -111,6 +113,29 @@ function normalizeSelected(
     return IMPORTED_SENSOR_HISTORY_ALL_METRICS;
   }
   return selected;
+}
+
+function formatImportedValue(metric: string, value: number | null): string {
+  if (value === null) return "—";
+  switch (metric) {
+    case "temperature_c":
+    case "soil_temp_c":
+      return `${value} °C`;
+    case "humidity_pct":
+    case "soil_moisture_pct":
+      return `${value}%`;
+    case "vpd_kpa":
+      return `${value} kPa`;
+    case "co2_ppm":
+      return `${value} ppm`;
+    case "ppfd":
+      return `${value} µmol/m²/s`;
+    case "ec":
+      return `${value} mS/cm`;
+    default:
+      // An unfamiliar imported key cannot establish a unit.
+      return String(value);
+  }
 }
 
 export function buildImportedSensorHistoryViewModel(args: {
@@ -187,10 +212,12 @@ export function buildImportedSensorHistoryViewModel(args: {
     const capturedAt = pickCapturedAt(r);
     if (capturedAt == null) continue;
     if (!r.metric) continue;
+    const value = typeof r.value === "number" && Number.isFinite(r.value) ? r.value : null;
     recentRows.push({
       capturedAt,
       metric: r.metric,
-      value: typeof r.value === "number" && Number.isFinite(r.value) ? r.value : null,
+      value,
+      displayValue: formatImportedValue(r.metric, value),
     });
   }
 

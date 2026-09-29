@@ -275,6 +275,33 @@ export function evaluateManualSensorSnapshotQuality(
   };
 }
 
+/**
+ * A manual entry whose form validation reports a blocking error cannot be
+ * saved, so its quality badge must not grade the remaining metrics as usable.
+ * Validation drops a rejected value from its metrics (VPD -1, CO₂ -5, PPFD
+ * 5000, a malformed temperature), so the evaluator never sees it; this forces
+ * the evaluation to invalid and names each blocking error as a reason.
+ * Returns the evaluation unchanged when nothing blocks.
+ */
+export function applyManualEntryBlockingErrors(
+  evaluation: ManualSensorSnapshotQuality,
+  blockingErrors: ReadonlyArray<string>,
+): ManualSensorSnapshotQuality {
+  if (blockingErrors.length === 0) return evaluation;
+  const reasons = [...evaluation.reasons];
+  for (const error of blockingErrors) {
+    if (!reasons.includes(error)) reasons.push(error);
+  }
+  return {
+    ...evaluation,
+    quality: "invalid",
+    summary: "Invalid reading",
+    reasons: Object.freeze(reasons),
+    canSupportAiDoctorCurrentContext: false,
+    canSupportActionSuggestionPreview: false,
+  };
+}
+
 export const MANUAL_SNAPSHOT_QUALITY_SOURCE_LABELS: Readonly<
   Record<ManualSnapshotSourceLabel, string>
 > = Object.freeze({

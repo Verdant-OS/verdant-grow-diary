@@ -245,7 +245,8 @@ describe("Quick Log corrections/retractions migration delivery", () => {
     expect(sql).not.toContain("set local search_path = public, pg_catalog;");
 
     expect(sql).toContain("'authenticated_role_contract'");
-    expect(sql).toContain("not authenticated_role.rolinherit");
+    // authenticated is INHERIT on production; privilege fences resolve membership instead.
+    expect(sql).not.toContain("rolinherit");
     expect(sql).toContain("not authenticated_role.rolcanlogin");
     expect(sql).toContain("not authenticated_role.rolbypassrls");
     expect(sql).toContain("'user_roles_contract'");

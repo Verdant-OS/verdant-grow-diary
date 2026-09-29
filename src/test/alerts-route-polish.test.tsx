@@ -20,6 +20,10 @@ import {
 // ---------------------------------------------------------------------------
 // Pure helper tests — no React needed.
 // ---------------------------------------------------------------------------
+// The Alerts page reads plant stages for alert stage resolution (BUG-006).
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({ data: [], isError: false }),
+}));
 vi.mock("@/components/AlertsAutoPersistForGrow", () => ({ default: () => null }));
 vi.mock("@/components/AlertsContextHeaderForGrow", () => ({ default: () => null }));
 vi.mock("@/components/AlertsEmptyStateSnapshotCta", () => ({ default: () => null }));
@@ -57,9 +61,8 @@ describe("alertsRouteView — pure helpers", () => {
 
   it("buildAlertRowAriaLabel never leaks raw severity/status slugs when unknown", () => {
     const label = buildAlertRowAriaLabel({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       severity: "bogus" as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       status: "bogus" as any,
       title: "",
       source: null,
@@ -276,7 +279,6 @@ describe("Alerts route — alert row accessibility", () => {
 
   it("renders calm fallbacks when timestamp or source is missing", async () => {
     listAlertsMock.mockResolvedValue([
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { ...ALERT, source: null as any, first_seen_at: "not-a-date" as any },
     ]);
     renderAt("/alerts");

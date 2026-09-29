@@ -140,7 +140,7 @@ describe("ContextualPhenoComparisonPanel", () => {
   });
 
   it("does not call fetch or any global network primitive during render", () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       throw new Error("fetch must not be called");
     });
     renderPanel();

@@ -3,6 +3,7 @@ import type { AiCreditedFailureReason } from "@/lib/aiCreditedResponseAdapter";
 import {
   buildAiDoctorLiveReviewScopeKey,
   canRetryAiDoctorLiveReviewFailure,
+  getAiDoctorLiveReviewVisibility,
   shouldReuseAiDoctorReviewIdempotencyKeyAfterResponse,
 } from "@/lib/aiDoctorLiveReviewRecoveryRules";
 
@@ -49,6 +50,139 @@ describe("canRetryAiDoctorLiveReviewFailure", () => {
   it.each(RETRYABILITY_CASES)("returns %s retryability as %s", (reason, expected) => {
     expect(canRetryAiDoctorLiveReviewFailure(reason)).toBe(expected);
     expect(canRetryAiDoctorLiveReviewFailure(reason)).toBe(expected);
+  });
+});
+
+describe("getAiDoctorLiveReviewVisibility", () => {
+  const baseInput = {
+    allowed: false,
+    acceptedEligibilityAllowed: false,
+    mode: "standard" as const,
+    omittedImportedHistory: false,
+    omittedRootZoneHistory: false,
+    includedRootZoneHistory: false,
+    rootZoneBlocksReview: false,
+    evidenceCapturedAt: "2026-09-23T12:00:00.000Z",
+    now: new Date("2026-09-23T12:00:00.000Z"),
+  };
+
+  it("keeps an accepted standard review visible when it was eligible at acceptance time", () => {
+    expect(
+      getAiDoctorLiveReviewVisibility({
+        ...baseInput,
+        acceptedEligibilityAllowed: true,
+      }),
+    ).toEqual({
+      visible: true,
+      retryBlockedReason: null,
+      showsStaleEvidenceNote: false,
+    });
+  });
+
+  it("shows the stale-evidence note and blocks retry for a standard review past the cutoff", () => {
+    expect(
+      getAiDoctorLiveReviewVisibility({
+        ...baseInput,
+        acceptedEligibilityAllowed: true,
+        now: new Date("2026-09-30T12:00:00.001Z"),
+      }),
+    ).toEqual({
+      visible: true,
+      retryBlockedReason: "stale-evidence",
+      showsStaleEvidenceNote: true,
+    });
+  });
+
+  it("does not stale-block historical reviews", () => {
+    expect(
+      getAiDoctorLiveReviewVisibility({
+        ...baseInput,
+        mode: "historical_review",
+        now: new Date("2026-09-30T12:00:00.001Z"),
+      }),
+    ).toEqual({
+      visible: true,
+      retryBlockedReason: null,
+      showsStaleEvidenceNote: false,
+    });
+  });
+
+  it("keeps the accepted review hidden when its standard sources were removed", () => {
+    expect(getAiDoctorLiveReviewVisibility(baseInput)).toEqual({
+      visible: false,
+      retryBlockedReason: null,
+      showsStaleEvidenceNote: false,
+    });
+  });
+
+  const unknownTimestamps = [undefined, null, "", " \t ", "not-a-date"];
+
+  it.each(unknownTimestamps)(
+    "blocks standard retry for unknown timestamp %j without hiding an accepted review",
+    (evidenceCapturedAt) => {
+      const input = { ...baseInput, acceptedEligibilityAllowed: true, evidenceCapturedAt };
+      const expected = {
+        visible: true,
+        retryBlockedReason: "unknown-evidence-freshness",
+        showsStaleEvidenceNote: false,
+      };
+      expect(getAiDoctorLiveReviewVisibility(input)).toEqual(expected);
+      expect(getAiDoctorLiveReviewVisibility(input)).toEqual(expected);
+    },
+  );
+
+  it.each(unknownTimestamps)(
+    "preserves historical retry for unknown timestamp %j",
+    (evidenceCapturedAt) => {
+      expect(
+        getAiDoctorLiveReviewVisibility({
+          ...baseInput,
+          mode: "historical_review",
+          evidenceCapturedAt,
+        }),
+      ).toEqual({ visible: true, retryBlockedReason: null, showsStaleEvidenceNote: false });
+    },
+  );
+
+  it.each(unknownTimestamps)(
+    "does not restore removed standard sources for unknown timestamp %j",
+    (evidenceCapturedAt) => {
+      expect(getAiDoctorLiveReviewVisibility({ ...baseInput, evidenceCapturedAt })).toEqual({
+        visible: false,
+        retryBlockedReason: "unknown-evidence-freshness",
+        showsStaleEvidenceNote: false,
+      });
+    },
+  );
+
+  it.each([Number.NaN, new Date(Number.NaN)])(
+    "blocks standard retry when the evaluation clock is invalid: %j",
+    (now) => {
+      expect(
+        getAiDoctorLiveReviewVisibility({ ...baseInput, acceptedEligibilityAllowed: true, now }),
+      ).toEqual({
+        visible: true,
+        retryBlockedReason: "unknown-evidence-freshness",
+        showsStaleEvidenceNote: false,
+      });
+    },
+  );
+
+  it.each([-1, 0, 1])("preserves the seven-day cutoff at offset %s ms", (offsetMs) => {
+    const now = Date.parse(baseInput.evidenceCapturedAt) + 7 * 24 * 60 * 60 * 1000 + offsetMs;
+    for (const clock of [now, new Date(now)]) {
+      expect(
+        getAiDoctorLiveReviewVisibility({
+          ...baseInput,
+          acceptedEligibilityAllowed: true,
+          now: clock,
+        }),
+      ).toEqual({
+        visible: true,
+        retryBlockedReason: offsetMs > 0 ? "stale-evidence" : null,
+        showsStaleEvidenceNote: offsetMs > 0,
+      });
+    }
   });
 });
 

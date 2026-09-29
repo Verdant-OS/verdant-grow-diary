@@ -179,6 +179,7 @@ import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
 import {
   buildTimelineSensorSnapshotViewModel,
   resolveTimelineCardSensorResolution,
+  resolveTimelineCardVpdStageValue,
 } from "@/lib/timelineSensorSnapshotViewModel";
 import {
   classifyTimelineSensorSource,
@@ -2746,6 +2747,8 @@ export default function Timeline() {
                                       ? buildTimelineSensorSnapshotViewModel(sensor, {
                                           preferUnit: "F",
                                           validateManualCompatibility: true,
+                                          // Retain the existing persisted generic-temp Celsius convention.
+                                          genericTempUnit: "C",
                                         })
                                       : null;
                                     const legacyDisplaySensor = sensor as {
@@ -2763,15 +2766,6 @@ export default function Timeline() {
                                       : Number.POSITIVE_INFINITY;
                                     const snapStale =
                                       !Number.isFinite(snapAgeMs) || snapAgeMs > snapshotStaleMs;
-                                    const rawVpd =
-                                      typeof sensor.vpd === "number" && Number.isFinite(sensor.vpd)
-                                        ? sensor.vpd
-                                        : null;
-                                    const vpdClassification = classifyVpdAgainstStage({
-                                      value: rawVpd,
-                                      stage: resolveTimelineDiaryEntryStage(e),
-                                      stale: snapStale,
-                                    });
                                     const sourceBadge = classifyTimelineSensorSource({
                                       rawSource,
                                       capturedAt: snapTs ?? null,
@@ -2781,6 +2775,18 @@ export default function Timeline() {
                                       // intrinsically grower-entered.
                                       fallback: "manual",
                                       context: "persisted_snapshot",
+                                    });
+                                    const stageVpd = resolveTimelineCardVpdStageValue({
+                                      sensor,
+                                      useManualValidation,
+                                      sensorViewModel,
+                                      canAssessStage: sourceBadge.canAssessStage,
+                                      hasFutureTimestamp,
+                                    });
+                                    const vpdClassification = classifyVpdAgainstStage({
+                                      value: stageVpd,
+                                      stage: resolveTimelineDiaryEntryStage(e),
+                                      stale: snapStale,
                                     });
                                     const manualHistoryNotice = timelineManualSnapshotHistoryNotice(
                                       {
@@ -2883,21 +2889,14 @@ export default function Timeline() {
                                             Future timestamp — freshness cannot be verified.
                                           </span>
                                         )}
-                                        {rawVpd != null &&
-                                          (!useManualValidation ||
-                                            (sensorViewModel?.kind === "chips" &&
-                                              sensorViewModel.chips.some(
-                                                (chip) => chip.metric === "vpd",
-                                              ))) &&
-                                          sourceBadge.canAssessStage &&
-                                          !hasFutureTimestamp && (
-                                            <span
-                                              className="text-[11px] text-muted-foreground"
-                                              data-testid="timeline-vpd-stage-hint"
-                                            >
-                                              {vpdClassification.label}
-                                            </span>
-                                          )}
+                                        {stageVpd != null && (
+                                          <span
+                                            className="text-[11px] text-muted-foreground"
+                                            data-testid="timeline-vpd-stage-hint"
+                                          >
+                                            {vpdClassification.label}
+                                          </span>
+                                        )}
                                       </div>
                                     );
                                   }}

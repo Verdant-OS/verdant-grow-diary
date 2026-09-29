@@ -3,14 +3,15 @@ name: EcoWitt Windows tooling
 on:
   pull_request:
     paths:
-      - '.github/workflows/ecowitt-windows-tooling.yml'
-      - 'src/test/ecowitt-windows-*.test.ts'
-      - 'src/test/ecowitt-local-bridge-smoke.test.ts'
-      - 'src/test/ecowitt-http-local-bridge.test.ts'
-      - 'tools/ecowitt-testbench/**'
-      - 'scripts/**ecowitt**'
-      - 'package.json'
-      - 'bun.lockb'
+      - ".github/workflows/ecowitt-windows-tooling.yml"
+      - "src/test/ecowitt-windows-*.test.ts"
+      - "src/test/ecowitt-local-bridge-smoke.test.ts"
+      - "src/test/ecowitt-http-local-bridge.test.ts"
+      - "tools/ecowitt-testbench/**"
+      - "scripts/**ecowitt**"
+      - "package.json"
+      - "bun.lockb"
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -18,6 +19,10 @@ permissions:
 
 env:
   ECOWITT_ARTIFACT_RETENTION_DAYS: 7
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ecowitt-windows-tooling:

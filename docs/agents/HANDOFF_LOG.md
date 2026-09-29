@@ -38,6 +38,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CHEM-ONBOARDING-STARTER-SINGLE-FLIGHT-001
+
+```text
+TASK CHEM-ONBOARDING-STARTER-SINGLE-FLIGHT-001  priority: P2  status: OPEN
+goal: Stop overlapping starter setup/plan-check activations before React commits the busy state. Preserve existing sequential retry, CSV handoff and owner/entitlement fences.
+branch: codex/chem-onboarding-starter-single-flight-001
+base: verdant-grow-diary at 61821446ebd7e4fb30a36a5a95b7526a34515df5
+checkout: git fetch origin verdant-grow-diary && git switch codex/chem-onboarding-starter-single-flight-001 && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1796
+head_sha: 8f874b595709d2b4f0b7d94a8d0e8fb515d4271c, normal push and draft/base read back 2026-09-29 00:46 CT
+state: Pushed stay-draft, two files (+126/-2), seven new cases. Exact-base same-turn reproduction: 3 FAIL / 0 PASS / 9 excluded by test-name filter. Shared synchronous presenter ref prevents overlapping setup and plan retry, released in finally; no service or database-wide serialization claim. Final focused run 7 files / 66 PASS / 0 FAIL / 0 SKIP; separate V0 contract 1 file / 26 PASS / 0 FAIL / 0 SKIP. Bun typecheck 0 diagnostics, scoped ESLint 2 files 0 errors/0 warnings, format/whitespace/three docs-safety categories/import guard PASS. Initial ESLint output-file setup failed EEXIST; stdout capture succeeded without changing source/security settings. At 05:46:17 UTC current head has 34/35 required SUCCESS, Main CI still running. Root 109273300041 FAIL fast-uri 1239943/1239946; nested 109273301682 FAIL moderate undici. Both failed logs read; no dependency edit or rerun. Independent acceptance/live behavior NOT_MEASURED.
+next_action: Exact-head required CI is now 35/35 SUCCESS at 05:48:34 UTC, zero required failure/missing/pending; earlier partial sample retained. Blue Dream reviews 8f874b595709d2b4f0b7d94a8d0e8fb515d4271c. Preserve additional dependency FAILs and pending supplemental jobs. No merge, ready, auto-merge or promotion by Codex.
+files: Closed: src/pages/Onboarding.tsx; src/test/starter-setup-onboarding.test.tsx. No auth, schema, Supabase adapter, service or entitlement-rule change.
+blockers: Independent acceptance and hosted behavior NOT_MEASURED; archived write-smoke fixture remains separate. Guard is per mounted presenter, not cross-tab/remount/database-wide. No production writes or credit spend.
+artifacts: PR #1796; Downloads CHEM-onboarding-starter-single-flight-2026-09-29.md, baseline/final/V0/typecheck logs, scoped ESLint JSON and setup-failure receipt. Full 67-open-PR path inventory inspected before creation; no target-path collision. Later 68-head check inventory completely paginated; follow-up listing confirms no head drift/additions/closures during collection.
+reviewer_seat: Blue Dream (.tsx product presenter)
+claimed_by: Codex, 2026-09-29 00:38 CT
+last_updated: 2026-09-29 00:48 CT, by Codex
+```
+
 ### GDP-1754-NONLIVE-SNAPSHOT-VALIDATE-001
 
 ```text
@@ -168,14 +188,14 @@ base: verdant-grow-diary
 checkout: git fetch origin verdant-grow-diary && git switch codex/chem-release-001-20260928 && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1795
 head_sha: 69a54f84aef49846847cb5d6f3315f9470c0cc89, remote and draft/base confirmed 2026-09-29 00:31 CT; base 61821446ebd7e4fb30a36a5a95b7526a34515df5
-state: Pushed stay-draft, one Markdown file +190/-0. Existing local branch was fast-forwarded normally from 6ca97026 to deploy 61821446; no branch recreation or history rewrite. Public response at 05:27:31.9666602 UTC is HTTP 200, commit 61821446, dirty:false, buildTime 03:02:39.564Z, cache HIT/Age 5052. All 149 target check records read over two pages; current 35/35 required SUCCESS does not erase the post-merge audit FAIL about late local-DB proof. Root fast-uri audit FAIL, provider Supabase Preview FAIL (remote migration versions absent locally); external-provider Actions log returns 404. GitHub Vercel pending status remains discrepant with the matching public response; allocation/native Deployment Checks NOT_MEASURED. Packet records eleven intervening commits, #1754 owner override, exact-head #1794 repair, archived fixture refusal and unapproved historical rollback candidate. Docs validation: 1 file / 67 PASS / 0 FAIL / 0 SKIP; 3 scanner categories, Prettier and whitespace PASS. New-head hosted CI/independent acceptance NOT_MEASURED; no production operation.
-next_action: Critical Mass reviews document at 69a54f84aef49846847cb5d6f3315f9470c0cc89; measure its own current-head CI without inheriting the base. Blue Dream reviews #1794's exact repair head. Matthew retains product publish/acceptance and the native deployment-check decision. No new promotion requested merely to close a zero advertised commit gap.
+state: Pushed stay-draft, one Markdown file +190/-0. Existing local branch was fast-forwarded normally from 6ca97026 to deploy 61821446; no branch recreation or history rewrite. Public response at 05:27:31.9666602 UTC is HTTP 200, commit 61821446, dirty:false, buildTime 03:02:39.564Z, cache HIT/Age 5052. All 149 target check records read over two pages; current 35/35 required SUCCESS does not erase the post-merge audit FAIL about late local-DB proof. Root fast-uri audit FAIL, provider Supabase Preview FAIL (remote migration versions absent locally); external-provider Actions log returns 404. GitHub Vercel pending status remains discrepant with the matching public response; allocation/native Deployment Checks NOT_MEASURED. Packet records eleven intervening commits, #1754 owner override, exact-head #1794 repair, archived fixture refusal and unapproved historical rollback candidate. Docs validation: 1 file / 67 PASS / 0 FAIL / 0 SKIP; 3 scanner categories, Prettier and whitespace PASS. Own new-head hosted required CI now 35/35 SUCCESS; independent acceptance NOT_MEASURED. Additional fast-uri audit FAIL remains; no production operation.
+next_action: Critical Mass reviews document at 69a54f84aef49846847cb5d6f3315f9470c0cc89. Own current-head required CI is now 35/35 SUCCESS, Main CI 109270820218 SUCCESS; conditional QuickLog RPC runtime harness SKIPPED, not runtime proof. Additional root 109270773395 still FAILS fast-uri, log read; no waiver. Blue Dream reviews #1794's exact repair head. Matthew retains product publish/acceptance and the native deployment-check decision. No new promotion requested merely to close a zero advertised commit gap.
 files: Closed: docs/agents/PUBLISH_READINESS_2026-09-28.md only. Operational log/checkpoint updates remain in existing #1777, not this packet's diff.
 blockers: Complete product acceptance BLOCKED: remaining Timeline exception not yet independently accepted/landed, archived active-smoke fixture, additional audit FAILs and uninspected native deployment gates. No Publish, SQL/APPLY/PREFLIGHT, production dispatch or live write by Codex.
 artifacts: PR #1795; repo docs/agents/PUBLISH_READINESS_2026-09-28.md; Downloads CHEM-release-checkpoint-2026-09-29.md, CHEM-release-target-checks-2026-09-29.json and CHEM-release-docs-safety-2026-09-29.log. Separate #1780 promotion runbook and all historical receipts preserved.
 reviewer_seat: Critical Mass for the named docs-only packet; Blue Dream retains the product publish gate
 claimed_by: Codex, 2026-09-29 00:30 CT (release packet resumed)
-last_updated: 2026-09-29 00:32 CT, by Codex
+last_updated: 2026-09-29 00:46 CT, by Codex
 ```
 
 ### GDP-1766-RECEIPT-TARGET-MISMATCH

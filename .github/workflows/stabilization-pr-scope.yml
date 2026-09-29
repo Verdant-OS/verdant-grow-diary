@@ -7,11 +7,15 @@ name: Stabilization PR scope gate
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, labeled, ready_for_review]
     # `verdant-grow-diary` is the default branch; main-only meant this gate
     # could never fire (#581). It stays opt-in: the job-level label check
     # below means only PRs labeled `test-stabilization` are evaluated.
     branches: [main, verdant-grow-diary]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   scope-gate:

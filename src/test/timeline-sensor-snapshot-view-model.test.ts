@@ -7,12 +7,21 @@ import {
 } from "@/lib/timelineSensorSnapshotViewModel";
 
 describe("persisted Timeline card metric validation", () => {
+  const buildCard = (details: Record<string, unknown> | null | undefined) =>
+    buildTimelineCardSensorSnapshotViewModel(resolveTimelineCardSensorResolution(details));
+
   const sources = ["csv", "demo", "stale", "invalid", "live"] as const;
+
+  it.each([null, undefined])("is safe for an absent resolved card input %s", (input) => {
+    expect(buildTimelineCardSensorSnapshotViewModel(input).sensorViewModel).toEqual({
+      kind: "none",
+    });
+  });
 
   it.each(sources)(
     "rejects implausible %s metrics while retaining the valid survivor",
     (source) => {
-      const result = buildTimelineCardSensorSnapshotViewModel({
+      const result = buildCard({
         sensor_snapshot: {
           source,
           temp_f: 76,
@@ -35,7 +44,7 @@ describe("persisted Timeline card metric validation", () => {
   );
 
   it.each(sources)("retains valid %s boundaries and legacy numeric precision", (source) => {
-    const { sensorViewModel } = buildTimelineCardSensorSnapshotViewModel({
+    const { sensorViewModel } = buildCard({
       sensor: { source, temp: 27.78, rh: 55.55, soil: 42.42, vpd: 1.234, co2: 850.6 },
     });
     expect(sensorViewModel.kind).toBe("chips");
@@ -52,7 +61,7 @@ describe("persisted Timeline card metric validation", () => {
 
   it.each([0.2, 3])("retains the canonical VPD boundary %s for every source", (vpd) => {
     for (const source of sources) {
-      const { sensorViewModel } = buildTimelineCardSensorSnapshotViewModel({
+      const { sensorViewModel } = buildCard({
         sensor_snapshot: { source, vpd },
       });
       expect(sensorViewModel.kind).toBe("chips");
@@ -64,7 +73,7 @@ describe("persisted Timeline card metric validation", () => {
 
   it.each([0, 10000])("retains the canonical CO2 boundary %s for every source", (co2) => {
     for (const source of sources) {
-      const { sensorViewModel } = buildTimelineCardSensorSnapshotViewModel({
+      const { sensorViewModel } = buildCard({
         sensor: { source, co2 },
       });
       expect(sensorViewModel.kind).toBe("chips");
@@ -75,7 +84,7 @@ describe("persisted Timeline card metric validation", () => {
   });
 
   it.each(sources)("retains %s history when every reading is invalid", (source) => {
-    const result = buildTimelineCardSensorSnapshotViewModel({
+    const result = buildCard({
       sensor_snapshot: { source, temp_f: 115, rh: 150, soil: 101, vpd: 20, co2: 10001 },
     });
     expect(result.sensor).toBeDefined();
@@ -84,7 +93,7 @@ describe("persisted Timeline card metric validation", () => {
   });
 
   it.each([0, 100])("discloses pinned humidity %s without calling it healthy", (rh) => {
-    const result = buildTimelineCardSensorSnapshotViewModel({ sensor: { source: "csv", rh } });
+    const result = buildCard({ sensor: { source: "csv", rh } });
     expect(result.sensorViewModel.kind).toBe("chips");
     if (result.sensorViewModel.kind !== "chips") return;
     expect(
@@ -96,7 +105,7 @@ describe("persisted Timeline card metric validation", () => {
   it.each([null, undefined, {}, { sensor_snapshot: { source: "csv" } }])(
     "is null-safe and does not accuse empty envelopes of invalid readings: %j",
     (details) => {
-      expect(buildTimelineCardSensorSnapshotViewModel(details).sensorViewModel).toEqual({
+      expect(buildCard(details).sensorViewModel).toEqual({
         kind: "none",
       });
     },
@@ -105,7 +114,7 @@ describe("persisted Timeline card metric validation", () => {
   it.each([Number.NaN, Number.POSITIVE_INFINITY, "150"])(
     "never renders non-numeric or non-finite persisted readings: %s",
     (value) => {
-      const { sensorViewModel } = buildTimelineCardSensorSnapshotViewModel({
+      const { sensorViewModel } = buildCard({
         sensor: { source: "csv", temp_f: 76, rh: value, soil: value, vpd: value, co2: value },
       });
       expect(sensorViewModel.kind).toBe("chips");
@@ -121,8 +130,8 @@ describe("persisted Timeline card metric validation", () => {
       sensor: Object.freeze({ source: "csv", rh: 55 }),
     });
     const before = JSON.stringify(details);
-    const a = buildTimelineCardSensorSnapshotViewModel(details);
-    expect(a).toEqual(buildTimelineCardSensorSnapshotViewModel(details));
+    const a = buildCard(details);
+    expect(a).toEqual(buildCard(details));
     expect(a.sensor).toBe(sensor_snapshot);
     expect(a.reviewMessage).toBe("Review manual snapshot — invalid readings were not shown.");
     expect(a.warningMessage).toBe("Check manual snapshot — a reading may need confirmation.");
@@ -132,7 +141,7 @@ describe("persisted Timeline card metric validation", () => {
   it.each(["vpd_kpa", "vpdKpa"])(
     "assesses a non-manual alias only with its rendered chip: %s",
     (key) => {
-      const result = buildTimelineCardSensorSnapshotViewModel({
+      const result = buildCard({
         sensor: { source: "csv", [key]: 1.2 },
       });
       const evidence = { ...result, canAssessStage: true, hasFutureTimestamp: false };

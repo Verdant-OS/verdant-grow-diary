@@ -140,14 +140,15 @@ export function resolveTimelineCardSensorResolution(
 
 /** Validate every persisted source; manual provenance only selects the existing copy. */
 export function buildTimelineCardSensorSnapshotViewModel(
-  details: Record<string, unknown> | null | undefined,
+  input: TimelineCardSensorResolution | null | undefined,
+  options: { validateManualCompatibility: true } = { validateManualCompatibility: true },
 ): TimelineCardSensorSnapshotViewModel {
-  const resolution = resolveTimelineCardSensorResolution(details);
+  const resolution = input ?? { sensor: undefined, useManualValidation: false };
   return {
     ...resolution,
     sensorViewModel: buildTimelineSensorSnapshotViewModel(resolution.sensor, {
       preferUnit: "F",
-      validateManualCompatibility: true,
+      validateManualCompatibility: options.validateManualCompatibility,
       // Retain Timeline's persisted generic-temperature Celsius convention.
       genericTempUnit: "C",
       preserveLegacyPrecision: !resolution.useManualValidation,

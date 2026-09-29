@@ -178,6 +178,7 @@ import TimelineSnapshotClock from "@/components/TimelineSnapshotClock";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
 import {
   buildTimelineCardSensorSnapshotViewModel,
+  resolveTimelineCardSensorResolution,
   resolveTimelineCardVpdStageValue,
 } from "@/lib/timelineSensorSnapshotViewModel";
 import {
@@ -2441,15 +2442,15 @@ export default function Timeline() {
                           // Canonical snapshots win, followed by the legacy
                           // `sensor` shape and Plant Quick Log's compatibility
                           // envelope. No persisted row is rewritten.
-                          const {
-                            sensor,
-                            useManualValidation,
-                            sensorViewModel,
-                            reviewMessage,
-                            warningMessage,
-                          } = buildTimelineCardSensorSnapshotViewModel(
-                            (e.details as Record<string, unknown> | null | undefined) ?? null,
-                          );
+                          const { sensor, useManualValidation } =
+                            resolveTimelineCardSensorResolution(
+                              (e.details as Record<string, unknown> | null | undefined) ?? null,
+                            );
+                          const { sensorViewModel, reviewMessage, warningMessage } =
+                            buildTimelineCardSensorSnapshotViewModel(
+                              { sensor, useManualValidation },
+                              { validateManualCompatibility: true },
+                            );
                           const rawSource =
                             typeof sensor?.source === "string" && sensor.source.trim().length > 0
                               ? sensor.source

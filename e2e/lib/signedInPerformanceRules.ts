@@ -73,13 +73,17 @@ export function buildPerformanceReceipt(value: unknown): PerformanceReceipt {
   const operation = sample && isOperation(sample.operation) ? sample.operation : null;
   const before = record(sample?.before);
   const after = record(sample?.after);
+  const initialSha =
+    before?.origin === PERFORMANCE_ORIGIN && before.dirty === false && isSha(before.commit)
+      ? before.commit
+      : null;
   const receipt: PerformanceReceipt = {
     operation,
     status: "BLOCKED",
     reason: performanceContextIssue(value) ?? "deployment_identity_missing",
     origin: sample?.origin === PERFORMANCE_ORIGIN ? PERFORMANCE_ORIGIN : null,
     expectedSha: isSha(sample?.expectedSha) ? sample.expectedSha : null,
-    observedSha: isSha(after?.commit) ? after.commit : null,
+    observedSha: isSha(after?.commit) ? after.commit : initialSha,
     elapsedMs: null,
     metric: operation
       ? operation === "quicklog-save-confirmed"
@@ -95,6 +99,8 @@ export function buildPerformanceReceipt(value: unknown): PerformanceReceipt {
           : null,
   };
   if (performanceContextIssue(value)) return receipt;
+  if (initialSha && initialSha !== sample?.expectedSha)
+    return { ...receipt, reason: "deployment_changed_or_mismatched" };
   if (
     !before ||
     !after ||

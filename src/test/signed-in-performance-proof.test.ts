@@ -213,6 +213,22 @@ describe("signed-in performance execution fence", () => {
       expect(d.run).not.toHaveBeenCalled();
     },
   );
+  it("reports a valid preflight SHA mismatch without calling it missing identity", async () => {
+    const observedSha = "b".repeat(40);
+    const d = deps();
+    d.readIdentity.mockResolvedValue({ ...identity, commit: observedSha });
+
+    const result = await measureSignedInPerformance(context, d);
+
+    expect(result.receipt).toMatchObject({
+      status: "BLOCKED",
+      reason: "deployment_changed_or_mismatched",
+      observedSha,
+      elapsedMs: null,
+    });
+    expect(d.readIdentity).toHaveBeenCalledTimes(1);
+    expect(d.run).not.toHaveBeenCalled();
+  });
   it("never executes with a throwing clock and does not manufacture elapsed time", async () => {
     const d = deps();
     d.clock.mockReset().mockImplementation(() => {

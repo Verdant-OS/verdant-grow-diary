@@ -188,7 +188,7 @@ describe("signed-in read-only production proof", () => {
     expect(result).toEqual({ method: "POST", capability });
     expect(JSON.stringify(result)).not.toContain("private");
   });
-  it.each([null, undefined, "invalid", "https://evil.example/rest/v1/rpc/has_role"])(
+  it.each([null, undefined, "invalid", "data:text/plain,private"])(
     "handles unknown request target %j without exporting it",
     (target) => {
       expect(classifyBlockedReadonlyRequest("private-method", target)).toEqual({
@@ -197,6 +197,24 @@ describe("signed-in read-only production proof", () => {
       });
     },
   );
+  it.each([
+    [QUICKLOG_SMOKE_BACKEND_ORIGIN + "/private?token=secret", "backend-other"],
+    ["https://verdantgrowdiary.com/private?token=secret", "application-other"],
+    ["https://evil.example/private?token=secret", "external"],
+  ])("diagnoses only the origin class without allowing %s", async (target, capability) => {
+    const expected = { method: "POST", capability };
+    expect(classifyBlockedReadonlyRequest("POST", target)).toEqual(expected);
+    expect(JSON.stringify(expected)).not.toMatch(/secret|private|evil|token/);
+    const h = await harness();
+    h.emit();
+    await h.proof.assertReady();
+    const request = await h.route("POST", target, { private: "secret" });
+    expect(request.abort).toHaveBeenCalledOnce();
+    expect(request.continue).not.toHaveBeenCalled();
+    expect(h.proof.blockedRequests()).toEqual([expected]);
+    expect(h.proof.blockedWrites()).toBe(1);
+    await expect(h.proof.assertReady()).rejects.toThrow("proof_unavailable");
+  });
   it("accepts only the normal server-validated fixture account without requiring plant rows", async () => {
     const h = await harness();
     h.emit({ ...account, token_like_unused_field: "private-unused" });

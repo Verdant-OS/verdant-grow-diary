@@ -1,6 +1,6 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-09-28.3**
+**Sentinel-Version: 2026-09-28.2**
 
 Operating order is sequential for a given slice. Parallel implementation of the **same**
 slice by multiple agents is the failure this protocol exists to prevent.
@@ -14,30 +14,15 @@ rules do **not** erase collision fences (Tranche A remaining edit points = Codex
 reassigned; Tranche B+ product code = Claude until reassigned; no competing Timeline /
 Alerts / Action Queue rewrite).
 
-### Claim + independent reviewer (standing rule)
+### One owner + independent reviewer (standing rule)
 
-Tasks are not owned by agents. Every open task has a coverage block in
-`docs/agents/HANDOFF_LOG.md` (see `AGENTS.md`, Agent Handoff / Coverage), and any agent
-may resume it after setting `claimed_by`. Every slice names:
+Every assigned slice names:
 
-1. **The current claim**: the agent building it now, recorded in the log
-2. **One independent reviewer**: an agent that has not touched the slice
+1. **One owner** — the peer who delivers the slice
+2. **One independent reviewer** — a **different** peer who reviews that work
 
-No agent that touched a slice can review it. Use the HANDOFF block below for a deliberate
-transfer between roles; use the log block for day-to-day coverage. Keep the same branch,
-confirm its remote head, and merge from base; never rename, recreate or force-push it.
-
-Independent acceptance routing: **Blue Dream** reviews any .tsx file,
-P1s and publish gates; **Critical Mass** reviews everything else. An author cannot
-give its own work an independent PASS. Claude may add peer observations but is not
-the acceptance reviewer. Matthew's Phase 1 exception permits Codex to integrate
-its own low-risk PRs through the PR flow after every required check is SUCCESS
-at the exact head SHA. High-risk work remains draft for GDP review and merge;
-publish gates remain with Matthew. Phase 2 requires Matthew's explicit confirmation
-that CI is proven. Historical receipts keep their original reviewer.
-
-Record the acceptance seat, exact reviewed head and completed/NOT_MEASURED
-review state in the handoff.
+The owner cannot be their own reviewer. Grok, Claude, or Codex may fill either seat.
+Record both names in `CURRENT_STATE.md` and in the handoff block when known.
 
 Preferred research → architecture → build path (not rank; any peer may own any stage
 when assigned):
@@ -72,9 +57,7 @@ sentinel_version:
 date:
 
 slice_owner:
-independent_reviewer: Blue Dream or Critical Mass, selected by scope/priority
-claimed_by:
-last_updated:
+independent_reviewer:
 
 completed:
   - what was actually done, not what was attempted
@@ -102,22 +85,9 @@ files_touched:
   - paths, or "none"
 ```
 
-The owner and acceptance reviewer must be independent. Route to Blue Dream
-for any .tsx file, any P1 or a publish gate; otherwise Critical Mass.
-Security/Gemini/Claude observations do not replace that acceptance. Name the
-exact head SHA; routing is not a completed PASS. State NOT_MEASURED if unassigned.
-
-Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
-E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
-disposable test account owns the fixture grow and its selected tent/plant;
-tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
-use the KEEP account. Stop a write if identity, ownership or tagging cannot
-be verified; report that exact safety gap rather than proposing another host.
-Local/CI fixtures validate code, not production. Repository integration follows
-the explicit merge phases in AGENTS.md; it is not production acceptance. No
-Publish, production APPLY, real charge, role/auth change, device control or
-Action Queue operation is authorized here. Existing owner locks remain.
-See docs/production-only-verification-runbook.md.
+`slice_owner` and `independent_reviewer` must name different peers among Grok, Claude,
+and Codex (or Security/Gemini when those roles own the review seat). Omit only when the
+slice has not yet been assigned; do not invent an owner.
 ---
 
 ## Rules that make handoffs trustworthy

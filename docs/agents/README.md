@@ -1,27 +1,6 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-09-28.3**
-
-Independent acceptance routing: **Blue Dream** reviews any .tsx file,
-P1s and publish gates; **Critical Mass** reviews everything else. An author cannot
-give its own work an independent PASS. Claude may add peer observations but is not
-the acceptance reviewer. Matthew's Phase 1 exception permits Codex to integrate
-its own low-risk PRs through the PR flow after every required check is SUCCESS
-at the exact head SHA. High-risk work remains draft for GDP review and merge;
-publish gates remain with Matthew. Phase 2 requires Matthew's explicit confirmation
-that CI is proven. Historical receipts keep their original reviewer.
-
-Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
-E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
-disposable test account owns the fixture grow and its selected tent/plant;
-tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
-use the KEEP account. Stop a write if identity, ownership or tagging cannot
-be verified; report that exact safety gap rather than proposing another host.
-Local/CI fixtures validate code, not production. Repository integration follows
-the explicit merge phases in AGENTS.md; it is not production acceptance. No
-Publish, production APPLY, real charge, role/auth change, device control or
-Action Queue operation is authorized here. Existing owner locks remain.
-See docs/production-only-verification-runbook.md.
+**Sentinel-Version: 2026-09-28.2**
 
 Multi-agent work on Verdant runs under one shared constitution plus a small
 platform-specific bootstrap per agent. A single file cannot reach every AI platform
@@ -60,9 +39,6 @@ HISTORICAL — never active instructions
 | Gemini        | `GEMINI.md`                               | `docs/agents/roles/gemini.md`, `CURRENT_STATE.md`                         |
 | Security      | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/security.md`              |
 | Council Chair | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/council-chair.md`         |
-
-Every agent also reads `docs/agents/HANDOFF_LOG.md` right after `SENTINEL_ACK` and
-resumes the highest-priority open block if it has no higher-priority assignment.
 
 Grok is Verdant's **Product Intelligence, Adversarial Audit, and Implementation Lead**
 (Cheek, 2026-08-20, refined): equally empowered to research, audit the live app,

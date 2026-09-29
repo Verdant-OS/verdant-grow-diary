@@ -1,0 +1,381 @@
+"""Local, bounded write-ahead delivery and incident state. No network or Flask."""
+from __future__ import annotations
+
+import json
+import os
+import threading
+from collections import OrderedDict
+from copy import deepcopy
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Callable
+
+from ecowitt_multitent import sanitize
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def parse_time(value: str) -> datetime:
+    result = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if result.tzinfo is None:
+        raise ValueError("Local state timestamp must contain UTC offset")
+    return result.astimezone(timezone.utc)
+
+
+def atomic_json(path: Path, value: Any) -> None:
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    with temporary.open("w", encoding="utf-8") as handle:
+        handle.write(json.dumps(value, separators=(",", ":"), allow_nan=False))
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, path)
+
+
+def append_jsonl(path: Path, value: Any) -> None:
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(value, separators=(",", ":"), allow_nan=False) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def trim_jsonl(path: Path, max_bytes: int, max_days: float, now: datetime) -> int:
+    """Bound auxiliary logs independently; report every oldest-record removal."""
+    if not path.exists():
+        return 0
+    lines = path.read_bytes().splitlines(keepends=True)
+    original_count = len(lines)
+    cutoff = now - timedelta(days=max_days)
+    kept = []
+    for line in lines:
+        try:
+            item = json.loads(line)
+            if parse_time(item["recorded_at"]) >= cutoff:
+                kept.append(line)
+        except (ValueError, KeyError, TypeError):
+            continue
+    total = sum(map(len, kept))
+    while kept and total > max_bytes:
+        total -= len(kept.pop(0))
+    if len(kept) != original_count:
+        temporary = path.with_suffix(".jsonl.tmp")
+        with temporary.open("wb") as handle:
+            handle.writelines(kept)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    return original_count - len(kept)
+
+def validate_health_data(data: dict) -> None:
+    """Reject malformed local state before it can disable incident reporting."""
+    for key in ("tents", "unmapped_counts", "incidents"):
+        if not isinstance(data[key], dict):
+            raise ValueError()
+    if any(type(count) is not int or count < 0 for count in data["unmapped_counts"].values()):
+        raise ValueError()
+    if any(type(active) is not bool for active in data["incidents"].values()):
+        raise ValueError()
+    for key in ("unmapped_log_dropped_count", "alert_webhook_error_count"):
+        if type(data[key]) is not int or data[key] < 0:
+            raise ValueError()
+    stamps = [data["started_at"], data["last_packet_received_at"], data["last_alert_webhook_at"]]
+    if not isinstance(data["started_at"], str):
+        raise ValueError()
+    for state in data["tents"].values():
+        if not isinstance(state, dict):
+            raise ValueError()
+        stamps.extend((state["last_forward_ok_at"], state["first_forward_failure_at"]))
+    for stamp in stamps:
+        if stamp is not None:
+            if not isinstance(stamp, str):
+                raise ValueError()
+            parse_time(stamp)
+    if not isinstance(data["pending_alerts"], list):
+        raise ValueError()
+    for message in data["pending_alerts"]:
+        if not isinstance(message, dict) or set(message) != {"event", "reason", "incident", "message"}:
+            raise ValueError()
+        if not all(isinstance(value, str) for value in message.values()):
+            raise ValueError()
+        if message["event"] not in {"alert", "recovery"}:
+            raise ValueError()
+
+
+class JsonlSpool:
+    """Append + fsync before send. Terminal transitions also survive restart."""
+    def __init__(self, root: Path, *, clock: Callable = utc_now,
+                 max_days: float = 7, max_bytes: int = 50 * 1024 * 1024,
+                 warn: Callable = print, cleaner: Callable = sanitize, lock: Any = None):
+        if max_days <= 0 or max_bytes <= 0:
+            raise ValueError("Spool limits must be positive")
+        self.root, self.clock, self.max_days, self.max_bytes = root, clock, max_days, max_bytes
+        self.warn, self.cleaner = warn, cleaner
+        self.lock = lock or threading.RLock()
+        root.mkdir(parents=True, exist_ok=True)
+        self.path, self.dead_path, self.stats_path = root / "queue.jsonl", root / "dead-letter.jsonl", root / "spool-stats.json"
+        self.entries: OrderedDict[str, dict] = OrderedDict()
+        self.stats = {"dropped_count": 0, "dead_letter_count": 0, "dead_letter_dropped_count": 0,
+                      "aux_log_dropped_count": 0, "torn_tail_count": 0}
+        if self.stats_path.exists():
+            try:
+                old = json.loads(self.stats_path.read_text(encoding="utf-8"))
+                for key in self.stats:
+                    if type(old.get(key)) is int and old[key] >= 0:
+                        self.stats[key] = old[key]
+            except (ValueError, AttributeError):
+                raise ValueError("Spool statistics are invalid; no payload echoed") from None
+        self._restore()
+        self.enforce_limits()
+
+    @property
+    def pending_count(self) -> int:
+        with self.lock:
+            return len(self.entries)
+
+    def _save_stats(self) -> None:
+        atomic_json(self.stats_path, self.stats)
+
+    def _restore(self) -> None:
+        if not self.path.exists():
+            return
+        data = self.path.read_bytes()
+        # Only an incomplete final append may be discarded. A corrupt complete
+        # record fails closed instead of silently losing acknowledged packets.
+        if data and not data.endswith(b"\n"):
+            data = data[:data.rfind(b"\n") + 1]
+            with self.path.open("wb") as handle:
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
+            self.stats["torn_tail_count"] += 1
+            self.warn("spool: incomplete final append discarded")
+        for line in data.splitlines():
+            try:
+                record = json.loads(line)
+                if record["op"] == "put":
+                    entry = self.cleaner(record["entry"])
+                    if not isinstance(entry["id"], str) or not isinstance(entry["reading"], dict):
+                        raise ValueError()
+                    parse_time(entry["created_at"])
+                    parse_time(entry["next_attempt_at"])
+                    if type(entry["attempts"]) is not int or entry["attempts"] < 0:
+                        raise ValueError()
+                    self.entries[entry["id"]] = entry
+                elif record["op"] == "done":
+                    self.entries.pop(record["id"], None)
+                else:
+                    raise ValueError()
+            except (ValueError, KeyError, TypeError):
+                raise ValueError("Spool contains an invalid complete record; no payload echoed") from None
+        self._compact()
+        self._save_stats()
+
+    def _compact(self) -> None:
+        temporary = self.path.with_suffix(".jsonl.tmp")
+        with temporary.open("w", encoding="utf-8") as handle:
+            for entry in self.entries.values():
+                handle.write(json.dumps({"op": "put", "entry": entry}, separators=(",", ":"), allow_nan=False) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, self.path)
+
+    def enforce_limits(self) -> None:
+        with self.lock:
+            cutoff = self.clock() - timedelta(days=self.max_days)
+            dropped = 0
+            for entry_id, entry in list(self.entries.items()):
+                if parse_time(entry["created_at"]) < cutoff:
+                    del self.entries[entry_id]
+                    dropped += 1
+            if dropped or self._disk_bytes() > self.max_bytes:
+                self._compact()
+            while self.entries and self._disk_bytes() > self.max_bytes:
+                self.entries.popitem(last=False)
+                dropped += 1
+                self._compact()
+            if dropped:
+                self.stats["dropped_count"] += dropped
+                self.warn(f"spool: dropped {dropped} oldest entries at retention/size limit")
+            dead_dropped = trim_jsonl(self.dead_path, self.max_bytes, self.max_days, self.clock())
+            if dead_dropped:
+                self.stats["dead_letter_dropped_count"] += dead_dropped
+                self.warn(f"spool: dropped {dead_dropped} oldest dead-letter records at limit")
+            self._save_stats()
+            # The cap includes auxiliary logs/state, not just pending payloads.
+            for path in (self.dead_path, self.root / "unmapped_channels.jsonl"):
+                if path.exists() and self._disk_bytes() > self.max_bytes:
+                    budget = max(0, self.max_bytes - (self._disk_bytes() - path.stat().st_size))
+                    removed = trim_jsonl(path, budget, self.max_days, self.clock())
+                    if removed:
+                        self.stats["aux_log_dropped_count"] += removed
+                        if path == self.dead_path:
+                            self.stats["dead_letter_dropped_count"] += removed
+                        self.warn(f"spool: dropped {removed} oldest auxiliary log records at size limit")
+                        self._save_stats()
+            if self._disk_bytes() > self.max_bytes:
+                raise ValueError("Spool state exceeds size cap; refusing further delivery")
+
+    def _disk_bytes(self) -> int:
+        return sum(path.stat().st_size for path in self.root.iterdir() if path.is_file())
+
+    def enqueue(self, entry_id: str, reading: dict, *, idempotency_key: str | None = None) -> dict:
+        with self.lock:
+            if entry_id in self.entries:
+                return deepcopy(self.entries[entry_id])
+            stamp = self.clock().isoformat()
+            entry = {"id": entry_id, "created_at": stamp, "next_attempt_at": stamp,
+                     "attempts": 0, "reading": self.cleaner(reading)}
+            if idempotency_key is not None:
+                entry["idempotency_key"] = idempotency_key
+            append_jsonl(self.path, {"op": "put", "entry": entry})
+            self.entries[entry_id] = entry
+            self.enforce_limits()
+            return deepcopy(entry)
+
+    def due_entries(self, limit: int = 8) -> list[dict]:
+        with self.lock:
+            self.enforce_limits()
+            return [deepcopy(e) for e in self.entries.values()
+                    if parse_time(e["next_attempt_at"]) <= self.clock()][:limit]
+
+    def finish(self, entry_id: str, status: int | None) -> None:
+        with self.lock:
+            entry = self.entries.get(entry_id)
+            if entry is None:
+                return
+            success = status is not None and 200 <= status < 300
+            terminal = status is not None and 400 <= status < 500 and status not in {408, 425, 429}
+            if success or terminal:
+                if terminal:
+                    append_jsonl(self.dead_path, {"recorded_at": self.clock().isoformat(), "reason": f"http_{status}", "entry": entry})
+                    self.stats["dead_letter_count"] += 1
+                append_jsonl(self.path, {"op": "done", "id": entry_id})
+                del self.entries[entry_id]
+                self._compact()
+            else:
+                entry["attempts"] += 1
+                delay = min(300, 5 * 2 ** min(entry["attempts"] - 1, 10))
+                entry["next_attempt_at"] = (self.clock() + timedelta(seconds=delay)).isoformat()
+                append_jsonl(self.path, {"op": "put", "entry": entry})
+            self.enforce_limits()
+
+
+class HealthState:
+    """Persist quiet/failure incidents before emitting one alert/recovery."""
+    def __init__(self, path: Path, tent_ids: list[str], *, clock: Callable = utc_now,
+                 quiet_seconds: float = 600, failure_seconds: float = 600,
+                 alert_interval: float = 60, log: Callable = print,
+                 send_alert: Callable | None = None, cleaner: Callable = sanitize,
+                 max_log_bytes: int = 5 * 1024 * 1024, max_days: float = 7, lock: Any = None):
+        self.path, self.clock, self.log, self.send_alert, self.cleaner = path, clock, log, send_alert, cleaner
+        self.quiet_seconds, self.failure_seconds, self.alert_interval = quiet_seconds, failure_seconds, alert_interval
+        self.max_log_bytes, self.max_days = max_log_bytes, max_days
+        self.lock = lock or threading.RLock()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.data = {"started_at": clock().isoformat(), "last_packet_received_at": None,
+                     "tents": {}, "unmapped_counts": {}, "unmapped_log_dropped_count": 0,
+                     "incidents": {}, "pending_alerts": [], "last_alert_webhook_at": None,
+                     "alert_webhook_error_count": 0}
+        if path.exists():
+            try:
+                old = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(old, dict):
+                    raise ValueError()
+                self.data.update(cleaner(old))
+                validate_health_data(self.data)
+            except (ValueError, TypeError, KeyError):
+                raise ValueError("Listener health state is invalid; no payload echoed") from None
+        self.tent_ids = tuple(tent_ids)
+        for tent_id in tent_ids:
+            self.data["tents"].setdefault(tent_id, {"last_forward_ok_at": None, "first_forward_failure_at": None})
+        self._save()
+
+    def _save(self) -> None:
+        safe = self.cleaner(self.data)
+        if len(json.dumps(safe, separators=(",", ":")).encode("utf-8")) > self.max_log_bytes:
+            raise ValueError("Listener state exceeds local size cap")
+        atomic_json(self.path, safe)
+
+    def packet_received(self) -> None:
+        with self.lock:
+            self.data["last_packet_received_at"] = self.clock().isoformat()
+            self._save()
+
+    def forward_result(self, tent_id: str, success: bool) -> None:
+        with self.lock:
+            state = self.data["tents"].setdefault(tent_id, {"last_forward_ok_at": None, "first_forward_failure_at": None})
+            if success:
+                state["last_forward_ok_at"] = self.clock().isoformat()
+                state["first_forward_failure_at"] = None
+            elif state["first_forward_failure_at"] is None:
+                state["first_forward_failure_at"] = self.clock().isoformat()
+            self._save()
+
+    def _active_incidents(self) -> set[str]:
+        now = self.clock()
+        active = set()
+        last_packet = self.data["last_packet_received_at"] or self.data["started_at"]
+        if (now - parse_time(last_packet)).total_seconds() >= self.quiet_seconds:
+            active.add("gateway_quiet")
+        for tent_id in self.tent_ids:
+            failed_at = self.data["tents"][tent_id]["first_forward_failure_at"]
+            if failed_at and (now - parse_time(failed_at)).total_seconds() >= self.failure_seconds:
+                active.add("forward:" + tent_id)
+        return active
+
+    def status(self) -> dict:
+        with self.lock:
+            active = self._active_incidents()
+            reasons = sorted({"forward_failure" if key.startswith("forward:") else key for key in active})
+            return {"ok": not reasons, "reasons": reasons, "last_packet_received_at": self.data["last_packet_received_at"],
+                    "tents": {tid: deepcopy(self.data["tents"][tid]) for tid in self.tent_ids}}
+
+    def unmapped(self, fields: dict) -> None:
+        with self.lock:
+            safe = self.cleaner(fields)
+            for key, value in safe.items():
+                first = key not in self.data["unmapped_counts"]
+                self.data["unmapped_counts"][key] = self.data["unmapped_counts"].get(key, 0) + 1
+                append_jsonl(self.path.parent / "unmapped_channels.jsonl",
+                             {"recorded_at": self.clock().isoformat(), "key": key, "value": value})
+                if first:
+                    self.log({"event": "unmapped", "key": key,
+                              "message": "seen but not mapped to any tent"})
+            dropped = trim_jsonl(self.path.parent / "unmapped_channels.jsonl", self.max_log_bytes, self.max_days, self.clock())
+            if dropped:
+                self.data["unmapped_log_dropped_count"] += dropped
+                self.log({"event": "unmapped_log_limit", "count": dropped})
+            self._save()
+
+    def tick(self) -> None:
+        with self.lock:
+            active = self._active_incidents()
+            for key in sorted(active | set(self.data["incidents"])):
+                was_active = self.data["incidents"].get(key, False)
+                is_active = key in active
+                if was_active == is_active:
+                    continue
+                self.data["incidents"][key] = is_active
+                kind = "alert" if is_active else "recovery"
+                reason = "forward_failure" if key.startswith("forward:") else "gateway_quiet"
+                message = {"event": kind, "reason": reason, "incident": key,
+                           "message": f"Ecowitt listener {kind}: {reason}"}
+                self.log(message)
+                if self.send_alert is not None:
+                    self.data["pending_alerts"].append(message)
+            self._save()
+            last = self.data["last_alert_webhook_at"]
+            due = last is None or (self.clock() - parse_time(last)).total_seconds() >= self.alert_interval
+            if due and self.data["pending_alerts"] and self.send_alert is not None:
+                message = self.data["pending_alerts"].pop(0)
+                self.data["last_alert_webhook_at"] = self.clock().isoformat()
+                # At most one webhook attempt per message, recorded before I/O.
+                # A timeout cannot prove the receiver did not accept the alert.
+                self._save()
+                try:
+                    if self.send_alert(message) is False:
+                        self.data["alert_webhook_error_count"] += 1
+                except Exception:
+                    self.data["alert_webhook_error_count"] += 1
+                self._save()

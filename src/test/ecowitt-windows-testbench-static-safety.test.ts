@@ -9,7 +9,12 @@ const DOC_PATH = join(process.cwd(), "docs", "ecowitt-windows-testbench.md");
 function walk(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
-    if (entry === ".venv" || entry === "__pycache__" || entry === ".env") continue;
+    if (
+      [".venv", "__pycache__", ".env", ".spool", "tent-map.json", "ecowitt_raw_log.jsonl"].includes(
+        entry,
+      )
+    )
+      continue;
     const full = join(dir, entry);
     const st = statSync(full);
     if (st.isDirectory()) out.push(...walk(full));
@@ -97,11 +102,15 @@ describe("ecowitt windows testbench — static safety", () => {
     }
   });
 
-  it("tokens are never printed in full — only masked previews", () => {
+  it("listener token diagnostics disclose configuration only", () => {
     const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
-    expect(py).toMatch(/mask_token/);
+    const fn = py.split("def mask_token")[1]?.split("\ndef ")[0] ?? "";
+    expect(fn).toContain("<configured>");
+    expect(fn).not.toMatch(/token\[/);
     const ps = readFileSync(join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"), "utf-8");
-    expect(ps).toMatch(/Get-MaskedToken/);
+    const psFn = ps.split("function Get-MaskedToken")[1]?.split("\n}")[0] ?? "";
+    expect(psFn).toContain("<configured>");
+    expect(psFn).not.toContain("Substring");
   });
 });
 
@@ -571,7 +580,7 @@ describe("ecowitt windows testbench — /debug/forwarding-status safety", () => 
 
 describe("ecowitt windows testbench — forwarding counters", () => {
   const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
-  const fn = py.split("def maybe_forward")[1]?.split("\ndef ")[0] ?? "";
+  const fn = py.split("def _send_forward")[1]?.split("\ndef ")[0] ?? "";
 
   it("declares module-level FORWARD_STATS counters", () => {
     expect(py).toMatch(/FORWARD_STATS\s*:\s*Dict\[str,\s*Any\]\s*=\s*\{/);
@@ -1212,7 +1221,9 @@ describe("ecowitt windows testbench — forwarding tent-context safety", () => {
   });
 
   it("forwarding-status does not echo the raw tent UUID value", () => {
-    expect(listener).not.toMatch(/"tent_id":\s*tent_id\b/);
+    const endpoint =
+      listener.split('@app.get("/debug/forwarding-status")')[1]?.split("@app.get(")[0] ?? "";
+    expect(endpoint).not.toMatch(/"tent_id"\s*:/);
   });
 
   it(".env.example documents VERDANT_TENT_ID as a real UUID requirement", () => {
@@ -1264,7 +1275,7 @@ describe("ecowitt windows testbench — forwarding response sanitization", () =>
 
   it("forwarded payload uses webhook transport source, never raw verdant 'live'", () => {
     expect(listener).toMatch(/WEBHOOK_TRANSPORT_SOURCE\s*=\s*"ecowitt"/);
-    const fn = listener.split("def maybe_forward")[1]?.split("\ndef ")[0] ?? "";
+    const fn = listener.split("def _send_forward")[1]?.split("\ndef ")[0] ?? "";
     expect(fn).toMatch(/"source":\s*WEBHOOK_TRANSPORT_SOURCE/);
     // Verdant source must be preserved as lineage in metadata, not as `source`.
     expect(fn).toMatch(/verdant_source/);
@@ -1333,7 +1344,7 @@ describe("ecowitt windows testbench — retry/backoff + error report", () => {
   });
 
   it("retry loop is bounded (uses MAX_RETRY_ATTEMPTS, not while True)", () => {
-    const fn = listener.split("def maybe_forward")[1]?.split("\ndef ")[0] ?? "";
+    const fn = listener.split("def _send_forward")[1]?.split("\ndef ")[0] ?? "";
     expect(fn).toMatch(/range\(MAX_RETRY_ATTEMPTS\s*\+\s*1\)/);
     expect(fn).not.toMatch(/while\s+True/);
     // No unbounded queue wording

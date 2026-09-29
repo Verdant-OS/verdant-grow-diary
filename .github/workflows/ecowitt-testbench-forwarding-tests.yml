@@ -6,12 +6,16 @@ on:
     paths:
       - "tools/ecowitt-testbench/**"
       - "docs/ecowitt-windows-testbench.md"
+      - "src/lib/ecowittCustomHttpBridgeIngestRules.ts"
+      - "src/test/ecowitt-custom-http-bridge-*.test.ts"
       - "src/test/ecowitt-windows-testbench-static-safety.test.ts"
       - ".github/workflows/ecowitt-testbench-forwarding-tests.yml"
   pull_request:
     paths:
       - "tools/ecowitt-testbench/**"
       - "docs/ecowitt-windows-testbench.md"
+      - "src/lib/ecowittCustomHttpBridgeIngestRules.ts"
+      - "src/test/ecowitt-custom-http-bridge-*.test.ts"
       - "src/test/ecowitt-windows-testbench-static-safety.test.ts"
       - ".github/workflows/ecowitt-testbench-forwarding-tests.yml"
     types: [opened, synchronize, reopened, ready_for_review]
@@ -20,6 +24,9 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
 
 jobs:
   forwarding-tests:
@@ -31,6 +38,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -92,11 +101,20 @@ jobs:
           set -o pipefail
           python3 -m unittest test_forwarding_contract 2>&1 | tee ../../artifacts/ecowitt-testbench-forwarding/contract.log
 
-      - name: Vitest — testbench static safety suite
+      - name: Python — routing, durable delivery, health and redaction
+        working-directory: tools/ecowitt-testbench
         shell: bash
         run: |
           set -o pipefail
-          bunx vitest run src/test/ecowitt-windows-testbench-static-safety.test.ts --reporter=dot 2>&1 | tee artifacts/ecowitt-testbench-forwarding/static-safety.log
+          python3 -m unittest test_debug_redaction test_multitent test_delivery test_ingest_readiness 2>&1 | tee ../../artifacts/ecowitt-testbench-forwarding/multitent-delivery.log
+
+      - name: Vitest — testbench static safety and Flask-free AST parity
+        env:
+          ECOWITT_PARITY_PYTHON: python3
+        shell: bash
+        run: |
+          set -o pipefail
+          bunx vitest run src/test/ecowitt-windows-testbench-static-safety.test.ts src/test/ecowitt-custom-http-bridge-*.test.ts --reporter=dot 2>&1 | tee artifacts/ecowitt-testbench-forwarding/static-safety.log
 
       - name: Typecheck
         shell: bash

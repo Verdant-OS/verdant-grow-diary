@@ -19,6 +19,9 @@ export type BlockedReadonlyRequest = {
     | "backend-rpc"
     | "backend-table"
     | "backend-function"
+    | "backend-other"
+    | "application-other"
+    | "external"
     | "websocket"
     | "other";
 };
@@ -35,12 +38,14 @@ export function classifyBlockedReadonlyRequest(
   try {
     const url = new URL(typeof target === "string" ? target : "");
     if (url.origin === QUICKLOG_SMOKE_BACKEND_ORIGIN) {
+      capability = "backend-other";
       if (url.pathname.startsWith("/auth/")) capability = "backend-auth";
       else if (url.pathname === "/rest/v1/rpc/has_role") capability = "backend-rpc:has_role";
       else if (url.pathname.startsWith("/rest/v1/rpc/")) capability = "backend-rpc";
       else if (url.pathname.startsWith("/rest/")) capability = "backend-table";
       else if (url.pathname.startsWith("/functions/")) capability = "backend-function";
-    }
+    } else if (url.origin === PERFORMANCE_ORIGIN) capability = "application-other";
+    else if (url.protocol === "https:" || url.protocol === "http:") capability = "external";
   } catch {
     /* Invalid targets remain an opaque diagnostic. */
   }

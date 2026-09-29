@@ -179,10 +179,10 @@ function parseRpcResult(data: unknown, handle: QuickLogEntryHandle): QuickLogRev
     diaryEntryIds: data.diary_entry_ids,
   };
   if (handle.growEventId && result.growEventId !== handle.growEventId) {
-    return { ok: false, reason: "rpc_error" };
+    return { ok: false, reason: "receipt_mismatch" };
   }
   if (handle.diaryEntryId && !result.diaryEntryIds.includes(handle.diaryEntryId)) {
-    return { ok: false, reason: "rpc_error" };
+    return { ok: false, reason: "receipt_mismatch" };
   }
   return result;
 }

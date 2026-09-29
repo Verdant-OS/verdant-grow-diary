@@ -107,8 +107,10 @@ test.describe("production settings/account/consent proof", () => {
           await expect(page.getByTestId("start-screen-saved")).toHaveText(
             "Start screen preference saved.",
           );
+          await proof.waitForAccount();
           await page.reload();
           await expect(page.getByTestId("start-screen-option-timeline")).toBeChecked();
+          await proof.waitForAccount();
           sample.checks["start-screen-reload"] = true;
           stage = "temperature-reload";
           await page.getByTestId("temperature-unit-option-celsius").check();
@@ -116,14 +118,17 @@ test.describe("production settings/account/consent proof", () => {
           await expect(page.getByTestId("temperature-unit-saved")).toHaveText(
             "Display temperature preference saved.",
           );
+          await proof.waitForAccount();
           await page.reload();
           await expect(page.getByTestId("temperature-unit-option-celsius")).toBeChecked();
+          await proof.waitForAccount();
           sample.checks["temperature-reload"] = true;
           stage = "temperature-reset-reload";
           await page.getByTestId("temperature-unit-reset").click();
           await expect(page.getByTestId("temperature-unit-saved")).toHaveText(
             "Reverted to Fahrenheit default.",
           );
+          await proof.waitForAccount();
           await page.reload();
           await expect(page.getByTestId("temperature-unit-option-fahrenheit")).toBeChecked();
           sample.checks["temperature-reset-reload"] = true;
@@ -193,8 +198,10 @@ test.describe("production settings/account/consent proof", () => {
           ).toBe("denied");
           sample.checks["decline-stored"] = true;
           stage = "refusal-reload";
+          await proof.waitForAccount();
           await page.goto(PERFORMANCE_ORIGIN + "/settings/analytics");
           await expect(page.getByTestId("analytics-consent-status")).toHaveText("Analytics off");
+          await proof.waitForAccount();
           await page.reload();
           await expect(page.getByTestId("analytics-consent-status")).toHaveText("Analytics off");
           await expect(page.getByTestId("analytics-consent-settings-revoke")).toBeDisabled();
@@ -206,8 +213,12 @@ test.describe("production settings/account/consent proof", () => {
           sample.checks["refusal-reload"] = true;
           sample.checks["no-analytics-requests"] = analyticsRequests === 0;
         }
+        // A ready UI can precede the normal auth/role reads. Settle those before
+        // metadata reads and teardown, while retaining the final post-close fence.
+        await proof.waitForAccount();
         sample.elapsedMs = performance.now() - started;
         sample.after = await readLivePerformanceIdentity(page);
+        await proof.waitForAccount();
       } catch {
         failed = true;
       } finally {

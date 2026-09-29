@@ -38,6 +38,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CHEM-SIGNEDIN-PERFORMANCE-001
+
+```text
+TASK CHEM-SIGNEDIN-PERFORMANCE-001  priority: P2  status: OPEN
+goal: Add exact-live-SHA signed-in performance evidence for Dashboard, Timeline, Sensors and the existing Quick Log save confirmation without adding writes or inventing speed budgets.
+branch: codex/chem-signedin-performance-001
+base: codex/chem-production-quicklog-fixture-001 at 34f8beae3334cceb6f914df904a6842c90005eb4
+checkout: git fetch origin codex/chem-signedin-performance-001 codex/chem-production-quicklog-fixture-001 && git switch codex/chem-signedin-performance-001 && git merge origin/codex/chem-production-quicklog-fixture-001
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1793
+head_sha: c449a0b486d37b3128d3bab18538dda498e111a3, remote and draft/base read back 2026-09-28 23:29 CT
+state: Pushed tests-only draft, five files (+601/-6). Opt-in exact-deployment timing for three read-only routes and the existing first Quick Log save; no additional saves. Four files / 113 PASS / 0 FAIL / 0 SKIP including 44 new cases; standalone 44 PASS. Removing deployment equality produces 2 FAIL / 42 PASS, restored final run 113 PASS. Earlier setup run 111 PASS / 2 FAIL retained. Project Bun and explicit Node typechecks plus targeted E2E compiler 0 diagnostics; ESLint five files 0 errors/0 warnings; format, whitespace, three docs-safety categories and no-src-lib-imports PASS. Playwright discovery five listed cases across three files, zero execution; initial discovery failed on describe-local trace/video, corrected to file scope. Receipts do not claim a performance budget, cold-load timing, full-page data completeness or saved-value retrieval.
+next_action: Critical Mass reviews this exact head; Blue Dream retains parent #1792. After parent acceptance/landing, update normally and retarget to deploy so required CI runs on the resulting exact head. Use an active approved owned fixture before sanctioned production timing; no auto-unarchive, credential/configuration change or extra save.
+files: e2e/lib/signedInPerformanceRules.ts; e2e/lib/signedInPerformanceProbe.ts; e2e/signed-in-performance.spec.ts; e2e/quicklog-smoke.spec.ts; src/test/signed-in-performance-proof.test.ts
+blockers: Production timings NOT_MEASURED; configured fixture archived. Independent acceptance NOT_MEASURED. Main CI's pull-request base filter excludes this stacked parent, so the complete 35 required contexts cannot be claimed from it. Other hosted jobs pending at 04:29:55 UTC; no pass inherited from parent. No production configuration or fixture alteration.
+artifacts: Downloads CHEM-signedin-performance-2026-09-28-2330CT.md; CHEM-signedin-performance-tsconfig-2026-09-28.json. Full 66-open-PR path audit refreshed against 64 open heads immediately before creation; changed-head files inspected. Only parent #1792 overlaps quicklog-smoke.spec.ts. No held branch or competing fixture implementation touched.
+reviewer_seat: Critical Mass (tests-only .ts performance evidence); Blue Dream retains #1792 P1 parent
+claimed_by: Codex, 2026-09-28 23:21 CT
+last_updated: 2026-09-28 23:30 CT, by Codex
+```
+
 ### CHEM-PRODUCTION-QUICKLOG-FIXTURE-001
 
 ```text
@@ -447,15 +467,15 @@ branch: codex/chem-production-only-docs-20260928
 base: verdant-grow-diary
 checkout: git fetch origin codex/chem-production-only-docs-20260928 verdant-grow-diary && git switch codex/chem-production-only-docs-20260928 && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1777
-head_sha: 9772884684aa7826c3213e9ad2cfdb72a5a575a9, pre-checkpoint observation; read PR metadata for resulting new head
-state: Existing draft follows source 61821446. At 97728846 all 35 required SUCCESS; native 109244115472 SUCCESS: 21 browser PASS / 0 FAIL / 0 SKIP plus separate 22 static PASS. Doc-marker red 89 PASS / 2 FAIL became 91 PASS / 0 FAIL / 0 SKIP in two files. Operational checkpoint updates six pushed repair claims and frontend identity; new-head hosted CI NOT_MEASURED. Eight comment deltas preserve parsed workflow behavior; historical CURRENT_STATE receipts unchanged.
-next_action: Normal-push existing draft after scoped validation; #1779 checker precedes coverage amendment. Remeasure resulting exact-head CI and obtain Critical Mass acceptance; no self-PASS or ready.
+head_sha: 1e7c55c328ee57b5a07f831a515e24224e35a5c2, pre-checkpoint observation; read PR metadata for resulting new head
+state: Existing draft follows source 61821446. At 1e7c55c3 all 35 required SUCCESS as of 04:32:51 UTC; three additional failures retained. Earlier 97728846 native 109244115472 SUCCESS: 21 browser PASS / 0 FAIL / 0 SKIP plus separate 22 static PASS. Doc-marker red 89 PASS / 2 FAIL became 91 PASS / 0 FAIL / 0 SKIP in two files. This checkpoint records new performance draft #1793 and fresh six-repair CI; resulting new-head hosted CI NOT_MEASURED. Eight comment deltas preserve parsed workflow behavior; historical CURRENT_STATE receipts unchanged.
+next_action: Normal-push the operational checkpoint after scoped validation; #1779 checker precedes coverage amendment. Remeasure resulting exact-head CI and obtain Critical Mass acceptance; no self-PASS or ready.
 files: Existing #1777 paths plus docs/agents/OWNERSHIP.md and docs/agents/HANDOFF_LOG.md; no executable CI change.
-blockers: #1779 d3511545 remains grammar dependency. On 97728846 legacy grammar checker FAIL, root fast-uri FAIL and old production-host Quick Log refusal FAIL; not waived. Whole CURRENT_STATE formatting FAIL predates diff; prefix formatting/history integrity PASS.
+blockers: #1779 d3511545 remains grammar dependency. On 1e7c55c3 legacy grammar checker FAIL, root fast-uri FAIL and old production-host Quick Log refusal FAIL; not waived. Whole CURRENT_STATE formatting FAIL predates diff; prefix formatting/history integrity PASS.
 artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1777; https://github.com/Verdant-OS/verdant-grow-diary/pull/1767. Founder amendment is included in AGENTS.md; shared /workspace paths are not required to resume.
 reviewer_seat: Critical Mass
 claimed_by: Codex, 2026-09-28 18:46 CT
-last_updated: 2026-09-28 23:12 CT, by Codex
+last_updated: 2026-09-28 23:33 CT, by Codex
 ```
 
 ### CHEM-1696-RECEIPT-RESTAMP

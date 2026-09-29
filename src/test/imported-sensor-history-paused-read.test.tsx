@@ -150,7 +150,7 @@ describe("Tent Detail imported-history paused reads", () => {
 
     act(() => onlineManager.setOnline(true));
     expect(await panel().findByTestId("imported-history-total")).toHaveTextContent(/^1$/);
-    expect(panel().getByRole("cell", { name: "24.5" })).toBeInTheDocument();
+    expect(panel().getByRole("cell", { name: "24.5 °C" })).toBeInTheDocument();
     expect(panel().getByTestId("imported-history-source-badge")).toHaveTextContent("Source: CSV");
     expect(panel().getByTestId("imported-history-not-live-badge")).toHaveTextContent(
       "Not live data",
@@ -216,7 +216,7 @@ describe("Tent Detail imported-history paused reads", () => {
           .fetchStatus,
       ).toBe("paused"),
     );
-    expect(panel().getByRole("cell", { name: "24.5" })).toBeInTheDocument();
+    expect(panel().getByRole("cell", { name: "24.5 °C" })).toBeInTheDocument();
     expect(panel().queryByTestId("imported-history-empty")).not.toBeInTheDocument();
     expect(panel().queryByTestId("imported-history-loading")).not.toBeInTheDocument();
     expect(server.read).toHaveBeenCalledTimes(1);

@@ -81,6 +81,7 @@ export type WriteWateringFailureReason =
   | "sensor_snapshot:invalid"
   | "details:invalid"
   | "rpc:no_event_id"
+  | "rpc:invalid_typed_payload"
   | "rpc:rejected"
   | "rpc:error";
 
@@ -269,6 +270,9 @@ export async function writeQuickLogWateringTypedEvent(
   if (response.error) return { ok: false, reason: "rpc:error" };
 
   const envelope = isPlainRecord(response.data) ? response.data : null;
+  if (envelope?.ok === false && envelope.reason === "invalid_typed_payload") {
+    return { ok: false, reason: "rpc:invalid_typed_payload" };
+  }
   if (!envelope || envelope.ok !== true) return { ok: false, reason: "rpc:rejected" };
   const eventId = trimOrNull(envelope.grow_event_id);
   if (!eventId) return { ok: false, reason: "rpc:no_event_id" };

@@ -345,6 +345,22 @@ describe("writeQuickLogWateringTypedEvent — RPC behavior and idempotency", () 
     });
   });
 
+  it("distinguishes a structured pre-write invalid-payload rejection from an unknown rejection", async () => {
+    const invalid = makeClient({ data: { ok: false, reason: "invalid_typed_payload" } });
+    const malformed = makeClient({ data: { ok: "false", reason: "invalid_typed_payload" } });
+
+    expect(await writeQuickLogWateringTypedEvent(baseInput(), { client: invalid.client })).toEqual({
+      ok: false,
+      reason: "rpc:invalid_typed_payload",
+    });
+    expect(
+      await writeQuickLogWateringTypedEvent(baseInput(), { client: malformed.client }),
+    ).toEqual({
+      ok: false,
+      reason: "rpc:rejected",
+    });
+  });
+
   it("turns transport and thrown errors into a safe reason", async () => {
     const errored = makeClient({ error: { message: "permission denied" } });
     const throwingClient: WateringRpcClient = {

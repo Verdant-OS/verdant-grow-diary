@@ -146,7 +146,10 @@ import {
   quickLogMaturityEvidenceReasonToMessage,
   type QuickLogMaturityEvidenceFormState,
 } from "@/lib/quickLogMaturityEvidenceRules";
-import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
+import {
+  buildReceiptTargetMovedMessage,
+  quickLogReasonToOperatorMessage,
+} from "@/lib/quickLogSaveErrorMessage";
 import {
   QUICK_LOG_POST_SAVE_VIEW_LABEL,
   QUICK_LOG_POST_SAVE_ANOTHER_LABEL,
@@ -1862,9 +1865,15 @@ function QuickLogV2SheetForOwner({
           ? "The saved note could not be confirmed. Retry to check the original submission."
           : reason === "receipt_mismatch"
             ? "The saved note differs from this submission. It has not been confirmed; check its Timeline before making another entry."
-            : reason === "save_failed"
-              ? QUICK_LOG_SAVE_FAILED_MESSAGE
-              : reasonToMessage(reason),
+            : reason === "receipt_target_moved"
+              ? buildReceiptTargetMovedMessage(res, {
+                  grows: Array.isArray(grows) ? grows : [],
+                  tents,
+                  plants,
+                })
+              : reason === "save_failed"
+                ? QUICK_LOG_SAVE_FAILED_MESSAGE
+                : reasonToMessage(reason),
       );
       setSaveStatus("");
       return;

@@ -445,24 +445,19 @@ describe("ASTRA-001 exact Note recovery", () => {
     expect(committed.size).toBe(1);
   });
 
-  it.each([
-    {
-      note: "Different stored note",
-      plant_id: "33333333-3333-4333-8333-333333333333",
-      tent_id: "55555555-5555-4555-8555-555555555555",
-    },
-    {
-      note: originalNote,
-      plant_id: "44444444-4444-4444-8444-444444444444",
-      tent_id: "55555555-5555-4555-8555-555555555555",
-    },
-  ])("does not claim success for a mismatched persisted note or target (%j)", async (mismatch) => {
+  it("keeps a target-moved receipt locked and names the saved target", async () => {
     modelLostNoteReply();
     readbackMock.mockResolvedValue({
-      data: { id: "77777777-7777-4777-8777-000000000001", ...mismatch },
+      data: {
+        id: confirmedEventId,
+        note: originalNote,
+        grow_id: "66666666-6666-4666-8666-666666666666",
+        plant_id: "44444444-4444-4444-8444-444444444444",
+        tent_id: "55555555-5555-4555-8555-555555555555",
+      },
       error: null,
     });
-    renderSheet();
+    const view = renderSheet();
     typeNote();
     save();
     await expectRetry();
@@ -472,6 +467,37 @@ describe("ASTRA-001 exact Note recovery", () => {
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(telemetryMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId("qlv2-persisted-note")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("qlv2-review-saved-entry")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("qlv2-mismatched-note")).not.toBeInTheDocument();
+    expect(screen.getByTestId("qlv2-error")).toHaveTextContent(
+      "The saved entry target differs from this submission.",
+    );
+    expect(screen.getByTestId("qlv2-error")).toHaveTextContent(
+      "Saved target: Grow: Grow 1 · Tent: Tent 1 · Plant: Plant 2.",
+    );
+    expect(screen.getByTestId("qlv2-error")).toHaveTextContent(
+      "It has not been confirmed; check its Timeline before making another entry.",
+    );
+    expect(screen.getByTestId("qlv2-error")).not.toHaveTextContent(
+      "The saved note differs from this submission.",
+    );
+    expect(screen.getByLabelText("Note (optional)")).toBeDisabled();
+    expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeInTheDocument();
+    expect(photoEntryMock).not.toHaveBeenCalled();
+    expect(videoEntryMock).not.toHaveBeenCalled();
+    expect(navigationMock).not.toHaveBeenCalled();
+    const originalPayload = rpcMock.mock.calls[0][1];
+    view.unmount();
+    renderSheet("plant:44444444-4444-4444-8444-444444444444");
+    await expectRetry();
+    expect(screen.getByLabelText("Note (optional)")).toHaveValue(originalNote);
+    expect(screen.getByLabelText("Note (optional)")).toBeDisabled();
+    retry();
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(3));
+    await expectRetry();
+    expect(rpcMock.mock.calls[2][1]).toEqual(originalPayload);
+    expect(screen.queryByTestId("qlv2-review-saved-entry")).not.toBeInTheDocument();
+    expect(committed.size).toBe(1);
   });
 
   it("does not accept a reused success response without a persisted event id", async () => {
@@ -495,6 +521,47 @@ describe("ASTRA-001 exact Note recovery", () => {
     expect(receipt?.ok).toBe(false);
     expect(telemetryMock).not.toHaveBeenCalled();
   });
+
+  it.each(["33333333-3333-4333-8333-333333333333", "44444444-4444-4444-8444-444444444444"])(
+    "rejects a readback of another event without exposing its scope (%s)",
+    async (plantId) => {
+      rpcMock.mockResolvedValue({
+        data: { ok: true, reused: true, grow_event_id: confirmedEventId },
+        error: null,
+      });
+      readbackMock.mockResolvedValue({
+        data: {
+          id: "99999999-9999-4999-8999-999999999999",
+          note: originalNote,
+          grow_id: "66666666-6666-4666-8666-666666666666",
+          plant_id: plantId,
+          tent_id: "55555555-5555-4555-8555-555555555555",
+        },
+        error: null,
+      });
+      const { result } = renderHook(() => quickLogSaveHook.useQuickLogV2Save());
+      let receipt: Awaited<ReturnType<typeof result.current.save>> | undefined;
+      await act(async () => {
+        receipt = await result.current.save(
+          {
+            p_target_type: "plant",
+            p_target_id: "33333333-3333-4333-8333-333333333333",
+            p_action: "note",
+            p_volume_ml: null,
+            p_note: originalNote,
+            p_temperature_c: null,
+            p_humidity_pct: null,
+            p_vpd_kpa: null,
+            p_occurred_at: null,
+            p_idempotency_key: "exact-note-retry-key",
+          },
+          { verifyPersistedNote: true },
+        );
+      });
+      expect(receipt).toEqual({ ok: false, reason: "receipt_unverified" });
+      expect(telemetryMock).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     {
@@ -548,6 +615,139 @@ describe("ASTRA-001 exact Note recovery", () => {
       persistedPlantId: event.plant_id,
       persistedTentId: event.tent_id,
       persistedNote: originalNote,
+    });
+  });
+
+  it("maps a persisted target move to receipt_target_moved without saved-entry review fields", async () => {
+    rpcMock.mockResolvedValue({
+      data: { ok: true, reused: true, grow_event_id: confirmedEventId },
+      error: null,
+    });
+    readbackMock.mockResolvedValue({
+      data: {
+        id: confirmedEventId,
+        note: originalNote,
+        grow_id: "66666666-6666-4666-8666-666666666666",
+        plant_id: "44444444-4444-4444-8444-444444444444",
+        tent_id: "55555555-5555-4555-8555-555555555555",
+      },
+      error: null,
+    });
+    const { result } = renderHook(() => quickLogSaveHook.useQuickLogV2Save());
+    let receipt: Awaited<ReturnType<typeof result.current.save>> | undefined;
+    await act(async () => {
+      receipt = await result.current.save(
+        {
+          p_target_type: "plant",
+          p_target_id: "33333333-3333-4333-8333-333333333333",
+          p_action: "note",
+          p_volume_ml: null,
+          p_note: originalNote,
+          p_temperature_c: null,
+          p_humidity_pct: null,
+          p_vpd_kpa: null,
+          p_occurred_at: null,
+          p_idempotency_key: "exact-note-retry-key",
+        },
+        { verifyPersistedNote: true },
+      );
+    });
+    expect(receipt).toMatchObject({
+      ok: false,
+      reason: "receipt_target_moved",
+      persistedGrowId: "66666666-6666-4666-8666-666666666666",
+      persistedTentId: "55555555-5555-4555-8555-555555555555",
+      persistedPlantId: "44444444-4444-4444-8444-444444444444",
+    });
+    expect(receipt?.growEventId).toBeUndefined();
+    expect(receipt?.persistedNote).toBeUndefined();
+  });
+
+  it.each(["88888888-8888-4888-8888-888888888888", null])(
+    "keeps a changed or removed tent target unconfirmed (%s)",
+    async (tentId) => {
+      rpcMock.mockResolvedValue({
+        data: { ok: true, reused: true, grow_event_id: confirmedEventId },
+        error: null,
+      });
+      readbackMock.mockResolvedValue({
+        data: {
+          id: confirmedEventId,
+          note: originalNote,
+          grow_id: "66666666-6666-4666-8666-666666666666",
+          plant_id: null,
+          tent_id: tentId,
+        },
+        error: null,
+      });
+      const { result } = renderHook(() => quickLogSaveHook.useQuickLogV2Save());
+      let receipt: Awaited<ReturnType<typeof result.current.save>> | undefined;
+      await act(async () => {
+        receipt = await result.current.save(
+          {
+            p_target_type: "tent",
+            p_target_id: "55555555-5555-4555-8555-555555555555",
+            p_action: "note",
+            p_volume_ml: null,
+            p_note: originalNote,
+            p_temperature_c: null,
+            p_humidity_pct: null,
+            p_vpd_kpa: null,
+            p_occurred_at: null,
+            p_idempotency_key: "exact-tent-note-retry-key",
+          },
+          { verifyPersistedNote: true },
+        );
+      });
+      expect(receipt).toMatchObject({ ok: false, reason: "receipt_target_moved" });
+      expect(receipt?.growEventId).toBeUndefined();
+      expect(receipt?.persistedNote).toBeUndefined();
+      expect(telemetryMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps note mismatches on receipt_mismatch with saved-entry review metadata", async () => {
+    rpcMock.mockResolvedValue({
+      data: { ok: true, reused: true, grow_event_id: confirmedEventId },
+      error: null,
+    });
+    readbackMock.mockResolvedValue({
+      data: {
+        id: confirmedEventId,
+        note: "Different stored note",
+        grow_id: "66666666-6666-4666-8666-666666666666",
+        plant_id: "33333333-3333-4333-8333-333333333333",
+        tent_id: "55555555-5555-4555-8555-555555555555",
+      },
+      error: null,
+    });
+    const { result } = renderHook(() => quickLogSaveHook.useQuickLogV2Save());
+    let receipt: Awaited<ReturnType<typeof result.current.save>> | undefined;
+    await act(async () => {
+      receipt = await result.current.save(
+        {
+          p_target_type: "plant",
+          p_target_id: "33333333-3333-4333-8333-333333333333",
+          p_action: "note",
+          p_volume_ml: null,
+          p_note: originalNote,
+          p_temperature_c: null,
+          p_humidity_pct: null,
+          p_vpd_kpa: null,
+          p_occurred_at: null,
+          p_idempotency_key: "exact-note-retry-key",
+        },
+        { verifyPersistedNote: true },
+      );
+    });
+    expect(receipt).toMatchObject({
+      ok: false,
+      reason: "receipt_mismatch",
+      growEventId: confirmedEventId,
+      persistedNote: "Different stored note",
+      persistedGrowId: "66666666-6666-4666-8666-666666666666",
+      persistedTentId: "55555555-5555-4555-8555-555555555555",
+      persistedPlantId: "33333333-3333-4333-8333-333333333333",
     });
   });
 

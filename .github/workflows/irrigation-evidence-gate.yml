@@ -43,6 +43,7 @@ on:
       - "package.json"
       - "bun.lock"
       - "bun.lockb"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [verdant-grow-diary]
     paths:
@@ -74,8 +75,8 @@ on:
       - "bun.lockb"
 
 concurrency:
-  group: irrigation-evidence-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   irrigation-rls-runtime:

@@ -69,6 +69,34 @@ afterEach(() => {
 });
 
 describe("restoreUnconfirmedManualDraftValues pending recovery", () => {
+  it("restores stored values from a valid pending record", () => {
+    const record = pendingRecord();
+
+    expect(recoveredDraftFromRecord(record)).toEqual({
+      form: {
+        airTemp: "25",
+        airTempUnit: "C",
+        humidityPct: "60",
+        vpdKpa: "",
+        co2Ppm: "",
+        soilMoisturePct: "",
+        ppfd: "",
+      },
+      devicePreset: "custom",
+      deviceCustom: "Handheld meter",
+      hasEditedReading: true,
+      tempUnitOverride: "C",
+      revision: 0,
+      pendingStandardSnapshot: {
+        revision: 0,
+        payloads: record.payloads,
+      },
+      saveUnconfirmed: true,
+      lastSaved: null,
+    });
+    expectNoSupabaseCalls();
+  });
+
   it("restores an unconfirmed manual draft with its values intact", () => {
     const record = pendingRecord();
     expect(claimPendingManualSnapshot(record)).toEqual({ status: "claimed", record });
@@ -103,29 +131,28 @@ describe("restoreUnconfirmedManualDraftValues pending recovery", () => {
     const record = pendingRecord();
     claimPendingManualSnapshot(record);
     expect(clearPendingManualSnapshot(record)).toBe(true);
-    const pending = readPendingManualSnapshot(ownerId);
-    expect(pending).toEqual({ status: "empty" });
-    const recovered =
-      pending.status === "pending" ? restoreManualSnapshotValues(pending.record) : null;
-    expect(recovered).toBeNull();
+    expect(readPendingManualSnapshot(ownerId)).toEqual({ status: "empty" });
     expectNoSupabaseCalls();
   });
 
   it.each([
-    ["missing", null],
-    ["empty", ""],
-    ["malformed", "{"],
-  ])("returns no restorable values for %s stored input", (_label, raw) => {
+    ["missing", null, { status: "empty" }],
+    ["empty", "", { status: "blocked" }],
+    ["malformed", "{", { status: "blocked" }],
+  ])("returns no restorable values for %s stored input", (_label, raw, expected) => {
     if (raw !== null) sessionStorage.setItem(key, raw);
+    expect(readPendingManualSnapshot(ownerId)).toEqual(expected);
+    expectNoSupabaseCalls();
+  });
+
+  it("passes through fallback recovered values when explicitly provided", () => {
     const fallbackRecovered = recoveredDraftFromRecord(pendingRecord());
-    const pending = readPendingManualSnapshot(ownerId);
-    const recovered =
-      pending.status === "pending" ? restoreManualSnapshotValues(pending.record) : null;
-    expect(recovered).toBeNull();
+
     const restoredFromFallback = restoreUnconfirmedManualDraftValues(
       currentDraft(),
       fallbackRecovered,
     );
+
     expect(restoredFromFallback.form).toEqual(fallbackRecovered.form);
     expect(restoredFromFallback.tempUnitOverride).toBe(fallbackRecovered.tempUnitOverride);
     expect(restoredFromFallback.saveUnconfirmed).toBe(true);

@@ -5,6 +5,7 @@ name: Native Manual Correction Local
 on:
   pull_request:
     branches: [main, verdant-grow-diary, "codex/manual-correction-readers-*"]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:

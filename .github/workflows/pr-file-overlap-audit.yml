@@ -35,6 +35,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -46,10 +48,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_OVERLAP_BASE_BRANCH: verdant-grow-diary
+          # Passed through env, never interpolated into the script body.
+          FAIL_ON_HOT: ${{ inputs.fail_on_hot }}
         run: |
           set -euo pipefail
           EXTRA=()
-          if [ "${{ github.event.inputs.fail_on_hot || 'false' }}" = "true" ]; then
+          if [ "${FAIL_ON_HOT:-false}" = "true" ]; then
             EXTRA+=(--fail-on-hot)
           fi
           node scripts/ci/pr-file-overlap-audit.mjs \
@@ -61,7 +65,8 @@ jobs:
         if: always()
         run: |
           if [ -f pr-file-overlap-audit.txt ]; then
-            { echo '```'; cat pr-file-overlap-audit.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            # Backticks in file names are neutralized so they cannot close the fence.
+            { echo '```'; tr '`' "'" < pr-file-overlap-audit.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload audit artifact

@@ -28,7 +28,19 @@ import { writeFileSync } from "node:fs";
 
 const REPO = process.env.GITHUB_REPOSITORY || "Verdant-OS/verdant-grow-diary";
 const BASE = process.env.PR_OVERLAP_BASE_BRANCH || "verdant-grow-diary";
-const MAX_PRS = Number(process.env.PR_OVERLAP_MAX_PRS || "100");
+const DEFAULT_MAX_PRS = 100;
+
+/**
+ * Parse PR_OVERLAP_MAX_PRS. Anything that is not a positive integer falls back
+ * to the default, so a typo can never produce an empty-but-"ok" report.
+ * @param {string | undefined} raw
+ */
+export function parseMaxPrs(raw) {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : DEFAULT_MAX_PRS;
+}
+
+const MAX_PRS = parseMaxPrs(process.env.PR_OVERLAP_MAX_PRS);
 
 /**
  * Hot paths named in the collision brief. A file matches a hot path when it
@@ -225,8 +237,20 @@ function fetchOpenPrs() {
   });
 }
 
-function main() {
-  const args = process.argv.slice(2);
+/**
+ * Run the audit. Returns the process exit code instead of exiting, so the
+ * exit-code contract is testable.
+ * @param {{ args?: string[], fetchPrs?: () => any[], now?: Date, log?: (s: string) => void, error?: (s: string) => void, write?: (path: string, data: string) => void }} [deps]
+ * @returns {0 | 2 | 4}
+ */
+export function runAudit({
+  args = [],
+  fetchPrs = fetchOpenPrs,
+  now = new Date(),
+  log = (s) => console.log(s),
+  error = (s) => console.error(s),
+  write = (path, data) => writeFileSync(path, data),
+} = {}) {
   const flag = (n) => args.includes(n);
   const opt = (n) => {
     const i = args.indexOf(n);
@@ -235,18 +259,21 @@ function main() {
 
   let report;
   try {
-    report = computeOverlaps(fetchOpenPrs());
+    report = computeOverlaps(fetchPrs(), now);
   } catch (e) {
-    console.error(`pr-file-overlap-audit: ${e instanceof Error ? e.message : String(e)}`);
-    process.exit(2);
+    error(`pr-file-overlap-audit: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
   }
   const text = renderText(report);
   const jsonOut = opt("--json-out");
   const textOut = opt("--text-out");
-  if (jsonOut) writeFileSync(jsonOut, JSON.stringify(report, null, 2) + "\n");
-  if (textOut) writeFileSync(textOut, text + "\n");
-  console.log(flag("--json") ? JSON.stringify(report, null, 2) : text);
-  if (flag("--fail-on-hot") && report.hot_collisions.length > 0) process.exit(4);
+  if (jsonOut) write(jsonOut, JSON.stringify(report, null, 2) + "\n");
+  if (textOut) write(textOut, text + "\n");
+  log(flag("--json") ? JSON.stringify(report, null, 2) : text);
+  if (flag("--fail-on-hot") && report.hot_collisions.length > 0) return 4;
+  return 0;
 }
 
-if (process.argv[1] && /pr-file-overlap-audit\.mjs$/.test(process.argv[1])) main();
+if (process.argv[1] && /pr-file-overlap-audit\.mjs$/.test(process.argv[1])) {
+  process.exit(runAudit({ args: process.argv.slice(2) }));
+}

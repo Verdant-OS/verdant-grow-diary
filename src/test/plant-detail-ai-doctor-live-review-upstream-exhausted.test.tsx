@@ -80,31 +80,56 @@ function strongTimeline(): TimelineMemoryItem[] {
 }
 
 describe("PlantDetailAiDoctorLiveReview — upstream_credit_exhausted branch", () => {
-  it("renders shared service-degraded notice with no paywall CTA", async () => {
-    itemsRef.current = strongTimeline();
-    const invoke = vi.fn().mockResolvedValue({
-      data: { ok: false, reason: "upstream_credit_exhausted" },
-      error: null,
-    });
-    const { container } = render(
-      <PlantDetailAiDoctorLiveReview plantId="p1" plant={strongPlant} invoke={invoke} />,
-    );
-    fireEvent.click(await screen.findByTestId("plant-ai-doctor-live-review-start"));
-    const notice = await waitFor(() =>
-      screen.getByTestId("plant-ai-doctor-live-review-upstream-credit-exhausted"),
-    );
-    expect(notice.textContent).toContain("AI Doctor is briefly unavailable.");
-    expect(notice.textContent).toMatch(/not charged/i);
+  it.each([false, true])(
+    "renders service-degraded recovery without a paywall (known freshness: %s)",
+    async (knownFreshness) => {
+      itemsRef.current = strongTimeline();
+      if (knownFreshness) {
+        const capturedAt = new Date(Date.now() - 2 * 3600_000).toISOString();
+        itemsRef.current.push({
+          kind: "manual_sensor_snapshot",
+          key: "known-freshness",
+          occurredAt: capturedAt,
+          card: { capturedAt, severity: "ok", source: "manual", readings: [] },
+        } as unknown as TimelineMemoryItem);
+      }
+      const invoke = vi.fn().mockResolvedValue({
+        data: { ok: false, reason: "upstream_credit_exhausted" },
+        error: null,
+      });
+      const { container } = render(
+        <PlantDetailAiDoctorLiveReview plantId="p1" plant={strongPlant} invoke={invoke} />,
+      );
+      fireEvent.click(await screen.findByTestId("plant-ai-doctor-live-review-start"));
+      const notice = await waitFor(() =>
+        screen.getByTestId("plant-ai-doctor-live-review-upstream-credit-exhausted"),
+      );
+      expect(notice.textContent).toContain("AI Doctor is briefly unavailable.");
+      expect(notice.textContent).toMatch(/not charged/i);
 
-    // Hard fences: no credit-limit notice, no generic failure pane,
-    // no pricing/upgrade link or paywall CTA anywhere.
-    expect(screen.queryByTestId("plant-ai-doctor-live-review-credit-denied")).toBeNull();
-    expect(screen.queryByTestId("plant-ai-doctor-live-review-failure")).toBeNull();
-    const pricingLink = container.querySelector('a[href*="pricing"]');
-    expect(pricingLink).toBeNull();
+      // Hard fences: no credit-limit notice, no generic failure pane,
+      // no pricing/upgrade link or paywall CTA anywhere.
+      expect(screen.queryByTestId("plant-ai-doctor-live-review-credit-denied")).toBeNull();
+      expect(screen.queryByTestId("plant-ai-doctor-live-review-failure")).toBeNull();
+      const pricingLink = container.querySelector('a[href*="pricing"]');
+      expect(pricingLink).toBeNull();
 
-    const retry = screen.getByTestId("plant-ai-doctor-live-review-retry");
-    fireEvent.click(retry);
-    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
-  });
+      const retry = screen.getByTestId("plant-ai-doctor-live-review-retry");
+      fireEvent.click(retry);
+      if (knownFreshness) {
+        await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
+      } else {
+        expect(invoke).toHaveBeenCalledTimes(1);
+        expect(screen.queryByTestId("plant-ai-doctor-live-review-retry")).toBeNull();
+        expect(
+          screen.getByTestId("plant-ai-doctor-live-review-evidence-retry-block"),
+        ).toHaveTextContent(
+          "Evidence freshness could not be established. Capture a fresh reading to retry.",
+        );
+        expect(
+          screen.getByTestId("plant-ai-doctor-live-review-upstream-credit-exhausted"),
+        ).toBeInTheDocument();
+      }
+    },
+  );
 });

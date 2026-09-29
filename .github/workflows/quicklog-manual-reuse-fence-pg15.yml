@@ -5,12 +5,16 @@ on:
     paths: &quicklog_manual_reuse_paths
       - "supabase/migrations/20260927002000_quicklog_manual_reuse_fence.sql"
       - "supabase/migrations/20260927160000_quicklog_manual_plant_tent_lineage.sql"
+      - "supabase/migrations/20260928183000_quicklog_manual_replay_metadata_lock.sql"
       - "supabase/migrations/20260818010000_quicklog_manual_delegate_forward_repair.sql"
+      - "supabase/migrations/20260811090000_quicklog_corrections_retractions.sql"
       - "scripts/run-quicklog-manual-reuse-fence-pg15-harness.mjs"
       - "scripts/run-quicklog-manual-plant-lineage-pg15-harness.mjs"
+      - "scripts/run-quicklog-manual-reuse-lock-pg15-harness.mjs"
       - "scripts/run-quicklog-manual-delegate-forward-repair-pg15-harness.mjs"
       - "src/test/quicklog-manual-reuse-fence-pg15-harness.test.ts"
       - "src/test/quicklog-manual-plant-lineage-pg15-harness.test.ts"
+      - "src/test/quicklog-manual-reuse-lock-pg15-harness.test.ts"
       - ".github/workflows/quicklog-manual-reuse-fence-pg15.yml"
   push:
     branches:
@@ -83,3 +87,8 @@ jobs:
         env:
           QUICKLOG_MANUAL_LINEAGE_PG15_CONTAINER: ${{ job.services.postgres.id }}
         run: node scripts/run-quicklog-manual-plant-lineage-pg15-harness.mjs
+
+      - name: Prove manual replay versus the actual revision-root row locks
+        env:
+          QUICKLOG_MANUAL_REUSE_PG15_CONTAINER: ${{ job.services.postgres.id }}
+        run: node scripts/run-quicklog-manual-reuse-lock-pg15-harness.mjs

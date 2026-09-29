@@ -11,6 +11,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  buildReceiptTargetMovedMessage,
   classifyQuickLogThrownSaveError,
   canDiscardQuickLogHistoryDraft,
   describeQuickLogSaveFailure,
@@ -23,29 +24,72 @@ import {
 const GENERIC_MESSAGE = quickLogReasonToOperatorMessage("some_unknown_reason_code");
 const GENERIC_RECOVERY = quickLogSaveRecoveryAction("some_unknown_reason_code");
 
-describe("explicit history-review draft resolution", () => {
-  const input = {
-    historyCheckRequired: true,
-    inFlight: false,
-    currentOwnerId: "owner-1",
-    draftOwnerId: "owner-1",
-  };
-  it("allows only the current owner of an idle history-review draft, deterministically", () => {
-    expect(canDiscardQuickLogHistoryDraft(input)).toBe(true);
-    expect(canDiscardQuickLogHistoryDraft(input)).toBe(canDiscardQuickLogHistoryDraft(input));
+describe("saved target mismatch copy", () => {
+  const scope = Object.freeze({
+    persistedGrowId: "grow-saved",
+    persistedTentId: "tent-saved",
+    persistedPlantId: "plant-saved",
   });
-  it.each([
-    null,
-    undefined,
-    { ...input, historyCheckRequired: false },
-    { ...input, inFlight: true },
-    { ...input, currentOwnerId: null },
-    { ...input, currentOwnerId: "" },
-    { ...input, currentOwnerId: "   ", draftOwnerId: "   " },
-    { ...input, currentOwnerId: "other-owner" },
-    { ...input, draftOwnerId: undefined },
-  ])("refuses unresolved or foreign context %j", (context) => {
-    expect(canDiscardQuickLogHistoryDraft(context)).toBe(false);
+  const lookup = Object.freeze({
+    grows: Object.freeze([{ id: "grow-saved", name: " Saved Grow " }]),
+    tents: Object.freeze([{ id: "tent-saved", name: "Saved Tent" }]),
+    plants: Object.freeze([{ id: "plant-saved", name: "Saved Plant" }]),
+  });
+  const generic =
+    "The saved entry target differs from this submission. It has not been confirmed; check its Timeline before making another entry.";
+
+  it("names only the persisted scope and trims its matching names", () => {
+    expect(buildReceiptTargetMovedMessage(scope, lookup)).toBe(
+      "The saved entry target differs from this submission. Saved target: Grow: Saved Grow · Tent: Saved Tent · Plant: Saved Plant. It has not been confirmed; check its Timeline before making another entry.",
+    );
+  });
+
+  it("uses neutral labels when a saved ID is absent from the current lookup", () => {
+    const message = buildReceiptTargetMovedMessage(scope, {
+      grows: [{ id: "grow-draft", name: "Draft grow" }],
+      tents: [{ id: "tent-draft", name: "Draft tent" }],
+      plants: [{ id: "plant-draft", name: "Draft plant" }],
+    });
+    expect(message).toContain(
+      "Saved target: Grow: Saved grow · Tent: Saved tent · Plant: Saved plant.",
+    );
+    expect(message).not.toMatch(/Draft|grow-saved|tent-saved|plant-saved/);
+  });
+
+  it.each([null, undefined])("handles a missing receipt (%s)", (receipt) => {
+    expect(buildReceiptTargetMovedMessage(receipt, lookup)).toBe(generic);
+  });
+
+  it.each([null, undefined])("handles a missing lookup (%s)", (names) => {
+    expect(buildReceiptTargetMovedMessage(scope, names)).toContain(
+      "Saved target: Grow: Saved grow · Tent: Saved tent · Plant: Saved plant.",
+    );
+  });
+
+  it("handles missing lists, sparse records and blank names without using unrelated names", () => {
+    expect(
+      buildReceiptTargetMovedMessage(scope, {
+        grows: null,
+        plants: [null, undefined, { id: "plant-saved", name: " " }],
+      }),
+    ).toContain("Saved target: Grow: Saved grow · Tent: Saved tent · Plant: Saved plant.");
+  });
+
+  it("omits null, undefined and blank scope IDs even when names are available", () => {
+    expect(
+      buildReceiptTargetMovedMessage(
+        { persistedGrowId: null, persistedTentId: undefined, persistedPlantId: " " },
+        lookup,
+      ),
+    ).toBe(generic);
+  });
+
+  it("returns the same result for frozen inputs without changing them", () => {
+    const before = JSON.stringify({ scope, lookup });
+    expect(buildReceiptTargetMovedMessage(scope, lookup)).toBe(
+      buildReceiptTargetMovedMessage(scope, lookup),
+    );
+    expect(JSON.stringify({ scope, lookup })).toBe(before);
   });
 });
 

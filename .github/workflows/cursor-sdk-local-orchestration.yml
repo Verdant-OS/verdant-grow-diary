@@ -14,10 +14,15 @@ on:
       - ".github/workflows/cursor-sdk-local-orchestration.yml"
       - "src/test/cursor-sdk-production-isolation-fence.test.ts"
       - "docs/specs/cursor-sdk-local-orchestration-spike.md"
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   spike-static:

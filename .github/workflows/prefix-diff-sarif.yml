@@ -26,6 +26,7 @@ on:
       - "src/test/money-database-target-identity.test.ts"
       - "src/test/required-money-migrations-workflow-trust-boundary.test.ts"
       - ".github/workflows/prefix-diff-sarif.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [verdant-grow-diary]
     paths:

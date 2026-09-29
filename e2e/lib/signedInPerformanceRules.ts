@@ -16,6 +16,7 @@ export interface PerformanceContext {
   origin: string;
   expectedSha: string;
   fixtureVerified: boolean;
+  accountVerified?: boolean;
 }
 export interface PerformanceSample extends PerformanceContext {
   before: PublicDeploymentIdentity | null;
@@ -34,6 +35,7 @@ export interface PerformanceReceipt {
   elapsedMs: number | null;
   metric: "navigation-to-control-ready" | "save-click-to-confirmation" | null;
   performanceBudgetVerdict: "NOT_MEASURED";
+  verification: "owned-active-fixture" | "fixture-account-read-only" | null;
 }
 const isSha = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9a-f]{40}$/.test(value);
@@ -58,7 +60,11 @@ export function performanceContextIssue(value: unknown): string | null {
   if (!context || !isOperation(context.operation)) return "operation_missing";
   if (context.origin !== PERFORMANCE_ORIGIN) return "production_origin_required";
   if (!isSha(context.expectedSha)) return "expected_sha_required";
-  if (context.fixtureVerified !== true) return "owned_active_fixture_required";
+  if (
+    context.fixtureVerified !== true &&
+    (context.operation === "quicklog-save-confirmed" || context.accountVerified !== true)
+  )
+    return "owned_active_fixture_required";
   return null;
 }
 
@@ -81,6 +87,12 @@ export function buildPerformanceReceipt(value: unknown): PerformanceReceipt {
         : "navigation-to-control-ready"
       : null,
     performanceBudgetVerdict: "NOT_MEASURED",
+    verification:
+      sample?.fixtureVerified === true
+        ? "owned-active-fixture"
+        : operation !== "quicklog-save-confirmed" && sample?.accountVerified === true
+          ? "fixture-account-read-only"
+          : null,
   };
   if (performanceContextIssue(value)) return receipt;
   if (

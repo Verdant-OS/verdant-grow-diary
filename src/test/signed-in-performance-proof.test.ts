@@ -30,6 +30,47 @@ const sample: PerformanceSample = {
   confirmed: true,
 };
 describe("signed-in performance receipts", () => {
+  it.each(["dashboard-ready", "timeline-ready", "sensors-ready"] as const)(
+    "accepts positive read-only account proof for %s without claiming an active plant",
+    (operation) => {
+      expect(
+        buildPerformanceReceipt({
+          ...sample,
+          operation,
+          fixtureVerified: false,
+          accountVerified: true,
+        }),
+      ).toMatchObject({ status: "PASS", elapsedMs: 25, verification: "fixture-account-read-only" });
+    },
+  );
+  it("does not let account-only proof authorize a Quick Log save", () => {
+    expect(
+      buildPerformanceReceipt({
+        ...sample,
+        operation: "quicklog-save-confirmed",
+        fixtureVerified: false,
+        accountVerified: true,
+      }),
+    ).toMatchObject({
+      status: "BLOCKED",
+      elapsedMs: null,
+      reason: "owned_active_fixture_required",
+    });
+  });
+  it("withholds timing when the operation invalidates its safety proof", async () => {
+    const result = await measureSignedInPerformance(context, {
+      readIdentity: async () => identity,
+      run: async () => {},
+      assertComplete: async () => {
+        throw new Error("read_only_write_attempted");
+      },
+    } as Parameters<typeof measureSignedInPerformance>[1]);
+    expect(result.receipt).toMatchObject({
+      status: "BLOCKED",
+      reason: "operation_postcondition_failed",
+      elapsedMs: null,
+    });
+  });
   it("records confirmed readiness against one exact deployment without inventing a speed budget", () => {
     expect(buildPerformanceReceipt(sample)).toMatchObject({
       status: "PASS",

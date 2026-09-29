@@ -30,6 +30,7 @@ export async function measureSignedInPerformance(
   dependencies: {
     readIdentity: () => Promise<PublicDeploymentIdentity | null>;
     assertReady?: () => Promise<void>;
+    assertComplete?: () => Promise<void>;
     run: () => Promise<void>;
     clock?: () => number;
   },
@@ -92,5 +93,20 @@ export async function measureSignedInPerformance(
     finishedMs = tick();
   }
   after = await dependencies.readIdentity().catch(() => null);
+  try {
+    // Account continuity and attempted writes invalidate readiness even if
+    // the visible control succeeded. Never include this check in elapsed time.
+    await dependencies.assertComplete?.();
+  } catch (cause) {
+    return {
+      receipt: {
+        ...result().receipt,
+        status: "BLOCKED",
+        reason: "operation_postcondition_failed",
+        elapsedMs: null,
+      },
+      error: cause,
+    };
+  }
   return result();
 }

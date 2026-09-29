@@ -1,18 +1,24 @@
 import { test, expect } from "./lib/authedTest";
-import { validateQuickLogFixturePage } from "./lib/fixtureSafety";
-import { observeProductionQuickLogFixture } from "./lib/productionQuickLogFixtureProof";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { installSignedInReadonlyProof } from "./lib/signedInReadonlyProof";
 import {
   readLivePerformanceIdentity,
   measureSignedInPerformance,
 } from "./lib/signedInPerformanceProbe";
 import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
-import { PERFORMANCE_ORIGIN, type PerformanceOperation } from "./lib/signedInPerformanceRules";
+import {
+  buildPerformanceReceipt,
+  PERFORMANCE_ORIGIN,
+  type PerformanceContext,
+} from "./lib/signedInPerformanceRules";
 
 const enabled = process.env.E2E_MEASURE_SIGNED_IN_PERFORMANCE === "true";
-test.use({ trace: "off", video: "off" });
+test.use({ trace: "off", video: "off", screenshot: "off", serviceWorkers: "block" });
 
-// Opt-in measurement. Uses existing auth setup and positive owned-fixture proof.
-// No clicks that save, no reconsent acceptance, no telemetry writes and no trace tokens.
+// Uses existing auth setup. This proof verifies only the fixture account, not
+// an active owned plant. Quick Log's separate write proof remains unchanged.
+// Automatic HTTP writes and WebSockets are blocked before navigation; no fake responses.
 test.describe("signed-in route performance evidence", () => {
   test.describe.configure({ retries: 0 });
   test.skip(
@@ -34,44 +40,73 @@ test.describe("signed-in route performance evidence", () => {
         testInfo.project.name !== "chromium-authed",
         "Requires the normal authenticated fixture.",
       );
-      const proof = observeProductionQuickLogFixture(page);
+      test.setTimeout(45_000);
+      const proof = await installSignedInReadonlyProof(page);
+      const context: PerformanceContext = {
+        operation: target.operation,
+        origin: PERFORMANCE_ORIGIN,
+        expectedSha: process.env.E2E_EXPECTED_SHA ?? "",
+        fixtureVerified: false,
+        accountVerified: false,
+      };
+      let receipt = buildPerformanceReceipt(context);
       await page.addInitScript(
         (key) => localStorage.setItem(key, "denied"),
         ANALYTICS_CONSENT_STORAGE_KEY,
       );
       try {
-        if (!process.env.E2E_GROW_1_PLANT_URL) throw new Error("owned_fixture_url_required");
-        await page.goto(process.env.E2E_GROW_1_PLANT_URL);
-        await validateQuickLogFixturePage(page, undefined, proof);
-        const result = await measureSignedInPerformance(
-          {
-            operation: target.operation as PerformanceOperation,
-            origin: new URL(page.url()).origin,
-            expectedSha: process.env.E2E_EXPECTED_SHA ?? "",
-            fixtureVerified: true,
+        await page.goto(PERFORMANCE_ORIGIN + "/dashboard");
+        await proof.waitForAccount();
+        context.accountVerified = true;
+        const result = await measureSignedInPerformance(context, {
+          readIdentity: () => readLivePerformanceIdentity(page),
+          assertReady: proof.assertReady,
+          assertComplete: proof.assertReady,
+          run: async () => {
+            await page.goto(PERFORMANCE_ORIGIN + target.route);
+            await expect(page).toHaveURL(PERFORMANCE_ORIGIN + target.route);
+            const control = page.getByTestId(target.control);
+            await expect(control).toBeVisible();
+            if (target.operation === "sensors-ready")
+              await expect(control.locator("input").first()).toBeEnabled();
+            else await expect(control).toBeEnabled();
           },
-          {
-            readIdentity: () => readLivePerformanceIdentity(page),
-            run: async () => {
-              await page.goto(PERFORMANCE_ORIGIN + target.route);
-              await expect(page).toHaveURL(PERFORMANCE_ORIGIN + target.route);
-              const control = page.getByTestId(target.control);
-              await expect(control).toBeVisible();
-              if (target.operation === "sensors-ready")
-                await expect(control.locator("input").first()).toBeEnabled();
-              else await expect(control).toBeEnabled();
-            },
-          },
+        });
+        receipt = result.receipt;
+        expect(result.receipt.status, result.receipt.reason).toBe("PASS");
+      } catch {
+        if (!context.accountVerified)
+          receipt = { ...receipt, reason: "read_only_account_precondition_failed" };
+        throw new Error(`performance_proof_${receipt.status}:${receipt.reason}`);
+      } finally {
+        // End all browser activity before finalizing the receipt: a delayed
+        // effect must not write or change accounts just after the last check.
+        await page.context().close();
+        if (receipt.status === "PASS") {
+          try {
+            await proof.assertReady();
+          } catch {
+            receipt = {
+              ...receipt,
+              status: "BLOCKED",
+              reason: "operation_postcondition_failed",
+              elapsedMs: null,
+            };
+          }
+        }
+        const receiptPath = testInfo.outputPath(target.operation + "-performance.json");
+        mkdirSync(dirname(receiptPath), { recursive: true });
+        writeFileSync(
+          receiptPath,
+          JSON.stringify({ ...receipt, blockedWrites: proof.blockedWrites() }, null, 2),
         );
         await testInfo.attach(target.operation + "-performance", {
-          body: Buffer.from(JSON.stringify(result.receipt, null, 2)),
+          path: receiptPath,
           contentType: "application/json",
         });
-        if (result.error) throw result.error;
-        expect(result.receipt.status, result.receipt.reason).toBe("PASS");
-      } finally {
         proof.dispose();
       }
+      expect(receipt.status, receipt.reason).toBe("PASS");
     });
   }
 });

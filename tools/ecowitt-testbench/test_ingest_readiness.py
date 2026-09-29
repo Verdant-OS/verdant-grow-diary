@@ -12,16 +12,6 @@ from pathlib import Path
 from unittest import mock
 
 import ecowitt_listener
-from ecowitt_listener import (
-    ECOWITT_LIVE_FRESHNESS,
-    FIELD_MAP,
-    _redact_raw_payload_for_forward,
-    app,
-    is_stuck_zero_or_hundred_pct,
-    metrics_force_invalid_source,
-    normalize_metrics,
-    resolve_source,
-)
 
 FIXED_NOW = datetime(2026, 6, 17, 5, 45, 30, tzinfo=timezone.utc)
 
@@ -44,22 +34,22 @@ MULTI_CHANNEL_DEMO = {
 
 class FieldMapIngestReadinessTests(unittest.TestCase):
     def test_existing_field_map_names_preserved(self):
-        self.assertEqual(FIELD_MAP["temp_f"][:3], ("temp1f", "tempf", "tempinf"))
+        self.assertEqual(ecowitt_listener.FIELD_MAP["temp_f"][:3], ("temp1f", "tempf", "tempinf"))
         self.assertEqual(
-            FIELD_MAP["humidity_percent"][:3],
+            ecowitt_listener.FIELD_MAP["humidity_percent"][:3],
             ("humidity1", "humidity", "humidityin"),
         )
-        self.assertEqual(FIELD_MAP["soil_moisture_pct"][:2], ("soilmoisture1", "soilmoisture2"))
-        self.assertIn("temp1f", FIELD_MAP["temp_f"])
-        self.assertIn("tempinf", FIELD_MAP["temp_f"])
-        self.assertIn("humidity1", FIELD_MAP["humidity_percent"])
-        self.assertIn("humidityin", FIELD_MAP["humidity_percent"])
-        self.assertIn("soilmoisture1", FIELD_MAP["soil_moisture_pct"])
-        self.assertIn("soilmoisture2", FIELD_MAP["soil_moisture_pct"])
-        self.assertIn("co2", FIELD_MAP["co2_ppm"])
-        self.assertIn("co2in", FIELD_MAP["co2_ppm"])
-        self.assertNotIn("temp9f", FIELD_MAP["temp_f"])
-        self.assertNotIn("humidity9", FIELD_MAP["humidity_percent"])
+        self.assertEqual(ecowitt_listener.FIELD_MAP["soil_moisture_pct"][:2], ("soilmoisture1", "soilmoisture2"))
+        self.assertIn("temp1f", ecowitt_listener.FIELD_MAP["temp_f"])
+        self.assertIn("tempinf", ecowitt_listener.FIELD_MAP["temp_f"])
+        self.assertIn("humidity1", ecowitt_listener.FIELD_MAP["humidity_percent"])
+        self.assertIn("humidityin", ecowitt_listener.FIELD_MAP["humidity_percent"])
+        self.assertIn("soilmoisture1", ecowitt_listener.FIELD_MAP["soil_moisture_pct"])
+        self.assertIn("soilmoisture2", ecowitt_listener.FIELD_MAP["soil_moisture_pct"])
+        self.assertIn("co2", ecowitt_listener.FIELD_MAP["co2_ppm"])
+        self.assertIn("co2in", ecowitt_listener.FIELD_MAP["co2_ppm"])
+        self.assertNotIn("temp9f", ecowitt_listener.FIELD_MAP["temp_f"])
+        self.assertNotIn("humidity9", ecowitt_listener.FIELD_MAP["humidity_percent"])
 
     def test_unconfigured_channels_stay_raw_only(self):
         self.assertNotIn("temp2f", FIELD_MAP["temp_f"])

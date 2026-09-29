@@ -7,12 +7,17 @@ on:
     branches: [verdant-grow-diary]
   pull_request:
     branches: [verdant-grow-diary]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 # Read-only workflow: no secrets used, no artifacts uploaded that could
 # contain tokens. See scripts/check-dependency-security.mjs for the
 # redaction contract on any surfaced audit text.
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   security:

@@ -8,6 +8,7 @@ on:
       - "e2e/lib/coreLinkFormCensus.ts"
       - "playwright.config.ts"
       - ".github/workflows/core-link-form-census.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - verdant-grow-diary
@@ -25,8 +26,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: core-link-form-census-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   focused-rules:

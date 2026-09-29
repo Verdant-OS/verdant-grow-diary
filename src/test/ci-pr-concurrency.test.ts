@@ -85,4 +85,21 @@ describe("resolved PR workflow concurrency", () => {
     );
     expect(Object.hasOwn(ci.on, "merge_group")).toBe(true);
   });
+
+  it("reports every context pinned in the deploy ruleset", () => {
+    const { required } = JSON.parse(
+      readFileSync(resolve(__dirname, "../../config/required-status-checks.json"), "utf8"),
+    ) as { required: string[] };
+    const ci = readWorkflow("ci.yml");
+    const reported = Object.values(ci.jobs).flatMap((job) =>
+      job.strategy?.matrix?.shard
+        ? job.strategy.matrix.shard.map((shard) =>
+            job.name?.replace("${{ matrix.shard }}", String(shard)),
+          )
+        : [job.name],
+    );
+    expect(required).toHaveLength(35);
+    expect(reported).toHaveLength(35);
+    expect([...reported].sort()).toEqual([...required].sort());
+  });
 });

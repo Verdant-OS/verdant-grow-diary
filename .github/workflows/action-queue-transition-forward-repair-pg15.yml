@@ -32,6 +32,7 @@ on:
       - "src/test/solo-founder-production-authorization.test.ts"
       - "src/test/apply-action-queue-transition-forward-repair.test.ts"
       - "src/test/verify-action-queue-transition-forward-repair-preflight-artifact.test.ts"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - verdant-grow-diary

@@ -8,7 +8,7 @@ type Workflow = {
   concurrency?: { group: string; "cancel-in-progress": boolean | string };
   jobs: Record<
     string,
-    { name?: string; if?: string; strategy?: { matrix?: { shard?: number[] } } }
+    { name?: string; if?: string; strategy?: { matrix?: { shard?: number[]; batch?: number[] } } }
   >;
 };
 
@@ -47,6 +47,26 @@ describe("resolved PR workflow concurrency", () => {
       group: prGroup,
       "cancel-in-progress": cancelSupersededPr,
     });
+  });
+
+  it("starts every PR workflow when a draft is marked ready for review", () => {
+    expect(
+      prWorkflows
+        .filter(({ workflow }) => !workflow.on.pull_request?.types?.includes("ready_for_review"))
+        .map(({ name }) => name),
+    ).toEqual([]);
+  });
+
+  it("skips only the duplicate 16-batch suite on draft PRs", () => {
+    const fullSuite = readWorkflow("vitest-full-suite-pr-gate.yml");
+    expect(fullSuite.jobs["full-suite"].if).toBe(
+      "${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}",
+    );
+    expect(fullSuite.jobs["full-suite"].strategy?.matrix?.batch).toEqual(
+      Array.from({ length: 16 }, (_, index) => index),
+    );
+    expect(Object.hasOwn(fullSuite.on, "merge_group")).toBe(true);
+    expect(Object.hasOwn(fullSuite.on, "push")).toBe(true);
   });
 
   it("preserves all required CI contexts and their draft execution", () => {

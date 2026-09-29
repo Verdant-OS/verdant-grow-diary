@@ -23,6 +23,7 @@ on:
       - "src/test/solo-founder-production-authorization.test.ts"
       - "src/test/production-supabase-tls.test.ts"
       - "src/test/signup-acquisition-forward-repair-pg15-harness.test.ts"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - verdant-grow-diary

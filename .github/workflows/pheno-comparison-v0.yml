@@ -30,6 +30,7 @@ on:
       - "vitest.config.ts"
       - "playwright.config.ts"
       - "package.json"
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read

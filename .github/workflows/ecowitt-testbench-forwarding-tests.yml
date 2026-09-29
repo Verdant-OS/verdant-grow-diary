@@ -14,6 +14,7 @@ on:
       - "docs/ecowitt-windows-testbench.md"
       - "src/test/ecowitt-windows-testbench-static-safety.test.ts"
       - ".github/workflows/ecowitt-testbench-forwarding-tests.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 concurrency:

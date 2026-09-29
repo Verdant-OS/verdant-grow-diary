@@ -8,6 +8,7 @@ on:
       - "scripts/run-user-roles-client-grant-hardening-pg15-harness.mjs"
       - "src/test/user-roles-client-grant-hardening-migration.test.ts"
       - ".github/workflows/user-roles-client-grant-hardening-pg15.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - verdant-grow-diary

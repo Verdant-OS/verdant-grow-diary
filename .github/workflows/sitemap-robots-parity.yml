@@ -7,6 +7,7 @@ on:
       - "public/robots.txt"
       - "scripts/check-sitemap-robots-parity.mjs"
       - ".github/workflows/sitemap-robots-parity.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main, verdant-grow-diary]
     paths:

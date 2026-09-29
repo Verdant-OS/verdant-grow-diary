@@ -21,6 +21,7 @@ on:
       - "supabase/migrations/**"
       - "scripts/verify-published-migration-integrity.mjs"
       - ".github/workflows/published-migration-integrity.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read

@@ -7,6 +7,7 @@ on:
     branches: [verdant-grow-diary]
   pull_request:
     branches: [verdant-grow-diary]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 # Read-only workflow: no secrets used, no artifacts uploaded that could
 # contain tokens. See scripts/check-dependency-security.mjs for the

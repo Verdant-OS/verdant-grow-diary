@@ -25,6 +25,7 @@ on:
       - "src/test/production-supabase-tls.test.ts"
       - "src/test/solo-founder-production-authorization.test.ts"
       - "docs/quicklog-revision-idempotent-replay-operator-runbook.md"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - verdant-grow-diary

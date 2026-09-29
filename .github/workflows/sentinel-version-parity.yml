@@ -15,6 +15,7 @@ on:
       - "scripts/check-sentinel-version-parity.mjs"
       - "scripts/check-sentinel-version-parity.test.mjs"
       - ".github/workflows/sentinel-version-parity.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - main

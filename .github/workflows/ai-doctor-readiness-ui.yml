@@ -5,6 +5,7 @@ name: AI Doctor Readiness UI
 on:
   pull_request:
     branches: [main, verdant-grow-diary]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read

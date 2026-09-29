@@ -27,6 +27,7 @@ on:
     #   2. Keeps this workflow as a stable required check for branch
     #      protection: it always runs and reports a status, but the
     #      expensive jobs no-op when no irrigation surface changed.
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
       dry_run:

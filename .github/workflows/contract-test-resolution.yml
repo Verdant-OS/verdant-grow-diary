@@ -15,6 +15,7 @@ on:
       - "vitest.config.ts"
       - "scripts/check-contract-test-resolution.mjs"
       - ".github/workflows/contract-test-resolution.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - main

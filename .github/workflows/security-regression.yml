@@ -6,6 +6,7 @@ name: Security regression
 on:
   pull_request:
     branches: [main, verdant-grow-diary]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main, verdant-grow-diary]
   merge_group:

@@ -14,6 +14,7 @@ on:
       - "e2e/lib/phenoDisabledCompareHelpers.ts"
       - "scripts/e2e/run-pheno-disabled-compare-e2e.mjs"
       - ".github/workflows/pheno-disabled-compare-e2e.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read

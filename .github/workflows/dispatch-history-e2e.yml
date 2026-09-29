@@ -40,6 +40,7 @@ on:
       - "package.json"
       - "bun.lock"
       - "bun.lockb"
+    types: [opened, synchronize, reopened, ready_for_review]
   # Push paths mirror the pull_request allowlist exactly, so a direct push
   # or admin-bypassed merge touching any covered dependency still runs the
   # post-merge gate.

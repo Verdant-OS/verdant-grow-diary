@@ -11,6 +11,7 @@ on:
       - "scripts/**ecowitt**"
       - "package.json"
       - "bun.lockb"
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 concurrency:

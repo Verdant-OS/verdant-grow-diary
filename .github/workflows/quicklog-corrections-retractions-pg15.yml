@@ -22,6 +22,7 @@ on:
       - "scripts/required-core-migrations.mjs"
       - "src/test/required-core-migrations-gate.test.ts"
       - "src/test/production-supabase-tls.test.ts"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - verdant-grow-diary

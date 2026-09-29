@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
 import { MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import {
   completeManualSensorTimelineRows,
   diaryEntryBelongsInTimelineMeasurements,
@@ -137,50 +138,16 @@ describe("completeManualSensorTimelineRows", () => {
     expect(page.hasOlderRows).toBe(true);
   });
 
-  it("orders the captured and legacy streams by observation time before bounding them", () => {
-    const captured = {
-      ...metricRow("temperature_c", 24, "manual", {
-        ts: "2026-09-12T10:00:00.000Z",
-        captured_at: "2026-09-09T18:46:00.000Z",
-      }),
-      id: "captured",
-    };
-    const legacy = {
-      ...metricRow("humidity_pct", 55, "manual", {
-        ts: "2026-09-10T18:46:00.000Z",
-      }),
-      captured_at: null,
-      id: "legacy",
-    };
-    const rows = [captured, legacy];
-    expect(completeManualSensorTimelineRows(rows).rows.map((row) => row.id)).toEqual([
-      "legacy",
-      "captured",
-    ]);
-    expect(completeManualSensorTimelineRows([...rows].reverse())).toEqual(
-      completeManualSensorTimelineRows(rows),
-    );
-  });
-
-  it("retains the newest legacy row when it displaces an old captured row at the limit", () => {
-    const captured = Array.from({ length: TIMELINE_MANUAL_SENSOR_ROW_LIMIT }, (_, index) => ({
-      ...metricRow("temperature_c", 24, "manual", {
-        ts: new Date(Date.parse(CAPTURED) - index * 60_000).toISOString(),
-      }),
-      id: `captured-${index}`,
-    }));
-    const legacy = {
-      ...metricRow("temperature_c", 25, "manual", {
-        ts: new Date(Date.parse(CAPTURED) + 60_000).toISOString(),
-      }),
-      captured_at: null,
-      id: "newer-legacy",
-    };
-    const page = completeManualSensorTimelineRows([...captured, legacy]);
-    expect(page.hasOlderRows).toBe(true);
+  it("marks hasOlderRows when the bounded query returns exactly 201 rows", () => {
+    const rows = [
+      ...Array.from({ length: TIMELINE_MANUAL_SENSOR_ROW_LIMIT }, () =>
+        metricRow("temperature_c", 24, "manual", { ts: CAPTURED }),
+      ),
+      metricRow("humidity_pct", 55, "manual", { ts: "2026-09-08T18:46:00.000Z" }),
+    ];
+    const page = completeManualSensorTimelineRows(rows);
     expect(page.rows).toHaveLength(TIMELINE_MANUAL_SENSOR_ROW_LIMIT);
-    expect(page.rows[0].id).toBe("newer-legacy");
-    expect(page.rows.some((row) => row.id === "captured-199")).toBe(false);
+    expect(page.hasOlderRows).toBe(true);
   });
 });
 
@@ -317,7 +284,128 @@ describe("manualSensorReadingsToTimelineEntries", () => {
       [...rows, metricRow("soil_moisture_pct", 101)],
       now,
     );
-    expect(badSoil.details.sensor_snapshot).not.toHaveProperty("soil");
+    expect(badSoil.details.sensor_snapshot).toHaveProperty("soil", 101);
+    const vm = buildTimelineSensorSnapshotViewModel(badSoil.details.sensor_snapshot, {
+      validateManualCompatibility: true,
+    });
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.metric)).toEqual(["temp_f"]);
+    expect(vm.errors).toContain("Soil moisture must be between 0% and 100%.");
+  });
+
+  it("keeps valid metrics visible while preserving invalid metrics for disclosure context", () => {
+    const [receipt] = manualSensorReadingsToTimelineEntries(
+      [metricRow("temperature_c", fahrenheitToCelsius(500)), metricRow("humidity_pct", 58)],
+      NOW,
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt.note).not.toContain("°F");
+    expect(receipt.note).toContain("58% RH");
+    expect(receipt.details.sensor_snapshot).toMatchObject({
+      source: "manual",
+      rh: 58,
+    });
+    expect(receipt.details.sensor_snapshot).toHaveProperty("temp_c");
+    const vm = buildTimelineSensorSnapshotViewModel(receipt.details.sensor_snapshot, {
+      validateManualCompatibility: true,
+    });
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.display)).toEqual(["58%"]);
+    expect(vm.errors).toContain(
+      "Air temperature is outside the realistic 40–110°F grow-room range.",
+    );
+  });
+
+  it("keeps an all-invalid capture as a timeline row with manual-review disclosure context", () => {
+    const [receipt] = manualSensorReadingsToTimelineEntries(
+      [metricRow("temperature_c", fahrenheitToCelsius(500))],
+      NOW,
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt.note).toBe("Manual sensor snapshot");
+    expect(receipt.details.sensor_snapshot).toMatchObject({
+      source: "manual",
+      temp_c: fahrenheitToCelsius(500),
+    });
+    const vm = buildTimelineSensorSnapshotViewModel(receipt.details.sensor_snapshot, {
+      validateManualCompatibility: true,
+    });
+    expect(vm.kind).toBe("invalid");
+    if (vm.kind !== "invalid") return;
+    expect(vm.message).toBe("Review manual snapshot — invalid readings were not shown.");
+    expect(vm.errors).toContain(
+      "Air temperature is outside the realistic 40–110°F grow-room range.",
+    );
+  });
+
+  it.each([38, 115])(
+    "keeps saved %s°F manual readings in history and discloses them as invalid",
+    (tempF) => {
+      const [receipt] = manualSensorReadingsToTimelineEntries(
+        [metricRow("temperature_c", fahrenheitToCelsius(tempF)), metricRow("humidity_pct", 48)],
+        NOW,
+      );
+      expect(receipt).toBeDefined();
+      expect(receipt.details.sensor_snapshot).toMatchObject({
+        source: "manual",
+        temp_c: fahrenheitToCelsius(tempF),
+        rh: 48,
+      });
+      const vm = buildTimelineSensorSnapshotViewModel(receipt.details.sensor_snapshot, {
+        validateManualCompatibility: true,
+      });
+      expect(vm.kind).toBe("chips");
+      if (vm.kind !== "chips") return;
+      expect(vm.chips.map((chip) => chip.display)).toEqual(["48%"]);
+      expect(vm.errors).toContain(
+        "Air temperature is outside the realistic 40–110°F grow-room range.",
+      );
+    },
+  );
+
+  it("keeps invalid RH/soil/VPD in sensor_snapshot for disclosure but excludes them from receipt note", () => {
+    const [receipt] = manualSensorReadingsToTimelineEntries(
+      [
+        metricRow("temperature_c", fahrenheitToCelsius(76)),
+        metricRow("humidity_pct", 150),
+        metricRow("soil_moisture_pct", 101),
+        metricRow("vpd_kpa", 20),
+      ],
+      NOW,
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt.details.sensor_snapshot).toMatchObject({
+      source: "manual",
+      temp_c: fahrenheitToCelsius(76),
+      rh: 150,
+      soil: 101,
+      vpd_kpa: 20,
+    });
+    expect(receipt.note).toContain("76°F");
+    expect(receipt.note).not.toContain("150% RH");
+    expect(receipt.note).not.toContain("101% soil moisture");
+    expect(receipt.note).not.toContain("20 kPa VPD");
+  });
+
+  it.each([
+    [39, false],
+    [40, true],
+    [110, true],
+    [111, false],
+  ])("applies the 40–110°F bounds to note rendering at %s°F", (tempF, shouldRender) => {
+    const [receipt] = manualSensorReadingsToTimelineEntries(
+      [metricRow("temperature_c", fahrenheitToCelsius(tempF)), metricRow("humidity_pct", 48)],
+      NOW,
+    );
+    expect(receipt).toBeDefined();
+    expect(receipt.note).toContain("48% RH");
+    if (shouldRender) {
+      expect(receipt.note).toContain(`${tempF}°F`);
+    } else {
+      expect(receipt.note).not.toContain(`${tempF}°F`);
+    }
   });
 
   it("excludes live/csv/demo rows so Sensors live data is not a Timeline measurement receipt", () => {

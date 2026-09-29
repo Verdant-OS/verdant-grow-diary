@@ -125,7 +125,7 @@ describe("imported CSV history response honesty", () => {
     expect(screen.getByTestId("imported-history-not-live-badge")).toHaveTextContent(
       "Not live data",
     );
-    expect(screen.getByRole("cell", { name: "24.5" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "24.5 °C" })).toBeInTheDocument();
     expect(screen.queryByTestId("imported-history-error")).not.toBeInTheDocument();
     expect(screen.queryByTestId("imported-history-empty")).not.toBeInTheDocument();
   });

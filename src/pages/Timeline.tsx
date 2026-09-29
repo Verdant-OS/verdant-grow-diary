@@ -176,7 +176,11 @@ import {
 import TimelineEvidenceDetailPreview from "@/components/TimelineEvidenceDetailPreview";
 import TimelineSnapshotClock from "@/components/TimelineSnapshotClock";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
-import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
+import {
+  buildTimelineSensorSnapshotViewModel,
+  resolveTimelineCardSensorResolution,
+  resolveTimelineCardVpdStageValue,
+} from "@/lib/timelineSensorSnapshotViewModel";
 import {
   classifyTimelineSensorSource,
   type TimelineSensorSourceKind,
@@ -2461,11 +2465,10 @@ export default function Timeline() {
                           // Canonical snapshots win, followed by the legacy
                           // `sensor` shape and Plant Quick Log's compatibility
                           // envelope. No persisted row is rewritten.
-                          const canonicalSensor = e.details?.sensor_snapshot;
-                          const legacySensor = e.details?.sensor;
-                          const manualCompatSensor = e.details?.manual_sensor_snapshot;
-                          const sensor = (canonicalSensor ?? legacySensor ?? manualCompatSensor) as
-                            Record<string, unknown> | undefined;
+                          const { sensor, useManualValidation } =
+                            resolveTimelineCardSensorResolution(
+                              (e.details as Record<string, unknown> | null | undefined) ?? null,
+                            );
                           const rawSource =
                             typeof sensor?.source === "string" && sensor.source.trim().length > 0
                               ? sensor.source
@@ -2487,10 +2490,6 @@ export default function Timeline() {
                           const rawCapturedAt = sensor?.ts ?? sensor?.captured_at;
                           const snapshotCapturedAt =
                             typeof rawCapturedAt === "string" ? rawCapturedAt.trim() : "";
-                          const usesManualCompatSensor =
-                            canonicalSensor == null &&
-                            legacySensor == null &&
-                            manualCompatSensor != null;
                           const remindAt = e.details?.remind_at as string | undefined;
                           const eventTypeValue = effectiveCareType;
                           // Learning-loop rows (follow-up / outcome / decision) carry join
@@ -2725,10 +2724,12 @@ export default function Timeline() {
                                   }
                                 >
                                   {(nowMs) => {
-                                    const sensorViewModel = usesManualCompatSensor
+                                    const sensorViewModel = useManualValidation
                                       ? buildTimelineSensorSnapshotViewModel(sensor, {
                                           preferUnit: "F",
                                           validateManualCompatibility: true,
+                                          // Retain the existing persisted generic-temp Celsius convention.
+                                          genericTempUnit: "C",
                                         })
                                       : null;
                                     const legacyDisplaySensor = sensor as {
@@ -2746,15 +2747,6 @@ export default function Timeline() {
                                       : Number.POSITIVE_INFINITY;
                                     const snapStale =
                                       !Number.isFinite(snapAgeMs) || snapAgeMs > snapshotStaleMs;
-                                    const rawVpd =
-                                      typeof sensor.vpd === "number" && Number.isFinite(sensor.vpd)
-                                        ? sensor.vpd
-                                        : null;
-                                    const vpdClassification = classifyVpdAgainstStage({
-                                      value: rawVpd,
-                                      stage: resolveTimelineDiaryEntryStage(e),
-                                      stale: snapStale,
-                                    });
                                     const sourceBadge = classifyTimelineSensorSource({
                                       rawSource,
                                       capturedAt: snapTs ?? null,
@@ -2764,6 +2756,18 @@ export default function Timeline() {
                                       // intrinsically grower-entered.
                                       fallback: "manual",
                                       context: "persisted_snapshot",
+                                    });
+                                    const stageVpd = resolveTimelineCardVpdStageValue({
+                                      sensor,
+                                      useManualValidation,
+                                      sensorViewModel,
+                                      canAssessStage: sourceBadge.canAssessStage,
+                                      hasFutureTimestamp,
+                                    });
+                                    const vpdClassification = classifyVpdAgainstStage({
+                                      value: stageVpd,
+                                      stage: resolveTimelineDiaryEntryStage(e),
+                                      stale: snapStale,
                                     });
                                     const manualHistoryNotice = timelineManualSnapshotHistoryNotice(
                                       {
@@ -2839,26 +2843,25 @@ export default function Timeline() {
                                                           : chip.display}
                                             </SnapChip>
                                           ))}
-                                        {!usesManualCompatSensor &&
+                                        {!useManualValidation &&
                                           legacyDisplaySensor.temp != null && (
                                             <SnapChip>
                                               {((legacyDisplaySensor.temp * 9) / 5 + 32).toFixed(1)}
                                               °F
                                             </SnapChip>
                                           )}
-                                        {!usesManualCompatSensor &&
-                                          legacyDisplaySensor.rh != null && (
-                                            <SnapChip>{legacyDisplaySensor.rh}% RH</SnapChip>
-                                          )}
-                                        {!usesManualCompatSensor &&
+                                        {!useManualValidation && legacyDisplaySensor.rh != null && (
+                                          <SnapChip>{legacyDisplaySensor.rh}% RH</SnapChip>
+                                        )}
+                                        {!useManualValidation &&
                                           legacyDisplaySensor.vpd != null && (
                                             <SnapChip>VPD {legacyDisplaySensor.vpd}</SnapChip>
                                           )}
-                                        {!usesManualCompatSensor &&
+                                        {!useManualValidation &&
                                           legacyDisplaySensor.co2 != null && (
                                             <SnapChip>CO₂ {legacyDisplaySensor.co2}</SnapChip>
                                           )}
-                                        {!usesManualCompatSensor &&
+                                        {!useManualValidation &&
                                           legacyDisplaySensor.soil != null && (
                                             <SnapChip>Soil {legacyDisplaySensor.soil}%</SnapChip>
                                           )}
@@ -2867,16 +2870,14 @@ export default function Timeline() {
                                             Future timestamp — freshness cannot be verified.
                                           </span>
                                         )}
-                                        {rawVpd != null &&
-                                          sourceBadge.canAssessStage &&
-                                          !hasFutureTimestamp && (
-                                            <span
-                                              className="text-[11px] text-muted-foreground"
-                                              data-testid="timeline-vpd-stage-hint"
-                                            >
-                                              {vpdClassification.label}
-                                            </span>
-                                          )}
+                                        {stageVpd != null && (
+                                          <span
+                                            className="text-[11px] text-muted-foreground"
+                                            data-testid="timeline-vpd-stage-hint"
+                                          >
+                                            {vpdClassification.label}
+                                          </span>
+                                        )}
                                       </div>
                                     );
                                   }}

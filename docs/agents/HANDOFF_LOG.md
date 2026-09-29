@@ -49,13 +49,13 @@ checkout: git fetch origin codex/chem-production-quicklog-fixture-001 verdant-gr
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1792
 head_sha: 34f8beae3334cceb6f914df904a6842c90005eb4, remote confirmed 2026-09-28 22:26 CT
 state: Pushed draft, 9 files (+1020/-46). Current related run: 7 files / 257 PASS / 0 FAIL / 0 SKIP, including 63 new cases, 67 existing docs-safety and 26 V0 cases. Project and targeted E2E typechecks: 0 diagnostics. Lint 9 files 0 errors/0 warnings; format 9 files, 3 docs-safety scanners, whitespace PASS. Playwright discovery lists 3 tests only; zero browser execution locally. Previous head 6ba962d2 hosted fixture check: 1 PASS / 1 FAIL / 0 SKIP, one automatic retry; checklist step skipped before notes could be written. Its guard rejected the existing legitimate tentId query and optional grow-name setting. New head binds query IDs to positively owned rows and derives an omitted grow name only from the verified owned grow; CI variables remain unchanged. Follow-up red proof: 2 FAIL / 0 PASS / 57 excluded; both regressions now PASS. Earlier baseline 2 FAIL / 0 PASS / 53 excluded and intermediate 223 PASS / 1 FAIL remain retained. No unique-test sum across repeats.
-next_action: Read exact-head CI and Blue Dream acceptance; inspect any runtime refusal without relaxing account, ownership, in-flight/empty-read or smoke-tag fences.
+next_action: Matthew identifies an active fixture in the approved account's own grow; keep production CI variables unchanged here. Then remeasure the fixture through the sanctioned smoke lane and obtain Blue Dream acceptance at the exact head. Do not auto-unarchive or relax the ownership fence.
 files: e2e/lib/productionQuickLogFixtureRules.ts; e2e/lib/productionQuickLogFixtureProof.ts; e2e/lib/fixtureSafety.ts (Quick Log entry and opt-in QA marker only); e2e/fixture-safety.spec.ts; e2e/quicklog-smoke.spec.ts; e2e/scripts/print-fixture-config-checklist.ts; src/test/production-quicklog-fixture.test.ts; src/test/quicklog-e2e-fixture-safety.test.ts; src/test/quicklog-e2e-bootstrap-safety.test.ts
-blockers: Current-head hosted fixture ownership, production smoke and Blue Dream acceptance remain NOT_MEASURED. Root fast-uri and nested undici audits failed on the previous head and require locked dependency files. Account hint must be absent or the approved email; configured plant/tent names and the verified grow name must carry the fixture marker. Auth, Pheno, workflow/variable/secret configuration, bootstrap and production database changes remain outside this repair.
-artifacts: PR #1792; Downloads CHEM-production-quicklog-context tests, red and eslint receipts plus the earlier fixture/live-identity receipts dated 2026-09-28. Observer issues no network request and reads no credentials; normal app getUser and complete row reads supply the proof. Previous QuickLog failed job: 109238860866; logs read before correction.
+blockers: Current head has all 35 required contexts SUCCESS at 03:33:31 UTC, but production fixture verification FAILS: 1 PASS / 1 FAIL / 0 SKIP / 0 flaky, one automatic retry, write-producing checklist skipped. Artifact 11010864748 shows the live page says Plant archived and preserves its history. This is a valid refusal of the configured archived fixture, not permission to bypass it. Blue Dream acceptance, active fixture ownership and production save/retrieve remain NOT_MEASURED. Root fast-uri (1239943/1239946) and nested undici (GHSA-3wwx-pv8p-q78v) audits also FAIL on this head and require locked dependency files. No auth, Pheno, workflow/variable/secret, bootstrap or production database changes.
+artifacts: PR #1792; Quick Log job 109241785410; Downloads CHEM-1792-fixture-failure-34f8beae.zip (artifact 11010864748, inspected) and CHEM-production-quicklog-context tests/red/eslint receipts. Observer issues no requests and reads no credentials. Previous failed job 109238860866 was read before correction; current root 109241785865 and nested 109241785446 logs also read.
 reviewer_seat: Blue Dream (P1 write-smoke fence); Codex is author, not independent acceptance reviewer
 claimed_by: Codex, 2026-09-28 22:02 CT
-last_updated: 2026-09-28 22:26 CT, by Codex
+last_updated: 2026-09-28 22:34 CT, by Codex
 ```
 
 ### CHEM-REQUIRED-AUDIT-PR-EVIDENCE-001
@@ -447,15 +447,15 @@ branch: codex/chem-production-only-docs-20260928
 base: verdant-grow-diary
 checkout: git fetch origin codex/chem-production-only-docs-20260928 verdant-grow-diary && git switch codex/chem-production-only-docs-20260928 && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1777
-head_sha: 7b7f73b487095bb03b8ecc655f08996c467935e9 (remote before the current base-following push)
-state: Same draft #1777 follows the landed source 95464496a4dcc802710c2c08e303ffee15182a7d with a normal merge. This log precedes its next exact head; read PR metadata after push. Sentinel stays 2026-09-28.3; all eight workflow comment deltas preserve parsed behavior. Historical CURRENT_STATE receipts remain unchanged.
-next_action: Validate and normal-push this existing draft. Land checker #1779 before this coverage amendment; fresh exact-head required CI is mandatory. GDP #1781 is already merged, not a competing open amendment.
+head_sha: b46e11a965209094491bb11ae1295ebfab5a2fab, remote confirmed 2026-09-28 22:28 CT before this marker/receipt checkpoint; read PR metadata for the resulting new head
+state: Existing draft #1777 normally follows source 61821446. Failed logs on b46e11a9 identified two documentation regressions: missing dormant marker and three historical npm consumer markers. Red local reproduction: 89 PASS / 2 FAIL / 0 SKIP in 2 files. Restored markers without changing workflow semantics or dependency policy: 91 PASS / 0 FAIL / 0 SKIP. This log precedes its next exact head; obtain CI on that new head. Sentinel stays 2026-09-28.3; eight workflow comment deltas preserve parsed behavior and historical CURRENT_STATE receipts remain unchanged.
+next_action: Normal-push this existing draft after scoped validation; land checker #1779 before the coverage amendment, then follow base and remeasure exact-head CI. No self-acceptance or readiness action.
 files: Existing #1777 paths plus docs/agents/OWNERSHIP.md and docs/agents/HANDOFF_LOG.md; no executable CI change.
-blockers: Checker #1779 new-head CI and review remain open; old-head results do not cover either new push. Historical CURRENT_STATE formatting failure predates this diff; preserve its receipt body.
+blockers: #1779 at d3511545 has 35 required SUCCESS, but independent acceptance/integration remains open. Deployed checker rejects the candidate acknowledgement grammar until that dependency lands. Current-head hosted CI after this checkpoint NOT_MEASURED. Historical CURRENT_STATE formatting FAIL predates this diff; prefix formatting and historical-body integrity PASS. Production smoke and locked dependency failures remain separate items.
 artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1777; https://github.com/Verdant-OS/verdant-grow-diary/pull/1767. Founder amendment is included in AGENTS.md; shared /workspace paths are not required to resume.
 reviewer_seat: Critical Mass
 claimed_by: Codex, 2026-09-28 18:46 CT
-last_updated: 2026-09-28 21:22 CT, by Codex
+last_updated: 2026-09-28 22:34 CT, by Codex
 ```
 
 ### CHEM-1696-RECEIPT-RESTAMP

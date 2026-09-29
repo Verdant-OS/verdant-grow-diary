@@ -1,6 +1,6 @@
 name: Gamification staging smoke
 
-# Legacy dormant main-only (#581) setup; not production acceptance.
+# dormant: Legacy main-only (#581) setup; not production acceptance.
 # Hosted verification is verdantgrowdiary.com. Do not repoint privileged setup;
 # fixture safety/effective gating require a separate reviewed CI slice.
 # Jobs, triggers and credential bindings are unchanged by this comment.

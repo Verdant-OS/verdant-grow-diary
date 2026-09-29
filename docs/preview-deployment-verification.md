@@ -9,6 +9,20 @@ Prior Vite/Vercel project settings were historical configuration, not today's
 verified publisher. Measure the deployed identity before claiming platform or
 release status. Build artifacts and preview URLs cannot establish live acceptance.
 
+## Historical npm compatibility record
+
+The existing `config/dependency-lockfile-transition.json` retains these exact
+markers until its reviewed consumer inventory changes. They record historical
+dashboard settings, not verified production configuration or instructions to
+use another smoke host. Bun remains canonical; this documentation slice does
+not alter the dependency transition policy.
+
+```text
+| Install command      | `npm install`  |
+| Build command        | `npm run build`|
+| Dev command          | `npm run dev`  |
+```
+
 ## Live checks
 
 - Confirm frontend identity and dirty flag at the measurement time.

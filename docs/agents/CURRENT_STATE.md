@@ -1,5 +1,27 @@
+> Ownership and the connector spec: see [docs/agents/OWNERSHIP.md](OWNERSHIP.md). It wins on conflicts.
+
 # Verdant — Current Operating State
 
+**Current integration note — 2026-09-28 20:27 America/Chicago.**
+
+- **PASS — source integration:** this existing #1696 draft was updated with a
+  merge from deploy base `0755bfcc0d7ee9d4c88ee716384c28b9beb51cce`, after
+  #1767 and #1781 merged. The PR's own change remains this document only.
+- **PASS — current ownership source:** `docs/agents/OWNERSHIP.md` governs current
+  assignments. This document is a shared operational record, not an exclusive
+  Claude or Codex edit grant. Codex owns this restamp; Critical Mass is the
+  independent acceptance seat for this documentation slice. Claude's original
+  dated observations and reviewer identities remain recorded below.
+- **NOT_MEASURED — release acceptance:** fresh hosted CI and independent acceptance
+  of the resulting head remain separate gates. This source update makes no new
+  production, schema, Edge deployment, credit, or payment acceptance claim.
+- **PASS — history retained:** the dated receipts below are preserved. Their
+  board counts, live samples, ownership observations, and statements about a
+  sole open writer describe their observation dates; they do not establish
+  today's ownership or open-PR inventory. #1777 also edits this file's prefix;
+  integrate those prefixes serially rather than dropping either receipt.
+
+## Historical repository receipt — 2026-09-28 21:11–21:12 UTC
 **Last updated:** 2026-09-28 UTC; repository tip and open-PR inventory re-read at
 21:11–21:12 UTC. This stamp's own SHA and time are its Git commit, not a prediction.
 

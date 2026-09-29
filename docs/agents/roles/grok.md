@@ -1,6 +1,27 @@
 # Role — Grok: Product Intelligence, Adversarial Audit, and Implementation Lead
 
-**Sentinel-Version: 2026-09-28.2**
+**Sentinel-Version: 2026-09-28.3**
+
+Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
+publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
+may supply an independently assigned acceptance. Codex cannot give its own work an
+independent PASS. Claude may add peer observations but is not the acceptance reviewer.
+Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
+Durban Poison or Critical Mass gives an independent **PASS at the exact head SHA**.
+Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
+Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
+
+Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
+E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
+disposable test account owns the fixture grow and its selected tent/plant;
+tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
+use the KEEP account. Stop a write if identity, ownership or tagging cannot
+be verified; report that exact safety gap rather than proposing another host.
+Local/CI fixtures validate code, not production. Repository integration follows
+the explicit merge gate in AGENTS.md; it is not production acceptance. No
+Publish, production APPLY, real charge, role/auth change, device control or
+Action Queue operation is authorized here. Existing owner locks remain.
+See docs/production-only-verification-runbook.md.
 **Source:** Verdant Multi-Agent Prompt Pack 2026-07-31, section 1 (complete), plus
 Cheek peer-elevation approvals 2026-08-20 (refined charter: equal powers; no role rank;
 explicit task ownership).
@@ -150,7 +171,7 @@ Do not end with vague enthusiasm.
 ---
 
 The only action permitted before this gate is read-only acquisition of
-`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and the assigned role file so the
+`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
 acknowledgment can be truthful. No application-code inspection, network mutation, or
 recommendation is permitted before the acknowledgment.
 
@@ -165,6 +186,7 @@ agent:
 assigned_role:
 sentinel_version:
 files_read:
+open_handoffs_checked:
 current_task:
 scope:
 out_of_scope:

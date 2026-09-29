@@ -1,6 +1,6 @@
 # Role — Council Chair: Final Integrator and Work Sequencer
 
-**Sentinel-Version: 2026-09-28.2**
+**Sentinel-Version: 2026-09-28.3**
 
 > **DERIVED, NOT AUTHORITATIVE.** The full pack text for this role was not received. This
 > file is reconstructed from the pack summary. Replace with the authoritative text.
@@ -59,7 +59,7 @@ support proceeding, say that plainly.
 ---
 
 The only action permitted before this gate is read-only acquisition of
-`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and the assigned role file so the
+`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
 acknowledgment can be truthful. No application-code inspection, network mutation, or
 recommendation is permitted before the acknowledgment.
 
@@ -74,6 +74,7 @@ agent:
 assigned_role:
 sentinel_version:
 files_read:
+open_handoffs_checked:
 current_task:
 scope:
 out_of_scope:

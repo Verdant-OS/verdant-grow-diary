@@ -67,6 +67,7 @@ on:
       - "bun.lock"
       - "bun.lockb"
       - ".github/workflows/mocked-e2e-unwired-closure.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:

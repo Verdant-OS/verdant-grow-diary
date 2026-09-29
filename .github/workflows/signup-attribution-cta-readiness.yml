@@ -22,6 +22,7 @@ on:
       - "src/test/auth-error-sanitization.test.ts"
       - "src/test/auth-signup-acquisition-handoff.test.tsx"
       - ".github/workflows/signup-attribution-cta-readiness.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [verdant-grow-diary]
     paths:
@@ -46,6 +47,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   static-cta-readiness:

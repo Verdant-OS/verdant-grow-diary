@@ -98,7 +98,15 @@ test.describe("signed-in route performance evidence", () => {
         mkdirSync(dirname(receiptPath), { recursive: true });
         writeFileSync(
           receiptPath,
-          JSON.stringify({ ...receipt, blockedWrites: proof.blockedWrites() }, null, 2),
+          JSON.stringify(
+            {
+              ...receipt,
+              blockedWrites: proof.blockedWrites(),
+              blockedRequests: proof.blockedRequests(),
+            },
+            null,
+            2,
+          ),
         );
         await testInfo.attach(target.operation + "-performance", {
           path: receiptPath,

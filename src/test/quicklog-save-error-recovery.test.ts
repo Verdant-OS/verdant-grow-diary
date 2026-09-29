@@ -11,19 +11,96 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  buildReceiptTargetMovedMessage,
   classifyQuickLogThrownSaveError,
+  canDiscardQuickLogHistoryDraft,
   describeQuickLogSaveFailure,
+  quickLogDraftPreservedFailureMessage,
   quickLogReasonToOperatorMessage,
+  quickLogSaveRequiresHistoryCheck,
   quickLogSaveRecoveryAction,
 } from "@/lib/quickLogSaveErrorMessage";
 
 const GENERIC_MESSAGE = quickLogReasonToOperatorMessage("some_unknown_reason_code");
 const GENERIC_RECOVERY = quickLogSaveRecoveryAction("some_unknown_reason_code");
 
+describe("saved target mismatch copy", () => {
+  const scope = Object.freeze({
+    persistedGrowId: "grow-saved",
+    persistedTentId: "tent-saved",
+    persistedPlantId: "plant-saved",
+  });
+  const lookup = Object.freeze({
+    grows: Object.freeze([{ id: "grow-saved", name: " Saved Grow " }]),
+    tents: Object.freeze([{ id: "tent-saved", name: "Saved Tent" }]),
+    plants: Object.freeze([{ id: "plant-saved", name: "Saved Plant" }]),
+  });
+  const generic =
+    "The saved entry target differs from this submission. It has not been confirmed; check its Timeline before making another entry.";
+
+  it("names only the persisted scope and trims its matching names", () => {
+    expect(buildReceiptTargetMovedMessage(scope, lookup)).toBe(
+      "The saved entry target differs from this submission. Saved target: Grow: Saved Grow · Tent: Saved Tent · Plant: Saved Plant. It has not been confirmed; check its Timeline before making another entry.",
+    );
+  });
+
+  it("uses neutral labels when a saved ID is absent from the current lookup", () => {
+    const message = buildReceiptTargetMovedMessage(scope, {
+      grows: [{ id: "grow-draft", name: "Draft grow" }],
+      tents: [{ id: "tent-draft", name: "Draft tent" }],
+      plants: [{ id: "plant-draft", name: "Draft plant" }],
+    });
+    expect(message).toContain(
+      "Saved target: Grow: Saved grow · Tent: Saved tent · Plant: Saved plant.",
+    );
+    expect(message).not.toMatch(/Draft|grow-saved|tent-saved|plant-saved/);
+  });
+
+  it.each([null, undefined])("handles a missing receipt (%s)", (receipt) => {
+    expect(buildReceiptTargetMovedMessage(receipt, lookup)).toBe(generic);
+  });
+
+  it.each([null, undefined])("handles a missing lookup (%s)", (names) => {
+    expect(buildReceiptTargetMovedMessage(scope, names)).toContain(
+      "Saved target: Grow: Saved grow · Tent: Saved tent · Plant: Saved plant.",
+    );
+  });
+
+  it("handles missing lists, sparse records and blank names without using unrelated names", () => {
+    expect(
+      buildReceiptTargetMovedMessage(scope, {
+        grows: null,
+        plants: [null, undefined, { id: "plant-saved", name: " " }],
+      }),
+    ).toContain("Saved target: Grow: Saved grow · Tent: Saved tent · Plant: Saved plant.");
+  });
+
+  it("omits null, undefined and blank scope IDs even when names are available", () => {
+    expect(
+      buildReceiptTargetMovedMessage(
+        { persistedGrowId: null, persistedTentId: undefined, persistedPlantId: " " },
+        lookup,
+      ),
+    ).toBe(generic);
+  });
+
+  it("returns the same result for frozen inputs without changing them", () => {
+    const before = JSON.stringify({ scope, lookup });
+    expect(buildReceiptTargetMovedMessage(scope, lookup)).toBe(
+      buildReceiptTargetMovedMessage(scope, lookup),
+    );
+    expect(JSON.stringify({ scope, lookup })).toBe(before);
+  });
+});
+
 /** Every soft-failure reason the deployed wrapper + delegate can return. */
 const SERVER_REASONS = [
   "not_authenticated",
   "invalid_idempotency_key",
+  "idempotency_key_unverified",
+  "idempotency_receipt_missing",
+  "idempotency_key_retracted",
+  "idempotency_key_conflict",
   "invalid_target_type",
   "missing_target_id",
   "unsupported_action",
@@ -32,6 +109,7 @@ const SERVER_REASONS = [
   "invalid_logged_at",
   "target_not_owned",
   "grow_not_owned",
+  "plant_tent_grow_mismatch",
   "save_failed",
 ] as const;
 
@@ -92,8 +170,38 @@ describe("quickLogSaveRecoveryAction — every failure states what to do next", 
     }
   });
 
+  it("explains a plant/tent grow mismatch and how to correct the assignment", () => {
+    const message = quickLogReasonToOperatorMessage("plant_tent_grow_mismatch");
+    const recovery = quickLogSaveRecoveryAction("plant_tent_grow_mismatch");
+    expect(message).not.toBe(GENERIC_MESSAGE);
+    expect(message).toMatch(/plant.*tent.*another grow/i);
+    expect(message).toMatch(/not saved/i);
+    expect(recovery).not.toBe(GENERIC_RECOVERY);
+    expect(recovery).toMatch(/correct the assignment.*retry/i);
+  });
+
   it("network failures reassure that input is kept", () => {
     expect(quickLogSaveRecoveryAction("network_error")).toMatch(/input stays/i);
+  });
+
+  it("requires a Timeline check for replay refusals instead of promising another retry", () => {
+    for (const reason of [
+      "idempotency_key_unverified",
+      "idempotency_receipt_missing",
+      "idempotency_key_retracted",
+      "idempotency_key_conflict",
+    ]) {
+      expect(quickLogSaveRequiresHistoryCheck(reason)).toBe(true);
+      const guidance = describeQuickLogSaveFailure(reason);
+      expect(guidance.message).toMatch(/Timeline/i);
+      expect(guidance.recovery).toMatch(/Timeline/i);
+      expect(guidance.recovery).not.toMatch(/retry|try again/i);
+      expect(quickLogDraftPreservedFailureMessage(reason)).toMatch(/Timeline/i);
+      expect(quickLogDraftPreservedFailureMessage(reason)).not.toMatch(/retry|try again/i);
+    }
+    expect(quickLogSaveRequiresHistoryCheck("network_error")).toBe(false);
+    expect(quickLogSaveRequiresHistoryCheck(null)).toBe(false);
+    expect(quickLogDraftPreservedFailureMessage("network_error")).toMatch(/retry/i);
   });
 
   it("describeQuickLogSaveFailure composes the same message and recovery", () => {

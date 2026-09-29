@@ -24,6 +24,7 @@ export type QuickLogSaveReason =
   | "photo_saving_not_enabled"
   | "target_not_owned"
   | "grow_not_owned"
+  | "plant_tent_grow_mismatch"
   | "not_authenticated"
   | "save_failed"
   | "invalid_logged_at"
@@ -32,11 +33,77 @@ export type QuickLogSaveReason =
   | "missing_target_id"
   | "unsupported_action"
   | "invalid_idempotency_key"
+  | "idempotency_key_unverified"
+  | "idempotency_receipt_missing"
+  | "idempotency_key_retracted"
+  | "idempotency_key_conflict"
   | "invalid_uuid_input"
   | "rpc_unavailable"
   | "not_authorized"
   | "network_error"
   | (string & {});
+
+export type QuickLogHistoryCheckReason =
+  | "idempotency_key_unverified"
+  | "idempotency_receipt_missing"
+  | "idempotency_key_retracted"
+  | "idempotency_key_conflict";
+
+const REPLAY_HISTORY_CHECK_REASONS = new Set<string>([
+  "idempotency_key_unverified",
+  "idempotency_receipt_missing",
+  "idempotency_key_retracted",
+  "idempotency_key_conflict",
+]);
+
+export const QUICK_LOG_HISTORY_REVIEW_HELPER =
+  "Check Timeline before starting another log; this save reference cannot confirm the original entry.";
+export const QUICK_LOG_HISTORY_REVIEW_LOCK_COPY =
+  "This save reference cannot confirm the original log. Check Timeline in another tab before making a new entry. This draft remains locked while its history is unclear.";
+export const QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY =
+  "Check Timeline for the original log before making another entry. This draft remains here.";
+export const QUICK_LOG_HISTORY_REVIEW_LINK_LABEL = "Open Timeline in a new tab";
+export const QUICK_LOG_HISTORY_DISCARD_LABEL = "I checked Timeline; discard draft";
+export const QUICK_LOG_HISTORY_DISCARD_HELPER =
+  "Discard only after checking the original log. This clears this draft, never saved history. If history is unclear, ask support before making another entry.";
+export const QUICK_LOG_HISTORY_DISCARD_FAILED =
+  "This draft could not be removed from this tab. It remains locked; try again when browser storage is available.";
+
+/** Explicit local-draft resolution; never permission to write or claim a saved receipt. */
+export function canDiscardQuickLogHistoryDraft(
+  input:
+    | {
+        historyCheckRequired: boolean;
+        inFlight: boolean;
+        currentOwnerId: string | null | undefined;
+        draftOwnerId: string | null | undefined;
+      }
+    | null
+    | undefined,
+): boolean {
+  return (
+    input?.historyCheckRequired === true &&
+    input.inFlight === false &&
+    typeof input.currentOwnerId === "string" &&
+    input.currentOwnerId.trim().length > 0 &&
+    input.currentOwnerId === input.draftOwnerId
+  );
+}
+
+/** A refusal that cannot be resolved by resending the same save reference. */
+export function quickLogSaveRequiresHistoryCheck(
+  reason: unknown,
+): reason is QuickLogHistoryCheckReason {
+  return typeof reason === "string" && REPLAY_HISTORY_CHECK_REASONS.has(reason);
+}
+
+/** Preserve the legacy form's draft reassurance without offering an impossible retry. */
+export function quickLogDraftPreservedFailureMessage(reason: string | null | undefined): string {
+  const message = quickLogReasonToOperatorMessage(reason);
+  return quickLogSaveRequiresHistoryCheck(reason)
+    ? `${message} Your input is still here.`
+    : `${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`;
+}
 
 export function quickLogReasonToOperatorMessage(reason: string | null | undefined): string {
   switch (reason) {
@@ -61,6 +128,8 @@ export function quickLogReasonToOperatorMessage(reason: string | null | undefine
     case "target_not_owned":
     case "grow_not_owned":
       return "Couldn't save this log because the selected grow, tent, or plant no longer matches your workspace. Re-select the plant and try again.";
+    case "plant_tent_grow_mismatch":
+      return "This plant's assigned tent belongs to another grow, so the entry was not saved.";
     case "not_authenticated":
       return "Sign in to log entries.";
     case "invalid_logged_at":
@@ -74,6 +143,14 @@ export function quickLogReasonToOperatorMessage(reason: string | null | undefine
       return "The server does not accept this activity type yet.";
     case "invalid_idempotency_key":
       return "The save reference for this entry was rejected.";
+    case "idempotency_key_unverified":
+      return "This log may already be saved, but its earlier save cannot be confirmed. Check Timeline before starting another log.";
+    case "idempotency_receipt_missing":
+      return "The original log's linked history could not be confirmed. Check Timeline before starting another log.";
+    case "idempotency_key_retracted":
+      return "The original log was retracted. Check Timeline before starting another log.";
+    case "idempotency_key_conflict":
+      return "This save reference was already used for different details. Check Timeline before starting another log.";
     case "invalid_uuid_input":
       return "The selected plant or tent reference is malformed.";
     case "rpc_unavailable":
@@ -105,6 +182,8 @@ export function quickLogSaveRecoveryAction(reason: string | null | undefined): s
     case "missing_target_id":
     case "invalid_uuid_input":
       return "Re-select the grow, tent, and plant from the pickers, then save again.";
+    case "plant_tent_grow_mismatch":
+      return "Check the plant's grow and tent, correct the assignment, then retry this entry.";
     case "invalid_volume":
       return "Enter a volume above zero and save again.";
     case "empty_content":
@@ -122,6 +201,11 @@ export function quickLogSaveRecoveryAction(reason: string | null | undefined): s
       return "Refresh the app to pick up the latest version, then log this as a note or watering.";
     case "invalid_idempotency_key":
       return "Close and reopen the log form, then save again — that creates a fresh save reference.";
+    case "idempotency_key_unverified":
+    case "idempotency_receipt_missing":
+    case "idempotency_key_retracted":
+    case "idempotency_key_conflict":
+      return "Check Timeline for the original log. If its history is unclear, ask support before submitting another entry.";
     case "not_authenticated":
       return "Sign in again, then retry. Your input stays on this screen.";
     case "not_authorized":
@@ -151,6 +235,45 @@ export function describeQuickLogSaveFailure(
     message: quickLogReasonToOperatorMessage(reason),
     recovery: quickLogSaveRecoveryAction(reason),
   };
+}
+
+type QuickLogNamedRecord = { id?: string | null; name?: string | null };
+type QuickLogNamedRecords = ReadonlyArray<QuickLogNamedRecord | null | undefined> | null;
+
+interface QuickLogPersistedTargetScope {
+  persistedGrowId?: string | null;
+  persistedTentId?: string | null;
+  persistedPlantId?: string | null;
+}
+
+interface QuickLogTargetNameLookup {
+  grows?: QuickLogNamedRecords;
+  tents?: QuickLogNamedRecords;
+  plants?: QuickLogNamedRecords;
+}
+
+function describePersistedTarget(
+  label: string,
+  id: string | null | undefined,
+  records: QuickLogNamedRecords | undefined,
+): string | null {
+  if (typeof id !== "string" || id.trim().length === 0) return null;
+  const name = Array.isArray(records) ? records.find((record) => record?.id === id)?.name : null;
+  return `${label}: ${typeof name === "string" && name.trim() ? name.trim() : `Saved ${label.toLowerCase()}`}`;
+}
+
+/** Describe only the verified event's scope, without inventing names or exposing raw IDs. */
+export function buildReceiptTargetMovedMessage(
+  receipt: QuickLogPersistedTargetScope | null | undefined,
+  lookup?: QuickLogTargetNameLookup | null,
+): string {
+  const parts = [
+    describePersistedTarget("Grow", receipt?.persistedGrowId, lookup?.grows),
+    describePersistedTarget("Tent", receipt?.persistedTentId, lookup?.tents),
+    describePersistedTarget("Plant", receipt?.persistedPlantId, lookup?.plants),
+  ].filter((part): part is string => part !== null);
+  const savedTarget = parts.length > 0 ? ` Saved target: ${parts.join(" · ")}.` : "";
+  return `The saved entry target differs from this submission.${savedTarget} It has not been confirmed; check its Timeline before making another entry.`;
 }
 
 /**

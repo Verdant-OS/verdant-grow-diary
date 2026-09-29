@@ -113,7 +113,7 @@ export function extractFunctionDefinitionFromSource(sourceText, functionPrefix, 
   // Windows can check out the same immutable migration blob with CRLF. Work
   // from its committed LF shape so the harness's exact source edits remain
   // deterministic without changing any published migration file.
-  const source = sourceText.replace(/\r\n/g, "\n");
+  const source = sourceText.replace(/\r\n?/g, "\n");
   const start = source.indexOf(functionPrefix);
   if (start < 0) throw new Error("dependency_source_missing");
   const end = source.indexOf(`\n${terminator}`, start);

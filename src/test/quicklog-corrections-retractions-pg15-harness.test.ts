@@ -238,7 +238,8 @@ describe("Quick Log corrections/retractions PostgreSQL 15 runtime gate", () => {
       // Test the committed LF migration bytes even when Git's Windows checkout
       // has converted this working-tree copy to CRLF. The production runner
       // still rejects noncanonical bytes; only this fixture input is normalized.
-      readFile: (path: string) => Buffer.from(readFileSync(path, "utf8").replace(/\r\n/g, "\n")),
+      readFile: (path: string) =>
+        Buffer.from(readFileSync(path, "utf8").replace(/\r\n?/g, "\n"), "utf8"),
     });
     const prerequisiteMutation = "alter role authenticated bypassrls;";
     const targetMutation =

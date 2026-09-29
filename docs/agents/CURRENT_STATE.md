@@ -2,6 +2,10 @@
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-09-29T06:06 UTC
+
+- **PASS, terminal required CI:** stay-draft #1797 at `a3d5269435bbcdabac65b84536238017a7f66095`, base `61821446`, has all 35 required contexts SUCCESS, zero required failure/missing/pending. Main CI `109277565013` Build and build summary SUCCESS; conditional QuickLog RPC runtime harness SKIPPED. Context IDs saved in Downloads CHEM-pricing-pack-retry-CI-terminal-2026-09-29.json. Earlier partial snapshots remain dated history. Supplemental jobs pending; high fast-uri and moderate undici jobs remain FAIL with logs read. Blue Dream/live acceptance NOT_MEASURED; no waiver, merge or production operation. Goal stays active.
+
 ## Follow-up observation — 2026-09-29T06:02 UTC
 
 - **PASS, pricing repair:** stay-draft #1797 at `a3d5269435bbcdabac65b84536238017a7f66095`, base `61821446ebd7e4fb30a36a5a95b7526a34515df5`, four closed files (+306/-28). Exact-base pack-retry reproduction 8 FAIL / 0 PASS / 3 excluded. Pure retry gate reuses canonical SKU/eligibility logic, keeps blocked recovery intact and shows existing honest copy; verified pack/plan retries and success URL preserved. Forty-one new cases; new set 2 files / 41 PASS, related final set 15 files / 168 PASS, each 0 FAIL / 0 SKIP. Canonical typecheck 0 diagnostics, ESLint 4 files 0 errors/0 warnings, format/whitespace/three scanner categories/import guard PASS. No hook/provider, price/entitlement, auth, Supabase, migration, lockfile, device or Action Queue change or actual checkout/charge.

@@ -463,21 +463,29 @@ test("keeps the exact legacy startup gate valid through 2026-09-28.1", () => {
   assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.1 across 12/);
 });
 
-test("accepts the exact coverage startup gate at 2026-09-28.2", () => {
-  const root = makeFixture({
-    version: "2026-09-28.2",
-    startupGate: COVERAGE_STARTUP_GATE,
-    handoffLog: true,
-  });
+test("accepts shipped 2026-09-28.2 with its legacy ACK and no handoff log", () => {
+  const root = makeFixture({ version: "2026-09-28.2" });
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.2 across 12/);
 });
 
+test("accepts the exact coverage startup gate at 2026-09-28.3", () => {
+  const root = makeFixture({
+    version: "2026-09-28.3",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  const result = runChecker(root);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.3 across 12/);
+});
+
 test("accepts CRLF copies of the coverage gate without relaxing its field order", () => {
   const root = makeFixture({
-    version: "2026-09-28.2",
+    version: "2026-09-28.3",
     startupGate: COVERAGE_STARTUP_GATE,
     handoffLog: true,
   });
@@ -509,9 +517,9 @@ test("keeps the coverage gate required on a later Sentinel date", () => {
   assert.equal(result.status, 0, result.stderr);
 });
 
-test("rejects a detailed role that omits the coverage field at 2026-09-28.2", () => {
+test("rejects a detailed role that omits the coverage field at 2026-09-28.3", () => {
   const root = makeFixture({
-    version: "2026-09-28.2",
+    version: "2026-09-28.3",
     startupGate: COVERAGE_STARTUP_GATE,
     handoffLog: true,
   });
@@ -524,7 +532,7 @@ test("rejects a detailed role that omits the coverage field at 2026-09-28.2", ()
 
 test("rejects a coverage field placed after current_task instead of files_read", () => {
   const root = makeFixture({
-    version: "2026-09-28.2",
+    version: "2026-09-28.3",
     startupGate: COVERAGE_STARTUP_GATE,
     handoffLog: true,
   });
@@ -541,7 +549,7 @@ test("rejects a coverage field placed after current_task instead of files_read",
 });
 
 test("rejects the coverage version when its handoff log is missing", () => {
-  const root = makeFixture({ version: "2026-09-28.2", startupGate: COVERAGE_STARTUP_GATE });
+  const root = makeFixture({ version: "2026-09-28.3", startupGate: COVERAGE_STARTUP_GATE });
   const result = runChecker(root);
 
   assert.equal(result.status, 1);
@@ -551,11 +559,11 @@ test("rejects the coverage version when its handoff log is missing", () => {
 test("passes a coordinated upgrade from the legacy gate to the coverage gate", () => {
   const root = makeFixture({ version: "2026-09-28.1" });
   for (const path of GOVERNANCE_FILES) {
-    writeGovernanceFile(root, path, "2026-09-28.2", COVERAGE_STARTUP_GATE);
+    writeGovernanceFile(root, path, "2026-09-28.3", COVERAGE_STARTUP_GATE);
   }
   writeFileSync(join(root, "docs", "agents", "HANDOFF_LOG.md"), "# Handoff log\n", "utf8");
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.2 across 12/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.3 across 12/);
 });

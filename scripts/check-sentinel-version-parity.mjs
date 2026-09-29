@@ -174,11 +174,11 @@ function versionIn(text) {
   return match ? match[1] : null;
 }
 
-/** The coverage field became mandatory in the 2026-09-28.2 constitution. */
+/** The coverage field becomes mandatory in the 2026-09-28.3 constitution. */
 function requiresHandoffAck(version) {
   if (!version) return false;
   const [date, revision] = version.split(".");
-  return date > "2026-09-28" || (date === "2026-09-28" && Number(revision) >= 2);
+  return date > "2026-09-28" || (date === "2026-09-28" && Number(revision) >= 3);
 }
 
 /**

@@ -71,6 +71,7 @@ import {
   canRetryAiDoctorLiveReviewFailure,
   getAiDoctorLiveReviewVisibility,
   isAiDoctorServiceUnavailableFailure,
+  type AiDoctorLiveReviewVisibilityResult,
 } from "@/lib/aiDoctorLiveReviewRecoveryRules";
 import { resolveAiDoctorImportedHistoryRecovery } from "@/lib/aiDoctorImportedHistoryRecoveryRules";
 import { applyStageTargetSeverityToPacket } from "@/lib/aiDoctorPacketStageTargetRules";
@@ -92,6 +93,8 @@ export const AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_NOTE_COPY =
   "This review used evidence that was current when it started.";
 export const AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_RETRY_BLOCK_COPY =
   "Evidence is older than 7 days. Capture a fresh reading to retry.";
+export const AI_DOCTOR_LIVE_REVIEW_UNKNOWN_EVIDENCE_RETRY_BLOCK_COPY =
+  "Evidence freshness could not be established. Capture a fresh reading to retry.";
 export const AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY =
   "Context is partial — review may have limited confidence.";
 export const AI_DOCTOR_LIVE_REVIEW_STRONG_COPY = "Context is strong enough for a cautious review.";
@@ -178,7 +181,8 @@ function PlantDetailAiDoctorLiveReviewScope({
   const [rootZoneOmissionScope, setRootZoneOmissionScope] = useState<string | null>(null);
   const [acceptedReviewRequest, setAcceptedReviewRequest] =
     useState<AcceptedAiDoctorReviewRequest | null>(null);
-  const [retryBlockedReason, setRetryBlockedReason] = useState<"stale-evidence" | null>(null);
+  const [retryBlockedReason, setRetryBlockedReason] =
+    useState<AiDoctorLiveReviewVisibilityResult["retryBlockedReason"]>(null);
   const [, setContextRevision] = useState(0);
   const historyOmissionAcknowledged = historyOmissionScope === historyScopeKey;
   const rootZoneOmissionAcknowledged = rootZoneOmissionScope === historyScopeKey;
@@ -541,7 +545,7 @@ function PlantDetailAiDoctorLiveReviewScope({
     if (retryBlockedReason === null) return;
     if (
       review.status !== "error" ||
-      activeReviewVisibility.retryBlockedReason !== "stale-evidence"
+      activeReviewVisibility.retryBlockedReason !== retryBlockedReason
     ) {
       setRetryBlockedReason(null);
     }
@@ -745,9 +749,11 @@ function PlantDetailAiDoctorLiveReviewScope({
   const liveReviewFailureCopy =
     retryBlockedReason === "stale-evidence"
       ? AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_RETRY_BLOCK_COPY
-      : isAiDoctorServiceUnavailableFailure(review.reason)
-        ? AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY
-        : AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY;
+      : retryBlockedReason === "unknown-evidence-freshness"
+        ? AI_DOCTOR_LIVE_REVIEW_UNKNOWN_EVIDENCE_RETRY_BLOCK_COPY
+        : isAiDoctorServiceUnavailableFailure(review.reason)
+          ? AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY
+          : AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY;
 
   if (!allowed && !showHistoryRecovery && !showRootZoneRecovery && !activeReviewVisible)
     return null;
@@ -841,6 +847,10 @@ function PlantDetailAiDoctorLiveReviewScope({
   const handleRetryReview = () => {
     if (activeReviewVisibility.retryBlockedReason === "stale-evidence") {
       setRetryBlockedReason("stale-evidence");
+      return;
+    }
+    if (activeReviewVisibility.retryBlockedReason === "unknown-evidence-freshness") {
+      setRetryBlockedReason("unknown-evidence-freshness");
       return;
     }
     setRetryBlockedReason(null);
@@ -1036,10 +1046,17 @@ function PlantDetailAiDoctorLiveReviewScope({
             data-testid="plant-ai-doctor-live-review-credit-denied"
           />
         ) : review.reason === "upstream_credit_exhausted" ? (
-          <AiCreditServiceDegradedNotice
-            surface="doctor"
-            data-testid="plant-ai-doctor-live-review-upstream-credit-exhausted"
-          />
+          <>
+            <AiCreditServiceDegradedNotice
+              surface="doctor"
+              data-testid="plant-ai-doctor-live-review-upstream-credit-exhausted"
+            />
+            {retryBlockedReason !== null ? (
+              <p role="status" data-testid="plant-ai-doctor-live-review-evidence-retry-block">
+                {liveReviewFailureCopy}
+              </p>
+            ) : null}
+          </>
         ) : (
           <p
             className="text-xs text-amber-200"

@@ -114,6 +114,76 @@ describe("getAiDoctorLiveReviewVisibility", () => {
       showsStaleEvidenceNote: false,
     });
   });
+
+  const unknownTimestamps = [undefined, null, "", " \t ", "not-a-date"];
+
+  it.each(unknownTimestamps)(
+    "blocks standard retry for unknown timestamp %j without hiding an accepted review",
+    (evidenceCapturedAt) => {
+      const input = { ...baseInput, acceptedEligibilityAllowed: true, evidenceCapturedAt };
+      const expected = {
+        visible: true,
+        retryBlockedReason: "unknown-evidence-freshness",
+        showsStaleEvidenceNote: false,
+      };
+      expect(getAiDoctorLiveReviewVisibility(input)).toEqual(expected);
+      expect(getAiDoctorLiveReviewVisibility(input)).toEqual(expected);
+    },
+  );
+
+  it.each(unknownTimestamps)(
+    "preserves historical retry for unknown timestamp %j",
+    (evidenceCapturedAt) => {
+      expect(
+        getAiDoctorLiveReviewVisibility({
+          ...baseInput,
+          mode: "historical_review",
+          evidenceCapturedAt,
+        }),
+      ).toEqual({ visible: true, retryBlockedReason: null, showsStaleEvidenceNote: false });
+    },
+  );
+
+  it.each(unknownTimestamps)(
+    "does not restore removed standard sources for unknown timestamp %j",
+    (evidenceCapturedAt) => {
+      expect(getAiDoctorLiveReviewVisibility({ ...baseInput, evidenceCapturedAt })).toEqual({
+        visible: false,
+        retryBlockedReason: "unknown-evidence-freshness",
+        showsStaleEvidenceNote: false,
+      });
+    },
+  );
+
+  it.each([Number.NaN, new Date(Number.NaN)])(
+    "blocks standard retry when the evaluation clock is invalid: %j",
+    (now) => {
+      expect(
+        getAiDoctorLiveReviewVisibility({ ...baseInput, acceptedEligibilityAllowed: true, now }),
+      ).toEqual({
+        visible: true,
+        retryBlockedReason: "unknown-evidence-freshness",
+        showsStaleEvidenceNote: false,
+      });
+    },
+  );
+
+  it.each([-1, 0, 1])("preserves the seven-day cutoff at offset %s ms", (offsetMs) => {
+    const now = Date.parse(baseInput.evidenceCapturedAt) + 7 * 24 * 60 * 60 * 1000 + offsetMs;
+    for (const clock of [now, new Date(now)]) {
+      expect(
+        getAiDoctorLiveReviewVisibility({
+          ...baseInput,
+          acceptedEligibilityAllowed: true,
+          now: clock,
+        }),
+      ).toEqual({
+        visible: true,
+        retryBlockedReason: offsetMs > 0 ? "stale-evidence" : null,
+        showsStaleEvidenceNote: offsetMs > 0,
+      });
+    }
+  });
 });
 
 describe("shouldReuseAiDoctorReviewIdempotencyKeyAfterResponse", () => {

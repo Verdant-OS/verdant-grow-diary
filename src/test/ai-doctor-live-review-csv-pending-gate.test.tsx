@@ -560,6 +560,99 @@ describe("accepted standard review visibility across the seven-day cutoff", () =
   );
 });
 
+describe("unknown frozen evidence freshness", () => {
+  const unknownEvidence = [
+    { label: "no snapshot", snapshot: false, capturedAt: undefined },
+    { label: "missing timestamp", snapshot: true, capturedAt: undefined },
+    { label: "null timestamp", snapshot: true, capturedAt: null },
+    { label: "empty timestamp", snapshot: true, capturedAt: "" },
+    { label: "blank timestamp", snapshot: true, capturedAt: " \t " },
+    { label: "invalid timestamp", snapshot: true, capturedAt: "not-a-date" },
+  ];
+
+  it.each(unknownEvidence)(
+    "does not resend a failed standard review with $label",
+    async ({ snapshot, capturedAt }) => {
+      if (snapshot) {
+        const item = itemsRef.current.find((item) => item.kind === "manual_sensor_snapshot");
+        if (!item || item.kind !== "manual_sensor_snapshot")
+          throw new Error("Missing fixture snapshot");
+        // Keep the valid timeline occurrence: readiness and packet capture time
+        // are separate inputs, as they are in the actual component path.
+        Object.assign(item.card, { capturedAt });
+      } else {
+        itemsRef.current = itemsRef.current.filter(
+          (item) => item.kind !== "manual_sensor_snapshot",
+        );
+      }
+      const invoke = vi.fn<InvokeFn>(async () => ({
+        data: { ok: false, reason: "http" },
+        error: null,
+      }));
+      const persist = vi.fn();
+      render(reviewElement(invoke, TENT_ID, persist));
+      fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+      const retry = await screen.findByTestId("plant-ai-doctor-live-review-retry");
+      const acceptedBody = invoke.mock.calls[0][1].body;
+      const frozenPacket = JSON.stringify(acceptedBody.packet);
+      expect(acceptedBody.evidence_acceptance?.reviewMode).toBe("standard");
+      expect(acceptedBody.packet.recentSensorSnapshot?.capturedAt ?? null).toBe(capturedAt ?? null);
+
+      fireEvent.click(retry);
+      await act(async () => {});
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(persist).not.toHaveBeenCalled();
+      expect(screen.getByTestId("plant-ai-doctor-live-review-failure")).toHaveTextContent(
+        "Evidence freshness could not be established. Capture a fresh reading to retry.",
+      );
+      expect(screen.queryByTestId("plant-ai-doctor-live-review-retry")).toBeNull();
+      expect(screen.queryByTestId("plant-ai-doctor-live-review-stale-evidence-note")).toBeNull();
+      expect(JSON.stringify(acceptedBody.packet)).toBe(frozenPacket);
+    },
+  );
+
+  it.each(["loading", "result"] as const)(
+    "keeps an accepted snapshot-free standard review visible during %s",
+    async (phase) => {
+      itemsRef.current = itemsRef.current.filter((item) => item.kind !== "manual_sensor_snapshot");
+      let resolveInvoke!: (value: Awaited<ReturnType<InvokeFn>>) => void;
+      const response = new Promise<Awaited<ReturnType<InvokeFn>>>((resolve) => {
+        resolveInvoke = resolve;
+      });
+      const invoke = vi.fn<InvokeFn>(() => response);
+      const persist = vi.fn().mockResolvedValue({ ok: true, id: "unknown-freshness-session" });
+      const view = render(reviewElement(invoke, TENT_ID, persist));
+      fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+      await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+      expect(invoke.mock.calls[0][1].body.packet.recentSensorSnapshot).toBeNull();
+      if (phase === "result") {
+        await act(async () =>
+          resolveInvoke({ data: { ok: true, result: validResult() }, error: null }),
+        );
+        await screen.findByTestId("plant-ai-doctor-history-saved");
+      }
+      view.rerenderWithProviders(reviewElement(invoke, TENT_ID, persist));
+      expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+        "data-status",
+        phase,
+      );
+      expect(screen.queryByTestId("plant-ai-doctor-live-review-stale-evidence-note")).toBeNull();
+      if (phase === "result") {
+        expect(screen.getByTestId("plant-ai-doctor-live-review-result-wrap")).toHaveTextContent(
+          validResult().summary,
+        );
+      } else {
+        await act(async () =>
+          resolveInvoke({ data: { ok: true, result: validResult() }, error: null }),
+        );
+        await screen.findByTestId("plant-ai-doctor-history-saved");
+      }
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(persist).toHaveBeenCalledTimes(1);
+    },
+  );
+});
+
 describe("CSV history pending/error gating", () => {
   it("holds the start button while the CSV-history read is in flight", () => {
     sensorQueryState.csvStatus = "loading";

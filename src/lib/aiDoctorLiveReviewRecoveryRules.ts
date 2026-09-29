@@ -54,7 +54,7 @@ export interface AiDoctorLiveReviewVisibilityInput {
 
 export interface AiDoctorLiveReviewVisibilityResult {
   visible: boolean;
-  retryBlockedReason: "stale-evidence" | null;
+  retryBlockedReason: "stale-evidence" | "unknown-evidence-freshness" | null;
   showsStaleEvidenceNote: boolean;
 }
 
@@ -62,14 +62,23 @@ function resolveNowMs(now: number | Date): number {
   return typeof now === "number" ? now : now.getTime();
 }
 
-function evidenceIsPastCutoff(
+function evidenceRetryBlockedReason(
   evidenceCapturedAt: string | null | undefined,
   now: number | Date,
-): boolean {
-  if (typeof evidenceCapturedAt !== "string" || evidenceCapturedAt.length === 0) return false;
+): AiDoctorLiveReviewVisibilityResult["retryBlockedReason"] {
+  // Unknown freshness cannot authorize another standard request. Keep it
+  // separate from confirmed age so the UI never claims unknown evidence was current.
+  if (typeof evidenceCapturedAt !== "string" || evidenceCapturedAt.trim().length === 0) {
+    return "unknown-evidence-freshness";
+  }
   const capturedAtMs = Date.parse(evidenceCapturedAt);
-  if (!Number.isFinite(capturedAtMs)) return false;
-  return resolveNowMs(now) - capturedAtMs > AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_CUTOFF_MS;
+  const nowMs = resolveNowMs(now);
+  if (!Number.isFinite(capturedAtMs) || !Number.isFinite(nowMs)) {
+    return "unknown-evidence-freshness";
+  }
+  return nowMs - capturedAtMs > AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_CUTOFF_MS
+    ? "stale-evidence"
+    : null;
 }
 
 export function getAiDoctorLiveReviewVisibility(
@@ -83,8 +92,8 @@ export function getAiDoctorLiveReviewVisibility(
     input.omittedRootZoneHistory ||
     (input.includedRootZoneHistory && input.rootZoneBlocksReview);
   const retryBlockedReason =
-    input.mode === "standard" && evidenceIsPastCutoff(input.evidenceCapturedAt, input.now)
-      ? "stale-evidence"
+    input.mode === "standard"
+      ? evidenceRetryBlockedReason(input.evidenceCapturedAt, input.now)
       : null;
 
   return {

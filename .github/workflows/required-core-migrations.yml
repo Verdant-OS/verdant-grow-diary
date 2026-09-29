@@ -15,6 +15,7 @@ on:
       - "src/test/required-core-migrations-gate.test.ts"
       - "src/test/production-supabase-tls.test.ts"
       - ".github/workflows/required-core-migrations.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - verdant-grow-diary

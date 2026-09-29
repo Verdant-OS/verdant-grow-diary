@@ -297,7 +297,7 @@ describe("Docs: rotation + fixture setup + screenshots", () => {
     expect(body).not.toMatch(/\.delete\(/);
   });
 
-  it("legacy docs keep their generic flow while the production checklist requires grow ownership", () => {
+  it("legacy docs keep their generic flow and optional grow name still requires production ownership", () => {
     const setup = read("e2e/FIXTURE_SETUP.md");
     const readme = read("e2e/README.md");
     const checklist = read("e2e/scripts/print-fixture-config-checklist.ts");
@@ -316,14 +316,14 @@ describe("Docs: rotation + fixture setup + screenshots", () => {
     expect(readme).toMatch(/optional/i);
     expect(readme).not.toMatch(/Grow\s+named\s+exactly/i);
 
-    // The production-only Quick Log lane requires explicit grow ownership.
+    // Grow naming is optional; positive owned-grow evidence is mandatory.
     const requiredBlock = checklist.match(/const REQUIRED_VARS = \[([\s\S]*?)\] as const/);
     const optionalBlock = checklist.match(/const OPTIONAL_VARS = \[([\s\S]*?)\] as const/);
     expect(requiredBlock).toBeTruthy();
     expect(optionalBlock).toBeTruthy();
-    expect(requiredBlock![1]).toMatch(/E2E_FIXTURE_EXPECTED_GROW_NAME/);
-    expect(optionalBlock![1]).not.toMatch(/E2E_FIXTURE_EXPECTED_GROW_NAME/);
-    expect(checklist).toContain("exact grow, tent and plant names");
+    expect(requiredBlock![1]).not.toMatch(/E2E_FIXTURE_EXPECTED_GROW_NAME/);
+    expect(optionalBlock![1]).toMatch(/E2E_FIXTURE_EXPECTED_GROW_NAME/);
+    expect(checklist).toContain("owned grow read");
     expect(checklist).toContain("cheekhimself@gmail.com");
     expect(checklist).toContain("[smoke <timestamp>]");
   });

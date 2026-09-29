@@ -5,6 +5,7 @@ import type { Page, Request, Response } from "@playwright/test";
 import {
   buildQuickLogSmokeNote,
   productionFixturePlantId,
+  productionFixtureContextMatchesTarget,
   productionFixtureResponseKind,
   projectFixtureOwnedRow,
   validateProductionFixtureTarget,
@@ -117,6 +118,13 @@ function harness() {
 afterEach(() => vi.useRealTimers());
 
 describe("production Quick Log fixture policy", () => {
+  it("accepts the production fixture URL with its explicit tent context", () => {
+    const contextual = `${plantUrl}?tentId=${tentId}`;
+    expect(productionFixturePlantId(contextual)).toBe(plantId);
+    expect(validateProductionQuickLogEnv({ ...env, E2E_GROW_1_PLANT_URL: contextual }).ok).toBe(
+      true,
+    );
+  });
   it("requires the explicitly approved canonical production fixture", () => {
     expect(validateProductionQuickLogEnv(env)).toEqual({ ok: true, errors: [], expected });
     expect(productionFixturePlantId(plantUrl)).toBe(plantId);
@@ -130,7 +138,7 @@ describe("production Quick Log fixture policy", () => {
     `https://verdantgrowdiary.com.evil.example/plants/${plantId}`,
     `https://user:pass@verdantgrowdiary.com/plants/${plantId}`,
     `https://verdantgrowdiary.com:444/plants/${plantId}`,
-    `${plantUrl}?growId=${growId}`,
+    `${plantUrl}?unknownId=${growId}`,
     `${plantUrl}#x`,
     `${plantUrl}/`,
     "https://verdantgrowdiary.com/plants/not-a-uuid",
@@ -140,7 +148,6 @@ describe("production Quick Log fixture policy", () => {
   });
   it.each([
     "E2E_FIXTURE_MODE",
-    "E2E_FIXTURE_EXPECTED_GROW_NAME",
     "E2E_FIXTURE_EXPECTED_TENT_NAME",
     "E2E_FIXTURE_EXPECTED_PLANT_NAME",
   ] as const)("requires %s", (key) => {
@@ -189,6 +196,27 @@ describe("production Quick Log fixture policy", () => {
         "E2E Test Plant 2",
       ).ok,
     ).toBe(true);
+  });
+  it("binds both optional UUID contexts to the owned target and rejects duplicates", () => {
+    expect(
+      productionFixtureContextMatchesTarget(
+        `${plantUrl}?tentId=${tentId}&growId=${growId}`,
+        target,
+      ),
+    ).toBe(true);
+    expect(productionFixtureContextMatchesTarget(`${plantUrl}?tentId=${growId}`, target)).toBe(
+      false,
+    );
+    expect(productionFixtureContextMatchesTarget(`${plantUrl}?growId=${tentId}`, target)).toBe(
+      false,
+    );
+    for (const query of [
+      `tentId=${tentId}&tentId=${tentId}`,
+      "tentId=",
+      "growId=not-a-uuid",
+      `unknown=${tentId}`,
+    ])
+      expect(productionFixturePlantId(`${plantUrl}?${query}`)).toBeNull();
   });
   it.each(["plants", "tents", "grows"] as const)(
     "refuses foreign ownership even when the account can read %s",
@@ -291,6 +319,62 @@ describe("production Quick Log fixture policy", () => {
 });
 
 describe("read-only production fixture observer", () => {
+  it("accepts the matching tent context with grow name derived from owned evidence", async () => {
+    const h = harness();
+    h.populate();
+    const contextual = `${plantUrl}?tentId=${tentId}`;
+    h.navigate(contextual);
+    const result = await h.proof.assertInitial({
+      ...env,
+      E2E_GROW_1_PLANT_URL: contextual,
+      E2E_FIXTURE_EXPECTED_GROW_NAME: "",
+    });
+    expect(result.expected.grow).toBe(expected.grow);
+    await expect(
+      h.proof.assertTarget({ ...target, plantId: secondId }, result.expected, "E2E Test Plant 2"),
+    ).resolves.toBeUndefined();
+  });
+  it("invalidates the proof if the route's tent context changes after verification", async () => {
+    const h = harness();
+    h.populate();
+    await h.proof.assertInitial(env);
+    h.navigate(`${plantUrl}?tentId=${growId}`);
+    await expect(h.proof.assertTarget(target, expected, expected.plant)).rejects.toThrow(
+      "fixture_evidence_invalidated",
+    );
+  });
+  it("refuses mismatched tent/grow URL context despite valid ownership", async () => {
+    for (const query of [`tentId=${growId}`, `growId=${tentId}`]) {
+      const h = harness();
+      h.populate();
+      await expect(
+        h.proof.assertInitial({ ...env, E2E_GROW_1_PLANT_URL: `${plantUrl}?${query}` }),
+      ).rejects.toThrow("context_mismatch");
+    }
+  });
+  it("does not derive a grow name from an unowned or unmarked row", async () => {
+    for (const row of [
+      { ...evidence().grows[0], user_id: foreign },
+      { ...evidence().grows[0], name: "Skunk Gas Run" },
+    ]) {
+      vi.useFakeTimers();
+      const h = harness();
+      h.populate();
+      h.emit("/rest/v1/grows", [row]);
+      const failure = expect(
+        h.proof.assertInitial({ ...env, E2E_FIXTURE_EXPECTED_GROW_NAME: "" }),
+      ).rejects.toThrow("ownership refused");
+      await vi.advanceTimersByTimeAsync(20_100);
+      await failure;
+      vi.useRealTimers();
+    }
+  });
+  it("derives an omitted grow name only from the positively owned grow read", async () => {
+    const h = harness();
+    h.populate();
+    const result = await h.proof.assertInitial({ ...env, E2E_FIXTURE_EXPECTED_GROW_NAME: "" });
+    expect(result.expected.grow).toBe(expected.grow);
+  });
   it("clears prior proof for a null default-select ownership response", async () => {
     const h = harness();
     h.populate();

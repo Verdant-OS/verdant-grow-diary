@@ -2,6 +2,7 @@ import type { Page, Request, Response } from "@playwright/test";
 import type { FixtureSafetyEnv, FixtureEnvValidation } from "./fixtureSafety";
 import {
   productionFixturePlantId,
+  productionFixtureContextMatchesTarget,
   productionFixtureResponseKind,
   projectFixtureOwnedRow,
   validateProductionFixtureTarget,
@@ -17,6 +18,7 @@ import {
 export function observeProductionQuickLogFixture(page: Page) {
   let identity: FixtureIdentity | null = null;
   let invalidated = false;
+  let initialTarget: FixtureTarget | null = null;
   const rows = {
     plants: new Map<string, FixtureOwnedRow>(),
     tents: new Map<string, FixtureOwnedRow>(),
@@ -129,6 +131,8 @@ export function observeProductionQuickLogFixture(page: Page) {
   ) {
     await Promise.all([...pending]);
     if (!productionFixturePlantId(page.url())) invalidated = true;
+    if (initialTarget && !productionFixtureContextMatchesTarget(page.url(), initialTarget))
+      invalidated = true;
     if (pendingReads.size) return { ok: false, errors: ["fixture_reads_in_flight"] };
     return validateProductionFixtureTarget(
       {
@@ -157,11 +161,24 @@ export function observeProductionQuickLogFixture(page: Page) {
       while (Date.now() < deadline) {
         await Promise.all([...pending]);
         const plant = rows.plants.get(plantId);
-        const result = await check(
-          { plantId, tentId: plant?.tent_id ?? "", growId: plant?.grow_id ?? "" },
-          config.expected,
-        );
-        if (result.ok) return config;
+        const target = { plantId, tentId: plant?.tent_id ?? "", growId: plant?.grow_id ?? "" };
+        const resolved = {
+          ...config,
+          expected: {
+            ...config.expected,
+            grow: config.expected.grow || rows.grows.get(target.growId)?.name || "",
+          },
+        };
+        const result = await check(target, resolved.expected);
+        if (result.ok) {
+          if (
+            !productionFixtureContextMatchesTarget(env.E2E_GROW_1_PLANT_URL!, target) ||
+            !productionFixtureContextMatchesTarget(page.url(), target)
+          )
+            throw new Error("production_fixture_context_mismatch");
+          initialTarget = target;
+          return resolved;
+        }
         errors = result.errors;
         if (
           invalidated ||

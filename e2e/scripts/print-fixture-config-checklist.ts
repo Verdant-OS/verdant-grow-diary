@@ -16,12 +16,12 @@ const REQUIRED_VARS = [
   "E2E_BASE_URL",
   "E2E_GROW_1_PLANT_URL",
   "E2E_FIXTURE_MODE",
-  "E2E_FIXTURE_EXPECTED_GROW_NAME",
   "E2E_FIXTURE_EXPECTED_TENT_NAME",
   "E2E_FIXTURE_EXPECTED_PLANT_NAME",
 ] as const;
 
 const OPTIONAL_VARS = [
+  "E2E_FIXTURE_EXPECTED_GROW_NAME",
   "E2E_GROW_1_SECOND_PLANT_NAME",
   "E2E_FIXTURE_EXPECTED_ACCOUNT_HINT",
   "E2E_ALLOW_FIXTURE_BOOTSTRAP",
@@ -53,9 +53,11 @@ push("     active tent and plant. Each exact name must contain E2E, Test or QA."
 push("     Ownership of all three records is verified from normal app reads.");
 push("     A visible name or readable customer row does not establish ownership.");
 push("  3. The plant URL must be https://verdantgrowdiary.com/plants/<UUID>.");
-push("     No alternate host, URL credentials, query string or fragment.");
-push("  4. Set vars.E2E_FIXTURE_MODE=true; exact grow, tent and plant names");
-push("     are all required by the runtime production guard.");
+push("     Optional tentId/growId UUID query values must match its owned records.");
+push("     No alternate host, URL credentials, unknown query keys or fragment.");
+push("  4. Set vars.E2E_FIXTURE_MODE=true and exact tent and plant names.");
+push("     Grow name is optional: when absent, it comes only from the verified");
+push("     owned grow read, with E2E/Test/QA markers. A configured name must match.");
 push("  5. Configure a second plant in the same tent/grow: 'E2E Test Plant 2',");
 push("     or its exact fixture name through E2E_GROW_1_SECOND_PLANT_NAME.");
 push("     If an account hint is configured, use cheekhimself@gmail.com only.");

@@ -30,19 +30,30 @@ export function productionFixturePlantId(value: unknown): string | null {
   if (typeof value !== "string") return null;
   try {
     const url = new URL(value);
-    if (
-      url.origin !== QUICKLOG_SMOKE_APP_ORIGIN ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash
-    )
+    if (url.origin !== QUICKLOG_SMOKE_APP_ORIGIN || url.username || url.password || url.hash)
       return null;
+    const seen = new Set<string>();
+    for (const [key, value] of url.searchParams) {
+      if (!["tentId", "growId"].includes(key) || seen.has(key) || !UUID.test(value)) return null;
+      seen.add(key);
+    }
     const match = /^\/plants\/([^/]+)$/.exec(url.pathname);
     return match && UUID.test(match[1]) ? match[1] : null;
   } catch {
     return null;
   }
+}
+
+export function productionFixtureContextMatchesTarget(
+  value: string,
+  target: FixtureTarget,
+): boolean {
+  if (productionFixturePlantId(value) !== target.plantId) return false;
+  const params = new URL(value).searchParams;
+  return (
+    (!params.has("tentId") || params.get("tentId") === target.tentId) &&
+    (!params.has("growId") || params.get("growId") === target.growId)
+  );
 }
 
 export function validateProductionQuickLogEnv(
@@ -59,7 +70,8 @@ export function validateProductionQuickLogEnv(
     plant: (env.E2E_FIXTURE_EXPECTED_PLANT_NAME ?? "").trim(),
   };
   for (const [key, name] of Object.entries(expected)) {
-    if (!name || !MARKER.test(name)) errors.push(`${key}_fixture_name_required`);
+    if (key === "grow" ? name && !MARKER.test(name) : !name || !MARKER.test(name))
+      errors.push(`${key}_fixture_name_required`);
   }
   const hint = env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT?.trim().toLowerCase();
   if (hint && hint !== QUICKLOG_SMOKE_ACCOUNT_EMAIL) errors.push("unapproved_account_hint");

@@ -2,6 +2,12 @@
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-09-29T05:20:48 UTC
+
+- **PASS, terminal required CI:** stay-draft #1794 at `7866ad8d3281cadb46efa9ef32222cfe79541c59`, base `61821446`, has all 35 required contexts SUCCESS, including all 32 full-suite shards. Zero required failure/missing/pending. Main CI `109266800261` SUCCESS; Build and Generate build summary steps succeed, overall build summary PASS. Named check receipt saved in Downloads GDP-1794-CI-terminal-2026-09-29.json. Earlier first-head failures and partial snapshots remain history.
+- **NOT_MEASURED, runtime proof:** conditional QuickLog RPC runtime harness is SKIPPED. Separate Main CI summaries include 8 files / 167 PASS / 0 FAIL / 16 SKIP, 2 files / 31 PASS / 0 FAIL / 16 SKIP, Deno 248 PASS / 0 FAIL, scanner 20 files / 332 PASS / 0 FAIL, and 1 file / 6 PASS / 0 FAIL. These overlap other executions and are not unique-test sums or production proof.
+- **FAIL, additional audits / BLOCKED, locked repair:** exact-head root `109266743481` reports fast-uri 1239943/1239946; nested `109266743639` reports undici GHSA-3wwx-pv8p-q78v. Logs read; no locked dependency edit or waiver. Blue Dream exact-head acceptance and hosted behavior remain NOT_MEASURED. No ready, auto-merge, merge, Publish/promote or production operation. HOLD #1250 and ownership locks remain; CHEM-GOAL-3DAY-001 stays active.
+
 ## Follow-up observation — 2026-09-29T05:14 UTC
 
 - **FAIL, first-head CI / PASS, scoped correction:** #1794 predecessor `cb27310a` failed required shards 7/32 and 14/32 on three static page-wiring assertions (failing batches: 2 FAIL / 118 PASS and 1 FAIL / 148 PASS). Logs `109264969705` and `109264969632` read before repair. The original direct sensor-envelope resolver and explicit literal-true validation request are now preserved, with no unrelated test edits. Normal correction push is `7866ad8d3281cadb46efa9ef32222cfe79541c59`, stay-draft on base `61821446`, final five-file diff +387/-57. An intermediate local run 1 FAIL / 186 PASS remains dated evidence; no blind rerun.

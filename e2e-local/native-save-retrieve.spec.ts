@@ -245,6 +245,119 @@ test("an actually accepted Note survives lost reply and same-tab reload, then re
   }
 });
 
+test("an accepted Activity uses server time and survives a lost reply without a duplicate", async ({
+  page,
+  context,
+}) => {
+  const f = await createLocalFixture();
+  try {
+    await fenceBrowser(context, f.env);
+    const otherBefore = fingerprint(await witnessRows(f));
+    await signIn(page, f);
+    await page.goto(plantUrl(f, f.primary) + "&open=quick-log");
+    const dialog = page.getByRole("dialog", { name: /quick log/i });
+    const activity = "quick-log-dialog-all-activities";
+    await expect(dialog.getByTestId(activity)).toBeVisible();
+    const training = dialog.getByTestId(activity + "-picker-training");
+    if (!(await training.isVisible())) await dialog.getByTestId(activity + "-picker-more").click();
+    await training.click();
+    const note = "Native activity lost reply " + randomUUID();
+    await dialog.getByTestId(activity + "-note").fill(note);
+
+    const requests: Row[] = [];
+    const receipts: Array<Row & { grow_event_id: string }> = [];
+    let dropped = 0;
+    await context.route(f.env.api + "/rest/v1/rpc/quicklog_save_event", async (route) => {
+      const request = route.request();
+      if (request.method() !== "POST") return route.fallback();
+      if (new URL(request.url()).origin !== f.env.api)
+        throw new Error("Non-local Activity RPC blocked.");
+      const payload: unknown = request.postDataJSON();
+      if (!isRow(payload)) throw new Error("The real Activity request was not an object.");
+      requests.push(payload);
+      // Let the authenticated local RPC commit; lose only its browser reply.
+      const response = await route.fetch({ maxRedirects: 0 });
+      if (new URL(response.url()).origin !== f.env.api || !response.ok()) {
+        await route.fulfill({ response });
+        return;
+      }
+      const receipt = acceptedReceipt(await response.json());
+      receipts.push(receipt);
+      if (dropped === 0 && payload.p_note === note && payload.p_event_type === "training") {
+        dropped += 1;
+        await route.abort("failed");
+      } else {
+        await route.fulfill({ response });
+      }
+    });
+
+    await dialog.getByTestId(activity + "-save").click();
+    await expect(dialog.getByTestId(activity + "-pending-activity")).toBeVisible();
+    expect(dropped).toBe(1);
+    expect(requests).toHaveLength(1);
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0].reused).toBe(false);
+    const original = requests[0];
+    expect(original).toMatchObject({
+      p_grow_id: f.primary.growId,
+      p_tent_id: f.primary.tentId,
+      p_plant_id: f.primary.plantId,
+      p_event_type: "training",
+      p_note: note,
+      p_occurred_at: null,
+    });
+    const committed = await ownerRows(f.owner);
+    const events = committed.grow_events.filter((row) => row.id === receipts[0].grow_event_id);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      user_id: f.owner.id,
+      grow_id: f.primary.growId,
+      tent_id: f.primary.tentId,
+      plant_id: f.primary.plantId,
+      event_type: "training",
+      source: "manual",
+      note,
+    });
+    expect(Number.isFinite(Date.parse(String(events[0].occurred_at)))).toBe(true);
+    expect(
+      Math.abs(Date.parse(String(events[0].occurred_at)) - Date.parse(String(events[0].logged_at))),
+    ).toBeLessThan(5 * 60_000);
+
+    await page.reload();
+    // AppShell consumes the one-shot open marker, so use the supported route
+    // again after a true reload to inspect the persisted recovery envelope.
+    await page.goto(plantUrl(f, f.primary) + "&open=quick-log");
+    const reopened = page.getByRole("dialog", { name: /quick log/i });
+    await expect(reopened.getByTestId(activity + "-pending-activity")).toBeVisible();
+    await reopened.getByTestId(activity + "-retry-original").click();
+    await expect(reopened.getByTestId(activity + "-pending-activity")).toHaveCount(0);
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toEqual(original);
+    expect(receipts).toHaveLength(2);
+    expect(receipts[1]).toMatchObject({ reused: true, grow_event_id: receipts[0].grow_event_id });
+    expect(fingerprint(await ownerRows(f.owner))).toBe(fingerprint(committed));
+    expect(await visibleEventIds(f.other, [receipts[0].grow_event_id])).toEqual([]);
+    expect(fingerprint(await witnessRows(f))).toBe(otherBefore);
+
+    await page.goto(
+      f.env.ui +
+        "/timeline?growId=" +
+        f.primary.growId +
+        "&tentId=" +
+        f.primary.tentId +
+        "&plantId=" +
+        f.primary.plantId +
+        "#timeline-entry-" +
+        receipts[0].grow_event_id,
+    );
+    const anchor = page.locator('[id="timeline-entry-' + receipts[0].grow_event_id + '"]');
+    await expect(anchor.locator("xpath=ancestor-or-self::li[1]")).toContainText(note);
+  } finally {
+    await page.close();
+    await f.cleanup();
+  }
+});
+
 test("real dated rows retain manual provenance beyond the dense live cap and stale-only evidence stays cautionary", async ({ page, context }) => {
   const f = await createLocalFixture(true);
   try {

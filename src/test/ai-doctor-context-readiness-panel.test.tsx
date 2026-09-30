@@ -409,6 +409,13 @@ describe("AiDoctorContextReadinessPanel", () => {
 
 describe("AiDoctorContextReadinessPanel — open-alert read state", () => {
   const count = () => screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts");
+  // The status copy is the <dd>'s own text; a nested Retry button (when a retry
+  // callback is wired) contributes its own label, so read only the direct text nodes.
+  const statusText = (el: HTMLElement) =>
+    Array.from(el.childNodes)
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .map((node) => node.textContent)
+      .join("");
 
   it.each(["idle", "loading"] as const)(
     "shows loading for %s even with a retained count",
@@ -436,9 +443,11 @@ describe("AiDoctorContextReadinessPanel — open-alert read state", () => {
         onRetryAlerts={retry}
       />,
     );
-    expect(count()).toHaveTextContent(/^Unavailable$/);
+    expect(statusText(count())).toBe("Unavailable");
     expect(count()).not.toHaveTextContent(String(staleCount));
-    fireEvent.click(screen.getByRole("button", { name: "Retry alerts" }));
+    const retryButton = screen.getByRole("button", { name: "Retry alerts" });
+    expect(count()).toContainElement(retryButton);
+    fireEvent.click(retryButton);
     expect(retry).toHaveBeenCalledTimes(1);
   });
 
@@ -459,7 +468,7 @@ describe("AiDoctorContextReadinessPanel — open-alert read state", () => {
       <AiDoctorContextReadinessPanel
         context={ctx([], [])}
         openAlertsCount={0}
-        openAlertsStatus="unassigned"
+        openAlertsStatus="no_tent"
       />,
     );
     expect(count()).toHaveTextContent(/^No assigned tent$/);

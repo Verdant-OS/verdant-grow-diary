@@ -221,8 +221,9 @@ describe("legacy public-starter Water uncertain receipt", () => {
     const pending = readPendingStarterWater("user-1");
     expect(pending.status).toBe("pending");
     if (pending.status !== "pending") throw new Error("expected pending Watering");
-    expect(original.p_occurred_at).toBe(pending.record.createdAt);
-    expect(Number.isFinite(Date.parse(original.p_occurred_at))).toBe(true);
+    expect(original.p_occurred_at).toBeNull();
+    expect(pending.record.payload.p_occurred_at).toBeNull();
+    expect(Number.isFinite(Date.parse(pending.record.createdAt))).toBe(true);
     expect(screen.getByTestId("quicklog-note")).toBeDisabled();
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();
     expect(readPendingStarterWater("user-1")).toMatchObject({ status: "pending" });

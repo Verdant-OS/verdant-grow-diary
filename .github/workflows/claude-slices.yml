@@ -9,6 +9,7 @@ on:
   # It never enters the builder or spends Claude usage.
   pull_request:
     branches: [verdant-grow-diary]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -333,7 +334,12 @@ jobs:
         run: |
           git fetch --no-tags origin "refs/pull/$PR_NUMBER/head"
           test "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA"
-          git show "$HEAD_SHA:.github/workflows/claude-slices.yml" > "$RUNNER_TEMP/claude-slices.yml"
+          if git cat-file -e "$HEAD_SHA:.github/workflows/claude-slices.yml" 2>/dev/null; then
+            git show "$HEAD_SHA:.github/workflows/claude-slices.yml" > "$RUNNER_TEMP/claude-slices.yml"
+          else
+            # The PR head predates this workflow; validate the base checkout's copy instead.
+            cp .github/workflows/claude-slices.yml "$RUNNER_TEMP/claude-slices.yml"
+          fi
       - name: Check workflow syntax with checksum-verified actionlint
         run: |
           archive="$RUNNER_TEMP/actionlint.tar.gz"

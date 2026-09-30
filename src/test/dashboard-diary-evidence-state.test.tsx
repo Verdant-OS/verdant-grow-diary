@@ -385,6 +385,45 @@ describe("Dashboard diary evidence and sensor-history empty states", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("keeps the normal empty state and actions for a CO2-only saved reading", () => {
+    H.snapshotState = {
+      status: "ok",
+      snapshot: { ...savedSnapshot().snapshot, temp: null, rh: null, co2: 900 },
+    };
+    renderDashboard();
+    expect(screen.getByTestId("dashboard-environment-snapshot-empty")).toHaveTextContent(
+      "No sensor readings in this view",
+    );
+    expect(screen.getByTestId("dashboard-environment-snapshot-go-to-sensors")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("dashboard-environment-snapshot-add-manual-reading"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("dashboard-environment-snapshot-empty-sensors-link"),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-environment-snapshot-evidence")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Review saved environment evidence" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("still links CO2 plus a displayed humidity value to Latest environment", () => {
+    H.snapshotState = {
+      status: "ok",
+      snapshot: { ...savedSnapshot().snapshot, temp: null, rh: 55, co2: 900 },
+    };
+    renderDashboard();
+    expect(screen.getByTestId("dashboard-environment-snapshot-evidence")).toHaveTextContent(
+      "Saved environment evidence available",
+    );
+    const detail = screen.getByRole("region", { name: "Latest environment" });
+    expect(detail).toHaveTextContent("55.0%");
+    detail.scrollIntoView = vi.fn();
+    fireEvent.click(screen.getByRole("button", { name: "Review saved environment evidence" }));
+    expect(detail.scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+    expect(detail).toHaveFocus();
+  });
+
   it("does not link grow-wide diary evidence from an unscoped Dashboard", () => {
     H.scoped = false;
     renderDashboard();

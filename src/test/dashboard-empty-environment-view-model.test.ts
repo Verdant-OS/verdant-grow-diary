@@ -62,6 +62,20 @@ describe("Dashboard sensor-history empty view model", () => {
       build({ ...input, state: { status: "ok", snapshot: { ...snapshot, temp: 0 } } }).kind,
     ).toBe("evidence");
   });
+  it("does not offer Review for a CO2-only reading, which Latest Environment cannot show", () => {
+    const model = build({
+      ...input,
+      state: { status: "ok", snapshot: { ...snapshot, temp: null, co2: 900 } },
+    });
+    expect(model.kind).toBe("empty");
+    expect(model.heading).toBe("No sensor readings in this view");
+  });
+  it("still offers evidence when CO2 accompanies a displayed zero value", () => {
+    expect(
+      build({ ...input, state: { status: "ok", snapshot: { ...snapshot, temp: 0, co2: 900 } } })
+        .kind,
+    ).toBe("evidence");
+  });
   it("uses the existing paused-read language without confirming cached evidence", () => {
     const model = build({ ...input, state: { ...input.state, isPaused: true } });
     expect(model.kind).toBe("pending");

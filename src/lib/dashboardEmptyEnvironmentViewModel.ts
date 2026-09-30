@@ -40,13 +40,15 @@ export function buildDashboardEmptyEnvironmentViewModel(input: {
   }
   const snapshot = read.confirmedSnapshot;
   const tent = input.selectedTents?.find((candidate) => candidate.id === snapshot?.tent_id);
+  // Only metrics that Latest Environment displays can justify "Review". CO2 is a
+  // domain metric but has no row there, so a CO2-only reading must keep the
+  // normal empty state instead of linking to a panel of dashes.
   const hasValue =
     snapshot &&
     [
       snapshot.temp,
       snapshot.rh,
       snapshot.vpd,
-      snapshot.co2,
       snapshot.soil,
       snapshot.soil_ec,
       snapshot.soil_temp,

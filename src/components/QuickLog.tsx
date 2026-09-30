@@ -50,6 +50,8 @@ import QuickLogAllActivitiesSection, {
   type QuickLogAllActivitiesSaveSuccess,
   type QuickLogAllActivitiesSaveTarget,
 } from "@/components/QuickLogAllActivitiesSection";
+import { buildQuickLogTargetKey } from "@/lib/quickLogActivityRules";
+import { readPendingQuickLogActivity } from "@/lib/quickLogPendingActivityStore";
 import { STAGES } from "@/lib/grow";
 import {
   resolveQuickLogStageDefault,
@@ -83,6 +85,11 @@ import {
   filterQuickLogPlantOptions,
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
+import {
+  isQuickLogGrowStageUnconfirmed,
+  QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE,
+  shouldAttemptQuickLogGrowStageWriteback,
+} from "@/lib/quickLogGrowStageWritebackRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 import GuidedGrowWalkPanel from "@/components/GuidedGrowWalkPanel";
 import { type GrowWalkVisitMode } from "@/lib/growWalkContracts";
@@ -307,9 +314,6 @@ const QUICK_OBSERVATION_CHIPS = [
   { label: "Photo only", text: "Photo only — no other changes today." },
 ] as const;
 
-const GROW_STAGE_UNCONFIRMED_MESSAGE =
-  "Your log was saved, but the grow's stage update wasn't confirmed. Check the grow's stage before changing it again.";
-
 type SavedTarget = {
   id: string;
   name: string;
@@ -449,6 +453,7 @@ export default function QuickLog({
   });
   const [busy, setBusy] = useState(false);
   const [childSaveBusy, setChildSaveBusy] = useState(false);
+  const [activityRecoveryLockKey, setActivityRecoveryLockKey] = useState<string | null>(null);
   const [inFlightSaveContext, setInFlightSaveContext] = useState<InFlightSaveContext | null>(null);
   const [hardwareOpen, setHardwareOpen] = useState(false);
   const [wateringError, setWateringError] = useState<string | null>(null);
@@ -529,6 +534,12 @@ export default function QuickLog({
 
   const prefillRequestKey = quickLogPrefillTargetKey(prefill);
   const draftHandoffKey = quickLogDraftHandoffKey(prefill);
+  const reviewedStarterHandoffKey =
+    prefill?.source === "public-starter" &&
+    prefill.publicStarterDraftId &&
+    prefill.publicStarterDraftUpdatedAt
+      ? draftHandoffKey
+      : null;
   const namedPrefillQueryError =
     prefillRequestKey !== null && (plantsQuery.isError || tentsQuery.isError);
   const namedPrefillQueryPending =
@@ -804,6 +815,8 @@ export default function QuickLog({
   );
   const editorResolvedTarget = editorTarget.status === "ready" ? editorTarget.target : null;
   const resolvedTarget = inFlightSaveContext?.target ?? editorResolvedTarget;
+  const sameTargetRecoveryLocked =
+    !!resolvedTarget && activityRecoveryLockKey === buildQuickLogTargetKey(resolvedTarget);
   const resolvedTargetGrow = useMemo(
     () =>
       resolvedTarget ? (grows.find((grow) => grow.id === resolvedTarget.growId) ?? null) : null,
@@ -868,6 +881,15 @@ export default function QuickLog({
     setChildSaveBusy(false);
     setInFlightSaveContext(null);
   }, []);
+  const handleActivityRecoveryLockChange = useCallback(
+    (target: QuickLogAllActivitiesSaveTarget, locked: boolean) => {
+      const targetKey = buildQuickLogTargetKey(target);
+      setActivityRecoveryLockKey((current) =>
+        locked ? targetKey : current === targetKey ? null : current,
+      );
+    },
+    [],
+  );
   const isSaveInFlight = useCallback(() => saveInFlightRef.current, []);
   const consumeReviewedPublicStarterDraft = useCallback(() => {
     if (
@@ -893,6 +915,14 @@ export default function QuickLog({
    */
   const handleAllActivitiesSaveSuccess = useCallback(
     (result: QuickLogAllActivitiesSaveSuccess) => {
+      // An older recovered write must not consume the draft on screen. A
+      // recovered write carrying this exact reviewed handoff did save it.
+      if (
+        result.recovered &&
+        (!reviewedStarterHandoffKey ||
+          result.reviewedStarterHandoffKey !== reviewedStarterHandoffKey)
+      )
+        return;
       if (draftHandoffKey !== null) setSavedDraftHandoffKey(draftHandoffKey);
       consumeReviewedPublicStarterDraft();
       const plantId = result.target.plantId;
@@ -907,7 +937,7 @@ export default function QuickLog({
         user?.id ?? null,
       );
     },
-    [consumeReviewedPublicStarterDraft, draftHandoffKey, user?.id],
+    [consumeReviewedPublicStarterDraft, draftHandoffKey, reviewedStarterHandoffKey, user?.id],
   );
 
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
@@ -1246,6 +1276,13 @@ export default function QuickLog({
     e.preventDefault();
     if (saveInFlightRef.current || historyCheckRequiredRef.current || saveLocked || savedTarget)
       return;
+    if (user?.id && resolvedTarget) {
+      const recovery = readPendingQuickLogActivity(user.id, resolvedTarget);
+      if (recovery.status !== "empty") {
+        setActivityRecoveryLockKey(buildQuickLogTargetKey(resolvedTarget));
+        return;
+      }
+    }
     saveInFlightRef.current = true;
     try {
       await runSubmit();
@@ -1501,10 +1538,11 @@ export default function QuickLog({
       // ordinary save. Still never writes an unknown/empty stage.
       let growStageUnconfirmed = false;
       if (
-        saveGrow &&
-        saveStageWasUserTouched &&
-        normalizeQuickLogStage(saveStage) &&
-        saveStage !== saveGrow.stage
+        shouldAttemptQuickLogGrowStageWriteback({
+          saveGrow,
+          saveStageWasUserTouched,
+          saveStage,
+        })
       ) {
         // The diary entry is already confirmed. A separate stage write must
         // neither hide its own failure nor turn that saved entry into a retry.
@@ -1515,10 +1553,12 @@ export default function QuickLog({
             .eq("id", saveTarget.growId)
             .select("id,stage")
             .maybeSingle();
-          growStageUnconfirmed =
-            !!stageError ||
-            updatedGrow?.id !== saveTarget.growId ||
-            updatedGrow?.stage !== saveStage;
+          growStageUnconfirmed = isQuickLogGrowStageUnconfirmed({
+            stageError,
+            updatedGrow,
+            expectedGrowId: saveTarget.growId!,
+            expectedStage: saveStage,
+          });
         } catch {
           growStageUnconfirmed = true;
         }
@@ -1538,7 +1578,7 @@ export default function QuickLog({
       if (growStageUnconfirmed) {
         // Some callers navigate after onCreated, so keep the partial outcome
         // visible outside this dialog as well as in its saved-entry panel.
-        toast.message(GROW_STAGE_UNCONFIRMED_MESSAGE, { duration: 12_000 });
+        toast.message(QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE, { duration: 12_000 });
       } else {
         toast.success(finalMessage);
       }
@@ -1759,9 +1799,11 @@ export default function QuickLog({
           testIdPrefix="quick-log-dialog-all-activities"
           requestedActivityId={prefill?.activityId ?? null}
           requestedNote={prefill?.activityId ? (prefill.note ?? null) : null}
+          reviewedStarterHandoffKey={reviewedStarterHandoffKey}
           onSaveSuccess={handleAllActivitiesSaveSuccess}
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
+          onRecoveryLockChange={handleActivityRecoveryLockChange}
           saveBlocked={saveLocked}
           isSaveBlocked={isSaveInFlight}
           onBeforeStructuredWaterOpen={() => {
@@ -1771,6 +1813,16 @@ export default function QuickLog({
         />
 
         <form onSubmit={submit} className="grid gap-4">
+          {sameTargetRecoveryLocked && (
+            <p
+              role="status"
+              data-testid="quick-log-activity-recovery-lock"
+              className="text-sm text-muted-foreground"
+            >
+              An earlier activity save for this target is unresolved. Retry it in All activity types
+              before saving another log.
+            </p>
+          )}
           <fieldset
             data-testid="quick-log-main-draft-fields"
             disabled={saveLocked}
@@ -3323,7 +3375,7 @@ export default function QuickLog({
 
             <Button
               type="submit"
-              disabled={saveLocked || !resolvedTarget || !!savedTarget}
+              disabled={saveLocked || sameTargetRecoveryLocked || !resolvedTarget || !!savedTarget}
               data-testid="quick-log-save"
               className="gradient-leaf text-primary-foreground"
             >
@@ -3377,7 +3429,7 @@ export default function QuickLog({
                         className="mt-2 text-xs text-amber-700 dark:text-amber-400"
                         data-testid="quick-log-stage-save-unconfirmed"
                       >
-                        {GROW_STAGE_UNCONFIRMED_MESSAGE}
+                        {QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE}
                       </p>
                     )}
                   </div>

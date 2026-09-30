@@ -1,7 +1,7 @@
 # Verdant EcoWitt Windows Testbench - One-command wrapper
 # --------------------------------------------------------
 # Runs preflight, setup, starts the listener in a new PowerShell window,
-# waits briefly for /health, then runs verify.
+# waits briefly for /livez (liveness), then runs verify.
 #
 # Safety:
 #   - Does NOT read or print .env.
@@ -65,17 +65,19 @@ try {
 }
 
 Write-Host ""
-Write-Host "=== Waiting for /health ===" -ForegroundColor Cyan
+# /livez answers 200 whenever the listener process is up. /health can be 503
+# for delivery problems (bad token, outage, clock skew) on a running listener.
+Write-Host "=== Waiting for listener (/livez) ===" -ForegroundColor Cyan
 $ready = $false
 for ($i = 0; $i -lt 20; $i++) {
     try {
-        $null = curl.exe --silent --fail --max-time 2 "http://localhost:8787/health"
+        $null = curl.exe --silent --fail --max-time 2 "http://localhost:8787/livez"
         if ($LASTEXITCODE -eq 0) { $ready = $true; break }
     } catch { }
     Start-Sleep -Seconds 1
 }
 if (-not $ready) {
-    Write-Host "Listener did not respond on http://localhost:8787/health within 20s." -ForegroundColor Red
+    Write-Host "Listener did not respond on http://localhost:8787/livez within 20s." -ForegroundColor Red
     exit 1
 }
 Write-Host "Listener is up." -ForegroundColor Green
@@ -87,7 +89,8 @@ $verifyExit = $LASTEXITCODE
 
 Write-Host ""
 Write-Host "=== Next steps (local-only, no token) ===" -ForegroundColor Cyan
-Write-Host "  curl.exe http://localhost:8787/health"
+Write-Host "  curl.exe http://localhost:8787/livez    (is it running)"
+Write-Host "  curl.exe http://localhost:8787/health   (is delivery healthy)"
 Write-Host "  curl.exe http://localhost:8787/debug/status"
 Write-Host "  curl.exe http://localhost:8787/debug/last-events"
 Write-Host "  EcoWitt Customized Upload: Server=<LOCAL_PC_IP>, Port=8787, Path=/ecowitt, Protocol=Ecowitt"

@@ -93,6 +93,32 @@ describe("saved target mismatch copy", () => {
   });
 });
 
+describe("explicit history-review draft resolution", () => {
+  const input = {
+    historyCheckRequired: true,
+    inFlight: false,
+    currentOwnerId: "owner-1",
+    draftOwnerId: "owner-1",
+  };
+  it("allows only the current owner of an idle history-review draft, deterministically", () => {
+    expect(canDiscardQuickLogHistoryDraft(input)).toBe(true);
+    expect(canDiscardQuickLogHistoryDraft(input)).toBe(canDiscardQuickLogHistoryDraft(input));
+  });
+  it.each([
+    null,
+    undefined,
+    { ...input, historyCheckRequired: false },
+    { ...input, inFlight: true },
+    { ...input, currentOwnerId: null },
+    { ...input, currentOwnerId: "" },
+    { ...input, currentOwnerId: "   ", draftOwnerId: "   " },
+    { ...input, currentOwnerId: "other-owner" },
+    { ...input, draftOwnerId: undefined },
+  ])("refuses unresolved or foreign context %j", (context) => {
+    expect(canDiscardQuickLogHistoryDraft(context)).toBe(false);
+  });
+});
+
 /** Every soft-failure reason the deployed wrapper + delegate can return. */
 const SERVER_REASONS = [
   "not_authenticated",

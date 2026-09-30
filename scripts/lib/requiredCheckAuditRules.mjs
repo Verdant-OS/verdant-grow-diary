@@ -105,6 +105,8 @@ export function normalizeObservedChecks({
   commitStatuses = [],
   mergedAt = null,
   landedSha = "",
+  prHeadSha = "",
+  prHeadContexts = [],
 } = {}) {
   const observations = [];
 
@@ -205,11 +207,18 @@ export function normalizeObservedChecks({
   }
 
   // Merge-queue checks run on the landed merge-group SHA. If any evidence on
-  // that SHA existed at merge time, it is authoritative for the whole merge:
+  // that SHA existed at merge time, it is authoritative for queued gates:
   // a same-named PR-head failure/success is not the check that gated the
   // queued commit. Direct merges have no such landed evidence before merging,
   // so they fall back to the PR-head evidence gathered above.
   const authoritativeLandedSha = asString(landedSha);
+  const authoritativePrHeadSha = asString(prHeadSha);
+  const eligiblePrHeadContexts = new Set(Array.isArray(prHeadContexts) ? prHeadContexts : []);
+  const landedContextsAtMerge = new Set(
+    [...settled.values(), ...inFlight.values()]
+      .filter((observation) => observation.sha === authoritativeLandedSha)
+      .map((observation) => observation.context),
+  );
   const useLandedEvidence = Boolean(
     gateAtMerge &&
     authoritativeLandedSha &&
@@ -217,8 +226,17 @@ export function normalizeObservedChecks({
       (observation) => observation.sha === authoritativeLandedSha,
     ),
   );
+  // Explicit supplemental PR-only lanes have no merge_group trigger. Their
+  // exact PR-head result can count when that context has no landed evidence at
+  // the cutoff. Existing landed failures/in-flight runs always take precedence.
+  // Required contexts never enter this allowlist (enforced by the caller).
   const isRelevantEvidence = (observation) =>
-    !useLandedEvidence || observation.sha === authoritativeLandedSha;
+    !useLandedEvidence ||
+    observation.sha === authoritativeLandedSha ||
+    (authoritativePrHeadSha &&
+      observation.sha === authoritativePrHeadSha &&
+      eligiblePrHeadContexts.has(observation.context) &&
+      !landedContextsAtMerge.has(observation.context));
 
   const selected = new Map();
   const select = (key, observation) => {
@@ -301,6 +319,8 @@ export function normalizeObservedChecks({
  * where failing on absent would produce a false red on every merge.
  *
  * A bare string reads as `alwaysRuns: false`, the conservative default.
+ * `allowPrHeadEvidence` requires literal true and declares a supplemental
+ * workflow with no merge_group trigger. It never applies to required contexts.
  */
 export function normalizeMustBeGreen(entries) {
   const list = Array.isArray(entries) ? entries : [];
@@ -313,7 +333,11 @@ export function normalizeMustBeGreen(entries) {
     }
     const context = asString(entry?.context).trim();
     if (!context) continue;
-    normalized.push({ context, alwaysRuns: entry?.alwaysRuns === true });
+    normalized.push({
+      context,
+      alwaysRuns: entry?.alwaysRuns === true,
+      ...(entry?.allowPrHeadEvidence === true ? { allowPrHeadEvidence: true } : {}),
+    });
   }
   return normalized;
 }
@@ -388,6 +412,10 @@ export function auditRequiredChecks({
     commitStatuses,
     mergedAt: prResolution?.mergedAt ?? null,
     landedSha: prResolution?.landedSha ?? "",
+    prHeadSha: prResolution?.headSha ?? "",
+    prHeadContexts: mustBeGreen
+      .filter((entry) => entry.allowPrHeadEvidence && !required.includes(entry.context))
+      .map((entry) => entry.context),
   });
 
   // An always-on entry must report as well as be green: absent or skipped is

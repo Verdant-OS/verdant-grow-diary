@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
+import { runInNewContext } from "node:vm";
 import { load } from "js-yaml";
 import type { Page, Request, Response, Route, WebSocketRoute } from "@playwright/test";
 import {
@@ -503,6 +504,155 @@ describe("signed-in read-only production proof", () => {
   });
 });
 
+describe("performance workflow credential and timing boundaries", () => {
+  const workflows = [
+    [".github/workflows/signed-in-readonly-performance.yml", "signed-in-readonly-performance"],
+    [".github/workflows/quicklog-smoke.yml", "quicklog-smoke"],
+  ] as const;
+  const trusted = {
+    repository: "Verdant-OS/verdant-grow-diary",
+    actor: "cheekhimself",
+    triggering_actor: "cheekhimself",
+    ref: "refs/heads/verdant-grow-diary",
+    sha: "a".repeat(40),
+    run_attempt: "1",
+    event_name: "workflow_dispatch",
+    head_ref: "codex/chem-signedin-performance-001",
+    event: { pull_request: { head: { repo: { full_name: "Verdant-OS/verdant-grow-diary" } } } },
+  };
+  for (const [file, key] of workflows) {
+    const workflow = load(fs.readFileSync(file, "utf8")) as {
+      jobs: Record<
+        string,
+        {
+          if: string;
+          env: Record<string, string>;
+          steps: {
+            name: string;
+            env?: Record<string, string>;
+            run?: string;
+            with?: Record<string, string>;
+          }[];
+        }
+      >;
+    };
+    const job = workflow.jobs[key];
+    it.each([
+      ["owner deploy dispatch", {}, true],
+      ["owner deploy push", { event_name: "push" }, true],
+      ["arbitrary branch", { ref: "refs/heads/unreviewed" }, false],
+      [
+        "named repair branch dispatch",
+        { ref: "refs/heads/codex/chem-signedin-performance-001" },
+        false,
+      ],
+      ["fork PR", { event_name: "pull_request", repository: "outsider/fork" }, false],
+      ["same-repo named PR", { event_name: "pull_request", ref: "refs/pull/1793/merge" }, false],
+      ["PR event forged deploy ref", { event_name: "pull_request" }, false],
+      ["foreign actor", { actor: "outsider" }, false],
+      ["foreign rerun actor", { triggering_actor: "outsider" }, false],
+      ["second attempt", { run_attempt: "2" }, false],
+      ["foreign repository", { repository: "Verdant-OS/another-repo" }, false],
+      ["tag ref", { ref: "refs/tags/verdant-grow-diary" }, false],
+      ["empty ref", { ref: "" }, false],
+      ["workflow-run event", { event_name: "workflow_run" }, false],
+    ])(`${key} gates %s before allocating credentials`, (_name, override, expected) => {
+      // These job expressions use only the shared GitHub/JS equality and
+      // boolean-operator subset. Evaluate the parsed YAML, not a copied rule.
+      expect(
+        runInNewContext(
+          job.if,
+          {
+            github: { ...trusted, ...override },
+            inputs: { run_mode: "quicklog_smoke" },
+          },
+          { timeout: 100 },
+        ),
+      ).toBe(expected);
+    });
+    it(`${key} pins source and confines credentials to login/proof steps`, () => {
+      expect(JSON.stringify(job.env)).not.toContain("secrets.");
+      const checkout = job.steps.find((step) => step.name.startsWith("Checkout"))!;
+      expect(checkout.with).toMatchObject({
+        ref: "${{ github.sha }}",
+        "persist-credentials": false,
+      });
+      const credentialSteps = job.steps.filter((step) =>
+        (JSON.stringify(step.env) ?? "").includes("secrets."),
+      );
+      expect(credentialSteps.map((step) => step.name)).toEqual(
+        key === "quicklog-smoke"
+          ? [
+              "Verify required configuration",
+              "Bootstrap disposable E2E fixture",
+              "Verify disposable E2E fixture",
+              "Run Quick Log Playwright smoke",
+            ]
+          : ["Verify production fixture configuration", "Measure three signed-in read-only routes"],
+      );
+      for (const step of credentialSteps) {
+        expect(step.env).toEqual({
+          E2E_TEST_EMAIL: "${{ secrets.E2E_TEST_EMAIL }}",
+          E2E_TEST_PASSWORD: "${{ secrets.E2E_TEST_PASSWORD }}",
+        });
+      }
+    });
+  }
+  it("enables zero-retry Quick Log timing with a pinned source SHA and sanitized upload", () => {
+    const workflow = load(fs.readFileSync(workflows[1][0], "utf8")) as any;
+    const job = workflow.jobs["quicklog-smoke"];
+    expect(job.env.E2E_MEASURE_SIGNED_IN_PERFORMANCE).toBe("true");
+    expect(job.env.PLAYWRIGHT_RETRIES).toBe("0");
+    expect(job.concurrency).toEqual({
+      group: "quicklog-production-fixture",
+      "cancel-in-progress": false,
+    });
+    const pin = job.steps.find((step: any) => step.name === "Pin Quick Log proof SHA");
+    expect(pin.run).toContain("git rev-parse HEAD");
+    expect(pin.run).toContain("E2E_EXPECTED_SHA=$expected_sha");
+    expect(pin.run).not.toContain("version.json");
+    expect(job.steps.indexOf(pin)).toBeLessThan(
+      job.steps.findIndex((step: any) => step.name === "Verify disposable E2E fixture"),
+    );
+    const upload = job.steps.find(
+      (step: any) => step.name === "Upload sanitized Quick Log timing receipt",
+    );
+    expect(upload.with.path).toBe("test-results/**/*quicklog-save-confirmed-performance.json");
+    const source = fs.readFileSync("e2e/quicklog-smoke.spec.ts", "utf8");
+    expect(source).toContain('testInfo.outputPath("quicklog-save-confirmed-performance.json")');
+    expect(source).toContain(
+      "fs.writeFileSync(receiptPath, JSON.stringify(result.receipt, null, 2))",
+    );
+  });
+  it("does not select Quick Log credentials for another dispatch mode", () => {
+    const workflow = load(fs.readFileSync(workflows[1][0], "utf8")) as any;
+    expect(
+      runInNewContext(
+        workflow.jobs["quicklog-smoke"].if,
+        {
+          github: trusted,
+          inputs: { run_mode: "one_tent_proof" },
+        },
+        { timeout: 100 },
+      ),
+    ).toBe(false);
+  });
+  it("refuses a deployment mismatch and foreign fixture login before Quick Log navigation", () => {
+    const source = fs.readFileSync("e2e/quicklog-smoke.spec.ts", "utf8");
+    expect(source.indexOf("const identity = await readLivePerformanceIdentity(page)")).toBeLessThan(
+      source.indexOf("await page.goto(PLANT_URL!)"),
+    );
+    expect(source).toContain("commit: expectedSha");
+    expect(source).toContain("dirty: false");
+    const workflow = load(fs.readFileSync(workflows[1][0], "utf8")) as any;
+    const preflight = workflow.jobs["quicklog-smoke"].steps.find(
+      (step: any) => step.name === "Verify required configuration",
+    ).run;
+    expect(preflight).toContain('"$E2E_BASE_URL" != "https://verdantgrowdiary.com"');
+    expect(preflight).toContain('"$E2E_TEST_EMAIL" != "cheekhimself@gmail.com"');
+  });
+});
+
 describe("read-only performance lane wiring", () => {
   const workflow = load(
     fs.readFileSync(".github/workflows/signed-in-readonly-performance.yml", "utf8"),
@@ -519,11 +669,16 @@ describe("read-only performance lane wiring", () => {
     >;
   };
   const job = workflow.jobs["signed-in-readonly-performance"];
-  it("runs for the existing stacked trusted PR without a deploy-only base filter", () => {
+  it("keeps PR regression checks credential-free while restricting login to the deploy branch", () => {
     expect(workflow.on.pull_request).not.toHaveProperty("branches");
     expect(workflow.on).not.toHaveProperty(["pull", "request", "target"].join("_"));
-    expect(job.if).toContain("head.repo.full_name == github.repository");
-    expect(job.if).toContain("codex/chem-signedin-performance-001");
+    expect(job.if).toContain("github.ref == 'refs/heads/verdant-grow-diary'");
+    const regression = workflow.jobs["performance-safety-regressions"];
+    expect(regression).not.toHaveProperty("env");
+    expect(JSON.stringify(regression)).not.toContain("secrets.");
+    expect(
+      regression.steps.some((step) => step.run?.includes("signed-in-readonly-proof.test.ts")),
+    ).toBe(true);
     expect(workflow.permissions).toEqual({ contents: "read" });
   });
   it("requires the approved fixture email and production host without changing variables", () => {
@@ -548,7 +703,8 @@ describe("read-only performance lane wiring", () => {
   });
   it("pins the real deploy branch before comparing metadata rather than substituting the live SHA", () => {
     const pin = job.steps.find((step) => step.name === "Pin current deploy SHA")!.run!;
-    expect(pin).toContain("refs/remotes/origin/verdant-grow-diary");
+    expect(pin).toContain("git rev-parse HEAD");
+    expect(pin).toContain('[ "$expected_sha" = "$GITHUB_SHA" ]');
     expect(pin).not.toContain("version.json");
     expect(pin).toContain("E2E_EXPECTED_SHA=$expected_sha");
   });

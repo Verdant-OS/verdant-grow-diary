@@ -200,6 +200,17 @@ test.describe("Quick Log smoke checklist", () => {
     });
 
     try {
+      if (MEASURE_PERFORMANCE) {
+        const expectedSha = process.env.E2E_EXPECTED_SHA ?? "";
+        expect(expectedSha).toMatch(/^[0-9a-f]{40}$/);
+        // Refuse a source/deployment mismatch before navigation or any save.
+        const identity = await readLivePerformanceIdentity(page);
+        expect(identity).toEqual({
+          origin: "https://verdantgrowdiary.com",
+          commit: expectedSha,
+          dirty: false,
+        });
+      }
       await page.goto(PLANT_URL!);
       const fixture = await validateQuickLogFixturePage(page, undefined, productionProof);
       let routePlantId = "";
@@ -410,8 +421,11 @@ test.describe("Quick Log smoke checklist", () => {
               run: saveAndConfirm,
             },
           );
+          const receiptPath = testInfo.outputPath("quicklog-save-confirmed-performance.json");
+          fs.mkdirSync(path.dirname(receiptPath), { recursive: true });
+          fs.writeFileSync(receiptPath, JSON.stringify(result.receipt, null, 2));
           await testInfo.attach("quicklog-save-confirmed-performance", {
-            body: Buffer.from(JSON.stringify(result.receipt, null, 2)),
+            path: receiptPath,
             contentType: "application/json",
           });
           if (result.error) throw result.error;

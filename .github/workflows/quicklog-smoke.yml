@@ -469,9 +469,14 @@ jobs:
 
   quicklog-smoke:
     name: Quick Log Playwright smoke
-    if: github.event_name != 'workflow_dispatch' || inputs.run_mode == 'quicklog_smoke'
+    # Credential-bearing proof only from the owner on immutable deploy source.
+    # PR branches receive credential-free regression checks, never smoke writes.
+    if: github.repository == 'Verdant-OS/verdant-grow-diary' && github.ref == 'refs/heads/verdant-grow-diary' && github.actor == 'cheekhimself' && github.triggering_actor == 'cheekhimself' && github.run_attempt == '1' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_mode == 'quicklog_smoke'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    concurrency:
+      group: quicklog-production-fixture
+      cancel-in-progress: false
 
     # Job scope: read code, post a sticky PR comment linking to Playwright
     # artifact bundles for failed/flaky tests. No other write scopes.
@@ -491,8 +496,6 @@ jobs:
       E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
       E2E_GROW_1_PLANT_URL: ${{ vars.E2E_GROW_1_PLANT_URL }}
       E2E_GROW_1_SECOND_PLANT_NAME: ${{ vars.E2E_GROW_1_SECOND_PLANT_NAME }}
-      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
-      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
       E2E_FIXTURE_MODE: ${{ vars.E2E_FIXTURE_MODE }}
       E2E_FIXTURE_EXPECTED_GROW_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_GROW_NAME }}
       E2E_FIXTURE_EXPECTED_TENT_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_TENT_NAME }}
@@ -502,9 +505,9 @@ jobs:
       E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: ${{ vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT }}
       # Optional, off by default. Enables the UI-only fixture bootstrap step.
       E2E_ALLOW_FIXTURE_BOOTSTRAP: ${{ vars.E2E_ALLOW_FIXTURE_BOOTSTRAP }}
-      # Playwright retry policy for flake triage. Defaults to 1 retry in CI
-      # (playwright.config.ts). workflow_dispatch can override for deeper runs.
-      PLAYWRIGHT_RETRIES: ${{ github.event_name == 'workflow_dispatch' && inputs.playwright_retries || '1' }}
+      # Performance evidence is one first attempt, never a retry success.
+      E2E_MEASURE_SIGNED_IN_PERFORMANCE: "true"
+      PLAYWRIGHT_RETRIES: "0"
       # PR-comment posting mode, read by the two "Post ... PR comment" steps'
       # own `if:` conditions below. push/pull_request always default to
       # 'sticky'; only workflow_dispatch can choose 'new-per-run'.
@@ -530,9 +533,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Pin Quick Log proof SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_sha="$(git rev-parse HEAD)"
+          [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]]
+          [ "$expected_sha" = "$GITHUB_SHA" ]
+          echo "E2E_EXPECTED_SHA=$expected_sha" >> "$GITHUB_ENV"
 
       - name: Verify required configuration
         id: e2e_config
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         shell: bash
         run: |
           # Track presence (never echo values). Only NAMES of missing config
@@ -548,6 +566,13 @@ jobs:
           [ -n "$E2E_FIXTURE_MODE" ] || missing+=("vars.E2E_FIXTURE_MODE")
           [ -n "$E2E_FIXTURE_EXPECTED_TENT_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_TENT_NAME")
           [ -n "$E2E_FIXTURE_EXPECTED_PLANT_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_PLANT_NAME")
+
+          if [ "$E2E_BASE_URL" != "https://verdantgrowdiary.com" ] ||
+             [ "$E2E_TEST_EMAIL" != "cheekhimself@gmail.com" ]; then
+            echo "BLOCKED: exact production host and approved fixture-account credentials required." >&2
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
 
           event="${{ github.event_name }}"
 
@@ -626,17 +651,35 @@ jobs:
       - name: Bootstrap disposable E2E fixture
         id: bootstrap_fixture
         if: steps.e2e_config.outputs.should_run == 'true' && vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         run: bun run e2e:bootstrap-fixture
 
       - name: Verify disposable E2E fixture
         id: verify_fixture
         if: steps.e2e_config.outputs.should_run == 'true'
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         run: bun run e2e:verify-fixture
 
       - name: Run Quick Log Playwright smoke
         id: quicklog_smoke
         if: steps.e2e_config.outputs.should_run == 'true' && steps.verify_fixture.outcome == 'success'
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         run: bun run e2e:quicklog-smoke
+
+      - name: Upload sanitized Quick Log timing receipt
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: quicklog-save-performance-${{ env.ARTIFACT_SUFFIX }}
+          path: test-results/**/*quicklog-save-confirmed-performance.json
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Verify Quick Log smoke artifacts
         if: always() && steps.e2e_config.outputs.should_run == 'true'
@@ -1786,7 +1829,7 @@ jobs:
               echo "- Command: \`bun run e2e:quicklog-smoke\`"
               echo "- Browser: \`chromium\`"
               echo "- Playwright: \`${PLAYWRIGHT_VERSION:-unavailable}\`"
-              echo "- Playwright retries per test: \`${PLAYWRIGHT_RETRIES:-1}\` (override via workflow_dispatch \`playwright_retries\` input)"
+              echo "- Playwright retries per test: \`${PLAYWRIGHT_RETRIES:-0}\` (Quick Log timing proof always uses zero retries)"
               echo ""
               echo "  Retry artifacts use sibling directories such as \`test-results/<test>-retry1/\`. Authenticated tracing is intentionally off; screenshots/videos may still be retained by Playwright."
               echo ""

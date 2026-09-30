@@ -292,6 +292,9 @@ test("an accepted Activity uses server time and survives a lost reply without a 
     });
 
     await dialog.getByTestId(activity + "-save").click();
+    // The pending journal is rendered before the RPC finishes. Wait for the
+    // authenticated local acceptance and intentional reply drop, not that UI claim.
+    await expect.poll(() => dropped).toBe(1);
     await expect(dialog.getByTestId(activity + "-pending-activity")).toBeVisible();
     expect(dropped).toBe(1);
     expect(requests).toHaveLength(1);

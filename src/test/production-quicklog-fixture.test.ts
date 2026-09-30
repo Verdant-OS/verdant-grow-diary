@@ -533,9 +533,9 @@ describe("production smoke save integration", () => {
   it("installs proof before navigation and disposes it in both entry points", () => {
     for (const file of ["e2e/quicklog-smoke.spec.ts", "e2e/fixture-safety.spec.ts"]) {
       const source = read(file);
-      expect(source.indexOf("observeProductionQuickLogFixture(page)")).toBeLessThan(
-        source.indexOf("await page.goto("),
-      );
+      const observeIndex = source.indexOf("observeProductionQuickLogFixture(page)");
+      expect(observeIndex).toBeGreaterThanOrEqual(0);
+      expect(observeIndex).toBeLessThan(source.indexOf("await page.goto("));
       expect(source).toContain("productionProof.dispose()");
       expect(source).toContain("productionProof);");
     }

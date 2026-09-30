@@ -6,7 +6,9 @@ export const QUICKLOG_SMOKE_APP_ORIGIN = "https://verdantgrowdiary.com";
 export const QUICKLOG_SMOKE_BACKEND_ORIGIN = "https://knkwiiywfkbqznbxwqfh.supabase.co";
 export const QUICKLOG_SMOKE_ACCOUNT_EMAIL = "cheekhimself@gmail.com";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const MARKER = /\b(?:e2e|test|qa)\b/i;
+// Non-alphanumeric boundaries (not \b) so underscore-joined names such as
+// "E2E_Test_Tent" carry a marker, while "Contest" or "Testing" do not.
+const MARKER = /(?:^|[^A-Za-z0-9])(?:e2e|test|qa)(?:$|[^A-Za-z0-9])/i;
 
 export type FixtureOwnedRow = Readonly<{
   id: string;

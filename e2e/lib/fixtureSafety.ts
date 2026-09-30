@@ -140,8 +140,9 @@ export function pageTextMatchesFixture(
   const text = pageText ?? "";
 
   if (!(options.allowQaMarker ? /\b(?:E2E|Test|QA)\b/i : /E2E|Test/i).test(text)) {
+    const markers = options.allowQaMarker ? "'E2E', 'Test' or 'QA'" : "'E2E' or 'Test'";
     errors.push(
-      "Target page does not contain 'E2E' or 'Test' markers — refusing to treat as fixture data.",
+      `Target page does not contain ${markers} markers — refusing to treat as fixture data.`,
     );
   }
 
@@ -219,7 +220,7 @@ export async function validateQuickLogFixturePage(
     E2E_FIXTURE_EXPECTED_PLANT_NAME: process.env.E2E_FIXTURE_EXPECTED_PLANT_NAME,
     E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: process.env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
   },
-  productionProof?: ProductionQuickLogFixtureProof,
+  productionProof: ProductionQuickLogFixtureProof,
 ): Promise<FixtureEnvValidation> {
   // This explicit owner-approved production lane is separate from the generic
   // fixture validator. Pheno and bootstrap retain their existing host fences.

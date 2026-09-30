@@ -27,8 +27,9 @@ jobs:
     steps:
       - name: Fetch PR template
         if: github.event_name == 'pull_request'
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           sparse-checkout: .github/pull_request_template.md
           sparse-checkout-cone-mode: false
           persist-credentials: false
@@ -43,11 +44,14 @@ jobs:
             exit 0
           fi
           tpl=.github/pull_request_template.md
-          [ -f "$tpl" ] || tpl=/dev/null
+          if [ ! -f "$tpl" ]; then
+            echo "::error title=PR description required::Could not read $tpl from the base commit; failing closed."
+            exit 1
+          fi
           remaining="$(printf '%s' "$PR_BODY" | TPL="$tpl" perl -CSD -0777 -ne '
             my $b = $_;
             $b =~ s/<!--.*?(-->|\z)//gs;
-            $b =~ s/[\x{00A0}\x{200B}-\x{200D}\x{2060}\x{FEFF}]/ /g;
+            $b =~ s/[\x{00A0}\x{00AD}\x{180E}\x{200B}-\x{200D}\x{2060}-\x{2064}\x{FEFF}]/ /g;
             my %tpl;
             if (open(my $fh, "<:encoding(UTF-8)", $ENV{TPL})) {
               local $/; my $t = <$fh>; $t =~ s/<!--.*?(-->|\z)//gs;
@@ -66,7 +70,7 @@ jobs:
           ')"
           stripped="$(printf '%s' "$remaining" | tr -d '[:space:]')"
           if [ -z "$stripped" ]; then
-            echo "::error title=PR description required::This pull request has no description of its own (an empty body or an unfilled template does not count). Add a short summary of what it changes and why, then save; this check reruns on edit."
+            echo "::error title=PR description required::This pull request has no description of its own (an empty body, an unfilled template, or checkbox lines alone do not count). Add a short summary of what it changes and why, then save; this check reruns on edit."
             exit 1
           fi
           echo "PR description present (${#stripped} non-whitespace characters beyond the template)."

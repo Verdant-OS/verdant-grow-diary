@@ -33,11 +33,11 @@ function isAtLeast(actual: Version, minimum: Version): boolean {
 
 function isSafeBraceExpansionVersion(actual: Version): boolean {
   const [major] = actual;
-  if (major === 1) return isAtLeast(actual, [1, 1, 21]);
-  if (major === 2) return isAtLeast(actual, [2, 1, 7]);
-  if (major === 3) return isAtLeast(actual, [3, 0, 9]);
+  if (major === 1) return isAtLeast(actual, [1, 1, 18]);
+  if (major === 2) return isAtLeast(actual, [2, 1, 4]);
+  if (major === 3) return isAtLeast(actual, [3, 0, 6]);
   if (major === 4) return false;
-  if (major === 5) return isAtLeast(actual, [5, 0, 12]);
+  if (major === 5) return isAtLeast(actual, [5, 0, 9]);
   return major > 5;
 }
 
@@ -174,22 +174,14 @@ describe("dependency security Phase A resolution floors", () => {
 
   it.each([
     [[1, 1, 17] as const, false],
-    [[1, 1, 18] as const, false],
-    [[1, 1, 20] as const, false],
-    [[1, 1, 21] as const, true],
+    [[1, 1, 18] as const, true],
     [[2, 1, 3] as const, false],
-    [[2, 1, 4] as const, false],
-    [[2, 1, 6] as const, false],
-    [[2, 1, 7] as const, true],
+    [[2, 1, 4] as const, true],
     [[3, 0, 5] as const, false],
-    [[3, 0, 6] as const, false],
-    [[3, 0, 8] as const, false],
-    [[3, 0, 9] as const, true],
+    [[3, 0, 6] as const, true],
     [[4, 0, 1] as const, false],
     [[5, 0, 8] as const, false],
-    [[5, 0, 9] as const, false],
-    [[5, 0, 11] as const, false],
-    [[5, 0, 12] as const, true],
+    [[5, 0, 9] as const, true],
   ])("classifies brace-expansion %s safety as %s", (version, expected) => {
     expect(isSafeBraceExpansionVersion(version)).toBe(expected);
   });

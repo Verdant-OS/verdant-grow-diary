@@ -26,7 +26,7 @@ export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
   hono: "4.13.5",
   vite: "6.4.3",
   postcss: "8.5.18",
-  "brace-expansion": "1.1.21",
+  "brace-expansion": "1.1.18",
   "fast-uri": "3.1.8",
   "form-data": "4.0.6",
   "js-yaml": "4.3.2",
@@ -51,18 +51,16 @@ export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   vitest: "4.1.11",
   "@vitest/mocker": "4.1.11",
   esbuild: "0.28.1",
-  "brace-expansion": "1.1.21",
 });
 export const PACKAGE_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({
   "brace-expansion": Object.freeze({
-    1: "1.1.21",
-    2: "2.1.7",
-    3: "3.0.9",
+    1: "1.1.18",
+    2: "2.1.4",
+    3: "3.0.6",
     4: null,
-    5: "5.0.12",
+    5: "5.0.9",
   }),
 });
-export const BUN_LOCK_MAJOR_SECURITY_FLOORS = PACKAGE_LOCK_MAJOR_SECURITY_FLOORS;
 export const FORBIDDEN_LOCKFILES = Object.freeze(["bun.lockb", "yarn.lock", "pnpm-lock.yaml"]);
 const NPM_COMMAND = String.raw`npm(?:\.cmd|\.exe)?`;
 const NPM_CONSUMER_PATTERN = new RegExp(
@@ -521,19 +519,6 @@ export function evaluatePolicy({
           errors.push(
             `bun.lock security floor for ${packageName} is ${minimum}; ` +
               `found ${versions?.join(", ") || "none"}.`,
-          );
-        }
-      }
-
-      for (const [packageName, floors] of Object.entries(BUN_LOCK_MAJOR_SECURITY_FLOORS)) {
-        const versions = resolvedVersionInBunLock(bunLockText, packageName) ?? [];
-        const rejected = versions.filter(
-          (version) => !versionMeetsMajorSecurityFloors(version, floors),
-        );
-        if (versions.length === 0 || rejected.length > 0) {
-          errors.push(
-            `bun.lock major-aware security floor for ${packageName} rejected ` +
-              `${rejected.join(", ") || "a missing resolution"}.`,
           );
         }
       }

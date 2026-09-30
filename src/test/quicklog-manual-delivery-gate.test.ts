@@ -17,13 +17,21 @@ describe("database-enforced Quick Log manual delivery", () => {
     ][position];
     expect(script).toContain(predecessor[0]);
     expect(script).toContain(predecessor[1]);
-    expect(script.indexOf("delivery_order_rejected")).toBeLessThan(script.indexOf(sql));
+    const gateStart = script.indexOf("DO $manual_delivery_gate$");
+    expect(script.indexOf("\nBEGIN;\n")).toBeLessThan(gateStart);
+    expect(script.match(/^BEGIN;$/gm)).toHaveLength(1);
+    expect(script.indexOf("delivery_order_rejected")).toBeLessThan(
+      script.indexOf(sql.slice(sql.indexOf("\nBEGIN;\n") + "\nBEGIN;\n".length)),
+    );
     expect(script).toContain("pg_catalog.to_regprocedure('public.quicklog_save_manual(");
     expect(script).toContain(
       "pg_catalog.to_regprocedure('public.quicklog_save_manual_pre_logged_at(",
     );
-    expect(script).toContain("pg_catalog.pg_try_advisory_lock(20260929, 183000)");
-    expect(script.endsWith(sql)).toBe(true);
+    expect(script).toContain("pg_catalog.pg_try_advisory_xact_lock(20260929, 183000)");
+    expect(script).not.toContain("pg_catalog.pg_try_advisory_lock(");
+    expect(
+      script.replace(/DO \$manual_delivery_gate\$[\s\S]*?\$manual_delivery_gate\$;\n/, ""),
+    ).toBe(sql);
     expect(
       gate.buildManualDeliveryStepSql({
         order: gate.MANUAL_DELIVERY_ORDER,

@@ -43,11 +43,15 @@ history. #1742's branch and production runner are unchanged by this proof PR. No
 claim of an operational production manual-chain apply lane is made here.
 
 The shared `buildManualDeliveryStepSql` adapter adds a database catalog gate in
-front of each unchanged, fingerprint-checked migration. It resolves the schema-qualified
+inside each fingerprint-checked migration transaction. It resolves the schema-qualified
 wrapper and delegate signatures by OID, checks their exact predecessor source
 fingerprints, owners, return types, search paths and execution grants, and takes
-a shared session advisory lock before checking. The same connection submits the
-entire gated script with `ON_ERROR_STOP`, then closes to release the lock. No
+a shared transaction advisory lock before checking. The generated script inserts
+the gate immediately after the original `BEGIN`, preserving every authored
+statement and leaving the committed migration file unchanged. The check and
+migration share one transaction, including through transaction pooling; commit
+or rollback releases the lock. The protected caller submits the entire script
+with `ON_ERROR_STOP`. No
 caller-supplied completed prefix can replace these checks. In particular,
 `183000` requires the `160000` delegate; its original migration preflight checks
 only the `002000` wrapper. The PG15 proof now also tries `183000` after `002000`

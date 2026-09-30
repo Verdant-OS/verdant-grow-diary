@@ -33,8 +33,9 @@ const signature =
 
 /**
  * A protected runner must submit this entire script with ON_ERROR_STOP enabled.
- * The session lock covers the catalog check and the unchanged self-transactional
- * migration. Closing the one-step connection releases the lock, including on error.
+ * The gate is inserted after the pinned migration's BEGIN, preserving every
+ * original statement. Its transaction lock covers the check and migration even
+ * through a transaction pooler; commit or rollback releases the lock.
  * This builder has no database connection or standalone production entry point.
  */
 export function buildManualDeliveryStepSql(input) {
@@ -52,12 +53,12 @@ export function buildManualDeliveryStepSql(input) {
   }
   // The caller's completed-prefix claim cannot replace actual database evidence.
   // In particular, 183000 must see the 160000 delegate, not only the 002000 wrapper.
-  return `DO $manual_delivery_gate$
+  const gateSql = `DO $manual_delivery_gate$
 DECLARE
   v_wrapper oid := pg_catalog.to_regprocedure('public.quicklog_save_manual(${signature})');
   v_delegate oid := pg_catalog.to_regprocedure('public.quicklog_save_manual_pre_logged_at(${signature})');
 BEGIN
-  IF NOT pg_catalog.pg_try_advisory_lock(20260929, 183000) THEN
+  IF NOT pg_catalog.pg_try_advisory_xact_lock(20260929, 183000) THEN
     RAISE EXCEPTION USING ERRCODE='P0001', MESSAGE='manual_delivery_writer_busy';
   END IF;
   IF current_user <> 'postgres' OR v_wrapper IS NULL OR v_delegate IS NULL
@@ -91,7 +92,12 @@ BEGIN
   END IF;
 END;
 $manual_delivery_gate$;
-${input.sql}`;
+`;
+  const transactionMarker = "\nBEGIN;\n";
+  const start = input.sql.indexOf(transactionMarker);
+  if (start < 0) throw new Error("migration_shape_rejected");
+  const positionAfterBegin = start + transactionMarker.length;
+  return input.sql.slice(0, positionAfterBegin) + gateSql + input.sql.slice(positionAfterBegin);
 }
 
 export function validManualDeliveryOrder(value) {

@@ -282,9 +282,22 @@ requirements:
   consistency, which the audit fully covers.
 - It covers M11's full holder set: the apex-holding project at that boundary, the
   current one, and every project or platform that an unfiltered domain event or DNS
-  change in the window names.
+  change in the window names. The holder set is complete only when every entry
+  names a project. A DNS target that names a platform but no project (a shared
+  anycast address), or an unidentified DNS provider, leaves completeness
+  `NOT_MEASURED`. A holder the session cannot read leaves that portion `BLOCKED`.
 - It lists Vercel user events and authoritative DNS changes for every custom
   hostname in that union.
+- It enumerates every production deployment created in the window in those
+  projects and classifies each one by M4's rules. That includes the merge-queue
+  provenance of every deploy-branch tip. A CLI-created deployment, an off-branch
+  Git build or a bypass-merged tip is an out-of-band publish, even when the
+  topology was restored before the closing reading.
+- Everything else M11 lists in the specification is also covered.
+
+An audit is complete only when all of the above ran with no `BLOCKED` or
+`NOT_MEASURED` portion. An incomplete audit does not advance M11's boundary and
+cannot make the run `PASS`.
 
 What each outcome means:
 

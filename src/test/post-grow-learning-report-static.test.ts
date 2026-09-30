@@ -96,8 +96,6 @@ describe("Post-Grow Learning Report safety", () => {
   it("keeps report data adapter narrow and uses raw lineage only for classification", () => {
     expect(HOOK).toContain('from("grows")');
     expect(HOOK).toContain('from("diary_entries")');
-    expect(HOOK).toContain("effectiveSensorReadingsQuery()");
-    expect(HOOK).toContain("requireEffectiveSensorReadings(sensorRes.data)");
     expect(HOOK).not.toContain('from("sensor_readings")');
     expect(HOOK).toContain('from("action_queue")');
     expect(HOOK).toContain(

@@ -66,6 +66,10 @@ export default function PostGrowLearningReport() {
   const { user } = useAuth();
   const lessonScope = `${user?.id ?? "anon"}\u0000${growId ?? "none"}`;
   const lessonDraft = useRef("");
+  // True from the grower's first keystroke until the draft is synced to a saved
+  // record again. Text equality alone cannot tell a deliberate edit that restores
+  // the saved text from a pristine draft.
+  const lessonDirty = useRef(false);
   const lastSavedLesson = useRef<{ scope: string; entryId: string | null; text: string } | null>(
     null,
   );
@@ -106,6 +110,7 @@ export default function PostGrowLearningReport() {
 
   useEffect(() => {
     lessonDraft.current = "";
+    lessonDirty.current = false;
     lastSavedLesson.current = null;
     pendingFirstSave.current = null;
     setLesson("");
@@ -133,9 +138,10 @@ export default function PostGrowLearningReport() {
       !previous ||
       previous.scope !== current.scope ||
       (previous.entryId !== current.entryId && !preservePostSaveEdit) ||
-      (lessonDraft.current === previous.text && !preservePostSaveEdit)
+      (!lessonDirty.current && !preservePostSaveEdit)
     ) {
       lessonDraft.current = current.text;
+      lessonDirty.current = false;
       setLesson(current.text);
     }
     lastSavedLesson.current = current;
@@ -143,6 +149,7 @@ export default function PostGrowLearningReport() {
 
   function changeLesson(value: string) {
     lessonDraft.current = value;
+    lessonDirty.current = true;
     setLesson(value);
   }
 
@@ -158,8 +165,10 @@ export default function PostGrowLearningReport() {
     const result = await saveLesson(submitted);
     setBusy(false);
     if (result.ok) {
-      if (lastSavedLesson.current?.scope === submittedScope && lessonDraft.current === submitted)
+      if (lastSavedLesson.current?.scope === submittedScope && lessonDraft.current === submitted) {
         changeLesson(submitted.trim());
+        lessonDirty.current = false;
+      }
       toast.success("Lesson saved");
     } else {
       if (pendingFirstSave.current?.scope === submittedScope) pendingFirstSave.current = null;

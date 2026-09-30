@@ -277,3 +277,28 @@ it.each(["First saved and more", ""])(
     expect(input.value).toBe(laterDraft);
   },
 );
+
+it("keeps an in-flight edit that restores the previous saved text on an existing record", async () => {
+  let finishSave!: (value: { ok: true }) => void;
+  io.save.mockReturnValue(
+    new Promise((resolve) => {
+      finishSave = resolve;
+    }),
+  );
+  io.report = savedLesson("");
+  const view = mount();
+  const input = await lessonBox();
+  fireEvent.change(input, { target: { value: "B" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save lesson" }));
+  expect(io.save).toHaveBeenCalledWith("B");
+  fireEvent.change(input, { target: { value: "" } });
+  io.report = savedLesson("B");
+  view.rerender(
+    <MemoryRouter>
+      <PostGrowLearningReport />
+    </MemoryRouter>,
+  );
+  expect(input.value).toBe("");
+  await act(async () => finishSave({ ok: true }));
+  expect(input.value).toBe("");
+});

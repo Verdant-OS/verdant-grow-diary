@@ -118,7 +118,7 @@ describe("dependency security Phase A resolution floors", () => {
     ["vite", [6, 4, 3] as const],
     ["postcss", [8, 5, 18] as const],
     ["esbuild", [0, 28, 1] as const],
-    ["fast-uri", [3, 1, 6] as const],
+    ["fast-uri", [3, 1, 8] as const],
     ["form-data", [4, 0, 6] as const],
     ["js-yaml", [4, 3, 2] as const],
     ["hono", [4, 13, 5] as const],
@@ -207,7 +207,7 @@ describe("dependency security Phase A resolution floors", () => {
   it("pins only same-major compatible overrides", () => {
     expect(packageJson.overrides).toMatchObject({
       esbuild: "0.28.1",
-      "fast-uri": "3.1.6",
+      "fast-uri": "3.1.8",
       "form-data": "4.0.6",
       "js-yaml": "4.3.2",
       hono: "4.13.5",

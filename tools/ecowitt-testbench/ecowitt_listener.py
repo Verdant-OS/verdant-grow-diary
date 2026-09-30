@@ -33,7 +33,8 @@ Usage:
     python ecowitt_listener.py
 
 Endpoints:
-    GET  /health
+    GET  /health   readiness: 503 when delivery is failing (see body "reasons")
+    GET  /livez    liveness: always 200 while the process is serving HTTP
     GET  /ecowitt or /ECOWITT  (accepts query params, like EcoWitt customized upload)
     POST /ecowitt or /ECOWITT  (accepts form data, JSON, or raw body)
     GET  /debug/raw-log-tail   (LOCAL-ONLY operator debug; sanitized; read-only)
@@ -1139,6 +1140,38 @@ class ListenerRuntime:
                         print("[verdant-testbench] local delivery state error; pending entries retained")
             self.thread = threading.Thread(target=replay, name="ecowitt-replay", daemon=True)
             self.thread.start()
+            self.started = True
+
+    def worker_alive(self) -> bool:
+        thread = self.thread
+        return thread is not None and thread.is_alive()
+
+    def ensure_worker(self) -> bool:
+        """Replace a replay worker that died after start(). Returns True on restart.
+
+        Only acts once start() has run and the runtime has not been stopped, so
+        tests and one-shot callers that never started a worker are unaffected.
+        """
+        if not getattr(self, "started", False) or self.stop_event.is_set():
+            return False
+        with self.lock:
+            if self.worker_alive():
+                return False
+            self.worker_restarts = getattr(self, "worker_restarts", 0) + 1
+        print("[verdant-testbench] replay worker was not running; restarting it")
+        self.start()
+        return True
+
+    def supervise(self) -> None:
+        """Check the replay worker on a timer until the runtime is stopped."""
+        stop_event = self.stop_event
+        def loop() -> None:
+            while not stop_event.wait(max(self.interval, 1) * 5):
+                try:
+                    self.ensure_worker()
+                except Exception as exc:  # never let the supervisor die silently
+                    print(f"[verdant-testbench] replay supervisor error: {type(exc).__name__}")
+        threading.Thread(target=loop, name="ecowitt-replay-supervisor", daemon=True).start()
 
 
 def get_runtime() -> ListenerRuntime:
@@ -1198,10 +1231,30 @@ def mask_ingest_url(url: Optional[str]) -> Optional[str]:
 # Routes
 # ---------------------------------------------------------------------------
 
+@app.get("/livez")
+def livez() -> Any:
+    """Liveness only: 200 whenever this process can answer HTTP.
+
+    Delivery problems (bad token, network outage, clock skew, a dead replay
+    worker) are reported by /health, never here, so scripts that only need to
+    know "is the listener running" do not misreport those as "not started".
+    """
+    worker = None
+    try:
+        runtime = _RUNTIME
+        if runtime is not None:
+            worker = runtime.worker_alive()
+    except Exception:
+        worker = None
+    return jsonify({"ok": True, "alive": True, "vendor": VENDOR, "port": PORT,
+                    "replay_worker_alive": worker}), 200
+
+
 @app.get("/health")
 def health() -> Any:
     try:
         runtime = get_runtime()
+        runtime.ensure_worker()
         runtime.health.tick()
         status = runtime.health.status()
         if runtime.last_local_error:
@@ -2204,7 +2257,9 @@ def main() -> None:  # pragma: no cover
         print("[verdant-testbench] startup refused: invalid tent map, limits or local state; no credentials echoed", file=sys.stderr)
         raise SystemExit(2) from None
     runtime.start()
+    runtime.supervise()
     print(f"[verdant-testbench] listening on http://localhost:{PORT}")
+    print(f"[verdant-testbench] liveness: http://localhost:{PORT}/livez")
     print(f"[verdant-testbench] health:  http://localhost:{PORT}/health")
     print(
         f"[verdant-testbench] demo:    http://localhost:{PORT}/ecowitt"

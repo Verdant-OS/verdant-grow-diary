@@ -187,6 +187,65 @@ class ListenerIntegrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.get_json()["reasons"], ["forward_failure", "gateway_quiet"])
 
+    def test_livez_is_200_when_health_is_503_for_delivery_failure(self):
+        runtime = listener.get_runtime()
+        runtime.health.forward_result(TENT_A, False)
+        self.now += timedelta(minutes=11)
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        response = self.client.get("/livez")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["alive"])
+
+    def test_livez_is_200_after_restart_with_persisted_failure(self):
+        listener.get_runtime().health.forward_result(TENT_A, False)
+        self.now += timedelta(minutes=11)
+        listener._RUNTIME = None  # simulate a process restart; health state reloads from disk
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        self.assertEqual(self.client.get("/livez").status_code, 200)
+
+    def test_livez_is_200_before_any_runtime_exists_and_on_local_error(self):
+        self.assertEqual(self.client.get("/livez").status_code, 200)
+        runtime = listener.get_runtime()
+        runtime.last_local_error = "local_delivery_state_error"
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        self.assertEqual(self.client.get("/livez").status_code, 200)
+
+    def test_livez_reports_worker_state_without_failing(self):
+        runtime = listener.get_runtime()
+        self.assertIsNone(runtime.thread)
+        body = self.client.get("/livez").get_json()
+        self.assertFalse(body["replay_worker_alive"])
+
+    def test_dead_replay_worker_is_replaced_once_started(self):
+        runtime = listener.get_runtime()
+        self.addCleanup(lambda: runtime.stop_event.set())
+        runtime.start()
+        first = runtime.thread
+        runtime.stop_event.set()
+        first.join(timeout=5)
+        self.assertFalse(first.is_alive())
+        runtime.stop_event = __import__("threading").Event()  # runtime still running; only the worker died
+        with mock.patch("builtins.print"):
+            self.assertTrue(runtime.ensure_worker())
+        self.assertIsNot(runtime.thread, first)
+        self.assertTrue(runtime.thread.is_alive())
+        self.assertEqual(runtime.worker_restarts, 1)
+        self.assertFalse(runtime.ensure_worker())  # alive worker: no restart loop
+
+    def test_worker_is_not_started_by_health_if_never_started(self):
+        runtime = listener.get_runtime()
+        self.assertFalse(runtime.ensure_worker())
+        self.client.get("/health")
+        self.assertIsNone(runtime.thread)
+
+    def test_stopped_runtime_does_not_restart_worker(self):
+        runtime = listener.get_runtime()
+        runtime.start()
+        runtime.stop_event.set()
+        runtime.thread.join(timeout=5)
+        with mock.patch("builtins.print"):
+            self.assertFalse(runtime.ensure_worker())
+
     def test_invalid_or_future_timestamp_never_enters_spool(self):
         for value in (None, "garbage", "2026-09-28 12:06:00"):
             response = self.post({**self.packet, "dateutc": value})

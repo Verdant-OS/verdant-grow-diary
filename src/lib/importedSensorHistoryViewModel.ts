@@ -17,6 +17,13 @@
  */
 
 import { isCsvHistoryRow } from "@/lib/aiDoctorCsvHistoryContextRules";
+import {
+  AIR_TEMP_C_RANGE,
+  HUMIDITY_RANGE,
+  SUBSTRATE_TEMP_C_RANGE,
+  VWC_RANGE,
+} from "@/constants/csvValidationRanges";
+import { VPD_REALISTIC_RANGE } from "@/lib/manualSensorSnapshotQualityRules";
 
 export const IMPORTED_SENSOR_HISTORY_SOURCE = "csv" as const;
 export const IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT = 25;
@@ -65,8 +72,10 @@ export interface ImportedSensorHistoryDisplayRow {
   capturedAt: string;
   metric: string;
   value: number | null;
-  /** Canonical stored value with a unit only for known CSV metric keys. */
+  /** Display-only rounded value; `value` retains the stored precision. Units are known CSV keys only. */
   displayValue: string;
+  /** Plain-language row warning when the stored value is outside plausibility bounds. */
+  outOfRangeNote: string | null;
 }
 
 export interface ImportedSensorHistoryMetricOption {
@@ -120,21 +129,49 @@ function formatImportedValue(metric: string, value: number | null): string {
   switch (metric) {
     case "temperature_c":
     case "soil_temp_c":
-      return `${value} °C`;
+      return `${Number(value.toFixed(1))} °C`;
     case "humidity_pct":
     case "soil_moisture_pct":
-      return `${value}%`;
+      return `${Number(value.toFixed(1))}%`;
     case "vpd_kpa":
-      return `${value} kPa`;
+      return `${Number(value.toFixed(2))} kPa`;
     case "co2_ppm":
-      return `${value} ppm`;
+      return `${Math.round(value)} ppm`;
     case "ppfd":
-      return `${value} µmol/m²/s`;
+      return `${Math.round(value)} µmol/m²/s`;
     case "ec":
       return `${value} mS/cm`;
     default:
       // An unfamiliar imported key cannot establish a unit.
       return String(value);
+  }
+}
+
+function resolveOutOfRangeNote(metric: string, value: number | null): string | null {
+  if (value === null) return null;
+  switch (metric) {
+    case "temperature_c":
+      return value < AIR_TEMP_C_RANGE.min || value > AIR_TEMP_C_RANGE.max
+        ? "Temperature is out of range."
+        : null;
+    case "soil_temp_c":
+      return value < SUBSTRATE_TEMP_C_RANGE.min || value > SUBSTRATE_TEMP_C_RANGE.max
+        ? "Soil temperature is out of range."
+        : null;
+    case "humidity_pct":
+      return value < HUMIDITY_RANGE.min || value > HUMIDITY_RANGE.max
+        ? "Humidity is out of range."
+        : null;
+    case "soil_moisture_pct":
+      return value < VWC_RANGE.min || value > VWC_RANGE.max
+        ? "Soil moisture is out of range."
+        : null;
+    case "vpd_kpa":
+      return value < VPD_REALISTIC_RANGE.min || value > VPD_REALISTIC_RANGE.max
+        ? "VPD is out of range."
+        : null;
+    default:
+      return null;
   }
 }
 
@@ -218,6 +255,7 @@ export function buildImportedSensorHistoryViewModel(args: {
       metric: r.metric,
       value,
       displayValue: formatImportedValue(r.metric, value),
+      outOfRangeNote: resolveOutOfRangeNote(r.metric, value),
     });
   }
 

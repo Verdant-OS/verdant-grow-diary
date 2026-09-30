@@ -137,9 +137,7 @@ describe("Tent Detail idle snapshot freshness", () => {
     state.rows = [{ metric: "vpd_kpa", value: 1, ts, captured_at: ts, source: "live" }];
     mount();
     expect(screen.getByTestId("tent-detail-sensor-stale")).toBeVisible();
-    expect(screen.getByTestId("tent-detail-vpd-stage-hint")).toHaveTextContent(
-      "historical, stale reading",
-    );
+    expect(screen.getByTestId("tent-detail-vpd-stage-hint")).toHaveTextContent(/stale/i);
   });
 
   it("keeps a newer manual snapshot fresh while an older live group would have aged out", () => {

@@ -160,7 +160,7 @@ function sensorClient(input: {
         return chain;
       }
 
-      if (table !== "sensor_readings") throw new Error(`Unexpected table: ${table}`);
+      if (table !== "sensor_readings_effective") throw new Error(`Unexpected table: ${table}`);
       const queryIndex = sensorQueryIndex++;
       let metric = "";
       let capturedMode: "captured" | "legacy" = "captured";
@@ -208,7 +208,18 @@ function sensorClient(input: {
               (capturedMode === "legacy" ? row.captured_at === null : row.captured_at !== null) &&
               (sourceValues === null || sourceValues.includes(row.source)),
           );
-          return { data: data.slice(0, limit), error: null };
+          return {
+            data: data.slice(0, limit).map((r) => ({
+              ...r,
+              id:
+                "cccccccc-cccc-4ccc-8ccc-" +
+                String((input.rows ?? []).indexOf(r) + 1).padStart(12, "0"),
+              user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              device_id: null,
+              correction_valid: true,
+            })),
+            error: null,
+          };
         },
       };
       return chain;
@@ -220,7 +231,7 @@ function sensorClient(input: {
 function row(overrides: Partial<McpSensorQueryRow> = {}): McpSensorQueryRow {
   return {
     id: "reading-1",
-    tent_id: "tent-1",
+    tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     metric: "temperature_c",
     value: 24,
     quality: "ok",
@@ -895,19 +906,27 @@ describe("owner-scoped Operator account read models", () => {
   describe("getLatestSensorSnapshotForOwnedTent", () => {
     it("checks tent ownership before reading every supported metric", async () => {
       const { client, calls } = sensorClient({
-        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        tent: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Home tent", grow_id: "grow-1" },
         rows: [row()],
       });
 
-      const result = await getLatestSensorSnapshotForOwnedTent(client, "tent-1", {
-        now: new Date("2026-07-19T12:05:00Z"),
-      });
+      const result = await getLatestSensorSnapshotForOwnedTent(
+        client,
+        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        {
+          now: new Date("2026-07-19T12:05:00Z"),
+        },
+      );
       expect(result).toMatchObject({
         ok: true,
         data: {
-          tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+          tent: {
+            id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            name: "Home tent",
+            grow_id: "grow-1",
+          },
           snapshot: {
-            tentId: "tent-1",
+            tentId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             readings: { temperature_c: { current_live: true } },
           },
         },
@@ -915,26 +934,38 @@ describe("owner-scoped Operator account read models", () => {
       expect(
         calls.findIndex((call) => call.table === "tents" && call.method === "maybeSingle"),
       ).toBeLessThan(
-        calls.findIndex((call) => call.table === "sensor_readings" && call.method === "from"),
+        calls.findIndex(
+          (call) => call.table === "sensor_readings_effective" && call.method === "from",
+        ),
       );
       expect(
-        calls.filter((call) => call.table === "sensor_readings" && call.method === "from"),
+        calls.filter(
+          (call) => call.table === "sensor_readings_effective" && call.method === "from",
+        ),
       ).toHaveLength(OPERATOR_SENSOR_METRICS.length * 2);
       expect(calls).toContainEqual({
-        table: "sensor_readings",
+        table: "sensor_readings_effective",
         method: "select",
-        args: ["id,tent_id,metric,value,quality,source,ts,captured_at,created_at,raw_payload"],
+        args: [
+          "id,user_id,tent_id,metric,value,quality,source,ts,captured_at,created_at,device_id,raw_payload,correction_valid",
+        ],
       });
     });
 
     it("returns snapshot null when the owned tent has no eligible rows", async () => {
       const { client } = sensorClient({
-        tent: { id: "tent-1", name: "Empty tent", grow_id: "grow-1" },
+        tent: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Empty tent", grow_id: "grow-1" },
       });
-      await expect(getLatestSensorSnapshotForOwnedTent(client, "tent-1")).resolves.toEqual({
+      await expect(
+        getLatestSensorSnapshotForOwnedTent(client, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+      ).resolves.toEqual({
         ok: true,
         data: {
-          tent: { id: "tent-1", name: "Empty tent", grow_id: "grow-1" },
+          tent: {
+            id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            name: "Empty tent",
+            grow_id: "grow-1",
+          },
           snapshot: null,
         },
       });
@@ -943,7 +974,7 @@ describe("owner-scoped Operator account read models", () => {
     it("does not supplement exactly 25 logical candidates or surface a nonexistent recovery failure", async () => {
       const at = "2026-07-19T12:00:00Z";
       const { client, calls } = sensorClient({
-        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        tent: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Home tent", grow_id: "grow-1" },
         // Index 18 would be the first supplemental request after the 18
         // primary metric/branch reads. Exactly 25 rows must not reach it.
         queryErrorAt: OPERATOR_SENSOR_METRICS.length * 2,
@@ -960,16 +991,21 @@ describe("owner-scoped Operator account read models", () => {
       });
 
       await expect(
-        getLatestSensorSnapshotForOwnedTent(client, "tent-1", {
+        getLatestSensorSnapshotForOwnedTent(client, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", {
           now: new Date("2026-07-19T12:05:00Z"),
         }),
       ).resolves.toMatchObject({
         ok: true,
-        data: { snapshot: { tentId: "tent-1", readings: { humidity_pct: { value: 60 } } } },
+        data: {
+          snapshot: {
+            tentId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            readings: { humidity_pct: { value: 60 } },
+          },
+        },
       });
-      expect(calls.some((call) => call.table === "sensor_readings" && call.method === "in")).toBe(
-        false,
-      );
+      expect(
+        calls.some((call) => call.table === "sensor_readings_effective" && call.method === "in"),
+      ).toBe(false);
     });
 
     it("uses a 26-row lookahead then recovers a hidden conflicting source", async () => {
@@ -985,7 +1021,7 @@ describe("owner-scoped Operator account read models", () => {
         }),
       );
       const { client, calls } = sensorClient({
-        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        tent: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Home tent", grow_id: "grow-1" },
         rows: [
           ...liveRows,
           row({
@@ -999,22 +1035,26 @@ describe("owner-scoped Operator account read models", () => {
         ],
       });
 
-      const result = await getLatestSensorSnapshotForOwnedTent(client, "tent-1", {
-        now: new Date("2026-07-19T12:05:00Z"),
-      });
+      const result = await getLatestSensorSnapshotForOwnedTent(
+        client,
+        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        {
+          now: new Date("2026-07-19T12:05:00Z"),
+        },
+      );
 
       expect(result).toMatchObject({
         ok: true,
         data: { contradictionMetrics: ["humidity_pct"] },
       });
       expect(calls).toContainEqual({
-        table: "sensor_readings",
+        table: "sensor_readings_effective",
         method: "in",
         args: ["source", expect.arrayContaining(["manual"])],
       });
       expect(
         calls
-          .filter((call) => call.table === "sensor_readings" && call.method === "limit")
+          .filter((call) => call.table === "sensor_readings_effective" && call.method === "limit")
           .slice(0, OPERATOR_SENSOR_METRICS.length * 2)
           .map((call) => call.args),
       ).toEqual(Array.from({ length: OPERATOR_SENSOR_METRICS.length * 2 }, () => [26]));
@@ -1022,7 +1062,7 @@ describe("owner-scoped Operator account read models", () => {
 
     it("does not count a diagnostic canonical source as represented during a proven overflow", async () => {
       const { client, calls } = sensorClient({
-        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        tent: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Home tent", grow_id: "grow-1" },
         // These rows are supplied in the database query's DESC order. The
         // first 25 include a diagnostic manual row; the usable manual reading
         // is lookahead-only and needs source-specific recovery.
@@ -1061,7 +1101,7 @@ describe("owner-scoped Operator account read models", () => {
       });
 
       await expect(
-        getLatestSensorSnapshotForOwnedTent(client, "tent-1", {
+        getLatestSensorSnapshotForOwnedTent(client, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", {
           now: new Date("2026-07-19T12:05:00Z"),
         }),
       ).resolves.toMatchObject({
@@ -1069,7 +1109,7 @@ describe("owner-scoped Operator account read models", () => {
         data: { contradictionMetrics: ["humidity_pct"] },
       });
       expect(calls).toContainEqual({
-        table: "sensor_readings",
+        table: "sensor_readings_effective",
         method: "in",
         args: ["source", expect.arrayContaining(["manual"])],
       });
@@ -1077,7 +1117,7 @@ describe("owner-scoped Operator account read models", () => {
 
     it("recovers a legacy manual alias beyond overflow despite its newest diagnostic row", async () => {
       const { client, calls } = sensorClient({
-        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        tent: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Home tent", grow_id: "grow-1" },
         rows: [
           ...Array.from({ length: 26 }, (_, index) =>
             row({
@@ -1113,7 +1153,7 @@ describe("owner-scoped Operator account read models", () => {
       });
 
       await expect(
-        getLatestSensorSnapshotForOwnedTent(client, "tent-1", {
+        getLatestSensorSnapshotForOwnedTent(client, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", {
           now: new Date("2026-07-19T12:05:00Z"),
         }),
       ).resolves.toMatchObject({
@@ -1123,7 +1163,7 @@ describe("owner-scoped Operator account read models", () => {
 
       const manualSourceScope = calls.findIndex(
         (call) =>
-          call.table === "sensor_readings" &&
+          call.table === "sensor_readings_effective" &&
           call.method === "in" &&
           call.args[0] === "source" &&
           Array.isArray(call.args[1]) &&
@@ -1133,28 +1173,31 @@ describe("owner-scoped Operator account read models", () => {
       expect(
         calls
           .slice(manualSourceScope)
-          .find((call) => call.table === "sensor_readings" && call.method === "limit")?.args,
+          .find((call) => call.table === "sensor_readings_effective" && call.method === "limit")
+          ?.args,
       ).toEqual([25]);
     });
 
     it("does not fan out trusted-source reads when a metric branch is unsaturated", async () => {
       const { client, calls } = sensorClient({
-        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        tent: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Home tent", grow_id: "grow-1" },
         rows: [row({ metric: "humidity_pct", value: 60 })],
       });
 
-      await expect(getLatestSensorSnapshotForOwnedTent(client, "tent-1")).resolves.toMatchObject({
+      await expect(
+        getLatestSensorSnapshotForOwnedTent(client, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+      ).resolves.toMatchObject({
         ok: true,
       });
-      expect(calls.some((call) => call.table === "sensor_readings" && call.method === "in")).toBe(
-        false,
-      );
+      expect(
+        calls.some((call) => call.table === "sensor_readings_effective" && call.method === "in"),
+      ).toBe(false);
     });
 
     it("fails closed after a proven overflow when a source recovery read is unavailable", async () => {
       const at = "2026-07-19T12:00:00Z";
       const { client } = sensorClient({
-        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        tent: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Home tent", grow_id: "grow-1" },
         queryErrorAt: OPERATOR_SENSOR_METRICS.length * 2,
         rows: Array.from({ length: 26 }, (_, index) =>
           row({
@@ -1168,10 +1211,12 @@ describe("owner-scoped Operator account read models", () => {
         ),
       });
 
-      await expect(getLatestSensorSnapshotForOwnedTent(client, "tent-1")).resolves.toEqual({
+      await expect(
+        getLatestSensorSnapshotForOwnedTent(client, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+      ).resolves.toEqual({
         ok: false,
         reason: "unavailable",
-        message: "sensor query failed",
+        message: "Sensor snapshot unavailable.",
       });
     });
 
@@ -1182,30 +1227,38 @@ describe("owner-scoped Operator account read models", () => {
         reason: "not_found",
         message: "Tent not found for the signed-in grower.",
       });
-      expect(calls.some((call) => call.table === "sensor_readings")).toBe(false);
+      expect(calls.some((call) => call.table === "sensor_readings_effective")).toBe(false);
     });
 
     it("reports owner-check and metric-query failures as unavailable", async () => {
       const ownerFailure = sensorClient({ tentError: { message: "tent RLS unavailable" } });
       await expect(
-        getLatestSensorSnapshotForOwnedTent(ownerFailure.client, "tent-1"),
+        getLatestSensorSnapshotForOwnedTent(
+          ownerFailure.client,
+          "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        ),
       ).resolves.toEqual({
         ok: false,
         reason: "unavailable",
-        message: "tent RLS unavailable",
+        message: "Sensor snapshot unavailable.",
       });
-      expect(ownerFailure.calls.some((call) => call.table === "sensor_readings")).toBe(false);
+      expect(ownerFailure.calls.some((call) => call.table === "sensor_readings_effective")).toBe(
+        false,
+      );
 
       const queryFailure = sensorClient({
-        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        tent: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Home tent", grow_id: "grow-1" },
         queryErrorAt: 4,
       });
       await expect(
-        getLatestSensorSnapshotForOwnedTent(queryFailure.client, "tent-1"),
+        getLatestSensorSnapshotForOwnedTent(
+          queryFailure.client,
+          "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        ),
       ).resolves.toEqual({
         ok: false,
         reason: "unavailable",
-        message: "sensor query failed",
+        message: "Sensor snapshot unavailable.",
       });
     });
   });

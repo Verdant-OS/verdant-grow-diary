@@ -7,8 +7,10 @@
  * RLS and the loaders' explicit grow/tent visibility checks remain the data
  * authority; the operator role gate is presentation-only.
  */
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { EFFECTIVE_SENSOR_QUERY_VERSION } from "@/lib/effectiveSensorReadings";
+import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { supabase } from "@/integrations/supabase/client";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useOperatorRootZoneRecords } from "@/hooks/useOperatorRootZoneRecords";
@@ -67,7 +69,7 @@ function sensorState(
   if (tentStatus === "selection_required") {
     return { status: "select_tent", items: EMPTY_ITEMS };
   }
-  if (query.isLoading || (query.isFetching && !query.data)) {
+  if (query.isPending || query.isFetching || query.fetchStatus === "paused") {
     return { status: "loading", items: EMPTY_ITEMS };
   }
   if (query.isError || !query.data?.ok) {
@@ -95,13 +97,30 @@ function useDiaryReadModelQuery(userId: string | null, growId: string | null) {
 }
 
 function useSensorReadModelQuery(userId: string | null, tentId: string | null) {
-  return useQuery({
-    queryKey: ["operator-account-read-model", "sensor", userId ?? "signed-out", tentId ?? "none"],
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: [
+      "operator-account-read-model",
+      "sensor",
+      userId ?? "signed-out",
+      tentId ?? "none",
+      EFFECTIVE_SENSOR_QUERY_VERSION,
+    ],
     enabled: !!userId && !!tentId && isUuid(tentId),
     retry: false,
     refetchOnWindowFocus: true,
     queryFn: () => getLatestSensorSnapshotForOwnedTent(supabase, tentId as string),
   });
+  useEffect(
+    () =>
+      subscribeManualSensorCorrections(userId, () => {
+        void queryClient.invalidateQueries({
+          queryKey: ["operator-account-read-model", "sensor", userId],
+        });
+      }),
+    [queryClient, userId],
+  );
+  return query;
 }
 
 function useTentDiaryReadModelQuery(
@@ -214,7 +233,9 @@ export function useOperatorAccountReadModels(
             ? { status: "no_tent" as const }
             : tentStatus === "selection_required"
               ? { status: "no_tent" as const }
-              : sensorQuery.isLoading || (sensorQuery.isFetching && !sensorQuery.data)
+              : sensorQuery.isPending ||
+                  sensorQuery.isFetching ||
+                  sensorQuery.fetchStatus === "paused"
                 ? { status: "loading" as const }
                 : sensorQuery.isError ||
                     !sensorQuery.data?.ok ||

@@ -1,8 +1,9 @@
 name: Full Vitest Suite (PR gate)
 
-# The duplicate 16-batch suite runs on ready PRs, merge-group commits and
-# deploy pushes. Draft PRs retain the required 32-shard full suite in ci.yml.
-# Marking a draft ready starts this workflow through ready_for_review.
+# The duplicate 16-batch suite runs on merge-group commits and deploy pushes
+# only. Every pull request (draft or ready) is already gated on the whole suite
+# by the required 32-shard full suite in ci.yml (256 isolated partitions), so
+# this duplicate no longer spends PR runner capacity.
 # The 16-way matrix, per-file chunking and worker isolation remain unchanged.
 #
 # The `push` trigger on the default branch is deliberate: it does not BLOCK a
@@ -10,8 +11,6 @@ name: Full Vitest Suite (PR gate)
 # when changes land outside the PR flow (e.g. bot direct-pushes).
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   push:
     branches: [verdant-grow-diary, main]
@@ -25,7 +24,6 @@ permissions:
 
 jobs:
   full-suite:
-    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     name: Full suite — batch ${{ matrix.batch }}/16
     runs-on: ubuntu-latest
     timeout-minutes: 30

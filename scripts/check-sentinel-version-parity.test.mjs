@@ -54,6 +54,34 @@ STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
 
 Do not continue until the context issue is resolved.`;
 
+const COVERAGE_STARTUP_GATE = `MANDATORY STARTUP GATE
+
+Before analysis, research, commands, edits, writes, outreach, deployment,
+or recommendations, return:
+
+\`\`\`text
+SENTINEL_ACK
+agent:
+assigned_role:
+sentinel_version:
+files_read:
+open_handoffs_checked:
+current_task:
+scope:
+out_of_scope:
+conflicts_found:
+data_access_status:
+write_permission:
+\`\`\`
+
+If a required file is missing or conflicting, return:
+
+\`\`\`text
+STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
+\`\`\`
+
+Do not continue until the context issue is resolved.`;
+
 const CLAUDE_STATE_READ_INSTRUCTION =
   "**`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file " +
   "tool before you acknowledge.**";
@@ -79,16 +107,21 @@ function git(cwd, ...args) {
   );
 }
 
-function canonicalConstitution(version) {
-  return `# AGENTS.md\n\nSentinel-Version: ${version}\n\n${REQUIRED_STARTUP_GATE}\n`;
+function canonicalConstitution(version, startupGate = REQUIRED_STARTUP_GATE) {
+  return `# AGENTS.md\n\nSentinel-Version: ${version}\n\n${startupGate}\n`;
 }
 
-function writeGovernanceFile(root, path, version = "2026-08-01.1") {
+function writeGovernanceFile(
+  root,
+  path,
+  version = "2026-08-01.1",
+  startupGate = REQUIRED_STARTUP_GATE,
+) {
   const absolute = join(root, path);
   mkdirSync(dirname(absolute), { recursive: true });
 
   if (path === "AGENTS.md") {
-    writeFileSync(absolute, canonicalConstitution(version), "utf8");
+    writeFileSync(absolute, canonicalConstitution(version, startupGate), "utf8");
     return;
   }
 
@@ -106,9 +139,9 @@ function writeGovernanceFile(root, path, version = "2026-08-01.1") {
       : "";
   const core =
     path === "GEMINI.md"
-      ? `\n<!-- SENTINEL-CORE:BEGIN -->\n${canonicalConstitution(version)}<!-- SENTINEL-CORE:END -->`
+      ? `\n<!-- SENTINEL-CORE:BEGIN -->\n${canonicalConstitution(version, startupGate)}<!-- SENTINEL-CORE:END -->`
       : "";
-  const gate = ROLE_FILES.includes(path) ? `\n\n${REQUIRED_STARTUP_GATE}` : "";
+  const gate = ROLE_FILES.includes(path) ? `\n\n${startupGate}` : "";
 
   writeFileSync(
     absolute,
@@ -117,15 +150,22 @@ function writeGovernanceFile(root, path, version = "2026-08-01.1") {
   );
 }
 
-function makeFixture() {
+function makeFixture({
+  version = "2026-08-01.1",
+  startupGate = REQUIRED_STARTUP_GATE,
+  handoffLog = false,
+} = {}) {
   const root = mkdtempSync(join(tmpdir(), "verdant-sentinel-parity-"));
   fixtures.push(root);
 
-  for (const path of GOVERNANCE_FILES) writeGovernanceFile(root, path);
+  for (const path of GOVERNANCE_FILES) writeGovernanceFile(root, path, version, startupGate);
 
   const currentState = join(root, "docs", "agents", "CURRENT_STATE.md");
   mkdirSync(dirname(currentState), { recursive: true });
   writeFileSync(currentState, "# Current State\n", "utf8");
+  if (handoffLog) {
+    writeFileSync(join(root, "docs", "agents", "HANDOFF_LOG.md"), "# Handoff log\n", "utf8");
+  }
 
   const archive = join(root, "docs", "archive", "legacy", "verdant-master-prompt-legacy.md");
   mkdirSync(dirname(archive), { recursive: true });
@@ -436,4 +476,182 @@ test("passes a coordinated rule update with one shared bumped version", () => {
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Sentinel-Version OK — 2026-08-01\.2 across 12/);
+});
+
+test("keeps the exact legacy startup gate valid through 2026-09-28.1", () => {
+  const root = makeFixture({ version: "2026-09-28.1" });
+  const result = runChecker(root);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.1 across 12/);
+});
+
+test("accepts shipped 2026-09-28.2 with its legacy ACK and no handoff log", () => {
+  const root = makeFixture({ version: "2026-09-28.2" });
+  const result = runChecker(root);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.2 across 12/);
+});
+
+test("accepts the exact coverage startup gate at 2026-09-28.3", () => {
+  const root = makeFixture({
+    version: "2026-09-28.3",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  const result = runChecker(root);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.3 across 12/);
+});
+
+test("accepts CRLF copies of the coverage gate without relaxing its field order", () => {
+  const root = makeFixture({
+    version: "2026-09-28.3",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  for (const path of GOVERNANCE_FILES) {
+    const absolute = join(root, path);
+    writeFileSync(absolute, readFileSync(absolute, "utf8").replace(/\n/g, "\r\n"), "utf8");
+  }
+  const result = runChecker(root);
+
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("requires coverage for revision 10 instead of comparing revision strings", () => {
+  const root = makeFixture({ version: "2026-09-28.10", handoffLog: true });
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /AGENTS\.md: exact mandatory SENTINEL_ACK/);
+});
+
+test("keeps the coverage gate required on a later Sentinel date", () => {
+  const root = makeFixture({
+    version: "2026-10-01.1",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  const result = runChecker(root);
+
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("rejects a detailed role that omits the coverage field at 2026-09-28.3", () => {
+  const root = makeFixture({
+    version: "2026-09-28.3",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  replace(root, "docs/agents/roles/security.md", "open_handoffs_checked:\n", "");
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /security\.md: exact mandatory SENTINEL_ACK/);
+});
+
+test("rejects a coverage field placed after current_task instead of files_read", () => {
+  const root = makeFixture({
+    version: "2026-09-28.3",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  replace(
+    root,
+    "docs/agents/roles/security.md",
+    "files_read:\nopen_handoffs_checked:\ncurrent_task:",
+    "files_read:\ncurrent_task:\nopen_handoffs_checked:",
+  );
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /security\.md: exact mandatory SENTINEL_ACK/);
+});
+
+test("rejects the coverage version when its handoff log is missing", () => {
+  const root = makeFixture({ version: "2026-09-28.3", startupGate: COVERAGE_STARTUP_GATE });
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /HANDOFF_LOG\.md: missing/);
+});
+
+test("passes a coordinated upgrade from the legacy gate to the coverage gate", () => {
+  const root = makeFixture({ version: "2026-09-28.1" });
+  for (const path of GOVERNANCE_FILES) {
+    writeGovernanceFile(root, path, "2026-09-28.3", COVERAGE_STARTUP_GATE);
+  }
+  writeFileSync(join(root, "docs", "agents", "HANDOFF_LOG.md"), "# Handoff log\n", "utf8");
+  const result = runChecker(root);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.3 across 12/);
+});
+
+test("rejects a coordinated downgrade that removes coverage and its handoff log", () => {
+  const root = makeFixture({
+    version: "2026-09-28.3",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  for (const path of GOVERNANCE_FILES) {
+    writeGovernanceFile(root, path, "2026-09-28.2", REQUIRED_STARTUP_GATE);
+  }
+  rmSync(join(root, "docs", "agents", "HANDOFF_LOG.md"));
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Sentinel-Version downgrade/);
+});
+
+test("rejects a same-date numeric revision downgrade even when rules are unchanged", () => {
+  const root = makeFixture({
+    version: "2026-09-28.10",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  for (const path of GOVERNANCE_FILES) {
+    writeGovernanceFile(root, path, "2026-09-28.3", COVERAGE_STARTUP_GATE);
+  }
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Sentinel-Version downgrade/);
+});
+
+test("rejects a Sentinel date downgrade with a higher revision number", () => {
+  const root = makeFixture({
+    version: "2026-10-01.1",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  for (const path of GOVERNANCE_FILES) {
+    writeGovernanceFile(root, path, "2026-09-28.10", COVERAGE_STARTUP_GATE);
+  }
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Sentinel-Version downgrade/);
+});
+
+test("allows a same-date revision upgrade from 9 to 10", () => {
+  const root = makeFixture({
+    version: "2026-09-28.9",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  for (const path of GOVERNANCE_FILES) {
+    writeGovernanceFile(root, path, "2026-09-28.10", COVERAGE_STARTUP_GATE);
+  }
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.10 across 12/);
 });

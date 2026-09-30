@@ -77,7 +77,8 @@ try {
 Write-Section "Local listener checks"
 $listenerUp = $true
 try {
-    $null = curl.exe --silent --fail --max-time 3 "http://localhost:8787/health"
+    # Liveness only. Delivery health is checked below by GET /health.
+    $null = curl.exe --silent --fail --max-time 3 "http://localhost:8787/livez"
     if ($LASTEXITCODE -ne 0) { $listenerUp = $false }
 } catch {
     $listenerUp = $false

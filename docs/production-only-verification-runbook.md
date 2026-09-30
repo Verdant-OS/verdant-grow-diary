@@ -38,14 +38,16 @@ exact counts and run/artifact links. Use PASS / FAIL / BLOCKED / NOT_MEASURED /
 NOT_APPLICABLE per axis. Source presence, frontend SHA, skipped production jobs
 and CI cannot establish applied schema, Edge deployment or live save/retrieve.
 
-Independent acceptance routing: **Blue Dream** reviews any .tsx file,
-P1s and publish gates; **Critical Mass** reviews everything else. An author cannot
-give its own work an independent PASS. Claude may add peer observations but is not
-the acceptance reviewer. Matthew's Phase 1 exception permits Codex to integrate
-its own low-risk PRs through the PR flow after every required check is SUCCESS
-at the exact head SHA. High-risk work remains draft for GDP review and merge;
-publish gates remain with Matthew. Phase 2 requires Matthew's explicit confirmation
-that CI is proven. Historical receipts keep their original reviewer.
+Independent acceptance routing: **Blue Dream** reviews `.tsx` files outside
+`src/test/`, P1s and publish gates; **Critical Mass** is the default for other
+acceptance. Independently assigned **Durban Poison** is also a valid acceptance
+seat. Another author's CI/build infrastructure additionally receives **Codex**
+technical review; that does not replace independent acceptance, and Codex cannot
+review its own work. Claude may add peer observations but is not the acceptance
+reviewer. Codex opens repairs as drafts and uses normal pushes only. **Chemdawg**
+alone owns merge after all 35 required checks are SUCCESS and an independent PASS
+covers the exact head. Earlier self-integration phases grant no current authority.
+Publish gates remain with Matthew. Historical receipts keep their original reviewer.
 
 ## Existing non-production dependencies — separate CI slices
 

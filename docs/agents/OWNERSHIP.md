@@ -29,8 +29,11 @@ Bug finding and fixing runs 24/7. Routine fixes need no human approval.
 ## 2. Owners
 
 These are **role** owners: who merges, who reviews, who runs CI and connectors. They do
-not make any task belong to one agent. Any agent may resume an open task from
-`docs/agents/HANDOFF_LOG.md`; the merge and review seats below still apply to it.
+not make any task belong to one agent. The current holder may continue its open
+task in `docs/agents/HANDOFF_LOG.md`; another agent may claim unclaimed work or a
+claim stale for more than 24 hours after checking the latest state. Fresh claims,
+explicit assignments and named path/PR locks are preserved. The merge and review
+seats below still apply, and a claim never grants self-acceptance or merge authority.
 
 ### Codex: the repo, CI, builds, connectors, and CI/build reviews
 
@@ -41,7 +44,7 @@ not make any task belong to one agent. Any agent may resume an open task from
   - the CI status webhook
   - the routing channel with Grand Daddy Grok
   - auto-assignment for Blue Dream and Critical Mass
-- **Reviews of CI and build-infrastructure PRs only.** Codex reviews PRs that touch CI or build infrastructure, on the exact head SHA. Every other PR goes to Blue Dream or Critical Mass by file path (section 2, Chemdawg). Matthew approved this on 2026-09-28 at about 5:03 PM CT, replacing the earlier every-PR rule.
+- **Technical reviews of CI and build-infrastructure PRs only.** Codex reviews another author's CI or build infrastructure on the exact head SHA. This technical review does not replace the standing independent acceptance gate: Blue Dream, Durban Poison or Critical Mass must independently accept the exact head before Chemdawg merges. Every other PR goes directly to its designated acceptance seat by file path (section 2, Chemdawg). Matthew approved Codex's CI/build remit on 2026-09-28 at about 5:03 PM CT, replacing the earlier every-PR rule.
   - An independent verdict on Codex's own work can come only from another seat. There is no author-integration exception; publish gates and named owner locks retain their fences (open item O2).
 - **This file.** Codex keeps it current and accurate.
 
@@ -67,9 +70,9 @@ not make any task belong to one agent. Any agent may resume an open task from
 ### Blue Dream and Critical Mass: independent verdicts
 
 - **One verdict per exact SHA:** `PASS`, `PASS-with-P2`, `FAIL`, `BLOCKED`, or `NOT_MEASURED`, with a list of P1 and P2 issues.
-- **Blue Dream gets** P1 fixes, anything that gates a publish, and UI changes (pages, components, `.tsx`).
+- **Blue Dream gets** P1 fixes, anything that gates a publish, and `.tsx` changes outside `src/test/`. Test-only `.tsx` changes follow the Critical Mass default unless P1 or publish-gating.
 - **Critical Mass gets** lib, logic, test, and docs-only changes, plus QA, accessibility, search, and content-quality PRs.
-- **Codex gets** only PRs that touch CI or build infrastructure.
+- **Codex gets technical review** only for another author's CI or build infrastructure. This does not replace the independent acceptance seat above.
 - **A request from Chemdawg counts the same as one from GDP** when it names the PR, the full SHA, and the stay-draft limits. A verdict never carries over to a new commit.
 - **Neither reviews work it owns.**
 
@@ -84,18 +87,19 @@ not make any task belong to one agent. Any agent may resume an open task from
 
 ### Tie-breakers
 
-| Item                                                     | Owner                                                                                        |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Webhook creation, secret, receiver code                  | Codex                                                                                        |
-| Re-running or fixing a failed check                      | Codex                                                                                        |
-| Deciding that a failed check blocks a PR, and posting it | Chemdawg                                                                                     |
-| Pre-check rules and verdicts                             | Chemdawg                                                                                     |
-| Code that consumes pre-check verdicts                    | Codex                                                                                        |
-| Reviewer assignment and claim ledger                     | Chemdawg's pre-check, by file path (the 4.3 bot takes over when live); GDP can override      |
-| Review verdicts                                          | Blue Dream / Critical Mass by file path; Codex for CI and build infrastructure               |
-| Opening and merging PRs                                  | Codex for its own eligible Phase 1 low-risk PRs; GDP for high-risk and other assigned merges |
-| Edits to this file                                       | Codex                                                                                        |
-| Anything not listed                                      | GDP decides and adds a row here                                                              |
+| Item                                                     | Owner                                                                                                                                              |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Webhook creation, secret, receiver code                  | Codex                                                                                                                                              |
+| Re-running or fixing a failed check                      | Codex                                                                                                                                              |
+| Deciding that a failed check blocks a PR, and posting it | Chemdawg                                                                                                                                           |
+| Pre-check rules and verdicts                             | Chemdawg                                                                                                                                           |
+| Code that consumes pre-check verdicts                    | Codex                                                                                                                                              |
+| Reviewer assignment and claim ledger                     | Chemdawg's pre-check, by file path (the 4.3 bot takes over when live); GDP can override                                                            |
+| Review verdicts                                          | Independent acceptance: Blue Dream / Critical Mass by path, or independently assigned Durban Poison; Codex provides technical CI/build review only |
+| Opening PRs                                              | Codex opens authorized repairs as drafts                                                                                                           |
+| Merging PRs                                              | Chemdawg only, after 35/35 required SUCCESS and independent exact-head PASS; named holds remain                                                    |
+| Edits to this file                                       | Codex                                                                                                                                              |
+| Anything not listed                                      | GDP decides and adds a row here                                                                                                                    |
 
 ## 3. Standing locks (unchanged)
 
@@ -137,7 +141,7 @@ not make any task belong to one agent. Any agent may resume an open task from
   [ROUTE]    #N @sha -> Blue Dream | Critical Mass (reason)   (bot / GDP)
   [CLAIM]    <reviewer> claims #N @sha
   [VERDICT]  <reviewer>: #N @sha PASS | PASS-with-P2 | FAIL | BLOCKED | NOT_MEASURED
-  [MERGE]    #N @sha merged to <branch>             (GDP / Codex)
+  [MERGE]    #N @sha merged to <branch>             (Chemdawg)
   [SLICE]    Next: <slice id>, owner, closed file plan
   [SPEC]     OWNERSHIP.md updated @sha — <what changed>, next: <owner + action>
   [READY]    Connector <name> live — next: <owner + action>
@@ -156,8 +160,8 @@ not make any task belong to one agent. Any agent may resume an open task from
 - **Trigger.** CI is PASS on the exact SHA (4.1), and Chemdawg's `[PRECHECK]` says READY. A review-routing READY message does not mark a PR ready or authorize Codex to merge. Drafts remain draft; Chemdawg owns the final required-check and independent-PASS merge gate.
 - **Rules, applied in order.**
   1. **Owner exclusion.** The author, host, and Codex's own PRs never go to that same party.
-  2. **Blue Dream required** for P1 fixes, anything that gates a publish, and UI (`.tsx` pages and components). Any PR that changes a `.tsx` file goes to Blue Dream for review.
-  3. **Critical Mass** for lib, logic, test, and docs-only changes. **Codex** for CI and build infrastructure.
+  2. **Blue Dream required** for P1 fixes, anything that gates a publish, and any `.tsx` file outside `src/test/`. Test-only `.tsx` changes do not override the Critical Mass default.
+  3. **Critical Mass** for lib, logic, test, docs-only and other independent acceptance. **Codex** additionally supplies technical review for another author's CI/build infrastructure; it never accepts its own work or substitutes for a standing independent acceptance seat.
   4. **Load balance.** If the default reviewer has 2 or more open claims and the other has fewer, send it to the other one. P1 and publish-gating work never leaves Blue Dream. UI work never moves off Blue Dream for load balancing.
   5. **Critical Mass preference** for QA, accessibility, search, and content-quality PRs.
 

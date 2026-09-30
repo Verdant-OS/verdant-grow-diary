@@ -702,6 +702,12 @@ function quickLogCatalogContractFailures(result) {
   return QUICKLOG_CATALOG_CONTRACT_KEYS.filter((key) => result?.[key] !== true);
 }
 
+export function parsePsqlSqlstate(stderr) {
+  // The catalog invocation requests psql's sqlstate-only verbosity. Match only
+  // its error-code line; never persist a message, URL, or arbitrary stderr.
+  return /^ERROR:[ \t]+([0-9A-Z]{5})(?=[: \t\r\n]|$)/m.exec(String(stderr ?? ""))?.[1] ?? null;
+}
+
 function createArtifactWriters({ targetEnv, reportPath, auditPath, expected, logger, now }) {
   const writeAudit = (outcome, note = "", extras = {}) => {
     if (!auditPath) return;
@@ -736,6 +742,9 @@ function createArtifactWriters({ targetEnv, reportPath, auditPath, expected, log
         : {}),
       ...(typeof extras.psql_status === "number" || typeof extras.psql_status === "string"
         ? { psql_status: Number(extras.psql_status) }
+        : {}),
+      ...(typeof extras.psql_sqlstate === "string" && /^[0-9A-Z]{5}$/.test(extras.psql_sqlstate)
+        ? { psql_sqlstate: extras.psql_sqlstate }
         : {}),
       ...(typeof extras.quicklog_catalog_contract_verified === "boolean"
         ? {
@@ -1019,6 +1028,8 @@ export function runRequiredCoreMigrationsApplied({
           "-t",
           "-v",
           "ON_ERROR_STOP=1",
+          "-v",
+          "VERBOSITY=sqlstate",
           "--single-transaction",
           "-c",
           QUICKLOG_CORRECTIONS_CATALOG_SQL,
@@ -1048,13 +1059,15 @@ export function runRequiredCoreMigrationsApplied({
 
     if (catalogResult.status !== 0) {
       const psqlStatus = String(catalogResult.status);
+      const sqlstate = parsePsqlSqlstate(catalogResult.stderr);
       logger.error(
-        `psql exited ${psqlStatus} while checking the exact Quick Log catalog contract; stderr was suppressed.`,
+        `psql exited ${psqlStatus} while checking the exact Quick Log catalog contract${sqlstate ? ` (SQLSTATE ${sqlstate})` : ""}; stderr was suppressed.`,
       );
       writeReport("FAILED - Quick Log catalog query failed", [
         "All required columns were observed, but the exact Quick Log schema effect remains unknown.",
         "Raw psql stderr was suppressed to protect credentials.",
         `psql exit status: ${psqlStatus}.`,
+        ...(sqlstate ? [`PostgreSQL SQLSTATE: \`${sqlstate}\`.`] : []),
         "Migration ledger: `NOT_MEASURED` by this catalog-only gate.",
       ]);
       writeAudit(
@@ -1063,6 +1076,7 @@ export function runRequiredCoreMigrationsApplied({
         {
           identity,
           psql_status: catalogResult.status,
+          psql_sqlstate: sqlstate,
           quicklog_catalog_contract_verified: false,
           migration_ledger_status: "not_measured",
         },

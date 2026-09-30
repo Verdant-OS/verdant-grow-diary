@@ -34,6 +34,24 @@ const replacedGroups = [
   "typecheck-build-push.yml",
 ] as const;
 
+// Non-required, non-security PR workflows that wait for ready_for_review instead of
+// running on every draft push. ci.yml, security-regression.yml and the mustBeGreen
+// gates in config/required-status-checks.json are deliberately absent.
+const skipDraftPr =
+  "${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}";
+const draftSkippedWorkflows = [
+  "ai-doctor-golden-cases.yml",
+  "ai-doctor-readiness-ui.yml",
+  "contextual-pheno-comparison-v0.yml",
+  "edge-shared-sync.yml",
+  "lint.yml",
+  "paddle-preflight-renderer-tests.yml",
+  "quicklog-gate.yml",
+  "seo-parity-and-head-fidelity.yml",
+  "typecheck-build-push.yml",
+  "typecheck.yml",
+] as const;
+
 describe("resolved PR workflow concurrency", () => {
   it("gives every PR workflow a concurrency group", () => {
     expect(prWorkflows.length).toBeGreaterThan(0);
@@ -57,16 +75,26 @@ describe("resolved PR workflow concurrency", () => {
     ).toEqual([]);
   });
 
-  it("skips only the duplicate 16-batch suite on draft PRs", () => {
+  it("runs the duplicate 16-batch suite only in the merge queue and on deploy pushes", () => {
+    // ci.yml's 32 required shards already run the whole suite on every PR (256 isolated
+    // partitions), so the 16-batch duplicate no longer spends PR runner capacity.
     const fullSuite = readWorkflow("vitest-full-suite-pr-gate.yml");
-    expect(fullSuite.jobs["full-suite"].if).toBe(
-      "${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}",
-    );
+    expect(Object.hasOwn(fullSuite.on, "pull_request")).toBe(false);
+    expect(Object.hasOwn(fullSuite.on, "merge_group")).toBe(true);
+    expect(Object.hasOwn(fullSuite.on, "push")).toBe(true);
     expect(fullSuite.jobs["full-suite"].strategy?.matrix?.batch).toEqual(
       Array.from({ length: 16 }, (_, index) => index),
     );
-    expect(Object.hasOwn(fullSuite.on, "merge_group")).toBe(true);
-    expect(Object.hasOwn(fullSuite.on, "push")).toBe(true);
+  });
+
+  it("skips exactly the reviewed non-required PR workflows on draft PRs", () => {
+    const draftSkipped = prWorkflows
+      .filter(({ workflow }) => Object.values(workflow.jobs).some((job) => job.if === skipDraftPr))
+      .map(({ name }) => name);
+    expect(draftSkipped).toEqual([...draftSkippedWorkflows].sort());
+    for (const name of draftSkippedWorkflows) {
+      for (const job of Object.values(readWorkflow(name).jobs)) expect(job.if).toBe(skipDraftPr);
+    }
   });
 
   it("preserves all required CI contexts and their draft execution", () => {

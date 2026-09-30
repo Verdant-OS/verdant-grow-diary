@@ -414,7 +414,7 @@ From the repository root, after the normal testbench setup:
 
 ```powershell
 & .\tools\ecowitt-testbench\.venv\Scripts\python.exe -m unittest discover -s tools/ecowitt-testbench -p "test*.py"
-bunx vitest run src/test/ecowitt-windows-testbench-static-safety.test.ts src/test/ecowitt-custom-http-bridge-*.test.ts
+bunx vitest run src/test/ecowitt-windows-testbench-static-safety.test.ts src/test/ecowitt-custom-http-bridge-ingest-readiness.test.ts
 bun run typecheck
 ```
 

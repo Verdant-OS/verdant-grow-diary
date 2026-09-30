@@ -1455,6 +1455,11 @@ def ecowitt() -> Any:
             receive_step = "routing"
             reading["metadata"]["raw_payload"] = {k: v for k, v in safe_raw.items() if k.lower() in legacy_keys}
             reading["metadata"]["device_id"] = f"ecowitt:{gateway_fingerprint(raw)}:gateway"
+            # Unowned probes remain diagnostic evidence, not this tent's provenance.
+            reading["source"] = source = _resolve_source_from_validated(
+                payload={k: v for k, v in raw.items() if str(k).lower() in legacy_keys},
+                remote_addr=request.remote_addr, canonical_gateway_time=gateway_captured_at,
+                header_mode=None, env_mode=None, now=request_now)
             readings = [reading]
         for own_reading in readings:
             append_raw_log(own_reading)

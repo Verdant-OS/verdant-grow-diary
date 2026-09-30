@@ -20,6 +20,50 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_legacy_unowned_stuck_probes_are_only_local_diagnostics(self):
+        os.environ.pop("ECOWITT_TENT_MAP")
+        os.environ.update(VERDANT_TENT_ID=TENT_A, VERDANT_BRIDGE_TOKEN=TOKEN_A)
+        for field in ("soilmoisture4", "SOILMOISTURE4", "humidity5", "HUMIDITY5", "humidity2"):
+            for value in ("0", "100"):
+                with self.subTest(field=field, value=value):
+                    response = self.post({**self.packet, field: value})
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.get_json()["reading"]["source"], "live")
+                    forwarded = self.requests.post.call_args.kwargs["json"]
+                    self.assertEqual(forwarded["metadata"]["verdant_source"], "live")
+                    self.assertEqual(forwarded["metrics"]["temp_f"], 77)
+                    self.assertEqual(forwarded["metrics"]["humidity_percent"], 50)
+                    self.assertNotIn(field, forwarded["metadata"]["raw_payload"])
+                    rows = (listener.get_runtime().spool.root / "unmapped_channels.jsonl").read_text()
+                    self.assertTrue(any(json.loads(row)["key"] == field for row in rows.splitlines()))
+
+    def test_legacy_owned_stuck_primary_and_secondary_candidates_remain_invalid(self):
+        os.environ.pop("ECOWITT_TENT_MAP")
+        os.environ.update(VERDANT_TENT_ID=TENT_A, VERDANT_BRIDGE_TOKEN=TOKEN_A)
+        for field in ("humidity1", "humidity", "humidityin", "soilmoisture1", "soilmoisture2"):
+            for value in ("0", "100"):
+                with self.subTest(field=field, value=value):
+                    response = self.post({**self.packet, field: value})
+                    self.assertEqual(response.get_json()["reading"]["source"], "invalid")
+                    self.assertEqual(self.requests.post.call_args.kwargs["json"]["metadata"]["verdant_source"], "invalid")
+
+    def test_legacy_unowned_probes_preserve_explicit_stale_and_loopback_source_fences(self):
+        os.environ.pop("ECOWITT_TENT_MAP")
+        os.environ.update(VERDANT_TENT_ID=TENT_A, VERDANT_BRIDGE_TOKEN=TOKEN_A, VERDANT_FORWARD_MODE="live")
+        cases = [({"source": "manual"}, "198.51.100.2", "manual"),
+                 ({"source": "csv"}, "198.51.100.2", "csv"),
+                 ({"source": "invalid"}, "198.51.100.2", "invalid"),
+                 ({"source": "unknown"}, "198.51.100.2", "invalid"),
+                 ({"dateutc": "2026-09-28 11:29:00"}, "198.51.100.2", "stale"),
+                 ({"source": "live"}, "127.0.0.1", "demo")]
+        for fields, remote, expected in cases:
+            with self.subTest(fields=fields, remote=remote):
+                response = self.client.post("/ecowitt", json={**self.packet, "soilmoisture4": "0", **fields},
+                    headers={"X-Verdant-Forward-Mode": "live"}, environ_overrides={"REMOTE_ADDR": remote})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.get_json()["reading"]["source"], expected)
+                self.assertEqual(self.requests.post.call_args.kwargs["json"]["metadata"]["verdant_source"], expected)
+
     def test_orphaned_queue_alert_and_recovery_are_shared_durable_and_private(self):
         self.post()
         original_map = self.mapping.read_text()

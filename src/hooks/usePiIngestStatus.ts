@@ -20,9 +20,11 @@ export interface PiIngestStatusQueryResult {
   latestTentName: string | null;
 }
 
-export function usePiIngestStatus(): UseQueryResult<PiIngestStatusQueryResult> {
+export function usePiIngestStatus(): UseQueryResult<PiIngestStatusQueryResult> & {
+  isSignedOut: boolean;
+} {
   const { user } = useAuth();
-  return useQuery({
+  const query = useQuery({
     queryKey: ["pi_ingest_status", "validated-v1", user?.id ?? "signed-out"],
     enabled: !!user?.id,
     retry: false,
@@ -35,7 +37,7 @@ export function usePiIngestStatus(): UseQueryResult<PiIngestStatusQueryResult> {
         .gte("ts", sinceIso)
         .order("ts", { ascending: false })
         .limit(500);
-      if (error) throw new Error("Could not load ingest status.");
+      if (error) throw new Error("Could not load ingest status.", { cause: error });
       const rows = requirePiIngestReadings(data);
       const summary = computePiIngestStatus(rows);
 
@@ -52,4 +54,5 @@ export function usePiIngestStatus(): UseQueryResult<PiIngestStatusQueryResult> {
     },
     staleTime: 30_000,
   });
+  return { ...query, isSignedOut: !user?.id };
 }

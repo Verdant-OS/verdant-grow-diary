@@ -51,12 +51,14 @@ export function requirePiIngestReadings(data: unknown): PiIngestReadingLike[] {
 
 /** Cached health is not current evidence while its required read is unresolved. */
 export function piIngestReadState(query: {
+  isSignedOut: boolean;
   isPending: boolean;
   isFetching: boolean;
   isPaused: boolean;
   isError: boolean;
   data: unknown;
-}): "waiting" | "loading" | "unavailable" | "ready" {
+}): "signed-out" | "waiting" | "loading" | "unavailable" | "ready" {
+  if (query.isSignedOut) return "signed-out";
   if (query.isPaused) return "waiting";
   if (query.isPending || query.isFetching) return "loading";
   if (query.isError || !query.data) return "unavailable";

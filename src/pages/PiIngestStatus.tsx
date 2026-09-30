@@ -48,6 +48,11 @@ export default function PiIngestStatus() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
+          {state === "signed-out" && (
+            <p role="status" className="text-muted-foreground">
+              Sign in to view ingest status.
+            </p>
+          )}
           {state === "loading" && (
             <p role="status" className="text-muted-foreground">
               Loading…

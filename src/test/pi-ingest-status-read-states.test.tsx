@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { QueryClient, QueryClientProvider, onlineManager } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ from: vi.fn(), auth: vi.fn(), limit: vi.fn() }));
@@ -83,10 +83,12 @@ describe("Pi status required-read truth", () => {
   it("withholds a cached healthy result after refresh failure and retries both reads", async () => {
     const { client } = mount();
     await screen.findByText("Recently active");
+    client.setQueryData(["unrelated"], "untouched");
     mocks.limit.mockResolvedValue({ data: null, error: new Error("private backend detail") });
     await act(async () => {
-      await client.invalidateQueries();
+      await client.invalidateQueries({ queryKey: ["pi_ingest_status"], exact: false });
     });
+    expect(client.getQueryState(["unrelated"])?.isInvalidated).toBe(false);
     await screen.findByText("Could not load ingest status.");
     expectNoHealth();
     expect(screen.queryByText(/private backend detail/)).not.toBeInTheDocument();
@@ -111,7 +113,7 @@ describe("Pi status required-read truth", () => {
     await screen.findByText("Recently active");
     act(() => onlineManager.setOnline(false));
     act(() => {
-      void client.invalidateQueries();
+      void client.invalidateQueries({ queryKey: ["pi_ingest_status"], exact: false });
     });
     await screen.findByText(/Waiting for connection/i);
     expectNoHealth();
@@ -121,7 +123,9 @@ describe("Pi status required-read truth", () => {
   it("does not request data while signed out", async () => {
     mocks.auth.mockReturnValue({ user: null });
     mount();
-    await waitFor(() => expect(screen.getByText(/Loading/)).toBeInTheDocument());
+    expect(screen.getByText("Sign in to view ingest status.")).toBeInTheDocument();
+    expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
     expect(mocks.from).not.toHaveBeenCalled();
     expectNoHealth();
   });
@@ -146,7 +150,7 @@ describe("Pi status required-read truth", () => {
         }),
     );
     act(() => {
-      void client.invalidateQueries();
+      void client.invalidateQueries({ queryKey: ["pi_ingest_status"], exact: false });
     });
     await screen.findByText(/Loading/);
     expectNoHealth();
@@ -193,6 +197,20 @@ describe("Pi status required-read truth", () => {
     await screen.findByText("Could not load ingest status.");
     expectNoHealth();
     expect(screen.queryByText(/private transport/)).not.toBeInTheDocument();
+  });
+  it("retains the original required-read error as a private cause", async () => {
+    const backendError = new Error("private backend detail");
+    mocks.limit.mockResolvedValue({ data: null, error: backendError });
+    const { client } = mount();
+    await screen.findByText("Could not load ingest status.");
+    const query = client.getQueryCache().find({
+      queryKey: ["pi_ingest_status", "validated-v1", "owner-a"],
+    });
+    expect(query?.state.error).toMatchObject({
+      message: "Could not load ingest status.",
+      cause: backendError,
+    });
+    expect(screen.queryByText(/private backend detail/)).not.toBeInTheDocument();
   });
   it("preserves the pi-only bounded query", async () => {
     mount();

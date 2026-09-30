@@ -788,6 +788,22 @@ def is_valid_tent_id(value: Optional[str]) -> bool:
     return bool(_UUID_RE.match(v))
 
 
+def is_valid_ingest_url(url: Any) -> bool:
+    """Require an HTTPS destination without URL credentials or malformed ports."""
+    if not isinstance(url, str) or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in url):
+        return False
+    from urllib.parse import urlsplit
+    try:
+        parsed = urlsplit(url)
+        if (parsed.scheme != "https" or not parsed.hostname or
+                parsed.username is not None or parsed.password is not None):
+            return False
+        parsed.port  # Validate numeric/range bounds before requests sees the URL.
+    except ValueError:
+        return False
+    return True
+
+
 def evaluate_forwarding_readiness(
     url: Optional[str],
     token: Optional[str],
@@ -805,6 +821,8 @@ def evaluate_forwarding_readiness(
     tent_valid = is_valid_tent_id(tent_id)
     if not url_ok or not token_ok:
         reason: Optional[str] = "no_forwarding_configured"
+    elif not is_valid_ingest_url(url):
+        reason = "blocked_invalid_ingest_url"
     elif not tent_configured:
         reason = "blocked_missing_tent_id"
     elif not tent_valid:
@@ -1062,6 +1080,8 @@ class ListenerRuntime:
             self.tents, self.aliases = load_tent_map(Path(mapping), os.environ)
             if not os.environ.get("VERDANT_INGEST_URL", "").strip():
                 raise ConfigError("Mapped forwarding requires VERDANT_INGEST_URL")
+            if not is_valid_ingest_url(os.environ.get("VERDANT_INGEST_URL")):
+                raise ConfigError("VERDANT_INGEST_URL must be HTTPS without userinfo or malformed ports")
         else:
             tent_id = os.environ.get("VERDANT_TENT_ID")
             self.tents = (Tent(tent_id, "Single tent", "VERDANT_BRIDGE_TOKEN"),) if is_valid_tent_id(tent_id) else ()
@@ -1083,8 +1103,6 @@ class ListenerRuntime:
         self.interval = _positive_setting("ECOWITT_REPLAY_INTERVAL_SECONDS", 2)
         self.cleaner = lambda value: sanitize(value, secrets=_delivery_secrets() +
             tuple(os.environ[t.token_env] for t in self.tents if os.environ.get(t.token_env)))
-        self.spool = JsonlSpool(root, clock=_utc_now, max_bytes=max_bytes, max_days=max_days,
-                               warn=lambda message: print("[verdant-testbench] " + message), cleaner=self.cleaner, lock=self.lock)
         self.health = HealthState(root / "state.json", [t.tent_id for t in self.tents], clock=_utc_now,
             quiet_seconds=_positive_setting("ECOWITT_QUIET_SECONDS", 600),
             failure_seconds=_positive_setting("ECOWITT_FORWARD_FAILURE_SECONDS", 600),
@@ -1095,6 +1113,10 @@ class ListenerRuntime:
             spool_drops=lambda: self.spool.stats["dropped_count"],
             local_errors=lambda: bool(self.last_local_error or self.last_enqueue_error),
             orphaned_queue=self._has_orphaned_queue)
+        # Accept health state before queue retention can evict readings. Health
+        # callbacks are evaluated only after spool construction has completed.
+        self.spool = JsonlSpool(root, clock=_utc_now, max_bytes=max_bytes, max_days=max_days,
+                               warn=lambda message: print("[verdant-testbench] " + message), cleaner=self.cleaner, lock=self.lock)
         self.spool.enforce_limits()
 
     def enqueue(self, reading: dict, tent_id: str) -> str:

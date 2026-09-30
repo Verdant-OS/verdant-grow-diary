@@ -20,6 +20,79 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_invalid_health_state_cannot_evict_durable_queue_before_startup_refusal(self):
+        self.post()
+        runtime = listener.get_runtime()
+        saved_queue = runtime.spool.path.read_bytes()
+        saved_stats = runtime.spool.stats_path.read_bytes()
+        saved_health = runtime.health.path.read_bytes()
+        saved_ids = list(runtime.spool.entries)
+        cap = runtime.spool._disk_bytes() // 2
+        corrupt_health = json.dumps({"tents": "invalid", "private": TOKEN_A + "x" * 10000}).encode()
+        runtime.health.path.write_bytes(corrupt_health)
+        os.environ["ECOWITT_SPOOL_MAX_MB"] = str(cap / (1024 * 1024))
+        listener._RUNTIME = None
+        with self.assertRaises(ValueError) as caught:
+            listener.get_runtime()
+        self.assertNotIn(TOKEN_A, str(caught.exception))
+        self.assertEqual(runtime.spool.path.read_bytes(), saved_queue)
+        self.assertEqual(runtime.spool.stats_path.read_bytes(), saved_stats)
+        self.assertEqual(runtime.health.path.read_bytes(), corrupt_health)
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        self.assertEqual(self.post().status_code, 503)
+        self.requests.post.assert_not_called()
+        runtime.health.path.write_bytes(saved_health)
+        os.environ.pop("ECOWITT_SPOOL_MAX_MB")
+        restored = listener.get_runtime()
+        self.assertEqual(list(restored.spool.entries), saved_ids)
+        self.assertEqual(restored.spool.stats["dropped_count"], 0)
+        restored.replay_once()
+        self.assertEqual(restored.spool.pending_count, 0)
+        self.assertEqual(self.requests.post.call_count, 2)
+
+    def test_mapped_unsafe_ingest_urls_fail_before_touching_durable_queue(self):
+        self.post()
+        runtime = listener.get_runtime()
+        saved_queue = runtime.spool.path.read_bytes()
+        original_url = os.environ["VERDANT_INGEST_URL"]
+        urls = ("http://example.invalid/ingest", "ftp://example.invalid/ingest",
+                "https://synthetic-private@example.invalid/ingest", "https://@example.invalid/ingest",
+                "https://:synthetic-private@example.invalid/ingest", "https:///ingest",
+                "https://example.invalid:bad/ingest", "https://example.invalid:65536/ingest",
+                "https://example.invalid/ingest\n")
+        for url in urls:
+            with self.subTest(url=url):
+                os.environ["VERDANT_INGEST_URL"] = url
+                listener._RUNTIME = None
+                with self.assertRaises(ValueError) as caught:
+                    listener.get_runtime()
+                self.assertNotIn("synthetic-private", str(caught.exception))
+                self.assertNotIn(url, str(caught.exception))
+                self.assertEqual(runtime.spool.path.read_bytes(), saved_queue)
+                self.assertEqual(self.client.get("/health").status_code, 503)
+                self.assertEqual(self.post().status_code, 503)
+                self.requests.post.assert_not_called()
+        os.environ["VERDANT_INGEST_URL"] = original_url
+        restored = listener.get_runtime()
+        restored.replay_once()
+        self.assertEqual(restored.spool.pending_count, 0)
+
+    def test_replay_rechecks_ingest_url_before_sending_outbound_credentials(self):
+        self.post()
+        runtime = listener.get_runtime()
+        saved_ids = list(runtime.spool.entries)
+        original_url = os.environ["VERDANT_INGEST_URL"]
+        os.environ["VERDANT_INGEST_URL"] = "http://example.invalid/ingest"
+        runtime.replay_once()
+        self.requests.post.assert_not_called()
+        self.assertEqual(list(runtime.spool.entries), saved_ids)
+        self.assertTrue(all(entry["attempts"] == 1 for entry in runtime.spool.entries.values()))
+        os.environ["VERDANT_INGEST_URL"] = original_url
+        self.now += timedelta(seconds=6)
+        runtime.replay_once()
+        self.assertEqual(runtime.spool.pending_count, 0)
+        self.assertEqual(self.requests.post.call_count, 2)
+
     def test_legacy_unowned_stuck_probes_are_only_local_diagnostics(self):
         os.environ.pop("ECOWITT_TENT_MAP")
         os.environ.update(VERDANT_TENT_ID=TENT_A, VERDANT_BRIDGE_TOKEN=TOKEN_A)

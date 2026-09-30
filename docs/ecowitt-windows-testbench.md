@@ -154,6 +154,8 @@ The file stores environment-variable names, never bridge-token values:
 
 Set `ECOWITT_TENT_MAP=tent-map.json` in the local `.env`, and set each
 named token variable locally. Keep `VERDANT_INGEST_URL` configured.
+Forwarding requires an HTTPS URL without userinfo, whitespace or malformed
+ports. Outbound readiness rechecks it before every send, including replay.
 Mapped startup rejects a missing, empty or whitespace-only ingest URL with
 a fixed diagnostic before changing the spool. Restore the configuration
 and restart to replay existing queued readings. Legacy receive-only mode
@@ -320,7 +322,8 @@ Oldest pending entries are dropped at the cap with a persistent counter and warn
 logs are also bounded and expose drop counters. If state alone exceeds
 the size cap, delivery stops with a local-state error instead of hiding
 loss. A torn final append is counted and discarded; a corrupt complete
-record or malformed health state fails closed.
+record or malformed health state fails closed. Health state is validated
+before queue construction can enforce retention or evict acknowledged readings.
 
 Eviction decisions and their absolute loss count are flushed and synced in
 the queue before payloads are removed. Compaction retains a loss-count

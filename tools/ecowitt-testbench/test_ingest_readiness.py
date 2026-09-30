@@ -7,7 +7,6 @@ import subprocess
 import sys
 import threading
 import tempfile
-import threading
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timedelta, timezone

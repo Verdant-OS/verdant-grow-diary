@@ -49,7 +49,9 @@ function loadMigrations() {
     .sort()
     .map((name) => ({
       name,
-      sql: readFileSync(join(MIGRATIONS_DIR, name), "utf8"),
+      // Canonicalize in memory before scanners truncate fingerprint snippets.
+      // Windows checkout line endings must not invalidate an accepted LF baseline.
+      sql: readFileSync(join(MIGRATIONS_DIR, name), "utf8").replace(/\r\n/g, "\n"),
     }));
 }
 

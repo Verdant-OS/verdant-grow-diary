@@ -50,6 +50,65 @@ function run(scriptPath: string, extra: string[] = []): { code: number; out: str
 }
 
 describe("check-supabase-migration-safety", () => {
+  it.each(["lf", "crlf", "mixed"] as const)(
+    "preserves accepted fingerprints with %s line endings without hiding a new unsafe function",
+    (lineEndings) => {
+      const names = [
+        "20260805090000_security_advisor_hardening_followup.sql",
+        "20260807133000_global_default_privilege_hardening.sql",
+      ];
+      const repoRoot = resolve(__dirname, "../..");
+      const sources = Object.fromEntries(
+        names.map((name) => {
+          const lf = readFileSync(join(repoRoot, "supabase/migrations", name), "utf8").replace(
+            /\r\n/g,
+            "\n",
+          );
+          const sql = lf
+            .split("\n")
+            .map((line, index) =>
+              lineEndings === "crlf" || (lineEndings === "mixed" && index % 2 === 0)
+                ? line + "\r"
+                : line,
+            )
+            .join("\n");
+          return [name, sql];
+        }),
+      );
+      const { dir, scriptPath } = makeSandbox(sources);
+      const baselinePath = join(dir, "config/supabase-migration-safety-baseline.json");
+      const baseline = readFileSync(
+        join(repoRoot, "config/supabase-migration-safety-baseline.json"),
+        "utf8",
+      );
+      writeFileSync(baselinePath, baseline);
+      try {
+        const first = run(scriptPath, ["--json"]);
+        const repeated = run(scriptPath, ["--json"]);
+        expect(first.code).toBe(0);
+        expect(JSON.parse(first.out).new).toEqual([]);
+        expect(repeated).toEqual(first);
+        expect(readFileSync(baselinePath, "utf8")).toBe(baseline);
+
+        writeFileSync(
+          join(dir, "supabase/migrations/20260930000100_new_unsafe.sql"),
+          [
+            "CREATE FUNCTION public.new_unsafe() RETURNS void",
+            "LANGUAGE sql SECURITY DEFINER AS $$ SELECT 1; $$;",
+          ].join("\r\n"),
+        );
+        const unsafe = run(scriptPath, ["--json"]);
+        expect(unsafe.code).toBe(1);
+        expect(JSON.parse(unsafe.out).new).toEqual([
+          expect.objectContaining({ scanner: "SEARCH_PATH_MUTABLE", subject: "public.new_unsafe" }),
+        ]);
+        expect(readFileSync(baselinePath, "utf8")).toBe(baseline);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
+
   it("passes when a well-formed migration adds SECURITY DEFINER with search_path", () => {
     const { scriptPath } = makeSandbox({
       "20260101_ok.sql": `

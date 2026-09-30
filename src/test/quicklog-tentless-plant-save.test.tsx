@@ -69,7 +69,11 @@ async function chooseActivity(id: string) {
       "p1",
     ),
   );
-  fireEvent.click(screen.getByTestId(`${prefix}-picker-${id}`));
+  const pickerId = `${prefix}-picker-${id}`;
+  if (!screen.queryByTestId(pickerId)) {
+    fireEvent.click(screen.getByRole("button", { name: "More activity types" }));
+  }
+  fireEvent.click(screen.getByTestId(pickerId));
   return screen.findByTestId(`${prefix}-form`);
 }
 
@@ -192,6 +196,24 @@ describe("Quick Log tentless in-grow plant saves", () => {
     );
     expect(harness.rpc).not.toHaveBeenCalled();
   });
+
+  it.each(["training", "defoliation", "harvest"] as const)(
+    "blocks %s for a tentless plant before any write",
+    async (id) => {
+      if (id === "harvest") harness.plants[0].stage = "flower";
+      renderQuickLog();
+      await chooseActivity(id);
+      fireEvent.change(screen.getByTestId(`${prefix}-note`), {
+        target: { value: "Activity observation" },
+      });
+      expect(screen.getByTestId(`${prefix}-save`)).toBeDisabled();
+      expect(screen.getByTestId(`${prefix}-persistence-block`)).toHaveTextContent(
+        "Assign this plant to a tent before saving.",
+      );
+      expect(harness.rpc).not.toHaveBeenCalled();
+      expect(harness.photo).not.toHaveBeenCalled();
+    },
+  );
 
   it("blocks the main Environment entry before its existing writer", async () => {
     renderQuickLog({

@@ -196,15 +196,15 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
-  it("keeps the no-grow notice for a genuinely unscoped activity editor", () => {
+  it("keeps the no-grow notice and fails closed before an activity is selected", () => {
     mountSection({ growId: null, tentId: null, plantId: null });
 
     expect(screen.getByTestId("quick-log-all-activities-no-grow")).toHaveTextContent(
       "Select a grow to enable Quick Log actions.",
     );
-    expect(
-      screen.queryByTestId("quick-log-all-activities-persistence-block"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-all-activities-persistence-block")).toHaveTextContent(
+      "Assign this plant to a tent before saving.",
+    );
   });
 
   it("uses the full visible symptom labels while preserving canonical test identities", () => {

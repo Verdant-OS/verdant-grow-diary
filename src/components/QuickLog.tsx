@@ -1700,7 +1700,7 @@ export default function QuickLog({
       ? mainFormTarget.target
       : (inFlightSaveContext?.target ?? null);
   const allActivitiesTentRequiredBlockReason =
-    strictEditorTarget.status === "blocked" && strictEditorTarget.reason === "plant_tent_unassigned"
+    strictEditorTarget.status === "blocked"
       ? QUICK_LOG_TARGET_BLOCKED_COPY[strictEditorTarget.reason]
       : null;
   const editorTargetBlocked =

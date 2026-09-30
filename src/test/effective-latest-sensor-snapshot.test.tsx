@@ -25,6 +25,7 @@ vi.mock("@/integrations/supabase/client", () => ({
         in: () => q,
         eq: () => q,
         is: () => q,
+        or: () => q,
         order: () => q,
         limit: () => {
           if (table === "diary_entries") {

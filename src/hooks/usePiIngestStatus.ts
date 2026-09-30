@@ -6,10 +6,12 @@
  */
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/store/auth";
 import {
   PI_INGEST_SOURCE,
   PI_INGEST_7D_MS,
   computePiIngestStatus,
+  requirePiIngestReadings,
   type PiIngestStatusSummary,
 } from "@/lib/piIngestStatusRules";
 
@@ -18,9 +20,14 @@ export interface PiIngestStatusQueryResult {
   latestTentName: string | null;
 }
 
-export function usePiIngestStatus(): UseQueryResult<PiIngestStatusQueryResult> {
-  return useQuery({
-    queryKey: ["pi_ingest_status"],
+export function usePiIngestStatus(): UseQueryResult<PiIngestStatusQueryResult> & {
+  isSignedOut: boolean;
+} {
+  const { user } = useAuth();
+  const query = useQuery({
+    queryKey: ["pi_ingest_status", "validated-v1", user?.id ?? "signed-out"],
+    enabled: !!user?.id,
+    retry: false,
     queryFn: async (): Promise<PiIngestStatusQueryResult> => {
       const sinceIso = new Date(Date.now() - PI_INGEST_7D_MS).toISOString();
       const { data, error } = await supabase
@@ -30,8 +37,8 @@ export function usePiIngestStatus(): UseQueryResult<PiIngestStatusQueryResult> {
         .gte("ts", sinceIso)
         .order("ts", { ascending: false })
         .limit(500);
-      if (error) throw error;
-      const rows = data ?? [];
+      if (error) throw new Error("Could not load ingest status.", { cause: error });
+      const rows = requirePiIngestReadings(data);
       const summary = computePiIngestStatus(rows);
 
       let latestTentName: string | null = null;
@@ -47,4 +54,5 @@ export function usePiIngestStatus(): UseQueryResult<PiIngestStatusQueryResult> {
     },
     staleTime: 30_000,
   });
+  return { ...query, isSignedOut: !user?.id };
 }

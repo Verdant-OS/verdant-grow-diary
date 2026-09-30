@@ -35,6 +35,7 @@ export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
   picomatch: "2.3.2",
   vitest: "4.1.11",
   "@vitest/mocker": "4.1.11",
+  undici: "6.28.1",
 });
 // Vitest 4 uses the root Vite/Rolldown graph and no longer brings in Rollup.
 // Absence is safe; every copy must still be patched if it returns transitively.
@@ -52,6 +53,7 @@ export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   "@vitest/mocker": "4.1.11",
   esbuild: "0.28.1",
   "brace-expansion": "1.1.21",
+  undici: "6.28.1",
 });
 export const PACKAGE_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({
   "brace-expansion": Object.freeze({

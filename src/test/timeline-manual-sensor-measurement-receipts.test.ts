@@ -45,6 +45,46 @@ function metricRow(
 }
 
 describe("completeManualSensorTimelineRows", () => {
+  it.each([
+    "2026-09-09T18:46:00.000+00:00",
+    "2026-09-09T18:46:00Z",
+    "2026-09-09T20:46:00.000+02:00",
+  ])("excludes the entire boundary instant when its timestamp also uses %s", (equivalentTime) => {
+    const newest = metricRow("soil_moisture_pct", 40, "manual", {
+      ts: new Date(Date.parse(CAPTURED) + 60_000).toISOString(),
+    });
+    const boundary = metricRow("temperature_c", 24);
+    const lookahead = metricRow("humidity_pct", 55, "manual", { ts: equivalentTime });
+    const rows = [boundary, newest, lookahead];
+    const before = rows.map((row) => ({ ...row }));
+    const expected = { rows: [newest], hasOlderRows: true };
+
+    expect(Date.parse(equivalentTime)).toBe(Date.parse(CAPTURED));
+    expect(completeManualSensorTimelineRows(rows, 2)).toEqual(expected);
+    expect(completeManualSensorTimelineRows([...rows].reverse(), 2)).toEqual(expected);
+    expect(completeManualSensorTimelineRows(rows, 2)).toEqual(expected);
+    expect(rows).toEqual(before);
+  });
+
+  it("excludes unverified timestamps together when the lookahead time is unverified", () => {
+    const newest = metricRow("soil_moisture_pct", 40);
+    const unknownOne = metricRow("temperature_c", 24, "manual", {
+      captured_at: "not-a-date",
+    });
+    const unknownTwo = metricRow("humidity_pct", 55, "manual", {
+      captured_at: "also-not-a-date",
+    });
+    const rows = [unknownOne, newest, unknownTwo];
+
+    expect(completeManualSensorTimelineRows(rows, 2)).toEqual({
+      rows: [newest],
+      hasOlderRows: true,
+    });
+    expect(completeManualSensorTimelineRows([...rows].reverse(), 2)).toEqual(
+      completeManualSensorTimelineRows(rows, 2),
+    );
+  });
+
   it("retains all rows when the bounded query proves it reached the end", () => {
     const rows = Array.from({ length: TIMELINE_MANUAL_SENSOR_ROW_LIMIT }, () =>
       metricRow("temperature_c", 24),
@@ -96,6 +136,52 @@ describe("completeManualSensorTimelineRows", () => {
     const page = completeManualSensorTimelineRows([...newer, boundary, lookahead]);
     expect(page.rows).toEqual(newer);
     expect(page.hasOlderRows).toBe(true);
+  });
+
+  it("orders the captured and legacy streams by observation time before bounding them", () => {
+    const captured = {
+      ...metricRow("temperature_c", 24, "manual", {
+        ts: "2026-09-12T10:00:00.000Z",
+        captured_at: "2026-09-09T18:46:00.000Z",
+      }),
+      id: "captured",
+    };
+    const legacy = {
+      ...metricRow("humidity_pct", 55, "manual", {
+        ts: "2026-09-10T18:46:00.000Z",
+      }),
+      captured_at: null,
+      id: "legacy",
+    };
+    const rows = [captured, legacy];
+    expect(completeManualSensorTimelineRows(rows).rows.map((row) => row.id)).toEqual([
+      "legacy",
+      "captured",
+    ]);
+    expect(completeManualSensorTimelineRows([...rows].reverse())).toEqual(
+      completeManualSensorTimelineRows(rows),
+    );
+  });
+
+  it("retains the newest legacy row when it displaces an old captured row at the limit", () => {
+    const captured = Array.from({ length: TIMELINE_MANUAL_SENSOR_ROW_LIMIT }, (_, index) => ({
+      ...metricRow("temperature_c", 24, "manual", {
+        ts: new Date(Date.parse(CAPTURED) - index * 60_000).toISOString(),
+      }),
+      id: `captured-${index}`,
+    }));
+    const legacy = {
+      ...metricRow("temperature_c", 25, "manual", {
+        ts: new Date(Date.parse(CAPTURED) + 60_000).toISOString(),
+      }),
+      captured_at: null,
+      id: "newer-legacy",
+    };
+    const page = completeManualSensorTimelineRows([...captured, legacy]);
+    expect(page.hasOlderRows).toBe(true);
+    expect(page.rows).toHaveLength(TIMELINE_MANUAL_SENSOR_ROW_LIMIT);
+    expect(page.rows[0].id).toBe("newer-legacy");
+    expect(page.rows.some((row) => row.id === "captured-199")).toBe(false);
   });
 
   it("marks hasOlderRows when the bounded query returns exactly 201 rows", () => {

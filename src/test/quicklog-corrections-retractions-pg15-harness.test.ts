@@ -252,6 +252,8 @@ describe("Quick Log corrections/retractions PostgreSQL 15 runtime gate", () => {
       expect(source).toContain(proof);
     }
     expect(source).toContain("quicklog_entry_revisions");
+    expect(source).toContain("apply-quicklog-revision-idempotent-replay.mjs");
+    expect(source).toContain("catalog_drift:required_core_baseline");
     expect(source).toContain("catalog_drift:required_core_false_green");
     expect(source).toContain("catalog_drift:required_core_restore_failed");
     expect(source).toContain("alter table public.diary_entries add column retracted_at");
@@ -271,6 +273,9 @@ describe("Quick Log corrections/retractions PostgreSQL 15 runtime gate", () => {
     );
     expect(trigger.pull_request.paths).toContain(
       "supabase/migrations/20260811090000_quicklog_corrections_retractions.sql",
+    );
+    expect(trigger.pull_request.paths).toContain(
+      "supabase/migrations/20260916111000_quicklog_revision_idempotent_replay.sql",
     );
     expect(trigger.pull_request.paths).toContain(
       "scripts/assert-required-core-migrations-applied.mjs",

@@ -26,7 +26,8 @@ function readPythonConstants(directory = testbench): Record<string, unknown> {
   const candidates = configured ? [configured] : ["python3", "python"];
   for (const executable of candidates) {
     const result = spawnSync(executable, [...args.slice(0, -1), directory], {
-      encoding: "utf8", timeout: 15_000,
+      encoding: "utf8",
+      timeout: 15_000,
     });
     if (!configured && result.error?.message.includes("ENOENT")) continue;
     if (result.error || result.status !== 0) {
@@ -46,8 +47,10 @@ describe("EcoWitt custom HTTP bridge field contracts", () => {
     const fixture = mkdtempSync(join(tmpdir(), "ecowitt-parity-"));
     try {
       const source = readFileSync(join(testbench, "ecowitt_multitent.py"), "utf8");
-      writeFileSync(join(fixture, "ecowitt_multitent.py"),
-        `${source}\nFIELD_MAP = {"changed": ("late_field",)}\nUNITS["temp_f"] = "changed"\n`);
+      writeFileSync(
+        join(fixture, "ecowitt_multitent.py"),
+        `${source}\nFIELD_MAP = {"changed": ("late_field",)}\nUNITS["temp_f"] = "changed"\n`,
+      );
       const effective = readPythonConstants(fixture);
       expect(effective.FIELD_MAP).toEqual({ changed: ["late_field"] });
       expect(effective.UNITS).toMatchObject({ temp_f: "changed" });

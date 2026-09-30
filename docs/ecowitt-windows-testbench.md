@@ -185,7 +185,12 @@ kept in that tent's `metadata.raw_payload`.
 | Configured, capture-verified EC alias               | `ec_ms_cm`                      | `mS/cm`; explicit `uS/cm` or `µS/cm` converts by ÷1000; first `soil_channels` entry |
 | Configured, capture-verified soil-temperature alias | `soil_temp_f` or `soil_temp_c`  | Explicit `F` or `C`; first `soil_temp_channels` entry                               |
 | Primary air temperature + RH                        | `vpd_kpa`                       | Derived kPa from that pair only; no secondary or WH45 substitution                  |
-| Unowned or unknown fields                           | Local `unmapped_channels.jsonl` | No tent attribution; per-key counters and one warning per key                       |
+| Unowned or unknown fields                           | Local `unmapped_channels.jsonl` | No tent attribution; bounded per-key counters and aggregate overflow warning        |
+
+The first 256 distinct unowned keys, within the state byte budget, receive
+individual counters and one warning per key. Further occurrences increment
+`unmapped_overflow_count` and still enter the sanitized local log, subject to
+the log's retention and size limits.
 
 **EC/WH52 capture status: NOT_MEASURED.** No verified sanitized capture
 was supplied. The default alias table is empty. Tests use clearly named
@@ -548,7 +553,7 @@ Fields:
 - `ingest_url_configured` — true when `VERDANT_INGEST_URL` is set.
 - `bridge_token_configured` — true when `VERDANT_BRIDGE_TOKEN` is set.
 - `masked_ingest_url` — host/path summary with project identifiers masked.
-- `masked_token_preview` — short `vbt_abc...xyz` preview. The full bridge token is **never** returned. Do not paste it into curl commands or docs.
+- `masked_token_preview` — `<configured>` or `<empty>` only. No token characters are returned. Do not paste tokens into curl commands or docs.
 - `forward_attempt_count` — forward attempts since listener start. `0` means none yet.
 - `forward_success_count` — webhook calls that returned 2xx. `>0` confirms at least one successful ingest.
 - `forward_failure_count` — non-2xx responses or request exceptions. `>0` means inspect `last_forward_error` and `last_forward_status`.

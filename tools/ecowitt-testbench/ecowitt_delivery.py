@@ -401,18 +401,24 @@ class HealthState:
         with self.lock:
             safe = self.cleaner(fields)
             rows = []
+            overflowed = 0
             for key, value in safe.items():
+                # Every sanitized unowned field needs local evidence, even
+                # after the bounded per-key counter reaches its limit.
+                rows.append({"recorded_at": self.clock().isoformat(), "key": key, "value": value})
                 first = key not in self.data["unmapped_counts"]
                 counts = self.data["unmapped_counts"]
                 candidate = {**counts, key: counts.get(key, 0) + 1}
                 if len(candidate) > 256 or len(json.dumps(candidate, separators=(",", ":")).encode("utf-8")) > self.max_log_bytes // 4:
                     self.data["unmapped_overflow_count"] += 1
+                    overflowed += 1
                     continue
                 self.data["unmapped_counts"] = candidate
-                rows.append({"recorded_at": self.clock().isoformat(), "key": key, "value": value})
                 if first:
                     self.log({"event": "unmapped", "key": key,
                               "message": "seen but not mapped to any tent"})
+            if overflowed:
+                self.log({"event": "unmapped_counter_limit", "count": overflowed})
             path = self.path.parent / "unmapped_channels.jsonl"
             if rows:
                 append_jsonl_many(path, rows, cache=self._log_cache)

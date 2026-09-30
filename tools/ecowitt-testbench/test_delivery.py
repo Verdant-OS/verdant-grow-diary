@@ -314,6 +314,17 @@ class HealthTests(DeliveryFixture):
         self.assertEqual(restored.data["unmapped_overflow_count"], state.data["unmapped_overflow_count"])
         self.assertTrue(restored.status()["ok"])
 
+    def test_overflowed_unmapped_keys_still_have_sanitized_local_log_rows(self):
+        state = self.health()
+        state.unmapped({f"unknown-{i}": i for i in range(300)})
+        self.assertEqual(state.data["unmapped_overflow_count"], 44)
+        rows = [json.loads(line) for line in (self.root / "unmapped_channels.jsonl").read_text().splitlines()]
+        self.assertEqual(len(rows), 300)
+        self.assertEqual(rows[-1]["key"], "unknown-299")
+        self.assertEqual(rows[-1]["value"], 299)
+        self.assertEqual(self.health().data["unmapped_overflow_count"], 44)
+        self.assertTrue(any(message.get("event") == "unmapped_counter_limit" for message in self.messages))
+
     def test_unmapped_append_is_batched_and_no_change_does_not_rescan(self):
         state = self.health()
         from ecowitt_delivery import append_jsonl_many

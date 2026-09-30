@@ -39,11 +39,12 @@ third-party development integration, not production schema acceptance. Do not re
 the dependency audit, required-check audit, production safeguards or required
 application checks to obtain a green release.
 
-At this runbook's original base, `verify-sandbox` runs on deploy pushes. PR #1778
-at `4e6710b9872e4c75cb478ea342f083796a561c7a` proposes making it manual-only;
-require a measured merge receipt and re-read the landed workflow before classifying
-it as retired. `verify-production` remains a separate protected manual lane. An
-intentionally unrun database check is `NOT_MEASURED`, not applied-schema proof.
+PR #1778 landed as `674eb480e5e5c2b55c18dd7ac823f088c5e0b424`. In the
+current deploy-branch workflow, `verify-sandbox` runs only on manual
+`workflow_dispatch` for the pinned sandbox target; deploy pushes still run the
+offline manifest-and-files job, but no automatic sandbox database probe.
+`verify-production` remains a separate protected manual lane. An intentionally
+unrun database check is `NOT_MEASURED`, not applied-schema proof.
 Reconcile the selected Vercel checks with the workflows that actually report on
 deploy pushes; a PR-only check cannot gate a deploy SHA unless it reports there.
 
@@ -82,7 +83,8 @@ complete and abort. These are owner controls; Codex runs none of them here.
 
 Before Matthew promotes, record:
 
-1. Current live full SHA and `dirty` from `version.json`, with observation time.
+1. Current production-host inventory and each hostname's serving deployment,
+   full SHA and `dirty` from `version.json`, with observation time.
 2. Target deploy full SHA, included commits and exact-head required check results;
    required checks must be successful, not skipped, cancelled or still pending.
 3. The target deployment URL, ID, project, `target: production`, `READY` state and
@@ -126,32 +128,53 @@ vercel rollback <deployment-url> --scope verdantgrowdiary
 
 Here `<deployment-url>` is the rollback artifact, not the failed target. Rollback
 changes routing without rebuilding. It does not reverse a database migration or
-an Edge deployment. After a rollback, automatic production domain assignment
-stays paused until Matthew explicitly promotes again. Preserve that pause; an
-automation must not undo the rollback by promoting another green commit. See
+an Edge deployment. Do not assume rollback paused automatic production domain
+assignment: the observed pause after an earlier rollback does not establish its
+cause or the current project setting. Matthew checks and records the production
+domain auto-assignment setting after rollback, or observes the routing of the next
+deploy-branch build. Until measured, mark the pause `NOT_MEASURED` and do not rely
+on it to keep a later Git deployment from returning the failed version. Any
+automation must honor a verified rollback/manual-pause state and must not undo
+the rollback by promoting another green commit. See
 [Instant Rollback](https://vercel.com/docs/instant-rollback) and
 [the rollback command](https://vercel.com/docs/cli/rollback).
 
-## Verify the app domain after either operation
+## Verify every production hostname after either operation
 
-After resolving any active rollout, read the app's build receipt with a unique
-observation timestamp and no-cache request. Follow redirects and retain response
-headers plus the effective URL, so a cached response or another origin is visible:
+After resolving any active rollout, Matthew refreshes the production-host inventory
+from the domains bound to the apex-holding project and its production aliases.
+Include at least `verdantgrowdiary.com`, `www.verdantgrowdiary.com`,
+`verdant-grow-diary.vercel.app` and the recorded project alias
+`verdant-grow-diary-verdantgrowdiary.vercel.app`, plus each
+earlier-inventoried hostname until its retirement is owner-recorded and verified.
+For **each** hostname, resolve the serving deployment (M10 in the release topology
+specification) and record its deployment ID, full SHA, `READY` state,
+`target: production` and `source: git`. A newest-deployment listing or one
+deployment's alias array is not a per-host resolution.
+
+Read a build receipt for each hostname with a unique observation timestamp and
+no-cache request. Follow redirects and retain response headers plus the effective
+URL, so a cached response or another origin is visible. Repeat this command with
+each inventoried hostname substituted for `<production-hostname>`:
 
 ```sh
 curl --fail --silent --show-error --location \
   --header 'Cache-Control: no-cache' \
-  --dump-header version-receipt.headers --output version-receipt.json \
+  --dump-header '<production-hostname>.version-receipt.headers' \
+  --output '<production-hostname>.version-receipt.json' \
   --write-out 'effective_url=%{url_effective}\nhttp_code=%{http_code}\n' \
-  'https://verdantgrowdiary.com/version.json?receipt=<utc-observation-timestamp>'
+  'https://<production-hostname>/version.json?receipt=<utc-observation-timestamp>'
 ```
 
-Replace the timestamp placeholder for each observation. Check the effective host,
-status and caching headers, then confirm the JSON's full `commit` equals the
-promoted or rollback SHA and `dirty` is `false`. Save the JSON, headers, timestamp,
-rollout resolution and owner operation receipts. Until the domain
-reports the expected build, release identity remains `NOT_MEASURED` or `FAIL`
-when a measured SHA mismatch exists.
+Replace the hostname and timestamp placeholders for each observation. Check the
+effective host, status and caching headers, then confirm every JSON receipt's
+full `commit` equals the intended promote or rollback SHA and `dirty` is `false`.
+Save each hostname's resolution, JSON, headers, timestamp, rollout resolution and
+owner operation receipts. A split between serving deployments or SHAs is `FAIL`;
+so is a resolved deployment that is not the intended `READY`, production-target,
+Git-sourced artifact. An unmeasured or unreachable hostname blocks acceptance as
+`NOT_MEASURED`. Do not declare promotion or rollback complete until the entire
+inventory agrees and the rollout is complete or aborted.
 
 Only then exercise the fixed flow on the fixture account's own grow, with every
 smoke write tagged `[smoke <timestamp>]`. Never use customer data or the KEEP

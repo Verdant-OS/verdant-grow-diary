@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { grantAnalyticsConsent } from "./utils/analyticsConsent";
+import { grantAnalyticsConsent, waitForAnalyticsClientReady } from "./utils/analyticsConsent";
 
 /**
  * Lightweight smoke: load the app once and confirm the GA4 tag is actually in
@@ -18,6 +18,16 @@ import { grantAnalyticsConsent } from "./utils/analyticsConsent";
 import { EXPECTED_MEASUREMENT_ID as MEASUREMENT_ID } from "./utils/analyticsMeasurementId";
 
 test.describe("GA4 tag smoke", () => {
+  test.beforeAll(async ({ browser, baseURL }, testInfo) => {
+    testInfo.setTimeout(120_000);
+    const page = await browser.newPage({ baseURL });
+    try {
+      await waitForAnalyticsClientReady(page, "/");
+    } finally {
+      await page.close();
+    }
+  });
+
   test("script tag and dataLayer are present after load", async ({ page }) => {
     await page.route("https://www.googletagmanager.com/**", (route) => route.abort());
     await grantAnalyticsConsent(page);

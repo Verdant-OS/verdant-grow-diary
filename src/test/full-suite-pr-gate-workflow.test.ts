@@ -2,11 +2,12 @@
  * Pins the invariants of the Full Vitest Suite PR gate
  * (.github/workflows/vitest-full-suite-pr-gate.yml).
  *
- * This workflow is what makes the ENTIRE src/test suite a required PR check.
- * A future edit that quietly drops the pull_request trigger, shrinks the
- * matrix, or stops invoking the batched runner would re-open the gap where
- * full-suite regressions land invisibly (targeted CI steps miss them). These
- * static assertions fail if the gate is weakened.
+ * On pull requests the ENTIRE src/test suite is gated by ci.yml's 32 required
+ * shards (256 isolated partitions). This 16-batch duplicate runs in the merge
+ * queue and on deploy-branch pushes only, so it no longer competes for PR runner
+ * capacity. A future edit that shrinks the matrix, drops the merge-queue trigger,
+ * or stops invoking the batched runner would weaken the queue-time check; these
+ * static assertions fail if that happens.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -18,8 +19,8 @@ const WF = readFileSync(
 );
 
 describe("Full Vitest Suite PR gate workflow", () => {
-  it("runs on pull_request and the merge queue", () => {
-    expect(WF).toMatch(/^\s*pull_request\s*:/m);
+  it("runs in the merge queue but not on pull_request", () => {
+    expect(WF).not.toMatch(/^\s*pull_request\s*:/m);
     expect(WF).toMatch(/^\s*merge_group\s*:/m);
   });
 

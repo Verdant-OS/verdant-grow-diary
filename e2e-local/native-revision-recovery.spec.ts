@@ -195,8 +195,14 @@ test("a committed retraction with a lost reply resolves on retry instead of leav
     const id = await createNoteThroughBrowser(page, f, note);
     const trace = await loseFirstCommittedReply(page, f, "quicklog_retract_entry");
     await recentRow(page, note).getByTestId("quicklog-entry-retract-button").click();
-    await page.getByTestId("quicklog-retract-reason-accidental").click();
-    await page.getByTestId("quicklog-retract-confirm").click();
+    const reason = page.getByTestId("quicklog-retract-reason-accidental");
+    const confirm = page.getByTestId("quicklog-retract-confirm");
+    await reason.click();
+    // Prove the chip's state landed before exercising lost-reply recovery;
+    // an unselected chip leaves Confirm disabled before any RPC is sent.
+    await expect(reason).toHaveAttribute("aria-checked", "true");
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
     await expect.poll(() => trace.replies.length).toBe(1);
     await expect
       .poll(async () =>

@@ -124,6 +124,7 @@
     "lodash": "4.18.1",
     "nanoid": "3.3.18",
     "qs": "6.16.0",
+    "undici": "6.28.1",
   },
   "packages": {
     "@actions/artifact": ["@actions/artifact@6.2.1", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@actions/artifact/-/artifact-6.2.1.tgz", { "dependencies": { "@actions/core": "^3.0.0", "@actions/github": "^9.0.0", "@actions/http-client": "^4.0.0", "@azure/storage-blob": "^12.30.0", "@octokit/core": "^7.0.6", "@octokit/plugin-request-log": "^6.0.0", "@octokit/plugin-retry": "^8.0.0", "@octokit/request": "^10.0.7", "@octokit/request-error": "^7.1.0", "@protobuf-ts/plugin": "^2.2.3-alpha.1", "@protobuf-ts/runtime": "^2.9.4", "archiver": "^7.0.1", "jwt-decode": "^4.0.0", "unzip-stream": "^0.3.1" } }, "sha512-sJGH0mhEbEjBCw7o6SaLhUU66u27aFW8HTfkIb5Tk2/Wy0caUDc+oYQEgnuFN7a0HCpAbQyK0U6U7XUJDgDWrw=="],
@@ -1984,7 +1985,7 @@
 
     "unbox-primitive": ["unbox-primitive@1.1.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/unbox-primitive/-/unbox-primitive-1.1.0.tgz", { "dependencies": { "call-bound": "^1.0.3", "has-bigints": "^1.0.2", "has-symbols": "^1.1.0", "which-boxed-primitive": "^1.1.1" } }, "sha512-nWJ91DjeOkej/TA8pXQ3myruKpKEYgqvpw9lz4OPHj/NWFNluYrjbz9j01CJ8yKQd2g4jFoOkINCTW2I5LEEyw=="],
 
-    "undici": ["undici@6.28.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/undici/-/undici-6.28.0.tgz", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
+    "undici": ["undici@6.28.1", "", {}, "sha512-zWpdTVD54H48CIybL0rWQ3ukpb9d23wM7eH5RtfdmeP70cWHNjtfo7P4vZX+5CoDcO53J4Pu5uXp7lNfjc6DRA=="],
 
     "undici-types": ["undici-types@6.21.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/undici-types/-/undici-types-6.21.0.tgz", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
 

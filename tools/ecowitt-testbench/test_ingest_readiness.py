@@ -20,6 +20,35 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_replay_preserves_normalized_source_case_variants_and_age(self):
+        for key, value in (("SOURCE", "LIVE"), ("Source", " live ")):
+            with self.subTest(key=key):
+                response = self.post({**self.packet, key: value})
+                self.assertTrue(all(item["source"] == "live" for item in response.get_json()["readings"]))
+                runtime = listener.get_runtime()
+                runtime.replay_once()
+                self.assertTrue(all(call.kwargs["json"]["metadata"]["verdant_source"] == "live"
+                                    for call in self.requests.post.call_args_list))
+                self.requests.post.reset_mock()
+        self.post({**self.packet, "SOURCE": "LIVE"})
+        self.now += listener.ECOWITT_LIVE_FRESHNESS + timedelta(microseconds=1)
+        runtime.replay_once()
+        self.assertTrue(all(call.kwargs["json"]["metadata"]["verdant_source"] == "stale"
+                            for call in self.requests.post.call_args_list))
+
+    def test_every_accepted_nonsecret_gateway_marker_survives_mapped_routing(self):
+        for marker in sorted(listener.ECOWITT_GATEWAY_MARKERS - {"dateutc"}):
+            with self.subTest(marker=marker):
+                packet = {"dateutc": self.packet["dateutc"], marker: "synthetic-marker", "temp1f": "77", "humidity1": "50"}
+                response = self.post(packet)
+                self.assertEqual(response.get_json()["readings"][0]["source"], "live")
+                listener.get_runtime().replay_once()
+                forwarded = self.requests.post.call_args.kwargs["json"]
+                self.assertEqual(forwarded["metadata"]["verdant_source"], "live")
+                self.assertEqual(forwarded["metadata"]["raw_payload"][marker], "synthetic-marker")
+                self.assertGreaterEqual(len(set(k.lower() for k in forwarded["metadata"]["raw_payload"]) & listener.ECOWITT_GATEWAY_MARKERS), 2)
+                self.requests.post.reset_mock()
+
     def test_invalid_owned_empty_packets_fail_health_and_absence_does_not(self):
         runtime = listener.get_runtime()
         common = {k: v for k, v in self.packet.items() if k in ("PASSKEY", "model", "stationtype", "dateutc")}

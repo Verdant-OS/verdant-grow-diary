@@ -253,6 +253,9 @@ The default `.spool/` folder contains:
 The queue append is flushed and synced before network I/O. Tokens and
 Authorization headers are never persisted; each send resolves the
 current process environment through that tent's configured token name.
+Dead-letter and unmapped logs each receive at most one tenth of the combined
+spool cap. They are trimmed before pending readings are evicted; removal
+counters remain durable. Auxiliary size trimming scans records once.
 Mapped tents must use distinct token environment names and distinct resolved
 tokens; startup rejects credential reuse without echoing credential details.
 After a restart, the background worker replays due entries in enqueue

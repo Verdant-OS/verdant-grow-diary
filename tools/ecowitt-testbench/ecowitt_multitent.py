@@ -26,7 +26,7 @@ CHANNEL_FIELD_MAP = {
     "soil_temp": {"soil_temp_f": "tf_ch{channel}"},
     "co2": {"co2_ppm": "co2", "temp_f": "tf_co2", "humidity_percent": "humi_co2"},
 }
-COMMON_FIELDS = {"stationtype", "model", "dateutc", "freq", "runtime", "source"}
+COMMON_FIELDS = {"stationtype", "model", "dateutc", "freq", "runtime", "source", "wh65batt", "wh25batt"}
 UNITS = {"temp_f": "F", "humidity_percent": "%", "soil_moisture_pct": "%",
          "soil_temp_f": "F", "soil_temp_c": "C", "co2_ppm": "ppm", "ec_ms_cm": "mS/cm"}
 SECRET_KEYS = {"passkey", "mac", "authorization", "password", "secret", "api_key",

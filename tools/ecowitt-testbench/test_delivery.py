@@ -30,6 +30,26 @@ class DeliveryFixture(unittest.TestCase):
 
 
 class DeliveryTests(DeliveryFixture):
+    def test_auxiliary_budget_is_reclaimed_before_pending_entries(self):
+        spool = self.spool()
+        for n in range(2):
+            spool.enqueue(str(n), self.reading(n))
+        for path in (spool.dead_path, self.root / "unmapped_channels.jsonl"):
+            path.write_text("".join(json.dumps({"recorded_at": self.now.isoformat(), "value": "x" * 200}) + "\n"
+                                    for _ in range(8)), encoding="utf-8")
+        spool.max_bytes = 2300
+        with mock.patch.object(spool, "_compact", wraps=spool._compact) as compact:
+            spool.enforce_limits()
+            self.assertLessEqual(compact.call_count, 1)
+        self.assertEqual(list(spool.entries), ["0", "1"])
+        self.assertEqual(spool.stats["dropped_count"], 0)
+        self.assertGreater(spool.stats["aux_log_dropped_count"], 0)
+        self.assertGreater(spool.stats["dead_letter_dropped_count"], 0)
+        self.assertLessEqual(spool._disk_bytes(), spool.max_bytes)
+        restored = self.spool(max_bytes=2300)
+        self.assertEqual(list(restored.entries), ["0", "1"])
+        self.assertEqual(restored.stats, spool.stats)
+
     def test_success_batch_uses_durable_done_records_without_full_rewrites(self):
         spool = self.spool()
         for i in range(100):

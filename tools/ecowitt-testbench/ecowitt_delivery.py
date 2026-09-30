@@ -82,9 +82,11 @@ def trim_jsonl(path: Path, max_bytes: int, max_days: float, now: datetime, *, ca
         except (ValueError, KeyError, TypeError):
             continue
     total = sum(map(len, kept))
-    while kept and total > max_bytes:
-        total -= len(kept.pop(0))
-        stamps.pop(0)
+    start = 0
+    while start < len(kept) and total > max_bytes:
+        total -= len(kept[start])
+        start += 1
+    kept, stamps = kept[start:], stamps[start:]
     if len(kept) != original_count:
         temporary = path.with_suffix(".jsonl.tmp")
         with temporary.open("wb") as handle:
@@ -226,6 +228,15 @@ class JsonlSpool:
                 if parse_time(entry["created_at"]) < cutoff:
                     del self.entries[entry_id]
                     dropped += 1
+            # Diagnostics get at most one tenth of the combined cap each.
+            # Reclaim their space before deciding which pending readings fit.
+            for path in (self.dead_path, self.root / "unmapped_channels.jsonl"):
+                removed = trim_jsonl(path, self.max_bytes // 10, self.max_days, self.clock(), cache=self._log_cache)
+                if removed:
+                    self.stats["aux_log_dropped_count"] += removed
+                    if path == self.dead_path:
+                        self.stats["dead_letter_dropped_count"] += removed
+                    self.warn(f"spool: dropped {removed} oldest auxiliary log records at retention/size limit")
             disk_bytes = self._disk_bytes()
             if dropped or disk_bytes > self.max_bytes:
                 # Select survivors in memory so size eviction needs one durable
@@ -250,10 +261,6 @@ class JsonlSpool:
             if dropped:
                 self.stats["dropped_count"] += dropped
                 self.warn(f"spool: dropped {dropped} oldest entries at retention/size limit")
-            dead_dropped = trim_jsonl(self.dead_path, self.max_bytes, self.max_days, self.clock(), cache=self._log_cache)
-            if dead_dropped:
-                self.stats["dead_letter_dropped_count"] += dead_dropped
-                self.warn(f"spool: dropped {dead_dropped} oldest dead-letter records at limit")
             self._save_stats()
             # The cap includes auxiliary logs/state, not just pending payloads.
             for path in (self.dead_path, self.root / "unmapped_channels.jsonl"):

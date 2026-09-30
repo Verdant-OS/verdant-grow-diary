@@ -1148,7 +1148,8 @@ class ListenerRuntime:
                 raw = reading["metadata"].get("raw_payload") or {}
                 gateway_time = validate_ecowitt_dateutc(_payload_value_case_insensitive(raw, "dateutc"), now=_utc_now())
                 reading["source"] = _resolve_source_from_validated(
-                    payload={**raw, "source": reading.get("source")}, remote_addr=None,
+                    payload={**{key: value for key, value in raw.items() if key.lower() != "source"},
+                             "source": reading.get("source")}, remote_addr=None,
                     canonical_gateway_time=gateway_time, header_mode="", env_mode="", now=_utc_now(),
                     persisted_physical_evidence=reading.get("physical_gateway_evidence") is True)
                 result = _send_forward(reading, _tent_id=tent_id, _token_env=tent.token_env,

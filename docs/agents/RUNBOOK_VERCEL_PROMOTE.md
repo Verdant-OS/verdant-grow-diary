@@ -148,7 +148,10 @@ of every read.
 **1. Opening reading.** After resolving any active rollout, Matthew records:
 
 - the rolling-release record and configuration (state, substate, current and canary
-  deployments, canary percentage, stage, queued deployment, advancement type);
+  deployments, canary percentage, stage, queued deployment, `startedAt`, `updatedAt`,
+  configured stages and advancement type). The timestamps are what reveal a rollout
+  restarted or recompleted for the same deployment mid-sweep, so compare them in the
+  closing reading like every other field;
 - the deploy tip, freshly fetched: `git fetch origin verdant-grow-diary`, then
   `git rev-parse origin/verdant-grow-diary`;
 - the complete production-host inventory: the domains bound to the project that M2

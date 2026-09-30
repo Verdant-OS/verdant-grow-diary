@@ -598,24 +598,44 @@ claimed_by: Codex, 2026-09-28 22:48 CT
 last_updated: 2026-09-28 23:12 CT, by Codex
 ```
 
-### SENTINEL-AMENDMENT-2026-09-28.2
+### CHEM-PRODUCTION-ONLY-DOCS-001
 
 ```text
-TASK SENTINEL-AMENDMENT-2026-09-28.2  priority: P2  status: OPEN
-goal: Persist Matthew operating phases, production-only verification and coverage as Sentinel 2026-09-28.3, preserving shipped 2026-09-28.2 routing.
+TASK CHEM-PRODUCTION-ONLY-DOCS-001  priority: P2  status: OPEN
+goal: Production-only verification guidance and operational checkpoints; executable CI configuration and historical CURRENT_STATE receipts remain unchanged.
 branch: codex/chem-production-only-docs-20260928
-base: verdant-grow-diary
-checkout: git fetch origin codex/chem-production-only-docs-20260928 verdant-grow-diary && git switch codex/chem-production-only-docs-20260928 && git merge origin/verdant-grow-diary
+base: codex/chem-sentinel-handoff-gate-20260928 (#1779 at d91cdbd5cc77627498d44a4f09ece1dd0030de1e)
+checkout: git fetch origin codex/chem-production-only-docs-20260928 codex/chem-sentinel-handoff-gate-20260928 && git switch codex/chem-production-only-docs-20260928 && git merge origin/codex/chem-sentinel-handoff-gate-20260928
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1777
-head_sha: 1e7c55c328ee57b5a07f831a515e24224e35a5c2, pre-checkpoint observation; read PR metadata for resulting new head
-state: Existing draft follows source 61821446. At 1e7c55c3 all 35 required SUCCESS as of 04:32:51 UTC; three additional failures retained. Earlier 97728846 native 109244115472 SUCCESS: 21 browser PASS / 0 FAIL / 0 SKIP plus separate 22 static PASS. Doc-marker red 89 PASS / 2 FAIL became 91 PASS / 0 FAIL / 0 SKIP in two files. This checkpoint records new performance draft #1793 and fresh six-repair CI; resulting new-head hosted CI NOT_MEASURED. Eight comment deltas preserve parsed workflow behavior; historical CURRENT_STATE receipts unchanged.
-next_action: Normal-push the operational checkpoint after scoped validation; #1779 checker precedes coverage amendment. Remeasure resulting exact-head CI and obtain Critical Mass acceptance; no self-PASS or ready.
-files: Existing #1777 paths plus docs/agents/OWNERSHIP.md and docs/agents/HANDOFF_LOG.md; no executable CI change.
-blockers: #1779 d3511545 remains grammar dependency. On 1e7c55c3 legacy grammar checker FAIL, root fast-uri FAIL and old production-host Quick Log refusal FAIL; not waived. Whole CURRENT_STATE formatting FAIL predates diff; prefix formatting/history integrity PASS.
-artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1777; https://github.com/Verdant-OS/verdant-grow-diary/pull/1767. Founder amendment is included in AGENTS.md; shared /workspace paths are not required to resume.
-reviewer_seat: Critical Mass
-claimed_by: Codex, 2026-09-28 18:46 CT
-last_updated: 2026-09-28 23:33 CT, by Codex
+head_sha: b7fa047de30c60a7e39ce67849835cdffdb0a115, verified source checkpoint 2026-09-30 03:56:14 UTC; the following handoff-only commit cannot include its own SHA. Confirm resulting exact PR head from GitHub and refresh the claim before resuming; do not inherit this checkpoint's CI.
+state: Source checkpoint Main 36656049242 terminal PASS, all 35/35 configured required contexts exactly matched. Local prior 97 Vitest PASS and 31 Node PASS are separate runs. This change updates only the existing HANDOFF_LOG.md; own scope remains 22 documentation/comment paths. New checkpoint-head hosted CI and independent acceptance NOT_MEASURED.
+next_action: Read the new checkpoint's exact-head Main CI and obtain Critical Mass acceptance. Landing order is #1779, then #1777, then #1811. No Codex merge, ready or auto-merge.
+files: Existing 22 #1777 documentation/workflow-comment paths; this delta is docs/agents/HANDOFF_LOG.md only.
+blockers: Parent and child remain unmerged. A green repository check is not production acceptance. Fixture write proof remains refused; no fixture change or CI-variable edit.
+artifacts: Downloads/CHEM-1777-parent-coupling-2026-09-29-b7fa047d.md; Downloads/CHEM-current-required-checks-2026-09-30.json; current PR body records resulting exact checkpoint head.
+reviewer_seat: Critical Mass, exact resulting head; author does not accept own work.
+claimed_by: Codex, 2026-09-29 22:59 CT, existing authorized holder
+last_updated: 2026-09-29 22:59 CT, by Codex
+```
+
+### SENTINEL-AMENDMENT-2026-09-28.3
+
+```text
+TASK SENTINEL-AMENDMENT-2026-09-28.3  priority: P2  status: OPEN
+goal: Separate exact twelve-file Sentinel 28.3 amendment, including pre-ACK coverage, eligible task claims and independent acceptance routing.
+branch: codex/sentinel-amendment-20260928-3
+base: codex/chem-production-only-docs-20260928 (#1777; amendment source checkpoint b7fa047de30c60a7e39ce67849835cdffdb0a115)
+checkout: git fetch origin codex/sentinel-amendment-20260928-3 codex/chem-production-only-docs-20260928 && git switch codex/sentinel-amendment-20260928-3 && git merge origin/codex/chem-production-only-docs-20260928
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1811
+head_sha: 5f106bfabe851791338badf68c6c5ab30fd73f35, normal-pushed and remote-confirmed 2026-09-30 03:53 UTC
+state: Draft restored; no auto-merge. Twelve governance files only. Corrected pre-ACK log reads in all bootstraps, four-file disconnected packets, unclaimed/older-than-24-hours eligibility without preempting explicit assignments, one current claim and contributor-independent acceptance. Local 31 Node PASS / 0 FAIL / 0 SKIP, separate 67 Vitest PASS / 0 FAIL / 0 SKIP, 12 supplemental consistency validation checks PASS, mirror/version parity and docs safety PASS. Main 36666466256 submitted once for this new head; earlier 44961a08 35/35 is historical and does not carry.
+next_action: Follow Main 36666466256 to terminal and obtain Critical Mass exact-head acceptance; retain independent chain #1779 then #1777 then this child. Read current PR metadata before any push.
+files: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/claude.md; docs/agents/roles/codex.md; docs/agents/roles/grok.md; docs/agents/roles/gemini.md; docs/agents/roles/security.md; docs/agents/roles/council-chair.md. No thirteenth file in this PR; this log is updated separately in parent #1777.
+blockers: Fresh required CI and independent acceptance NOT_MEASURED. #1807 has older 2026-09-25.1 governance in a broad stale branch; it is not a competing 28.3 amendment. Preserve all named holds and reconcile old governance before any later landing.
+artifacts: PR #1811; Downloads/CHEM-Sentinel-28.3-corrections-2026-09-30-5f106bfa.md; Temp/1811-governance-corrections-node.log; Temp/1811-governance-corrections-vitest.log; Temp/1811-governance-consistency-validation.cjs.
+reviewer_seat: Critical Mass, exact head; no author self-acceptance.
+claimed_by: Codex, 2026-09-29 22:59 CT, existing authorized holder
+last_updated: 2026-09-29 22:59 CT, by Codex
 ```
 
 ### CHEM-1696-RECEIPT-RESTAMP
@@ -750,6 +770,27 @@ last_updated: 2026-09-28 23:53 CT, by Codex
 ```
 
 ## Closed
+
+### SENTINEL-AMENDMENT-2026-09-28.2
+
+```text
+TASK SENTINEL-AMENDMENT-2026-09-28.2  priority: P2  status: CLOSED
+goal: Persist Matthew operating phases, production-only verification and coverage as Sentinel 2026-09-28.3, preserving shipped 2026-09-28.2 routing.
+branch: codex/chem-production-only-docs-20260928
+base: verdant-grow-diary
+checkout: git fetch origin codex/chem-production-only-docs-20260928 verdant-grow-diary && git switch codex/chem-production-only-docs-20260928 && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1777
+head_sha: 1e7c55c328ee57b5a07f831a515e24224e35a5c2, pre-checkpoint observation; read PR metadata for resulting new head
+state: Existing draft follows source 61821446. At 1e7c55c3 all 35 required SUCCESS as of 04:32:51 UTC; three additional failures retained. Earlier 97728846 native 109244115472 SUCCESS: 21 browser PASS / 0 FAIL / 0 SKIP plus separate 22 static PASS. Doc-marker red 89 PASS / 2 FAIL became 91 PASS / 0 FAIL / 0 SKIP in two files. This checkpoint records new performance draft #1793 and fresh six-repair CI; resulting new-head hosted CI NOT_MEASURED. Eight comment deltas preserve parsed workflow behavior; historical CURRENT_STATE receipts unchanged.
+next_action: Normal-push the operational checkpoint after scoped validation; #1779 checker precedes coverage amendment. Remeasure resulting exact-head CI and obtain Critical Mass acceptance; no self-PASS or ready.
+files: Existing #1777 paths plus docs/agents/OWNERSHIP.md and docs/agents/HANDOFF_LOG.md; no executable CI change.
+blockers: #1779 d3511545 remains grammar dependency. On 1e7c55c3 legacy grammar checker FAIL, root fast-uri FAIL and old production-host Quick Log refusal FAIL; not waived. Whole CURRENT_STATE formatting FAIL predates diff; prefix formatting/history integrity PASS.
+artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1777; https://github.com/Verdant-OS/verdant-grow-diary/pull/1767. Founder amendment is included in AGENTS.md; shared /workspace paths are not required to resume.
+reviewer_seat: Critical Mass
+claimed_by: Codex, 2026-09-28 18:46 CT
+last_updated: 2026-09-28 23:33 CT, by Codex
+closure: Superseded by separate CHEM-PRODUCTION-ONLY-DOCS-001 (#1777) and SENTINEL-AMENDMENT-2026-09-28.3 (#1811) blocks. Earlier dated observations above remain historical; neither replacement is merged or accepted.
+```
 
 ### CHEM-1773-UNKNOWN-FRESHNESS
 

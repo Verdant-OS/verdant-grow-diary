@@ -35,6 +35,25 @@ not alter the dependency transition policy.
 - Preserve approval-required Action Queue, no AI execution and no device control.
 - Keep credentials and server-only secret values out of output and receipts.
 
+## Frontend secret-exposure gate
+
+Identify the current production publisher and selected project from measured
+configuration before inspecting its environment. An authorized operator checks
+the frontend build's variable names and exposure settings, without copying secret
+values: no service-role key, JWT secret, private database URL or other privileged
+credential may enter a public/client variable or browser bundle. Check the actual
+browser-delivered JavaScript with secret detection whose output is limited to the
+finding category and file location; never print matching values or token fragments.
+The committed publishable/anon key is the only allowed browser credential and does
+not waive inspection for privileged credentials.
+
+Both the publisher configuration and delivered bundle checks require an exact
+deployment identity and dated PASS / FAIL / BLOCKED / NOT_MEASURED receipts. If
+access is closed, retain NOT_MEASURED and block the release verdict; build success,
+secret masking in logs, or an old preview project's settings are not substitutes.
+A finding stops the release for the authorized owner to remediate. This checklist
+does not authorize secret reads, edits, rotation, environment changes or Publish.
+
 ## Limits and rollback
 
 No merge, Publish, APPLY or secret/environment edit is authorized. Frontend

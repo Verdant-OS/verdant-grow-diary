@@ -112,6 +112,12 @@ def _coerce_float(value: Any) -> Optional[float]:
     return f
 
 
+def _stuck_legacy_percent_metrics(payload: Dict[str, Any]) -> set[str]:
+    return {metric for metric in ("humidity_percent", "soil_moisture_pct")
+            if any(str(key).lower() in FIELD_MAP[metric] and numeric(value) in {0, 100}
+                   for key, value in payload.items())}
+
+
 def normalize_metrics(payload: Dict[str, Any]) -> Dict[str, Optional[float]]:
     """Map known EcoWitt fields into Verdant canonical metric names.
 
@@ -120,8 +126,9 @@ def normalize_metrics(payload: Dict[str, Any]) -> Dict[str, Optional[float]]:
     """
     metrics: Dict[str, Optional[float]] = {}
     conflicts = _conflicting_case_fields(payload)
+    stuck = _stuck_legacy_percent_metrics(payload)
     for canonical, candidates in FIELD_MAP.items():
-        if conflicts.intersection(candidates):
+        if canonical in stuck or conflicts.intersection(candidates):
             metrics[canonical] = None
             continue
         value: Optional[float] = None
@@ -923,11 +930,16 @@ def _send_forward(reading: Dict[str, Any], *, _tent_id: Optional[str] = None,
     if safe_raw_payload is not None:
         safe_metadata["raw_payload"] = safe_raw_payload
 
+    outbound_metrics = dict(reading.get("metrics") or {})
+    for metric in ("humidity_percent", "soil_moisture_pct"):
+        if numeric(outbound_metrics.get(metric)) in {0, 100}:
+            outbound_metrics[metric] = None
+            safe_metadata["verdant_source"] = "invalid"
     outbound: Dict[str, Any] = {
         "source": WEBHOOK_TRANSPORT_SOURCE,
         "vendor": VENDOR,
         "captured_at": reading.get("captured_at"),
-        "metrics": reading.get("metrics") or {},
+        "metrics": outbound_metrics,
         "metadata": safe_metadata,
     }
     # Top-level tent_id is required by sensor-ingest-webhook. Set via
@@ -1168,9 +1180,13 @@ class ListenerRuntime:
             self.spool.finish(key, status)
             outstanding = any(e["attempts"] > 0 and e["reading"]["metadata"]["tent_id"] == tent_id
                               for e in self.spool.entries.values())
+            delivered = set(primary_families(entry["reading"]["metrics"]))
+            if not self.mapped:
+                stuck = _stuck_legacy_percent_metrics(entry["reading"]["metadata"].get("raw_payload") or {})
+                delivered -= {"air" if metric == "humidity_percent" else "soil" for metric in stuck}
             self.health.forward_result(tent_id, isinstance(status, int) and 200 <= status < 300,
                 outstanding_failure=outstanding, recovered_spool_drop_count=dropped_before_finish,
-                delivered_primary_families=primary_families(entry["reading"]["metrics"]))
+                delivered_primary_families=tuple(sorted(delivered)))
         self.health.tick()
 
     def replay_once(self) -> None:
@@ -1508,6 +1524,10 @@ def ecowitt() -> Any:
                 payload={k: v for k, v in raw.items() if str(k).lower() in legacy_keys},
                 remote_addr=request.remote_addr, canonical_gateway_time=gateway_captured_at,
                 header_mode=None, env_mode=None, now=request_now)
+            stuck = _stuck_legacy_percent_metrics(raw)
+            if stuck and runtime.tents:
+                runtime.health.primary_failure(runtime.tents[0].tent_id,
+                    sorted({"air" if metric == "humidity_percent" else "soil" for metric in stuck}))
             readings = [reading]
         for own_reading in readings:
             append_raw_log(own_reading)

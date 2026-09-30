@@ -182,6 +182,58 @@ class ListenerIntegrationTests(unittest.TestCase):
                     self.assertEqual(response.get_json()["reading"]["source"], "invalid")
                     self.assertEqual(self.requests.post.call_args.kwargs["json"]["metadata"]["verdant_source"], "invalid")
 
+    def test_legacy_stuck_percentages_are_null_before_enqueue_and_delivery(self):
+        os.environ.pop("ECOWITT_TENT_MAP")
+        os.environ.update(VERDANT_TENT_ID=TENT_A, VERDANT_BRIDGE_TOKEN=TOKEN_A)
+        for field in ("humidity1", "HUMIDITY1", "humidity", "humidityin", "soilmoisture1", "soilmoisture2"):
+            for value in ("0", "100"):
+                with self.subTest(field=field, value=value):
+                    canonical = "humidity_percent" if field.lower().startswith("humidity") else "soil_moisture_pct"
+                    response = self.post({**self.packet, field: value})
+                    self.assertIsNone(response.get_json()["reading"]["metrics"][canonical])
+                    outbound = self.requests.post.call_args.kwargs["json"]
+                    self.assertIsNone(outbound["metrics"][canonical])
+                    self.assertEqual(outbound["metrics"]["temp_f"], 77)
+                    self.assertEqual(outbound["metadata"]["raw_payload"][field], value)
+                    self.assertEqual(outbound["metadata"]["verdant_source"], "invalid")
+        for value in ("0.1", "99.9", "50"):
+            result = listener.normalize_metrics({"humidity1": value, "soilmoisture1": value})
+            self.assertEqual(result["humidity_percent"], float(value))
+            self.assertEqual(result["soil_moisture_pct"], float(value))
+
+    def test_legacy_stuck_percent_delivery_warning_survives_success_and_restart(self):
+        os.environ.pop("ECOWITT_TENT_MAP")
+        os.environ.update(VERDANT_TENT_ID=TENT_A, VERDANT_BRIDGE_TOKEN=TOKEN_A)
+        for field in ("humidity1", "soilmoisture1"):
+            with self.subTest(field=field):
+                packet = {**self.packet, field: "100", "dateutc": self.now.strftime("%Y-%m-%d %H:%M:%S")}
+                self.post(packet)
+                self.now += timedelta(minutes=10)
+                self.post({**packet, "dateutc": self.now.strftime("%Y-%m-%d %H:%M:%S")})
+                self.assertEqual(self.client.get("/health").status_code, 503)
+                listener._RUNTIME = None
+                self.assertEqual(self.client.get("/health").status_code, 503)
+                self.post({**self.packet, "dateutc": self.now.strftime("%Y-%m-%d %H:%M:%S")})
+                self.assertEqual(self.client.get("/health").status_code, 200)
+
+    def test_legacy_preexisting_stuck_queue_values_cannot_forward_as_numeric(self):
+        os.environ.pop("ECOWITT_TENT_MAP")
+        os.environ.update(VERDANT_TENT_ID=TENT_A, VERDANT_BRIDGE_TOKEN=TOKEN_A)
+        runtime = listener.get_runtime()
+        reading = {"captured_at": NOW.isoformat(), "source": "invalid", "vendor": listener.VENDOR,
+                   "physical_gateway_evidence": True,
+                   "metrics": {"temp_f": 77, "humidity_percent": 100, "soil_moisture_pct": 0},
+                   "metadata": {"raw_payload": {**self.packet, "humidity1": "100", "soilmoisture1": "0"}}}
+        runtime.enqueue(reading, TENT_A)
+        listener._RUNTIME = None
+        listener.get_runtime().replay_once()
+        outbound = self.requests.post.call_args.kwargs["json"]
+        self.assertIsNone(outbound["metrics"]["humidity_percent"])
+        self.assertIsNone(outbound["metrics"]["soil_moisture_pct"])
+        self.assertEqual(outbound["metrics"]["temp_f"], 77)
+        self.assertEqual(outbound["metadata"]["verdant_source"], "invalid")
+        self.assertEqual(reading["metrics"]["humidity_percent"], 100)
+
     def test_legacy_unowned_probes_preserve_explicit_stale_and_loopback_source_fences(self):
         os.environ.pop("ECOWITT_TENT_MAP")
         os.environ.update(VERDANT_TENT_ID=TENT_A, VERDANT_BRIDGE_TOKEN=TOKEN_A, VERDANT_FORWARD_MODE="live")

@@ -2,6 +2,8 @@
 
 From this point, Codex and Claude finish the open Verdant repo work without Chemdawg. Matthew is still the only person who publishes, applies SQL, or lifts a hold.
 
+Precedence: `docs/agents/OWNERSHIP.md` wins over this page on ownership, routing and holds. Where the two disagree, this page is a working note, not the rule.
+
 ## Who owns what
 
 **Codex is the writer.** It owns every code change on open PRs: fixes, base merges and PR descriptions. It never reviews or merges its own PR.
@@ -23,19 +25,21 @@ Never force-push, rebase a pushed branch, publish, apply SQL, or touch productio
 
 #1735, #1741, #1810 (migration/SQL stack); #1737; #1736; #1369. #1740 is never-merge until Codex's save/retrieve proof is final and green, and it gets a security-focused review.
 
+Update 2026-09-30: Matthew lifted the holds on #1737, #1735 and #1369 in a live session and instructed that every open PR be merged once its required checks are green. HOLD #1250 is moot: #1250 merged on 2026-09-29 (GitHub `merged_at` 2026-09-29T21:43:13Z), so there is nothing left to hold. The list above is kept as it stood at handoff.
+
 ## Open work ledger
 
 | PR | State at handoff | Owner | Next step |
 |---|---|---|---|
-| #1761 | FAIL, 1 P1 at `dde3a9ec` (tent gating lets Training, Defoliation and Harvest save without a tent) | Codex | Follow the fix request comment on the PR: only Note, Photo and Issue save without a tent, add tests, merge the base, fix the PR body. Then Claude reviews. |
-| #1816 | Draft at `aad349f9`, CI queued | Claude (watch only) | When a required check first fails, or all 35 finish, report to Matthew: the head SHA, any failed or missing contexts, whether native save/retrieve proves the new drop barrier, and the smallest next step. **Don't rerun it, mark it ready, merge it or change it without Matthew's approval.** |
-| #1798 | PASS-with-P2 at `c076016c`; base merged, now at `d61f23c4` with CI running | Claude | Once all checks are green at `d61f23c4`, review again, mark ready, enqueue. |
-| #1783 | Head keeps moving (EcoWitt multi-tent); CI pending | Codex, then Claude | Codex finishes the work and posts the final SHA. Claude reviews it and merges once green. |
+| #1761 | Open, not draft, at `a0c5f3c7` (2026-09-30). Was FAIL, 1 P1 at `dde3a9ec` (tent gating lets Training, Defoliation and Harvest save without a tent) | Codex | Follow the fix request comment on the PR: only Note, Photo and Issue save without a tent, add tests, merge the base, fix the PR body. Then Claude reviews. |
+| #1816 | Merged 2026-09-30 (was draft at `aad349f9`, CI queued) | — | Done. |
+| #1798 | Still draft at `d61f23c4` (2026-09-30); PASS-with-P2 at `c076016c`, base merged since | Claude | Once all checks are green at `d61f23c4`, review again, mark ready, enqueue. |
+| #1783 | Merged 2026-09-30 (EcoWitt multi-tent) | — | Done. |
 | #1676 | Conflicts with tip `4a94ca27` | Codex | Merge the tip in with a normal merge commit and push. Then Claude reviews. |
 | #1760 | Draft; shard 10 fails (`daily-check-active-grow-fallback.test.ts:93`) | Codex | Fix the test failure. |
 | #1675 | Draft; CI pending | Claude | Review once green. |
 | #1763 | 7 required checks fail; the Timeline wiring was asked of Copilot | Codex | Finish the wiring or close the PR. |
-| #1815 | PR description check; no P1, CI pending | Claude | Merge once green with a counting PASS. Add it to required checks only after one green PR run and one green merge-queue run. |
+| #1815 | Merged 2026-09-30 (PR description check) | — | Done. Add it to required checks only after one green PR run and one green merge-queue run. |
 | 23 branches updated after #1812 | CI rerunning | Claude | Sweep them on weekdays and review/merge any that clear the gate. |
 
 ## Weekday cadence

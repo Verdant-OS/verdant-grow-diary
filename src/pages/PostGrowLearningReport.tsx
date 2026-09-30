@@ -69,6 +69,7 @@ export default function PostGrowLearningReport() {
   const lastSavedLesson = useRef<{ scope: string; entryId: string | null; text: string } | null>(
     null,
   );
+  const pendingFirstSave = useRef<{ scope: string; submitted: string } | null>(null);
 
   // Pro gate. Pricing has always sold this report as Pro-only; the page
   // now enforces it: client hint avoids a content flash, and the
@@ -106,6 +107,7 @@ export default function PostGrowLearningReport() {
   useEffect(() => {
     lessonDraft.current = "";
     lastSavedLesson.current = null;
+    pendingFirstSave.current = null;
     setLesson("");
   }, [lessonScope]);
 
@@ -117,11 +119,21 @@ export default function PostGrowLearningReport() {
       text: report.lesson.text,
     };
     const previous = lastSavedLesson.current;
+    const firstSave = pendingFirstSave.current;
+    // An insert changes the lesson ID while its save is still in flight. Match
+    // its saved text so edits typed after submission survive that transition.
+    const preservePostSaveEdit =
+      previous?.entryId === null &&
+      current.entryId !== null &&
+      firstSave?.scope === current.scope &&
+      current.text === firstSave.submitted.trim() &&
+      lessonDraft.current !== firstSave.submitted;
+    if (previous?.entryId === null && current.entryId !== null) pendingFirstSave.current = null;
     if (
       !previous ||
       previous.scope !== current.scope ||
-      previous.entryId !== current.entryId ||
-      lessonDraft.current === previous.text
+      (previous.entryId !== current.entryId && !preservePostSaveEdit) ||
+      (lessonDraft.current === previous.text && !preservePostSaveEdit)
     ) {
       lessonDraft.current = current.text;
       setLesson(current.text);
@@ -138,13 +150,21 @@ export default function PostGrowLearningReport() {
     setBusy(true);
     const submitted = lessonDraft.current;
     const submittedScope = lessonScope;
+    if (
+      lastSavedLesson.current?.scope === submittedScope &&
+      lastSavedLesson.current.entryId === null
+    )
+      pendingFirstSave.current = { scope: submittedScope, submitted };
     const result = await saveLesson(submitted);
     setBusy(false);
     if (result.ok) {
       if (lastSavedLesson.current?.scope === submittedScope && lessonDraft.current === submitted)
         changeLesson(submitted.trim());
       toast.success("Lesson saved");
-    } else toast.error(resultMessage(result, "Lesson could not be saved."));
+    } else {
+      if (pendingFirstSave.current?.scope === submittedScope) pendingFirstSave.current = null;
+      toast.error(resultMessage(result, "Lesson could not be saved."));
+    }
   }
 
   async function handleApplyLesson() {

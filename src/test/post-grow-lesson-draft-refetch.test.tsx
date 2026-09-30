@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 
 const io = vi.hoisted(() => ({
@@ -249,3 +249,31 @@ it("saves the current draft and accepts its refreshed saved text", async () => {
   );
   await waitFor(() => expect(input.value).toBe("Newly saved lesson"));
 });
+
+it.each(["First saved and more", ""])(
+  "keeps a %j draft typed while a first lesson save creates its record",
+  async (laterDraft) => {
+    let finishSave!: (value: { ok: true }) => void;
+    io.save.mockReturnValue(
+      new Promise((resolve) => {
+        finishSave = resolve;
+      }),
+    );
+    io.report = savedLesson("", null);
+    const view = mount();
+    const input = await lessonBox();
+    fireEvent.change(input, { target: { value: "First saved" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save lesson" }));
+    expect(io.save).toHaveBeenCalledWith("First saved");
+    fireEvent.change(input, { target: { value: laterDraft } });
+    io.report = savedLesson("First saved", "new-lesson-id");
+    view.rerender(
+      <MemoryRouter>
+        <PostGrowLearningReport />
+      </MemoryRouter>,
+    );
+    expect(input.value).toBe(laterDraft);
+    await act(async () => finishSave({ ok: true }));
+    expect(input.value).toBe(laterDraft);
+  },
+);

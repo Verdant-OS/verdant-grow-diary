@@ -259,6 +259,22 @@ for (const mode of ["reload", "reload onto another plant"] as const) {
       await expect(card).toContainText(note);
       await expect(card).toContainText(/feeding/i);
       await expect(card.getByTestId("timeline-sensor-source-badge-live")).toHaveCount(0);
+
+      // Read back the same committed event through the typed history panel,
+      // including the grower-facing units rather than only its Timeline note.
+      const history = page.getByTestId("feeding-history-panel");
+      const historyRow = history.locator("li").filter({ hasText: note });
+      await expect(historyRow).toHaveCount(1);
+      await expect(historyRow.getByTestId("feeding-history-source")).toHaveAttribute(
+        "data-source",
+        "manual",
+      );
+      await expect(historyRow).toContainText("750 ml");
+      await expect(historyRow).toContainText("6.20");
+      await expect(historyRow).toContainText("1.40 mS/cm");
+      await expect(historyRow).toContainText("77°F / 25°C");
+      await expect(historyRow).toContainText("Base A");
+      await expect(historyRow).toContainText("2 mL/L");
     } finally {
       await page.close();
       await f.cleanup();

@@ -31,7 +31,8 @@ function clientFor(
         },
         eq(...args: unknown[]) {
           calls.push({ table, method: "eq", args });
-          if (table === "sensor_readings" && args[0] === "metric") metric = String(args[1]);
+          if (table === "sensor_readings_effective" && args[0] === "metric")
+            metric = String(args[1]);
           return chain;
         },
         neq(...args: unknown[]) {
@@ -101,7 +102,7 @@ function clientFor(
                 }
               : (fixtures[table] ?? { data: [], error: null });
           let data = fixture.data;
-          if (table === "sensor_readings" && Array.isArray(data)) {
+          if (table === "sensor_readings_effective" && Array.isArray(data)) {
             data = data.filter((row) => {
               const candidate = row as { metric?: string; captured_at?: string | null };
               if (metric && candidate.metric !== metric) return false;
@@ -147,7 +148,7 @@ function fixtures(): Record<string, FixtureResult> {
         id: "plant-1",
         name: "Sour Diesel Auto",
         strain: "Sour Diesel",
-        tent_id: "tent-1",
+        tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         grow_id: "grow-1",
         stage: "flower",
         health: "watch",
@@ -160,7 +161,7 @@ function fixtures(): Record<string, FixtureResult> {
     },
     tents: {
       data: {
-        id: "tent-1",
+        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         name: "Flower Tent",
         grow_id: "grow-1",
         stage: "flower",
@@ -183,7 +184,7 @@ function fixtures(): Record<string, FixtureResult> {
         {
           id: "water-1",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           event_type: "watering",
           source: "manual",
@@ -195,7 +196,7 @@ function fixtures(): Record<string, FixtureResult> {
         {
           id: "photo-1",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           event_type: "photo",
           source: "manual",
@@ -207,7 +208,7 @@ function fixtures(): Record<string, FixtureResult> {
         {
           id: "obs-1",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           event_type: "observation",
           source: "manual",
@@ -224,7 +225,7 @@ function fixtures(): Record<string, FixtureResult> {
         {
           id: "photo-top-level",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           entry_at: "2026-08-07T09:00:00.000Z",
           photo_url: "verdant-photo://private/top-level",
@@ -234,7 +235,7 @@ function fixtures(): Record<string, FixtureResult> {
         {
           id: "photo-legacy-details",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           entry_at: "2026-08-07T09:30:00.000Z",
           photo_url: null,
@@ -244,7 +245,7 @@ function fixtures(): Record<string, FixtureResult> {
         {
           id: "photo-retracted",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           entry_at: "2026-08-07T10:00:00.000Z",
           photo_url: "verdant-photo://private/retracted",
@@ -259,7 +260,7 @@ function fixtures(): Record<string, FixtureResult> {
         {
           id: "alert-1",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           title: "High humidity",
           reason: "Humidity needs physical confirmation.",
@@ -277,7 +278,7 @@ function fixtures(): Record<string, FixtureResult> {
         {
           id: "session-1",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           created_at: "2026-08-07T11:00:00.000Z",
           displayed_confidence: 0.55,
@@ -294,7 +295,7 @@ function fixtures(): Record<string, FixtureResult> {
         {
           id: "aq-1",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           status: "pending_approval",
           risk_level: "low",
@@ -327,11 +328,14 @@ function fixtures(): Record<string, FixtureResult> {
       ],
       error: null,
     },
-    sensor_readings: {
+    sensor_readings_effective: {
       data: [
         {
-          id: "reading-1",
-          tent_id: "tent-1",
+          id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          device_id: null,
+          correction_valid: true,
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           metric: "humidity_pct",
           value: 78,
           quality: "ok",
@@ -351,7 +355,7 @@ function tentRelationPlants(count: number): Record<string, unknown>[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `tent-plant-${index + 1}`,
     grow_id: "grow-1",
-    tent_id: "tent-1",
+    tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
   }));
 }
 
@@ -417,7 +421,7 @@ function routineReadyFixtures(): Record<string, FixtureResult> {
       {
         id: "routine-observation",
         grow_id: "grow-1",
-        tent_id: "tent-1",
+        tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         plant_id: "plant-1",
         event_type: "observation",
         source: "manual",
@@ -447,7 +451,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     expect(result.data.context.scope).toEqual({
       growId: "grow-1",
       growName: "Home Grow",
-      tentId: "tent-1",
+      tentId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       tentName: "Flower Tent",
       plantId: "plant-1",
       plantName: "Sour Diesel Auto",
@@ -489,7 +493,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "aq-1",
           growId: "grow-1",
-          tentId: "tent-1",
+          tentId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plantId: "plant-1",
           relatedAlertId: "alert-1",
           status: "pending_approval",
@@ -658,11 +662,14 @@ describe("getGrowWalkContextForOwnedTarget", () => {
 
   it("detects coeval sensor-source disagreement before reducing to the latest reading", async () => {
     const data = fixtures();
-    data.sensor_readings = {
+    data.sensor_readings_effective = {
       data: [
         {
-          id: "z-live-humidity",
-          tent_id: "tent-1",
+          id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+          user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          device_id: null,
+          correction_valid: true,
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           metric: "humidity_pct",
           value: 60,
           quality: "ok",
@@ -673,8 +680,11 @@ describe("getGrowWalkContextForOwnedTarget", () => {
           raw_payload: { secret: "must-not-cross" },
         },
         {
-          id: "manual-humidity",
-          tent_id: "tent-1",
+          id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+          user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          device_id: null,
+          correction_valid: true,
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           metric: "humidity_pct",
           value: 80,
           quality: "ok",
@@ -696,7 +706,9 @@ describe("getGrowWalkContextForOwnedTarget", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.context.evidence.sensors.readings.humidity_pct?.id).toBe("z-live-humidity");
+    expect(result.data.context.evidence.sensors.readings.humidity_pct?.id).toBe(
+      "ffffffff-ffff-4fff-8fff-ffffffffffff",
+    );
     expect(result.data.context.evidence.sensors.contradictionMetrics).toEqual(["humidity_pct"]);
     expect(result.data.context.derived.contradictionCodes).toContain("sensor_sources_disagree");
     expect(result.data.context.derived.reasonCodes).toContain("contradictory_evidence");
@@ -740,7 +752,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "tent-watering",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: null,
           event_type: "watering",
           source: "manual",
@@ -752,7 +764,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "tent-worse",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: null,
           event_type: "observation",
           source: "manual",
@@ -764,7 +776,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "tent-environment",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: null,
           event_type: "environment",
           source: "manual",
@@ -776,7 +788,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "sibling-quick-log",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-2",
           event_type: "observation",
           source: "manual",
@@ -819,7 +831,9 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     const eventScope = calls.find((call) => call.table === "grow_events" && call.method === "or");
     expect(String(eventScope?.args[0])).toContain("plant_id.eq.plant-1");
     expect(String(eventScope?.args[0])).toContain("plant_id.is.null");
-    expect(String(eventScope?.args[0])).toContain("tent_id.eq.tent-1");
+    expect(String(eventScope?.args[0])).toContain(
+      "tent_id.eq.bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    );
     expect(String(eventScope?.args[0])).toContain("event_type.eq.environment");
   });
 
@@ -831,7 +845,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "tent-watering",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: null,
           event_type: "watering",
           source: "manual",
@@ -843,7 +857,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "tent-worse",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: null,
           event_type: "observation",
           source: "manual",
@@ -858,7 +872,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
 
     const result = await getGrowWalkContextForOwnedTarget(
       clientFor(data).client,
-      { targetType: "tent", targetId: "tent-1" },
+      { targetType: "tent", targetId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
       { now: new Date("2026-08-07T12:00:00.000Z") },
     );
 
@@ -877,7 +891,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "tent-alert-1",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: null,
           title: "Tent humidity",
           reason: "The tent needs a physical check.",
@@ -890,7 +904,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "sibling-plant-alert",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-2",
           title: "Sibling only",
           reason: "This must not leak into Plant 1 context.",
@@ -937,7 +951,9 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     const alertScope = calls.find((call) => call.table === "alerts" && call.method === "or");
     expect(String(alertScope?.args[0])).toContain("plant_id.eq.plant-1");
     expect(String(alertScope?.args[0])).toContain("plant_id.is.null");
-    expect(String(alertScope?.args[0])).toContain("tent_id.eq.tent-1");
+    expect(String(alertScope?.args[0])).toContain(
+      "tent_id.eq.bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    );
   });
 
   it("includes an exact-plant and unassigned enclosing-tent Action Queue item without importing sibling or grow-wide actions", async () => {
@@ -948,7 +964,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "tent-action-1",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: null,
           source: "environment_alert",
           status: "approved",
@@ -959,7 +975,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "sibling-action",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-2",
           source: "manual",
           status: "pending_approval",
@@ -1023,7 +1039,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     ]);
     expect(result.data.context.evidence.actionQueue.items[1]).toMatchObject({
       growId: "grow-1",
-      tentId: "tent-1",
+      tentId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       plantId: null,
       relatedAlertId: "tent-alert-1",
       status: "approved",
@@ -1040,7 +1056,9 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     const actionScope = calls.find((call) => call.table === "action_queue" && call.method === "or");
     expect(String(actionScope?.args[0])).toContain("plant_id.eq.plant-1");
     expect(String(actionScope?.args[0])).toContain("plant_id.is.null");
-    expect(String(actionScope?.args[0])).toContain("tent_id.eq.tent-1");
+    expect(String(actionScope?.args[0])).toContain(
+      "tent_id.eq.bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    );
     expect(calls).toContainEqual({
       table: "action_queue_events",
       method: "in",
@@ -1050,7 +1068,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     const { client: tentClient, calls: tentCalls } = clientFor(data);
     const tentResult = await getGrowWalkContextForOwnedTarget(
       tentClient,
-      { targetType: "tent", targetId: "tent-1" },
+      { targetType: "tent", targetId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
       { now: new Date("2026-08-07T12:00:00.000Z") },
     );
     expect(tentResult.ok).toBe(true);
@@ -1074,7 +1092,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     expect(tentCalls).toContainEqual({
       table: "action_queue",
       method: "eq",
-      args: ["tent_id", "tent-1"],
+      args: ["tent_id", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],
     });
     expect(tentCalls.some((call) => call.table === "action_queue" && call.method === "or")).toBe(
       false,
@@ -1093,8 +1111,8 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     const data = fixtures();
     data.plants = {
       data: [
-        { id: "plant-1", grow_id: "grow-1", tent_id: "tent-1" },
-        { id: "plant-2", grow_id: "grow-1", tent_id: "tent-1" },
+        { id: "plant-1", grow_id: "grow-1", tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+        { id: "plant-2", grow_id: "grow-1", tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
         { id: "foreign-plant", grow_id: "grow-1", tent_id: "tent-2" },
       ],
       error: null,
@@ -1168,7 +1186,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
 
     const result = await getGrowWalkContextForOwnedTarget(
       client,
-      { targetType: "tent", targetId: "tent-1" },
+      { targetType: "tent", targetId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
       { now: new Date("2026-08-07T12:00:00.000Z") },
     );
 
@@ -1193,7 +1211,9 @@ describe("getGrowWalkContextForOwnedTarget", () => {
       ],
     });
     const actionScope = calls.find((call) => call.table === "action_queue" && call.method === "or");
-    expect(String(actionScope?.args[0])).toContain("tent_id.eq.tent-1");
+    expect(String(actionScope?.args[0])).toContain(
+      "tent_id.eq.bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    );
     expect(String(actionScope?.args[0])).toContain("tent_id.is.null");
     expect(String(actionScope?.args[0])).toContain("plant_id.in.(plant-1,plant-2)");
     expect(calls).toContainEqual({
@@ -1212,7 +1232,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
 
     const result = await getGrowWalkContextForOwnedTarget(
       clientFor(data).client,
-      { targetType: "tent", targetId: "tent-1" },
+      { targetType: "tent", targetId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
       { now: new Date("2026-08-07T12:00:00.000Z") },
     );
 
@@ -1229,7 +1249,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "acknowledged-current-alert",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           title: "Older active humidity alert",
           reason: "Acknowledged alerts remain current until resolved.",
@@ -1271,7 +1291,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
           id: "plant-legacy",
           name: "Legacy Tent Plant",
           strain: null,
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           grow_id: null,
           stage: "flower",
           health: null,
@@ -1388,7 +1408,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
 
     const result = await getGrowWalkContextForOwnedTarget(
       client,
-      { targetType: "tent", targetId: "tent-1" },
+      { targetType: "tent", targetId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
       { now: new Date("2026-08-07T12:00:00.000Z") },
     );
 
@@ -1412,7 +1432,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     expect(calls).toContainEqual({
       table: "plants",
       method: "eq",
-      args: ["tent_id", "tent-1"],
+      args: ["tent_id", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],
     });
     expect(calls).toContainEqual({
       table: "plants",
@@ -1420,7 +1440,9 @@ describe("getGrowWalkContextForOwnedTarget", () => {
       args: ["grow_id.eq.grow-1,grow_id.is.null"],
     });
     const alertScope = calls.find((call) => call.table === "alerts" && call.method === "or");
-    expect(String(alertScope?.args[0])).toContain("tent_id.eq.tent-1");
+    expect(String(alertScope?.args[0])).toContain(
+      "tent_id.eq.bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    );
     expect(String(alertScope?.args[0])).toContain("plant_id.in.(plant-1,plant-legacy)");
     const relationalScopes = calls.filter(
       (call) =>
@@ -1470,7 +1492,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
       data: Array.from({ length: 11 }, (_, index) => ({
         id: `aq-${index + 1}`,
         grow_id: "grow-1",
-        tent_id: "tent-1",
+        tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         plant_id: "plant-1",
         status: "pending_approval",
         risk_level: "low",
@@ -1553,7 +1575,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "aq-open-before-lookback",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           source: "manual",
           status: "pending_approval",
@@ -1564,7 +1586,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "aq-completed-before-lookback",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           source: "manual",
           status: "completed",
@@ -1602,7 +1624,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
       data: Array.from({ length: 20 }, (_, index) => ({
         id: `aq-${index + 1}`,
         grow_id: "grow-1",
-        tent_id: "tent-1",
+        tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         plant_id: "plant-1",
         status: "pending_approval",
         risk_level: "low",
@@ -1633,7 +1655,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
       data: Array.from({ length: 21 }, (_, index) => ({
         id: `aq-${index + 1}`,
         grow_id: "grow-1",
-        tent_id: "tent-1",
+        tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         plant_id: "plant-1",
         source: "manual",
         status: "pending_approval",
@@ -1665,7 +1687,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     exactData.action_queue_events = { data: actionQueueAuditEvents(100), error: null };
     const exact = await getGrowWalkContextForOwnedTarget(
       clientFor(exactData).client,
-      { targetType: "tent", targetId: "tent-1" },
+      { targetType: "tent", targetId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
       { now: new Date("2026-08-07T12:00:00.000Z") },
     );
 
@@ -1680,7 +1702,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     relationOverflowData.plants = { data: tentRelationPlants(101), error: null };
     const relationOverflow = await getGrowWalkContextForOwnedTarget(
       clientFor(relationOverflowData).client,
-      { targetType: "tent", targetId: "tent-1" },
+      { targetType: "tent", targetId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
       { now: new Date("2026-08-07T12:00:00.000Z") },
     );
 
@@ -1695,7 +1717,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     overflowData.action_queue_events = { data: actionQueueAuditEvents(101), error: null };
     const overflow = await getGrowWalkContextForOwnedTarget(
       clientFor(overflowData).client,
-      { targetType: "tent", targetId: "tent-1" },
+      { targetType: "tent", targetId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
       { now: new Date("2026-08-07T12:00:00.000Z") },
     );
 
@@ -1764,7 +1786,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
           "alerts",
           "ai_doctor_sessions",
           "action_queue",
-          "sensor_readings",
+          "sensor_readings_effective",
         ].includes(call.table),
       ),
     ).toBe(false);
@@ -1859,7 +1881,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     const { client } = clientFor(fixtures());
     const result = await getGrowWalkContextForOwnedTarget(
       client,
-      { targetType: "tent", targetId: "tent-1" },
+      { targetType: "tent", targetId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
       { now: new Date("2026-08-07T12:00:00.000Z") },
     );
     expect(result.ok).toBe(true);
@@ -1869,7 +1891,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     expect(result.data.context.profile.medium).toBeNull();
     expect(result.data.context.profile.growType).toBe("indoor");
     expect(result.data.context.profile.plantType).toBeNull();
-    expect(result.data.context.scope.tentId).toBe("tent-1");
+    expect(result.data.context.scope.tentId).toBe("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
   });
 
   it("keeps the requested event output window while deriving fixed-window evidence from 48 hours", async () => {
@@ -1879,7 +1901,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "water-30-hours-ago",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           event_type: "watering",
           source: "manual",
@@ -1923,7 +1945,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "water-30-hours-ago",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           event_type: "watering",
           source: "manual",
@@ -1935,7 +1957,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "worse-30-hours-ago",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           event_type: "observation",
           source: "manual",
@@ -1972,7 +1994,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
       data: Array.from({ length: 101 }, (_, index) => ({
         id: `water-30-hours-${index + 1}`,
         grow_id: "grow-1",
-        tent_id: "tent-1",
+        tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         plant_id: "plant-1",
         event_type: "watering",
         source: "manual",
@@ -2060,7 +2082,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
           data: Array.from({ length: 51 }, (_, index) => ({
             id: `active-watch-${index + 1}`,
             grow_id: "grow-1",
-            tent_id: "tent-1",
+            tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             plant_id: "plant-1",
             title: "Active watch alert",
             reason: "This row remains an active low-severity review signal.",
@@ -2101,7 +2123,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     const { client } = clientFor(data);
     const result = await getGrowWalkContextForOwnedTarget(
       client,
-      { targetType: "tent", targetId: "tent-1" },
+      { targetType: "tent", targetId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
       { now: new Date("2026-08-07T12:00:00.000Z") },
     );
     expect(result.ok).toBe(true);
@@ -2125,7 +2147,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "high-humidity-alert",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           title: "High humidity",
           reason: "Needs physical confirmation.",
@@ -2162,7 +2184,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "warning-humidity-alert",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           title: "Humidity needs a check",
           reason: "The current value is outside the preferred range.",
@@ -2197,7 +2219,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
         {
           id: "watch-humidity-alert",
           grow_id: "grow-1",
-          tent_id: "tent-1",
+          tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
           plant_id: "plant-1",
           title: "Humidity is worth watching",
           reason: "The current value is near the preferred range.",

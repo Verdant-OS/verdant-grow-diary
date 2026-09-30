@@ -141,21 +141,55 @@ the rollback by promoting another green commit. See
 
 ## Verify every production hostname after either operation
 
-After resolving any active rollout, Matthew refreshes the production-host inventory
-from the domains bound to the apex-holding project and its production aliases.
-Include at least `verdantgrowdiary.com`, `www.verdantgrowdiary.com`,
-`verdant-grow-diary.vercel.app` and the recorded project alias
-`verdant-grow-diary-verdantgrowdiary.vercel.app`, plus each
-earlier-inventoried hostname until its retirement is owner-recorded and verified.
-For **each** hostname, resolve the serving deployment (M10 in the release topology
-specification) and record its deployment ID, full SHA, `READY` state,
-`target: production` and `source: git`. A newest-deployment listing or one
-deployment's alias array is not a per-host resolution.
+This is M10 of the [release topology specification](../specs/release-topology-specification.md),
+run as an **opening reading**, a sweep, and a **closing reading**. Record the UTC time
+of every read.
 
-Read a build receipt for each hostname with a unique observation timestamp and
-no-cache request. Follow redirects and retain response headers plus the effective
-URL, so a cached response or another origin is visible. Repeat this command with
-each inventoried hostname substituted for `<production-hostname>`:
+**1. Opening reading.** After resolving any active rollout, Matthew records:
+
+- the rolling-release record and configuration (state, substate, current and canary
+  deployments, canary percentage, stage, queued deployment, advancement type);
+- the deploy tip, freshly fetched: `git fetch origin verdant-grow-diary`, then
+  `git rev-parse origin/verdant-grow-diary`;
+- the complete production-host inventory: the domains bound to the project that M2
+  verifies as the apex holder, plus that project's production aliases.
+
+The inventory includes at least `verdantgrowdiary.com`, `www.verdantgrowdiary.com`,
+`verdant-grow-diary.vercel.app` and the recorded project alias
+`verdant-grow-diary-verdantgrowdiary.vercel.app`, plus each earlier-inventoried
+hostname until its retirement is owner-recorded and verified. If M2 names no single
+holder, the inventory's completeness is `NOT_MEASURED`.
+
+**2. DNS for each custom hostname, before resolving its deployment.** Resolve `A`,
+`AAAA` and `CNAME`, as M2 does for the apex, and record each answer:
+
+- An authoritative `NODATA` for a record type is `NO_DATA` for that type; reconcile
+  the others.
+- A split, or a record naming another platform, is `FAIL`. Audit that hostname on
+  the platform DNS names; never pass it through a stale Vercel binding. A Vercel
+  binding that still lists the hostname is not serving evidence.
+- A proxy that hides the serving platform is `NOT_MEASURED`.
+- A failed lookup (timeout, `SERVFAIL`, no reachable resolver) is `BLOCKED`.
+
+Platform-owned `*.vercel.app` hostnames need no DNS step.
+
+**3. Per-host deployment, then alias moves.** For **each** hostname, resolve the
+serving deployment (`get_deployment <hostname>`) and record its deployment ID,
+`target: production`, `READY` state, `source: git`, `githubCommitRef` and full
+`githubCommitSha`. A newest-deployment listing or one deployment's alias array is
+not a per-host resolution. A preview deployment on a production hostname is `FAIL`
+even at the tip's SHA.
+
+Then read `list_promote_aliases`. A pending or failed alias move prevents
+completion. It is reconciled only by an owner-authorized action (D-RT-13), followed
+by a repeated sweep from step 1. Do not treat an automatic or repeated promotion as
+the remedy.
+
+**4. Build receipts, then the closing reading.** Read a build receipt for each
+hostname with a unique observation timestamp and no-cache request. Follow redirects
+and retain response headers plus the effective URL, so a cached response or another
+origin is visible. Repeat this command with each inventoried hostname substituted
+for `<production-hostname>`:
 
 ```sh
 curl --fail --silent --show-error --location \
@@ -166,15 +200,46 @@ curl --fail --silent --show-error --location \
   'https://<production-hostname>/version.json?receipt=<utc-observation-timestamp>'
 ```
 
-Replace the hostname and timestamp placeholders for each observation. Check the
-effective host, status and caching headers, then confirm every JSON receipt's
-full `commit` equals the intended promote or rollback SHA and `dirty` is `false`.
-Save each hostname's resolution, JSON, headers, timestamp, rollout resolution and
-owner operation receipts. A split between serving deployments or SHAs is `FAIL`;
-so is a resolved deployment that is not the intended `READY`, production-target,
-Git-sourced artifact. An unmeasured or unreachable hostname blocks acceptance as
-`NOT_MEASURED`. Do not declare promotion or rollback complete until the entire
-inventory agrees and the rollout is complete or aborted.
+Check the effective host, status and caching headers, then confirm every JSON
+receipt's full `commit` equals the intended promote or rollback SHA and `dirty` is
+`false`.
+
+Then take the **closing reading**: reread the rollout record and configuration, the
+host inventory, each custom hostname's DNS, each hostname's deployment, the alias
+moves, and a freshly fetched deploy tip. The run is `PASS` only when the opening and
+closing readings agree on every value.
+
+- If any value changed during the sweep (a rollout, promote, redeploy, rollback,
+  alias or domain move, DNS change or new merge), mark consistency `NOT_MEASURED`
+  and repeat the sweep.
+- A definite `FAIL` still stands under M10's opening-tip rule: a hostname that
+  served neither the opening tip nor a commit merged during the run was not serving
+  the tip.
+
+**5. Record and classify.**
+
+- A split between serving deployments or SHAs is `FAIL`. So is a resolved
+  deployment that is not the intended `READY`, production-target, Git-sourced
+  artifact.
+- A verification that was attempted but could not be completed for lack of access,
+  egress or a dependency is `BLOCKED`. One that was not performed is
+  `NOT_MEASURED`. Neither is acceptance.
+- An approved rollback can correctly restore its intended older SHA while the
+  current-tip release status remains `FAIL`. Record both.
+
+For every publish action (promote, rollback, or rollout start, complete or abort),
+record in the session report and the next `CURRENT_STATE.md` stamp (D-RT-13):
+
+- the action;
+- the affected deployment IDs;
+- the actor class (Git integration, owner CLI or dashboard, token);
+- a sanitized reason;
+- the operation receipts.
+
+Save each hostname's DNS answers, resolution, JSON, headers and timestamp alongside
+them. Do not declare promotion or rollback complete until the entire inventory
+agrees across a consistent opening and closing reading, and the rollout is complete
+or aborted.
 
 Only then exercise the fixed flow on the fixture account's own grow, with every
 smoke write tagged `[smoke <timestamp>]`. Never use customer data or the KEEP

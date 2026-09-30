@@ -1056,6 +1056,8 @@ class ListenerRuntime:
         self.lock, self.send_lock = threading.RLock(), threading.RLock()
         self.stop_event = threading.Event()
         self.thread: Optional[threading.Thread] = None
+        self.supervisor_stop_event = threading.Event()
+        self.supervisor_thread: Optional[threading.Thread] = None
         self.last_local_error: Optional[str] = None
         root = Path(os.environ.get("ECOWITT_SPOOL_DIR") or Path(__file__).with_name(".spool"))
         max_bytes = int(_positive_setting("ECOWITT_SPOOL_MAX_MB", 50) * 1024 * 1024)
@@ -1152,26 +1154,45 @@ class ListenerRuntime:
         Only acts once start() has run and the runtime has not been stopped, so
         tests and one-shot callers that never started a worker are unaffected.
         """
-        if not getattr(self, "started", False) or self.stop_event.is_set():
-            return False
         with self.lock:
+            if (not getattr(self, "started", False) or self.stop_event.is_set()
+                    or self.supervisor_stop_event.is_set()):
+                return False
             if self.worker_alive():
                 return False
+            self.last_local_error = "local_delivery_state_error"
+            print("[verdant-testbench] replay worker was not running; restarting it")
+            self.start()
             self.worker_restarts = getattr(self, "worker_restarts", 0) + 1
-        print("[verdant-testbench] replay worker was not running; restarting it")
-        self.start()
-        return True
+            return True
 
     def supervise(self) -> None:
         """Check the replay worker on a timer until the runtime is stopped."""
-        stop_event = self.stop_event
-        def loop() -> None:
-            while not stop_event.wait(max(self.interval, 1) * 5):
-                try:
-                    self.ensure_worker()
-                except Exception as exc:  # never let the supervisor die silently
-                    print(f"[verdant-testbench] replay supervisor error: {type(exc).__name__}")
-        threading.Thread(target=loop, name="ecowitt-replay-supervisor", daemon=True).start()
+        with self.lock:
+            if self.supervisor_stop_event.is_set():
+                return
+            if self.supervisor_thread is not None and self.supervisor_thread.is_alive():
+                return
+            stop_event = self.supervisor_stop_event
+            def loop() -> None:
+                while not stop_event.wait(max(self.interval, 1) * 5):
+                    with self.lock:
+                        if stop_event.is_set():
+                            return
+                        try:
+                            self.ensure_worker()
+                        except Exception as exc:  # never let the supervisor die silently
+                            self.last_local_error = "local_delivery_state_error"
+                            print(f"[verdant-testbench] replay supervisor error: {type(exc).__name__}")
+            self.supervisor_thread = threading.Thread(target=loop, name="ecowitt-replay-supervisor", daemon=True)
+            self.supervisor_thread.start()
+
+    def stop(self) -> None:
+        with self.lock:
+            # The supervisor event survives worker replacement. Setting both
+            # events under the restart lock prevents shutdown resurrection.
+            self.supervisor_stop_event.set()
+            self.stop_event.set()
 
 
 def get_runtime() -> ListenerRuntime:
@@ -1183,7 +1204,7 @@ def get_runtime() -> ListenerRuntime:
     with _RUNTIME_LOCK:
         if _RUNTIME is None or _RUNTIME_KEY != key:
             if _RUNTIME is not None:
-                _RUNTIME.stop_event.set()
+                _RUNTIME.stop()
             _RUNTIME = ListenerRuntime()
             _RUNTIME_KEY = key
         return _RUNTIME
@@ -2269,7 +2290,7 @@ def main() -> None:  # pragma: no cover
     try:
         app.run(host="0.0.0.0", port=PORT, debug=False)
     finally:
-        runtime.stop_event.set()
+        runtime.stop()
 
 
 if __name__ == "__main__":  # pragma: no cover

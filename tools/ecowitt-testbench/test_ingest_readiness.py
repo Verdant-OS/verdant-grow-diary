@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import tempfile
 import threading
 import unittest
@@ -487,6 +488,145 @@ class ListenerIntegrationTests(unittest.TestCase):
         runtime.replay_once()
         bodies = [call.kwargs["json"] for call in self.requests.post.call_args_list if call.kwargs["json"]["tent_id"] == TENT_A]
         self.assertEqual([body["metadata"]["channels"][0]["value"] for body in bodies], [70, 71])
+
+
+    def test_livez_does_not_load_runtime_or_claim_delivery_readiness(self):
+        with mock.patch.object(listener, "get_runtime", side_effect=ValueError("invalid local state")) as runtime:
+            response = self.client.get("/livez")
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.get_json()["alive"])
+            runtime.assert_not_called()
+            self.assertEqual(self.client.get("/health").status_code, 503)
+        self.requests.post.assert_not_called()
+
+
+    def test_livez_stays_available_during_persisted_forward_failures_and_restart(self):
+        for status in (401, None):
+            with self.subTest(status=status):
+                runtime = listener.get_runtime()
+                self.post()
+                self.requests.post.side_effect = OSError("synthetic network outage") if status is None else None
+                self.requests.post.return_value.status_code = status
+                runtime.replay_once()
+                self.now += timedelta(minutes=10)
+                failed_at = runtime.health.data["tents"][TENT_A]["first_forward_failure_at"]
+                self.assertEqual(self.client.get("/health").status_code, 503)
+                self.assertEqual(self.client.get("/livez").status_code, 200)
+                with mock.patch.object(listener, "_RUNTIME", None):
+                    restored = listener.get_runtime()
+                    self.assertEqual(restored.health.data["tents"][TENT_A]["first_forward_failure_at"], failed_at)
+                    self.assertEqual(self.client.get("/health").status_code, 503)
+                    self.assertTrue(self.client.get("/livez").get_json()["alive"])
+        self.assertEqual(self.requests.post.call_count, 4)
+
+
+    def test_livez_stays_available_during_sustained_gateway_clock_skew(self):
+        self.packet["dateutc"] = "2026-09-28 13:00:00"
+        self.post()
+        self.now += timedelta(minutes=10)
+        self.post()
+        response = self.client.get("/health")
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("forward_failure", response.get_json()["reasons"])
+        self.assertTrue(self.client.get("/livez").get_json()["alive"])
+        self.requests.post.assert_not_called()
+
+
+    def test_supervisor_replaces_a_crashed_worker_without_another_gateway_packet(self):
+        self.post()
+        runtime = listener.get_runtime()
+        runtime.interval = 0.01
+        release_crash, delivered = threading.Event(), threading.Event()
+        replay_once = runtime.replay_once
+        first_call = True
+        def replay():
+            nonlocal first_call
+            if first_call:
+                first_call = False
+                release_crash.wait(timeout=2)
+                raise RuntimeError("synthetic replay crash")
+            replay_once()
+            delivered.set()
+        supervisor_wait = runtime.supervisor_stop_event.wait
+        with mock.patch.object(runtime, "replay_once", side_effect=replay), mock.patch.object(threading, "excepthook"), mock.patch.object(runtime.supervisor_stop_event, "wait", side_effect=lambda timeout: supervisor_wait(0.01)):
+            runtime.start()
+            runtime.supervise()
+            first_worker = runtime.thread
+            first_worker_event = runtime.stop_event
+            supervisor_event = runtime.supervisor_stop_event
+            self.addCleanup(runtime.stop)
+            release_crash.set()
+            self.assertTrue(delivered.wait(timeout=2))
+            self.assertIsNot(runtime.thread, first_worker)
+            self.assertIsNot(runtime.stop_event, first_worker_event)
+            self.assertIs(runtime.supervisor_stop_event, supervisor_event)
+            self.assertTrue(runtime.thread.is_alive())
+            self.assertEqual(runtime.spool.pending_count, 0)
+            self.assertEqual(self.requests.post.call_count, 2)
+            supervisor = runtime.supervisor_thread
+            runtime.start()
+            runtime.supervise()
+            self.assertIs(runtime.supervisor_thread, supervisor)
+            runtime.stop()
+            supervisor.join(timeout=1)
+            runtime.thread.join(timeout=1)
+            self.assertFalse(supervisor.is_alive())
+            self.assertFalse(runtime.thread.is_alive())
+
+
+    def test_supervisor_does_not_restart_worker_after_shutdown_wins_the_check_race(self):
+        runtime = listener.get_runtime()
+        supervisor = None
+        with mock.patch.object(listener.threading, "Thread") as thread:
+            runtime.start()
+            runtime.supervise()
+            supervisor = thread.call_args.kwargs["target"]
+        runtime.stop()
+        with mock.patch.object(runtime.supervisor_stop_event, "wait", return_value=False), mock.patch.object(runtime, "start") as start:
+            supervisor()
+            start.assert_not_called()
+
+
+    def test_supervisor_retries_a_failed_restart_without_echoing_exception_details(self):
+        runtime = listener.get_runtime()
+        with mock.patch.object(listener.threading, "Thread") as thread:
+            runtime.start()
+            runtime.supervise()
+            supervise = thread.call_args.kwargs["target"]
+        with mock.patch.object(runtime.supervisor_stop_event, "wait", side_effect=[False, False, True]), mock.patch.object(runtime, "ensure_worker", side_effect=[RuntimeError("private diagnostic"), None]) as start, mock.patch("builtins.print") as output:
+            supervise()
+            self.assertEqual(start.call_count, 2)
+            self.assertEqual(runtime.last_local_error, "local_delivery_state_error")
+            self.assertNotIn("private diagnostic", str(output.call_args_list))
+
+    def test_worker_restart_rechecks_shutdown_after_acquiring_the_lock(self):
+        runtime = listener.get_runtime()
+        runtime.started = True
+        runtime.thread = mock.Mock()
+        runtime.thread.is_alive.return_value = False
+        with mock.patch.object(runtime, "lock") as lock, mock.patch.object(runtime, "start") as start:
+            lock.__enter__.side_effect = runtime.stop_event.set
+            self.assertFalse(runtime.ensure_worker())
+            start.assert_not_called()
+
+
+    def test_runtime_replacement_stops_the_old_supervisor_and_worker(self):
+        previous = listener.get_runtime()
+        os.environ["ECOWITT_SPOOL_DIR"] = str(self.root / "replacement")
+        self.assertIsNot(listener.get_runtime(), previous)
+        self.assertTrue(previous.supervisor_stop_event.is_set())
+        self.assertTrue(previous.stop_event.is_set())
+
+
+    def test_main_starts_supervision_and_stops_it_when_the_server_exits(self):
+        runtime = mock.Mock()
+        with mock.patch.object(listener, "get_runtime", return_value=runtime), mock.patch.object(listener.app, "run") as run, mock.patch("builtins.print"):
+            listener.main()
+        runtime.supervise.assert_called_once()
+        runtime.start.assert_called_once()
+        runtime.stop.assert_called_once()
+        run.assert_called_once_with(host="0.0.0.0", port=listener.PORT, debug=False)
+
 
 
 if __name__ == "__main__":

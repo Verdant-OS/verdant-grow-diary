@@ -248,6 +248,11 @@ Authorization headers are never persisted; each send resolves the
 current process environment through that tent's configured token name.
 After a restart, the background worker replays due entries in enqueue
 order with the same Idempotency-Key and original gateway `dateutc`.
+A supervisor periodically checks the replay worker and replaces it if it
+exits unexpectedly, without waiting for another gateway packet. Its default
+check interval is 10 seconds (five times the replay interval, with a
+five-second minimum).
+Listener shutdown and runtime replacement stop both loops.
 Mapped mode acknowledges locally after enqueueing. Single-tent mode
 retains its initial bounded inline attempts; failures then remain queued.
 
@@ -280,7 +285,13 @@ dead letters before changing credentials or choosing a deliberate replay.
 
 ## I. Listener health and incident alerts
 
-`GET /health` returns `200` while the listener is available, including
+`GET /livez` always returns `200` with `alive: true` when the HTTP
+listener responds. It does not load local delivery state, send requests,
+or claim that forwarding or sensor data is healthy. Windows startup
+checks use this endpoint, so delivery failures do not suggest restarting
+an already running listener.
+
+`GET /health` remains the separate delivery readiness check. It returns `200`
 after a gateway quiet period. Quiet delivery still reports `ok: false`
 and `gateway_quiet` in the response; the HTTP status does not classify
 sensor readings as healthy. Sustained `forward_failure` or
@@ -678,7 +689,8 @@ cd tools/ecowitt-testbench
 ```
 
 The script runs `bun run typecheck`, the EcoWitt static safety vitest,
-and probes the safe local debug endpoints (`/health`, `/debug/status`,
+and checks HTTP liveness with `/livez` before probing delivery readiness
+and the safe local debug endpoints (`/health`, `/debug/status`,
 `/debug/forwarding-status`, `/debug/parse-diagnostics`). It does **not**
 start the listener, read `.env`, print bridge tokens, post payloads, or
 forward to Verdant. If the listener is not running it tells you to run
@@ -693,7 +705,7 @@ cd "C:\Users\G7\OneDrive\Documents\GitHub\verdant-grow-diary"
 
 `run-testbench-windows.ps1` runs preflight, then setup, starts the
 listener in a new PowerShell window, waits briefly for
-`http://localhost:8787/health`, then runs verify. It does **not** read
+`http://localhost:8787/livez`, then runs verify. It does **not** read
 `.env`, print bridge tokens, post payloads, or forward to Verdant.
 
 ## Troubleshooting: wrong folder or out-of-date checkout

@@ -11,14 +11,16 @@ import { buildEcowittTentSnapshotV0ViewModel } from "@/lib/ecowittTentSnapshotV0
 import { ECOWITT_CUSTOM_HTTP_FIELD_MAP } from "@/lib/ecowittCustomHttpBridgeIngestRules";
 
 describe("ecowitt custom-HTTP FIELD_MAP contract", () => {
-  it("matches Python FIELD_MAP tuples in ecowitt_listener.py", () => {
+  it("matches Python FIELD_MAP tuples in ecowitt_listener.py exactly", () => {
     const listener = readFileSync("tools/ecowitt-testbench/ecowitt_listener.py", "utf-8");
-    const block = listener.split("FIELD_MAP = {")[1]?.split("}\n")[0] ?? "";
-    for (const [canonical, candidates] of Object.entries(ECOWITT_CUSTOM_HTTP_FIELD_MAP)) {
-      for (const key of candidates) {
-        expect(block, `${canonical} missing ${key} in Python FIELD_MAP`).toContain(`"${key}"`);
-      }
+    const block = listener.split("\nFIELD_MAP = {")[1]?.split("\n}\n")[0] ?? "";
+    expect(block, "Python FIELD_MAP block not found").not.toBe("");
+    const python: Record<string, string[]> = {};
+    for (const match of block.matchAll(/"([a-z0-9_]+)"\s*:\s*\(([^)]*)\)/g)) {
+      python[match[1]] = [...match[2].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
     }
+    // Same canonical metrics, same candidate keys, same priority order.
+    expect(python).toEqual(ECOWITT_CUSTOM_HTTP_FIELD_MAP);
   });
 
   it("matches the listener's configured channels", () => {

@@ -256,6 +256,15 @@ five-second minimum).
 Listener shutdown and runtime replacement stop both loops.
 Mapped mode acknowledges locally after enqueueing. Single-tent mode
 retains its initial bounded inline attempts; failures then remain queued.
+The mapped acknowledgement counts only entries that survive the batch's
+spool limits; partial eviction reports `spool_capacity_drop` and its drop
+count. Tents without deliverable primary metrics remain local diagnostics
+with invalid provenance, and are not sent as unsupported empty-metrics
+requests. No secondary sensor is promoted to fill the gap.
+An enqueue error remains visible in health until a durable enqueue succeeds;
+an empty replay does not prove that the queue can be written. A newer success
+updates its tent's success time while preserving any older outstanding
+delivery failure and its incident time.
 
 All 2xx responses mark an entry done. This is delivery acknowledgement,
 not proof of a database insert. In particular, the current webhook may

@@ -21,6 +21,87 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_newer_success_cannot_hide_an_older_outstanding_failure(self):
+        runtime = listener.get_runtime()
+        runtime.health.packet_received()
+        def reading(value):
+            return {"captured_at": NOW.isoformat(), "source": "live", "metrics": {"temp_f": value},
+                    "metadata": {"raw_payload": self.packet}}
+        old = runtime.enqueue(reading(70), TENT_A)
+        newer = runtime.enqueue(reading(80), TENT_A)
+        runtime.finish(old, {"status_code": 503})
+        failed_at = runtime.health.data["tents"][TENT_A]["first_forward_failure_at"]
+        self.now += timedelta(minutes=10)
+        runtime.health.packet_received()
+        runtime.finish(newer, {"status_code": 200})
+        self.assertEqual(runtime.health.data["tents"][TENT_A]["first_forward_failure_at"], failed_at)
+        self.assertIsNotNone(runtime.health.data["tents"][TENT_A]["last_forward_ok_at"])
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        listener._RUNTIME = None
+        restored = listener.get_runtime()
+        self.assertIn(old, restored.spool.entries)
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        restored.finish(old, {"status_code": 200})
+        self.assertIsNone(restored.health.data["tents"][TENT_A]["first_forward_failure_at"])
+        self.assertEqual(self.client.get("/health").status_code, 200)
+
+    def test_mapped_enqueue_failure_stays_unhealthy_until_a_durable_enqueue(self):
+        runtime = listener.get_runtime()
+        for error in (OSError("synthetic private failure"), ValueError("synthetic private failure")):
+            with self.subTest(error=type(error)):
+                with mock.patch.object(runtime.spool, "enqueue", side_effect=error):
+                    response = self.post()
+                    self.assertEqual(response.status_code, 503)
+                    self.assertNotIn("synthetic private failure", response.get_data(as_text=True))
+                    runtime.replay_once()  # an empty read is not a successful write probe
+                    self.assertEqual(self.client.get("/health").status_code, 503)
+                self.assertEqual(self.post().status_code, 200)
+                self.assertEqual(self.client.get("/health").status_code, 200)
+                runtime.replay_once()
+
+    def test_absent_mapped_tent_metrics_are_local_diagnostics_not_dead_letters(self):
+        packet = {k: v for k, v in self.packet.items() if not k.endswith("2") and k != "temp2f"}
+        response = self.post(packet)
+        self.assertEqual(response.status_code, 200)
+        forward = response.get_json()["forward"]
+        self.assertEqual(forward["entry_count"], 1)
+        self.assertEqual(forward["skipped_empty_count"], 1)
+        runtime = listener.get_runtime()
+        runtime.replay_once()
+        self.assertEqual(self.requests.post.call_count, 1)
+        self.assertEqual(self.requests.post.call_args.kwargs["json"]["tent_id"], TENT_A)
+        self.assertEqual(runtime.spool.stats["dead_letter_count"], 0)
+        empty = {k: v for k, v in self.packet.items() if k in ("PASSKEY", "model", "stationtype", "dateutc")}
+        response = self.post(empty)
+        self.assertFalse(response.get_json()["forward"]["queued"])
+        self.assertEqual(response.get_json()["forward"]["reason"], "no_deliverable_metrics")
+        self.assertEqual(response.get_json()["forward"]["entry_count"], 0)
+        self.assertTrue(all(item["source"] == "invalid" for item in response.get_json()["readings"]))
+
+    def test_mapped_batch_acknowledgement_counts_only_surviving_entries(self):
+        self.post()
+        runtime = listener.get_runtime()
+        runtime.replay_once()
+        original = runtime.enqueue
+        calls = 0
+        def enqueue(*args):
+            nonlocal calls
+            calls += 1
+            key = original(*args)
+            if calls == 2:
+                # Exercise actual oldest-first cap eviction after the batch grows.
+                runtime.spool._compact()
+                runtime.spool.max_bytes = runtime.spool._disk_bytes() - 1
+                runtime.spool.enforce_limits()
+            return key
+        with mock.patch.object(runtime, "enqueue", side_effect=enqueue):
+            response = self.post()
+        forward = response.get_json()["forward"]
+        self.assertEqual(runtime.spool.pending_count, 1)
+        self.assertFalse(forward["queued"])
+        self.assertEqual(forward["entry_count"], 1)
+        self.assertEqual(forward["dropped_count"], 1)
+        self.assertEqual(forward["reason"], "spool_capacity_drop")
     def test_listener_uses_the_effective_pure_field_map(self):
         import ecowitt_multitent
         self.assertIs(listener.FIELD_MAP, ecowitt_multitent.FIELD_MAP)

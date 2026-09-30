@@ -367,13 +367,14 @@ class HealthState:
             self.data["last_packet_received_at"] = self.clock().isoformat()
             self._save()
 
-    def forward_result(self, tent_id: str, success: bool) -> None:
+    def forward_result(self, tent_id: str, success: bool, *, outstanding_failure: bool = False) -> None:
         with self.lock:
             state = self.data["tents"].setdefault(tent_id, {"last_forward_ok_at": None, "first_forward_failure_at": None})
             if success:
                 state["last_forward_ok_at"] = self.clock().isoformat()
-                state["first_forward_failure_at"] = None
-            elif state["first_forward_failure_at"] is None:
+                if not outstanding_failure:
+                    state["first_forward_failure_at"] = None
+            if (not success or outstanding_failure) and state["first_forward_failure_at"] is None:
                 state["first_forward_failure_at"] = self.clock().isoformat()
             self._save()
 

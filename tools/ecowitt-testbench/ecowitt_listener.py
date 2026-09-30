@@ -1070,6 +1070,7 @@ class ListenerRuntime:
         self.supervisor_stop_event = threading.Event()
         self.supervisor_thread: Optional[threading.Thread] = None
         self.last_local_error: Optional[str] = None
+        self.last_enqueue_error: Optional[str] = None
         root = Path(os.environ.get("ECOWITT_SPOOL_DIR") or Path(__file__).with_name(".spool"))
         max_bytes = int(_positive_setting("ECOWITT_SPOOL_MAX_MB", 50) * 1024 * 1024)
         max_days = _positive_setting("ECOWITT_SPOOL_MAX_DAYS", 7)
@@ -1092,27 +1093,37 @@ class ListenerRuntime:
         self.spool.enforce_limits()
 
     def enqueue(self, reading: dict, tent_id: str) -> str:
-        safe = self.cleaner(reading)
-        safe.setdefault("metadata", {})["tent_id"] = tent_id
-        safe["metadata"].pop("remote_addr", None)
-        key = build_forward_idempotency_key({"tent_id": tent_id, "source": WEBHOOK_TRANSPORT_SOURCE,
-            "captured_at": safe.get("captured_at"), "metrics": safe.get("metrics") or {}})
-        # Header identity keeps the existing tent/metrics/event-time contract.
-        # Queue identity additionally preserves differing secondary/raw fields
-        # at the same timestamp; they must not be silently coalesced away.
-        identity = json.dumps({"key": key, "metadata": safe.get("metadata")}, sort_keys=True, separators=(",", ":"))
-        entry_id = "queue-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
-        self.spool.enqueue(entry_id, safe, idempotency_key=key)
-        return entry_id
+        with self.lock:
+            try:
+                safe = self.cleaner(reading)
+                safe.setdefault("metadata", {})["tent_id"] = tent_id
+                safe["metadata"].pop("remote_addr", None)
+                key = build_forward_idempotency_key({"tent_id": tent_id, "source": WEBHOOK_TRANSPORT_SOURCE,
+                    "captured_at": safe.get("captured_at"), "metrics": safe.get("metrics") or {}})
+                # Header identity keeps the existing tent/metrics/event-time contract.
+                # Queue identity additionally preserves differing secondary/raw fields
+                # at the same timestamp; they must not be silently coalesced away.
+                identity = json.dumps({"key": key, "metadata": safe.get("metadata")}, sort_keys=True, separators=(",", ":"))
+                entry_id = "queue-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+                self.spool.enqueue(entry_id, safe, idempotency_key=key)
+                self.last_enqueue_error = None
+                return entry_id
+            except (OSError, ValueError, KeyError, TypeError):
+                self.last_enqueue_error = "local_delivery_state_error"
+                raise
 
     def finish(self, key: str, result: dict) -> None:
-        entry = self.spool.entries.get(key)
-        if entry is None:
-            return
-        status = result.get("status_code")
-        tent_id = entry["reading"]["metadata"]["tent_id"]
-        self.spool.finish(key, status)
-        self.health.forward_result(tent_id, isinstance(status, int) and 200 <= status < 300)
+        with self.lock:
+            entry = self.spool.entries.get(key)
+            if entry is None:
+                return
+            status = result.get("status_code")
+            tent_id = entry["reading"]["metadata"]["tent_id"]
+            self.spool.finish(key, status)
+            outstanding = any(e["attempts"] > 0 and e["reading"]["metadata"]["tent_id"] == tent_id
+                              for e in self.spool.entries.values())
+            self.health.forward_result(tent_id, isinstance(status, int) and 200 <= status < 300,
+                                       outstanding_failure=outstanding)
         self.health.tick()
 
     def replay_once(self) -> None:
@@ -1295,9 +1306,9 @@ def health() -> Any:
         runtime.health.tick()
         status = runtime.health.status()
         status.pop("tents", None)
-        if runtime.last_local_error:
+        if runtime.last_local_error or runtime.last_enqueue_error:
             status["ok"] = False
-            status["reasons"].append(runtime.last_local_error)
+            status["reasons"].append("local_delivery_state_error")
         status.update(vendor=VENDOR, port=PORT)
         # An idle gateway does not make the listener unavailable. Keep its
         # delivery warning in the body; real delivery/local errors stay 503.
@@ -1388,7 +1399,7 @@ def ecowitt() -> Any:
                 own_raw = packet["metadata"]["raw_payload"]
                 own_source = _resolve_source_from_validated(payload=own_raw, remote_addr=request.remote_addr,
                     canonical_gateway_time=gateway_captured_at, header_mode="", env_mode="", now=request_now)
-                readings.append({"captured_at": captured_at, "source": "invalid" if packet["invalid"] else own_source,
+                readings.append({"captured_at": captured_at, "source": "invalid" if packet["invalid"] or not packet["metrics"] else own_source,
                     "vendor": VENDOR, "metrics": packet["metrics"], "physical_gateway_evidence": physical_gateway_evidence,
                     "metadata": {**packet["metadata"], "tent_id": packet["tent_id"]}})
         else:
@@ -1423,8 +1434,18 @@ def ecowitt() -> Any:
     else:
         try:
             if runtime.mapped:
-                keys = [runtime.enqueue(item, item["metadata"]["tent_id"]) for item in readings]
-                forward_result = {"forwarded": False, "queued": True, "entry_count": len(keys)}
+                deliverable = [item for item in readings if item["metrics"]]
+                with runtime.lock:
+                    keys = [runtime.enqueue(item, item["metadata"]["tent_id"]) for item in deliverable]
+                    survivors = sum(key in runtime.spool.entries for key in keys)
+                dropped = len(keys) - survivors
+                forward_result = {"forwarded": False, "queued": bool(keys) and not dropped,
+                    "entry_count": survivors, "dropped_count": dropped,
+                    "skipped_empty_count": len(readings) - len(deliverable)}
+                if dropped:
+                    forward_result["reason"] = "spool_capacity_drop"
+                elif not keys:
+                    forward_result["reason"] = "no_deliverable_metrics"
             else:
                 forward_result = maybe_forward(reading)
         except (OSError, ValueError, KeyError, TypeError):

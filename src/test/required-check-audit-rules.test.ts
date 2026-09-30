@@ -52,6 +52,225 @@ const MUST_BE_GREEN: string[] = normalizeMustBeGreen(PINNED.mustBeGreen).map(
 );
 const EVERY_PINNED = [...PINNED.required, ...MUST_BE_GREEN];
 
+describe("queued merges with supplemental PR-only checks", () => {
+  const supplementalWorkflows = [
+    ["test:security-db-local", "security-db-local.yml"],
+    ["pgTAP irrigation (feeding + watering)", "irrigation-pgtap-rls-gate.yml"],
+    ["irrigation harness typecheck (tsc --noEmit)", "irrigation-pgtap-rls-gate.yml"],
+    ["Deno bridge auth + handler E2E", "sensor-ingest-webhook-edge-tests.yml"],
+    ["Mocked E2E closure (15 previously unrun specs)", "mocked-e2e-unwired-closure.yml"],
+    ["Timeline local-day date filter (mocked)", "mocked-e2e-unwired-closure.yml"],
+  ] as const;
+  const resolution = {
+    kind: PR_RESOLUTION.PULL_REQUEST,
+    number: 1776,
+    headSha: "pr-head",
+    landedSha: "landed",
+    mergedAt: "2026-09-29T02:18:08Z",
+  };
+  const supplemental = "test:security-db-local";
+  const pinned = {
+    required: ["required"],
+    mustBeGreen: [{ context: supplemental, alwaysRuns: false, allowPrHeadEvidence: true }],
+  };
+  const run = (name: string, sha: string, overrides = {}) => ({
+    name,
+    head_sha: sha,
+    id: 1,
+    status: "completed",
+    conclusion: "success",
+    started_at: "2026-09-29T00:35:39Z",
+    completed_at: "2026-09-29T00:39:29Z",
+    ...overrides,
+  });
+  const late = {
+    id: 3,
+    started_at: "2026-09-29T02:33:25Z",
+    completed_at: "2026-09-29T02:37:01Z",
+  };
+  const audit = (checks: ReturnType<typeof run>[], overrides = {}) =>
+    auditRequiredChecks({
+      pinned,
+      checkRuns: [run("required", "landed"), ...checks],
+      prResolution: resolution,
+      ...overrides,
+    });
+
+  it.each(supplementalWorkflows)(
+    "permits PR-head evidence only for declared PR-only lane %s",
+    (context, filename) => {
+      const entry = PINNED.mustBeGreen.find(
+        (item: { context: string }) => item.context === context,
+      );
+      expect(entry?.allowPrHeadEvidence).toBe(true);
+      const workflow = loadYaml(
+        readFileSync(resolve(ROOT, ".github/workflows", filename), "utf8"),
+      ) as { on: Record<string, unknown>; jobs: Record<string, { name: string }> };
+      expect(workflow.on).toHaveProperty("pull_request");
+      expect(workflow.on).not.toHaveProperty("merge_group");
+      expect(Object.values(workflow.jobs).map((job) => job.name)).toContain(context);
+      expect(
+        auditRequiredChecks({
+          pinned: { required: ["required"], mustBeGreen: [entry] },
+          checkRuns: [
+            run("required", "landed"),
+            run(context, "pr-head"),
+            run(context, "landed", late),
+          ],
+          prResolution: resolution,
+        }).verdict,
+      ).toBe(AUDIT_VERDICT.PASS);
+    },
+  );
+
+  it("does not opt the merge-group security gate into PR-head fallback", () => {
+    const entry = PINNED.mustBeGreen.find(
+      (item: { context: string }) => item.context === "test:security-regression",
+    );
+    expect(entry?.allowPrHeadEvidence).not.toBe(true);
+    const workflow = loadYaml(
+      readFileSync(resolve(ROOT, ".github/workflows/security-regression.yml"), "utf8"),
+    ) as { on: Record<string, unknown> };
+    expect(workflow.on).toHaveProperty("merge_group");
+  });
+
+  it("preserves pre-merge PR success instead of crediting the later push run", () => {
+    const result = audit([run(supplemental, "pr-head"), run(supplemental, "landed", late)]);
+    expect(result.verdict).toBe(AUDIT_VERDICT.PASS);
+    const finding = result.findings.find((item) => item.context === supplemental);
+    expect(finding).toMatchObject({
+      status: CHECK_STATUS.PASS,
+      lateForMerge: false,
+      source: "check_run",
+    });
+    expect(result.rulesetDrift.status).toBe("BLOCKED");
+  });
+
+  it.each(["failure", "cancelled", "timed_out"])(
+    "retains a pre-merge PR %s despite a later push success",
+    (conclusion) => {
+      const result = audit([
+        run(supplemental, "pr-head", { conclusion }),
+        run(supplemental, "landed", late),
+      ]);
+      expect(result.failingFindings).toEqual([
+        expect.objectContaining({
+          context: supplemental,
+          status: CHECK_STATUS.FAIL,
+          observed: conclusion,
+        }),
+      ]);
+    },
+  );
+
+  it.each([
+    { status: "in_progress", conclusion: null, completed_at: null },
+    { started_at: "not-a-time", completed_at: "not-a-time" },
+    { started_at: "", completed_at: null },
+    { completed_at: "2026-09-29T02:20:00Z" },
+    late,
+  ])("rejects PR evidence that cannot prove completion before merge: %j", (overrides) => {
+    expect(audit([run(supplemental, "pr-head", overrides)]).verdict).toBe(AUDIT_VERDICT.FAIL);
+  });
+
+  it("keeps a new PR run in flight from borrowing an older green result", () => {
+    expect(
+      audit([
+        run(supplemental, "pr-head"),
+        run(supplemental, "pr-head", { id: 2, status: "in_progress", completed_at: null }),
+      ]).failingFindings[0],
+    ).toMatchObject({ context: supplemental, status: CHECK_STATUS.FAIL });
+  });
+
+  it.each(["failure", "skipped", "in_progress"])(
+    "uses landed %s evidence instead of a green PR result",
+    (outcome) => {
+      const result = audit([
+        run(supplemental, "pr-head"),
+        run(
+          supplemental,
+          "landed",
+          outcome === "in_progress"
+            ? { status: outcome, conclusion: null, completed_at: null }
+            : { conclusion: outcome },
+        ),
+      ]);
+      expect(result.findings.find((item) => item.context === supplemental)?.observed).toBe(outcome);
+      expect(result.verdict).toBe(outcome === "skipped" ? AUDIT_VERDICT.PASS : AUDIT_VERDICT.FAIL);
+    },
+  );
+
+  it("does not borrow checks from an unrelated SHA or an unidentified PR head", () => {
+    expect(
+      audit([run(supplemental, "old-head")]).findings.find((item) => item.context === supplemental)
+        ?.status,
+    ).toBe(CHECK_STATUS.MISSING);
+    expect(
+      audit([run(supplemental, "pr-head"), run(supplemental, "landed", late)], {
+        prResolution: { ...resolution, headSha: null },
+      }).verdict,
+    ).toBe(AUDIT_VERDICT.FAIL);
+  });
+
+  it.each(["missing", "failure", "skipped", "in_progress"])(
+    "preserves the required merge-group %s failure",
+    (outcome) => {
+      const requiredRun =
+        outcome === "missing"
+          ? []
+          : [
+              run(
+                "required",
+                "landed",
+                outcome === "in_progress"
+                  ? { status: outcome, conclusion: null, completed_at: null }
+                  : { conclusion: outcome },
+              ),
+            ];
+      const result = audit([], {
+        pinned: {
+          required: ["required"],
+          mustBeGreen: [{ context: "required", allowPrHeadEvidence: true }],
+        },
+        checkRuns: [run("other", "landed"), run("required", "pr-head"), ...requiredRun],
+      });
+      expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
+      expect(result.failingFindings.some((item) => item.provenance === "required")).toBe(true);
+    },
+  );
+
+  it("requires literal opt-in and preserves the default landed-SHA policy", () => {
+    const checks = [run(supplemental, "pr-head"), run(supplemental, "landed", late)];
+    for (const eligibility of [undefined, false, "true"]) {
+      expect(
+        audit(checks, {
+          pinned: {
+            required: ["required"],
+            mustBeGreen: [{ context: supplemental, allowPrHeadEvidence: eligibility }],
+          },
+        }).verdict,
+      ).toBe(AUDIT_VERDICT.FAIL);
+    }
+  });
+
+  it("keeps conflicting legacy-status failures and evaluates deterministically", () => {
+    const checks = [run(supplemental, "pr-head"), run(supplemental, "landed", late)];
+    const statuses = [
+      {
+        context: supplemental,
+        sha: "pr-head",
+        state: "failure",
+        id: 9,
+        created_at: "2026-09-29T00:35:39Z",
+        updated_at: "2026-09-29T00:39:29Z",
+      },
+    ];
+    const result = audit(checks, { commitStatuses: statuses });
+    expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
+    expect(result).toEqual(audit([...checks].reverse(), { commitStatuses: statuses }));
+  });
+});
+
 describe("config/required-status-checks.json", () => {
   it("pins the 35 contexts of ruleset 20421416 and targets the deploy branch", () => {
     expect(PINNED.rulesetId).toBe(20421416);

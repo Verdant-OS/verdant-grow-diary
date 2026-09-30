@@ -1060,6 +1060,8 @@ class ListenerRuntime:
         self.mapped = bool(mapping)
         if mapping:
             self.tents, self.aliases = load_tent_map(Path(mapping), os.environ)
+            if not os.environ.get("VERDANT_INGEST_URL", "").strip():
+                raise ConfigError("Mapped forwarding requires VERDANT_INGEST_URL")
         else:
             tent_id = os.environ.get("VERDANT_TENT_ID")
             self.tents = (Tent(tent_id, "Single tent", "VERDANT_BRIDGE_TOKEN"),) if is_valid_tent_id(tent_id) else ()

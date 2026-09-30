@@ -154,6 +154,10 @@ The file stores environment-variable names, never bridge-token values:
 
 Set `ECOWITT_TENT_MAP=tent-map.json` in the local `.env`, and set each
 named token variable locally. Keep `VERDANT_INGEST_URL` configured.
+Mapped startup rejects a missing, empty or whitespace-only ingest URL with
+a fixed diagnostic before changing the spool. Restore the configuration
+and restart to replay existing queued readings. Legacy receive-only mode
+without a tent map still works without forwarding credentials or a URL.
 Both `.env` and `tent-map.json` are gitignored. Restart after changing
 the map or `.env`; the running process does not reload either file.
 

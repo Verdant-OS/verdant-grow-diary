@@ -20,6 +20,53 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_mapped_mode_requires_ingest_url_at_startup(self):
+        for url in (None, "", "   "):
+            with self.subTest(url=url):
+                if url is None:
+                    os.environ.pop("VERDANT_INGEST_URL", None)
+                else:
+                    os.environ["VERDANT_INGEST_URL"] = url
+                listener._RUNTIME = None
+                with self.assertRaises(ValueError) as caught:
+                    listener.get_runtime()
+                self.assertIn("requires VERDANT_INGEST_URL", str(caught.exception))
+                self.assertNotIn(TOKEN_A, str(caught.exception))
+                self.assertEqual(self.client.get("/health").status_code, 503)
+                self.assertEqual(self.post().status_code, 503)
+                self.assertEqual(self.client.get("/livez").status_code, 200)
+                self.requests.post.assert_not_called()
+
+    def test_missing_mapped_url_preserves_queue_until_configuration_recovers(self):
+        self.post()
+        original = listener.get_runtime()
+        saved_ids = list(original.spool.entries)
+        saved_queue = original.spool.path.read_bytes()
+        url = os.environ.pop("VERDANT_INGEST_URL")
+        listener._RUNTIME = None
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        self.assertEqual(self.post().status_code, 503)
+        self.assertEqual(original.spool.path.read_bytes(), saved_queue)
+        self.requests.post.assert_not_called()
+        os.environ["VERDANT_INGEST_URL"] = url
+        restored = listener.get_runtime()
+        self.assertEqual(list(restored.spool.entries), saved_ids)
+        restored.replay_once()
+        self.assertEqual(restored.spool.pending_count, 0)
+        self.assertEqual(self.client.get("/health").status_code, 200)
+        self.assertEqual(self.requests.post.call_count, 2)
+
+    def test_legacy_receive_only_still_accepts_packets_without_forwarding_config(self):
+        for key in ("ECOWITT_TENT_MAP", "VERDANT_INGEST_URL", "VERDANT_BRIDGE_TOKEN", "VERDANT_TENT_ID"):
+            os.environ.pop(key, None)
+        response = self.post()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["forward"]["reason"], "no_forwarding_configured")
+        self.assertEqual(listener.get_runtime().spool.pending_count, 0)
+        self.assertEqual(self.client.get("/health").status_code, 200)
+        self.assertEqual(self.client.get("/livez").status_code, 200)
+        self.requests.post.assert_not_called()
+
     def test_map_without_owned_channels_fails_receive_and_health_without_forwarding(self):
         identity = {"tent_id": TENT_A, "label": "Test tent", "token_env": "TOKEN_A"}
         for ownership in ({}, {"air_channels": [], "soil_channels": [],

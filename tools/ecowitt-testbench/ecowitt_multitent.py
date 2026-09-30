@@ -217,16 +217,20 @@ def checked_value(metric: str, value: Any, unit: str) -> float | None:
     return result
 
 
+def gateway_secrets(payload: Mapping[str, Any]) -> tuple[str, ...]:
+    return tuple(sorted({value for key, value in payload.items()
+                         if str(key).lower() == "passkey" and isinstance(value, str) and value}))
+
+
 def gateway_fingerprint(payload: Mapping[str, Any]) -> str:
-    value = next((v for k, v in payload.items() if str(k).lower() == "passkey"), None)
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16] if isinstance(value, str) and value else "unknown"
+    values = gateway_secrets(payload)
+    return hashlib.sha256(values[0].encode("utf-8")).hexdigest()[:16] if len(values) == 1 else "unknown"
 
 
 def route_packet(raw: dict[str, Any], tents: tuple[Tent, ...], aliases: tuple[Alias, ...],
                  *, secrets: tuple[str, ...] = ()) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     fingerprint = gateway_fingerprint(raw)
-    passkey = next((v for k, v in raw.items() if str(k).lower() == "passkey"), "")
-    safe = sanitize(raw, secrets=secrets + ((passkey,) if isinstance(passkey, str) and passkey else ()))
+    safe = sanitize(raw, secrets=secrets + gateway_secrets(raw))
     packets = [{"tent_id": t.tent_id, "metrics": {}, "invalid": False,
                 "metadata": {"device_id": f"ecowitt:{fingerprint}:gateway", "primary_channels": {},
                              "channels": [], "raw_payload": {}}} for t in tents]

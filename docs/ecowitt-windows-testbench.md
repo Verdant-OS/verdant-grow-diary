@@ -218,7 +218,8 @@ in the primary and secondary descriptors:
 `soil_temp_ch1` or `co2_ch1` (and `air_chin` for indoor air).
 The fingerprint is the first 16 hexadecimal characters of SHA-256;
 the PASSKEY itself is removed before logs, disk or forwarding.
-An absent PASSKEY is represented honestly as `unknown`.
+An absent or conflicting-case PASSKEY is represented honestly as `unknown`.
+Every supplied PASSKEY case variant is scrubbed from echoed fields as well.
 
 The webhook stores at most one canonical metric per tent, source and
 timestamp. Secondary readings are metadata, not additional metric rows.
@@ -268,6 +269,12 @@ spool limits; partial eviction reports `spool_capacity_drop` and its drop
 count. Tents without deliverable primary metrics remain local diagnostics
 with invalid provenance, and are not sent as unsupported empty-metrics
 requests. No secondary sensor is promoted to fill the gap.
+Owned fields that are all invalid record a tent failure; ordinary channel
+absence does not. The existing failure-duration threshold applies, and only
+a successful delivery for that tent can clear the failure.
+Queued entries for a tent removed from configuration remain durable and
+make public health return `orphaned_queue` without exposing tent IDs. Restoring
+the same tent permits replay with the original identity and timestamp.
 An enqueue error remains visible in health until a durable enqueue succeeds;
 an empty replay does not prove that the queue can be written. A newer success
 updates its tent's success time while preserving any older outstanding

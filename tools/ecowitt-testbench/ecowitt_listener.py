@@ -56,7 +56,7 @@ from typing import Any, Dict, Optional
 
 from ecowitt_delivery import HealthState, JsonlSpool
 from ecowitt_multitent import (
-    COMMON_FIELDS, FIELD_MAP, ConfigError, Tent, gateway_fingerprint, load_tent_map,
+    COMMON_FIELDS, FIELD_MAP, ConfigError, Tent, gateway_fingerprint, gateway_secrets, load_tent_map,
     numeric, route_packet, sanitize, valid_token,
 )
 
@@ -587,8 +587,7 @@ def _redact_raw_payload_for_forward(raw: Any) -> Any:
         if ks.lower() in _FORWARD_PAYLOAD_REDACT_KEYS:
             continue
         out[ks] = v
-    passkey = _payload_value_case_insensitive(raw, "passkey")
-    secrets = _delivery_secrets() + ((passkey,) if isinstance(passkey, str) and passkey else ())
+    secrets = _delivery_secrets() + gateway_secrets(raw)
     return sanitize(out, secrets=secrets)
 
 
@@ -1113,6 +1112,16 @@ class ListenerRuntime:
                 self.last_enqueue_error = "local_delivery_state_error"
                 raise
 
+    def delivery_health(self) -> dict:
+        with self.lock:
+            status = self.health.status()
+            configured = {tent.tent_id for tent in self.tents}
+            if any(entry["reading"]["metadata"]["tent_id"] not in configured
+                   for entry in self.spool.entries.values()):
+                status["ok"] = False
+                status["reasons"].append("orphaned_queue")
+            return status
+
     def finish(self, key: str, result: dict) -> None:
         with self.lock:
             entry = self.spool.entries.get(key)
@@ -1307,7 +1316,7 @@ def health() -> Any:
         runtime = get_runtime()
         runtime.ensure_worker()
         runtime.health.tick()
-        status = runtime.health.status()
+        status = runtime.delivery_health()
         status.pop("tents", None)
         if runtime.last_local_error or runtime.last_enqueue_error or runtime.last_receive_error:
             status["ok"] = False
@@ -1333,7 +1342,7 @@ def delivery_status() -> Any:
         return jsonify({"ok": False, "error": "forbidden_non_local"}), 403
     try:
         runtime = get_runtime()
-        status = runtime.health.status()
+        status = runtime.delivery_health()
         status.update(mode="mapped" if runtime.mapped else "single_tent", pending_count=runtime.spool.pending_count,
                       spool=dict(runtime.spool.stats), unmapped_counts=runtime.health.data["unmapped_counts"],
                       unmapped_overflow_count=runtime.health.data["unmapped_overflow_count"],
@@ -1409,6 +1418,9 @@ def ecowitt() -> Any:
             receive_step = "routing"
             readings = []
             for packet in routed:
+                if packet["invalid"] and not packet["metrics"]:
+                    # Owned but unusable data is a failure, unlike absent channels.
+                    runtime.health.forward_result(packet["tent_id"], False)
                 own_raw = packet["metadata"]["raw_payload"]
                 own_source = _resolve_source_from_validated(payload=own_raw, remote_addr=request.remote_addr,
                     canonical_gateway_time=gateway_captured_at, header_mode="", env_mode="", now=request_now)

@@ -21,6 +21,79 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_invalid_owned_empty_packets_fail_health_and_absence_does_not(self):
+        runtime = listener.get_runtime()
+        common = {k: v for k, v in self.packet.items() if k in ("PASSKEY", "model", "stationtype", "dateutc")}
+        self.post(common)
+        self.assertIsNone(runtime.health.data["tents"][TENT_A]["first_forward_failure_at"])
+        for fields in ({"humidity1": "0"}, {"humidity1": "100"}, {"temp1f": "malformed"}):
+            with self.subTest(fields=fields):
+                response = self.post({**common, **fields})
+                self.assertEqual(response.get_json()["forward"]["entry_count"], 0)
+                self.assertIsNotNone(runtime.health.data["tents"][TENT_A]["first_forward_failure_at"])
+        self.now += timedelta(minutes=10)
+        common["dateutc"] = self.now.strftime("%Y-%m-%d %H:%M:%S")
+        self.post({**common, "humidity1": "0", "temp2f": "80"})
+        runtime.replay_once()  # another tent's success cannot hide invalid data
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        listener._RUNTIME = None
+        restored = listener.get_runtime()
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        self.post({**common, "temp1f": "77", "humidity1": "50"})
+        restored.replay_once()
+        self.assertEqual(self.client.get("/health").status_code, 200)
+
+    def test_orphaned_queue_is_unhealthy_until_same_tent_is_restored_and_delivered(self):
+        self.post()
+        old = listener.get_runtime()
+        entry = next(e for e in old.spool.entries.values() if e["reading"]["metadata"]["tent_id"] == TENT_A)
+        identity = (entry["id"], entry["idempotency_key"], entry["reading"]["captured_at"])
+        original_map = self.mapping.read_text()
+        self.mapping.write_text(json.dumps([json.loads(original_map)[1]]))
+        listener._RUNTIME = None
+        runtime = listener.get_runtime()
+        runtime.replay_once()
+        self.assertEqual(self.requests.post.call_count, 1)
+        self.assertEqual(self.requests.post.call_args.kwargs["json"]["tent_id"], TENT_B)
+        response = self.client.get("/health")
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("orphaned_queue", response.get_json()["reasons"])
+        self.assertNotIn(TENT_A, response.get_data(as_text=True))
+        self.assertIn("orphaned_queue", self.client.get("/status").get_json()["reasons"])
+        listener._RUNTIME = None
+        runtime = listener.get_runtime()
+        queued = runtime.spool.entries[identity[0]]
+        self.assertEqual((queued["id"], queued["idempotency_key"], queued["reading"]["captured_at"]), identity)
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        self.mapping.write_text(original_map)
+        listener._RUNTIME = None
+        runtime = listener.get_runtime()
+        self.now += timedelta(seconds=61)
+        runtime.replay_once()
+        self.assertEqual(runtime.spool.pending_count, 0)
+        self.assertEqual(self.client.get("/health").status_code, 200)
+
+    def test_all_passkey_case_values_are_redacted_in_mapped_and_legacy_delivery(self):
+        secrets = ("synthetic-first-passkey", "synthetic-second-passkey")
+        for mapped in (True, False):
+            with self.subTest(mapped=mapped):
+                if not mapped:
+                    os.environ.pop("ECOWITT_TENT_MAP")
+                    os.environ.update(VERDANT_TENT_ID=TENT_A, VERDANT_BRIDGE_TOKEN=TOKEN_A)
+                packet = {**self.packet, "PASSKEY": secrets[0], "passkey": secrets[1],
+                          "echo": {"nested": list(secrets)}, "runtime": "prefix " + secrets[1]}
+                with mock.patch("builtins.print") as logs:
+                    response = self.post(packet)
+                    listener.get_runtime().replay_once()
+                combined = response.get_data(as_text=True) + str(logs.call_args_list)
+                combined += json.dumps([call.kwargs.get("json") for call in self.requests.post.call_args_list])
+                combined += self.client.get("/status").get_data(as_text=True)
+                for path in self.root.rglob("*"):
+                    if path.is_file() and path != self.mapping:
+                        combined += path.read_text()
+                for secret in secrets:
+                    self.assertNotIn(secret, combined)
+
     def test_blocked_single_tent_config_is_unhealthy_but_unconfigured_mode_is_allowed(self):
         os.environ.pop("ECOWITT_TENT_MAP")
         os.environ["VERDANT_BRIDGE_TOKEN"] = TOKEN_A

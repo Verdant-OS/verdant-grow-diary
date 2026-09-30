@@ -23,6 +23,19 @@ def tent(tent_id=TENT_A, token_env="TOKEN_A", **overrides):
 
 
 class MultiTentTests(unittest.TestCase):
+    def test_conflicting_passkeys_redact_all_echoes_independent_of_order(self):
+        tents, aliases = self.load([tent()])
+        raw = {"PASSKEY": "synthetic-first", "passkey": "synthetic-second",
+               "temp2f": "77", "runtime": "synthetic-second", "unknown": {"echo": "synthetic-first"}}
+        results = [route_packet(payload, tents, aliases) for payload in (raw, dict(reversed(list(raw.items()))))]
+        self.assertEqual(*results)
+        for packets, unmapped in results:
+            text = json.dumps((packets, unmapped))
+            self.assertNotIn("synthetic-first", text)
+            self.assertNotIn("synthetic-second", text)
+            self.assertEqual(packets[0]["metadata"]["device_id"], "ecowitt:unknown:gateway")
+            self.assertEqual(packets[0]["metrics"]["temp_f"], 77)
+
     def test_mapped_tents_cannot_reuse_credential_names_or_values(self):
         second = tent(TENT_B, "TOKEN_B", air_channels=[3], soil_channels=[3],
                       soil_temp_channels=[3], co2=False)

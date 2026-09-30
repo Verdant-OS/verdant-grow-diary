@@ -398,11 +398,17 @@ function proveCatalogDrift(env, spawnImpl) {
     { stage: "catalog_mutation", spawnImpl },
   );
   requireStatus("catalog_drift", readPreflight(env, spawnImpl), "schema_drift");
+  if (readRequiredCoreCatalog(env, spawnImpl).target_function_overloads_contract !== false) {
+    throw new Error("catalog_drift:required_core_false_green");
+  }
   executeSql("drop function public.quicklog_correct_entry(integer);", env, {
     stage: "catalog_restore",
     spawnImpl,
   });
   requireStatus("catalog_restored", readPreflight(env, spawnImpl), "verify_only");
+  if (readRequiredCoreCatalog(env, spawnImpl).target_function_overloads_contract !== true) {
+    throw new Error("catalog_drift:required_core_restore_failed");
+  }
 }
 
 function proveHostilePolicyDrift(env, spawnImpl) {

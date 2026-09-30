@@ -101,13 +101,13 @@ const quickLogFunctionFingerprintValues = Object.entries(EXPECTED_FUNCTION_DEFIN
   })
   .join(",\n      ");
 
-const quickLogObservedSignaturesLiteral = [
+const quickLogObservedFunctionOidPredicates = [
   ...Object.values(LEGACY_QUICKLOG_SIGNATURES),
   QUICKLOG_REVISION_REPLAY_SIGNATURES.keyedCorrect,
   QUICKLOG_REVISION_REPLAY_SIGNATURES.keyedRetract,
 ]
-  .map((signature) => `'${signature}'`)
-  .join(",\n        ");
+  .map((signature) => `p.oid = to_regprocedure('${signature}')`)
+  .join("\n    or ");
 
 const quickLogClientFunctionSignaturesLiteral = QUICKLOG_CLIENT_FUNCTION_SIGNATURES.map(
   (signature) => `'${signature}'`,
@@ -175,10 +175,8 @@ with target as (
       'quicklog_correct_entry'
     )
 ), observed_signature_functions as (
-  select * from observed_functions
-  where signature in (
-    ${quickLogObservedSignaturesLiteral}
-  )
+  select * from observed_functions p
+  where ${quickLogObservedFunctionOidPredicates}
 ), manual_contract_function_ids(kind, oid) as (
   values
     (
@@ -309,7 +307,8 @@ ${QUICKLOG_DEPENDENCY_CATALOG_EXPRESSIONS_SQL},
         when 'quicklog_revision_rebase_captured_at' then o.lanname = 'plpgsql' and o.provolatile = 'i' and not o.prosecdef
         else o.lanname = 'plpgsql' and o.provolatile = 'v' and o.prosecdef
       end
-    ) from expected_functions e join observed_functions o on o.signature = e.signature
+    ) from expected_functions e
+    join observed_functions o on o.oid = to_regprocedure(e.signature)
   ), false),
   'target_function_overloads_contract', (select count(*) = 7 from observed_functions)
     and to_regprocedure('${LEGACY_QUICKLOG_SIGNATURES.quicklog_revision_resolve_root}') is not null

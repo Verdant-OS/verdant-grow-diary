@@ -252,6 +252,8 @@ describe("Quick Log corrections/retractions PostgreSQL 15 runtime gate", () => {
       expect(source).toContain(proof);
     }
     expect(source).toContain("quicklog_entry_revisions");
+    expect(source).toContain("catalog_drift:required_core_false_green");
+    expect(source).toContain("catalog_drift:required_core_restore_failed");
     expect(source).toContain("alter table public.diary_entries add column retracted_at");
     expect(source).toContain("alter role authenticated bypassrls");
     expect(source).toContain("update pg_catalog.pg_index");

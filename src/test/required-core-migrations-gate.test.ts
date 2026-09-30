@@ -747,11 +747,30 @@ describe("remote applied-schema runner safety", () => {
     expect(observedCatalog).toContain("'quicklog_correct_entry'");
     expect(observedCatalog).toContain("'quicklog_retract_entry'");
     expect(observedCatalog).not.toContain("p.oid::regprocedure::text in (");
-    expect(pinnedCatalog).toContain("where signature in (");
+    expect(pinnedCatalog).not.toContain("where signature in (");
+    expect(pinnedCatalog).toContain(
+      "p.oid = to_regprocedure('public.quicklog_revision_resolve_root(uuid,uuid,uuid)')",
+    );
+    expect(pinnedCatalog).toContain(
+      "p.oid = to_regprocedure('public.quicklog_correct_entry(text,text,jsonb,uuid,uuid,text)')",
+    );
     expect(pinnedCatalog).toContain(
       "public.quicklog_correct_entry(text,text,jsonb,uuid,uuid,text)",
     );
     expect(pinnedCatalog).toContain("public.quicklog_retract_entry(text,text,uuid,uuid,text)");
+  });
+
+  it("resolves qualified signatures to function OIDs under the catalog-first search path", () => {
+    const catalogSql = emittedQuickLogCatalogSql();
+    const functionContract = catalogSql.slice(
+      catalogSql.indexOf("'target_functions_contract'"),
+      catalogSql.indexOf("'target_function_overloads_contract'"),
+    );
+
+    expect(functionContract).toContain(
+      "join observed_functions o on o.oid = to_regprocedure(e.signature)",
+    );
+    expect(functionContract).not.toContain("o.signature = e.signature");
   });
 
   it("requires every pinned index to be valid, ready, and live", () => {

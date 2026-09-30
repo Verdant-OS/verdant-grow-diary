@@ -175,8 +175,12 @@ of every read.
 The inventory includes at least `verdantgrowdiary.com`, `www.verdantgrowdiary.com`,
 `verdant-grow-diary.vercel.app` and the recorded project alias
 `verdant-grow-diary-verdantgrowdiary.vercel.app`, plus each earlier-inventoried
-hostname until its retirement is owner-recorded and verified. If M2 names no single
-holder, the inventory's completeness is `NOT_MEASURED`.
+hostname until its retirement is owner-recorded and verified. The inventory's
+completeness is `NOT_MEASURED`, and acceptance is withheld, when either:
+
+- M2 names no single holder; or
+- the previous successful M10 inventory was not recorded. Current bindings alone
+  cannot show that a formerly inventoried hostname has stopped serving.
 
 **2. DNS for each custom hostname, before resolving its deployment.** Resolve `A`,
 `AAAA` and `CNAME`, as M2 does for the apex, and record each answer:
@@ -236,17 +240,32 @@ closing readings agree on every value.
 
 **5. Record and classify.**
 
-- A split between serving deployments or SHAs is `FAIL`. So is a resolved
-  deployment that is not the intended `READY`, production-target, Git-sourced
-  artifact.
+- Subject to M10's opening-tip rule, a measured split between serving deployments
+  or SHAs is `FAIL`. So is a resolved deployment that is not the intended `READY`,
+  production-target, Git-sourced artifact.
+- A hostname serving a commit merged mid-sweep, or a closing tip that does not
+  descend from the opening tip, makes the run `NOT_MEASURED`; repeat it. For
+  example, opening tip A, host 1 serves A, B merges, host 2 serves B, closing tip B
+  is a torn sample, not a same-time split. This never erases a definite `FAIL`
+  established under the opening-tip rule.
 - A verification that was attempted but could not be completed for lack of access,
   egress or a dependency is `BLOCKED`. One that was not performed is
   `NOT_MEASURED`. Neither is acceptance.
 - An approved rollback can correctly restore its intended older SHA while the
   current-tip release status remains `FAIL`. Record both.
 
-For every publish action (promote, rollback, or rollout start, complete or abort),
-record in the session report and the next `CURRENT_STATE.md` stamp (D-RT-13):
+For every publish action, record the following in the session report and the next
+`CURRENT_STATE.md` stamp (D-RT-13). Publish actions are:
+
+- a promote, redeploy or rollback;
+- a rollout start, stage approval, completion (forced included) or abort;
+- a manual alias assignment, including the reconciliation of a pending or failed
+  alias move in step 3;
+- a domain add, remove or move, or a DNS record change for a production hostname;
+- a production-setting change: Skew Protection, build settings, connectors,
+  auto-assignment, or enabling, disabling or reconfiguring Rolling Releases.
+
+For each one, record:
 
 - the action;
 - the affected deployment IDs;

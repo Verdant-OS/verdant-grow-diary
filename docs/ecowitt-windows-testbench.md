@@ -247,6 +247,8 @@ The default `.spool/` folder contains:
 The queue append is flushed and synced before network I/O. Tokens and
 Authorization headers are never persisted; each send resolves the
 current process environment through that tent's configured token name.
+Mapped tents must use distinct token environment names and distinct resolved
+tokens; startup rejects credential reuse without echoing credential details.
 After a restart, the background worker replays due entries in enqueue
 order with the same Idempotency-Key and original gateway `dateutc`.
 A supervisor periodically checks the replay worker and replaces it if it
@@ -265,6 +267,11 @@ An enqueue error remains visible in health until a durable enqueue succeeds;
 an empty replay does not prove that the queue can be written. A newer success
 updates its tent's success time while preserving any older outstanding
 delivery failure and its incident time.
+Routing and raw-log write errors also remain visible until receive-path
+writes succeed. An unmapped-log error requires an actual unmapped append
+to prove recovery. In single-tent mode, configured forwarding with a missing
+or invalid tent ID makes readiness fail; intentionally unconfigured
+forwarding remains a receive-only no-op.
 
 All 2xx responses mark an entry done. This is delivery acknowledgement,
 not proof of a database insert. In particular, the current webhook may

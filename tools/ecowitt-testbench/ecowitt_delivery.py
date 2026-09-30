@@ -397,7 +397,7 @@ class HealthState:
             return {"ok": not reasons, "reasons": reasons, "last_packet_received_at": self.data["last_packet_received_at"],
                     "tents": {tid: deepcopy(self.data["tents"][tid]) for tid in self.tent_ids}}
 
-    def unmapped(self, fields: dict) -> None:
+    def unmapped(self, fields: dict) -> bool:
         with self.lock:
             safe = self.cleaner(fields)
             rows = []
@@ -421,6 +421,8 @@ class HealthState:
                 self.data["unmapped_log_dropped_count"] += dropped
                 self.log({"event": "unmapped_log_limit", "count": dropped})
             self._save()
+
+            return bool(rows)
 
     def tick(self) -> None:
         message = None

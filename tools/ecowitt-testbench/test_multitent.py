@@ -23,6 +23,15 @@ def tent(tent_id=TENT_A, token_env="TOKEN_A", **overrides):
 
 
 class MultiTentTests(unittest.TestCase):
+    def test_mapped_tents_cannot_reuse_credential_names_or_values(self):
+        second = tent(TENT_B, "TOKEN_B", air_channels=[3], soil_channels=[3],
+                      soil_temp_channels=[3], co2=False)
+        for token_env, env in (("TOKEN_A", ENV), ("TOKEN_B", {**ENV, "TOKEN_B": TOKEN_A})):
+            with self.subTest(token_env=token_env):
+                with self.assertRaises(ConfigError) as caught:
+                    self.load([tent(), {**second, "token_env": token_env}], env)
+                self.assertNotIn(TOKEN_A, str(caught.exception))
+                self.assertNotIn(TOKEN_B, str(caught.exception))
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -211,11 +220,12 @@ class MultiTentTests(unittest.TestCase):
                 self.load([tent(), other])
 
     def test_eight_tents_allowed_nine_rejected(self):
-        config = [tent(f"{n:08x}-2222-3333-4444-555555555555", air_channels=[],
+        config = [tent(f"{n:08x}-2222-3333-4444-555555555555", f"TOKEN_{n}", air_channels=[],
                        soil_channels=[], soil_temp_channels=[], co2=False) for n in range(1, 10)]
-        self.assertEqual(len(self.load(config[:8])[0]), 8)
+        env = {f"TOKEN_{n}": f"vbt_synthetic_unique_tent_{n}" for n in range(1, 10)}
+        self.assertEqual(len(self.load(config[:8], env)[0]), 8)
         with self.assertRaises(ConfigError):
-            self.load(config)
+            self.load(config, env)
 
     def test_bad_uuid_missing_token_and_placeholder_sanitized(self):
         for config, env in (([tent("bad-private-value")], ENV),

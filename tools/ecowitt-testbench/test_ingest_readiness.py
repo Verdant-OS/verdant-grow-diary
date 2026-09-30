@@ -21,6 +21,44 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_blocked_single_tent_config_is_unhealthy_but_unconfigured_mode_is_allowed(self):
+        os.environ.pop("ECOWITT_TENT_MAP")
+        os.environ["VERDANT_BRIDGE_TOKEN"] = TOKEN_A
+        for tent_id, reason in (("", "blocked_missing_tent_id"), ("private-placeholder", "blocked_invalid_tent_id")):
+            with self.subTest(reason=reason):
+                os.environ["VERDANT_TENT_ID"] = tent_id
+                self.assertEqual(self.post().get_json()["forward"]["reason"], reason)
+                runtime = listener.get_runtime()
+                runtime.replay_once()
+                health = self.client.get("/health")
+                self.assertEqual(health.status_code, 503)
+                self.assertIn(reason, health.get_json()["reasons"])
+                self.assertNotIn("private-placeholder", health.get_data(as_text=True))
+                self.assertEqual(self.client.get("/livez").status_code, 200)
+        os.environ.pop("VERDANT_BRIDGE_TOKEN")
+        self.assertEqual(self.post().get_json()["forward"]["reason"], "no_forwarding_configured")
+        self.assertEqual(self.client.get("/health").status_code, 200)
+        self.requests.post.assert_not_called()
+
+    def test_pre_enqueue_write_failure_latches_until_that_path_recovers(self):
+        runtime = listener.get_runtime()
+        packet = {**self.packet, "unknown": 5}
+        with mock.patch.object(runtime.health, "unmapped", side_effect=OSError("synthetic private error")):
+            self.assertEqual(self.post(packet).status_code, 503)
+        runtime.replay_once()
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        self.assertEqual(self.post().status_code, 200)  # no unmapped append to prove repair
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        self.assertEqual(self.post(packet).status_code, 200)
+        self.assertEqual(self.client.get("/health").status_code, 200)
+        with mock.patch.object(listener, "append_raw_log", side_effect=ValueError("synthetic private error")):
+            response = self.post()
+            self.assertEqual(response.status_code, 503)
+            self.assertNotIn("synthetic private error", response.get_data(as_text=True))
+        runtime.replay_once()
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        self.assertEqual(self.post().status_code, 200)
+        self.assertEqual(self.client.get("/health").status_code, 200)
     def test_newer_success_cannot_hide_an_older_outstanding_failure(self):
         runtime = listener.get_runtime()
         runtime.health.packet_received()

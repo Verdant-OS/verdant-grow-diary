@@ -109,6 +109,7 @@ def load_tent_map(path: Path, env: Mapping[str, str]) -> tuple[tuple[Tent, ...],
     if not isinstance(entries, list) or not 1 <= len(entries) <= 8:
         raise ConfigError("Tent map must contain between 1 and 8 tents")
     tents, identities, assigned = [], set(), set()
+    token_names, token_values = set(), set()
     allowed = {"tent_id", "label", "token_env", "air_channels", "soil_channels", "soil_temp_channels", "co2"}
     for index, entry in enumerate(entries, 1):
         prefix = f"Tent map entry {index}: "
@@ -130,6 +131,10 @@ def load_tent_map(path: Path, env: Mapping[str, str]) -> tuple[tuple[Tent, ...],
             raise ConfigError(prefix + "invalid token_env name")
         if not valid_token(env.get(token_env)):
             raise ConfigError(prefix + "bridge token missing, invalid or placeholder")
+        if token_env in token_names or env[token_env] in token_values:
+            raise ConfigError(prefix + "bridge credentials must be unique per tent")
+        token_names.add(token_env)
+        token_values.add(env[token_env])
         label = entry.get("label")
         if not isinstance(label, str) or not label.strip() or len(label) > 100:
             raise ConfigError(prefix + "label must contain 1 to 100 characters")

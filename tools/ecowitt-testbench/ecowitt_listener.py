@@ -1071,6 +1071,7 @@ class ListenerRuntime:
         self.supervisor_thread: Optional[threading.Thread] = None
         self.last_local_error: Optional[str] = None
         self.last_enqueue_error: Optional[str] = None
+        self.last_receive_error: Optional[str] = None
         root = Path(os.environ.get("ECOWITT_SPOOL_DIR") or Path(__file__).with_name(".spool"))
         max_bytes = int(_positive_setting("ECOWITT_SPOOL_MAX_MB", 50) * 1024 * 1024)
         max_days = _positive_setting("ECOWITT_SPOOL_MAX_DAYS", 7)
@@ -1306,9 +1307,15 @@ def health() -> Any:
         runtime.health.tick()
         status = runtime.health.status()
         status.pop("tents", None)
-        if runtime.last_local_error or runtime.last_enqueue_error:
+        if runtime.last_local_error or runtime.last_enqueue_error or runtime.last_receive_error:
             status["ok"] = False
             status["reasons"].append("local_delivery_state_error")
+        if not runtime.mapped:
+            readiness = evaluate_forwarding_readiness(os.environ.get("VERDANT_INGEST_URL"),
+                os.environ.get("VERDANT_BRIDGE_TOKEN"), os.environ.get("VERDANT_TENT_ID"))
+            if readiness["reason"] not in {None, "no_forwarding_configured"}:
+                status["ok"] = False
+                status["reasons"].append(readiness["reason"])
         status.update(vendor=VENDOR, port=PORT)
         # An idle gateway does not make the listener unavailable. Keep its
         # delivery warning in the body; real delivery/local errors stay 503.
@@ -1387,13 +1394,17 @@ def ecowitt() -> Any:
         },
     }
 
+    runtime = None
+    receive_step, unmapped_written = "routing", False
     try:
         runtime = get_runtime()
         if gateway_shaped and request.remote_addr and not _is_loopback_source_addr(request.remote_addr):
             runtime.health.packet_received()
         if runtime.mapped:
             routed, unmapped = route_packet(raw, runtime.tents, runtime.aliases, secrets=_delivery_secrets())
-            runtime.health.unmapped(unmapped)
+            receive_step = "unmapped"
+            unmapped_written = runtime.health.unmapped(unmapped)
+            receive_step = "routing"
             readings = []
             for packet in routed:
                 own_raw = packet["metadata"]["raw_payload"]
@@ -1407,13 +1418,19 @@ def ecowitt() -> Any:
             # locally, never silently attributed to the single configured tent.
             legacy_keys = COMMON_FIELDS | {key for values in FIELD_MAP.values() for key in values}
             unmapped = {k: v for k, v in safe_raw.items() if k.lower() not in legacy_keys}
-            runtime.health.unmapped(unmapped)
+            receive_step = "unmapped"
+            unmapped_written = runtime.health.unmapped(unmapped)
+            receive_step = "routing"
             reading["metadata"]["raw_payload"] = {k: v for k, v in safe_raw.items() if k.lower() in legacy_keys}
             reading["metadata"]["device_id"] = f"ecowitt:{gateway_fingerprint(raw)}:gateway"
             readings = [reading]
         for own_reading in readings:
             append_raw_log(own_reading)
+        if runtime.last_receive_error != "unmapped" or unmapped_written:
+            runtime.last_receive_error = None
     except (OSError, ValueError, KeyError, TypeError):
+        if runtime is not None:
+            runtime.last_receive_error = receive_step
         return jsonify({"ok": False, "error": "local_delivery_state_error"}), 503
 
     if gateway_shaped and gateway_captured_at is None:

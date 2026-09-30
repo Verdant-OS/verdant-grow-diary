@@ -87,6 +87,12 @@ Before Matthew promotes, record:
    full SHA and `dirty` from `version.json`, with observation time.
 2. Target deploy full SHA, included commits and exact-head required check results;
    required checks must be successful, not skipped, cancelled or still pending.
+   Record merge-queue provenance (M4): a successful `ci.yml` run with
+   `event: merge_group` whose `head_sha` is the target SHA, on the
+   `gh-readonly-queue/verdant-grow-diary/pr-<N>-<parent>` branch whose `<parent>`
+   is the previous first-parent tip. A merged PR is not that evidence. A tip without
+   a queue run is a direct push or bypass merge, an out-of-band publish: do not
+   promote it. Unreadable runs leave provenance `BLOCKED`, never assumed.
 3. The target deployment URL, ID, project, `target: production`, `READY` state and
    matching `meta.githubCommitSha` / `meta.githubCommitRef`.
 4. The selected Deployment Checks and remaining security/publish gates. Escalate a
@@ -111,7 +117,7 @@ for each of these reads:
 
 - the deploy tip, freshly fetched (`git fetch origin verdant-grow-diary`, then
   `git rev-parse origin/verdant-grow-diary`), which must still equal the packet's
-  target SHA;
+  target SHA and still carry the recorded merge-queue provenance;
 - the target deployment's project, `target: production`, `READY` state and
   `meta.githubCommitSha` / `meta.githubCommitRef`, which must still match that SHA;
 - the required and selected Deployment Check results for that SHA, which must all
@@ -192,6 +198,13 @@ completeness is `NOT_MEASURED`, and acceptance is withheld, when either:
   binding that still lists the hostname is not serving evidence.
 - A proxy that hides the serving platform is `NOT_MEASURED`.
 - A failed lookup (timeout, `SERVFAIL`, no reachable resolver) is `BLOCKED`.
+- **Retirement.** An earlier-inventoried hostname whose retirement the owner
+  recorded in `CURRENT_STATE.md` leaves the inventory once retirement is verified.
+  Verification means either no `A`, `AAAA` or `CNAME` record at all, or a permanent
+  redirect to an inventoried hostname (M10). Record that evidence, and skip step 3
+  and the receipt for that hostname. A hostname that still resolves without a
+  recorded retirement stays in the sweep, and one bound to no Verdant deployment is
+  `FAIL`.
 
 Platform-owned `*.vercel.app` hostnames need no DNS step.
 

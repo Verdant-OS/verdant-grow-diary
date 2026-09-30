@@ -1273,6 +1273,32 @@ class ListenerRuntime:
             self.stop_event.set()
 
 
+def _diagnostic_forwarding_readiness() -> Dict[str, Any]:
+    """Read configuration only; never initialize a spool, health state or worker."""
+    url = os.environ.get("VERDANT_INGEST_URL")
+    mapping = os.environ.get("ECOWITT_TENT_MAP", "").strip()
+    if not mapping:
+        return evaluate_forwarding_readiness(url, os.environ.get("VERDANT_BRIDGE_TOKEN"),
+                                             os.environ.get("VERDANT_TENT_ID"))
+    try:
+        with _RUNTIME_LOCK:
+            if (_RUNTIME is not None and _RUNTIME.mapped and _RUNTIME_KEY
+                    and _RUNTIME_KEY[0].strip() == mapping):
+                tents = _RUNTIME.tents  # Maps are loaded once, until a listener restart.
+            else:
+                tents, _ = load_tent_map(Path(mapping), os.environ)
+        tokens = tuple(os.environ.get(tent.token_env) for tent in tents)
+        token_ok = all(valid_token(token) for token in tokens) and len(set(tokens)) == len(tokens)
+        map_ok = bool(tents)
+    except (ConfigError, OSError):
+        map_ok, token_ok = False, False
+    reason = ("blocked_mapped_configuration" if not map_ok or not token_ok else
+              "blocked_invalid_ingest_url" if not is_valid_ingest_url(url) else None)
+    return {"ready": reason is None, "reason": reason, "mapped": True,
+            "ingest_url_configured": bool(url), "bridge_token_configured": token_ok,
+            "tent_id_configured": map_ok, "tent_id_valid": map_ok}
+
+
 def get_runtime() -> ListenerRuntime:
     global _RUNTIME, _RUNTIME_KEY
     settings = ("ECOWITT_TENT_MAP", "ECOWITT_SPOOL_DIR", "VERDANT_TENT_ID", "VERDANT_INGEST_URL",
@@ -1875,9 +1901,8 @@ def debug_forwarding_status() -> Any:
 
     url = os.environ.get("VERDANT_INGEST_URL")
     token = os.environ.get("VERDANT_BRIDGE_TOKEN")
-    tent_id = os.environ.get("VERDANT_TENT_ID")
-    readiness = evaluate_forwarding_readiness(url, token, tent_id)
-    forwarding_enabled = bool(url and token)
+    readiness = _diagnostic_forwarding_readiness()
+    forwarding_enabled = bool(url and readiness["bridge_token_configured"])
     latest = _latest_metrics_summary()
 
     last_error = FORWARD_STATS.get("last_error")
@@ -1919,7 +1944,8 @@ def debug_forwarding_status() -> Any:
             "tent_id_configured": readiness["tent_id_configured"],
             "tent_id_valid": readiness["tent_id_valid"],
             "masked_ingest_url": mask_ingest_url(url),
-            "masked_token_preview": _mask_token_preview(token),
+            "masked_token_preview": ("<configured>" if readiness["bridge_token_configured"] else None)
+                if readiness.get("mapped") else _mask_token_preview(token),
             "forward_attempt_count": int(FORWARD_STATS.get("attempt_count", 0)),
             "forward_success_count": int(FORWARD_STATS.get("success_count", 0)),
             "forward_failure_count": int(FORWARD_STATS.get("failure_count", 0)),
@@ -2014,6 +2040,13 @@ _RECOMMENDED_NEXT_STEP: Dict[str, str] = {
 }
 
 _RECOMMENDED_BLOCKED: Dict[str, str] = {
+    "blocked_mapped_configuration": (
+        "Check the mapped tent configuration and each mapped credential environment variable. "
+        "Use distinct active tent-scoped bridge credentials and restart the listener; never share their values."
+    ),
+    "blocked_invalid_ingest_url": (
+        "Set VERDANT_INGEST_URL to a valid HTTPS webhook URL without URL credentials and restart the listener."
+    ),
     "blocked_missing_tent_id": (
         "Set VERDANT_TENT_ID=<your-tent-uuid> in .env and restart the listener."
     ),
@@ -2069,6 +2102,13 @@ def _recommended_next_step_for(
     if not readiness.get("ready"):
         block_reason = readiness.get("reason") or "no_forwarding_configured"
         return _RECOMMENDED_BLOCKED.get(block_reason, "Resolve forwarding readiness before retrying.")
+    if readiness.get("mapped") and classification in {
+        "auth_failed", "bridge_required", "token_revoked", "token_expired",
+        "tent_authorization_mismatch", "tent_lookup_failed",
+    }:
+        return ("Check each mapped tent UUID and its active tent-scoped bridge credential in the "
+                "configured environment variable. Correct the mapping or credential and restart the listener; "
+                "never share credential values.")
     # When the webhook reports storage_insert_failed, prefer the
     # reason-specific copy if we have a known sanitized reason.
     if (
@@ -2139,10 +2179,8 @@ def debug_forwarding_error_report() -> Any:
         )
 
     url = os.environ.get("VERDANT_INGEST_URL")
-    token = os.environ.get("VERDANT_BRIDGE_TOKEN")
-    tent_id = os.environ.get("VERDANT_TENT_ID")
-    readiness = evaluate_forwarding_readiness(url, token, tent_id)
-    forwarding_enabled = bool(url and token)
+    readiness = _diagnostic_forwarding_readiness()
+    forwarding_enabled = bool(url and readiness["bridge_token_configured"])
 
     last_error_raw = FORWARD_STATS.get("last_error")
     last_error = sanitize_debug_payload(last_error_raw) if isinstance(last_error_raw, str) else last_error_raw

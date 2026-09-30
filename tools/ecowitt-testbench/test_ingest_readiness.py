@@ -20,6 +20,68 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_mapped_forwarding_diagnostics_use_mapped_credentials_without_state_writes(self):
+        for active in (False, True):
+            with self.subTest(active=active):
+                if active:
+                    self.post()
+                before = {path: path.read_bytes() for path in self.root.rglob("*") if path.is_file()}
+                with mock.patch.object(listener, "get_runtime", side_effect=AssertionError("diagnostics must not initialize state")):
+                    for endpoint in ("/debug/forwarding-status", "/debug/forwarding-error-report"):
+                        report = self.client.get(endpoint).get_json()
+                        self.assertTrue(report["forwarding_enabled"])
+                        self.assertTrue(report["forwarding_ready"])
+                        self.assertTrue(report["bridge_token_configured"])
+                        self.assertTrue(report["tent_id_valid"])
+                        text = json.dumps(report)
+                        for private in (TOKEN_A, TOKEN_B, TENT_A, TENT_B, "VERDANT_BRIDGE_TOKEN", "VERDANT_TENT_ID"):
+                            self.assertNotIn(private, text)
+                        self.assertEqual(self.client.get(endpoint, environ_overrides={"REMOTE_ADDR": "198.51.100.2"}).status_code, 403)
+                self.assertEqual(before, {path: path.read_bytes() for path in self.root.rglob("*") if path.is_file()})
+                self.requests.post.assert_not_called()
+
+    def test_mapped_diagnostics_recheck_rotated_credentials_and_use_safe_guidance(self):
+        self.post()
+        original = os.environ["TOKEN_B"]
+        for value in (None, "private invalid rotated credential", TOKEN_A):
+            with self.subTest(value=value):
+                if value is None:
+                    os.environ.pop("TOKEN_B", None)
+                else:
+                    os.environ["TOKEN_B"] = value
+                for endpoint in ("/debug/forwarding-status", "/debug/forwarding-error-report"):
+                    report = self.client.get(endpoint).get_json()
+                    self.assertFalse(report["forwarding_ready"])
+                    self.assertFalse(report["bridge_token_configured"])
+                    text = json.dumps(report)
+                    self.assertNotIn("private invalid", text)
+                    self.assertNotIn("VERDANT_BRIDGE_TOKEN", text)
+                    if endpoint.endswith("error-report"):
+                        self.assertIn("mapped", report["recommended_next_step"].lower())
+        os.environ["TOKEN_B"] = original
+        self.assertTrue(self.client.get("/debug/forwarding-status").get_json()["forwarding_ready"])
+        with mock.patch.dict(listener.FORWARD_STATS, {"last_forward_response_classification": "tent_authorization_mismatch"}):
+            guidance = self.client.get("/debug/forwarding-error-report").get_json()["recommended_next_step"]
+            self.assertIn("mapped", guidance.lower())
+            self.assertNotIn("VERDANT_TENT_ID", guidance)
+        self.requests.post.assert_not_called()
+
+    def test_mapped_diagnostics_fail_closed_before_startup_for_bad_map_or_url(self):
+        for kind in ("map", "url"):
+            with self.subTest(kind=kind):
+                with mock.patch.dict(os.environ, {"VERDANT_INGEST_URL": "http://example.invalid"} if kind == "url" else {}):
+                    if kind == "map":
+                        self.mapping.write_text("private invalid map")
+                    else:
+                        self.mapping.write_text(json.dumps([tent(air_channels=[1])]))
+                    report = self.client.get("/debug/forwarding-error-report").get_json()
+                    self.assertFalse(report["forwarding_ready"])
+                    self.assertNotIn("private invalid", json.dumps(report))
+                    self.assertNotIn("VERDANT_BRIDGE_TOKEN", report["recommended_next_step"])
+                    self.assertIsNone(listener._RUNTIME)
+                    self.assertFalse((self.root / "spool").exists())
+        self.requests.post.assert_not_called()
+
     def test_invalid_health_state_cannot_evict_durable_queue_before_startup_refusal(self):
         self.post()
         runtime = listener.get_runtime()

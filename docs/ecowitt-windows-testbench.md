@@ -634,6 +634,7 @@ Notes:
 
 - Counters are **in-memory** and reset when the listener restarts.
 - `forwarding_enabled=false` is expected for local-only testing.
+- In mapped mode, both forwarding debug reports use the loaded tent map and recheck every mapped credential, including uniqueness. Before startup they validate the map without opening delivery state. Missing legacy `VERDANT_TENT_ID`/`VERDANT_BRIDGE_TOKEN` does not disable a valid mapped configuration. These reports remain loopback-only and read-only; their readiness describes configuration, while `/health` reports delivery health.
 - Do **not** paste bridge tokens, Authorization headers, or raw EcoWitt payloads into curl commands, support chats, or issue reports. **Never paste bridge token values or raw payloads** anywhere — the sanitized `last_forward_response_*` fields are the safe way to share failure context.
 - The single-tent inline send retries transient webhook failures (HTTP 408, 425, 429, 500, 502, 503, 504, plus connection/DNS/timeout errors) with bounded exponential backoff. `retry_count`, `last_retry_error`, `last_retry_at`, `last_retryable_status`, and `max_retry_attempts` are exposed in `/debug/forwarding-status`. Durable replay is described in section H: terminal HTTP errors are dead-lettered, while locally missing tent/token/url configuration defers queued packets without an HTTP request. Legacy debug counters describe this process only; persistent queue and health state are on `/status`.
 

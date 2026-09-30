@@ -20,6 +20,43 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_orphaned_queue_alert_and_recovery_are_shared_durable_and_private(self):
+        self.post()
+        original_map = self.mapping.read_text()
+        self.mapping.write_text(json.dumps([json.loads(original_map)[1]]))
+        send = mock.Mock(return_value=True)
+        def restore_runtime():
+            listener._RUNTIME = None
+            runtime = listener.get_runtime()
+            runtime.health.send_alert = send
+            runtime.health.alert_interval = 0
+            return runtime
+        runtime = restore_runtime()
+        runtime.replay_once()
+        self.assertEqual(send.call_count, 1)
+        self.assertEqual(send.call_args.args[0]["event"], "alert")
+        self.assertEqual(send.call_args.args[0]["reason"], "orphaned_queue")
+        self.assertIn("orphaned_queue", runtime.health.status()["reasons"])
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        runtime.replay_once()
+        runtime = restore_runtime()
+        runtime.replay_once()
+        self.assertEqual(send.call_count, 1)
+        self.mapping.write_text(original_map)
+        runtime = restore_runtime()
+        self.now += timedelta(seconds=61)
+        runtime.replay_once()
+        self.assertEqual(send.call_count, 2)
+        self.assertEqual(send.call_args.args[0]["event"], "recovery")
+        self.assertEqual(send.call_args.args[0]["reason"], "orphaned_queue")
+        runtime.replay_once()
+        self.assertEqual(send.call_count, 2)
+        self.assertEqual(runtime.spool.pending_count, 0)
+        self.assertEqual(self.client.get("/health").status_code, 200)
+        messages = json.dumps([call.args[0] for call in send.call_args_list])
+        for private in (TENT_A, TENT_B, TOKEN_A, TOKEN_B):
+            self.assertNotIn(private, messages)
+
     def test_each_local_delivery_latch_emits_one_alert_and_one_recovery(self):
         runtime = listener.get_runtime()
         send = mock.Mock(return_value=True)

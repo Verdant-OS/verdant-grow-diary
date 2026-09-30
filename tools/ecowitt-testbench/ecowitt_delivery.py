@@ -12,6 +12,11 @@ from typing import Any, Callable
 
 from ecowitt_multitent import PRIMARY_FAMILY_METRICS, sanitize
 
+_ATOMIC_SPOOL_TEMP_NAMES = frozenset({
+    "queue.jsonl.tmp", "dead-letter.jsonl.tmp", "spool-stats.json.tmp",
+    "state.json.tmp", "unmapped_channels.jsonl.tmp",
+})
+
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -317,7 +322,10 @@ class JsonlSpool:
                 raise ValueError("Spool state exceeds size cap; refusing further delivery")
 
     def _disk_bytes(self) -> int:
-        return sum(path.stat().st_size for path in self.root.iterdir() if path.is_file())
+        # Interrupted atomic writes are uncommitted copies. Counting them can
+        # evict acknowledged readings before their final targets are replaced.
+        return sum(path.stat().st_size for path in self.root.iterdir()
+                   if path.name not in _ATOMIC_SPOOL_TEMP_NAMES and path.is_file())
 
     def enqueue(self, entry_id: str, reading: dict, *, idempotency_key: str | None = None) -> dict:
         with self.lock:
@@ -370,13 +378,15 @@ class HealthState:
                  alert_interval: float = 60, log: Callable = print,
                  send_alert: Callable | None = None, cleaner: Callable = sanitize,
                  max_log_bytes: int = 5 * 1024 * 1024, max_days: float = 7, lock: Any = None,
-                 spool_drops: Callable[[], int] | None = None, local_errors: Callable[[], bool] | None = None):
+                 spool_drops: Callable[[], int] | None = None, local_errors: Callable[[], bool] | None = None,
+                 orphaned_queue: Callable[[], bool] | None = None):
         self.path, self.clock, self.log, self.send_alert, self.cleaner = path, clock, log, send_alert, cleaner
         self.quiet_seconds, self.failure_seconds, self.alert_interval = quiet_seconds, failure_seconds, alert_interval
         self.max_log_bytes, self.max_days = max_log_bytes, max_days
         self.lock = lock or threading.RLock()
         self.spool_drops = spool_drops
         self.local_errors = local_errors
+        self.orphaned_queue = orphaned_queue
         self._log_cache: dict = {}
         path.parent.mkdir(parents=True, exist_ok=True)
         self.data = {"started_at": clock().isoformat(), "last_packet_received_at": None,
@@ -463,6 +473,8 @@ class HealthState:
         active = set()
         if self.data["receive_error"] is not None or (self.local_errors is not None and self.local_errors()):
             active.add("local_delivery_state_error")
+        if self.orphaned_queue is not None and self.orphaned_queue():
+            active.add("orphaned_queue")
         if self.spool_drops is not None and self.spool_drops() != self.data["spool_drop_recovered_count"]:
             active.add("spool_data_drop")
         last_packet = self.data["last_packet_received_at"] or self.data["started_at"]
@@ -527,7 +539,7 @@ class HealthState:
                 self.data["incidents"][key] = is_active
                 kind = "alert" if is_active else "recovery"
                 reason = ("forward_failure" if key.startswith("forward:") else
-                          key if key in {"spool_data_drop", "local_delivery_state_error"} else "gateway_quiet")
+                          key if key in {"spool_data_drop", "local_delivery_state_error", "orphaned_queue"} else "gateway_quiet")
                 transition = {"event": kind, "reason": reason, "incident": key,
                            "message": f"Ecowitt listener {kind}: {reason}"}
                 self.log(transition)

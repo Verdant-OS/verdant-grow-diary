@@ -1093,7 +1093,8 @@ class ListenerRuntime:
             send_alert=send_listener_alert if os.environ.get("ECOWITT_ALERT_WEBHOOK_URL") else None,
             cleaner=self.cleaner, max_log_bytes=max(256, max_bytes // 10), max_days=max_days, lock=self.lock,
             spool_drops=lambda: self.spool.stats["dropped_count"],
-            local_errors=lambda: bool(self.last_local_error or self.last_enqueue_error))
+            local_errors=lambda: bool(self.last_local_error or self.last_enqueue_error),
+            orphaned_queue=self._has_orphaned_queue)
         self.spool.enforce_limits()
 
     def enqueue(self, reading: dict, tent_id: str) -> str:
@@ -1117,14 +1118,13 @@ class ListenerRuntime:
                 raise
 
     def delivery_health(self) -> dict:
+        return self.health.status()
+
+    def _has_orphaned_queue(self) -> bool:
         with self.lock:
-            status = self.health.status()
             configured = {tent.tent_id for tent in self.tents}
-            if any(entry["reading"]["metadata"]["tent_id"] not in configured
-                   for entry in self.spool.entries.values()):
-                status["ok"] = False
-                status["reasons"].append("orphaned_queue")
-            return status
+            return any(entry["reading"]["metadata"]["tent_id"] not in configured
+                       for entry in self.spool.entries.values())
 
     @property
     def last_receive_error(self) -> Optional[str]:

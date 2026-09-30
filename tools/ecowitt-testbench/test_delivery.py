@@ -30,6 +30,39 @@ class DeliveryFixture(unittest.TestCase):
 
 
 class DeliveryTests(DeliveryFixture):
+    def test_crashed_health_replace_does_not_evict_acknowledged_queue_entries(self):
+        spool = self.spool()
+        spool.enqueue("old", self.reading())
+        spool.enqueue("new", self.reading(78))
+        health = HealthState(self.root / "state.json", [], clock=self.clock)
+        committed_state = health.path.read_bytes()
+        budget = spool._disk_bytes() + 32
+        with mock.patch("ecowitt_delivery.os.replace", side_effect=RuntimeError("simulated interruption")):
+            with self.assertRaises(RuntimeError):
+                health._save()
+        self.assertTrue((self.root / "state.json.tmp").exists())
+        restored = self.spool(max_bytes=budget)
+        self.assertEqual(list(restored.entries), ["old", "new"])
+        self.assertEqual(restored.stats["dropped_count"], 0)
+        self.assertEqual(health.path.read_bytes(), committed_state)
+        HealthState(health.path, [], clock=self.clock)
+        self.assertFalse((self.root / "state.json.tmp").exists())
+        self.assertEqual(self.spool(max_bytes=budget).stats["dropped_count"], 0)
+
+    def test_only_known_atomic_temporary_files_are_excluded_from_durable_budget(self):
+        spool = self.spool()
+        spool.enqueue("old", self.reading())
+        durable_bytes = spool._disk_bytes()
+        for name in ("queue.jsonl.tmp", "dead-letter.jsonl.tmp", "spool-stats.json.tmp",
+                     "state.json.tmp", "unmapped_channels.jsonl.tmp"):
+            (self.root / name).write_bytes(b"uncommitted temporary state" * 100)
+        self.assertEqual(spool._disk_bytes(), durable_bytes)
+        (self.root / "operator-backup.tmp").write_bytes(b"external state")
+        self.assertEqual(spool._disk_bytes(), durable_bytes + len(b"external state"))
+        restored = self.spool(max_bytes=durable_bytes + 64)
+        self.assertEqual(list(restored.entries), ["old"])
+        self.assertEqual(restored.stats["dropped_count"], 0)
+
     def test_failed_eviction_journal_keeps_live_and_durable_entries_until_retry(self):
         for limit in ("age", "size"):
             with self.subTest(limit=limit):

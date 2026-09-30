@@ -287,6 +287,8 @@ cannot clear the missing-primary state; that family's primary must be delivered.
 Queued entries for a tent removed from configuration remain durable and
 make public health return `orphaned_queue` without exposing tent IDs. Restoring
 the same tent permits replay with the original identity and timestamp.
+The same incident evaluator drives health and configured alerts, with one
+durable alert/recovery transition using the fixed `orphaned_queue` reason.
 An enqueue error remains visible in health until a durable enqueue succeeds;
 an empty replay does not prove that the queue can be written. A newer success
 updates its tent's success time while preserving any older outstanding
@@ -311,8 +313,10 @@ the 10-minute quiet threshold. Old data never gets a new capture time
 or becomes fresh `live` data merely because delivery resumed.
 
 Retention defaults to 7 days from enqueue time and 50 MB for the
-spool directory, including auxiliary logs/state. Oldest pending entries
-are dropped at the cap with a persistent counter and warning. Auxiliary
+spool directory, including auxiliary logs/state.
+Known atomic-write temporary copies are excluded from this durable budget;
+they are never promoted over committed files. Unrecognized files still count.
+Oldest pending entries are dropped at the cap with a persistent counter and warning. Auxiliary
 logs are also bounded and expose drop counters. If state alone exceeds
 the size cap, delivery stops with a local-state error instead of hiding
 loss. A torn final append is counted and discarded; a corrupt complete

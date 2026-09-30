@@ -313,6 +313,8 @@ class ListenerIntegrationTests(unittest.TestCase):
 
     def test_replay_worker_reports_local_error_while_retries_are_still_failing(self):
         runtime = listener.get_runtime()
+        runtime.enqueue({"captured_at": NOW.isoformat(), "source": "live", "metrics": {"temp_f": 70},
+                         "metadata": {"raw_payload": self.packet}}, TENT_A)
         runtime.interval = 0.01
         runtime.health.alert_interval = 0
         alerted, recovered, allow_recovery = threading.Event(), threading.Event(), threading.Event()
@@ -339,7 +341,7 @@ class ListenerIntegrationTests(unittest.TestCase):
             self.assertEqual([message["event"] for message in messages], ["alert", "recovery"])
             self.assertNotIn(TOKEN_A, json.dumps(messages) + str(logs.call_args_list))
             self.assertNotIn("private disk details", json.dumps(messages) + str(logs.call_args_list))
-        self.requests.post.assert_not_called()
+        self.assertEqual(self.requests.post.call_count, 1)
 
     def test_observed_family_without_primary_is_not_hidden_by_other_family_delivery(self):
         common = {k: v for k, v in self.packet.items() if k in ("PASSKEY", "model", "stationtype", "dateutc")}
@@ -720,6 +722,32 @@ class ListenerIntegrationTests(unittest.TestCase):
 
         self.assertEqual(self.post(distinct).status_code, 200)
         self.assertIsNone(runtime.last_enqueue_error)
+        self.assertEqual(self.client.get("/health").status_code, 200)
+
+    def test_empty_replay_cannot_clear_failed_finish_latch(self):
+        self.mapping.write_text(json.dumps([json.loads(self.mapping.read_text())[0]]))
+        self.assertEqual(self.post().status_code, 200)
+        runtime = listener.get_runtime()
+        entry = next(iter(runtime.spool.entries.values()))
+
+        def fail_after_scheduling_retry(entry_id, _status):
+            queued = runtime.spool.entries[entry_id]
+            queued["attempts"] += 1
+            queued["next_attempt_at"] = (self.now + timedelta(minutes=5)).isoformat()
+            raise OSError("synthetic private failure")
+
+        with mock.patch.object(runtime.spool, "finish", side_effect=fail_after_scheduling_retry):
+            with self.assertRaises(OSError):
+                runtime.replay_once()
+        runtime.last_local_error = "local_delivery_state_error"
+        runtime.replay_once()
+        self.assertEqual(runtime.last_local_error, "local_delivery_state_error")
+        self.assertEqual(self.client.get("/health").status_code, 503)
+
+        self.now += timedelta(minutes=6)
+        runtime.replay_once()
+        self.assertIsNone(runtime.last_local_error)
+        self.assertNotIn(entry["id"], runtime.spool.entries)
         self.assertEqual(self.client.get("/health").status_code, 200)
 
     def test_absent_mapped_tent_metrics_are_local_diagnostics_not_dead_letters(self):

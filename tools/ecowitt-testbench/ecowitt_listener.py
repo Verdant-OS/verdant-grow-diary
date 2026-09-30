@@ -1195,6 +1195,7 @@ class ListenerRuntime:
 
     def replay_once(self) -> None:
         with self.send_lock:
+            wrote_delivery_state = False
             for entry in self.spool.due_entries():
                 reading = entry["reading"]
                 tent_id = reading["metadata"]["tent_id"]
@@ -1212,8 +1213,12 @@ class ListenerRuntime:
                 result = _send_forward(reading, _tent_id=tent_id, _token_env=tent.token_env,
                                        _entry_id=entry.get("idempotency_key", entry["id"]), _replay=True)
                 self.finish(entry["id"], result)
+                wrote_delivery_state = True
             self.health.tick()
-            self.last_local_error = None
+            # An empty replay is only a read. It cannot prove that the queue is
+            # writable after persisting a retry or completion previously failed.
+            if wrote_delivery_state:
+                self.last_local_error = None
 
     def start(self) -> None:
         with self.lock:

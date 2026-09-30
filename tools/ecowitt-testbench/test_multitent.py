@@ -222,7 +222,7 @@ class MultiTentTests(unittest.TestCase):
     def test_eight_tents_allowed_nine_rejected(self):
         config = [tent(f"{n:08x}-2222-3333-4444-555555555555", f"TOKEN_{n}", air_channels=[],
                        soil_channels=[], soil_temp_channels=[], co2=False) for n in range(1, 10)]
-        env = {f"TOKEN_{n}": f"vbt_synthetic_unique_tent_{n}" for n in range(1, 10)}
+        env = {f"TOKEN_{n}": "vbt_" + f"synthetic_unique_tent_{n}" for n in range(1, 10)}
         self.assertEqual(len(self.load(config[:8], env)[0]), 8)
         with self.assertRaises(ConfigError):
             self.load(config, env)

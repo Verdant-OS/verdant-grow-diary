@@ -215,6 +215,7 @@ class JsonlSpool:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, self.path)
+        self._done_records = 0
         return record_sizes
 
     def enforce_limits(self) -> None:
@@ -225,15 +226,19 @@ class JsonlSpool:
                 if parse_time(entry["created_at"]) < cutoff:
                     del self.entries[entry_id]
                     dropped += 1
-            if dropped or self._disk_bytes() > self.max_bytes:
-                record_sizes = self._compact()
-                disk_bytes = self._disk_bytes()
-                stats_bytes = self.stats_path.stat().st_size if self.stats_path.exists() else 0
+            disk_bytes = self._disk_bytes()
+            if dropped or disk_bytes > self.max_bytes:
+                # Select survivors in memory so size eviction needs one durable
+                # rewrite. Include auxiliary files and the growing drop counter.
+                record_sizes = {
+                    entry_id: len((json.dumps({"op": "put", "entry": entry}, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8"))
+                    for entry_id, entry in self.entries.items()
+                }
                 queue_bytes = sum(record_sizes.values())
-                other_bytes = disk_bytes - queue_bytes - stats_bytes
-                size_dropped = 0
+                previous_queue_bytes = self.path.stat().st_size if self.path.exists() else 0
+                previous_stats_bytes = self.stats_path.stat().st_size if self.stats_path.exists() else 0
+                other_bytes = disk_bytes - previous_queue_bytes - previous_stats_bytes
                 for entry_id, record_bytes in record_sizes.items():
-                    # Include counter growth before choosing the survivor set.
                     updated_stats = {**self.stats, "dropped_count": self.stats["dropped_count"] + dropped}
                     updated_stats_bytes = len(json.dumps(updated_stats, separators=(",", ":"), allow_nan=False).encode("utf-8"))
                     if other_bytes + queue_bytes + updated_stats_bytes <= self.max_bytes:
@@ -241,9 +246,7 @@ class JsonlSpool:
                     del self.entries[entry_id]
                     queue_bytes -= record_bytes
                     dropped += 1
-                    size_dropped += 1
-                if size_dropped:
-                    self._compact()
+                self._compact()
             if dropped:
                 self.stats["dropped_count"] += dropped
                 self.warn(f"spool: dropped {dropped} oldest entries at retention/size limit")

@@ -727,7 +727,7 @@ class ListenerIntegrationTests(unittest.TestCase):
             if first_call:
                 first_call = False
                 release_crash.wait(timeout=2)
-                raise RuntimeError("synthetic replay crash")
+                raise SystemExit("synthetic replay crash")
             replay_once()
             delivered.set()
         supervisor_wait = runtime.supervisor_stop_event.wait

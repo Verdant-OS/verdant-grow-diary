@@ -1153,9 +1153,11 @@ class ListenerRuntime:
             # A retired runtime must not resume using obsolete tent settings.
             if self.stop_event.is_set() or (self.thread is not None and self.thread.is_alive()):
                 return
+            self.stop_event = threading.Event()
+            stop_event = self.stop_event
 
             def replay() -> None:
-                while not self.stop_event.wait(self.interval):
+                while not stop_event.wait(self.interval):
                     try:
                         self.replay_once()
                     except Exception:

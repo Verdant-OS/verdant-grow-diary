@@ -18,6 +18,9 @@ const rpcMock = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { rpc: (...args: unknown[]) => rpcMock(...args) },
 }));
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "harvest-owner" }, loading: false }),
+}));
 
 function mount() {
   return render(
@@ -31,6 +34,7 @@ function selectHarvest() {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   rpcMock.mockReset();
 });
 
@@ -60,7 +64,7 @@ describe("Harvest Quick Log form", () => {
 
   it("saves Harvest with sanitized p_details.harvest and dispatches on success", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "ge-1" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000200" },
       error: null,
     });
     const events: Event[] = [];
@@ -123,7 +127,7 @@ describe("Harvest Quick Log form", () => {
 
   it("Harvest with only a note omits p_details.harvest", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "ge-2" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000201" },
       error: null,
     });
     mount();

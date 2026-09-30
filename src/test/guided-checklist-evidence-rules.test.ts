@@ -37,7 +37,7 @@ describe("guided evidence scope and provenance", () => {
       expect(isGuidedChecklistReadingFresh(result, now)).toBe(true);
     },
   );
-  it.each([{ ph: 3 }, { ph: 9 }, { ec: 0 }, { ec: 19.999 }])(
+  it.each([{ ph: 3 }, { ph: 9 }, { ec: 0 }, { ec: 8 }])(
     "uses the canonical root-zone presentation boundary: %j",
     (metrics) => {
       expect(
@@ -61,8 +61,12 @@ describe("guided evidence scope and provenance", () => {
     { ec: NaN },
     { ec: Infinity },
     { ec: -0.01 },
+    { ec: 8.001 },
+    { ec: 12 },
+    { ec: 19.999 },
     { ec: 20 },
     { ec: 1200 },
+    { ph: 2.99, ec: 12 },
   ])("does not count invalid or suspicious root-zone-only evidence: %j", (metrics) => {
     expect(
       selectGuidedChecklistEvidence({
@@ -72,6 +76,18 @@ describe("guided evidence scope and provenance", () => {
         ],
       }).t1,
     ).toBeNull();
+  });
+  it.each([
+    { ph: 6.2, ec: 12 },
+    { ph: 2.99, ec: 8 },
+  ])("keeps fresh manual evidence when one root-zone metric is valid: %j", (metrics) => {
+    const result = selectGuidedChecklistEvidence({
+      ...input,
+      diaryEntries: [
+        { ...manual, details: { manual_sensor_snapshot: { source: "manual", ...metrics } } },
+      ],
+    }).t1;
+    expect(isGuidedChecklistReadingFresh(result, now)).toBe(true);
   });
   it.each(["live", "csv", "unknown"])("never promotes a %s root-zone diary payload", (source) => {
     expect(

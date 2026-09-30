@@ -51,6 +51,7 @@ describe("guided checklist evidence honesty", () => {
     { manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 55 } },
     { manual_sensor_snapshot: { source: "manual", ph: 6.2 } },
     { manual_sensor_snapshot: { source: "manual", ec: 1.2 } },
+    { manual_sensor_snapshot: { source: "manual", ec: 8 } },
     { environment_check: { temp_c: 25, humidity_pct: 55 } },
   ])("recognizes scoped manual diary evidence %j", (details) => {
     state.diary.data = [
@@ -65,6 +66,22 @@ describe("guided checklist evidence honesty", () => {
     show();
     expect(gap()).toBeNull();
   });
+  it.each([8.001, 12, 19.999])(
+    "prompts for a reading when the only manual EC is implausible: %s",
+    (ec) => {
+      state.diary.data = [
+        {
+          id: "d1",
+          grow_id: "g1",
+          tent_id: "t1",
+          entry_at: new Date(NOW - 3_600_000).toISOString(),
+          details: { manual_sensor_snapshot: { source: "manual", ec } },
+        },
+      ];
+      show();
+      expect(gap()).not.toBeNull();
+    },
+  );
   it("keeps manual sensor context for its 24-hour window", () => {
     state.readings.data = [reading("manual", 3_600_000)];
     show();

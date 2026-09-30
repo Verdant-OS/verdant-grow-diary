@@ -13,7 +13,8 @@ import {
   isGuidedChecklistReadingFresh,
   type GuidedChecklistSensorReading,
 } from "@/lib/guidedActionChecklistRules";
-import { EC_MSCM_UNIT_MISMATCH_AT, PH_PRESENTATION_REALISTIC } from "@/constants/sensorTruthRanges";
+import { isSoilEcMscmRealistic } from "@/lib/sensorTruthRules";
+import { PH_PRESENTATION_REALISTIC } from "@/constants/sensorTruthRanges";
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -40,8 +41,7 @@ function manualDiaryEvidence(
     Number.isFinite(ph) &&
     ph >= PH_PRESENTATION_REALISTIC.min &&
     ph <= PH_PRESENTATION_REALISTIC.max;
-  const usableEc =
-    typeof ec === "number" && Number.isFinite(ec) && ec >= 0 && ec < EC_MSCM_UNIT_MISMATCH_AT;
+  const usableEc = typeof ec === "number" && isSoilEcMscmRealistic(ec);
   return usablePh || usableEc ? { capturedAt: entryAt, source: "manual", quality: "ok" } : null;
 }
 

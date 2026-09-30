@@ -1404,6 +1404,187 @@ describe("Timeline mounted read-state boundary", () => {
     expect(within(entry).queryByTestId("timeline-vpd-stage-hint")).toBeNull();
   });
 
+  it.each(["csv", "demo", "stale", "invalid", "live"])(
+    "range-validates persisted %s snapshots while keeping provenance and valid metrics",
+    async (source) => {
+      harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+        if (spec.table === "diary_entries")
+          return {
+            data: [
+              {
+                ...diaryEntry("nonmanual-range-repro", "Nonmanual range audit"),
+                details: {
+                  event_type: "observation",
+                  sensor_snapshot: {
+                    temp: 24,
+                    rh: 150,
+                    soil: 101,
+                    vpd: 20,
+                    co2: 10001,
+                    source,
+                    ts: new Date().toISOString(),
+                  },
+                },
+              },
+            ],
+            error: null,
+            count: 1,
+          };
+        return defaultResult(spec);
+      });
+      renderTimeline();
+      const entry = (await screen.findByText("Nonmanual range audit")).closest(
+        '[data-testid="timeline-entry"]',
+      ) as HTMLElement;
+      expect(entry).toHaveTextContent("75.2°F");
+      for (const invalid of ["150% RH", "Soil 101%", "VPD 20", "CO₂ 10001"])
+        expect(entry).not.toHaveTextContent(invalid);
+      expect(within(entry).queryByTestId("timeline-vpd-stage-hint")).toBeNull();
+      expect(
+        within(entry).getByTestId(
+          "timeline-sensor-source-badge-" + (source === "live" ? "invalid" : source),
+        ),
+      ).toBeInTheDocument();
+      expect(within(entry).getByTestId("timeline-manual-snapshot-invalid")).toHaveTextContent(
+        "Review sensor snapshot — invalid readings were not shown.",
+      );
+      expect(entry).not.toHaveTextContent("Review manual snapshot");
+    },
+  );
+
+  it.each(["sensor", "manual_sensor_snapshot"])(
+    "validates non-manual aliases in the %s compatibility envelope",
+    async (envelope) => {
+      harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+        if (spec.table === "diary_entries")
+          return {
+            data: ["csv", "demo", "stale", "invalid", "live"].map((source) => ({
+              ...diaryEntry(`alias-${source}`, `${source} alias snapshot`),
+              details: {
+                event_type: "observation",
+                [envelope]: {
+                  temperature_f: 76,
+                  humidity_percent: 150,
+                  soil_moisture_pct: 101,
+                  vpd_kpa: 20,
+                  co2_ppm: 10001,
+                  source,
+                  captured_at: new Date().toISOString(),
+                },
+              },
+            })),
+            error: null,
+            count: 5,
+          };
+        return defaultResult(spec);
+      });
+      renderTimeline();
+      await screen.findByText("csv alias snapshot");
+      for (const source of ["csv", "demo", "stale", "invalid", "live"]) {
+        const entry = screen
+          .getByText(`${source} alias snapshot`)
+          .closest('[data-testid="timeline-entry"]') as HTMLElement;
+        expect(entry).toHaveTextContent("76°F");
+        for (const invalid of ["150% RH", "Soil 101%", "VPD 20", "CO₂ 10001"])
+          expect(entry).not.toHaveTextContent(invalid);
+        expect(within(entry).getByTestId("timeline-manual-snapshot-invalid")).toHaveTextContent(
+          envelope === "manual_sensor_snapshot"
+            ? "Review manual snapshot"
+            : "Review sensor snapshot",
+        );
+        expect(
+          within(entry).getByTestId(
+            `timeline-sensor-source-badge-${source === "live" ? "invalid" : source}`,
+          ),
+        ).toBeInTheDocument();
+        expect(within(entry).queryByTestId("timeline-vpd-stage-hint")).toBeNull();
+      }
+    },
+  );
+
+  it("keeps all-invalid non-manual history visible with review copy and no metric chips", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries")
+        return {
+          data: [
+            {
+              ...diaryEntry("invalid-csv", "CSV capture needs review"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: {
+                  temp: 100,
+                  rh: 150,
+                  soil: 101,
+                  vpd: 20,
+                  co2: 10001,
+                  source: "csv",
+                },
+              },
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      return defaultResult(spec);
+    });
+    renderTimeline();
+    const entry = (await screen.findByText("CSV capture needs review")).closest(
+      '[data-testid="timeline-entry"]',
+    ) as HTMLElement;
+    expect(within(entry).getByTestId("timeline-manual-snapshot-invalid")).toHaveTextContent(
+      "Review sensor snapshot",
+    );
+    for (const invalid of ["212.0°F", "150% RH", "Soil 101%", "VPD 20", "CO₂ 10001"])
+      expect(entry).not.toHaveTextContent(invalid);
+    expect(within(entry).getByTestId("timeline-sensor-source-badge-csv")).toBeInTheDocument();
+    expect(within(entry).queryByTestId("timeline-vpd-stage-hint")).toBeNull();
+  });
+
+  it.each([undefined, "not-a-time", new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString()])(
+    "renders a valid CSV VPD alias without a current-health verdict for capture %s",
+    async (capturedAt) => {
+      harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+        if (spec.table === "diary_entries")
+          return {
+            data: [
+              {
+                ...diaryEntry("csv-valid-alias", "Historical CSV alias"),
+                details: {
+                  event_type: "observation",
+                  sensor_snapshot: {
+                    temperature_c: 24,
+                    humidity_percent: 55.55,
+                    vpd_kpa: 1.234,
+                    co2_ppm: 850.6,
+                    soil_moisture_pct: 42.42,
+                    source: "csv",
+                    captured_at: capturedAt,
+                  },
+                },
+              },
+            ],
+            error: null,
+            count: 1,
+          };
+        return defaultResult(spec);
+      });
+      renderTimeline();
+      const entry = (await screen.findByText("Historical CSV alias")).closest(
+        '[data-testid="timeline-entry"]',
+      ) as HTMLElement;
+      for (const valid of ["75.2°F", "55.55% RH", "VPD 1.234", "CO₂ 850.6", "Soil 42.42%"])
+        expect(entry).toHaveTextContent(valid);
+      expect(within(entry).queryByTestId("timeline-manual-snapshot-invalid")).toBeNull();
+      expect(within(entry).getByTestId("timeline-vpd-stage-hint")).toHaveTextContent(
+        /historical|stale/i,
+      );
+      expect(entry).not.toHaveTextContent(/In Vegetative VPD range/i);
+      expect(within(entry).getByTestId("timeline-sensor-source-badge-csv")).toHaveTextContent(
+        "Source: CSV",
+      );
+    },
+  );
+
   it("does not accuse an empty manual snapshot of invalid readings", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries")

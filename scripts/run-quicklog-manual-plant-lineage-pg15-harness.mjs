@@ -74,7 +74,7 @@ function requireSqlRefusal({ stage, expectedMessage, run, spawnImpl }) {
 }
 
 // Fingerprint every relation's data and catalog definition in the disposable scaffold.
-// The rejected delivery must run no SQL; these read-only snapshots prove that against PG15.
+// SQL refusals must leave this covered persistent state unchanged; they do execute SQL.
 export const DELIVERY_DATABASE_SNAPSHOT_SQL = `select md5(jsonb_build_object(
   'relations', (select jsonb_agg(to_jsonb(c) order by c.oid) from pg_class c
     join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','auth','supabase_migrations')),
@@ -99,6 +99,64 @@ export const DELIVERY_DATABASE_SNAPSHOT_SQL = `select md5(jsonb_build_object(
 )::text);`;
 const signature =
   "text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb, text, text";
+
+function proveDeliveryAclRefusals(input) {
+  const { env, spawnImpl, version } = input;
+  const cases = [
+    ["wrapper_extra_grantee", "quicklog_save_manual", "quicklog_delegate_probe", false],
+    [
+      "delegate_extra_grantee",
+      "quicklog_save_manual_pre_logged_at",
+      "quicklog_delegate_probe",
+      false,
+    ],
+    ["wrapper_grant_option", "quicklog_save_manual", "authenticated", true],
+  ];
+  for (const [name, fn, role, grantOption] of cases) {
+    const stage = `acl_${version}_${name}`;
+    const original = executeSql(DELIVERY_DATABASE_SNAPSHOT_SQL, env, {
+      stage: `${stage}_original`,
+      spawnImpl,
+    });
+    executeSql(
+      `grant execute on function public.${fn}(${signature}) to ${role}${grantOption ? " with grant option" : ""};`,
+      env,
+      { stage: `${stage}_inject`, spawnImpl },
+    );
+    try {
+      const before = executeSql(DELIVERY_DATABASE_SNAPSHOT_SQL, env, {
+        stage: `${stage}_before`,
+        spawnImpl,
+      });
+      requireSqlRefusal({
+        stage,
+        expectedMessage: "delivery_order_rejected",
+        spawnImpl,
+        run: (observedSpawn) => deliverManualMigration({ ...input, spawnImpl: observedSpawn }),
+      });
+      const after = executeSql(DELIVERY_DATABASE_SNAPSHOT_SQL, env, {
+        stage: `${stage}_after`,
+        spawnImpl,
+      });
+      if (!/^[0-9a-f]{32}$/.test(before) || after !== before) {
+        throw new Error(`${stage}:changed_database`);
+      }
+    } finally {
+      executeSql(
+        `revoke ${grantOption ? "grant option for " : ""}execute on function public.${fn}(${signature}) from ${role};`,
+        env,
+        { stage: `${stage}_restore`, spawnImpl },
+      );
+    }
+    const restored = executeSql(DELIVERY_DATABASE_SNAPSHOT_SQL, env, {
+      stage: `${stage}_restored`,
+      spawnImpl,
+    });
+    if (!/^[0-9a-f]{32}$/.test(original) || restored !== original) {
+      throw new Error(`${stage}:fixture_not_restored`);
+    }
+  }
+}
 
 function sqlFile(name, migrationRoot = resolve(root, "supabase/migrations")) {
   const sql = readFileSync(resolve(migrationRoot, name), "utf8").replace(/\r\n/g, "\n");
@@ -282,14 +340,16 @@ export async function runPlantLineageHarness({
       env,
       spawnImpl,
     );
-    let completed = deliverManualMigration({
+    const reuseInput = {
       order: deliveryOrder,
       completed: [],
       version: MANUAL_DELIVERY_ORDER[0],
       sql: reuseSql,
       env,
       spawnImpl,
-    });
+    };
+    proveDeliveryAclRefusals(reuseInput);
+    let completed = deliverManualMigration(reuseInput);
     // A fabricated completed prefix must not permit skipping 160000. The old
     // 183000 source preflight accepts this wrapper; the delivery catalog gate must not.
     const skippedBefore = executeSql(DELIVERY_DATABASE_SNAPSHOT_SQL, env, {
@@ -340,22 +400,26 @@ export async function runPlantLineageHarness({
       env,
       { stage: "delegate_identity_before", spawnImpl },
     );
-    completed = deliverManualMigration({
+    const lineageInput = {
       order: deliveryOrder,
       completed,
       version: MANUAL_DELIVERY_ORDER[1],
       sql,
       env,
       spawnImpl,
-    });
-    deliverManualMigration({
+    };
+    proveDeliveryAclRefusals(lineageInput);
+    completed = deliverManualMigration(lineageInput);
+    const metadataInput = {
       order: deliveryOrder,
       completed,
       version: MANUAL_DELIVERY_ORDER[2],
       sql: metadataSql,
       env,
       spawnImpl,
-    });
+    };
+    proveDeliveryAclRefusals(metadataInput);
+    deliverManualMigration(metadataInput);
     requireTrue(
       "full_chain_wrapper_identity_and_grants",
       `select md5(replace(prosrc, E'\\r', ''))='1875cf01f7d1aa843d4b8ad080f9bcb2'

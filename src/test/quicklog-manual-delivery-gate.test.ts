@@ -63,6 +63,36 @@ describe("database-enforced Quick Log manual delivery", () => {
     expect(generatedGate).toContain("IF current_user <> 'postgres' OR v_wrapper IS NULL");
   });
 
+  it.each([0, 1, 2])("requires the exact wrapper ACL at step %i", (position) => {
+    const script = gate.buildManualDeliveryStepSql({
+      order: gate.MANUAL_DELIVERY_ORDER,
+      version: gate.MANUAL_DELIVERY_ORDER[position],
+      sql: loadManualDeliverySql()[position],
+    });
+    const wrapperGate = script.split("WHERE p.oid=v_wrapper")[1].split("WHERE p.oid=v_delegate")[0];
+    expect(wrapperGate).toContain("acl.is_grantable,grantor.rolname");
+    expect(wrapperGate).toContain("'authenticated|EXECUTE|f|postgres'");
+    expect(wrapperGate).toContain("'postgres|EXECUTE|f|postgres'");
+    expect(wrapperGate).toContain("'service_role|EXECUTE|f|postgres'");
+    expect(wrapperGate).toContain("COALESCE((");
+    expect(wrapperGate).toContain("),false)");
+  });
+
+  it.each([0, 1, 2])("requires the exact private-delegate ACL at step %i", (position) => {
+    const script = gate.buildManualDeliveryStepSql({
+      order: gate.MANUAL_DELIVERY_ORDER,
+      version: gate.MANUAL_DELIVERY_ORDER[position],
+      sql: loadManualDeliverySql()[position],
+    });
+    const delegateGate = script
+      .split("WHERE p.oid=v_delegate")[1]
+      .split("OR pg_catalog.has_function_privilege")[0];
+    expect(delegateGate).toContain("acl.is_grantable,grantor.rolname");
+    expect(delegateGate).toContain("= ARRAY['postgres|EXECUTE|f|postgres']::text[]");
+    expect(delegateGate).toContain("COALESCE((");
+    expect(delegateGate).toContain("),false)");
+  });
+
   it.each([0, 1, 2])(
     "pins service-role exclusion from the private delegate at step %i",
     (position) => {

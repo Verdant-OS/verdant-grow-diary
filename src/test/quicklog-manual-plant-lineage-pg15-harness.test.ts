@@ -115,6 +115,8 @@ describe("Quick Log manual plant/tent lineage fence", () => {
     ["reverse unrelated SQL failure", "reverse", "sql"],
     ["lineage connection failure", "lineage", "connection"],
     ["lineage unrelated SQL failure", "lineage", "sql"],
+    ["ACL connection failure", "acl", "connection"],
+    ["ACL unrelated SQL failure", "acl", "sql"],
     ["skipped lineage connection failure", "skipped", "connection"],
     ["skipped lineage unrelated SQL failure", "skipped", "sql"],
   ])(
@@ -129,6 +131,8 @@ describe("Quick Log manual plant/tent lineage fence", () => {
         }),
       );
       const applied: number[] = [];
+      const aclRefusals: number[] = [];
+      let aclInjected = false;
       let lineageAttempt = 0;
       let metadataAttempt = 0;
       let rejectedKeyCalls = 0;
@@ -150,8 +154,20 @@ describe("Quick Log manual plant/tent lineage fence", () => {
           return result("verdant_quicklog_delegate_repair_pg15_disposable_v1");
         }
         if (input === DELIVERY_DATABASE_SNAPSHOT_SQL) return result("a".repeat(32));
+        if (input.startsWith("grant execute on function public.quicklog_save_manual")) {
+          aclInjected = true;
+          return result();
+        }
+        if (input.startsWith("revoke ")) {
+          aclInjected = false;
+          return result();
+        }
         const position = guardedSql.indexOf(input);
         if (position >= 0) {
+          if (aclInjected) {
+            aclRefusals.push(position);
+            return refusal("acl", "delivery_order_rejected");
+          }
           if (position === 2 && ++metadataAttempt === 1)
             return refusal("skipped", "delivery_order_rejected");
           applied.push(position);
@@ -202,11 +218,13 @@ describe("Quick Log manual plant/tent lineage fence", () => {
           expect(write).not.toHaveBeenCalled();
         } else {
           expect(applied).toEqual([0, 1, 2]);
+          expect(aclRefusals).toEqual([0, 0, 0, 1, 1, 1, 2, 2, 2]);
+          expect(aclInjected).toBe(false);
           expect(
             spawnImpl.mock.calls.filter(
               ([, , options]) => options.input === DELIVERY_DATABASE_SNAPSHOT_SQL,
             ),
-          ).toHaveLength(4);
+          ).toHaveLength(40);
           expect(write).toHaveBeenCalledWith(
             expect.stringContaining("full chain 002000 -> 160000 -> 183000"),
           );

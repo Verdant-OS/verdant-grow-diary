@@ -41,6 +41,17 @@ unrelated-error regressions. Generated-gate assertions also pin the required
 `postgres` runner role and the private delegate's service-role exclusion at all
 three steps.
 
+Each step also requires the exact ACL rows, including grantor and grant options:
+the wrapper permits only `postgres`, `authenticated` and `service_role` EXECUTE
+grants from `postgres`, without grant options; the private delegate permits only
+the corresponding `postgres` grant. An extra grantee, PUBLIC access, missing grant
+or altered grant option fails closed. The PG15 proof injects an extra wrapper
+grantee, an extra private-delegate grantee and a wrapper grant option before each
+of the three steps. All nine actual SQL attempts must refuse delivery without
+changing the covered catalog or data, and the original fixture ACL must be
+restored before ordinary ordered delivery proceeds. Equal snapshots establish
+unchanged covered persistent state; the negative controls do execute SQL.
+
 The script-error status is `3` with `ON_ERROR_STOP`, distinct from psql fatal
 errors (`1`) and a lost connection (`2`), per the
 [PostgreSQL 15 exit-status contract](https://www.postgresql.org/docs/15/app-psql.html#APP-PSQL-EXIT-STATUS).

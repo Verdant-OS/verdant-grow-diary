@@ -108,9 +108,21 @@ BEGIN
         AND p.prorettype='jsonb'::pg_catalog.regtype
         AND p.proconfig=ARRAY['search_path=public, pg_temp']::text[]
         AND pg_catalog.md5(pg_catalog.replace(p.prosrc, E'\\r', ''))='${pin.wrapperBefore}'
-        AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(
-          COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) acl
-          WHERE acl.grantee=0 AND acl.privilege_type='EXECUTE')
+        AND COALESCE((
+          SELECT pg_catalog.array_agg(
+            pg_catalog.format('%s|%s|%s|%s',COALESCE(grantee.rolname,'PUBLIC'),
+              acl.privilege_type,acl.is_grantable,grantor.rolname)
+            ORDER BY COALESCE(grantee.rolname,'PUBLIC'),acl.privilege_type
+          ) = ARRAY[
+            'authenticated|EXECUTE|f|postgres',
+            'postgres|EXECUTE|f|postgres',
+            'service_role|EXECUTE|f|postgres'
+          ]::text[]
+          FROM pg_catalog.aclexplode(
+            COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) acl
+          LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
+          JOIN pg_catalog.pg_roles grantor ON grantor.oid=acl.grantor
+        ),false)
     ) OR NOT EXISTS (
       SELECT 1 FROM pg_catalog.pg_proc p
       JOIN pg_catalog.pg_roles r ON r.oid=p.proowner
@@ -118,9 +130,17 @@ BEGIN
         AND p.prorettype='jsonb'::pg_catalog.regtype
         AND p.proconfig=ARRAY['search_path=public, pg_temp']::text[]
         AND pg_catalog.md5(pg_catalog.replace(p.prosrc, E'\\r', ''))='${pin.delegateBefore}'
-        AND NOT EXISTS (SELECT 1 FROM pg_catalog.aclexplode(
-          COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) acl
-          WHERE acl.grantee=0 AND acl.privilege_type='EXECUTE')
+        AND COALESCE((
+          SELECT pg_catalog.array_agg(
+            pg_catalog.format('%s|%s|%s|%s',COALESCE(grantee.rolname,'PUBLIC'),
+              acl.privilege_type,acl.is_grantable,grantor.rolname)
+            ORDER BY COALESCE(grantee.rolname,'PUBLIC'),acl.privilege_type
+          ) = ARRAY['postgres|EXECUTE|f|postgres']::text[]
+          FROM pg_catalog.aclexplode(
+            COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) acl
+          LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=acl.grantee
+          JOIN pg_catalog.pg_roles grantor ON grantor.oid=acl.grantor
+        ),false)
     ) OR pg_catalog.has_function_privilege('anon',v_wrapper,'EXECUTE')
       OR NOT pg_catalog.has_function_privilege('authenticated',v_wrapper,'EXECUTE')
       OR NOT pg_catalog.has_function_privilege('service_role',v_wrapper,'EXECUTE')

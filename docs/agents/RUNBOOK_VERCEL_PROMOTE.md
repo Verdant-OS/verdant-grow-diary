@@ -122,7 +122,10 @@ for each of these reads:
   `meta.githubCommitSha` / `meta.githubCommitRef`, which must still match that SHA;
 - the required and selected Deployment Check results for that SHA, which must all
   still be successful;
-- the rolling-release record, which must show no unresolved rollout.
+- the rolling-release record, which must show no unresolved rollout, and the
+  rolling-release configuration (`get_rolling_release_config`), whose stages and
+  advancement type must still equal what the owner approved in the packet, because
+  a promote may start a partial rollout under those settings.
 
 If any value differs from the packet, stop and rebuild the packet rather than
 promoting a stale artifact. Only then does Matthew run:
@@ -305,8 +308,14 @@ dashboard selection and measure whether native promotion resumes.
 If Matthew determines the native lane remains insufficient, he creates a token in
 Vercel **Account Settings → Tokens**, named `verdant-github-promotion`, scoped only
 to `VerdantGrowDiary`, with an explicit expiry. He enters it directly in GitHub
-**Settings → Secrets and variables → Actions** as the repository secret
-`VERCEL_PROMOTION_TOKEN`. Codex must not create, view or alter its value. See
+**Settings → Environments** as the secret `VERCEL_PROMOTION_TOKEN` of a dedicated
+protected environment. That environment is restricted to the deploy branch, with
+required reviewers as Matthew sets them, and only the promotion job binds to it,
+following the repository's existing pattern for production credentials (the
+`verdant-production` environment in `required-core-migrations.yml`). Never store
+the token as a repository-wide secret: any later workflow could reference it by
+name and bypass the Action's serialization and rollback checks. Codex must not
+create, view or alter its value. See
 [Vercel access tokens](https://vercel.com/docs/accounts/access-tokens).
 
 Prepare the fallback as a separate scoped PR. Its acceptance must prove: the SHA

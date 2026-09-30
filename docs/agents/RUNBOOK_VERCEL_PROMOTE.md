@@ -269,6 +269,12 @@ requirements:
 
 - It starts from M11's own last successful boundary, the last stamp at which M11
   ran, not from this sweep's opening reading.
+- If M11 has never run to completion, there is no boundary yet. The first complete
+  audit starts at a time the owner names, no later than this sweep's opening
+  reading. It records that start and the holder set as M11's first boundary. Its
+  history before that start is reported `NO_BASELINE`, never `PASS` and never
+  `NOT_MEASURED`. That gap stays in the record, but it does not block this sweep's
+  consistency, which the audit fully covers.
 - It covers M11's full holder set: the apex-holding project at that boundary, the
   current one, and every project or platform that an unfiltered domain event or DNS
   change in the window names.
@@ -277,13 +283,20 @@ requirements:
 
 What each outcome means:
 
-- Any routing, alias, domain, DNS or production-setting event in the window that is
-  not this operation's own recorded action makes consistency `NOT_MEASURED` and the
-  sweep repeats. The event and its actor are recorded as a D-RT-13 publish action.
+- Every routing, alias, domain, DNS or production-setting event in the audit window
+  that is not this operation's own recorded action is recorded as a D-RT-13 publish
+  action, with its actor.
+- Only such an event timed between the opening and closing readings makes
+  consistency `NOT_MEASURED` and the sweep repeats. An event before the opening
+  reading is an M11 finding, not a consistency failure, because both readings
+  were taken after it.
+- A complete audit advances M11's boundary to the closing timestamp, whatever it
+  finds. Findings are measurements, so a later retry does not re-read events that
+  were already recorded.
 - An audit attempted but prevented by missing access, permission or egress leaves
   consistency `BLOCKED`.
-- An audit that was not performed, or that has no recorded boundary or holder set,
-  leaves consistency `NOT_MEASURED`.
+- An audit that was not performed, or that ran without recording its start or
+  holder set, leaves consistency `NOT_MEASURED`.
 - Neither `BLOCKED` nor `NOT_MEASURED` is `PASS`.
 
 - If any value changed during the sweep (a rollout, promote, redeploy, rollback,

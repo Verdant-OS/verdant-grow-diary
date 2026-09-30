@@ -30,6 +30,55 @@ class DeliveryFixture(unittest.TestCase):
 
 
 class DeliveryTests(DeliveryFixture):
+    def test_eviction_journal_survives_crashes_before_and_after_queue_rewrite(self):
+        for limit in ("age", "size"):
+            for phase in ("before", "after"):
+                with self.subTest(limit=limit, phase=phase):
+                    root = self.root / (limit + phase)
+                    spool = JsonlSpool(root, clock=self.clock, warn=self.warnings.append)
+                    spool.enqueue("old", self.reading())
+                    if limit == "age":
+                        self.now += timedelta(days=8)
+                    else:
+                        spool.max_bytes = 200
+                    compact = spool._compact
+                    def interrupted():
+                        if phase == "after":
+                            compact()
+                        raise RuntimeError("simulated process interruption")
+                    with mock.patch.object(spool, "_compact", side_effect=interrupted):
+                        with self.assertRaises(RuntimeError):
+                            spool.enforce_limits()
+                    restored = JsonlSpool(root, clock=self.clock, max_days=1000)
+                    self.assertEqual(restored.pending_count, 0)
+                    self.assertEqual(restored.stats["dropped_count"], 1)
+                    again = JsonlSpool(root, clock=self.clock, max_days=1000)
+                    self.assertEqual(again.stats["dropped_count"], 1)
+                    health = HealthState(root / "state.json", [], clock=self.clock,
+                                         spool_drops=lambda: again.stats["dropped_count"])
+                    self.assertIn("spool_data_drop", health.status()["reasons"])
+
+    def test_torn_eviction_journal_retains_entries_without_reporting_a_committed_drop(self):
+        spool = self.spool()
+        spool.enqueue("old", self.reading())
+        with spool.path.open("ab") as handle:
+            handle.write(b'{"op":"drop","ids":["old"]')
+        restored = self.spool()
+        self.assertEqual(list(restored.entries), ["old"])
+        self.assertEqual(restored.stats["dropped_count"], 0)
+        self.assertEqual(restored.stats["torn_tail_count"], 1)
+
+    def test_invalid_eviction_journal_fails_closed_without_echoing_payload(self):
+        for record in ({"op": "drop", "ids": "do-not-print", "dropped_count": 1},
+                       {"op": "drop", "ids": ["old"], "dropped_count": -1},
+                       {"op": "drop", "ids": ["old"], "dropped_count": True},
+                       {"op": "drop_checkpoint", "dropped_count": "do-not-print"}):
+            with self.subTest(record=record):
+                (self.root / "queue.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+                with self.assertRaises(ValueError) as caught:
+                    self.spool()
+                self.assertNotIn("do-not-print", str(caught.exception))
+
     def test_auxiliary_budget_is_reclaimed_before_pending_entries(self):
         spool = self.spool()
         for n in range(2):
@@ -510,6 +559,10 @@ class HealthTests(DeliveryFixture):
             {"spool_drop_recovered_count": -1},
             {"spool_drop_recovered_count": True},
             {"spool_drop_recovered_count": "do-not-print"},
+            {"receive_error": "do-not-print"},
+            {"receive_error": False},
+            {"tents": {"tent-a": {**original["tents"]["tent-a"], "primary_failures": {"unknown": self.now.isoformat()}}}},
+            {"tents": {"tent-a": {**original["tents"]["tent-a"], "primary_failures": {"air": True}}}},
         ):
             with self.subTest(corrupted=corrupted):
                 (self.root / "state.json").write_text(json.dumps({**original, **corrupted}))

@@ -57,7 +57,7 @@ from typing import Any, Dict, Optional
 from ecowitt_delivery import HealthState, JsonlSpool
 from ecowitt_multitent import (
     COMMON_FIELDS, FIELD_MAP, ConfigError, Tent, gateway_fingerprint, gateway_secrets, load_tent_map,
-    numeric, route_packet, sanitize, valid_token,
+    numeric, primary_families, route_packet, sanitize, valid_token,
 )
 
 try:
@@ -1073,7 +1073,6 @@ class ListenerRuntime:
         self.supervisor_thread: Optional[threading.Thread] = None
         self.last_local_error: Optional[str] = None
         self.last_enqueue_error: Optional[str] = None
-        self.last_receive_error: Optional[str] = None
         root = Path(os.environ.get("ECOWITT_SPOOL_DIR") or Path(__file__).with_name(".spool"))
         max_bytes = int(_positive_setting("ECOWITT_SPOOL_MAX_MB", 50) * 1024 * 1024)
         max_days = _positive_setting("ECOWITT_SPOOL_MAX_DAYS", 7)
@@ -1119,12 +1118,24 @@ class ListenerRuntime:
     def delivery_health(self) -> dict:
         with self.lock:
             status = self.health.status()
+            if self.last_local_error or self.last_enqueue_error or self.last_receive_error:
+                status["ok"] = False
+                status["reasons"].append("local_delivery_state_error")
             configured = {tent.tent_id for tent in self.tents}
             if any(entry["reading"]["metadata"]["tent_id"] not in configured
                    for entry in self.spool.entries.values()):
                 status["ok"] = False
                 status["reasons"].append("orphaned_queue")
             return status
+
+    @property
+    def last_receive_error(self) -> Optional[str]:
+        with self.lock:
+            return self.health.data["receive_error"]
+
+    @last_receive_error.setter
+    def last_receive_error(self, error: Optional[str]) -> None:
+        self.health.receive_result(error)
 
     def finish(self, key: str, result: dict) -> None:
         with self.lock:
@@ -1138,7 +1149,8 @@ class ListenerRuntime:
             outstanding = any(e["attempts"] > 0 and e["reading"]["metadata"]["tent_id"] == tent_id
                               for e in self.spool.entries.values())
             self.health.forward_result(tent_id, isinstance(status, int) and 200 <= status < 300,
-                outstanding_failure=outstanding, recovered_spool_drop_count=dropped_before_finish)
+                outstanding_failure=outstanding, recovered_spool_drop_count=dropped_before_finish,
+                delivered_primary_families=primary_families(entry["reading"]["metrics"]))
         self.health.tick()
 
     def replay_once(self) -> None:
@@ -1324,9 +1336,6 @@ def health() -> Any:
         runtime.health.tick()
         status = runtime.delivery_health()
         status.pop("tents", None)
-        if runtime.last_local_error or runtime.last_enqueue_error or runtime.last_receive_error:
-            status["ok"] = False
-            status["reasons"].append("local_delivery_state_error")
         if not runtime.mapped:
             readiness = evaluate_forwarding_readiness(os.environ.get("VERDANT_INGEST_URL"),
                 os.environ.get("VERDANT_BRIDGE_TOKEN"), os.environ.get("VERDANT_TENT_ID"))
@@ -1424,9 +1433,8 @@ def ecowitt() -> Any:
             receive_step = "routing"
             readings = []
             for packet in routed:
-                if (packet["metadata"]["primary_channels"] or packet["metadata"]["channels"]) and not packet["metrics"]:
-                    # Owned data without a usable primary metric is a failure.
-                    runtime.health.forward_result(packet["tent_id"], False)
+                if packet["missing_primary_families"]:
+                    runtime.health.primary_failure(packet["tent_id"], packet["missing_primary_families"])
                 own_raw = packet["metadata"]["raw_payload"]
                 own_source = _resolve_source_from_validated(payload=own_raw, remote_addr=request.remote_addr,
                     canonical_gateway_time=gateway_captured_at, header_mode="", env_mode="", now=request_now)
@@ -1450,7 +1458,10 @@ def ecowitt() -> Any:
             runtime.last_receive_error = None
     except (OSError, ValueError, KeyError, TypeError):
         if runtime is not None:
-            runtime.last_receive_error = receive_step
+            try:
+                runtime.last_receive_error = receive_step
+            except (OSError, ValueError, KeyError, TypeError):
+                runtime.last_local_error = "local_delivery_state_error"
         return jsonify({"ok": False, "error": "local_delivery_state_error"}), 503
 
     if gateway_shaped and gateway_captured_at is None:

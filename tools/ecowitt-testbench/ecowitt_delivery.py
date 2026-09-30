@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from ecowitt_multitent import sanitize
+from ecowitt_multitent import PRIMARY_FAMILY_METRICS, sanitize
 
 
 def utc_now() -> datetime:
@@ -99,6 +99,11 @@ def trim_jsonl(path: Path, max_bytes: int, max_days: float, now: datetime, *, ca
         cache[path] = ((stat.st_size, stat.st_mtime_ns), min(stamps) if stamps else None)
     return original_count - len(kept)
 
+
+def drop_checkpoint_line(count: int) -> str:
+    return json.dumps({"op": "drop_checkpoint", "dropped_count": count}, separators=(",", ":")) + "\n" if count else ""
+
+
 def validate_health_data(data: dict) -> None:
     """Reject malformed local state before it can disable incident reporting."""
     for key in ("tents", "unmapped_counts", "incidents"):
@@ -107,6 +112,8 @@ def validate_health_data(data: dict) -> None:
     if any(type(count) is not int or count < 0 for count in data["unmapped_counts"].values()):
         raise ValueError()
     if any(type(active) is not bool for active in data["incidents"].values()):
+        raise ValueError()
+    if data["receive_error"] not in (None, "routing", "unmapped"):
         raise ValueError()
     for key in ("unmapped_log_dropped_count", "unmapped_overflow_count", "alert_webhook_error_count", "spool_drop_recovered_count"):
         if type(data[key]) is not int or data[key] < 0:
@@ -117,6 +124,12 @@ def validate_health_data(data: dict) -> None:
     for state in data["tents"].values():
         if not isinstance(state, dict):
             raise ValueError()
+        failures = state.get("primary_failures", {})
+        if not isinstance(failures, dict) or set(failures) - set(PRIMARY_FAMILY_METRICS):
+            raise ValueError()
+        if not all(isinstance(stamp, str) for stamp in failures.values()):
+            raise ValueError()
+        stamps.extend(failures.values())
         stamps.extend((state["last_forward_ok_at"], state["first_forward_failure_at"]))
     for stamp in stamps:
         if stamp is not None:
@@ -198,6 +211,19 @@ class JsonlSpool:
                     self.entries[entry["id"]] = entry
                 elif record["op"] == "done":
                     self.entries.pop(record["id"], None)
+                elif record["op"] in {"drop", "drop_checkpoint"}:
+                    count = record["dropped_count"]
+                    if type(count) is not int or count < 0:
+                        raise ValueError()
+                    if record["op"] == "drop":
+                        ids = record["ids"]
+                        if (not isinstance(ids, list) or not ids or
+                                not all(isinstance(key, str) for key in ids) or
+                                len(set(ids)) != len(ids) or count < len(ids)):
+                            raise ValueError()
+                        for key in ids:
+                            self.entries.pop(key, None)
+                    self.stats["dropped_count"] = max(self.stats["dropped_count"], count)
                 else:
                     raise ValueError()
             except (ValueError, KeyError, TypeError):
@@ -210,6 +236,7 @@ class JsonlSpool:
         record_sizes = {}
         # Fixed LF bytes make the budget match the file on Windows too.
         with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(drop_checkpoint_line(self.stats["dropped_count"]))
             for entry_id, entry in self.entries.items():
                 line = json.dumps({"op": "put", "entry": entry}, separators=(",", ":"), allow_nan=False) + "\n"
                 handle.write(line)
@@ -224,10 +251,12 @@ class JsonlSpool:
         with self.lock:
             cutoff = self.clock() - timedelta(days=self.max_days)
             dropped = 0
+            dropped_ids = []
             for entry_id, entry in list(self.entries.items()):
                 if parse_time(entry["created_at"]) < cutoff:
                     del self.entries[entry_id]
                     dropped += 1
+                    dropped_ids.append(entry_id)
             # Diagnostics get at most one tenth of the combined cap each.
             # Reclaim their space before deciding which pending readings fit.
             for path in (self.dead_path, self.root / "unmapped_channels.jsonl"):
@@ -252,14 +281,22 @@ class JsonlSpool:
                 for entry_id, record_bytes in record_sizes.items():
                     updated_stats = {**self.stats, "dropped_count": self.stats["dropped_count"] + dropped}
                     updated_stats_bytes = len(json.dumps(updated_stats, separators=(",", ":"), allow_nan=False).encode("utf-8"))
-                    if other_bytes + queue_bytes + updated_stats_bytes <= self.max_bytes:
+                    checkpoint_bytes = len(drop_checkpoint_line(updated_stats["dropped_count"]).encode("utf-8"))
+                    if other_bytes + queue_bytes + checkpoint_bytes + updated_stats_bytes <= self.max_bytes:
                         break
                     del self.entries[entry_id]
                     queue_bytes -= record_bytes
                     dropped += 1
+                    dropped_ids.append(entry_id)
+                if dropped:
+                    # Commit logical eviction and its absolute loss count before
+                    # removing payloads. The compacted checkpoint preserves the
+                    # count even if the statistics file never gets replaced.
+                    count = self.stats["dropped_count"] + dropped
+                    append_jsonl(self.path, {"op": "drop", "ids": dropped_ids, "dropped_count": count})
+                    self.stats["dropped_count"] = count
                 self._compact()
             if dropped:
-                self.stats["dropped_count"] += dropped
                 self.warn(f"spool: dropped {dropped} oldest entries at retention/size limit")
             self._save_stats()
             # The cap includes auxiliary logs/state, not just pending payloads.
@@ -341,7 +378,7 @@ class HealthState:
         self.data = {"started_at": clock().isoformat(), "last_packet_received_at": None,
                      "tents": {}, "unmapped_counts": {}, "unmapped_log_dropped_count": 0, "unmapped_overflow_count": 0,
                      "incidents": {}, "pending_alerts": [], "last_alert_webhook_at": None,
-                     "alert_webhook_error_count": 0, "spool_drop_recovered_count": 0}
+                     "alert_webhook_error_count": 0, "spool_drop_recovered_count": 0, "receive_error": None}
         if path.exists():
             try:
                 old = json.loads(path.read_text(encoding="utf-8"))
@@ -354,6 +391,7 @@ class HealthState:
         self.tent_ids = tuple(tent_ids)
         for tent_id in tent_ids:
             self.data["tents"].setdefault(tent_id, {"last_forward_ok_at": None, "first_forward_failure_at": None})
+            self.data["tents"][tent_id].setdefault("primary_failures", {})
         self._bound_unmapped_counts()
         self._save()
 
@@ -379,15 +417,38 @@ class HealthState:
             self.data["last_packet_received_at"] = self.clock().isoformat()
             self._save()
 
+    def receive_result(self, error: str | None) -> None:
+        with self.lock:
+            if error not in (None, "routing", "unmapped"):
+                raise ValueError("Receive-path error kind is invalid; no payload echoed")
+            if error is None and self.data["receive_error"] is None:
+                return
+            self.data["receive_error"] = error
+            self._save()
+
+    def primary_failure(self, tent_id: str, families: list[str]) -> None:
+        with self.lock:
+            state = self.data["tents"][tent_id]
+            stamp = self.clock().isoformat()
+            for family in families:
+                state["primary_failures"].setdefault(family, stamp)
+            if families and state["first_forward_failure_at"] is None:
+                state["first_forward_failure_at"] = stamp
+            self._save()
+
     def forward_result(self, tent_id: str, success: bool, *, outstanding_failure: bool = False,
-                       recovered_spool_drop_count: int | None = None) -> None:
+                       recovered_spool_drop_count: int | None = None,
+                       delivered_primary_families: tuple[str, ...] = ()) -> None:
         with self.lock:
             state = self.data["tents"].setdefault(tent_id, {"last_forward_ok_at": None, "first_forward_failure_at": None})
+            failures = state.setdefault("primary_failures", {})
             if success:
                 state["last_forward_ok_at"] = self.clock().isoformat()
                 if recovered_spool_drop_count is not None:
                     self.data["spool_drop_recovered_count"] = recovered_spool_drop_count
-                if not outstanding_failure:
+                for family in delivered_primary_families:
+                    failures.pop(family, None)
+                if not outstanding_failure and not failures:
                     state["first_forward_failure_at"] = None
             if (not success or outstanding_failure) and state["first_forward_failure_at"] is None:
                 state["first_forward_failure_at"] = self.clock().isoformat()
@@ -402,8 +463,9 @@ class HealthState:
         if (now - parse_time(last_packet)).total_seconds() >= self.quiet_seconds:
             active.add("gateway_quiet")
         for tent_id in self.tent_ids:
-            failed_at = self.data["tents"][tent_id]["first_forward_failure_at"]
-            if failed_at and (now - parse_time(failed_at)).total_seconds() >= self.failure_seconds:
+            state = self.data["tents"][tent_id]
+            failures = [state["first_forward_failure_at"], *state["primary_failures"].values()]
+            if any(stamp and (now - parse_time(stamp)).total_seconds() >= self.failure_seconds for stamp in failures):
                 active.add("forward:" + tent_id)
         return active
 

@@ -249,7 +249,8 @@ tent packet invalid; secondary descriptors also retain their own invalid quality
 
 The default `.spool/` folder contains:
 
-- `queue.jsonl`: write-ahead payloads and terminal transitions.
+- `queue.jsonl`: write-ahead payloads, terminal transitions, eviction
+  decisions and loss-count checkpoints.
 - `dead-letter.jsonl`: sanitized payloads rejected by non-retryable 4xx,
   with fixed reasons such as `http_401`; no response body or token.
 - `spool-stats.json`: persistent drop, dead-letter and torn-tail counters.
@@ -278,10 +279,11 @@ spool limits; partial eviction reports `spool_capacity_drop` and its drop
 count. Tents without deliverable primary metrics remain local diagnostics
 with invalid provenance, and are not sent as unsupported empty-metrics
 requests. No secondary sensor is promoted to fill the gap.
-Owned fields that produce no usable primary metric record a tent failure,
-including secondary-only packets; ordinary channel absence does not.
-The existing failure-duration threshold applies, and only
-a successful delivery for that tent can clear the failure.
+Each observed sensor family without a usable primary records a persistent
+tent failure, even if another family has deliverable metrics. Secondary-only
+packets count; ordinary absence of an entire family does not. The existing
+failure-duration threshold applies. Successful delivery of another family
+cannot clear the missing-primary state; that family's primary must be delivered.
 Queued entries for a tent removed from configuration remain durable and
 make public health return `orphaned_queue` without exposing tent IDs. Restoring
 the same tent permits replay with the original identity and timestamp.
@@ -289,7 +291,7 @@ An enqueue error remains visible in health until a durable enqueue succeeds;
 an empty replay does not prove that the queue can be written. A newer success
 updates its tent's success time while preserving any older outstanding
 delivery failure and its incident time.
-Routing and raw-log write errors also remain visible until receive-path
+Routing and raw-log write errors remain visible across restart until receive-path
 writes succeed. An unmapped-log error requires an actual unmapped append
 to prove recovery. In single-tent mode, configured forwarding with a missing
 or invalid tent ID makes readiness fail; intentionally unconfigured
@@ -315,6 +317,14 @@ logs are also bounded and expose drop counters. If state alone exceeds
 the size cap, delivery stops with a local-state error instead of hiding
 loss. A torn final append is counted and discarded; a corrupt complete
 record or malformed health state fails closed.
+
+Eviction decisions and their absolute loss count are flushed and synced in
+the queue before payloads are removed. Compaction retains a loss-count
+checkpoint, so a crash before the statistics file is updated cannot hide
+the incident or count the same committed eviction twice after restart.
+The checkpoint bytes are included in survivor selection; eviction still
+uses one full compaction. Builds predating these queue record types cannot
+read the updated queue. Preserve it and use a compatible build for recovery.
 
 Optional settings are `ECOWITT_SPOOL_DIR`,
 `ECOWITT_SPOOL_MAX_DAYS`, `ECOWITT_SPOOL_MAX_MB` and
@@ -395,8 +405,8 @@ bunx vitest run src/test/ecowitt-windows-testbench-static-safety.test.ts src/tes
 bun run typecheck
 ```
 
-The TypeScript parity test reads Python assignments through
-`ast.literal_eval` with site packages disabled. It never imports Flask.
+The TypeScript parity test imports the effective Python constants in an
+isolated subprocess with site packages disabled. It never imports Flask.
 The dedicated forwarding workflow runs every existing Python group plus
 routing, delivery/health, integration and redaction tests. All outbound
 requests in those tests are mocked. Synthetic tests and green CI do not

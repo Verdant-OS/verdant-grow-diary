@@ -20,6 +20,56 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_observed_family_without_primary_is_not_hidden_by_other_family_delivery(self):
+        common = {k: v for k, v in self.packet.items() if k in ("PASSKEY", "model", "stationtype", "dateutc")}
+        cases = (
+            ("air", {"temp2f": "80", "humidity2": "60", "soilmoisture1": "30"}, {"temp1f": "77"}),
+            ("soil", {"soilmoisture2": "40", "temp1f": "77"}, {"soilmoisture1": "30"}),
+            ("soil_temp", {"tf_ch2": "77", "temp1f": "77"}, {"tf_ch1": "76"}),
+            ("co2", {"tf_co2": "77", "soilmoisture1": "30"}, {"co2": "800"}),
+        )
+        for family, fields, recovered in cases:
+            with self.subTest(family=family):
+                self.mapping.write_text(json.dumps([tent(air_channels=[1, 2], soil_channels=[1, 2], soil_temp_channels=[1, 2])]))
+                listener._RUNTIME = None
+                packet = {**common, **fields, "dateutc": self.now.strftime("%Y-%m-%d %H:%M:%S")}
+                response = self.post(packet)
+                self.assertTrue(response.get_json()["readings"][0]["metrics"])
+                runtime = listener.get_runtime()
+                runtime.replay_once()  # successful delivery of the other family
+                self.now += timedelta(minutes=10)
+                runtime.health.packet_received()
+                self.assertEqual(self.client.get("/health").status_code, 503)
+                listener._RUNTIME = None
+                restored = listener.get_runtime()
+                self.assertEqual(self.client.get("/health").status_code, 503)
+                self.post({**packet, **recovered, "dateutc": self.now.strftime("%Y-%m-%d %H:%M:%S")})
+                restored.replay_once()
+                self.assertEqual(self.client.get("/health").status_code, 200)
+                self.requests.post.reset_mock()
+
+    def test_raw_receive_failure_remains_unhealthy_across_restart_until_a_real_write(self):
+        self.post()
+        runtime = listener.get_runtime()
+        runtime.replay_once()
+        original_open = Path.open
+        def broken(path, *args, **kwargs):
+            if path == listener.LOG_PATH:
+                raise OSError("synthetic private disk details")
+            return original_open(path, *args, **kwargs)
+        with mock.patch.object(Path, "open", autospec=True, side_effect=broken):
+            self.assertEqual(self.post().status_code, 503)
+            listener._RUNTIME = None
+            restored = listener.get_runtime()
+            self.assertEqual(self.client.get("/health").status_code, 503)
+            self.assertFalse(self.client.get("/status").get_json()["ok"])
+            restored.replay_once()
+            self.assertEqual(self.client.get("/health").status_code, 503)
+        self.assertEqual(self.post().status_code, 200)
+        self.assertEqual(self.client.get("/health").status_code, 200)
+        listener._RUNTIME = None
+        self.assertEqual(self.client.get("/health").status_code, 200)
+
     def test_mapped_mode_requires_ingest_url_at_startup(self):
         for url in (None, "", "   "):
             with self.subTest(url=url):
@@ -87,7 +137,7 @@ class ListenerIntegrationTests(unittest.TestCase):
         self.post()
         runtime = listener.get_runtime()
         old_ids = set(runtime.spool.entries)
-        runtime.spool.max_bytes = runtime.spool._disk_bytes()
+        runtime.spool.max_bytes = runtime.spool._disk_bytes() + 256  # allow incident/checkpoint state, not another reading
         self.now += timedelta(seconds=2)
         packet = {**self.packet, "dateutc": self.now.strftime("%Y-%m-%d %H:%M:%S")}
         forward = self.post(packet).get_json()["forward"]
@@ -129,7 +179,7 @@ class ListenerIntegrationTests(unittest.TestCase):
         listener._RUNTIME = None
         self.assertEqual(self.client.get("/health").status_code, 503)
         common["dateutc"] = self.now.strftime("%Y-%m-%d %H:%M:%S")
-        self.post({**common, "temp1f": "77"})
+        self.post({**common, "temp1f": "77", "co2": "800"})
         listener.get_runtime().replay_once()
         self.assertEqual(self.client.get("/health").status_code, 200)
 

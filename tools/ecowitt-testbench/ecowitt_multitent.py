@@ -29,6 +29,10 @@ CHANNEL_FIELD_MAP = {
 COMMON_FIELDS = {"stationtype", "model", "dateutc", "freq", "runtime", "source", "wh65batt", "wh25batt"}
 UNITS = {"temp_f": "F", "humidity_percent": "%", "soil_moisture_pct": "%",
          "soil_temp_f": "F", "soil_temp_c": "C", "co2_ppm": "ppm", "ec_ms_cm": "mS/cm"}
+PRIMARY_FAMILY_METRICS = {
+    "air": {"temp_f", "humidity_percent"}, "soil": {"soil_moisture_pct", "ec_ms_cm"},
+    "soil_temp": {"soil_temp_f", "soil_temp_c"}, "co2": {"co2_ppm"},
+}
 SECRET_KEYS = {"passkey", "mac", "authorization", "password", "secret", "api_key",
                "apikey", "service" + "_" + "role"}
 # A fixed token boundary prevents retrying at every eyJ inside a long word.
@@ -229,6 +233,10 @@ def gateway_fingerprint(payload: Mapping[str, Any]) -> str:
     return hashlib.sha256(values[0].encode("utf-8")).hexdigest()[:16] if len(values) == 1 else "unknown"
 
 
+def primary_families(metrics: Mapping[str, Any]) -> tuple[str, ...]:
+    return tuple(sorted(kind for kind, names in PRIMARY_FAMILY_METRICS.items() if names.intersection(metrics)))
+
+
 def route_packet(raw: dict[str, Any], tents: tuple[Tent, ...], aliases: tuple[Alias, ...],
                  *, secrets: tuple[str, ...] = ()) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     fingerprint = gateway_fingerprint(raw)
@@ -236,6 +244,7 @@ def route_packet(raw: dict[str, Any], tents: tuple[Tent, ...], aliases: tuple[Al
     packets = [{"tent_id": t.tent_id, "metrics": {}, "invalid": False,
                 "metadata": {"device_id": f"ecowitt:{fingerprint}:gateway", "primary_channels": {},
                              "channels": [], "raw_payload": {}}} for t in tents]
+    observed_families = [set() for _ in tents]
     grouped: dict[str, list[tuple[str, Any]]] = {}
     for key, value in sorted(safe.items()):
         grouped.setdefault(key.lower(), []).append((key, value))
@@ -259,6 +268,7 @@ def route_packet(raw: dict[str, Any], tents: tuple[Tent, ...], aliases: tuple[Al
             unmapped.update(values)
             continue
         packet, t = packets[owner], tents[owner]
+        observed_families[owner].add(kind)
         packet["metadata"]["raw_payload"].update(values)
         unit = alias.unit if alias else UNITS[metric]
         conflicting = len({json.dumps(v, sort_keys=True) for _, v in values}) > 1
@@ -282,7 +292,7 @@ def route_packet(raw: dict[str, Any], tents: tuple[Tent, ...], aliases: tuple[Al
                     packet["metrics"][metric] = value
         else:
             packet["metadata"]["channels"].append(descriptor)
-    for packet in packets:
+    for index, packet in enumerate(packets):
         metrics = packet["metrics"]
         if "soil_temp_f" in metrics and "soil_temp_c" in metrics:
             # Both normalize to the same stored soil-temperature metric. There
@@ -296,4 +306,5 @@ def route_packet(raw: dict[str, Any], tents: tuple[Tent, ...], aliases: tuple[Al
                 metrics["vpd_kpa"] = round(vpd, 6)
             else:
                 packet["invalid"] = True
+        packet["missing_primary_families"] = sorted(observed_families[index] - set(primary_families(metrics)))
     return packets, unmapped

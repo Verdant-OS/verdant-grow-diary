@@ -108,7 +108,7 @@ def validate_health_data(data: dict) -> None:
         raise ValueError()
     if any(type(active) is not bool for active in data["incidents"].values()):
         raise ValueError()
-    for key in ("unmapped_log_dropped_count", "unmapped_overflow_count", "alert_webhook_error_count"):
+    for key in ("unmapped_log_dropped_count", "unmapped_overflow_count", "alert_webhook_error_count", "spool_drop_recovered_count"):
         if type(data[key]) is not int or data[key] < 0:
             raise ValueError()
     stamps = [data["started_at"], data["last_packet_received_at"], data["last_alert_webhook_at"]]
@@ -329,17 +329,19 @@ class HealthState:
                  quiet_seconds: float = 600, failure_seconds: float = 600,
                  alert_interval: float = 60, log: Callable = print,
                  send_alert: Callable | None = None, cleaner: Callable = sanitize,
-                 max_log_bytes: int = 5 * 1024 * 1024, max_days: float = 7, lock: Any = None):
+                 max_log_bytes: int = 5 * 1024 * 1024, max_days: float = 7, lock: Any = None,
+                 spool_drops: Callable[[], int] | None = None):
         self.path, self.clock, self.log, self.send_alert, self.cleaner = path, clock, log, send_alert, cleaner
         self.quiet_seconds, self.failure_seconds, self.alert_interval = quiet_seconds, failure_seconds, alert_interval
         self.max_log_bytes, self.max_days = max_log_bytes, max_days
         self.lock = lock or threading.RLock()
+        self.spool_drops = spool_drops
         self._log_cache: dict = {}
         path.parent.mkdir(parents=True, exist_ok=True)
         self.data = {"started_at": clock().isoformat(), "last_packet_received_at": None,
                      "tents": {}, "unmapped_counts": {}, "unmapped_log_dropped_count": 0, "unmapped_overflow_count": 0,
                      "incidents": {}, "pending_alerts": [], "last_alert_webhook_at": None,
-                     "alert_webhook_error_count": 0}
+                     "alert_webhook_error_count": 0, "spool_drop_recovered_count": 0}
         if path.exists():
             try:
                 old = json.loads(path.read_text(encoding="utf-8"))
@@ -377,11 +379,14 @@ class HealthState:
             self.data["last_packet_received_at"] = self.clock().isoformat()
             self._save()
 
-    def forward_result(self, tent_id: str, success: bool, *, outstanding_failure: bool = False) -> None:
+    def forward_result(self, tent_id: str, success: bool, *, outstanding_failure: bool = False,
+                       recovered_spool_drop_count: int | None = None) -> None:
         with self.lock:
             state = self.data["tents"].setdefault(tent_id, {"last_forward_ok_at": None, "first_forward_failure_at": None})
             if success:
                 state["last_forward_ok_at"] = self.clock().isoformat()
+                if recovered_spool_drop_count is not None:
+                    self.data["spool_drop_recovered_count"] = recovered_spool_drop_count
                 if not outstanding_failure:
                     state["first_forward_failure_at"] = None
             if (not success or outstanding_failure) and state["first_forward_failure_at"] is None:
@@ -391,6 +396,8 @@ class HealthState:
     def _active_incidents(self) -> set[str]:
         now = self.clock()
         active = set()
+        if self.spool_drops is not None and self.spool_drops() != self.data["spool_drop_recovered_count"]:
+            active.add("spool_data_drop")
         last_packet = self.data["last_packet_received_at"] or self.data["started_at"]
         if (now - parse_time(last_packet)).total_seconds() >= self.quiet_seconds:
             active.add("gateway_quiet")
@@ -451,7 +458,8 @@ class HealthState:
                     continue
                 self.data["incidents"][key] = is_active
                 kind = "alert" if is_active else "recovery"
-                reason = "forward_failure" if key.startswith("forward:") else "gateway_quiet"
+                reason = ("forward_failure" if key.startswith("forward:") else
+                          "spool_data_drop" if key == "spool_data_drop" else "gateway_quiet")
                 transition = {"event": kind, "reason": reason, "incident": key,
                            "message": f"Ecowitt listener {kind}: {reason}"}
                 self.log(transition)

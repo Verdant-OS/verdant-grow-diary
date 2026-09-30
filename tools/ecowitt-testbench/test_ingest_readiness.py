@@ -20,6 +20,34 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_evicted_older_batch_stays_unhealthy_until_durable_delivery_after_restart(self):
+        self.post()
+        runtime = listener.get_runtime()
+        old_ids = set(runtime.spool.entries)
+        runtime.spool.max_bytes = runtime.spool._disk_bytes()
+        self.now += timedelta(seconds=2)
+        packet = {**self.packet, "dateutc": self.now.strftime("%Y-%m-%d %H:%M:%S")}
+        forward = self.post(packet).get_json()["forward"]
+        self.assertTrue(forward["queued"])
+        self.assertEqual(forward["dropped_count"], 0)  # both current entries survived
+        self.assertFalse(old_ids & set(runtime.spool.entries))
+        self.assertGreater(runtime.spool.stats["dropped_count"], 0)
+        response = self.client.get("/health")
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("spool_data_drop", response.get_json()["reasons"])
+        listener._RUNTIME = None
+        restored = listener.get_runtime()
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        self.requests.post.return_value.status_code = 503
+        restored.replay_once()
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        self.now += timedelta(seconds=6)
+        self.requests.post.return_value.status_code = 200
+        restored.replay_once()
+        self.assertEqual(self.client.get("/health").status_code, 200)
+        listener._RUNTIME = None
+        self.assertEqual(self.client.get("/health").status_code, 200)
+
     def test_secondary_only_owned_data_records_failure_without_promotion(self):
         self.mapping.write_text(json.dumps([tent(air_channels=[1, 2], soil_channels=[1], soil_temp_channels=[1])]))
         runtime = listener.get_runtime()

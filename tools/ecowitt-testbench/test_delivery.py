@@ -311,6 +311,24 @@ class DeliveryTests(DeliveryFixture):
 
 
 class HealthTests(DeliveryFixture):
+    def test_spool_drop_incident_recovers_only_through_matching_durable_count(self):
+        dropped = 1
+        state = self.health(spool_drops=lambda: dropped, alert_interval=0)
+        state.packet_received()
+        self.assertIn("spool_data_drop", state.status()["reasons"])
+        state.tick()
+        self.assertTrue(any(m.get("event") == "alert" and m.get("reason") == "spool_data_drop" for m in self.messages))
+        state.forward_result("tent-a", True)
+        self.assertIn("spool_data_drop", state.status()["reasons"])
+        dropped = 2  # another eviction while an earlier delivery was completing
+        state.forward_result("tent-a", True, recovered_spool_drop_count=1)
+        self.assertIn("spool_data_drop", state.status()["reasons"])
+        state.forward_result("tent-a", True, recovered_spool_drop_count=2)
+        state.tick()
+        self.assertTrue(state.status()["ok"])
+        self.assertTrue(self.health(spool_drops=lambda: dropped).status()["ok"])
+        self.assertTrue(any(m.get("event") == "recovery" and m.get("reason") == "spool_data_drop" for m in self.messages))
+
     def setUp(self):
         super().setUp()
         self.messages = []
@@ -489,6 +507,9 @@ class HealthTests(DeliveryFixture):
             {"unmapped_counts": {"unknown": True}},
             {"incidents": {"gateway_quiet": "do-not-print"}},
             {"pending_alerts": ["do-not-print"]},
+            {"spool_drop_recovered_count": -1},
+            {"spool_drop_recovered_count": True},
+            {"spool_drop_recovered_count": "do-not-print"},
         ):
             with self.subTest(corrupted=corrupted):
                 (self.root / "state.json").write_text(json.dumps({**original, **corrupted}))

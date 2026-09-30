@@ -328,13 +328,21 @@ an already running listener.
 after a gateway quiet period. Quiet delivery still reports `ok: false`
 and `gateway_quiet` in the response; the HTTP status does not classify
 sensor readings as healthy. Sustained `forward_failure` or
-`local_delivery_state_error` still returns `503`, including when the
+`local_delivery_state_error`, and any unrecovered `spool_data_drop`, return
+`503`, including when the
 gateway is also quiet. `GET /status` retains the same delivery warnings.
 `last_packet_received_at` records gateway-shaped, non-loopback traffic.
 Each tent has a persistent `last_forward_ok_at` and first failure time.
 A 2xx acknowledgement updates the forward time even if no row was inserted.
 Repeated invalid gateway timestamps count as local delivery failures, so
 continuing malformed traffic cannot keep delivery health green indefinitely.
+
+Evicting pending readings immediately records `spool_data_drop`, including
+when only an older batch is lost and the current batch survives. The incident
+persists across restart and failed replay. A subsequent successful delivery
+must record its terminal transition durably before recording recovery; any
+new drops during that transition remain active. Recovery confirms resumed
+delivery, while the permanent drop counter still records the lost readings.
 
 The default quiet and sustained-failure thresholds are 600 seconds.
 Set `ECOWITT_QUIET_SECONDS` or `ECOWITT_FORWARD_FAILURE_SECONDS`

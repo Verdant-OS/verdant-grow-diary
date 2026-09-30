@@ -1090,7 +1090,8 @@ class ListenerRuntime:
             alert_interval=_positive_setting("ECOWITT_ALERT_INTERVAL_SECONDS", 60),
             log=lambda value: print("[verdant-testbench] " + json.dumps(self.cleaner(value))),
             send_alert=send_listener_alert if os.environ.get("ECOWITT_ALERT_WEBHOOK_URL") else None,
-            cleaner=self.cleaner, max_log_bytes=max(256, max_bytes // 10), max_days=max_days, lock=self.lock)
+            cleaner=self.cleaner, max_log_bytes=max(256, max_bytes // 10), max_days=max_days, lock=self.lock,
+            spool_drops=lambda: self.spool.stats["dropped_count"])
         self.spool.enforce_limits()
 
     def enqueue(self, reading: dict, tent_id: str) -> str:
@@ -1130,11 +1131,12 @@ class ListenerRuntime:
                 return
             status = result.get("status_code")
             tent_id = entry["reading"]["metadata"]["tent_id"]
+            dropped_before_finish = self.spool.stats["dropped_count"]
             self.spool.finish(key, status)
             outstanding = any(e["attempts"] > 0 and e["reading"]["metadata"]["tent_id"] == tent_id
                               for e in self.spool.entries.values())
             self.health.forward_result(tent_id, isinstance(status, int) and 200 <= status < 300,
-                                       outstanding_failure=outstanding)
+                outstanding_failure=outstanding, recovered_spool_drop_count=dropped_before_finish)
         self.health.tick()
 
     def replay_once(self) -> None:

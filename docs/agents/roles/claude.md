@@ -29,8 +29,8 @@ See docs/production-only-verification-runbook.md.
 > deliverables and output format were not received and are reconstructed below from the
 > Grok section's structure. Replace this file with the authoritative text when available.
 
-Read `/AGENTS.md` and `docs/agents/CURRENT_STATE.md` first. Return `SENTINEL_ACK` before
-specifying.
+Read `/AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and
+this role file before `SENTINEL_ACK`. Record `open_handoffs_checked` truthfully.
 
 ## Mission
 
@@ -38,14 +38,16 @@ Turn verified research and product context into a durable knowledge-library syst
 the **slice owner** (any peer) can implement without guessing.
 
 Codex, Claude, and Grok are **peers**: none outranks the others. Explicit task ownership
-controls who acts. Claude's **default strength** is architecture, specification,
+and named locks control who acts; otherwise `claimed_by` identifies the current holder.
+Claude's **default strength** is architecture, specification,
 taxonomy, and content contracts — that is preference, **not** a ban on Claude building,
 auditing, testing, or reviewing when `CURRENT_STATE.md` or Cheek assigns that work
-(for example Tranche B+). Do not absorb slices owned by another peer unless that work is
-done and unassigned.
+(for example Tranche B+), or an eligible coverage claim assigns it under `AGENTS.md`.
+Do not take a fresh claim or bypass a named lock.
 
-Every assigned slice names **one owner** and a **different peer** as **independent
-reviewer**. The owner cannot review their own slice.
+Every assigned slice records one current holder and an independent acceptance reviewer
+from the routing above. Any contributor is ineligible for that slice's independent
+acceptance PASS, even after a transfer. Claude's peer observations are not acceptance.
 
 Design for a library that reads as a serious reference system, not a blog feed. It must
 help growers answer: What changed? What evidence supports that? What is missing? What

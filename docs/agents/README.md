@@ -33,7 +33,7 @@ platform actually auto-loads.
 ```text
 ROOT — auto-loaded by the platforms
   AGENTS.md                      universal constitution (canonical)
-  CLAUDE.md                      imports constitution + Claude role; requires a pre-ack read of CURRENT_STATE.md
+  CLAUDE.md                      imports constitution + Claude role; requires pre-ack reads of CURRENT_STATE.md and HANDOFF_LOG.md
   GEMINI.md                      mirrors the full constitution + Gemini role
   .grok/rules/verdant-grok-role.md   Grok's automatic role rules
 
@@ -42,6 +42,7 @@ ROLE DOCUMENTS
 
 OPERATING STATE
   docs/agents/CURRENT_STATE.md   the changing shift report
+  docs/agents/HANDOFF_LOG.md     current task claims and resumable coverage blocks
   docs/agents/HANDOFF_PROTOCOL.md  handoff format and rules
   docs/agents/cheek-approval-workflow.md  Cheek ship-authority decision workflow
   docs/agents/merge-queue.md       deploy-branch merge queue + snapshot script
@@ -52,23 +53,26 @@ HISTORICAL — never active instructions
 
 ## Which files each agent loads
 
-| Agent         | Auto-loads                                | Must also read                                                            |
-| ------------- | ----------------------------------------- | ------------------------------------------------------------------------- |
-| Codex         | `AGENTS.md`                               | `docs/agents/roles/codex.md`, `CURRENT_STATE.md`                          |
-| Claude        | `CLAUDE.md` (imports constitution + role) | `CURRENT_STATE.md` — not imported since #1094; read before `SENTINEL_ACK` |
-| Grok          | `AGENTS.md`, `.grok/rules/*`              | `docs/agents/roles/grok.md`, `CURRENT_STATE.md`                           |
-| Gemini        | `GEMINI.md`                               | `docs/agents/roles/gemini.md`, `CURRENT_STATE.md`                         |
-| Security      | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/security.md`              |
-| Council Chair | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/council-chair.md`         |
+| Agent         | Auto-loads                                | Must also read                                                                      |
+| ------------- | ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| Codex         | `AGENTS.md`                               | `docs/agents/roles/codex.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                  |
+| Claude        | `CLAUDE.md` (imports constitution + role) | `CURRENT_STATE.md`, `HANDOFF_LOG.md` — read before `SENTINEL_ACK`                   |
+| Grok          | `AGENTS.md`, `.grok/rules/*`              | `docs/agents/roles/grok.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                   |
+| Gemini        | `GEMINI.md`                               | `docs/agents/roles/gemini.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                 |
+| Security      | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`, `roles/security.md`      |
+| Council Chair | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`, `roles/council-chair.md` |
 
-Every agent also reads `docs/agents/HANDOFF_LOG.md` right after `SENTINEL_ACK` and
-resumes the highest-priority open block if it has no higher-priority assignment.
+Every agent reads `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK` and records
+`open_handoffs_checked`. After acknowledgment, keep an explicit assignment. If
+unassigned, select the highest-priority eligible unclaimed or older-than-24-hours
+open block under `AGENTS.md`; do not take a fresh claim or bypass a named lock.
 
 Grok is Verdant's **Product Intelligence, Adversarial Audit, and Implementation Lead**
 (Cheek, 2026-08-20, refined): equally empowered to research, audit the live app,
 implement assigned slices, test, and independently review. Codex, Claude, and Grok
 retain different default strengths but **none outranks the others** — explicit task
-ownership controls. See `docs/agents/roles/grok.md` and
+assignments and named locks control; otherwise `claimed_by` identifies the current
+task holder. See `docs/agents/roles/grok.md` and
 `docs/agents/grok-peer-elevation-map-2026-08-20.md`.
 
 Verify Grok's discovery with `grok inspect`.

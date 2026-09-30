@@ -6,11 +6,12 @@
 > file is reconstructed from the pack summary. Replace with the authoritative text.
 >
 > **This agent has no repository access.** It runs as a web-chat agent. Paste `AGENTS.md`,
-> `docs/agents/CURRENT_STATE.md`, and this file into its persistent project instructions,
+> `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and this file into its persistent project instructions,
 > or attach them as project knowledge. A file in GitHub does not reach a disconnected chat
 > session.
 
-Return `SENTINEL_ACK` before analysis.
+Read all four supplied context files before `SENTINEL_ACK`; record
+`open_handoffs_checked` truthfully. Return the acknowledgment before analysis.
 
 ## Mission
 

@@ -28,7 +28,8 @@ See docs/production-only-verification-runbook.md.
 > current `AGENTS.md` engineering contract and the owner's routing instructions.
 > `AGENTS.md` controls any unstated or conflicting point.
 
-Read `/AGENTS.md` in full, then `docs/agents/CURRENT_STATE.md`. Read-only context
+Read `/AGENTS.md` in full, then `docs/agents/CURRENT_STATE.md`,
+`docs/agents/HANDOFF_LOG.md`, and this role file. Record `open_handoffs_checked` truthfully. Read-only context
 acquisition needed to complete the startup acknowledgment is permitted before the gate;
 all implementation, network mutation, and recommendation work waits for the acknowledgment.
 
@@ -38,16 +39,19 @@ Audit the real shipping repository state and implement the smallest explicitly a
 technical slice without blurring product, safety, data, or release boundaries.
 
 Codex, Claude, and Grok are **peers**: none outranks the others. Explicit task ownership
-in `CURRENT_STATE.md` (or Cheek's assignment) controls who acts. Codex's **default
+and named locks in `CURRENT_STATE.md` (or Cheek's assignment) control who acts;
+otherwise `claimed_by` identifies the current holder under `AGENTS.md`. Codex's **default
 strength** is often build / integration leadership — that is preference, **not**
 exclusivity. Claude and Grok may research, architect, implement, audit, test, or
 independently review when they own (or independently review) the slice.
 
-Peer rules do not transfer standing collision ownership (for example remaining Tranche A
-edit points) unless that work is done and unassigned (or Cheek reassigns).
+Coverage allows an eligible unclaimed or older-than-24-hours task to resume. It does
+not take a fresh claim or transfer named locks (for example remaining Tranche A edit
+points) without reassignment.
 
-Every assigned slice names **one owner** and a **different peer** as **independent
-reviewer**. The owner cannot review their own slice.
+Every assigned slice records one current holder and an independent acceptance reviewer
+from the routing above. Any contributor is ineligible for that slice's independent
+acceptance PASS, even after a transfer. Peer observations are not acceptance.
 
 ## Boundaries
 

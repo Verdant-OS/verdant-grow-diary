@@ -6,7 +6,8 @@ Operating order is sequential for a given slice. Parallel implementation of the 
 slice by multiple agents is the failure this protocol exists to prevent.
 
 **Peers (Cheek, 2026-08-20, refined):** Codex, Claude, and Grok have equal authority.
-None outranks the others. Explicit task ownership controls who researches, architects,
+None outranks the others. Explicit assignments, named locks and the current coverage
+claim control who researches, architects,
 implements, audits, tests, or independently reviews. Default strengths differ (Grok:
 product intelligence / adversarial audit / implementation; Claude: specs & knowledge
 architecture; Codex: often build / integration) — preference, not exclusivity. Peer
@@ -18,12 +19,16 @@ Alerts / Action Queue rewrite).
 
 Tasks are not owned by agents. Every open task has a coverage block in
 `docs/agents/HANDOFF_LOG.md` (see `AGENTS.md`, Agent Handoff / Coverage), and any agent
-may resume it after setting `claimed_by`. Every slice names:
+may resume an eligible unclaimed or older-than-24-hours block after setting `claimed_by`.
+Keep explicit assignments and named locks; a fresh claim is not available for takeover.
+Every slice names:
 
 1. **The current claim**: the agent building it now, recorded in the log
 2. **One independent reviewer**: an agent that has not touched the slice
 
-No agent that touched a slice can review it. Use the HANDOFF block below for a deliberate
+No agent that contributed to a slice can give its independent acceptance PASS.
+Contributors may provide peer observations, which do not replace independent acceptance.
+Use the HANDOFF block below for a deliberate
 transfer between roles; use the log block for day-to-day coverage. Keep the same branch,
 confirm its remote head, and merge from base; never rename, recreate or force-push it.
 
@@ -71,8 +76,8 @@ to_agent:
 sentinel_version:
 date:
 
-slice_owner:
-independent_reviewer: Blue Dream or Critical Mass, selected by scope/priority
+task_id:
+independent_reviewer: Blue Dream or Critical Mass by scope/priority; Durban Poison if independently assigned
 claimed_by:
 last_updated:
 
@@ -102,8 +107,10 @@ files_touched:
   - paths, or "none"
 ```
 
-The owner and acceptance reviewer must be independent. Route to Blue Dream
-for any .tsx file, any P1 or a publish gate; otherwise Critical Mass.
+The current holder and acceptance reviewer must be independent; changing the claim
+does not erase earlier contributions. Route to Blue Dream for .tsx outside src/test/,
+any P1 or a publish gate; otherwise Critical Mass. Durban Poison may provide acceptance
+when independently assigned.
 Security/Gemini/Claude observations do not replace that acceptance. Name the
 exact head SHA; routing is not a completed PASS. State NOT_MEASURED if unassigned.
 

@@ -146,18 +146,23 @@ agent from one written block.
 - **When to update it.** At least once a day while the task is open, and always before the
   agent stops, hands off, or expects to run out of budget. A block older than 24 hours, or
   with no `claimed_by`, is open for anyone.
-- **Anyone may resume.** The handoff block is the only context a resuming agent needs.
-  Before resuming, set `claimed_by` to yourself with the time; from then on you hold the
+- **Eligible coverage.** Any agent may resume an unclaimed block or one whose
+  `last_updated` is older than 24 hours, subject to explicit assignments and named locks.
+  A fresh claim is not available for takeover. The handoff block carries the context
+  needed to resume. Before resuming, set `claimed_by` to yourself with the time; from then on you hold the
   branch and the previous holder stops pushing. Run the block's checkout command, confirm
   `git rev-parse origin/<branch>` matches the block's head SHA, then merge from base and
   continue on the same branch. Never rename, recreate, or force-push it.
-- **Coverage on startup.** After `SENTINEL_ACK`, read `docs/agents/HANDOFF_LOG.md`. If you
-  have no assigned task, or your assigned task is lower priority, resume the
-  highest-priority open block. Priority order: publish gate, then P1, then P2, then
-  everything else. Ties go to the oldest `last_updated`.
+- **Coverage on startup.** Read `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK`
+  and truthfully record `open_handoffs_checked`. After the acknowledgment, keep an
+  explicit assignment. If you have no assigned task, select the highest-priority
+  eligible open block: unclaimed or older than 24 hours, with no conflicting assignment
+  or named lock. Priority order: publish gate, then P1, then P2, then everything else.
+  Ties go to the oldest `last_updated`.
 - **Role seats still hold.** Resuming a task does not change who merges, who reviews, or
   who owns CI; those stay as `docs/agents/OWNERSHIP.md` lists them. An agent that touched
-  a task can never be its independent reviewer.
+  a task can never give its independent acceptance PASS. Peer observations do not
+  replace independent acceptance.
 - **Closing.** When a task merges, is superseded, or is dropped, mark the block `CLOSED`
   with the reason and the final SHA, and move it to the log's Closed section the same day.
 
@@ -670,7 +675,8 @@ Agent Handoff / Coverage. Claim it in the log first. Do not start a second imple
 of a task someone else has claimed within the last 24 hours.
 
 Codex, Claude, and Grok are **peers**: none outranks the others (Cheek, 2026-08-20,
-refined). Explicit task ownership controls who researches, architects, implements,
+refined). Explicit assignments, named locks and the current coverage claim control
+who researches, architects, implements,
 audits, tests, or independently reviews. Default strengths differ; they are preference,
 not exclusivity. Standing collision fences in `CURRENT_STATE.md` still bind (for
 example remaining Tranche A edit points for Codex, Tranche B+ product code for Claude,

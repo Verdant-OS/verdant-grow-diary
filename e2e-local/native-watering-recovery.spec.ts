@@ -29,13 +29,17 @@ async function openQuickLog(page: Page): Promise<void> {
 }
 
 async function pendingWater(page: Page, ownerId: string): Promise<Row | null> {
-  // Read this operation only; never enumerate auth/session storage.
-  const raw = await page.evaluate(
-    (key) => sessionStorage.getItem(key),
+  // Read this operation only; never enumerate auth/session storage. Typed Water
+  // recovery is tab-scoped, and its private payload must not be copied into
+  // localStorage while the original claim is pending or after it clears.
+  const { pending, shared } = await page.evaluate(
+    (key) => ({ pending: sessionStorage.getItem(key), shared: localStorage.getItem(key) }),
     "verdant:quick-log:pending-watering:v1:" + ownerId,
   );
-  if (raw === null) return null;
-  const value: unknown = JSON.parse(raw);
+  if (shared !== null)
+    throw new Error("Typed Water copied a private recovery claim to shared storage.");
+  if (pending === null) return null;
+  const value: unknown = JSON.parse(pending);
   if (!isRow(value)) throw new Error("Pending Water envelope is malformed.");
   return value;
 }
@@ -266,6 +270,17 @@ for (const mode of ["close/reopen", "reload onto another plant"] as const) {
         "Source: manual",
       );
       await expect(card.getByTestId("timeline-sensor-source-badge-live")).toHaveCount(0);
+
+      // The typed history card must reopen the committed watering amount,
+      // not merely the companion Timeline note after an exact retry.
+      const history = page.getByTestId("watering-history-panel");
+      const historyRow = history.locator("li").filter({ hasText: note });
+      await expect(historyRow).toHaveCount(1);
+      await expect(historyRow.getByTestId("watering-history-source")).toHaveAttribute(
+        "data-source",
+        "manual",
+      );
+      await expect(historyRow).toContainText("750 ml");
     } finally {
       await page.close();
       await f.cleanup();

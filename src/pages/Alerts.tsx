@@ -25,6 +25,7 @@ import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
 import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
 import AlertsContextHeaderForGrow from "@/components/AlertsContextHeaderForGrow";
 import AlertsEmptyStateSnapshotCta from "@/components/AlertsEmptyStateSnapshotCta";
+import { useAlertsPresentationClock } from "@/hooks/useAlertsPresentationClock";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import { pickAlertsGrowContext } from "@/lib/alertFreshnessContext";
 import { plantsForAlertPersistence } from "@/lib/alertPlantStageScopeRules";
@@ -98,6 +99,7 @@ const STATUS_TONE: Record<AlertStatusRow, string> = {
 };
 
 export default function Alerts() {
+  const presentationClock = useAlertsPresentationClock();
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const scopedGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : undefined;
   // A grow id was passed in the URL but doesn't map to a grow the viewer
@@ -278,6 +280,7 @@ export default function Alerts() {
 
       {headerContext ? (
         <AlertsContextHeaderForGrow
+          clock={presentationClock}
           growId={headerContext.growId}
           growName={headerContext.growName}
           stage={headerContext.stage}
@@ -395,7 +398,10 @@ export default function Alerts() {
           />
           {headerContext ? (
             <>
-              <AlertsEmptyStateSnapshotCta growId={headerContext.growId} />
+              <AlertsEmptyStateSnapshotCta
+                growId={headerContext.growId}
+                clock={presentationClock}
+              />
               <div className="mt-3 flex flex-wrap gap-2 justify-center">
                 <Button
                   size="sm"

@@ -109,13 +109,24 @@ function executeSqlExpectFailure(sql, env, stage, spawnImpl = spawnSync) {
   return formatPsqlFailureCode(stage, result?.stderr);
 }
 
-function extractFunctionDefinition(relativePath, functionPrefix, terminator) {
-  const source = readFileSync(resolve(repoRoot, relativePath), "utf8");
+export function extractFunctionDefinitionFromSource(sourceText, functionPrefix, terminator) {
+  // Windows can check out the same immutable migration blob with CRLF. Work
+  // from its committed LF shape so the harness's exact source edits remain
+  // deterministic without changing any published migration file.
+  const source = sourceText.replace(/\r\n/g, "\n");
   const start = source.indexOf(functionPrefix);
   if (start < 0) throw new Error("dependency_source_missing");
   const end = source.indexOf(`\n${terminator}`, start);
   if (end < 0) throw new Error("dependency_source_malformed");
   return source.slice(start, end + terminator.length + 1);
+}
+
+function extractFunctionDefinition(relativePath, functionPrefix, terminator) {
+  return extractFunctionDefinitionFromSource(
+    readFileSync(resolve(repoRoot, relativePath), "utf8"),
+    functionPrefix,
+    terminator,
+  );
 }
 
 const hasRoleDefinition = extractFunctionDefinition(
@@ -282,6 +293,39 @@ function readRequiredCoreCatalog(env, spawnImpl) {
     spawnImpl,
   });
   return parseQuickLogCatalogContract(`${stdout}\n`);
+}
+
+// The hosted core-schema gate uses -c with --single-transaction, whereas this
+// harness normally sends SQL through stdin. Check that exact transport on the
+// disposable database before attributing a hosted psql failure to schema drift.
+function proveRequiredCoreCatalogCliParity(env, spawnImpl) {
+  const viaStdin = readRequiredCoreCatalog(env, spawnImpl);
+  const result = spawnImpl(
+    "psql",
+    [
+      ...buildPsqlArgs({ quiet: true }),
+      "--single-transaction",
+      "-c",
+      QUICKLOG_CORRECTIONS_CATALOG_SQL,
+    ],
+    { encoding: "utf8", env, maxBuffer: MAX_PSQL_OUTPUT_BYTES },
+  );
+  if (result?.error || result?.status !== 0) {
+    throw new Error(`required_core_catalog_cli:${String(result?.status ?? "not_invocable")}`);
+  }
+  const viaCli = parseQuickLogCatalogContract(`${String(result.stdout ?? "").trim()}\n`);
+  if (JSON.stringify(viaCli) !== JSON.stringify(viaStdin)) {
+    throw new Error("required_core_catalog_cli:mismatch");
+  }
+  const rejectedSql = spawnImpl(
+    "psql",
+    [...buildPsqlArgs({ quiet: true }), "--single-transaction", "-c", "select 1/0;"],
+    { encoding: "utf8", env, maxBuffer: MAX_PSQL_OUTPUT_BYTES },
+  );
+  if (rejectedSql?.error || rejectedSql?.status === 0 || rejectedSql?.status == null) {
+    throw new Error("required_core_catalog_cli:negative_probe_unexpected");
+  }
+  process.stdout.write(`Quick Log catalog -c SQL rejection status: ${rejectedSql.status}\n`);
 }
 
 function injectBeforeUniqueMarker(sql, marker, injectedSql) {
@@ -635,6 +679,7 @@ export async function runPg15Harness({
     attestDisposableTarget(env, spawnImpl);
     resetScaffold(env, spawnImpl);
     proveBaselineAndApply(env, spawnImpl);
+    proveRequiredCoreCatalogCliParity(env, spawnImpl);
     proveFiveFunctionFingerprints(env, spawnImpl);
     proveClientAccessFences(env, spawnImpl);
     proveHostilePolicyDrift(env, spawnImpl);

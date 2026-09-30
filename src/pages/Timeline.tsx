@@ -188,6 +188,8 @@ import {
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 import { SENSOR_SOURCE_KINDS, SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
+import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
+import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
 import {
   parseTimelineHighlightToken,
   diaryEntryMatchesHighlight,
@@ -881,30 +883,53 @@ export default function Timeline() {
                 setManualSensorHistoryLimited(false);
                 return;
               }
-              let sensorQuery = effectiveSensorReadingsQuery()
+              // Captured rows and legacy rows need separate bounded reads:
+              // filtering or ordering everything by ts would hide a backdated
+              // capture in the correct observation-date window, while sorting
+              // null captured_at last can hide a newer legacy reading.
+              let capturedQuery = effectiveSensorReadingsQuery()
                 .select("*")
                 .in("tent_id", tentIds)
                 .eq("source", "manual")
+                .not("captured_at", "is", null)
                 .order("captured_at", { ascending: false, nullsFirst: false })
                 .order("ts", { ascending: false })
                 .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
+              let legacyQuery = effectiveSensorReadingsQuery()
+                .select("*")
+                .in("tent_id", tentIds)
+                .eq("source", "manual")
+                .is("captured_at", null)
+                .order("ts", { ascending: false })
+                .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
               if (timelineDateRangeBounds.startIso) {
-                sensorQuery = sensorQuery.gte("ts", timelineDateRangeBounds.startIso);
+                capturedQuery = capturedQuery.gte("captured_at", timelineDateRangeBounds.startIso);
+                legacyQuery = legacyQuery.gte("ts", timelineDateRangeBounds.startIso);
               }
               if (timelineDateRangeBounds.endIso) {
-                sensorQuery = sensorQuery.lte("ts", timelineDateRangeBounds.endIso);
+                capturedQuery = capturedQuery.lte("captured_at", timelineDateRangeBounds.endIso);
+                legacyQuery = legacyQuery.lte("ts", timelineDateRangeBounds.endIso);
               }
-              const sensorResult = await sensorQuery;
+              const [capturedResult, legacyResult] = await Promise.all([
+                capturedQuery,
+                legacyQuery,
+              ]);
               if (!isCurrentRequest()) return;
-              if (sensorResult.error || !Array.isArray(sensorResult.data)) {
+              if (
+                capturedResult.error ||
+                !Array.isArray(capturedResult.data) ||
+                legacyResult.error ||
+                !Array.isArray(legacyResult.data)
+              ) {
                 markPartial("manual_sensor_readings");
                 setManualSensorMeasurementEntries([]);
                 setManualSensorHistoryLimited(false);
                 return;
               }
-              const manualPage = completeManualSensorTimelineRows(
-                requireEffectiveSensorReadings(sensorResult.data),
-              );
+              const manualPage = completeManualSensorTimelineRows([
+                ...requireEffectiveSensorReadings(capturedResult.data),
+                ...requireEffectiveSensorReadings(legacyResult.data),
+              ]);
               let receipts = manualSensorReadingsToTimelineEntries(manualPage.rows, new Date());
               if (timelineDateRangeBounds.startIso) {
                 receipts = receipts.filter(
@@ -2540,7 +2565,19 @@ export default function Timeline() {
                                 <span title={format(new Date(e.entry_at), "PPpp")}>
                                   {formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}
                                 </span>
-                                {!isTimelineSensorDerivedDiaryId(e.id) ? (
+                                {!isTimelineSensorDerivedDiaryId(e.id) &&
+                                isLinkedQuickLogDiaryDetails(e.details) ? (
+                                  <QuickLogEntryIntegrityControls
+                                    handle={{ diaryEntryId: e.id }}
+                                    currentNote={e.note}
+                                    currentOccurredAt={e.entry_at}
+                                    currentPlantId={e.plant_id ?? null}
+                                    plantId={e.plant_id ?? null}
+                                    tentId={e.tent_id ?? null}
+                                    growId={loopGrowId}
+                                    onChanged={() => void load()}
+                                  />
+                                ) : !isTimelineSensorDerivedDiaryId(e.id) ? (
                                   <>
                                     <button
                                       type="button"
@@ -2555,7 +2592,12 @@ export default function Timeline() {
                                       Edit
                                     </button>
                                     <DiaryEntryRemoveButton
-                                      entry={{ id: e.id, photoUrl: e.photo_url, kind: "diary" }}
+                                      entry={{
+                                        id: e.id,
+                                        photoUrl: e.photo_url,
+                                        kind: "diary",
+                                        details: e.details,
+                                      }}
                                       viewer={{ currentUserId: user }}
                                       plantName={plantName}
                                       plantId={e.plant_id ?? null}

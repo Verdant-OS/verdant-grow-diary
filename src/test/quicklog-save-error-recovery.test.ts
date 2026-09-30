@@ -12,18 +12,51 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyQuickLogThrownSaveError,
+  canDiscardQuickLogHistoryDraft,
   describeQuickLogSaveFailure,
+  quickLogDraftPreservedFailureMessage,
   quickLogReasonToOperatorMessage,
+  quickLogSaveRequiresHistoryCheck,
   quickLogSaveRecoveryAction,
 } from "@/lib/quickLogSaveErrorMessage";
 
 const GENERIC_MESSAGE = quickLogReasonToOperatorMessage("some_unknown_reason_code");
 const GENERIC_RECOVERY = quickLogSaveRecoveryAction("some_unknown_reason_code");
 
+describe("explicit history-review draft resolution", () => {
+  const input = {
+    historyCheckRequired: true,
+    inFlight: false,
+    currentOwnerId: "owner-1",
+    draftOwnerId: "owner-1",
+  };
+  it("allows only the current owner of an idle history-review draft, deterministically", () => {
+    expect(canDiscardQuickLogHistoryDraft(input)).toBe(true);
+    expect(canDiscardQuickLogHistoryDraft(input)).toBe(canDiscardQuickLogHistoryDraft(input));
+  });
+  it.each([
+    null,
+    undefined,
+    { ...input, historyCheckRequired: false },
+    { ...input, inFlight: true },
+    { ...input, currentOwnerId: null },
+    { ...input, currentOwnerId: "" },
+    { ...input, currentOwnerId: "   ", draftOwnerId: "   " },
+    { ...input, currentOwnerId: "other-owner" },
+    { ...input, draftOwnerId: undefined },
+  ])("refuses unresolved or foreign context %j", (context) => {
+    expect(canDiscardQuickLogHistoryDraft(context)).toBe(false);
+  });
+});
+
 /** Every soft-failure reason the deployed wrapper + delegate can return. */
 const SERVER_REASONS = [
   "not_authenticated",
   "invalid_idempotency_key",
+  "idempotency_key_unverified",
+  "idempotency_receipt_missing",
+  "idempotency_key_retracted",
+  "idempotency_key_conflict",
   "invalid_target_type",
   "missing_target_id",
   "unsupported_action",
@@ -32,6 +65,7 @@ const SERVER_REASONS = [
   "invalid_logged_at",
   "target_not_owned",
   "grow_not_owned",
+  "plant_tent_grow_mismatch",
   "save_failed",
 ] as const;
 
@@ -92,8 +126,38 @@ describe("quickLogSaveRecoveryAction — every failure states what to do next", 
     }
   });
 
+  it("explains a plant/tent grow mismatch and how to correct the assignment", () => {
+    const message = quickLogReasonToOperatorMessage("plant_tent_grow_mismatch");
+    const recovery = quickLogSaveRecoveryAction("plant_tent_grow_mismatch");
+    expect(message).not.toBe(GENERIC_MESSAGE);
+    expect(message).toMatch(/plant.*tent.*another grow/i);
+    expect(message).toMatch(/not saved/i);
+    expect(recovery).not.toBe(GENERIC_RECOVERY);
+    expect(recovery).toMatch(/correct the assignment.*retry/i);
+  });
+
   it("network failures reassure that input is kept", () => {
     expect(quickLogSaveRecoveryAction("network_error")).toMatch(/input stays/i);
+  });
+
+  it("requires a Timeline check for replay refusals instead of promising another retry", () => {
+    for (const reason of [
+      "idempotency_key_unverified",
+      "idempotency_receipt_missing",
+      "idempotency_key_retracted",
+      "idempotency_key_conflict",
+    ]) {
+      expect(quickLogSaveRequiresHistoryCheck(reason)).toBe(true);
+      const guidance = describeQuickLogSaveFailure(reason);
+      expect(guidance.message).toMatch(/Timeline/i);
+      expect(guidance.recovery).toMatch(/Timeline/i);
+      expect(guidance.recovery).not.toMatch(/retry|try again/i);
+      expect(quickLogDraftPreservedFailureMessage(reason)).toMatch(/Timeline/i);
+      expect(quickLogDraftPreservedFailureMessage(reason)).not.toMatch(/retry|try again/i);
+    }
+    expect(quickLogSaveRequiresHistoryCheck("network_error")).toBe(false);
+    expect(quickLogSaveRequiresHistoryCheck(null)).toBe(false);
+    expect(quickLogDraftPreservedFailureMessage("network_error")).toMatch(/retry/i);
   });
 
   it("describeQuickLogSaveFailure composes the same message and recovery", () => {

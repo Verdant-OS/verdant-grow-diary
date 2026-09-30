@@ -1,10 +1,8 @@
 /**
  * A Feed save the server explicitly rejects during validation
- * (`{ ok: false, reason: "invalid_typed_payload" }`) wrote nothing, so the
- * grower must be able to correct it. Before this fix the rejection was
- * treated like an ambiguous transport failure: every input locked, Retry
- * resent the same invalid payload forever, and the pending entry came back
- * after reload (QA 2026-09-24, BUG-002).
+ * (`{ ok: false, reason: "invalid_typed_payload" }`) lets a first attempt be
+ * corrected. A later rejection after an ambiguous earlier attempt cannot
+ * disprove that earlier commit because validation precedes idempotency lookup.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -99,46 +97,44 @@ describe("Feed save rejected by server validation", () => {
     expect(window.sessionStorage.getItem(storageKey)).toBeNull();
   });
 
-  it("releases a restored pending Feed when the server answers invalid_typed_payload", async () => {
-    const rejectedKey = await seedPendingFeedWithPh(15);
+  it("releases a first invalid-payload Feed for correction with a new key", async () => {
     rpc.mockResolvedValueOnce({
       data: { ok: false, reason: "invalid_typed_payload" },
       error: null,
     });
     sheet();
-    expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeVisible();
-    expect(screen.getByLabelText("pH")).toBeDisabled();
-
-    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+    fill("6.2");
+    fireEvent.click(screen.getByTestId("qlv2-save"));
     await waitFor(() =>
       expect(screen.getByTestId("qlv2-error")).toHaveTextContent(
-        "Feed pH must be between 0 and 14.",
+        "Verdant did not save this feeding because a value is outside the accepted range.",
       ),
     );
     expect(rpc).toHaveBeenCalledTimes(1);
-    expect((rpc.mock.calls[0][1] as QuickLogFeedingEventRpcArgs).p_feed).toMatchObject({ ph: 15 });
+    expect((rpc.mock.calls[0][1] as QuickLogFeedingEventRpcArgs).p_feed).toMatchObject({ ph: 6.2 });
     expect(screen.queryByTestId("qlv2-exact-retry-lock")).toBeNull();
     expect(window.sessionStorage.getItem(storageKey)).toBeNull();
     const phInput = screen.getByLabelText("pH");
     expect(phInput).not.toBeDisabled();
-    expect(phInput).toHaveValue("15");
+    expect(phInput).toHaveValue("6.2");
+    const rejectedKey = (rpc.mock.calls[0][1] as QuickLogFeedingEventRpcArgs).p_idempotency_key;
 
     // Correct the value: the new save is a new logical submission.
     rpc.mockResolvedValueOnce({
       data: { ok: true, grow_event_id: "0f0c5a0e-7b5c-4b3a-9d55-0d3c4b1e2a11", reused: false },
       error: null,
     });
-    fireEvent.change(phInput, { target: { value: "6.2" } });
+    fireEvent.change(phInput, { target: { value: "6.4" } });
     fireEvent.click(screen.getByTestId("qlv2-save"));
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
     expect(rpc).toHaveBeenCalledTimes(2);
     const corrected = rpc.mock.calls[1][1] as QuickLogFeedingEventRpcArgs;
-    expect(corrected.p_feed).toMatchObject({ ph: 6.2 });
+    expect(corrected.p_feed).toMatchObject({ ph: 6.4 });
     expect(corrected.p_idempotency_key).not.toBe(rejectedKey);
   });
 
-  it("uses the generic rejection copy when no field is outside the mirrored bounds", async () => {
-    await seedPendingFeedWithPh(6.2);
+  it("keeps a restored uncertain Feed locked despite a later invalid-payload reply", async () => {
+    const pendingKey = await seedPendingFeedWithPh(15);
     rpc.mockResolvedValueOnce({
       data: { ok: false, reason: "invalid_typed_payload" },
       error: null,
@@ -147,11 +143,15 @@ describe("Feed save rejected by server validation", () => {
     fireEvent.click(screen.getByTestId("qlv2-save-retry"));
     await waitFor(() =>
       expect(screen.getByTestId("qlv2-error")).toHaveTextContent(
-        "Verdant did not save this feeding because a value is outside the accepted range.",
+        "This Feeding is unconfirmed. Retry checks the original entry and destination.",
       ),
     );
-    expect(screen.queryByTestId("qlv2-exact-retry-lock")).toBeNull();
-    expect(window.sessionStorage.getItem(storageKey)).toBeNull();
+    expect((rpc.mock.calls[0][1] as QuickLogFeedingEventRpcArgs).p_idempotency_key).toBe(
+      pendingKey,
+    );
+    expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeVisible();
+    expect(screen.getByLabelText("pH")).toBeDisabled();
+    expect(window.sessionStorage.getItem(storageKey)).not.toBeNull();
   });
 
   it("keeps the exact-retry lock for rejections that are not definitive", async () => {

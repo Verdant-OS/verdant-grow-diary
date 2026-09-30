@@ -131,7 +131,12 @@ for each of these reads:
 - the rolling-release record, which must show no unresolved rollout, and the
   rolling-release configuration (`get_rolling_release_config`), whose stages and
   advancement type must still equal what the owner approved in the packet, because
-  a promote may start a partial rollout under those settings.
+  a promote may start a partial rollout under those settings;
+- the production-host inventory from packet item 1, re-enumerated: the M2 apex
+  holder, the production domains bound to the project, the aliases
+  (`list_promote_aliases`) and each custom hostname's DNS, which must still equal
+  the packet's inventory, because a domain added, removed or moved since the packet
+  would put traffic on a topology the owner never approved.
 
 If any value differs from the packet, stop and rebuild the packet rather than
 promoting a stale artifact. Only then does Matthew run:

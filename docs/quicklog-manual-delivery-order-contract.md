@@ -33,6 +33,18 @@ the database fingerprint must remain identical. It then delivers all three files
 in order and checks the resulting wrapper, grants, mixed-grow refusal, zero writes
 for refusal, and same-key save/reuse after repairing the assignment.
 
+Every SQL negative control requires psql's script-error exit status and the exact
+expected PostgreSQL refusal message. A lost connection, missing executable or
+unrelated SQL error fails the proof instead of counting as an unchanged-database
+refusal. The three negative controls are covered by injected connection and
+unrelated-error regressions. Generated-gate assertions also pin the required
+`postgres` runner role and the private delegate's service-role exclusion at all
+three steps.
+
+The script-error status is `3` with `ON_ERROR_STOP`, distinct from psql fatal
+errors (`1`) and a lost connection (`2`), per the
+[PostgreSQL 15 exit-status contract](https://www.postgresql.org/docs/15/app-psql.html#APP-PSQL-EXIT-STATUS).
+
 ## Coordination with #1742
 
 At inspected head `114da090a5e2d4ec271563570dfbc84f1546bcf7`, #1742 delivers only
@@ -44,6 +56,12 @@ lane for the three files above. Its existing protections must be retained:
 - independently reviewed exact candidate and matching PREFLIGHT artifact;
 - authenticated target identity, verified TLS, and all production writers idle;
 - compatible frontend-delivery evidence and Matthew's separate explicit go/no-go.
+
+The inspected #1742 catalog contract requires `current_user = 'postgres'` and
+binds the required-role contract to that same role. This agrees with the manual
+gate's runner-role requirement at the source level; no hosted connection or
+production role was measured. A protected runner with another actual role must
+fail closed.
 
 A future authorized manual-chain apply adapter must use the shared ordering gate,
 reconstruct its completed prefix from authoritative hosted evidence, and retain

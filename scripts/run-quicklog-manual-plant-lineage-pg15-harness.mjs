@@ -49,6 +49,30 @@ export function deliverManualMigration({ order, completed, version, sql, env, sp
   return next;
 }
 
+// Only a script error with the exact PostgreSQL refusal is a negative witness.
+// Connection/process failures and unrelated SQL errors must fail the proof.
+function requireSqlRefusal({ stage, expectedMessage, run, spawnImpl }) {
+  let result;
+  try {
+    run((...args) => {
+      result = spawnImpl(...args);
+      return result;
+    });
+  } catch {
+    const expectedError =
+      typeof result?.stderr === "string" &&
+      result.stderr.split(/\r?\n/).some((line) => {
+        const match = /^(?:psql:[^\r\n]*:\d+:\s*)?ERROR:\s+(?:P0001:\s+)?([a-z_]+)$/.exec(
+          line.trim(),
+        );
+        return match?.[1] === expectedMessage;
+      });
+    if (result?.status === 3 && !result.error && !result.signal && expectedError) return;
+    throw new Error(stage + ":expected_sql_refusal_missing");
+  }
+  throw new Error(stage + ":unexpected_success");
+}
+
 // Fingerprint every relation's data and catalog definition in the disposable scaffold.
 // The rejected delivery must run no SQL; these read-only snapshots prove that against PG15.
 export const DELIVERY_DATABASE_SNAPSHOT_SQL = `select md5(jsonb_build_object(
@@ -226,13 +250,16 @@ export async function runPlantLineageHarness({
     if (!reverseRejected) throw new Error("reverse_order_accepted");
     // Defense in depth: bypassing the delivery gate still cannot commit 183000
     // before its required parent. Stop at its first error, as an operator must.
-    let reverseSqlRejected = false;
-    try {
-      executeSql(metadataSql, env, { stage: "reverse_metadata_before_parent", spawnImpl });
-    } catch {
-      reverseSqlRejected = true;
-    }
-    if (!reverseSqlRejected) throw new Error("reverse_sql_accepted");
+    requireSqlRefusal({
+      stage: "reverse_metadata_before_parent",
+      expectedMessage: "quicklog_manual_metadata_lock_preflight_unrecognized",
+      spawnImpl,
+      run: (observedSpawn) =>
+        executeSql(metadataSql, env, {
+          stage: "reverse_metadata_before_parent",
+          spawnImpl: observedSpawn,
+        }),
+    });
     const reverseAfter = executeSql(DELIVERY_DATABASE_SNAPSHOT_SQL, env, {
       stage: "reverse_order_database_after",
       spawnImpl,
@@ -241,13 +268,13 @@ export async function runPlantLineageHarness({
       throw new Error("reverse_order_changed_database");
     }
     const sql = lineageSql;
-    let rejectedWithoutParent = false;
-    try {
-      executeSql(sql, env, { stage: "lineage_before_parent", spawnImpl });
-    } catch {
-      rejectedWithoutParent = true;
-    }
-    if (!rejectedWithoutParent) throw new Error("missing_parent_accepted");
+    requireSqlRefusal({
+      stage: "lineage_before_parent",
+      expectedMessage: "quicklog_manual_lineage_preflight_unrecognized",
+      spawnImpl,
+      run: (observedSpawn) =>
+        executeSql(sql, env, { stage: "lineage_before_parent", spawnImpl: observedSpawn }),
+    });
     requireTrue(
       "missing_parent_left_delegate_unchanged",
       `select md5(replace(prosrc, E'\\r', ''))='7ec296e422f7f47c8b2793b051840798'
@@ -269,20 +296,20 @@ export async function runPlantLineageHarness({
       stage: "skipped_lineage_database_before",
       spawnImpl,
     });
-    let skippedLineageRejected = false;
-    try {
-      deliverManualMigration({
-        order: deliveryOrder,
-        completed: MANUAL_DELIVERY_ORDER.slice(0, 2),
-        version: MANUAL_DELIVERY_ORDER[2],
-        sql: metadataSql,
-        env,
-        spawnImpl,
-      });
-    } catch {
-      skippedLineageRejected = true;
-    }
-    if (!skippedLineageRejected) throw new Error("skipped_lineage_accepted");
+    requireSqlRefusal({
+      stage: "skipped_lineage",
+      expectedMessage: "delivery_order_rejected",
+      spawnImpl,
+      run: (observedSpawn) =>
+        deliverManualMigration({
+          order: deliveryOrder,
+          completed: MANUAL_DELIVERY_ORDER.slice(0, 2),
+          version: MANUAL_DELIVERY_ORDER[2],
+          sql: metadataSql,
+          env,
+          spawnImpl: observedSpawn,
+        }),
+    });
     const skippedAfter = executeSql(DELIVERY_DATABASE_SNAPSHOT_SQL, env, {
       stage: "skipped_lineage_database_after",
       spawnImpl,

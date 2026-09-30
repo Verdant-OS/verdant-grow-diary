@@ -109,79 +109,114 @@ describe("Quick Log manual plant/tent lineage fence", () => {
     }
   });
 
-  it("runs all three migrations in order on one attested scaffold before checking the fence", async () => {
-    const sql = loadManualDeliverySql();
-    const guardedSql = sql.map((text, position) =>
-      buildManualDeliveryStepSql({
-        order: MANUAL_DELIVERY_ORDER,
-        version: MANUAL_DELIVERY_ORDER[position],
-        sql: text,
-      }),
-    );
-    const applied: number[] = [];
-    let lineageAttempt = 0;
-    let metadataAttempt = 0;
-    let rejectedKeyCalls = 0;
-    const spawnImpl = vi.fn((_command, _args, options) => {
-      const input = options.input as string;
-      const result = (stdout = "", status = 0) => ({ status, stdout, stderr: "" });
-      if (input.includes("current_database()") && input.includes("runtime_sentinel")) {
-        return result("verdant_quicklog_delegate_repair_pg15_disposable_v1");
-      }
-      if (input === DELIVERY_DATABASE_SNAPSHOT_SQL) return result("a".repeat(32));
-      const position = guardedSql.indexOf(input);
-      if (position >= 0) {
-        if (position === 2 && ++metadataAttempt === 1) return result("", 1);
-        applied.push(position);
-        return result();
-      }
-      if (input === sql[2]) return result("", 1);
-      if (input === sql[1] && ++lineageAttempt === 1) return result("", 1);
-      if (input.includes("select oid::text from pg_proc")) return result("123");
-      if (input.includes("update public.plants set tent_id=")) {
-        return result("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
-      }
-      if (input.includes("select public.quicklog_save_manual(")) {
-        if (input.includes("plant-lineage-rejected-0001")) {
-          rejectedKeyCalls += 1;
-          if (rejectedKeyCalls === 1) {
-            return result(JSON.stringify({ ok: false, reason: "plant_tent_grow_mismatch" }));
+  it.each([
+    ["full-chain", null, null],
+    ["reverse connection failure", "reverse", "connection"],
+    ["reverse unrelated SQL failure", "reverse", "sql"],
+    ["lineage connection failure", "lineage", "connection"],
+    ["lineage unrelated SQL failure", "lineage", "sql"],
+    ["skipped lineage connection failure", "skipped", "connection"],
+    ["skipped lineage unrelated SQL failure", "skipped", "sql"],
+  ])(
+    "requires genuine SQL refusals before full-chain acceptance: %s",
+    async (_label, failureStage, failureKind) => {
+      const sql = loadManualDeliverySql();
+      const guardedSql = sql.map((text, position) =>
+        buildManualDeliveryStepSql({
+          order: MANUAL_DELIVERY_ORDER,
+          version: MANUAL_DELIVERY_ORDER[position],
+          sql: text,
+        }),
+      );
+      const applied: number[] = [];
+      let lineageAttempt = 0;
+      let metadataAttempt = 0;
+      let rejectedKeyCalls = 0;
+      const spawnImpl = vi.fn((_command, _args, options) => {
+        const input = options.input as string;
+        const result = (stdout = "", status = 0) => ({ status, stdout, stderr: "" });
+        const refusal = (stage: string, expectedMessage: string) => {
+          if (failureStage === stage) {
+            return {
+              status: failureKind === "connection" ? 2 : 3,
+              stdout: "",
+              stderr:
+                failureKind === "connection" ? "connection refused" : "ERROR:  unrelated_failure\n",
+            };
+          }
+          return { status: 3, stdout: "", stderr: "ERROR:  " + expectedMessage + "\n" };
+        };
+        if (input.includes("current_database()") && input.includes("runtime_sentinel")) {
+          return result("verdant_quicklog_delegate_repair_pg15_disposable_v1");
+        }
+        if (input === DELIVERY_DATABASE_SNAPSHOT_SQL) return result("a".repeat(32));
+        const position = guardedSql.indexOf(input);
+        if (position >= 0) {
+          if (position === 2 && ++metadataAttempt === 1)
+            return refusal("skipped", "delivery_order_rejected");
+          applied.push(position);
+          return result();
+        }
+        if (input === sql[2])
+          return refusal("reverse", "quicklog_manual_metadata_lock_preflight_unrecognized");
+        if (input === sql[1] && ++lineageAttempt === 1)
+          return refusal("lineage", "quicklog_manual_lineage_preflight_unrecognized");
+        if (input.includes("select oid::text from pg_proc")) return result("123");
+        if (input.includes("update public.plants set tent_id=")) {
+          return result("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
+        }
+        if (input.includes("select public.quicklog_save_manual(")) {
+          if (input.includes("plant-lineage-rejected-0001")) {
+            rejectedKeyCalls += 1;
+            if (rejectedKeyCalls === 1) {
+              return result(JSON.stringify({ ok: false, reason: "plant_tent_grow_mismatch" }));
+            }
+            return result(
+              JSON.stringify({
+                ok: true,
+                reused: rejectedKeyCalls === 3,
+                grow_event_id: "fixed-event",
+              }),
+            );
           }
           return result(
-            JSON.stringify({
-              ok: true,
-              reused: rejectedKeyCalls === 3,
-              grow_event_id: "fixed-event",
-            }),
+            JSON.stringify({ ok: true, reused: false, grow_event_id: "baseline-or-tentless" }),
           );
         }
-        return result(
-          JSON.stringify({ ok: true, reused: false, grow_event_id: "baseline-or-tentless" }),
-        );
+        return result("t");
+      });
+      const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+      const errorWrite = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        expect(
+          await runPlantLineageHarness({
+            url: "postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_quicklog_delegate_repair",
+            spawnImpl,
+          }),
+        ).toBe(failureStage ? 1 : 0);
+        if (failureStage) {
+          expect(applied).toEqual(failureStage === "skipped" ? [0] : []);
+          expect(errorWrite).toHaveBeenCalledWith(
+            expect.stringContaining("expected_sql_refusal_missing"),
+          );
+          expect(write).not.toHaveBeenCalled();
+        } else {
+          expect(applied).toEqual([0, 1, 2]);
+          expect(
+            spawnImpl.mock.calls.filter(
+              ([, , options]) => options.input === DELIVERY_DATABASE_SNAPSHOT_SQL,
+            ),
+          ).toHaveLength(4);
+          expect(write).toHaveBeenCalledWith(
+            expect.stringContaining("full chain 002000 -> 160000 -> 183000"),
+          );
+        }
+      } finally {
+        write.mockRestore();
+        errorWrite.mockRestore();
       }
-      return result("t");
-    });
-    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    try {
-      expect(
-        await runPlantLineageHarness({
-          url: "postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_quicklog_delegate_repair",
-          spawnImpl,
-        }),
-      ).toBe(0);
-      expect(applied).toEqual([0, 1, 2]);
-      expect(
-        spawnImpl.mock.calls.filter(
-          ([, , options]) => options.input === DELIVERY_DATABASE_SNAPSHOT_SQL,
-        ),
-      ).toHaveLength(4);
-      expect(write).toHaveBeenCalledWith(
-        expect.stringContaining("full chain 002000 -> 160000 -> 183000"),
-      );
-    } finally {
-      write.mockRestore();
-    }
-  });
+    },
+  );
 
   it.each(
     [

@@ -51,6 +51,35 @@ describe("database-enforced Quick Log manual delivery", () => {
     ).toThrow("migration_fingerprint_mismatch");
   });
 
+  it.each([0, 1, 2])("pins the protected runner role at step %i", (position) => {
+    const script = gate.buildManualDeliveryStepSql({
+      order: gate.MANUAL_DELIVERY_ORDER,
+      version: gate.MANUAL_DELIVERY_ORDER[position],
+      sql: loadManualDeliverySql()[position],
+    });
+    const generatedGate = script
+      .split("DO $manual_delivery_gate$")[1]
+      .split("$manual_delivery_gate$;")[0];
+    expect(generatedGate).toContain("IF current_user <> 'postgres' OR v_wrapper IS NULL");
+  });
+
+  it.each([0, 1, 2])(
+    "pins service-role exclusion from the private delegate at step %i",
+    (position) => {
+      const script = gate.buildManualDeliveryStepSql({
+        order: gate.MANUAL_DELIVERY_ORDER,
+        version: gate.MANUAL_DELIVERY_ORDER[position],
+        sql: loadManualDeliverySql()[position],
+      });
+      const generatedGate = script
+        .split("DO $manual_delivery_gate$")[1]
+        .split("$manual_delivery_gate$;")[0];
+      expect(generatedGate).toContain(
+        "OR pg_catalog.has_function_privilege('service_role',v_delegate,'EXECUTE') THEN",
+      );
+    },
+  );
+
   it("cannot substitute the lock repair for the lineage migration", () => {
     expect(() =>
       gate.buildManualDeliveryStepSql({

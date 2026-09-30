@@ -158,6 +158,16 @@ export function usePersistEnvironmentAlerts(
     const pendingKeys = new Set<string>();
 
     (async () => {
+      // One decision clock per run. The gate below and the wake computed from
+      // its verdict must read the same sample: with two reads, a capture
+      // timestamp can fall between them (millisecond precision on both
+      // sides), so the gate rejects a still-future observation while the
+      // second read finds it current and arms nothing. The unchanged breach
+      // would then never be persisted, because no effect dependency moves
+      // with wall time. The write path re-lists open rows and dedupes, so a
+      // sample a few milliseconds old cannot mint a stale row.
+      const now = Date.now();
+
       // 1. Re-derive alerts from the rules layer (single source of truth).
       const derived: EnvironmentAlert[] = buildEnvironmentAlerts({
         snapshot: input.snapshot,
@@ -171,6 +181,7 @@ export function usePersistEnvironmentAlerts(
         snapshot: input.snapshot,
         quality: input.quality.quality,
         isDemoData,
+        now,
       });
 
       if (persistable.length === 0) {
@@ -180,8 +191,8 @@ export function usePersistEnvironmentAlerts(
           // (correctly) refuses to persist ahead of the observation time. No
           // dependency of this effect changes as wall time catches up, so
           // arm exactly one wake at the boundary; the gate decides again then.
-          // Missing or invalid timestamps never wake (delay is null).
-          const now = Date.now();
+          // Missing or invalid timestamps never wake (delay is null). Same
+          // `now` as the gate above, by construction (see the note there).
           const ctx = { snapshot: input.snapshot, quality: input.quality.quality, isDemoData, now };
           const delay =
             snapshotPersistenceBlockReason(ctx) === "outside_live_window"

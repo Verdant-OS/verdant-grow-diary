@@ -14,6 +14,12 @@
  *  10. New persistence module is free of automation / device-control / service_role.
  *  11. A future-dated (clock-skewed) breach is retried exactly once at its
  *      eligibility boundary with no other dependency change.
+ *  12. The gate and the boundary wake read ONE clock sample: a capture time
+ *      that falls between two reads must still be persisted exactly once.
+ *  13. A pending boundary wake is cancelled on unmount and replaced when the
+ *      inputs change, never firing a second evaluation.
+ *  14. A capture far beyond the live window is reached by clamped hops with
+ *      no persistence attempt before the boundary and exactly one after it.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
@@ -32,8 +38,25 @@ import {
   snapshotFromEnvironmentCheck,
   snapshotFromManualSensorSnapshot,
   snapshotFromReadings,
+  STALE_THRESHOLD_MS,
   type SensorSnapshot,
 } from "@/lib/sensorSnapshot";
+
+// Observes the persistence gate so a test can move the clock at the exact
+// point between the gate's read and any later read the hook might take. The
+// real implementation is called unchanged; every other export passes through.
+const gateObserver = vi.hoisted(() => ({ afterGate: null as null | (() => void) }));
+vi.mock("@/lib/environmentAlertPersistence", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/environmentAlertPersistence")>();
+  return {
+    ...actual,
+    selectPersistableAlerts: (...args: Parameters<typeof actual.selectPersistableAlerts>) => {
+      const result = actual.selectPersistableAlerts(...args);
+      gateObserver.afterGate?.();
+      return result;
+    },
+  };
+});
 import type { TargetComparisonResult } from "@/lib/environmentTargetComparison";
 import type { SensorQualityResult } from "@/lib/sensorQuality";
 
@@ -317,6 +340,7 @@ describe("usePersistEnvironmentAlerts — hook behaviour", () => {
   });
 
   afterEach(() => {
+    gateObserver.afterGate = null;
     vi.useRealTimers();
   });
 
@@ -499,6 +523,141 @@ describe("usePersistEnvironmentAlerts — hook behaviour", () => {
     // Once eligible there is no further boundary to wake for.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(listAlertsMock).toHaveBeenCalledTimes(1);
+    expect(saveAlertMock).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it("persists exactly once when the capture time falls between the gate's clock read and a later one", async () => {
+    // Date.now and Date.parse are both millisecond-precise, so a capture
+    // timestamp can sit between two synchronous reads. The gate must decide
+    // and the wake must be computed from ONE sample: if the gate rejects a
+    // future observation, a wake is armed for it, whatever a later read says.
+    const capturedAt = NOW + 60_000;
+    let crossings = 0;
+    gateObserver.afterGate = () => {
+      // Cross the boundary immediately after the gate's read, once.
+      if (crossings++ === 0) vi.setSystemTime(capturedAt);
+    };
+    const { result, unmount } = renderHook(() =>
+      usePersistEnvironmentAlerts({
+        growId: "g1",
+        snapshot: liveSnapshot({ ts: new Date(capturedAt).toISOString() }),
+        quality: okQuality,
+        targets: outOfRangeTargets,
+        enabled: true,
+      }),
+    );
+    await waitFor(() => expect(result.current.status).toBe("skipped"));
+    expect(crossings).toBe(1);
+    expect(listAlertsMock).not.toHaveBeenCalled();
+
+    // Nothing about the inputs changes; only the armed wake can recover it.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    await waitFor(() => expect(saveAlertMock).toHaveBeenCalledTimes(1));
+    expect(listAlertsMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.status).toBe("done"));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(listAlertsMock).toHaveBeenCalledTimes(1);
+    expect(saveAlertMock).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it("cancels a pending boundary wake on unmount", async () => {
+    const { result, unmount } = renderHook(() =>
+      usePersistEnvironmentAlerts({
+        growId: "g1",
+        snapshot: liveSnapshot({ ts: new Date(NOW + 60_000).toISOString() }),
+        quality: okQuality,
+        targets: outOfRangeTargets,
+        enabled: true,
+      }),
+    );
+    await waitFor(() => expect(result.current.status).toBe("skipped"));
+    unmount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120_000);
+    });
+    expect(listAlertsMock).not.toHaveBeenCalled();
+    expect(saveAlertMock).not.toHaveBeenCalled();
+  });
+
+  it("replaces a pending boundary wake when the snapshot changes before the boundary", async () => {
+    const futureTs = new Date(NOW + 60_000).toISOString();
+    const { result, rerender, unmount } = renderHook(
+      (props: { ts: string }) =>
+        usePersistEnvironmentAlerts({
+          growId: "g1",
+          snapshot: liveSnapshot({ ts: props.ts }),
+          quality: okQuality,
+          targets: outOfRangeTargets,
+          enabled: true,
+        }),
+      { initialProps: { ts: futureTs } },
+    );
+    await waitFor(() => expect(result.current.status).toBe("skipped"));
+    expect(listAlertsMock).not.toHaveBeenCalled();
+
+    // A current reading arrives before the boundary: it persists on its own
+    // merits, and the wake armed for the superseded reading must not fire a
+    // second evaluation once the old boundary passes.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    rerender({ ts: FRESH_TS });
+    await waitFor(() => expect(saveAlertMock).toHaveBeenCalledTimes(1));
+    expect(listAlertsMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.status).toBe("done"));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(90_000);
+    });
+    expect(listAlertsMock).toHaveBeenCalledTimes(1);
+    expect(saveAlertMock).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it("reaches a capture beyond the live window by clamped hops and persists exactly once", async () => {
+    // A wake is never longer than the live window; a reading further out is
+    // reached by re-evaluating at each clamp. No hop may attempt a write
+    // before the boundary, and the boundary must be reached, not skipped.
+    const ahead = 2 * STALE_THRESHOLD_MS + 5_000;
+    const { result, unmount } = renderHook(() =>
+      usePersistEnvironmentAlerts({
+        growId: "g1",
+        snapshot: liveSnapshot({ ts: new Date(NOW + ahead).toISOString() }),
+        quality: okQuality,
+        targets: outOfRangeTargets,
+        enabled: true,
+      }),
+    );
+    await waitFor(() => expect(result.current.status).toBe("skipped"));
+
+    for (let hop = 0; hop < 2; hop += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(STALE_THRESHOLD_MS);
+      });
+      expect(listAlertsMock, `hop ${hop + 1}`).not.toHaveBeenCalled();
+      expect(saveAlertMock, `hop ${hop + 1}`).not.toHaveBeenCalled();
+      expect(result.current.status).toBe("skipped");
+    }
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    await waitFor(() => expect(saveAlertMock).toHaveBeenCalledTimes(1));
+    expect(listAlertsMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.status).toBe("done"));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STALE_THRESHOLD_MS);
     });
     expect(listAlertsMock).toHaveBeenCalledTimes(1);
     expect(saveAlertMock).toHaveBeenCalledTimes(1);

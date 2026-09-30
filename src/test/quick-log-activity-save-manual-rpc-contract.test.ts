@@ -20,7 +20,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 
 const OK_RESPONSE = {
-  data: { ok: true, grow_event_id: "event-1", reused: false },
+  data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000009", reused: false },
   error: null,
 };
 
@@ -155,7 +155,7 @@ describe("useQuickLogActivitySave — quicklog_save_manual payload shape", () =>
 
   it("surfaces the server reused flag on duplicate submissions", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "event-1", reused: true },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000009", reused: true },
       error: null,
     });
     const res = await save({
@@ -166,7 +166,7 @@ describe("useQuickLogActivitySave — quicklog_save_manual payload shape", () =>
     });
     expect(res.ok).toBe(true);
     expect(res.reused).toBe(true);
-    expect(res.growEventId).toBe("event-1");
+    expect(res.growEventId).toBe("77777777-7777-4777-8777-000000000009");
   });
 
   it("maps an RPC error to save_failed without dispatching success", async () => {

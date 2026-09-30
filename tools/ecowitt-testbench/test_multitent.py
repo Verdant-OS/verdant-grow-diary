@@ -23,6 +23,26 @@ def tent(tent_id=TENT_A, token_env="TOKEN_A", **overrides):
 
 
 class MultiTentTests(unittest.TestCase):
+    def test_tents_without_channel_ownership_are_rejected(self):
+        identity = {"tent_id": TENT_A, "label": "Test tent", "token_env": "TOKEN_A"}
+        for ownership in ({}, {"co2": False}, {"air_channels": [], "soil_channels": [],
+                                               "soil_temp_channels": [], "co2": False}):
+            with self.subTest(ownership=ownership):
+                with self.assertRaises(ConfigError) as caught:
+                    self.load([{**identity, **ownership}])
+                self.assertIn("must own at least one channel", str(caught.exception))
+                self.assertNotIn(TOKEN_A, str(caught.exception))
+
+    def test_a_single_owned_channel_family_is_sufficient(self):
+        identity = {"tent_id": TENT_A, "label": "Test tent", "token_env": "TOKEN_A"}
+        for ownership in ({"air_channels": [1]}, {"air_channels": ["in"]},
+                          {"soil_channels": [1]}, {"soil_temp_channels": [1]}, {"co2": True}):
+            with self.subTest(ownership=ownership):
+                first = self.load([{**identity, **ownership}])
+                second = self.load([{**identity, **ownership}])
+                self.assertEqual(first, second)
+                self.assertEqual(len(first[0]), 1)
+
     def test_conflicting_passkeys_redact_all_echoes_independent_of_order(self):
         tents, aliases = self.load([tent()])
         raw = {"PASSKEY": "synthetic-first", "passkey": "synthetic-second",
@@ -233,7 +253,7 @@ class MultiTentTests(unittest.TestCase):
                 self.load([tent(), other])
 
     def test_eight_tents_allowed_nine_rejected(self):
-        config = [tent(f"{n:08x}-2222-3333-4444-555555555555", f"TOKEN_{n}", air_channels=[],
+        config = [tent(f"{n:08x}-2222-3333-4444-555555555555", f"TOKEN_{n}", air_channels=[n],
                        soil_channels=[], soil_temp_channels=[], co2=False) for n in range(1, 10)]
         env = {f"TOKEN_{n}": "vbt_" + f"synthetic_unique_tent_{n}" for n in range(1, 10)}
         self.assertEqual(len(self.load(config[:8], env)[0]), 8)

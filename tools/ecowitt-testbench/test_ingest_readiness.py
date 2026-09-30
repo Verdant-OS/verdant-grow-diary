@@ -20,6 +20,22 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_map_without_owned_channels_fails_receive_and_health_without_forwarding(self):
+        identity = {"tent_id": TENT_A, "label": "Test tent", "token_env": "TOKEN_A"}
+        for ownership in ({}, {"air_channels": [], "soil_channels": [],
+                              "soil_temp_channels": [], "co2": False}):
+            with self.subTest(ownership=ownership):
+                self.mapping.write_text(json.dumps([{**identity, **ownership}]))
+                listener._RUNTIME = None
+                response = self.post()
+                self.assertEqual(response.status_code, 503)
+                self.assertNotIn(TOKEN_A, response.get_data(as_text=True))
+                health = self.client.get("/health")
+                self.assertEqual(health.status_code, 503)
+                self.assertFalse(health.get_json()["ok"])
+                self.assertIsNone(listener._RUNTIME)
+                self.requests.post.assert_not_called()
+
     def test_evicted_older_batch_stays_unhealthy_until_durable_delivery_after_restart(self):
         self.post()
         runtime = listener.get_runtime()

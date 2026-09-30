@@ -157,6 +157,8 @@ def load_tent_map(path: Path, env: Mapping[str, str]) -> tuple[tuple[Tent, ...],
         co2 = entry.get("co2", False)
         if type(co2) is not bool:
             raise ConfigError(prefix + "co2 must be a boolean")
+        if not co2 and not any(channels.values()):
+            raise ConfigError(prefix + "must own at least one channel")
         if co2:
             if ("co2", 1) in assigned:
                 raise ConfigError(prefix + "CO2 channel assigned more than once")

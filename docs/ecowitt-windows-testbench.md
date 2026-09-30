@@ -161,7 +161,9 @@ Startup accepts 1–8 tents with distinct, non-placeholder UUIDs, nonempty
 labels, valid token-variable names and configured non-placeholder bridge
 tokens. Channels are 1–8; air also supports `"in"`. A channel cannot be
 listed twice within its sensor family, including across tents. Only one
-tent can own the WH45 CO2 channel. An invalid map stops startup with a
+tent can own the WH45 CO2 channel. Every tent must own at least one air,
+soil, soil-temperature or CO2 channel; empty ownership is rejected even
+when the optional channel fields are omitted. An invalid map stops startup with a
 sanitized diagnostic and never falls back silently to single-tent mode.
 
 For every gateway packet, the listener queues one POST per mapped tent.

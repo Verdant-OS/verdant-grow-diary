@@ -251,14 +251,29 @@ receipt's full `commit` equals the intended promote or rollback SHA and `dirty` 
 Then take the **closing reading**: reread the rollout record and configuration, the
 host inventory, each custom hostname's DNS, each hostname's deployment, the alias
 moves, and a freshly fetched deploy tip. The run is `PASS` only when the opening and
-closing readings agree on every value **and** an M11 audit covers the window from
-the opening reading through the closing timestamp. That audit lists the Vercel user
-events and authoritative DNS changes for the apex-holding project and every custom
-hostname. Snapshots that agree cannot reveal a change that was made and reverted
-during the sweep, and the audit can. Any routing, alias, domain, DNS or
-production-setting event in the window makes consistency `NOT_MEASURED`, and the
-sweep repeats. The event and its actor are recorded as a D-RT-13 publish action. If
-the audit is `BLOCKED` or `NOT_MEASURED`, consistency is `NOT_MEASURED`.
+closing readings agree on every value **and** a full M11 audit runs through the
+closing timestamp. Snapshots that agree cannot reveal a change that was made and
+reverted, and the audit can. The audit must meet the specification's M11
+requirements:
+
+- It starts from M11's own last successful boundary, the last stamp at which M11
+  ran, not from this sweep's opening reading.
+- It covers M11's full holder set: the apex-holding project at that boundary, the
+  current one, and every project or platform that an unfiltered domain event or DNS
+  change in the window names.
+- It lists Vercel user events and authoritative DNS changes for every custom
+  hostname in that union.
+
+What each outcome means:
+
+- Any routing, alias, domain, DNS or production-setting event in the window that is
+  not this operation's own recorded action makes consistency `NOT_MEASURED` and the
+  sweep repeats. The event and its actor are recorded as a D-RT-13 publish action.
+- An audit attempted but prevented by missing access, permission or egress leaves
+  consistency `BLOCKED`.
+- An audit that was not performed, or that has no recorded boundary or holder set,
+  leaves consistency `NOT_MEASURED`.
+- Neither `BLOCKED` nor `NOT_MEASURED` is `PASS`.
 
 - If any value changed during the sweep (a rollout, promote, redeploy, rollback,
   alias or domain move, DNS change or new merge), mark consistency `NOT_MEASURED`

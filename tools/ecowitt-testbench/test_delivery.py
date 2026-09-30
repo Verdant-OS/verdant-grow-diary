@@ -30,6 +30,31 @@ class DeliveryFixture(unittest.TestCase):
 
 
 class DeliveryTests(DeliveryFixture):
+    def test_failed_eviction_journal_keeps_live_and_durable_entries_until_retry(self):
+        for limit in ("age", "size"):
+            with self.subTest(limit=limit):
+                spool = JsonlSpool(self.root / limit, clock=self.clock)
+                spool.enqueue("old", self.reading())
+                saved_bytes = spool.path.read_bytes()
+                if limit == "age":
+                    self.now += timedelta(days=8)
+                else:
+                    spool.max_bytes = 200
+                with mock.patch("ecowitt_delivery.append_jsonl", side_effect=OSError("simulated disk full")), \
+                        mock.patch.object(spool, "_compact", wraps=spool._compact) as compact:
+                    with self.assertRaises(OSError):
+                        spool.enforce_limits()
+                    compact.assert_not_called()
+                self.assertEqual(list(spool.entries), ["old"])
+                self.assertEqual(spool.path.read_bytes(), saved_bytes)
+                self.assertEqual(spool.stats["dropped_count"], 0)
+                spool.max_days, spool.max_bytes = 1000, 50 * 1024 * 1024
+                self.assertEqual([entry["id"] for entry in spool.due_entries()], ["old"])
+                spool.finish("old", 200)
+                restored = JsonlSpool(spool.root, clock=self.clock, max_days=1000)
+                self.assertEqual(restored.pending_count, 0)
+                self.assertEqual(restored.stats["dropped_count"], 0)
+
     def test_eviction_journal_survives_crashes_before_and_after_queue_rewrite(self):
         for limit in ("age", "size"):
             for phase in ("before", "after"):

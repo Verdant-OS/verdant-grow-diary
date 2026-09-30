@@ -252,9 +252,10 @@ class JsonlSpool:
             cutoff = self.clock() - timedelta(days=self.max_days)
             dropped = 0
             dropped_ids = []
-            for entry_id, entry in list(self.entries.items()):
+            survivors = OrderedDict(self.entries)
+            for entry_id, entry in list(survivors.items()):
                 if parse_time(entry["created_at"]) < cutoff:
-                    del self.entries[entry_id]
+                    del survivors[entry_id]
                     dropped += 1
                     dropped_ids.append(entry_id)
             # Diagnostics get at most one tenth of the combined cap each.
@@ -272,7 +273,7 @@ class JsonlSpool:
                 # rewrite. Include auxiliary files and the growing drop counter.
                 record_sizes = {
                     entry_id: len((json.dumps({"op": "put", "entry": entry}, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8"))
-                    for entry_id, entry in self.entries.items()
+                    for entry_id, entry in survivors.items()
                 }
                 queue_bytes = sum(record_sizes.values())
                 previous_queue_bytes = self.path.stat().st_size if self.path.exists() else 0
@@ -284,7 +285,7 @@ class JsonlSpool:
                     checkpoint_bytes = len(drop_checkpoint_line(updated_stats["dropped_count"]).encode("utf-8"))
                     if other_bytes + queue_bytes + checkpoint_bytes + updated_stats_bytes <= self.max_bytes:
                         break
-                    del self.entries[entry_id]
+                    del survivors[entry_id]
                     queue_bytes -= record_bytes
                     dropped += 1
                     dropped_ids.append(entry_id)
@@ -295,6 +296,8 @@ class JsonlSpool:
                     count = self.stats["dropped_count"] + dropped
                     append_jsonl(self.path, {"op": "drop", "ids": dropped_ids, "dropped_count": count})
                     self.stats["dropped_count"] = count
+                    for entry_id in dropped_ids:
+                        del self.entries[entry_id]
                 self._compact()
             if dropped:
                 self.warn(f"spool: dropped {dropped} oldest entries at retention/size limit")

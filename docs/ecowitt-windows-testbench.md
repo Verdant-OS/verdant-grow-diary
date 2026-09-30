@@ -322,6 +322,9 @@ Eviction decisions and their absolute loss count are flushed and synced in
 the queue before payloads are removed. Compaction retains a loss-count
 checkpoint, so a crash before the statistics file is updated cannot hide
 the incident or count the same committed eviction twice after restart.
+Survivors are selected without changing the live queue; a failed journal
+append leaves acknowledged entries available for retry and cannot silently
+remove them in a later compaction.
 The checkpoint bytes are included in survivor selection; eviction still
 uses one full compaction. Builds predating these queue record types cannot
 read the updated queue. Preserve it and use a compatible build for recovery.

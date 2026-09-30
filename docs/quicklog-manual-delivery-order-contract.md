@@ -42,7 +42,7 @@ those protections. An in-memory test prefix is not proof of hosted migration
 history. #1742's branch and production runner are unchanged by this proof PR. No
 claim of an operational production manual-chain apply lane is made here.
 
-The shared `buildManualDeliveryStepSql` adapter adds a database catalog gate in
+The shared `buildManualDeliveryStepSql` adapter adds a database catalog gate
 inside each fingerprint-checked migration transaction. It resolves the schema-qualified
 wrapper and delegate signatures by OID, checks their exact predecessor source
 fingerprints, owners, return types, search paths and execution grants, and takes

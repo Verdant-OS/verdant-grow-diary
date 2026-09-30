@@ -20,6 +20,59 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_each_local_delivery_latch_emits_one_alert_and_one_recovery(self):
+        runtime = listener.get_runtime()
+        send = mock.Mock(return_value=True)
+        runtime.health.send_alert = send
+        runtime.health.alert_interval = 0
+        for index, (field, value) in enumerate((("last_local_error", "local_delivery_state_error"),
+                                               ("last_enqueue_error", "local_delivery_state_error"),
+                                               ("last_receive_error", "routing"))):
+            with self.subTest(field=field):
+                setattr(runtime, field, value)
+                runtime.health.tick()
+                self.assertEqual(send.call_count, index * 2 + 1)
+                self.assertEqual(send.call_args.args[0]["event"], "alert")
+                self.assertEqual(send.call_args.args[0]["reason"], "local_delivery_state_error")
+                runtime.health.tick()
+                self.assertEqual(send.call_count, index * 2 + 1)
+                setattr(runtime, field, None)
+                runtime.health.tick()
+                self.assertEqual(send.call_count, index * 2 + 2)
+                self.assertEqual(send.call_args.args[0]["event"], "recovery")
+                self.assertEqual(send.call_args.args[0]["reason"], "local_delivery_state_error")
+                self.assertTrue(runtime.delivery_health()["ok"])
+
+    def test_replay_worker_reports_local_error_while_retries_are_still_failing(self):
+        runtime = listener.get_runtime()
+        runtime.interval = 0.01
+        runtime.health.alert_interval = 0
+        alerted, recovered, allow_recovery = threading.Event(), threading.Event(), threading.Event()
+        messages = []
+        def send(message):
+            messages.append(message)
+            (alerted if message["event"] == "alert" else recovered).set()
+            return True
+        runtime.health.send_alert = send
+        original = runtime.replay_once
+        def replay():
+            if not allow_recovery.is_set():
+                raise OSError("synthetic private disk details " + TOKEN_A)
+            original()
+        with mock.patch.object(runtime, "replay_once", side_effect=replay), mock.patch("builtins.print") as logs:
+            runtime.start()
+            self.addCleanup(lambda: (runtime.stop(), runtime.thread.join(timeout=2)))
+            self.assertTrue(alerted.wait(timeout=2))
+            self.assertIsNotNone(runtime.last_local_error)
+            allow_recovery.set()
+            self.assertTrue(recovered.wait(timeout=2))
+            runtime.stop()
+            runtime.thread.join(timeout=2)
+            self.assertEqual([message["event"] for message in messages], ["alert", "recovery"])
+            self.assertNotIn(TOKEN_A, json.dumps(messages) + str(logs.call_args_list))
+            self.assertNotIn("private disk details", json.dumps(messages) + str(logs.call_args_list))
+        self.requests.post.assert_not_called()
+
     def test_observed_family_without_primary_is_not_hidden_by_other_family_delivery(self):
         common = {k: v for k, v in self.packet.items() if k in ("PASSKEY", "model", "stationtype", "dateutc")}
         cases = (

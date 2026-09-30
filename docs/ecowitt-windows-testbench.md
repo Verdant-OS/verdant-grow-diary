@@ -368,6 +368,12 @@ Set `ECOWITT_QUIET_SECONDS` or `ECOWITT_FORWARD_FAILURE_SECONDS`
 to change them. Startup gets one quiet grace period; restarting retains
 previous times and incidents. Each incident logs one alert and one
 recovery. With no webhook URL, there is no outbound alert request.
+Local receive, enqueue and replay failures participate in that same incident
+set, with the fixed reason `local_delivery_state_error`. Replay exceptions
+attempt incident reporting while retries continue. Alert state must be
+durable before an outbound attempt; an unwritable incident-state file blocks
+that attempt and keeps health unhealthy. Alert I/O runs outside the shared
+state lock, and receive-path recovery still requires a real successful write.
 
 For an optional notification destination, set these values locally:
 

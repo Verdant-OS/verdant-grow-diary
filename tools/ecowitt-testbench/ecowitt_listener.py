@@ -1092,7 +1092,8 @@ class ListenerRuntime:
             log=lambda value: print("[verdant-testbench] " + json.dumps(self.cleaner(value))),
             send_alert=send_listener_alert if os.environ.get("ECOWITT_ALERT_WEBHOOK_URL") else None,
             cleaner=self.cleaner, max_log_bytes=max(256, max_bytes // 10), max_days=max_days, lock=self.lock,
-            spool_drops=lambda: self.spool.stats["dropped_count"])
+            spool_drops=lambda: self.spool.stats["dropped_count"],
+            local_errors=lambda: bool(self.last_local_error or self.last_enqueue_error))
         self.spool.enforce_limits()
 
     def enqueue(self, reading: dict, tent_id: str) -> str:
@@ -1118,9 +1119,6 @@ class ListenerRuntime:
     def delivery_health(self) -> dict:
         with self.lock:
             status = self.health.status()
-            if self.last_local_error or self.last_enqueue_error or self.last_receive_error:
-                status["ok"] = False
-                status["reasons"].append("local_delivery_state_error")
             configured = {tent.tent_id for tent in self.tents}
             if any(entry["reading"]["metadata"]["tent_id"] not in configured
                    for entry in self.spool.entries.values()):
@@ -1192,6 +1190,12 @@ class ListenerRuntime:
                         # Exception text may contain credentials; never echo it.
                         self.last_local_error = "local_delivery_state_error"
                         print("[verdant-testbench] local delivery state error; pending entries retained")
+                        try:
+                            self.health.tick()
+                        except Exception:
+                            # Preserve the error when incident state itself
+                            # cannot be written; never echo exception details.
+                            pass
             self.thread = threading.Thread(target=replay, name="ecowitt-replay", daemon=True)
             self.thread.start()
             self.started = True

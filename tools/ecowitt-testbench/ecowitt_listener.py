@@ -1123,17 +1123,22 @@ class ListenerRuntime:
             self.last_local_error = None
 
     def start(self) -> None:
-        if self.thread is not None:
-            return
-        def replay() -> None:
-            while not self.stop_event.wait(self.interval):
-                try:
-                    self.replay_once()
-                except (OSError, ValueError, KeyError, TypeError):
-                    self.last_local_error = "local_delivery_state_error"
-                    print("[verdant-testbench] local delivery state error; pending entries retained")
-        self.thread = threading.Thread(target=replay, name="ecowitt-replay", daemon=True)
-        self.thread.start()
+        with self.lock:
+            # A retired runtime must not resume using obsolete tent settings.
+            if self.stop_event.is_set() or (self.thread is not None and self.thread.is_alive()):
+                return
+
+            def replay() -> None:
+                while not self.stop_event.wait(self.interval):
+                    try:
+                        self.replay_once()
+                    except Exception:
+                        # Keep replay alive for unexpected ordinary failures too.
+                        # Exception text may contain credentials; never echo it.
+                        self.last_local_error = "local_delivery_state_error"
+                        print("[verdant-testbench] local delivery state error; pending entries retained")
+            self.thread = threading.Thread(target=replay, name="ecowitt-replay", daemon=True)
+            self.thread.start()
 
 
 def get_runtime() -> ListenerRuntime:

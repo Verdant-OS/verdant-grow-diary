@@ -173,14 +173,19 @@ class JsonlSpool:
         self._compact()
         self._save_stats()
 
-    def _compact(self) -> None:
+    def _compact(self) -> dict[str, int]:
         temporary = self.path.with_suffix(".jsonl.tmp")
-        with temporary.open("w", encoding="utf-8") as handle:
-            for entry in self.entries.values():
-                handle.write(json.dumps({"op": "put", "entry": entry}, separators=(",", ":"), allow_nan=False) + "\n")
+        record_sizes = {}
+        # Fixed LF bytes make the budget match the file on Windows too.
+        with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+            for entry_id, entry in self.entries.items():
+                line = json.dumps({"op": "put", "entry": entry}, separators=(",", ":"), allow_nan=False) + "\n"
+                handle.write(line)
+                record_sizes[entry_id] = len(line.encode("utf-8"))
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, self.path)
+        return record_sizes
 
     def enforce_limits(self) -> None:
         with self.lock:
@@ -191,11 +196,24 @@ class JsonlSpool:
                     del self.entries[entry_id]
                     dropped += 1
             if dropped or self._disk_bytes() > self.max_bytes:
-                self._compact()
-            while self.entries and self._disk_bytes() > self.max_bytes:
-                self.entries.popitem(last=False)
-                dropped += 1
-                self._compact()
+                record_sizes = self._compact()
+                disk_bytes = self._disk_bytes()
+                stats_bytes = self.stats_path.stat().st_size if self.stats_path.exists() else 0
+                queue_bytes = sum(record_sizes.values())
+                other_bytes = disk_bytes - queue_bytes - stats_bytes
+                size_dropped = 0
+                for entry_id, record_bytes in record_sizes.items():
+                    # Include counter growth before choosing the survivor set.
+                    updated_stats = {**self.stats, "dropped_count": self.stats["dropped_count"] + dropped}
+                    updated_stats_bytes = len(json.dumps(updated_stats, separators=(",", ":"), allow_nan=False).encode("utf-8"))
+                    if other_bytes + queue_bytes + updated_stats_bytes <= self.max_bytes:
+                        break
+                    del self.entries[entry_id]
+                    queue_bytes -= record_bytes
+                    dropped += 1
+                    size_dropped += 1
+                if size_dropped:
+                    self._compact()
             if dropped:
                 self.stats["dropped_count"] += dropped
                 self.warn(f"spool: dropped {dropped} oldest entries at retention/size limit")

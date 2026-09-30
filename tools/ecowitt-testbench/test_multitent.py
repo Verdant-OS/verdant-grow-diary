@@ -39,6 +39,53 @@ class MultiTentTests(unittest.TestCase):
         self.assertEqual(sanitize(raw), {
             "temperature_channel_note": "keep this non-credential field"})
 
+    def test_unsupported_leaf_values_become_null_without_stringification(self):
+        class PrivateValue:
+            def __str__(self):
+                raise AssertionError("Untrusted values must not be stringified")
+
+            def __repr__(self):
+                raise AssertionError("Untrusted values must not be represented")
+
+        safe = sanitize({"values": [b"private", {"private"}, PrivateValue(), None,
+                                     True, 77, 77.0, "77"],
+                         "nested": ({"value": PrivateValue(), "PASSKEY": "private"},)})
+        self.assertEqual(safe, {"values": [None, None, None, None, True, 77, 77.0, "77"],
+                                "nested": [{"value": None}]})
+        json.dumps(safe, allow_nan=False)
+
+    def test_unsupported_owned_values_do_not_abort_other_fields_or_tents(self):
+        tents, aliases = self.load([tent(air_channels=[1, 3]),
+            tent(TENT_B, "TOKEN_B", air_channels=[2], soil_channels=[],
+                 soil_temp_channels=[], co2=False)])
+        for bad in (b"private", {"private"}, object()):
+            with self.subTest(value_type=type(bad).__name__):
+                packets, unmapped = route_packet({"temp1f": bad, "humidity1": "50",
+                    "temp3f": bad, "temp2f": "80", "humidity2": "60",
+                    "unknown": {"nested": bad}}, tents, aliases)
+                self.assertTrue(packets[0]["invalid"])
+                self.assertNotIn("temp_f", packets[0]["metrics"])
+                self.assertEqual(packets[0]["metrics"]["humidity_percent"], 50)
+                self.assertIsNone(packets[0]["metadata"]["raw_payload"]["temp1f"])
+                self.assertIsNone(packets[0]["metadata"]["channels"][0]["value"])
+                self.assertFalse(packets[1]["invalid"])
+                self.assertEqual(packets[1]["metrics"]["temp_f"], 80)
+                self.assertEqual(unmapped, {"unknown": {"nested": None}})
+                json.dumps({"packets": packets, "unmapped": unmapped}, allow_nan=False)
+
+    def test_duplicate_case_values_keep_strict_type_sensitive_conflicts(self):
+        tents, aliases = self.load([tent(air_channels=[1])])
+        for first, second, conflicting in ((77, 77, False), (77, 77.0, True),
+                                            ("77", 77, True), (77, b"77", True)):
+            with self.subTest(first_type=type(first).__name__, second_type=type(second).__name__):
+                raw = {"TEMP1F": first, "temp1f": second, "humidity1": "50"}
+                packets, unmapped = route_packet(raw, tents, aliases)
+                repeated, repeated_unmapped = route_packet(dict(reversed(list(raw.items()))), tents, aliases)
+                self.assertEqual(packets, repeated)
+                self.assertEqual(unmapped, repeated_unmapped)
+                self.assertEqual(packets[0]["invalid"], conflicting)
+                self.assertEqual("temp_f" in packets[0]["metrics"], not conflicting)
+
     def test_two_tents_route_without_cross_attribution(self):
         tents, aliases = self.load([tent(air_channels=[1], soil_channels=[1],
                                         soil_temp_channels=[1], co2=True),

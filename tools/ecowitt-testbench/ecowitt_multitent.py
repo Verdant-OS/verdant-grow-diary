@@ -56,7 +56,10 @@ def sanitize(value: Any, *, secrets: tuple[str, ...] = ()) -> Any:
         return text(value)
     if isinstance(value, float) and not math.isfinite(value):
         return None
-    return value
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    # Unknown leaf types are invalid data, never objects to stringify or persist.
+    return None
 
 
 def valid_token(value: Any) -> bool:

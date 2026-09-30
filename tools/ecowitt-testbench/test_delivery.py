@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+import unittest.mock as mock
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -108,6 +109,85 @@ class DeliveryTests(DeliveryFixture):
         spool.enforce_limits()
         self.assertLessEqual((self.root / "dead-letter.jsonl").stat().st_size, 850)
         self.assertGreater(spool.stats["dead_letter_dropped_count"], 0)
+
+    def test_size_evictions_batch_compaction_and_restore_exact_survivors(self):
+        spool = self.spool()
+        reading = self.reading()
+        reading["metadata"]["note"] = "Unicode: \u6f22\u5b57 \U0001f33f\nsecond line"
+        for n in range(100):
+            spool.enqueue(f"entry-{n:03d}", reading)
+        spool.max_bytes = int(spool._disk_bytes() * 0.3)
+        with mock.patch.object(spool, "_compact", wraps=spool._compact) as compact, \
+                mock.patch.object(spool, "_disk_bytes", wraps=spool._disk_bytes) as scans:
+            spool.enforce_limits()
+        survivors = list(spool.entries)
+        self.assertGreater(spool.stats["dropped_count"], 50)
+        self.assertEqual(survivors, [f"entry-{n:03d}" for n in range(100 - len(survivors), 100)])
+        self.assertLessEqual(compact.call_count, 2)
+        self.assertLessEqual(scans.call_count, 8)
+        self.assertLessEqual(spool._disk_bytes(), spool.max_bytes)
+        restored = self.spool(max_bytes=spool.max_bytes)
+        self.assertEqual(list(restored.entries), survivors)
+        self.assertEqual(restored.stats["dropped_count"], 100 - len(survivors))
+        for entry in restored.entries.values():
+            self.assertEqual(entry["reading"], reading)
+
+    def test_journal_compaction_reclaims_space_without_evicting_pending_entry(self):
+        spool = self.spool()
+        spool.enqueue("pending", self.reading())
+        for _ in range(20):
+            spool.finish("pending", 503)
+        spool.max_bytes = 600
+        with mock.patch.object(spool, "_compact", wraps=spool._compact) as compact:
+            spool.enforce_limits()
+        self.assertEqual(list(spool.entries), ["pending"])
+        self.assertEqual(spool.stats["dropped_count"], 0)
+        self.assertEqual(compact.call_count, 1)
+        self.assertLessEqual(spool._disk_bytes(), spool.max_bytes)
+        self.assertEqual(self.spool(max_bytes=600).entries["pending"]["attempts"], 20)
+
+    def test_size_budget_includes_growth_of_persisted_drop_counter(self):
+        spool = self.spool()
+        spool.stats["dropped_count"] = 9
+        spool._save_stats()
+        spool.enqueue("old", self.reading())
+        spool.enqueue("new", self.reading())
+        newest_line = spool.path.read_bytes().splitlines(keepends=True)[-1]
+        spool.max_bytes = len(newest_line) + spool.stats_path.stat().st_size
+        spool.enforce_limits()
+        self.assertNotIn("old", spool.entries)
+        self.assertLessEqual(spool._disk_bytes(), spool.max_bytes)
+        restored = self.spool(max_bytes=spool.max_bytes)
+        self.assertEqual(list(restored.entries), list(spool.entries))
+        self.assertEqual(restored.stats["dropped_count"], 11 - spool.pending_count)
+
+    def test_age_and_size_evictions_include_auxiliary_state_in_budget(self):
+        spool = self.spool()
+        spool.enqueue("expired", self.reading())
+        self.now += timedelta(days=8)
+        for n in range(20):
+            spool.enqueue(f"fresh-{n:02d}", self.reading())
+        fixed = self.root / "state.json"
+        fixed.write_text(json.dumps({"note": "x" * 200}), encoding="utf-8")
+        spool.max_bytes = 1500
+        with mock.patch.object(spool, "_compact", wraps=spool._compact) as compact:
+            spool.enforce_limits()
+        self.assertNotIn("expired", spool.entries)
+        self.assertLessEqual(compact.call_count, 2)
+        self.assertLessEqual(spool._disk_bytes(), 1500)
+        self.assertEqual(json.loads(fixed.read_text()), {"note": "x" * 200})
+        restored = self.spool(max_bytes=1500)
+        self.assertEqual(list(restored.entries), list(spool.entries))
+        self.assertEqual(restored.stats["dropped_count"], 21 - spool.pending_count)
+
+    def test_fixed_state_larger_than_cap_still_refuses_delivery(self):
+        spool = self.spool()
+        fixed = self.root / "state.json"
+        fixed.write_text(json.dumps({"note": "x" * 1000}), encoding="utf-8")
+        spool.max_bytes = 600
+        with self.assertRaisesRegex(ValueError, "Spool state exceeds size cap"):
+            spool.due_entries()
+        self.assertTrue(fixed.exists())
 
     def test_torn_tail_does_not_destroy_prior_entry_or_next_append(self):
         spool = self.spool()

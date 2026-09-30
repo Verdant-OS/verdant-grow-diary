@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timedelta, timezone
@@ -263,6 +264,138 @@ class ListenerIntegrationTests(unittest.TestCase):
         runtime.start()
         self.assertTrue(done.wait(timeout=2))
         self.assertTrue(runtime.thread.is_alive())
+
+    def test_dead_worker_is_replaced_and_drains_without_another_packet(self):
+        self.post()
+        runtime = listener.get_runtime()
+        old = threading.Thread(target=lambda: None)
+        old.start()
+        old.join(timeout=1)
+        self.assertFalse(old.is_alive())
+        runtime.thread = old
+        runtime.interval = 0.01
+        drained = threading.Event()
+        original = runtime.replay_once
+
+        def replay():
+            original()
+            drained.set()
+
+        with mock.patch.object(runtime, "replay_once", side_effect=replay):
+            runtime.start()
+            self.addCleanup(lambda: (runtime.stop_event.set(), runtime.thread.join(timeout=2)))
+            self.assertIsNot(runtime.thread, old)
+            self.assertTrue(drained.wait(timeout=2))
+        self.assertEqual(runtime.spool.pending_count, 0)
+        self.assertEqual(self.requests.post.call_count, 2)
+        for call in self.requests.post.call_args_list:
+            self.assertEqual(call.kwargs["json"]["captured_at"], "2026-09-28T12:00:00Z")
+
+    def test_unexpected_worker_exception_is_redacted_then_replay_recovers(self):
+        self.post()
+        runtime = listener.get_runtime()
+        saved_keys = {entry["idempotency_key"] for entry in runtime.spool.entries.values()}
+        runtime.interval = 0.01
+        waiting = threading.Event()
+        allow_recovery = threading.Event()
+        recovered = threading.Event()
+        original = runtime.replay_once
+        attempts = 0
+
+        def replay():
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise RuntimeError("private failure " + TOKEN_A)
+            waiting.set()
+            if allow_recovery.wait(timeout=2):
+                original()
+                recovered.set()
+
+        def stop():
+            runtime.stop_event.set()
+            allow_recovery.set()
+            runtime.thread.join(timeout=2)
+
+        with mock.patch.object(runtime, "replay_once", side_effect=replay), \
+                mock.patch("builtins.print") as logs, mock.patch.object(threading, "excepthook") as hook:
+            runtime.start()
+            self.addCleanup(stop)
+            self.assertTrue(waiting.wait(timeout=2))
+            self.assertTrue(runtime.thread.is_alive())
+            self.assertEqual(runtime.spool.pending_count, 2)
+            self.assertEqual(runtime.last_local_error, "local_delivery_state_error")
+            self.assertEqual(self.client.get("/health").status_code, 503)
+            allow_recovery.set()
+            self.assertTrue(recovered.wait(timeout=2))
+            self.assertEqual(runtime.spool.pending_count, 0)
+            self.assertEqual(self.client.get("/health").status_code, 200)
+            hook.assert_not_called()
+            self.assertNotIn(TOKEN_A, str(logs.call_args_list))
+            self.assertNotIn("private failure", str(logs.call_args_list))
+            runtime.stop_event.set()
+            runtime.thread.join(timeout=2)
+        self.assertEqual({call.kwargs["headers"]["Idempotency-Key"]
+                          for call in self.requests.post.call_args_list}, saved_keys)
+
+    def test_concurrent_starts_create_only_one_worker(self):
+        runtime = listener.get_runtime()
+        real_thread = threading.Thread
+        barrier = threading.Barrier(8)
+
+        def start():
+            barrier.wait(timeout=2)
+            runtime.start()
+
+        with mock.patch.object(listener.threading, "Thread", wraps=real_thread) as constructor:
+            callers = [real_thread(target=start) for _ in range(8)]
+            for caller in callers:
+                caller.start()
+            for caller in callers:
+                caller.join(timeout=2)
+                self.assertFalse(caller.is_alive())
+            self.addCleanup(lambda: (runtime.stop_event.set(), runtime.thread.join(timeout=2)))
+            self.assertEqual(constructor.call_count, 1)
+            self.assertTrue(runtime.thread.is_alive())
+            runtime.start()
+            self.assertEqual(constructor.call_count, 1)
+
+    def test_retired_runtime_stop_event_is_never_cleared_or_restarted(self):
+        runtime = listener.get_runtime()
+        runtime.stop_event.set()
+        with mock.patch.object(listener.threading, "Thread") as constructor:
+            runtime.start()
+        constructor.assert_not_called()
+        self.assertIsNone(runtime.thread)
+        self.assertTrue(runtime.stop_event.is_set())
+        self.requests.post.assert_not_called()
+
+    def test_unsupported_internal_payload_values_are_durably_contained(self):
+        raw = {**self.packet, "temp1f": b"unsupported", "unknown": {"nested": object()}}
+        with mock.patch.object(listener, "extract_payload", return_value=raw):
+            response = self.post()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["readings"][0]["source"], "invalid")
+        self.assertEqual(response.get_json()["readings"][1]["metrics"]["temp_f"], 80)
+        runtime = listener.get_runtime()
+        self.assertEqual(runtime.spool.pending_count, 2)
+        self.requests.post.assert_not_called()
+        listener._RUNTIME = None
+        restored = listener.get_runtime()
+        self.assertEqual(restored.spool.pending_count, 2)
+        first = next(iter(restored.spool.entries.values()))
+        self.assertIsNone(first["reading"]["metadata"]["raw_payload"]["temp1f"])
+        for path in (self.root / "spool").glob("*.jsonl"):
+            for line in path.read_text().splitlines():
+                json.loads(line)
+
+    def test_json_container_metric_is_invalid_without_blocking_other_tent(self):
+        response = self.post({**self.packet, "temp1f": {"unexpected": ["shape"]}})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["readings"][0]["source"], "invalid")
+        self.assertEqual(response.get_json()["readings"][1]["metrics"]["temp_f"], 80)
+        self.assertEqual(listener.get_runtime().spool.pending_count, 2)
+        self.requests.post.assert_not_called()
 
     def test_changed_secondary_values_at_same_time_are_not_coalesced_away(self):
         mapping = json.loads(self.mapping.read_text())

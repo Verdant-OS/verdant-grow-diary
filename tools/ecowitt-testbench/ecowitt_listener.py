@@ -10,7 +10,8 @@ Safety properties (must remain true):
 
 * No direct Supabase table writes. Forwarding, when explicitly enabled,
   goes only to the existing validated ingest webhook
-  (`VERDANT_INGEST_URL`) using the bridge token (`VERDANT_BRIDGE_TOKEN`).
+  (`VERDANT_INGEST_URL`) using the single-tent bridge token or each
+  mapped tent's configured token environment variable.
 * No fake live data. Synthetic loopback browser/curl/demo payloads are
   labeled ``source = "demo"``. Real LAN EcoWitt gateway uploads
   (non-loopback caller carrying at least two non-secret EcoWitt gateway
@@ -25,15 +26,15 @@ Safety properties (must remain true):
   — they are normalized to ``None`` and the raw payload is kept in
   ``metadata.raw_payload`` for audit. Old gateway timestamps retain their
   event time and downgrade the reading to ``stale``.
-* Bridge tokens are never printed in full. Only a masked preview
-  (``vbt_abc...xyz``) is logged. Authorization headers are validated to
+* Bridge tokens are never logged or persisted. Authorization headers are validated to
   be ASCII-only before any outbound request.
 
 Usage:
     python ecowitt_listener.py
 
 Endpoints:
-    GET  /health
+    GET  /health   readiness: 503 when delivery is failing (see body "reasons")
+    GET  /livez    liveness: always 200 while the process is serving HTTP
     GET  /ecowitt or /ECOWITT  (accepts query params, like EcoWitt customized upload)
     POST /ecowitt or /ECOWITT  (accepts form data, JSON, or raw body)
     GET  /debug/raw-log-tail   (LOCAL-ONLY operator debug; sanitized; read-only)
@@ -47,10 +48,17 @@ import json
 import os
 import re
 import sys
+import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+from ecowitt_delivery import HealthState, JsonlSpool
+from ecowitt_multitent import (
+    COMMON_FIELDS, FIELD_MAP, ConfigError, Tent, gateway_fingerprint, gateway_secrets, load_tent_map,
+    numeric, primary_families, route_packet, sanitize, valid_token,
+)
 
 try:
     from flask import Flask, jsonify, request
@@ -83,22 +91,16 @@ PORT = int(os.environ.get("VERDANT_TESTBENCH_PORT", "8787"))
 ECOWITT_LIVE_FRESHNESS = timedelta(minutes=30)
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
 
 
 # ---------------------------------------------------------------------------
 # Normalization
 # ---------------------------------------------------------------------------
 
-FIELD_MAP = {
-    "temp_f": ("temp1f", "tempf", "tempinf"),
-    "humidity_percent": ("humidity1", "humidity", "humidityin"),
-    "soil_moisture_pct": ("soilmoisture1", "soilmoisture2"),
-    "co2_ppm": ("co2", "co2in", "co2_ppm"),
-}
-
 
 def _coerce_float(value: Any) -> Optional[float]:
-    if value is None:
+    if value is None or isinstance(value, bool):
         return None
     try:
         f = float(value)
@@ -110,6 +112,12 @@ def _coerce_float(value: Any) -> Optional[float]:
     return f
 
 
+def _stuck_legacy_percent_metrics(payload: Dict[str, Any]) -> set[str]:
+    return {metric for metric in ("humidity_percent", "soil_moisture_pct")
+            if any(str(key).lower() in FIELD_MAP[metric] and numeric(value) in {0, 100}
+                   for key, value in payload.items())}
+
+
 def normalize_metrics(payload: Dict[str, Any]) -> Dict[str, Optional[float]]:
     """Map known EcoWitt fields into Verdant canonical metric names.
 
@@ -117,15 +125,31 @@ def normalize_metrics(payload: Dict[str, Any]) -> Dict[str, Optional[float]]:
     code can flag them — they are never treated as healthy.
     """
     metrics: Dict[str, Optional[float]] = {}
+    conflicts = _conflicting_case_fields(payload)
+    stuck = _stuck_legacy_percent_metrics(payload)
     for canonical, candidates in FIELD_MAP.items():
+        if canonical in stuck or conflicts.intersection(candidates):
+            metrics[canonical] = None
+            continue
         value: Optional[float] = None
         for key in candidates:
-            if key in payload:
-                value = _coerce_float(payload[key])
+            raw_value = _payload_value_case_insensitive(payload, key)
+            if raw_value is not None:
+                value = _coerce_float(raw_value)
                 if value is not None:
                     break
         metrics[canonical] = value
     return metrics
+
+
+def has_stuck_ecowitt_percent_metric(payload: Any) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    for key, value in payload.items():
+        if re.fullmatch(r"humidity(?:[1-8]|in)?|soilmoisture[1-8]", str(key).lower()):
+            if numeric(value) in {0, 100}:
+                return True
+    return False
 
 
 def parse_ecowitt_dateutc(value: Any) -> Optional[str]:
@@ -151,6 +175,15 @@ def parse_ecowitt_dateutc(value: Any) -> Optional[str]:
     )
 
 
+def _conflicting_case_fields(payload: Any) -> set[str]:
+    if not isinstance(payload, dict):
+        return set()
+    values = {}
+    for key, value in payload.items():
+        values.setdefault(str(key).lower(), set()).add(json.dumps(sanitize(value), sort_keys=True))
+    return {key for key, variants in values.items() if len(variants) > 1}
+
+
 def _payload_value_case_insensitive(
     payload: Optional[Dict[str, Any]],
     wanted_key: str,
@@ -158,6 +191,8 @@ def _payload_value_case_insensitive(
     if not isinstance(payload, dict):
         return None
     wanted = wanted_key.lower()
+    if wanted in _conflicting_case_fields(payload):
+        return None
     for key, value in payload.items():
         if str(key).lower() == wanted:
             return value
@@ -358,6 +393,7 @@ def _resolve_source_from_validated(
     header_mode: Optional[str],
     env_mode: Optional[str],
     now: Optional[datetime],
+    persisted_physical_evidence: Optional[bool] = None,
 ) -> str:
     """Resolve source using one request-level timestamp validation result."""
     if header_mode is None:
@@ -365,9 +401,15 @@ def _resolve_source_from_validated(
     if env_mode is None:
         env_mode = (os.environ.get("VERDANT_FORWARD_MODE") or "").strip().lower()
 
+    known_fields = COMMON_FIELDS | {key for candidates in FIELD_MAP.values() for key in candidates}
+    if _conflicting_case_fields(payload).intersection(known_fields):
+        return "invalid"
+    if has_stuck_ecowitt_percent_metric(payload):
+        return "invalid"
+
     explicit: Optional[str] = None
     if isinstance(payload, dict):
-        raw_src = payload.get("source")
+        raw_src = _payload_value_case_insensitive(payload, "source")
         if isinstance(raw_src, str) and raw_src.strip():
             cand = raw_src.strip().lower()
             if cand in ALLOWED_SOURCES:
@@ -387,6 +429,11 @@ def _resolve_source_from_validated(
         remote_addr,
         canonical_gateway_time,
     )
+    if persisted_physical_evidence is not None:
+        # This bit is computed by this listener at receive time and saved only
+        # in its local spool. A gateway body cannot supply it. Do not persist
+        # or fabricate a caller IP to reconstruct physical proof on replay.
+        physical_gateway_evidence = persisted_physical_evidence and canonical_gateway_time is not None
     stale_gateway_evidence = physical_gateway_evidence and is_ecowitt_dateutc_stale(
         canonical_gateway_time,
         now=now,
@@ -418,9 +465,7 @@ def _resolve_source_from_validated(
 def mask_token(token: str) -> str:
     if not token:
         return "<empty>"
-    if len(token) <= 10:
-        return "***"
-    return f"{token[:7]}...{token[-3:]}"
+    return "<configured>"
 
 
 def is_ascii_header_safe(value: str) -> bool:
@@ -448,9 +493,10 @@ def is_ascii_header_safe(value: str) -> bool:
 def append_raw_log(record: Dict[str, Any]) -> None:
     try:
         with LOG_PATH.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record, default=str) + "\n")
-    except Exception as exc:  # pragma: no cover
-        print(f"[verdant-testbench] failed to write raw log: {exc}", file=sys.stderr)
+            fh.write(json.dumps(sanitize(record, secrets=_delivery_secrets()), default=str) + "\n")
+    except Exception:
+        print("[verdant-testbench] failed to write sanitized raw log", file=sys.stderr)
+        raise OSError("Sanitized raw log write failed") from None
 
 
 # ---------------------------------------------------------------------------
@@ -549,7 +595,8 @@ def _redact_raw_payload_for_forward(raw: Any) -> Any:
         if ks.lower() in _FORWARD_PAYLOAD_REDACT_KEYS:
             continue
         out[ks] = v
-    return out
+    secrets = _delivery_secrets() + gateway_secrets(raw)
+    return sanitize(out, secrets=secrets)
 
 
 def build_forward_idempotency_key(outbound: Dict[str, Any]) -> str:
@@ -617,7 +664,7 @@ import re as _re_inline
 # leak the embedded credential).
 _INLINE_REDACT_PATTERNS = [
     _re_inline.compile(r"vbt_[A-Za-z0-9_\-]{6,}"),
-    _re_inline.compile(r"eyJ[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}"),
+    _re_inline.compile(r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}"),
     _re_inline.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{6,}"),
 ]
 
@@ -627,7 +674,7 @@ def _scrub_inline_secrets(text: str) -> str:
     out = text
     for pat in _INLINE_REDACT_PATTERNS:
         out = pat.sub(_REDACTED, out)
-    return out
+    return sanitize(out, secrets=_delivery_secrets())
 
 
 def sanitize_forward_error_value(value: Any) -> Any:
@@ -653,7 +700,7 @@ def sanitize_forward_error_value(value: Any) -> Any:
             return json.loads(scrubbed)
         except Exception:
             return safe
-    return safe
+    return sanitize(safe, secrets=_delivery_secrets())
 
 
 
@@ -748,6 +795,22 @@ def is_valid_tent_id(value: Optional[str]) -> bool:
     return bool(_UUID_RE.match(v))
 
 
+def is_valid_ingest_url(url: Any) -> bool:
+    """Require an HTTPS destination without URL credentials or malformed ports."""
+    if not isinstance(url, str) or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in url):
+        return False
+    from urllib.parse import urlsplit
+    try:
+        parsed = urlsplit(url)
+        if (parsed.scheme != "https" or not parsed.hostname or
+                parsed.username is not None or parsed.password is not None):
+            return False
+        parsed.port  # Validate numeric/range bounds before requests sees the URL.
+    except ValueError:
+        return False
+    return True
+
+
 def evaluate_forwarding_readiness(
     url: Optional[str],
     token: Optional[str],
@@ -765,6 +828,8 @@ def evaluate_forwarding_readiness(
     tent_valid = is_valid_tent_id(tent_id)
     if not url_ok or not token_ok:
         reason: Optional[str] = "no_forwarding_configured"
+    elif not is_valid_ingest_url(url):
+        reason = "blocked_invalid_ingest_url"
     elif not tent_configured:
         reason = "blocked_missing_tent_id"
     elif not tent_valid:
@@ -799,10 +864,12 @@ def sanitize_debug_payload_str_safe(text: str) -> str:
         return text
 
 
-def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
+def _send_forward(reading: Dict[str, Any], *, _tent_id: Optional[str] = None,
+                  _token_env: str = "VERDANT_BRIDGE_TOKEN", _entry_id: Optional[str] = None,
+                  _replay: bool = False) -> Dict[str, Any]:
     url = os.environ.get("VERDANT_INGEST_URL")
-    token = os.environ.get("VERDANT_BRIDGE_TOKEN")
-    tent_id = os.environ.get("VERDANT_TENT_ID")
+    token = os.environ.get(_token_env)
+    tent_id = _tent_id or os.environ.get("VERDANT_TENT_ID")
 
     readiness = evaluate_forwarding_readiness(url, token, tent_id)
     if not readiness["ready"]:
@@ -863,11 +930,16 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
     if safe_raw_payload is not None:
         safe_metadata["raw_payload"] = safe_raw_payload
 
+    outbound_metrics = dict(reading.get("metrics") or {})
+    for metric in ("humidity_percent", "soil_moisture_pct"):
+        if numeric(outbound_metrics.get(metric)) in {0, 100}:
+            outbound_metrics[metric] = None
+            safe_metadata["verdant_source"] = "invalid"
     outbound: Dict[str, Any] = {
         "source": WEBHOOK_TRANSPORT_SOURCE,
         "vendor": VENDOR,
         "captured_at": reading.get("captured_at"),
-        "metrics": reading.get("metrics") or {},
+        "metrics": outbound_metrics,
         "metadata": safe_metadata,
     }
     # Top-level tent_id is required by sensor-ingest-webhook. Set via
@@ -879,7 +951,7 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
     headers = {
         "Authorization": auth,
         "Content-Type": "application/json",
-        "Idempotency-Key": build_forward_idempotency_key(outbound),
+        "Idempotency-Key": _entry_id or build_forward_idempotency_key(outbound),
         "User-Agent": f"{VENDOR}/1.0",
         "x-verdant-tent-id": tent_id or "",
     }
@@ -902,12 +974,12 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
     # never block indefinitely and never queue unbounded readings.
     for attempt_index in range(MAX_RETRY_ATTEMPTS + 1):
         try:
-            last_resp = requests.post(url, json=outbound, headers=headers, timeout=10)
+            last_resp = requests.post(url, json=outbound, headers=headers, timeout=10, allow_redirects=False)
             last_exc = None
             final_status = last_resp.status_code
             if 200 <= final_status < 300:
                 break
-            if attempt_index < MAX_RETRY_ATTEMPTS and is_retryable_status(final_status):
+            if not _replay and attempt_index < MAX_RETRY_ATTEMPTS and is_retryable_status(final_status):
                 FORWARD_STATS["retry_count"] = int(FORWARD_STATS.get("retry_count", 0)) + 1
                 FORWARD_STATS["last_retry_at"] = datetime.now(timezone.utc).isoformat()
                 FORWARD_STATS["last_retryable_status"] = final_status
@@ -919,7 +991,7 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
             last_exc = exc
             last_resp = None
             final_status = None
-            if attempt_index < MAX_RETRY_ATTEMPTS:
+            if not _replay and attempt_index < MAX_RETRY_ATTEMPTS:
                 FORWARD_STATS["retry_count"] = int(FORWARD_STATS.get("retry_count", 0)) + 1
                 FORWARD_STATS["last_retry_at"] = datetime.now(timezone.utc).isoformat()
                 FORWARD_STATS["last_retryable_status"] = None
@@ -948,8 +1020,7 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         FORWARD_STATS["last_forward_response_message"] = summary["message"]
         FORWARD_STATS["last_forward_response_reason"] = summary.get("reason")
     print(
-        f"[verdant-testbench] forwarded reading -> {resp.status_code} "
-        f"(token {mask_token(token or '')})"
+        f"[verdant-testbench] forwarded reading -> {resp.status_code}"
     )
     return {
         "forwarded": True,
@@ -957,6 +1028,338 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         "idempotency_key": headers["Idempotency-Key"],
     }
 
+
+
+_RUNTIME: Optional["ListenerRuntime"] = None
+_RUNTIME_KEY: Any = None
+_RUNTIME_LOCK = threading.RLock()
+
+
+def _delivery_secrets() -> tuple[str, ...]:
+    names = {"VERDANT_BRIDGE_TOKEN", "ECOWITT_ALERT_WEBHOOK_URL"}
+    if _RUNTIME is not None:
+        names.update(t.token_env for t in _RUNTIME.tents)
+    # Includes test/rotated credentials whose values do not have a vbt prefix.
+    return tuple(os.environ[k] for k in names if os.environ.get(k))
+
+
+def _positive_setting(name: str, default: float) -> float:
+    value = numeric(os.environ.get(name, str(default)))
+    if value is None or not 0 < value <= 1_000_000:
+        raise ConfigError(name + " must be positive, finite and within the supported limit")
+    return value
+
+
+def send_listener_alert(message: dict) -> bool:
+    url = os.environ.get("ECOWITT_ALERT_WEBHOOK_URL")
+    if not url:
+        return True
+    if requests is None:
+        return False
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        return False
+    safe = sanitize(message, secrets=_delivery_secrets())
+    format_name = os.environ.get("ECOWITT_ALERT_FORMAT", "generic").lower()
+    text = safe.get("message", "Ecowitt listener incident")
+    if format_name == "slack":
+        body = {"text": text, "mrkdwn": False}
+    elif format_name == "discord":
+        body = {"content": text, "allowed_mentions": {"parse": []}}
+    elif format_name == "ntfy":
+        topic = os.environ.get("ECOWITT_ALERT_NTFY_TOPIC", "")
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", topic):
+            return False
+        body = {"topic": topic, "message": text, "title": "Ecowitt listener"}
+    elif format_name == "generic":
+        body = safe
+    else:
+        return False
+    try:
+        response = requests.post(url, json=body, timeout=10, allow_redirects=False)
+        return 200 <= response.status_code < 300
+    except Exception:
+        # URL may contain the webhook credential. Never log exception text.
+        return False
+
+
+class ListenerRuntime:
+    def __init__(self) -> None:
+        mapping = os.environ.get("ECOWITT_TENT_MAP", "").strip()
+        self.mapped = bool(mapping)
+        if mapping:
+            self.tents, self.aliases = load_tent_map(Path(mapping), os.environ)
+            if not os.environ.get("VERDANT_INGEST_URL", "").strip():
+                raise ConfigError("Mapped forwarding requires VERDANT_INGEST_URL")
+            if not is_valid_ingest_url(os.environ.get("VERDANT_INGEST_URL")):
+                raise ConfigError("VERDANT_INGEST_URL must be HTTPS without userinfo or malformed ports")
+        else:
+            tent_id = os.environ.get("VERDANT_TENT_ID")
+            self.tents = (Tent(tent_id, "Single tent", "VERDANT_BRIDGE_TOKEN"),) if is_valid_tent_id(tent_id) else ()
+            self.aliases = ()
+        self.lock, self.send_lock = threading.RLock(), threading.RLock()
+        self.stop_event = threading.Event()
+        self.thread: Optional[threading.Thread] = None
+        self.supervisor_stop_event = threading.Event()
+        self.supervisor_thread: Optional[threading.Thread] = None
+        self.last_local_error: Optional[str] = None
+        self.last_enqueue_error: Optional[str] = None
+        root = Path(os.environ.get("ECOWITT_SPOOL_DIR") or Path(__file__).with_name(".spool"))
+        max_bytes = int(_positive_setting("ECOWITT_SPOOL_MAX_MB", 50) * 1024 * 1024)
+        max_days = _positive_setting("ECOWITT_SPOOL_MAX_DAYS", 7)
+        try:
+            _utc_now() - timedelta(days=max_days)
+        except OverflowError:
+            raise ConfigError("ECOWITT_SPOOL_MAX_DAYS exceeds the supported calendar range") from None
+        self.interval = _positive_setting("ECOWITT_REPLAY_INTERVAL_SECONDS", 2)
+        self.cleaner = lambda value: sanitize(value, secrets=_delivery_secrets() +
+            tuple(os.environ[t.token_env] for t in self.tents if os.environ.get(t.token_env)))
+        self.health = HealthState(root / "state.json", [t.tent_id for t in self.tents], clock=_utc_now,
+            quiet_seconds=_positive_setting("ECOWITT_QUIET_SECONDS", 600),
+            failure_seconds=_positive_setting("ECOWITT_FORWARD_FAILURE_SECONDS", 600),
+            alert_interval=_positive_setting("ECOWITT_ALERT_INTERVAL_SECONDS", 60),
+            log=lambda value: print("[verdant-testbench] " + json.dumps(self.cleaner(value))),
+            send_alert=send_listener_alert if os.environ.get("ECOWITT_ALERT_WEBHOOK_URL") else None,
+            cleaner=self.cleaner, max_log_bytes=max(256, max_bytes // 10), max_days=max_days, lock=self.lock,
+            spool_drops=lambda: self.spool.stats["dropped_count"],
+            local_errors=lambda: bool(self.last_local_error or self.last_enqueue_error),
+            orphaned_queue=self._has_orphaned_queue)
+        # Accept health state before queue retention can evict readings. Health
+        # callbacks are evaluated only after spool construction has completed.
+        self.spool = JsonlSpool(root, clock=_utc_now, max_bytes=max_bytes, max_days=max_days,
+                               warn=lambda message: print("[verdant-testbench] " + message), cleaner=self.cleaner, lock=self.lock)
+        self.spool.enforce_limits()
+
+    def enqueue(self, reading: dict, tent_id: str) -> str:
+        with self.lock:
+            try:
+                safe = self.cleaner(reading)
+                safe.setdefault("metadata", {})["tent_id"] = tent_id
+                safe["metadata"].pop("remote_addr", None)
+                key = build_forward_idempotency_key({"tent_id": tent_id, "source": WEBHOOK_TRANSPORT_SOURCE,
+                    "captured_at": safe.get("captured_at"), "metrics": safe.get("metrics") or {}})
+                # Header identity keeps the existing tent/metrics/event-time contract.
+                # Queue identity additionally preserves differing secondary/raw fields
+                # at the same timestamp; they must not be silently coalesced away.
+                identity = json.dumps({"key": key, "metadata": safe.get("metadata")}, sort_keys=True, separators=(",", ":"))
+                entry_id = "queue-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+                was_present = entry_id in self.spool.entries
+                self.spool.enqueue(entry_id, safe, idempotency_key=key)
+                # A duplicate enqueue is a no-op, so it does not prove that the
+                # local delivery state is writable after a prior failed write.
+                if not was_present:
+                    self.last_enqueue_error = None
+                return entry_id
+            except (OSError, ValueError, KeyError, TypeError):
+                self.last_enqueue_error = "local_delivery_state_error"
+                raise
+
+    def delivery_health(self) -> dict:
+        return self.health.status()
+
+    def _has_orphaned_queue(self) -> bool:
+        with self.lock:
+            configured = {tent.tent_id for tent in self.tents}
+            return any(entry["reading"]["metadata"]["tent_id"] not in configured
+                       for entry in self.spool.entries.values())
+
+    @property
+    def last_receive_error(self) -> Optional[str]:
+        with self.lock:
+            return self.health.data["receive_error"]
+
+    @last_receive_error.setter
+    def last_receive_error(self, error: Optional[str]) -> None:
+        self.health.receive_result(error)
+
+    def finish(self, key: str, result: dict) -> None:
+        with self.lock:
+            entry = self.spool.entries.get(key)
+            if entry is None:
+                return
+            status = result.get("status_code")
+            tent_id = entry["reading"]["metadata"]["tent_id"]
+            dropped_before_finish = self.spool.stats["dropped_count"]
+            self.spool.finish(key, status)
+            outstanding = any(e["attempts"] > 0 and e["reading"]["metadata"]["tent_id"] == tent_id
+                              for e in self.spool.entries.values())
+            delivered = set(primary_families(entry["reading"]["metrics"]))
+            if not self.mapped:
+                stuck = _stuck_legacy_percent_metrics(entry["reading"]["metadata"].get("raw_payload") or {})
+                delivered -= {"air" if metric == "humidity_percent" else "soil" for metric in stuck}
+            self.health.forward_result(tent_id, isinstance(status, int) and 200 <= status < 300,
+                outstanding_failure=outstanding, recovered_spool_drop_count=dropped_before_finish,
+                delivered_primary_families=tuple(sorted(delivered)))
+        self.health.tick()
+
+    def replay_once(self) -> None:
+        with self.send_lock:
+            wrote_delivery_state = False
+            for entry in self.spool.due_entries():
+                reading = entry["reading"]
+                tent_id = reading["metadata"]["tent_id"]
+                tent = next((t for t in self.tents if t.tent_id == tent_id), None)
+                if tent is None or (self.mapped and not valid_token(os.environ.get(tent.token_env))):
+                    self.finish(entry["id"], {"reason": "tent_or_token_not_configured"})
+                    continue
+                raw = reading["metadata"].get("raw_payload") or {}
+                gateway_time = validate_ecowitt_dateutc(_payload_value_case_insensitive(raw, "dateutc"), now=_utc_now())
+                reading["source"] = _resolve_source_from_validated(
+                    payload={**{key: value for key, value in raw.items() if key.lower() != "source"},
+                             "source": reading.get("source")}, remote_addr=None,
+                    canonical_gateway_time=gateway_time, header_mode="", env_mode="", now=_utc_now(),
+                    persisted_physical_evidence=reading.get("physical_gateway_evidence") is True)
+                result = _send_forward(reading, _tent_id=tent_id, _token_env=tent.token_env,
+                                       _entry_id=entry.get("idempotency_key", entry["id"]), _replay=True)
+                self.finish(entry["id"], result)
+                wrote_delivery_state = True
+            self.health.tick()
+            # An empty replay is only a read. It cannot prove that the queue is
+            # writable after persisting a retry or completion previously failed.
+            if wrote_delivery_state:
+                self.last_local_error = None
+
+    def start(self) -> None:
+        with self.lock:
+            # A retired runtime must not resume using obsolete tent settings.
+            if self.stop_event.is_set() or (self.thread is not None and self.thread.is_alive()):
+                return
+            self.stop_event = threading.Event()
+            stop_event = self.stop_event
+
+            def replay() -> None:
+                while not stop_event.wait(self.interval):
+                    try:
+                        self.replay_once()
+                    except Exception:
+                        # Keep replay alive for unexpected ordinary failures too.
+                        # Exception text may contain credentials; never echo it.
+                        self.last_local_error = "local_delivery_state_error"
+                        print("[verdant-testbench] local delivery state error; pending entries retained")
+                        try:
+                            self.health.tick()
+                        except Exception:
+                            # Preserve the error when incident state itself
+                            # cannot be written; never echo exception details.
+                            pass
+            self.thread = threading.Thread(target=replay, name="ecowitt-replay", daemon=True)
+            self.thread.start()
+            self.started = True
+
+    def worker_alive(self) -> bool:
+        thread = self.thread
+        return thread is not None and thread.is_alive()
+
+    def ensure_worker(self) -> bool:
+        """Replace a replay worker that died after start(). Returns True on restart.
+
+        Only acts once start() has run and the runtime has not been stopped, so
+        tests and one-shot callers that never started a worker are unaffected.
+        """
+        with self.lock:
+            if (not getattr(self, "started", False) or self.stop_event.is_set()
+                    or self.supervisor_stop_event.is_set()):
+                return False
+            if self.worker_alive():
+                return False
+            self.last_local_error = "local_delivery_state_error"
+            print("[verdant-testbench] replay worker was not running; restarting it")
+            self.start()
+            self.worker_restarts = getattr(self, "worker_restarts", 0) + 1
+            return True
+
+    def supervise(self) -> None:
+        """Check the replay worker on a timer until the runtime is stopped."""
+        with self.lock:
+            if self.supervisor_stop_event.is_set():
+                return
+            if self.supervisor_thread is not None and self.supervisor_thread.is_alive():
+                return
+            stop_event = self.supervisor_stop_event
+            def loop() -> None:
+                while not stop_event.wait(max(self.interval, 1) * 5):
+                    with self.lock:
+                        if stop_event.is_set():
+                            return
+                        try:
+                            self.ensure_worker()
+                        except Exception as exc:  # never let the supervisor die silently
+                            self.last_local_error = "local_delivery_state_error"
+                            print(f"[verdant-testbench] replay supervisor error: {type(exc).__name__}")
+            self.supervisor_thread = threading.Thread(target=loop, name="ecowitt-replay-supervisor", daemon=True)
+            self.supervisor_thread.start()
+
+    def stop(self) -> None:
+        with self.lock:
+            # The supervisor event survives worker replacement. Setting both
+            # events under the restart lock prevents shutdown resurrection.
+            self.supervisor_stop_event.set()
+            self.stop_event.set()
+
+
+def _diagnostic_forwarding_readiness() -> Dict[str, Any]:
+    """Read configuration only; never initialize a spool, health state or worker."""
+    url = os.environ.get("VERDANT_INGEST_URL")
+    mapping = os.environ.get("ECOWITT_TENT_MAP", "").strip()
+    if not mapping:
+        return evaluate_forwarding_readiness(url, os.environ.get("VERDANT_BRIDGE_TOKEN"),
+                                             os.environ.get("VERDANT_TENT_ID"))
+    try:
+        with _RUNTIME_LOCK:
+            if (_RUNTIME is not None and _RUNTIME.mapped and _RUNTIME_KEY
+                    and _RUNTIME_KEY[0].strip() == mapping):
+                tents = _RUNTIME.tents  # Maps are loaded once, until a listener restart.
+            else:
+                tents, _ = load_tent_map(Path(mapping), os.environ)
+        tokens = tuple(os.environ.get(tent.token_env) for tent in tents)
+        token_ok = all(valid_token(token) for token in tokens) and len(set(tokens)) == len(tokens)
+        map_ok = bool(tents)
+    except (ConfigError, OSError):
+        map_ok, token_ok = False, False
+    reason = ("blocked_mapped_configuration" if not map_ok or not token_ok else
+              "blocked_invalid_ingest_url" if not is_valid_ingest_url(url) else None)
+    return {"ready": reason is None, "reason": reason, "mapped": True,
+            "ingest_url_configured": bool(url), "bridge_token_configured": token_ok,
+            "tent_id_configured": map_ok, "tent_id_valid": map_ok}
+
+
+def get_runtime() -> ListenerRuntime:
+    global _RUNTIME, _RUNTIME_KEY
+    settings = ("ECOWITT_TENT_MAP", "ECOWITT_SPOOL_DIR", "VERDANT_TENT_ID", "VERDANT_INGEST_URL",
+                "ECOWITT_SPOOL_MAX_MB", "ECOWITT_SPOOL_MAX_DAYS", "ECOWITT_QUIET_SECONDS",
+                "ECOWITT_FORWARD_FAILURE_SECONDS", "ECOWITT_ALERT_INTERVAL_SECONDS", "ECOWITT_REPLAY_INTERVAL_SECONDS")
+    key = tuple(os.environ.get(name, "") for name in settings)
+    with _RUNTIME_LOCK:
+        if _RUNTIME is None or _RUNTIME_KEY != key:
+            if _RUNTIME is not None:
+                _RUNTIME.stop()
+            _RUNTIME = ListenerRuntime()
+            _RUNTIME_KEY = key
+        return _RUNTIME
+
+
+def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
+    """Preserve single-tent inline behavior, but persist before its first send."""
+    readiness = evaluate_forwarding_readiness(os.environ.get("VERDANT_INGEST_URL"),
+        os.environ.get("VERDANT_BRIDGE_TOKEN"), os.environ.get("VERDANT_TENT_ID"))
+    if not readiness["ready"]:
+        return _send_forward(reading)
+    runtime = get_runtime()
+    tent_id = os.environ["VERDANT_TENT_ID"]
+    key = runtime.enqueue(reading, tent_id)
+    if not runtime.send_lock.acquire(blocking=False):
+        return {"forwarded": False, "queued": key in runtime.spool.entries,
+                "reason": "replay_busy" if key in runtime.spool.entries else "spool_capacity_drop"}
+    try:
+        if key not in runtime.spool.entries:
+            return {"forwarded": False, "reason": "spool_capacity_drop"}
+        entry = runtime.spool.entries[key]
+        result = _send_forward(entry["reading"], _entry_id=entry.get("idempotency_key", key))
+        runtime.finish(key, result)
+        return result
+    finally:
+        runtime.send_lock.release()
 
 
 def mask_ingest_url(url: Optional[str]) -> Optional[str]:
@@ -983,19 +1386,63 @@ def mask_ingest_url(url: Optional[str]) -> Optional[str]:
 # Routes
 # ---------------------------------------------------------------------------
 
+@app.get("/livez")
+def livez() -> Any:
+    """Liveness only: 200 whenever this process can answer HTTP.
+
+    Delivery problems (bad token, network outage, clock skew, a dead replay
+    worker) are reported by /health, never here, so scripts that only need to
+    know "is the listener running" do not misreport those as "not started".
+    """
+    worker = None
+    try:
+        runtime = _RUNTIME
+        if runtime is not None:
+            worker = runtime.worker_alive()
+    except Exception:
+        worker = None
+    return jsonify({"ok": True, "alive": True, "vendor": VENDOR, "port": PORT,
+                    "replay_worker_alive": worker}), 200
+
+
 @app.get("/health")
 def health() -> Any:
-    return jsonify(
-        {
-            "ok": True,
-            "vendor": VENDOR,
-            "port": PORT,
-            "forwarding_configured": bool(
-                os.environ.get("VERDANT_INGEST_URL")
-                and os.environ.get("VERDANT_BRIDGE_TOKEN")
-            ),
-        }
-    )
+    try:
+        runtime = get_runtime()
+        runtime.ensure_worker()
+        runtime.health.tick()
+        status = runtime.delivery_health()
+        status.pop("tents", None)
+        if not runtime.mapped:
+            readiness = evaluate_forwarding_readiness(os.environ.get("VERDANT_INGEST_URL"),
+                os.environ.get("VERDANT_BRIDGE_TOKEN"), os.environ.get("VERDANT_TENT_ID"))
+            if readiness["reason"] not in {None, "no_forwarding_configured"}:
+                status["ok"] = False
+                status["reasons"].append(readiness["reason"])
+        status.update(vendor=VENDOR, port=PORT)
+        # An idle gateway does not make the listener unavailable. Keep its
+        # delivery warning in the body; real delivery/local errors stay 503.
+        unavailable = any(reason != "gateway_quiet" for reason in status["reasons"])
+        return jsonify(status), 503 if unavailable else 200
+    except (OSError, ValueError, KeyError, TypeError):
+        return jsonify({"ok": False, "reasons": ["local_delivery_state_error"]}), 503
+
+
+@app.get("/status")
+def delivery_status() -> Any:
+    if not _is_local_request():
+        return jsonify({"ok": False, "error": "forbidden_non_local"}), 403
+    try:
+        runtime = get_runtime()
+        status = runtime.delivery_health()
+        status.update(mode="mapped" if runtime.mapped else "single_tent", pending_count=runtime.spool.pending_count,
+                      spool=dict(runtime.spool.stats), unmapped_counts=runtime.health.data["unmapped_counts"],
+                      unmapped_overflow_count=runtime.health.data["unmapped_overflow_count"],
+                      unmapped_log_dropped_count=runtime.health.data["unmapped_log_dropped_count"],
+                      alert_webhook_error_count=runtime.health.data["alert_webhook_error_count"])
+        return jsonify(runtime.cleaner(status))
+    except (OSError, ValueError, KeyError, TypeError):
+        return jsonify({"ok": False, "error": "local_delivery_state_error"}), 503
 
 
 @app.route("/ecowitt", methods=["GET", "POST"], strict_slashes=False)
@@ -1050,7 +1497,59 @@ def ecowitt() -> Any:
         },
     }
 
-    append_raw_log(reading)
+    runtime = None
+    receive_step, unmapped_written = "routing", False
+    try:
+        runtime = get_runtime()
+        if gateway_shaped and request.remote_addr and not _is_loopback_source_addr(request.remote_addr):
+            runtime.health.packet_received()
+        if runtime.mapped:
+            routed, unmapped = route_packet(raw, runtime.tents, runtime.aliases, secrets=_delivery_secrets())
+            receive_step = "unmapped"
+            unmapped_written = runtime.health.unmapped(unmapped)
+            receive_step = "routing"
+            readings = []
+            for packet in routed:
+                if packet["missing_primary_families"]:
+                    runtime.health.primary_failure(packet["tent_id"], packet["missing_primary_families"])
+                own_raw = packet["metadata"]["raw_payload"]
+                own_source = _resolve_source_from_validated(payload=own_raw, remote_addr=request.remote_addr,
+                    canonical_gateway_time=gateway_captured_at, header_mode="", env_mode="", now=request_now)
+                readings.append({"captured_at": captured_at, "source": "invalid" if packet["invalid"] or not packet["metrics"] else own_source,
+                    "vendor": VENDOR, "metrics": packet["metrics"], "physical_gateway_evidence": physical_gateway_evidence,
+                    "metadata": {**packet["metadata"], "tent_id": packet["tent_id"]}})
+        else:
+            # Keep legacy FIELD_MAP candidate order. Other channels are visible
+            # locally, never silently attributed to the single configured tent.
+            legacy_keys = COMMON_FIELDS | {key for values in FIELD_MAP.values() for key in values}
+            unmapped = {k: v for k, v in safe_raw.items() if k.lower() not in legacy_keys}
+            receive_step = "unmapped"
+            unmapped_written = runtime.health.unmapped(unmapped)
+            receive_step = "routing"
+            reading["metadata"]["raw_payload"] = {k: v for k, v in safe_raw.items() if k.lower() in legacy_keys}
+            reading["metadata"]["device_id"] = f"ecowitt:{gateway_fingerprint(raw)}:gateway"
+            # Unowned probes remain diagnostic evidence, not this tent's provenance.
+            reading["source"] = source = _resolve_source_from_validated(
+                payload={k: v for k, v in raw.items() if str(k).lower() in legacy_keys},
+                remote_addr=request.remote_addr, canonical_gateway_time=gateway_captured_at,
+                header_mode=None, env_mode=None, now=request_now)
+            stuck = _stuck_legacy_percent_metrics(raw)
+            if stuck and runtime.tents:
+                runtime.health.primary_failure(runtime.tents[0].tent_id,
+                    sorted({"air" if metric == "humidity_percent" else "soil" for metric in stuck}))
+            readings = [reading]
+        for own_reading in readings:
+            append_raw_log(own_reading)
+        if runtime.last_receive_error != "unmapped" or unmapped_written:
+            runtime.last_receive_error = None
+    except (OSError, ValueError, KeyError, TypeError):
+        if runtime is not None:
+            try:
+                runtime.last_receive_error = receive_step
+            except (OSError, ValueError, KeyError, TypeError):
+                runtime.last_local_error = "local_delivery_state_error"
+        return jsonify({"ok": False, "error": "local_delivery_state_error"}), 503
+
     if gateway_shaped and gateway_captured_at is None:
         FORWARD_STATS["blocked_count"] += 1
         FORWARD_STATS["last_status"] = None
@@ -1060,8 +1559,31 @@ def ecowitt() -> Any:
             "forwarded": False,
             "reason": "invalid_gateway_timestamp",
         }
+        try:
+            for tent in runtime.tents:
+                runtime.health.forward_result(tent.tent_id, False)
+            runtime.health.tick()
+        except (OSError, ValueError, KeyError, TypeError):
+            return jsonify({"ok": False, "error": "local_delivery_state_error"}), 503
     else:
-        forward_result = maybe_forward(reading)
+        try:
+            if runtime.mapped:
+                deliverable = [item for item in readings if item["metrics"]]
+                with runtime.lock:
+                    keys = [runtime.enqueue(item, item["metadata"]["tent_id"]) for item in deliverable]
+                    survivors = sum(key in runtime.spool.entries for key in keys)
+                dropped = len(keys) - survivors
+                forward_result = {"forwarded": False, "queued": bool(keys) and not dropped,
+                    "entry_count": survivors, "dropped_count": dropped,
+                    "skipped_empty_count": len(readings) - len(deliverable)}
+                if dropped:
+                    forward_result["reason"] = "spool_capacity_drop"
+                elif not keys:
+                    forward_result["reason"] = "no_deliverable_metrics"
+            else:
+                forward_result = maybe_forward(reading)
+        except (OSError, ValueError, KeyError, TypeError):
+            return jsonify({"ok": False, "error": "local_delivery_state_error"}), 503
 
     # The gateway only needs an acknowledgement. Return the safe telemetry
     # summary, not local network details or the stored raw envelope.
@@ -1072,7 +1594,11 @@ def ecowitt() -> Any:
         "physical_gateway_evidence": physical_gateway_evidence,
         "metrics": metrics,
     }
-    return jsonify({"ok": True, "reading": public_reading, "forward": forward_result})
+    result = {"ok": True, "reading": public_reading, "forward": forward_result}
+    if runtime.mapped:
+        result["readings"] = [{k: item[k] for k in ("captured_at", "source", "vendor", "metrics")}
+                              for item in readings]
+    return jsonify(result)
 
 
 
@@ -1157,7 +1683,7 @@ def sanitize_debug_payload(value: Any) -> Any:
     if isinstance(value, str):
         if _looks_like_secret_value(value):
             return _REDACTED
-        return value
+        return _scrub_inline_secrets(value)
     return value
 
 
@@ -1404,9 +1930,8 @@ def debug_forwarding_status() -> Any:
 
     url = os.environ.get("VERDANT_INGEST_URL")
     token = os.environ.get("VERDANT_BRIDGE_TOKEN")
-    tent_id = os.environ.get("VERDANT_TENT_ID")
-    readiness = evaluate_forwarding_readiness(url, token, tent_id)
-    forwarding_enabled = bool(url and token)
+    readiness = _diagnostic_forwarding_readiness()
+    forwarding_enabled = bool(url and readiness["bridge_token_configured"])
     latest = _latest_metrics_summary()
 
     last_error = FORWARD_STATS.get("last_error")
@@ -1448,7 +1973,8 @@ def debug_forwarding_status() -> Any:
             "tent_id_configured": readiness["tent_id_configured"],
             "tent_id_valid": readiness["tent_id_valid"],
             "masked_ingest_url": mask_ingest_url(url),
-            "masked_token_preview": _mask_token_preview(token),
+            "masked_token_preview": ("<configured>" if readiness["bridge_token_configured"] else None)
+                if readiness.get("mapped") else _mask_token_preview(token),
             "forward_attempt_count": int(FORWARD_STATS.get("attempt_count", 0)),
             "forward_success_count": int(FORWARD_STATS.get("success_count", 0)),
             "forward_failure_count": int(FORWARD_STATS.get("failure_count", 0)),
@@ -1543,6 +2069,13 @@ _RECOMMENDED_NEXT_STEP: Dict[str, str] = {
 }
 
 _RECOMMENDED_BLOCKED: Dict[str, str] = {
+    "blocked_mapped_configuration": (
+        "Check the mapped tent configuration and each mapped credential environment variable. "
+        "Use distinct active tent-scoped bridge credentials and restart the listener; never share their values."
+    ),
+    "blocked_invalid_ingest_url": (
+        "Set VERDANT_INGEST_URL to a valid HTTPS webhook URL without URL credentials and restart the listener."
+    ),
     "blocked_missing_tent_id": (
         "Set VERDANT_TENT_ID=<your-tent-uuid> in .env and restart the listener."
     ),
@@ -1598,6 +2131,13 @@ def _recommended_next_step_for(
     if not readiness.get("ready"):
         block_reason = readiness.get("reason") or "no_forwarding_configured"
         return _RECOMMENDED_BLOCKED.get(block_reason, "Resolve forwarding readiness before retrying.")
+    if readiness.get("mapped") and classification in {
+        "auth_failed", "bridge_required", "token_revoked", "token_expired",
+        "tent_authorization_mismatch", "tent_lookup_failed",
+    }:
+        return ("Check each mapped tent UUID and its active tent-scoped bridge credential in the "
+                "configured environment variable. Correct the mapping or credential and restart the listener; "
+                "never share credential values.")
     # When the webhook reports storage_insert_failed, prefer the
     # reason-specific copy if we have a known sanitized reason.
     if (
@@ -1668,10 +2208,8 @@ def debug_forwarding_error_report() -> Any:
         )
 
     url = os.environ.get("VERDANT_INGEST_URL")
-    token = os.environ.get("VERDANT_BRIDGE_TOKEN")
-    tent_id = os.environ.get("VERDANT_TENT_ID")
-    readiness = evaluate_forwarding_readiness(url, token, tent_id)
-    forwarding_enabled = bool(url and token)
+    readiness = _diagnostic_forwarding_readiness()
+    forwarding_enabled = bool(url and readiness["bridge_token_configured"])
 
     last_error_raw = FORWARD_STATS.get("last_error")
     last_error = sanitize_debug_payload(last_error_raw) if isinstance(last_error_raw, str) else last_error_raw
@@ -1916,18 +2454,28 @@ def debug_parse_diagnostics() -> Any:
 
 
 def main() -> None:  # pragma: no cover
+    try:
+        runtime = get_runtime()
+    except ConfigError as exc:
+        print("[verdant-testbench] startup refused: " + str(exc), file=sys.stderr)
+        raise SystemExit(2) from None
+    except (OSError, ValueError, KeyError, TypeError):
+        print("[verdant-testbench] startup refused: invalid tent map, limits or local state; no credentials echoed", file=sys.stderr)
+        raise SystemExit(2) from None
+    runtime.start()
+    runtime.supervise()
     print(f"[verdant-testbench] listening on http://localhost:{PORT}")
+    print(f"[verdant-testbench] liveness: http://localhost:{PORT}/livez")
     print(f"[verdant-testbench] health:  http://localhost:{PORT}/health")
     print(
         f"[verdant-testbench] demo:    http://localhost:{PORT}/ecowitt"
         "?temp1f=77.4&humidity1=58&soilmoisture1=33&co2=721"
     )
-    token = os.environ.get("VERDANT_BRIDGE_TOKEN")
-    if token:
-        print(f"[verdant-testbench] forwarding token preview: {mask_token(token)}")
-    else:
-        print("[verdant-testbench] forwarding disabled (no VERDANT_BRIDGE_TOKEN set)")
-    app.run(host="0.0.0.0", port=PORT, debug=False)
+    print(f"[verdant-testbench] forwarding mode: {'mapped' if runtime.mapped else 'single tent'}")
+    try:
+        app.run(host="0.0.0.0", port=PORT, debug=False)
+    finally:
+        runtime.stop()
 
 
 if __name__ == "__main__":  # pragma: no cover

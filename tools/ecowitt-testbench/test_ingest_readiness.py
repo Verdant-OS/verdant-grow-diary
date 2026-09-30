@@ -20,6 +20,52 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_secondary_only_owned_data_records_failure_without_promotion(self):
+        self.mapping.write_text(json.dumps([tent(air_channels=[1, 2], soil_channels=[1], soil_temp_channels=[1])]))
+        runtime = listener.get_runtime()
+        common = {k: v for k, v in self.packet.items() if k in ("PASSKEY", "model", "stationtype", "dateutc")}
+        for fields in ({"temp2f": "80", "humidity2": "60"}, {"tf_co2": "77"}):
+            with self.subTest(fields=fields):
+                common["dateutc"] = self.now.strftime("%Y-%m-%d %H:%M:%S")
+                response = self.post({**common, **fields})
+                self.assertEqual(response.get_json()["forward"]["entry_count"], 0)
+                self.assertEqual(response.get_json()["readings"][0]["metrics"], {})
+                self.assertIsNotNone(runtime.health.data["tents"][TENT_A]["first_forward_failure_at"])
+                self.now += timedelta(minutes=10)
+                runtime.health.packet_received()
+                self.assertEqual(self.client.get("/health").status_code, 503)
+        self.requests.post.assert_not_called()
+        listener._RUNTIME = None
+        self.assertEqual(self.client.get("/health").status_code, 503)
+        common["dateutc"] = self.now.strftime("%Y-%m-%d %H:%M:%S")
+        self.post({**common, "temp1f": "77"})
+        listener.get_runtime().replay_once()
+        self.assertEqual(self.client.get("/health").status_code, 200)
+
+    def test_real_raw_log_open_and_write_failures_latch_health_until_repaired(self):
+        runtime = listener.get_runtime()
+        original_open = Path.open
+        for stage in ("open", "write"):
+            with self.subTest(stage=stage):
+                def broken(path, *args, **kwargs):
+                    if path != listener.LOG_PATH:
+                        return original_open(path, *args, **kwargs)
+                    if stage == "open":
+                        raise OSError("synthetic private disk details")
+                    handle = mock.MagicMock()
+                    handle.__enter__.return_value = handle
+                    handle.write.side_effect = OSError("synthetic private disk details")
+                    return handle
+                with mock.patch.object(Path, "open", autospec=True, side_effect=broken):
+                    response = self.post()
+                self.assertEqual(response.status_code, 503)
+                self.assertNotIn("synthetic private disk details", response.get_data(as_text=True))
+                runtime.replay_once()
+                self.assertEqual(self.client.get("/health").status_code, 503)
+                self.assertEqual(self.post().status_code, 200)
+                self.assertEqual(self.client.get("/health").status_code, 200)
+                runtime.replay_once()
+
     def test_replay_preserves_normalized_source_case_variants_and_age(self):
         for key, value in (("SOURCE", "LIVE"), ("Source", " live ")):
             with self.subTest(key=key):

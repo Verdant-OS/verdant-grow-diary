@@ -272,8 +272,9 @@ spool limits; partial eviction reports `spool_capacity_drop` and its drop
 count. Tents without deliverable primary metrics remain local diagnostics
 with invalid provenance, and are not sent as unsupported empty-metrics
 requests. No secondary sensor is promoted to fill the gap.
-Owned fields that are all invalid record a tent failure; ordinary channel
-absence does not. The existing failure-duration threshold applies, and only
+Owned fields that produce no usable primary metric record a tent failure,
+including secondary-only packets; ordinary channel absence does not.
+The existing failure-duration threshold applies, and only
 a successful delivery for that tent can clear the failure.
 Queued entries for a tent removed from configuration remain durable and
 make public health return `orphaned_queue` without exposing tent IDs. Restoring

@@ -487,8 +487,9 @@ def append_raw_log(record: Dict[str, Any]) -> None:
     try:
         with LOG_PATH.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(sanitize(record, secrets=_delivery_secrets()), default=str) + "\n")
-    except Exception as exc:  # pragma: no cover
+    except Exception:
         print("[verdant-testbench] failed to write sanitized raw log", file=sys.stderr)
+        raise OSError("Sanitized raw log write failed") from None
 
 
 # ---------------------------------------------------------------------------
@@ -1419,8 +1420,8 @@ def ecowitt() -> Any:
             receive_step = "routing"
             readings = []
             for packet in routed:
-                if packet["invalid"] and not packet["metrics"]:
-                    # Owned but unusable data is a failure, unlike absent channels.
+                if (packet["metadata"]["primary_channels"] or packet["metadata"]["channels"]) and not packet["metrics"]:
+                    # Owned data without a usable primary metric is a failure.
                     runtime.health.forward_result(packet["tent_id"], False)
                 own_raw = packet["metadata"]["raw_payload"]
                 own_source = _resolve_source_from_validated(payload=own_raw, remote_addr=request.remote_addr,

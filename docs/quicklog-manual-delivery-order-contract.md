@@ -16,6 +16,15 @@ also checks the immutable SHA-256 of each file before starting its database
 process. Failed steps never advance the completed prefix. Migration files remain
 unchanged.
 
+After the actual PostgreSQL proofs pass, CI compiles all three guarded scripts from
+the exact candidate's committed migration bytes and retains a `manual-delivery-bundle`
+artifact. Its deterministic manifest binds the candidate, exact order, original file
+hashes and generated script hashes. Changed, reversed or incomplete inputs are
+rejected before writing any output. An existing bundle is never overwritten.
+The bundle explicitly carries `production_authorization: false`; it is a reviewable
+delivery plan, not an APPLY receipt. The protected caller must verify its provenance
+and use the guarded scripts, not bypass them by applying the original files directly.
+
 The existing manual replay workflow proves this against its attested, loopback-only
 PostgreSQL 15 service. It first fingerprints scaffold data and catalog objects,
 rejects a reverse-order delivery before starting a database process, then deliberately

@@ -31,6 +31,45 @@ export const MANUAL_DELIVERY_FILES = Object.freeze([
 const signature =
   "text, uuid, text, numeric, text, numeric, numeric, numeric, timestamp with time zone, jsonb, text, text";
 
+/** A reviewable, deterministic bundle; never a production authorization receipt. */
+export function buildManualDeliveryBundle(input) {
+  const { candidateSha, sources } = input ?? {};
+  if (
+    typeof candidateSha !== "string" ||
+    !/^[0-9a-f]{40}$/.test(candidateSha) ||
+    !Array.isArray(sources) ||
+    sources.length !== MANUAL_DELIVERY_FILES.length
+  ) {
+    throw new Error("delivery_bundle_input_rejected");
+  }
+  // Construct every step before returning anything that a caller could write.
+  const steps = MANUAL_DELIVERY_FILES.map((pin, index) => {
+    const version = MANUAL_DELIVERY_ORDER[index];
+    const sql = buildManualDeliveryStepSql({
+      order: MANUAL_DELIVERY_ORDER,
+      version,
+      sql: sources[index],
+    });
+    return Object.freeze({
+      version,
+      file: pin.file,
+      source_sha256: pin.sha256,
+      guarded_sha256: createHash("sha256").update(sql).digest("hex"),
+      sql,
+    });
+  });
+  const manifest = Object.freeze({
+    schema_version: 1,
+    candidate_sha: candidateSha,
+    scope: "repository-plan-only",
+    production_authorization: false,
+    requires_protected_delivery: true,
+    order: MANUAL_DELIVERY_ORDER,
+    steps: Object.freeze(steps.map(({ sql: _sql, ...step }) => Object.freeze(step))),
+  });
+  return Object.freeze({ manifest, steps: Object.freeze(steps) });
+}
+
 /**
  * A protected runner must submit this entire script with ON_ERROR_STOP enabled.
  * The gate is inserted after the pinned migration's BEGIN, preserving every

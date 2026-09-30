@@ -571,6 +571,25 @@ class HealthTests(DeliveryFixture):
         self.assertEqual(self.messages[-1]["event"], "recovery")
         self.assertTrue(state.status()["ok"])
 
+    def test_forward_alerts_keep_tent_identifier_only_in_internal_state(self):
+        tent_id = "stable-grower-tent-id"
+        state = HealthState(self.root / "state.json", [tent_id], clock=self.clock,
+                            log=self.messages.append, send_alert=self.sends.append,
+                            alert_interval=0)
+        state.packet_received()
+        state.forward_result(tent_id, False)
+        self.now += timedelta(minutes=11)
+        state.packet_received()
+        state.tick()
+        state.forward_result(tent_id, True)
+        state.tick()
+
+        self.assertTrue(state.data["incidents"][f"forward:{tent_id}"] is False)
+        public = json.dumps(self.messages + self.sends)
+        self.assertNotIn(tent_id, public)
+        self.assertEqual([item["incident"] for item in self.messages],
+                         ["forward_failure", "forward_failure"])
+
     def test_global_webhook_rate_limit_keeps_each_incident_message(self):
         state = self.health(alert_interval=60)
         state.packet_received()

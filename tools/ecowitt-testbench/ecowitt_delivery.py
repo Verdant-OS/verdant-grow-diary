@@ -540,7 +540,10 @@ class HealthState:
                 kind = "alert" if is_active else "recovery"
                 reason = ("forward_failure" if key.startswith("forward:") else
                           key if key in {"spool_data_drop", "local_delivery_state_error", "orphaned_queue"} else "gateway_quiet")
-                transition = {"event": kind, "reason": reason, "incident": key,
+                # Tent-qualified keys remain only in durable local state. Logs
+                # and third-party alert webhooks receive the redacted reason.
+                public_incident = reason if key.startswith("forward:") else key
+                transition = {"event": kind, "reason": reason, "incident": public_incident,
                            "message": f"Ecowitt listener {kind}: {reason}"}
                 self.log(transition)
                 if self.send_alert is not None:

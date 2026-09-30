@@ -12,6 +12,8 @@
  *   8. saveAlert payload never sends user_id (RLS / DB default = auth.uid()).
  *   9. UI / Dashboard does not directly call supabase.from("alerts").insert.
  *  10. New persistence module is free of automation / device-control / service_role.
+ *  11. A future-dated (clock-skewed) breach is retried exactly once at its
+ *      eligibility boundary with no other dependency change.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
@@ -292,7 +294,7 @@ vi.mock("@/lib/alerts", () => ({
   listAlerts: (...a: unknown[]) => listAlertsMock(...a),
 }));
 
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 
 function setupOk() {
@@ -465,6 +467,42 @@ describe("usePersistEnvironmentAlerts — hook behaviour", () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(saveAlertMock).not.toHaveBeenCalled();
     expect(listAlertsMock).not.toHaveBeenCalled();
+  });
+
+  it("retries a future-dated live breach exactly once when wall time reaches its capture", async () => {
+    // Live ingest tolerates bounded future clock skew. The fence must hold
+    // before the boundary, and the hook must wake by itself at it: nothing
+    // else in its inputs changes while the tab sits idle.
+    const { result, unmount } = renderHook(() =>
+      usePersistEnvironmentAlerts({
+        growId: "g1",
+        snapshot: liveSnapshot({ ts: new Date(NOW + 60_000).toISOString() }),
+        quality: okQuality,
+        targets: outOfRangeTargets,
+        enabled: true,
+      }),
+    );
+    await waitFor(() => expect(result.current.status).toBe("skipped"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(listAlertsMock).not.toHaveBeenCalled();
+    expect(saveAlertMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    await waitFor(() => expect(saveAlertMock).toHaveBeenCalledTimes(1));
+    expect(listAlertsMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.status).toBe("done"));
+
+    // Once eligible there is no further boundary to wake for.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(listAlertsMock).toHaveBeenCalledTimes(1);
+    expect(saveAlertMock).toHaveBeenCalledTimes(1);
+    unmount();
   });
 });
 

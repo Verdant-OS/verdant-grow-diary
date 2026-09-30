@@ -27,7 +27,11 @@
  * Pure. No I/O, no Supabase, no clock reads (now is always injected).
  */
 import { describe, it, expect } from "vitest";
-import { isSnapshotPersistable, selectPersistableAlerts } from "@/lib/environmentAlertPersistence";
+import {
+  futureObservationWakeDelayMs,
+  isSnapshotPersistable,
+  selectPersistableAlerts,
+} from "@/lib/environmentAlertPersistence";
 import { LIVE_CURRENT_STATE_STALE_MS, MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import type { EnvironmentAlert } from "@/lib/environmentAlerts";
@@ -73,6 +77,25 @@ describe("alert persistence uses the LIVE window regardless of source", () => {
     expect(
       isSnapshotPersistable({ snapshot: agedSnapshot(0, "manual"), quality: "good", now }),
     ).toBe(false);
+  });
+  it("wakes only for a future observation, at its boundary, clamped to the live window", () => {
+    for (const ts of [null, "", "invalid", new Date(NOW).toISOString()]) {
+      expect(futureObservationWakeDelayMs({ ts }, NOW), String(ts)).toBeNull();
+    }
+    expect(futureObservationWakeDelayMs(null, NOW)).toBeNull();
+    expect(
+      futureObservationWakeDelayMs({ ts: new Date(NOW + 60_000).toISOString() }, NaN),
+    ).toBeNull();
+    expect(futureObservationWakeDelayMs({ ts: new Date(NOW + 1).toISOString() }, NOW)).toBe(1);
+    expect(futureObservationWakeDelayMs({ ts: new Date(NOW + 60_000).toISOString() }, NOW)).toBe(
+      60_000,
+    );
+    expect(
+      futureObservationWakeDelayMs(
+        { ts: new Date(NOW + LIVE_CURRENT_STATE_STALE_MS + 1).toISOString() },
+        NOW,
+      ),
+    ).toBe(LIVE_CURRENT_STATE_STALE_MS);
   });
   it.each(["live", "manual"] as const)(
     "preserves exact current and live-window boundaries for %s",

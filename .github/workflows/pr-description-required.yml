@@ -1,0 +1,36 @@
+name: PR description required
+
+# Fails any pull request whose description is empty (after removing
+# HTML comments and whitespace), so every PR, including agent-authored
+# ones, says what it changes. Merge-queue runs pass trivially because the
+# description was already checked on the pull request itself.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  pr-description:
+    name: PR description required
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check pull request description
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [ "$EVENT_NAME" = "merge_group" ]; then
+            echo "Merge queue run: description was checked on the pull request."
+            exit 0
+          fi
+          stripped="$(printf '%s' "$PR_BODY" | perl -0777 -pe 's/<!--.*?-->//gs' | tr -d '[:space:]')"
+          if [ -z "$stripped" ]; then
+            echo "::error title=PR description required::This pull request has no description. Add a short summary of what it changes and why, then save; this check reruns on edit."
+            exit 1
+          fi
+          echo "PR description present (${#stripped} non-whitespace characters)."

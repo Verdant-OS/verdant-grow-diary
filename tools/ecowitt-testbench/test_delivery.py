@@ -584,7 +584,7 @@ class HealthTests(DeliveryFixture):
         state.forward_result(tent_id, True)
         state.tick()
 
-        self.assertTrue(state.data["incidents"][f"forward:{tent_id}"] is False)
+        self.assertIs(state.data["incidents"][f"forward:{tent_id}"], False)
         public = json.dumps(self.messages + self.sends)
         self.assertNotIn(tent_id, public)
         self.assertEqual([item["incident"] for item in self.messages],

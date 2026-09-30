@@ -706,6 +706,22 @@ class ListenerIntegrationTests(unittest.TestCase):
                 self.assertEqual(self.client.get("/health").status_code, 200)
                 runtime.replay_once()
 
+    def test_duplicate_enqueue_noop_cannot_clear_failed_write_latch(self):
+        runtime = listener.get_runtime()
+        self.assertEqual(self.post().status_code, 200)
+        distinct = {**self.packet, "temp1f": "71.9"}
+        with mock.patch.object(runtime.spool, "enqueue", side_effect=OSError("synthetic private failure")):
+            self.assertEqual(self.post(distinct).status_code, 503)
+        self.assertEqual(runtime.last_enqueue_error, "local_delivery_state_error")
+
+        self.assertEqual(self.post().status_code, 200)
+        self.assertEqual(runtime.last_enqueue_error, "local_delivery_state_error")
+        self.assertEqual(self.client.get("/health").status_code, 503)
+
+        self.assertEqual(self.post(distinct).status_code, 200)
+        self.assertIsNone(runtime.last_enqueue_error)
+        self.assertEqual(self.client.get("/health").status_code, 200)
+
     def test_absent_mapped_tent_metrics_are_local_diagnostics_not_dead_letters(self):
         packet = {k: v for k, v in self.packet.items() if not k.endswith("2") and k != "temp2f"}
         response = self.post(packet)

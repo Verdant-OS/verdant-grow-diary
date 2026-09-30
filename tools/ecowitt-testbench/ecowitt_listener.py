@@ -1144,8 +1144,12 @@ class ListenerRuntime:
                 # at the same timestamp; they must not be silently coalesced away.
                 identity = json.dumps({"key": key, "metadata": safe.get("metadata")}, sort_keys=True, separators=(",", ":"))
                 entry_id = "queue-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+                was_present = entry_id in self.spool.entries
                 self.spool.enqueue(entry_id, safe, idempotency_key=key)
-                self.last_enqueue_error = None
+                # A duplicate enqueue is a no-op, so it does not prove that the
+                # local delivery state is writable after a prior failed write.
+                if not was_present:
+                    self.last_enqueue_error = None
                 return entry_id
             except (OSError, ValueError, KeyError, TypeError):
                 self.last_enqueue_error = "local_delivery_state_error"

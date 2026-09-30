@@ -6,7 +6,10 @@ import {
   readPendingStarterWater,
   type PendingStarterWater,
 } from "@/lib/quickLogPendingStarterWaterStore";
-import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const record = (overrides: Partial<PendingStarterWater> = {}): PendingStarterWater => ({
   version: 1,
@@ -71,7 +74,7 @@ describe("tab-scoped starter Water recovery claim", () => {
     expect(readPendingStarterWater("owner-a")).toEqual({ status: "pending", record: first });
     expect(readPendingStarterWater("owner-a")).toEqual(readPendingStarterWater("owner-a"));
     expect(
-      window.localStorage.getItem("verdant:quick-log:pending-starter-water:v1:owner-a"),
+      getLocalStorageItemForTest("verdant:quick-log:pending-starter-water:v1:owner-a"),
     ).toBeNull();
     window.sessionStorage.clear();
     expect(readPendingStarterWater("owner-a")).toEqual({ status: "empty" });

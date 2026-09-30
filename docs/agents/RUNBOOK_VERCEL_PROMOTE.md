@@ -136,7 +136,11 @@ for each of these reads:
   holder, the production domains bound to the project, the aliases
   (`list_promote_aliases`) and each custom hostname's DNS, which must still equal
   the packet's inventory, because a domain added, removed or moved since the packet
-  would put traffic on a topology the owner never approved.
+  would put traffic on a topology the owner never approved;
+- each hostname's current serving deployment (`get_deployment`), for every hostname
+  in that re-enumerated inventory, which must still equal packet item 1, because an
+  intervening promote, rollback or alias assignment would otherwise be overwritten
+  unseen.
 
 If any value differs from the packet, stop and rebuild the packet rather than
 promoting a stale artifact. Only then does Matthew run:
@@ -406,13 +410,16 @@ selected and required checks passed for that SHA; the deployment belongs to this
 project and is the Git-sourced production artifact for that SHA; no unresolved
 rollout exists; the rolling-release configuration (stages and advancement type),
 read immediately before the write, equals the owner-approved baseline recorded in
-the packet; and a rollback/manual-pause state prevents promotion. Before the
+the packet; the production-host inventory (the M2 apex holder, the production
+domains bound to the project, the aliases from `list_promote_aliases` and each
+custom hostname's DNS) and each inventoried hostname's serving deployment, read
+immediately before the write, equal packet item 1, and any difference stops the
+write for the owner; and a rollback/manual-pause state prevents promotion. Before the
 Action is enabled, Matthew disables or otherwise fences native production
 auto-assignment, and records it as a D-RT-13 production-setting change. Otherwise
 the Git integration keeps an independent routing path outside the Action's
 serialization and rollback checks, which is the second-writer condition this lane
 exists to avoid. He restores native assignment only after the fallback Action is
-retired and its token revoked. Serialize promotions,
-recheck immediately before the
-write, use read-only GitHub permissions and keep the token out of logs. No such
-Action or token is enabled by this runbook.
+retired and its token revoked. Serialize promotions, recheck immediately before
+the write, use read-only GitHub permissions and keep the token out of logs. No
+such Action or token is enabled by this runbook.

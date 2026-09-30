@@ -309,7 +309,7 @@ immutable workspace, then runs the individual RLS lanes), `security-regression`,
 
 ### Test runners
 
-`ci`, `vitest-full-suite-pr-gate` (16-way batch matrix on every PR),
+`ci`, `vitest-full-suite-pr-gate` (16-way batch matrix in the merge queue and on deploy pushes),
 `vitest-batched-full-suite`, `vitest-controlled-full-suite`, `lint`, `typecheck`,
 `typecheck-build-push`.
 

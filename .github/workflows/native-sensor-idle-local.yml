@@ -4,6 +4,7 @@ name: Native Sensor Idle Aging Local
 # the published build, runs migrations remotely, or uses deployment credentials.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
       - verdant-grow-diary

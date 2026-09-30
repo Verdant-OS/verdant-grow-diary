@@ -290,7 +290,17 @@ export default function ImportedSensorHistoryPanel({
                   >
                     <td className="py-1 pr-2">{formatTimestamp(r.capturedAt)}</td>
                     <td className="py-1 pr-2">{r.metric}</td>
-                    <td className="py-1">{r.displayValue}</td>
+                    <td className="py-1">
+                      <span>{r.displayValue}</span>
+                      {r.outOfRangeNote ? (
+                        <span
+                          className="ml-2 text-xs text-amber-300"
+                          data-testid="imported-history-out-of-range-note"
+                        >
+                          {r.outOfRangeNote}
+                        </span>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>

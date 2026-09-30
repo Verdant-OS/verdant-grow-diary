@@ -32,6 +32,8 @@ permissions:
 
 jobs:
   typecheck-and-build:
+    # Draft PRs wait for ready_for_review; ci.yml's required checks still run on drafts.
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     name: tsgo --noEmit + vite build
     runs-on: ubuntu-latest
     timeout-minutes: 20

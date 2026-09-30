@@ -2,6 +2,7 @@ name: Linked Quick Log diary client-write fence PG15
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths: &linked_quicklog_diary_paths
       - "supabase/migrations/20260927094000_linked_quicklog_diary_client_write_fence.sql"
       - "scripts/run-linked-quicklog-diary-pg15-harness.mjs"
@@ -16,6 +17,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   pg15_runtime:

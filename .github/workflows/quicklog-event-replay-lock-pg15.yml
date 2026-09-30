@@ -2,6 +2,7 @@ name: Quick Log event replay locking PG15
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths: &event_replay_lock_paths
       - "supabase/migrations/20260927012000_quicklog_event_replay_active_receipt.sql"
       - "supabase/migrations/20260725023000_core_schema_forward_repair.sql"
@@ -20,6 +21,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   pg15_runtime:

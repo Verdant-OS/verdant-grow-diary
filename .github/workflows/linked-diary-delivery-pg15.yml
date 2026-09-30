@@ -2,6 +2,7 @@ name: Linked diary delivery PG15
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths: &linked_diary_delivery_paths
       - "scripts/apply-linked-quicklog-diary-client-write-fence.mjs"
       - "scripts/lib/linkedQuicklogDiaryDeliveryCatalog.mjs"
@@ -15,6 +16,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   pg15_runtime:

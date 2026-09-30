@@ -3,6 +3,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
+import {
+  claimPendingQuickLogActivity,
+  readPendingQuickLogActivity,
+} from "@/lib/quickLogPendingActivityStore";
 
 const harness = vi.hoisted(() => ({
   plants: [] as Array<Record<string, unknown>>,
@@ -79,6 +83,7 @@ async function chooseActivity(id: string) {
 
 beforeEach(() => {
   clearLocalStorageForTest();
+  window.sessionStorage.clear();
   vi.clearAllMocks();
   harness.plants = [{ id: "p1", name: "Plant One", grow_id: "g1", tent_id: null, stage: "veg" }];
   harness.tents = [{ id: "t1", name: "Tent One", grow_id: "g1" }];
@@ -214,6 +219,43 @@ describe("Quick Log tentless in-grow plant saves", () => {
       expect(harness.photo).not.toHaveBeenCalled();
     },
   );
+
+  it("blocks a pending tent-required retry for a tentless plant before any write", async () => {
+    // A session-storage recovery record is untrusted input. A stale or edited
+    // record for a tent-required activity must not reach the RPC through Retry.
+    const createdAt = "2026-09-30T00:00:00.000Z";
+    const record = {
+      version: 1 as const,
+      ownerId: "u1",
+      createdAt,
+      input: {
+        activityId: "feeding" as const,
+        growId: "g1",
+        tentId: null,
+        plantId: "p1",
+        note: "Stale feeding retry",
+        occurredAt: createdAt,
+        extraDetails: null,
+        idempotencyKey: "tentless-feeding-retry-key",
+      },
+      receipt: { symptomCheck: false, harvestDetails: null },
+    };
+    expect(claimPendingQuickLogActivity(record).status).toBe("claimed");
+    renderQuickLog();
+    const retry = await screen.findByTestId(`${prefix}-retry-original`);
+    await waitFor(() => expect(retry).toBeEnabled());
+    fireEvent.click(retry);
+    await waitFor(() =>
+      expect(screen.getByTestId(`${prefix}-error`)).toHaveTextContent(
+        "Assign this plant to a tent before saving.",
+      ),
+    );
+    expect(harness.rpc).not.toHaveBeenCalled();
+    expect(harness.photo).not.toHaveBeenCalled();
+    // Fail closed: the draft stays recoverable once a tent is assigned.
+    expect(screen.getByTestId(`${prefix}-pending-activity`)).toBeInTheDocument();
+    expect(readPendingQuickLogActivity("u1", record.input).status).toBe("pending");
+  });
 
   it("blocks the main Environment entry before its existing writer", async () => {
     renderQuickLog({

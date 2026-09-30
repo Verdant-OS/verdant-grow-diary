@@ -791,6 +791,15 @@ export default function QuickLogAllActivitiesSection({
       return;
     }
     const record = recovery.record;
+    // A recovery record is untrusted input. Apply the same per-activity tent
+    // gate as a fresh save before any receipt read or retry, and keep the
+    // record so the draft stays recoverable once a tent is assigned.
+    const retryBlockReason = activityPersistenceBlockReason(record.input.activityId);
+    if (retryBlockReason) {
+      setErrorReason(retryBlockReason);
+      setErrorForActivity(record.input.activityId);
+      return;
+    }
     if (!activePendingActivity || !samePendingQuickLogActivity(activePendingActivity, record)) {
       setPendingActivity(record);
       setSelectedDraft(bindQuickLogActivityDraft(record.input.activityId, currentTarget));
@@ -909,6 +918,7 @@ export default function QuickLogAllActivitiesSection({
     }
   }, [
     activePendingActivity,
+    activityPersistenceBlockReason,
     currentTarget,
     externalPersistenceBlockReason,
     finishConfirmedPendingActivity,

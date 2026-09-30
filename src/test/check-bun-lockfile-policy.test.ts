@@ -286,6 +286,7 @@ describe("evaluatePolicy", () => {
     ["postcss", "8.5.18-rc.0"],
     ["brace-expansion", "1.1.17"],
     ["fast-uri", "3.1.5"],
+    ["fast-uri", "3.1.6"],
   ])("fails when the npm graph regresses the %s security floor", (packageName, version) => {
     const files = policyFiles();
     const stale = JSON.parse(files[at("package-lock.json")]);

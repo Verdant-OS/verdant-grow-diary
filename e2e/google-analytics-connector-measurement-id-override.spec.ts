@@ -1,6 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { ANALYTICS_CONSENT_STORAGE_KEY } from "./utils/analyticsConsent";
+import {
+  ANALYTICS_CONSENT_STORAGE_KEY,
+  waitForAnalyticsClientReady,
+} from "./utils/analyticsConsent";
 import {
   EXPECTED_MEASUREMENT_ID,
   GA4_MEASUREMENT_ID_PATTERN,
@@ -65,7 +68,10 @@ async function readDataLayer(page: Page): Promise<unknown[][]> {
 test.describe.configure({ mode: "serial" });
 
 test.describe("GA4 measurement id follows the connector value", () => {
-  test.beforeAll(async () => {
+  test.beforeAll(async ({ browser }, testInfo) => {
+    testInfo.setTimeout(120_000);
+    const deadline = Date.now() + 110_000;
+    const remaining = () => Math.max(1, deadline - Date.now());
     // Sanity: the override must actually differ from the fallback, otherwise
     // this spec would pass without proving anything.
     expect(GA4_MEASUREMENT_ID_PATTERN.test(OVERRIDE_MEASUREMENT_ID)).toBe(true);
@@ -87,7 +93,13 @@ test.describe("GA4 measurement id follows the connector value", () => {
     server.stdout.on("data", () => {});
     server.stderr.on("data", () => {});
 
-    await waitForServer(ORIGIN);
+    await waitForServer(ORIGIN, remaining());
+    const page = await browser.newPage();
+    try {
+      await waitForAnalyticsClientReady(page, ORIGIN, remaining());
+    } finally {
+      await page.close();
+    }
   });
 
   test.afterAll(() => {
@@ -158,10 +170,7 @@ test.describe("GA4 measurement id follows the connector value", () => {
       .toBe(true);
 
     expect(
-      await page.evaluate(
-        (key) => window.localStorage.getItem(key),
-        ANALYTICS_CONSENT_STORAGE_KEY,
-      ),
+      await page.evaluate((key) => window.localStorage.getItem(key), ANALYTICS_CONSENT_STORAGE_KEY),
     ).toBe("granted");
   });
 

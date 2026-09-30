@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import threading
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timedelta, timezone
@@ -29,6 +30,37 @@ class DeliveryFixture(unittest.TestCase):
 
 
 class DeliveryTests(DeliveryFixture):
+    def test_success_batch_uses_durable_done_records_without_full_rewrites(self):
+        spool = self.spool()
+        for i in range(100):
+            spool.enqueue(str(i), self.reading(i))
+        with mock.patch.object(spool, "_compact", wraps=spool._compact) as compact:
+            for i in range(50):
+                spool.finish(str(i), 200)
+            self.assertEqual(compact.call_count, 0)
+            self.assertIn('"op":"done"', spool.path.read_text())
+            restored = self.spool()
+            self.assertEqual(list(restored.entries), [str(i) for i in range(50, 100)])
+            for i in range(50, 100):
+                spool.finish(str(i), 200)
+            self.assertLessEqual(compact.call_count, 2)
+        self.assertEqual(self.spool().pending_count, 0)
+
+    def test_dead_letter_cache_preserves_exact_age_boundary_and_external_changes(self):
+        spool = self.spool(max_days=1)
+        spool.enqueue("bad", self.reading())
+        spool.finish("bad", 401)
+        with mock.patch.object(Path, "read_bytes", autospec=True, wraps=None) as read:
+            self.now += timedelta(days=1)
+            spool.enforce_limits()
+            read.assert_not_called()
+        self.now += timedelta(microseconds=1)
+        spool.enforce_limits()
+        self.assertEqual(spool.stats["dead_letter_dropped_count"], 1)
+        spool.dead_path.write_text('invalid complete row\n')
+        spool.enforce_limits()
+        self.assertEqual(spool.stats["dead_letter_dropped_count"], 2)
+
     def test_write_ahead_is_durable_before_send_and_survives_restart(self):
         spool = self.spool()
         entry = spool.enqueue("fixed-id", self.reading())
@@ -262,6 +294,70 @@ class HealthTests(DeliveryFixture):
     def health(self, **kwargs):
         return HealthState(self.root / "state.json", ["tent-a", "tent-b"], clock=self.clock,
                            log=self.messages.append, send_alert=self.sends.append, **kwargs)
+
+    def test_unmapped_cardinality_and_long_keys_cannot_poison_state(self):
+        state = self.health(max_log_bytes=4096)
+        state.unmapped({f"unknown-{i}": i for i in range(1000)})
+        state.unmapped({"x" * 60000: 1})
+        state.packet_received()
+        state.forward_result("tent-a", True)
+        state.tick()
+        self.assertLessEqual(len(state.data["unmapped_counts"]), 256)
+        self.assertLessEqual(state.path.stat().st_size, 4096)
+        self.assertEqual(sum(state.data["unmapped_counts"].values()) + state.data["unmapped_overflow_count"], 1001)
+        restored = self.health(max_log_bytes=4096)
+        self.assertEqual(restored.data["unmapped_overflow_count"], state.data["unmapped_overflow_count"])
+        self.assertTrue(restored.status()["ok"])
+
+    def test_unmapped_append_is_batched_and_no_change_does_not_rescan(self):
+        state = self.health()
+        from ecowitt_delivery import append_jsonl_many
+        with mock.patch("ecowitt_delivery.append_jsonl_many", wraps=append_jsonl_many) as append:
+            state.unmapped({f"unknown-{i}": i for i in range(20)})
+            self.assertEqual(append.call_count, 1)
+        with mock.patch.object(Path, "read_bytes") as read:
+            state.unmapped({})
+            state.unmapped({"unknown-1": 30})
+            read.assert_not_called()
+        self.now += timedelta(days=7, microseconds=1)
+        state.unmapped({})
+        self.assertEqual(state.data["unmapped_log_dropped_count"], 21)
+
+    def test_unmapped_overflow_counter_rejects_invalid_state(self):
+        state = self.health()
+        data = json.loads(state.path.read_text())
+        for value in (-1, True, "1", None):
+            with self.subTest(value=value):
+                data["unmapped_overflow_count"] = value
+                state.path.write_text(json.dumps(data))
+                with self.assertRaises(ValueError):
+                    self.health()
+
+    def test_alert_network_call_releases_lock_and_attempt_is_durable(self):
+        state = self.health()
+        entered, release, updated = threading.Event(), threading.Event(), threading.Event()
+        def send(message):
+            saved = json.loads(state.path.read_text())
+            self.assertEqual(saved["pending_alerts"], [])
+            self.assertIsNotNone(saved["last_alert_webhook_at"])
+            entered.set()
+            release.wait(2)
+            return False
+        state.send_alert = send
+        self.now += timedelta(minutes=10)
+        worker = threading.Thread(target=state.tick)
+        worker.start()
+        try:
+            self.assertTrue(entered.wait(1))
+            update = threading.Thread(target=lambda: (state.packet_received(), updated.set()))
+            update.start()
+            self.assertTrue(updated.wait(1))
+            update.join(1)
+        finally:
+            release.set()
+            worker.join(2)
+        self.assertEqual(state.data["alert_webhook_error_count"], 1)
+        self.assertEqual(self.health().data["alert_webhook_error_count"], 1)
 
     def test_quiet_boundary_503_after_ten_minutes(self):
         state = self.health()

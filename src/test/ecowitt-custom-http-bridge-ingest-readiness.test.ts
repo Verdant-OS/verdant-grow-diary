@@ -82,6 +82,6 @@ describe("EcoWitt custom HTTP bridge field contracts", () => {
     );
     expect(fields).not.toContain("ec1");
     expect(fields).not.toContain("soilad1");
-    expect(fields.some((field) => /^ec|soilad/.test(field))).toBe(false);
+    expect(fields.some((field) => /^(?:ec|soilad)/.test(field))).toBe(false);
   });
 });

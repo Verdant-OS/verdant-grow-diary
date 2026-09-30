@@ -1218,14 +1218,19 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         return _send_forward(reading)
     runtime = get_runtime()
     tent_id = os.environ["VERDANT_TENT_ID"]
-    with runtime.send_lock:
-        key = runtime.enqueue(reading, tent_id)
+    key = runtime.enqueue(reading, tent_id)
+    if not runtime.send_lock.acquire(blocking=False):
+        return {"forwarded": False, "queued": key in runtime.spool.entries,
+                "reason": "replay_busy" if key in runtime.spool.entries else "spool_capacity_drop"}
+    try:
         if key not in runtime.spool.entries:
             return {"forwarded": False, "reason": "spool_capacity_drop"}
         entry = runtime.spool.entries[key]
         result = _send_forward(entry["reading"], _entry_id=entry.get("idempotency_key", key))
         runtime.finish(key, result)
         return result
+    finally:
+        runtime.send_lock.release()
 
 
 def mask_ingest_url(url: Optional[str]) -> Optional[str]:
@@ -1278,6 +1283,7 @@ def health() -> Any:
         runtime.ensure_worker()
         runtime.health.tick()
         status = runtime.health.status()
+        status.pop("tents", None)
         if runtime.last_local_error:
             status["ok"] = False
             status["reasons"].append(runtime.last_local_error)
@@ -1299,6 +1305,7 @@ def delivery_status() -> Any:
         status = runtime.health.status()
         status.update(mode="mapped" if runtime.mapped else "single_tent", pending_count=runtime.spool.pending_count,
                       spool=dict(runtime.spool.stats), unmapped_counts=runtime.health.data["unmapped_counts"],
+                      unmapped_overflow_count=runtime.health.data["unmapped_overflow_count"],
                       unmapped_log_dropped_count=runtime.health.data["unmapped_log_dropped_count"],
                       alert_webhook_error_count=runtime.health.data["alert_webhook_error_count"])
         return jsonify(runtime.cleaner(status))

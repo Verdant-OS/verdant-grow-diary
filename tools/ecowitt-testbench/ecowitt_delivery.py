@@ -35,31 +35,51 @@ def atomic_json(path: Path, value: Any) -> None:
     os.replace(temporary, path)
 
 
-def append_jsonl(path: Path, value: Any) -> None:
+def append_jsonl(path: Path, value: Any, *, cache: dict | None = None) -> None:
+    append_jsonl_many(path, [value], cache=cache)
+
+
+def append_jsonl_many(path: Path, values: list, *, cache: dict | None = None) -> None:
     with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(value, separators=(",", ":"), allow_nan=False) + "\n")
+        for value in values:
+            handle.write(json.dumps(value, separators=(",", ":"), allow_nan=False) + "\n")
         handle.flush()
         os.fsync(handle.fileno())
+    if cache is not None and path in cache:
+        _, earliest = cache[path]
+        stamps = [parse_time(value["recorded_at"]) for value in values]
+        earliest = min(stamps + ([earliest] if earliest is not None else []))
+        stat = path.stat()
+        cache[path] = ((stat.st_size, stat.st_mtime_ns), earliest)
 
 
-def trim_jsonl(path: Path, max_bytes: int, max_days: float, now: datetime) -> int:
+def trim_jsonl(path: Path, max_bytes: int, max_days: float, now: datetime, *, cache: dict | None = None) -> int:
     """Bound auxiliary logs independently; report every oldest-record removal."""
     if not path.exists():
         return 0
+    cutoff = now - timedelta(days=max_days)
+    stat = path.stat()
+    signature = (stat.st_size, stat.st_mtime_ns)
+    if cache is not None and path in cache:
+        previous, earliest = cache[path]
+        if previous == signature and stat.st_size <= max_bytes and (earliest is None or earliest >= cutoff):
+            return 0
     lines = path.read_bytes().splitlines(keepends=True)
     original_count = len(lines)
-    cutoff = now - timedelta(days=max_days)
     kept = []
+    stamps = []
     for line in lines:
         try:
             item = json.loads(line)
             if parse_time(item["recorded_at"]) >= cutoff:
                 kept.append(line)
+                stamps.append(parse_time(item["recorded_at"]))
         except (ValueError, KeyError, TypeError):
             continue
     total = sum(map(len, kept))
     while kept and total > max_bytes:
         total -= len(kept.pop(0))
+        stamps.pop(0)
     if len(kept) != original_count:
         temporary = path.with_suffix(".jsonl.tmp")
         with temporary.open("wb") as handle:
@@ -67,6 +87,9 @@ def trim_jsonl(path: Path, max_bytes: int, max_days: float, now: datetime) -> in
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
+    if cache is not None:
+        stat = path.stat()
+        cache[path] = ((stat.st_size, stat.st_mtime_ns), min(stamps) if stamps else None)
     return original_count - len(kept)
 
 def validate_health_data(data: dict) -> None:
@@ -78,7 +101,7 @@ def validate_health_data(data: dict) -> None:
         raise ValueError()
     if any(type(active) is not bool for active in data["incidents"].values()):
         raise ValueError()
-    for key in ("unmapped_log_dropped_count", "alert_webhook_error_count"):
+    for key in ("unmapped_log_dropped_count", "unmapped_overflow_count", "alert_webhook_error_count"):
         if type(data[key]) is not int or data[key] < 0:
             raise ValueError()
     stamps = [data["started_at"], data["last_packet_received_at"], data["last_alert_webhook_at"]]
@@ -117,6 +140,8 @@ class JsonlSpool:
         root.mkdir(parents=True, exist_ok=True)
         self.path, self.dead_path, self.stats_path = root / "queue.jsonl", root / "dead-letter.jsonl", root / "spool-stats.json"
         self.entries: OrderedDict[str, dict] = OrderedDict()
+        self._done_records = 0
+        self._log_cache: dict = {}
         self.stats = {"dropped_count": 0, "dead_letter_count": 0, "dead_letter_dropped_count": 0,
                       "aux_log_dropped_count": 0, "torn_tail_count": 0}
         if self.stats_path.exists():
@@ -217,7 +242,7 @@ class JsonlSpool:
             if dropped:
                 self.stats["dropped_count"] += dropped
                 self.warn(f"spool: dropped {dropped} oldest entries at retention/size limit")
-            dead_dropped = trim_jsonl(self.dead_path, self.max_bytes, self.max_days, self.clock())
+            dead_dropped = trim_jsonl(self.dead_path, self.max_bytes, self.max_days, self.clock(), cache=self._log_cache)
             if dead_dropped:
                 self.stats["dead_letter_dropped_count"] += dead_dropped
                 self.warn(f"spool: dropped {dead_dropped} oldest dead-letter records at limit")
@@ -226,7 +251,7 @@ class JsonlSpool:
             for path in (self.dead_path, self.root / "unmapped_channels.jsonl"):
                 if path.exists() and self._disk_bytes() > self.max_bytes:
                     budget = max(0, self.max_bytes - (self._disk_bytes() - path.stat().st_size))
-                    removed = trim_jsonl(path, budget, self.max_days, self.clock())
+                    removed = trim_jsonl(path, budget, self.max_days, self.clock(), cache=self._log_cache)
                     if removed:
                         self.stats["aux_log_dropped_count"] += removed
                         if path == self.dead_path:
@@ -268,11 +293,13 @@ class JsonlSpool:
             terminal = status is not None and 400 <= status < 500 and status not in {408, 425, 429}
             if success or terminal:
                 if terminal:
-                    append_jsonl(self.dead_path, {"recorded_at": self.clock().isoformat(), "reason": f"http_{status}", "entry": entry})
+                    append_jsonl(self.dead_path, {"recorded_at": self.clock().isoformat(), "reason": f"http_{status}", "entry": entry}, cache=self._log_cache)
                     self.stats["dead_letter_count"] += 1
                 append_jsonl(self.path, {"op": "done", "id": entry_id})
                 del self.entries[entry_id]
-                self._compact()
+                self._done_records += 1
+                if not self.entries or self._done_records >= max(64, len(self.entries)):
+                    self._compact()
             else:
                 entry["attempts"] += 1
                 delay = min(300, 5 * 2 ** min(entry["attempts"] - 1, 10))
@@ -292,9 +319,10 @@ class HealthState:
         self.quiet_seconds, self.failure_seconds, self.alert_interval = quiet_seconds, failure_seconds, alert_interval
         self.max_log_bytes, self.max_days = max_log_bytes, max_days
         self.lock = lock or threading.RLock()
+        self._log_cache: dict = {}
         path.parent.mkdir(parents=True, exist_ok=True)
         self.data = {"started_at": clock().isoformat(), "last_packet_received_at": None,
-                     "tents": {}, "unmapped_counts": {}, "unmapped_log_dropped_count": 0,
+                     "tents": {}, "unmapped_counts": {}, "unmapped_log_dropped_count": 0, "unmapped_overflow_count": 0,
                      "incidents": {}, "pending_alerts": [], "last_alert_webhook_at": None,
                      "alert_webhook_error_count": 0}
         if path.exists():
@@ -309,7 +337,19 @@ class HealthState:
         self.tent_ids = tuple(tent_ids)
         for tent_id in tent_ids:
             self.data["tents"].setdefault(tent_id, {"last_forward_ok_at": None, "first_forward_failure_at": None})
+        self._bound_unmapped_counts()
         self._save()
+
+    def _bound_unmapped_counts(self) -> None:
+        kept = {}
+        # Bound both cardinality and bytes: even one untrusted key can be huge.
+        for key, count in self.data["unmapped_counts"].items():
+            candidate = {**kept, key: count}
+            if len(candidate) <= 256 and len(json.dumps(candidate, separators=(",", ":")).encode("utf-8")) <= self.max_log_bytes // 4:
+                kept = candidate
+            else:
+                self.data["unmapped_overflow_count"] += count
+        self.data["unmapped_counts"] = kept
 
     def _save(self) -> None:
         safe = self.cleaner(self.data)
@@ -354,21 +394,30 @@ class HealthState:
     def unmapped(self, fields: dict) -> None:
         with self.lock:
             safe = self.cleaner(fields)
+            rows = []
             for key, value in safe.items():
                 first = key not in self.data["unmapped_counts"]
-                self.data["unmapped_counts"][key] = self.data["unmapped_counts"].get(key, 0) + 1
-                append_jsonl(self.path.parent / "unmapped_channels.jsonl",
-                             {"recorded_at": self.clock().isoformat(), "key": key, "value": value})
+                counts = self.data["unmapped_counts"]
+                candidate = {**counts, key: counts.get(key, 0) + 1}
+                if len(candidate) > 256 or len(json.dumps(candidate, separators=(",", ":")).encode("utf-8")) > self.max_log_bytes // 4:
+                    self.data["unmapped_overflow_count"] += 1
+                    continue
+                self.data["unmapped_counts"] = candidate
+                rows.append({"recorded_at": self.clock().isoformat(), "key": key, "value": value})
                 if first:
                     self.log({"event": "unmapped", "key": key,
                               "message": "seen but not mapped to any tent"})
-            dropped = trim_jsonl(self.path.parent / "unmapped_channels.jsonl", self.max_log_bytes, self.max_days, self.clock())
+            path = self.path.parent / "unmapped_channels.jsonl"
+            if rows:
+                append_jsonl_many(path, rows, cache=self._log_cache)
+            dropped = trim_jsonl(path, self.max_log_bytes, self.max_days, self.clock(), cache=self._log_cache)
             if dropped:
                 self.data["unmapped_log_dropped_count"] += dropped
                 self.log({"event": "unmapped_log_limit", "count": dropped})
             self._save()
 
     def tick(self) -> None:
+        message = None
         with self.lock:
             active = self._active_incidents()
             for key in sorted(active | set(self.data["incidents"])):
@@ -379,11 +428,11 @@ class HealthState:
                 self.data["incidents"][key] = is_active
                 kind = "alert" if is_active else "recovery"
                 reason = "forward_failure" if key.startswith("forward:") else "gateway_quiet"
-                message = {"event": kind, "reason": reason, "incident": key,
+                transition = {"event": kind, "reason": reason, "incident": key,
                            "message": f"Ecowitt listener {kind}: {reason}"}
-                self.log(message)
+                self.log(transition)
                 if self.send_alert is not None:
-                    self.data["pending_alerts"].append(message)
+                    self.data["pending_alerts"].append(transition)
             self._save()
             last = self.data["last_alert_webhook_at"]
             due = last is None or (self.clock() - parse_time(last)).total_seconds() >= self.alert_interval
@@ -393,9 +442,12 @@ class HealthState:
                 # At most one webhook attempt per message, recorded before I/O.
                 # A timeout cannot prove the receiver did not accept the alert.
                 self._save()
-                try:
-                    if self.send_alert(message) is False:
-                        self.data["alert_webhook_error_count"] += 1
-                except Exception:
+        if message is not None:
+            try:
+                failed = self.send_alert(message) is False
+            except Exception:
+                failed = True
+            if failed:
+                with self.lock:
                     self.data["alert_webhook_error_count"] += 1
-                self._save()
+                    self._save()

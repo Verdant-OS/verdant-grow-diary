@@ -272,6 +272,43 @@ class ListenerIntegrationTests(unittest.TestCase):
         self.assertEqual(self.requests.post.call_args.kwargs["json"]["metrics"]["temp_f"], 77)
         self.assertEqual(listener.get_runtime().spool.pending_count, 0)
 
+    def test_single_tent_ingest_is_durable_while_replay_send_lock_is_busy(self):
+        os.environ.pop("ECOWITT_TENT_MAP")
+        os.environ.update(VERDANT_TENT_ID=TENT_A, VERDANT_BRIDGE_TOKEN=TOKEN_A)
+        runtime = listener.get_runtime()
+        held, release = threading.Event(), threading.Event()
+        def hold():
+            with runtime.send_lock:
+                held.set()
+                release.wait(2)
+        worker = threading.Thread(target=hold)
+        worker.start()
+        try:
+            self.assertTrue(held.wait(1))
+            response = self.post()
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(runtime.spool.pending_count, 1)
+            self.assertTrue((self.root / "spool" / "queue.jsonl").read_text())
+            self.requests.post.assert_not_called()
+        finally:
+            release.set()
+            worker.join(2)
+        runtime.replay_once()
+        self.assertEqual(self.requests.post.call_count, 1)
+        self.assertEqual(runtime.spool.pending_count, 0)
+
+    def test_public_health_omits_private_tents_and_local_status_retains_them(self):
+        self.post()
+        runtime = listener.get_runtime()
+        runtime.replay_once()
+        response = self.client.get("/health", environ_overrides={"REMOTE_ADDR": "198.51.100.2"})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("tents", response.get_json())
+        self.assertNotIn(TENT_A, response.get_data(as_text=True))
+        self.assertEqual(self.client.get("/status", environ_overrides={"REMOTE_ADDR": "198.51.100.2"}).status_code, 403)
+        status = self.client.get("/status", environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).get_json()
+        self.assertIn(TENT_A, status["tents"])
+
     def test_bad_startup_map_is_sanitized_and_does_not_fall_back(self):
         self.mapping.write_text('{"private": "do-not-echo"}')
         with self.assertRaises(ValueError) as caught:

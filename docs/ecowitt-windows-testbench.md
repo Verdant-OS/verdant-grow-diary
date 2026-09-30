@@ -230,7 +230,8 @@ tent. Unknown fields never inherit a tent. Invalid gateway timestamps
 block forwarding; sanitized local raw-log entries remain available for
 diagnosis. Missing, malformed, conflicting-case and out-of-range values
 are not converted to healthy measurements. RH/soil values pinned at
-0 or 100 are invalid.
+0 or 100 are invalid. Any invalid owned channel conservatively marks the whole
+tent packet invalid; secondary descriptors also retain their own invalid quality.
 
 ## H. Durable local delivery
 
@@ -473,7 +474,7 @@ Debug endpoint summary:
 - `/debug/last-events` — last N normalized readings only; no raw payload by default.
 - `/debug/raw-log-tail` — sanitized raw-log debugging (parsed JSONL entries).
 - `/debug/forwarding-status` — read-only forwarding configuration and
-  in-memory attempt/success/failure counters. Token preview is masked,
+  in-memory attempt/success/failure counters. Token status is `<configured>` or `<empty>`;
   ingest URL is masked, the bridge token and Authorization header are
   never returned.
 - All endpoints are loopback-only (`127.0.0.1`, `::1`). LAN callers get HTTP 403.

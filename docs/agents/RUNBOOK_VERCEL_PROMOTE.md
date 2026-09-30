@@ -93,13 +93,18 @@ Before Matthew promotes, record:
    is the previous first-parent tip. A merged PR is not that evidence. A tip without
    a queue run is a direct push or bypass merge, an out-of-band publish: do not
    promote it. Unreadable runs leave provenance `BLOCKED`, never assumed.
-3. The target deployment URL, ID, project, `target: production`, `READY` state and
-   matching `meta.githubCommitSha` / `meta.githubCommitRef`.
+3. The target deployment URL, ID, project, `target: production`, `READY` state,
+   `source: git` and matching `meta.githubCommitSha` / `meta.githubCommitRef`. A
+   CLI-created or other non-Git deployment is not promoted even when its metadata
+   matches.
 4. The selected Deployment Checks and remaining security/publish gates. Escalate a
    publish gate to Matthew; green unrelated checks cannot clear it.
 5. A known-good production rollback URL and SHA, and the production fixture plan.
 6. Current/canary/queued deployment identities, measured traffic allocation,
-   rollout stage/state, and the owner's intended completion or abort. A single
+   rollout stage/state, and the owner's intended completion or abort. Also record
+   the rolling-release configuration (`get_rolling_release_config`), meaning its
+   stages and advancement type, as the owner-approved baseline for the pre-promote
+   comparison. A single
    `/version.json` sample cannot establish fleet-wide rollout completion.
 
 Use the production-built artifact for the exact approved deploy SHA. Do not
@@ -118,8 +123,9 @@ for each of these reads:
 - the deploy tip, freshly fetched (`git fetch origin verdant-grow-diary`, then
   `git rev-parse origin/verdant-grow-diary`), which must still equal the packet's
   target SHA and still carry the recorded merge-queue provenance;
-- the target deployment's project, `target: production`, `READY` state and
-  `meta.githubCommitSha` / `meta.githubCommitRef`, which must still match that SHA;
+- the target deployment's project, `target: production`, `READY` state,
+  `source: git` and `meta.githubCommitSha` / `meta.githubCommitRef`, which must
+  still match that SHA;
 - the required and selected Deployment Check results for that SHA, which must all
   still be successful;
 - the rolling-release record, which must show no unresolved rollout, and the
@@ -319,9 +325,9 @@ create, view or alter its value. See
 [Vercel access tokens](https://vercel.com/docs/accounts/access-tokens).
 
 Prepare the fallback as a separate scoped PR. Its acceptance must prove: the SHA
-is still the deploy tip; all selected and required checks passed for that SHA;
-the deployment belongs to this project and is the production artifact for that
-SHA; production automatic assignment is enabled; no unresolved rollout exists;
+is still the deploy tip and carries successful M4 merge-queue provenance; all
+selected and required checks passed for that SHA; the deployment belongs to this
+project and is the Git-sourced production artifact for that SHA; production automatic assignment is enabled; no unresolved rollout exists;
 and a rollback/manual-pause state prevents promotion. Serialize promotions,
 recheck immediately before the
 write, use read-only GitHub permissions and keep the token out of logs. No such

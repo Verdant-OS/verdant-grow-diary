@@ -60,6 +60,11 @@ class DeliveryTests(DeliveryFixture):
         spool.dead_path.write_text('invalid complete row\n')
         spool.enforce_limits()
         self.assertEqual(spool.stats["dead_letter_dropped_count"], 2)
+        spool.dead_path.write_text(json.dumps({"recorded_at": "2020-01-01T00:00:00Z"}) + "\n")
+        spool.enqueue("next", self.reading())
+        spool.finish("next", 401)
+        self.assertEqual(spool.stats["dead_letter_dropped_count"], 3)
+        self.assertEqual(len(spool.dead_path.read_text().splitlines()), 1)
 
     def test_write_ahead_is_durable_before_send_and_survives_restart(self):
         spool = self.spool()

@@ -40,6 +40,11 @@ def append_jsonl(path: Path, value: Any, *, cache: dict | None = None) -> None:
 
 
 def append_jsonl_many(path: Path, values: list, *, cache: dict | None = None) -> None:
+    if cache is not None and path in cache:
+        stat = path.stat() if path.exists() else None
+        signature = (stat.st_size, stat.st_mtime_ns) if stat else None
+        if cache[path][0] != signature:
+            del cache[path]
     with path.open("a", encoding="utf-8") as handle:
         for value in values:
             handle.write(json.dumps(value, separators=(",", ":"), allow_nan=False) + "\n")

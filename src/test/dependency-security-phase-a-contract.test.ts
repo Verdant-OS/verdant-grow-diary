@@ -128,6 +128,7 @@ describe("dependency security Phase A resolution floors", () => {
     ["vitest", [4, 1, 11] as const],
     ["@vitest/mocker", [4, 1, 11] as const],
     ["nanoid", [3, 3, 18] as const],
+    ["undici", [6, 28, 1] as const],
   ])("resolves every %s instance at or above %s in both locks", (packageName, minimum) => {
     for (const [lockName, versions] of [
       ["bun.lock", resolvedVersions(packageName)],
@@ -213,6 +214,7 @@ describe("dependency security Phase A resolution floors", () => {
       hono: "4.13.5",
       qs: "6.16.0",
       nanoid: "3.3.18",
+      undici: "6.28.1",
     });
     expect(packageJson.overrides?.postcss).toBeUndefined();
     expect(packageJson.overrides?.vite).toBeUndefined();

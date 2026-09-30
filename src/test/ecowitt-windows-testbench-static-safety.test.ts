@@ -9,7 +9,12 @@ const DOC_PATH = join(process.cwd(), "docs", "ecowitt-windows-testbench.md");
 function walk(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
-    if (entry === ".venv" || entry === "__pycache__" || entry === ".env") continue;
+    if (
+      [".venv", "__pycache__", ".env", ".spool", "tent-map.json", "ecowitt_raw_log.jsonl"].includes(
+        entry,
+      )
+    )
+      continue;
     const full = join(dir, entry);
     const st = statSync(full);
     if (st.isDirectory()) out.push(...walk(full));
@@ -97,11 +102,15 @@ describe("ecowitt windows testbench — static safety", () => {
     }
   });
 
-  it("tokens are never printed in full — only masked previews", () => {
+  it("listener token diagnostics disclose configuration only", () => {
     const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
-    expect(py).toMatch(/mask_token/);
+    const fn = py.split("def mask_token")[1]?.split("\ndef ")[0] ?? "";
+    expect(fn).toContain("<configured>");
+    expect(fn).not.toMatch(/token\[/);
     const ps = readFileSync(join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"), "utf-8");
-    expect(ps).toMatch(/Get-MaskedToken/);
+    const psFn = ps.split("function Get-MaskedToken")[1]?.split("\n}")[0] ?? "";
+    expect(psFn).toContain("<configured>");
+    expect(psFn).not.toContain("Substring");
   });
 });
 
@@ -571,7 +580,7 @@ describe("ecowitt windows testbench — /debug/forwarding-status safety", () => 
 
 describe("ecowitt windows testbench — forwarding counters", () => {
   const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
-  const fn = py.split("def maybe_forward")[1]?.split("\ndef ")[0] ?? "";
+  const fn = py.split("def _send_forward")[1]?.split("\ndef ")[0] ?? "";
 
   it("declares module-level FORWARD_STATS counters", () => {
     expect(py).toMatch(/FORWARD_STATS\s*:\s*Dict\[str,\s*Any\]\s*=\s*\{/);
@@ -950,7 +959,7 @@ describe("ecowitt windows testbench — preflight + wrapper + CI artifacts", () 
     expect(body).toMatch(/setup-windows\.ps1/);
     expect(body).toMatch(/start-listener-windows\.ps1/);
     expect(body).toMatch(/verify-testbench-windows\.ps1/);
-    expect(body).toMatch(/localhost:8787\/health/);
+    expect(body).toMatch(/localhost:8787\/livez/);
   });
 
   it("run-testbench wrapper is safe (no .env read, no forward, no default POST)", () => {
@@ -1179,6 +1188,63 @@ describe("ecowitt windows testbench — preflight PowerShell invocation smoke", 
     },
     PWSH_INVOKE_BUDGET_MS,
   );
+
+  maybeIt(
+    "Windows probes distinguish a live listener from failed delivery readiness",
+    () => {
+      // Execute the actual parsed probe blocks with curl stubbed. Do not launch
+      // the listener, run setup, contact a gateway, or forward any payload.
+      const command = `
+        $ErrorActionPreference = 'Stop'
+        $script:probes = [System.Collections.Generic.List[string]]::new()
+        function global:curl.exe {
+          $url = $args[-1]
+          $script:probes.Add($url)
+          $global:LASTEXITCODE = if ($url.EndsWith('/health')) { 22 } else { 0 }
+        }
+        function global:Start-Sleep {}
+        $tokens = $null; $errors = $null
+        $wrapper = [System.Management.Automation.Language.Parser]::ParseFile($env:ECOWITT_PROBE_WRAPPER, [ref]$tokens, [ref]$errors)
+        if ($errors.Count) { throw 'Wrapper parse failed' }
+        $loops = @($wrapper.FindAll({ param($node) $node -is [System.Management.Automation.Language.ForStatementAst] }, $true))
+        if ($loops.Count -ne 1) { throw 'Expected one startup probe loop' }
+        $ready = $false
+        Invoke-Expression $loops[0].Extent.Text
+        if (-not $ready) { throw 'Startup misclassified delivery failure as a stopped listener' }
+        $verify = [System.Management.Automation.Language.Parser]::ParseFile($env:ECOWITT_PROBE_VERIFY, [ref]$tokens, [ref]$errors)
+        if ($errors.Count) { throw 'Verify parse failed' }
+        $step = $verify.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Invoke-Step' }, $true)
+        Invoke-Expression $step.Extent.Text
+        $Failures = @()
+        $statements = @($verify.EndBlock.Statements)
+        $assignment = $statements | Where-Object { $_ -is [System.Management.Automation.Language.AssignmentStatementAst] -and $_.Left.VariablePath.UserPath -eq 'listenerUp' }
+        $index = [array]::IndexOf($statements, $assignment)
+        if ($index -lt 0) { throw 'Listener probe block missing' }
+        0..2 | ForEach-Object { Invoke-Expression $statements[$index + $_].Extent.Text }
+        @{ wrapperReady = $ready; listenerUp = $listenerUp; failures = @($Failures); probes = @($script:probes) } | ConvertTo-Json -Compress
+      `;
+      const result = spawnSync(pwsh!, ["-NoLogo", "-NoProfile", "-Command", command], {
+        cwd: repoRoot,
+        encoding: "utf-8",
+        timeout: PWSH_INVOKE_BUDGET_MS,
+        env: {
+          ...process.env,
+          ECOWITT_PROBE_WRAPPER: join(tbDir, "run-testbench-windows.ps1"),
+          ECOWITT_PROBE_VERIFY: join(tbDir, "verify-testbench-windows.ps1"),
+        },
+      });
+      const output = result.stdout + result.stderr;
+      expect(result.status, output).toBe(0);
+      expect(output).not.toContain("Start the listener first");
+      const proof = JSON.parse(result.stdout.trim().split(/\r?\n/).at(-1)!);
+      expect(proof.wrapperReady).toBe(true);
+      expect(proof.listenerUp).toBe(true);
+      expect(proof.failures).toEqual(["GET /health"]);
+      expect(proof.probes.filter((url: string) => url.endsWith("/livez"))).toHaveLength(2);
+      expect(proof.probes.filter((url: string) => url.endsWith("/health"))).toHaveLength(1);
+    },
+    PWSH_INVOKE_BUDGET_MS,
+  );
 });
 
 describe("ecowitt windows testbench — forwarding tent-context safety", () => {
@@ -1212,7 +1278,9 @@ describe("ecowitt windows testbench — forwarding tent-context safety", () => {
   });
 
   it("forwarding-status does not echo the raw tent UUID value", () => {
-    expect(listener).not.toMatch(/"tent_id":\s*tent_id\b/);
+    const endpoint =
+      listener.split('@app.get("/debug/forwarding-status")')[1]?.split("@app.get(")[0] ?? "";
+    expect(endpoint).not.toMatch(/"tent_id"\s*:/);
   });
 
   it(".env.example documents VERDANT_TENT_ID as a real UUID requirement", () => {
@@ -1264,7 +1332,7 @@ describe("ecowitt windows testbench — forwarding response sanitization", () =>
 
   it("forwarded payload uses webhook transport source, never raw verdant 'live'", () => {
     expect(listener).toMatch(/WEBHOOK_TRANSPORT_SOURCE\s*=\s*"ecowitt"/);
-    const fn = listener.split("def maybe_forward")[1]?.split("\ndef ")[0] ?? "";
+    const fn = listener.split("def _send_forward")[1]?.split("\ndef ")[0] ?? "";
     expect(fn).toMatch(/"source":\s*WEBHOOK_TRANSPORT_SOURCE/);
     // Verdant source must be preserved as lineage in metadata, not as `source`.
     expect(fn).toMatch(/verdant_source/);
@@ -1333,7 +1401,7 @@ describe("ecowitt windows testbench — retry/backoff + error report", () => {
   });
 
   it("retry loop is bounded (uses MAX_RETRY_ATTEMPTS, not while True)", () => {
-    const fn = listener.split("def maybe_forward")[1]?.split("\ndef ")[0] ?? "";
+    const fn = listener.split("def _send_forward")[1]?.split("\ndef ")[0] ?? "";
     expect(fn).toMatch(/range\(MAX_RETRY_ATTEMPTS\s*\+\s*1\)/);
     expect(fn).not.toMatch(/while\s+True/);
     // No unbounded queue wording

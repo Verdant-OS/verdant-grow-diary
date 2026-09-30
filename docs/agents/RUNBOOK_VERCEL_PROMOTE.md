@@ -251,7 +251,14 @@ receipt's full `commit` equals the intended promote or rollback SHA and `dirty` 
 Then take the **closing reading**: reread the rollout record and configuration, the
 host inventory, each custom hostname's DNS, each hostname's deployment, the alias
 moves, and a freshly fetched deploy tip. The run is `PASS` only when the opening and
-closing readings agree on every value.
+closing readings agree on every value **and** an M11 audit covers the window from
+the opening reading through the closing timestamp. That audit lists the Vercel user
+events and authoritative DNS changes for the apex-holding project and every custom
+hostname. Snapshots that agree cannot reveal a change that was made and reverted
+during the sweep, and the audit can. Any routing, alias, domain, DNS or
+production-setting event in the window makes consistency `NOT_MEASURED`, and the
+sweep repeats. The event and its actor are recorded as a D-RT-13 publish action. If
+the audit is `BLOCKED` or `NOT_MEASURED`, consistency is `NOT_MEASURED`.
 
 - If any value changed during the sweep (a rollout, promote, redeploy, rollback,
   alias or domain move, DNS change or new merge), mark consistency `NOT_MEASURED`
@@ -327,8 +334,14 @@ create, view or alter its value. See
 Prepare the fallback as a separate scoped PR. Its acceptance must prove: the SHA
 is still the deploy tip and carries successful M4 merge-queue provenance; all
 selected and required checks passed for that SHA; the deployment belongs to this
-project and is the Git-sourced production artifact for that SHA; production automatic assignment is enabled; no unresolved rollout exists;
-and a rollback/manual-pause state prevents promotion. Serialize promotions,
+project and is the Git-sourced production artifact for that SHA; no unresolved
+rollout exists; and a rollback/manual-pause state prevents promotion. Before the
+Action is enabled, Matthew disables or otherwise fences native production
+auto-assignment, and records it as a D-RT-13 production-setting change. Otherwise
+the Git integration keeps an independent routing path outside the Action's
+serialization and rollback checks, which is the second-writer condition this lane
+exists to avoid. He restores native assignment only after the fallback Action is
+retired and its token revoked. Serialize promotions,
 recheck immediately before the
 write, use read-only GitHub permissions and keep the token out of logs. No such
 Action or token is enabled by this runbook.

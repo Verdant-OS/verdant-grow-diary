@@ -9,6 +9,8 @@ import {
   MANUAL_DELIVERY_ORDER,
   validManualDeliveryOrder,
   assertManualDeliveryStep,
+  MANUAL_DELIVERY_FILES,
+  buildManualDeliveryStepSql,
 } from "./lib/quicklogManualDeliveryOrder.mjs";
 export { MANUAL_DELIVERY_ORDER, validManualDeliveryOrder };
 import {
@@ -28,19 +30,7 @@ const originalGrow = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const originalTent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const otherOwnedGrow = "33333333-3333-4333-8333-333333333333";
 const otherOwnedTent = "44444444-4444-4444-8444-444444444444";
-const migration = "20260927160000_quicklog_manual_plant_tent_lineage.sql";
-const migrationSha256 = "843bfd62f72b712dccfa9e4a58150e88cf5d2bc045323562abf0af8c54f30014";
-const deliveryFiles = Object.freeze([
-  {
-    file: "20260927002000_quicklog_manual_reuse_fence.sql",
-    sha256: "5017b8f697f77a358df43d38fae486a21cabf92a65aa3af439bc750d221d6b1b",
-  },
-  { file: migration, sha256: migrationSha256 },
-  {
-    file: "20260928183000_quicklog_manual_replay_metadata_lock.sql",
-    sha256: "ef8e208bb306b8aed8d29be4ecca72344cfc1f0dc7de236de48c12aa6b4f14a7",
-  },
-]);
+const deliveryFiles = MANUAL_DELIVERY_FILES;
 
 export function loadManualDeliverySql(migrationRoot = resolve(root, "supabase/migrations")) {
   return deliveryFiles.map(({ file, sha256 }) => {
@@ -54,14 +44,8 @@ export function loadManualDeliverySql(migrationRoot = resolve(root, "supabase/mi
 
 export function deliverManualMigration({ order, completed, version, sql, env, spawnImpl }) {
   const next = assertManualDeliveryStep({ order, completed, version });
-  const position = MANUAL_DELIVERY_ORDER.indexOf(version);
-  if (
-    typeof sql !== "string" ||
-    createHash("sha256").update(sql).digest("hex") !== deliveryFiles[position].sha256
-  ) {
-    throw new Error("migration_fingerprint_mismatch");
-  }
-  executeSql(sql, env, { stage: `manual_delivery_${version}`, spawnImpl });
+  const guardedSql = buildManualDeliveryStepSql({ order, version, sql });
+  executeSql(guardedSql, env, { stage: `manual_delivery_${version}`, spawnImpl });
   return next;
 }
 
@@ -279,6 +263,33 @@ export async function runPlantLineageHarness({
       env,
       spawnImpl,
     });
+    // A fabricated completed prefix must not permit skipping 160000. The old
+    // 183000 source preflight accepts this wrapper; the delivery catalog gate must not.
+    const skippedBefore = executeSql(DELIVERY_DATABASE_SNAPSHOT_SQL, env, {
+      stage: "skipped_lineage_database_before",
+      spawnImpl,
+    });
+    let skippedLineageRejected = false;
+    try {
+      deliverManualMigration({
+        order: deliveryOrder,
+        completed: MANUAL_DELIVERY_ORDER.slice(0, 2),
+        version: MANUAL_DELIVERY_ORDER[2],
+        sql: metadataSql,
+        env,
+        spawnImpl,
+      });
+    } catch {
+      skippedLineageRejected = true;
+    }
+    if (!skippedLineageRejected) throw new Error("skipped_lineage_accepted");
+    const skippedAfter = executeSql(DELIVERY_DATABASE_SNAPSHOT_SQL, env, {
+      stage: "skipped_lineage_database_after",
+      spawnImpl,
+    });
+    if (!/^[0-9a-f]{32}$/.test(skippedBefore) || skippedAfter !== skippedBefore) {
+      throw new Error("skipped_lineage_changed_database");
+    }
     setupSameOwnerRls(env, spawnImpl);
 
     // The existing same-owner policies permit this cross-grow tent assignment.
@@ -403,7 +414,7 @@ export async function runPlantLineageHarness({
     return 1;
   }
   process.stdout.write(
-    "Quick Log plant lineage PG15 harness PASS: full chain 002000 -> 160000 -> 183000; reverse refused, database unchanged\n",
+    "Quick Log plant lineage PG15 harness PASS: full chain 002000 -> 160000 -> 183000; reverse and skipped-lineage refused, database unchanged\n",
   );
   return 0;
 }

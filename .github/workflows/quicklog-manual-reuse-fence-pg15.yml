@@ -15,6 +15,7 @@ on:
       - "scripts/run-quicklog-manual-delegate-forward-repair-pg15-harness.mjs"
       - "src/test/quicklog-manual-reuse-fence-pg15-harness.test.ts"
       - "src/test/quicklog-manual-plant-lineage-pg15-harness.test.ts"
+      - "src/test/quicklog-manual-delivery-gate.test.ts"
       - "src/test/quicklog-manual-reuse-lock-pg15-harness.test.ts"
       - ".github/workflows/quicklog-manual-reuse-fence-pg15.yml"
   push:

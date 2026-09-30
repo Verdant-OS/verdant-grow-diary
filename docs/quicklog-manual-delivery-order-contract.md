@@ -42,6 +42,22 @@ those protections. An in-memory test prefix is not proof of hosted migration
 history. #1742's branch and production runner are unchanged by this proof PR. No
 claim of an operational production manual-chain apply lane is made here.
 
+The shared `buildManualDeliveryStepSql` adapter adds a database catalog gate in
+front of each unchanged, fingerprint-checked migration. It resolves the schema-qualified
+wrapper and delegate signatures by OID, checks their exact predecessor source
+fingerprints, owners, return types, search paths and execution grants, and takes
+a shared session advisory lock before checking. The same connection submits the
+entire gated script with `ON_ERROR_STOP`, then closes to release the lock. No
+caller-supplied completed prefix can replace these checks. In particular,
+`183000` requires the `160000` delegate; its original migration preflight checks
+only the `002000` wrapper. The PG15 proof now also tries `183000` after `002000`
+with a fabricated completed prefix and verifies unchanged catalog and data.
+
+This adapter is production-compatible SQL construction, not a production dispatch
+entry point. Integration into #1742's protected runner remains BLOCKED pending
+an authorized manual-chain lane retaining the protections above. A successful
+disposable proof cannot be used as that authorization or as a hosted receipt.
+
 Run the proof through `.github/workflows/quicklog-manual-reuse-fence-pg15.yml` on
 the reviewed candidate. The fixture database is disposable test infrastructure;
 passing it does not establish production acceptance or remove #1735's hold.

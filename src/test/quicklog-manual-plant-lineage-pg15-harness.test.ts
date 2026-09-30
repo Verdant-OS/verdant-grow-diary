@@ -11,7 +11,10 @@ import {
   deliverManualMigration,
   DELIVERY_DATABASE_SNAPSHOT_SQL,
 } from "../../scripts/run-quicklog-manual-plant-lineage-pg15-harness.mjs";
-import { assertManualDeliveryStep } from "../../scripts/lib/quicklogManualDeliveryOrder.mjs";
+import {
+  assertManualDeliveryStep,
+  buildManualDeliveryStepSql,
+} from "../../scripts/lib/quicklogManualDeliveryOrder.mjs";
 
 const migration = readFileSync(
   resolve(
@@ -108,6 +111,13 @@ describe("Quick Log manual plant/tent lineage fence", () => {
 
   it("runs all three migrations in order on one attested scaffold before checking the fence", async () => {
     const sql = loadManualDeliverySql();
+    const guardedSql = sql.map((text, position) =>
+      buildManualDeliveryStepSql({
+        order: MANUAL_DELIVERY_ORDER,
+        version: MANUAL_DELIVERY_ORDER[position],
+        sql: text,
+      }),
+    );
     const applied: number[] = [];
     let lineageAttempt = 0;
     let metadataAttempt = 0;
@@ -119,13 +129,14 @@ describe("Quick Log manual plant/tent lineage fence", () => {
         return result("verdant_quicklog_delegate_repair_pg15_disposable_v1");
       }
       if (input === DELIVERY_DATABASE_SNAPSHOT_SQL) return result("a".repeat(32));
-      const position = sql.indexOf(input);
+      const position = guardedSql.indexOf(input);
       if (position >= 0) {
         if (position === 2 && ++metadataAttempt === 1) return result("", 1);
-        if (position === 1 && ++lineageAttempt === 1) return result("", 1);
         applied.push(position);
         return result();
       }
+      if (input === sql[2]) return result("", 1);
+      if (input === sql[1] && ++lineageAttempt === 1) return result("", 1);
       if (input.includes("select oid::text from pg_proc")) return result("123");
       if (input.includes("update public.plants set tent_id=")) {
         return result("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
@@ -163,7 +174,7 @@ describe("Quick Log manual plant/tent lineage fence", () => {
         spawnImpl.mock.calls.filter(
           ([, , options]) => options.input === DELIVERY_DATABASE_SNAPSHOT_SQL,
         ),
-      ).toHaveLength(2);
+      ).toHaveLength(4);
       expect(write).toHaveBeenCalledWith(
         expect.stringContaining("full chain 002000 -> 160000 -> 183000"),
       );

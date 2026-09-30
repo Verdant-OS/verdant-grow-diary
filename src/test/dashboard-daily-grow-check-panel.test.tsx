@@ -4,7 +4,7 @@
  * Covers pure rules + component wiring/safety. Reuses the existing
  * Daily Grow Check consistency basis — does not re-test that calculation.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, within } from "@testing-library/react";
@@ -146,6 +146,8 @@ describe("buildDashboardDailyGrowCheckPanel · pure rules", () => {
     });
     const ids = panel.rows.map((r) => r.plantId).sort();
     expect(ids).toEqual(["pA", "pB"]);
+    expect(panel.rows.find((r) => r.plantId === "pA")?.dailyCheckGrowId).toBe("g1");
+    expect(panel.rows.find((r) => r.plantId === "pB")?.dailyCheckGrowId).toBeNull();
   });
 
   it("returns single CTA href format /daily-check?plantId=<id>", () => {
@@ -204,6 +206,18 @@ describe("buildDashboardDailyGrowCheckPanel · pure rules", () => {
 // -----------------------------------------------------------------------
 import { vi } from "vitest";
 
+let mockedGrowPlants: Array<{
+  id: string;
+  name: string;
+  tentId: string;
+  growId: string | null;
+  isArchived: boolean;
+  lastNote: string;
+}> = [
+  { id: "p1", name: "Sour D", tentId: "t1", growId: "g1", isArchived: false, lastNote: "" },
+  { id: "p2", name: "Blue Dream", tentId: "t1", growId: "g1", isArchived: false, lastNote: "" },
+];
+
 vi.mock("@/hooks/use-diary-entries", () => ({
   useDiaryEntries: () => ({
     data: [{ entry_at: TODAY_ISO, id: "d1", plant_id: "p1", tent_id: "t1" }],
@@ -214,10 +228,7 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
 }));
 vi.mock("@/hooks/useGrowData", () => ({
   useGrowPlants: () => ({
-    data: [
-      { id: "p1", name: "Sour D", tentId: "t1", growId: "g1", isArchived: false, lastNote: "" },
-      { id: "p2", name: "Blue Dream", tentId: "t1", growId: "g1", isArchived: false, lastNote: "" },
-    ],
+    data: mockedGrowPlants,
   }),
   useGrowTents: () => ({ data: [{ id: "t1", name: "Tent A" }] }),
 }));
@@ -234,6 +245,20 @@ function renderPanel(scopedGrowId: string | null = "g1") {
 }
 
 describe("DashboardDailyGrowCheckPanel · component", () => {
+  beforeEach(() => {
+    mockedGrowPlants = [
+      { id: "p1", name: "Sour D", tentId: "t1", growId: "g1", isArchived: false, lastNote: "" },
+      {
+        id: "p2",
+        name: "Blue Dream",
+        tentId: "t1",
+        growId: "g1",
+        isArchived: false,
+        lastNote: "",
+      },
+    ];
+  });
+
   beforeAll(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -259,11 +284,42 @@ describe("DashboardDailyGrowCheckPanel · component", () => {
     ).toHaveLength(1);
   });
 
-  it("unchecked plant Add note action links to /daily-check?plantId=<id>&from=dashboard&method=note", () => {
+  it("unchecked plant Add note action preserves the selected grow and note method", () => {
     renderPanel();
     const action = screen.getByTestId("dashboard-daily-grow-check-panel-row-action-note");
     const link = (action.tagName === "A" ? action : action.querySelector("a")) as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe("/daily-check?plantId=p2&from=dashboard&method=note");
+    expect(link.getAttribute("href")).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=note&growId=g1",
+    );
+  });
+
+  it("unchecked legacy no-grow plant omits growId on Add note and Add sensor snapshot links", () => {
+    mockedGrowPlants = [
+      { id: "p1", name: "Sour D", tentId: "t1", growId: "g1", isArchived: false, lastNote: "" },
+      {
+        id: "p2",
+        name: "Blue Dream",
+        tentId: "t1",
+        growId: null,
+        isArchived: false,
+        lastNote: "",
+      },
+    ];
+    renderPanel();
+    const noteAction = screen.getByTestId("dashboard-daily-grow-check-panel-row-action-note");
+    const sensorAction = screen.getByTestId("dashboard-daily-grow-check-panel-row-action-sensor");
+    const noteLink = (
+      noteAction.tagName === "A" ? noteAction : noteAction.querySelector("a")
+    ) as HTMLAnchorElement | null;
+    const sensorLink = (
+      sensorAction.tagName === "A" ? sensorAction : sensorAction.querySelector("a")
+    ) as HTMLAnchorElement | null;
+    expect(noteLink?.getAttribute("href")).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=note",
+    );
+    expect(sensorLink?.getAttribute("href")).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=sensor",
+    );
   });
 });
 

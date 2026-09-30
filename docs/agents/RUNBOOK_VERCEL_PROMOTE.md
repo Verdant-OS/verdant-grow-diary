@@ -150,7 +150,18 @@ Force Promote to bypass an unresolved publish or security gate. See
 ## Rollback — Matthew only
 
 If the release must be reversed, Matthew selects the packet's known-good production
-artifact and runs:
+artifact. **Immediately before** rolling back, he rereads the following and records
+a UTC time for each read:
+
+- the rollback target deployment's project, `target: production`, `READY` state,
+  `source: git` and `meta.githubCommitSha`, which must still match the packet's
+  known-good SHA;
+- the rolling-release record and configuration (`get_rolling_release` and
+  `get_rolling_release_config`);
+- each production hostname's current serving deployment.
+
+If a rollout started, or routing changed, after the packet was prepared, he stops
+and resolves it before any rollback. He then runs:
 
 ```sh
 vercel rollback <deployment-url> --scope verdantgrowdiary
@@ -350,7 +361,9 @@ Prepare the fallback as a separate scoped PR. Its acceptance must prove: the SHA
 is still the deploy tip and carries successful M4 merge-queue provenance; all
 selected and required checks passed for that SHA; the deployment belongs to this
 project and is the Git-sourced production artifact for that SHA; no unresolved
-rollout exists; and a rollback/manual-pause state prevents promotion. Before the
+rollout exists; the rolling-release configuration (stages and advancement type),
+read immediately before the write, equals the owner-approved baseline recorded in
+the packet; and a rollback/manual-pause state prevents promotion. Before the
 Action is enabled, Matthew disables or otherwise fences native production
 auto-assignment, and records it as a D-RT-13 production-setting change. Otherwise
 the Git integration keeps an independent routing path outside the Action's

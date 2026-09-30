@@ -150,7 +150,16 @@ import {
 } from "@/lib/quickLogMaturityEvidenceRules";
 import {
   buildReceiptTargetMovedMessage,
+  canDiscardQuickLogHistoryDraft,
+  QUICK_LOG_HISTORY_DISCARD_FAILED,
+  QUICK_LOG_HISTORY_DISCARD_HELPER,
+  QUICK_LOG_HISTORY_DISCARD_LABEL,
+  QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY,
+  QUICK_LOG_HISTORY_REVIEW_HELPER,
+  QUICK_LOG_HISTORY_REVIEW_LINK_LABEL,
+  QUICK_LOG_HISTORY_REVIEW_LOCK_COPY,
   quickLogReasonToOperatorMessage,
+  quickLogSaveRequiresHistoryCheck,
 } from "@/lib/quickLogSaveErrorMessage";
 import {
   QUICK_LOG_POST_SAVE_VIEW_LABEL,

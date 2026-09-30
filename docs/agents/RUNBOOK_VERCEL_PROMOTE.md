@@ -163,10 +163,15 @@ a UTC time for each read:
   known-good SHA;
 - the rolling-release record and configuration (`get_rolling_release` and
   `get_rolling_release_config`);
-- each production hostname's current serving deployment.
+- the production-host inventory from packet item 1, re-enumerated: the M2 apex
+  holder, the production domains bound to the project, the aliases
+  (`list_promote_aliases`) and each custom hostname's DNS, which must still equal
+  the packet's inventory;
+- each hostname's current serving deployment, for every hostname in that
+  re-enumerated inventory.
 
-If a rollout started, or routing changed, after the packet was prepared, he stops
-and resolves it before any rollback. He then runs:
+If a rollout started, or the inventory or routing changed, after the packet was
+prepared, he stops and resolves it before any rollback. He then runs:
 
 ```sh
 vercel rollback <deployment-url> --scope verdantgrowdiary
@@ -207,11 +212,18 @@ The inventory includes at least `verdantgrowdiary.com`, `www.verdantgrowdiary.co
 `verdant-grow-diary.vercel.app` and the recorded project alias
 `verdant-grow-diary-verdantgrowdiary.vercel.app`, plus each earlier-inventoried
 hostname until its retirement is owner-recorded and verified. The inventory's
-completeness is `NOT_MEASURED`, and acceptance is withheld, when either:
+completeness is not established, and acceptance is withheld, when either:
 
-- M2 names no single holder; or
-- the previous successful M10 inventory was not recorded. Current bindings alone
-  cannot show that a formerly inventoried hostname has stopped serving.
+- M2 names no single holder, which leaves completeness `NOT_MEASURED`; or
+- no previous M10 inventory was recorded, which leaves prior-hostname coverage
+  `NO_BASELINE`. Current bindings alone cannot show that a formerly inventoried
+  hostname has stopped serving.
+
+The previous inventory is the one recorded by the last M10 run that completed its
+inventory reads, whatever that run's status. The specification carries it from the
+last stamp at which M10 ran, not from the last `PASS`. So the first sweep that
+records an inventory still withholds acceptance, but it becomes the baseline for
+the next sweep. Without that rule no sweep could ever pass.
 
 **2. DNS for each custom hostname, before resolving its deployment.** Resolve `A`,
 `AAAA` and `CNAME`, as M2 does for the apex, and record each answer:

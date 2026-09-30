@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -7,54 +9,52 @@ import {
   ECOWITT_CUSTOM_HTTP_METRIC_UNITS,
 } from "@/lib/ecowittCustomHttpBridgeIngestRules";
 
-// -I -S disables site packages and environment-driven imports. Only the Python
-// standard library reads AST literals; Flask is not imported and site packages
-// remain disabled even when the testbench's own environment contains them.
-const literalReader = `
-import ast, json, sys
-result = {}
-for path, name in zip(sys.argv[1::2], sys.argv[2::2]):
-    with open(path, encoding="utf-8-sig") as handle:
-        tree = ast.parse(handle.read(), filename=path)
-    assignment = next(
-        node for node in tree.body if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == name for target in node.targets)
-    )
-    result[name] = ast.literal_eval(assignment.value)
-print(json.dumps(result, sort_keys=True))
+// -I -S disables site packages and environment-driven imports. The routing
+// module owns these constants and imports only the Python standard library.
+const runtimeReader = `
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import ecowitt_multitent as routing
+print(json.dumps({name: getattr(routing, name) for name in
+                 ("FIELD_MAP", "CHANNEL_FIELD_MAP", "UNITS")}, sort_keys=True))
 `;
 const testbench = join(process.cwd(), "tools", "ecowitt-testbench");
-const args = [
-  "-I",
-  "-S",
-  "-c",
-  literalReader,
-  join(testbench, "ecowitt_listener.py"),
-  "FIELD_MAP",
-  join(testbench, "ecowitt_multitent.py"),
-  "CHANNEL_FIELD_MAP",
-  join(testbench, "ecowitt_multitent.py"),
-  "UNITS",
-];
+const args = ["-I", "-S", "-c", runtimeReader, testbench];
 
-function readPythonLiterals(): Record<string, unknown> {
+function readPythonConstants(directory = testbench): Record<string, unknown> {
   const configured = process.env.ECOWITT_PARITY_PYTHON;
   const candidates = configured ? [configured] : ["python3", "python"];
   for (const executable of candidates) {
-    const result = spawnSync(executable, args, { encoding: "utf8", timeout: 15_000 });
+    const result = spawnSync(executable, [...args.slice(0, -1), directory], {
+      encoding: "utf8", timeout: 15_000,
+    });
     if (!configured && result.error?.message.includes("ENOENT")) continue;
     if (result.error || result.status !== 0) {
       throw new Error(
-        `Python AST parity failed (${executable}): ${result.error?.message ?? result.stderr}`,
+        `Python import parity failed (${executable}): ${result.error?.message ?? result.stderr}`,
       );
     }
     return JSON.parse(result.stdout) as Record<string, unknown>;
   }
-  throw new Error("Python is required for AST parity; set ECOWITT_PARITY_PYTHON if needed.");
+  throw new Error("Python is required for import parity; set ECOWITT_PARITY_PYTHON if needed.");
 }
 
 describe("EcoWitt custom HTTP bridge field contracts", () => {
-  const python = readPythonLiterals();
+  const python = readPythonConstants();
+
+  it("reads effective values after reassignment and mutation during import", () => {
+    const fixture = mkdtempSync(join(tmpdir(), "ecowitt-parity-"));
+    try {
+      const source = readFileSync(join(testbench, "ecowitt_multitent.py"), "utf8");
+      writeFileSync(join(fixture, "ecowitt_multitent.py"),
+        `${source}\nFIELD_MAP = {"changed": ("late_field",)}\nUNITS["temp_f"] = "changed"\n`);
+      const effective = readPythonConstants(fixture);
+      expect(effective.FIELD_MAP).toEqual({ changed: ["late_field"] });
+      expect(effective.UNITS).toMatchObject({ temp_f: "changed" });
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
 
   it("preserves the legacy first-match FIELD_MAP, read without importing Flask", () => {
     expect(python.FIELD_MAP).toEqual(ECOWITT_CUSTOM_HTTP_FIELD_MAP);

@@ -21,6 +21,33 @@ NOW = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
 
 
 class ListenerIntegrationTests(unittest.TestCase):
+    def test_listener_uses_the_effective_pure_field_map(self):
+        import ecowitt_multitent
+        self.assertIs(listener.FIELD_MAP, ecowitt_multitent.FIELD_MAP)
+
+    def test_single_tent_conflicting_case_fields_never_select_a_healthy_metric(self):
+        os.environ.pop("ECOWITT_TENT_MAP")
+        os.environ.update(VERDANT_TENT_ID=TENT_A, VERDANT_BRIDGE_TOKEN=TOKEN_A)
+        for variants in ({"TEMP1F": 70, "temp1f": 90}, {"temp1f": 90, "TEMP1F": 70},
+                         {"TEMP1F": "70", "temp1f": 70}, {"TEMP1F": 70, "temp1f": 70.0}):
+            with self.subTest(variants=variants):
+                packet = {**self.packet, "tempf": 88}
+                packet.pop("temp1f")
+                packet.update(variants)
+                metrics = listener.normalize_metrics(packet)
+                self.assertIsNone(metrics["temp_f"])
+                self.assertEqual(listener.resolve_source(packet, "198.51.100.2", "", "", now=NOW), "invalid")
+                response = self.post(packet)
+                self.assertEqual(response.status_code, 200)
+                forwarded = self.requests.post.call_args.kwargs["json"]
+                self.assertIsNone(forwarded["metrics"]["temp_f"])
+                self.assertEqual(forwarded["metadata"]["verdant_source"], "invalid")
+                self.assertEqual(listener.get_runtime().spool.pending_count, 0)
+
+    def test_identical_case_variants_preserve_legacy_candidates_and_provenance(self):
+        packet = {**self.packet, "TEMP1F": "77", "tempf": "90"}
+        self.assertEqual(listener.normalize_metrics(packet)["temp_f"], 77)
+        self.assertEqual(listener.resolve_source(packet, "198.51.100.2", "", "", now=NOW), "live")
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

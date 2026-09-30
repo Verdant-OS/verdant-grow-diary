@@ -11,7 +11,14 @@ from pathlib import Path
 from typing import Any, Mapping
 
 
-# Literal templates are mirrored in TypeScript through flask-free AST tests.
+# Effective constants are mirrored in TypeScript through Flask-free imports.
+FIELD_MAP = {
+    "temp_f": ("temp1f", "tempf", "tempinf"),
+    "humidity_percent": ("humidity1", "humidity", "humidityin"),
+    "soil_moisture_pct": ("soilmoisture1", "soilmoisture2"),
+    "co2_ppm": ("co2", "co2in", "co2_ppm"),
+}
+
 CHANNEL_FIELD_MAP = {
     "air": {"temp_f": "temp{channel}f", "humidity_percent": "humidity{channel}"},
     "in": {"temp_f": "tempinf", "humidity_percent": "humidityin"},

@@ -108,7 +108,7 @@ jobs:
           set -o pipefail
           python3 -m unittest test_debug_redaction test_multitent test_delivery test_ingest_readiness 2>&1 | tee ../../artifacts/ecowitt-testbench-forwarding/multitent-delivery.log
 
-      - name: Vitest — testbench static safety and Flask-free AST parity
+      - name: Vitest — testbench static safety and Flask-free import parity
         env:
           ECOWITT_PARITY_PYTHON: python3
         shell: bash

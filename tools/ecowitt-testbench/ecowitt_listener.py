@@ -56,7 +56,7 @@ from typing import Any, Dict, Optional
 
 from ecowitt_delivery import HealthState, JsonlSpool
 from ecowitt_multitent import (
-    COMMON_FIELDS, ConfigError, Tent, gateway_fingerprint, load_tent_map,
+    COMMON_FIELDS, FIELD_MAP, ConfigError, Tent, gateway_fingerprint, load_tent_map,
     numeric, route_packet, sanitize, valid_token,
 )
 
@@ -98,13 +98,6 @@ app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
 # Normalization
 # ---------------------------------------------------------------------------
 
-FIELD_MAP = {
-    "temp_f": ("temp1f", "tempf", "tempinf"),
-    "humidity_percent": ("humidity1", "humidity", "humidityin"),
-    "soil_moisture_pct": ("soilmoisture1", "soilmoisture2"),
-    "co2_ppm": ("co2", "co2in", "co2_ppm"),
-}
-
 
 def _coerce_float(value: Any) -> Optional[float]:
     if value is None or isinstance(value, bool):
@@ -126,7 +119,11 @@ def normalize_metrics(payload: Dict[str, Any]) -> Dict[str, Optional[float]]:
     code can flag them — they are never treated as healthy.
     """
     metrics: Dict[str, Optional[float]] = {}
+    conflicts = _conflicting_case_fields(payload)
     for canonical, candidates in FIELD_MAP.items():
+        if conflicts.intersection(candidates):
+            metrics[canonical] = None
+            continue
         value: Optional[float] = None
         for key in candidates:
             raw_value = _payload_value_case_insensitive(payload, key)
@@ -171,6 +168,15 @@ def parse_ecowitt_dateutc(value: Any) -> Optional[str]:
     )
 
 
+def _conflicting_case_fields(payload: Any) -> set[str]:
+    if not isinstance(payload, dict):
+        return set()
+    values = {}
+    for key, value in payload.items():
+        values.setdefault(str(key).lower(), set()).add(json.dumps(sanitize(value), sort_keys=True))
+    return {key for key, variants in values.items() if len(variants) > 1}
+
+
 def _payload_value_case_insensitive(
     payload: Optional[Dict[str, Any]],
     wanted_key: str,
@@ -178,6 +184,8 @@ def _payload_value_case_insensitive(
     if not isinstance(payload, dict):
         return None
     wanted = wanted_key.lower()
+    if wanted in _conflicting_case_fields(payload):
+        return None
     for key, value in payload.items():
         if str(key).lower() == wanted:
             return value
@@ -386,6 +394,9 @@ def _resolve_source_from_validated(
     if env_mode is None:
         env_mode = (os.environ.get("VERDANT_FORWARD_MODE") or "").strip().lower()
 
+    known_fields = COMMON_FIELDS | {key for candidates in FIELD_MAP.values() for key in candidates}
+    if _conflicting_case_fields(payload).intersection(known_fields):
+        return "invalid"
     if has_stuck_ecowitt_percent_metric(payload):
         return "invalid"
 

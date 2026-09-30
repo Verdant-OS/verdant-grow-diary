@@ -60,6 +60,8 @@ export async function fetchPostGrowLearningDiaryRows(growId: string) {
 
 async function signPhotoUrls(rows: PostGrowDiaryLike[]): Promise<PostGrowDiaryLike[]> {
   const paths = rows
+    .filter((r) => typeof r.photo_url === "string" && r.photo_url.length > 0)
+    .slice(0, 12)
     .map((r) => r.photo_url)
     .filter((p): p is string => !!p && !p.startsWith("http"));
   if (paths.length === 0) return rows;

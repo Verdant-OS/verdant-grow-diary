@@ -11,6 +11,7 @@ const io = vi.hoisted(() => ({
   unit: "celsius",
   diary: [] as unknown[],
   signed: { data: [] as unknown, error: null as unknown },
+  signCalls: vi.fn(),
   calls: vi.fn(),
 }));
 vi.mock("@/store/auth", () => {
@@ -27,7 +28,14 @@ vi.mock("@/hooks/useTemperatureUnitPreference", () => ({
 }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    storage: { from: () => ({ createSignedUrls: async () => io.signed }) },
+    storage: {
+      from: () => ({
+        createSignedUrls: async (paths: string[]) => {
+          io.signCalls(paths);
+          return io.signed;
+        },
+      }),
+    },
     from: (table: string) => {
       let growId = "grow-a";
       const q = {
@@ -120,6 +128,7 @@ beforeEach(() => {
   io.unit = "celsius";
   io.diary = [];
   io.signed = { data: [], error: null };
+  io.signCalls.mockClear();
   io.calls.mockClear();
 });
 it("summarizes corrected manual evidence while retaining scope, ordering and source", async () => {
@@ -311,4 +320,27 @@ it("retrieves photos after complete signing", async () => {
   const { result } = mount();
   await waitFor(() => expect(result.current.status).toBe("ready"));
   expect(result.current.report?.photos[0].url).toBe("https://signed.example/photo.jpg");
+});
+it("requires signing only for the 12 photos the report displays", async () => {
+  io.diary = Array.from({ length: 250 }, (_, index) => ({
+    id: `photo-${index}`,
+    photo_url: `owner/photo-${index}.jpg`,
+    entry_at: observed,
+  }));
+  io.signed = {
+    data: Array.from({ length: 12 }, (_, index) => ({
+      path: `owner/photo-${index}.jpg`,
+      signedUrl: `https://signed.example/photo-${index}.jpg`,
+    })),
+    error: null,
+  };
+  const { result } = mount();
+  await waitFor(() => expect(result.current.status).toBe("ready"));
+  expect(io.signCalls).toHaveBeenCalledWith(
+    Array.from({ length: 12 }, (_, index) => `owner/photo-${index}.jpg`),
+  );
+  expect(result.current.report?.photos).toHaveLength(12);
+  expect(
+    result.current.report?.photos.every((photo) => photo.url.startsWith("https://signed.example/")),
+  ).toBe(true);
 });

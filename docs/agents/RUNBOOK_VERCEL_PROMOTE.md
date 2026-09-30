@@ -104,7 +104,22 @@ not evidence that production is accepted.
 
 ## Manual promotion — Matthew only
 
-After the packet and publish decision are complete, Matthew runs:
+After the packet and publish decision are complete, and **immediately before**
+promoting, Matthew rereads the release state. The packet may be stale if a merge,
+check rerun or rollout change happened after it was prepared. He records a UTC time
+for each of these reads:
+
+- the deploy tip, freshly fetched (`git fetch origin verdant-grow-diary`, then
+  `git rev-parse origin/verdant-grow-diary`), which must still equal the packet's
+  target SHA;
+- the target deployment's project, `target: production`, `READY` state and
+  `meta.githubCommitSha` / `meta.githubCommitRef`, which must still match that SHA;
+- the required and selected Deployment Check results for that SHA, which must all
+  still be successful;
+- the rolling-release record, which must show no unresolved rollout.
+
+If any value differs from the packet, stop and rebuild the packet rather than
+promoting a stale artifact. Only then does Matthew run:
 
 ```sh
 vercel promote <deployment-url> --scope verdantgrowdiary

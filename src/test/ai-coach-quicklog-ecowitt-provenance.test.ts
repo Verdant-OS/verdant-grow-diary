@@ -160,9 +160,9 @@ describe("AI Coach — Quick Log ECOWITT provenance consumption", () => {
     expect(acquired.snapshot?.metrics).toEqual({ temperature: 24.3, humidity: 55 });
   });
 
-  it("fails closed for a legacy nested live snapshot with no row provenance", () => {
+  it("fails closed to invalid for a legacy nested live snapshot with no row provenance", () => {
     const context = coachContext(null);
-    expect(context.sourceLabel).toBe("unknown");
+    expect(context.sourceLabel).toBe("invalid");
     expect(context.trustLevel).toBe("low");
     expect(context.isTrustedForAi).toBe(false);
     expect(context.valuesForModel).toBeNull();

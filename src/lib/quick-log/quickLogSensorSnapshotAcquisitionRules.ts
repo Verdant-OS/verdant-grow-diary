@@ -164,53 +164,164 @@ export function acquireQuickLogSensorSnapshot(
   };
 }
 
-function flattenSnapshotForAi(snapshot: Record<string, unknown>): Record<string, unknown> {
-  const metrics = asObject(snapshot.metrics) ?? {};
-  const out: Record<string, unknown> = {
-    source: snapshot.source,
-    captured_at: snapshot.captured_at,
-  };
-  for (const [rawKey, rawValue] of Object.entries(metrics)) {
-    const key = AI_METRIC_MAP[rawKey] ?? rawKey;
+/**
+ * Canonical source vocabulary the AI prompt may see. Anything else,
+ * including a missing label or the legacy `unknown`, is unverifiable
+ * provenance and resolves to `invalid`.
+ */
+export type QuickLogAiSensorSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
+
+/** Model-safe snapshot: only allowlisted scalar fields, never raw input. */
+export type QuickLogAiSensorSnapshot = {
+  source: QuickLogAiSensorSource;
+  captured_at: string | null;
+} & Record<string, string | number | null>;
+
+const AI_CANONICAL_SOURCES: ReadonlySet<string> = new Set([
+  "live",
+  "manual",
+  "csv",
+  "demo",
+  "stale",
+  "invalid",
+]);
+
+const AI_SOURCE_ALIASES: Readonly<Record<string, QuickLogAiSensorSource>> = {
+  imported: "csv",
+  import: "csv",
+  mock: "demo",
+  fixture: "demo",
+};
+
+/**
+ * Flat reading keys the AI snapshot annotator understands. Kept in step with
+ * `READING_KEYS` in `aiSensorSnapshotContextRules.ts`; a key missing here is
+ * dropped, never forwarded.
+ */
+const AI_READING_KEYS: ReadonlySet<string> = new Set([
+  "temperature_c",
+  "temperature_f",
+  "humidity",
+  "vpd",
+  "vpd_kpa",
+  "co2",
+  "co2_ppm",
+  "ppfd",
+  "soil_moisture",
+  "soil_water_content",
+  "soil_ec",
+  "soil_temp_c",
+  "soil_temp_f",
+  "ph",
+  "temp_c",
+  "temp_f",
+  "air_temp_c",
+  "humidity_pct",
+  "soil_moisture_pct",
+  "soil_ec_mscm",
+  "reservoir_ph",
+  "reservoir_ec_mscm",
+]);
+
+function canonicalAiSource(object: Record<string, unknown>): QuickLogAiSensorSource {
+  for (const key of ["source", "data_source", "sensor_source"]) {
+    const source = normalizedSource(object[key]);
+    if (source === "") continue;
+    if (AI_CANONICAL_SOURCES.has(source)) return source as QuickLogAiSensorSource;
+    return AI_SOURCE_ALIASES[source] ?? "invalid";
+  }
+  return "invalid";
+}
+
+/**
+ * Re-emit a timestamp as ISO-8601, or null. The raw value is never echoed,
+ * so a token-shaped or structured `captured_at` cannot reach the prompt.
+ */
+function canonicalCapturedAt(object: Record<string, unknown>): string | null {
+  for (const key of ["captured_at", "capturedAt", "timestamp", "ts", "time"]) {
+    const raw = object[key];
+    if (raw === undefined || raw === null) continue;
+    let ms: number | null = null;
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      ms = raw < 1e12 ? raw * 1000 : raw;
+    } else if (typeof raw === "string" && raw.trim() !== "") {
+      const parsed = Date.parse(raw.trim());
+      ms = Number.isFinite(parsed) ? parsed : null;
+    }
+    if (ms === null) return null;
+    const date = new Date(ms);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+  return null;
+}
+
+function aiSnapshotHeader(
+  source: QuickLogAiSensorSource,
+  object: Record<string, unknown>,
+): QuickLogAiSensorSnapshot {
+  return { source, captured_at: canonicalCapturedAt(object) };
+}
+
+function withAllowlistedReadings(
+  target: QuickLogAiSensorSnapshot,
+  readings: Record<string, unknown>,
+  keyMap: Readonly<Record<string, string>>,
+): QuickLogAiSensorSnapshot {
+  for (const [rawKey, rawValue] of Object.entries(readings)) {
+    const key = keyMap[rawKey] ?? rawKey;
+    if (!AI_READING_KEYS.has(key)) continue;
     if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
-      out[key] = rawValue;
+      target[key] = rawValue;
     }
   }
-  return out;
+  return target;
 }
 
 /**
  * Resolve a diary `details.sensor_snapshot` into the model-safe flat shape.
  *
+ * Every path builds a fresh object from an allowlist: a canonical source,
+ * an ISO `captured_at`, and finite numbers under known reading keys. Raw
+ * payloads, tokens, hardware ids and every other input field are dropped.
+ *
  * Nested Quick Log snapshots declaring `source=live` must be corroborated by
  * provenance-bearing sensor rows. Older live snapshots that discarded raw
- * lineage fail closed to `unknown`; diagnostic-only matches become `demo`.
+ * lineage fail closed to `invalid`; diagnostic-only matches become `demo`.
  */
 export function resolveQuickLogSensorSnapshotForAi(
   snapshot: unknown,
   provenanceRows?: readonly QuickLogSensorAcquisitionRow[] | null,
-): unknown {
+): QuickLogAiSensorSnapshot | null {
+  if (snapshot === null || snapshot === undefined) return null;
   const object = asObject(snapshot);
-  if (!object) return snapshot;
+  if (!object) return { source: "invalid", captured_at: null };
 
   if (isDiagnosticSensorProvenanceRow(object)) {
-    return { source: "demo", captured_at: object.captured_at ?? null };
+    return aiSnapshotHeader("demo", object);
   }
 
+  const source = canonicalAiSource(object);
   const metrics = asObject(object.metrics);
-  if (!metrics) return object;
+  if (!metrics) {
+    return withAllowlistedReadings(aiSnapshotHeader(source, object), object, {});
+  }
 
-  const source = normalizedSource(object.source);
-  if (source !== "live") return flattenSnapshotForAi(object);
+  if (source !== "live") {
+    return withAllowlistedReadings(aiSnapshotHeader(source, object), metrics, AI_METRIC_MAP);
+  }
 
   const acquired = acquireQuickLogSensorSnapshot(provenanceRows ?? []);
   if (acquired.snapshot && normalizedSource(acquired.snapshot.source) === "live") {
-    return flattenSnapshotForAi({ ...acquired.snapshot });
+    return withAllowlistedReadings(
+      { source: "live", captured_at: canonicalCapturedAt({ ...acquired.snapshot }) },
+      acquired.snapshot.metrics,
+      AI_METRIC_MAP,
+    );
   }
 
   if (acquired.diagnosticRowsOmitted > 0) {
-    return { source: "demo", captured_at: object.captured_at ?? null };
+    return aiSnapshotHeader("demo", object);
   }
 
-  return { source: "unknown", captured_at: object.captured_at ?? null };
+  return aiSnapshotHeader("invalid", object);
 }

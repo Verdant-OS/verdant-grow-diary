@@ -316,6 +316,9 @@ describe("Actions proof workflow on the deploy branch", () => {
     for (const input of ["src/**", "public/**", "vite.config.ts", "package.json", "bun.lock"])
       expect(triggers.on.push.paths).toContain(input);
     expect(triggers.on.push.paths).toContain(".github/workflows/actions-readonly-proof.yml");
+    // The probe's runner dependencies: login setup, shared helpers, config, SHA wait.
+    for (const input of ["e2e/**", "playwright.config.ts", "scripts/wait-for-deployed-sha.mjs"])
+      expect(triggers.on.push.paths).toContain(input);
   });
 
   it("pins the checked-out deploy SHA and waits for it to be live before measuring", () => {

@@ -23,9 +23,10 @@ on:
       - "vite.config.ts"
       - "package.json"
       - "bun.lock"
-      - "e2e/lib/actionsReadonlyProofRules.ts"
-      - "e2e/lib/signedInReadonlyProof.ts"
-      - "e2e/actions-readonly-proof.spec.ts"
+      # The probe, its login/config/fixture helpers and the deployed-SHA wait.
+      - "e2e/**"
+      - "playwright.config.ts"
+      - "scripts/wait-for-deployed-sha.mjs"
       - ".github/workflows/actions-readonly-proof.yml"
 
 permissions:

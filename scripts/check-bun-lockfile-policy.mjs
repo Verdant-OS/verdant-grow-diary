@@ -41,7 +41,6 @@ export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
 // Absence is safe; every copy must still be patched if it returns transitively.
 export const PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS = Object.freeze({
   rollup: "4.59.0",
-  undici: "6.28.1",
 });
 export const BUN_LOCK_OPTIONAL_SECURITY_FLOORS = PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS;
 export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({

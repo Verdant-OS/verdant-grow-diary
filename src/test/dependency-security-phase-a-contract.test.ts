@@ -167,7 +167,6 @@ describe("dependency security Phase A resolution floors", () => {
     ["postcss", [8, 5, 18] as const],
     ["esbuild", [0, 28, 1] as const],
     ["fast-uri", [3, 1, 8] as const],
-    ["undici", [6, 28, 1] as const],
     ["form-data", [4, 0, 6] as const],
     ["js-yaml", [4, 3, 2] as const],
     ["hono", [4, 13, 5] as const],
@@ -270,7 +269,6 @@ describe("dependency security Phase A resolution floors", () => {
       "js-yaml": "4.3.2",
       hono: "4.13.7",
       qs: "6.16.0",
-      undici: "6.28.1",
       nanoid: "3.3.18",
       undici: "6.28.1",
     });

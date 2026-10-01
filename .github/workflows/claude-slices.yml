@@ -12,16 +12,13 @@ on:
   # It never enters the builder or spends Claude usage.
   pull_request:
     branches: [verdant-grow-diary]
-    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
 
-# Builder runs share one serialized group; PR validation gets a per-PR group so
-# it never waits behind a builder run and superseded PR pushes cancel.
 concurrency:
-  group: claude-slices-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'builder' }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: claude-slices
+  cancel-in-progress: false
 
 jobs:
   claude-slices:
@@ -38,7 +35,6 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
-      id-token: write
     steps:
       - name: Check billing configuration without exposing credentials
         id: billing
@@ -221,7 +217,6 @@ jobs:
           [[ $# == 2 ]] || { echo 'Expected PR title and body arguments' >&2; exit 1; }
           branch=$(git branch --show-current)
           [[ "$branch" =~ ^claude/[A-Za-z0-9._-]+$ ]] || { echo 'Only claude/<slice-id> branches may open a PR' >&2; exit 1; }
-          git merge-base --is-ancestor origin/verdant-grow-diary HEAD
           base=$(git rev-parse origin/verdant-grow-diary)
           head=$(git rev-parse HEAD)
           node "$RUNNER_TEMP/claude-slice-policy.cjs" --diff "$base" "$head"
@@ -340,12 +335,7 @@ jobs:
         run: |
           git fetch --no-tags origin "refs/pull/$PR_NUMBER/head"
           test "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA"
-          if git cat-file -e "$HEAD_SHA:.github/workflows/claude-slices.yml" 2>/dev/null; then
-            git show "$HEAD_SHA:.github/workflows/claude-slices.yml" > "$RUNNER_TEMP/claude-slices.yml"
-          else
-            # The PR head predates this workflow; validate the base checkout's copy instead.
-            cp .github/workflows/claude-slices.yml "$RUNNER_TEMP/claude-slices.yml"
-          fi
+          git show "$HEAD_SHA:.github/workflows/claude-slices.yml" > "$RUNNER_TEMP/claude-slices.yml"
       - name: Check workflow syntax with checksum-verified actionlint
         run: |
           archive="$RUNNER_TEMP/actionlint.tar.gz"

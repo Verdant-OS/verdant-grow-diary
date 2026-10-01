@@ -262,7 +262,7 @@ function validateReceipt(value, expected, runAttempt, priorRun) {
     value.migration_sha256 !== MIGRATION_SHA256 ||
     value.delivery_mode !== SOLO_FOUNDER_POLICY.deliveryMode ||
     value.founder_github_user_id !== SOLO_FOUNDER_POLICY.founderUserId ||
-    value.founder_github_user_id !== priorRun.actor.id ||
+    value.founder_github_user_id !== positiveInteger(priorRun.actor.id) ||
     value.founder_github_login !== SOLO_FOUNDER_POLICY.founderLogin ||
     value.founder_github_login !== priorRun.actor.login ||
     value.production_environment !== SOLO_FOUNDER_POLICY.environmentName ||

@@ -210,10 +210,14 @@ describe("pinned linked Quick Log diary production delivery", () => {
 
   it("keeps the workflow founder-gated, exact-head, serialized and pinned", () => {
     const workflow = readFileSync(WORKFLOW, "utf8");
+    type Step = { name?: string; if?: string; run?: string; env?: Record<string, string> };
     const parsed = loadYaml(workflow) as {
       on: Record<string, unknown>;
       concurrency: { group: string; "cancel-in-progress": boolean; queue: string };
-      jobs: { apply: { environment: string } };
+      jobs: {
+        validate: { env: Record<string, string>; steps: Step[] };
+        apply: { environment: string; needs: string; env: Record<string, string>; steps: Step[] };
+      };
     };
     expect(Object.keys(parsed.on)).toEqual(["workflow_dispatch"]);
     expect(parsed.jobs.apply.environment).toBe("verdant-production-solo-founder");
@@ -222,14 +226,42 @@ describe("pinned linked Quick Log diary production delivery", () => {
       "cancel-in-progress": false,
       queue: "max",
     });
-    expect(workflow).toContain("refs/heads/verdant-grow-diary");
-    expect(workflow).toContain("EXPECTED_HEAD_SHA");
-    expect(workflow).toContain("SOLO_FOUNDER_ACKNOWLEDGEMENT");
-    expect(workflow).toContain("SUPABASE_DB_CA_CERT_B64");
-    expect(workflow).toContain(
-      "verify-linked-quicklog-diary-client-write-fence-preflight-artifact.mjs",
+    // Resolved workflow values, not source text: a commented-out guard or an
+    // unreachable step must not satisfy these.
+    const { validate, apply } = parsed.jobs;
+    expect(apply.needs).toBe("validate");
+    const branchGuard = validate.steps.find((step) =>
+      step.run?.includes('[ "$OBSERVED_REF" != "refs/heads/verdant-grow-diary" ]'),
     );
-    expect(workflow).toContain("node scripts/apply-linked-quicklog-diary-client-write-fence.mjs");
+    expect(branchGuard?.if).toBeUndefined();
+    const headGuard = validate.steps.find((step) =>
+      step.run?.includes('[ "$EXPECTED_HEAD_SHA" != "$OBSERVED_SHA" ]'),
+    );
+    expect(headGuard?.if).toBeUndefined();
+    for (const job of [validate, apply]) {
+      expect(job.env.EXPECTED_HEAD_SHA).toBe("${{ inputs.expected_head_sha }}");
+      expect(job.env.SOLO_FOUNDER_ACKNOWLEDGEMENT).toBe(
+        "${{ inputs.solo_founder_acknowledgement }}",
+      );
+    }
+    const verifierStep = apply.steps.find((step) =>
+      step.run?.includes(
+        "node scripts/verify-linked-quicklog-diary-client-write-fence-preflight-artifact.mjs",
+      ),
+    );
+    expect(verifierStep?.if).toBe("inputs.operation == 'APPLY'");
+    const runner = apply.steps.filter((step) =>
+      step.run?.includes("node scripts/apply-linked-quicklog-diary-client-write-fence.mjs"),
+    );
+    expect(runner).toHaveLength(1);
+    expect(runner[0].if).toBeUndefined();
+    expect(Object.keys(runner[0].env ?? {})).toEqual(
+      expect.arrayContaining(["SUPABASE_DB_URL", "SUPABASE_DB_CA_CERT_PATH"]),
+    );
+    expect(
+      apply.steps.find((step) => step.env && "SUPABASE_DB_CA_CERT_B64" in step.env)?.env
+        ?.SUPABASE_DB_CA_CERT_B64,
+    ).toBe("${{ secrets.SUPABASE_DB_CA_CERT_B64 }}");
     expect(readFileSync(VERIFIER, "utf8")).toContain("linked-quicklog-diary-client-write-fence");
   });
 
@@ -263,6 +295,12 @@ describe("pinned linked Quick Log diary production delivery", () => {
     expect(
       disposableConnection("postgresql://postgres:local-only@127.0.0.1:5432/postgres"),
     ).toBeNull();
+    // Bracketed IPv6 loopback: WHATWG URL keeps the brackets in hostname.
+    expect(
+      disposableConnection(
+        "postgresql://postgres:local-only@[::1]:5432/verdant_linked_diary_delivery",
+      ),
+    ).toEqual({ host: "::1", password: "local-only" });
   });
 
   it("issues a read-only, state-bound PREFLIGHT receipt without writing SQL", () => {
@@ -318,6 +356,21 @@ describe("pinned linked Quick Log diary production delivery", () => {
     expect(status).toBe(lane.EXIT.OK);
     expect(calls).toHaveLength(5);
     expect(calls.filter((args) => args.includes("--file"))).toHaveLength(2);
+    // The migration file runs with bounded lock and statement waits, set in
+    // the same session before the file; the ledger file sets its own.
+    const [migrationCall, ledgerCall] = calls.filter((args) => args.includes("--file"));
+    expect(migrationCall.slice(0, migrationCall.indexOf("--file"))).toEqual([
+      "-X",
+      "-q",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      "set lock_timeout = '8s'",
+      "-c",
+      "set statement_timeout = '60s'",
+    ]);
+    expect(migrationCall[migrationCall.indexOf("--file") + 1].endsWith(MIGRATION)).toBe(true);
+    expect(ledgerCall).not.toContain("-c");
     expect(calls.filter((args) => args.includes("--single-transaction"))).toHaveLength(3);
     expect(calls[1]).not.toContain("--single-transaction");
     expect(calls[3]).not.toContain("--single-transaction");

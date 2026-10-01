@@ -1,8 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
@@ -172,17 +171,29 @@ function expectedContext(archive: Buffer, extra: Record<string, unknown> = {}) {
 }
 
 describe("authenticated linked diary client-write fence PREFLIGHT artifact", () => {
+  // @source-scan-justified: which modules load before the token-bearing API
+  // call is an import-graph property; it has no resolved runtime value to assert.
   it("uses only Node built-ins before token-bearing API access", async () => {
     await loadVerifier();
-    const isolated = mkdtempSync(join(tmpdir(), "action-queue-transition-verifier-clean-"));
-    try {
-      const target = join(isolated, "verifier.mjs");
-      copyFileSync(VERIFIER_PATH, target);
-      const source = readFileSync(target, "utf8");
-      expect(source).not.toMatch(/from\s+["'](?:jszip|adm-zip|yauzl|unzipper)["']/);
-    } finally {
-      rmSync(isolated, { recursive: true, force: true });
-    }
+    const seen = new Set<string>();
+    const visit = (path: string) => {
+      if (seen.has(path)) return;
+      seen.add(path);
+      const source = readFileSync(path, "utf8");
+      const specifiers = [
+        ...source.matchAll(/^\s*(?:import|export)\b[^;]*?\bfrom\s+["']([^"']+)["']/gm),
+        ...source.matchAll(/^\s*import\s+["']([^"']+)["']/gm),
+        ...source.matchAll(/\bimport\(\s*["']([^"']+)["']\s*\)/g),
+      ].map((match) => match[1]);
+      for (const specifier of specifiers) {
+        if (specifier.startsWith("node:")) continue;
+        expect(specifier, `${path} imports ${specifier}`).toMatch(/^\.\.?\//);
+        visit(resolve(dirname(path), specifier));
+      }
+    };
+    visit(VERIFIER_PATH);
+    // The verifier and its two local dependencies.
+    expect(seen.size).toBeGreaterThanOrEqual(3);
   });
 
   it("accepts one successful same-repo same-workflow preflight and rejects cross-run metadata", async () => {
@@ -356,6 +367,22 @@ describe("authenticated linked diary client-write fence PREFLIGHT artifact", () 
       ).resolves.toEqual({ receiptDigest: STATE_DIGEST, artifactId: 444333222 });
     },
   );
+
+  it("accepts a prior-run actor id that the API encodes as a numeric string", async () => {
+    const verifier = await loadVerifier();
+    const archive = await archiveFor(receipt());
+    const stringActor = { id: String(FOUNDER_USER_ID), login: FOUNDER_LOGIN };
+    await expect(
+      verifier.verifyPreflightArtifactBundle({
+        priorRun: priorRun({ actor: stringActor, triggering_actor: stringActor }),
+        currentRun: currentRun(),
+        workflow: workflow(),
+        artifacts: { total_count: 1, artifacts: [artifactFor(archive)] },
+        archive,
+        expected: expectedContext(archive),
+      }),
+    ).resolves.toEqual({ receiptDigest: STATE_DIGEST, artifactId: 444333222 });
+  });
 
   it("rejects changed keys, outcome, hash, or extra zip members", async () => {
     const verifier = await loadVerifier();

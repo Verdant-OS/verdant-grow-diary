@@ -5,6 +5,7 @@ on:
     paths: &linked_diary_delivery_paths
       - "scripts/apply-linked-quicklog-diary-client-write-fence.mjs"
       - "scripts/lib/linkedQuicklogDiaryDeliveryCatalog.mjs"
+      - "scripts/lib/supabaseMigrationLedgerShape.mjs"
       - "scripts/run-linked-diary-delivery-pg15-harness.mjs"
       - "supabase/migrations/20260927094000_linked_quicklog_diary_client_write_fence.sql"
       - ".github/workflows/linked-diary-delivery-pg15.yml"

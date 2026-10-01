@@ -29,10 +29,7 @@ import {
   ACCEPTED_LEDGER_NAMES as CATALOG_LEDGER_NAMES,
   BOOLEAN_KEYS,
   CATALOG_STATE_QUERY_SQL,
-  DELETE_POLICY,
-  FUNCTION_SIGNATURE,
   INTEGER_KEYS,
-  INSERT_POLICY,
   LEDGER_STATEMENT_MARKERS as CATALOG_LEDGER_MARKERS,
   PREFLIGHT_SQL,
   PREREQUISITE_KEYS,
@@ -410,10 +407,21 @@ function runReadOnlyQuery({ childEnv, spawnImpl }) {
   return { ok: true, stdout: result.stdout };
 }
 
-function runPlainFile({ path, childEnv, spawnImpl, failureKind }) {
+// The pinned migration opens its own transaction and takes locks on
+// public.diary_entries (CREATE POLICY / CREATE TRIGGER). Session-level bounds,
+// set before the file runs, make a conflicting transaction fail APPLY instead
+// of leaving it waiting; the migration bytes stay unchanged. The ledger insert
+// sets its own transaction-local bounds.
+export const MIGRATION_APPLY_SESSION_SETTINGS = Object.freeze([
+  "set lock_timeout = '8s'",
+  "set statement_timeout = '60s'",
+]);
+
+function runPlainFile({ path, childEnv, spawnImpl, failureKind, sessionSettings = [] }) {
   let result;
   try {
-    result = spawnImpl("psql", ["-X", "-q", "-v", "ON_ERROR_STOP=1", "--file", path], {
+    const settings = sessionSettings.flatMap((statement) => ["-c", statement]);
+    result = spawnImpl("psql", ["-X", "-q", "-v", "ON_ERROR_STOP=1", ...settings, "--file", path], {
       encoding: "utf8",
       env: childEnv,
     });
@@ -753,6 +761,7 @@ export function runLinkedQuicklogDiaryClientWriteFence({
       childEnv,
       spawnImpl,
       failureKind: "apply_failed",
+      sessionSettings: MIGRATION_APPLY_SESSION_SETTINGS,
     });
     if (!applied.ok) {
       writeReport("FAIL - migration apply failed", ["No ledger row was inserted."]);

@@ -24,7 +24,7 @@ export function disposableConnection(value) {
   try {
     const url = new URL(value);
     if (!new Set(["postgres:", "postgresql:"]).has(url.protocol)) return null;
-    if (!new Set(["127.0.0.1", "localhost", "::1", "[::1"]).has(url.hostname)) return null;
+    if (!new Set(["127.0.0.1", "localhost", "::1", "[::1]"]).has(url.hostname)) return null;
     if (
       url.username !== "postgres" ||
       url.port !== "5432" ||

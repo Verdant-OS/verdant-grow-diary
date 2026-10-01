@@ -146,6 +146,12 @@ import {
   selectDashboardSensorEvidenceRows,
 } from "@/lib/dashboardSensorEvidenceRules";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
+import TonightTentHomeCard from "@/components/TonightTentHomeCard";
+import {
+  buildTonightLastLog,
+  buildTonightTentMetrics,
+  resolveTonightTentSelection,
+} from "@/lib/tonightTentHomeViewModel";
 
 /**
  * Renders the grower's overview for a valid URL-selected grow or the full account.
@@ -268,6 +274,32 @@ export default function Dashboard() {
     preferredGrowId: scopedGrowId ?? activeGrowId,
   });
   const activationEvidence = useOneTentActivationEvidence(activationGraph);
+  // One-Tent Home first fold: one tent, never an arbitrary pick among several.
+  const homeSelection = resolveTonightTentSelection({
+    tents,
+    plants,
+    connectedTentId: activationGraph.tentId,
+  });
+  const homeTent = homeSelection.kind === "tent" ? homeSelection.tent : null;
+  // Diary-inclusive snapshot for this tent alone, so Quick Log manual readings
+  // count; idle (never "missing") when the tent has no grow id.
+  const homeSnapshotState = useLatestSensorSnapshot(
+    homeTent?.growId ?? null,
+    homeTent ? [homeTent.id] : [],
+  );
+  const homeMetrics = buildTonightTentMetrics({
+    rows: homeTent ? (readingsByTent[homeTent.id] ?? []) : [],
+    // Non-UUID ids are never queried, so their absence is established.
+    rowsRead: { status: homeTent ? (sensorStatusByTent[homeTent.id] ?? "success") : "success" },
+    snapshot: { status: homeSnapshotState.status, snapshot: homeSnapshotState.snapshot },
+    now: new Date(nowTick),
+  });
+  const homeLastLog = buildTonightLastLog({
+    applies: !!homeTent && activationGraph.tentId === homeTent.id,
+    status: activationEvidence.status,
+    latestAt: activationEvidence.summary.latestAt,
+    now: new Date(nowTick),
+  });
   const connectedSensorReadingCount = activationGraph.tentId
     ? countActivatingSensorReadings(readingsByTent[activationGraph.tentId] ?? [])
     : 0;
@@ -463,6 +495,13 @@ export default function Dashboard() {
           </div>
         }
       />
+      <TonightTentHomeCard
+        selection={homeSelection}
+        metrics={homeMetrics}
+        lastLog={homeLastLog}
+        logHref={withGrowId("/daily-check", homeTent?.growId ?? scopedGrowId)}
+      />
+
       {urlGrowId && (
         <ScopedGrowBanner
           growId={urlGrowId}

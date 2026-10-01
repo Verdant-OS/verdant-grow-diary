@@ -384,4 +384,15 @@ describe("workspace evidence → Quick Log target (#1005)", () => {
     expect(plantsRefetch).toHaveBeenCalledTimes(1);
     expect(listener).not.toHaveBeenCalled();
   });
+
+  it("a tentless candidate waits while the tent catalog loads (Codex on #1825)", () => {
+    tentsState.current = { ...tentsState.current, data: undefined, isError: false };
+    renderWorkspace(candidate("g-a", null));
+    expect(screen.queryByTestId(`${COVERAGE}-record-aroma`)).toBeNull();
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "pending",
+    );
+    expect(listener).not.toHaveBeenCalled();
+  });
 });

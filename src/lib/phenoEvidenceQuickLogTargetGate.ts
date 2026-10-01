@@ -169,14 +169,17 @@ export function resolvePhenoEvidenceQuickLogTarget(input: {
   if (grows.status === "error") return { kind: "catalog_error" };
   if (!grows.growIds.has(growId)) return { kind: "grow_unavailable" };
 
-  const tentId = cleanId(row.tent_id);
-  // Tentless: exact stored plant + grow, tent decided by Quick Log (header).
-  if (!tentId) return { kind: "ready", plantId, growId, tentId: null };
-
-  // A tent is named: never infer anything until the catalog has been read.
+  // Never infer anything until the tent catalog has been read — tentless
+  // plants included: Quick Log blocks EVERY named prefill while its tent
+  // query is pending or errored (QuickLog.tsx `namedPrefillQuery*`), so a
+  // tentless handoff fired now would open without a target (Codex on #1825).
   const catalog = input.catalog;
   if (!catalog || catalog.status === "loading") return { kind: "pending" };
   if (catalog.status === "error") return { kind: "catalog_error" };
+
+  const tentId = cleanId(row.tent_id);
+  // Tentless: exact stored plant + grow, tent decided by Quick Log (header).
+  if (!tentId) return { kind: "ready", plantId, growId, tentId: null };
 
   const resolution = resolveQuickLogPrefillTarget({
     prefill: { plantId, growId, tentId },

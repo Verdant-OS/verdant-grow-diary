@@ -85,20 +85,26 @@ describe("resolvePhenoEvidenceQuickLogTarget", () => {
   });
 
   it("tentless plant in a grow → exact plant + grow, tent deferred to Quick Log (null)", () => {
-    for (const catalog of [READY, { status: "loading" } as const, { status: "error" } as const]) {
-      expect(
-        resolve({
-          grows: ACTIVE_GROWS,
-          plant: plant("g1", null),
-          catalog,
-        }),
-      ).toEqual({
-        kind: "ready",
-        plantId: "p1",
-        growId: "g1",
-        tentId: null,
-      });
-    }
+    expect(resolve({ grows: ACTIVE_GROWS, plant: plant("g1", null), catalog: READY })).toEqual({
+      kind: "ready",
+      plantId: "p1",
+      growId: "g1",
+      tentId: null,
+    });
+  });
+
+  it("tentless plant still waits for the tent catalog, as Quick Log does (Codex on #1825)", () => {
+    // Quick Log blocks EVERY named prefill while its tent query is pending or
+    // errored (QuickLog.tsx namedPrefillQuery*), tentless targets included.
+    expect(
+      resolve({ grows: ACTIVE_GROWS, plant: plant("g1", null), catalog: { status: "loading" } }),
+    ).toEqual({ kind: "pending" });
+    expect(resolve({ grows: ACTIVE_GROWS, plant: plant("g1", null), catalog: null })).toEqual({
+      kind: "pending",
+    });
+    expect(
+      resolve({ grows: ACTIVE_GROWS, plant: plant("g1", null), catalog: { status: "error" } }),
+    ).toEqual({ kind: "catalog_error" });
   });
 
   it("catalog loading → pending; it never infers missing setup", () => {

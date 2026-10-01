@@ -28,8 +28,8 @@ Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured 
   CodeRabbit's manual review was rate-limited. Grok's review is `NOT_MEASURED` until it is posted.
   Claude does not self-merge.
 - **Overlap to watch:** `#1793` also edits `.github/workflows/security-db-local.yml` (different hunk;
-  no textual conflict measured). `#1777` inserts entries at the top of this file; whichever merges
-  second rebases.
+  no textual conflict measured). `#1777` merged first (`569ac94a1`); this entry was rebased above its
+  entries on 2026-10-01 with both preserved.
 
 ## Follow-up observation — 2026-09-29T08:38 UTC
 

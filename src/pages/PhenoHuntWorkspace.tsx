@@ -65,6 +65,7 @@ import PhenoProductSamplingSection from "@/components/PhenoProductSamplingSectio
 import PhenoStressTestingSection from "@/components/PhenoStressTestingSection";
 import PhenoSamplingWorkspaceTools from "@/components/PhenoSamplingWorkspaceTools";
 import PhenoDocumentationSections from "@/components/PhenoDocumentationSections";
+import PhenoDocumentationBackupPanel from "@/components/PhenoDocumentationBackupPanel";
 import PhenoStressObservationsList from "@/components/PhenoStressObservationsList";
 import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
 import { usePhenoStressObservations } from "@/hooks/usePhenoStressObservations";
@@ -1784,6 +1785,10 @@ export default function PhenoHuntWorkspace() {
             </p>
           )}
         </header>
+
+        {/* #552: candidate documentation is device-only; offer a backup. Local
+            only, so it stays available to read-only growers too. */}
+        <PhenoDocumentationBackupPanel />
 
         {!canWrite && (
           <p

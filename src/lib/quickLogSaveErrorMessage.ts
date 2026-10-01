@@ -47,13 +47,19 @@ export type QuickLogHistoryCheckReason =
   | "idempotency_key_unverified"
   | "idempotency_receipt_missing"
   | "idempotency_key_retracted"
-  | "idempotency_key_conflict";
+  | "idempotency_key_conflict"
+  | "receipt_target_moved";
 
+// receipt_target_moved: an exact retry read back the original entry, but it now
+// belongs to a different plant or tent. Resending the same immutable payload can
+// only return that same moved row, so the draft is resolved by history review
+// (Timeline + explicit discard), never by another Retry.
 const REPLAY_HISTORY_CHECK_REASONS = new Set<string>([
   "idempotency_key_unverified",
   "idempotency_receipt_missing",
   "idempotency_key_retracted",
   "idempotency_key_conflict",
+  "receipt_target_moved",
 ]);
 
 export const QUICK_LOG_HISTORY_REVIEW_HELPER =
@@ -151,6 +157,8 @@ export function quickLogReasonToOperatorMessage(reason: string | null | undefine
       return "The original log was retracted. Check Timeline before starting another log.";
     case "idempotency_key_conflict":
       return "This save reference was already used for different details. Check Timeline before starting another log.";
+    case "receipt_target_moved":
+      return "The original log was saved but now belongs to a different plant or tent. It has not been confirmed; check Timeline before starting another log.";
     case "invalid_uuid_input":
       return "The selected plant or tent reference is malformed.";
     case "rpc_unavailable":
@@ -205,6 +213,7 @@ export function quickLogSaveRecoveryAction(reason: string | null | undefined): s
     case "idempotency_receipt_missing":
     case "idempotency_key_retracted":
     case "idempotency_key_conflict":
+    case "receipt_target_moved":
       return "Check Timeline for the original log. If its history is unclear, ask support before submitting another entry.";
     case "not_authenticated":
       return "Sign in again, then retry. Your input stays on this screen.";

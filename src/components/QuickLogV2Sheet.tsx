@@ -525,6 +525,11 @@ function QuickLogV2SheetForOwner({
     note: string | null;
     navigation: NonNullable<ReturnType<typeof buildQuickLogTimelineNavTarget>>;
   } | null>(null);
+  // Where a target-moved original entry lives now, from the verified readback.
+  // In-memory only: after a reload the review link falls back to the draft scope.
+  const [historyReviewScope, setHistoryReviewScope] = useState<ReturnType<
+    typeof resolveQuickLogConfirmedScope
+  > | null>(null);
   const retryPending = wateringRetryPending || exactRetryPending;
   const [submissionLocked, setSubmissionLocked] = useState(Boolean(initialSubmission));
   // Synchronous in-flight guard. The save-state flags are React
@@ -851,15 +856,18 @@ function QuickLogV2SheetForOwner({
     manualRetrySubmissionRef.current?.resolved ??
     feedingRetrySubmissionRef.current?.resolved ??
     resolvedTarget;
-  const historyReviewNavigation =
-    historyCheckRequired && historyReviewResolved.ok
-      ? buildQuickLogTimelineNavTarget({
-          growId: historyReviewResolved.growId ?? null,
-          targetType: historyReviewResolved.targetType ?? null,
-          targetId: historyReviewResolved.targetId ?? null,
-          tentId: historyReviewResolved.tentId ?? null,
-        })
-      : null;
+  const historyReviewNavigation = !historyCheckRequired
+    ? null
+    : historyReviewScope
+      ? buildQuickLogTimelineNavTarget(historyReviewScope)
+      : historyReviewResolved.ok
+        ? buildQuickLogTimelineNavTarget({
+            growId: historyReviewResolved.growId ?? null,
+            targetType: historyReviewResolved.targetType ?? null,
+            targetId: historyReviewResolved.targetId ?? null,
+            tentId: historyReviewResolved.tentId ?? null,
+          })
+        : null;
   const saveHelper = historyCheckRequired
     ? QUICK_LOG_HISTORY_REVIEW_HELPER
     : wateringRetryPending
@@ -1928,6 +1936,9 @@ function QuickLogV2SheetForOwner({
         // Even when storage fails, keep this mounted sheet fail-closed.
         historyCheckRequiredRef.current = true;
         setHistoryCheckRequired(true);
+        setHistoryReviewScope(
+          reason === "receipt_target_moved" ? resolveQuickLogConfirmedScope(resolved, res) : null,
+        );
       } else {
         historyCheckRequiredRef.current = false;
         setHistoryCheckRequired(false);
@@ -2257,6 +2268,7 @@ function QuickLogV2SheetForOwner({
     setExactRetryPending(false);
     historyCheckRequiredRef.current = false;
     setHistoryCheckRequired(false);
+    setHistoryReviewScope(null);
     setPersistedNote(undefined);
     setMismatchedReceipt(null);
     manualRetrySubmissionRef.current = null;

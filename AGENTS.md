@@ -101,7 +101,7 @@ Use small, scoped changes. Avoid broad rewrites.
 - **One task, one branch, one holder.** New Codex branches use
   `codex/<task-id>-<slug>` in lowercase. There is no shared working branch.
   Only the agent currently holding a
-  branch, per `docs/agents/HANDOFF_LOG.md`, pushes to it, and no agent edits files on
+  branch, per the newest claim in `docs/agents/HANDOFF_LOG.md` or on the task's PR, pushes to it, and no agent edits files on
   another holder's branch. The task goes with the branch: whoever holds the branch holds
   the task. Preserve the original names of existing branches when resuming them.
 - **Repair ownership and intake.** Codex fixes every discovered defect in its assigned
@@ -149,8 +149,13 @@ agent from one written block.
 - **Eligible coverage.** Any agent may resume an unclaimed block or one whose
   `last_updated` is older than 24 hours, subject to explicit assignments and named locks.
   A fresh claim is not available for takeover. The handoff block carries the context
-  needed to resume. Before resuming, set `claimed_by` to yourself with the time; from then on you hold the
-  branch and the previous holder stops pushing. Run the block's checkout command, confirm
+  needed to resume. Before resuming, claim the task with a comment on its PR that reads
+  `claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC` (owner decision 2026-10-01); a task
+  without a PR first opens its draft PR from the block's branch with that line in the body.
+  The claim takes effect when posted: from then on you hold the branch and the previous
+  holder stops pushing. The newest claim, in the log or on the PR, is the current
+  `claimed_by` and counts as `last_updated` for the 24-hour rule; carry it into the block
+  at the next log update. Run the block's checkout command, confirm
   `git rev-parse origin/<branch>` matches the block's head SHA, then merge from base and
   continue on the same branch. Never rename, recreate, or force-push it.
 - **Coverage on startup.** Read `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK`

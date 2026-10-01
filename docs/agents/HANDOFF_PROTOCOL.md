@@ -19,11 +19,13 @@ Alerts / Action Queue rewrite).
 
 Tasks are not owned by agents. Every open task has a coverage block in
 `docs/agents/HANDOFF_LOG.md` (see `AGENTS.md`, Agent Handoff / Coverage), and any agent
-may resume an eligible unclaimed or older-than-24-hours block after setting `claimed_by`.
+may resume an eligible unclaimed or older-than-24-hours block after posting a
+`claimed_by` claim comment on the task's PR (see `AGENTS.md`).
 Keep explicit assignments and named locks; a fresh claim is not available for takeover.
 Every slice names:
 
-1. **The current claim**: the agent building it now, recorded in the log
+1. **The current claim**: the agent building it now, recorded in the log or in a newer
+   claim comment on the task's PR
 2. **One independent reviewer**: an agent that has not touched the slice
 
 No agent that contributed to a slice can give its independent acceptance PASS.

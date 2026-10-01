@@ -2,7 +2,7 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T19:23 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T19:35 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
@@ -11,9 +11,9 @@ this entry's earlier 2026-10-01 versions.
   routed:
   [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
   (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `2a2de17dc`, 29 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 19:23
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 19:35
   UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI on the exact head —
-  44 pass / 57 pending / 15 skipped / **1 failed — `Vercel`** (non-required). No approving
+  97 pass / 7 pending / 14 skipped / **1 failed — `Vercel`** (non-required). No approving
   review.
   - **Not draft, against `AGENTS.md` (Git and merges: "Open PRs as drafts").** `#1827` and `#1830`
     were marked ready on the owner's earlier instruction. Two Codex threads on `#1830` ask for
@@ -24,10 +24,10 @@ this entry's earlier 2026-10-01 versions.
     No migration change.
   - `24ba8e148` merges `b15cd0de0` (`#1811`, the twelve-file `Sentinel-Version 2026-09-28.3`
     governance amendment; no migration, no overlap with this PR's files).
-  - Required contexts (35, `config/required-status-checks.json`) at `2a2de17dc`: 34 pending, 1 not
-    yet reported. **`NOT_MEASURED`.** At `a73dbfb40` (earlier head): **35/35 `PASS`**.
+  - Required contexts (35, `config/required-status-checks.json`) at `2a2de17dc`: **33 pass**, 2
+    pending (`Lint, typecheck, test, build` and `test:legal-seo`), none failed. **`NOT_MEASURED`.** At `a73dbfb40` (earlier head): **35/35 `PASS`**.
   - `Dispatch history Playwright` (non-required; runs here because `package.json` changed) — at
-    `2a2de17dc` in progress (`NOT_MEASURED`); at `d7a753f29` **`PASS`** (run `36911964958`); at
+    `2a2de17dc` **`PASS`** (run `36913305947`); at `d7a753f29` **`PASS`** (run `36911964958`); at
     `a73dbfb40`:
     - attempt 1 was **cancelled, not failed** — its "Install Chromium only (with deps)" step ran
       18:03–18:18 UTC and hit the job's 15-minute `timeout-minutes`, so the spec never ran (a
@@ -35,13 +35,13 @@ this entry's earlier 2026-10-01 versions.
     - attempt 2 (re-run requested 18:20 UTC) **`PASS`**: Chromium installed and the spec passed.
   - The repository-wide Actions backlog that delayed these runs is draining (`established fact`,
     Actions API): 168 queued / 27 in progress at 17:58, 136 / 30 at 18:06, 48 / 38 at 18:19,
-    73 / 43 at 18:36, 21 / 30 at 19:12, 67 / 27 at 19:23.
+    73 / 43 at 18:36, 21 / 30 at 19:12, 67 / 27 at 19:23, 90 / 41 at 19:35.
     Cause `NOT_MEASURED`.
   - `2d954bda1` merged in `6ed854cee` (`#1835`) and `ebdb1dcd0` merged in `a8af664c5` (`#1742`);
     neither adds a migration.
   - `f2be7e722` merged in `25515a8b9` (`#1810`, Quick Log delivery tests; no migration).
     `24ba8e148` merged in `b15cd0de0` (`#1811`). **1 commit behind** `verdant-grow-diary` at
-    19:23 UTC: `b5d064881` (`#1849`, re-land of `#1793`; touches none of this PR's files). Not yet
+    19:35 UTC: `b5d064881` (`#1849`, re-land of `#1793`; touches none of this PR's files). Not yet
     merged into the branch.
   - `84cb262ad`, `44af6a8ea`, `5c5568a37`, `9b6a6872d`, `a73dbfb40`, `5b7ea953e`, `b4e569ea2`,
     `d7a753f29` and `2a2de17dc` are review fixes (below).
@@ -82,7 +82,7 @@ this entry's earlier 2026-10-01 versions.
 - **Release state:** `cultivarDatabaseReadsEnabled = false`. `/cultivars` still renders the bundled
   sample library with no database request. Status language stays "working V1 prototype in
   pre-release validation" — no "database-backed public reads", "shipped", or "live" claim.
-- **Automated review:** 45 review threads (Codex, CodeRabbit), **all resolved** (19:23 UTC).
+- **Automated review:** 45 review threads (Codex, CodeRabbit), **all resolved** (19:35 UTC).
   - Real gaps were fixed, each RED-tested. The read model now fails closed on:
     - unlinked evidence and an ambiguous latest guide;
     - non-percent units, out-of-range percentages, and malformed claim `verified_at`;
@@ -141,8 +141,9 @@ this entry's earlier 2026-10-01 versions.
     template-table write probes and the one-line payload change. Strict parity READY as anon and
     as authenticated, and migration re-apply idempotent.
   - Runs on every head from `2d954bda1` through `9b6a6872d` were cancelled by later pushes.
-  - **At `2a2de17dc` (exact head): `NOT_MEASURED`** — run `36913306205` in progress at 19:23
-    UTC. This head changes the read model, so earlier passes do not carry over.
+  - **At `2a2de17dc` (exact head): `PASS`.** Run `36913306205` reported
+    `[cultivar-reference-rls] 150 passed, 0 failed` (observed 19:35 UTC), including strict parity
+    READY as anon and as authenticated under the stricter read model.
   - At `d7a753f29`: **`PASS`**, run `36911964981`, `[cultivar-reference-rls] 150 passed, 0 failed`.
     On `b4e569ea2`: **`PASS`**, run `36910725964`, `[cultivar-reference-rls] 150 passed, 0 failed`. Also
     `PASS` on `5b7ea953e`; the run on `24ba8e148` was cancelled by a later push.
@@ -170,9 +171,8 @@ this entry's earlier 2026-10-01 versions.
 - **Full suite at `a73dbfb40` (previous head): `PASS`** — the 35 required contexts passed in CI
   (observed 18:25 UTC): all 32 `Full test suite` shards, `Lint, typecheck, test, build`,
   `Preflight — edge shared-lib mirror in sync` and `test:legal-seo`.
-- **`NOT_MEASURED`:** the full suite and the other required contexts at `2a2de17dc`, Security DB
-  Local at `2a2de17dc`, the production receipt and production smoke, and the cause of the Vercel
-  block.
+- **`NOT_MEASURED`:** `Lint, typecheck, test, build` and `test:legal-seo` at `2a2de17dc` (pending
+  at 19:35), the production receipt and production smoke, and the cause of the Vercel block.
 - **Review seat — not satisfied.** No independent review is recorded.
   - The owner named **Grok** as reviewer on 2026-10-01. Codex is unavailable, and the earlier
     Copilot stand-in could not review (quota).

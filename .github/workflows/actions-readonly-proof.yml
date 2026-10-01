@@ -15,7 +15,14 @@ on:
       - ".github/workflows/actions-readonly-proof.yml"
   push:
     branches: [verdant-grow-diary]
+    # The measured Action Queue list and refresh are built from src/ and these build inputs,
+    # plus the probe itself: product changes are what can regress them.
     paths:
+      - "src/**"
+      - "public/**"
+      - "vite.config.ts"
+      - "package.json"
+      - "bun.lock"
       - "e2e/lib/actionsReadonlyProofRules.ts"
       - "e2e/lib/signedInReadonlyProof.ts"
       - "e2e/actions-readonly-proof.spec.ts"

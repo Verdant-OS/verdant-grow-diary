@@ -308,6 +308,16 @@ describe("Actions proof workflow on the deploy branch", () => {
     ]);
   });
 
+  it("measures after deploy pushes that change the measured product", () => {
+    const triggers = load(readFileSync(".github/workflows/actions-readonly-proof.yml", "utf8")) as {
+      on: { push: { branches: string[]; paths: string[] } };
+    };
+    expect(triggers.on.push.branches).toEqual(["verdant-grow-diary"]);
+    for (const input of ["src/**", "public/**", "vite.config.ts", "package.json", "bun.lock"])
+      expect(triggers.on.push.paths).toContain(input);
+    expect(triggers.on.push.paths).toContain(".github/workflows/actions-readonly-proof.yml");
+  });
+
   it("pins the checked-out deploy SHA and waits for it to be live before measuring", () => {
     expect(job.steps[index("Checkout proof source")].with?.ref).toBe("${{ github.sha }}");
     const pin = job.steps[index("Pin current deploy SHA")].run ?? "";

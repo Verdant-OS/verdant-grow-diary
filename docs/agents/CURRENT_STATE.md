@@ -23,10 +23,10 @@ Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured 
   all postbuild SEO validators OK. **`NOT_MEASURED`:** the local-DB harness
   (`test:cultivar-reference-db-security`, CI `security-db-local` only), full 32-shard suite, preview
   and production receipts.
-- **Review seat:** independent reviewer is **GitHub Copilot**, on the owner's instruction
-  (2026-09-30) because Codex is unavailable. Copilot is not a constitution-named peer; whether it
-  satisfies peer review is **Cheek's decision** (precedent: CodeRabbit on `#1685`). Copilot review
-  requested 01:48 UTC; CodeRabbit's manual review was rate-limited. Claude does not self-merge.
+- **Review seat:** independent reviewer is **Grok**, on the owner's instruction (2026-10-01).
+  Codex is unavailable; the earlier Copilot stand-in could not review (Copilot quota reached) and
+  CodeRabbit's manual review was rate-limited. Grok's review is `NOT_MEASURED` until it is posted.
+  Claude does not self-merge.
 - **Overlap to watch:** `#1793` also edits `.github/workflows/security-db-local.yml` (different hunk;
   no textual conflict measured). `#1777` inserts entries at the top of this file; whichever merges
   second rebases.

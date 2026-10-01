@@ -58,6 +58,46 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CLAUDE-STRAIN-LIBRARY-V1-1-DB-PARITY-419
+
+```text
+TASK CLAUDE-STRAIN-LIBRARY-V1-1-DB-PARITY-419  priority: P2  status: OPEN
+goal: Issue #419 — Strain Reference Library V1.1 database content parity and read-only public cutover, behind cultivarDatabaseReadsEnabled (default false). plants.strain stays free text; no AI Doctor/alerts/Action Queue/sensor/device change; no production apply by any agent.
+branch: claude/strain-library-v1-1-db-parity-cutover
+base: verdant-grow-diary
+checkout: git fetch origin claude/strain-library-v1-1-db-parity-cutover verdant-grow-diary && git switch claude/strain-library-v1-1-db-parity-cutover && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1827
+head_sha: 5b7ea953e4e08e1165db278c975926b469dcd98c, observed 2026-10-01 18:41 UTC
+state: Open, not draft. CI re-running at head. At a73dbfb40 (previous head): 35/35 required PASS, Security DB Local 150/150, Strain gate PASS, migration integrity PASS. All automated review threads resolved; no independent acceptance yet.
+next_action: Bring in verdant-grow-diary b5d064881 (#1849), let exact-head CI settle, then route for independent acceptance; record results in docs/agents/CURRENT_STATE.md (PR #1830).
+files: supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql; src/lib/cultivarDatabase{ReadModel,ParityRules,SeedPayloadRules}.ts; src/lib/cultivarReference{Service,SourceRules}.ts; src/lib/supabasePublicReadKeyRules.ts; src/hooks/usePublishedCultivars.ts; src/constants/cultivarReferenceSourceCopy.ts; src/lib/featureFlags.ts; src/pages/Cultivar{Page,sIndex}.tsx; scripts/audit-cultivar-database-parity.ts; scripts/run-cultivar-reference-rls-harness.ts; .github/workflows/{strain-reference-library-v1-gate,security-db-local}.yml; package.json; docs/product/strain-reference-library-v1-1-db-cutover.md; six src/test/cultivar*/strain* tests
+blockers: HOLD-CHEEK — adds a migration, so merge waits for Matthew (OWNERSHIP.md §4.3); production apply is Matthew's only. Vercel check red = account block (owner, dashboard). Independent exact-head PASS from Blue Dream / Durban Poison / Critical Mass not yet recorded; owner named Grok as reviewer 2026-10-01.
+artifacts: PR #1827 checks; Security DB Local runs; docs/product/strain-reference-library-v1-1-db-cutover.md (production-only runbook); CURRENT_STATE entry via PR #1830
+reviewer_seat: Blue Dream (.tsx product files and migration); Claude cannot accept its own work
+claimed_by: Claude, 2026-10-01 13:41 CT
+last_updated: 2026-10-01 13:41 CT, by Claude
+```
+
+### CLAUDE-CURRENT-STATE-1827-STATUS
+
+```text
+TASK CLAUDE-CURRENT-STATE-1827-STATUS  priority: other  status: OPEN
+goal: Keep a scoped, evidence-labelled #1827 status entry at the top of docs/agents/CURRENT_STATE.md, plus this log's blocks for #1827 and #1830. Docs only; no Sentinel-Version bump (both files exempt).
+branch: claude/current-state-1827-status
+base: verdant-grow-diary
+checkout: git fetch origin claude/current-state-1827-status verdant-grow-diary && git switch claude/current-state-1827-status && git rebase origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1830
+head_sha: 12744f9d5c00115519ebfdb2ffbf39db80eb05c5 before this block's commit, observed 2026-10-01 18:41 UTC
+state: Open, not draft. Entry records #1827 at 24ba8e148; #1827 has since moved to 5b7ea953e.
+next_action: Refresh the #1827 entry once exact-head CI on #1827 reports; rebase onto verdant-grow-diary when it moves.
+files: docs/agents/CURRENT_STATE.md; docs/agents/HANDOFF_LOG.md
+blockers: Vercel check red = account block (owner). Rebase conflicts possible with other CURRENT_STATE/HANDOFF_LOG edits; resolve by keeping every entry.
+artifacts: PR #1830
+reviewer_seat: Critical Mass (docs/state); Claude cannot accept its own work
+claimed_by: Claude, 2026-10-01 13:41 CT
+last_updated: 2026-10-01 13:41 CT, by Claude
+```
+
 ### CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001
 
 ```text

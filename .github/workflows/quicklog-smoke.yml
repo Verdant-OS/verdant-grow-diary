@@ -480,7 +480,9 @@ jobs:
     name: Quick Log Playwright smoke
     # Credential-bearing proof only from the owner on immutable deploy source.
     # PR branches receive credential-free regression checks, never smoke writes.
-    if: github.repository == 'Verdant-OS/verdant-grow-diary' && github.ref == 'refs/heads/verdant-grow-diary' && github.actor == 'cheekhimself' && github.triggering_actor == 'cheekhimself' && github.run_attempt == '1' && (github.event_name == 'push' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_mode == 'quicklog_smoke'))
+    # A schedule has no human trigger: GitHub attributes it to whoever last edited
+    # the cron, so it is trusted by the protected deploy ref and merged source alone.
+    if: github.repository == 'Verdant-OS/verdant-grow-diary' && github.ref == 'refs/heads/verdant-grow-diary' && github.run_attempt == '1' && (github.event_name == 'schedule' || (github.actor == 'cheekhimself' && github.triggering_actor == 'cheekhimself' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_mode == 'quicklog_smoke'))))
     runs-on: ubuntu-latest
     # Includes up to 20 minutes waiting for publishing to serve the pinned SHA.
     timeout-minutes: 45

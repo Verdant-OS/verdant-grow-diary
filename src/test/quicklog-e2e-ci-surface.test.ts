@@ -15,6 +15,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { runInNewContext } from "node:vm";
 import {
   QUICKLOG_SMOKE_DAILY_CRON,
   loadQuickLogSmokeWorkflow,
@@ -36,13 +37,41 @@ describe("Quick Log Playwright CI surface", () => {
     const workflow = loadQuickLogSmokeWorkflow(ROOT);
     // Exactly one daily schedule (#1852); no other cron entry may be added.
     expect(workflow.on.schedule).toEqual([{ cron: QUICKLOG_SMOKE_DAILY_CRON }]);
-    const smoke = workflow.jobs["quicklog-smoke"].if ?? "";
-    expect(smoke).toContain("github.event_name == 'schedule'");
-    // The schedule inherits every owner/deploy-ref guard of the push path.
-    expect(smoke).toContain("github.ref == 'refs/heads/verdant-grow-diary'");
-    expect(smoke).toContain("github.actor == 'cheekhimself'");
-    expect(smoke).toContain("github.triggering_actor == 'cheekhimself'");
-    expect(smoke).toContain("github.run_attempt == '1'");
+    // Evaluate the parsed job guards (GitHub/JS shared equality and boolean subset).
+    const allowed = (job: string, github: Record<string, string>) =>
+      runInNewContext(
+        workflow.jobs[job].if ?? "false",
+        {
+          github: {
+            repository: "Verdant-OS/verdant-grow-diary",
+            ref: "refs/heads/verdant-grow-diary",
+            run_attempt: "1",
+            event_name: "schedule",
+            // GitHub attributes a schedule to whoever last edited the cron.
+            actor: "github-merge-queue[bot]",
+            triggering_actor: "github-merge-queue[bot]",
+            ...github,
+          },
+          inputs: {},
+        },
+        { timeout: 100 },
+      ) as boolean;
+    expect(allowed("quicklog-smoke", {})).toBe(true);
+    expect(allowed("quicklog-smoke", { actor: "cheekhimself" })).toBe(true);
+    // The schedule keeps every non-actor guard of the push path.
+    expect(allowed("quicklog-smoke", { repository: "outsider/fork" })).toBe(false);
+    expect(allowed("quicklog-smoke", { ref: "refs/heads/unreviewed" })).toBe(false);
+    expect(allowed("quicklog-smoke", { run_attempt: "2" })).toBe(false);
+    // Human-triggered events still need the owner as actor and triggering actor.
+    expect(allowed("quicklog-smoke", { event_name: "push" })).toBe(false);
+    expect(
+      allowed("quicklog-smoke", {
+        event_name: "push",
+        actor: "cheekhimself",
+        triggering_actor: "cheekhimself",
+      }),
+    ).toBe(true);
+    expect(allowed("one-tent-authenticated-proof", {})).toBe(false);
     // The guarded One-Tent proof stays dispatch-only.
     expect(workflow.jobs["one-tent-authenticated-proof"].if).not.toContain("schedule");
   });

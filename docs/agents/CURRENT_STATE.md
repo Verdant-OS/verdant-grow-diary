@@ -2,29 +2,30 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T17:22 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T17:40 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
 
 - **Open (not draft), awaiting CI and Chemdawg pre-check — review not routed:
   [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
-  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `44af6a8ea`, 20 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 17:20
+  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `a73dbfb40`, 24 commits) implements
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 17:40
   UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI restarted on the new
   head — 1 pass / 91 pending / 7 skipped / **1 failed — `Vercel`**. No approving review.
   - Required contexts (35, `config/required-status-checks.json`): 34 pending, 1 not yet reported
     (`Lint, typecheck, test, build`). None failed.
   - `2d954bda1` merged in `6ed854cee` (`#1835`) and `ebdb1dcd0` merged in `a8af664c5` (`#1742`);
     neither adds a migration.
-  - `84cb262ad` and `44af6a8ea` are review fixes (below).
-  - **1 commit behind again:** `25515a8b9` (`#1810`, Quick Log delivery tests) landed after
-    `ebdb1dcd0`. No migration. Not yet merged into the branch.
+  - `f2be7e722` merged in `25515a8b9` (`#1810`, Quick Log delivery tests; no migration).
+    **0 commits behind** `verdant-grow-diary` at 17:40 UTC.
+  - `84cb262ad`, `44af6a8ea`, `5c5568a37`, `9b6a6872d` and `a73dbfb40` are review fixes (below).
 - **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` and again at `69f2f5b23` (2026-10-01,
   no conflicts). The first brought `#1832` (hono pin), which clears the earlier
   `Dependency & Security CI` red; the second brought `#1836`.
-- **`Published migration integrity` at `44af6a8ea` (exact head): queued** (run `36898375016`).
-  - Runs on `2d954bda1`, `ebdb1dcd0` and `84cb262ad` were cancelled by later pushes.
+- **`Published migration integrity` at `a73dbfb40` (exact head): `NOT_MEASURED`** — run
+  `36901103681` was queued at 17:40 UTC, so no exact-head result exists yet.
+  - Runs on every head from `2d954bda1` through `9b6a6872d` were cancelled by later pushes.
   - At `358d69c38` (previous head, same migration file): `PASS`, run `36892553063`, including its
     one-line payload change.
   - Historical, earlier heads only: the red on `d65094aa9` ran before `#1836` was merged in and
@@ -52,7 +53,7 @@ this entry's earlier 2026-10-01 versions.
 - **Release state:** `cultivarDatabaseReadsEnabled = false`. `/cultivars` still renders the bundled
   sample library with no database request. Status language stays "working V1 prototype in
   pre-release validation" — no "database-backed public reads", "shipped", or "live" claim.
-- **Automated review:** 35 review threads (Codex, CodeRabbit), **all resolved** (17:20 UTC).
+- **Automated review:** 39 review threads (Codex, CodeRabbit), **all resolved** (17:40 UTC).
   - Real gaps were fixed, each RED-tested. The read model now fails closed on:
     - unlinked evidence and an ambiguous latest guide;
     - non-percent units, out-of-range percentages, and malformed claim `verified_at`;
@@ -71,14 +72,22 @@ this entry's earlier 2026-10-01 versions.
 
     Expected rows come from the migration's own payload builder.
 
-  - Latest round (`84cb262ad`, `44af6a8ea`), each RED-tested:
+  - Latest rounds (`84cb262ad` → `a73dbfb40`), each RED-tested except the CI-only harness change:
     - row-level findings carry their cultivar's slug, and `matchedSlugs` is computed after every
       check, so a row-only drift can no longer list that cultivar as matched;
     - rows sharing a natural key are ordered by content before `#2` suffixes (order-independent);
     - the harness creates its user inside the cleanup `try` and `check()`s every teardown delete;
     - the static-safety absence scan declares `@source-scan-justified`;
     - with reads on, a database listing a profile **outside** the approved set also falls back
-      visibly (`database_unapproved`), so `/cultivars` never lists a page whose URL redirects.
+      visibly (`database_unapproved`), so `/cultivars` never lists a page whose URL redirects;
+    - every approved profile must also still carry each approved terpene, cannabinoid, dominant
+      terpene, alias, source and section, plus its stored `chemotype` and
+      `reported_dominant_terpenes` claims; a miss falls back as `database_incomplete` (content
+      edits stay allowed);
+    - the harness's update/delete fixtures are now **publicly visible** (published harness
+      cultivar, guide, section and links), and each client must read a fixture before its
+      mutation probe counts — `NOT_MEASURED` until CI's Security DB Local run on the exact head;
+    - the strain gate now also triggers on `src/lib/featureFlags.ts`.
   - The strain gate's safety fence now fails on findings in the V1.1 migration as well as V1.
   - The harness requires both Supabase endpoints to be loopback. It has valid-payload insert
     probes, update/delete denial on every table, direct child-row probes, and fail-fast seed and
@@ -97,13 +106,14 @@ this entry's earlier 2026-10-01 versions.
     It is the first real-database run of the row-level parity check, the base-template link, the
     template-table write probes and the one-line payload change. Strict parity READY as anon and
     as authenticated, and migration re-apply idempotent.
-  - Runs on `2d954bda1`, `ebdb1dcd0` and `84cb262ad` were cancelled by later pushes.
-  - **At `44af6a8ea` (exact head): pending** (run `36898375343`). This head changes the parity
-    rules, the harness teardown and the source-state gate, so the exact-head result is
-    `NOT_MEASURED`.
+  - Runs on every head from `2d954bda1` through `9b6a6872d` were cancelled by later pushes.
+  - **At `a73dbfb40` (exact head): `NOT_MEASURED`** — run `36901103567` was pending at 17:40
+    UTC. This head changes the parity rules, the source-state gate and the harness fixtures, so
+    the `358d69c38` PASS does not carry over.
 - **Local evidence (`established fact`, Windows clone):**
-  - at `44af6a8ea`: the five strain test files 105/105, `tsc` 0 diagnostics, scoped eslint clean,
-    contract-test resolution OK, offline strict parity READY 10/10, harness `bun build` OK;
+  - at `a73dbfb40`: the five strain test files 110/110, `tsc` 0 diagnostics, scoped eslint clean;
+    at `9b6a6872d` the harness passes `bun build` and a strict (`noImplicitAny`) typecheck;
+    at `44af6a8ea`: contract-test resolution OK, offline strict parity READY 10/10;
   - offline strict parity READY 10/10 at `358d69c38`;
   - at `358d69c38`, the PR's tests plus every migration-scanning test: 1,542 passed, with 1 file
     failing machine-locally (needs Unix psql), identically on base, and 1 load-dependent flake

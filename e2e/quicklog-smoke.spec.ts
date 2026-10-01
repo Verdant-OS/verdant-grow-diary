@@ -11,6 +11,11 @@ import {
   readLivePerformanceIdentity,
 } from "./lib/signedInPerformanceProbe";
 import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
+import {
+  UNATTENDED_RECONSENT_BLOCKED,
+  isUnattendedRun,
+  reconsentAction,
+} from "./lib/unattendedRunRules";
 
 /**
  * Authenticated Quick Log smoke checklist.
@@ -140,7 +145,8 @@ async function openQuickLogDialog(page: import("@playwright/test").Page) {
  * this checklist at the first click for a full test-timeout. Accept it for
  * the disposable fixture account (a real, persisted acceptance — the same
  * click-through a returning grower performs) and continue. No-op when the
- * gate is not shown.
+ * gate is not shown. A scheduled run has no person present, so it stops with
+ * BLOCKED instead of accepting (#1852).
  */
 async function acceptReconsentGateIfShown(page: import("@playwright/test").Page) {
   const gate = page.getByTestId("agreement-reconsent-gate");
@@ -148,6 +154,8 @@ async function acceptReconsentGateIfShown(page: import("@playwright/test").Page)
     .waitFor({ state: "visible", timeout: 5_000 })
     .then(() => true)
     .catch(() => false);
+  if (reconsentAction(shown, isUnattendedRun(process.env)) === "block")
+    throw new Error(UNATTENDED_RECONSENT_BLOCKED);
   if (!shown) return;
   await gate.locator("#reconsent-accept").click();
   await gate.getByRole("button", { name: /accept and continue/i }).click();

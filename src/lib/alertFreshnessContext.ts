@@ -22,6 +22,7 @@ import {
   type SnapshotSource,
 } from "@/lib/sensorSnapshot";
 import {
+  hasConfirmedAlertObservationTime,
   snapshotPersistenceBlockReason,
   type PersistenceBlockReason,
   type PersistenceContext,
@@ -40,6 +41,12 @@ export const STALE_THRESHOLD_MINUTES = Math.round(STALE_THRESHOLD_MS / 60_000);
 export const FRESHNESS_WINDOW_LABEL = "15-minute alert window";
 
 export type LatestSnapshotFreshness = "fresh" | "stale" | "missing" | "unavailable";
+
+function outsideObservationWindow(snapshot: SensorSnapshot, now: number, source?: string): boolean {
+  return (
+    !hasConfirmedAlertObservationTime(snapshot, now) || isStale(snapshot.ts, now, undefined, source)
+  );
+}
 
 /**
  * Operator-facing explanation for why the manual "Save alert" action is
@@ -109,7 +116,7 @@ export function classifyLatestSnapshotFreshness(
   const snap = args.snapshot;
   if (!snap || snap.source === "unavailable" || !snap.ts) return "missing";
   const now = args.now ?? Date.now();
-  const stale = isStale(snap.ts, now, undefined, snap.source);
+  const stale = outsideObservationWindow(snap, now, snap.source);
   if (stale) return "stale";
   if (snap.source === "live" || snap.source === "manual") return "fresh";
   // sim / diary / csv: not eligible for persistence even when "fresh".
@@ -127,7 +134,7 @@ export function hasRecentManualSnapshot(args: ClassifyLatestSnapshotArgs): boole
   if (!snap || snap.source !== "manual" || !snap.ts) return false;
   if (snap.alert_persistence_eligible === false) return false;
   const now = args.now ?? Date.now();
-  return !isStale(snap.ts, now);
+  return !outsideObservationWindow(snap, now);
 }
 
 /**
@@ -143,7 +150,7 @@ export function snapshotAlertsCanPersist(args: ClassifyLatestSnapshotArgs): bool
   if (snap.alert_persistence_eligible === false) return false;
   if (snap.source !== "live" && snap.source !== "manual") return false;
   const now = args.now ?? Date.now();
-  return !isStale(snap.ts, now);
+  return !outsideObservationWindow(snap, now);
 }
 
 /**
@@ -170,8 +177,8 @@ export function describeLatestSnapshotForAlerts(args: ClassifyLatestSnapshotArgs
   // reading "stale" when display surfaces still consider it current:
   //   displayStale   — source-aware; is the telemetry itself out of date?
   //   outsidePersist — live window; can it back a new alert row?
-  const displayStale = isStale(snap.ts, now, undefined, snap.source);
-  const outsidePersistWindow = isStale(snap.ts, now);
+  const displayStale = outsideObservationWindow(snap, now, snap.source);
+  const outsidePersistWindow = outsideObservationWindow(snap, now);
   if (displayStale) {
     return `Latest ${sourceWord} snapshot is stale. Enter a new manual snapshot inside the ${FRESHNESS_WINDOW_LABEL}.`;
   }
@@ -375,7 +382,7 @@ export function buildLatestSnapshotDetail(
   const now = args.now ?? Date.now();
   const ms = Date.parse(snap.ts);
   const capturedAgoText = formatCapturedAgo(Number.isFinite(ms) ? ms : null, now);
-  const stale = isStale(snap.ts, now);
+  const stale = outsideObservationWindow(snap, now);
   const insideWindow = !stale;
   const persistableSource = snap.source === "live" || snap.source === "manual";
   const provenanceIneligible = snap.alert_persistence_eligible === false;
@@ -525,7 +532,7 @@ export function buildSourceChip(args: ClassifyLatestSnapshotArgs): SourceChipVie
       canPersist: false,
     };
   }
-  const stale = isStale(snap.ts, args.now ?? Date.now());
+  const stale = outsideObservationWindow(snap, args.now ?? Date.now());
   const label = SOURCE_LABELS[snap.source] ?? "Unknown";
   if (snap.alert_persistence_eligible === false) {
     return { label, tone: "context", qualifier: "manual evidence", canPersist: false };
@@ -599,7 +606,7 @@ export function emptyStateSnapshotCta(
       kind: "context-only",
     };
   }
-  const stale = isStale(snap.ts, args.now ?? Date.now());
+  const stale = outsideObservationWindow(snap, args.now ?? Date.now());
   if (stale) {
     return {
       message: `Latest snapshot is outside the ${FRESHNESS_WINDOW_LABEL}. Enter a fresh manual snapshot to check alerts.`,

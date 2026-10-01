@@ -231,6 +231,31 @@ describe("cultivar reference source resolution", () => {
     );
   });
 
+  it("falls back when the database publishes a profile outside the approved set", () => {
+    // A valid extra profile would list on /cultivars, yet its direct URL
+    // redirects while the bundled catalog resolves during loading.
+    const oreoz = VERDANT_CULTIVARS.find((profile) => profile.slug === "oreoz");
+    if (!oreoz) throw new Error("oreoz");
+    const extra = { ...oreoz, slug: "harness-extra", name: "Harness Extra", aliases: [] };
+    const data = cultivarSeedPayloadToSnapshot(
+      buildCultivarDatabaseSeedPayload({
+        profiles: [...VERDANT_CULTIVARS, extra],
+        sources: CULTIVAR_SOURCES,
+        sectionsFor: getCultivarGuideSections,
+      }),
+    );
+    const resolution = resolveCultivarReferenceSource({
+      databaseReadsEnabled: true,
+      query: { status: "success", result: { ok: true, snapshot: data } },
+    });
+    expect(resolution).toMatchObject({ state: "bundled_fallback", reason: "database_unapproved" });
+    expect(resolution.catalog).toBe(BUNDLED_CULTIVAR_CATALOG);
+    expect(resolution.catalog.findBySlug("harness-extra")).toBeUndefined();
+    expect(cultivarReferenceSourceNotice(resolution.reason)).toBe(
+      CULTIVAR_REFERENCE_SOURCE_COPY.database_unapproved,
+    );
+  });
+
   it("never upgrades evidence state on any fallback path", () => {
     const empty = resolveCultivarReferenceSource({
       databaseReadsEnabled: true,

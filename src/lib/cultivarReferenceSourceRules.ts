@@ -28,7 +28,8 @@ export type CultivarReferenceSourceReason =
   | "database_error"
   | "database_invalid"
   | "database_empty"
-  | "database_incomplete";
+  | "database_incomplete"
+  | "database_unapproved";
 
 export interface CultivarReferenceCatalog {
   origin: "database" | "bundled";
@@ -101,11 +102,15 @@ export function resolveCultivarReferenceSource(input: {
     return fallback("bundled_fallback", "database_invalid", mapped.issues.length);
   }
   if (mapped.catalog.profiles.length === 0) return fallback("bundled_fallback", "database_empty");
-  // V1.1 cutover is parity-gated: the database must still carry every approved
-  // profile, or an archived/deleted row would silently drop a public page.
+  // V1.1 cutover is parity-gated: the database slug set must EQUAL the approved
+  // set. A missing profile would silently drop a public page; an extra one
+  // would list on /cultivars while its direct URL redirects during loading.
   const databaseSlugs = new Set(mapped.catalog.profiles.map((profile) => profile.slug));
   if (VERDANT_CULTIVARS.some((profile) => !databaseSlugs.has(profile.slug))) {
     return fallback("bundled_fallback", "database_incomplete");
+  }
+  if (mapped.catalog.profiles.some((profile) => !BUNDLED_BY_SLUG.has(profile.slug))) {
+    return fallback("bundled_fallback", "database_unapproved");
   }
   return {
     state: "database",

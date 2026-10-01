@@ -17,6 +17,8 @@ export const CULTIVAR_REFERENCE_SOURCE_COPY = {
     "Reference database returned incomplete records — showing the bundled sample reference library instead.",
   database_incomplete:
     "Reference database is missing approved profiles — showing the bundled sample reference library instead.",
+  database_unapproved:
+    "Reference database lists profiles outside the approved set — showing the bundled sample reference library instead.",
   database_empty:
     "Reference database returned no published profiles — showing the bundled sample reference library instead.",
 } as const satisfies Record<

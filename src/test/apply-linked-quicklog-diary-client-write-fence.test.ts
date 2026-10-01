@@ -313,11 +313,31 @@ describe("pinned linked Quick Log diary production delivery", () => {
       [{ now: new Date(Number.NaN) }, "client_measured_at_invalid"],
     ];
     for (const [change, reason] of cases) {
-      expect(lane.validateCompatibleClientReceipt({ ...ok, ...change }), reason).toEqual({
-        ok: false,
-        reason,
-      });
+      const result = lane.validateCompatibleClientReceipt({ ...ok, ...change });
+      expect(result.ok, reason).toBe(false);
+      expect(result.reason, reason).toBe(reason);
     }
+    // Shape-valid values survive rejection so the audit names the attempt.
+    expect(
+      lane.validateCompatibleClientReceipt({ ...ok, measuredAt: "2026-10-01T14:59:59Z" }),
+    ).toEqual({
+      ok: false,
+      reason: "client_measurement_stale",
+      clientSha: CLIENT,
+      measuredAt: "2026-10-01T14:59:59.000Z",
+    });
+    expect(lane.validateCompatibleClientReceipt({ ...ok, ancestryVerifiedSha: undefined })).toEqual(
+      {
+        ok: false,
+        reason: "client_ancestry_unverified",
+        clientSha: CLIENT,
+        measuredAt: "2026-10-01T15:30:00.000Z",
+      },
+    );
+    expect(lane.validateCompatibleClientReceipt({ ...ok, clientSha: "x" })).toEqual({
+      ok: false,
+      reason: "client_sha_invalid",
+    });
     // Boundaries: exactly 60 minutes old and exactly 5 minutes ahead are accepted.
     expect(
       lane.validateCompatibleClientReceipt({ ...ok, measuredAt: "2026-10-01T15:00:00Z" }).ok,
@@ -350,10 +370,16 @@ describe("pinned linked Quick Log diary production delivery", () => {
       });
       expect(status, reason).toBe(lane.EXIT.INPUT_REJECTED);
       expect(calls, reason).toHaveLength(0);
-      expect(JSON.parse(readFileSync(env.AUDIT_PATH, "utf8")), reason).toMatchObject({
-        outcome: "client_receipt_rejected",
-        reason,
-      });
+      const audit = JSON.parse(readFileSync(env.AUDIT_PATH, "utf8"));
+      expect(audit, reason).toMatchObject({ outcome: "client_receipt_rejected", reason });
+      if (reason === "client_sha_invalid") {
+        expect(audit.compatible_client_sha, reason).toBeUndefined();
+      } else {
+        expect(audit.compatible_client_sha, reason).toBe(CLIENT);
+        expect(audit.compatible_client_measured_at, reason).toBe(
+          new Date(env.COMPATIBLE_CLIENT_MEASURED_AT).toISOString(),
+        );
+      }
     }
   });
 

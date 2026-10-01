@@ -64,8 +64,9 @@ export function validateCompatibleClientReceipt({
 }) {
   const sha = typeof clientSha === "string" && /^[0-9a-f]{40}$/.test(clientSha) ? clientSha : null;
   if (sha === null) return { ok: false, reason: "client_sha_invalid" };
+  // Rejections keep every shape-valid value so the audit names the attempt.
   if (typeof measuredAt !== "string" || !COMPATIBLE_CLIENT_MEASURED_AT.test(measuredAt)) {
-    return { ok: false, reason: "client_measured_at_invalid" };
+    return { ok: false, reason: "client_measured_at_invalid", clientSha: sha };
   }
   const measuredMs = Date.parse(measuredAt);
   const nowMs = now instanceof Date ? now.getTime() : Number.NaN;
@@ -80,16 +81,24 @@ export function validateCompatibleClientReceipt({
     !Number.isFinite(nowMs) ||
     new Date(measuredMs).toISOString() !== canonicalInput
   ) {
-    return { ok: false, reason: "client_measured_at_invalid" };
+    return { ok: false, reason: "client_measured_at_invalid", clientSha: sha };
   }
+  const measured = new Date(measuredMs).toISOString();
   if (measuredMs > nowMs + COMPATIBLE_CLIENT_MAX_FUTURE_SKEW_MS) {
-    return { ok: false, reason: "client_measured_at_future" };
+    return { ok: false, reason: "client_measured_at_future", clientSha: sha, measuredAt: measured };
   }
   if (nowMs - measuredMs > COMPATIBLE_CLIENT_MAX_AGE_MS) {
-    return { ok: false, reason: "client_measurement_stale" };
+    return { ok: false, reason: "client_measurement_stale", clientSha: sha, measuredAt: measured };
   }
-  if (ancestryVerifiedSha !== sha) return { ok: false, reason: "client_ancestry_unverified" };
-  return { ok: true, clientSha: sha, measuredAt: new Date(measuredMs).toISOString() };
+  if (ancestryVerifiedSha !== sha) {
+    return {
+      ok: false,
+      reason: "client_ancestry_unverified",
+      clientSha: sha,
+      measuredAt: measured,
+    };
+  }
+  return { ok: true, clientSha: sha, measuredAt: measured };
 }
 export const EXPECTED_REPOSITORY = "Verdant-OS/verdant-grow-diary";
 export const EXPECTED_WORKFLOW_PATH =
@@ -550,11 +559,11 @@ function makeArtifactWriters({ reportPath, auditPath, receiptPath, authorization
           ...(typeof extra.reason === "string" && /^[a-z_]{1,64}$/.test(extra.reason)
             ? { reason: extra.reason }
             : {}),
-          ...(base.compatibleClient
-            ? {
-                compatible_client_sha: base.compatibleClient.clientSha,
-                compatible_client_measured_at: base.compatibleClient.measuredAt,
-              }
+          ...(safeSha(base.compatibleClient?.clientSha)
+            ? { compatible_client_sha: base.compatibleClient.clientSha }
+            : {}),
+          ...(typeof base.compatibleClient?.measuredAt === "string"
+            ? { compatible_client_measured_at: base.compatibleClient.measuredAt }
             : {}),
         },
         null,
@@ -700,6 +709,7 @@ export function runLinkedQuicklogDiaryClientWriteFence({
         "No database process was started.",
         `Reason: ${client.reason}. Measure the live client bundle again and dispatch a fresh APPLY.`,
       ]);
+      base.compatibleClient = { clientSha: client.clientSha, measuredAt: client.measuredAt };
       writeAudit("client_receipt_rejected", base, { reason: client.reason });
       return EXIT.INPUT_REJECTED;
     }

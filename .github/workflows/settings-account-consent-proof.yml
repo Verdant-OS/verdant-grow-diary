@@ -15,7 +15,14 @@ on:
       - ".github/workflows/settings-account-consent-proof.yml"
   push:
     branches: [verdant-grow-diary]
+    # The measured Settings, account and consent surfaces are built from src/ and these build inputs,
+    # plus the probe itself: product changes are what can regress them.
     paths:
+      - "src/**"
+      - "public/**"
+      - "vite.config.ts"
+      - "package.json"
+      - "bun.lock"
       - "e2e/lib/settingsAccountProofRules.ts"
       - "e2e/lib/signedInReadonlyProof.ts"
       - "e2e/settings-account-consent-proof.spec.ts"

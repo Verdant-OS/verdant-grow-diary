@@ -2,32 +2,32 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T15:43 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T16:15 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
 
 - **Open (not draft), awaiting CI and Chemdawg pre-check — review not routed:
   [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
-  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `a7232e1e1`, 12 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 15:43
-  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 1 pass / 92 pending /
+  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `9ca178156`, 15 commits) implements
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 16:15
+  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 1 pass / 91 pending /
   6 skipped / **1 failed — `Vercel`**. No approving review. 0 commits behind `verdant-grow-diary`.
 - **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` and again at `69f2f5b23` (2026-10-01,
   no conflicts). The first brought `#1832` (hono pin), which clears the earlier
   `Dependency & Security CI` red; the second brought `#1836`.
-- **`Published migration integrity` red is stale:** it ran on `d65094aa9`, before `#1836` was
-  merged in, so it read `#1836`'s migration as "deleted". At `a7232e1e1` the same verifier, run
-  locally against `origin/verdant-grow-diary`, reports 291/291 matched, 0 deleted, 1 new. The CI
-  rerun on `a7232e1e1` is queued.
+- **`Published migration integrity` is green:** the earlier red ran on `d65094aa9`, before `#1836`
+  was merged in, and read `#1836`'s migration as "deleted". CI then passed on `a7232e1e1` (run
+  `36886278227`) and `dac35e4fc` (run `36888190685`). The run on `9ca178156` is queued.
 - **`Vercel` red is an account block, not code:** status "Account is blocked"; Vercel created **no
   deployment** for any branch commit since `1b66c4f0e`, while the six before it deployed `READY`.
   Not a required context. Clearing it is an owner action in the Vercel dashboard
   (`verdantgrowdiary` team). Cause `NOT_MEASURED`.
 - **Adds a migration:** `supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql`
   (new file; additive columns + `cultivar_profile_sources` with published-only RLS and SELECT-only
-  grant; idempotent content upserts). **Committed is not applied. No APPLY.** Re-dated from `20260930200000` on 2026-10-01
-  (`a7232e1e1`, content byte-identical) so it sorts after `#1836`'s `20261001140000` migration.
+  grant; idempotent content upserts). **Committed is not applied. No APPLY.**
+  - It was re-dated from `20260930200000` on 2026-10-01 (`a7232e1e1`, content byte-identical), so it
+    sorts after `#1836`'s `20261001140000` migration.
   - **`HOLD-CHEEK`:** because #1827 adds a migration, its **merge** waits for Matthew
     (`OWNERSHIP.md` §4.3), not only its production apply. Green checks plus an independent PASS do
     not by themselves authorize it to land.
@@ -37,34 +37,44 @@ this entry's earlier 2026-10-01 versions.
 - **Release state:** `cultivarDatabaseReadsEnabled = false`. `/cultivars` still renders the bundled
   sample library with no database request. Status language stays "working V1 prototype in
   pre-release validation" — no "database-backed public reads", "shipped", or "live" claim.
-- **Automated review:** 20 review threads (Codex, CodeRabbit), **all resolved**.
+- **Automated review:** 26 review threads (Codex, CodeRabbit), **all resolved**.
   - Real gaps were fixed, each RED-tested. The read model now fails closed on:
     - unlinked evidence and an ambiguous latest guide;
-    - non-percent units and out-of-range percentages;
+    - non-percent units, out-of-range percentages, and malformed claim `verified_at`;
     - alias provenance;
     - malformed guide and section metadata.
-  - The strict audit now requires exact set parity for sources, section links and support notes,
-    plus guide and section metadata and auxiliary-claim provenance. Expected rows come from the
-    migration's own payload builder.
+  - With reads on, the database catalog is served only when it still carries every approved
+    profile; otherwise the page falls back visibly (`database_incomplete`).
+  - The strict audit requires exact set parity for:
+    - sources, section links and support notes;
+    - guide and section metadata;
+    - complete auxiliary-claim provenance;
+    - every rendered claim's `verified_at`.
+
+    Expected rows come from the migration's own payload builder.
+
+  - The strain gate's safety fence now fails on findings in the V1.1 migration as well as V1.
   - The harness requires both Supabase endpoints to be loopback. It has valid-payload insert
     probes, update/delete denial on every table, direct child-row probes, and fail-fast seed and
-    lookup checks. The receipt accepts anon keys only.
+    lookup checks. The receipt accepts anon keys only and no longer claims to prove hidden-row
+    denial (that stays with the harness).
   - One P1 claim ("missing `END;` breaks the migration") was **refuted with CI evidence**.
 - **CI DB evidence (`established fact`):** Security DB Local passed on `de12624a2`, `1b66c4f0e`,
-  `d30ac3293`, `42ad20a74` and `d65094aa9`. The expanded harness
-  `test:cultivar-reference-db-security` reported **106 passed, 0 failed** at `42ad20a74` (run
-  `36882965813`) and again at `d65094aa9` (run `36884507525`, including the metadata, provenance,
-  %-bound and loopback-API changes), against a freshly replayed local database, with strict parity
-  READY and migration re-apply idempotency. The run on `a7232e1e1` (re-dated migration) is queued.
+  `d30ac3293`, `42ad20a74`, `d65094aa9`, `a7232e1e1` and `dac35e4fc`.
+  - The expanded harness `test:cultivar-reference-db-security` reported **106 passed, 0 failed**
+    at `42ad20a74`, `d65094aa9`, `a7232e1e1` (run `36886278180`, the re-dated migration) and
+    `dac35e4fc` (run `36888191319`).
+  - Each run used a freshly replayed local database, with strict parity READY and migration
+    re-apply idempotency.
+  - The run on `0bcb2464d` was cancelled by the next push; the run on `9ca178156` is queued.
 - **Local evidence (`established fact`, Windows clone):**
-  - offline strict parity READY 10/10 at `a7232e1e1`;
-  - focused suite 103/103 at `d65094aa9`; at `a7232e1e1`, the PR's tests plus every
-    migration-scanning test: 1,530 passed, with 1 file failing machine-locally (needs Unix psql),
-    identically on base;
-  - published-migration integrity verifier OK at `a7232e1e1`;
+  - offline strict parity READY 10/10 at `9ca178156`;
+  - focused suite 101/101 at `9ca178156`;
+  - at `a7232e1e1`, the PR's tests plus every migration-scanning test: 1,530 passed, with 1 file
+    failing machine-locally (needs Unix psql), identically on base;
   - `tsc` 0 diagnostics;
   - `bun run build` exit 0 with all postbuild SEO validators OK (measured at `fd75bb832`).
-- **`NOT_MEASURED`:** the full 32-shard suite at `a7232e1e1`, the preview and production receipts,
+- **`NOT_MEASURED`:** the full 32-shard suite at `9ca178156`, the preview and production receipts,
   and the cause of the Vercel block.
 - **Review seat — not satisfied.** No independent review is recorded.
   - The owner named **Grok** as reviewer on 2026-10-01. Codex is unavailable, and the earlier

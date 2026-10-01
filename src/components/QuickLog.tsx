@@ -117,6 +117,7 @@ import {
   resolveQuickLogWriteTarget,
   type QuickLogResolvedTarget,
 } from "@/lib/quickLogTargetIntegrityRules";
+import { legacyQuickLogEventRequiresTent } from "@/lib/quickLogTentRequirementRules";
 import {
   buildRecentTargetStorageKey,
   getRecentTargetSuggestionWakeDelayMs,
@@ -127,7 +128,16 @@ import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { resolveQuickLogTargetPlan } from "@/lib/quickLogTargetResolutionRules";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 import { persistedSensorSourceLabel } from "@/lib/quickLogSnapshotStripAdapter";
-import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
+import {
+  quickLogDraftPreservedFailureMessage,
+  quickLogReasonToOperatorMessage,
+  quickLogSaveRequiresHistoryCheck,
+  canDiscardQuickLogHistoryDraft,
+  QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY,
+  QUICK_LOG_HISTORY_REVIEW_LINK_LABEL,
+  QUICK_LOG_HISTORY_DISCARD_LABEL,
+  QUICK_LOG_HISTORY_DISCARD_HELPER,
+} from "@/lib/quickLogSaveErrorMessage";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
 import { buildQuickLogDraftPreview } from "@/lib/quickLogDraftPreviewViewModel";
 import {
@@ -449,6 +459,11 @@ export default function QuickLog({
   const [hardwareOpen, setHardwareOpen] = useState(false);
   const [wateringError, setWateringError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [historyCheckRequired, setHistoryCheckRequired] = useState(false);
+  const historyCheckRequiredRef = useRef(false);
+  const historyDraftOwnerRef = useRef<string | null>(null);
+  const [historyReviewNavigation, setHistoryReviewNavigation] =
+    useState<ReturnType<typeof buildQuickLogTimelineNavTarget>>(null);
   const [savedTarget, setSavedTarget] = useState<SavedTarget | null>(null);
   const [savedDraftHandoffKey, setSavedDraftHandoffKey] = useState<string | null>(null);
   const [earlyMilestone, setEarlyMilestone] = useState<EarlyStageMilestone | null>(null);
@@ -500,9 +515,9 @@ export default function QuickLog({
   // One synchronous guard shared by the parent form and the all-activities
   // child. Presenter state complements this ref but never replaces it.
   const saveInFlightRef = useRef(false);
-  const saveLocked = busy || childSaveBusy;
+  const saveLocked = busy || childSaveBusy || historyCheckRequired;
   const isMainDraftMutationLocked = useCallback(
-    () => saveInFlightRef.current || saveLocked,
+    () => saveInFlightRef.current || historyCheckRequiredRef.current || saveLocked,
     [saveLocked],
   );
   // One idempotency key per LOGICAL submission (quickLogIdempotencyKey
@@ -535,11 +550,23 @@ export default function QuickLog({
       plantsQuery.isLoading ||
       tentsQuery.isPending ||
       tentsQuery.isLoading);
-  const prefillTarget = useMemo(
+  const strictPrefillTarget = useMemo(
     () =>
       namedPrefillQueryPending || namedPrefillQueryError
         ? ({ status: "blocked", reason: "prefill_target_pending" } as const)
         : resolveQuickLogPrefillTarget({ prefill, plants, tents: activeTents }),
+    [prefill, plants, activeTents, namedPrefillQueryPending, namedPrefillQueryError],
+  );
+  const prefillTarget = useMemo(
+    () =>
+      namedPrefillQueryPending || namedPrefillQueryError
+        ? ({ status: "blocked", reason: "prefill_target_pending" } as const)
+        : resolveQuickLogPrefillTarget({
+            prefill,
+            plants,
+            tents: activeTents,
+            requireTent: false,
+          }),
     [prefill, plants, activeTents, namedPrefillQueryPending, namedPrefillQueryError],
   );
   const prefillPlantId = prefillTarget.status === "ready" ? prefillTarget.target.plantId : null;
@@ -780,7 +807,7 @@ export default function QuickLog({
     [activeTents, selectedPlant?.tent_id],
   );
 
-  const writeTarget = useMemo(
+  const strictWriteTarget = useMemo(
     () =>
       resolveQuickLogWriteTarget({
         activeGrowId,
@@ -788,6 +815,26 @@ export default function QuickLog({
         selectedTent,
       }),
     [activeGrowId, selectedPlant, selectedTent],
+  );
+  const writeTarget = useMemo(
+    () =>
+      resolveQuickLogWriteTarget({
+        activeGrowId,
+        selectedPlant,
+        selectedTent,
+        requireTent: false,
+      }),
+    [activeGrowId, selectedPlant, selectedTent],
+  );
+  const strictEditorTarget = useMemo(
+    () =>
+      resolveQuickLogEditorTarget({
+        prefill,
+        prefillResolution: strictPrefillTarget,
+        writeResolution: strictWriteTarget,
+        dismissedBlockedPrefillKey,
+      }),
+    [prefill, strictPrefillTarget, strictWriteTarget, dismissedBlockedPrefillKey],
   );
   const editorTarget = useMemo(
     () =>
@@ -823,19 +870,21 @@ export default function QuickLog({
 
   const beginAllActivitiesSave = useCallback(
     (target: QuickLogAllActivitiesSaveTarget): boolean => {
-      if (saveInFlightRef.current || !target.plantId || !target.tentId || !target.growId) {
+      if (saveInFlightRef.current || !target.plantId || !target.growId) {
         return false;
       }
       const targetPlant = plants.find((plant) => plant.id === target.plantId) ?? null;
-      const targetTent = activeTents.find((tent) => tent.id === target.tentId) ?? null;
+      const targetTent = target.tentId
+        ? (activeTents.find((tent) => tent.id === target.tentId) ?? null)
+        : null;
       const targetGrow = grows.find((grow) => grow.id === target.growId) ?? null;
       if (
         !targetPlant ||
-        !targetTent ||
+        (target.tentId !== null && !targetTent) ||
         !targetGrow ||
         targetPlant.grow_id !== target.growId ||
-        targetPlant.tent_id !== target.tentId ||
-        targetTent.grow_id !== target.growId
+        (targetPlant.tent_id ?? null) !== (target.tentId ?? null) ||
+        (targetTent !== null && targetTent.grow_id !== target.growId)
       ) {
         return false;
       }
@@ -850,7 +899,7 @@ export default function QuickLog({
             growId: target.growId,
           }),
           plantName: targetPlant.name,
-          tentName: targetTent.name ?? null,
+          tentName: targetTent?.name ?? null,
           growName: targetGrow.name ?? null,
           eventType,
           stage,
@@ -1260,7 +1309,8 @@ export default function QuickLog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (saveInFlightRef.current || saveLocked || savedTarget) return;
+    if (saveInFlightRef.current || historyCheckRequiredRef.current || saveLocked || savedTarget)
+      return;
     if (user?.id && resolvedTarget) {
       const recovery = readPendingQuickLogActivity(user.id, resolvedTarget);
       if (recovery.status !== "empty") {
@@ -1293,17 +1343,25 @@ export default function QuickLog({
       toast.message(UNSUPPORTED_EVENT_TYPE_COPY);
       return;
     }
-    if (editorTarget.status !== "ready" || !selectedPlant || !selectedTent) {
+    const saveTargetResolution =
+      legacyQuickLogEventRequiresTent(effectiveEventType) || snapshot
+        ? strictEditorTarget
+        : editorTarget;
+    if (
+      saveTargetResolution.status !== "ready" ||
+      !selectedPlant ||
+      (legacyQuickLogEventRequiresTent(effectiveEventType) && !selectedTent)
+    ) {
       const message =
-        editorTarget.status === "blocked"
-          ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
+        saveTargetResolution.status === "blocked"
+          ? QUICK_LOG_TARGET_BLOCKED_COPY[saveTargetResolution.reason]
           : "Review the Quick Log target before saving.";
       setSaveError(message);
       toast.error(message);
       if (!selectedPlant) focusPlant();
       return;
     }
-    const saveTarget = Object.freeze({ ...editorTarget.target });
+    const saveTarget = Object.freeze({ ...saveTargetResolution.target });
     const saveDraftHandoffKey = draftHandoffKey;
     const saveStage = stage;
     const saveStageWasUserTouched = stageUserTouchedRef.current;
@@ -1350,7 +1408,7 @@ export default function QuickLog({
       Object.freeze({
         target: saveTarget,
         plantName: savePlant.name,
-        tentName: saveTent.name ?? null,
+        tentName: saveTent?.name ?? null,
         growName: saveGrow?.name ?? null,
         eventType: saveEventType,
         stage: saveStage,
@@ -1491,9 +1549,33 @@ export default function QuickLog({
         lastFailedSaveSigRef.current = attemptSig;
         const reason = result.reason ?? "save_failed";
         const message = quickLogReasonToOperatorMessage(reason);
-        setSaveError(
-          `${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`,
-        );
+        setSaveError(quickLogDraftPreservedFailureMessage(reason));
+        if (quickLogSaveRequiresHistoryCheck(reason)) {
+          historyCheckRequiredRef.current = true;
+          historyDraftOwnerRef.current = user.id;
+          setHistoryCheckRequired(true);
+          // A moved receipt's original entry no longer lives on the draft's
+          // target; review it where the verified readback says it is now.
+          const movedReceipt =
+            reason === "receipt_target_moved" && result.persistedGrowId !== undefined;
+          setHistoryReviewNavigation(
+            buildQuickLogTimelineNavTarget(
+              movedReceipt
+                ? {
+                    growId: result.persistedGrowId ?? null,
+                    plantId: result.persistedPlantId ?? null,
+                    tentId: result.persistedTentId ?? null,
+                  }
+                : {
+                    growId: saveTarget.growId,
+                    targetType: "plant",
+                    targetId: saveTarget.plantId,
+                    plantId: saveTarget.plantId,
+                    tentId: saveTarget.tentId,
+                  },
+            ),
+          );
+        }
         // Surface the (allow-listed) reason code alongside the friendly
         // copy so the operator and tests can correlate the failure with
         // logs without exposing tokens, endpoints, or raw payloads.
@@ -1569,7 +1651,7 @@ export default function QuickLog({
       setSavedTarget({
         id: savePlant.id,
         name: plantLabel,
-        tentName: saveTent.name ?? null,
+        tentName: saveTent?.name ?? null,
         growName: saveGrow?.name ?? null,
         growId: saveTarget.growId ?? null,
         tentId: saveTarget.tentId ?? null,
@@ -1617,7 +1699,8 @@ export default function QuickLog({
   // is attachable. Usable-but-non-attachable rows render a disabled,
   // unchecked toggle and save as manual logs only.
   const snapshotAttachable = stripView.trustBadge.attachable;
-  const attachDisabled = saveLocked || !resolvedTarget || !snapshotUsable || !snapshotAttachable;
+  const attachDisabled =
+    saveLocked || !resolvedTarget?.tentId || !snapshotUsable || !snapshotAttachable;
   const showMismatch = !!(
     prefill?.plantId &&
     selectedPlant &&
@@ -1642,15 +1725,28 @@ export default function QuickLog({
     (resolvedTarget ? (resolvedTargetPlant?.name ?? "Assigned plant") : "Choose a plant");
   const targetTentName =
     inFlightSaveContext?.tentName ??
-    (resolvedTarget ? (resolvedTargetTent?.name ?? "Assigned tent") : "Plant required before save");
+    (resolvedTarget
+      ? (resolvedTargetTent?.name ?? "No tent assigned")
+      : "Plant required before save");
   const targetGrowName =
     inFlightSaveContext?.growName ??
     (resolvedTarget ? (resolvedTargetGrow?.name ?? "Assigned grow") : "No setup selected");
+  const mainFormRequiresTent = legacyQuickLogEventRequiresTent(displayedEventType) || snapshot;
+  const mainFormTarget =
+    inFlightSaveContext === null && mainFormRequiresTent ? strictEditorTarget : editorTarget;
+  const mainFormResolvedTarget =
+    mainFormTarget.status === "ready"
+      ? mainFormTarget.target
+      : (inFlightSaveContext?.target ?? null);
+  const allActivitiesTentRequiredBlockReason =
+    strictEditorTarget.status === "blocked"
+      ? QUICK_LOG_TARGET_BLOCKED_COPY[strictEditorTarget.reason]
+      : null;
   const editorTargetBlocked =
     inFlightSaveContext === null &&
     !targetQueryPending &&
     !targetQueryError &&
-    editorTarget.status === "blocked";
+    mainFormTarget.status === "blocked";
   const showTargetError = editorTargetBlocked && (prefillHoldActive || selectedPlant !== null);
   const plantSelectErrorId = targetQueryPending
     ? "quick-log-target-loading"
@@ -1671,6 +1767,21 @@ export default function QuickLog({
   const emptyDraftNoteWasSaved =
     draftHandoffKey !== null && savedDraftHandoffKey === draftHandoffKey;
 
+  const historyDiscardAllowed = canDiscardQuickLogHistoryDraft({
+    historyCheckRequired,
+    inFlight: busy || childSaveBusy || saveInFlightRef.current,
+    currentOwnerId: user?.id,
+    draftOwnerId: historyDraftOwnerRef.current,
+  });
+  function handleDiscardHistoryDraft() {
+    if (!historyDiscardAllowed || saveInFlightRef.current) return;
+    historyCheckRequiredRef.current = false;
+    historyDraftOwnerRef.current = null;
+    setHistoryCheckRequired(false);
+    setHistoryReviewNavigation(null);
+    reset();
+  }
+
   return (
     <Dialog
       open={open}
@@ -1681,7 +1792,11 @@ export default function QuickLog({
             inFlight: saveInFlightRef.current,
           });
           if (blocked) {
-            toast.message(QUICK_LOG_CLOSE_BLOCKED_HINT);
+            toast.message(
+              historyCheckRequired
+                ? QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY
+                : QUICK_LOG_CLOSE_BLOCKED_HINT,
+            );
             return;
           }
           onOpenChange(false);
@@ -1739,12 +1854,13 @@ export default function QuickLog({
           growId={resolvedTarget?.growId ?? activeGrow?.id ?? null}
           tentId={resolvedTarget?.tentId ?? null}
           plantId={resolvedTarget?.plantId ?? null}
+          tentRequiredBlockReason={allActivitiesTentRequiredBlockReason}
           externalPersistenceBlockReason={
             targetQueryPending
               ? QUICK_LOG_TARGET_BLOCKED_COPY.prefill_target_pending
               : targetQueryError
                 ? `We couldn't load the ${targetQueryErrorSubject} needed to confirm this Quick Log target.`
-                : editorTargetBlocked && editorTarget.status === "blocked"
+                : editorTarget.status === "blocked"
                   ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
                   : null
           }
@@ -2163,14 +2279,14 @@ export default function QuickLog({
                     Retry
                   </Button>
                 </div>
-              ) : showTargetError && editorTarget.status === "blocked" ? (
+              ) : showTargetError && mainFormTarget.status === "blocked" ? (
                 <p
                   id="quick-log-target-error"
                   role="alert"
                   className="text-[11px] text-destructive"
                   data-testid="quick-log-target-error"
                 >
-                  {QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]}
+                  {QUICK_LOG_TARGET_BLOCKED_COPY[mainFormTarget.reason]}
                 </p>
               ) : !selectedPlant ? (
                 <p
@@ -3305,11 +3421,13 @@ export default function QuickLog({
 
             <Button
               type="submit"
-              disabled={saveLocked || sameTargetRecoveryLocked || !resolvedTarget || !!savedTarget}
+              disabled={
+                saveLocked || sameTargetRecoveryLocked || !mainFormResolvedTarget || !!savedTarget
+              }
               data-testid="quick-log-save"
               className="gradient-leaf text-primary-foreground"
             >
-              {saveLocked ? (
+              {busy || childSaveBusy ? (
                 <>
                   <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
                   <span>Saving…</span>
@@ -3437,6 +3555,33 @@ export default function QuickLog({
               </div>
             )}
           </fieldset>
+          {/* Outside the draft fieldset on purpose: that fieldset is disabled while a
+              history check is required, and a button inside a disabled fieldset
+              cannot be clicked in a browser. This panel is the only exit from that
+              state (save, close and Escape are locked), so it must stay enabled. */}
+          {historyCheckRequired && (
+            <div className="rounded-lg border border-amber-500/40 p-3 space-y-2">
+              {historyReviewNavigation && (
+                <a
+                  href={historyReviewNavigation.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block underline"
+                >
+                  {QUICK_LOG_HISTORY_REVIEW_LINK_LABEL}
+                </a>
+              )}
+              <p className="text-sm">{QUICK_LOG_HISTORY_DISCARD_HELPER}</p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!historyDiscardAllowed}
+                onClick={handleDiscardHistoryDraft}
+              >
+                {QUICK_LOG_HISTORY_DISCARD_LABEL}
+              </Button>
+            </div>
+          )}
         </form>
       </DialogContent>
     </Dialog>

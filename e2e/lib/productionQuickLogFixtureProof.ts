@@ -129,7 +129,8 @@ export function observeProductionQuickLogFixture(page: Page) {
     expected: FixtureEnvValidation["expected"],
     plantName?: string,
   ) {
-    await Promise.all([...pending]);
+    // A response can land while an earlier capture is awaited; drain until quiet.
+    while (pending.size) await Promise.all([...pending]);
     if (!productionFixturePlantId(page.url())) invalidated = true;
     if (initialTarget && !productionFixtureContextMatchesTarget(page.url(), initialTarget))
       invalidated = true;

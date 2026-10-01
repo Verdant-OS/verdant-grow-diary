@@ -85,7 +85,7 @@ describe("harvest/cure Quick Log persistence slice static safety", () => {
     expect(/GRANT[^;]*\bgrow_events\b[^;]*service_role/i.test(sql)).toBe(false);
   });
 
-  it("latest quicklog_save_event migration includes harvest + cure_check in whitelist", () => {
+  it("active quicklog_save_event path retains harvest + cure_check in whitelist", () => {
     const dir = "supabase/migrations";
     const files = readdirSync(dir).filter((f) => f.endsWith(".sql"));
     const rpcFiles = files
@@ -97,8 +97,27 @@ describe("harvest/cure Quick Log persistence slice static safety", () => {
       .sort();
     expect(rpcFiles.length).toBeGreaterThan(0);
     const latest = rpcFiles[rpcFiles.length - 1];
-    const sql = readFileSync(join(dir, latest), "utf8");
-    expect(sql).toMatch(/p_event_type\s+NOT\s+IN[\s\S]*?'harvest'/);
-    expect(sql).toMatch(/p_event_type\s+NOT\s+IN[\s\S]*?'cure_check'/);
+    const wrapperSql = readFileSync(join(dir, latest), "utf8");
+    let validatorSql = wrapperSql;
+    if (!/p_event_type\s+NOT\s+IN/.test(wrapperSql)) {
+      // The dual-timestamp wrapper delegates event-type validation to the
+      // pre-logged_at function renamed from the immediately prior public RPC.
+      expect(wrapperSql).toMatch(/(?:RETURN|:=)\s+public\.quicklog_save_event_pre_logged_at\(/);
+      const renameMigration = files
+        .filter((name) => name <= latest)
+        .sort()
+        .reverse()
+        .find((name) =>
+          /RENAME\s+TO\s+quicklog_save_event_pre_logged_at/i.test(
+            readFileSync(join(dir, name), "utf8"),
+          ),
+        );
+      expect(renameMigration).toBeDefined();
+      const delegateMigration = rpcFiles.filter((name) => name < renameMigration!).at(-1);
+      expect(delegateMigration).toBeDefined();
+      validatorSql = readFileSync(join(dir, delegateMigration!), "utf8");
+    }
+    expect(validatorSql).toMatch(/p_event_type\s+NOT\s+IN[\s\S]*?'harvest'/);
+    expect(validatorSql).toMatch(/p_event_type\s+NOT\s+IN[\s\S]*?'cure_check'/);
   });
 });

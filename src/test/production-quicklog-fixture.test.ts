@@ -18,6 +18,7 @@ import { measureQuickLogSavePerformance } from "../../e2e/lib/signedInPerformanc
 import {
   validateFixtureEnv,
   validatePhenoWriteFixtureEnv,
+  validateQuickLogFixturePage,
   pageTextMatchesFixture,
 } from "../../e2e/lib/fixtureSafety";
 
@@ -455,6 +456,28 @@ describe("production Quick Log fixture policy", () => {
       true,
     );
   });
+  it("uses the env policy's marker boundaries on the visible production page", () => {
+    // Codex P2 on #1835: `\b` treats "_" as a word character, so a name the env
+    // policy accepts ("E2E_Test_Tent") failed the page check.
+    const underscored = { grow: "", tent: "E2E_Test_Tent", plant: "E2E_Test_Plant" };
+    expect(
+      validateProductionQuickLogEnv({
+        ...env,
+        E2E_FIXTURE_EXPECTED_GROW_NAME: "",
+        E2E_FIXTURE_EXPECTED_TENT_NAME: underscored.tent,
+        E2E_FIXTURE_EXPECTED_PLANT_NAME: underscored.plant,
+      }).ok,
+    ).toBe(true);
+    expect(
+      pageTextMatchesFixture("E2E_Test_Plant\nE2E_Test_Tent", underscored, { allowQaMarker: true })
+        .ok,
+    ).toBe(true);
+    // Markers embedded in longer words still do not count.
+    const embedded = { grow: "", tent: "Contest Tent", plant: "Testing Plant" };
+    expect(
+      pageTextMatchesFixture("Testing Plant\nContest Tent", embedded, { allowQaMarker: true }).ok,
+    ).toBe(false);
+  });
   it("refuses a customer account hint and unmarked fixture names", () => {
     expect(
       validateProductionQuickLogEnv({
@@ -813,17 +836,90 @@ describe("read-only production fixture observer", () => {
   });
 });
 
+// @source-scan-justified: Playwright specs register tests on import and cannot be loaded into
+// Vitest; the order of observer install, navigation, assertTarget and the save click is asserted
+// on the spec source.
+describe("visible Plant Detail checks", () => {
+  // Codex P1 on #1835: assertInitial derives an omitted grow name from the owned
+  // grow row, and Plant Detail does not render a grow name. The visible checks
+  // must not wait for the derived name; ownership and saves still use it.
+  function plantDetailPage(bodyText: string) {
+    const textWaits: string[] = [];
+    const visible = (text: string) => {
+      const locator = {
+        waitFor: async () => {
+          if (!bodyText.includes(text)) throw new Error(`timed out waiting for '${text}'`);
+        },
+        innerText: async () => text,
+        first: () => locator,
+      };
+      return locator;
+    };
+    const page = {
+      url: () => plantUrl,
+      getByRole: (_role: string, options: { name: string }) => visible(options.name),
+      getByTestId: () => ({ getByText: (text: string) => visible(text) }),
+      getByText: (text: string) => {
+        textWaits.push(text);
+        return visible(text);
+      },
+      locator: () => ({ innerText: async () => bodyText }),
+    } as unknown as Page;
+    return { page, textWaits };
+  }
+  const derivedProof = {
+    assertInitial: async () => ({ ok: true, errors: [], expected }),
+  } as unknown as Parameters<typeof validateQuickLogFixturePage>[2];
+  const plantDetailText = `${expected.plant}\n${expected.tent}\nE2E fixture`;
+
+  it("keeps a derived grow name for ownership without requiring it on the page", async () => {
+    const { page, textWaits } = plantDetailPage(plantDetailText);
+    const result = await validateQuickLogFixturePage(
+      page,
+      { ...env, E2E_FIXTURE_EXPECTED_GROW_NAME: "" },
+      derivedProof,
+    );
+    expect(result.expected.grow).toBe(expected.grow);
+    expect(textWaits).toEqual([]);
+  });
+
+  it("still requires an explicitly configured grow name to be visible", async () => {
+    const { page, textWaits } = plantDetailPage(plantDetailText);
+    await expect(validateQuickLogFixturePage(page, env, derivedProof)).rejects.toThrow(
+      `timed out waiting for '${expected.grow}'`,
+    );
+    expect(textWaits).toEqual([expected.grow]);
+  });
+});
+
 describe("production smoke save integration", () => {
   const read = (file: string) => fs.readFileSync(path.resolve(__dirname, "../..", file), "utf8");
   it("installs proof before navigation and disposes it in both entry points", () => {
     for (const file of ["e2e/quicklog-smoke.spec.ts", "e2e/fixture-safety.spec.ts"]) {
       const source = read(file);
-      expect(source.indexOf("observeProductionQuickLogFixture(page)")).toBeLessThan(
-        source.indexOf("await page.goto("),
-      );
+      const observeIndex = source.indexOf("observeProductionQuickLogFixture(page)");
+      expect(observeIndex).toBeGreaterThanOrEqual(0);
+      expect(observeIndex).toBeLessThan(source.indexOf("await page.goto("));
       expect(source).toContain("productionProof.dispose()");
       expect(source).toContain("productionProof);");
     }
+  });
+  it("reads both tagged saves back from the grow Timeline after the last save", () => {
+    // Codex P2 on #1835: a post-save UI is not readback evidence.
+    const source = read("e2e/quicklog-smoke.spec.ts");
+    const step = source.split('await report.run(24, "Read both tagged saves back')[1] ?? "";
+    expect(step).not.toBe("");
+    expect(source.indexOf("await report.run(24,")).toBeGreaterThan(
+      source.indexOf("await report.run(21,"),
+    );
+    expect(step).toContain(
+      "page.goto(`/timeline?growId=${encodeURIComponent(initialTarget.growId)}`)",
+    );
+    expect(step).toContain("buildQuickLogSmokeNote(smokeTime, sequence)");
+    expect(step).toContain("for (const sequence of [1, 2] as const)");
+    expect(step).toMatch(
+      /getByTestId\("timeline-entry"\)\.filter\(\{\s*hasText:\s*note\s*\}\)\)\.toHaveCount\(\s*1,/,
+    );
   });
   it("checks ownership immediately before both saves and tags both persisted notes", () => {
     const source = read("e2e/quicklog-smoke.spec.ts");

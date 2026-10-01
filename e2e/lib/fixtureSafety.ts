@@ -22,6 +22,7 @@
  */
 import type { Page } from "@playwright/test";
 import type { ProductionQuickLogFixtureProof } from "./productionQuickLogFixtureProof";
+import { PRODUCTION_FIXTURE_MARKER } from "./productionQuickLogFixtureRules";
 import { isForbiddenRealGrowName as isForbiddenRealGrowNameImpl } from "../../scripts/e2e/real-grow-denylist.mjs";
 
 export type FixtureSafetyEnv = Readonly<{
@@ -139,9 +140,12 @@ export function pageTextMatchesFixture(
   const errors: string[] = [];
   const text = pageText ?? "";
 
-  if (!(options.allowQaMarker ? /\b(?:E2E|Test|QA)\b/i : /E2E|Test/i).test(text)) {
+  // The production lane uses the same marker boundaries as its env policy:
+  // non-alphanumeric, so "E2E_Test_Tent" carries a marker and "Contest" does not.
+  if (!(options.allowQaMarker ? PRODUCTION_FIXTURE_MARKER : /E2E|Test/i).test(text)) {
+    const markers = options.allowQaMarker ? "'E2E', 'Test' or 'QA'" : "'E2E' or 'Test'";
     errors.push(
-      "Target page does not contain 'E2E' or 'Test' markers — refusing to treat as fixture data.",
+      `Target page does not contain ${markers} markers — refusing to treat as fixture data.`,
     );
   }
 
@@ -219,12 +223,20 @@ export async function validateQuickLogFixturePage(
     E2E_FIXTURE_EXPECTED_PLANT_NAME: process.env.E2E_FIXTURE_EXPECTED_PLANT_NAME,
     E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: process.env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
   },
-  productionProof?: ProductionQuickLogFixtureProof,
+  productionProof: ProductionQuickLogFixtureProof,
 ): Promise<FixtureEnvValidation> {
   // This explicit owner-approved production lane is separate from the generic
   // fixture validator. Pheno and bootstrap retain their existing host fences.
   if (!productionProof) throw new Error("production_fixture_observer_required");
   const envCheck = await productionProof.assertInitial(env);
+  // assertInitial may derive an omitted grow name from the owned grow row; the
+  // ownership and save checks keep that name. Plant Detail does not render a
+  // grow name, so the visible-page checks require one only when the
+  // environment supplied it explicitly.
+  const visibleExpected = {
+    ...envCheck.expected,
+    grow: (env.E2E_FIXTURE_EXPECTED_GROW_NAME ?? "").trim(),
+  };
 
   if (page.url().includes("/auth")) {
     throw new Error(
@@ -262,15 +274,15 @@ export async function validateQuickLogFixturePage(
     );
   }
 
-  if (envCheck.expected.grow) {
+  if (visibleExpected.grow) {
     await page
-      .getByText(envCheck.expected.grow, { exact: false })
+      .getByText(visibleExpected.grow, { exact: false })
       .first()
       .waitFor({ state: "visible", timeout: 20_000 });
   }
 
   const bodyText = (await page.locator("body").innerText()).slice(0, 50_000);
-  const pageCheck = pageTextMatchesFixture(bodyText, envCheck.expected, {
+  const pageCheck = pageTextMatchesFixture(bodyText, visibleExpected, {
     // Account ownership was checked against the server response above; an
     // incidental email in page text cannot substitute for that proof.
     allowQaMarker: true,

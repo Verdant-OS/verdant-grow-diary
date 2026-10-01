@@ -48,6 +48,8 @@ export interface DashboardDailyGrowCheckPanelInput {
 export interface DashboardDailyGrowCheckRow {
   plantId: string;
   plantName: string;
+  /** Scoped grow to keep on Daily Check deep-links; null when plant has no matching own grow. */
+  dailyCheckGrowId: string | null;
   tentId: string | null;
   tentName: string | null;
   checkedToday: boolean;
@@ -184,6 +186,10 @@ export function buildDashboardDailyGrowCheckPanel(
       const row: DashboardDailyGrowCheckRow = {
         plantId: plant.id,
         plantName: plant.name ?? "Unnamed plant",
+        dailyCheckGrowId:
+          input.scopedGrowId && plantGrowId(plant) === input.scopedGrowId
+            ? input.scopedGrowId
+            : null,
         tentId: tId,
         tentName: tId ? (tentName.get(tId) ?? null) : null,
         checkedToday,

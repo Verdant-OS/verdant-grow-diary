@@ -49,6 +49,7 @@ import {
   buildOtherGrowMoveDestinations,
   withoutDisclosedMoveDestinations,
 } from "@/lib/plantMoveDestinationRules";
+import { buildAssignTentListingReadState } from "@/lib/assignTentListingReadRules";
 
 interface TentRow {
   id: string;
@@ -161,7 +162,13 @@ export default function AssignTentDialog({
       is_archived: t.is_archived,
     }));
 
-  const { data: rows = [], isPending: tentsPending } = useQuery({
+  const {
+    data: rows = [],
+    isPending: tentsPending,
+    isError: tentsError,
+    isFetching: tentsFetching,
+    refetch: refetchTents,
+  } = useQuery({
     queryKey: [
       "plant-detail",
       "eligible-tents",
@@ -256,6 +263,10 @@ export default function AssignTentDialog({
   const hasCrossGrowDestinations = crossGrowDestinations.length > 0;
   const showUntagPath =
     huntLinked && (hasCrossGrowDestinations || (Boolean(growId) && sameGrow.length === 0));
+  const listingRead = buildAssignTentListingReadState({
+    isPending: huntTagPending || tentsPending,
+    isError: tentsError,
+  });
 
   async function confirmPhenoUntag() {
     setUntagBusy(true);
@@ -281,6 +292,10 @@ export default function AssignTentDialog({
     e.preventDefault();
     if (!user) {
       toast.error("Not signed in");
+      return;
+    }
+    if (!listingRead.canChoose) {
+      toast.error(listingRead.message);
       return;
     }
     if (!selected) {
@@ -395,7 +410,6 @@ export default function AssignTentDialog({
   // Controlled Plants-list Move owns a menu item and omits DialogTrigger so the
   // dialog can live outside DropdownMenuContent (menu closes on select).
   const showTrigger = trigger !== undefined || !isControlled;
-  const listingPending = huntTagPending || tentsPending;
 
   return (
     <>
@@ -421,8 +435,22 @@ export default function AssignTentDialog({
             </DialogTitle>
           </DialogHeader>
 
-          {listingPending ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+          {listingRead.status === "loading" ? (
+            <p className="text-sm text-muted-foreground">{listingRead.message}</p>
+          ) : listingRead.status === "unavailable" ? (
+            <div className="grid gap-3" data-testid="assign-tent-load-error">
+              <p className="text-sm text-muted-foreground" role="alert">
+                {listingRead.message}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={tentsFetching}
+                onClick={() => void refetchTents({ cancelRefetch: false })}
+              >
+                Retry
+              </Button>
+            </div>
           ) : (
             <>
               {huntTagError ? (

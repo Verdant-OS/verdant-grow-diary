@@ -10,12 +10,12 @@ removes its three cron triggers and routes four existing migration writers to
 
 ## Which environment does what?
 
-| Environment                       | Role after this change                                                                                                                       |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-production-solo-founder` | Existing protected production delivery environment, now also selected by the four legacy writers below.                                      |
-| `verdant-production`              | Legacy manual read-check bindings remain. Its three daily monitoring schedules are retired. It is not deleted or repopulated by this change. |
-| `verdant-sandbox`                 | Separate sandbox verification lane. Production routing does not repair or apply sandbox migrations.                                          |
-| `Preview` / `Production`          | Other deployment environment names are unchanged; their settings and deployment targets were not inspected here.                             |
+| Environment                       | Role after this change                                                                                                                          |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdant-production-solo-founder` | Existing protected production delivery environment, now also selected by the four legacy writers below.                                         |
+| `verdant-production`              | Legacy manual read-check bindings remain. Its three daily monitoring schedules are retired. It is not deleted or repopulated by this change.    |
+| `verdant-sandbox`                 | Legacy sandbox CI diagnostic, not production acceptance. Hosted verification uses verdantgrowdiary.com only; jobs and migrations are unchanged. |
+| `Preview` / `Production`          | Other deployment environment names are unchanged; their settings and deployment targets were not inspected here.                                |
 
 A GitHub environment selects job protections and secret scope. Its name does not
 prove database identity. The existing writer scripts still validate the pinned

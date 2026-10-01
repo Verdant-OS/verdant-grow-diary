@@ -33,11 +33,11 @@ function isAtLeast(actual: Version, minimum: Version): boolean {
 
 function isSafeBraceExpansionVersion(actual: Version): boolean {
   const [major] = actual;
-  if (major === 1) return isAtLeast(actual, [1, 1, 18]);
-  if (major === 2) return isAtLeast(actual, [2, 1, 4]);
-  if (major === 3) return isAtLeast(actual, [3, 0, 6]);
+  if (major === 1) return isAtLeast(actual, [1, 1, 21]);
+  if (major === 2) return isAtLeast(actual, [2, 1, 7]);
+  if (major === 3) return isAtLeast(actual, [3, 0, 9]);
   if (major === 4) return false;
-  if (major === 5) return isAtLeast(actual, [5, 0, 9]);
+  if (major === 5) return isAtLeast(actual, [5, 0, 12]);
   return major > 5;
 }
 
@@ -177,6 +177,7 @@ describe("dependency security Phase A resolution floors", () => {
     ["vitest", [4, 1, 11] as const],
     ["@vitest/mocker", [4, 1, 11] as const],
     ["nanoid", [3, 3, 18] as const],
+    ["undici", [6, 28, 1] as const],
   ])("resolves every %s instance at or above %s in both locks", (packageName, minimum) => {
     for (const [lockName, versions] of [
       ["bun.lock", resolvedVersions(packageName)],
@@ -223,14 +224,22 @@ describe("dependency security Phase A resolution floors", () => {
 
   it.each([
     [[1, 1, 17] as const, false],
-    [[1, 1, 18] as const, true],
+    [[1, 1, 18] as const, false],
+    [[1, 1, 20] as const, false],
+    [[1, 1, 21] as const, true],
     [[2, 1, 3] as const, false],
-    [[2, 1, 4] as const, true],
+    [[2, 1, 4] as const, false],
+    [[2, 1, 6] as const, false],
+    [[2, 1, 7] as const, true],
     [[3, 0, 5] as const, false],
-    [[3, 0, 6] as const, true],
+    [[3, 0, 6] as const, false],
+    [[3, 0, 8] as const, false],
+    [[3, 0, 9] as const, true],
     [[4, 0, 1] as const, false],
     [[5, 0, 8] as const, false],
-    [[5, 0, 9] as const, true],
+    [[5, 0, 9] as const, false],
+    [[5, 0, 11] as const, false],
+    [[5, 0, 12] as const, true],
   ])("classifies brace-expansion %s safety as %s", (version, expected) => {
     expect(isSafeBraceExpansionVersion(version)).toBe(expected);
   });
@@ -259,10 +268,11 @@ describe("dependency security Phase A resolution floors", () => {
       "fast-uri": "3.1.8",
       "form-data": "4.0.6",
       "js-yaml": "4.3.2",
-      hono: "4.13.5",
+      hono: "4.13.7",
       qs: "6.16.0",
       undici: "6.28.1",
       nanoid: "3.3.18",
+      undici: "6.28.1",
     });
     expect(packageJson.overrides?.postcss).toBeUndefined();
     expect(packageJson.overrides?.vite).toBeUndefined();

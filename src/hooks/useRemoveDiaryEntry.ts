@@ -16,7 +16,12 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { REMOVE_LOG_ERROR_TOAST, getRemoveSuccessToast } from "@/lib/diaryEntryRemovalRules";
+import {
+  LINKED_QUICKLOG_REVISION_COPY,
+  REMOVE_LOG_ERROR_TOAST,
+  getRemoveSuccessToast,
+  isLinkedQuickLogDiaryDetails,
+} from "@/lib/diaryEntryRemovalRules";
 import {
   buildDiaryRemovalInvalidationKeys,
   type DiaryEntryRemovalMetadata,
@@ -54,10 +59,32 @@ export function useRemoveDiaryEntry(onRemoved?: (id: string) => void): UseRemove
       if (!id) return false;
       setIsRemoving(true);
       try {
-        const { error } = await supabase.from("diary_entries").delete().eq("id", id);
+        const { data: current, error: readError } = await supabase
+          .from("diary_entries")
+          .select("details")
+          .eq("id", id)
+          .maybeSingle();
+        if (readError || !current) {
+          toast.error(REMOVE_LOG_ERROR_TOAST);
+          return false;
+        }
+        if (isLinkedQuickLogDiaryDetails(current.details)) {
+          toast.error(LINKED_QUICKLOG_REVISION_COPY);
+          return false;
+        }
+        const { data: deleted, error } = await supabase
+          .from("diary_entries")
+          .delete()
+          .eq("id", id)
+          .select("id")
+          .maybeSingle();
         if (error) {
           // Safe diagnostic only; UI copy is generic.
           console.warn("[diary] remove failed", { code: error.code });
+          toast.error(REMOVE_LOG_ERROR_TOAST);
+          return false;
+        }
+        if (deleted?.id !== id) {
           toast.error(REMOVE_LOG_ERROR_TOAST);
           return false;
         }

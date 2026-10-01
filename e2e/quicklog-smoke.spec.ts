@@ -496,6 +496,21 @@ test.describe("Quick Log smoke checklist", () => {
         await expect(reopened.getByTestId("quicklog-note")).toHaveValue("");
         return "clean dialog";
       });
+
+      // The production-only runbook requires each tagged save to be read back
+      // from the grow's persisted Timeline; a post-save UI alone is not proof.
+      await report.run(24, "Read both tagged saves back from the grow Timeline", async () => {
+        if (!initialTarget) throw new Error("Grow target unknown; cannot read the saves back.");
+        await page.goto(`/timeline?growId=${encodeURIComponent(initialTarget.growId)}`);
+        for (const sequence of [1, 2] as const) {
+          const note = buildQuickLogSmokeNote(smokeTime, sequence);
+          await expect(page.getByTestId("timeline-entry").filter({ hasText: note })).toHaveCount(
+            1,
+            { timeout: 20_000 },
+          );
+        }
+        return "both tagged saves read back exactly once from the grow Timeline";
+      });
     } finally {
       productionProof.dispose();
       // Always write the smoke report to a stable path so CI can upload it

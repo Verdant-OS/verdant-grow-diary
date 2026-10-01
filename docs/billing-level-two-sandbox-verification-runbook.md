@@ -1,5 +1,27 @@
 # Verdant Level Two — Paddle Sandbox Verification Runbook
 
+## Current hosted verification policy — 2026-09-28
+
+Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
+E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
+disposable test account owns the fixture grow and its selected tent/plant;
+tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
+use the KEEP account. Stop a write if identity, ownership or tagging cannot
+be verified; report that exact safety gap rather than proposing another host.
+Local/CI fixtures validate code, not production. Repository integration follows
+the merge gate in AGENTS.md; it is not production acceptance. No
+Publish, production APPLY, real charge, role/auth change, device control or
+Action Queue operation is authorized here. Existing owner locks remain.
+See docs/production-only-verification-runbook.md.
+
+The older procedure below is **historical reference, not the current hosted
+verification lane**. Its non-production app/database setup must not be
+repointed at production. Existing jobs/scripts stay unchanged; hosted fixture
+safety needs its own reviewed CI slice. Absence of a non-production smoke host
+is not a blocker; report concrete fixture/safety or protected-operation gaps.
+
+## Historical procedure — superseded for hosted verification
+
 ## Status
 
 - Docs/static-only.
@@ -37,15 +59,15 @@ logic, or entitlement resolution logic.
 
 ## Test Matrix
 
-| # | Case | Notes |
-|---|------|-------|
-| 1 | Pro Monthly sandbox transaction | New sandbox checkout |
-| 2 | Pro Annual sandbox transaction | New sandbox checkout |
-| 3 | Duplicate webhook delivery | Same event id replayed |
-| 4 | Blocked event case | Event recorded but not applied |
-| 5 | Failed / invalid signature case | Signature mismatch path |
-| 6 | Canceled / paused / past_due subscription state | Only if feasible in sandbox |
-| 7 | Entitlement resolution fallback case | Only if feasible without unsafe mutation |
+| #   | Case                                            | Notes                                    |
+| --- | ----------------------------------------------- | ---------------------------------------- |
+| 1   | Pro Monthly sandbox transaction                 | New sandbox checkout                     |
+| 2   | Pro Annual sandbox transaction                  | New sandbox checkout                     |
+| 3   | Duplicate webhook delivery                      | Same event id replayed                   |
+| 4   | Blocked event case                              | Event recorded but not applied           |
+| 5   | Failed / invalid signature case                 | Signature mismatch path                  |
+| 6   | Canceled / paused / past_due subscription state | Only if feasible in sandbox              |
+| 7   | Entitlement resolution fallback case            | Only if feasible without unsafe mutation |
 
 ## Step-by-Step Verification
 

@@ -9,6 +9,9 @@ on:
       - "src/constants/strainReferenceLibrary.ts"
       - "src/constants/verdantCultivars.ts"
       - "src/lib/cultivarReference*.ts"
+      - "src/lib/cultivarDatabase*.ts"
+      - "src/hooks/usePublishedCultivars.ts"
+      - "scripts/audit-cultivar-database-parity.ts"
       - "src/lib/sharedSearchTextRules.ts"
       - "src/lib/strainSourceVerification.ts"
       - "src/pages/Cultivar*.tsx"
@@ -19,6 +22,7 @@ on:
       - "supabase/functions/_shared/lib/.sync-manifest.json"
       - "supabase/functions/_shared/lib/integrations/supabase/types.ts"
       - "supabase/migrations/20260722203000_strain_reference_library_v1.sql"
+      - "supabase/migrations/20260930200000_strain_reference_library_v1_1_parity.sql"
       - "docs/product/strain-reference-library-v1.md"
       - ".github/workflows/strain-reference-library-v1-gate.yml"
     types: [opened, synchronize, reopened, ready_for_review]
@@ -72,6 +76,11 @@ jobs:
             src/test/cultivar-page-v1.test.tsx \
             src/test/cultivar-index-seo-rules.test.tsx \
             src/test/static-public-seo-documents.test.ts \
+            src/test/cultivar-database-parity-rules.test.ts \
+            src/test/cultivar-database-read-model.test.ts \
+            src/test/cultivar-reference-source-state.test.ts \
+            src/test/cultivar-pages-database-source.test.tsx \
+            src/test/strain-reference-library-v1-1-migration.test.ts \
             --reporter=verbose \
             --reporter=json \
             --outputFile=artifacts/strain-reference-library/targeted-tests.json
@@ -89,6 +98,9 @@ jobs:
         id: source_verification
         continue-on-error: true
         run: bun scripts/verify-cultivar-sources.mjs
+
+      - name: V1.1 database parity audit (offline, strict)
+        run: bun run audit:cultivar-db-parity -- --strict
 
       - name: Upload source verification evidence
         if: always()
@@ -141,12 +153,16 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          mkdir -p .diagnostics
+          # Keep diagnostics OUTSIDE the checkout: an untracked file in the
+          # working tree makes prebuild's stamp report dirty:true, and the
+          # publish provenance preflight (#1175) then fails the build.
+          diag="$RUNNER_TEMP/strain-reference-diagnostics"
+          mkdir -p "$diag"
           set +e
-          bun run build > .diagnostics/strain-reference-build.txt 2>&1
+          bun run build > "$diag/strain-reference-build.txt" 2>&1
           status=$?
           set -e
-          cat .diagnostics/strain-reference-build.txt
+          cat "$diag/strain-reference-build.txt"
           exit "$status"
 
       - name: Upload focused build diagnostics
@@ -154,7 +170,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: strain-reference-build-diagnostics
-          path: .diagnostics/strain-reference-build.txt
+          path: ${{ runner.temp }}/strain-reference-diagnostics/strain-reference-build.txt
           if-no-files-found: error
           retention-days: 3
 

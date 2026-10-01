@@ -116,6 +116,7 @@ describe("QuickLog legacy failed-save idempotency", () => {
     "idempotency_receipt_missing",
     "idempotency_key_retracted",
     "idempotency_key_conflict",
+    "receipt_target_moved",
   ])("does not rotate or resubmit a history-review draft after %s", async (reason) => {
     saveMock.mockResolvedValue({ ok: false, reason });
     renderQuickLog();
@@ -129,6 +130,29 @@ describe("QuickLog legacy failed-save idempotency", () => {
     expect(screen.getByRole("dialog").querySelector("textarea")).toHaveValue(
       "Possibly saved original.",
     );
+    expect(saveMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("links a moved receipt's history review to the entry's verified current target", async () => {
+    saveMock.mockResolvedValue({
+      ok: false,
+      reason: "receipt_target_moved",
+      persistedGrowId: "grow-2",
+      persistedTentId: "tent-2",
+      persistedPlantId: "plant-2",
+    });
+    renderQuickLog();
+    await typeNote("Possibly saved original.");
+    await clickSave();
+    await screen.findByTestId("quick-log-save-error");
+    const link = screen.getByRole("link", { name: "Open Timeline in a new tab" });
+    expect(link.getAttribute("href")).toContain("growId=grow-2");
+    expect(link.getAttribute("href")).toContain("plantId=plant-2");
+    expect(link.getAttribute("href")).not.toContain("plantId=plant-1");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "I checked Timeline; discard draft" }),
+    ).toBeEnabled();
     expect(saveMock).toHaveBeenCalledTimes(1);
   });
 

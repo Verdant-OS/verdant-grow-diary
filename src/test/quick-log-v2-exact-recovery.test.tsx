@@ -445,7 +445,7 @@ describe("ASTRA-001 exact Note recovery", () => {
     expect(committed.size).toBe(1);
   });
 
-  it("keeps a target-moved receipt locked and names the saved target", async () => {
+  it("routes a target-moved receipt to history review instead of an endless retry", async () => {
     modelLostNoteReply();
     readbackMock.mockResolvedValue({
       data: {
@@ -463,7 +463,10 @@ describe("ASTRA-001 exact Note recovery", () => {
     await expectRetry();
     retry();
     await waitFor(() => expect(readbackMock).toHaveBeenCalledTimes(1));
-    await expectRetry();
+    // Resending the immutable payload can only read back the same moved row, so
+    // Retry is withdrawn and the grower gets the history-review exit instead.
+    await waitFor(() => expect(screen.getByTestId("qlv2-history-review-link")).toBeInTheDocument());
+    expect(screen.queryByTestId("qlv2-save-retry")).not.toBeInTheDocument();
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(telemetryMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId("qlv2-persisted-note")).not.toBeInTheDocument();
@@ -478,25 +481,44 @@ describe("ASTRA-001 exact Note recovery", () => {
     expect(screen.getByTestId("qlv2-error")).toHaveTextContent(
       "It has not been confirmed; check its Timeline before making another entry.",
     );
-    expect(screen.getByTestId("qlv2-error")).not.toHaveTextContent(
-      "The saved note differs from this submission.",
-    );
+    // The review link opens the Timeline where the original entry lives now.
+    const link = screen.getByTestId("qlv2-history-review-link");
+    expect(link.getAttribute("href")).toContain("growId=66666666-6666-4666-8666-666666666666");
+    expect(link.getAttribute("href")).toContain("plantId=44444444-4444-4444-8444-444444444444");
     expect(screen.getByLabelText("Note (optional)")).toBeDisabled();
     expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeInTheDocument();
     expect(photoEntryMock).not.toHaveBeenCalled();
     expect(videoEntryMock).not.toHaveBeenCalled();
     expect(navigationMock).not.toHaveBeenCalled();
-    const originalPayload = rpcMock.mock.calls[0][1];
+    expect(rpcMock).toHaveBeenCalledTimes(2);
+
+    // The review state survives a remount, and the explicit discard is the exit.
     view.unmount();
     renderSheet("plant:44444444-4444-4444-8444-444444444444");
-    await expectRetry();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "I checked Timeline; discard draft" }),
+      ).toBeEnabled(),
+    );
+    expect(screen.queryByTestId("qlv2-save-retry")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Note (optional)")).toHaveValue(originalNote);
-    expect(screen.getByLabelText("Note (optional)")).toBeDisabled();
-    retry();
-    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(3));
-    await expectRetry();
-    expect(rpcMock.mock.calls[2][1]).toEqual(originalPayload);
-    expect(screen.queryByTestId("qlv2-review-saved-entry")).not.toBeInTheDocument();
+    // The verified moved scope is persisted, so the review link still targets
+    // the entry's current Timeline after a reload, not the original draft target.
+    const restoredLink = screen.getByTestId("qlv2-history-review-link");
+    expect(restoredLink.getAttribute("href")).toContain(
+      "growId=66666666-6666-4666-8666-666666666666",
+    );
+    expect(restoredLink.getAttribute("href")).toContain(
+      "plantId=44444444-4444-4444-8444-444444444444",
+    );
+    expect(restoredLink.getAttribute("href")).not.toContain(
+      "plantId=33333333-3333-4333-8333-333333333333",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+    expect(screen.queryByTestId("qlv2-exact-retry-lock")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Note (optional)")).toHaveValue("");
+    expect(rpcMock).toHaveBeenCalledTimes(2);
+    expect(toastSuccess).not.toHaveBeenCalled();
     expect(committed.size).toBe(1);
   });
 

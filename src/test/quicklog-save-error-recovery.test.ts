@@ -216,6 +216,7 @@ describe("quickLogSaveRecoveryAction — every failure states what to do next", 
       "idempotency_receipt_missing",
       "idempotency_key_retracted",
       "idempotency_key_conflict",
+      "receipt_target_moved",
     ]) {
       expect(quickLogSaveRequiresHistoryCheck(reason)).toBe(true);
       const guidance = describeQuickLogSaveFailure(reason);

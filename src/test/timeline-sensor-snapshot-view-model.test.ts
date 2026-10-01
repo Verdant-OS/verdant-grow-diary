@@ -1,9 +1,159 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildTimelineCardSensorSnapshotViewModel,
   buildTimelineSensorSnapshotViewModel,
   resolveTimelineCardSensorResolution,
   resolveTimelineCardVpdStageValue,
 } from "@/lib/timelineSensorSnapshotViewModel";
+
+describe("persisted Timeline card metric validation", () => {
+  const buildCard = (details: Record<string, unknown> | null | undefined) =>
+    buildTimelineCardSensorSnapshotViewModel(resolveTimelineCardSensorResolution(details));
+
+  const sources = ["csv", "demo", "stale", "invalid", "live"] as const;
+
+  it.each([null, undefined])("is safe for an absent resolved card input %s", (input) => {
+    expect(buildTimelineCardSensorSnapshotViewModel(input).sensorViewModel).toEqual({
+      kind: "none",
+    });
+  });
+
+  it.each(sources)(
+    "rejects implausible %s metrics while retaining the valid survivor",
+    (source) => {
+      const result = buildCard({
+        sensor_snapshot: {
+          source,
+          temp_f: 76,
+          rh: 150,
+          soil: 101,
+          vpd: 20,
+          co2: 10001,
+          ph: 15,
+          ec: 1000,
+        },
+      });
+      expect(result.sensorViewModel.kind).toBe("chips");
+      if (result.sensorViewModel.kind !== "chips") return;
+      expect(result.sensorViewModel.chips.map((chip) => chip.display)).toEqual(["76°F"]);
+      expect(result.sensorViewModel.errors.length).toBeGreaterThan(0);
+      expect(result.reviewMessage).toBe(
+        "Review sensor snapshot — invalid readings were not shown.",
+      );
+    },
+  );
+
+  it.each(sources)("retains valid %s boundaries and legacy numeric precision", (source) => {
+    const { sensorViewModel } = buildCard({
+      sensor: { source, temp: 27.78, rh: 55.55, soil: 42.42, vpd: 1.234, co2: 850.6 },
+    });
+    expect(sensorViewModel.kind).toBe("chips");
+    if (sensorViewModel.kind !== "chips") return;
+    expect(sensorViewModel.chips.map((chip) => chip.display)).toEqual([
+      "82.0°F",
+      "55.55%",
+      "1.234 kPa",
+      "42.42%",
+      "850.6 ppm",
+    ]);
+    expect(sensorViewModel.errors).toEqual([]);
+  });
+
+  it.each([0.2, 3])("retains the canonical VPD boundary %s for every source", (vpd) => {
+    for (const source of sources) {
+      const { sensorViewModel } = buildCard({
+        sensor_snapshot: { source, vpd },
+      });
+      expect(sensorViewModel.kind).toBe("chips");
+      if (sensorViewModel.kind !== "chips") continue;
+      expect(sensorViewModel.chips.map((chip) => chip.value)).toEqual([vpd]);
+      expect(sensorViewModel.errors).toEqual([]);
+    }
+  });
+
+  it.each([0, 10000])("retains the canonical CO2 boundary %s for every source", (co2) => {
+    for (const source of sources) {
+      const { sensorViewModel } = buildCard({
+        sensor: { source, co2 },
+      });
+      expect(sensorViewModel.kind).toBe("chips");
+      if (sensorViewModel.kind !== "chips") continue;
+      expect(sensorViewModel.chips.map((chip) => chip.value)).toEqual([co2]);
+      expect(sensorViewModel.errors).toEqual([]);
+    }
+  });
+
+  it.each(sources)("retains %s history when every reading is invalid", (source) => {
+    const result = buildCard({
+      sensor_snapshot: { source, temp_f: 115, rh: 150, soil: 101, vpd: 20, co2: 10001 },
+    });
+    expect(result.sensor).toBeDefined();
+    expect(result.sensorViewModel.kind).toBe("invalid");
+    expect(result.reviewMessage).toContain("Review sensor snapshot");
+  });
+
+  it.each([0, 100])("discloses pinned humidity %s without calling it healthy", (rh) => {
+    const result = buildCard({ sensor: { source: "csv", rh } });
+    expect(result.sensorViewModel.kind).toBe("chips");
+    if (result.sensorViewModel.kind !== "chips") return;
+    expect(
+      result.sensorViewModel.warnings.some((warning) => warning.includes("stuck sensor")),
+    ).toBe(true);
+    expect(result.warningMessage).toBe("Check sensor snapshot — a reading may need confirmation.");
+  });
+
+  it.each([null, undefined, {}, { sensor_snapshot: { source: "csv" } }])(
+    "is null-safe and does not accuse empty envelopes of invalid readings: %j",
+    (details) => {
+      expect(buildCard(details).sensorViewModel).toEqual({
+        kind: "none",
+      });
+    },
+  );
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, "150"])(
+    "never renders non-numeric or non-finite persisted readings: %s",
+    (value) => {
+      const { sensorViewModel } = buildCard({
+        sensor: { source: "csv", temp_f: 76, rh: value, soil: value, vpd: value, co2: value },
+      });
+      expect(sensorViewModel.kind).toBe("chips");
+      if (sensorViewModel.kind !== "chips") return;
+      expect(sensorViewModel.chips.map((chip) => chip.display)).toEqual(["76°F"]);
+    },
+  );
+
+  it("preserves envelope precedence, inputs, deterministic output and manual copy", () => {
+    const sensor_snapshot = Object.freeze({ source: "manual", temp_f: 76, rh: 150 });
+    const details = Object.freeze({
+      sensor_snapshot,
+      sensor: Object.freeze({ source: "csv", rh: 55 }),
+    });
+    const before = JSON.stringify(details);
+    const a = buildCard(details);
+    expect(a).toEqual(buildCard(details));
+    expect(a.sensor).toBe(sensor_snapshot);
+    expect(a.reviewMessage).toBe("Review manual snapshot — invalid readings were not shown.");
+    expect(a.warningMessage).toBe("Check manual snapshot — a reading may need confirmation.");
+    expect(JSON.stringify(details)).toBe(before);
+  });
+
+  it.each(["vpd_kpa", "vpdKpa"])(
+    "assesses a non-manual alias only with its rendered chip: %s",
+    (key) => {
+      const result = buildCard({
+        sensor: { source: "csv", [key]: 1.2 },
+      });
+      const evidence = { ...result, canAssessStage: true, hasFutureTimestamp: false };
+      expect(resolveTimelineCardVpdStageValue(evidence)).toBe(1.2);
+      expect(resolveTimelineCardVpdStageValue({ ...evidence, sensorViewModel: null })).toBeNull();
+      expect(resolveTimelineCardVpdStageValue({ ...evidence, canAssessStage: false })).toBeNull();
+      expect(
+        resolveTimelineCardVpdStageValue({ ...evidence, hasFutureTimestamp: true }),
+      ).toBeNull();
+    },
+  );
+});
 
 describe("buildTimelineSensorSnapshotViewModel", () => {
   it("returns none for null/undefined", () => {

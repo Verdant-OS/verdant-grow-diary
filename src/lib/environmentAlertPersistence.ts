@@ -23,7 +23,7 @@
  *     environment problems)
  *   - demo/fallback/mock data is explicitly rejected
  */
-import { isStale, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { isStale, STALE_THRESHOLD_MS, type SensorSnapshot } from "@/lib/sensorSnapshot";
 import type { SensorQuality } from "@/lib/sensorQuality";
 import type { EnvironmentAlert } from "@/lib/environmentAlerts";
 
@@ -42,6 +42,35 @@ export interface PersistenceContext {
   isDemoData?: boolean;
   /** Defaults to Date.now(); injectable for tests. */
   now?: number;
+}
+
+/** Age-only staleness cannot establish that a missing, invalid or future observation is current. */
+export function hasConfirmedAlertObservationTime(
+  snapshot: Pick<SensorSnapshot, "ts"> | null | undefined,
+  now: number,
+): boolean {
+  if (typeof snapshot?.ts !== "string" || !Number.isFinite(now)) return false;
+  const capturedAt = Date.parse(snapshot.ts);
+  return Number.isFinite(capturedAt) && capturedAt <= now;
+}
+
+/**
+ * Milliseconds until a future-dated observation stops being future, or null
+ * when the snapshot is missing, its timestamp is invalid, or it is already
+ * current. Only a future observation can become eligible by wall time alone
+ * (accepted ingest clock skew); a missing or invalid timestamp never will, so
+ * callers must not wake for it. Clamped to the live window: a re-evaluation
+ * at the clamp finds the observation still future and asks again, so the
+ * chain stays bounded and converges without any single long timer.
+ */
+export function futureObservationWakeDelayMs(
+  snapshot: Pick<SensorSnapshot, "ts"> | null | undefined,
+  now: number,
+): number | null {
+  if (typeof snapshot?.ts !== "string" || !Number.isFinite(now)) return null;
+  const capturedAt = Date.parse(snapshot.ts);
+  if (!Number.isFinite(capturedAt) || capturedAt <= now) return null;
+  return Math.min(capturedAt - now, STALE_THRESHOLD_MS);
 }
 
 /** Why a snapshot may not back a persisted alert. `null` means it may. */
@@ -84,7 +113,8 @@ export function snapshotPersistenceBlockReason(
   // mint a row stamped as brand new. `snapshot.source` is therefore
   // intentionally NOT forwarded to isStale here.
   // Regression fence: src/test/environment-alert-persistence-live-window.test.ts
-  if (isStale(snapshot.ts, now)) return "outside_live_window";
+  if (!hasConfirmedAlertObservationTime(snapshot, now) || isStale(snapshot.ts, now))
+    return "outside_live_window";
   return null;
 }
 

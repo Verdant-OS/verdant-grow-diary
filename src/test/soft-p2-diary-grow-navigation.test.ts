@@ -16,7 +16,7 @@ const TENT = "00000000-0000-4000-8000-000000000003";
 const fixture = {
   now: Date.parse("2026-09-10T12:00:00Z"),
   scopedGrowId: GROW,
-  plants: [{ id: PLANT, name: "Fixture plant", tentId: TENT, stage: "veg" }],
+  plants: [{ id: PLANT, name: "Fixture plant", growId: GROW, tentId: TENT, stage: "veg" }],
   tents: [],
   diaryEntries: [],
   latestReadingByTent: {},

@@ -23,6 +23,7 @@ import {
   buildDailyCheckPostSubmitActions,
   formatDailyCheckLoggedAt,
   parseDailyCheckEntrySource,
+  resolveDailyCheckDashboardBreadcrumbHref,
   resolveDailyCheckPostSubmitHref,
 } from "@/lib/dailyCheckPostSubmitRules";
 
@@ -154,6 +155,24 @@ describe("resolveDailyCheckPostSubmitHref · pure rules", () => {
         source: "plant-detail",
       }),
     ).toBe("/plants/p-9");
+  });
+
+  describe("resolveDailyCheckDashboardBreadcrumbHref · pure rules", () => {
+    it("uses the source-aware primary action when grow scope is present", () => {
+      const actions = buildDailyCheckPostSubmitActions({
+        plantId: "p-1",
+        source: "dashboard",
+        growId: "g-1",
+      });
+      expect(resolveDailyCheckDashboardBreadcrumbHref({ growId: "g-1", actions })).toBe(
+        "/?growId=g-1",
+      );
+    });
+
+    it("falls back to root when no grow scope is present", () => {
+      const actions = buildDailyCheckPostSubmitActions({ plantId: "p-1", source: "dashboard" });
+      expect(resolveDailyCheckDashboardBreadcrumbHref({ growId: null, actions })).toBe("/");
+    });
   });
 
   it("falls back safely when context is missing or invalid", () => {

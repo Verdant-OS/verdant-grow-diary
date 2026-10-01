@@ -2,19 +2,19 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T19:35 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T20:03 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
 
-- **Open (not draft), CI re-running after review fixes, awaiting Chemdawg pre-check — review not
-  routed:
+- **Open (not draft), required CI green at the exact head, awaiting Chemdawg pre-check — review
+  not routed:
   [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
   (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `2a2de17dc`, 29 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 19:35
-  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI on the exact head —
-  97 pass / 7 pending / 14 skipped / **1 failed — `Vercel`** (non-required). No approving
-  review.
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 20:00
+  UTC): mergeable, `mergeStateStatus: UNSTABLE` (non-required checks not all green); CI on the exact
+  head — 102 pass / 1 pending / 14 skipped / 2 not green, both non-required: **`Vercel` failed**
+  (account block) and **`GA E2E (webkit)` cancelled** (see below). No approving review.
   - **Not draft, against `AGENTS.md` (Git and merges: "Open PRs as drafts").** `#1827` and `#1830`
     were marked ready on the owner's earlier instruction. Two Codex threads on `#1830` ask for
     both to return to draft; that is awaiting the owner's decision (`NOT_MEASURED`).
@@ -24,8 +24,12 @@ this entry's earlier 2026-10-01 versions.
     No migration change.
   - `24ba8e148` merges `b15cd0de0` (`#1811`, the twelve-file `Sentinel-Version 2026-09-28.3`
     governance amendment; no migration, no overlap with this PR's files).
-  - Required contexts (35, `config/required-status-checks.json`) at `2a2de17dc`: **33 pass**, 2
-    pending (`Lint, typecheck, test, build` and `test:legal-seo`), none failed. **`NOT_MEASURED`.** At `a73dbfb40` (earlier head): **35/35 `PASS`**.
+  - Required contexts (35, `config/required-status-checks.json`) at `2a2de17dc`: **35/35 `PASS`**
+    (observed 20:00 UTC). Also 35/35 at `a73dbfb40` (earlier head).
+  - `GA E2E (webkit)` (non-required) was **cancelled, not failed**: "Install Playwright browser
+    (webkit)" ran 19:21–19:41 UTC and hit the job's 20-minute `timeout-minutes`, so the suite
+    never ran; `GA E2E (chromium)` passed. Same pattern as the earlier dispatch-history cancel.
+    Re-run requested at 20:01 UTC; result `NOT_MEASURED`.
   - `Dispatch history Playwright` (non-required; runs here because `package.json` changed) — at
     `2a2de17dc` **`PASS`** (run `36913305947`); at `d7a753f29` **`PASS`** (run `36911964958`); at
     `a73dbfb40`:
@@ -40,9 +44,9 @@ this entry's earlier 2026-10-01 versions.
   - `2d954bda1` merged in `6ed854cee` (`#1835`) and `ebdb1dcd0` merged in `a8af664c5` (`#1742`);
     neither adds a migration.
   - `f2be7e722` merged in `25515a8b9` (`#1810`, Quick Log delivery tests; no migration).
-    `24ba8e148` merged in `b15cd0de0` (`#1811`). **1 commit behind** `verdant-grow-diary` at
-    19:35 UTC: `b5d064881` (`#1849`, re-land of `#1793`; touches none of this PR's files). Not yet
-    merged into the branch.
+    `24ba8e148` merged in `b15cd0de0` (`#1811`). **2 commits behind** `verdant-grow-diary` at
+    20:00 UTC: `b5d064881` (`#1849`, re-land of `#1793`) and `9dda2742e` (`#1856`, handoff-log
+    template); neither touches this PR's files. Not yet merged into the branch.
   - `84cb262ad`, `44af6a8ea`, `5c5568a37`, `9b6a6872d`, `a73dbfb40`, `5b7ea953e`, `b4e569ea2`,
     `d7a753f29` and `2a2de17dc` are review fixes (below).
 - **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` and again at `69f2f5b23` (2026-10-01,
@@ -82,7 +86,7 @@ this entry's earlier 2026-10-01 versions.
 - **Release state:** `cultivarDatabaseReadsEnabled = false`. `/cultivars` still renders the bundled
   sample library with no database request. Status language stays "working V1 prototype in
   pre-release validation" — no "database-backed public reads", "shipped", or "live" claim.
-- **Automated review:** 45 review threads (Codex, CodeRabbit), **all resolved** (19:35 UTC).
+- **Automated review:** 45 review threads (Codex, CodeRabbit), **all resolved** (20:00 UTC).
   - Real gaps were fixed, each RED-tested. The read model now fails closed on:
     - unlinked evidence and an ambiguous latest guide;
     - non-percent units, out-of-range percentages, and malformed claim `verified_at`;
@@ -171,8 +175,11 @@ this entry's earlier 2026-10-01 versions.
 - **Full suite at `a73dbfb40` (previous head): `PASS`** — the 35 required contexts passed in CI
   (observed 18:25 UTC): all 32 `Full test suite` shards, `Lint, typecheck, test, build`,
   `Preflight — edge shared-lib mirror in sync` and `test:legal-seo`.
-- **`NOT_MEASURED`:** `Lint, typecheck, test, build` and `test:legal-seo` at `2a2de17dc` (pending
-  at 19:35), the production receipt and production smoke, and the cause of the Vercel block.
+- **Full suite at `2a2de17dc` (exact head): `PASS`** — all 35 required contexts (observed 20:00
+  UTC): the 32 `Full test suite` shards, `Lint, typecheck, test, build`,
+  `Preflight — edge shared-lib mirror in sync` and `test:legal-seo`.
+- **`NOT_MEASURED`:** the `GA E2E (webkit)` re-run, the production receipt and production smoke,
+  and the cause of the Vercel block.
 - **Review seat — not satisfied.** No independent review is recorded.
   - The owner named **Grok** as reviewer on 2026-10-01. Codex is unavailable, and the earlier
     Copilot stand-in could not review (quota).

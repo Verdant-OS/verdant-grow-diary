@@ -278,6 +278,40 @@ describe("cultivar database read model — fails closed", () => {
     expect(slugs(gapped)).not.toContain("og-kush");
   });
 
+  it("refuses a terpene repeated under consecutive ranks", () => {
+    // Ranks stay 1..n+1 without a gap, so only a terpene-identity check catches it.
+    const snapshot = freshSnapshot();
+    const ogKush = row(snapshot, "og-kush").id;
+    const terpenes = snapshot.cultivar_claims.filter(
+      (item) => item.cultivar_id === ogKush && item.trait_key === "terpene",
+    );
+    const top = terpenes.find((item) => (item.value_jsonb as { rank: number }).rank === 1);
+    if (!top) throw new Error("rank 1 terpene");
+    snapshot.cultivar_claims.push({
+      ...top,
+      id: "dup-terpene",
+      value_jsonb: { ...(top.value_jsonb as object), rank: terpenes.length + 1 },
+    });
+    const result = map(snapshot);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ slug: "og-kush", path: "cultivar_claims.terpene" }),
+    );
+    expect(slugs(snapshot)).not.toContain("og-kush");
+  });
+
+  it.each(["community", "reviewed", "verified"])(
+    "refuses a %s verification status: V1.1 serves sample reference data only",
+    (status) => {
+      const snapshot = freshSnapshot();
+      row(snapshot, "gg4").verification_status = status;
+      const result = map(snapshot);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({ slug: "gg4", path: "cultivars.verification_status" }),
+      );
+      expect(slugs(snapshot)).not.toContain("gg4");
+    },
+  );
+
   it("refuses a cannabinoid claim stored in a non-percent unit", () => {
     for (const unit of ["mg/g", null]) {
       const snapshot = freshSnapshot();

@@ -468,8 +468,15 @@ describe("cultivar database parity — blocked content", () => {
   });
 
   it("fails publication, verification, origin, schema-version, and verified-date drift", () => {
+    // An upgraded verification state is refused outright (V1.1 serves sample
+    // data only), so it surfaces as malformed rather than as content drift.
+    const upgraded = freshSnapshot();
+    cultivarRow(upgraded, "oreoz").verification_status = "verified";
+    const upgradedReport = audit(upgraded);
+    expect(upgradedReport.status).toBe("invalid");
+    expect(paths(upgradedReport)).toContain("malformed oreoz cultivars.verification_status");
+
     const snapshot = freshSnapshot();
-    cultivarRow(snapshot, "blue-cookies").verification_status = "verified";
     cultivarRow(snapshot, "blue-cookies").data_origin = "editorial";
     cultivarRow(snapshot, "blue-cookies").last_verified_at = "2026-09-01T00:00:00Z";
     const guide = snapshot.cultivar_guides.find(
@@ -480,7 +487,6 @@ describe("cultivar database parity — blocked content", () => {
     const report = audit(snapshot);
     expect(paths(report)).toEqual(
       expect.arrayContaining([
-        "changed blue-cookies profile.verificationStatus",
         "changed blue-cookies profile.dataOrigin",
         "changed blue-cookies profile.lastVerifiedAt",
         "changed blue-cookies profile.contentSchemaVersion",

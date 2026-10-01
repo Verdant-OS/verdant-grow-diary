@@ -140,12 +140,12 @@ const CHEMOTYPES: readonly CultivarChemotype[] = [
   "type_v",
   "unknown",
 ];
-const VERIFICATION_STATUSES: readonly CultivarVerificationStatus[] = [
-  "sample",
-  "community",
-  "reviewed",
-  "verified",
-];
+/**
+ * V1.1 serves sample reference data only: the source notice promises the
+ * transport never upgrades the evidence state, so any other verification
+ * status is refused rather than rendered as "Source-backed".
+ */
+const VERIFICATION_STATUSES: readonly CultivarVerificationStatus[] = ["sample"];
 const CONFIDENCES: readonly CultivarConfidence[] = ["high", "medium", "community"];
 const RISKS: readonly CultivarRisk[] = ["low", "medium", "high"];
 const SOURCE_TYPES: readonly CultivarSource["sourceType"][] = [
@@ -770,6 +770,16 @@ function mapClaims(
       slug,
       path: "cultivar_claims.terpene",
       message: `terpene ranks must run 1..n without gaps or duplicates (got ${ranks.join(",")})`,
+    });
+    return undefined;
+  }
+  const terpeneNames = terpenes.map((claim) => claim.terpene);
+  const repeated = terpeneNames.filter((name, index) => terpeneNames.indexOf(name) !== index);
+  if (repeated.length > 0) {
+    issues.push({
+      slug,
+      path: "cultivar_claims.terpene",
+      message: `each terpene may appear once (repeated: ${[...new Set(repeated)].sort(compareText).join(",")})`,
     });
     return undefined;
   }

@@ -73,9 +73,22 @@ if (!anonKeyClass.ok) {
   process.exit(2);
 }
 const loopback = ["localhost", "127.0.0.1", "::1", "[::1]"];
-if (!loopback.includes(new URL(dbUrl!).hostname.toLowerCase())) {
-  console.error("[cultivar-reference-rls] REFUSED — SUPABASE_DB_URL must be a loopback host");
-  process.exit(2);
+// Both endpoints must be local: the service role below performs setup writes
+// and auth-user creation through SUPABASE_URL, not only through the DB URL.
+for (const [name, value] of [
+  ["SUPABASE_DB_URL", dbUrl],
+  ["SUPABASE_URL", url],
+] as const) {
+  let host: string;
+  try {
+    host = new URL(value!).hostname.toLowerCase().replace(/\.$/, "");
+  } catch {
+    host = "";
+  }
+  if (!loopback.includes(host)) {
+    console.error(`[cultivar-reference-rls] REFUSED — ${name} must be a loopback host`);
+    process.exit(2);
+  }
 }
 
 const options = { auth: { autoRefreshToken: false, persistSession: false } };

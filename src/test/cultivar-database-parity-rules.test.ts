@@ -269,6 +269,49 @@ describe("cultivar database parity — blocked content", () => {
     expect(paths(unreadableReport)).toContain("malformed gg4 cultivar_aliases.source_id");
   });
 
+  it("fails drifted guide metadata, section metadata, and link support notes", () => {
+    const snapshot = freshSnapshot();
+    const guide = snapshot.cultivar_guides.find(
+      (item) => item.cultivar_id === cultivarRow(snapshot, "gg4").id,
+    );
+    if (!guide) throw new Error("guide");
+    guide.title = "Renamed guide";
+    guide.published_at = "2026-09-01T00:00:00Z";
+    sectionRow(snapshot, "gg4", "missing_information").sort_order = 150;
+    const link = snapshot.cultivar_guide_section_sources.find(
+      (item) => item.guide_section_id === "section:gg4:overview",
+    );
+    if (!link) throw new Error("link");
+    link.support_note = "Edited note.";
+    const report = audit(snapshot);
+    expect(report.status).toBe("blocked");
+    expect(paths(report)).toEqual(
+      expect.arrayContaining([
+        "changed gg4 guideMetadata.title",
+        "changed gg4 guideMetadata.publishedAt",
+        "changed gg4 sectionMetadata.missing_information.sortOrder",
+        "changed gg4 sectionMetadata.overview.sourceNotes.gg4-public-profile",
+      ]),
+    );
+  });
+
+  it("fails auxiliary claims that cite the wrong source", () => {
+    const snapshot = freshSnapshot();
+    const watts = snapshot.cultivar_sources.find(
+      (item) => item.source_key === "watts-2021-terpene-genetics",
+    );
+    claimRows(snapshot, "og-kush", "chemotype")[0].source_id = watts?.id;
+    claimRows(snapshot, "og-kush", "reported_dominant_terpenes")[0].source_id = watts?.id;
+    const report = audit(snapshot);
+    expect(report.status).toBe("blocked");
+    expect(paths(report)).toEqual(
+      expect.arrayContaining([
+        "changed og-kush claims.chemotype.sourceKey",
+        "changed og-kush claims.reported_dominant_terpenes.sourceKey",
+      ]),
+    );
+  });
+
   it("fails an extra readable source outside the approved catalog", () => {
     const snapshot = freshSnapshot();
     snapshot.cultivar_sources.push({

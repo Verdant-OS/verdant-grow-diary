@@ -219,8 +219,35 @@ export interface CultivarDatabaseCatalogData {
   sources: readonly CultivarSource[];
 }
 
+/** Stored guide row metadata (not rendered; audited for exact parity). */
+export interface CultivarDatabaseGuideMetadata {
+  version: number;
+  title: string;
+  confidence: CultivarConfidence;
+  contentSchemaVersion: number;
+  lastVerifiedAt: string | null;
+  publishedAt: string | null;
+}
+
+/** Stored section row metadata plus each source link's support note, keyed by source. */
+export interface CultivarDatabaseSectionMetadata {
+  sortOrder: number;
+  contentSchemaVersion: number;
+  lastVerifiedAt: string | null;
+  sourceNotes: Readonly<Record<string, string>>;
+}
+
 export interface CultivarDatabaseMapResult {
   catalog: CultivarDatabaseCatalogData;
+  /** Latest published guide's stored metadata, per slug. */
+  guideMetadataBySlug: Readonly<Record<string, CultivarDatabaseGuideMetadata>>;
+  /** Stored section metadata and link support notes, per slug and section. */
+  sectionMetadataBySlug: Readonly<
+    Record<
+      string,
+      Readonly<Partial<Record<CultivarGuideSectionKey, CultivarDatabaseSectionMetadata>>>
+    >
+  >;
   /** Alias rows as stored, including the database normalization, per slug. */
   aliasRecordsBySlug: Readonly<Record<string, readonly CultivarDatabaseAliasRecord[]>>;
   /** Stored-but-not-rendered claims (chemotype, dominant terpenes, unknown traits). */
@@ -300,6 +327,12 @@ class RowReader {
     return iso ?? this.fail(column, "expected an ISO timestamp");
   }
 
+  nullableTimestamp(column: string): string | null | undefined {
+    const value = this.row[column];
+    if (value === null || value === undefined) return null;
+    return this.timestamp(column);
+  }
+
   stringArray(column: string): string[] | undefined {
     const values = toStringArray(this.row[column]);
     return values ?? this.fail(column, "expected an array of non-empty strings");
@@ -333,6 +366,11 @@ function toStringArray(value: unknown): string[] | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** A stored percentage must be null or within 0–100 inclusive. */
+function percentInRange(value: number | null): boolean {
+  return value === null || (value >= 0 && value <= 100);
 }
 
 function rangeIsOrdered(min: number | null, max: number | null): boolean {
@@ -593,6 +631,10 @@ function mapClaims(
         read.fail("value_min", "terpene range is inverted");
         continue;
       }
+      if (!percentInRange(min) || !percentInRange(max)) {
+        read.fail("value_min", "terpene percentage is outside 0–100");
+        continue;
+      }
       // The view model renders terpene values as percentages: a value needs a
       // "%" unit; a value-less (rank-only) claim may carry "%" or no unit.
       const unit = row.unit ?? null;
@@ -650,6 +692,10 @@ function mapClaims(
       }
       if (!rangeIsOrdered(min, max)) {
         read.fail("value_min", `${traitKey} range is inverted`);
+        continue;
+      }
+      if (!percentInRange(min) || !percentInRange(max)) {
+        read.fail("value_min", `${traitKey} percentage is outside 0–100`);
         continue;
       }
       if (seenCannabinoidTraits.has(traitKey)) {
@@ -752,6 +798,11 @@ export function mapCultivarDatabaseSnapshot(
   const sourcesBySlug: Record<string, readonly CultivarSource[]> = {};
   const aliasRecordsBySlug: Record<string, readonly CultivarDatabaseAliasRecord[]> = {};
   const auxiliaryClaimsBySlug: Record<string, readonly CultivarDatabaseAuxiliaryClaim[]> = {};
+  const guideMetadataBySlug: Record<string, CultivarDatabaseGuideMetadata> = {};
+  const sectionMetadataBySlug: Record<
+    string,
+    Partial<Record<CultivarGuideSectionKey, CultivarDatabaseSectionMetadata>>
+  > = {};
   const sectionSourceKeysBySlug: Record<
     string,
     Partial<Record<CultivarGuideSectionKey, readonly string[]>>
@@ -933,6 +984,10 @@ export function mapCultivarDatabaseSnapshot(
     let contentSchemaVersion: number | undefined;
     let sections: CultivarGuideSection[] | undefined;
     const sectionSourceKeys: Partial<Record<CultivarGuideSectionKey, string[]>> = {};
+    const sectionMetadata: Partial<
+      Record<CultivarGuideSectionKey, CultivarDatabaseSectionMetadata>
+    > = {};
+    let guideMetadata: CultivarDatabaseGuideMetadata | undefined;
     if (!guideRow) {
       if (!ambiguous) {
         issues.push({ slug, path: "cultivar_guides", message: "no published guide" });
@@ -942,6 +997,27 @@ export function mapCultivarDatabaseSnapshot(
       const guideId = guideRead.text("id");
       guideVersion = guideRead.integer("version");
       contentSchemaVersion = guideRead.integer("content_schema_version");
+      const guideTitle = guideRead.text("title");
+      const guideConfidence = guideRead.oneOf("confidence", CONFIDENCES);
+      const guideLastVerifiedAt = guideRead.nullableTimestamp("last_verified_at");
+      const guidePublishedAt = guideRead.nullableTimestamp("published_at");
+      if (
+        guideVersion !== undefined &&
+        contentSchemaVersion !== undefined &&
+        guideTitle !== undefined &&
+        guideConfidence !== undefined &&
+        guideLastVerifiedAt !== undefined &&
+        guidePublishedAt !== undefined
+      ) {
+        guideMetadata = {
+          version: guideVersion,
+          title: guideTitle,
+          confidence: guideConfidence,
+          contentSchemaVersion,
+          lastVerifiedAt: guideLastVerifiedAt,
+          publishedAt: guidePublishedAt,
+        };
+      }
       const sectionRows = [...(guideId ? (sectionsByGuide.get(guideId) ?? []) : [])];
       sectionRows.sort(
         (a, b) =>
@@ -958,12 +1034,33 @@ export function mapCultivarDatabaseSnapshot(
         if (section) mapped.push(section);
         const sectionId = typeof sectionRow.id === "string" ? sectionRow.id : null;
         const keys: string[] = [];
+        const sourceNotes: Record<string, string> = {};
         for (const link of sectionId ? (sectionSourcesBySection.get(sectionId) ?? []) : []) {
           const source =
             typeof link.source_id === "string" ? sourcesById.get(link.source_id) : undefined;
-          if (source) keys.push(source.key);
+          if (!source) continue;
+          keys.push(source.key);
+          const note = new RowReader(link, slug, "cultivar_guide_section_sources", issues).text(
+            "support_note",
+          );
+          if (note !== undefined) sourceNotes[source.key] = note;
         }
         if (keys.length > 0) sectionSourceKeys[key] = keys.sort(compareText);
+        const sortOrder = sectionRead.integer("sort_order");
+        const sectionSchemaVersion = sectionRead.integer("content_schema_version");
+        const sectionLastVerifiedAt = sectionRead.nullableTimestamp("last_verified_at");
+        if (
+          sortOrder !== undefined &&
+          sectionSchemaVersion !== undefined &&
+          sectionLastVerifiedAt !== undefined
+        ) {
+          sectionMetadata[key] = {
+            sortOrder,
+            contentSchemaVersion: sectionSchemaVersion,
+            lastVerifiedAt: sectionLastVerifiedAt,
+            sourceNotes,
+          };
+        }
       }
       const keys = mapped.map((section) => section.key);
       const complete =
@@ -1068,6 +1165,8 @@ export function mapCultivarDatabaseSnapshot(
     }));
     auxiliaryClaimsBySlug[slug] = claims.auxiliary;
     sectionSourceKeysBySlug[slug] = sectionSourceKeys;
+    if (guideMetadata) guideMetadataBySlug[slug] = guideMetadata;
+    sectionMetadataBySlug[slug] = sectionMetadata;
   }
 
   profiles.sort((a, b) => compareText(a.name, b.name) || compareText(a.slug, b.slug));
@@ -1082,6 +1181,8 @@ export function mapCultivarDatabaseSnapshot(
     aliasRecordsBySlug,
     auxiliaryClaimsBySlug,
     sectionSourceKeysBySlug,
+    guideMetadataBySlug,
+    sectionMetadataBySlug,
     issues,
   };
 }

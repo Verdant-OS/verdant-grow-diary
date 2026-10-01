@@ -24,9 +24,13 @@ import {
   type CultivarDatabaseSnapshot,
 } from "@/lib/cultivarDatabaseReadModel";
 import {
+  buildCultivarDatabaseSeedPayload,
   expectedAliasSourceKey,
   expectedSectionSourceKeys,
 } from "@/lib/cultivarDatabaseSeedPayloadRules";
+
+const isoOrNull = (value: string | null): string | null =>
+  value === null ? null : new Date(value).toISOString();
 
 export const CULTIVAR_PARITY_REPORT_VERSION = 1;
 
@@ -150,6 +154,14 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
   const malformedSlugs = new Set(mapped.issues.map((issue) => issue.slug));
 
   const databaseBySlug = new Map(mapped.catalog.profiles.map((profile) => [profile.slug, profile]));
+  // The approved normalized rows: exactly what the migration payload builder
+  // produces from the bundled library, so expected metadata is never re-typed.
+  const approvedPayload = buildCultivarDatabaseSeedPayload({
+    profiles: input.bundledProfiles,
+    sources: input.bundledSources,
+    sectionsFor: input.bundledSectionsFor,
+  });
+  const approvedBySlug = new Map(approvedPayload.cultivars.map((row) => [row.slug, row]));
   const expectedSlugs = input.bundledProfiles.map((profile) => profile.slug).sort();
   const matchedSlugs: string[] = [];
 
@@ -214,6 +226,45 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
       issues,
     );
 
+    // Stored guide and section metadata, and each link's support note, must
+    // match the approved normalized rows exactly.
+    const approved = approvedBySlug.get(slug);
+    if (approved) {
+      diffValues(
+        slug,
+        "guideMetadata",
+        {
+          version: approved.guide.version,
+          title: approved.guide.title,
+          confidence: approved.guide.confidence,
+          contentSchemaVersion: approved.guide.content_schema_version,
+          lastVerifiedAt: isoOrNull(approved.guide.last_verified_at),
+          publishedAt: isoOrNull(approved.guide.published_at),
+        },
+        mapped.guideMetadataBySlug[slug] ?? null,
+        issues,
+      );
+      diffValues(
+        slug,
+        "sectionMetadata",
+        Object.fromEntries(
+          approved.sections.map((section) => [
+            section.section_key,
+            {
+              sortOrder: section.sort_order,
+              contentSchemaVersion: section.content_schema_version,
+              lastVerifiedAt: isoOrNull(section.last_verified_at),
+              sourceNotes: Object.fromEntries(
+                section.sources.map((link) => [link.source_key, link.support_note]),
+              ),
+            },
+          ]),
+        ),
+        mapped.sectionMetadataBySlug[slug] ?? {},
+        issues,
+      );
+    }
+
     // Stored-but-not-rendered claims must agree with the rendered fields.
     const auxiliary = mapped.auxiliaryClaimsBySlug[slug] ?? [];
     const known = new Set<string>(CULTIVAR_AUXILIARY_TRAITS);
@@ -245,6 +296,13 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
         chemotypeClaims[0].valueText,
         issues,
       );
+      diffValues(
+        slug,
+        "claims.chemotype.sourceKey",
+        approved?.claims.find((claim) => claim.trait_key === "chemotype")?.source_key ?? null,
+        chemotypeClaims[0].sourceKey,
+        issues,
+      );
     }
     const dominantClaims = auxiliary.filter(
       (claim) => claim.traitKey === "reported_dominant_terpenes",
@@ -263,6 +321,14 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
         "claims.reported_dominant_terpenes",
         [...expected.dominantTerpenes],
         dominantClaims[0].valueJsonb,
+        issues,
+      );
+      diffValues(
+        slug,
+        "claims.reported_dominant_terpenes.sourceKey",
+        approved?.claims.find((claim) => claim.trait_key === "reported_dominant_terpenes")
+          ?.source_key ?? null,
+        dominantClaims[0].sourceKey,
         issues,
       );
     }

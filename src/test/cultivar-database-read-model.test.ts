@@ -319,6 +319,46 @@ describe("cultivar database read model — fails closed", () => {
     expect(slugs(rankOnly)).not.toContain("jack-herer");
   });
 
+  it("refuses percentage claims outside 0–100", () => {
+    const cannabinoid = freshSnapshot();
+    const thc = cannabinoid.cultivar_claims.find(
+      (item) =>
+        item.cultivar_id === row(cannabinoid, "blue-dream").id &&
+        item.trait_key === "reported_thc_pct",
+    );
+    if (!thc) throw new Error("thc");
+    thc.value_max = 500;
+    expect(slugs(cannabinoid)).not.toContain("blue-dream");
+
+    const terpene = freshSnapshot();
+    const claim = terpene.cultivar_claims.find(
+      (item) => item.cultivar_id === row(terpene, "blue-dream").id && item.trait_key === "terpene",
+    );
+    if (!claim) throw new Error("terpene");
+    claim.value_min = -5;
+    claim.value_max = 1;
+    claim.unit = "%";
+    expect(slugs(terpene)).not.toContain("blue-dream");
+  });
+
+  it("refuses malformed guide and section metadata", () => {
+    const guideTs = freshSnapshot();
+    const guide = guideTs.cultivar_guides.find(
+      (item) => item.cultivar_id === row(guideTs, "oreoz").id,
+    );
+    if (!guide) throw new Error("guide");
+    guide.published_at = "not-a-date";
+    expect(slugs(guideTs)).not.toContain("oreoz");
+
+    const note = freshSnapshot();
+    const link = note.cultivar_guide_section_sources.find(
+      (item) => item.guide_section_id === "section:oreoz:overview",
+    );
+    if (!link) throw new Error("link");
+    link.support_note = "  ";
+    expect(slugs(note)).not.toContain("oreoz");
+  });
+
   it("refuses claims citing an unreadable source", () => {
     const snapshot = freshSnapshot();
     const claim = snapshot.cultivar_claims.find(

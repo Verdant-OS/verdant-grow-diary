@@ -195,6 +195,26 @@ function slugifyNormalized(normalized: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Section → source links
+// ---------------------------------------------------------------------------
+
+/**
+ * The exact cultivar_guide_section_sources keys a section must carry: every
+ * tendency's evidence key, plus the profile's own source on the overview (the
+ * V1 seed's link). Sorted, de-duplicated. Shared by the payload builder and the
+ * parity audit so they cannot drift apart.
+ */
+export function expectedSectionSourceKeys(
+  profile: VerdantCultivarProfile,
+  section: CultivarGuideSection,
+): string[] {
+  const keys = new Set(section.reportedTendencies.flatMap((tendency) => tendency.evidenceKeys));
+  const profileSourceKey = profile.sourceKeys[0];
+  if (section.key === "overview" && profileSourceKey) keys.add(profileSourceKey);
+  return [...keys].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
+// ---------------------------------------------------------------------------
 // Bundled → payload
 // ---------------------------------------------------------------------------
 
@@ -306,16 +326,13 @@ export function buildCultivarDatabaseSeedPayload(
     }
 
     const sections = input.sectionsFor(profile).map((section, sectionIndex) => {
-      const evidenceKeys = [
-        ...new Set(section.reportedTendencies.flatMap((tendency) => tendency.evidenceKeys)),
-      ];
-      const sourceLinks =
-        section.key === "overview"
-          ? [...new Set([profileSourceKey, ...evidenceKeys])].map((key) => ({
-              source_key: key,
-              support_note: key === profileSourceKey ? OVERVIEW_SUPPORT_NOTE : SECTION_SUPPORT_NOTE,
-            }))
-          : evidenceKeys.map((key) => ({ source_key: key, support_note: SECTION_SUPPORT_NOTE }));
+      const sourceLinks = expectedSectionSourceKeys(profile, section).map((key) => ({
+        source_key: key,
+        support_note:
+          section.key === "overview" && key === profileSourceKey
+            ? OVERVIEW_SUPPORT_NOTE
+            : SECTION_SUPPORT_NOTE,
+      }));
       return {
         section_key: section.key,
         sort_order: (sectionIndex + 1) * 10,

@@ -232,6 +232,34 @@ describe("cultivar database parity — blocked content", () => {
     expect(paths(report)).toContain("changed * sources.watts-2021-terpene-genetics.title");
   });
 
+  it("fails an extra readable source outside the approved catalog", () => {
+    const snapshot = freshSnapshot();
+    snapshot.cultivar_sources.push({
+      ...snapshot.cultivar_sources[0],
+      id: "51000000-0000-4000-8000-000000000999",
+      source_key: "unapproved-extra-source",
+    });
+    const report = audit(snapshot);
+    expect(report.status).toBe("blocked");
+    expect(report.counts.sources).toEqual({ expected: 14, database: 15 });
+    expect(paths(report)).toContain("unexpected * sources.unapproved-extra-source");
+  });
+
+  it("fails an extra or stale section source link", () => {
+    const snapshot = freshSnapshot();
+    const watts = snapshot.cultivar_sources.find(
+      (row) => row.source_key === "watts-2021-terpene-genetics",
+    );
+    snapshot.cultivar_guide_section_sources.push({
+      guide_section_id: "section:gg4:germination",
+      source_id: watts?.id,
+      support_note: "Stale association.",
+    });
+    const report = audit(snapshot);
+    expect(report.status).toBe("blocked");
+    expect(paths(report)).toContain("unexpected gg4 sectionSourceLinks.germination");
+  });
+
   it("is invalid when a cited tendency loses its section source link", () => {
     const snapshot = freshSnapshot();
     snapshot.cultivar_guide_section_sources = snapshot.cultivar_guide_section_sources.filter(

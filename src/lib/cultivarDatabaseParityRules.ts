@@ -23,6 +23,7 @@ import {
   normalizeCultivarAliasForDatabase,
   type CultivarDatabaseSnapshot,
 } from "@/lib/cultivarDatabaseReadModel";
+import { expectedSectionSourceKeys } from "@/lib/cultivarDatabaseSeedPayloadRules";
 
 export const CULTIVAR_PARITY_REPORT_VERSION = 1;
 
@@ -193,9 +194,21 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
       issues,
     );
 
-    // Section→source link coverage is enforced by the read model itself (an
-    // unlinked tendency is refused there and reported as malformed), so the
-    // public pages and this audit cannot disagree about it.
+    // Section→source links: the read model refuses an UNLINKED tendency
+    // (malformed); here the complete per-section link sets must match the
+    // approved ones exactly, so a stale or extra link is reported too.
+    const expectedLinks: Record<string, string[]> = {};
+    for (const section of input.bundledSectionsFor(expected)) {
+      const keys = expectedSectionSourceKeys(expected, section);
+      if (keys.length > 0) expectedLinks[section.key] = keys;
+    }
+    diffValues(
+      slug,
+      "sectionSourceLinks",
+      expectedLinks,
+      mapped.sectionSourceKeysBySlug[slug] ?? {},
+      issues,
+    );
 
     // Stored-but-not-rendered claims must agree with the rendered fields.
     const auxiliary = mapped.auxiliaryClaimsBySlug[slug] ?? [];
@@ -273,6 +286,18 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
       issues.push({ slug: null, kind: "missing", path: `sources.${source.key}` });
     } else {
       diffValues(null, `sources.${source.key}`, source, actual, issues);
+    }
+  }
+  // …and no source beyond the approved set may be present.
+  const bundledSourceKeys = new Set(input.bundledSources.map((source) => source.key));
+  for (const source of mapped.catalog.sources) {
+    if (!bundledSourceKeys.has(source.key)) {
+      issues.push({
+        slug: null,
+        kind: "unexpected",
+        path: `sources.${source.key}`,
+        message: "readable source is not in the approved bundled catalog",
+      });
     }
   }
 

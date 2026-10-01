@@ -75,7 +75,7 @@ blockers: HOLD-CHEEK — adds a migration, so merge waits for Matthew (OWNERSHIP
 artifacts: PR #1827 checks; Security DB Local runs; docs/product/strain-reference-library-v1-1-db-cutover.md (production-only runbook); CURRENT_STATE entry via PR #1830
 reviewer_seat: Blue Dream (.tsx product files and migration); Claude cannot accept its own work
 claimed_by: Claude, 2026-10-01 13:41 CT
-last_updated: 2026-10-01 14:08 CT, by Claude
+last_updated: 2026-10-01 14:12 CT, by Claude
 ```
 
 ### CLAUDE-CURRENT-STATE-1827-STATUS
@@ -87,15 +87,15 @@ branch: claude/current-state-1827-status
 base: verdant-grow-diary
 checkout: git fetch origin claude/current-state-1827-status verdant-grow-diary && git switch claude/current-state-1827-status && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1830
-head_sha: 8b760763e756d7bc23c8612dac66ae1554e404c2, observed 2026-10-01 19:08 UTC. A block cannot name the commit that writes it: the remote head is this SHA plus exactly one commit that edits only this log, so verify with `git rev-parse origin/claude/current-state-1827-status^` equal to this value and `git diff --stat origin/claude/current-state-1827-status^ origin/claude/current-state-1827-status` showing only docs/agents/HANDOFF_LOG.md.
-state: Open, not draft. The CURRENT_STATE entry records #1827 at 24ba8e148 (historical); #1827's current head is the one in the block above (d7a753f29 at 19:08 UTC), so refresh against that block's head_sha, never this line.
+head_sha: 0de8eb8658f02d9d6503fc3c362872f57def7a88, observed 2026-10-01 19:12 UTC. A block cannot name the commit that writes it: the remote head is this SHA plus exactly one commit that edits only docs/agents/CURRENT_STATE.md and/or docs/agents/HANDOFF_LOG.md, so verify `git rev-parse origin/claude/current-state-1827-status^` equals this value and `git diff --stat origin/claude/current-state-1827-status^ origin/claude/current-state-1827-status` lists only those files.
+state: Open, not draft. The CURRENT_STATE entry records #1827 at d7a753f29 (19:12 UTC); #1827's current head is the one in the block above (d7a753f29 at 19:08 UTC), so refresh against that block's head_sha, never this line.
 next_action: Refresh the #1827 entry once exact-head CI on #1827 reports; merge origin/verdant-grow-diary into the branch when it moves (normal push; never rebase or force-push).
 files: docs/agents/CURRENT_STATE.md; docs/agents/HANDOFF_LOG.md
 blockers: Vercel check red = account block (owner). Rebase conflicts possible with other CURRENT_STATE/HANDOFF_LOG edits; resolve by keeping every entry.
 artifacts: PR #1830
 reviewer_seat: Critical Mass (docs/state); Claude cannot accept its own work
 claimed_by: Claude, 2026-10-01 13:41 CT
-last_updated: 2026-10-01 14:08 CT, by Claude
+last_updated: 2026-10-01 14:12 CT, by Claude
 ```
 
 ### CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001

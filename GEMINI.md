@@ -153,9 +153,10 @@ agent from one written block.
   (date, time, zone). Use the template at the top of the log.
 - **When to update it.** At least once a day while the task is open, and always before the
   agent stops, hands off, or expects to run out of budget. Before stopping or handing off,
-  push the branch so the block's head SHA exists on GitHub: a successor can only claim on
-  a PR, and a local-only block (branch not on GitHub) is not eligible for coverage until
-  its holder pushes it. A pushed block older than 24 hours, or with no `claimed_by`, is
+  push the branch and make sure it has a PR, because a successor can only claim on a PR.
+  Under `docs/agents/OWNERSHIP.md` Codex opens PRs, as drafts; a holder without that
+  right asks Codex. A block without a pushed branch and a PR is not eligible for coverage
+  until both exist. A block with both, older than 24 hours or with no `claimed_by`, is
   open for anyone.
 - **Eligible coverage.** Any agent may resume an unclaimed block or one whose
   `last_updated` is older than 24 hours, subject to explicit assignments and named locks.
@@ -163,9 +164,8 @@ agent from one written block.
   needed to resume. A block's effective claim is the newest of its log `claimed_by` and
   any `claimed_by:` comment on its PR, so read the PR's comments before treating a block
   as unclaimed or stale. Before resuming, claim the task with a comment on its PR that reads
-  `claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC` (owner decision 2026-10-01); a task
-  without a PR first opens its draft PR from the block's branch, then posts that claim
-  comment on it.
+  `claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC` (owner decision 2026-10-01). A successor
+  never opens the PR itself; a block without one is not yet eligible.
   The claim takes effect when posted: from then on you hold the branch and the previous
   holder stops pushing. The newest claim, in the log or on the PR, is the current
   `claimed_by` and counts as `last_updated` for the 24-hour rule; carry it into the block

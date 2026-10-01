@@ -23,6 +23,7 @@
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import type { NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
+import { withGrowId } from "@/lib/routes";
 
 export type GuidedActionItemKind =
   "sensor_context" | "cadence" | "alert_followup" | "stage_transition";
@@ -46,6 +47,7 @@ export interface GuidedActionItem {
 export interface GuidedChecklistPlant {
   id: string;
   name: string;
+  growId: string | null;
   tentId: string | null;
   stage: string | null;
 }
@@ -190,15 +192,22 @@ function formatAge(ms: number): string {
   return `${hours}h`;
 }
 
+function dailyCheckGrowIdForPlant(
+  plant: GuidedChecklistPlant,
+  scopedGrowId: string,
+): string | null {
+  return plant.growId === scopedGrowId ? scopedGrowId : null;
+}
+
 /** Authenticated Daily Check deep-link for a known plant diary activity. */
 function plantDailyCheckHref(
-  plantId: string,
-  growId: string,
+  plant: GuidedChecklistPlant,
+  scopedGrowId: string,
   method: "note" | "watering" | "photo",
 ): string {
   return buildDailyCheckEntryHref({
-    plantId,
-    growId,
+    plantId: plant.id,
+    growId: dailyCheckGrowIdForPlant(plant, scopedGrowId),
     source: "dashboard",
     method,
   });
@@ -209,7 +218,11 @@ function plantDailyCheckHref(
  * Prefers a plant already assigned to the tent (stable id order); when the
  * tent has no plants, still stays on `/daily-check` — never public `/quick-log`.
  */
-function tentSensorDailyCheckHref(tentId: string, plants: readonly GuidedChecklistPlant[]): string {
+function tentSensorDailyCheckHref(
+  tentId: string,
+  plants: readonly GuidedChecklistPlant[],
+  scopedGrowId: string,
+): string {
   const plantInTent = plants
     .filter((p) => p.tentId === tentId)
     .slice()
@@ -217,11 +230,12 @@ function tentSensorDailyCheckHref(tentId: string, plants: readonly GuidedCheckli
   if (plantInTent) {
     return buildDailyCheckEntryHref({
       plantId: plantInTent.id,
+      growId: dailyCheckGrowIdForPlant(plantInTent, scopedGrowId),
       source: "dashboard",
       method: "sensor",
     });
   }
-  return "/daily-check?from=dashboard";
+  return withGrowId("/daily-check?from=dashboard", scopedGrowId);
 }
 
 /**
@@ -283,7 +297,7 @@ export function buildGuidedActionChecklist(
       title: `Capture a fresh reading for ${tent.name}`,
       reason: describeStaleReason(reading, now),
       ctaLabel: "Log snapshot",
-      ctaHref: tentSensorDailyCheckHref(tent.id, plants),
+      ctaHref: tentSensorDailyCheckHref(tent.id, plants, input.scopedGrowId),
       plantId: null,
       tentId: tent.id,
     });
@@ -306,7 +320,7 @@ export function buildGuidedActionChecklist(
             ? "No watering or feeding logged for this plant yet."
             : `No watering or feeding in ${age}.`,
         ctaLabel: "Quick Log",
-        ctaHref: plantDailyCheckHref(plant.id, input.scopedGrowId, "watering"),
+        ctaHref: plantDailyCheckHref(plant, input.scopedGrowId, "watering"),
         plantId: plant.id,
         tentId: plant.tentId,
       });
@@ -322,7 +336,7 @@ export function buildGuidedActionChecklist(
         title: `Capture a fresh photo of ${plant.name}`,
         reason: lastPhoto == null ? "No photo captured for this plant yet." : `No photo in ${age}.`,
         ctaLabel: "Quick Log",
-        ctaHref: plantDailyCheckHref(plant.id, input.scopedGrowId, "photo"),
+        ctaHref: plantDailyCheckHref(plant, input.scopedGrowId, "photo"),
         plantId: plant.id,
         tentId: plant.tentId,
       });
@@ -343,7 +357,7 @@ export function buildGuidedActionChecklist(
               ? `${plant.name} is in flower — no trichome or pistil note yet.`
               : `${plant.name} is in flower — last trichome/pistil note ${age} ago.`,
           ctaLabel: "Log observation",
-          ctaHref: plantDailyCheckHref(plant.id, input.scopedGrowId, "note"),
+          ctaHref: plantDailyCheckHref(plant, input.scopedGrowId, "note"),
           plantId: plant.id,
           tentId: plant.tentId,
         });

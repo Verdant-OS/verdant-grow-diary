@@ -150,6 +150,15 @@ export interface DailyCheckPostSubmitReturnInput {
   fallbackHref?: string | null;
 }
 
+export function resolveDailyCheckDashboardBreadcrumbHref(input: {
+  growId?: string | null;
+  actions: readonly DailyCheckPostSubmitAction[];
+  fallbackHref?: string | null;
+}): string {
+  const scopedBackAction = input.growId ? input.actions.find((action) => action.primary) : null;
+  return scopedBackAction?.href ?? input.fallbackHref ?? "/";
+}
+
 /**
  * Resolve where Daily Check should return after a successful submit.
  *

@@ -2,7 +2,7 @@
  * Timeline — stage-aware VPD wiring on diary sensor-snapshot chips.
  *
  * Static + behavioral assertions: canonical helper reuse, no duplicated
- * VPD bands in JSX, raw VPD chip preserved, and safety contract holds.
+ * VPD bands in JSX, validated VPD chips preserved, and safety contract holds.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -26,7 +26,8 @@ describe("Timeline — stage-aware VPD wiring (static)", () => {
   });
 
   it("still renders VPD for legacy and manual compatibility snapshots", () => {
-    expect(SRC).toMatch(/SnapChip>VPD\s*\{legacyDisplaySensor\.vpd\}/);
+    expect(SRC).toMatch(/buildTimelineCardSensorSnapshotViewModel/);
+    expect(SRC).not.toMatch(/legacyDisplaySensor/);
     expect(SRC).toMatch(/chip\.metric === ["']vpd["']/);
   });
 

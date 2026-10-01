@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import {
+  acceptedReceipt,
   createLocalFixture,
   fenceBrowser,
   fingerprint,
@@ -9,6 +11,89 @@ import {
   witnessRows,
   type Row,
 } from "./lib/nativeLocalFixtures";
+
+test("Dashboard skips a newer JSON-null diary envelope and retrieves an older manual reading", async ({
+  page,
+  context,
+}) => {
+  const f = await createLocalFixture();
+  try {
+    await fenceBrowser(context, f.env);
+    const otherBefore = fingerprint(await witnessRows(f));
+    const olderAt = new Date(Date.now() - 2 * 60_000).toISOString();
+    const newerAt = new Date(Date.now() - 60_000).toISOString();
+    const saveEvidence = async (
+      note: string,
+      details: Record<string, unknown>,
+      occurredAt: string,
+    ) => {
+      const { data, error } = await f.owner.client.rpc("quicklog_save_manual", {
+        p_target_type: "plant",
+        p_target_id: f.primary.plantId,
+        p_action: "note",
+        p_note: note,
+        p_occurred_at: occurredAt,
+        p_details: details,
+        p_idempotency_key: randomUUID(),
+      });
+      expect(error).toBeNull();
+      acceptedReceipt(data);
+    };
+    const olderNote = "Native local older usable manual evidence";
+    const newerNote = "Native local newer JSON-null evidence";
+    await saveEvidence(
+      olderNote,
+      { manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 55 } },
+      olderAt,
+    );
+    await saveEvidence(
+      newerNote,
+      { sensor_snapshot: null, manual_sensor_snapshot: null, environment_check: null },
+      newerAt,
+    );
+    const ownerDiary = (await ownerRows(f.owner)).diary_entries;
+    expect(ownerDiary).toHaveLength(2);
+    expect(ownerDiary.find((row) => row.note === newerNote)?.details).toMatchObject({
+      sensor_snapshot: null,
+      manual_sensor_snapshot: null,
+      environment_check: null,
+    });
+
+    // Use the authenticated owner's real PostgREST query. JSON null must
+    // become SQL NULL under ->>, excluding the newer unusable envelope.
+    const { data: evidence, error: readError } = await f.owner.client
+      .from("diary_entries")
+      .select("id,entry_at,details,tent_id,note")
+      .is("retracted_at", null)
+      .eq("grow_id", f.primary.growId)
+      .in("tent_id", [f.primary.tentId])
+      .or(
+        "details->>sensor_snapshot.not.is.null,details->>manual_sensor_snapshot.not.is.null,details->>environment_check.not.is.null",
+      )
+      .order("entry_at", { ascending: false })
+      .order("id", { ascending: true })
+      .limit(21);
+    expect(readError).toBeNull();
+    expect(evidence?.map((row) => row.note)).toEqual([olderNote]);
+
+    await signIn(page, f);
+    await page.goto(f.env.ui + "/dashboard?growId=" + f.primary.growId);
+    const latest = page.locator('section[aria-label="Latest environment"]');
+    await expect(latest).toBeVisible();
+    await expect(
+      latest.locator("dl").getByText("Humidity", { exact: true }).locator("..").locator("dd"),
+    ).toHaveText("55.0%");
+    await expect(
+      latest.locator("dl").getByText("Temperature", { exact: true }).locator("..").locator("dd"),
+    ).toHaveText("77.0°F");
+    await expect(latest).toContainText("Manual");
+    await expect(latest).not.toContainText("No sensor data yet.");
+    expect(fingerprint(await witnessRows(f))).toBe(otherBefore);
+  } finally {
+    await page.close();
+    await f.cleanup();
+  }
+});
 
 // The Sensors form path is distinct from Quick Log's manual snapshot. This
 // proof drives the real form and checks the disposable backend with the

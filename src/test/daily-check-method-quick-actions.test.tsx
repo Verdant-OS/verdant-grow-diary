@@ -165,6 +165,17 @@ function renderPanel() {
   );
 }
 
+function renderPanelWithoutGrowScope() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <DashboardDailyGrowCheckPanel scopedGrowId={null} />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe("Dashboard panel · quick method actions", () => {
   it("unchecked row exposes both Add note and Add sensor snapshot actions", () => {
     renderPanel();
@@ -179,18 +190,42 @@ describe("Dashboard panel · quick method actions", () => {
     ).toBeTruthy();
   });
 
-  it("Add note href carries method=note", () => {
+  it("Add note href carries method=note and growId when a grow is active", () => {
     renderPanel();
     const a = screen.getByTestId("dashboard-daily-grow-check-panel-row-action-note");
     const link = (a.tagName === "A" ? a : a.querySelector("a")) as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe("/daily-check?plantId=p2&from=dashboard&method=note");
+    expect(link.getAttribute("href")).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=note&growId=g1",
+    );
   });
 
-  it("Add sensor snapshot href carries method=sensor", () => {
+  it("Add sensor snapshot href carries method=sensor and growId when a grow is active", () => {
     renderPanel();
     const a = screen.getByTestId("dashboard-daily-grow-check-panel-row-action-sensor");
     const link = (a.tagName === "A" ? a : a.querySelector("a")) as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe("/daily-check?plantId=p2&from=dashboard&method=sensor");
+    expect(link.getAttribute("href")).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=sensor&growId=g1",
+    );
+  });
+
+  it("Add note and Add sensor snapshot hrefs omit growId when no grow is active", () => {
+    renderPanelWithoutGrowScope();
+    const noteLink = (screen
+      .getByTestId("dashboard-daily-grow-check-panel-row-action-note")
+      .querySelector("a") ??
+      screen.getByTestId("dashboard-daily-grow-check-panel-row-action-note")) as HTMLAnchorElement;
+    const sensorLink = (screen
+      .getByTestId("dashboard-daily-grow-check-panel-row-action-sensor")
+      .querySelector("a") ??
+      screen.getByTestId(
+        "dashboard-daily-grow-check-panel-row-action-sensor",
+      )) as HTMLAnchorElement;
+    expect(noteLink.getAttribute("href")).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=note",
+    );
+    expect(sensorLink.getAttribute("href")).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=sensor",
+    );
   });
 
   it("checked rows do not render quick-action buttons", () => {

@@ -19,8 +19,9 @@
  * tent, and never assigns a tent.
  *
  * Tentless candidates are deliberately NOT decided here. Whether a tentless
- * plant may save an observation is owned by Quick Log's own tent gating (open
- * PR #1824 makes "observation" tent-optional for in-grow plants). The gate
+ * plant may save an observation is owned by Quick Log's own tent gating
+ * (`quickLogTentRequirementRules`, #1824: "observation" is tent-optional for
+ * in-grow plants). The gate
  * passes the exact stored plant + grow with `tentId: null`, and Quick Log's
  * gating decides, so this surface follows that decision instead of competing
  * with it.

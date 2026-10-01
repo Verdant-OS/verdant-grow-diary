@@ -4,7 +4,7 @@
  * The handoff targets the candidate plant's OWN stored grow/tent, resolved
  * through the canonical Quick Log target rules against the tent catalog.
  * Tentless candidates pass through with tentId null so Quick Log's own tent
- * gating decides (open PR #1824 owns that rule).
+ * gating decides (`quickLogTentRequirementRules`, #1824, owns that rule).
  */
 import { describe, it, expect } from "vitest";
 import {

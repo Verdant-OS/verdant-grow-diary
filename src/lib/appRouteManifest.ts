@@ -30,8 +30,10 @@ import type { FeatureKey } from "@/lib/featureEntitlements";
  *  - `operator`  — mounted inside `<RequireAuth>` but intended for operator /
  *                  diagnostic use (e.g. `/operator/ecowitt`, `/diagnostics`,
  *                  `/sensors/ecowitt-audit`). Not exposed in normal user nav.
- *  - `internal`  — mounted inside `<RequireAuth>` for internal admin/support
- *                  flows (e.g. `/admin/leads`, `/leads`, `/grow-lineage`).
+ *  - `internal`  — internal admin/support/audit flows (e.g. `/admin/leads`,
+ *                  `/leads`, `/internal/*`). Mounted in the operator group
+ *                  (`src/routes/_app/_operator`), so beyond sign-in they
+ *                  require the server `has_role('operator')` check.
  *  - `redirect`  — an alias to another route (e.g. `/login` → `/auth`).
  *                  Carries no page of its own.
  */
@@ -408,7 +410,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     path: "/pheno-comparison",
     access: "public",
     description:
-      "Read-only Pheno Comparison preview (sample data, mounted outside AuthProvider/GrowsProvider/AppShell — no grows read, no write chrome).",
+      "Read-only Pheno Comparison preview (sample data, mounted outside AppShell — no grows read, no write chrome). Like every route it sits inside the root AuthProvider/GrowsProvider.",
   },
   {
     path: "/pheno-expression-showcase",

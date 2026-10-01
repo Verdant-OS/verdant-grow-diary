@@ -141,7 +141,13 @@ describe("QuickLog legacy failed-save idempotency", () => {
     await clickSave();
     await screen.findByTestId("quick-log-save-error");
     const refusedKey = payloadKey(0);
-    fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+    // The draft fieldset is disabled while review is required; the discard control
+    // must live outside it, or a real browser could never click it (fireEvent
+    // bypasses the disabled-fieldset rule, toBeEnabled() does not).
+    const discard = screen.getByRole("button", { name: "I checked Timeline; discard draft" });
+    expect(screen.getByTestId("quick-log-main-draft-fields")).toBeDisabled();
+    expect(discard).toBeEnabled();
+    fireEvent.click(discard);
     expect(screen.getByRole("dialog").querySelector("textarea")).toHaveValue("");
     expect(saveMock).toHaveBeenCalledTimes(1);
     await typeNote("Deliberately new entry after review.");

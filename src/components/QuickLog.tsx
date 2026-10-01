@@ -3349,30 +3349,6 @@ export default function QuickLog({
               </p>
             )}
 
-            {historyCheckRequired && (
-              <div className="rounded-lg border border-amber-500/40 p-3 space-y-2">
-                {historyReviewNavigation && (
-                  <a
-                    href={historyReviewNavigation.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block underline"
-                  >
-                    {QUICK_LOG_HISTORY_REVIEW_LINK_LABEL}
-                  </a>
-                )}
-                <p className="text-sm">{QUICK_LOG_HISTORY_DISCARD_HELPER}</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!historyDiscardAllowed}
-                  onClick={handleDiscardHistoryDraft}
-                >
-                  {QUICK_LOG_HISTORY_DISCARD_LABEL}
-                </Button>
-              </div>
-            )}
-
             <Button
               type="submit"
               disabled={saveLocked || sameTargetRecoveryLocked || !resolvedTarget || !!savedTarget}
@@ -3507,6 +3483,33 @@ export default function QuickLog({
               </div>
             )}
           </fieldset>
+          {/* Outside the draft fieldset on purpose: that fieldset is disabled while a
+              history check is required, and a button inside a disabled fieldset
+              cannot be clicked in a browser. This panel is the only exit from that
+              state (save, close and Escape are locked), so it must stay enabled. */}
+          {historyCheckRequired && (
+            <div className="rounded-lg border border-amber-500/40 p-3 space-y-2">
+              {historyReviewNavigation && (
+                <a
+                  href={historyReviewNavigation.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block underline"
+                >
+                  {QUICK_LOG_HISTORY_REVIEW_LINK_LABEL}
+                </a>
+              )}
+              <p className="text-sm">{QUICK_LOG_HISTORY_DISCARD_HELPER}</p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!historyDiscardAllowed}
+                onClick={handleDiscardHistoryDraft}
+              >
+                {QUICK_LOG_HISTORY_DISCARD_LABEL}
+              </Button>
+            </div>
+          )}
         </form>
       </DialogContent>
     </Dialog>

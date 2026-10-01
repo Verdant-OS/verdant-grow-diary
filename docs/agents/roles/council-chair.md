@@ -46,8 +46,9 @@ verified provenance over the one with more detail.
 Codex, Claude, and Grok are peers: **none outranks the others** (Cheek, 2026-08-20,
 refined). When weighing competing build, audit, or review outputs, prefer verified
 provenance and the **current holder / independent reviewer**. The current holder is the
-slice's effective claim under `AGENTS.md`: the newer of `HANDOFF_LOG.md`'s `claimed_by` and
-the PR's `claimed_by:` comments. If a slice's PR claim comments were not supplied, make no
+slice's effective claim under `AGENTS.md`: the newest valid claim among `HANDOFF_LOG.md`'s
+`claimed_by` and the PR's `claimed_by:` comments (a claim posted while another agent's
+claim is under 24 hours old is not valid). If a slice's PR claim comments were not supplied, make no
 recommendation that depends on who holds it; ask for them. Do not treat any peer's output
 as lower-weight by role rank. Confirm no contributor gives that slice's independent
 acceptance PASS.

@@ -25,8 +25,8 @@ effective claim or a last activity older than 24 hours) after posting a
 Keep explicit assignments and named locks; a fresh claim is not available for takeover.
 Every slice names:
 
-1. **The current claim**: the agent building it now, recorded in the log or in a newer
-   claim comment on the task's PR
+1. **The current claim**: the agent building it now, the effective claim under `AGENTS.md`
+   (the newest valid claim, in the log or in a claim comment on the task's PR)
 2. **One independent reviewer**: an agent that has not touched the slice
 
 No agent that contributed to a slice can give its independent acceptance PASS.

@@ -101,9 +101,13 @@ Use small, scoped changes. Avoid broad rewrites.
 - **One task, one branch, one holder.** New Codex branches use
   `codex/<task-id>-<slug>` in lowercase. There is no shared working branch.
   Only the agent currently holding a
-  branch, per the newest claim in `docs/agents/HANDOFF_LOG.md` or on the task's PR, pushes to it, and no agent edits files on
+  branch, per the effective claim (see Agent Handoff / Coverage) in `docs/agents/HANDOFF_LOG.md` or on the task's PR, pushes to it, and no agent edits files on
   another holder's branch. The task goes with the branch: whoever holds the branch holds
   the task. Preserve the original names of existing branches when resuming them.
+  A block records one branch and one PR; stacked work (a parent and a child PR) uses one
+  block per branch. A block that still lists several branches counts as one block per
+  branch: a claim on one of its PRs covers only that PR's branch, and the holder splits
+  the block at the next log update.
 - **Repair ownership and intake.** Codex fixes every discovered defect in its assigned
   repository scope itself. New work arrives as `@codex` PR comments. A coverage record
   preserves resumable evidence; it does not delegate implementation or grant new authority.
@@ -156,19 +160,26 @@ agent from one written block.
 - **Eligible coverage.** Any agent may resume an open block as defined above, subject to
   explicit assignments and named locks.
   A fresh claim is not available for takeover. The handoff block carries the context
-  needed to resume. A block's effective claim is the newest of its log `claimed_by` and
-  any `claimed_by:` comment on its PR, so read the PR's comments before treating a block
-  as unclaimed or stale. Before resuming, claim the task with a comment on its PR that reads
-  `claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC` (owner decision 2026-10-01). A successor
-  never opens the PR itself; a block without one is not yet eligible.
-  The claim takes effect when posted: from then on you hold the branch and the previous
-  holder stops pushing. The newest claim, in the log or on the PR, is the current
-  `claimed_by` and counts toward the block's last activity; carry it into the block at
-  the next log update. Fetch the branch and confirm `git rev-parse origin/<branch>`
-  matches the block's head SHA before running the block's checkout command, which ends
-  with the base merge; if it differs, stop and reconcile with the newest claim. Then run
-  the checkout command and continue on the same branch. Never rename, recreate, or
-  force-push it.
+  needed to resume. A claim is valid only when it is posted while the block is open, or
+  by the agent already holding the block's effective claim (a renewal). A block's
+  effective claim is the newest valid claim among its log `claimed_by` and the
+  `claimed_by:` comments on its PR, ordered by when they were posted, so read the PR's
+  comments before treating a block as unclaimed or stale. A claim posted while another
+  agent's valid claim is under 24 hours old is not valid: when two agents race for the
+  same open block, the first claim posted holds it. Before resuming, claim the task with a
+  comment on its PR that reads `claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC` (owner
+  decision 2026-10-01), then re-read the PR's comments; if another agent's valid claim was
+  posted before yours, yours is not valid, so stop and touch nothing. A successor never
+  opens the PR itself; a block without one is not yet eligible.
+  A valid claim takes effect when posted: from then on you hold the branch and the
+  previous holder stops pushing. The effective claim is the current `claimed_by` and
+  counts toward the block's last activity; carry it into the block at the next log
+  update. Fetch the branch and confirm `git rev-parse origin/<branch>` matches the
+  block's head SHA; if it differs, stop and reconcile with the effective claim. Then
+  check out the branch and run `git merge --ff-only origin/<branch>`, so a stale local
+  copy cannot stand in for the recorded head; if the fast-forward fails, stop and
+  reconcile. Only then run the block's checkout command, which ends with the base merge,
+  and continue on the same branch. Never rename, recreate, or force-push it.
 - **Coverage on startup.** Read `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK`
   and truthfully record `open_handoffs_checked`. After the acknowledgment, keep an
   explicit assignment. If you have no assigned task, select the highest-priority

@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths: &event_replay_lock_paths
       - "supabase/migrations/20260927012000_quicklog_event_replay_active_receipt.sql"
+      - "supabase/migrations/20261001140000_quicklog_event_replay_mirrorless_legacy.sql"
       - "supabase/migrations/20260725023000_core_schema_forward_repair.sql"
       - "supabase/migrations/20260725024026_quicklog_dual_timestamp_foundation.sql"
       - "supabase/migrations/20260811090000_quicklog_corrections_retractions.sql"
@@ -12,6 +13,7 @@ on:
       - "scripts/run-quicklog-manual-delegate-forward-repair-pg15-harness.mjs"
       - "src/test/quicklog-event-replay-lock-pg15-harness.test.ts"
       - "src/test/quicklog-event-replay-active-receipt.test.ts"
+      - "src/test/quicklog-event-replay-mirrorless-legacy.test.ts"
       - ".github/workflows/quicklog-event-replay-lock-pg15.yml"
   push:
     branches:

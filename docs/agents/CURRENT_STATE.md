@@ -7,7 +7,8 @@
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
 
-- **Open, ready for review: [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
+- **Open (not draft), awaiting CI and Chemdawg pre-check — review not routed:
+  [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
   (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `a7232e1e1`, 12 commits) implements
   issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 15:43
   UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 1 pass / 92 pending /

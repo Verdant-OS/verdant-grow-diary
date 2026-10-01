@@ -2,27 +2,25 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T15:17 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T15:31 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
-this entry's 2026-10-01T01:58 UTC version.
+this entry's earlier 2026-10-01 versions.
 
 - **Open, ready for review: [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
-  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `42ad20a74`, 9 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 15:17
-  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 1 pass / 86 pending /
-  6 skipped / **1 failed — `Vercel`**. No approving review is recorded.
-- **Base:** `verdant-grow-diary` merged into the branch at `1b66c4f0e` (2026-10-01, 15 commits, no
-  conflicts); that brought in `#1832` (hono pin), which clears the earlier `Dependency & Security CI`
-  red on the moderate `hono` advisory 1240640.
+  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `d65094aa9`, 10 commits) implements
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 15:31
+  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 1 pass / 92 pending /
+  7 skipped / **1 failed — `Vercel`**. No approving review. 0 commits behind `verdant-grow-diary`.
+- **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` (2026-10-01, no conflicts), bringing
+  `#1832` (hono pin) that clears the earlier `Dependency & Security CI` red.
 - **`Vercel` red is an account block, not code:** status "Account is blocked"; Vercel created **no
-  deployment** for `1b66c4f0e`, `d30ac3293`, or `42ad20a74`, while every earlier branch commit
-  deployed `READY`. Not a required context. Clearing it is an owner action in the Vercel dashboard
+  deployment** for any branch commit since `1b66c4f0e`, while the six before it deployed `READY`.
+  Not a required context. Clearing it is an owner action in the Vercel dashboard
   (`verdantgrowdiary` team). Cause `NOT_MEASURED`.
 - **Adds a migration:** `supabase/migrations/20260930200000_strain_reference_library_v1_1_parity.sql`
   (new file; additive columns + `cultivar_profile_sources` with published-only RLS and SELECT-only
-  grant; idempotent content upserts). **Committed is not applied. No APPLY.** It still sorts last
-  after the base's five new Quick Log migrations.
+  grant; idempotent content upserts). **Committed is not applied. No APPLY.** It still sorts last.
   - **`HOLD-CHEEK`:** because #1827 adds a migration, its **merge** waits for Matthew
     (`OWNERSHIP.md` §4.3), not only its production apply. Green checks plus an independent PASS do
     not by themselves authorize it to land.
@@ -32,29 +30,30 @@ this entry's 2026-10-01T01:58 UTC version.
 - **Release state:** `cultivarDatabaseReadsEnabled = false`. `/cultivars` still renders the bundled
   sample library with no database request. Status language stays "working V1 prototype in
   pre-release validation" — no "database-backed public reads", "shipped", or "live" claim.
-- **Automated review:** 16 review threads (Codex, CodeRabbit), **all resolved**.
-  - Real gaps were fixed and RED-tested. Fail closed on:
-    - unlinked evidence;
-    - an ambiguous latest guide;
-    - non-percent claim units;
-    - alias source provenance.
-
-    Strict-audit set parity now also covers sources and section links. The harness got
-    valid-payload insert probes, update/delete denial on every table, direct child-row probes, and
-    seed/lookup failure checks, and the receipt now accepts anon keys only.
-
-  - One P1 claim ("missing `END;` breaks the migration") was **refuted with evidence**: Security DB
-    Local run `36803000559` applied the file and re-applied it via `psql -v ON_ERROR_STOP=1`.
-    Copilot's review hit its quota; CodeRabbit's first manual review was rate-limited.
-- **Evidence (`established fact`, local Windows clone at `42ad20a74`):**
+- **Automated review:** 20 review threads (Codex, CodeRabbit), **all resolved**.
+  - Real gaps were fixed, each RED-tested. The read model now fails closed on:
+    - unlinked evidence and an ambiguous latest guide;
+    - non-percent units and out-of-range percentages;
+    - alias provenance;
+    - malformed guide and section metadata.
+  - The strict audit now requires exact set parity for sources, section links and support notes,
+    plus guide and section metadata and auxiliary-claim provenance. Expected rows come from the
+    migration's own payload builder.
+  - The harness requires both Supabase endpoints to be loopback. It has valid-payload insert
+    probes, update/delete denial on every table, direct child-row probes, and fail-fast seed and
+    lookup checks. The receipt accepts anon keys only.
+  - One P1 claim ("missing `END;` breaks the migration") was **refuted with CI evidence**.
+- **CI DB evidence (`established fact`):** Security DB Local passed on `de12624a2`, `1b66c4f0e`,
+  `d30ac3293` and `42ad20a74`. At `42ad20a74` (run `36882965813`) the expanded harness
+  `test:cultivar-reference-db-security` reported **106 passed, 0 failed** against a freshly replayed
+  local database, including strict parity READY and migration re-apply idempotency. The run on
+  `d65094aa9` (metadata/provenance/%-bound and loopback-API changes) is queued.
+- **Local evidence (`established fact`, Windows clone at `d65094aa9`):**
   - offline strict parity READY 10/10;
-  - focused suite 99/99;
+  - focused suite 103/103;
   - `tsc` 0 diagnostics;
   - `bun run build` exit 0 with all postbuild SEO validators OK (measured at `fd75bb832`).
-- **CI harness evidence:** `test:cultivar-reference-db-security` passed **45/45** on `fd75bb832` in
-  Security DB Local. The expanded harness (the review fixes above) has **not yet completed a CI
-  run** — later runs were cancelled by newer pushes; the run on `42ad20a74` is pending.
-- **`NOT_MEASURED`:** the full 32-shard suite at `42ad20a74`, the preview and production receipts,
+- **`NOT_MEASURED`:** the full 32-shard suite at `d65094aa9`, the preview and production receipts,
   and the cause of the Vercel block.
 - **Review seat — not satisfied.** No independent review is recorded.
   - The owner named **Grok** as reviewer on 2026-10-01. Codex is unavailable, and the earlier

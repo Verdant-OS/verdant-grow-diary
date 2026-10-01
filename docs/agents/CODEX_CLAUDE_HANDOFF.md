@@ -13,13 +13,13 @@ Precedence: `docs/agents/OWNERSHIP.md` wins over this page on ownership, routing
 ## Merge gate (all of these must be true at the exact head SHA)
 
 1. The PR is not a draft and targets `verdant-grow-diary`, not a stacked branch.
-2. Every check is passing: 35/35 required, and no red or pending non-required check either. The dependency-audit job counts. If it's red only because the branch is behind, merge the base in first.
+2. Every check is passing: all required checks (the set pinned in `config/required-status-checks.json`), and no red or pending non-required check either. The dependency-audit job counts. If it's red only because the branch is behind, merge the base in first.
 3. The reviewer (not the writer) has given a PASS or PASS-with-P2 with 0 P1 at that SHA, and there are no unresolved review threads or requested changes.
 4. The PR isn't on the hold list.
 
-Enqueue: `gh api -X PUT repos/Verdant-OS/verdant-grow-diary/pulls/N/merge-async -f sha=<full head> -f merge_action=merge_queue`.
+Enqueue: `gh api -X PUT repos/Verdant-OS/verdant-grow-diary/pulls/<PR_NUMBER>/merge-async -f sha=<HEAD_SHA> -f merge_action=merge_queue`, where `<HEAD_SHA>` is the full 40-character head SHA of the PR at review time (re-read it immediately before enqueueing; a moved head voids the review).
 
-Never force-push, rebase a pushed branch, publish, apply SQL, or touch production Supabase (knk). If the head moves after a review, the review is void; review it again.
+Never force-push, rebase a pushed branch, publish, apply SQL, or touch the production Supabase project. If the head moves after a review, the review is void; review it again.
 
 ## Holds (don't merge; Matthew only)
 

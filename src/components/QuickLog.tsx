@@ -1511,14 +1511,26 @@ export default function QuickLog({
           historyCheckRequiredRef.current = true;
           historyDraftOwnerRef.current = user.id;
           setHistoryCheckRequired(true);
+          // A moved receipt's original entry no longer lives on the draft's
+          // target; review it where the verified readback says it is now.
+          const movedReceipt =
+            reason === "receipt_target_moved" && result.persistedGrowId !== undefined;
           setHistoryReviewNavigation(
-            buildQuickLogTimelineNavTarget({
-              growId: saveTarget.growId,
-              targetType: "plant",
-              targetId: saveTarget.plantId,
-              plantId: saveTarget.plantId,
-              tentId: saveTarget.tentId,
-            }),
+            buildQuickLogTimelineNavTarget(
+              movedReceipt
+                ? {
+                    growId: result.persistedGrowId ?? null,
+                    plantId: result.persistedPlantId ?? null,
+                    tentId: result.persistedTentId ?? null,
+                  }
+                : {
+                    growId: saveTarget.growId,
+                    targetType: "plant",
+                    targetId: saveTarget.plantId,
+                    plantId: saveTarget.plantId,
+                    tentId: saveTarget.tentId,
+                  },
+            ),
           );
         }
         // Surface the (allow-listed) reason code alongside the friendly

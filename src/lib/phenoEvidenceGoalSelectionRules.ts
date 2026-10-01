@@ -2,7 +2,7 @@
  * phenoEvidenceGoalSelectionRules — copy and summary for the Pheno Hunt
  * Evidence goals step (#574).
  *
- * A new hunt arrives with the day-one goals pre-selected. The step must say
+ * A new hunt arrives with a suggested starting set pre-selected. The step must say
  * so plainly, instead of implying the grower already chose them, and the
  * summary must say whether the grower kept or changed that suggestion.
  *
@@ -16,12 +16,13 @@ import {
 } from "@/lib/phenoEvidenceGoals";
 
 export const PHENO_EVIDENCE_GOALS_STEP_INTRO =
-  "Verdant pre-selected the goals you can record from day one. Review them, remove any you " +
-  "won't track, and add later-stage goals if you want them. You decide what matters — Verdant " +
+  "Verdant pre-selected a suggested starting set of goals to track through the hunt. Some, " +
+  "like yield, can only be recorded later in the hunt. Review them, remove any you won't " +
+  "track, and add later-stage goals if you want them. You decide what matters — Verdant " +
   "preserves the evidence you record.";
 
 export interface PhenoEvidenceGoalSelectionSummary {
-  /** True when the selection is exactly the suggested day-one set. */
+  /** True when the selection is exactly the suggested starting set. */
   readonly isSuggestedDefault: boolean;
   readonly summary: string;
 }
@@ -29,7 +30,7 @@ export interface PhenoEvidenceGoalSelectionSummary {
 const KNOWN_GOAL_IDS: ReadonlySet<string> = new Set(PHENO_EVIDENCE_GOALS.map((g) => g.id));
 const SUGGESTED: ReadonlySet<string> = new Set(DEFAULT_SELECTED_EVIDENCE_GOALS);
 
-/** True when `id` is part of the suggested day-one set. */
+/** True when `id` is part of the suggested starting set. */
 export function isSuggestedEvidenceGoal(id: PhenoEvidenceGoalId): boolean {
   return SUGGESTED.has(id);
 }
@@ -47,7 +48,7 @@ export function describePhenoEvidenceGoalSelection(
   return {
     isSuggestedDefault,
     summary: isSuggestedDefault
-      ? `${chosen.size} of ${total} selected — the suggested day-one set`
+      ? `${chosen.size} of ${total} selected — the suggested starting set`
       : `${chosen.size} of ${total} selected — changed from the suggested ${SUGGESTED.size}`,
   };
 }

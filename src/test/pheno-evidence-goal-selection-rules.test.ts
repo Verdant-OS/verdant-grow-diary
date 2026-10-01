@@ -17,10 +17,10 @@ const TOTAL = PHENO_EVIDENCE_GOALS.length;
 const DEFAULTS = [...DEFAULT_SELECTED_EVIDENCE_GOALS];
 
 describe("describePhenoEvidenceGoalSelection", () => {
-  it("untouched default set is described as the suggested day-one set", () => {
+  it("untouched default set is described as the suggested starting set", () => {
     const d = describePhenoEvidenceGoalSelection(DEFAULTS);
     expect(d.isSuggestedDefault).toBe(true);
-    expect(d.summary).toBe(`${DEFAULTS.length} of ${TOTAL} selected — the suggested day-one set`);
+    expect(d.summary).toBe(`${DEFAULTS.length} of ${TOTAL} selected — the suggested starting set`);
   });
 
   it("default set in a different order still counts as the suggested set", () => {
@@ -71,5 +71,11 @@ describe("PHENO_EVIDENCE_GOALS_STEP_INTRO", () => {
     expect(PHENO_EVIDENCE_GOALS_STEP_INTRO).toMatch(/pre-selected/i);
     expect(PHENO_EVIDENCE_GOALS_STEP_INTRO).toMatch(/remove any/i);
     expect(PHENO_EVIDENCE_GOALS_STEP_INTRO).not.toMatch(/^Choose what you plan to track/);
+  });
+
+  it("does not claim every default goal is recordable on day one (Codex on #1843)", () => {
+    // `yield` is recorded at harvest; stretch and resin come later too.
+    expect(PHENO_EVIDENCE_GOALS_STEP_INTRO).not.toMatch(/day one|day-one/i);
+    expect(PHENO_EVIDENCE_GOALS_STEP_INTRO).toMatch(/later in the hunt/i);
   });
 });

@@ -7,7 +7,7 @@ import { isSuggestedEvidenceGoal } from "@/lib/phenoEvidenceGoalSelectionRules";
  * PhenoEvidenceGoalsSelector — presenter-only picker for the evidence goals
  * the grower plans to track. Pure UX; nothing is written to the DB here.
  * The selection lives in local onboarding state. Goals in the suggested
- * day-one set carry a "Suggested" badge so the preset is visible (#574).
+ * starting set carry a "Suggested" badge so the preset is visible (#574).
  */
 export interface PhenoEvidenceGoalsSelectorProps {
   selected: ReadonlyArray<PhenoEvidenceGoalId>;

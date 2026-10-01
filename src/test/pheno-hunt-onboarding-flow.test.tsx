@@ -318,7 +318,7 @@ describe("PhenoHuntNew onboarding flow", () => {
     expect(step.textContent).toMatch(/pre-selected/i);
     expect(step.textContent).not.toMatch(/Choose what you plan to track/);
     expect(screen.getByTestId("pheno-evidence-goals-summary").textContent).toBe(
-      "8 of 12 selected — the suggested day-one set",
+      "8 of 12 selected — the suggested starting set",
     );
     expect(screen.getByTestId("pheno-evidence-goals-suggested-structure")).toBeDefined();
     expect(screen.queryByTestId("pheno-evidence-goals-suggested-post_cure")).toBeNull();

@@ -80,6 +80,34 @@ STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
 
 Do not continue until the context issue is resolved.`;
 
+const REQUIRED_COVERAGE_STARTUP_GATE = `MANDATORY STARTUP GATE
+
+Before analysis, research, commands, edits, writes, outreach, deployment,
+or recommendations, return:
+
+\`\`\`text
+SENTINEL_ACK
+agent:
+assigned_role:
+sentinel_version:
+files_read:
+open_handoffs_checked:
+current_task:
+scope:
+out_of_scope:
+conflicts_found:
+data_access_status:
+write_permission:
+\`\`\`
+
+If a required file is missing or conflicting, return:
+
+\`\`\`text
+STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
+\`\`\`
+
+Do not continue until the context issue is resolved.`;
+
 /**
  * CURRENT_STATE.md is deliberately absent from this list. It was imported here until
  * 2026-08-21, when it measured 153,142 bytes / ~27,400 tokens — 19.1% of every context
@@ -169,6 +197,20 @@ function versionIn(text) {
   return match ? match[1] : null;
 }
 
+/** The coverage field becomes mandatory in the 2026-09-28.3 constitution. */
+function requiresHandoffAck(version) {
+  if (!version) return false;
+  const [date, revision] = version.split(".");
+  return date > "2026-09-28" || (date === "2026-09-28" && Number(revision) >= 3);
+}
+
+/** Dates sort lexically; revisions compare numerically without integer rounding. */
+function versionAdvanced(version, baseVersion) {
+  const [date, revision] = version.split(".");
+  const [baseDate, baseRevision] = baseVersion.split(".");
+  return date > baseDate || (date === baseDate && BigInt(revision) > BigInt(baseRevision));
+}
+
 /**
  * Content with the version line removed, so "did the rules change?" is asked
  * independently of "did the version change?". Without this the two questions answer each
@@ -247,9 +289,12 @@ if (geminiText) {
 // The owner requires the full visible startup block in the canonical constitution and
 // every detailed role file. A reference to the gate is not enough for disconnected
 // agents that receive only their role prompt.
+const requiredStartupGate = requiresHandoffAck(canonicalVersion)
+  ? REQUIRED_COVERAGE_STARTUP_GATE
+  : REQUIRED_STARTUP_GATE;
 for (const path of [CANONICAL, ...ROLE_FILES]) {
   const text = head.get(path)?.text.replace(/\r\n/g, "\n") ?? "";
-  if (text && !text.includes(REQUIRED_STARTUP_GATE)) {
+  if (text && !text.includes(requiredStartupGate)) {
     problems.push(`${path}: exact mandatory SENTINEL_ACK startup gate is missing`);
   }
 }
@@ -316,6 +361,10 @@ if (claudeText) {
 
 if (!existsSync("docs/agents/CURRENT_STATE.md")) {
   problems.push("docs/agents/CURRENT_STATE.md: missing changing shift report");
+}
+
+if (requiresHandoffAck(canonicalVersion) && !existsSync("docs/agents/HANDOFF_LOG.md")) {
+  problems.push("docs/agents/HANDOFF_LOG.md: missing task coverage log");
 }
 
 if (!existsSync(LEGACY_ARCHIVE)) {
@@ -386,6 +435,21 @@ if (!base) {
     notes.push(message);
   }
 } else {
+  // A coordinated downgrade must not restore the legacy gate or remove coverage.
+  // Check even version-only edits, which the normalized-content loop skips.
+  const baseCanonicalText = contentAt(base.sha, CANONICAL);
+  const baseCanonicalVersion = baseCanonicalText === null ? null : versionIn(baseCanonicalText);
+  if (
+    canonicalVersion &&
+    baseCanonicalVersion &&
+    canonicalVersion !== baseCanonicalVersion &&
+    !versionAdvanced(canonicalVersion, baseCanonicalVersion)
+  ) {
+    problems.push(
+      `${CANONICAL}: Sentinel-Version downgrade from ${baseCanonicalVersion} to ` +
+        `${canonicalVersion} is forbidden. The canonical version must increase against ${base.ref}.`,
+    );
+  }
   let changedFiles = 0;
   for (const path of ALL) {
     const entry = head.get(path);

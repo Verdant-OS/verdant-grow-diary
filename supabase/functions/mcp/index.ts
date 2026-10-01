@@ -111,33 +111,6 @@ var CONFIDENCE_BY_VERDICT = Object.freeze({
   mismatch: "none"
 });
 
-// src/lib/mcpSensorReadingRules.ts
-var CONFIDENCE = {
-  none: 0,
-  low: 0.35,
-  medium: 0.55,
-  high: 0.9
-};
-function normalizedQuality(quality) {
-  return typeof quality === "string" ? quality.trim().toLowerCase() : "invalid";
-}
-function deriveMcpSensorReadingConfidence(input) {
-  const quality = normalizedQuality(input.quality);
-  if (input.source === "invalid" || input.freshness === "invalid" || quality === "invalid" || !input.plausible) {
-    return CONFIDENCE.none;
-  }
-  if (input.source === "stale" || input.source === "demo" || input.freshness === "stale") {
-    return CONFIDENCE.low;
-  }
-  if (input.source === "manual" || input.source === "csv") {
-    return CONFIDENCE.medium;
-  }
-  if (input.source === "live" && input.freshness === "fresh" && quality === "ok") {
-    return CONFIDENCE.high;
-  }
-  return CONFIDENCE.low;
-}
-
 // src/lib/sensorLiveMembership.ts
 var TRUST_LIVE_ALIASES = /* @__PURE__ */ new Set(["live", "sensor", "realtime"]);
 
@@ -146,8 +119,10 @@ var ALIAS = {
   live: "live",
   sensor: "live",
   realtime: "live",
-  // First-party bridge is trust-live for badge purposes (matches
-  // VERIFIED_SNAPSHOT_LIVE_ROW_SOURCES reservation in sensorSnapshot).
+  // First-party bridge is trust-live for badge/membership purposes (matches
+  // VERIFIED_SNAPSHOT_LIVE_ROW_SOURCES). Display must still use
+  // resolveSensorSourceDisplayCanon so the grower sees Source "Live sensor"
+  // with provenance "Pi bridge" — never the raw token as the Source label.
   pi_bridge: "live",
   manual: "manual",
   user: "manual",
@@ -445,7 +420,61 @@ async function selectWithRetractionCompat(build) {
   return await build(false);
 }
 
+// src/lib/isUuid.ts
+var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(value) {
+  return typeof value === "string" && UUID_RE.test(value);
+}
+
+// src/lib/manualSensorCorrectionOperationRules.ts
+function isObservationTimestamp(value) {
+  if (typeof value !== "string") return false;
+  const match = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,6})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.exec(
+    value
+  );
+  if (!match || !Number.isFinite(Date.parse(value))) return false;
+  const day = /* @__PURE__ */ new Date(match[1] + "T00:00:00Z");
+  return Number.isFinite(day.getTime()) && day.toISOString().slice(0, 10) === match[1];
+}
+
+// src/lib/effectiveSensorReadingRules.ts
+function requireEffectiveSensorReadings(data) {
+  if (!Array.isArray(data)) throw new Error("Sensor readings are unavailable.");
+  const seen = /* @__PURE__ */ new Set();
+  for (const value of data) {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      throw new Error("Sensor readings are unavailable.");
+    const row = value;
+    if (row.correction_valid !== true || !isUuid(row.id) || seen.has(row.id) || !isUuid(row.user_id) || !isUuid(row.tent_id) || typeof row.value !== "number" || !Number.isFinite(row.value) || typeof row.metric !== "string" || !row.metric || typeof row.source !== "string" || !row.source || typeof row.quality !== "string" || !isObservationTimestamp(row.ts) || !isObservationTimestamp(row.created_at) || row.captured_at !== null && !isObservationTimestamp(row.captured_at) || row.device_id !== null && typeof row.device_id !== "string" || !Object.hasOwn(row, "raw_payload"))
+      throw new Error("Sensor readings are unavailable.");
+    seen.add(row.id);
+  }
+  return data;
+}
+
 // src/lib/operatorAccountReadModels.ts
+var MCP_SENSOR_CONFIDENCE = {
+  none: 0,
+  low: 0.35,
+  medium: 0.55,
+  high: 0.9
+};
+function deriveMcpSensorReadingConfidence(input) {
+  const quality = typeof input.quality === "string" ? input.quality.trim().toLowerCase() : "invalid";
+  if (input.source === "invalid" || input.freshness === "invalid" || quality === "invalid" || !input.plausible) {
+    return MCP_SENSOR_CONFIDENCE.none;
+  }
+  if (input.source === "stale" || input.source === "demo" || input.freshness === "stale") {
+    return MCP_SENSOR_CONFIDENCE.low;
+  }
+  if (input.source === "manual" || input.source === "csv") {
+    return MCP_SENSOR_CONFIDENCE.medium;
+  }
+  if (input.source === "live" && input.freshness === "fresh" && quality === "ok") {
+    return MCP_SENSOR_CONFIDENCE.high;
+  }
+  return MCP_SENSOR_CONFIDENCE.low;
+}
 var OPERATOR_SENSOR_METRICS = [
   "temperature_c",
   "humidity_pct",
@@ -458,7 +487,7 @@ var OPERATOR_SENSOR_METRICS = [
   "ppfd"
 ];
 var DIARY_COLUMNS = "id,grow_id,plant_id,tent_id,stage,note,entry_at,created_at";
-var SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at,created_at,raw_payload";
+var SENSOR_COLUMNS = "id,user_id,tent_id,metric,value,quality,source,ts,captured_at,created_at,device_id,raw_payload,correction_valid";
 var SENSOR_CANDIDATE_LIMIT = 25;
 var SENSOR_CANDIDATE_LOOKAHEAD_LIMIT = SENSOR_CANDIDATE_LIMIT + 1;
 var MCP_SENSOR_CONFLICT_SOURCE_CLASSES = ["live", "manual", "csv"];
@@ -590,13 +619,15 @@ function hasMaterialMcpSensorSourceConflict(metric, candidates) {
   return spread > MCP_SENSOR_SOURCE_CONTRADICTION_TOLERANCE[metric];
 }
 function sensorCandidateQuery(client, tentId, metric, branch, sources, limit = SENSOR_CANDIDATE_LIMIT) {
-  const base = client.from("sensor_readings").select(SENSOR_COLUMNS).eq("tent_id", tentId).eq("metric", metric);
+  const base = client.from("sensor_readings_effective").select(SENSOR_COLUMNS).eq("tent_id", tentId).eq("metric", metric);
   const sourceScoped = sources && sources.length > 0 ? base.in("source", sources) : base;
   const timestampScoped = branch === "captured" ? sourceScoped.not("captured_at", "is", null) : sourceScoped.is("captured_at", null);
   return timestampScoped.order("captured_at", { ascending: false }).order("ts", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(limit);
 }
-function rowsFromSensorCandidateResult(result) {
-  return Array.isArray(result.data) ? result.data : [];
+function rowsFromSensorCandidateResult(result, tentId) {
+  const rows = requireEffectiveSensorReadings(result.data);
+  if (rows.some((row) => row.tent_id !== tentId)) throw new Error("Sensor snapshot unavailable.");
+  return rows;
 }
 function usableMcpSensorConflictSource(row, nowMs, staleAfterMs) {
   if (!KNOWN_METRIC_SET.has(row.metric) || !isPlausibleMcpSensorValue(row)) return null;
@@ -667,10 +698,10 @@ function selectLatestMcpSensorReadings(rows, options = {}) {
     })
   );
 }
-async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {}) {
+async function loadLatestSensorSnapshotForOwnedTent(client, tentId, options = {}) {
   const { data: tent, error: tentError } = await client.from("tents").select("id,name,grow_id").eq("id", tentId).maybeSingle();
   if (tentError) {
-    return { ok: false, reason: "unavailable", message: tentError.message };
+    return { ok: false, reason: "unavailable", message: "Sensor snapshot unavailable." };
   }
   if (!tent) {
     return {
@@ -679,6 +710,7 @@ async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {})
       message: "Tent not found for the signed-in grower."
     };
   }
+  if (tent.id !== tentId) throw new Error("Sensor snapshot unavailable.");
   const primaryQueries = OPERATOR_SENSOR_METRICS.flatMap(
     (metric) => ["captured", "legacy"].map((branch) => ({
       metric,
@@ -696,9 +728,9 @@ async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {})
   const primaryResults = await Promise.all(primaryQueries.map(({ query }) => query));
   const primaryFailure = primaryResults.find((result) => result.error);
   if (primaryFailure?.error) {
-    return { ok: false, reason: "unavailable", message: primaryFailure.error.message };
+    return { ok: false, reason: "unavailable", message: "Sensor snapshot unavailable." };
   }
-  const primaryRows = primaryResults.map(rowsFromSensorCandidateResult);
+  const primaryRows = primaryResults.map((result) => rowsFromSensorCandidateResult(result, tentId));
   const primaryCandidates = primaryRows.map((rows) => rows.slice(0, SENSOR_CANDIDATE_LIMIT));
   const { nowMs, staleAfterMs } = sensorSelectionClock(options);
   const supplementalQueries = primaryQueries.flatMap((candidate, index) => {
@@ -724,11 +756,11 @@ async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {})
   const supplementalResults = await Promise.all(supplementalQueries.map(({ query }) => query));
   const supplementalFailure = supplementalResults.find((result) => result.error);
   if (supplementalFailure?.error) {
-    return { ok: false, reason: "unavailable", message: supplementalFailure.error.message };
+    return { ok: false, reason: "unavailable", message: "Sensor snapshot unavailable." };
   }
   const candidates = [
     ...primaryCandidates.flatMap((rows) => rows),
-    ...supplementalResults.flatMap(rowsFromSensorCandidateResult)
+    ...supplementalResults.flatMap((result) => rowsFromSensorCandidateResult(result, tentId))
   ];
   const readings = selectLatestMcpSensorReadings(candidates, options);
   const contradictionMetrics = findMcpSensorSourceContradictionMetrics(candidates, options);
@@ -748,6 +780,13 @@ async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {})
       ...contradictionMetrics.length > 0 ? { contradictionMetrics } : {}
     }
   };
+}
+async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {}) {
+  try {
+    return await loadLatestSensorSnapshotForOwnedTent(client, tentId, options);
+  } catch {
+    return { ok: false, reason: "unavailable", message: "Sensor snapshot unavailable." };
+  }
 }
 
 // src/lib/mcp/tools/list-recent-diary-entries.ts
@@ -2283,7 +2322,7 @@ var mcp_default = defineMcp({
   name: "verdant-grow-os-mcp",
   title: "Verdant Grow OS",
   version: "0.1.0",
-  instructions: "Read-only access to the signed-in Verdant grower's own data. Use `list_grows` to enumerate grows, `list_recent_diary_entries` for recent log entries in a grow the caller owns, and `get_latest_sensor_snapshot` for the most recent reading per metric in a tent the caller owns. Use `list_grow_walk_targets` to rank owned tents and plants for physical inspection, then `get_grow_walk_context` to retrieve bounded, source-labeled evidence for one exact owned target. Grow Walk priority is scouting guidance, not diagnosis. Photo rows are metadata only unless an image is separately supplied and inspected. Sensor readings publish constitution `source` labels only (live|manual|csv|demo|stale|invalid), never vendor/transport tokens, plus `quality`, derived `confidence` (0\u20131), and freshness. Trust is deny-by-default: a reading is current live telemetry ONLY when its quality is `ok` AND its source is `live` (fresh validated connected telemetry). Every other source or quality keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and stale or invalid labels are never current or healthy. This server never writes, never starts AI Doctor, never spends AI credits, never approves Action Queue items, and never controls devices.",
+  instructions: "Read-only access to the signed-in Verdant grower's own data. Use `list_grows` to enumerate grows, `list_recent_diary_entries` for recent log entries in a grow the caller owns, and `get_latest_sensor_snapshot` for the most recent reading per metric in a tent the caller owns. Use `list_grow_walk_targets` to rank owned tents and plants for physical inspection, then `get_grow_walk_context` to retrieve bounded, source-labeled evidence for one exact owned target. Grow Walk priority is scouting guidance, not diagnosis. Photo rows are metadata only unless an image is separately supplied and inspected. Sensor readings always include their `source` and `quality` labels verbatim. Trust is deny-by-default: a reading is current live telemetry ONLY when its quality is `ok` AND its source is `live` (fresh validated connected telemetry). Every other source or quality keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. This server never writes, never starts AI Doctor, never spends AI credits, never approves Action Queue items, and never controls devices.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"

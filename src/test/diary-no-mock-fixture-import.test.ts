@@ -3,9 +3,6 @@
  * `src/mock`. It is imported by Timeline and Quick Log history, so a value
  * import ships fake sensor rows into grower bundles, and any caller of a
  * fixture reader would show them without a Demo label.
- *
- * @source-scan-justified: proves a construct is absent from a file; there is
- * no resolved configuration to import.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";

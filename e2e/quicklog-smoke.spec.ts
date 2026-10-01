@@ -4,6 +4,8 @@ import path from "node:path";
 import type { Locator, Request } from "@playwright/test";
 import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
 import { validateQuickLogFixturePage } from "./lib/fixtureSafety";
+import { observeProductionQuickLogFixture } from "./lib/productionQuickLogFixtureProof";
+import { buildQuickLogSmokeNote } from "./lib/productionQuickLogFixtureRules";
 import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
 
 /**
@@ -171,6 +173,8 @@ test.describe("Quick Log smoke checklist", () => {
 
   test("authenticated end-to-end checklist", async ({ page }, testInfo) => {
     const report = new SmokeChecklistReporter();
+    const productionProof = observeProductionQuickLogFixture(page);
+    const smokeTime = new Date();
     let observedRpcTargetId: string | null = null;
 
     page.on("request", (request) => {
@@ -187,7 +191,7 @@ test.describe("Quick Log smoke checklist", () => {
 
     try {
       await page.goto(PLANT_URL!);
-      await validateQuickLogFixturePage(page);
+      const fixture = await validateQuickLogFixturePage(page, undefined, productionProof);
       let routePlantId = "";
       await report.run(1, "Validate initial plant route target", async () => {
         routePlantId = readPlantRouteId(PLANT_URL!);
@@ -212,6 +216,7 @@ test.describe("Quick Log smoke checklist", () => {
           })
           .toBe(routePlantId);
         initialTarget = await readTargetTuple(dialog);
+        await productionProof.assertTarget(initialTarget, fixture.expected, fixture.expected.plant);
         if (initialTarget.plantId !== routePlantId) {
           throw new Error("Quick Log target does not match the Plant Detail route.");
         }
@@ -231,6 +236,7 @@ test.describe("Quick Log smoke checklist", () => {
           )
           .not.toBe(routePlantId);
         const selectedTarget = await readTargetTuple(dialog);
+        await productionProof.assertTarget(selectedTarget, fixture.expected, TARGET_NAME);
         if (initialTarget && selectedTarget.growId !== initialTarget.growId) {
           throw new Error("Selected target plant is not in the routed plant's grow.");
         }
@@ -362,11 +368,16 @@ test.describe("Quick Log smoke checklist", () => {
             dialog.getByTestId("quick-log-target-card").getAttribute("data-target-plant-id"),
           )
           .toBe(structuredWaterTargetId);
-        await dialog.getByTestId("quicklog-note").fill("Smoke checklist observation");
+        await dialog.getByTestId("quicklog-note").fill(buildQuickLogSmokeNote(smokeTime, 1));
         return "structured sheet closed; target reselected and observation prepared";
       });
 
       await report.run(15, "Save uses displayed target", async () => {
+        await productionProof.assertTarget(
+          await readTargetTuple(dialog),
+          fixture.expected,
+          TARGET_NAME,
+        );
         const displayedTargetId = await dialog
           .getByTestId("quick-log-target-card")
           .getAttribute("data-target-plant-id");
@@ -414,7 +425,12 @@ test.describe("Quick Log smoke checklist", () => {
       });
 
       await report.run(21, "Save quick Observation", async () => {
-        await dialog.getByTestId("quicklog-note").fill("Smoke checklist observation");
+        await productionProof.assertTarget(
+          await readTargetTuple(dialog),
+          fixture.expected,
+          TARGET_NAME,
+        );
+        await dialog.getByTestId("quicklog-note").fill(buildQuickLogSmokeNote(smokeTime, 2));
         await dialog.getByTestId("quick-log-save").click();
         await expect(dialog.getByTestId("quick-log-post-save")).toBeVisible({
           timeout: 15_000,
@@ -437,7 +453,23 @@ test.describe("Quick Log smoke checklist", () => {
         await expect(reopened.getByTestId("quicklog-note")).toHaveValue("");
         return "clean dialog";
       });
+
+      // The production-only runbook requires each tagged save to be read back
+      // from the grow's persisted Timeline; a post-save UI alone is not proof.
+      await report.run(24, "Read both tagged saves back from the grow Timeline", async () => {
+        if (!initialTarget) throw new Error("Grow target unknown; cannot read the saves back.");
+        await page.goto(`/timeline?growId=${encodeURIComponent(initialTarget.growId)}`);
+        for (const sequence of [1, 2] as const) {
+          const note = buildQuickLogSmokeNote(smokeTime, sequence);
+          await expect(page.getByTestId("timeline-entry").filter({ hasText: note })).toHaveCount(
+            1,
+            { timeout: 20_000 },
+          );
+        }
+        return "both tagged saves read back exactly once from the grow Timeline";
+      });
     } finally {
+      productionProof.dispose();
       // Always write the smoke report to a stable path so CI can upload it
       // even when a step fails. Mirrored copy into testInfo.outputDir for
       // Playwright's per-test artifact bundle.

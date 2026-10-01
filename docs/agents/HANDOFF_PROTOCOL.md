@@ -80,7 +80,7 @@ sentinel_version:
 date:
 
 task_id:
-independent_reviewer: Blue Dream or Critical Mass by scope/priority; Durban Poison if independently assigned
+independent_reviewer: the seat assigned under OWNERSHIP.md §4.3 (Blue Dream or Critical Mass); Durban Poison if independently assigned
 claimed_by:
 last_updated:
 
@@ -111,9 +111,11 @@ files_touched:
 ```
 
 The current holder and acceptance reviewer must be independent; changing the claim
-does not erase earlier contributions. Route to Blue Dream for .tsx outside src/test/,
-any P1 or a publish gate; otherwise Critical Mass. Durban Poison may provide acceptance
-when independently assigned.
+does not erase earlier contributions. Record the reviewer actually assigned under
+`docs/agents/OWNERSHIP.md` §4.3 (Chemdawg's pre-check until the bot is live). Its
+defaults: Blue Dream for .tsx outside src/test/, any P1 or a publish gate; Critical
+Mass otherwise, unless load balancing moves that work to Blue Dream. Durban Poison may
+provide acceptance when independently assigned.
 Security/Gemini/Claude observations do not replace that acceptance. Name the
 exact head SHA; routing is not a completed PASS. State NOT_MEASURED if unassigned.
 

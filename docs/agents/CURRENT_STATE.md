@@ -158,10 +158,11 @@ this entry's earlier 2026-10-01 versions.
     independent PASS from Blue Dream, Durban Poison or Critical Mass.
   - Grok's review and that PASS are both `NOT_MEASURED`. Claude does not self-merge.
   - Under `2026-09-28.3` (`#1811`), Claude adds peer observations only and is not the acceptance
-    reviewer; `docs/agents/HANDOFF_LOG.md` has **no block** for `#1827` or `#1830` (checked 18:36
-    UTC). Adding one awaits the owner's decision.
-- **Overlap to watch:** `#1793` also edits `.github/workflows/security-db-local.yml` (different hunk;
-  no textual conflict measured). `#1777` merged first (`569ac94a1`); this entry was rebased above its
+    reviewer. `docs/agents/HANDOFF_LOG.md` carries resumable blocks for both tasks —
+    `CLAUDE-STRAIN-LIBRARY-V1-1-DB-PARITY-419` (`#1827`) and `CLAUDE-CURRENT-STATE-1827-STATUS`
+    (`#1830`) — added on this branch; they reach the deploy branch only when `#1830` merges.
+- **Overlap:** `#1793` was re-landed as `#1849` (`b5d064881`, merged); it touches none of this PR's
+  files, including `.github/workflows/security-db-local.yml`. `#1777` merged first (`569ac94a1`); this entry was rebased above its
   entries on 2026-10-01 with both preserved.
 
 ## Follow-up observation — 2026-09-29T08:38 UTC

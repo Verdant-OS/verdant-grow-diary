@@ -85,11 +85,11 @@ TASK CLAUDE-CURRENT-STATE-1827-STATUS  priority: other  status: OPEN
 goal: Keep a scoped, evidence-labelled #1827 status entry at the top of docs/agents/CURRENT_STATE.md, plus this log's blocks for #1827 and #1830. Docs only; no Sentinel-Version bump (both files exempt).
 branch: claude/current-state-1827-status
 base: verdant-grow-diary
-checkout: git fetch origin claude/current-state-1827-status verdant-grow-diary && git switch claude/current-state-1827-status && git rebase origin/verdant-grow-diary
+checkout: git fetch origin claude/current-state-1827-status verdant-grow-diary && git switch claude/current-state-1827-status && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1830
 head_sha: 12744f9d5c00115519ebfdb2ffbf39db80eb05c5 before this block's commit, observed 2026-10-01 18:41 UTC
 state: Open, not draft. Entry records #1827 at 24ba8e148; #1827 has since moved to 5b7ea953e.
-next_action: Refresh the #1827 entry once exact-head CI on #1827 reports; rebase onto verdant-grow-diary when it moves.
+next_action: Refresh the #1827 entry once exact-head CI on #1827 reports; merge origin/verdant-grow-diary into the branch when it moves (normal push; never rebase or force-push).
 files: docs/agents/CURRENT_STATE.md; docs/agents/HANDOFF_LOG.md
 blockers: Vercel check red = account block (owner). Rebase conflicts possible with other CURRENT_STATE/HANDOFF_LOG edits; resolve by keeping every entry.
 artifacts: PR #1830

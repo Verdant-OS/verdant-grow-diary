@@ -229,7 +229,7 @@ jobs:
 
       - name: Implement one Claude slice
         if: steps.billing.outputs.configured == 'true'
-        uses: anthropics/claude-code-action@8ce9314fa9a404564fa7e954cd84f25bcba2b829 # v1, verified 2026-09-28
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # probe: third-party action swapped out
         with:
           # Max OAuth wins if both credentials exist; never pass both to Claude.
           claude_code_oauth_token: ${{ steps.billing.outputs.mode == 'oauth' && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}

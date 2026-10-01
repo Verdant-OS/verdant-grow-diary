@@ -10,6 +10,9 @@
  *  - "receiving"  → recent (≤ STALE_MS) ingest from a machine pathway that is
  *                    NOT testbench-tagged. Transport evidence only — the UI
  *                    must not call this "live" (#584).
+ *  - "no_bridge_ingest" → the most recent reading is fresh but did not come
+ *                    through a machine ingest pathway (manual / CSV / demo).
+ *                    Not stale, and never promoted to receiving (#593).
  *  - "stale"      → most recent ingest is older than STALE_MS.
  *  - "none"       → no rows seen for this tent.
  *
@@ -28,7 +31,8 @@ export { SENSOR_TESTBENCH_LIVE_WINDOW_MS };
 // machine pathway is TRANSPORT evidence, not a verified live reading — only
 // the strict source rules may award the word "live". Renamed so the two
 // meanings can never be confused again.
-export type SensorTestbenchIndicator = "testbench" | "receiving" | "stale" | "none";
+export type SensorTestbenchIndicator =
+  "testbench" | "receiving" | "no_bridge_ingest" | "stale" | "none";
 
 export interface SensorTestbenchRowLike {
   source?: string | null;
@@ -225,6 +229,10 @@ export function classifySensorTestbench(input: ClassifyInput): SensorTestbenchCl
     indicator = "testbench";
   } else if (ageMs <= windowMs && source && RECEIVING_SOURCES.has(source)) {
     indicator = "receiving";
+  } else if (ageMs >= 0 && ageMs <= windowMs) {
+    // Fresh, but not a machine ingest: label it for what it is instead of
+    // calling a just-recorded manual reading "stale" (#593).
+    indicator = "no_bridge_ingest";
   } else {
     indicator = "stale";
   }

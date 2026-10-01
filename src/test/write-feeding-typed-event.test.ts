@@ -13,6 +13,65 @@ import { getTypedEventWriteReadiness } from "@/lib/quickLogTypedEventPayloadRule
 
 const REPO_ROOT = resolve(__dirname, "..", "..");
 
+describe("typed Feed permanent refusal boundary", () => {
+  const reasons = [
+    "idempotency_key_unverified",
+    "idempotency_receipt_missing",
+    "idempotency_key_retracted",
+    "idempotency_key_conflict",
+  ];
+  it.each(reasons)("preserves the explicit %s server refusal", async (reason) => {
+    const { client, rpc } = makeClient({ data: { ok: false, reason } });
+    expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({ ok: false, reason });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0][1].p_idempotency_key).toBe("feed-save-123");
+  });
+  it.each([null, undefined, "unknown", "plant_tent_grow_mismatch", 42])(
+    "keeps unknown or repairable rejection %s generic",
+    async (reason) => {
+      const { client } = makeClient({ data: { ok: false, reason } });
+      expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
+        ok: false,
+        reason: "rpc:rejected",
+      });
+    },
+  );
+  it.each([undefined, null, "false", 0])(
+    "does not infer permanent refusal from malformed ok=%s",
+    async (ok) => {
+      const { client } = makeClient({ data: { ok, reason: "idempotency_key_retracted" } });
+      expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
+        ok: false,
+        reason: "rpc:rejected",
+      });
+    },
+  );
+  it("does not override an accepted receipt with a stray refusal reason", async () => {
+    const { client } = makeClient({
+      data: {
+        ok: true,
+        grow_event_id: "aaaaaaaa-3333-4333-8333-333333333333",
+        reason: "idempotency_key_retracted",
+      },
+    });
+    expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
+      ok: true,
+      eventId: "aaaaaaaa-3333-4333-8333-333333333333",
+      reused: false,
+    });
+  });
+  it("keeps an RPC transport error uncertain even if its data contains a refusal", async () => {
+    const { client } = makeClient({
+      data: { ok: false, reason: "idempotency_key_retracted" },
+      error: new Error("network"),
+    });
+    expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
+      ok: false,
+      reason: "rpc:error",
+    });
+  });
+});
+
 function baseInput(overrides: Partial<FeedingTypedEventInput> = {}): FeedingTypedEventInput {
   return {
     idempotency_key: "feed-save-123",

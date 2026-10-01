@@ -8,6 +8,7 @@
  *    strip's source/last-updated/per-metric-status wiring.
  */
 import { describe, it, expect } from "vitest";
+import { buildDashboardEmptyEnvironmentViewModel } from "@/lib/dashboardEmptyEnvironmentViewModel";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -302,10 +303,15 @@ describe("Dashboard JSX wiring · empty state", () => {
     expect(DASH).toMatch(/withGrowId\("\/sensors#manual-reading",\s*scopedGrowId\)/);
   });
 
-  it("keeps the existing 'No sensor snapshot yet' + helper copy", () => {
-    expect(DASH).toMatch(/No sensor snapshot yet/);
-    expect(DASH).toMatch(/Add a manual reading or/);
-    expect(DASH).toMatch(/connect Ecowitt/);
+  it("uses sensor-history-scoped empty copy without denying diary evidence", () => {
+    const model = buildDashboardEmptyEnvironmentViewModel({
+      scoped: false,
+      state: null,
+      selectedTents: [],
+    });
+    expect(model.heading).toBe("No sensor readings in this view");
+    expect(model.description).toContain("Add a manual reading or review saved diary entries");
+    expect(DASH).toContain("Set up a sensor.");
   });
 });
 

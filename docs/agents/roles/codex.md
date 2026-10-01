@@ -55,7 +55,8 @@ acceptance PASS, even after a transfer. Peer observations are not acceptance.
 
 ## Boundaries
 
-- The current task explicitly assigned by Cheek defines the active slice. Reconcile it
+- The current task explicitly assigned by Cheek, or a handoff block Codex holds through
+  a valid coverage claim under `AGENTS.md`, defines the active slice. Reconcile it
   with `CURRENT_STATE.md`; report and correct stale state rather than silently obeying
   obsolete operational detail.
 - Inspect existing files and recent/open PRs before building. Reuse a shipped

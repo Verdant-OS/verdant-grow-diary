@@ -8,6 +8,7 @@ on:
       - "scripts/run-linked-diary-delivery-pg15-harness.mjs"
       - "supabase/migrations/20260927094000_linked_quicklog_diary_client_write_fence.sql"
       - ".github/workflows/linked-diary-delivery-pg15.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [verdant-grow-diary]
     paths: *linked_diary_delivery_paths
@@ -15,6 +16,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   pg15_runtime:

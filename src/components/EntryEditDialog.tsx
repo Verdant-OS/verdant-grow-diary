@@ -22,6 +22,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { STAGES } from "@/lib/grow";
 import { toast } from "sonner";
 import DiaryStressObservationsSection from "@/components/DiaryStressObservationsSection";
+import {
+  isLinkedQuickLogDiaryDetails,
+  LINKED_QUICKLOG_REVISION_COPY,
+} from "@/lib/diaryEntryRemovalRules";
 
 interface Entry {
   id: string;
@@ -97,6 +101,10 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
 
   async function save() {
     if (!entry) return;
+    if (isLinkedQuickLogDiaryDetails(entry.details)) {
+      toast.error(LINKED_QUICKLOG_REVISION_COPY);
+      return;
+    }
     if (!note.trim()) {
       toast.error("Note can't be empty");
       return;
@@ -110,10 +118,15 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
       if (k && k !== "event_type" && v) details[k] = v;
     }
     const patch = { note: note.trim(), stage, details };
-    const { error } = await supabase.from("diary_entries").update(patch).eq("id", entry.id);
+    const { data: updated, error } = await supabase
+      .from("diary_entries")
+      .update(patch)
+      .eq("id", entry.id)
+      .select("id")
+      .maybeSingle();
     setBusy(false);
-    if (error) {
-      toast.error(error.message);
+    if (error || updated?.id !== entry.id) {
+      toast.error("Couldn't update this entry. Please try again.");
       return;
     }
     toast.success("Entry updated");
@@ -123,12 +136,21 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
 
   async function remove() {
     if (!entry) return;
+    if (isLinkedQuickLogDiaryDetails(entry.details)) {
+      toast.error(LINKED_QUICKLOG_REVISION_COPY);
+      return;
+    }
     if (!confirm("Delete this entry? This can't be undone.")) return;
     setDeleting(true);
-    const { error } = await supabase.from("diary_entries").delete().eq("id", entry.id);
+    const { data: deleted, error } = await supabase
+      .from("diary_entries")
+      .delete()
+      .eq("id", entry.id)
+      .select("id")
+      .maybeSingle();
     setDeleting(false);
-    if (error) {
-      toast.error(error.message);
+    if (error || deleted?.id !== entry.id) {
+      toast.error("Couldn't delete this entry. Please try again.");
       return;
     }
     toast.success("Entry deleted");

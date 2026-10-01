@@ -15,59 +15,11 @@
  * automation, or device-control surfaces are touched.
  */
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { currentQuicklogManualRpcSource } from "./quicklogManualRpcSource";
 
-const ROOT = resolve(__dirname, "../..");
-const MIG_DIR = resolve(ROOT, "supabase/migrations");
-
-function findLatestRpcSql(): { path: string; sql: string } | null {
-  if (!existsSync(MIG_DIR)) return null;
-  const matches: { path: string; sql: string; name: string }[] = [];
-  for (const name of readdirSync(MIG_DIR)) {
-    const p = join(MIG_DIR, name);
-    const sql = readFileSync(p, "utf8");
-    if (/CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual/i.test(sql)) {
-      matches.push({ path: p, sql, name });
-    }
-  }
-  if (matches.length === 0) return null;
-  matches.sort((a, b) => a.name.localeCompare(b.name));
-  return matches[matches.length - 1];
-}
-
-const mig = findLatestRpcSql();
+const mig = currentQuicklogManualRpcSource();
 const sql = mig?.sql ?? "";
-const bodyMatch = sql.match(
-  /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual[\s\S]*?AS\s+(\$function\$|\$\$)([\s\S]*?)\1/i,
-);
-const wrapperBody = bodyMatch?.[2] ?? "";
-
-function findDelegatedRpcBody(): string {
-  if (
-    !mig ||
-    !/RENAME\s+TO\s+quicklog_save_manual_pre_logged_at/i.test(sql) ||
-    !/quicklog_save_manual_pre_logged_at\s*\(/i.test(wrapperBody)
-  ) {
-    return "";
-  }
-
-  const latestName = mig.path.split(/[\\/]/).pop() ?? "";
-  const earlier = readdirSync(MIG_DIR)
-    .filter((name) => name.localeCompare(latestName) < 0)
-    .sort((a, b) => b.localeCompare(a));
-  for (const name of earlier) {
-    const priorSql = readFileSync(join(MIG_DIR, name), "utf8");
-    const match = priorSql.match(
-      /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual[\s\S]*?AS\s+(\$function\$|\$\$)([\s\S]*?)\1/i,
-    );
-    if (match?.[2]) return match[2];
-  }
-  return "";
-}
-
-const delegatedBody = findDelegatedRpcBody();
-const body = delegatedBody ? `${delegatedBody}\n${wrapperBody}` : wrapperBody;
+const body = mig?.body ?? "";
 
 describe("quicklog_save_manual — migration discoverable", () => {
   it("migration defines the function", () => {

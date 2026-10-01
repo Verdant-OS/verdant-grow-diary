@@ -619,6 +619,23 @@ describe("production smoke save integration", () => {
       expect(source).toContain("productionProof);");
     }
   });
+  it("reads both tagged saves back from the grow Timeline after the last save", () => {
+    // Codex P2 on #1835: a post-save UI is not readback evidence.
+    const source = read("e2e/quicklog-smoke.spec.ts");
+    const step = source.split('await report.run(24, "Read both tagged saves back')[1] ?? "";
+    expect(step).not.toBe("");
+    expect(source.indexOf("await report.run(24,")).toBeGreaterThan(
+      source.indexOf("await report.run(21,"),
+    );
+    expect(step).toContain(
+      "page.goto(`/timeline?growId=${encodeURIComponent(initialTarget.growId)}`)",
+    );
+    expect(step).toContain("buildQuickLogSmokeNote(smokeTime, sequence)");
+    expect(step).toContain("for (const sequence of [1, 2] as const)");
+    expect(step).toMatch(
+      /getByTestId\("timeline-entry"\)\.filter\(\{\s*hasText:\s*note\s*\}\)\)\.toHaveCount\(\s*1,/,
+    );
+  });
   it("checks ownership immediately before both saves and tags both persisted notes", () => {
     const source = read("e2e/quicklog-smoke.spec.ts");
     expect(source).not.toContain('.fill("Smoke checklist observation")');

@@ -43,6 +43,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import {
+  countKeepersForOwner,
   listKeepersForHunt,
   listKeeperStabilityForOwner,
   updateKeeperStabilityRuns,
@@ -196,5 +197,25 @@ describe("updateKeeperStabilityRuns — write", () => {
     const res = await updateKeeperStabilityRuns({ keeperId: "  ", runs: [] });
     expect(res.ok).toBe(false);
     expect(updateChain.updateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("countKeepersForOwner — server-side exact count (Codex on #1825)", () => {
+  it("returns the exact owner-scoped count from a head-only query", async () => {
+    const select = vi.fn(() => Promise.resolve({ count: 2400, error: null }));
+    fromMock.mockReturnValueOnce({ select } as never);
+    expect(await countKeepersForOwner()).toBe(2400);
+    expect(select).toHaveBeenCalledWith("id", { count: "exact", head: true });
+  });
+
+  it("rejects on an error or a missing count — never guesses a total", async () => {
+    fromMock.mockReturnValueOnce({
+      select: vi.fn(() => Promise.resolve({ count: null, error: { message: "boom" } })),
+    } as never);
+    await expect(countKeepersForOwner()).rejects.toThrow();
+    fromMock.mockReturnValueOnce({
+      select: vi.fn(() => Promise.resolve({ count: null, error: null })),
+    } as never);
+    await expect(countKeepersForOwner()).rejects.toThrow();
   });
 });

@@ -19,8 +19,10 @@ vi.mock("@/lib/phenoHuntCandidatesService", () => ({
 }));
 
 const mockKeepers = vi.fn();
+const mockKeeperCount = vi.fn();
 vi.mock("@/lib/phenoKeepersService", () => ({
   listKeeperStabilityForOwner: () => mockKeepers(),
+  countKeepersForOwner: () => mockKeeperCount(),
 }));
 
 function renderIndex() {
@@ -51,6 +53,8 @@ const HUNTS: PhenoHuntListItem[] = [
 beforeEach(() => {
   mockList.mockResolvedValue(HUNTS);
   mockKeepers.mockResolvedValue([]);
+  // By default the server count matches whatever the roll-up returned.
+  mockKeeperCount.mockImplementation(async () => ((await mockKeepers()) ?? []).length);
 });
 
 afterEach(() => {
@@ -258,5 +262,15 @@ describe("PhenoHuntsIndex — candidate and keeper counts agree (#550)", () => {
         screen.getByTestId(`pheno-stability-dashboard-entry-${k.keeperId}`),
       ).toBeInTheDocument();
     }
+  });
+
+  it("omits keeper counts when the server count exceeds the rows read (Codex on #1825)", async () => {
+    mockList.mockResolvedValue(DEMO_HUNTS);
+    mockKeepers.mockResolvedValue(DEMO_KEEPERS);
+    mockKeeperCount.mockResolvedValue(DEMO_KEEPERS.length + 1);
+    renderIndex();
+    const card = await screen.findByTestId(`pheno-hunts-index-item-${DEMO_HUNT_ID}`);
+    expect(card.textContent).toContain("0 active candidates");
+    expect(card.textContent).not.toMatch(/keeper/i);
   });
 });

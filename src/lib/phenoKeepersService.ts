@@ -170,6 +170,20 @@ export async function listKeeperStabilityForOwner(): Promise<KeeperStabilityRow[
 }
 
 /**
+ * Exact number of keepers the signed-in grower owns, from a head-only
+ * `count: "exact"` query (RLS-scoped like the roll-up). Independent of any
+ * response row cap, so the hunts index can prove its roll-up is complete
+ * before showing exact per-hunt keeper counts. Rejects rather than guessing.
+ */
+export async function countKeepersForOwner(): Promise<number> {
+  const { count, error } = await phenoDb
+    .from("pheno_keepers")
+    .select("id", { count: "exact", head: true });
+  if (error || typeof count !== "number") throw new Error("Could not count keepers.");
+  return count;
+}
+
+/**
  * Replace a keeper's stability runs (the grower edits the ledger as a
  * whole set). Sanitized before write; RLS-scoped to the owner via the
  * keeper's own owner policy. Reads the row back so a silently-blocked

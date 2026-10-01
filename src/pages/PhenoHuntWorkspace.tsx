@@ -1465,9 +1465,14 @@ export default function PhenoHuntWorkspace() {
     return { status: "ready", growIds: new Set(growsCtx.grows.map((g) => g.id)) };
   }, [growsCtx.error, growsCtx.loading, growsCtx.grows]);
   const refetchTents = tentsQuery.refetch;
+  const refreshGrows = growsCtx.refresh;
+  const growsFailed = Boolean(growsCtx.error);
+  // Retry whichever catalog failed: a grow-catalog error is not cleared by a
+  // tent refetch (Codex on #1825).
   const retryEvidenceTentCatalog = useCallback(() => {
     void refetchTents();
-  }, [refetchTents]);
+    if (growsFailed && typeof refreshGrows === "function") void refreshGrows();
+  }, [refetchTents, refreshGrows, growsFailed]);
   const { entitlement, refetch: refetchEntitlement } = useMyEntitlements();
   // Owner-only + Pro. Pheno surfaces are owner-only via RLS, so the viewer owns
   // the hunt; the presentation gate is an active Pheno Tracker Pro plan. The

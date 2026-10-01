@@ -38,9 +38,10 @@ vi.mock("@/store/grows", () => ({
     activeGrowId: null,
     activeGrow: null,
     setActiveGrowId: () => {},
-    refresh: () => Promise.resolve(),
+    refresh: () => growsRefresh(),
   }),
 }));
+const growsRefresh = vi.fn(() => Promise.resolve());
 
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
@@ -272,5 +273,23 @@ describe("workspace evidence → Quick Log target (#1005)", () => {
     fireEvent.click(screen.getByTestId(`${COVERAGE}-target-retry`));
     expect(refetch).toHaveBeenCalledTimes(1);
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("Retry also refreshes a failed grow catalog (Codex on #1825)", () => {
+    const refetch = vi.fn().mockResolvedValue(undefined);
+    tentsState.current = { data: [{ id: "t-a", grow_id: "g-a" }], isError: false, refetch };
+    growsState.current = { ...growsState.current, error: "boom" };
+    growsRefresh.mockClear();
+    try {
+      renderWorkspace(candidate("g-a", "t-a"));
+      expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+        "data-target-state",
+        "catalog_error",
+      );
+      fireEvent.click(screen.getByTestId(`${COVERAGE}-target-retry`));
+      expect(growsRefresh).toHaveBeenCalledTimes(1);
+    } finally {
+      growsState.current = { ...growsState.current, error: null };
+    }
   });
 });

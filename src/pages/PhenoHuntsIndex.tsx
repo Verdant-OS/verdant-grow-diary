@@ -17,7 +17,11 @@ import { AlertCircle, ArrowUpRight, Loader2, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/PageHeader";
 import { listPhenoHuntsForOwner, type PhenoHuntListItem } from "@/lib/phenoHuntCandidatesService";
-import { listKeeperStabilityForOwner, type KeeperStabilityRow } from "@/lib/phenoKeepersService";
+import {
+  countKeepersForOwner,
+  listKeeperStabilityForOwner,
+  type KeeperStabilityRow,
+} from "@/lib/phenoKeepersService";
 import { buildStabilityDashboard } from "@/lib/phenoStabilityDashboardRules";
 import {
   buildPhenoHuntCardSummary,
@@ -47,6 +51,8 @@ export default function PhenoHuntsIndex() {
   const [hunts, setHunts] = useState<PhenoHuntListItem[]>([]);
   const [keepers, setKeepers] = useState<KeeperStabilityRow[]>([]);
   const [rollupUnavailable, setRollupUnavailable] = useState(false);
+  // Server-side exact keeper count; null = unknown (counts are then omitted).
+  const [keeperTotal, setKeeperTotal] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,11 +69,16 @@ export default function PhenoHuntsIndex() {
         if (!cancelled) setRollupUnavailable(true);
         return [] as KeeperStabilityRow[];
       }),
+      // Best-effort: an unknown total only hides the per-hunt keeper counts.
+      Promise.resolve()
+        .then(() => countKeepersForOwner())
+        .catch(() => null),
     ])
-      .then(([huntRows, keeperRows]) => {
+      .then(([huntRows, keeperRows, total]) => {
         if (cancelled) return;
         setHunts(huntRows);
         setKeepers(keeperRows);
+        setKeeperTotal(total);
         setStatus("ready");
       })
       .catch(() => {
@@ -101,8 +112,9 @@ export default function PhenoHuntsIndex() {
       keeperCountsFromRollup(keepers, {
         limit: KEEPER_STABILITY_ROLLUP_LIMIT,
         unavailable: rollupUnavailable,
+        total: keeperTotal,
       }),
-    [keepers, rollupUnavailable],
+    [keepers, rollupUnavailable, keeperTotal],
   );
 
   return (

@@ -858,6 +858,7 @@ describe("Agreement acceptance insert production delivery", () => {
       "apply-agreement-acceptance-insert-forward-repair.yml",
       "apply-quicklog-revision-idempotent-replay.yml",
       "apply-plants-health-unassessed-default.yml",
+      "apply-linked-quicklog-diary-client-write-fence.yml",
     ];
 
     expect(guard).toBeDefined();
@@ -906,6 +907,7 @@ describe("Agreement acceptance insert production delivery", () => {
       "apply-agreement-acceptance-insert-forward-repair.yml",
       "apply-quicklog-revision-idempotent-replay.yml",
       "apply-plants-health-unassessed-default.yml",
+      "apply-linked-quicklog-diary-client-write-fence.yml",
     ];
 
     for (const writer of writers) {

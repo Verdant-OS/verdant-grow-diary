@@ -2,6 +2,10 @@
 
 # Verdant — Current Operating State
 
+## Owner notice — Vercel check — 2026-10-01
+
+- **Do not investigate the failing `Vercel` check.** Per Matthew (2026-10-01), the `Vercel` status failing on open PRs comes from a known account-level issue on the owner's side, not from repository code. Do not debug, rerun, re-trigger, change `vercel.json`/deploy settings or work around it, and do not count it as a code regression. Judge PRs on their GitHub Actions checks (the 35 required contexts plus any scoped jobs). This changes no lock, hold or publish gate; production publisher state stays as recorded below.
+
 ## Follow-up observation — 2026-09-29T08:38 UTC
 
 - **PASS, two normal merge-from-base repairs pushed:** #1651 now7f31a8d4eaaf217bab6897fbaacdb7bf0edf48c6 from0ca4487f016877b8db872fa9eeba0205e07c433b; #1355 now9eae24dd35c930b33739b16c324fcc7c700d5a60 fromd5c708740c5b8d91e5c5844d1ea92ef6789442ef. Both incorporate deploy61821446ebd7e4fb30a36a5a95b7526a34515df5 cleanly, no history rewrite. Existing draft/auto-merge-off checked before pushes; PR bodies updated. #1651's eleven feature blobs byte-identical to predecessor; #1355 remains sole .coderabbit.yaml feature, one obsolete approval comment replaced with OWNERSHIP independent-review/GDP routing, parsed configuration unchanged.

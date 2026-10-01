@@ -20,6 +20,12 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const MIGRATION_FILE = "20260927012000_quicklog_event_replay_active_receipt.sql";
 export const MIGRATION_SHA256 = "5896372e29155c5b13353a8a11ef33526338b81290a24aff802df43cc13357fd";
+// Forward repair: carries the complete wrapper at a current version and fixes
+// mirrorless legacy replays. It must apply after MIGRATION_FILE (recorded
+// history) and directly over the foundation wrapper (MIGRATION_FILE skipped).
+export const FORWARD_MIGRATION_FILE = "20261001140000_quicklog_event_replay_mirrorless_legacy.sql";
+export const FORWARD_MIGRATION_SHA256 =
+  "29b1bea6b30e22526ae0070f78e4c43245e2cf04cb6ca99126b97bd6f1dc1af2";
 const foundation = "20260725024026_quicklog_dual_timestamp_foundation.sql";
 const eventSignature =
   "text, uuid, text, uuid, uuid, text, text, jsonb, timestamptz, jsonb, jsonb, jsonb";
@@ -28,6 +34,10 @@ const grow = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const event = "33333333-3333-4333-8333-333333333333";
 const diary = "44444444-4444-4444-8444-444444444444";
 const key = "event-lock-proof-0001";
+const mirrorlessEvent = "55555555-5555-4555-8555-555555555555";
+const mirrorlessKey = "event-lock-proof-mirrorless-0001";
+const mirroredEvent = "66666666-6666-4666-8666-666666666666";
+const mirroredKey = "event-lock-proof-mirrored-0001";
 const occurred = "2026-01-01T10:00:00Z";
 const logged = "2026-01-01T10:01:00Z";
 const MAX_BYTES = 64 * 1024;
@@ -231,6 +241,75 @@ and (select count(*)=1 from public.diary_entries);`,
     await Promise.all([replay.done, revision.done]);
   }
 }
+function assertSequentialBackfill(env, spawnImpl, label) {
+  resetReceipt(env, spawnImpl, true);
+  const receipt = JSON.parse(
+    executeSql(`${beginSql} set local role authenticated; select ${callSql}; commit;`, env, {
+      stage: `${label}sequential_legacy_replay`,
+      spawnImpl,
+    }),
+  );
+  if (
+    !receipt.ok ||
+    receipt.reused !== true ||
+    executeSql(
+      `select logged_at='${logged}'::timestamptz and public.quicklog_try_parse_logged_at(details->>'logged_at')='${logged}'::timestamptz from public.diary_entries where id='${diary}';`,
+      env,
+      { stage: `${label}sequential_backfill`, spawnImpl },
+    ) !== "t"
+  )
+    throw new Error("sequential_backfill_rejected");
+}
+// Before the dual-timestamp foundation, a request without sensor metrics,
+// photo, details, water or feed saved its event with no diary companion. An
+// exact retry of that request still owns an active receipt; the same shape
+// that did need a companion must still refuse when the companion is missing.
+function assertLegacyMirrorless(env, spawnImpl, label) {
+  executeSql(
+    `begin;
+set local verdant.quicklog_logged_at = '${logged}';
+insert into public.grow_events(id,user_id,grow_id,event_type,occurred_at,logged_at,note) values
+  ('${mirrorlessEvent}','${owner}','${grow}','note','${occurred}','${logged}','mirrorless legacy'),
+  ('${mirroredEvent}','${owner}','${grow}','note','${occurred}','${logged}','mirrored legacy');
+insert into public.quicklog_idempotency(user_id,idempotency_key,grow_event_id,request_hash) values
+  ('${owner}','${mirrorlessKey}','${mirrorlessEvent}',public.quicklog_event_request_hash_pre_logged_at('${grow}','note',null,null,'mirrorless legacy',null,'${occurred}'::timestamptz,null,'{}'::jsonb,null,null)),
+  ('${owner}','${mirroredKey}','${mirroredEvent}',public.quicklog_event_request_hash_pre_logged_at('${grow}','note',null,null,'mirrored legacy',null,'${occurred}'::timestamptz,null,'{"source":"legacy"}'::jsonb,null,null));
+commit;`,
+    env,
+    { stage: `${label}legacy_mirrorless_fixture`, spawnImpl },
+  );
+  const mirrorless = JSON.parse(
+    executeSql(
+      `${beginSql} set local role authenticated; select public.quicklog_save_event('${mirrorlessKey}', '${grow}', 'note', null, null, 'mirrorless legacy', null, null, '${occurred}'::timestamptz, '{}'::jsonb, null, null); commit;`,
+      env,
+      { stage: `${label}legacy_mirrorless_replay`, spawnImpl },
+    ),
+  );
+  if (
+    mirrorless?.ok !== true ||
+    mirrorless.reused !== true ||
+    mirrorless.grow_event_id !== mirrorlessEvent
+  )
+    throw new Error("legacy_mirrorless_replay_rejected");
+  const mirrored = JSON.parse(
+    executeSql(
+      `${beginSql} set local role authenticated; select public.quicklog_save_event('${mirroredKey}', '${grow}', 'note', null, null, 'mirrored legacy', null, null, '${occurred}'::timestamptz, '{"source":"legacy"}'::jsonb, null, null); commit;`,
+      env,
+      { stage: `${label}legacy_mirrored_receipt_missing`, spawnImpl },
+    ),
+  );
+  if (mirrored?.ok !== false || mirrored.reason !== "idempotency_receipt_missing")
+    throw new Error("legacy_mirrored_receipt_missing_rejected");
+  if (
+    executeSql(
+      `select (select count(*) from public.diary_entries where details->>'linked_grow_event_id' in ('${mirrorlessEvent}','${mirroredEvent}'))=0
+and (select count(*)=2 from public.grow_events where id in ('${mirrorlessEvent}','${mirroredEvent}') and not is_deleted);`,
+      env,
+      { stage: `${label}legacy_mirrorless_final_rows`, spawnImpl },
+    ) !== "t"
+  )
+    throw new Error("legacy_mirrorless_final_rows_rejected");
+}
 export async function runEventReplayLockHarness({
   url = process.env.QUICKLOG_EVENT_REPLAY_LOCK_PG15_URL,
   containerId = process.env.QUICKLOG_EVENT_REPLAY_LOCK_PG15_CONTAINER,
@@ -251,8 +330,11 @@ export async function runEventReplayLockHarness({
     const migration = sqlFile(MIGRATION_FILE);
     if (createHash("sha256").update(migration).digest("hex") !== MIGRATION_SHA256)
       throw new Error("migration_byte_pin_mismatch");
+    const forward = sqlFile(FORWARD_MIGRATION_FILE);
+    if (createHash("sha256").update(forward).digest("hex") !== FORWARD_MIGRATION_SHA256)
+      throw new Error("forward_migration_byte_pin_mismatch");
     const corrected = extractDefinition(
-      migration,
+      forward,
       "CREATE OR REPLACE FUNCTION public.quicklog_save_event(",
     );
     const originalWrapper = extractDefinition(
@@ -272,10 +354,11 @@ export async function runEventReplayLockHarness({
       "CREATE OR REPLACE FUNCTION public.quicklog_revision_resolve_root(",
       "$$;",
     );
-    stage = "scaffold";
-    resetScaffold(env, spawnImpl);
-    executeSql(
-      `begin;
+    const prepare = (label) => {
+      stage = `${label}scaffold`;
+      resetScaffold(env, spawnImpl);
+      executeSql(
+        `begin;
 alter table public.grow_events add column is_deleted boolean not null default false;
 alter table public.diary_entries add column retracted_at timestamptz;
 ${delegate}
@@ -292,38 +375,26 @@ insert into public.grow_events(id,user_id,grow_id,event_type,occurred_at,logged_
 insert into public.diary_entries(id,user_id,grow_id,note,details,logged_at) values ('${diary}','${owner}','${grow}','lock proof',jsonb_build_object('linked_grow_event_id','${event}'),'${logged}');
 insert into public.quicklog_idempotency(user_id,idempotency_key,grow_event_id,request_hash) values ('${owner}','${key}','${event}',public.quicklog_event_request_hash_pre_logged_at('${grow}','note',null,null,'lock proof',null,'${occurred}'::timestamptz,null,'{}'::jsonb,null,null));
 commit;`,
-      env,
-      { stage: "real_function_fixture", spawnImpl },
-    );
-    if (
-      executeSql(
-        `select (select logged_at='${logged}'::timestamptz from public.grow_events where id='${event}')
-and (select logged_at='${logged}'::timestamptz from public.diary_entries where id='${diary}');`,
         env,
-        { stage: "fixture_timestamp", spawnImpl },
-      ) !== "t"
-    )
-      throw new Error("fixture_timestamp_rejected");
+        { stage: "real_function_fixture", spawnImpl },
+      );
+      if (
+        executeSql(
+          `select (select logged_at='${logged}'::timestamptz from public.grow_events where id='${event}')
+and (select logged_at='${logged}'::timestamptz from public.diary_entries where id='${diary}');`,
+          env,
+          { stage: "fixture_timestamp", spawnImpl },
+        ) !== "t"
+      )
+        throw new Error("fixture_timestamp_rejected");
+    };
+    prepare("");
     stage = "migration";
     executeSql(migration, env, { stage: "pinned_event_replay_migration", spawnImpl });
+    stage = "forward_migration";
+    executeSql(forward, env, { stage: "pinned_forward_migration", spawnImpl });
     stage = "sequential_backfill";
-    resetReceipt(env, spawnImpl, true);
-    const receipt = JSON.parse(
-      executeSql(`${beginSql} set local role authenticated; select ${callSql}; commit;`, env, {
-        stage: "sequential_legacy_replay",
-        spawnImpl,
-      }),
-    );
-    if (
-      !receipt.ok ||
-      receipt.reused !== true ||
-      executeSql(
-        `select logged_at='${logged}'::timestamptz and public.quicklog_try_parse_logged_at(details->>'logged_at')='${logged}'::timestamptz from public.diary_entries where id='${diary}';`,
-        env,
-        { stage: "sequential_backfill", spawnImpl },
-      ) !== "t"
-    )
-      throw new Error("sequential_backfill_rejected");
+    assertSequentialBackfill(env, spawnImpl, "");
     stage = "receipt_deadlock_control";
     await assertRace(
       env,
@@ -356,8 +427,19 @@ and (select logged_at='${logged}'::timestamptz from public.diary_entries where i
       spawnImpl,
       spawnAsyncImpl,
     );
+    stage = "legacy_mirrorless_replay";
+    assertLegacyMirrorless(env, spawnImpl, "");
+    // A database whose recorded history made it skip MIGRATION_FILE still has
+    // the foundation wrapper; the forward repair must apply directly over it.
+    prepare("skipped_history_");
+    stage = "skipped_history_forward_migration";
+    executeSql(forward, env, { stage: "skipped_history_forward_migration", spawnImpl });
+    stage = "skipped_history_sequential_backfill";
+    assertSequentialBackfill(env, spawnImpl, "skipped_history_");
+    stage = "skipped_history_legacy_mirrorless_replay";
+    assertLegacyMirrorless(env, spawnImpl, "skipped_history_");
     process.stdout.write(
-      "Event replay lock PG15: 5 passed, 0 failed (2 deadlock controls detected; 2 serialized races; sequential legacy backfill)\n",
+      "Event replay lock PG15: 10 passed, 0 failed (recorded history: 2 deadlock controls detected, 2 serialized races, sequential legacy backfill, legacy mirrorless replay and its mirrored control; skipped history: forward repair over the foundation wrapper, sequential legacy backfill, legacy mirrorless replay and its mirrored control)\n",
     );
     return 0;
   } catch (error) {

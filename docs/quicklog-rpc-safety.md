@@ -57,6 +57,11 @@ backdated.
   fingerprint so changed and cross-shape retries conflict. Valid grower object
   fields are reconstructed after the delegate returns; the fingerprint itself
   never becomes grower-facing plant memory.
+- The manual wrapper accepts an existing key only when its stored request
+  fingerprint matches and both the original event and linked diary entry remain
+  active. Historical manual keys without a fingerprint cannot prove an exact
+  retry and fail closed without changing the original rows. New keyed saves
+  store the fingerprint with the event inside the protected save transaction.
 
 ## Allowed safe reason codes
 
@@ -65,19 +70,24 @@ The RPC returns `jsonb` of shape `{ ok: boolean, reason?: text, ... }`. When
 the **only** strings the RPC may put in `reason`. Adding a new code requires
 updating this list and the regression tests in the same change.
 
-| Code                      | Meaning                                                               |
-| ------------------------- | --------------------------------------------------------------------- |
-| `not_authenticated`       | `auth.uid()` is null                                                  |
-| `invalid_target_type`     | `p_target_type` not in (`plant`, `tent`)                              |
-| `missing_target_id`       | `p_target_id` is null                                                 |
-| `unsupported_action`      | `p_action` not in (`water`, `note`)                                   |
-| `invalid_volume`          | Water action with missing or non-positive `p_volume_ml`               |
-| `invalid_details`         | `p_details` is present but is not a JSON object                       |
-| `invalid_idempotency_key` | Retry key is present but outside its length bounds                    |
-| `invalid_logged_at`       | Captured timestamp is malformed, impossible, or too far in the future |
-| `target_not_owned`        | Selected plant/tent does not belong to `auth.uid()`                   |
-| `grow_not_owned`          | Defense-in-depth: resolved grow does not belong to caller             |
-| `save_failed`             | Atomic persistence failed; no raw database error is exposed           |
+| Code                          | Meaning                                                               |
+| ----------------------------- | --------------------------------------------------------------------- |
+| `not_authenticated`           | `auth.uid()` is null                                                  |
+| `invalid_target_type`         | `p_target_type` not in (`plant`, `tent`)                              |
+| `missing_target_id`           | `p_target_id` is null                                                 |
+| `unsupported_action`          | `p_action` not in (`water`, `note`)                                   |
+| `invalid_volume`              | Water action with missing or non-positive `p_volume_ml`               |
+| `invalid_details`             | `p_details` is present but is not a JSON object                       |
+| `invalid_idempotency_key`     | Retry key is present but outside its length bounds                    |
+| `idempotency_key_retracted`   | The original event was retracted; its retry key cannot resurrect it   |
+| `idempotency_key_unverified`  | A historical key has no request fingerprint to prove an exact retry   |
+| `idempotency_key_conflict`    | The same key was submitted with a changed request                     |
+| `idempotency_receipt_missing` | The original event has no active diary mirror to retrieve             |
+| `invalid_logged_at`           | Captured timestamp is malformed, impossible, or too far in the future |
+| `target_not_owned`            | Selected plant/tent does not belong to `auth.uid()`                   |
+| `grow_not_owned`              | Defense-in-depth: resolved grow does not belong to caller             |
+| `plant_tent_grow_mismatch`    | Assigned plant tent belongs to another grow; no save was written      |
+| `save_failed`                 | Atomic persistence failed; no raw database error is exposed           |
 
 ### Reason-code rules
 

@@ -406,3 +406,89 @@ describe("AiDoctorContextReadinessPanel", () => {
     expect(src).not.toMatch(/createAlert|insertAlert/);
   });
 });
+
+describe("AiDoctorContextReadinessPanel — open-alert read state", () => {
+  const count = () => screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts");
+  // The status copy is the <dd>'s own text; a nested Retry button (when a retry
+  // callback is wired) contributes its own label, so read only the direct text nodes.
+  const statusText = (el: HTMLElement) =>
+    Array.from(el.childNodes)
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .map((node) => node.textContent)
+      .join("");
+
+  it.each(["idle", "loading"] as const)(
+    "shows loading for %s even with a retained count",
+    (status) => {
+      render(
+        <AiDoctorContextReadinessPanel
+          context={ctx([], [])}
+          openAlertsCount={7}
+          openAlertsStatus={status}
+        />,
+      );
+      expect(count()).toHaveTextContent(/^Loading…$/);
+      expect(count()).not.toHaveTextContent("7");
+      expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+    },
+  );
+
+  it.each([0, 7])("shows unavailable instead of the stale numeric prop %s", (staleCount) => {
+    const retry = vi.fn();
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={staleCount}
+        openAlertsStatus="unavailable"
+        onRetryAlerts={retry}
+      />,
+    );
+    expect(statusText(count())).toBe("Unavailable");
+    expect(count()).not.toHaveTextContent(String(staleCount));
+    const retryButton = screen.getByRole("button", { name: "Retry alerts" });
+    expect(count()).toContainElement(retryButton);
+    fireEvent.click(retryButton);
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([0, 8])("shows the successful uncapped open count %s", (openCount) => {
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={openCount}
+        openAlertsStatus="ok"
+      />,
+    );
+    expect(count()).toHaveTextContent(new RegExp(`^${openCount}$`));
+    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+  });
+
+  it("shows no assigned tent without inventing an empty result or a retry target", () => {
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={0}
+        openAlertsStatus="no_tent"
+      />,
+    );
+    expect(count()).toHaveTextContent(/^No assigned tent$/);
+    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+  });
+
+  it("keeps unavailable truthful when no retry callback is available", () => {
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={3}
+        openAlertsStatus="unavailable"
+      />,
+    );
+    expect(count()).toHaveTextContent(/^Unavailable$/);
+    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+  });
+
+  it("preserves numeric-only presenter callers", () => {
+    render(<AiDoctorContextReadinessPanel context={ctx([], [])} openAlertsCount={5} />);
+    expect(count()).toHaveTextContent(/^5$/);
+  });
+});

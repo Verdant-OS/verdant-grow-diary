@@ -76,8 +76,10 @@ import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
 import { useTents } from "@/hooks/use-tents";
+import { useGrows } from "@/store/grows";
 import {
   resolvePhenoEvidenceQuickLogTarget,
+  type PhenoEvidenceGrowCatalog,
   type PhenoEvidenceTentCatalog,
 } from "@/lib/phenoEvidenceQuickLogTargetGate";
 import type { PhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
@@ -879,6 +881,7 @@ interface EditorProps {
   evidenceStatus: "loading" | "ready" | "error" | "disabled";
   /** The tent catalog Quick Log resolves against (#1005 target gate). */
   evidenceTentCatalog: PhenoEvidenceTentCatalog;
+  evidenceGrowCatalog: PhenoEvidenceGrowCatalog;
   onRetryEvidenceTentCatalog: () => void;
   selected: boolean;
   onToggleSelect: (plantId: string) => void;
@@ -972,6 +975,7 @@ const CandidateEditor = memo(function CandidateEditor({
   evidencePacket,
   evidenceStatus,
   evidenceTentCatalog,
+  evidenceGrowCatalog,
   onRetryEvidenceTentCatalog,
   selected,
   onToggleSelect,
@@ -1030,8 +1034,9 @@ const CandidateEditor = memo(function CandidateEditor({
       resolvePhenoEvidenceQuickLogTarget({
         plant: { plantId, growId: candidate.growId, tentId: candidate.tentId },
         catalog: evidenceTentCatalog,
+        grows: evidenceGrowCatalog,
       }),
-    [plantId, candidate.growId, candidate.tentId, evidenceTentCatalog],
+    [plantId, candidate.growId, candidate.tentId, evidenceTentCatalog, evidenceGrowCatalog],
   );
   const readiness = useMemo(
     () => candidateReadiness(candidate, score, decision, sexRow, smokeRow, labRow, cloneInsured),
@@ -1450,6 +1455,15 @@ export default function PhenoHuntWorkspace() {
     if (tentsQuery.data) return { status: "ready", tents: tentsQuery.data };
     return tentsQuery.isError ? { status: "error" } : { status: "loading" };
   }, [tentsQuery.data, tentsQuery.isError]);
+  // Codex on #1825: Quick Log only targets ACTIVE grows (GrowsProvider lists
+  // non-archived grows), so a candidate in an archived grow must not offer
+  // the handoff. Missing provider/state → loading (fail closed).
+  const growsCtx = useGrows();
+  const evidenceGrowCatalog = useMemo<PhenoEvidenceGrowCatalog>(() => {
+    if (growsCtx.error) return { status: "error" };
+    if (growsCtx.loading || !Array.isArray(growsCtx.grows)) return { status: "loading" };
+    return { status: "ready", growIds: new Set(growsCtx.grows.map((g) => g.id)) };
+  }, [growsCtx.error, growsCtx.loading, growsCtx.grows]);
   const refetchTents = tentsQuery.refetch;
   const retryEvidenceTentCatalog = useCallback(() => {
     void refetchTents();
@@ -2175,6 +2189,7 @@ export default function PhenoHuntWorkspace() {
                       evidencePacket={evidencePackets.packets.get(c.candidateId) ?? null}
                       evidenceStatus={evidencePackets.status}
                       evidenceTentCatalog={evidenceTentCatalog}
+                      evidenceGrowCatalog={evidenceGrowCatalog}
                       onRetryEvidenceTentCatalog={retryEvidenceTentCatalog}
                       selected={selectedIds.includes(c.candidateId)}
                       onToggleSelect={onToggleSelect}

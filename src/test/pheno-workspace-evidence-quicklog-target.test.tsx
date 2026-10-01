@@ -28,6 +28,20 @@ vi.mock("@/hooks/use-tents", () => ({
   useTents: () => tentsState.current,
 }));
 
+// Active (non-archived) grows, as GrowsProvider lists them (Codex on #1825).
+const growsState: {
+  current: { grows: Array<{ id: string }>; loading: boolean; error: string | null };
+} = { current: { grows: [{ id: "g-a" }, { id: "g-hunt" }], loading: false, error: null } };
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({
+    ...growsState.current,
+    activeGrowId: null,
+    activeGrow: null,
+    setActiveGrowId: () => {},
+    refresh: () => Promise.resolve(),
+  }),
+}));
+
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: false,
@@ -205,6 +219,24 @@ describe("workspace evidence → Quick Log target (#1005)", () => {
       `/plants/${PLANT}`,
     );
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("a candidate in an archived grow is blocked and offers Review plant (Codex on #1825)", () => {
+    growsState.current = { ...growsState.current, grows: [{ id: "g-hunt" }] };
+    try {
+      renderWorkspace(candidate("g-a", "t-a"));
+      expect(screen.queryByTestId(`${COVERAGE}-record-structure`)).toBeNull();
+      const status = screen.getByTestId(`${COVERAGE}-target`);
+      expect(status).toHaveAttribute("data-target-state", "grow_unavailable");
+      expect(status).toHaveTextContent("This plant's grow is archived or no longer available.");
+      expect(screen.getByTestId(`${COVERAGE}-target-review`)).toHaveAttribute(
+        "href",
+        `/plants/${PLANT}`,
+      );
+      expect(listener).not.toHaveBeenCalled();
+    } finally {
+      growsState.current = { ...growsState.current, grows: [{ id: "g-a" }, { id: "g-hunt" }] };
+    }
   });
 
   it("a tent that belongs to another grow is blocked, never re-targeted", () => {

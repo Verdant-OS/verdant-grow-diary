@@ -2,6 +2,35 @@
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-01T01:58 UTC — Strain Reference Library V1.1 (#1827)
+
+Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here.
+
+- **Open, ready for review: [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
+  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `fd75bb83`) implements issue
+  `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 01:58 UTC):
+  mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 4 pass / 94 pending /
+  12 cancelled (superseded by the ready-for-review re-trigger) / 7 skipped, 0 failed; no review
+  submitted yet.
+- **Adds a migration:** `supabase/migrations/20260930200000_strain_reference_library_v1_1_parity.sql`
+  (new file; additive columns + `cultivar_profile_sources` with published-only RLS and SELECT-only
+  grant; idempotent content upserts). **Committed is not applied. No APPLY.**
+- **Release state:** `cultivarDatabaseReadsEnabled = false`. `/cultivars` still renders the bundled
+  sample library with no database request. Status language stays "working V1 prototype in
+  pre-release validation" — no "database-backed public reads", "shipped", or "live" claim.
+- **Evidence (`established fact`, local, Windows clone):** offline strict parity audit READY 10/10;
+  81/81 new tests; existing cultivar suite 98/98; `tsc` 0 diagnostics; `bun run build` exit 0 with
+  all postbuild SEO validators OK. **`NOT_MEASURED`:** the local-DB harness
+  (`test:cultivar-reference-db-security`, CI `security-db-local` only), full 32-shard suite, preview
+  and production receipts.
+- **Review seat:** independent reviewer is **GitHub Copilot**, on the owner's instruction
+  (2026-09-30) because Codex is unavailable. Copilot is not a constitution-named peer; whether it
+  satisfies peer review is **Cheek's decision** (precedent: CodeRabbit on `#1685`). Copilot review
+  requested 01:48 UTC; CodeRabbit's manual review was rate-limited. Claude does not self-merge.
+- **Overlap to watch:** `#1793` also edits `.github/workflows/security-db-local.yml` (different hunk;
+  no textual conflict measured). `#1777` inserts entries at the top of this file; whichever merges
+  second rebases.
+
 ## Follow-up observation — 2026-09-29T08:38 UTC
 
 - **PASS, two normal merge-from-base repairs pushed:** #1651 now7f31a8d4eaaf217bab6897fbaacdb7bf0edf48c6 from0ca4487f016877b8db872fa9eeba0205e07c433b; #1355 now9eae24dd35c930b33739b16c324fcc7c700d5a60 fromd5c708740c5b8d91e5c5844d1ea92ef6789442ef. Both incorporate deploy61821446ebd7e4fb30a36a5a95b7526a34515df5 cleanly, no history rewrite. Existing draft/auto-merge-off checked before pushes; PR bodies updated. #1651's eleven feature blobs byte-identical to predecessor; #1355 remains sole .coderabbit.yaml feature, one obsolete approval comment replaced with OWNERSHIP independent-review/GDP routing, parsed configuration unchanged.

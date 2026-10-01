@@ -197,6 +197,8 @@ async function main() {
   let hiddenCultivarId: string | null = null;
   let hiddenSectionId: string | null = null;
   let draftGuideId: string | null = null;
+  const hiddenGuideIds: string[] = [];
+  const hiddenSectionIds: string[] = [];
   let batchId: string | null = null;
   try {
     for (const status of ["draft", "archived"] as const) {
@@ -225,6 +227,7 @@ async function main() {
         .select("id")
         .single();
       if (guide) {
+        hiddenGuideIds.push(guide.id);
         const { data: section } = await admin
           .from("cultivar_guide_sections")
           .insert({
@@ -236,6 +239,7 @@ async function main() {
           .select("id")
           .single();
         if (status === "draft") hiddenSectionId = section?.id ?? null;
+        if (section) hiddenSectionIds.push(section.id);
       }
       if (status === "draft") hiddenCultivarId = cultivar.id;
       await admin.from("cultivar_aliases").insert({
@@ -269,6 +273,27 @@ async function main() {
     if (draftGuide) {
       created.push({ table: "cultivar_guides", column: "id", value: draftGuide.id });
       draftGuideId = draftGuide.id;
+      hiddenGuideIds.push(draftGuide.id);
+      const { data: draftSection } = await admin
+        .from("cultivar_guide_sections")
+        .insert({
+          guide_id: draftGuide.id,
+          section_key: "overview",
+          sort_order: 10,
+          content: { title: "Harness draft guide section" },
+        })
+        .select("id")
+        .single();
+      if (draftSection) hiddenSectionIds.push(draftSection.id);
+    }
+    // Every hidden section carries a source link, so the direct child-table
+    // probes below have real rows to (not) find.
+    for (const sectionId of hiddenSectionIds) {
+      await admin.from("cultivar_guide_section_sources").insert({
+        guide_section_id: sectionId,
+        source_id: watts.data?.id,
+        support_note: "Harness hidden link.",
+      });
     }
     const { data: batch } = await admin
       .from("cultivar_import_batches")
@@ -281,6 +306,22 @@ async function main() {
       await admin
         .from("cultivar_import_rows")
         .insert({ batch_id: batch.id, row_number: 1, raw_payload: {} });
+    }
+
+    {
+      const { count: sectionCount } = await admin
+        .from("cultivar_guide_sections")
+        .select("*", { count: "exact", head: true })
+        .in("guide_id", hiddenGuideIds);
+      const { count: linkCount } = await admin
+        .from("cultivar_guide_section_sources")
+        .select("*", { count: "exact", head: true })
+        .in("guide_section_id", hiddenSectionIds);
+      check(
+        "hidden child rows exist for the direct probes (service-role view)",
+        (sectionCount ?? 0) >= 3 && (linkCount ?? 0) >= 3,
+        JSON.stringify({ sectionCount, linkCount }),
+      );
     }
 
     for (const [label, client] of [
@@ -314,6 +355,26 @@ async function main() {
         check(
           `${label} cannot read a draft guide even without a filter`,
           !(unfilteredGuides ?? []).some((row) => row.version === 99),
+        );
+      }
+      {
+        const sections = await client
+          .from("cultivar_guide_sections")
+          .select("id")
+          .in("guide_id", hiddenGuideIds);
+        check(
+          `${label} cannot read sections of hidden guides directly`,
+          Boolean(sections.error) || (sections.data ?? []).length === 0,
+          JSON.stringify(sections.data?.slice(0, 3)),
+        );
+        const links = await client
+          .from("cultivar_guide_section_sources")
+          .select("guide_section_id")
+          .in("guide_section_id", hiddenSectionIds);
+        check(
+          `${label} cannot read source links of hidden sections directly`,
+          Boolean(links.error) || (links.data ?? []).length === 0,
+          JSON.stringify(links.data?.slice(0, 3)),
         );
       }
       for (const table of IMPORT_TABLES) {
@@ -517,17 +578,67 @@ async function main() {
       untouched?.description !== "tampered",
     );
 
-    // Control: the same probe shapes DO insert as the service role, so a client
-    // refusal above came from grants/RLS, not from an invalid payload.
-    for (const probe of insertProbes("control")) {
+    // Fixtures: the same probe shapes DO insert as the service role, so every
+    // client refusal above came from grants/RLS, not from an invalid payload.
+    // They then serve as harness-owned targets for update/delete denial on
+    // every protected table, verified by value with the service role.
+    const mutations: Record<string, { column: string; value: unknown }> = {
+      breeders: { column: "name", value: "tampered" },
+      cultivars: { column: "description", value: "tampered" },
+      cultivar_aliases: { column: "alias", value: "tampered" },
+      cultivar_sources: { column: "title", value: "tampered" },
+      cultivar_profile_sources: { column: "sort_order", value: 999 },
+      cultivar_claims: { column: "value_text", value: "tampered" },
+      cultivar_guides: { column: "title", value: "tampered" },
+      cultivar_guide_sections: { column: "sort_order", value: 999 },
+      cultivar_guide_section_sources: { column: "support_note", value: "tampered" },
+      cultivar_import_batches: { column: "status", value: "approved" },
+      cultivar_import_rows: { column: "status", value: "approved" },
+    };
+    const fixtures = insertProbes("control");
+    const fixtureValue = async (probe: InsertProbe, column: string) => {
+      const { data } = await admin.from(probe.table).select(column).match(probe.match);
+      const rows = (data ?? []) as unknown as Record<string, unknown>[];
+      return rows.length === 1 ? rows[0][column] : undefined;
+    };
+    const original = new Map<string, unknown>();
+    for (const probe of fixtures) {
       const { error } = await admin.from(probe.table).insert(probe.payload);
-      const present = await rowExists(probe.table, probe.match);
+      const value = await fixtureValue(probe, mutations[probe.table].column);
       check(
         `control: probe payload for ${probe.table} is structurally valid`,
-        !error && present,
+        !error && value !== undefined,
         error?.message,
       );
-      await admin.from(probe.table).delete().match(probe.match);
+      original.set(probe.table, value);
+    }
+    try {
+      for (const [label, client] of [
+        ["anon", anonymous],
+        ["authenticated", authenticated],
+      ] as const) {
+        for (const probe of fixtures) {
+          const { column, value } = mutations[probe.table];
+          await client
+            .from(probe.table)
+            .update({ [column]: value })
+            .match(probe.match);
+          const afterUpdate = await fixtureValue(probe, column);
+          check(
+            `${label} cannot update ${probe.table}`,
+            afterUpdate !== undefined &&
+              JSON.stringify(afterUpdate) === JSON.stringify(original.get(probe.table)),
+            JSON.stringify({ before: original.get(probe.table), after: afterUpdate }),
+          );
+          await client.from(probe.table).delete().match(probe.match);
+          const stillThere = await fixtureValue(probe, column);
+          check(`${label} cannot delete from ${probe.table}`, stillThere !== undefined);
+        }
+      }
+    } finally {
+      for (const probe of [...fixtures].reverse()) {
+        await admin.from(probe.table).delete().match(probe.match);
+      }
     }
     await auditAs("anon after write attempts", anonymous);
   } finally {

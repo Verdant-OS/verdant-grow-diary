@@ -161,13 +161,16 @@ agent from one written block.
   any `claimed_by:` comment on its PR, so read the PR's comments before treating a block
   as unclaimed or stale. Before resuming, claim the task with a comment on its PR that reads
   `claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC` (owner decision 2026-10-01); a task
-  without a PR first opens its draft PR from the block's branch with that line in the body.
+  without a PR first opens its draft PR from the block's branch, then posts that claim
+  comment on it.
   The claim takes effect when posted: from then on you hold the branch and the previous
   holder stops pushing. The newest claim, in the log or on the PR, is the current
   `claimed_by` and counts as `last_updated` for the 24-hour rule; carry it into the block
-  at the next log update. Run the block's checkout command, confirm
-  `git rev-parse origin/<branch>` matches the block's head SHA, then merge from base and
-  continue on the same branch. Never rename, recreate, or force-push it.
+  at the next log update. Fetch the branch and confirm `git rev-parse origin/<branch>`
+  matches the block's head SHA before running the block's checkout command, which ends
+  with the base merge; if it differs, stop and reconcile with the newest claim. Then run
+  the checkout command and continue on the same branch. Never rename, recreate, or
+  force-push it.
 - **Coverage on startup.** Read `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK`
   and truthfully record `open_handoffs_checked`. After the acknowledgment, keep an
   explicit assignment. If you have no assigned task, select the highest-priority

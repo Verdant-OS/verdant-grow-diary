@@ -2,7 +2,7 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T18:06 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T18:19 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
@@ -10,18 +10,23 @@ this entry's earlier 2026-10-01 versions.
 - **Open (not draft), awaiting CI and Chemdawg pre-check — review not routed:
   [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
   (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `a73dbfb40`, 24 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 18:06
-  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI restarted on the new
-  head — 38 pass / 62 pending / 8 skipped / **1 failed — `Vercel`**. No approving review.
-  - Exact-head runs created at 17:40 UTC are draining slowly. `established fact` (Actions API):
-    repository-wide, 168 queued / 27 in progress at 17:58, 145 / 32 at 18:04 and 136 / 30 at 18:06 — a backed-up
-    queue, not a failure on this PR. Cause of the backlog `NOT_MEASURED`.
-  - Required contexts (35, `config/required-status-checks.json`): 34 pending, 1 not yet reported
-    (`Lint, typecheck, test, build`). None failed.
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 18:19
+  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI on the exact head —
+  93 pass / 9 pending / 14 skipped / **2 failed — `Vercel` and `Dispatch history Playwright`**
+  (both non-required; see below). No approving review.
+  - Required contexts (35, `config/required-status-checks.json`): **34 pass**, only
+    `Lint, typecheck, test, build` still pending. None failed.
+  - `Dispatch history Playwright` (non-required; runs here because `package.json` changed) was
+    **cancelled, not failed**: its "Install Chromium only (with deps)" step ran 18:03–18:18 UTC
+    and hit the job's 15-minute `timeout-minutes`, so the spec never ran. A `#1793` run of the
+    same workflow was also cancelled. Re-run requested at 18:20 UTC; result `NOT_MEASURED`.
+  - The repository-wide Actions backlog that delayed these runs is draining (`established fact`,
+    Actions API): 168 queued / 27 in progress at 17:58, 136 / 30 at 18:06, 48 / 38 at 18:19.
+    Cause `NOT_MEASURED`.
   - `2d954bda1` merged in `6ed854cee` (`#1835`) and `ebdb1dcd0` merged in `a8af664c5` (`#1742`);
     neither adds a migration.
   - `f2be7e722` merged in `25515a8b9` (`#1810`, Quick Log delivery tests; no migration).
-    **0 commits behind** `verdant-grow-diary` at 18:06 UTC.
+    **0 commits behind** `verdant-grow-diary` at 18:19 UTC.
   - `84cb262ad`, `44af6a8ea`, `5c5568a37`, `9b6a6872d` and `a73dbfb40` are review fixes (below).
 - **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` and again at `69f2f5b23` (2026-10-01,
   no conflicts). The first brought `#1832` (hono pin), which clears the earlier
@@ -58,7 +63,7 @@ this entry's earlier 2026-10-01 versions.
 - **Release state:** `cultivarDatabaseReadsEnabled = false`. `/cultivars` still renders the bundled
   sample library with no database request. Status language stays "working V1 prototype in
   pre-release validation" — no "database-backed public reads", "shipped", or "live" claim.
-- **Automated review:** 39 review threads (Codex, CodeRabbit), **all resolved** (18:06 UTC).
+- **Automated review:** 39 review threads (Codex, CodeRabbit), **all resolved** (18:19 UTC).
   - Real gaps were fixed, each RED-tested. The read model now fails closed on:
     - unlinked evidence and an ambiguous latest guide;
     - non-percent units, out-of-range percentages, and malformed claim `verified_at`;
@@ -91,7 +96,7 @@ this entry's earlier 2026-10-01 versions.
       edits stay allowed);
     - the harness's update/delete fixtures are now **publicly visible** (published harness
       cultivar, guide, section and links), and each client must read a fixture before its
-      mutation probe counts — `NOT_MEASURED` until CI's Security DB Local run on the exact head;
+      mutation probe counts — `PASS` in CI at `a73dbfb40` (150/150);
     - the strain gate now also triggers on `src/lib/featureFlags.ts`.
   - The strain gate's safety fence now fails on findings in the V1.1 migration as well as V1.
   - The harness requires both Supabase endpoints to be loopback. It has valid-payload insert
@@ -112,9 +117,10 @@ this entry's earlier 2026-10-01 versions.
     template-table write probes and the one-line payload change. Strict parity READY as anon and
     as authenticated, and migration re-apply idempotent.
   - Runs on every head from `2d954bda1` through `9b6a6872d` were cancelled by later pushes.
-  - **At `a73dbfb40` (exact head): `NOT_MEASURED`** — run `36901103567` was in progress at
-    18:06 UTC. This head changes the parity rules, the source-state gate and the harness fixtures, so
-    the `358d69c38` PASS does not carry over.
+  - **At `a73dbfb40` (exact head): `PASS`.** Run `36901103567` reported
+    `[cultivar-reference-rls] 150 passed, 0 failed` (observed 18:19 UTC). It is the first
+    real-database run of the publicly visible mutation fixtures: anon and authenticated each read
+    every public fixture before its update/delete probe, and every probe was denied.
 - **Local evidence (`established fact`, Windows clone):**
   - at `a73dbfb40`: the five strain test files 110/110, `tsc` 0 diagnostics, scoped eslint clean;
     at `9b6a6872d` the harness passes `bun build` and a strict (`noImplicitAny`) typecheck;
@@ -126,8 +132,11 @@ this entry's earlier 2026-10-01 versions.
   - migration safety scanner and published-migration integrity verifier OK at `358d69c38`;
   - `tsc` 0 diagnostics;
   - `bun run build` exit 0 with all postbuild SEO validators OK (measured at `fd75bb832`).
-- **`NOT_MEASURED`:** the full 32-shard suite at `358d69c38`, the preview and production receipts,
-  and the cause of the Vercel block.
+- **Full suite at `a73dbfb40`: `PASS`** — all 32 `Full test suite` shards passed in CI (required
+  contexts, observed 18:19 UTC), as did `Preflight — edge shared-lib mirror in sync` and
+  `test:legal-seo`.
+- **`NOT_MEASURED`:** `Lint, typecheck, test, build` at the exact head (pending at 18:19), the
+  preview and production receipts, and the cause of the Vercel block.
 - **Review seat — not satisfied.** No independent review is recorded.
   - The owner named **Grok** as reviewer on 2026-10-01. Codex is unavailable, and the earlier
     Copilot stand-in could not review (quota).

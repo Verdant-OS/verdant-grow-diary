@@ -36,6 +36,7 @@ export type TimelineManualSensorReceipt = {
 
 /** Narrow row shape Timeline may SELECT without `raw_payload` in page source. */
 export type ManualSensorTimelineMetricRow = {
+  id?: string;
   tent_id: string;
   metric: string;
   value: number | string | null;
@@ -44,6 +45,12 @@ export type ManualSensorTimelineMetricRow = {
   captured_at?: string | null;
   quality?: string | null;
 };
+
+function timelineObservationTimeMs(row: ManualSensorTimelineMetricRow): number | null {
+  const observation = resolveSensorObservationTime(row);
+  const timeMs = observation ? Date.parse(observation) : Number.NaN;
+  return Number.isFinite(timeMs) ? timeMs : null;
+}
 
 /**
  * The query reads one extra metric row. When it finds that sentinel, the
@@ -57,12 +64,45 @@ export function completeManualSensorTimelineRows<T extends ManualSensorTimelineM
 ): { rows: T[]; hasOlderRows: boolean } {
   if (!Array.isArray(rows) || rows.length === 0) return { rows: [], hasOlderRows: false };
   if (!Number.isSafeInteger(limit) || limit < 1) return { rows: [], hasOlderRows: true };
-  if (rows.length <= limit) return { rows: [...rows], hasOlderRows: false };
+  // The read is the union of captured_at and legacy null-captured_at streams.
+  // Order by the same observation time used for receipt grouping before
+  // applying the metric-row budget; either stream can contain the newest row.
+  const sorted = [...rows].sort((a, b) => {
+    const aObservation = resolveSensorObservationTime(a);
+    const bObservation = resolveSensorObservationTime(b);
+    const aTime = timelineObservationTimeMs(a) ?? Number.NEGATIVE_INFINITY;
+    const bTime = timelineObservationTimeMs(b) ?? Number.NEGATIVE_INFINITY;
+    if (aTime !== bTime) return bTime - aTime;
+    const aKey = JSON.stringify([
+      aObservation,
+      a.tent_id,
+      a.ts,
+      a.metric,
+      a.id ?? "",
+      a.source ?? "",
+      a.value,
+      a.quality ?? "",
+    ]);
+    const bKey = JSON.stringify([
+      bObservation,
+      b.tent_id,
+      b.ts,
+      b.metric,
+      b.id ?? "",
+      b.source ?? "",
+      b.value,
+      b.quality ?? "",
+    ]);
+    return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+  });
+  if (sorted.length <= limit) return { rows: sorted, hasOlderRows: false };
 
-  const boundaryObservationTime = resolveSensorObservationTime(rows[limit]);
-  const completeRows = rows
+  // Equivalent timestamp strings belong to the same boundary instant.
+  // Unverified times share a fail-closed boundary rather than a partial group.
+  const boundaryObservationTimeMs = timelineObservationTimeMs(sorted[limit]);
+  const completeRows = sorted
     .slice(0, limit)
-    .filter((row) => resolveSensorObservationTime(row) !== boundaryObservationTime);
+    .filter((row) => timelineObservationTimeMs(row) !== boundaryObservationTimeMs);
   return { rows: completeRows, hasOlderRows: true };
 }
 

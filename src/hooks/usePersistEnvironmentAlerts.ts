@@ -24,7 +24,12 @@ import type { SensorSnapshot, SensorSnapshotMetricRefKey } from "@/lib/sensorSna
 import type { SensorQualityResult } from "@/lib/sensorQuality";
 import type { TargetComparisonResult } from "@/lib/environmentTargetComparison";
 import { buildEnvironmentAlerts, type EnvironmentAlert } from "@/lib/environmentAlerts";
-import { derivedAlertKey, selectPersistableAlerts } from "@/lib/environmentAlertPersistence";
+import {
+  derivedAlertKey,
+  futureObservationWakeDelayMs,
+  selectPersistableAlerts,
+  snapshotPersistenceBlockReason,
+} from "@/lib/environmentAlertPersistence";
 import { listAlerts, saveAlert, logAlertEvent } from "@/lib/alerts";
 import { buildSensorSnapshotEvidenceRefs } from "@/lib/sensorSnapshotEvidenceRefRules";
 import { buildDiaryEntryEvidenceRefs } from "@/lib/diaryEntryEvidenceRefRules";
@@ -115,6 +120,9 @@ export function usePersistEnvironmentAlerts(
   // Per-session guard to avoid re-issuing the same insert within the same
   // render window (before the open-list refresh would naturally dedupe it).
   const inFlightKeys = useRef<Set<string>>(new Set());
+  // Bumped once when a future-dated observation reaches its eligibility
+  // boundary, so the gate below is asked again with nothing else changed.
+  const [eligibilityWake, setEligibilityWake] = useState(0);
 
   // Stable deps — recompute on snapshot ts / quality / targets identity.
   const tsKey = input.snapshot?.ts ?? "";
@@ -143,12 +151,23 @@ export function usePersistEnvironmentAlerts(
     }
 
     let cancelled = false;
+    let wakeId: number | null = null;
     const activeKeys = inFlightKeys.current;
     // Reservations belong to this read until its request actually starts.
     // Release unstarted work on cleanup so a newer confirmed read can proceed.
     const pendingKeys = new Set<string>();
 
     (async () => {
+      // One decision clock per run. The gate below and the wake computed from
+      // its verdict must read the same sample: with two reads, a capture
+      // timestamp can fall between them (millisecond precision on both
+      // sides), so the gate rejects a still-future observation while the
+      // second read finds it current and arms nothing. The unchanged breach
+      // would then never be persisted, because no effect dependency moves
+      // with wall time. The write path re-lists open rows and dedupes, so a
+      // sample a few milliseconds old cannot mint a stale row.
+      const now = Date.now();
+
       // 1. Re-derive alerts from the rules layer (single source of truth).
       const derived: EnvironmentAlert[] = buildEnvironmentAlerts({
         snapshot: input.snapshot,
@@ -162,11 +181,26 @@ export function usePersistEnvironmentAlerts(
         snapshot: input.snapshot,
         quality: input.quality.quality,
         isDemoData,
+        now,
       });
 
       if (persistable.length === 0) {
         if (!cancelled) {
           setState({ status: "skipped", persistedCount: 0, lastError: null });
+          // Live ingest accepts bounded future clock skew, and the fence above
+          // (correctly) refuses to persist ahead of the observation time. No
+          // dependency of this effect changes as wall time catches up, so
+          // arm exactly one wake at the boundary; the gate decides again then.
+          // Missing or invalid timestamps never wake (delay is null). Same
+          // `now` as the gate above, by construction (see the note there).
+          const ctx = { snapshot: input.snapshot, quality: input.quality.quality, isDemoData, now };
+          const delay =
+            snapshotPersistenceBlockReason(ctx) === "outside_live_window"
+              ? futureObservationWakeDelayMs(input.snapshot, now)
+              : null;
+          if (delay !== null) {
+            wakeId = window.setTimeout(() => setEligibilityWake((n) => n + 1), delay);
+          }
         }
         return;
       }
@@ -317,6 +351,7 @@ export function usePersistEnvironmentAlerts(
 
     return () => {
       cancelled = true;
+      if (wakeId !== null) window.clearTimeout(wakeId);
       for (const key of pendingKeys) activeKeys.delete(key);
       pendingKeys.clear();
     };
@@ -333,6 +368,7 @@ export function usePersistEnvironmentAlerts(
     stageKey,
     stageProvided,
     tentKey,
+    eligibilityWake,
   ]);
 
   return state;

@@ -195,7 +195,7 @@ async function readEvent(id: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (admin as any)
     .from("grow_events")
-    .select("id,user_id,grow_id,occurred_at,logged_at,updated_at,note")
+    .select("id,user_id,grow_id,occurred_at,logged_at,updated_at,note,is_deleted")
     .eq("id", id)
     .single();
   if (error) throw new Error(`read event failed: ${error.message}`);
@@ -234,7 +234,7 @@ async function readMirrors(uid: string, growId: string, eventId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (admin as any)
     .from("diary_entries")
-    .select("id,user_id,grow_id,entry_at,logged_at,details,note")
+    .select("id,user_id,grow_id,entry_at,logged_at,details,note,retracted_at")
     .eq("user_id", uid)
     .eq("grow_id", growId);
   if (error) throw new Error(`read mirrors failed: ${error.message}`);
@@ -1333,6 +1333,73 @@ async function main() {
       instantsWithin(genericDiary.logged_at, genericDiary.created_at) &&
         !sameInstant(genericDiary.logged_at, genericOccurred),
       JSON.stringify(genericDiary),
+    );
+
+    // A keyed event that was later retracted must not claim a successful
+    // replay, even when the original request hash still matches exactly.
+    const retractedAt = new Date().toISOString();
+    const { error: retractEventError } = await admin
+      .from("grow_events")
+      .update({ is_deleted: true, deleted_at: retractedAt })
+      .eq("id", eventId)
+      .eq("user_id", uidA);
+    if (retractEventError)
+      throw new Error(`retract event fixture failed: ${retractEventError.message}`);
+    const eventAfterRetraction = await readEvent(eventId);
+    const eventCountBeforeRetractedRetry = await countEvents(uidA);
+    const retractedRetry = await callEvent(clientA, eventArgs);
+    const eventAfterRetractedRetry = await readEvent(eventId);
+    check(
+      "retracted event key refuses an exact retry without rewriting history",
+      !retractedRetry.error &&
+        (retractedRetry.data as { ok?: boolean; reason?: string } | null)?.ok === false &&
+        (retractedRetry.data as { reason?: string } | null)?.reason ===
+          "idempotency_key_retracted" &&
+        (await countEvents(uidA)) === eventCountBeforeRetractedRetry &&
+        eventAfterRetractedRetry.is_deleted === true &&
+        sameInstant(eventAfterRetraction.updated_at, eventAfterRetractedRetry.updated_at),
+      JSON.stringify(retractedRetry.data),
+    );
+
+    const missingReceiptArgs = {
+      ...eventArgs,
+      p_idempotency_key: key("event-retracted-diary"),
+      p_note: `event missing diary receipt ${STAMP}`,
+    };
+    const missingReceiptSave = await callEvent(clientA, missingReceiptArgs);
+    const missingReceiptId = (missingReceiptSave.data as { grow_event_id?: string } | null)
+      ?.grow_event_id;
+    if (missingReceiptSave.error || !missingReceiptId) {
+      throw new Error(`missing-receipt fixture save failed: ${missingReceiptSave.error?.message}`);
+    }
+    const receiptMirrors = await readMirrors(uidA, seedA.growId, missingReceiptId);
+    if (receiptMirrors.length === 0) throw new Error("missing-receipt fixture has no diary mirror");
+    const { error: retractMirrorError } = await admin
+      .from("diary_entries")
+      .update({ retracted_at: new Date().toISOString() })
+      .in(
+        "id",
+        receiptMirrors.map((mirror) => String(mirror.id)),
+      );
+    if (retractMirrorError) {
+      throw new Error(`retract diary fixture failed: ${retractMirrorError.message}`);
+    }
+    const receiptEventBeforeRetry = await readEvent(missingReceiptId);
+    const eventCountBeforeMissingReceiptRetry = await countEvents(uidA);
+    const missingReceiptRetry = await callEvent(clientA, missingReceiptArgs);
+    const receiptEventAfterRetry = await readEvent(missingReceiptId);
+    const receiptMirrorsAfterRetry = await readMirrors(uidA, seedA.growId, missingReceiptId);
+    check(
+      "key with no active diary receipt refuses reuse without a second event",
+      !missingReceiptRetry.error &&
+        (missingReceiptRetry.data as { ok?: boolean; reason?: string } | null)?.ok === false &&
+        (missingReceiptRetry.data as { reason?: string } | null)?.reason ===
+          "idempotency_receipt_missing" &&
+        (await countEvents(uidA)) === eventCountBeforeMissingReceiptRetry &&
+        receiptMirrorsAfterRetry.length === receiptMirrors.length &&
+        receiptMirrorsAfterRetry.every((mirror) => mirror.retracted_at != null) &&
+        sameInstant(receiptEventBeforeRetry.updated_at, receiptEventAfterRetry.updated_at),
+      JSON.stringify(missingReceiptRetry.data),
     );
 
     const anon = createClient(SUPABASE_URL, ANON_KEY, {

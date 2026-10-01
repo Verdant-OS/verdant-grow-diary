@@ -37,7 +37,7 @@ TASK <id>  priority: publish-gate | P1 | P2 | other  status: OPEN | CLOSED
 goal:
 branch: codex/<task-id>-<slug> for new Codex tasks; preserve existing names
 base: verdant-grow-diary or the recorded parent branch
-checkout: git fetch origin <branch> <base> && git switch <branch> && git merge --ff-only origin/<branch> && git merge origin/<base>
+checkout: git fetch origin <branch> <base>; verify the head (note below); then git switch <branch> && git merge --ff-only <verified-sha> && git merge origin/<base>
 pr: URL or NOT_MEASURED
 head_sha: full exact remote SHA, with observation time
 state: implemented / local only / pushed draft / CI / review / merged / live measured
@@ -50,13 +50,14 @@ claimed_by: agent and date/time/zone, or empty
 last_updated: YYYY-MM-DD HH:MM CT, by agent
 ```
 
-Before the checkout command, compare `git rev-parse origin/<branch>` with head_sha as
-AGENTS.md (Agent Handoff / Coverage) describes: equal, continue; ahead (it equals the PR's
-current head and head_sha is its ancestor), adopt that head and name it in your claim;
-diverged or rewritten, stop and reconcile. The `--ff-only` step keeps a stale local copy
-from standing in for the remote head. Any mismatch invalidates the block's current-head
-CI/review claims: refresh the block and preserve the existing branch. Never rename,
-recreate or force-push.
+Fetch first, then compare the freshly fetched `git rev-parse origin/<branch>` with
+head_sha as AGENTS.md (Agent Handoff / Coverage) describes: equal, continue; ahead (it
+equals the PR's current head and head_sha is its ancestor), adopt that head and name it in
+your claim; diverged or rewritten, stop and reconcile. `<verified-sha>` is the SHA that
+passed that check, so `--ff-only` lands exactly on the verified head, never on a newer tip,
+and a stale local copy cannot stand in for it. Any mismatch invalidates the block's
+current-head CI/review claims: refresh the block and preserve the existing branch. Never
+rename, recreate or force-push.
 Use the original base and declared closed scope. The example command assumes no other
 active checkout has the branch open; inspect worktree ownership before selecting a checkout.
 

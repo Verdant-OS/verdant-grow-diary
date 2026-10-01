@@ -120,6 +120,21 @@ async function auditAs(label: string, client: SupabaseClient) {
   return result.snapshot;
 }
 
+function seeded<T>(label: string, result: { data: T; error: { message: string } | null }): T {
+  if (result.error) throw new Error(`seed ${label}: ${result.error.message}`);
+  return result.data;
+}
+
+function seededRow<T>(
+  label: string,
+  result: { data: T; error: { message: string } | null },
+): NonNullable<T> {
+  if (result.error || result.data === null) {
+    throw new Error(`seed ${label}: ${result.error?.message ?? "no row returned"}`);
+  }
+  return result.data as NonNullable<T>;
+}
+
 async function rowCounts(): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
   for (const table of CULTIVAR_DATABASE_TABLES) {
@@ -216,96 +231,126 @@ async function main() {
         .single();
       if (error || !cultivar) throw new Error(`seed ${status}: ${error?.message}`);
       created.push({ table: "cultivars", column: "id", value: cultivar.id });
-      const { data: guide } = await admin
-        .from("cultivar_guides")
-        .insert({
-          cultivar_id: cultivar.id,
-          version: 1,
-          title: "Harness",
-          publication_status: "published",
-        })
-        .select("id")
-        .single();
-      if (guide) {
-        hiddenGuideIds.push(guide.id);
-        const { data: section } = await admin
-          .from("cultivar_guide_sections")
+      const guide = seededRow(
+        `${status} guide`,
+        await admin
+          .from("cultivar_guides")
           .insert({
-            guide_id: guide.id,
-            section_key: "overview",
-            sort_order: 10,
-            content: { title: "Harness" },
+            cultivar_id: cultivar.id,
+            version: 1,
+            title: "Harness",
+            publication_status: "published",
           })
           .select("id")
-          .single();
-        if (status === "draft") hiddenSectionId = section?.id ?? null;
-        if (section) hiddenSectionIds.push(section.id);
+          .single(),
+      );
+      {
+        hiddenGuideIds.push(guide.id);
+        const section = seededRow(
+          `${status} section`,
+          await admin
+            .from("cultivar_guide_sections")
+            .insert({
+              guide_id: guide.id,
+              section_key: "overview",
+              sort_order: 10,
+              content: { title: "Harness" },
+            })
+            .select("id")
+            .single(),
+        );
+        if (status === "draft") hiddenSectionId = section.id;
+        hiddenSectionIds.push(section.id);
       }
       if (status === "draft") hiddenCultivarId = cultivar.id;
-      await admin.from("cultivar_aliases").insert({
-        cultivar_id: cultivar.id,
-        alias: `Harness ${status}`,
-        normalized_alias: `harness ${status}`,
-      });
-      await admin.from("cultivar_profile_sources").insert({
-        cultivar_id: cultivar.id,
-        source_id: watts.data?.id,
-        sort_order: 0,
-      });
-      await admin.from("cultivar_claims").insert({
-        cultivar_id: cultivar.id,
-        trait_key: "chemotype",
-        value_text: "unknown",
-        source_id: watts.data?.id,
-      });
+      seeded(
+        `${status} alias`,
+        await admin.from("cultivar_aliases").insert({
+          cultivar_id: cultivar.id,
+          alias: `Harness ${status}`,
+          normalized_alias: `harness ${status}`,
+        }),
+      );
+      seeded(
+        `${status} profile source`,
+        await admin.from("cultivar_profile_sources").insert({
+          cultivar_id: cultivar.id,
+          source_id: watts.data?.id,
+          sort_order: 0,
+        }),
+      );
+      seeded(
+        `${status} claim`,
+        await admin.from("cultivar_claims").insert({
+          cultivar_id: cultivar.id,
+          trait_key: "chemotype",
+          value_text: "unknown",
+          source_id: watts.data?.id,
+        }),
+      );
     }
     // A draft guide version on a PUBLISHED cultivar must stay hidden too.
-    const { data: draftGuide } = await admin
-      .from("cultivar_guides")
-      .insert({
-        cultivar_id: gg4.data?.id,
-        version: 99,
-        title: "Harness draft",
-        publication_status: "draft",
-      })
-      .select("id")
-      .single();
-    if (draftGuide) {
+    const draftGuide = seededRow(
+      "draft guide",
+      await admin
+        .from("cultivar_guides")
+        .insert({
+          cultivar_id: gg4.data?.id,
+          version: 99,
+          title: "Harness draft",
+          publication_status: "draft",
+        })
+        .select("id")
+        .single(),
+    );
+    {
       created.push({ table: "cultivar_guides", column: "id", value: draftGuide.id });
       draftGuideId = draftGuide.id;
       hiddenGuideIds.push(draftGuide.id);
-      const { data: draftSection } = await admin
-        .from("cultivar_guide_sections")
-        .insert({
-          guide_id: draftGuide.id,
-          section_key: "overview",
-          sort_order: 10,
-          content: { title: "Harness draft guide section" },
-        })
-        .select("id")
-        .single();
-      if (draftSection) hiddenSectionIds.push(draftSection.id);
+      const draftSection = seededRow(
+        "draft guide section",
+        await admin
+          .from("cultivar_guide_sections")
+          .insert({
+            guide_id: draftGuide.id,
+            section_key: "overview",
+            sort_order: 10,
+            content: { title: "Harness draft guide section" },
+          })
+          .select("id")
+          .single(),
+      );
+      hiddenSectionIds.push(draftSection.id);
     }
     // Every hidden section carries a source link, so the direct child-table
     // probes below have real rows to (not) find.
     for (const sectionId of hiddenSectionIds) {
-      await admin.from("cultivar_guide_section_sources").insert({
-        guide_section_id: sectionId,
-        source_id: watts.data?.id,
-        support_note: "Harness hidden link.",
-      });
+      seeded(
+        "hidden section link",
+        await admin.from("cultivar_guide_section_sources").insert({
+          guide_section_id: sectionId,
+          source_id: watts.data?.id,
+          support_note: "Harness hidden link.",
+        }),
+      );
     }
-    const { data: batch } = await admin
-      .from("cultivar_import_batches")
-      .insert({ filename: "harness.csv", file_checksum: `harness-${runId}` })
-      .select("id")
-      .single();
-    if (batch) {
+    const batch = seededRow(
+      "import batch",
+      await admin
+        .from("cultivar_import_batches")
+        .insert({ filename: "harness.csv", file_checksum: `harness-${runId}` })
+        .select("id")
+        .single(),
+    );
+    {
       created.push({ table: "cultivar_import_batches", column: "id", value: batch.id });
       batchId = batch.id;
-      await admin
-        .from("cultivar_import_rows")
-        .insert({ batch_id: batch.id, row_number: 1, raw_payload: {} });
+      seeded(
+        "import row",
+        await admin
+          .from("cultivar_import_rows")
+          .insert({ batch_id: batch.id, row_number: 1, raw_payload: {} }),
+      );
     }
 
     {

@@ -220,23 +220,29 @@ describe("cultivar database parity — blocked content", () => {
     );
   });
 
-  it("fails a changed source citation and a missing section source link", () => {
+  it("fails a changed source citation", () => {
     const snapshot = freshSnapshot();
     const source = snapshot.cultivar_sources.find(
       (row) => row.source_key === "watts-2021-terpene-genetics",
     );
     if (!source) throw new Error("source");
     source.title = "Retitled";
+    const report = audit(snapshot);
+    expect(report.status).toBe("blocked");
+    expect(paths(report)).toContain("changed * sources.watts-2021-terpene-genetics.title");
+  });
+
+  it("is invalid when a cited tendency loses its section source link", () => {
+    const snapshot = freshSnapshot();
     snapshot.cultivar_guide_section_sources = snapshot.cultivar_guide_section_sources.filter(
       (row) => row.guide_section_id !== "section:lemon-cherry-gelato:environment",
     );
     const report = audit(snapshot);
-    expect(paths(report)).toEqual(
-      expect.arrayContaining([
-        "changed * sources.watts-2021-terpene-genetics.title",
-        "missing lemon-cherry-gelato sectionSourceLinks.environment",
-      ]),
+    expect(report.status).toBe("invalid");
+    expect(paths(report)).toContain(
+      "malformed lemon-cherry-gelato cultivar_guide_section_sources[environment]",
     );
+    expect(report.matchedSlugs).not.toContain("lemon-cherry-gelato");
   });
 
   it("fails publication, verification, origin, schema-version, and verified-date drift", () => {
@@ -313,6 +319,14 @@ describe("cultivar database parity — blocked content", () => {
         guide_id: guide?.id,
       });
     }
+    for (const link of snapshot.cultivar_guide_section_sources.filter((item) =>
+      String(item.guide_section_id).startsWith("section:gg4:"),
+    )) {
+      snapshot.cultivar_guide_section_sources.push({
+        ...link,
+        guide_section_id: `extra-${String(link.guide_section_id)}`,
+      });
+    }
     snapshot.cultivar_claims.push({
       ...claimRows(snapshot, "sour-diesel", "chemotype")[0],
       id: "yield-claim",
@@ -355,6 +369,17 @@ describe("cultivar database parity — invalid read model", () => {
     expect(report.status).toBe("invalid");
     expect(paths(report)).toContain("malformed gg4 cultivars.data_origin");
     expect(paths(report)).not.toContain("missing gg4 profile");
+  });
+
+  it("orders tied malformed issues identically regardless of row order", () => {
+    const snapshot = freshSnapshot();
+    snapshot.cultivar_sources[0].url = "http://insecure.example/a";
+    snapshot.cultivar_sources[1].url = "http://insecure.example/b";
+    const reversed = structuredClone(snapshot);
+    for (const rows of Object.values(reversed)) rows.reverse();
+    const forward = audit(snapshot);
+    expect(forward.status).toBe("invalid");
+    expect(audit(reversed)).toEqual(forward);
   });
 
   it("is invalid when a table is absent from the snapshot", () => {

@@ -124,7 +124,11 @@ function compareIssues(a: CultivarParityIssue, b: CultivarParityIssue): number {
   if (slugA !== slugB) return slugA < slugB ? -1 : 1;
   if (a.path !== b.path) return a.path < b.path ? -1 : 1;
   if (a.kind !== b.kind) return a.kind < b.kind ? -1 : 1;
-  return 0;
+  // Full tie-break on the remaining fields: PostgREST row order is unspecified,
+  // so equal (slug, path, kind) issues must not keep insertion order.
+  const restA = JSON.stringify([a.message ?? "", a.expected ?? null, a.actual ?? null]);
+  const restB = JSON.stringify([b.message ?? "", b.expected ?? null, b.actual ?? null]);
+  return restA < restB ? -1 : restA > restB ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,25 +193,9 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
       issues,
     );
 
-    // Normalized section→source links must cover every tendency's evidence.
-    const links = mapped.sectionSourceKeysBySlug[slug] ?? {};
-    for (const section of mapped.catalog.sectionsBySlug[slug] ?? []) {
-      const linked = new Set(links[section.key] ?? []);
-      const evidence = [
-        ...new Set(section.reportedTendencies.flatMap((tendency) => tendency.evidenceKeys)),
-      ].sort();
-      for (const key of evidence) {
-        if (!linked.has(key)) {
-          issues.push({
-            slug,
-            kind: "missing",
-            path: `sectionSourceLinks.${section.key}`,
-            expected: key,
-            message: "tendency evidence has no cultivar_guide_section_sources row",
-          });
-        }
-      }
-    }
+    // Section→source link coverage is enforced by the read model itself (an
+    // unlinked tendency is refused there and reported as malformed), so the
+    // public pages and this audit cannot disagree about it.
 
     // Stored-but-not-rendered claims must agree with the rendered fields.
     const auxiliary = mapped.auxiliaryClaimsBySlug[slug] ?? [];

@@ -225,6 +225,38 @@ describe("cultivar database read model — fails closed", () => {
     expect(slugs(noSources)).not.toContain("blue-dream");
   });
 
+  it("refuses an ambiguous latest published guide", () => {
+    const snapshot = freshSnapshot();
+    const guide = snapshot.cultivar_guides.find(
+      (item) => item.cultivar_id === row(snapshot, "oreoz").id,
+    );
+    snapshot.cultivar_guides.push({ ...guide, id: "second-guide-same-version" });
+    const result = map(snapshot);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        slug: "oreoz",
+        path: "cultivar_guides",
+        message: expect.stringMatching(/ambiguous latest published guide/),
+      }),
+    );
+    expect(result.catalog.profiles.map((profile) => profile.slug)).not.toContain("oreoz");
+  });
+
+  it("refuses a cited tendency whose section source link is missing", () => {
+    const snapshot = freshSnapshot();
+    snapshot.cultivar_guide_section_sources = snapshot.cultivar_guide_section_sources.filter(
+      (item) => item.guide_section_id !== "section:blue-cookies:flowering",
+    );
+    const result = map(snapshot);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        slug: "blue-cookies",
+        path: "cultivar_guide_section_sources[flowering]",
+      }),
+    );
+    expect(result.catalog.profiles.map((profile) => profile.slug)).not.toContain("blue-cookies");
+  });
+
   it("refuses duplicate cannabinoid summaries and gapped terpene ranks", () => {
     const duplicate = freshSnapshot();
     const thc = duplicate.cultivar_claims.find(

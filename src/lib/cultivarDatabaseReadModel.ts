@@ -884,13 +884,28 @@ export function mapCultivarDatabaseSnapshot(
       (guide) => guide.publication_status === "published",
     );
     guides.sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0));
-    const guideRow = guides[0];
+    // Two published guides sharing the top version leave no deterministic
+    // winner; refuse instead of letting row order pick one.
+    const ambiguous =
+      guides.length > 1 && Number(guides[0].version ?? 0) === Number(guides[1].version ?? 0);
+    if (ambiguous) {
+      issues.push({
+        slug,
+        path: "cultivar_guides",
+        message: `ambiguous latest published guide: more than one at version ${String(
+          guides[0].version,
+        )}`,
+      });
+    }
+    const guideRow = ambiguous ? undefined : guides[0];
     let guideVersion: number | undefined;
     let contentSchemaVersion: number | undefined;
     let sections: CultivarGuideSection[] | undefined;
     const sectionSourceKeys: Partial<Record<CultivarGuideSectionKey, string[]>> = {};
     if (!guideRow) {
-      issues.push({ slug, path: "cultivar_guides", message: "no published guide" });
+      if (!ambiguous) {
+        issues.push({ slug, path: "cultivar_guides", message: "no published guide" });
+      }
     } else {
       const guideRead = new RowReader(guideRow, slug, "cultivar_guides", issues);
       const guideId = guideRead.text("id");
@@ -936,10 +951,13 @@ export function mapCultivarDatabaseSnapshot(
       }
     }
 
-    // Every tendency's evidence key must resolve to a readable source.
+    // Every tendency's evidence key must resolve to a readable source AND be
+    // backed by that section's normalized cultivar_guide_section_sources row;
+    // a dropped link is drift, so it falls back rather than rendering.
     if (sections) {
       const readableKeys = new Set([...sourcesById.values()].map((source) => source.key));
       for (const section of sections) {
+        const linked = new Set(sectionSourceKeys[section.key] ?? []);
         for (const tendency of section.reportedTendencies) {
           for (const key of tendency.evidenceKeys) {
             if (!readableKeys.has(key)) {
@@ -947,6 +965,12 @@ export function mapCultivarDatabaseSnapshot(
                 slug,
                 path: `cultivar_guide_sections[${section.key}].content.reported_tendencies`,
                 message: `evidence key ${key} does not resolve to a readable source`,
+              });
+            } else if (!linked.has(key)) {
+              issues.push({
+                slug,
+                path: `cultivar_guide_section_sources[${section.key}]`,
+                message: `evidence key ${key} has no cultivar_guide_section_sources row`,
               });
             }
           }

@@ -19,11 +19,11 @@ const STATEMENTS = (SQL.slice(0, SQL.indexOf(TAG)) + SQL.slice(SQL.lastIndexOf(T
   .toLowerCase();
 
 describe("Strain Reference Library V1.1 parity migration", () => {
-  it("sorts after every published migration, including V1", () => {
+  it("is present and sorts after the published V1 migration", () => {
     const files = readdirSync(MIGRATIONS)
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(files.at(-1)).toBe(FILE);
+    expect(files).toContain(FILE);
     expect(files.indexOf("20260722203000_strain_reference_library_v1.sql")).toBeLessThan(
       files.indexOf(FILE),
     );

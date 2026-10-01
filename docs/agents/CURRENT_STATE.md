@@ -2,7 +2,7 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T17:40 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T17:43 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
@@ -10,7 +10,7 @@ this entry's earlier 2026-10-01 versions.
 - **Open (not draft), awaiting CI and Chemdawg pre-check — review not routed:
   [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
   (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `a73dbfb40`, 24 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 17:40
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 17:43
   UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI restarted on the new
   head — 1 pass / 91 pending / 7 skipped / **1 failed — `Vercel`**. No approving review.
   - Required contexts (35, `config/required-status-checks.json`): 34 pending, 1 not yet reported
@@ -18,7 +18,7 @@ this entry's earlier 2026-10-01 versions.
   - `2d954bda1` merged in `6ed854cee` (`#1835`) and `ebdb1dcd0` merged in `a8af664c5` (`#1742`);
     neither adds a migration.
   - `f2be7e722` merged in `25515a8b9` (`#1810`, Quick Log delivery tests; no migration).
-    **0 commits behind** `verdant-grow-diary` at 17:40 UTC.
+    **0 commits behind** `verdant-grow-diary` at 17:43 UTC.
   - `84cb262ad`, `44af6a8ea`, `5c5568a37`, `9b6a6872d` and `a73dbfb40` are review fixes (below).
 - **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` and again at `69f2f5b23` (2026-10-01,
   no conflicts). The first brought `#1832` (hono pin), which clears the earlier
@@ -26,6 +26,8 @@ this entry's earlier 2026-10-01 versions.
 - **`Published migration integrity` at `a73dbfb40` (exact head): `NOT_MEASURED`** — run
   `36901103681` was queued at 17:40 UTC, so no exact-head result exists yet.
   - Runs on every head from `2d954bda1` through `9b6a6872d` were cancelled by later pushes.
+  - `Strain Reference Library V1 Gate` at `a73dbfb40`: `NOT_MEASURED` — run `36901103554` was
+    queued at 17:43 UTC.
   - At `358d69c38` (previous head, same migration file): `PASS`, run `36892553063`, including its
     one-line payload change.
   - Historical, earlier heads only: the red on `d65094aa9` ran before `#1836` was merged in and
@@ -53,7 +55,7 @@ this entry's earlier 2026-10-01 versions.
 - **Release state:** `cultivarDatabaseReadsEnabled = false`. `/cultivars` still renders the bundled
   sample library with no database request. Status language stays "working V1 prototype in
   pre-release validation" — no "database-backed public reads", "shipped", or "live" claim.
-- **Automated review:** 39 review threads (Codex, CodeRabbit), **all resolved** (17:40 UTC).
+- **Automated review:** 39 review threads (Codex, CodeRabbit), **all resolved** (17:43 UTC).
   - Real gaps were fixed, each RED-tested. The read model now fails closed on:
     - unlinked evidence and an ambiguous latest guide;
     - non-percent units, out-of-range percentages, and malformed claim `verified_at`;

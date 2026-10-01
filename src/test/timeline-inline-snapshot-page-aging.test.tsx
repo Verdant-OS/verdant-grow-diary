@@ -19,7 +19,6 @@ import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDeta
 
 interface QuerySpec {
   table: string;
-  legacyCaptureOnly?: boolean;
 }
 
 interface QueryResult {
@@ -39,15 +38,10 @@ const harness = vi.hoisted(() => ({
 
 vi.mock("@/integrations/supabase/client", () => {
   function queryFor(table: string) {
-    let legacyCaptureOnly = false;
     const query = {
       select: () => query,
       eq: () => query,
-      is: (column: string) => {
-        if (column === "captured_at") legacyCaptureOnly = true;
-        return query;
-      },
-      not: () => query,
+      is: () => query,
       gte: () => query,
       lte: () => query,
       lt: () => query,
@@ -62,7 +56,7 @@ vi.mock("@/integrations/supabase/client", () => {
         onfulfilled?: ((value: QueryResult) => TResult1 | PromiseLike<TResult1>) | null,
         onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
       ): Promise<TResult1 | TResult2> {
-        const spec: QuerySpec = { table, legacyCaptureOnly };
+        const spec: QuerySpec = { table };
         harness.capturedQueries.push(spec);
         return Promise.resolve(harness.executeQuery(spec)).then(onfulfilled, onrejected);
       },
@@ -270,8 +264,7 @@ describe("Timeline page — inline manual snapshot ages while idle", () => {
     };
     harness.executeQuery.mockImplementation((spec) => {
       if (spec.table === "tents") return { data: [{ id: TENT_ID }], error: null };
-      if (spec.table === "sensor_readings_effective")
-        return { data: spec.legacyCaptureOnly ? [] : [soilRow], error: null };
+      if (spec.table === "sensor_readings_effective") return { data: [soilRow], error: null };
       return { data: [], error: null };
     });
 

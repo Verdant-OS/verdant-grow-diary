@@ -1456,11 +1456,15 @@ export default function PhenoHuntWorkspace() {
     configuredGoals: ws.hunt?.evidenceGoals ?? [],
   });
   // #1005: the same canonical tent catalog (and cache) Quick Log resolves
-  // against. Loaded data wins over a later background-refetch error.
+  // against. An error wins over cached data, exactly as Quick Log's own
+  // named-prefill check does (QuickLog.tsx `namedPrefillQueryError`): a
+  // failed background refetch keeps `data` but Quick Log holds the target
+  // empty, so this surface must not offer the handoff either (Codex on #1825).
   const tentsQuery = useTents();
   const evidenceTentCatalog = useMemo<PhenoEvidenceTentCatalog>(() => {
+    if (tentsQuery.isError) return { status: "error" };
     if (tentsQuery.data) return { status: "ready", tents: tentsQuery.data };
-    return tentsQuery.isError ? { status: "error" } : { status: "loading" };
+    return { status: "loading" };
   }, [tentsQuery.data, tentsQuery.isError]);
   // Codex on #1825: Quick Log only targets ACTIVE grows (GrowsProvider lists
   // non-archived grows), so a candidate in an archived grow must not offer
@@ -1476,8 +1480,10 @@ export default function PhenoHuntWorkspace() {
   // plant moved after this page loaded cannot open a dead handoff.
   const plantsQuery = usePlants();
   const evidencePlantCatalog = useMemo<PhenoEvidencePlantCatalog>(() => {
+    // Error first, as for tents above and in Quick Log.
+    if (plantsQuery.isError) return { status: "error" };
     if (Array.isArray(plantsQuery.data)) return { status: "ready", plants: plantsQuery.data };
-    return plantsQuery.isError ? { status: "error" } : { status: "loading" };
+    return { status: "loading" };
   }, [plantsQuery.data, plantsQuery.isError]);
   const refetchTents = tentsQuery.refetch;
   const refetchPlants = plantsQuery.refetch;

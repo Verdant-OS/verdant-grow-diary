@@ -356,4 +356,32 @@ describe("workspace evidence → Quick Log target (#1005)", () => {
     expect(plantsRefetch).toHaveBeenCalledTimes(1);
     expect(listener).not.toHaveBeenCalled();
   });
+
+  it("a failed background refetch with cached tents blocks like Quick Log does (Codex on #1825)", () => {
+    // TanStack keeps `data` AND sets `isError`; Quick Log gives the error precedence.
+    tentsState.current = { ...tentsState.current, isError: true };
+    renderWorkspace(candidate("g-a", "t-a"));
+    expect(screen.queryByTestId(`${COVERAGE}-record-structure`)).toBeNull();
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "catalog_error",
+    );
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("a failed background refetch with cached plants blocks like Quick Log does (Codex on #1825)", () => {
+    plantsState.current = {
+      data: [{ id: PLANT, grow_id: "g-a", tent_id: "t-a" }],
+      isError: true,
+    };
+    renderWorkspace(candidate("g-a", "t-a"));
+    expect(screen.queryByTestId(`${COVERAGE}-record-structure`)).toBeNull();
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "catalog_error",
+    );
+    fireEvent.click(screen.getByTestId(`${COVERAGE}-target-retry`));
+    expect(plantsRefetch).toHaveBeenCalledTimes(1);
+    expect(listener).not.toHaveBeenCalled();
+  });
 });

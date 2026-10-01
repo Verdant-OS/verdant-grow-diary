@@ -21,9 +21,14 @@ on:
       - "supabase/migrations/20260722203000_strain_reference_library_v1.sql"
       - "docs/product/strain-reference-library-v1.md"
       - ".github/workflows/strain-reference-library-v1-gate.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:

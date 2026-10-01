@@ -21,6 +21,8 @@ on:
       - "config/local-supabase-replay-compatibility.json"
       - "config/local-supabase-replay/**"
       - "scripts/prepare-local-supabase-replay.mjs"
+      - "scripts/summarize-local-supabase-startup.mjs"
+      - "src/test/local-supabase-startup-summary.test.ts"
       - "scripts/run-irrigation-evidence-rls-harness.ts"
       - "src/test/irrigation-evidence-rls-harness-static-safety.test.ts"
       - "src/test/irrigation-overflow-structure.test.tsx"
@@ -43,6 +45,7 @@ on:
       - "package.json"
       - "bun.lock"
       - "bun.lockb"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [verdant-grow-diary]
     paths:
@@ -50,6 +53,8 @@ on:
       - "config/local-supabase-replay-compatibility.json"
       - "config/local-supabase-replay/**"
       - "scripts/prepare-local-supabase-replay.mjs"
+      - "scripts/summarize-local-supabase-startup.mjs"
+      - "src/test/local-supabase-startup-summary.test.ts"
       - "scripts/run-irrigation-evidence-rls-harness.ts"
       - "src/test/irrigation-evidence-rls-harness-static-safety.test.ts"
       - "src/test/irrigation-overflow-structure.test.tsx"
@@ -74,8 +79,8 @@ on:
       - "bun.lockb"
 
 concurrency:
-  group: irrigation-evidence-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   irrigation-rls-runtime:
@@ -117,10 +122,12 @@ jobs:
           # Supabase prints ephemeral credentials in its startup summary. Keep
           # that output private until the next step has masked every credential.
           if ! supabase start --workdir "$SUPABASE_REPLAY_WORKDIR" --exclude studio,mailpit,imgproxy,postgres-meta,supavisor,realtime,edge-runtime,logflare,vector,storage-api >"${RUNNER_TEMP}/irrigation-supabase-start.log" 2>&1; then
+            node scripts/summarize-local-supabase-startup.mjs --phase=start --log-file="${RUNNER_TEMP}/irrigation-supabase-start.log"
             echo "::error::Disposable local Supabase failed to start"
             exit 1
           fi
           if ! supabase db reset --workdir "$SUPABASE_REPLAY_WORKDIR" --local >"${RUNNER_TEMP}/irrigation-supabase-reset.log" 2>&1; then
+            node scripts/summarize-local-supabase-startup.mjs --phase=reset --log-file="${RUNNER_TEMP}/irrigation-supabase-reset.log"
             echo "::error::Disposable local Supabase migration reset failed"
             exit 1
           fi

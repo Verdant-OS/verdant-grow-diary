@@ -5,6 +5,7 @@ name: Native Manual Correction Local
 on:
   pull_request:
     branches: [main, verdant-grow-diary, "codex/manual-correction-readers-*"]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -42,6 +43,11 @@ jobs:
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v1
         with:
           version: 2.109.1
+      - name: Restore pinned CLI public registry fallback
+        run: |
+          # setup-cli forces GHCR, disabling CLI 2.109.1's public-registry fallback.
+          # Clear only that override; keep CLI image versions and failure behavior.
+          echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
       - name: Prepare immutable migration replay
         run: |
           set -eo pipefail

@@ -10,6 +10,8 @@ import {
   formatCapturedAgo,
   snapshotAlertsCanPersist,
   describeAlertSaveBlock,
+  buildSourceChip,
+  emptyStateSnapshotCta,
   pickAlertsGrowContext,
 } from "@/lib/alertFreshnessContext";
 import {
@@ -39,6 +41,21 @@ function snap(
 }
 
 describe("alertFreshnessContext — shared constants", () => {
+  it.each(["live", "manual"] as const)(
+    "keeps invalid or future %s timestamps ineligible across presenters",
+    (source) => {
+      for (const ts of ["invalid", new Date(NOW + 1).toISOString()]) {
+        const args = { status: "ok" as const, snapshot: snap({ source, ts }), now: NOW };
+        expect(classifyLatestSnapshotFreshness(args)).toBe("stale");
+        expect(snapshotAlertsCanPersist(args)).toBe(false);
+        expect(hasRecentManualSnapshot(args)).toBe(false);
+        expect(buildSourceChip(args).canPersist).toBe(false);
+        expect(buildLatestSnapshotDetail(args)?.canPersist).toBe(false);
+        expect(emptyStateSnapshotCta(args)).not.toBeNull();
+        expect(describeLatestSnapshotForAlerts(args)).not.toMatch(/fresh and can be checked/i);
+      }
+    },
+  );
   it("derives the minute label from STALE_THRESHOLD_MS and exposes the canon window label", () => {
     expect(STALE_THRESHOLD_MINUTES).toBe(Math.round(STALE_THRESHOLD_MS / 60_000));
     expect(STALE_THRESHOLD_MINUTES).toBe(15);

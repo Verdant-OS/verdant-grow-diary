@@ -289,7 +289,7 @@ describe("Logs page wiring (Timeline.tsx)", () => {
     expect(aqIdx).toBeGreaterThan(recentIdx);
   });
 
-  it("measurement filter uses diaryEntryBelongsInTimelineMeasurements (stale-drawer manuals excluded)", () => {
+  it("measurement filter uses diaryEntryBelongsInTimelineMeasurements", () => {
     expect(TIMELINE).toMatch(/diaryEntryBelongsInTimelineMeasurements\(e,/);
   });
 

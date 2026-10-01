@@ -12,6 +12,7 @@ name: Security DB Local
 on:
   pull_request:
     branches: [main, verdant-grow-diary]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main, verdant-grow-diary]
   workflow_dispatch:
@@ -21,6 +22,10 @@ on:
         type: boolean
         required: false
         default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test-security-db-local:
@@ -61,6 +66,13 @@ jobs:
           # call that rate-limits on shared runners (two fast lane failures
           # on 2026-07-09). Bump deliberately when a newer CLI is needed.
           version: 2.109.1
+
+      - name: Restore pinned CLI public registry fallback
+        if: env.ENABLED == 'true'
+        run: |
+          # setup-cli forces GHCR, disabling CLI 2.109.1's public-registry fallback.
+          # Clear only that override; keep CLI image versions and failure behavior.
+          echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=" >> "$GITHUB_ENV"
 
       - name: Prepare immutable migration replay workspace
         if: env.ENABLED == 'true'

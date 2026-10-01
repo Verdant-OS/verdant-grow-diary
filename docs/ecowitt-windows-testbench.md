@@ -1,8 +1,8 @@
 # EcoWitt Windows Local Testbench
 
 A Windows-friendly local testbench for validating the EcoWitt → Verdant
-sensor-ingest path **without** touching production. Lives entirely under
-`tools/ecowitt-testbench/`.
+sensor-ingest path **without** touching production. The listener and its local
+state live under `tools/ecowitt-testbench/`.
 
 ## Why this exists
 
@@ -22,12 +22,13 @@ This kit removes all of those pitfalls.
 - **No direct Supabase table writes.** Forwarding goes only to the existing
   validated `sensor-ingest-webhook` Edge Function.
 - **No fake live data.** Built-in/test payloads are labeled `source="demo"`.
-  `source="live"` is only used when an EcoWitt gateway forwards a real
-  reading and the operator has explicitly opted in via
-  `X-Verdant-Forward-Mode: live` or `VERDANT_FORWARD_MODE=live`.
+  The listener requires a non-loopback sender, gateway markers and a valid
+  gateway `dateutc` before its source rules can classify a fresh upload as
+  `live`. A header or environment value saying `live` alone remains `demo`.
+  Stuck humidity/soil percentages and unusable measurements are invalid.
 - **Never commit `.env`.** Tokens stay local. `.env` is gitignored.
-- **Never paste full bridge tokens** into docs, chat, or issues. The
-  scripts only log a masked preview like `vbt_abc...xyz`.
+- **Never paste bridge tokens** into docs, chat, or issues. The listener and
+  demo sender show only `<configured>` or `<empty>` in token diagnostics.
 - **Forwarding requires explicit opt-in** via the `-ForwardToVerdant`
   flag on `send-demo-payload-windows.ps1`.
 
@@ -111,7 +112,329 @@ ASCII-only before sending. Pasted placeholder text containing `…`, `<`,
 `>`, whitespace, or the phrase `mint a token` is rejected before any
 network call.
 
-## What this kit will not do
+## G. Map one gateway to multiple tents
+
+Without `ECOWITT_TENT_MAP`, the listener keeps the existing single-tent
+`VERDANT_TENT_ID` / `VERDANT_BRIDGE_TOKEN` settings and first-match order:
+`temp1f/tempf/tempinf`, `humidity1/humidity/humidityin`,
+`soilmoisture1/soilmoisture2`, and `co2/co2in/co2_ppm`. Field lookup is
+case-insensitive. Extra fields are recorded locally as unmapped rather than
+silently assigned to that tent. Forwarding now writes to the durable spool
+before the existing bounded inline attempts.
+
+For mapped mode, create a local `tent-map.json` in the testbench folder.
+This example uses synthetic UUIDs; replace them with your actual tent IDs.
+The file stores environment-variable names, never bridge-token values:
+
+```json
+{
+  "tents": [
+    {
+      "tent_id": "11111111-2222-3333-4444-555555555555",
+      "label": "Flower",
+      "token_env": "ECOWITT_FLOWER_BRIDGE_TOKEN",
+      "air_channels": [1, 3],
+      "soil_channels": [1, 3],
+      "soil_temp_channels": [1],
+      "co2": true
+    },
+    {
+      "tent_id": "22222222-3333-4444-5555-666666666666",
+      "label": "Vegetative",
+      "token_env": "ECOWITT_VEG_BRIDGE_TOKEN",
+      "air_channels": [2, "in"],
+      "soil_channels": [2],
+      "soil_temp_channels": [2],
+      "co2": false
+    }
+  ],
+  "aliases": []
+}
+```
+
+Set `ECOWITT_TENT_MAP=tent-map.json` in the local `.env`, and set each
+named token variable locally. Keep `VERDANT_INGEST_URL` configured.
+Forwarding requires an HTTPS URL without userinfo, whitespace or malformed
+ports. Outbound readiness rechecks it before every send, including replay.
+Mapped startup rejects a missing, empty or whitespace-only ingest URL with
+a fixed diagnostic before changing the spool. Restore the configuration
+and restart to replay existing queued readings. Legacy receive-only mode
+without a tent map still works without forwarding credentials or a URL.
+Both `.env` and `tent-map.json` are gitignored. Restart after changing
+the map or `.env`; the running process does not reload either file.
+
+Startup accepts 1–8 tents with distinct, non-placeholder UUIDs, nonempty
+labels, valid token-variable names and configured non-placeholder bridge
+tokens. Channels are 1–8; air also supports `"in"`. A channel cannot be
+listed twice within its sensor family, including across tents. Only one
+tent can own the WH45 CO2 channel. Every tent must own at least one air,
+soil, soil-temperature or CO2 channel; empty ownership is rejected even
+when the optional channel fields are omitted. An invalid map stops startup with a
+sanitized diagnostic and never falls back silently to single-tent mode.
+
+For every gateway packet, the listener queues one POST per mapped tent.
+The POST's `tent_id`, `x-verdant-tent-id` and token all belong to that tent.
+The first channel listed in each family is primary, even if another
+channel has a lower number. An absent primary is never replaced silently
+by a secondary. Secondary readings include value, explicit unit, channel,
+label, metric, field, quality and channel ID in `metadata.channels`.
+Primary lineage is in `metadata.primary_channels`. Owned raw fields are
+kept in that tent's `metadata.raw_payload`.
+
+| Gateway field                                       | Forwarded metric or metadata    | Unit and primary rule                                                               |
+| --------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------- |
+| `temp1f` … `temp8f`                                 | `temp_f`                        | Fahrenheit; first `air_channels` entry                                              |
+| `humidity1` … `humidity8`                           | `humidity_percent`              | Percent; same primary air channel                                                   |
+| `tempinf`, `humidityin`                             | `temp_f`, `humidity_percent`    | Fahrenheit / percent; air channel `"in"`                                            |
+| `soilmoisture1` … `soilmoisture8`                   | `soil_moisture_pct`             | Percent; first `soil_channels` entry                                                |
+| `tf_ch1` … `tf_ch8` (WN34)                          | `soil_temp_f`                   | Fahrenheit; first `soil_temp_channels` entry                                        |
+| `co2` (WH45)                                        | `co2_ppm`                       | ppm; the one tent with `co2: true`                                                  |
+| `tf_co2`, `humi_co2` (WH45)                         | `metadata.channels` only        | Fahrenheit / percent; auxiliary WH45 values                                         |
+| Configured, capture-verified EC alias               | `ec_ms_cm`                      | `mS/cm`; explicit `uS/cm` or `µS/cm` converts by ÷1000; first `soil_channels` entry |
+| Configured, capture-verified soil-temperature alias | `soil_temp_f` or `soil_temp_c`  | Explicit `F` or `C`; first `soil_temp_channels` entry                               |
+| Primary air temperature + RH                        | `vpd_kpa`                       | Derived kPa from that pair only; no secondary or WH45 substitution                  |
+| Unowned or unknown fields                           | Local `unmapped_channels.jsonl` | No tent attribution; bounded per-key counters and aggregate overflow warning        |
+
+The first 256 distinct unowned keys, within the state byte budget, receive
+individual counters and one warning per key. Further occurrences increment
+`unmapped_overflow_count` and still enter the sanitized local log, subject to
+the log's retention and size limits.
+
+**EC/WH52 capture status: NOT_MEASURED.** No verified sanitized capture
+was supplied. The default alias table is empty. Tests use clearly named
+synthetic configuration fields to check conversion; they do not establish
+hardware field names. Celsius-only air fields do not become Fahrenheit.
+
+To configure an alias after verifying a real capture, add an object to
+`aliases` with four fields: `field` (the exact captured field name),
+`metric`, `channel` (1–8), and `unit`. Supported pairs are
+`ec_ms_cm` with `mS/cm`, `uS/cm` or `µS/cm`;
+`soil_temp_f` with `F`; and `soil_temp_c` with `C`.
+EC aliases use the tent's soil-channel ownership; temperature aliases
+use soil-temperature ownership. Credential-like, duplicate, shadowing
+or unsupported aliases fail startup. Multiple primary aliases for the
+same stored metric fail closed, including simultaneous Fahrenheit and
+Celsius soil-temperature fields.
+
+### Gateway identity and the existing row contract
+
+The current webhook copies one `metadata.device_id` onto every metric
+row in a POST. Therefore each tent POST uses the agreed gateway ID
+`ecowitt:<passkey fingerprint>:gateway`. Exact channel IDs are preserved
+in the primary and secondary descriptors:
+`ecowitt:<passkey fingerprint>:air_ch1`, `soil_ch1`,
+`soil_temp_ch1` or `co2_ch1` (and `air_chin` for indoor air).
+The fingerprint is the first 16 hexadecimal characters of SHA-256;
+the PASSKEY itself is removed before logs, disk or forwarding.
+An absent or conflicting-case PASSKEY is represented honestly as `unknown`.
+Every supplied PASSKEY case variant is scrubbed from echoed fields as well.
+
+The webhook stores at most one canonical metric per tent, source and
+timestamp. Secondary readings are metadata, not additional metric rows.
+Repeated timestamps never get offsets or invented metric names.
+A repeated POST can be acknowledged without updating a previously stored
+row or its metadata because the existing database conflict behavior is
+DO NOTHING. Local queue identity distinguishes changed secondary/raw
+fields so they are sent rather than silently coalesced; the HTTP
+Idempotency-Key keeps the existing tent/metric/event-time identity.
+
+Every credential-free gateway field is retained in its owner's POST or
+the local unmapped log. Common gateway markers are retained with each
+tent. Unknown fields never inherit a tent. Invalid gateway timestamps
+block forwarding; sanitized local raw-log entries remain available for
+diagnosis. Missing, malformed, conflicting-case and out-of-range values
+are not converted to healthy measurements. RH/soil values pinned at
+0 or 100 are invalid. Any invalid owned channel conservatively marks the whole
+tent packet invalid; secondary descriptors also retain their own invalid quality.
+
+## H. Durable local delivery
+
+The default `.spool/` folder contains:
+
+- `queue.jsonl`: write-ahead payloads, terminal transitions, eviction
+  decisions and loss-count checkpoints.
+- `dead-letter.jsonl`: sanitized payloads rejected by non-retryable 4xx,
+  with fixed reasons such as `http_401`; no response body or token.
+- `spool-stats.json`: persistent drop, dead-letter and torn-tail counters.
+- `state.json`: packet/forward times, incidents and unmapped counters.
+- `unmapped_channels.jsonl`: sanitized unowned field values.
+
+The queue append is flushed and synced before network I/O. Tokens and
+Authorization headers are never persisted; each send resolves the
+current process environment through that tent's configured token name.
+Dead-letter and unmapped logs each receive at most one tenth of the combined
+spool cap. They are trimmed before pending readings are evicted; removal
+counters remain durable. Auxiliary size trimming scans records once.
+Mapped tents must use distinct token environment names and distinct resolved
+tokens; startup rejects credential reuse without echoing credential details.
+After a restart, the background worker replays due entries in enqueue
+order with the same Idempotency-Key and original gateway `dateutc`.
+A supervisor periodically checks the replay worker and replaces it if it
+exits unexpectedly, without waiting for another gateway packet. Its default
+check interval is 10 seconds (five times the replay interval, with a
+five-second minimum).
+Listener shutdown and runtime replacement stop both loops.
+Mapped mode acknowledges locally after enqueueing. Single-tent mode
+retains its initial bounded inline attempts; failures then remain queued.
+The mapped acknowledgement counts only entries that survive the batch's
+spool limits; partial eviction reports `spool_capacity_drop` and its drop
+count. Tents without deliverable primary metrics remain local diagnostics
+with invalid provenance, and are not sent as unsupported empty-metrics
+requests. No secondary sensor is promoted to fill the gap.
+Each observed sensor family without a usable primary records a persistent
+tent failure, even if another family has deliverable metrics. Secondary-only
+packets count; ordinary absence of an entire family does not. The existing
+failure-duration threshold applies. Successful delivery of another family
+cannot clear the missing-primary state; that family's primary must be delivered.
+Queued entries for a tent removed from configuration remain durable and
+make public health return `orphaned_queue` without exposing tent IDs. Restoring
+the same tent permits replay with the original identity and timestamp.
+The same incident evaluator drives health and configured alerts, with one
+durable alert/recovery transition using the fixed `orphaned_queue` reason.
+An enqueue error remains visible in health until a durable enqueue succeeds;
+an empty replay does not prove that the queue can be written. A newer success
+updates its tent's success time while preserving any older outstanding
+delivery failure and its incident time.
+Routing and raw-log write errors remain visible across restart until receive-path
+writes succeed. An unmapped-log error requires an actual unmapped append
+to prove recovery. In single-tent mode, configured forwarding with a missing
+or invalid tent ID makes readiness fail; intentionally unconfigured
+forwarding remains a receive-only no-op.
+
+All 2xx responses mark an entry done. This is delivery acknowledgement,
+not proof of a database insert. In particular, the current webhook may
+return `200` with `accepted: false` / `timestamp_stale` for old captures.
+Other non-retryable 4xx go to the dead-letter file; 408, 425, 429,
+network errors and server failures stay queued. Replay uses one HTTP
+attempt per due entry, with 5-second exponential backoff capped at
+300 seconds; the default worker interval is 2 seconds.
+
+Replays retain event time and re-evaluate the existing source rules.
+The current listener stale window is 30 minutes; it is separate from
+the 10-minute quiet threshold. Old data never gets a new capture time
+or becomes fresh `live` data merely because delivery resumed.
+
+Retention defaults to 7 days from enqueue time and 50 MB for the
+spool directory, including auxiliary logs/state.
+Known atomic-write temporary copies are excluded from this durable budget;
+they are never promoted over committed files. Unrecognized files still count.
+Oldest pending entries are dropped at the cap with a persistent counter and warning. Auxiliary
+logs are also bounded and expose drop counters. If state alone exceeds
+the size cap, delivery stops with a local-state error instead of hiding
+loss. A torn final append is counted and discarded; a corrupt complete
+record or malformed health state fails closed. Health state is validated
+before queue construction can enforce retention or evict acknowledged readings.
+
+Eviction decisions and their absolute loss count are flushed and synced in
+the queue before payloads are removed. Compaction retains a loss-count
+checkpoint, so a crash before the statistics file is updated cannot hide
+the incident or count the same committed eviction twice after restart.
+Survivors are selected without changing the live queue; a failed journal
+append leaves acknowledged entries available for retry and cannot silently
+remove them in a later compaction.
+The checkpoint bytes are included in survivor selection; eviction still
+uses one full compaction. Builds predating these queue record types cannot
+read the updated queue. Preserve it and use a compatible build for recovery.
+
+Optional settings are `ECOWITT_SPOOL_DIR`,
+`ECOWITT_SPOOL_MAX_DAYS`, `ECOWITT_SPOOL_MAX_MB` and
+`ECOWITT_REPLAY_INTERVAL_SECONDS`. Preserve this directory during
+restart or rollback so pending packets remain recoverable. Inspect
+dead letters before changing credentials or choosing a deliberate replay.
+
+## I. Listener health and incident alerts
+
+`GET /livez` always returns `200` with `alive: true` when the HTTP
+listener responds. It does not load local delivery state, send requests,
+or claim that forwarding or sensor data is healthy. Windows startup
+checks use this endpoint, so delivery failures do not suggest restarting
+an already running listener.
+
+`GET /health` remains the separate delivery readiness check. It returns `200`
+after a gateway quiet period. Quiet delivery still reports `ok: false`
+and `gateway_quiet` in the response; the HTTP status does not classify
+sensor readings as healthy. Sustained `forward_failure` or
+`local_delivery_state_error`, and any unrecovered `spool_data_drop`, return
+`503`, including when the
+gateway is also quiet. `GET /status` retains the same delivery warnings.
+`last_packet_received_at` records gateway-shaped, non-loopback traffic.
+Each tent has a persistent `last_forward_ok_at` and first failure time.
+A 2xx acknowledgement updates the forward time even if no row was inserted.
+Repeated invalid gateway timestamps count as local delivery failures, so
+continuing malformed traffic cannot keep delivery health green indefinitely.
+
+Evicting pending readings immediately records `spool_data_drop`, including
+when only an older batch is lost and the current batch survives. The incident
+persists across restart and failed replay. A subsequent successful delivery
+must record its terminal transition durably before recording recovery; any
+new drops during that transition remain active. Recovery confirms resumed
+delivery, while the permanent drop counter still records the lost readings.
+
+The default quiet and sustained-failure thresholds are 600 seconds.
+Set `ECOWITT_QUIET_SECONDS` or `ECOWITT_FORWARD_FAILURE_SECONDS`
+to change them. Startup gets one quiet grace period; restarting retains
+previous times and incidents. Each incident logs one alert and one
+recovery. With no webhook URL, there is no outbound alert request.
+Local receive, enqueue and replay failures participate in that same incident
+set, with the fixed reason `local_delivery_state_error`. Replay exceptions
+attempt incident reporting while retries continue. Alert state must be
+durable before an outbound attempt; an unwritable incident-state file blocks
+that attempt and keeps health unhealthy. Alert I/O runs outside the shared
+state lock, and receive-path recovery still requires a real successful write.
+
+For an optional notification destination, set these values locally:
+
+- `ECOWITT_ALERT_WEBHOOK_URL`: an HTTPS webhook URL; never commit or paste it.
+- `ECOWITT_ALERT_FORMAT`: `generic` (default), `slack`, `discord` or `ntfy`.
+- `ECOWITT_ALERT_INTERVAL_SECONDS`: global minimum interval, default 60.
+- `ECOWITT_ALERT_NTFY_TOPIC`: required only for ntfy.
+
+Generic JSON includes event, reason, incident and a fixed message.
+Slack uses a JSON `text` payload; Discord uses `content` with mentions
+disabled. For ntfy, use the server **root URL**, with the topic configured
+separately. See [ntfy JSON publishing](https://docs.ntfy.sh/publish/#publish-as-json),
+[Slack incoming webhooks](https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/)
+and [Discord webhook execution](https://docs.discord.com/developers/resources/webhook#execute-webhook).
+Incident messages contain no sensor values or credentials.
+
+Pending incident messages survive restart and drain at the rate limit.
+Each message gets at most one webhook attempt, recorded before I/O,
+because a timeout cannot establish whether the receiver accepted it.
+Failed attempts increment `alert_webhook_error_count`; the log remains
+the local record. Provider delivery is NOT_MEASURED until tested by the
+operator with an authorized destination.
+
+Inspect queue counts, drop counters, unmapped counts and per-tent times
+at the loopback-only endpoint:
+
+```powershell
+curl.exe "http://localhost:8787/status"
+```
+
+## J. Local verification and rollback
+
+From the repository root, after the normal testbench setup:
+
+```powershell
+& .\tools\ecowitt-testbench\.venv\Scripts\python.exe -m unittest discover -s tools/ecowitt-testbench -p "test*.py"
+bunx vitest run src/test/ecowitt-windows-testbench-static-safety.test.ts src/test/ecowitt-custom-http-bridge-ingest-readiness.test.ts
+bun run typecheck
+```
+
+The TypeScript parity test imports the effective Python constants in an
+isolated subprocess with site packages disabled. It never imports Flask.
+The dedicated forwarding workflow runs every existing Python group plus
+routing, delivery/health, integration and redaction tests. All outbound
+requests in those tests are mocked. Synthetic tests and green CI do not
+prove real gateway, bridge-token, server-storage or notification delivery.
+
+To return to legacy routing, unset `ECOWITT_TENT_MAP`, retain the
+single-tent settings and restart. Preserve the spool: entries for tents
+no longer configured remain deferred rather than being sent to another
+tent. Reverting the slice's code also requires retaining the queue for a
+later compatible replay; the previous listener cannot consume it.
+
+## Safety boundaries
 
 - It will not write to Supabase tables directly.
 - It will not bypass the validated ingest webhook.
@@ -120,9 +443,9 @@ network call.
   for audit. A real gateway packet whose `dateutc` has aged past Verdant's
   live window keeps its original timestamp and is forwarded as `stale`, never
   as current `live` telemetry.
-- It will not print full tokens. Only masked previews appear in logs.
-- It will not trigger alerts, Action Queue writes, AI calls, or device
-  control.
+- It will not print tokens or token fragments.
+- Local delivery incidents can use the optional notification webhook.
+  The listener has no database, Action Queue, AI or device operation.
 
 ## Curl checks without PowerShell scripts
 
@@ -223,7 +546,7 @@ Debug endpoint summary:
 - `/debug/last-events` — last N normalized readings only; no raw payload by default.
 - `/debug/raw-log-tail` — sanitized raw-log debugging (parsed JSONL entries).
 - `/debug/forwarding-status` — read-only forwarding configuration and
-  in-memory attempt/success/failure counters. Token preview is masked,
+  in-memory attempt/success/failure counters. Token status is `<configured>` or `<empty>`;
   ingest URL is masked, the bridge token and Authorization header are
   never returned.
 - All endpoints are loopback-only (`127.0.0.1`, `::1`). LAN callers get HTTP 403.
@@ -281,7 +604,7 @@ Fields:
 - `ingest_url_configured` — true when `VERDANT_INGEST_URL` is set.
 - `bridge_token_configured` — true when `VERDANT_BRIDGE_TOKEN` is set.
 - `masked_ingest_url` — host/path summary with project identifiers masked.
-- `masked_token_preview` — short `vbt_abc...xyz` preview. The full bridge token is **never** returned. Do not paste it into curl commands or docs.
+- `masked_token_preview` — `<configured>` or `<empty>` only. No token characters are returned. Do not paste tokens into curl commands or docs.
 - `forward_attempt_count` — forward attempts since listener start. `0` means none yet.
 - `forward_success_count` — webhook calls that returned 2xx. `>0` confirms at least one successful ingest.
 - `forward_failure_count` — non-2xx responses or request exceptions. `>0` means inspect `last_forward_error` and `last_forward_status`.
@@ -311,8 +634,10 @@ Notes:
 
 - Counters are **in-memory** and reset when the listener restarts.
 - `forwarding_enabled=false` is expected for local-only testing.
+- In mapped mode, both forwarding debug reports use the loaded tent map and recheck every mapped credential, including uniqueness. Before startup they validate the map without opening delivery state. Missing legacy `VERDANT_TENT_ID`/`VERDANT_BRIDGE_TOKEN` does not disable a valid mapped configuration. These reports remain loopback-only and read-only; their readiness describes configuration, while `/health` reports delivery health.
+- In single-tent mode, any owned humidity or soil percentage at 0/100 normalizes to `null` before enqueueing; a valid fallback cannot hide a stuck owned probe. Sanitized raw evidence is retained. The outbound boundary also normalizes numeric stuck percentages in preexisting queue entries. Success delivering other metrics does not clear that family's delivery warning; a corrected percentage must be durably delivered to clear it.
 - Do **not** paste bridge tokens, Authorization headers, or raw EcoWitt payloads into curl commands, support chats, or issue reports. **Never paste bridge token values or raw payloads** anywhere — the sanitized `last_forward_response_*` fields are the safe way to share failure context.
-- The listener now retries transient webhook failures (HTTP 408, 425, 429, 500, 502, 503, 504, plus connection/DNS/timeout errors) with bounded exponential backoff. `retry_count`, `last_retry_error`, `last_retry_at`, `last_retryable_status`, and `max_retry_attempts` are exposed in `/debug/forwarding-status`. Non-retryable errors (400, 401, 403, 404, 405, validation errors, missing tent/token/url) are **never** retried.
+- The single-tent inline send retries transient webhook failures (HTTP 408, 425, 429, 500, 502, 503, 504, plus connection/DNS/timeout errors) with bounded exponential backoff. `retry_count`, `last_retry_error`, `last_retry_at`, `last_retryable_status`, and `max_retry_attempts` are exposed in `/debug/forwarding-status`. Durable replay is described in section H: terminal HTTP errors are dead-lettered, while locally missing tent/token/url configuration defers queued packets without an HTTP request. Legacy debug counters describe this process only; persistent queue and health state are on `/status`.
 
 ### Copyable sanitized forwarding error report
 
@@ -439,7 +764,8 @@ cd tools/ecowitt-testbench
 ```
 
 The script runs `bun run typecheck`, the EcoWitt static safety vitest,
-and probes the safe local debug endpoints (`/health`, `/debug/status`,
+and checks HTTP liveness with `/livez` before probing delivery readiness
+and the safe local debug endpoints (`/health`, `/debug/status`,
 `/debug/forwarding-status`, `/debug/parse-diagnostics`). It does **not**
 start the listener, read `.env`, print bridge tokens, post payloads, or
 forward to Verdant. If the listener is not running it tells you to run
@@ -454,7 +780,7 @@ cd "C:\Users\G7\OneDrive\Documents\GitHub\verdant-grow-diary"
 
 `run-testbench-windows.ps1` runs preflight, then setup, starts the
 listener in a new PowerShell window, waits briefly for
-`http://localhost:8787/health`, then runs verify. It does **not** read
+`http://localhost:8787/livez`, then runs verify. It does **not** read
 `.env`, print bridge tokens, post payloads, or forward to Verdant.
 
 ## Troubleshooting: wrong folder or out-of-date checkout
@@ -502,6 +828,11 @@ and does **not** forward any data.
 ```
 tools/ecowitt-testbench/
   ecowitt_listener.py
+  ecowitt_multitent.py
+  ecowitt_delivery.py
+  test_multitent.py
+  test_delivery.py
+  test_ingest_readiness.py
   requirements.txt
   preflight-windows.ps1
   setup-windows.ps1
@@ -510,6 +841,10 @@ tools/ecowitt-testbench/
   verify-testbench-windows.ps1
   run-testbench-windows.ps1
   .env.example
+  .gitignore
+src/lib/ecowittCustomHttpBridgeIngestRules.ts
+src/test/ecowitt-custom-http-bridge-ingest-readiness.test.ts
+.github/workflows/ecowitt-testbench-forwarding-tests.yml
 docs/ecowitt-windows-testbench.md  (this file)
 ```
 

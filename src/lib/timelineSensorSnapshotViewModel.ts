@@ -17,9 +17,12 @@ import {
   AIR_TEMP_F_REALISTIC,
   EC_MSCM_UNIT_MISMATCH_AT,
   RH_STUCK_VALUES,
+  VPD_KPA_REALISTIC,
 } from "@/constants/sensorTruthRanges";
 import { validateManualSnapshot } from "@/lib/manualSensorSnapshotRules";
 import { resolveSensorSourceLabel, type ResolvedSourceLabel } from "@/lib/sensorSourceLabelRules";
+import { classifyManualMetric, CO2_PPM_RANGE } from "@/lib/sensorTruthRules";
+import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 
 export type TimelineSensorChipMetric =
@@ -53,6 +56,18 @@ export type TimelineSensorSnapshotViewModel =
       /** True only when source resolves to canonical "Live". */
       isLive: boolean;
     };
+
+export type TimelineCardSensorResolution = {
+  sensor: Record<string, unknown> | undefined;
+  /** Manual provenance/compatibility copy; never a metric-validation exemption. */
+  useManualValidation: boolean;
+};
+
+export type TimelineCardSensorSnapshotViewModel = TimelineCardSensorResolution & {
+  sensorViewModel: TimelineSensorSnapshotViewModel;
+  reviewMessage: string;
+  warningMessage: string;
+};
 
 const UNAVAILABLE_MESSAGE = "Sensor snapshot unavailable";
 const MANUAL_REVIEW_MESSAGE = "Review manual snapshot — invalid readings were not shown.";
@@ -89,6 +104,88 @@ function readSource(raw: unknown): SensorReadingSource | null {
   return null;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+/**
+ * Resolve the snapshot payload and whether its provenance uses manual copy.
+ * All resolved payloads are validated by the card view model, regardless of source.
+ */
+export function resolveTimelineCardSensorResolution(
+  details: Record<string, unknown> | null | undefined,
+): TimelineCardSensorResolution {
+  const canonical = asRecord(details?.sensor_snapshot);
+  const legacy = asRecord(details?.sensor);
+  const manualCompat = asRecord(details?.manual_sensor_snapshot);
+  const sensor = canonical ?? legacy ?? manualCompat ?? undefined;
+  if (!sensor) return { sensor: undefined, useManualValidation: false };
+
+  const sourceRaw =
+    typeof sensor.source === "string" && sensor.source.trim().length > 0
+      ? sensor.source
+      : typeof details?.source === "string"
+        ? details.source
+        : null;
+  const source = classifyTimelineSensorSource({
+    rawSource: sourceRaw,
+    fallback: "manual",
+    context: "persisted_snapshot",
+  });
+  return {
+    sensor,
+    useManualValidation: sensor === manualCompat || source.kind === "manual",
+  };
+}
+
+/** Validate every persisted source; manual provenance only selects the existing copy. */
+export function buildTimelineCardSensorSnapshotViewModel(
+  input: TimelineCardSensorResolution | null | undefined,
+  options: { validateManualCompatibility: true } = { validateManualCompatibility: true },
+): TimelineCardSensorSnapshotViewModel {
+  const resolution = input ?? { sensor: undefined, useManualValidation: false };
+  return {
+    ...resolution,
+    sensorViewModel: buildTimelineSensorSnapshotViewModel(resolution.sensor, {
+      preferUnit: "F",
+      validateManualCompatibility: options.validateManualCompatibility,
+      // Retain Timeline's persisted generic-temperature Celsius convention.
+      genericTempUnit: "C",
+      preserveLegacyPrecision: !resolution.useManualValidation,
+    }),
+    reviewMessage: resolution.useManualValidation
+      ? MANUAL_REVIEW_MESSAGE
+      : "Review sensor snapshot — invalid readings were not shown.",
+    warningMessage: resolution.useManualValidation
+      ? "Check manual snapshot — a reading may need confirmation."
+      : "Check sensor snapshot — a reading may need confirmation.",
+  };
+}
+
+/** Only a displayed, plausible VPD with eligible provenance may get a stage hint. */
+export function resolveTimelineCardVpdStageValue(
+  input:
+    | {
+        sensor: Record<string, unknown> | null | undefined;
+        useManualValidation: boolean;
+        sensorViewModel: TimelineSensorSnapshotViewModel | null;
+        canAssessStage: boolean;
+        hasFutureTimestamp: boolean;
+      }
+    | null
+    | undefined,
+): number | null {
+  if (!input?.sensor || !input.canAssessStage || input.hasFutureTimestamp) return null;
+  const value = pick(input.sensor, "vpd", "vpd_kpa", "vpdKpa");
+  if (!isFiniteNumber(value) || !classifyManualMetric("vpd_kpa", value).valid) return null;
+  if (
+    input.sensorViewModel?.kind !== "chips" ||
+    !input.sensorViewModel.chips.some((chip) => chip.metric === "vpd")
+  )
+    return null;
+  return value;
+}
+
 /**
  * Build a Timeline sensor-chip view-model from an unknown input.
  *
@@ -106,7 +203,14 @@ function readSource(raw: unknown): SensorReadingSource | null {
  */
 export function buildTimelineSensorSnapshotViewModel(
   input: unknown,
-  options: { preferUnit?: "F" | "C"; validateManualCompatibility?: boolean } = {},
+  options: {
+    preferUnit?: "F" | "C";
+    validateManualCompatibility?: boolean;
+    /** Timeline's persisted generic-temperature convention; absent means unit unverified. */
+    genericTempUnit?: "F" | "C";
+    /** Preserve the old raw non-manual chip precision after validating the metric. */
+    preserveLegacyPrecision?: boolean;
+  } = {},
 ): TimelineSensorSnapshotViewModel {
   if (input === null || input === undefined) return { kind: "none" };
   if (typeof input !== "object") {
@@ -134,6 +238,7 @@ export function buildTimelineSensorSnapshotViewModel(
     obj,
     "soil",
     "soil_moisture",
+    "soil_moisture_pct",
     "soilMoisture",
     "soil_water_content",
     "soilWaterContent",
@@ -141,10 +246,30 @@ export function buildTimelineSensorSnapshotViewModel(
   );
   const co2 = pick(obj, "co2", "co2_ppm", "co2Ppm");
 
+  if (
+    options.validateManualCompatibility &&
+    ![tempF, tempC, tempGeneric, rh, ph, ec, vpd, soil, co2].some((value) => value !== undefined)
+  ) {
+    return { kind: "none" };
+  }
+  const genericTemp = isFiniteNumber(tempGeneric) && options.genericTempUnit ? tempGeneric : null;
+  const manualTemp = isFiniteNumber(tempF) ? tempF : isFiniteNumber(tempC) ? tempC : genericTemp;
+  const manualTempUnit = isFiniteNumber(tempF)
+    ? "F"
+    : isFiniteNumber(tempC)
+      ? "C"
+      : (options.genericTempUnit ?? "C");
+  const legacyPrecision =
+    options.preserveLegacyPrecision ||
+    (options.genericTempUnit === "C" &&
+      !isFiniteNumber(tempF) &&
+      !isFiniteNumber(tempC) &&
+      isFiniteNumber(tempGeneric));
+
   const manualValidation = options.validateManualCompatibility
     ? validateManualSnapshot({
-        airTemp: isFiniteNumber(tempF) ? tempF : isFiniteNumber(tempC) ? tempC : null,
-        airTempUnit: isFiniteNumber(tempF) ? "F" : "C",
+        airTemp: manualTemp,
+        airTempUnit: manualTempUnit,
         humidityPct: isFiniteNumber(rh) ? rh : null,
         vpdKpa: isFiniteNumber(vpd) ? vpd : null,
         co2Ppm: isFiniteNumber(co2) ? co2 : null,
@@ -156,17 +281,34 @@ export function buildTimelineSensorSnapshotViewModel(
     : null;
   const manualErrors = [...(manualValidation?.errors ?? [])];
   const manualWarnings = [...(manualValidation?.warnings ?? [])];
+  if (
+    manualValidation &&
+    isFiniteNumber(tempGeneric) &&
+    genericTemp === null &&
+    !isFiniteNumber(tempF) &&
+    !isFiniteNumber(tempC)
+  ) {
+    manualWarnings.push("Temperature unit unverified; the generic temperature was not shown.");
+  }
   const explicitTempF = isFiniteNumber(tempF)
     ? tempF
     : isFiniteNumber(tempC)
       ? tempFFromC(tempC)
-      : null;
+      : genericTemp === null
+        ? null
+        : manualTempUnit === "C"
+          ? tempFFromC(genericTemp)
+          : genericTemp;
   const manualTempOutsideRealisticBand =
     manualValidation !== null &&
     explicitTempF !== null &&
     (explicitTempF < AIR_TEMP_F_REALISTIC.min || explicitTempF > AIR_TEMP_F_REALISTIC.max);
   const manualEcUnitMismatch =
     manualValidation !== null && isFiniteNumber(ec) && ec >= EC_MSCM_UNIT_MISMATCH_AT;
+  const manualVpdOutsideRealisticBand =
+    manualValidation !== null && isFiniteNumber(vpd) && !classifyManualMetric("vpd_kpa", vpd).valid;
+  const manualCo2OutsideRealisticBand =
+    manualValidation !== null && isFiniteNumber(co2) && !classifyManualMetric("co2_ppm", co2).valid;
   if (manualTempOutsideRealisticBand) {
     manualErrors.push(
       `Air temperature is outside the realistic ${AIR_TEMP_F_REALISTIC.min}–${AIR_TEMP_F_REALISTIC.max}°F grow-room range.`,
@@ -174,6 +316,16 @@ export function buildTimelineSensorSnapshotViewModel(
   }
   if (manualEcUnitMismatch) {
     manualErrors.push("EC may use µS/cm while labeled mS/cm; the suspicious value was not shown.");
+  }
+  if (manualVpdOutsideRealisticBand && vpd >= 0) {
+    manualErrors.push(
+      `VPD is outside the realistic ${VPD_KPA_REALISTIC.min}–${VPD_KPA_REALISTIC.max} kPa range.`,
+    );
+  }
+  if (manualCo2OutsideRealisticBand && co2 >= 0) {
+    manualErrors.push(
+      `CO₂ is outside the plausible ${CO2_PPM_RANGE.min}–${CO2_PPM_RANGE.max} ppm range.`,
+    );
   }
   if (
     manualValidation !== null &&
@@ -185,6 +337,8 @@ export function buildTimelineSensorSnapshotViewModel(
   const allowedManualFields = new Set(manualValidation?.metrics.map((metric) => metric.field));
   if (manualTempOutsideRealisticBand) allowedManualFields.delete("air_temp_c");
   if (manualEcUnitMismatch) allowedManualFields.delete("reservoir_ec_mscm");
+  if (manualVpdOutsideRealisticBand) allowedManualFields.delete("vpd_kpa");
+  if (manualCo2OutsideRealisticBand) allowedManualFields.delete("co2_ppm");
   const allows = (field: Parameters<typeof allowedManualFields.has>[0]): boolean =>
     manualValidation === null || allowedManualFields.has(field);
 
@@ -223,15 +377,29 @@ export function buildTimelineSensorSnapshotViewModel(
         });
       }
     }
-  } else if (isFiniteNumber(tempGeneric)) {
-    const v = roundTo(tempGeneric, 1);
-    const unit = options.preferUnit === "C" ? "°C" : "°F";
-    const metric: TimelineSensorChipMetric = options.preferUnit === "C" ? "temp_c" : "temp_f";
-    chips.push({ metric, label: "Temp", value: v, unit, display: `${v}${unit}` });
+  } else if (isFiniteNumber(tempGeneric) && allows("air_temp_c")) {
+    const displayTemp =
+      options.genericTempUnit === "C" && options.preferUnit !== "C"
+        ? tempFFromC(tempGeneric)
+        : options.genericTempUnit === "F" && options.preferUnit === "C"
+          ? ((tempGeneric - 32) * 5) / 9
+          : tempGeneric;
+    if (isFiniteNumber(displayTemp)) {
+      const v = roundTo(displayTemp, 1);
+      const unit = options.preferUnit === "C" ? "°C" : "°F";
+      const metric: TimelineSensorChipMetric = options.preferUnit === "C" ? "temp_c" : "temp_f";
+      chips.push({
+        metric,
+        label: "Temp",
+        value: v,
+        unit,
+        display: `${options.genericTempUnit === "C" && options.preferUnit !== "C" ? displayTemp.toFixed(1) : v}${unit}`,
+      });
+    }
   }
 
   if (isFiniteNumber(rh) && allows("humidity_pct")) {
-    const v = roundTo(rh, 1);
+    const v = options.preserveLegacyPrecision ? rh : roundTo(rh, 1);
     chips.push({
       metric: "rh",
       label: "RH",
@@ -258,7 +426,7 @@ export function buildTimelineSensorSnapshotViewModel(
   }
 
   if (isFiniteNumber(vpd) && allows("vpd_kpa")) {
-    const v = roundTo(vpd, 2);
+    const v = legacyPrecision ? vpd : roundTo(vpd, 2);
     chips.push({
       metric: "vpd",
       label: "VPD",
@@ -269,7 +437,7 @@ export function buildTimelineSensorSnapshotViewModel(
   }
 
   if (isFiniteNumber(soil) && allows("soil_moisture_pct")) {
-    const v = roundTo(soil, 1);
+    const v = options.preserveLegacyPrecision ? soil : roundTo(soil, 1);
     chips.push({
       metric: "soil_moisture",
       label: "Soil",
@@ -280,7 +448,7 @@ export function buildTimelineSensorSnapshotViewModel(
   }
 
   if (isFiniteNumber(co2) && allows("co2_ppm")) {
-    const v = Math.round(co2);
+    const v = legacyPrecision ? co2 : Math.round(co2);
     chips.push({
       metric: "co2",
       label: "CO₂",

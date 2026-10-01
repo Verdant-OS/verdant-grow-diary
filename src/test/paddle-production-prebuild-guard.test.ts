@@ -100,6 +100,7 @@ describe("Paddle production prebuild guard", () => {
       "node scripts/verify-edge-shared-in-sync.mjs",
       "node scripts/check-no-src-lib-imports.mjs",
       "node scripts/stamp-version.mjs",
+      "node scripts/verify-publish-provenance.mjs",
     ]);
     expect(packageJson.scripts.dev).toBe("vite dev");
     expect(packageJson.scripts["build:dev"]).toBe("vite build --mode development");

@@ -12,7 +12,12 @@ on:
     branches: [main, verdant-grow-diary]
   pull_request:
     branches: [main, verdant-grow-diary]
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Preflight: verify the edge shared-lib mirror
@@ -206,9 +211,9 @@ jobs:
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-bun-v2-${{ hashFiles('bun.lock') }}
           restore-keys: |
-            ${{ runner.os }}-bun-
+            ${{ runner.os }}-bun-v2-
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -388,12 +393,11 @@ jobs:
       - name: Gamification direct-insert scan + static tests
         run: bun run test:security-gamification
 
-      # NOTE: Gamification RLS live verification and award_nugs staging smoke
-      # are intentionally NOT in this PR-default workflow. They require
-      # privileged staging credentials (DB URL / service role / anon key) and
-      # must not be reachable from untrusted PRs. They live in the separate
-      # manual workflow .github/workflows/gamification-staging-smoke.yml,
-      # gated on workflow_dispatch + push-to-main only.
+      # Legacy gamification setup is not production acceptance and stays out
+      # of PR-default jobs. Current hosted verification is verdantgrowdiary.com.
+      # The dormant gamification-staging-smoke.yml needs separate fixture-safety
+      # and effective-gating review; never repoint privileged setup to production.
+      # This comment changes no job, trigger or credential binding.
 
       # Stop-ship: every Shelly H&T edge function declared in
       # supabase/config.toml must have its source file in the repo.
@@ -468,10 +472,10 @@ jobs:
       - name: Edge Function colocated Deno unit tests
         run: bun run test:edge:colocated-unit
 
-      # Optional: QuickLog RPC runtime harnesses. Only runs when staging
-      # Supabase credentials are configured as repo/org secrets. The
-      # orchestrator script also skips cleanly when env is missing, so this
-      # step is safe to leave wired even for forked PRs.
+      # Existing conditional QuickLog RPC setup validates repository behavior.
+      # Production smoke is verdantgrowdiary.com with fixture ownership/tag guards.
+      # Audit privileged setup in a separate CI slice before any production run.
+      # A skip is not live acceptance; executable settings remain unchanged.
       - name: QuickLog RPC runtime harnesses (conditional)
         if: ${{ env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SUPABASE_ANON_KEY != '' }}
         env:
@@ -535,9 +539,40 @@ jobs:
             artifacts/ecowitt-bridge-ci-exit-code.txt
           if-no-files-found: warn
 
+      # Earlier stop-ship steps in this job write reports (artifacts/,
+      # test-results/) and can leave tracked/untracked residue. stamp-version
+      # records that as dirty:true (fail-open). verify-publish-provenance then
+      # fail-closes. Restore HEAD before stamping so this job measures the
+      # checkout, not test residue. Does not teach stamp-version to ignore
+      # .env.production. Path names only in the status dump — no diffs.
+      - name: Restore clean worktree before production stamp
+        run: |
+          echo "::group::worktree before restore"
+          node scripts/verify-publish-provenance.mjs --print-safe-dirty-paths
+          echo "::endgroup::"
+          git restore --source=HEAD --worktree --staged -- .
+          git clean -fd \
+            --exclude=node_modules \
+            --exclude=dist \
+            --exclude=artifacts \
+            --exclude=test-results \
+            --exclude=coverage \
+            --exclude=playwright-report
+
       - name: Build
         id: prod_build
         run: bun run build
+
+      # Written by prebuild's verify-publish-provenance (also on FAIL).
+      # Path names and class labels only — no token bytes.
+      - name: Upload publish verification report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publish-verification
+          path: artifacts/publish-verification.json
+          if-no-files-found: warn
+          retention-days: 30
 
       # Downloadable build-summary artifact — always runs so failures
       # produce evidence too. Captures commit SHA, validator outcomes,
@@ -629,9 +664,9 @@ jobs:
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-bun-v2-${{ hashFiles('bun.lock') }}
           restore-keys: |
-            ${{ runner.os }}-bun-
+            ${{ runner.os }}-bun-v2-
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -743,9 +778,9 @@ jobs:
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-bun-v2-${{ hashFiles('bun.lock') }}
           restore-keys: |
-            ${{ runner.os }}-bun-
+            ${{ runner.os }}-bun-v2-
 
       - name: Install dependencies
         run: bun install --frozen-lockfile

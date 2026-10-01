@@ -79,6 +79,7 @@ import {
   type DailyCheckPlantResolution,
 } from "@/lib/dailyCheckPlantSelectionRules";
 import { resolveDailyCheckActivityTarget } from "@/lib/dailyCheckWaterContextRules";
+import { resolveDailyCheckGrowContext } from "@/lib/dailyCheckGrowContextRules";
 import {
   DAILY_CHECK_NOTE_SAVED_TOAST,
   DAILY_CHECK_SENSOR_SAVED_TOAST,
@@ -89,6 +90,7 @@ import {
   DAILY_CHECK_TIMELINE_CONFIRMATION_TITLE,
   DAILY_CHECK_TIMELINE_CTA_LABEL,
   buildDailyCheckPostSubmitActions,
+  resolveDailyCheckDashboardBreadcrumbHref,
   buildDailyCheckSavedItems,
   buildDailyCheckTimelineHref,
   formatDailyCheckLoggedAt,
@@ -318,17 +320,12 @@ export default function DailyCheck() {
     () => selectableTents.find((tent) => tent.id === effectiveTentId) ?? null,
     [effectiveTentId, selectableTents],
   );
-  // Grow context, most specific first: the selected plant's own grow, then an
-  // explicit `?growId=` scope, then the workspace's active grow. That last
-  // fallback matters for the plain `/daily-check` entry (sidebar link, Quick
-  // Log CTA): without it a grower who HAS an active grow still saw
-  // "Select a grow to enable Quick Log actions" with every action disabled,
-  // because no plant is selected yet and no URL scope is present.
-  const growId =
-    (selectedPlant as { grow_id?: string | null } | null)?.grow_id ??
-    urlGrowId ??
-    activeGrowId ??
-    null;
+  const growId = resolveDailyCheckGrowContext({
+    plant: selectedPlant,
+    assignedTent: selectedTent,
+    urlGrowId,
+    activeGrowId,
+  });
   const quickLogTargetIdentity = JSON.stringify([
     selectedPlant?.id ?? null,
     effectiveTentId || null,
@@ -408,6 +405,14 @@ export default function DailyCheck() {
     [selectedPlant?.id, entrySource, urlGrowId],
   );
   const scopedBackAction = urlGrowId ? postSubmitActions.find((action) => action.primary) : null;
+  const backHref = useMemo(
+    () =>
+      resolveDailyCheckDashboardBreadcrumbHref({
+        growId: urlGrowId,
+        actions: postSubmitActions,
+      }),
+    [urlGrowId, postSubmitActions],
+  );
 
   const loggedAtLabel = useMemo(() => formatDailyCheckLoggedAt(lastSubmittedAt), [lastSubmittedAt]);
   const savedItems = useMemo(
@@ -468,7 +473,7 @@ export default function DailyCheck() {
   return (
     <div className="mx-auto w-full min-w-0 max-w-2xl pb-24" data-testid="daily-grow-check-page">
       <Button asChild variant="ghost" size="sm" className="mb-3 min-h-11 whitespace-normal">
-        <Link to={scopedBackAction?.href ?? "/"}>
+        <Link to={backHref}>
           <ArrowLeft className="h-4 w-4" />{" "}
           {scopedBackAction && scopedBackAction.key !== "dashboard"
             ? scopedBackAction.label

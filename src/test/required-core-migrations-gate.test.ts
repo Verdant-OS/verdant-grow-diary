@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { rootCertificates } from "node:tls";
+import { load as loadYaml } from "js-yaml";
 import { afterEach, describe, expect, it } from "vitest";
 import { PRODUCTION_SUPABASE_CA_FILENAME } from "../../scripts/lib/productionSupabaseTls.mjs";
 import {
@@ -13,6 +14,7 @@ import {
 } from "../../scripts/lib/supabaseDatabaseTargetIdentity.mjs";
 import {
   EXIT,
+  parsePsqlSqlstate,
   runRequiredCoreMigrationsApplied,
 } from "../../scripts/assert-required-core-migrations-applied.mjs";
 import { PREFLIGHT_SQL } from "../../scripts/apply-quicklog-corrections-retractions.mjs";
@@ -726,6 +728,61 @@ describe("remote applied-schema runner safety", () => {
     expect(delegateContract).toMatch(/has_function_privilege\(\s*'anon'/);
     expect(delegateContract).toMatch(/has_function_privilege\(\s*'authenticated'/);
     expect(delegateContract).toMatch(/has_function_privilege\(\s*'service_role'/);
+    expect(catalogSql).toContain("public.quicklog_correct_entry(text,text,jsonb,uuid,uuid,text)");
+    expect(catalogSql).toContain("public.quicklog_retract_entry(text,text,uuid,uuid,text)");
+    expect(catalogSql).toMatch(/select\s+count\(\*\)\s*=\s*7\s+from observed_functions/i);
+  });
+
+  it("counts every overload before selecting the seven pinned signatures", () => {
+    const catalogSql = emittedQuickLogCatalogSql();
+    const observedCatalog = catalogSql.slice(
+      catalogSql.indexOf("observed_functions as ("),
+      catalogSql.indexOf("observed_signature_functions as ("),
+    );
+    const pinnedCatalog = catalogSql.slice(
+      catalogSql.indexOf("observed_signature_functions as ("),
+      catalogSql.indexOf("manual_contract_function_ids(kind, oid) as ("),
+    );
+
+    expect(observedCatalog).toContain("p.proname in (");
+    expect(observedCatalog).toContain("'quicklog_correct_entry'");
+    expect(observedCatalog).toContain("'quicklog_retract_entry'");
+    expect(observedCatalog).not.toContain("p.oid::regprocedure::text in (");
+    expect(pinnedCatalog).toContain("where oid in (");
+    expect(pinnedCatalog).toContain(
+      "public.quicklog_correct_entry(text,text,jsonb,uuid,uuid,text)",
+    );
+    expect(pinnedCatalog).toContain("public.quicklog_retract_entry(text,text,uuid,uuid,text)");
+  });
+
+  it("matches schema-qualified Quick Log signatures by function OID", () => {
+    const catalogSql = emittedQuickLogCatalogSql();
+    const pinnedCatalog = catalogSql.slice(
+      catalogSql.indexOf("observed_signature_functions as ("),
+      catalogSql.indexOf("manual_contract_function_ids(kind, oid) as ("),
+    );
+    const legacyContract = catalogSql.slice(
+      catalogSql.indexOf("'target_functions_contract'"),
+      catalogSql.indexOf("'target_function_overloads_contract'"),
+    );
+    const securityContract = catalogSql.slice(
+      catalogSql.indexOf("'target_function_security_contract'"),
+      catalogSql.indexOf("'manual_delegate_contract'"),
+    );
+
+    expect(pinnedCatalog).toContain("where oid in (");
+    expect(pinnedCatalog).toContain(
+      "to_regprocedure('public.quicklog_revision_resolve_root(uuid,uuid,uuid)')",
+    );
+    expect(pinnedCatalog).toContain(
+      "to_regprocedure('public.quicklog_correct_entry(text,text,jsonb,uuid,uuid,text)')",
+    );
+    expect(legacyContract).toContain("o.oid = to_regprocedure(e.signature)");
+    expect(securityContract).toContain("when o.oid in (");
+    expect(securityContract).toContain(
+      "to_regprocedure('public.quicklog_retract_entry(text,uuid,uuid,text)')",
+    );
+    expect(catalogSql).not.toMatch(/\bo\.signature\s*(?:=|in)\b/);
   });
 
   it("requires every pinned index to be valid, ready, and live", () => {
@@ -779,9 +836,14 @@ describe("remote applied-schema runner safety", () => {
       ["target_indexes_contract"],
     ],
     [
-      "one of the five functions is missing",
+      "one of the seven correction/retraction functions is missing",
       { target_functions_contract: false, target_function_overloads_contract: false },
       ["target_functions_contract", "target_function_overloads_contract"],
+    ],
+    [
+      "an eighth overload exists while all seven pinned signatures remain valid",
+      { target_function_overloads_contract: false },
+      ["target_function_overloads_contract"],
     ],
     [
       "an unexpected role can execute a Quick Log function",
@@ -1393,6 +1455,58 @@ describe("remote applied-schema runner safety", () => {
     expect(observable).toContain("stderr was suppressed");
   });
 
+  it("extracts only a psql SQLSTATE line from a rejected catalog query", () => {
+    expect(parsePsqlSqlstate("ERROR:  42501\nDETAIL: private text")).toBe("42501");
+    expect(parsePsqlSqlstate("ERROR:  42P01: relation absent")).toBe("42P01");
+    expect(parsePsqlSqlstate("psql: connection to ERROR:  42501 failed")).toBeNull();
+    expect(parsePsqlSqlstate("ERROR:\n42501")).toBeNull();
+    expect(parsePsqlSqlstate("ERROR:  42501PRIVATE")).toBeNull();
+    expect(parsePsqlSqlstate(null)).toBeNull();
+  });
+
+  it("records the catalog SQLSTATE without exposing stderr or credentials", () => {
+    const sentinel = "CATALOG-SECRET-SENTINEL";
+    const url = directUrl(SANDBOX_REF, 5432, sentinel);
+    const dir = mkdtempSync(join(tmpdir(), "core-schema-catalog-sqlstate-"));
+    tempDirs.push(dir);
+    const reportPath = join(dir, "report.md");
+    const auditPath = join(dir, "audit.json");
+    const { logger, lines } = captureLogger();
+    const calls: string[][] = [];
+
+    const status = runRequiredCoreMigrationsApplied({
+      env: {
+        TARGET_ENV: "sandbox",
+        SUPABASE_DB_URL: url,
+        REPORT_PATH: reportPath,
+        AUDIT_PATH: auditPath,
+      },
+      spawnImpl: (_command, args) => {
+        calls.push(args);
+        return calls.length === 1
+          ? successfulCoreQueryResult(1)
+          : {
+              status: 1,
+              stdout: "",
+              stderr: `ERROR:  42501\nDETAIL: ${sentinel} ${url}`,
+            };
+      },
+      logger,
+    });
+
+    const report = readFileSync(reportPath, "utf8");
+    const audit = JSON.parse(readFileSync(auditPath, "utf8"));
+    const observable = [...lines, report, JSON.stringify(audit)].join("\n");
+    expect(status).toBe(EXIT.SCHEMA_QUERY_FAILED);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toContain("VERBOSITY=sqlstate");
+    expect(report).toContain("PostgreSQL SQLSTATE: `42501`.");
+    expect(audit).toMatchObject({ psql_status: 1, psql_sqlstate: "42501" });
+    expect(observable).not.toContain(sentinel);
+    expect(observable).not.toContain(url);
+    expect(observable).not.toContain("DETAIL:");
+  });
+
   /**
    * Suppressing stderr is correct, but it left the report saying only "the
    * target schema remains unknown" for BOTH a rejected query and a database
@@ -1494,6 +1608,10 @@ describe("remote applied-schema runner safety", () => {
 
 describe("required-core-migrations workflow trust boundary", () => {
   const workflow = readFileSync(WORKFLOW_PATH, "utf8");
+  const workflowConfig = loadYaml(workflow) as {
+    on: { push: { branches: string[] }; pull_request: unknown };
+    jobs: Record<string, { if?: string; environment?: string; steps: { run?: string }[] }>;
+  };
   const manifestStart = workflow.indexOf("  manifest-and-files:");
   const sandboxStart = workflow.indexOf("  verify-sandbox:");
   const productionStart = workflow.indexOf("  verify-production:");
@@ -1520,10 +1638,11 @@ describe("required-core-migrations workflow trust boundary", () => {
     expect(manifestBlock).toContain("src/test/required-core-migrations-gate.test.ts");
   });
 
-  it("allows sandbox remote access only on the deploy branch or manual dispatch", () => {
-    expect(sandboxBlock).toContain(
-      "github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary'",
+  it("allows sandbox remote access only by manual dispatch from the deploy branch", () => {
+    expect(workflowConfig.jobs["verify-sandbox"].if).toBe(
+      "${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox' }}",
     );
+    expect(sandboxBlock).not.toContain("github.event_name == 'push'");
     expect(sandboxBlock).toContain(
       "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox'",
     );
@@ -1531,6 +1650,21 @@ describe("required-core-migrations workflow trust boundary", () => {
     expect(sandboxBlock).toContain("environment: verdant-sandbox");
     expect(sandboxBlock.match(/secrets\.SUPABASE_DB_URL_SANDBOX/g)).toHaveLength(2);
     expect(sandboxBlock).not.toMatch(/SUPABASE_DB_URL:\s*\$\{\{\s*secrets\.SUPABASE_DB_URL\s*\}\}/);
+  });
+
+  it("keeps the manifest and focused tests offline on deploy pushes and pull requests", () => {
+    const manifest = workflowConfig.jobs["manifest-and-files"];
+    expect(workflowConfig.on.push.branches).toContain("verdant-grow-diary");
+    expect(workflowConfig.on.pull_request).toBeDefined();
+    expect(manifest.if).toBeUndefined();
+    expect(manifest.environment).toBeUndefined();
+    expect(JSON.stringify(manifest)).not.toContain("secrets.");
+    expect(manifest.steps.map((step) => step.run)).toContain(
+      "node scripts/assert-required-core-migrations.mjs",
+    );
+    expect(
+      manifest.steps.some((step) => step.run?.includes("required-core-migrations-gate.test.ts")),
+    ).toBe(true);
   });
 
   it("allows production remote access only by manual dispatch from the deploy branch", () => {

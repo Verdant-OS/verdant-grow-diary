@@ -237,3 +237,18 @@ describe("allowed rendering", () => {
     ).toBe(true);
   });
 });
+it("offers read Retry after an allowed plan check without printing unavailable data", async () => {
+  const retry = vi.fn();
+  mockData.mockReturnValue({
+    status: "unavailable",
+    data: null,
+    error: "Unable to load diary report data. Try again.",
+    retry,
+  });
+  renderPage();
+  await waitFor(() => expect(screen.getByTestId("diary-range-report-error")).toBeInTheDocument());
+  expect(screen.queryByTestId("diary-range-report-print")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Retry report" }));
+  expect(retry).toHaveBeenCalledTimes(1);
+  expect(mockCheck).toHaveBeenCalledTimes(1);
+});

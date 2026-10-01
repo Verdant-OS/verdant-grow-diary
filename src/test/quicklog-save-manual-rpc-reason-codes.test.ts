@@ -13,7 +13,7 @@ import { currentQuicklogManualRpcSource } from "./quicklogManualRpcSource";
 
 const ROOT = resolve(__dirname, "../..");
 const DOC_PATH = resolve(ROOT, "docs/quicklog-rpc-safety.md");
-const sql = currentQuicklogManualRpcSource()?.body ?? "";
+const body = currentQuicklogManualRpcSource()?.body ?? "";
 const doc = existsSync(DOC_PATH) ? readFileSync(DOC_PATH, "utf8") : "";
 
 function reasonCodesInSql(s: string): string[] {
@@ -37,11 +37,11 @@ describe("quicklog_save_manual — reason-code doc alignment", () => {
   });
 
   it("migration is discoverable", () => {
-    expect(sql.length).toBeGreaterThan(200);
+    expect(body.length).toBeGreaterThan(200);
   });
 
   it("every RPC reason code is documented in the safety doc", () => {
-    const fromSql = reasonCodesInSql(sql);
+    const fromSql = reasonCodesInSql(body);
     const fromDoc = reasonCodesInDoc(doc);
     expect(fromSql.length).toBeGreaterThan(0);
     for (const code of fromSql) {
@@ -50,7 +50,7 @@ describe("quicklog_save_manual — reason-code doc alignment", () => {
   });
 
   it("every documented reason code still exists in the RPC", () => {
-    const fromSql = new Set(reasonCodesInSql(sql));
+    const fromSql = new Set(reasonCodesInSql(body));
     // Pull only codes that appear inside the allow-list section.
     const allowSection = doc.match(/Allowed safe reason codes[\s\S]+?##\s/)?.[0] ?? "";
     const documented = reasonCodesInDoc(allowSection);
@@ -62,7 +62,7 @@ describe("quicklog_save_manual — reason-code doc alignment", () => {
 });
 
 describe("quicklog_save_manual — reason-code safety", () => {
-  const codes = reasonCodesInSql(sql);
+  const codes = reasonCodesInSql(body);
 
   it("uses safe short tokens", () => {
     for (const c of codes) expect(c).toMatch(/^[a-z][a-z0-9_]{2,40}$/);

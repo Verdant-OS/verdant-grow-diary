@@ -2,23 +2,24 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T16:15 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T16:31 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
 
 - **Open (not draft), awaiting CI and Chemdawg pre-check — review not routed:
   [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
-  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `9ca178156`, 15 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 16:15
-  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 1 pass / 91 pending /
-  6 skipped / **1 failed — `Vercel`**. No approving review. 0 commits behind `verdant-grow-diary`.
+  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `358d69c38`, 16 commits) implements
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 16:31
+  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 1 pass / 82 pending /
+  7 skipped / **1 failed — `Vercel`**. No approving review. 0 commits behind `verdant-grow-diary`.
 - **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` and again at `69f2f5b23` (2026-10-01,
   no conflicts). The first brought `#1832` (hono pin), which clears the earlier
   `Dependency & Security CI` red; the second brought `#1836`.
 - **`Published migration integrity` is green:** the earlier red ran on `d65094aa9`, before `#1836`
   was merged in, and read `#1836`'s migration as "deleted". CI then passed on `a7232e1e1` (run
-  `36886278227`) and `dac35e4fc` (run `36888190685`). The run on `9ca178156` is queued.
+  `36886278227`), `dac35e4fc` (run `36888190685`) and `9ca178156` (run `36890471647`). The run on
+  `358d69c38` is queued.
 - **`Vercel` red is an account block, not code:** status "Account is blocked"; Vercel created **no
   deployment** for any branch commit since `1b66c4f0e`, while the six before it deployed `READY`.
   Not a required context. Clearing it is an owner action in the Vercel dashboard
@@ -26,6 +27,9 @@ this entry's earlier 2026-10-01 versions.
 - **Adds a migration:** `supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql`
   (new file; additive columns + `cultivar_profile_sources` with published-only RLS and SELECT-only
   grant; idempotent content upserts). **Committed is not applied. No APPLY.**
+  - At `358d69c38` its payload changed by one line (breeder slug `gg-strains-llc` → `gg-strains`,
+    matching the row the V1 seed already created; breeders are insert-if-missing). Still unmerged
+    and unapplied.
   - It was re-dated from `20260930200000` on 2026-10-01 (`a7232e1e1`, content byte-identical), so it
     sorts after `#1836`'s `20261001140000` migration.
   - **`HOLD-CHEEK`:** because #1827 adds a migration, its **merge** waits for Matthew
@@ -37,7 +41,7 @@ this entry's earlier 2026-10-01 versions.
 - **Release state:** `cultivarDatabaseReadsEnabled = false`. `/cultivars` still renders the bundled
   sample library with no database request. Status language stays "working V1 prototype in
   pre-release validation" — no "database-backed public reads", "shipped", or "live" claim.
-- **Automated review:** 26 review threads (Codex, CodeRabbit), **all resolved**.
+- **Automated review:** 30 review threads (Codex, CodeRabbit), **all resolved**.
   - Real gaps were fixed, each RED-tested. The read model now fails closed on:
     - unlinked evidence and an ambiguous latest guide;
     - non-percent units, out-of-range percentages, and malformed claim `verified_at`;
@@ -45,11 +49,14 @@ this entry's earlier 2026-10-01 versions.
     - malformed guide and section metadata.
   - With reads on, the database catalog is served only when it still carries every approved
     profile; otherwise the page falls back visibly (`database_incomplete`).
-  - The strict audit requires exact set parity for:
+  - The strict audit now runs **row-level parity**: every selected column of every published row
+    is compared with the approved rows (natural keys; generated ids dropped; foreign keys mapped).
+    It additionally requires exact set parity for:
     - sources, section links and support notes;
     - guide and section metadata;
     - complete auxiliary-claim provenance;
-    - every rendered claim's `verified_at`.
+    - every rendered claim's `verified_at`;
+    - each guide's base-template link (`cultivar_guide_templates` added to the read surface).
 
     Expected rows come from the migration's own payload builder.
 
@@ -66,15 +73,19 @@ this entry's earlier 2026-10-01 versions.
     `dac35e4fc` (run `36888191319`).
   - Each run used a freshly replayed local database, with strict parity READY and migration
     re-apply idempotency.
-  - The run on `0bcb2464d` was cancelled by the next push; the run on `9ca178156` is queued.
+  - The runs on `0bcb2464d` and `9ca178156` were cancelled by later pushes.
+  - **None of this evidence covers `358d69c38`** (row-level parity, template link, one-line payload
+    change). Its run is queued; until it completes, the row-level check against a real database is
+    `NOT_MEASURED`.
 - **Local evidence (`established fact`, Windows clone):**
-  - offline strict parity READY 10/10 at `9ca178156`;
-  - focused suite 101/101 at `9ca178156`;
-  - at `a7232e1e1`, the PR's tests plus every migration-scanning test: 1,530 passed, with 1 file
-    failing machine-locally (needs Unix psql), identically on base;
+  - offline strict parity READY 10/10 at `358d69c38`;
+  - at `358d69c38`, the PR's tests plus every migration-scanning test: 1,542 passed, with 1 file
+    failing machine-locally (needs Unix psql), identically on base, and 1 load-dependent flake
+    that passes alone;
+  - migration safety scanner and published-migration integrity verifier OK at `358d69c38`;
   - `tsc` 0 diagnostics;
   - `bun run build` exit 0 with all postbuild SEO validators OK (measured at `fd75bb832`).
-- **`NOT_MEASURED`:** the full 32-shard suite at `9ca178156`, the preview and production receipts,
+- **`NOT_MEASURED`:** the full 32-shard suite at `358d69c38`, the preview and production receipts,
   and the cause of the Vercel block.
 - **Review seat — not satisfied.** No independent review is recorded.
   - The owner named **Grok** as reviewer on 2026-10-01. Codex is unavailable, and the earlier

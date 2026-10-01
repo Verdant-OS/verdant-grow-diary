@@ -177,7 +177,7 @@ import TimelineEvidenceDetailPreview from "@/components/TimelineEvidenceDetailPr
 import TimelineSnapshotClock from "@/components/TimelineSnapshotClock";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
 import {
-  buildTimelineSensorSnapshotViewModel,
+  buildTimelineCardSensorSnapshotViewModel,
   resolveTimelineCardSensorResolution,
   resolveTimelineCardVpdStageValue,
 } from "@/lib/timelineSensorSnapshotViewModel";
@@ -2446,6 +2446,11 @@ export default function Timeline() {
                             resolveTimelineCardSensorResolution(
                               (e.details as Record<string, unknown> | null | undefined) ?? null,
                             );
+                          const { sensorViewModel, reviewMessage, warningMessage } =
+                            buildTimelineCardSensorSnapshotViewModel(
+                              { sensor, useManualValidation },
+                              { validateManualCompatibility: true },
+                            );
                           const rawSource =
                             typeof sensor?.source === "string" && sensor.source.trim().length > 0
                               ? sensor.source
@@ -2701,21 +2706,6 @@ export default function Timeline() {
                                   }
                                 >
                                   {(nowMs) => {
-                                    const sensorViewModel = useManualValidation
-                                      ? buildTimelineSensorSnapshotViewModel(sensor, {
-                                          preferUnit: "F",
-                                          validateManualCompatibility: true,
-                                          // Retain the existing persisted generic-temp Celsius convention.
-                                          genericTempUnit: "C",
-                                        })
-                                      : null;
-                                    const legacyDisplaySensor = sensor as {
-                                      temp?: number;
-                                      rh?: number;
-                                      vpd?: number;
-                                      co2?: number;
-                                      soil?: number;
-                                    };
                                     const snapTs = snapshotCapturedAt;
                                     const hasFutureTimestamp =
                                       classifySnapshotTimestamp(snapTs, nowMs) === "future";
@@ -2777,8 +2767,7 @@ export default function Timeline() {
                                             className="text-[11px] text-destructive"
                                             data-testid="timeline-manual-snapshot-invalid"
                                           >
-                                            Review manual snapshot — invalid readings were not
-                                            shown.
+                                            {reviewMessage}
                                           </span>
                                         )}
                                         {sensorViewModel?.kind === "chips" &&
@@ -2787,8 +2776,7 @@ export default function Timeline() {
                                               className="text-[11px] text-destructive"
                                               data-testid="timeline-manual-snapshot-invalid"
                                             >
-                                              Review manual snapshot — invalid readings were not
-                                              shown.
+                                              {reviewMessage}
                                             </span>
                                           )}
                                         {sensorViewModel?.kind === "chips" &&
@@ -2798,8 +2786,7 @@ export default function Timeline() {
                                               className="text-[11px] text-warning-foreground"
                                               data-testid="timeline-manual-snapshot-warning"
                                             >
-                                              Check manual snapshot — a reading may need
-                                              confirmation.
+                                              {warningMessage}
                                             </span>
                                           )}
                                         {sensorViewModel?.kind === "chips" &&
@@ -2820,28 +2807,6 @@ export default function Timeline() {
                                                           : chip.display}
                                             </SnapChip>
                                           ))}
-                                        {!useManualValidation &&
-                                          legacyDisplaySensor.temp != null && (
-                                            <SnapChip>
-                                              {((legacyDisplaySensor.temp * 9) / 5 + 32).toFixed(1)}
-                                              °F
-                                            </SnapChip>
-                                          )}
-                                        {!useManualValidation && legacyDisplaySensor.rh != null && (
-                                          <SnapChip>{legacyDisplaySensor.rh}% RH</SnapChip>
-                                        )}
-                                        {!useManualValidation &&
-                                          legacyDisplaySensor.vpd != null && (
-                                            <SnapChip>VPD {legacyDisplaySensor.vpd}</SnapChip>
-                                          )}
-                                        {!useManualValidation &&
-                                          legacyDisplaySensor.co2 != null && (
-                                            <SnapChip>CO₂ {legacyDisplaySensor.co2}</SnapChip>
-                                          )}
-                                        {!useManualValidation &&
-                                          legacyDisplaySensor.soil != null && (
-                                            <SnapChip>Soil {legacyDisplaySensor.soil}%</SnapChip>
-                                          )}
                                         {hasFutureTimestamp && (
                                           <span className="text-[11px] text-muted-foreground">
                                             Future timestamp — freshness cannot be verified.

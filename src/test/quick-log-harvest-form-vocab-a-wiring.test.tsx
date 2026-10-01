@@ -24,6 +24,9 @@ const rpcMock = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { rpc: (...args: unknown[]) => rpcMock(...args) },
 }));
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "owner-a" }, loading: false }),
+}));
 
 function mountForm() {
   return render(
@@ -36,9 +39,10 @@ function selectHarvest() {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   rpcMock.mockReset();
   rpcMock.mockResolvedValue({
-    data: { ok: true, grow_event_id: "ge-x" },
+    data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" },
     error: null,
   });
 });

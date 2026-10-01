@@ -51,3 +51,39 @@ export function classifySupabasePublicReadKey(
     reason: `JWT role ${JSON.stringify(role ?? null)} is not anon`,
   };
 }
+
+/**
+ * Verdant's production Supabase project. Verdant is production only (AGENTS.md,
+ * Release and Environment Rules); the same ref is pinned in the repo's other
+ * production-only scripts and harnesses.
+ */
+export const VERDANT_PRODUCTION_SUPABASE_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
+
+export type CultivarParityReceiptTargetClassification =
+  { ok: true } | { ok: false; reason: string };
+
+/**
+ * The parity receipt gates enabling database reads, so it must target the
+ * pinned production project exactly: https, the project host, no path. A
+ * stale shell pointing at a local, retired, or unrelated project is refused
+ * rather than allowed to emit an indistinguishable READY.
+ */
+export function classifyCultivarParityReceiptTarget(
+  url: string | null | undefined,
+): CultivarParityReceiptTargetClassification {
+  let parsed: URL;
+  try {
+    parsed = new URL((url ?? "").trim());
+  } catch {
+    return { ok: false, reason: "not a valid URL" };
+  }
+  const expectedHost = `${VERDANT_PRODUCTION_SUPABASE_PROJECT_REF}.supabase.co`;
+  if (parsed.protocol !== "https:") return { ok: false, reason: "must use https" };
+  if (parsed.hostname.toLowerCase() !== expectedHost) {
+    return { ok: false, reason: `host ${parsed.hostname} is not the production project` };
+  }
+  if (parsed.pathname !== "/" || parsed.search || parsed.hash || parsed.port) {
+    return { ok: false, reason: "must be the bare project URL" };
+  }
+  return { ok: true };
+}

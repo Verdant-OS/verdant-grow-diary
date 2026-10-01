@@ -47,7 +47,10 @@ import {
   extractCultivarSeedPayloadFromMigration,
 } from "@/lib/cultivarDatabaseSeedPayloadRules";
 import { fetchPublishedCultivarSnapshot } from "@/lib/cultivarReferenceService";
-import { classifySupabasePublicReadKey } from "@/lib/supabasePublicReadKeyRules";
+import {
+  classifyCultivarParityReceiptTarget,
+  classifySupabasePublicReadKey,
+} from "@/lib/supabasePublicReadKeyRules";
 
 const DEFAULT_OUT = "artifacts/strain-reference-library/db-parity-report.json";
 
@@ -95,6 +98,14 @@ async function loadSnapshot(source: string): Promise<CultivarDatabaseSnapshot | 
     process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) {
     console.error("BLOCKED: supabase mode needs SUPABASE_URL and SUPABASE_ANON_KEY (publishable).");
+    process.exit(2);
+  }
+  // The receipt gates enabling reads, so it must target production exactly.
+  const target = classifyCultivarParityReceiptTarget(url);
+  if (!target.ok) {
+    console.error(
+      `REFUSED: the parity receipt must target the production project (${target.reason}).`,
+    );
     process.exit(2);
   }
   // Decide from the key itself: a service-role or secret key mapped into the

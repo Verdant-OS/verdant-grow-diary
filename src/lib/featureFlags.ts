@@ -30,8 +30,8 @@ export const typedWateringWriteEnabled = false as const;
  *
  * MUST stay `false` until the V1.1 parity migration is applied and the strict
  * anon parity receipt (`bun run audit:cultivar-db-parity -- --source=supabase
- * --strict`) is green against that environment — preview first, then
- * production. See docs/product/strain-reference-library-v1-1-db-cutover.md.
+ * --strict`) is green against production. Verdant is production only: there is
+ * no preview step. Follow docs/product/strain-reference-library-v1-1-db-cutover.md.
  *
  * While `false`, the pages render the bundled sample/reference library and issue
  * no database request. When `true`, any read or mapping failure falls back,

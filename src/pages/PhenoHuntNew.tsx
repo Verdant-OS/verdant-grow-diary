@@ -56,6 +56,8 @@ interface PhenoHuntSetupDraft {
   selected: string[];
   evidenceGoals: PhenoEvidenceGoalId[];
   currentStep: PhenoOnboardingStepId;
+  /** Evidence goals step opened in this draft (#573). Absent → false. */
+  goalsReviewed: boolean;
 }
 
 function huntDraftKey(userId: string, growId: string, tentId: string | null): string {
@@ -82,6 +84,7 @@ function readHuntDraft(key: string): PhenoHuntSetupDraft | null {
         (PHENO_ONBOARDING_STEP_ORDER as readonly string[]).includes(parsed.currentStep)
           ? (parsed.currentStep as PhenoOnboardingStepId)
           : "basics",
+      goalsReviewed: parsed.goalsReviewed === true,
     };
   } catch {
     return null;
@@ -127,6 +130,9 @@ export default function PhenoHuntNew() {
     defaultEvidenceGoalSelection(),
   );
   const [currentStep, setCurrentStep] = useState<PhenoOnboardingStepId>("basics");
+  // #573: Confirmation/Create unlock only after the grower has opened the
+  // Evidence goals step, so the pre-selected defaults are never accepted unseen.
+  const [goalsReviewed, setGoalsReviewed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
 
@@ -146,7 +152,11 @@ export default function PhenoHuntNew() {
     setNotes((prev) => (prev.trim() !== "" ? prev : draft.notes));
     setSelected((prev) => (prev.size > 0 ? prev : new Set(draft.selected)));
     if (draft.evidenceGoals.length > 0) setEvidenceGoals(draft.evidenceGoals);
-    setCurrentStep(draft.currentStep);
+    setGoalsReviewed((prev) => prev || draft.goalsReviewed);
+    // A draft saved on a locked confirmation step reopens on Goals instead.
+    setCurrentStep(
+      draft.currentStep === "confirmation" && !draft.goalsReviewed ? "goals" : draft.currentStep,
+    );
     setDraftRestored(true);
   }, [draftKey]);
 
@@ -162,12 +172,17 @@ export default function PhenoHuntNew() {
         selected: Array.from(selected),
         evidenceGoals,
         currentStep,
+        goalsReviewed,
       };
       window.localStorage.setItem(draftKey, JSON.stringify(draft));
     } catch {
       // Storage unavailable (private mode, quota) — the form still works.
     }
-  }, [draftKey, name, notes, selected, evidenceGoals, currentStep]);
+  }, [draftKey, name, notes, selected, evidenceGoals, currentStep, goalsReviewed]);
+
+  useEffect(() => {
+    if (currentStep === "goals") setGoalsReviewed(true);
+  }, [currentStep]);
 
   const discardDraft = () => {
     try {
@@ -263,8 +278,9 @@ export default function PhenoHuntNew() {
         candidateIds,
         evidenceGoals,
         setupCompleted: setupConfirmed,
+        goalsReviewed,
       }),
-    [name, growId, tentId, notes, candidateIds, evidenceGoals, setupConfirmed],
+    [name, growId, tentId, notes, candidateIds, evidenceGoals, setupConfirmed, goalsReviewed],
   );
 
   const canSave = vm.canCreate && !saving && !!user;
@@ -283,10 +299,16 @@ export default function PhenoHuntNew() {
   };
 
   const stepIndex = PHENO_ONBOARDING_STEP_ORDER.indexOf(currentStep);
+  const isStepLocked = (id: PhenoOnboardingStepId) =>
+    vm.steps.find((s) => s.id === id)?.locked === true;
+  const selectStep = (id: PhenoOnboardingStepId) => {
+    if (!isStepLocked(id)) setCurrentStep(id);
+  };
   const goStep = (delta: number) => {
     const next = PHENO_ONBOARDING_STEP_ORDER[stepIndex + delta];
-    if (next) setCurrentStep(next);
+    if (next) selectStep(next);
   };
+  const nextStep = PHENO_ONBOARDING_STEP_ORDER[stepIndex + 1];
 
   const selectedCandidates = useMemo(
     () => plants.filter((p) => selected.has(p.id)),
@@ -446,7 +468,7 @@ export default function PhenoHuntNew() {
       <PhenoHuntOnboardingStepper
         steps={vm.steps}
         currentStepId={currentStep}
-        onStepSelect={setCurrentStep}
+        onStepSelect={selectStep}
       />
 
       {currentStep === "basics" && (
@@ -646,7 +668,7 @@ export default function PhenoHuntNew() {
             size="sm"
             className="flex-1 sm:flex-none"
             onClick={() => goStep(1)}
-            disabled={stepIndex === PHENO_ONBOARDING_STEP_ORDER.length - 1}
+            disabled={!nextStep || isStepLocked(nextStep)}
             data-testid="pheno-step-next"
           >
             Next <ArrowRight className="h-4 w-4 ml-1" />

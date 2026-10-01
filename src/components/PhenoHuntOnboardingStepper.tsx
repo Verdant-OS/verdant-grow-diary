@@ -7,6 +7,7 @@ import { CheckCircle2, Circle } from "lucide-react";
 /**
  * PhenoHuntOnboardingStepper — presenter for the guided onboarding flow.
  * Renders step labels + completion state driven by the pure view model.
+ * A step the view model marks `locked` renders disabled with its reason.
  */
 export interface PhenoHuntOnboardingStepperProps {
   steps: ReadonlyArray<PhenoOnboardingStep>;
@@ -34,15 +35,21 @@ export default function PhenoHuntOnboardingStepper({
           <li key={s.id} className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => onStepSelect?.(s.id)}
+              onClick={() => {
+                if (!s.locked) onStepSelect?.(s.id);
+              }}
+              disabled={s.locked === true}
+              title={s.locked ? s.reason : undefined}
               data-testid={`${testId}-step-${testIdSegment}`}
+              data-locked={s.locked ? "true" : "false"}
               data-current={isCurrent ? "true" : "false"}
               data-complete={s.complete ? "true" : "false"}
               className={
                 "flex items-center gap-1 rounded-full border px-2 py-1 " +
                 (isCurrent
                   ? "border-primary bg-primary/10 text-foreground"
-                  : "border-border bg-transparent text-muted-foreground hover:text-foreground")
+                  : "border-border bg-transparent text-muted-foreground hover:text-foreground") +
+                (s.locked ? " cursor-not-allowed opacity-60" : "")
               }
             >
               <Icon

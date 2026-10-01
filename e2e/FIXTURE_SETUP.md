@@ -3,7 +3,10 @@
 The Quick Log Playwright smoke is **write-producing**: it creates real
 diary entries through the normal authenticated UI. It must therefore
 **only** run against a dedicated disposable test account that owns
-**no** real grower data.
+**no** real grower data. It runs against production only,
+`https://verdantgrowdiary.com`, as the approved smoke account
+`cheekhimself@gmail.com`
+([`docs/production-only-verification-runbook.md`](../docs/production-only-verification-runbook.md)).
 
 This document is the end-to-end checklist for creating, verifying, and
 rotating that disposable fixture. There is **no in-app automation**
@@ -17,9 +20,11 @@ normal authenticated UI.
 
 ## 1. Dedicated disposable test account
 
-- Create a brand new account through the normal `/auth` UI.
-- Do **not** reuse a personal account or any production grower account.
-- Use an email you control (e.g. an alias or a dedicated test inbox).
+- The production smoke lane accepts only `cheekhimself@gmail.com`
+  (`e2e/lib/productionQuickLogFixtureRules.ts`). A different account needs a
+  reviewed policy change first.
+- Do **not** reuse a personal account, `matt@verdantgrowdiary.com`, the KEEP
+  account or any customer account.
 - The password lives **only** in `secrets.E2E_TEST_PASSWORD`. Never
   paste it into docs, screenshots, scripts, or commit messages.
 
@@ -59,7 +64,9 @@ Configure in `Settings → Secrets and variables → Actions`:
 
 - `E2E_BASE_URL`
 - `E2E_GROW_1_PLANT_URL` — full URL of the `E2E Test Plant` page on the
-  disposable account. Must **not** be on `verdantgrowdiary.com`.
+  disposable account, as `https://verdantgrowdiary.com/plants/<UUID>`
+  (optionally with matching `tentId` / `growId` UUIDs). The smoke refuses any
+  other host.
 - `E2E_FIXTURE_MODE=true`
 - `E2E_FIXTURE_EXPECTED_TENT_NAME=E2E Test Tent`
 - `E2E_FIXTURE_EXPECTED_PLANT_NAME=E2E Test Plant`
@@ -71,9 +78,9 @@ Configure in `Settings → Secrets and variables → Actions`:
   has no Grow page, so this is **not** required and fixture
   verification will not fail when it is omitted.
 - `E2E_GROW_1_SECOND_PLANT_NAME` (default `E2E Test Plant 2`; must be in the same grow/tent as the route plant)
-- `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` — a short safe label (e.g. `E2E`)
-  used only if the app visibly exposes the signed-in account identity.
-  **Must not** be a password or token.
+- `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` — if set, must be
+  `cheekhimself@gmail.com`; any other value is refused. The guard checks the
+  signed-in server identity either way. **Must not** be a password or token.
 - `E2E_ALLOW_FIXTURE_BOOTSTRAP=true` — enables the optional UI-only
   fixture bootstrap step (see §6). Off by default.
 
@@ -157,7 +164,10 @@ still runs afterwards; smoke is still gated on verification success.
 ## 7. Rotate or recreate the disposable E2E account
 
 Use this process when the disposable account is compromised, lost, or
-should be rotated:
+should be rotated. The production smoke lane accepts only
+`cheekhimself@gmail.com`: changing that account's password needs only the
+secret update, and switching to a different account needs a reviewed policy
+change to `e2e/lib/productionQuickLogFixtureRules.ts` first.
 
 1. Create a **new** dedicated test account through the normal `/auth`
    UI. Do not reuse a personal or production grower account.

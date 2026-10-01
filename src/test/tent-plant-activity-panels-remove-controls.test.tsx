@@ -12,7 +12,9 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const { deleteEq, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
-  const deleteEq = vi.fn(() => Promise.resolve({ error: null }));
+  const deleteEq = vi.fn((_field: string, id: string) => ({
+    select: () => ({ maybeSingle: async () => ({ data: { id }, error: null }) }),
+  }));
   const deleteFn = vi.fn(() => ({ eq: deleteEq }));
   return {
     deleteEq,
@@ -22,7 +24,14 @@ const { deleteEq, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
   };
 });
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: vi.fn(() => ({ delete: deleteFn })) },
+  supabase: {
+    from: vi.fn(() => ({
+      select: () => ({
+        eq: () => ({ maybeSingle: async () => ({ data: { details: {} }, error: null }) }),
+      }),
+      delete: deleteFn,
+    })),
+  },
 }));
 vi.mock("sonner", () => ({
   toast: { success: toastSuccess, error: toastError },
@@ -63,8 +72,7 @@ function buildVm(activity: Record<string, unknown>) {
 }
 
 beforeEach(() => {
-  deleteEq.mockReset();
-  deleteEq.mockImplementation(() => Promise.resolve({ error: null }));
+  deleteEq.mockClear();
   deleteFn.mockClear();
   toastSuccess.mockClear();
   toastError.mockClear();

@@ -5,8 +5,9 @@
  * GDP GATE: no schema/RPC/migration. Checkpoint text is parsed from note
  * bodies written by composeGrowWalkCloseoutNote (`Next checkpoint: …`).
  * Clear is a grower-driven durable marker line on the same entry
- * (`Checkpoint status: done` / `Checkpoint status: dismissed`), matching
- * the existing diary_entries.note update path (EntryEditDialog).
+ * (`Checkpoint status: done` / `Checkpoint status: dismissed`). Linked Quick
+ * Log companions take the audited revision path; ordinary diary rows retain
+ * their direct note update.
  *
  * No Action Queue. No fake data. Client-side derive only.
  */
@@ -24,6 +25,8 @@ export interface VisitCheckpointDiaryEntry {
   readonly entry_at?: string | null;
   readonly occurred_at?: string | null;
   readonly created_at?: string | null;
+  /** A Quick Log companion needs the canonical correction RPC for note changes. */
+  readonly linkedQuickLog?: boolean;
 }
 
 export interface PendingVisitCheckpoint {
@@ -76,6 +79,45 @@ export function checkpointClearMarkerLine(status: CheckpointClearStatus): string
  * Append a durable clear marker to a note body (idempotent if already cleared).
  * Does not invent other content.
  */
+/**
+ * FNV-1a 64-bit over every UTF-16 code unit (both bytes), as hex. Pure and
+ * synchronous; used only to fingerprint a note, never for security.
+ */
+function fnv1a64HexUtf16(input: string): string {
+  let hi = 0xcbf29ce4 >>> 0;
+  let lo = 0x84222325 >>> 0;
+  const step = (byte: number) => {
+    lo = (lo ^ byte) >>> 0;
+    const loMul = lo * 0x1b3;
+    const hiMul = hi * 0x1b3 + lo;
+    lo = loMul >>> 0;
+    hi = (hiMul + Math.floor(loMul / 0x1_0000_0000)) >>> 0;
+  };
+  for (let i = 0; i < input.length; i++) {
+    const unit = input.charCodeAt(i);
+    step(unit & 0xff);
+    step(unit >>> 8);
+  }
+  return hi.toString(16).padStart(8, "0") + lo.toString(16).padStart(8, "0");
+}
+
+/**
+ * Bounded, deterministic identity for one checkpoint clear attempt, used as
+ * the correction-journal intent. The journal caps intents (5000 chars) and its
+ * stored record (8192 chars), so embedding the full next note would block the
+ * clear for any checkpoint living inside a long note. Entry, status, note
+ * length and a note fingerprint keep the journal's contract: a retry of the
+ * same action matches, while the opposite status or a different resulting
+ * note is a conflict.
+ */
+export function buildCheckpointCorrectionIntent(
+  diaryEntryId: string,
+  status: CheckpointClearStatus,
+  nextNote: string,
+): string {
+  return `${diaryEntryId}:${status}:${nextNote.length}:${fnv1a64HexUtf16(nextNote)}`;
+}
+
 export function appendCheckpointClearMarker(
   note: string | null | undefined,
   status: CheckpointClearStatus,

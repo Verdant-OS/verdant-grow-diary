@@ -158,7 +158,9 @@ agent from one written block.
   explicit assignment. If you have no assigned task, select the highest-priority
   eligible open block: unclaimed or older than 24 hours, with no conflicting assignment
   or named lock. Priority order: publish gate, then P1, then P2, then everything else.
-  Ties go to the oldest `last_updated`.
+  Ties go to the oldest `last_updated`. Agents without repository access (Security,
+  Council Chair) cannot set `claimed_by` or touch a branch, so they never select or
+  resume a block: they read the log for context and act only on an explicit assignment.
 - **Role seats still hold.** Resuming a task does not change who merges, who reviews, or
   who owns CI; those stay as `docs/agents/OWNERSHIP.md` lists them. An agent that touched
   a task can never give its independent acceptance PASS. Peer observations do not

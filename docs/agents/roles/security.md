@@ -11,7 +11,9 @@
 > session.
 
 Read all four supplied context files before `SENTINEL_ACK`; record
-`open_handoffs_checked` truthfully. Return the acknowledgment before analysis.
+`open_handoffs_checked` truthfully. Without repository access this role never selects or
+resumes a handoff block; it uses the log for context and acts only on an explicit
+assignment. Return the acknowledgment before analysis.
 
 ## Mission
 

@@ -66,6 +66,8 @@ Every agent reads `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK` and records
 `open_handoffs_checked`. After acknowledgment, keep an explicit assignment. If
 unassigned, select the highest-priority eligible unclaimed or older-than-24-hours
 open block under `AGENTS.md`; do not take a fresh claim or bypass a named lock.
+Security and Council Chair have no repository access, so they never select or resume a
+block; they act only on an explicit assignment.
 
 Grok is Verdant's **Product Intelligence, Adversarial Audit, and Implementation Lead**
 (Cheek, 2026-08-20, refined): equally empowered to research, audit the live app,

@@ -196,15 +196,15 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
-  it("keeps the no-grow notice for a genuinely unscoped activity editor", () => {
+  it("keeps the no-grow notice and fails closed before an activity is selected", () => {
     mountSection({ growId: null, tentId: null, plantId: null });
 
     expect(screen.getByTestId("quick-log-all-activities-no-grow")).toHaveTextContent(
       "Select a grow to enable Quick Log actions.",
     );
-    expect(
-      screen.queryByTestId("quick-log-all-activities-persistence-block"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-all-activities-persistence-block")).toHaveTextContent(
+      "Assign this plant to a tent before saving.",
+    );
   });
 
   it("uses the full visible symptom labels while preserving canonical test identities", () => {
@@ -317,6 +317,20 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
       }),
     );
     expect(onSaveSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps Note savable for an in-grow plant with no tent", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-note-no-tent" },
+      error: null,
+    });
+    mountSection({ tentId: null });
+    await saveWithNote("note", "tentless plant note");
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [rpcName, args] = rpcMock.mock.calls[0];
+    expect(rpcName).toBe("quicklog_save_manual");
+    expect(args.p_target_type).toBe("plant");
+    expect(args.p_target_id).toBe(PLANT);
   });
 
   it("Note → quicklog_save_manual with p_action=note; dispatches + saved breakdown", async () => {
@@ -443,6 +457,22 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     });
     // The event-route RPC is never used for photo — it cannot render an image.
     expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps Photo savable for an in-grow plant with no tent", async () => {
+    mountSection({ tentId: null });
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    const file = new File(["img-bytes"], "bud.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(diaryInsertMock).toHaveBeenCalledTimes(1));
+    const [, row] = diaryInsertMock.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(row.tent_id).toBeNull();
+    expect(row.plant_id).toBe(PLANT);
   });
 
   it("Photo upload failure surfaces the error and never writes a diary row", async () => {
@@ -1158,6 +1188,62 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     const [, args] = rpcMock.mock.calls[0];
     expect(args.p_event_type).toBe("observation");
     expect(args.p_details).toEqual({ subtype: "issue", event_type: "observation" });
+  });
+
+  it("keeps Issue / observation savable for an in-grow plant with no tent", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-obs-no-tent" },
+      error: null,
+    });
+    mountSection({ tentId: null });
+    await saveWithNote("issue_observation", "yellowing on lower leaf");
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [rpcName, args] = rpcMock.mock.calls[0];
+    expect(rpcName).toBe("quicklog_save_event");
+    expect(args.p_event_type).toBe("observation");
+    expect(args.p_tent_id).toBeNull();
+    expect(args.p_plant_id).toBe(PLANT);
+  });
+
+  it("blocks Water for an in-grow plant with no tent using the tent-only copy", async () => {
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    mountSection({
+      tentId: null,
+      tentRequiredBlockReason: "Assign this plant to a tent before saving.",
+    });
+    selectActivity("watering");
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("quick-log-all-activities-structured-water-error"),
+      ).toHaveTextContent("Assign this plant to a tent before saving."),
+    );
+    expect(events).toHaveLength(0);
+    expect(rpcMock).not.toHaveBeenCalled();
+    window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+  });
+
+  it("blocks tent-required activities when the optional caller reason is omitted", async () => {
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    mountSection({ tentId: null });
+
+    selectActivity("watering");
+    expect(screen.getByTestId("quick-log-all-activities-structured-water-error")).toHaveTextContent(
+      "Assign this plant to a tent before saving.",
+    );
+    expect(events).toHaveLength(0);
+
+    selectActivity("feeding");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "light feeding" },
+    });
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
+    expect(rpcMock).not.toHaveBeenCalled();
+    window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
   });
 });
 

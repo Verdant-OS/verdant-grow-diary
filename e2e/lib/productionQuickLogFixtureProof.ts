@@ -8,7 +8,7 @@ import {
   validateProductionFixtureTarget,
   validateProductionQuickLogEnv,
   QUICKLOG_SMOKE_BACKEND_ORIGIN,
-  productionQuickLogAccountEmail,
+  QUICKLOG_SMOKE_ACCOUNT_EMAIL,
   type FixtureIdentity,
   type FixtureOwnedRow,
   type FixtureTarget,
@@ -183,7 +183,7 @@ export function observeProductionQuickLogFixture(page: Page) {
         errors = result.errors;
         if (
           invalidated ||
-          (identity && identity.email.toLowerCase() !== productionQuickLogAccountEmail(plantId))
+          (identity && identity.email.toLowerCase() !== QUICKLOG_SMOKE_ACCOUNT_EMAIL)
         )
           break;
         await new Promise((resolve) => setTimeout(resolve, 100));

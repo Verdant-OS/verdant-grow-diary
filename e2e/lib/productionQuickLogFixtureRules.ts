@@ -5,23 +5,6 @@ export const QUICKLOG_SMOKE_APP_ORIGIN = "https://verdantgrowdiary.com";
 // Public backend origin committed in .env; this is not a credential.
 export const QUICKLOG_SMOKE_BACKEND_ORIGIN = "https://knkwiiywfkbqznbxwqfh.supabase.co";
 export const QUICKLOG_SMOKE_ACCOUNT_EMAIL = "cheekhimself@gmail.com";
-// Owner authorized this one new QA plant on 2026-09-29. Existing owner rows
-// and other accounts remain outside the production write proof.
-const OWNER_QA_FIXTURE = Object.freeze({
-  email: "matt@verdantgrowdiary.com",
-  plantId: "614175ab-870c-4887-aa36-f2a5b34b3fbc",
-  tentId: "fcae5f02-7686-466c-941a-271640d76f4d",
-  growId: "2c5b5d44-e34f-4c54-a841-f8eb9530169e",
-  grow: "QA Save Retrieve 2026-09-12",
-  tent: "QA Tent Save Retrieve 2026-09-12",
-  plant: "QA PR1793 Quick Log 2026-09-29",
-});
-
-export function productionQuickLogAccountEmail(plantId: string): string {
-  return plantId === OWNER_QA_FIXTURE.plantId
-    ? OWNER_QA_FIXTURE.email
-    : QUICKLOG_SMOKE_ACCOUNT_EMAIL;
-}
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Non-alphanumeric boundaries (not \b) so underscore-joined names such as
 // "E2E_Test_Tent" carry a marker, while "Contest" or "Testing" do not.
@@ -94,18 +77,7 @@ export function validateProductionQuickLogEnv(
       errors.push(`${key}_fixture_name_required`);
   }
   const hint = env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT?.trim().toLowerCase();
-  if (productionFixturePlantId(env.E2E_GROW_1_PLANT_URL) === OWNER_QA_FIXTURE.plantId) {
-    const params = new URL(env.E2E_GROW_1_PLANT_URL!).searchParams;
-    if (
-      hint !== OWNER_QA_FIXTURE.email ||
-      params.get("tentId") !== OWNER_QA_FIXTURE.tentId ||
-      params.get("growId") !== OWNER_QA_FIXTURE.growId ||
-      expected.grow !== OWNER_QA_FIXTURE.grow ||
-      expected.tent !== OWNER_QA_FIXTURE.tent ||
-      expected.plant !== OWNER_QA_FIXTURE.plant
-    )
-      errors.push("owner_fixture_scope_required");
-  } else if (hint && hint !== QUICKLOG_SMOKE_ACCOUNT_EMAIL) errors.push("unapproved_account_hint");
+  if (hint && hint !== QUICKLOG_SMOKE_ACCOUNT_EMAIL) errors.push("unapproved_account_hint");
   return { ok: errors.length === 0, errors, expected };
 }
 
@@ -171,19 +143,9 @@ export function validateProductionFixtureTarget(
   if (
     !identity ||
     !UUID.test(identity.id) ||
-    identity.email.toLowerCase() !== productionQuickLogAccountEmail(target.plantId)
+    identity.email.toLowerCase() !== QUICKLOG_SMOKE_ACCOUNT_EMAIL
   )
     errors.push("approved_server_account_required");
-  if (
-    target.plantId === OWNER_QA_FIXTURE.plantId &&
-    (target.tentId !== OWNER_QA_FIXTURE.tentId ||
-      target.growId !== OWNER_QA_FIXTURE.growId ||
-      expected.grow !== OWNER_QA_FIXTURE.grow ||
-      expected.tent !== OWNER_QA_FIXTURE.tent ||
-      expected.plant !== OWNER_QA_FIXTURE.plant ||
-      plantName !== OWNER_QA_FIXTURE.plant)
-  )
-    errors.push("owner_fixture_scope_required");
   if (![target.plantId, target.tentId, target.growId].every((id) => UUID.test(id)))
     errors.push("complete_target_required");
   const plant = evidence.plants.find((row) => row.id === target.plantId);

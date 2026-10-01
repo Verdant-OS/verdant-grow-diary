@@ -2,11 +2,18 @@ name: TypeScript typecheck
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main, verdant-grow-diary]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   typecheck:
+    # Draft PRs wait for ready_for_review; ci.yml's required checks still run on drafts.
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     name: tsc --noEmit
     runs-on: ubuntu-latest
     timeout-minutes: 15

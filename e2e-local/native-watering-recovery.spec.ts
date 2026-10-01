@@ -1,5 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { readNativeWaterRecovery } from "./lib/nativeWaterRecoveryStorage";
+import { typedWaterRecoveryKey } from "../src/lib/quickLogWaterRecoveryKeys";
 import {
   acceptedReceipt,
   createLocalFixture,
@@ -29,19 +31,7 @@ async function openQuickLog(page: Page): Promise<void> {
 }
 
 async function pendingWater(page: Page, ownerId: string): Promise<Row | null> {
-  // Read this operation only; never enumerate auth/session storage. Typed Water
-  // recovery is tab-scoped, and its private payload must not be copied into
-  // localStorage while the original claim is pending or after it clears.
-  const { pending, shared } = await page.evaluate(
-    (key) => ({ pending: sessionStorage.getItem(key), shared: localStorage.getItem(key) }),
-    "verdant:quick-log:pending-watering:v1:" + ownerId,
-  );
-  if (shared !== null)
-    throw new Error("Typed Water copied a private recovery claim to shared storage.");
-  if (pending === null) return null;
-  const value: unknown = JSON.parse(pending);
-  if (!isRow(value)) throw new Error("Pending Water envelope is malformed.");
-  return value;
+  return page.evaluate(readNativeWaterRecovery, typedWaterRecoveryKey(ownerId));
 }
 
 async function wateringRows(account: Account): Promise<Row[]> {

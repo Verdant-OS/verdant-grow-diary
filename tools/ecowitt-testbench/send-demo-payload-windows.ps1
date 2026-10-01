@@ -50,8 +50,7 @@ function Test-AsciiHeaderSafe {
 function Get-MaskedToken {
     param([string]$token)
     if (-not $token) { return "<empty>" }
-    if ($token.Length -le 10) { return "***" }
-    return ($token.Substring(0, 7) + "..." + $token.Substring($token.Length - 3, 3))
+    return "<configured>"
 }
 
 $demoPayload = @{

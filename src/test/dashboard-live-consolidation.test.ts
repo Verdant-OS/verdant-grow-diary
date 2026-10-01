@@ -12,6 +12,7 @@
  *    strings, no automation/autopilot, no *_executed event naming.
  */
 import { describe, it, expect } from "vitest";
+import { buildDashboardEmptyEnvironmentViewModel } from "@/lib/dashboardEmptyEnvironmentViewModel";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
@@ -58,8 +59,13 @@ describe("Dashboard · Environment Snapshot section", () => {
   });
 
   it("Environment Snapshot copy includes an honest helper for empty state", () => {
-    expect(DASH).toMatch(/Add a manual reading or/);
-    expect(DASH).toMatch(/connect Ecowitt/);
+    const model = buildDashboardEmptyEnvironmentViewModel({
+      scoped: false,
+      state: null,
+      selectedTents: [],
+    });
+    expect(model.description).toContain("Add a manual reading or review saved diary entries");
+    expect(DASH).toContain("Set up a sensor.");
   });
 
   it("section is not labelled 'Live' (we never claim live without verification)", () => {

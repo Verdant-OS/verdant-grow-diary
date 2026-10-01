@@ -67,6 +67,7 @@ export default function Onboarding() {
   const [choice, setChoice] = useState<StartScreenChoice>(DEFAULT_START_SCREEN);
   const [starterBusy, setStarterBusy] = useState(false);
   const [starterRetrying, setStarterRetrying] = useState(false);
+  const starterOperationInFlightRef = useRef(false);
   const [starterError, setStarterError] = useState<string | null>(null);
   const [csvHistoryImportHref, setCsvHistoryImportHref] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -88,12 +89,15 @@ export default function Onboarding() {
   }
 
   async function handleStarterSetup(next: "quick_log" | "csv_history") {
-    if (starterBusy || starterRetrying || !user) return;
+    if (starterOperationInFlightRef.current || starterBusy || starterRetrying || !user) return;
     if (entitlementLoading || entitlementLookupFailed) {
       setStarterError(CREATION_ENTITLEMENT_UNAVAILABLE_COPY);
       return;
     }
     setStarterError(null);
+    // React's busy render can lag a second activation in the same turn.
+    // Claim the operation synchronously before the first asynchronous call.
+    starterOperationInFlightRef.current = true;
     setStarterBusy(true);
     try {
       const result = await runStarterSetup(user.id, starterSetupSupabaseAdapter, {
@@ -140,17 +144,20 @@ export default function Onboarding() {
           : STARTER_SETUP_ERROR_COPY;
       setStarterError(message);
     } finally {
+      starterOperationInFlightRef.current = false;
       setStarterBusy(false);
     }
   }
 
   async function retryStarterEntitlement() {
-    if (starterBusy || starterRetrying) return;
+    if (starterOperationInFlightRef.current || starterBusy || starterRetrying) return;
+    starterOperationInFlightRef.current = true;
     setStarterRetrying(true);
     setStarterError(null);
     try {
       await refetchEntitlements();
     } finally {
+      starterOperationInFlightRef.current = false;
       setStarterRetrying(false);
     }
   }

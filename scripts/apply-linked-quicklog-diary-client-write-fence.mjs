@@ -44,6 +44,53 @@ export { findUnsafeSqlReason };
 
 export const PRODUCTION_PROJECT_REF = SUPABASE_DATABASE_TARGETS.production.projectRef;
 export const APPLY_CONFIRMATION = "APPLY LINKED QUICKLOG DIARY CLIENT WRITE FENCE";
+
+// Compatible-client gate (owner decision 2026-10-01, option a). APPLY needs the
+// founder's measurement of the live client bundle: its commit and the UTC time
+// it was measured. The workflow verifies through the GitHub API that the commit
+// descends from #1741's merge (the compatible client) and is on the deploy
+// branch, then exports COMPATIBLE_CLIENT_ANCESTRY_VERIFIED_SHA. The runner
+// re-checks shape, freshness and that verification before any database access.
+export const COMPATIBLE_CLIENT_BASE_SHA = "07f258ff6d8e348d99ec8131ae95b7eaeed98326";
+export const COMPATIBLE_CLIENT_MAX_AGE_MS = 60 * 60 * 1000;
+export const COMPATIBLE_CLIENT_MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
+const COMPATIBLE_CLIENT_MEASURED_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+
+export function validateCompatibleClientReceipt({
+  clientSha,
+  measuredAt,
+  ancestryVerifiedSha,
+  now,
+}) {
+  const sha = typeof clientSha === "string" && /^[0-9a-f]{40}$/.test(clientSha) ? clientSha : null;
+  if (sha === null) return { ok: false, reason: "client_sha_invalid" };
+  if (typeof measuredAt !== "string" || !COMPATIBLE_CLIENT_MEASURED_AT.test(measuredAt)) {
+    return { ok: false, reason: "client_measured_at_invalid" };
+  }
+  const measuredMs = Date.parse(measuredAt);
+  const nowMs = now instanceof Date ? now.getTime() : Number.NaN;
+  // Date.parse rolls impossible dates over (2026-02-30 becomes March 2), so the
+  // parsed instant must round-trip to the exact text supplied.
+  const canonicalInput = measuredAt.replace(
+    /(?:\.(\d{1,3}))?Z$/,
+    (_match, fraction = "") => `.${fraction.padEnd(3, "0")}Z`,
+  );
+  if (
+    !Number.isFinite(measuredMs) ||
+    !Number.isFinite(nowMs) ||
+    new Date(measuredMs).toISOString() !== canonicalInput
+  ) {
+    return { ok: false, reason: "client_measured_at_invalid" };
+  }
+  if (measuredMs > nowMs + COMPATIBLE_CLIENT_MAX_FUTURE_SKEW_MS) {
+    return { ok: false, reason: "client_measured_at_future" };
+  }
+  if (nowMs - measuredMs > COMPATIBLE_CLIENT_MAX_AGE_MS) {
+    return { ok: false, reason: "client_measurement_stale" };
+  }
+  if (ancestryVerifiedSha !== sha) return { ok: false, reason: "client_ancestry_unverified" };
+  return { ok: true, clientSha: sha, measuredAt: new Date(measuredMs).toISOString() };
+}
 export const EXPECTED_REPOSITORY = "Verdant-OS/verdant-grow-diary";
 export const EXPECTED_WORKFLOW_PATH =
   ".github/workflows/apply-linked-quicklog-diary-client-write-fence.yml";
@@ -435,6 +482,7 @@ function runPlainFile({ path, childEnv, spawnImpl, failureKind, sessionSettings 
 
 const AUDIT_OUTCOMES = new Set([
   "input_rejected",
+  "client_receipt_rejected",
   "deploy_head_advanced",
   "no_database_url",
   "target_rejected",
@@ -501,6 +549,12 @@ function makeArtifactWriters({ reportPath, auditPath, receiptPath, authorization
             : {}),
           ...(typeof extra.reason === "string" && /^[a-z_]{1,64}$/.test(extra.reason)
             ? { reason: extra.reason }
+            : {}),
+          ...(base.compatibleClient
+            ? {
+                compatible_client_sha: base.compatibleClient.clientSha,
+                compatible_client_measured_at: base.compatibleClient.measuredAt,
+              }
             : {}),
         },
         null,
@@ -632,6 +686,24 @@ export function runLinkedQuicklogDiaryClientWriteFence({
     writeReport("BLOCKED - APPLY confirmation rejected", ["No database process was started."]);
     writeAudit("input_rejected", base);
     return EXIT.INPUT_REJECTED;
+  }
+  if (operation === "APPLY") {
+    const client = validateCompatibleClientReceipt({
+      clientSha: env.COMPATIBLE_CLIENT_SHA,
+      measuredAt: env.COMPATIBLE_CLIENT_MEASURED_AT,
+      ancestryVerifiedSha: env.COMPATIBLE_CLIENT_ANCESTRY_VERIFIED_SHA,
+      now: now(),
+    });
+    if (!client.ok) {
+      logger.error(`Compatible-client receipt rejected: ${client.reason}`);
+      writeReport("BLOCKED - compatible-client receipt rejected", [
+        "No database process was started.",
+        `Reason: ${client.reason}. Measure the live client bundle again and dispatch a fresh APPLY.`,
+      ]);
+      writeAudit("client_receipt_rejected", base, { reason: client.reason });
+      return EXIT.INPUT_REJECTED;
+    }
+    base.compatibleClient = { clientSha: client.clientSha, measuredAt: client.measuredAt };
   }
 
   const databaseUrl = env.SUPABASE_DB_URL ?? "";

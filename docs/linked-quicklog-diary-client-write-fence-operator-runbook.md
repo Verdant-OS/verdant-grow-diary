@@ -84,8 +84,23 @@ failure as a production result. An old client that checks only the DELETE
 error can report false success after this migration silently affects zero
 rows, so deploying SQL first is unsafe.
 
-The workflow does not verify frontend deployment or browser behavior.
-Its protected approval must therefore reference the founder-reviewed
+The workflow does not verify frontend deployment or browser behavior itself,
+but it binds the founder's measurement to APPLY and fails closed without it
+(owner decision 2026-10-01). APPLY requires two dispatch inputs:
+
+- `compatible_client_sha`: the 40-character commit of the measured live client
+  bundle.
+- `compatible_client_measured_at`: the UTC time of that measurement, as
+  `YYYY-MM-DDTHH:MM:SSZ`.
+
+Before any database access, the workflow uses the GitHub compare API to require
+that this commit contains #1741's merge `07f258ff6d8e348d99ec8131ae95b7eaeed98326`
+(status `ahead` or `identical`) and is on `verdant-grow-diary`. The runner then
+refuses APPLY, with outcome `client_receipt_rejected`, when either input is
+missing or malformed, when the measurement is more than 60 minutes old or more
+than 5 minutes in the future, or when the ancestry check did not verify the
+same commit. Both values are recorded in the audit. PREFLIGHT must leave them
+empty. The protected approval must still reference the founder-reviewed
 compatible-client receipt as well as the exact PREFLIGHT receipt. Missing,
 stale, or contradicted evidence stops APPLY. Recheck the client identity
 immediately before dispatch. Read-only PREFLIGHT can precede client delivery;
@@ -116,8 +131,11 @@ and checkpoint recovery on an explicitly authorized disposable fixture.
    with `confirm_apply=APPLY LINKED QUICKLOG DIARY CLIENT WRITE FENCE`,
    the recorded `preflight_run_id`,
    `expected_preflight_run_attempt=1`,
-   `expected_preflight_artifact_sha256`, and the same founder
-   acknowledgement. Approve the protected environment again.
+   `expected_preflight_artifact_sha256`, `compatible_client_sha` and
+   `compatible_client_measured_at` (measured within the last 60 minutes),
+   and the same founder acknowledgement. Approve the protected environment
+   again; an approval wait longer than the 60-minute window refuses APPLY,
+   so measure again and dispatch fresh.
 6. Retain the sanitized APPLY artifact and run URLs. Require
    `applied_verified` or `already_applied_verified` and an exact ledger
    receipt before calling the migration applied. Then verify the live client

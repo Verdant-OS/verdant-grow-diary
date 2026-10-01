@@ -59,6 +59,7 @@ const canonical = state({
 });
 
 const HEAD = "a".repeat(40);
+const CLIENT = "c".repeat(40);
 const temporaryRoots: string[] = [];
 
 function deliveryEnv(extra: Record<string, string> = {}) {
@@ -86,6 +87,9 @@ function deliveryEnv(extra: Record<string, string> = {}) {
     CONFIRM_APPLY: lane.APPLY_CONFIRMATION,
     PREFLIGHT_RUN_ID: "13579",
     PREFLIGHT_RECEIPT_DIGEST: "",
+    COMPATIBLE_CLIENT_SHA: CLIENT,
+    COMPATIBLE_CLIENT_MEASURED_AT: new Date().toISOString(),
+    COMPATIBLE_CLIENT_ANCESTRY_VERIFIED_SHA: CLIENT,
     SOLO_FOUNDER_ACKNOWLEDGEMENT: "I AM THE SOLE FOUNDER AND AUTHORIZE THIS PRODUCTION RUN",
     SOLO_FOUNDER_DELIVERY_MODE: "solo_founder_self_review_v1",
     SOLO_FOUNDER_VERIFIED_USER_ID: "72639960",
@@ -281,6 +285,130 @@ describe("pinned linked Quick Log diary production delivery", () => {
     expect(runbook).toContain("compatible-client receipt");
   });
 
+  it("validates the compatible-client receipt shape, freshness and verified ancestry", () => {
+    const now = new Date("2026-10-01T16:00:00.000Z");
+    const ok = {
+      clientSha: CLIENT,
+      measuredAt: "2026-10-01T15:30:00Z",
+      ancestryVerifiedSha: CLIENT,
+      now,
+    };
+    expect(lane.validateCompatibleClientReceipt(ok)).toEqual({
+      ok: true,
+      clientSha: CLIENT,
+      measuredAt: "2026-10-01T15:30:00.000Z",
+    });
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ clientSha: "" }, "client_sha_invalid"],
+      [{ clientSha: CLIENT.toUpperCase() }, "client_sha_invalid"],
+      [{ clientSha: CLIENT.slice(1) }, "client_sha_invalid"],
+      [{ measuredAt: "" }, "client_measured_at_invalid"],
+      [{ measuredAt: "2026-10-01T15:30:00+00:00" }, "client_measured_at_invalid"],
+      [{ measuredAt: "2026-10-01 15:30:00Z" }, "client_measured_at_invalid"],
+      [{ measuredAt: "2026-02-30T15:30:00Z" }, "client_measured_at_invalid"],
+      [{ measuredAt: "2026-10-01T16:05:01Z" }, "client_measured_at_future"],
+      [{ measuredAt: "2026-10-01T14:59:59Z" }, "client_measurement_stale"],
+      [{ ancestryVerifiedSha: undefined }, "client_ancestry_unverified"],
+      [{ ancestryVerifiedSha: "d".repeat(40) }, "client_ancestry_unverified"],
+      [{ now: new Date(Number.NaN) }, "client_measured_at_invalid"],
+    ];
+    for (const [change, reason] of cases) {
+      expect(lane.validateCompatibleClientReceipt({ ...ok, ...change }), reason).toEqual({
+        ok: false,
+        reason,
+      });
+    }
+    // Boundaries: exactly 60 minutes old and exactly 5 minutes ahead are accepted.
+    expect(
+      lane.validateCompatibleClientReceipt({ ...ok, measuredAt: "2026-10-01T15:00:00Z" }).ok,
+    ).toBe(true);
+    expect(
+      lane.validateCompatibleClientReceipt({ ...ok, measuredAt: "2026-10-01T16:05:00Z" }).ok,
+    ).toBe(true);
+  });
+
+  it("refuses APPLY before any database process without a verified compatible-client receipt", () => {
+    for (const [extra, reason] of [
+      [{ COMPATIBLE_CLIENT_SHA: "" }, "client_sha_invalid"],
+      [{ COMPATIBLE_CLIENT_MEASURED_AT: "2020-01-01T00:00:00Z" }, "client_measurement_stale"],
+      [{ COMPATIBLE_CLIENT_ANCESTRY_VERIFIED_SHA: "" }, "client_ancestry_unverified"],
+    ] as const) {
+      const env = deliveryEnv({
+        OPERATION: "APPLY",
+        PREFLIGHT_RECEIPT_DIGEST: "f".repeat(64),
+        ...extra,
+      });
+      const calls: string[][] = [];
+      const status = lane.runLinkedQuicklogDiaryClientWriteFence({
+        env,
+        readFile: committedMigration,
+        logger: { log() {}, error() {} },
+        spawnImpl: (_command: string, args: string[]) => {
+          calls.push(args);
+          return { status: 0, stdout: "" };
+        },
+      });
+      expect(status, reason).toBe(lane.EXIT.INPUT_REJECTED);
+      expect(calls, reason).toHaveLength(0);
+      expect(JSON.parse(readFileSync(env.AUDIT_PATH, "utf8")), reason).toMatchObject({
+        outcome: "client_receipt_rejected",
+        reason,
+      });
+    }
+  });
+
+  it("binds the compatible-client inputs, format checks and ancestry step in the workflow", () => {
+    type Step = { name?: string; if?: string; run?: string; env?: Record<string, string> };
+    const parsed = loadYaml(readFileSync(WORKFLOW, "utf8")) as {
+      on: {
+        workflow_dispatch: { inputs: Record<string, { required: boolean; default?: string }> };
+      };
+      jobs: Record<"validate" | "apply", { env: Record<string, string>; steps: Step[] }>;
+    };
+    const inputs = parsed.on.workflow_dispatch.inputs;
+    for (const name of ["compatible_client_sha", "compatible_client_measured_at"]) {
+      expect(inputs[name], name).toMatchObject({ required: false, default: "" });
+    }
+    expect(Object.keys(inputs).length).toBeLessThanOrEqual(10);
+    for (const job of [parsed.jobs.validate, parsed.jobs.apply]) {
+      expect(job.env.COMPATIBLE_CLIENT_SHA).toBe("${{ inputs.compatible_client_sha }}");
+      expect(job.env.COMPATIBLE_CLIENT_MEASURED_AT).toBe(
+        "${{ inputs.compatible_client_measured_at }}",
+      );
+    }
+    const confirmations = parsed.jobs.validate.steps.find(
+      (step) => step.name === "Verify dispatch confirmations",
+    )?.run;
+    expect(confirmations).toContain('[[ "$COMPATIBLE_CLIENT_SHA" =~ ^[0-9a-f]{40}$ ]]');
+    expect(confirmations).toContain('[[ "$COMPATIBLE_CLIENT_MEASURED_AT" =~ ');
+    expect(confirmations).toContain("PREFLIGHT must leave the compatible-client inputs empty.");
+
+    const steps = parsed.jobs.apply.steps;
+    const ancestryIndex = steps.findIndex(
+      (step) => step.name === "Verify the compatible-client receipt ancestry",
+    );
+    const runnerIndex = steps.findIndex((step) =>
+      step.run?.includes("node scripts/apply-linked-quicklog-diary-client-write-fence.mjs"),
+    );
+    const reResolveIndex = steps.findIndex(
+      (step) => step.name === "Re-resolve current deploy branch head before database access",
+    );
+    expect(ancestryIndex).toBeGreaterThan(reResolveIndex);
+    expect(ancestryIndex).toBe(runnerIndex - 1);
+    const ancestry = steps[ancestryIndex];
+    expect(ancestry.if).toBe("inputs.operation == 'APPLY'");
+    expect(ancestry.env?.GH_TOKEN).toBe("${{ github.token }}");
+    expect(ancestry.env?.COMPATIBLE_CLIENT_BASE_SHA).toBe(lane.COMPATIBLE_CLIENT_BASE_SHA);
+    expect(ancestry.run).toContain(
+      'compare_status "$COMPATIBLE_CLIENT_BASE_SHA" "$COMPATIBLE_CLIENT_SHA"',
+    );
+    expect(ancestry.run).toContain('compare_status "$COMPATIBLE_CLIENT_SHA" "verdant-grow-diary"');
+    expect(ancestry.run?.match(/ahead\|identical\) ;;/g)).toHaveLength(2);
+    expect(ancestry.run).toContain(
+      'printf \'COMPATIBLE_CLIENT_ANCESTRY_VERIFIED_SHA=%s\\n\' "$COMPATIBLE_CLIENT_SHA" >> "$GITHUB_ENV"',
+    );
+  });
+
   it("refuses non-disposable database targets in the PG15 proof", () => {
     expect(
       disposableConnection(
@@ -377,6 +505,8 @@ describe("pinned linked Quick Log diary production delivery", () => {
     expect(JSON.parse(readFileSync(env.AUDIT_PATH, "utf8"))).toMatchObject({
       outcome: "applied_verified",
       recovery_path: "migration_then_ledger",
+      compatible_client_sha: CLIENT,
+      compatible_client_measured_at: env.COMPATIBLE_CLIENT_MEASURED_AT,
     });
   });
 

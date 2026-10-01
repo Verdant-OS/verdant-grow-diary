@@ -94,6 +94,7 @@ describe("cultivar database read model — approved view model", () => {
       "cultivar_profile_sources",
       "cultivar_claims",
       "cultivar_guides",
+      "cultivar_guide_templates",
       "cultivar_guide_sections",
       "cultivar_guide_section_sources",
     ]);
@@ -372,6 +373,19 @@ describe("cultivar database read model — fails closed", () => {
       );
       expect(slugs(snapshot)).not.toContain("gg4");
     }
+  });
+
+  it("refuses a guide whose base template is not readable", () => {
+    const snapshot = freshSnapshot();
+    const guide = snapshot.cultivar_guides.find(
+      (item) => item.cultivar_id === row(snapshot, "gg4").id,
+    );
+    if (!guide) throw new Error("guide");
+    guide.base_template_id = "missing-template";
+    expect(map(snapshot).issues).toContainEqual(
+      expect.objectContaining({ slug: "gg4", path: "cultivar_guides.base_template_id" }),
+    );
+    expect(slugs(snapshot)).not.toContain("gg4");
   });
 
   it("refuses claims citing an unreadable source", () => {

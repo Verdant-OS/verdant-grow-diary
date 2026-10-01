@@ -202,6 +202,14 @@ function slugifyNormalized(normalized: string): string {
   return normalized.replace(/\s+/g, "-");
 }
 
+/**
+ * Breeder slugs the V1 seed already created. Breeders are only inserted when
+ * missing, so the approved slug must be V1's, not a re-derived one.
+ */
+const V1_BREEDER_SLUGS: Readonly<Record<string, string>> = {
+  "gg strains llc": "gg-strains",
+};
+
 // ---------------------------------------------------------------------------
 // Section → source links
 // ---------------------------------------------------------------------------
@@ -254,7 +262,11 @@ export function buildCultivarDatabaseSeedPayload(
   const breeders = breederNames
     .map((name) => {
       const normalized = normalizeSharedSearchText(name);
-      return { name, normalized_name: normalized, slug: slugifyNormalized(normalized) };
+      return {
+        name,
+        normalized_name: normalized,
+        slug: V1_BREEDER_SLUGS[normalized] ?? slugifyNormalized(normalized),
+      };
     })
     .sort((a, b) => (a.normalized_name < b.normalized_name ? -1 : 1));
 
@@ -476,6 +488,16 @@ export function cultivarSeedPayloadToSnapshot(
     cultivar_profile_sources: [],
     cultivar_claims: [],
     cultivar_guides: [],
+    cultivar_guide_templates: [
+      ...new Set(payload.cultivars.map((cultivar) => cultivar.guide.base_template_key)),
+    ]
+      .sort()
+      .map((key) => ({
+        id: `template:${key}`,
+        template_key: key,
+        version: 1,
+        publication_status: "published",
+      })),
     cultivar_guide_sections: [],
     cultivar_guide_section_sources: [],
   };
@@ -512,8 +534,12 @@ export function cultivarSeedPayloadToSnapshot(
         source_id: sourceId(source_key),
       });
     }
-    const { base_template_key: _template, ...guideRow } = guide;
-    snapshot.cultivar_guides.push({ ...guideRow, cultivar_id: cultivar.id });
+    const { base_template_key: templateKey, ...guideRow } = guide;
+    snapshot.cultivar_guides.push({
+      ...guideRow,
+      cultivar_id: cultivar.id,
+      base_template_id: `template:${templateKey}`,
+    });
     for (const section of sections) {
       const sectionId = `section:${cultivar.slug}:${section.section_key}`;
       const { sources: links, ...sectionRow } = section;

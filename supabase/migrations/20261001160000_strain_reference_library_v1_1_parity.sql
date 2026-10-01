@@ -245,7 +245,7 @@ declare
     {
       "name": "GG Strains LLC",
       "normalized_name": "gg strains llc",
-      "slug": "gg-strains-llc"
+      "slug": "gg-strains"
     },
     {
       "name": "Mephisto Genetics",

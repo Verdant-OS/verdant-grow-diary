@@ -59,8 +59,9 @@ export const CULTIVAR_DATABASE_READ_SURFACE = {
     "id,cultivar_id,trait_key,value_min,value_max,value_text,value_jsonb,unit,context_jsonb," +
     "source_id,confidence,verified_at",
   cultivar_guides:
-    "id,cultivar_id,version,title,publication_status,confidence,content_schema_version," +
-    "last_verified_at,published_at",
+    "id,cultivar_id,base_template_id,version,title,publication_status,confidence," +
+    "content_schema_version,last_verified_at,published_at",
+  cultivar_guide_templates: "id,template_key,version,publication_status",
   cultivar_guide_sections:
     "id,guide_id,section_key,sort_order,content,content_schema_version,confidence,last_verified_at",
   cultivar_guide_section_sources: "guide_section_id,source_id,support_note",
@@ -227,6 +228,8 @@ export interface CultivarDatabaseCatalogData {
 /** Stored guide row metadata (not rendered; audited for exact parity). */
 export interface CultivarDatabaseGuideMetadata {
   version: number;
+  /** `template_key` of the guide's base template, or null when the guide cites none. */
+  baseTemplateKey: string | null;
   title: string;
   confidence: CultivarConfidence;
   contentSchemaVersion: number;
@@ -814,6 +817,13 @@ export function mapCultivarDatabaseSnapshot(
     const name = read.text("name");
     if (id !== undefined && name !== undefined) breedersById.set(id, name);
   }
+  const templateKeysById = new Map<string, string>();
+  for (const row of rows("cultivar_guide_templates")) {
+    const read = new RowReader(row, null, "cultivar_guide_templates", issues);
+    const id = read.text("id");
+    const key = read.text("template_key");
+    if (id !== undefined && key !== undefined) templateKeysById.set(id, key);
+  }
 
   const aliasesByCultivar = groupBy(rows("cultivar_aliases"), "cultivar_id");
   const profileSourcesByCultivar = groupBy(rows("cultivar_profile_sources"), "cultivar_id");
@@ -1034,7 +1044,18 @@ export function mapCultivarDatabaseSnapshot(
       const guideConfidence = guideRead.oneOf("confidence", CONFIDENCES);
       const guideLastVerifiedAt = guideRead.nullableTimestamp("last_verified_at");
       const guidePublishedAt = guideRead.nullableTimestamp("published_at");
+      const templateId = guideRead.nullableText("base_template_id");
+      let baseTemplateKey: string | null | undefined = null;
+      if (typeof templateId === "string") {
+        baseTemplateKey = templateKeysById.get(templateId);
+        if (baseTemplateKey === undefined) {
+          guideRead.fail("base_template_id", "base template is not readable");
+        }
+      } else if (templateId === undefined) {
+        baseTemplateKey = undefined;
+      }
       if (
+        baseTemplateKey !== undefined &&
         guideVersion !== undefined &&
         contentSchemaVersion !== undefined &&
         guideTitle !== undefined &&
@@ -1044,6 +1065,7 @@ export function mapCultivarDatabaseSnapshot(
       ) {
         guideMetadata = {
           version: guideVersion,
+          baseTemplateKey,
           title: guideTitle,
           confidence: guideConfidence,
           contentSchemaVersion,

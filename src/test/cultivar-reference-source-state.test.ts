@@ -83,13 +83,13 @@ function fakeClient(
 }
 
 describe("cultivar reference service", () => {
-  it("issues SELECTs only, on the nine reference tables, with published filters", async () => {
+  it("issues SELECTs only, on the ten reference tables, with published filters", async () => {
     const { client, calls } = fakeClient(snapshot());
     const result = await fetchPublishedCultivarSnapshot(client);
     expect(result.ok).toBe(true);
     expect([...new Set(calls.map((call) => call.method))].sort()).toEqual(["eq", "from", "select"]);
     expect(calls.filter((call) => call.method === "from").map((call) => call.table)).toHaveLength(
-      9,
+      10,
     );
     expect(calls.filter((call) => call.method === "eq")).toEqual([
       { table: "cultivars", method: "eq", args: ["publication_status", "published"] },

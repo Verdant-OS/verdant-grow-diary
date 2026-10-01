@@ -352,6 +352,55 @@ describe("cultivar database parity — blocked content", () => {
     );
   });
 
+  it("fails any drifted column through row-level parity", () => {
+    const snapshot = freshSnapshot();
+    cultivarRow(snapshot, "oreoz").normalized_name = "oreoz renamed";
+    const jack = snapshot.cultivar_aliases.find(
+      (item) => item.cultivar_id === cultivarRow(snapshot, "jack-herer").id,
+    );
+    if (!jack) throw new Error("alias");
+    jack.sort_order = 5;
+    claimRows(snapshot, "gg4", "reported_thc_pct")[0].value_text = "very strong";
+    const breeder = snapshot.breeders.find((item) => item.normalized_name === "gg strains llc");
+    if (!breeder) throw new Error("breeder");
+    breeder.slug = "gg-strains-renamed";
+    const report = audit(snapshot);
+    expect(report.status).toBe("blocked");
+    expect(paths(report)).toEqual(
+      expect.arrayContaining([
+        "changed * rows.cultivars.oreoz.normalized_name",
+        "changed * rows.cultivar_aliases.jack-herer|jack.sort_order",
+        "changed * rows.cultivar_claims.gg4|reported_thc_pct|.value_text",
+        "changed * rows.breeders.gg strains llc.slug",
+      ]),
+    );
+  });
+
+  it("fails a guide whose base template link is missing", () => {
+    const snapshot = freshSnapshot();
+    const guide = snapshot.cultivar_guides.find(
+      (item) => item.cultivar_id === cultivarRow(snapshot, "sour-stomper").id,
+    );
+    if (!guide) throw new Error("guide");
+    guide.base_template_id = null;
+    const report = audit(snapshot);
+    expect(report.status).toBe("blocked");
+    expect(paths(report)).toEqual(
+      expect.arrayContaining([
+        "changed sour-stomper guideMetadata.baseTemplateKey",
+        "changed * rows.cultivar_guides.sour-stomper@1.base_template_id",
+      ]),
+    );
+  });
+
+  it("the approved payload carries the V1 seed's breeder slugs", () => {
+    const slugsByName = Object.fromEntries(
+      bundledPayload().breeders.map((breeder) => [breeder.normalized_name, breeder.slug]),
+    );
+    expect(slugsByName["gg strains llc"]).toBe("gg-strains");
+    expect(slugsByName["mephisto genetics"]).toBe("mephisto-genetics");
+  });
+
   it("fails an extra readable source outside the approved catalog", () => {
     const snapshot = freshSnapshot();
     snapshot.cultivar_sources.push({

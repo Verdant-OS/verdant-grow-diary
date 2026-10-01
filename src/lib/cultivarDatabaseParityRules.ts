@@ -20,13 +20,17 @@ import {
 import {
   CULTIVAR_AUXILIARY_TRAITS,
   mapCultivarDatabaseSnapshot,
+  CULTIVAR_DATABASE_READ_SURFACE,
+  CULTIVAR_DATABASE_TABLES,
   normalizeCultivarAliasForDatabase,
   renderedClaimKey,
+  type CultivarDatabaseRow,
   type CultivarDatabaseAuxiliaryClaim,
   type CultivarDatabaseSnapshot,
 } from "@/lib/cultivarDatabaseReadModel";
 import {
   buildCultivarDatabaseSeedPayload,
+  cultivarSeedPayloadToSnapshot,
   expectedAliasSourceKey,
   expectedSectionSourceKeys,
   type CultivarSeedPayloadCultivar,
@@ -34,6 +38,111 @@ import {
 
 const isoOrNull = (value: string | null): string | null =>
   value === null ? null : new Date(value).toISOString();
+
+// ---------------------------------------------------------------------------
+// Row-level parity: every selected column of every published row
+// ---------------------------------------------------------------------------
+
+const TIMESTAMP_COLUMNS = new Set([
+  "last_verified_at",
+  "retrieved_at",
+  "verified_at",
+  "published_at",
+]);
+
+function normalizeCell(column: string, value: unknown): unknown {
+  if (value === undefined || value === null) return null;
+  if (TIMESTAMP_COLUMNS.has(column) && typeof value === "string") {
+    const time = Date.parse(value);
+    return Number.isFinite(time) ? new Date(time).toISOString() : value;
+  }
+  // PostgREST may return numeric columns as strings; compare them as numbers.
+  if (typeof value === "string" && /^-?\d+\.\d+$/.test(value.trim()) && column !== "url") {
+    return Number(value.trim());
+  }
+  return value;
+}
+
+/**
+ * Canonical form of the published read surface: per table, rows keyed by
+ * their natural identity, with database-generated ids dropped and foreign
+ * keys replaced by the natural key they point at. Two snapshots holding the
+ * same content compare equal regardless of generated ids or row order.
+ */
+function canonicalRows(
+  snapshot: CultivarDatabaseSnapshot,
+): Record<string, Record<string, Record<string, unknown>>> {
+  const rows = (table: keyof CultivarDatabaseSnapshot): readonly CultivarDatabaseRow[] =>
+    Array.isArray(snapshot[table]) ? snapshot[table] : [];
+  const index = (
+    table: keyof CultivarDatabaseSnapshot,
+    label: (row: CultivarDatabaseRow) => string,
+  ) => new Map(rows(table).map((row) => [String(row.id), label(row)]));
+  const breeders = index("breeders", (row) => String(row.normalized_name));
+  const cultivars = index("cultivars", (row) => String(row.slug));
+  const sources = index("cultivar_sources", (row) => String(row.source_key));
+  const templates = index(
+    "cultivar_guide_templates",
+    (row) => `${String(row.template_key)}@${String(row.version)}`,
+  );
+  const ref = (map: Map<string, string>, value: unknown): string | null =>
+    value === null || value === undefined
+      ? null
+      : (map.get(String(value)) ?? `unresolved:${String(value)}`);
+  const guides = index(
+    "cultivar_guides",
+    (row) => `${ref(cultivars, row.cultivar_id)}@${String(row.version)}`,
+  );
+  const sections = index(
+    "cultivar_guide_sections",
+    (row) => `${ref(guides, row.guide_id)}/${String(row.section_key)}`,
+  );
+  const foreignKeys: Record<string, Map<string, string>> = {
+    breeder_id: breeders,
+    cultivar_id: cultivars,
+    source_id: sources,
+    base_template_id: templates,
+    guide_id: guides,
+    guide_section_id: sections,
+  };
+  const rowKey: Record<string, (row: CultivarDatabaseRow) => string> = {
+    breeders: (row) => String(row.normalized_name),
+    cultivars: (row) => String(row.slug),
+    cultivar_aliases: (row) => `${ref(cultivars, row.cultivar_id)}|${String(row.normalized_alias)}`,
+    cultivar_sources: (row) => String(row.source_key),
+    cultivar_profile_sources: (row) =>
+      `${ref(cultivars, row.cultivar_id)}|${ref(sources, row.source_id)}`,
+    cultivar_claims: (row) =>
+      `${ref(cultivars, row.cultivar_id)}|${String(row.trait_key)}|${
+        row.trait_key === "terpene" ? String(row.value_text) : ""
+      }`,
+    cultivar_guides: (row) => `${ref(cultivars, row.cultivar_id)}@${String(row.version)}`,
+    cultivar_guide_templates: (row) => `${String(row.template_key)}@${String(row.version)}`,
+    cultivar_guide_sections: (row) => `${ref(guides, row.guide_id)}/${String(row.section_key)}`,
+    cultivar_guide_section_sources: (row) =>
+      `${ref(sections, row.guide_section_id)}|${ref(sources, row.source_id)}`,
+  };
+
+  const out: Record<string, Record<string, Record<string, unknown>>> = {};
+  for (const table of CULTIVAR_DATABASE_TABLES) {
+    const columns = CULTIVAR_DATABASE_READ_SURFACE[table]
+      .split(",")
+      .filter((column) => column !== "id");
+    const byKey: Record<string, Record<string, unknown>> = {};
+    for (const row of rows(table)) {
+      let key = rowKey[table](row);
+      for (let n = 2; byKey[key] !== undefined; n += 1) key = `${rowKey[table](row)}#${n}`;
+      const canonical: Record<string, unknown> = {};
+      for (const column of columns) {
+        const map = foreignKeys[column];
+        canonical[column] = map ? ref(map, row[column]) : normalizeCell(column, row[column]);
+      }
+      byKey[key] = canonical;
+    }
+    out[table] = byKey;
+  }
+  return out;
+}
 
 /** Provenance fields of a stored auxiliary claim, in comparable form. */
 function auxiliaryMetadata(claim: CultivarDatabaseAuxiliaryClaim): Record<string, unknown> {
@@ -263,6 +372,7 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
         "guideMetadata",
         {
           version: approved.guide.version,
+          baseTemplateKey: approved.guide.base_template_key,
           title: approved.guide.title,
           confidence: approved.guide.confidence,
           contentSchemaVersion: approved.guide.content_schema_version,
@@ -408,6 +518,14 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
         message: "published database profile is not in the approved bundled library",
       });
     }
+  }
+
+  // Row-level parity: every selected column of every published row must match
+  // the rows the approved payload produces, so no column can drift unseen.
+  const approvedRows = canonicalRows(cultivarSeedPayloadToSnapshot(approvedPayload));
+  const databaseRows = canonicalRows(input.snapshot);
+  for (const table of CULTIVAR_DATABASE_TABLES) {
+    diffValues(null, `rows.${table}`, approvedRows[table], databaseRows[table], issues);
   }
 
   // Every approved source must exist with identical citation fields.

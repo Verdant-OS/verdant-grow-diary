@@ -570,6 +570,17 @@ async function main() {
           match: { guide_section_id: hiddenSectionId, source_id: source },
         },
         {
+          table: "cultivar_guide_templates",
+          payload: {
+            template_key: `harness_${label}_${runId}`,
+            life_cycle: "photoperiod",
+            version: 1,
+            publication_status: "draft",
+            content: { title: "Harness probe" },
+          },
+          match: { template_key: `harness_${label}_${runId}`, version: 1 },
+        },
+        {
           table: "cultivar_import_batches",
           payload: { filename: "harness-probe.csv", file_checksum: `harness-probe-${tag}` },
           match: { file_checksum: `harness-probe-${tag}` },
@@ -659,6 +670,7 @@ async function main() {
       cultivar_guides: { column: "title", value: "tampered" },
       cultivar_guide_sections: { column: "sort_order", value: 999 },
       cultivar_guide_section_sources: { column: "support_note", value: "tampered" },
+      cultivar_guide_templates: { column: "medium_scope", value: "tampered" },
       cultivar_import_batches: { column: "status", value: "approved" },
       cultivar_import_rows: { column: "status", value: "approved" },
     };

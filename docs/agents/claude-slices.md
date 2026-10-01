@@ -36,8 +36,9 @@ sensor truth) over any new surface.
 Claude slice: GDP opens the slice issue in the same block format it uses for Copilot, then comments `@claude Implement this slice as a draft PR. Stay draft. Owner Claude; reviewer per path routing.` (or applies the `claude-slice` label). No paste.
 
 Only events performed by `cheekhimself`, the account GDP posts through, can start
-the builder. Accepted events are a newly created issue or PR comment containing
-`@claude`, or an issue labeled `claude-slice`. A comment from any other account
+the builder. Accepted events are a newly created comment (on an issue or a PR)
+containing `@claude`, or an issue labeled `claude-slice`. Opening an issue whose
+body mentions `@claude` does not start it; comment `@claude` afterwards. A comment from any other account
 skips at the job gate. Labels applied by another account also skip. PR events
 only run configuration tests and, for `claude/**` heads, the path guard; they
 cannot enter the Claude builder. There is no schedule or `pull_request_target`.

@@ -14,9 +14,11 @@ on:
 permissions:
   contents: read
 
+# Builder runs share one serialized group; PR validation gets a per-PR group so
+# it never waits behind a builder run and superseded PR pushes cancel.
 concurrency:
-  group: claude-slices
-  cancel-in-progress: false
+  group: claude-slices-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'builder' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   claude-slices:
@@ -216,6 +218,7 @@ jobs:
           [[ $# == 2 ]] || { echo 'Expected PR title and body arguments' >&2; exit 1; }
           branch=$(git branch --show-current)
           [[ "$branch" =~ ^claude/[A-Za-z0-9._-]+$ ]] || { echo 'Only claude/<slice-id> branches may open a PR' >&2; exit 1; }
+          git merge-base --is-ancestor origin/verdant-grow-diary HEAD
           base=$(git rev-parse origin/verdant-grow-diary)
           head=$(git rev-parse HEAD)
           node "$RUNNER_TEMP/claude-slice-policy.cjs" --diff "$base" "$head"

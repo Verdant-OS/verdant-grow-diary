@@ -24,6 +24,15 @@ const row = {
 const input = { now, growId: "g1", tentIds: ["t1"], readings: [], diaryEntries: [manual] };
 
 describe("guided evidence scope and provenance", () => {
+  it("rejects recent live humidity 999 despite quality ok", () => {
+    const result = selectGuidedChecklistEvidence({
+      ...input,
+      diaryEntries: [],
+      readings: [{ ...row, metric: "humidity_pct", value: 999 }],
+    }).t1;
+    expect(result).toBeNull();
+    expect(isGuidedChecklistReadingFresh(result, now)).toBe(false);
+  });
   it.each([{ ph: 6.2 }, { ec: 1.2 }, { ph: 6.2, ec: 1.2 }])(
     "counts usable root-zone-only manual evidence without projecting air metrics: %j",
     (metrics) => {
@@ -190,6 +199,9 @@ describe("guided evidence scope and provenance", () => {
     { value: null },
     { value: "" },
     { value: Infinity },
+    { metric: "humidity_pct", value: 999 },
+    { metric: "unknown_metric" },
+    { metric: "constructor" },
     { tent_id: "other" },
   ])("cannot hide usable manual evidence with a newer unusable row: %j", (change) => {
     expect(
@@ -224,6 +236,118 @@ describe("guided evidence scope and provenance", () => {
   });
   it("never uses another grow without an active grow", () => {
     expect(selectGuidedChecklistEvidence({ ...input, growId: null }).t1).toBeNull();
+  });
+});
+
+describe("telemetry metric validity", () => {
+  const telemetry = (change: Record<string, unknown>) =>
+    selectGuidedChecklistEvidence({
+      ...input,
+      diaryEntries: [],
+      readings: [{ ...row, ...change }],
+    }).t1;
+
+  const bounds = [
+    ["temperature_c", ((40 - 32) * 5) / 9, ((110 - 32) * 5) / 9],
+    ["humidity_pct", 0, 100],
+    ["vpd_kpa", 0.2, 3],
+    ["co2_ppm", 0, 10_000],
+    ["soil_moisture_pct", 0, 100],
+    ["soil_ec_ms_cm", 0, 8],
+    ["soil_ec", 0, 8],
+    ["soil_temp_c", ((35 - 32) * 5) / 9, ((100 - 32) * 5) / 9],
+    ["reservoir_ph", 3, 9],
+    ["ph", 3, 9],
+    ["ppfd", 0, 2500],
+  ] as const;
+  it.each(
+    bounds.flatMap(([metric, min, max]) => [
+      { metric, value: min, valid: true },
+      { metric, value: max, valid: true },
+      { metric, value: min - 0.001, valid: false },
+      { metric, value: max + 0.001, valid: false },
+    ]),
+  )("applies canonical bounds to $metric=$value (valid=$valid)", ({ metric, value, valid }) => {
+    const result = telemetry({ metric, value });
+    expect(result).toEqual(
+      valid ? { capturedAt: row.captured_at, source: "live", quality: "ok" } : null,
+    );
+    expect(isGuidedChecklistReadingFresh(result, now)).toBe(valid);
+  });
+
+  it.each([
+    "unknown_metric",
+    "temperature",
+    "temperature_f",
+    "humidity",
+    "constructor",
+    "__proto__",
+    "toString",
+    " humidity_pct ",
+    "HUMIDITY_PCT",
+    "",
+    " ",
+    null,
+    undefined,
+    1,
+    {},
+  ])("rejects an unrecognized metric even with a plausible value: %j", (metric) => {
+    expect(telemetry({ metric, value: 25 })).toBeNull();
+  });
+
+  it.each([
+    null,
+    undefined,
+    "",
+    " ",
+    "not-a-number",
+    "Infinity",
+    "NaN",
+    NaN,
+    Infinity,
+    -Infinity,
+    true,
+    false,
+    [],
+    {},
+  ])("rejects missing or nonnumeric humidity: %j", (value) => {
+    expect(telemetry({ metric: "humidity_pct", value })).toBeNull();
+  });
+  it.each(["999", "-0.001", "100.001"])("validates parsed numeric strings: %s", (value) => {
+    expect(telemetry({ metric: "humidity_pct", value })).toBeNull();
+  });
+  it.each(["0", " 55 ", "100"])("preserves valid numeric-string evidence: %s", (value) => {
+    expect(telemetry({ metric: "humidity_pct", value })).toEqual({
+      capturedAt: row.captured_at,
+      source: "live",
+      quality: "ok",
+    });
+  });
+
+  it.each([
+    ["live", "live", true],
+    ["pi_bridge", "live", true],
+    ["manual", "manual", true],
+    ["csv", "csv", false],
+  ] as const)("preserves the %s source and freshness policy", (source, expectedSource, fresh) => {
+    const result = telemetry({ source, metric: "humidity_pct", value: 55 });
+    expect(result).toEqual({ capturedAt: row.captured_at, source: expectedSource, quality: "ok" });
+    expect(isGuidedChecklistReadingFresh(result, now)).toBe(fresh);
+    expect(telemetry({ source, metric: "humidity_pct", value: 999 })).toBeNull();
+  });
+
+  it.each([
+    { metric: "humidity_pct", value: 999 },
+    { metric: "unknown_metric", value: 25 },
+  ])("keeps the valid telemetry survivor regardless of row order: %j", (invalidMetric) => {
+    const valid = Object.freeze({ ...row, captured_at: at(120_000) });
+    const invalid = Object.freeze({ ...row, ...invalidMetric });
+    const args = { ...input, diaryEntries: [], readings: Object.freeze([valid, invalid]) };
+    const result = selectGuidedChecklistEvidence(args);
+    expect(result.t1).toEqual({ capturedAt: valid.captured_at, source: "live", quality: "ok" });
+    expect(isGuidedChecklistReadingFresh(result.t1, now)).toBe(true);
+    expect(selectGuidedChecklistEvidence(args)).toEqual(result);
+    expect(selectGuidedChecklistEvidence({ ...args, readings: [invalid, valid] })).toEqual(result);
   });
 });
 

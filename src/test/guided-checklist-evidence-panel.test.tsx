@@ -22,7 +22,7 @@ const reading = (source = "live", age = 300_000) => ({
   tent_id: "t1",
   source,
   quality: "ok",
-  metric: "temperature",
+  metric: "temperature_c",
   value: 25,
   captured_at: new Date(NOW - age).toISOString(),
 });
@@ -47,6 +47,52 @@ afterEach(() => {
 });
 
 describe("guided checklist evidence honesty", () => {
+  it("keeps capture guidance for recent live humidity 999 despite quality ok", () => {
+    state.readings.data = [{ ...reading(), metric: "humidity_pct", value: 999 }];
+    show();
+    expect(gap()).not.toBeNull();
+    expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+    expect(screen.queryByTestId("guided-action-checklist-empty")).toBeNull();
+  });
+  it.each([
+    { metric: "humidity_pct", value: "999" },
+    { metric: "unknown_metric", value: 25 },
+    { metric: "constructor", value: 25 },
+    { metric: "temperature_c", value: 999 },
+    { metric: "ppfd", value: -1 },
+  ])("keeps capture guidance when telemetry is invalid: %j", (invalidMetric) => {
+    state.readings.data = [{ ...reading(), ...invalidMetric }];
+    show();
+    expect(gap()).not.toBeNull();
+    expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+    expect(screen.queryByTestId("guided-action-checklist-empty")).toBeNull();
+  });
+  it("keeps an older valid telemetry survivor and expires it on its own clock", () => {
+    state.readings.data = [
+      { ...reading("live", 60_000), metric: "humidity_pct", value: 999 },
+      reading("live", 14 * 60_000),
+    ];
+    show();
+    expect(gap()).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(120_000);
+    });
+    expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+  });
+  it("keeps valid manual diary evidence despite newer invalid telemetry", () => {
+    state.readings.data = [{ ...reading(), metric: "humidity_pct", value: 999 }];
+    state.diary.data = [
+      {
+        id: "d1",
+        grow_id: "g1",
+        tent_id: "t1",
+        entry_at: new Date(NOW - 3_600_000).toISOString(),
+        details: { manual_sensor_snapshot: { source: "manual", ph: 6.2 } },
+      },
+    ];
+    show();
+    expect(gap()).toBeNull();
+  });
   it.each([
     { manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 55 } },
     { manual_sensor_snapshot: { source: "manual", ph: 6.2 } },

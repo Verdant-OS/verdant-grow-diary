@@ -13,8 +13,31 @@ import {
   isGuidedChecklistReadingFresh,
   type GuidedChecklistSensorReading,
 } from "@/lib/guidedActionChecklistRules";
-import { isSoilEcMscmRealistic } from "@/lib/sensorTruthRules";
+import { classifyManualMetric, isSoilEcMscmRealistic } from "@/lib/sensorTruthRules";
+import { isPpfdValid } from "@/lib/ppfdRules";
 import { PH_PRESENTATION_REALISTIC } from "@/constants/sensorTruthRanges";
+
+/** Validate before projection drops the value; unknown metrics must fail closed. */
+function isUsableTelemetryMetric(metric: unknown, value: number): boolean {
+  switch (metric) {
+    case "temperature_c":
+    case "humidity_pct":
+    case "vpd_kpa":
+    case "co2_ppm":
+    case "soil_moisture_pct":
+    case "soil_ec_ms_cm":
+    case "soil_ec":
+    case "soil_temp_c":
+    case "reservoir_ph":
+    case "ph":
+      // The classifier's default accepts unknown metrics, so keep this allowlist explicit.
+      return classifyManualMetric(metric, value).valid;
+    case "ppfd":
+      return isPpfdValid(value);
+    default:
+      return false;
+  }
+}
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -114,7 +137,7 @@ export function selectGuidedChecklistEvidence(input: {
         : typeof row.value === "string" && row.value.trim()
           ? Number(row.value)
           : NaN;
-    if (!Number.isFinite(numeric) || typeof row.metric !== "string" || !row.metric.trim()) continue;
+    if (!Number.isFinite(numeric) || !isUsableTelemetryMetric(row.metric, numeric)) continue;
     const source = text(row.source)?.trim().toLowerCase() ?? null;
     offer(text(row.tent_id), {
       capturedAt: resolveSensorObservationTime(row),

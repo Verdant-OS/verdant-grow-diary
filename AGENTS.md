@@ -148,14 +148,19 @@ agent from one written block.
   where artifacts live, the independent reviewer seat, `claimed_by`, and `last_updated`
   (date, time, zone). Use the template at the top of the log.
 - **When to update it.** At least once a day while the task is open, and always before the
-  agent stops, hands off, or expects to run out of budget. Push the branch and have its
+  agent stops, hands off, or expects to run out of budget. Every daily update includes a
+  renewal comment on the task's PR (`claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC`, posted
+  by the current holder): a log edit made on a task branch is invisible to a successor
+  until it merges, so the PR comment is what keeps the task's activity visible. Push the branch and have its
   draft PR open before implementation begins, not only before a planned stop: an agent
   can be cut off at any time, and a successor can only claim on a PR. Under
   `docs/agents/OWNERSHIP.md` Codex opens PRs, as drafts; a holder without that right asks
   Codex first. A block without a pushed branch and a PR is not eligible for coverage until
   both exist.
-- **Last activity.** A block's last activity is the newer of its `last_updated` and its
-  effective claim (below). A block with both a pushed branch and a PR is open for anyone
+- **Last activity.** A block's last activity is the newer of its `last_updated` as
+  recorded on the deploy branch (`verdant-grow-diary`) and its effective claim (below),
+  which includes the holder's renewal comments. A `last_updated` that exists only on a
+  task branch does not count. A block with both a pushed branch and a PR is open for anyone
   when it has no effective claim or its last activity is older than 24 hours.
 - **Eligible coverage.** Any agent may resume an open block as defined above, subject to
   explicit assignments and named locks.

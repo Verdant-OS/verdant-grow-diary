@@ -58,6 +58,24 @@ describe("analytics consent storage", () => {
     expect(readAnalyticsConsent()).toBe("denied");
   });
 
+  it("prefers a denied fallback when a failed write leaves granted storage readable", () => {
+    window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError");
+    });
+    const decisionsSeenBySubscriber: string[] = [];
+    const unsubscribe = subscribeToAnalyticsConsent(() => {
+      decisionsSeenBySubscriber.push(readAnalyticsConsent());
+    });
+
+    writeAnalyticsConsent("denied");
+
+    expect(window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY)).toBe("granted");
+    expect(readAnalyticsConsent()).toBe("denied");
+    expect(decisionsSeenBySubscriber).toEqual(["denied"]);
+    unsubscribe();
+  });
+
   it("fails closed when a successfully persisted decision is removed", () => {
     writeAnalyticsConsent("granted");
     window.localStorage.removeItem(ANALYTICS_CONSENT_STORAGE_KEY);

@@ -20,14 +20,14 @@ export function parseAnalyticsConsentValue(
   return "unset";
 }
 
-/** Read the stored decision. Returns "unset" on SSR or when storage is blocked. */
+/** Read the decision, preferring a current-document fallback after a failed write. */
 export function readAnalyticsConsent(): AnalyticsConsentDecision {
   if (typeof window === "undefined") return "unset";
+  if (documentDecision !== "unset") return documentDecision;
   try {
-    const stored = parseAnalyticsConsentValue(
+    return parseAnalyticsConsentValue(
       window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY),
     );
-    return stored;
   } catch {
     return documentDecision;
   }

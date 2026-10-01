@@ -13,6 +13,8 @@ import {
   formatActiveCandidateCount,
   formatKeeperCount,
   keeperCountForHunt,
+  keeperCountsFromRollup,
+  KEEPER_STABILITY_ROLLUP_LIMIT,
 } from "@/lib/phenoHuntsIndexCardRules";
 
 describe("countKeepersByHunt", () => {
@@ -126,5 +128,28 @@ describe("buildPhenoHuntCardSummary", () => {
         startedLabel: "",
       }),
     ).toBe("1 active candidate · 1 keeper · setup in progress");
+  });
+});
+
+describe("keeperCountsFromRollup (Codex on #1825)", () => {
+  const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ huntId: `h${i % 3}` }));
+
+  it("counts when the roll-up is complete", () => {
+    const counts = keeperCountsFromRollup(rows(5), { limit: 10, unavailable: false });
+    expect(counts).not.toBeNull();
+    expect(keeperCountForHunt(counts, "h0")).toBe(2);
+  });
+
+  it("returns null when the roll-up hit its cap (may be truncated), never an undercount", () => {
+    expect(keeperCountsFromRollup(rows(10), { limit: 10, unavailable: false })).toBeNull();
+    expect(keeperCountsFromRollup(rows(11), { limit: 10, unavailable: false })).toBeNull();
+  });
+
+  it("returns null when the roll-up read failed", () => {
+    expect(keeperCountsFromRollup(rows(1), { limit: 10, unavailable: true })).toBeNull();
+  });
+
+  it("the service cap is exported and positive", () => {
+    expect(KEEPER_STABILITY_ROLLUP_LIMIT).toBeGreaterThan(0);
   });
 });

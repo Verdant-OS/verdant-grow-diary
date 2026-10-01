@@ -21,6 +21,7 @@ import {
 } from "@/lib/genetics/breedingReproductionRules";
 import { hasReversal } from "@/lib/phenoReversalsService";
 import { sanitizeStabilityRuns, type StabilityRun } from "@/lib/phenoStabilityRunRules";
+import { KEEPER_STABILITY_ROLLUP_LIMIT } from "@/lib/phenoHuntsIndexCardRules";
 
 export interface KeeperRow {
   readonly id: string;
@@ -154,7 +155,7 @@ export async function listKeeperStabilityForOwner(): Promise<KeeperStabilityRow[
     .from("pheno_keepers")
     .select("id, hunt_id, keeper_name, stability_runs")
     .order("created_at", { ascending: true })
-    .limit(2000);
+    .limit(KEEPER_STABILITY_ROLLUP_LIMIT);
   if (error || !data) throw new Error("Could not load the keeper stability roll-up.");
   return data.map((r) => ({
     keeperId: r.id,

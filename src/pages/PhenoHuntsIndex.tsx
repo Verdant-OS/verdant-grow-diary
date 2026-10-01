@@ -21,7 +21,8 @@ import { listKeeperStabilityForOwner, type KeeperStabilityRow } from "@/lib/phen
 import { buildStabilityDashboard } from "@/lib/phenoStabilityDashboardRules";
 import {
   buildPhenoHuntCardSummary,
-  countKeepersByHunt,
+  KEEPER_STABILITY_ROLLUP_LIMIT,
+  keeperCountsFromRollup,
   keeperCountForHunt,
 } from "@/lib/phenoHuntsIndexCardRules";
 import PhenoStabilityDashboard from "@/components/PhenoStabilityDashboard";
@@ -96,7 +97,11 @@ export default function PhenoHuntsIndex() {
   // ACTIVE (non-archived) candidate count. Null when the roll-up failed, so a
   // failed read never renders as "no keepers".
   const keeperCounts = useMemo(
-    () => (rollupUnavailable ? null : countKeepersByHunt(keepers)),
+    () =>
+      keeperCountsFromRollup(keepers, {
+        limit: KEEPER_STABILITY_ROLLUP_LIMIT,
+        unavailable: rollupUnavailable,
+      }),
     [keepers, rollupUnavailable],
   );
 

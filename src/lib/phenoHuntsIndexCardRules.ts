@@ -10,15 +10,22 @@
  * which looked contradictory. This module names the count for what it is
  * ("active candidates") and states the hunt's keeper count beside it.
  *
- * Keeper counts are `null` when the keeper roll-up could not be read. A failed
- * read never renders as "no keepers": the clause is omitted and the page shows
- * its own roll-up-unavailable notice.
+ * Keeper counts are `null` when the keeper roll-up could not be read, or hit
+ * its row cap and may be truncated. Neither renders as "no keepers" or an
+ * undercount: the clause is omitted (a failed read also shows the page's own
+ * roll-up-unavailable notice).
  *
  * Pure. No React, no network, no clock.
  */
 
 export const PHENO_HUNT_CARD_SETUP_IN_PROGRESS = "setup in progress" as const;
 export const PHENO_HUNT_CARD_SEPARATOR = " · " as const;
+
+/**
+ * Row cap of the owner-wide keeper roll-up (listKeeperStabilityForOwner). A
+ * read that returns this many rows may be truncated.
+ */
+export const KEEPER_STABILITY_ROLLUP_LIMIT = 2000;
 
 export interface KeeperHuntRef {
   readonly huntId: string | null | undefined;
@@ -40,6 +47,22 @@ export function countKeepersByHunt(
     counts[id] = (counts[id] ?? 0) + 1;
   }
   return counts;
+}
+
+/**
+ * Per-hunt keeper counts from the owner-wide roll-up, or `null` when they
+ * cannot be exact: the read failed, or it returned `limit` rows or more and
+ * so may be truncated (Codex on #1825). A capped read never renders as an
+ * undercount; the clause is omitted instead.
+ */
+export function keeperCountsFromRollup(
+  keepers: readonly KeeperHuntRef[] | null | undefined,
+  opts: { readonly limit: number; readonly unavailable: boolean },
+): Record<string, number> | null {
+  if (opts.unavailable) return null;
+  const n = Array.isArray(keepers) ? keepers.length : 0;
+  if (n >= opts.limit) return null;
+  return countKeepersByHunt(keepers);
 }
 
 /** Keeper count for one hunt; `null` when the roll-up is unavailable. */

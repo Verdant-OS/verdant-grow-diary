@@ -12,6 +12,7 @@ on:
       - "src/lib/cultivarDatabase*.ts"
       - "src/hooks/usePublishedCultivars.ts"
       - "src/lib/featureFlags.ts"
+      - "src/lib/supabasePublicReadKeyRules.ts"
       - "scripts/audit-cultivar-database-parity.ts"
       - "src/lib/sharedSearchTextRules.ts"
       - "src/lib/strainSourceVerification.ts"
@@ -19,6 +20,7 @@ on:
       - "src/test/cultivar*.test.*"
       - "src/test/shared-search-text-rules.test.ts"
       - "src/test/strain-reference-library*.test.ts"
+      - "src/test/supabase-public-read-key-rules.test.ts"
       - "scripts/verify-cultivar-sources.mjs"
       - "supabase/functions/_shared/lib/.sync-manifest.json"
       - "supabase/functions/_shared/lib/integrations/supabase/types.ts"
@@ -82,6 +84,7 @@ jobs:
             src/test/cultivar-reference-source-state.test.ts \
             src/test/cultivar-pages-database-source.test.tsx \
             src/test/strain-reference-library-v1-1-migration.test.ts \
+            src/test/supabase-public-read-key-rules.test.ts \
             --reporter=verbose \
             --reporter=json \
             --outputFile=artifacts/strain-reference-library/targeted-tests.json

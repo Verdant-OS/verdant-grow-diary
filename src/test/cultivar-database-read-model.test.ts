@@ -277,6 +277,48 @@ describe("cultivar database read model — fails closed", () => {
     expect(slugs(gapped)).not.toContain("og-kush");
   });
 
+  it("refuses a cannabinoid claim stored in a non-percent unit", () => {
+    for (const unit of ["mg/g", null]) {
+      const snapshot = freshSnapshot();
+      const thc = snapshot.cultivar_claims.find(
+        (item) =>
+          item.cultivar_id === row(snapshot, "jack-herer").id &&
+          item.trait_key === "reported_thc_pct",
+      );
+      if (!thc) throw new Error("thc claim");
+      thc.unit = unit;
+      const result = map(snapshot);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({ slug: "jack-herer", path: "cultivar_claims.unit" }),
+      );
+      expect(slugs(snapshot)).not.toContain("jack-herer");
+    }
+  });
+
+  it("requires a percent unit on valued terpene claims and allows none on rank-only ones", () => {
+    const valued = freshSnapshot();
+    const terpene = valued.cultivar_claims.find(
+      (item) => item.cultivar_id === row(valued, "jack-herer").id && item.trait_key === "terpene",
+    );
+    if (!terpene) throw new Error("terpene claim");
+    terpene.value_min = 0.5;
+    terpene.value_max = 1.2;
+    terpene.unit = "mg/g";
+    expect(slugs(valued)).not.toContain("jack-herer");
+    terpene.unit = "%";
+    expect(slugs(valued)).toContain("jack-herer");
+
+    const rankOnly = freshSnapshot();
+    const rankOnlyTerpene = rankOnly.cultivar_claims.find(
+      (item) => item.cultivar_id === row(rankOnly, "jack-herer").id && item.trait_key === "terpene",
+    );
+    if (!rankOnlyTerpene) throw new Error("terpene claim");
+    expect(rankOnlyTerpene.unit).toBeNull();
+    expect(slugs(rankOnly)).toContain("jack-herer");
+    rankOnlyTerpene.unit = "ppm";
+    expect(slugs(rankOnly)).not.toContain("jack-herer");
+  });
+
   it("refuses claims citing an unreadable source", () => {
     const snapshot = freshSnapshot();
     const claim = snapshot.cultivar_claims.find(

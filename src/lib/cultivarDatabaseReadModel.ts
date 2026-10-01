@@ -178,6 +178,8 @@ export const CULTIVAR_CANNABINOID_TRAITS: Readonly<
   reported_cbd_pct: { cannabinoid: "reported_cbd", label: "Source-reported CBD summary" },
 };
 export const CULTIVAR_TERPENE_TRAIT = "terpene";
+/** The only claim unit the percentage fields of the public view model accept. */
+const PERCENT_UNIT = "%";
 /** Claim traits that are stored for provenance and cross-checked, not rendered. */
 export const CULTIVAR_AUXILIARY_TRAITS = ["chemotype", "reported_dominant_terpenes"] as const;
 
@@ -589,6 +591,14 @@ function mapClaims(
         read.fail("value_min", "terpene range is inverted");
         continue;
       }
+      // The view model renders terpene values as percentages: a value needs a
+      // "%" unit; a value-less (rank-only) claim may carry "%" or no unit.
+      const unit = row.unit ?? null;
+      const hasValue = min !== null || max !== null;
+      if (hasValue ? unit !== PERCENT_UNIT : unit !== null && unit !== PERCENT_UNIT) {
+        read.fail("unit", `terpene claim unit ${JSON.stringify(unit)} is not "%"`);
+        continue;
+      }
       terpenes.push({
         terpene,
         rank: detail.rank,
@@ -608,6 +618,12 @@ function mapClaims(
 
     const cannabinoidTrait = CULTIVAR_CANNABINOID_TRAITS[traitKey];
     if (cannabinoidTrait) {
+      // `reported_*_pct` values render as percentages; any other unit (mg/g,
+      // missing) would be shown mis-unit, so the claim fails closed.
+      if ((row.unit ?? null) !== PERCENT_UNIT) {
+        read.fail("unit", `${traitKey} unit ${JSON.stringify(row.unit ?? null)} is not "%"`);
+        continue;
+      }
       const min = read.nullableNumber("value_min");
       const max = read.nullableNumber("value_max");
       if (

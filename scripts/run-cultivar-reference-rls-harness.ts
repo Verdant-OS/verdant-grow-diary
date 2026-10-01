@@ -190,24 +190,35 @@ async function main() {
 
   console.log("→ hidden rows: draft/archived cultivars and import staging");
   const created: { table: string; column: string; value: string }[] = [];
-  const gg4 = await admin.from("cultivars").select("id").eq("slug", "gg4").single();
-  const watts = await admin
-    .from("cultivar_sources")
-    .select("id")
-    .eq("source_key", "watts-2021-terpene-genetics")
-    .single();
+  // Resolve real published rows first: a failed lookup must stop the harness,
+  // never leave probes aimed at an undefined or nonexistent id.
+  const gg4 = {
+    data: seededRow(
+      "gg4 cultivar lookup",
+      await admin.from("cultivars").select("id").eq("slug", "gg4").single(),
+    ),
+  };
+  const watts = {
+    data: seededRow(
+      "watts source lookup",
+      await admin
+        .from("cultivar_sources")
+        .select("id")
+        .eq("source_key", "watts-2021-terpene-genetics")
+        .single(),
+    ),
+  };
   const sourceIds = new Map<string, string>();
   for (const key of [
     "sour-diesel-public-profile",
     "og-kush-public-profile",
     "blue-dream-public-profile",
   ]) {
-    const { data } = await admin
-      .from("cultivar_sources")
-      .select("id")
-      .eq("source_key", key)
-      .single();
-    if (data) sourceIds.set(key, data.id);
+    const data = seededRow(
+      `${key} source lookup`,
+      await admin.from("cultivar_sources").select("id").eq("source_key", key).single(),
+    );
+    sourceIds.set(key, data.id);
   }
   let hiddenCultivarId: string | null = null;
   let hiddenSectionId: string | null = null;
@@ -429,7 +440,7 @@ async function main() {
     }
 
     console.log("→ client writes are rejected on every reference and staging table");
-    const probeId = gg4.data?.id ?? "00000000-0000-0000-0000-000000000000";
+    const probeId = gg4.data.id;
     const wattsId = watts.data?.id;
     if (!wattsId || !hiddenCultivarId || !hiddenSectionId || !draftGuideId || !batchId) {
       throw new Error("harness setup did not produce every id the insert probes need");

@@ -96,9 +96,39 @@ beforeEach(() => {
   mocks.owner = "owner-a";
   mocks.plants = [{ id: "plant-a", name: "Plant A" }];
 });
-afterEach(cleanup);
+async function cleanupRevisionFixture() {
+  await act(async () => {
+    cleanup();
+    // Radix queues focus restoration on unmount. Complete that task while
+    // this worker's document and CustomEvent constructor still agree.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+afterEach(cleanupRevisionFixture);
 
 describe("revision confirmation recovery", () => {
+  it.each<Kind>(["correction", "retraction"])(
+    "drains pending %s focus cleanup before the worker disposes its document",
+    async (kind) => {
+      mount();
+      fireEvent.click(
+        screen.getByTestId(
+          kind === "correction" ? "quicklog-entry-correct-button" : "quicklog-entry-retract-button",
+        ),
+      );
+      const dialog = await screen.findByRole(kind === "correction" ? "dialog" : "alertdialog");
+      const onUnmount = vi.fn();
+      dialog.addEventListener("focusScope.autoFocusOnUnmount", onUnmount);
+      try {
+        await cleanupRevisionFixture();
+        expect(onUnmount).toHaveBeenCalledOnce();
+      } finally {
+        dialog.removeEventListener("focusScope.autoFocusOnUnmount", onUnmount);
+      }
+    },
+  );
+
   it("does not reuse the previous owner's cached correction targets", async () => {
     const view = mount();
     fireEvent.click(screen.getByTestId("quicklog-entry-correct-button"));

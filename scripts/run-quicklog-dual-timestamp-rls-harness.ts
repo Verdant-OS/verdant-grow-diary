@@ -1056,20 +1056,32 @@ async function main() {
       JSON.stringify(manualEnvironmentEvents),
     );
 
-    const manualRetry = await callManual(clientA, {
+    const manualRetry = await callManual(clientA, manualArgs);
+    const manualAfterRetry = await readEvent(manualId);
+    check(
+      "manual exact idempotent retry reuses row and freezes original Captured",
+      (manualRetry.data as { reused?: boolean } | null)?.reused === true &&
+        (manualRetry.data as { grow_event_id?: string } | null)?.grow_event_id === manualId &&
+        sameInstant(manualAfterRetry.logged_at, manualCaptured),
+      JSON.stringify(manualRetry.data),
+    );
+
+    const changedManualRetry = await callManual(clientA, {
       ...manualArgs,
       p_details: {
         kind: "note",
         logged_at: new Date(Date.now() - 30_000).toISOString(),
       },
     });
-    const manualAfterRetry = await readEvent(manualId);
+    const manualAfterChangedRetry = await readEvent(manualId);
     check(
-      "manual idempotent retry reuses row and freezes original Captured",
-      (manualRetry.data as { reused?: boolean } | null)?.reused === true &&
-        (manualRetry.data as { grow_event_id?: string } | null)?.grow_event_id === manualId &&
-        sameInstant(manualAfterRetry.logged_at, manualCaptured),
-      JSON.stringify(manualRetry.data),
+      "manual changed Captured conflicts without rewriting the original row",
+      !changedManualRetry.error &&
+        (changedManualRetry.data as { reason?: string } | null)?.reason ===
+          "idempotency_key_conflict" &&
+        sameInstant(manualAfterChangedRetry.logged_at, manualCaptured) &&
+        sameInstant(manualAfterChangedRetry.updated_at, manualRow.updated_at),
+      JSON.stringify(changedManualRetry.data),
     );
 
     const malformedManualRetry = await callManual(clientA, {
@@ -1078,9 +1090,10 @@ async function main() {
     });
     const manualAfterMalformedRetry = await readEvent(manualId);
     check(
-      "manual existing key reuses before changed Captured validation",
+      "manual existing key rejects malformed changed Captured without rewriting",
       !malformedManualRetry.error &&
-        (malformedManualRetry.data as { reused?: boolean } | null)?.reused === true &&
+        (malformedManualRetry.data as { reason?: string } | null)?.reason ===
+          "idempotency_key_conflict" &&
         sameInstant(manualAfterMalformedRetry.logged_at, manualCaptured) &&
         sameInstant(manualAfterMalformedRetry.updated_at, manualRow.updated_at),
       JSON.stringify(malformedManualRetry.data),

@@ -1,0 +1,99 @@
+name: Quick Log manual reuse fence PG15
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths: &quicklog_manual_reuse_paths
+      - "supabase/migrations/20260927002000_quicklog_manual_reuse_fence.sql"
+      - "supabase/migrations/20260927160000_quicklog_manual_plant_tent_lineage.sql"
+      - "supabase/migrations/20260928183000_quicklog_manual_replay_metadata_lock.sql"
+      - "supabase/migrations/20260818010000_quicklog_manual_delegate_forward_repair.sql"
+      - "supabase/migrations/20260811090000_quicklog_corrections_retractions.sql"
+      - "scripts/run-quicklog-manual-reuse-fence-pg15-harness.mjs"
+      - "scripts/run-quicklog-manual-plant-lineage-pg15-harness.mjs"
+      - "scripts/run-quicklog-manual-reuse-lock-pg15-harness.mjs"
+      - "scripts/run-quicklog-manual-delegate-forward-repair-pg15-harness.mjs"
+      - "src/test/quicklog-manual-reuse-fence-pg15-harness.test.ts"
+      - "src/test/quicklog-manual-plant-lineage-pg15-harness.test.ts"
+      - "src/test/quicklog-manual-reuse-lock-pg15-harness.test.ts"
+      - ".github/workflows/quicklog-manual-reuse-fence-pg15.yml"
+  push:
+    branches:
+      - verdant-grow-diary
+    paths: *quicklog_manual_reuse_paths
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pg15_runtime:
+    name: PostgreSQL 15 manual replay contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: verdant-runtime-only
+          POSTGRES_DB: verdant_quicklog_delegate_repair
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d verdant_quicklog_delegate_repair"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      QUICKLOG_MANUAL_REUSE_PG15_URL: postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_quicklog_delegate_repair
+      QUICKLOG_MANUAL_LINEAGE_PG15_URL: postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_quicklog_delegate_repair
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+
+      - name: Create disposable PostgreSQL harness sentinel
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i \
+            -e PGHOST=127.0.0.1 \
+            -e PGPORT=5432 \
+            -e PGUSER=postgres \
+            -e PGPASSWORD=verdant-runtime-only \
+            -e PGDATABASE=verdant_quicklog_delegate_repair \
+            "$POSTGRES_CONTAINER" \
+            psql -X -q -v ON_ERROR_STOP=1 --single-transaction --file=- <<'SQL'
+          create schema verdant_quicklog_delegate_repair_harness authorization postgres;
+          revoke all on schema verdant_quicklog_delegate_repair_harness from public;
+          create table verdant_quicklog_delegate_repair_harness.runtime_sentinel (
+            sentinel text primary key
+          );
+          revoke all on table verdant_quicklog_delegate_repair_harness.runtime_sentinel from public;
+          insert into verdant_quicklog_delegate_repair_harness.runtime_sentinel(sentinel)
+          values ('verdant_quicklog_delegate_repair_pg15_disposable_v1');
+          SQL
+
+      - name: Run isolated PostgreSQL 15 harness
+        env:
+          QUICKLOG_MANUAL_REUSE_PG15_CONTAINER: ${{ job.services.postgres.id }}
+        run: node scripts/run-quicklog-manual-reuse-fence-pg15-harness.mjs
+
+      - name: Prove plant/tent lineage fence against the disposable database
+        env:
+          QUICKLOG_MANUAL_LINEAGE_PG15_CONTAINER: ${{ job.services.postgres.id }}
+        run: node scripts/run-quicklog-manual-plant-lineage-pg15-harness.mjs
+
+      - name: Prove manual replay versus the actual revision-root row locks
+        env:
+          QUICKLOG_MANUAL_REUSE_PG15_CONTAINER: ${{ job.services.postgres.id }}
+        run: node scripts/run-quicklog-manual-reuse-lock-pg15-harness.mjs

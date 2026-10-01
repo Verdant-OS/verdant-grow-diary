@@ -1,13 +1,14 @@
 name: Sandbox credit-packs smoke (read-only)
 
-# Runs the read-only sandbox smoke script against the staging (sandbox)
-# Supabase project and uploads the per-checkpoint transcript as an
-# artifact for audit. The script never mutates data, policies, or Paddle.
+# Existing read-only sandbox DB diagnostic; not production acceptance.
+# Current hosted verification is verdantgrowdiary.com. A fixture-scoped
+# production read-only equivalent requires a separate reviewed CI slice.
+# Script, secrets, jobs and schedule remain unchanged in this docs-only change.
 #
 # Triggers:
 #   - manual dispatch (allows overriding the target user)
-#   - nightly at 09:00 UTC so a regression against the staging project
-#     surfaces within 24h without waiting for a release
+#   - existing nightly at 09:00 UTC reports the legacy diagnostic target;
+#     it does not measure the production app
 #
 # Required repo secrets:
 #   SUPABASE_DB_URL_SANDBOX   — read connection string for the sandbox DB

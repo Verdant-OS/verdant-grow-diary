@@ -2,7 +2,7 @@
 /**
  * Verdant Batched Validation Runner v1
  *
- * Runs the full `src/test` + `src/lib/__tests__` Vitest suite in deterministic batches so it
+ * Runs all configured .test/.spec TS/TSX files under src in deterministic batches so it
  * completes in memory-limited / time-limited environments without one
  * huge `bunx vitest run`. Never skips, never hides failures, never
  * updates snapshots.
@@ -32,7 +32,7 @@ import {
 } from "./vitest-batch-utils.mjs";
 
 const ROOT = process.cwd();
-const TEST_ROOTS = [resolve(ROOT, "src/test"), resolve(ROOT, "src/lib/__tests__")];
+const TEST_ROOTS = [resolve(ROOT, "src")];
 
 /**
  * Emit a machine-readable marker for the CI log parser. Markers carry only
@@ -50,10 +50,13 @@ function discoverTestFiles(dir) {
   while (stack.length) {
     const cur = stack.pop();
     for (const entry of readdirSync(cur)) {
+      // Match Vitest's default directory exclusions as well as its configured
+      // include pattern. Do not schedule dependency or Git-internal tests.
+      if (entry === "node_modules" || entry === ".git") continue;
       const full = join(cur, entry);
       const s = statSync(full);
       if (s.isDirectory()) stack.push(full);
-      else if (/\.test\.(ts|tsx)$/.test(entry)) {
+      else if (/\.(test|spec)\.(ts|tsx)$/.test(entry)) {
         out.push(relative(ROOT, full));
       }
     }
@@ -153,7 +156,7 @@ function main() {
 
   const all = sortTestFiles([...new Set(TEST_ROOTS.flatMap((dir) => discoverTestFiles(dir)))]);
   if (all.length === 0) {
-    console.error("✗ No test files discovered under src/test or src/lib/__tests__");
+    console.error("✗ No test files discovered under src");
     process.exit(2);
   }
 

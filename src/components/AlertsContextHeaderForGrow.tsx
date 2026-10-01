@@ -11,6 +11,10 @@
  *    via `convertCelsiusForDisplay`.
  */
 import { useMemo } from "react";
+import {
+  useAlertsPresentationClock,
+  type AlertsPresentationClock,
+} from "@/hooks/useAlertsPresentationClock";
 import AlertsContextHeader from "@/components/AlertsContextHeader";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useGrowTargets } from "@/hooks/useGrowTargets";
@@ -46,6 +50,7 @@ interface Props {
   /** True when the relevant grow already has at least one open alert.
    * Drives the duplicate-prevention reassurance banner. */
   hasOpenAlerts?: boolean;
+  clock?: AlertsPresentationClock;
 }
 
 export default function AlertsContextHeaderForGrow({
@@ -55,6 +60,7 @@ export default function AlertsContextHeaderForGrow({
   plants,
   isFallback = false,
   hasOpenAlerts = false,
+  clock,
 }: Props) {
   const { data: tentRows } = useGrowTents(growId);
   const tents = useMemo(() => tentRows ?? [], [tentRows]);
@@ -62,6 +68,7 @@ export default function AlertsContextHeaderForGrow({
   const sensorState = useLatestSensorSnapshot(growId, tentIds);
   const targetsState = useGrowTargets(growId);
   const tempUnit = useTemperatureUnitPreference();
+  const { now } = useAlertsPresentationClock(sensorState.snapshot, clock);
   // Stage precedence lives in resolveAlertContextStage: grow stage + tent
   // stages, most advanced known stage wins on disagreement. Until the tent
   // and plant reads have data the stage is not known, so the header says so
@@ -98,6 +105,7 @@ export default function AlertsContextHeaderForGrow({
         snapshot: confirmedSnapshot,
         status: headerStatus,
         tempUnit,
+        now,
       }),
     [
       growName,
@@ -108,12 +116,14 @@ export default function AlertsContextHeaderForGrow({
       confirmedSnapshot,
       headerStatus,
       tempUnit,
+      now,
     ],
   );
 
   const freshnessArgs = {
     snapshot: confirmedSnapshot,
     status: headerStatus,
+    now,
   } as const;
 
   return (

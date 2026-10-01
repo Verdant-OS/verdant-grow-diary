@@ -7,6 +7,10 @@
  * companion photo/video failure double-wrote the diary. These tests pin
  * the migration's guarantees and the client threading so neither side
  * silently regresses.
+ *
+ * @source-scan-justified: the migrations are SQL with no importable module, and
+ * the client-threading pins assert statement order inside handleDiscardHistoryDraft,
+ * which no resolved value exposes.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
@@ -167,6 +171,8 @@ describe("quicklog_save_manual idempotency contract (migration)", () => {
 describe("quicklog_save_manual idempotency contract (client threading)", () => {
   const SHEET = readFileSync(resolve(ROOT, "src/components/QuickLogV2Sheet.tsx"), "utf8");
   const PAYLOAD = readFileSync(resolve(ROOT, "src/lib/quickLogV2SavePayload.ts"), "utf8");
+  const HISTORY_DISCARD =
+    SHEET.match(/ {2}function handleDiscardHistoryDraft\(\) \{[\s\S]*?\n {2}\}/)?.[0] ?? "";
 
   it("payload builder requires and threads the key", () => {
     expect(PAYLOAD).toMatch(/p_idempotency_key: string/);
@@ -184,7 +190,12 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
     // definitively rejected in validation (nothing was written under that
     // key; the corrected entry is a new logical submission). An ambiguous
     // failure must never rotate.
-    const rotations = SHEET.match(/saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/g) ?? [];
+    // The separate, explicitly reviewed abandonment path is pinned below;
+    // exclude it from the existing completion/definitive-rejection contract.
+    const rotations =
+      SHEET.replace(HISTORY_DISCARD, "").match(
+        /saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/g,
+      ) ?? [];
     expect(rotations).toHaveLength(4);
     expect(SHEET).toMatch(
       /trackQuickLogSuccess\("feed", \{ reused: result\.reused \}\);[\s\S]{0,300}saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/,
@@ -195,6 +206,31 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
     expect(SHEET).toMatch(
       /const definitiveServerRejection = result\.reason === "rpc:invalid_typed_payload";/,
     );
+  });
+
+  it("rotates an abandoned history draft only after guarded exact journal clearance", () => {
+    expect(HISTORY_DISCARD).not.toBe("");
+    expect(HISTORY_DISCARD).toMatch(
+      /!historyDiscardAllowed\s*\|\|\s*saveInFlightRef\.current\s*\|\|\s*\(!pending && !pendingFeed\)\s*\|\|\s*\(pending && pendingFeed\)/,
+    );
+    expect(HISTORY_DISCARD).toMatch(
+      /if \(pending && !clearPendingQuickLogNote\(pending\.recovery\)\) \{\s*setLocalError\(QUICK_LOG_HISTORY_DISCARD_FAILED\);\s*return;\s*\}/,
+    );
+    expect(HISTORY_DISCARD).toMatch(
+      /if \(pendingFeed && !clearPendingQuickLogFeeding\(pendingFeed\.recovery\)\) \{\s*setLocalError\(QUICK_LOG_HISTORY_DISCARD_FAILED\);\s*return;\s*\}/,
+    );
+    const clearance = HISTORY_DISCARD.indexOf("clearPendingQuickLogNote(pending.recovery)");
+    const rotation = HISTORY_DISCARD.indexOf(
+      "saveIdempotencyKeyRef.current = newQuickLogSaveKey()",
+    );
+    expect(rotation).toBeGreaterThan(clearance);
+    expect(rotation).toBeGreaterThan(
+      HISTORY_DISCARD.indexOf("clearPendingQuickLogFeeding(pendingFeed.recovery)"),
+    );
+    expect(
+      HISTORY_DISCARD.match(/saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/g),
+    ).toHaveLength(1);
+    expect(HISTORY_DISCARD).not.toMatch(/\bawait\b|trackQuickLogSuccess|setPostSave|\bsave\(/);
   });
 
   it("companion-media failure is partial success — the save flow no longer aborts", () => {

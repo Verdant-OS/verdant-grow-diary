@@ -199,6 +199,8 @@ export interface CultivarDatabaseIssue {
 export interface CultivarDatabaseAliasRecord {
   alias: string;
   normalizedAlias: string;
+  /** Key of the source the alias cites, or null when the row cites none. */
+  sourceKey: string | null;
 }
 
 export interface CultivarDatabaseAuxiliaryClaim {
@@ -858,8 +860,21 @@ export function mapCultivarDatabaseSnapshot(
       const alias = aliasRead.text("alias");
       const normalizedAlias = aliasRead.text("normalized_alias");
       const sortOrder = aliasRead.nullableInteger("sort_order");
-      if (alias !== undefined && normalizedAlias !== undefined && sortOrder !== undefined) {
-        aliasRecords.push({ alias, normalizedAlias, sortOrder });
+      const aliasSourceId = aliasRead.nullableText("source_id");
+      let sourceKey: string | null | undefined = null;
+      if (typeof aliasSourceId === "string") {
+        sourceKey = sourcesById.get(aliasSourceId)?.key;
+        if (sourceKey === undefined) aliasRead.fail("source_id", "alias source is not readable");
+      } else if (aliasSourceId === undefined) {
+        sourceKey = undefined;
+      }
+      if (
+        alias !== undefined &&
+        normalizedAlias !== undefined &&
+        sortOrder !== undefined &&
+        sourceKey !== undefined
+      ) {
+        aliasRecords.push({ alias, normalizedAlias, sourceKey, sortOrder });
       }
     }
     aliasRecords.sort(
@@ -1046,9 +1061,10 @@ export function mapCultivarDatabaseSnapshot(
     });
     sectionsBySlug[slug] = sections;
     sourcesBySlug[slug] = profileSources.map((item) => item.source);
-    aliasRecordsBySlug[slug] = aliasRecords.map(({ alias, normalizedAlias }) => ({
+    aliasRecordsBySlug[slug] = aliasRecords.map(({ alias, normalizedAlias, sourceKey }) => ({
       alias,
       normalizedAlias,
+      sourceKey,
     }));
     auxiliaryClaimsBySlug[slug] = claims.auxiliary;
     sectionSourceKeysBySlug[slug] = sectionSourceKeys;

@@ -214,6 +214,14 @@ export function expectedSectionSourceKeys(
   return [...keys].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
+/**
+ * The source an alias cites: the profile's own source. Shared by the payload
+ * builder and the parity audit so alias provenance cannot drift.
+ */
+export function expectedAliasSourceKey(profile: VerdantCultivarProfile): string | null {
+  return profile.sourceKeys[0] ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Bundled → payload
 // ---------------------------------------------------------------------------
@@ -404,7 +412,7 @@ export function buildCultivarDatabaseSeedPayload(
         alias,
         normalized_alias: normalizeCultivarAliasForDatabase(alias),
         sort_order: aliasIndex,
-        source_key: profileSourceKey,
+        source_key: expectedAliasSourceKey(profile) ?? profileSourceKey,
       })),
       profile_sources: profile.sourceKeys.map((key, sourceIndex) => ({
         source_key: key,

@@ -232,6 +232,43 @@ describe("cultivar database parity — blocked content", () => {
     expect(paths(report)).toContain("changed * sources.watts-2021-terpene-genetics.title");
   });
 
+  it("fails a missing, wrong, or unreadable alias source", () => {
+    const aliasOf = (snapshot: MutableSnapshot, slug: string, alias: string) => {
+      const found = snapshot.cultivar_aliases.find(
+        (item) => item.cultivar_id === cultivarRow(snapshot, slug).id && item.alias === alias,
+      );
+      if (!found) throw new Error(`${slug}/${alias}`);
+      return found;
+    };
+
+    const missing = freshSnapshot();
+    aliasOf(missing, "gg4", "GG4").source_id = null;
+    const missingReport = audit(missing);
+    expect(missingReport.status).toBe("blocked");
+    expect(missingReport.issues).toContainEqual(
+      expect.objectContaining({
+        slug: "gg4",
+        kind: "changed",
+        path: "aliasNormalization[0].sourceKey",
+        expected: "gg4-public-profile",
+        actual: null,
+      }),
+    );
+
+    const wrong = freshSnapshot();
+    const watts = wrong.cultivar_sources.find(
+      (item) => item.source_key === "watts-2021-terpene-genetics",
+    );
+    aliasOf(wrong, "gg4", "GG4").source_id = watts?.id;
+    expect(paths(audit(wrong))).toContain("changed gg4 aliasNormalization[0].sourceKey");
+
+    const unreadable = freshSnapshot();
+    aliasOf(unreadable, "gg4", "GG4").source_id = "not-a-readable-source";
+    const unreadableReport = audit(unreadable);
+    expect(unreadableReport.status).toBe("invalid");
+    expect(paths(unreadableReport)).toContain("malformed gg4 cultivar_aliases.source_id");
+  });
+
   it("fails an extra readable source outside the approved catalog", () => {
     const snapshot = freshSnapshot();
     snapshot.cultivar_sources.push({

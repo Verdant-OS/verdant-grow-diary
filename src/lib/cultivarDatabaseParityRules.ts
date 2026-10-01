@@ -23,7 +23,10 @@ import {
   normalizeCultivarAliasForDatabase,
   type CultivarDatabaseSnapshot,
 } from "@/lib/cultivarDatabaseReadModel";
-import { expectedSectionSourceKeys } from "@/lib/cultivarDatabaseSeedPayloadRules";
+import {
+  expectedAliasSourceKey,
+  expectedSectionSourceKeys,
+} from "@/lib/cultivarDatabaseSeedPayloadRules";
 
 export const CULTIVAR_PARITY_REPORT_VERSION = 1;
 
@@ -189,6 +192,7 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
       expected.aliases.map((alias) => ({
         alias,
         normalizedAlias: normalizeCultivarAliasForDatabase(alias),
+        sourceKey: expectedAliasSourceKey(expected),
       })),
       mapped.aliasRecordsBySlug[slug] ?? [],
       issues,

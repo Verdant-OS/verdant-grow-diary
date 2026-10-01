@@ -97,6 +97,7 @@ import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnv
 import { saveAlert, logAlertEvent } from "@/lib/alerts";
 import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 import { useAlertsList } from "@/hooks/useAlertsList";
+import { buildDashboardOpenAlertsView } from "@/lib/dashboardOpenAlertsViewModel";
 import { resolveSelectedTentIds, type TentSelection } from "@/lib/dashboardLatestEnvironmentRules";
 import {
   Select,
@@ -327,6 +328,11 @@ export default function Dashboard() {
 
   // Open alert count and recent alerts come from real persisted alerts (RLS).
   const openAlerts = persistedAlertsState.alerts.filter((a) => a.status === "open").length;
+  // A pending or failed read is not "zero alerts"; see dashboardOpenAlertsViewModel.
+  const openAlertsView = buildDashboardOpenAlertsView({
+    status: persistedAlertsState.status,
+    openCount: openAlerts,
+  });
 
   // Latest reading per tent for the strip + a read-only stability summary
   // computed from the same tent-scoped readings (no extra fetches, no writes).
@@ -1012,7 +1018,17 @@ export default function Dashboard() {
               </Link>
             </Button>
           </div>
-          {recentAlerts.length === 0 && (
+          {openAlertsView.kind !== "known" && (
+            <p
+              className="text-sm text-muted-foreground"
+              role="status"
+              data-testid="dashboard-active-alerts-unknown"
+              data-kind={openAlertsView.kind}
+            >
+              {openAlertsView.detail}
+            </p>
+          )}
+          {openAlertsView.kind === "known" && recentAlerts.length === 0 && (
             <div
               className="rounded-xl border border-dashed border-border/50 p-3"
               role="status"
@@ -1091,9 +1107,9 @@ export default function Dashboard() {
         />
         <KpiCard
           label="Open alerts"
-          value={openAlerts}
+          value={openAlertsView.kpiValue}
           icon={<AlertTriangle className="h-3.5 w-3.5" />}
-          accent={openAlerts > 0 ? "destructive" : "success"}
+          accent={openAlertsView.accent}
         />
       </div>
       {scopedGrowId ? (
@@ -1101,6 +1117,7 @@ export default function Dashboard() {
           <DashboardSensorHealthSummary
             summary={buildDashboardSensorHealthSummary(sensorState)}
             activeAlertCount={openAlerts}
+            alertsKnown={openAlertsView.kind === "known"}
             growId={scopedGrowId}
             className="mt-4"
           />

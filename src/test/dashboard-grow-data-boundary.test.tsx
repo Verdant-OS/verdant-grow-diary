@@ -22,6 +22,7 @@ const H = vi.hoisted(() => ({
   secondTentId: "6b2d7f10-3c4e-4d6f-9a01-2b3c4d5e6f70",
   targetsStatus: "idle" as "idle" | "ok",
   targets: null as Record<string, { min: number | null; max: number | null }> | null,
+  alertsStatus: "ok" as "idle" | "loading" | "ok" | "unavailable",
 }));
 
 vi.mock("@/hooks/useGrowData", () => ({
@@ -155,7 +156,7 @@ vi.mock("@/hooks/usePersistEnvironmentAlerts", () => ({
   usePersistEnvironmentAlerts: (input: unknown) => H.persist(input),
 }));
 vi.mock("@/hooks/useAlertsList", () => ({
-  useAlertsList: () => ({ status: "ok", alerts: [], error: null, reload: vi.fn() }),
+  useAlertsList: () => ({ status: H.alertsStatus, alerts: [], error: null, reload: vi.fn() }),
 }));
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => undefined }));
 vi.mock("@/hooks/useNowTick", () => ({ useNowTick: () => Date.now() }));
@@ -233,6 +234,7 @@ function pendingFirstRead(fetchStatus: "paused" | "idle") {
 
 describe("Dashboard private-read honesty boundary", () => {
   beforeEach(() => {
+    H.alertsStatus = "ok";
     H.snapshotState = null;
     H.scoped = false;
     H.persist.mockClear();
@@ -680,5 +682,42 @@ describe("Dashboard private-read honesty boundary", () => {
     const empty = screen.getByTestId("dashboard-zero-tent-empty-state");
     const firstKpi = screen.getAllByTestId("dashboard-kpi-card")[0];
     expect(empty.compareDocumentPosition(firstKpi) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  // Open alerts honesty: a pending or failed alerts read is not zero alerts.
+  it.each([
+    ["loading", "Checking…", "pending"],
+    ["unavailable", "Unavailable", "unavailable"],
+  ] as const)(
+    "does not report zero open alerts while the alerts read is %s",
+    (status, kpiText, kind) => {
+      H.growStatus = "success";
+      H.alertsStatus = status;
+      renderDashboard();
+
+      const alertsKpi = screen
+        .getAllByTestId("dashboard-kpi-card")
+        .find((el) => el.textContent?.startsWith("Open alerts"));
+      expect(alertsKpi).toHaveTextContent(`Open alerts: ${kpiText}`);
+      expect(screen.queryByTestId("dashboard-active-alerts-empty")).toBeNull();
+      expect(screen.getByTestId("dashboard-active-alerts-unknown")).toHaveAttribute(
+        "data-kind",
+        kind,
+      );
+      expect(screen.queryByText("No active alerts right now.")).toBeNull();
+    },
+  );
+
+  it("reports zero open alerts only after the alerts read succeeds", () => {
+    H.growStatus = "success";
+    H.alertsStatus = "ok";
+    renderDashboard();
+
+    const alertsKpi = screen
+      .getAllByTestId("dashboard-kpi-card")
+      .find((el) => el.textContent?.startsWith("Open alerts"));
+    expect(alertsKpi).toHaveTextContent("Open alerts: 0");
+    expect(screen.getByTestId("dashboard-active-alerts-empty")).toBeVisible();
+    expect(screen.queryByTestId("dashboard-active-alerts-unknown")).toBeNull();
   });
 });

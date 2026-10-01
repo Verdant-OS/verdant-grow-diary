@@ -16,6 +16,10 @@ import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/re
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { resolveEntitlements } from "@/lib/entitlements/resolveEntitlements";
 import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 
 const NOW = new Date("2026-08-01T00:00:00Z");
 const entMode = vi.hoisted(() => ({
@@ -340,7 +344,7 @@ describe("PhenoHuntNew onboarding flow", () => {
 
   it("Next cannot advance onto a locked confirmation from a resumed checklist draft", async () => {
     entMode.current = "pro";
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       "verdant:pheno-hunt-draft:u1:grow-1:all",
       JSON.stringify({
         name: "Resumed hunt",
@@ -357,13 +361,13 @@ describe("PhenoHuntNew onboarding flow", () => {
       expect(screen.queryByTestId("pheno-step-confirmation")).toBeNull();
       expect((screen.getByTestId("ph-save-btn") as HTMLButtonElement).disabled).toBe(true);
     } finally {
-      window.localStorage.clear();
+      clearLocalStorageForTest();
     }
   });
 
   it("a resumed draft saved on confirmation without a goals review reopens on Goals", async () => {
     entMode.current = "pro";
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       "verdant:pheno-hunt-draft:u1:grow-1:all",
       JSON.stringify({
         name: "Resumed hunt",
@@ -379,13 +383,13 @@ describe("PhenoHuntNew onboarding flow", () => {
       expect(screen.queryByTestId("pheno-step-confirmation")).toBeNull();
       expect(screen.getByTestId("pheno-evidence-goals")).toBeDefined();
     } finally {
-      window.localStorage.clear();
+      clearLocalStorageForTest();
     }
   });
 
   it("a resumed draft that already reviewed goals keeps confirmation unlocked", async () => {
     entMode.current = "pro";
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       "verdant:pheno-hunt-draft:u1:grow-1:all",
       JSON.stringify({
         name: "Resumed hunt",
@@ -401,7 +405,7 @@ describe("PhenoHuntNew onboarding flow", () => {
       await waitFor(() => screen.getByTestId("ph-draft-restored"));
       expect(screen.getByTestId("pheno-step-confirmation")).toBeDefined();
     } finally {
-      window.localStorage.clear();
+      clearLocalStorageForTest();
     }
   });
 });

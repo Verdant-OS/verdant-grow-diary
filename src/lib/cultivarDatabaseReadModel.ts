@@ -208,6 +208,11 @@ export interface CultivarDatabaseAuxiliaryClaim {
   valueText: string | null;
   valueJsonb: unknown;
   sourceKey: string | null;
+  /** Stored provenance metadata, kept so the audit can require exact claim parity. */
+  confidence: CultivarConfidence | null;
+  verifiedAt: string | null;
+  unit: string | null;
+  context: unknown;
 }
 
 export interface CultivarDatabaseCatalogData {
@@ -723,11 +728,17 @@ function mapClaims(
       continue;
     }
 
+    const verifiedAt = read.nullableTimestamp("verified_at");
+    if (confidence === undefined || verifiedAt === undefined) continue;
     auxiliary.push({
       traitKey,
       valueText: typeof row.value_text === "string" ? row.value_text : null,
       valueJsonb: row.value_jsonb ?? null,
       sourceKey: source.key,
+      confidence,
+      verifiedAt,
+      unit: typeof row.unit === "string" ? row.unit : null,
+      context: context ?? null,
     });
   }
 

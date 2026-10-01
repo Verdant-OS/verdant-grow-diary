@@ -58,13 +58,13 @@ The published V1 migration is untouched; its replay patch in
 `/cultivars` and `/cultivars/:slug` resolve one explicit state (`data-cultivar-source-state`
 on the page root):
 
-| State              | When                                                | Content shown    | Visible notice |
-| ------------------ | --------------------------------------------------- | ---------------- | -------------- |
-| `bundled_fallback` | flag off (default)                                  | bundled library  | none           |
-| `loading`          | flag on, read pending (also SSR and first paint)    | bundled library  | yes            |
-| `database`         | flag on, every row mapped                           | database catalog | yes            |
-| `error`            | flag on, read failed                                | bundled library  | yes            |
-| `bundled_fallback` | flag on, any row refused or zero published profiles | bundled library  | yes            |
+| State              | When                                                                              | Content shown    | Visible notice |
+| ------------------ | --------------------------------------------------------------------------------- | ---------------- | -------------- |
+| `bundled_fallback` | flag off (default)                                                                | bundled library  | none           |
+| `loading`          | flag on, read pending (also SSR and first paint)                                  | bundled library  | yes            |
+| `database`         | flag on, every row mapped                                                         | database catalog | yes            |
+| `error`            | flag on, read failed                                                              | bundled library  | yes            |
+| `bundled_fallback` | flag on, any row refused, zero published profiles, or an approved profile missing | bundled library  | yes            |
 
 The fallback is all-or-nothing, so a partially valid catalog never mixes sources. The
 sample-reference banner renders in every state, and no transport upgrades the evidence

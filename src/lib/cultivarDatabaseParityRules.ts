@@ -21,16 +21,43 @@ import {
   CULTIVAR_AUXILIARY_TRAITS,
   mapCultivarDatabaseSnapshot,
   normalizeCultivarAliasForDatabase,
+  type CultivarDatabaseAuxiliaryClaim,
   type CultivarDatabaseSnapshot,
 } from "@/lib/cultivarDatabaseReadModel";
 import {
   buildCultivarDatabaseSeedPayload,
   expectedAliasSourceKey,
   expectedSectionSourceKeys,
+  type CultivarSeedPayloadCultivar,
 } from "@/lib/cultivarDatabaseSeedPayloadRules";
 
 const isoOrNull = (value: string | null): string | null =>
   value === null ? null : new Date(value).toISOString();
+
+/** Provenance fields of a stored auxiliary claim, in comparable form. */
+function auxiliaryMetadata(claim: CultivarDatabaseAuxiliaryClaim): Record<string, unknown> {
+  return {
+    confidence: claim.confidence,
+    verifiedAt: claim.verifiedAt,
+    unit: claim.unit,
+    context: claim.context,
+  };
+}
+
+/** The same fields from the approved payload row, or null when it has none. */
+function approvedAuxiliaryMetadata(
+  approved: CultivarSeedPayloadCultivar | undefined,
+  traitKey: string,
+): Record<string, unknown> | null {
+  const claim = approved?.claims.find((item) => item.trait_key === traitKey);
+  if (!claim) return null;
+  return {
+    confidence: claim.confidence,
+    verifiedAt: isoOrNull(claim.verified_at),
+    unit: claim.unit,
+    context: claim.context,
+  };
+}
 
 export const CULTIVAR_PARITY_REPORT_VERSION = 1;
 
@@ -303,6 +330,13 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
         chemotypeClaims[0].sourceKey,
         issues,
       );
+      diffValues(
+        slug,
+        "claims.chemotype.metadata",
+        approvedAuxiliaryMetadata(approved, "chemotype"),
+        auxiliaryMetadata(chemotypeClaims[0]),
+        issues,
+      );
     }
     const dominantClaims = auxiliary.filter(
       (claim) => claim.traitKey === "reported_dominant_terpenes",
@@ -329,6 +363,13 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
         approved?.claims.find((claim) => claim.trait_key === "reported_dominant_terpenes")
           ?.source_key ?? null,
         dominantClaims[0].sourceKey,
+        issues,
+      );
+      diffValues(
+        slug,
+        "claims.reported_dominant_terpenes.metadata",
+        approvedAuxiliaryMetadata(approved, "reported_dominant_terpenes"),
+        auxiliaryMetadata(dominantClaims[0]),
         issues,
       );
     }

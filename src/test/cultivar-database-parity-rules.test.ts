@@ -312,6 +312,26 @@ describe("cultivar database parity — blocked content", () => {
     );
   });
 
+  it("fails auxiliary claims whose provenance metadata drifted", () => {
+    const snapshot = freshSnapshot();
+    const chemotype = claimRows(snapshot, "og-kush", "chemotype")[0];
+    chemotype.confidence = "high";
+    chemotype.verified_at = "2026-09-01T00:00:00Z";
+    const dominant = claimRows(snapshot, "og-kush", "reported_dominant_terpenes")[0];
+    (dominant.context_jsonb as Record<string, unknown>).analytical_method = "gc_ms";
+    dominant.unit = "%";
+    const report = audit(snapshot);
+    expect(report.status).toBe("blocked");
+    expect(paths(report)).toEqual(
+      expect.arrayContaining([
+        "changed og-kush claims.chemotype.metadata.confidence",
+        "changed og-kush claims.chemotype.metadata.verifiedAt",
+        "changed og-kush claims.reported_dominant_terpenes.metadata.context.analytical_method",
+        "changed og-kush claims.reported_dominant_terpenes.metadata.unit",
+      ]),
+    );
+  });
+
   it("fails an extra readable source outside the approved catalog", () => {
     const snapshot = freshSnapshot();
     snapshot.cultivar_sources.push({

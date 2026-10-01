@@ -212,6 +212,25 @@ describe("cultivar reference source resolution", () => {
     expect(resolution.catalog).toBe(BUNDLED_CULTIVAR_CATALOG);
   });
 
+  it("falls back when the database no longer carries every approved profile", () => {
+    const data = snapshot() as unknown as Record<string, Record<string, unknown>[]>;
+    // An archived or deleted cultivar leaves the published read surface entirely.
+    data.cultivars = data.cultivars.filter((row) => row.slug !== "oreoz");
+    const resolution = resolveCultivarReferenceSource({
+      databaseReadsEnabled: true,
+      query: {
+        status: "success",
+        result: { ok: true, snapshot: data as unknown as CultivarDatabaseSnapshot },
+      },
+    });
+    expect(resolution).toMatchObject({ state: "bundled_fallback", reason: "database_incomplete" });
+    expect(resolution.catalog).toBe(BUNDLED_CULTIVAR_CATALOG);
+    expect(resolution.catalog.findBySlug("oreoz")).toBeDefined();
+    expect(cultivarReferenceSourceNotice(resolution.reason)).toBe(
+      CULTIVAR_REFERENCE_SOURCE_COPY.database_incomplete,
+    );
+  });
+
   it("never upgrades evidence state on any fallback path", () => {
     const empty = resolveCultivarReferenceSource({
       databaseReadsEnabled: true,

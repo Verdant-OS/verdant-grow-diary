@@ -305,4 +305,27 @@ describe("PhenoHuntNew onboarding flow", () => {
     expect(toastMock.error.mock.calls[0]?.[0]).not.toMatch(/upgrade/i);
     expect(createPhenoHuntMock).not.toHaveBeenCalled();
   });
+
+  // #574: the Goals step must describe the pre-selected defaults rather than
+  // imply the grower picked them, and say when the selection was changed.
+  it("Goals step labels the pre-selected set as suggested and tracks changes", async () => {
+    entMode.current = "pro";
+    renderPage();
+    await waitFor(() => screen.getByTestId("pheno-onboarding-stepper"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-goals"));
+
+    const step = screen.getByTestId("pheno-step-goals");
+    expect(step.textContent).toMatch(/pre-selected/i);
+    expect(step.textContent).not.toMatch(/Choose what you plan to track/);
+    expect(screen.getByTestId("pheno-evidence-goals-summary").textContent).toBe(
+      "8 of 12 selected — the suggested day-one set",
+    );
+    expect(screen.getByTestId("pheno-evidence-goals-suggested-structure")).toBeDefined();
+    expect(screen.queryByTestId("pheno-evidence-goals-suggested-post_cure")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("pheno-evidence-goals-toggle-yield"));
+    expect(screen.getByTestId("pheno-evidence-goals-summary").textContent).toBe(
+      "7 of 12 selected — changed from the suggested 8",
+    );
+  });
 });

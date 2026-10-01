@@ -110,6 +110,10 @@ export function useQuickLogV2Save() {
         ) as RpcResponse;
         if (r.ok !== true) {
           const reason = typeof r.reason === "string" && r.reason ? r.reason : "save_failed";
+          // `idempotency_key_retracted` is reported before the server compares
+          // request hashes and carries no event id, so it cannot prove that the
+          // retracted event was this submission. It stays a history-check
+          // reason; only a verified readback may resolve a retracted save.
           setError(reason);
           return {
             ok: false,

@@ -85,6 +85,11 @@ import {
   filterQuickLogPlantOptions,
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
+import {
+  isQuickLogGrowStageUnconfirmed,
+  QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE,
+  shouldAttemptQuickLogGrowStageWriteback,
+} from "@/lib/quickLogGrowStageWritebackRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 import GuidedGrowWalkPanel from "@/components/GuidedGrowWalkPanel";
 import { type GrowWalkVisitMode } from "@/lib/growWalkContracts";
@@ -314,8 +319,6 @@ const QUICK_OBSERVATION_CHIPS = [
   { label: "Photo only", text: "Photo only — no other changes today." },
 ] as const;
 
-const GROW_STAGE_UNCONFIRMED_MESSAGE =
-  "Your log was saved, but the grow's stage update wasn't confirmed. Check the grow's stage before changing it again.";
 const WATER_CONTEXT_CHANGED_MESSAGE =
   "Watering was saved after this plant changed tents or grows. Open its Timeline to confirm the saved location.";
 
@@ -1538,11 +1541,10 @@ export default function QuickLog({
 
       let waterRecord: PendingStarterWater | null = null;
       if (saveEventType === "watering") {
-        // Freeze the first attempt's time in both the claimed record and the
-        // RPC payload. A lost-response retry must not move this Watering to
-        // the time of the later replay.
+        // Keep the client time as recovery metadata. A fresh Watering leaves
+        // occurrence time null so the server assigns it; retries replay that
+        // same null rather than inventing a later client timestamp.
         const firstAttemptAt = new Date().toISOString();
-        built.payload.p_occurred_at = firstAttemptAt;
         const claim = await claimPendingStarterWater({
           version: 1,
           ownerId: user.id,
@@ -1572,7 +1574,7 @@ export default function QuickLog({
         setStarterWaterStorageBlocked(false);
         setStarterWaterPending(waterRecord);
         // Dispatch the serialized copy. It is the exact payload every later
-        // retry will replay, including the target, timestamp and key.
+        // retry will replay, including the target, null occurrence time and key.
         built.payload = waterRecord.payload;
       }
 
@@ -1657,10 +1659,11 @@ export default function QuickLog({
       let growStageUnconfirmed = waterContextChanged && saveStageWasUserTouched;
       if (
         !waterContextChanged &&
-        saveGrow &&
-        saveStageWasUserTouched &&
-        normalizeQuickLogStage(saveStage) &&
-        saveStage !== saveGrow.stage
+        shouldAttemptQuickLogGrowStageWriteback({
+          saveGrow,
+          saveStageWasUserTouched,
+          saveStage,
+        })
       ) {
         // The diary entry is already confirmed. A separate stage write must
         // neither hide its own failure nor turn that saved entry into a retry.
@@ -1671,10 +1674,12 @@ export default function QuickLog({
             .eq("id", saveTarget.growId)
             .select("id,stage")
             .maybeSingle();
-          growStageUnconfirmed =
-            !!stageError ||
-            updatedGrow?.id !== saveTarget.growId ||
-            updatedGrow?.stage !== saveStage;
+          growStageUnconfirmed = isQuickLogGrowStageUnconfirmed({
+            stageError,
+            updatedGrow,
+            expectedGrowId: saveTarget.growId!,
+            expectedStage: saveStage,
+          });
         } catch {
           growStageUnconfirmed = true;
         }
@@ -1698,7 +1703,7 @@ export default function QuickLog({
       } else if (growStageUnconfirmed) {
         // Some callers navigate after onCreated, so keep the partial outcome
         // visible outside this dialog as well as in its saved-entry panel.
-        toast.message(GROW_STAGE_UNCONFIRMED_MESSAGE, { duration: 12_000 });
+        toast.message(QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE, { duration: 12_000 });
       } else {
         toast.success(finalMessage);
       }
@@ -1877,7 +1882,7 @@ export default function QuickLog({
       else if (waterContextChanged)
         toast.message(WATER_CONTEXT_CHANGED_MESSAGE, { duration: 12_000 });
       else if (record.stageWasUserTouched)
-        toast.message(GROW_STAGE_UNCONFIRMED_MESSAGE, { duration: 12_000 });
+        toast.message(QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE, { duration: 12_000 });
       else toast.success(`Saved watering for ${record.plantName}`);
       setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
     } catch {
@@ -3664,7 +3669,7 @@ export default function QuickLog({
                         className="mt-2 text-xs text-amber-700 dark:text-amber-400"
                         data-testid="quick-log-stage-save-unconfirmed"
                       >
-                        {GROW_STAGE_UNCONFIRMED_MESSAGE}
+                        {QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE}
                       </p>
                     )}
                     {savedTarget.waterContextChanged && (

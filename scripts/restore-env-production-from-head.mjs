@@ -17,7 +17,7 @@
  * Fail closed when HEAD has no `.env.production`, or when git is unavailable.
  * Never invents a file. Stdout reports token CLASS only (never token bytes).
  */
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
@@ -141,7 +141,22 @@ export function restoreEnvProductionFromHead({
   },
 } = {}) {
   const shown = gitShow(rootDir, ENV_PRODUCTION_REL_PATH);
-  if (!shown.ok) return shown;
+  if (!shown.ok) {
+    // Publisher checkouts may lack git history/HEAD. Fail open ONLY when the
+    // working-tree file exists; never invent one.
+    if (shown.reason === "head_env_production_missing" || shown.reason === "git_unavailable") {
+      const abs = resolve(rootDir, ENV_PRODUCTION_REL_PATH);
+      if (existsSync(abs)) {
+        try {
+          const text = readFileSync(abs, "utf8");
+          return { ok: true, skipped: true, reason: shown.reason, tokenClass: classifyPaymentsClientTokenClass(text) };
+        } catch {
+          return shown;
+        }
+      }
+    }
+    return shown;
+  }
 
   try {
     writeFile(resolve(rootDir, ENV_PRODUCTION_REL_PATH), shown.content);

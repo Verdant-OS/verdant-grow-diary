@@ -41,9 +41,9 @@ verified provenance over the one with more detail.
 
 Codex, Claude, and Grok are peers: **none outranks the others** (Cheek, 2026-08-20,
 refined). When weighing competing build, audit, or review outputs, prefer verified
-provenance and the **owner / independent reviewer** named in `CURRENT_STATE.md`. Do not
-treat any peer's output as lower-weight by role rank. Confirm the owner is not reviewing
-their own slice.
+provenance and the **current holder / independent reviewer** recorded in `CURRENT_STATE.md`
+or `HANDOFF_LOG.md`. Do not treat any peer's output as lower-weight by role rank. Confirm
+no contributor gives that slice's independent acceptance PASS.
 
 ## Output
 

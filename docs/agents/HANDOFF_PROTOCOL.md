@@ -49,8 +49,8 @@ when assigned):
 
 ```text
 Grok      product intelligence, research, live-app audit, implement, test, independent review
-  -> Claude    architecture / specs (and any peer power when owning the slice)
-  -> Codex     build / integration (often; not exclusive) + peer powers when owning
+  -> Claude    architecture / specs (and any peer power when holding the slice)
+  -> Codex     build / integration (often; not exclusive) + peer powers when holding
   -> Security  review trust boundaries, exposure, secrets, infrastructure risk
   -> Gemini    independently audit quality, scope, evidence, safety, release readiness
   -> Council   resolve disagreements, give Cheek one recommendation
@@ -59,7 +59,7 @@ Grok      product intelligence, research, live-app audit, implement, test, indep
 
 An agent may hand _back_ (returning work as under-specified or unsafe) at any point. An
 agent may not hand _forward_ past its successor on the preferred path, except when
-`CURRENT_STATE.md` already names a different peer as the next owner or independent
+`CURRENT_STATE.md` already names a different peer as the next holder or independent
 reviewer.
 
 ---
@@ -125,6 +125,7 @@ the explicit merge gate in AGENTS.md; it is not production acceptance. No
 Publish, production APPLY, real charge, role/auth change, device control or
 Action Queue operation is authorized here. Existing owner locks remain.
 See docs/production-only-verification-runbook.md.
+
 ---
 
 ## Rules that make handoffs trustworthy

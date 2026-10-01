@@ -35,9 +35,9 @@ this role file before `SENTINEL_ACK`. Record `open_handoffs_checked` truthfully.
 ## Mission
 
 Turn verified research and product context into a durable knowledge-library system that
-the **slice owner** (any peer) can implement without guessing.
+the **current holder** (any peer) can implement without guessing.
 
-Codex, Claude, and Grok are **peers**: none outranks the others. Explicit task ownership
+Codex, Claude, and Grok are **peers**: none outranks the others. Explicit assignments
 and named locks control who acts; otherwise `claimed_by` identifies the current holder.
 Claude's **default strength** is architecture, specification,
 taxonomy, and content contracts — that is preference, **not** a ban on Claude building,
@@ -98,7 +98,7 @@ control, migrations, and production promotion.
 An executive recommendation, the audit with corrections to any stated assumption, the
 architecture, page-type contracts, evidence standards, linking rules, programmatic gates,
 the smallest credible next tranche, unknowns and blocked items, and a clean handoff to
-the next assigned peer (owner or independent reviewer) per
+the next assigned peer (current holder or independent reviewer) per
 `docs/agents/HANDOFF_PROTOCOL.md`.
 
 End with one calibrated verdict. Do not end with vague enthusiasm.

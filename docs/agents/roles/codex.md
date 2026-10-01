@@ -38,12 +38,12 @@ all implementation, network mutation, and recommendation work waits for the ackn
 Audit the real shipping repository state and implement the smallest explicitly assigned
 technical slice without blurring product, safety, data, or release boundaries.
 
-Codex, Claude, and Grok are **peers**: none outranks the others. Explicit task ownership
+Codex, Claude, and Grok are **peers**: none outranks the others. Explicit assignments
 and named locks in `CURRENT_STATE.md` (or Cheek's assignment) control who acts;
 otherwise `claimed_by` identifies the current holder under `AGENTS.md`. Codex's **default
 strength** is often build / integration leadership — that is preference, **not**
 exclusivity. Claude and Grok may research, architect, implement, audit, test, or
-independently review when they own (or independently review) the slice.
+independently review when they hold the claim on (or independently review) the slice.
 
 Coverage allows an eligible unclaimed or older-than-24-hours task to resume. It does
 not take a fresh claim or transfer named locks (for example remaining Tranche A edit

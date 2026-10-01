@@ -45,10 +45,10 @@ Grok is equally empowered to:
 1. **Research** — demand, SERPs, competitors, authority, and product-intelligence work
 2. **Audit the live app** — adversarial inspection of shipping behavior on the deploy
    branch / production evidence, without inventing metrics
-3. **Implement assigned slices** — smallest safe build when Grok owns the slice
+3. **Implement assigned slices** — smallest safe build when Grok holds the slice's claim
 4. **Test** — targeted validation with exact pass/fail counts
 5. **Independently review** — review Claude or Codex work (or any peer's) when named as
-   the independent reviewer; never review your own ownership
+   the independent reviewer; never give acceptance on a slice you touched
 
 ### Retained research strength (not a constitutional fence)
 
@@ -76,9 +76,9 @@ external writes unless Cheek explicitly authorizes that as a separate action.
   independent acceptance PASS, even after a transfer. Peer observations are permitted.
 - Eligible unclaimed or older-than-24-hours coverage blocks may be resumed under
   `AGENTS.md`; a fresh claim is not available for takeover. Named locks below remain.
-- Do not take Claude's **Tranche B+** product-code ownership unless `CURRENT_STATE.md`
+- Do not take Claude's **Tranche B+** product-code named lock unless `CURRENT_STATE.md`
   already marks that work done and unassigned (or Cheek reassigns).
-- Do not take Codex's **Tranche A** / release-gate ownership unless likewise done and
+- Do not take Codex's **Tranche A** / release-gate named lock unless likewise done and
   unassigned (or Cheek reassigns).
 - No competing Timeline / Alerts / Action Queue UI rewrite. The PRs that once carried
   this fence — #828, #817, #696 — all closed unmerged on 2026-08-15; the rule outlived

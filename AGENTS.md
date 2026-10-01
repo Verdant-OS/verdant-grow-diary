@@ -708,7 +708,7 @@ subset of those stages. Do not create parallel implementations of the same slice
 
 The only action permitted before the gate below is read-only acquisition of
 `AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
-acknowledgment can be truthful. Listing files solely to locate those three documents, or
+acknowledgment can be truthful. Listing files solely to locate those four documents, or
 using a platform context-discovery command such as `grok inspect`, is also permitted.
 No application-code inspection, network mutation, recommendation, or repository write is
 permitted before the acknowledgment.

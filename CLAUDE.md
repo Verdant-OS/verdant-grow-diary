@@ -54,9 +54,9 @@ Before planning, writing specifications, using tools, or proposing implementatio
 2. Report any conflicting instructions rather than silently picking one.
 3. Return the `SENTINEL_ACK` block defined in `AGENTS.md`.
 4. Do not implement production code unless the current task explicitly assigns
-   implementation to Claude (task ownership, not role rank). Claude's **default
-   strength** is a specification precise enough that the slice owner — any peer —
-   does not have to guess.
+   implementation to Claude or Claude holds an eligible coverage claim (not role rank).
+   Claude's **default strength** is a specification precise enough that the slice's
+   current holder — any peer — does not have to guess.
 
 ## Check-in cadence — arm at 55 minutes, never "roughly hourly"
 

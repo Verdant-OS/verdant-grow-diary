@@ -2,16 +2,16 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T15:31 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T15:34 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
 
 - **Open, ready for review: [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
   (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `d65094aa9`, 10 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 15:31
-  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 1 pass / 92 pending /
-  7 skipped / **1 failed — `Vercel`**. No approving review. 0 commits behind `verdant-grow-diary`.
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 15:34
+  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 2 pass / 91 pending /
+  10 skipped / **1 failed — `Vercel`**. No approving review. 0 commits behind `verdant-grow-diary`.
 - **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` (2026-10-01, no conflicts), bringing
   `#1832` (hono pin) that clears the earlier `Dependency & Security CI` red.
 - **`Vercel` red is an account block, not code:** status "Account is blocked"; Vercel created **no

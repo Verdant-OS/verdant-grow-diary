@@ -255,6 +255,33 @@ describe("cultivar reference source resolution", () => {
     expect(resolution.catalog).toBe(BUNDLED_CULTIVAR_CATALOG);
   });
 
+  it.each(["chemotype", "reported_dominant_terpenes"])(
+    "falls back when an approved cultivar's stored %s claim is deleted",
+    (traitKey) => {
+      // The cultivar row still carries the denormalized values, so only the
+      // stored claim row vanishes; the read model accepts that on its own.
+      const data = snapshot() as unknown as Record<string, Record<string, unknown>[]>;
+      const gg4 = data.cultivars.find((row) => row.slug === "gg4");
+      if (!gg4) throw new Error("gg4");
+      const before = data.cultivar_claims.length;
+      data.cultivar_claims = data.cultivar_claims.filter(
+        (row) => !(row.cultivar_id === gg4.id && row.trait_key === traitKey),
+      );
+      expect(data.cultivar_claims.length).toBe(before - 1);
+      const resolution = resolveCultivarReferenceSource({
+        databaseReadsEnabled: true,
+        query: {
+          status: "success",
+          result: { ok: true, snapshot: data as unknown as CultivarDatabaseSnapshot },
+        },
+      });
+      expect(resolution).toMatchObject({
+        state: "bundled_fallback",
+        reason: "database_incomplete",
+      });
+    },
+  );
+
   it("falls back when an approved cultivar's last-ranked terpene claim is deleted", () => {
     // Removing the LAST rank leaves ranks 1..n-1 gap-free, so the read model
     // accepts it; only the completeness gate notices the missing evidence.

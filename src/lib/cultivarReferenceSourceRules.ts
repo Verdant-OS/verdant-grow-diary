@@ -15,7 +15,9 @@ import {
   type VerdantCultivarProfile,
 } from "@/constants/strainReferenceLibrary";
 import {
+  CULTIVAR_AUXILIARY_TRAITS,
   mapCultivarDatabaseSnapshot,
+  type CultivarDatabaseAuxiliaryClaim,
   type CultivarDatabaseCatalogData,
 } from "@/lib/cultivarDatabaseReadModel";
 import type { CultivarSnapshotResult } from "@/lib/cultivarReferenceService";
@@ -98,11 +100,23 @@ function approvedRecordKeys(
   ];
 }
 
-/** True when every approved profile still carries all of its approved child records. */
-function carriesApprovedRecords(database: CultivarReferenceCatalog): boolean {
+/**
+ * True when every approved profile still carries all of its approved child
+ * records, including its stored auxiliary claims (chemotype, reported dominant
+ * terpenes): the cultivar row keeps denormalized copies of both, so only the
+ * claim rows themselves prove that evidence is still present.
+ */
+function carriesApprovedRecords(
+  database: CultivarReferenceCatalog,
+  auxiliaryClaimsBySlug: Readonly<Record<string, readonly CultivarDatabaseAuxiliaryClaim[]>>,
+): boolean {
   return VERDANT_CULTIVARS.every((approved) => {
     const actual = database.findBySlug(approved.slug);
     if (!actual) return false;
+    const storedTraits = new Set(
+      (auxiliaryClaimsBySlug[approved.slug] ?? []).map((claim) => claim.traitKey),
+    );
+    if (CULTIVAR_AUXILIARY_TRAITS.some((trait) => !storedTraits.has(trait))) return false;
     const present = new Set(
       approvedRecordKeys(actual, database.sectionsFor(actual), database.sourcesFor(actual)),
     );
@@ -151,7 +165,7 @@ export function resolveCultivarReferenceSource(input: {
   // Slug parity is not enough: a profile whose claim or alias rows were
   // deleted still maps cleanly, so it must also carry every approved record.
   const catalog = buildDatabaseCultivarCatalog(mapped.catalog);
-  if (!carriesApprovedRecords(catalog)) {
+  if (!carriesApprovedRecords(catalog, mapped.auxiliaryClaimsBySlug)) {
     return fallback("bundled_fallback", "database_incomplete");
   }
   return { state: "database", reason: null, catalog, refusedRowIssues: 0 };

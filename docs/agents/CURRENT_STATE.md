@@ -2,7 +2,7 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T16:31 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T16:43 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
@@ -10,18 +10,18 @@ this entry's earlier 2026-10-01 versions.
 - **Open (not draft), awaiting CI and Chemdawg pre-check — review not routed:
   [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
   (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `358d69c38`, 16 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 16:31
-  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 1 pass / 82 pending /
-  7 skipped / **1 failed — `Vercel`**. No approving review. 0 commits behind `verdant-grow-diary`.
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 16:43
+  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 32 pass / 68 pending /
+  11 skipped / **1 failed — `Vercel`**. No approving review. 0 commits behind `verdant-grow-diary`.
 - **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` and again at `69f2f5b23` (2026-10-01,
   no conflicts). The first brought `#1832` (hono pin), which clears the earlier
   `Dependency & Security CI` red; the second brought `#1836`.
-- **`Published migration integrity` at `358d69c38`: `NOT_MEASURED`** — its CI run (`36892553063`)
-  is queued, and this head changed the migration payload, so earlier passes do not cover it.
+- **`Published migration integrity` at `358d69c38`: `PASS`** — CI run `36892553063` completed
+  successfully on this exact head, including its one-line payload change.
   - Historical, earlier heads only: the red on `d65094aa9` ran before `#1836` was merged in and
     read `#1836`'s migration as "deleted". CI then passed on `a7232e1e1` (run `36886278227`),
     `dac35e4fc` (run `36888190685`) and `9ca178156` (run `36890471647`).
-  - Local verifier at `358d69c38` against `origin/verdant-grow-diary`: OK (not a CI receipt).
+  - Local verifier at `358d69c38` against `origin/verdant-grow-diary`: also OK.
 - **`Vercel` red is an account block, not code:** status "Account is blocked"; Vercel created **no
   deployment** for any branch commit since `1b66c4f0e`, while the six before it deployed `READY`.
   Not a required context. Clearing it is an owner action in the Vercel dashboard
@@ -77,8 +77,8 @@ this entry's earlier 2026-10-01 versions.
     re-apply idempotency.
   - The runs on `0bcb2464d` and `9ca178156` were cancelled by later pushes.
   - **None of this evidence covers `358d69c38`** (row-level parity, template link, one-line payload
-    change). Its run is queued; until it completes, the row-level check against a real database is
-    `NOT_MEASURED`.
+    change). Its run (`36892553425`) was **in progress** at 16:43 UTC; until it completes, the
+    row-level check against a real database is `NOT_MEASURED`.
 - **Local evidence (`established fact`, Windows clone):**
   - offline strict parity READY 10/10 at `358d69c38`;
   - at `358d69c38`, the PR's tests plus every migration-scanning test: 1,542 passed, with 1 file

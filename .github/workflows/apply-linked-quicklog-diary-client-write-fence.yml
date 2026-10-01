@@ -440,26 +440,27 @@ jobs:
           COMPATIBLE_CLIENT_BASE_SHA: "07f258ff6d8e348d99ec8131ae95b7eaeed98326"
         run: |
           set -euo pipefail
-          if ! [[ "$COMPATIBLE_CLIENT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::The measured live client bundle commit is malformed."
-            exit 1
+          # Never stop early: the runner refuses an unverified receipt and writes
+          # the client_receipt_rejected report and audit, which the failure
+          # evidence upload needs.
+          verified=""
+          if [[ "$COMPATIBLE_CLIENT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            compare_status() {
+              gh api "repos/${GITHUB_REPOSITORY}/compare/$1...$2" --jq '.status' 2>/dev/null || true
+            }
+            # The client must contain #1741's merge (the compatible client)...
+            FROM_FENCE="$(compare_status "$COMPATIBLE_CLIENT_BASE_SHA" "$COMPATIBLE_CLIENT_SHA")"
+            # ...and must itself be on the deploy branch.
+            TO_DEPLOY="$(compare_status "$COMPATIBLE_CLIENT_SHA" "verdant-grow-diary")"
+            if [[ "$FROM_FENCE" =~ ^(ahead|identical)$ ]] && [[ "$TO_DEPLOY" =~ ^(ahead|identical)$ ]]; then
+              verified="$COMPATIBLE_CLIENT_SHA"
+            else
+              echo "::error::Compatible-client ancestry not verified (from #1741: ${FROM_FENCE:-unresolved}; to verdant-grow-diary: ${TO_DEPLOY:-unresolved}). The runner will refuse APPLY and record the receipt."
+            fi
+          else
+            echo "::error::The measured live client bundle commit is malformed. The runner will refuse APPLY and record the receipt."
           fi
-          compare_status() {
-            gh api "repos/${GITHUB_REPOSITORY}/compare/$1...$2" --jq '.status' 2>/dev/null || true
-          }
-          # The client must contain #1741's merge (the compatible client)...
-          FROM_FENCE="$(compare_status "$COMPATIBLE_CLIENT_BASE_SHA" "$COMPATIBLE_CLIENT_SHA")"
-          # ...and must itself be on the deploy branch.
-          TO_DEPLOY="$(compare_status "$COMPATIBLE_CLIENT_SHA" "verdant-grow-diary")"
-          case "$FROM_FENCE" in ahead|identical) ;; *)
-            echo "::error::The measured live client does not contain the #1741 compatible client (compare status: ${FROM_FENCE:-unresolved})."
-            exit 1 ;;
-          esac
-          case "$TO_DEPLOY" in ahead|identical) ;; *)
-            echo "::error::The measured live client commit is not on verdant-grow-diary (compare status: ${TO_DEPLOY:-unresolved})."
-            exit 1 ;;
-          esac
-          printf 'COMPATIBLE_CLIENT_ANCESTRY_VERIFIED_SHA=%s\n' "$COMPATIBLE_CLIENT_SHA" >> "$GITHUB_ENV"
+          printf 'COMPATIBLE_CLIENT_ANCESTRY_VERIFIED_SHA=%s\n' "$verified" >> "$GITHUB_ENV"
 
       - name: Run the environment-gated linked diary fence delivery
         env:

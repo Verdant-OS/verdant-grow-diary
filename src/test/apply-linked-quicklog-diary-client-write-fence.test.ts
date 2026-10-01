@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -399,14 +399,60 @@ describe("pinned linked Quick Log diary production delivery", () => {
     expect(ancestry.if).toBe("inputs.operation == 'APPLY'");
     expect(ancestry.env?.GH_TOKEN).toBe("${{ github.token }}");
     expect(ancestry.env?.COMPATIBLE_CLIENT_BASE_SHA).toBe(lane.COMPATIBLE_CLIENT_BASE_SHA);
-    expect(ancestry.run).toContain(
-      'compare_status "$COMPATIBLE_CLIENT_BASE_SHA" "$COMPATIBLE_CLIENT_SHA"',
+    expect(ancestry.run).not.toMatch(/\bexit\b/);
+  });
+
+  it("runs the ancestry step to completion and exports a SHA only when both compares pass", () => {
+    // Codex P2 on #1742: an early exit left no client_receipt_rejected evidence.
+    const parsed = loadYaml(readFileSync(WORKFLOW, "utf8")) as {
+      jobs: { apply: { steps: Array<{ name?: string; run?: string }> } };
+    };
+    const script = parsed.jobs.apply.steps.find(
+      (step) => step.name === "Verify the compatible-client receipt ancestry",
+    )?.run;
+    expect(script).toBeTruthy();
+    const root = mkdtempSync(join(tmpdir(), "verdant-client-ancestry-"));
+    temporaryRoots.push(root);
+    const bin = join(root, "bin");
+    execFileSync("mkdir", ["-p", bin]);
+    // Fake gh: answers each compare from FAKE_FROM / FAKE_TO by direction.
+    writeFileSync(
+      join(bin, "gh"),
+      '#!/usr/bin/env bash\ncase "$2" in\n  */compare/"$COMPATIBLE_CLIENT_BASE_SHA"...*) echo "$FAKE_FROM" ;;\n  *) echo "$FAKE_TO" ;;\nesac\n',
+      { mode: 0o755 },
     );
-    expect(ancestry.run).toContain('compare_status "$COMPATIBLE_CLIENT_SHA" "verdant-grow-diary"');
-    expect(ancestry.run?.match(/ahead\|identical\) ;;/g)).toHaveLength(2);
-    expect(ancestry.run).toContain(
-      'printf \'COMPATIBLE_CLIENT_ANCESTRY_VERIFIED_SHA=%s\\n\' "$COMPATIBLE_CLIENT_SHA" >> "$GITHUB_ENV"',
-    );
+    const run = (sha: string, from: string, to: string) => {
+      const envFile = join(root, `env-${sha.slice(0, 4)}-${from}-${to}`);
+      writeFileSync(envFile, "");
+      const result = spawnSync("bash", ["-c", script!], {
+        encoding: "utf8",
+        env: {
+          PATH: `${bin}:${process.env.PATH}`,
+          GITHUB_ENV: envFile,
+          GITHUB_REPOSITORY: "Verdant-OS/verdant-grow-diary",
+          COMPATIBLE_CLIENT_BASE_SHA: lane.COMPATIBLE_CLIENT_BASE_SHA,
+          COMPATIBLE_CLIENT_SHA: sha,
+          FAKE_FROM: from,
+          FAKE_TO: to,
+        },
+      });
+      return { status: result.status, env: readFileSync(envFile, "utf8") };
+    };
+    expect(run(CLIENT, "ahead", "identical")).toEqual({
+      status: 0,
+      env: `COMPATIBLE_CLIENT_ANCESTRY_VERIFIED_SHA=${CLIENT}\n`,
+    });
+    for (const [sha, from, to] of [
+      [CLIENT, "behind", "ahead"],
+      [CLIENT, "ahead", "diverged"],
+      [CLIENT, "", ""],
+      ["not-a-sha", "ahead", "ahead"],
+    ]) {
+      expect(run(sha, from, to), `${sha}/${from}/${to}`).toEqual({
+        status: 0,
+        env: "COMPATIBLE_CLIENT_ANCESTRY_VERIFIED_SHA=\n",
+      });
+    }
   });
 
   it("refuses non-disposable database targets in the PG15 proof", () => {

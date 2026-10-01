@@ -32,7 +32,9 @@ Every slice names:
 No agent that contributed to a slice can give its independent acceptance PASS.
 Contributors may provide peer observations, which do not replace independent acceptance.
 Use the HANDOFF block below for a deliberate
-transfer between roles; use the log block for day-to-day coverage. Keep the same branch,
+transfer between roles; use the log block for day-to-day coverage. In a deliberate
+transfer the current holder first posts a `released_by: <agent>, <YYYY-MM-DD HH:MM> UTC
+to <successor>` comment on the PR (see `AGENTS.md`), and the successor then claims. Keep the same branch,
 confirm its remote head, and merge from base; never rename, recreate or force-push it.
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and

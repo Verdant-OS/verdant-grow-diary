@@ -179,7 +179,12 @@ agent from one written block.
   `claimed_by:` comments on its PR, ordered by when they were posted, so read the PR's
   comments before treating a block as unclaimed or stale. A claim posted while another
   agent's valid claim is under 24 hours old is not valid: when two agents race for the
-  same open block, the first claim posted holds it. Before resuming, claim the task with a
+  same open block, the first claim posted holds it. The current holder can end its claim
+  early, for a deliberate transfer or when it stops work, with a PR comment reading
+  `released_by: <agent>, <YYYY-MM-DD HH:MM> UTC`, optionally followed by
+  `to <successor>`; it stops pushing before posting. A release leaves the block with no
+  effective claim, so the block is open at once. A release that names a successor makes
+  only that agent's claim valid for the next 24 hours. Before resuming, claim the task with a
   comment on its PR that reads `claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC` (owner
   decision 2026-10-01), then re-read the PR's comments; if another agent's valid claim was
   posted before yours, yours is not valid, so stop and touch nothing. A successor never

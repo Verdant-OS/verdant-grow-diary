@@ -2,31 +2,57 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T01:58 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T15:17 UTC — Strain Reference Library V1.1 (#1827)
 
-Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here.
+Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
+this entry's 2026-10-01T01:58 UTC version.
 
 - **Open, ready for review: [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
-  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `fd75bb83`) implements issue
-  `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 01:58 UTC):
-  mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 4 pass / 94 pending /
-  12 cancelled (superseded by the ready-for-review re-trigger) / 7 skipped, 0 failed; no review
-  submitted yet.
+  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `42ad20a74`, 9 commits) implements
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 15:17
+  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 1 pass / 86 pending /
+  6 skipped / **1 failed — `Vercel`**. No approving review is recorded.
+- **Base:** `verdant-grow-diary` merged into the branch at `1b66c4f0e` (2026-10-01, 15 commits, no
+  conflicts); that brought in `#1832` (hono pin), which clears the earlier `Dependency & Security CI`
+  red on the moderate `hono` advisory 1240640.
+- **`Vercel` red is an account block, not code:** status "Account is blocked"; Vercel created **no
+  deployment** for `1b66c4f0e`, `d30ac3293`, or `42ad20a74`, while every earlier branch commit
+  deployed `READY`. Not a required context. Clearing it is an owner action in the Vercel dashboard
+  (`verdantgrowdiary` team). Cause `NOT_MEASURED`.
 - **Adds a migration:** `supabase/migrations/20260930200000_strain_reference_library_v1_1_parity.sql`
   (new file; additive columns + `cultivar_profile_sources` with published-only RLS and SELECT-only
-  grant; idempotent content upserts). **Committed is not applied. No APPLY.**
+  grant; idempotent content upserts). **Committed is not applied. No APPLY.** It still sorts last
+  after the base's five new Quick Log migrations.
 - **Release state:** `cultivarDatabaseReadsEnabled = false`. `/cultivars` still renders the bundled
   sample library with no database request. Status language stays "working V1 prototype in
   pre-release validation" — no "database-backed public reads", "shipped", or "live" claim.
-- **Evidence (`established fact`, local, Windows clone):** offline strict parity audit READY 10/10;
-  81/81 new tests; existing cultivar suite 98/98; `tsc` 0 diagnostics; `bun run build` exit 0 with
-  all postbuild SEO validators OK. **`NOT_MEASURED`:** the local-DB harness
-  (`test:cultivar-reference-db-security`, CI `security-db-local` only), full 32-shard suite, preview
-  and production receipts.
+- **Automated review:** 16 review threads (Codex, CodeRabbit), **all resolved**.
+  - Real gaps were fixed and RED-tested. Fail closed on:
+    - unlinked evidence;
+    - an ambiguous latest guide;
+    - non-percent claim units;
+    - alias source provenance.
+
+    Strict-audit set parity now also covers sources and section links. The harness got
+    valid-payload insert probes, update/delete denial on every table, direct child-row probes, and
+    seed/lookup failure checks, and the receipt now accepts anon keys only.
+
+  - One P1 claim ("missing `END;` breaks the migration") was **refuted with evidence**: Security DB
+    Local run `36803000559` applied the file and re-applied it via `psql -v ON_ERROR_STOP=1`.
+    Copilot's review hit its quota; CodeRabbit's first manual review was rate-limited.
+- **Evidence (`established fact`, local Windows clone at `42ad20a74`):**
+  - offline strict parity READY 10/10;
+  - focused suite 99/99;
+  - `tsc` 0 diagnostics;
+  - `bun run build` exit 0 with all postbuild SEO validators OK (measured at `fd75bb832`).
+- **CI harness evidence:** `test:cultivar-reference-db-security` passed **45/45** on `fd75bb832` in
+  Security DB Local. The expanded harness (the review fixes above) has **not yet completed a CI
+  run** — later runs were cancelled by newer pushes; the run on `42ad20a74` is pending.
+- **`NOT_MEASURED`:** the full 32-shard suite at `42ad20a74`, the preview and production receipts,
+  and the cause of the Vercel block.
 - **Review seat:** independent reviewer is **Grok**, on the owner's instruction (2026-10-01).
-  Codex is unavailable; the earlier Copilot stand-in could not review (Copilot quota reached) and
-  CodeRabbit's manual review was rate-limited. Grok's review is `NOT_MEASURED` until it is posted.
-  Claude does not self-merge.
+  - Codex is unavailable; the earlier Copilot stand-in could not review (quota).
+  - Grok's review is `NOT_MEASURED` until it is posted. Claude does not self-merge.
 - **Overlap to watch:** `#1793` also edits `.github/workflows/security-db-local.yml` (different hunk;
   no textual conflict measured). `#1777` merged first (`569ac94a1`); this entry was rebased above its
   entries on 2026-10-01 with both preserved.

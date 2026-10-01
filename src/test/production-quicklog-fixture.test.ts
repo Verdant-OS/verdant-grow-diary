@@ -171,6 +171,28 @@ describe("production Quick Log fixture policy", () => {
       true,
     );
   });
+  it("uses the env policy's marker boundaries on the visible production page", () => {
+    // Codex P2 on #1835: `\b` treats "_" as a word character, so a name the env
+    // policy accepts ("E2E_Test_Tent") failed the page check.
+    const underscored = { grow: "", tent: "E2E_Test_Tent", plant: "E2E_Test_Plant" };
+    expect(
+      validateProductionQuickLogEnv({
+        ...env,
+        E2E_FIXTURE_EXPECTED_GROW_NAME: "",
+        E2E_FIXTURE_EXPECTED_TENT_NAME: underscored.tent,
+        E2E_FIXTURE_EXPECTED_PLANT_NAME: underscored.plant,
+      }).ok,
+    ).toBe(true);
+    expect(
+      pageTextMatchesFixture("E2E_Test_Plant\nE2E_Test_Tent", underscored, { allowQaMarker: true })
+        .ok,
+    ).toBe(true);
+    // Markers embedded in longer words still do not count.
+    const embedded = { grow: "", tent: "Contest Tent", plant: "Testing Plant" };
+    expect(
+      pageTextMatchesFixture("Testing Plant\nContest Tent", embedded, { allowQaMarker: true }).ok,
+    ).toBe(false);
+  });
   it("refuses a customer account hint and unmarked fixture names", () => {
     expect(
       validateProductionQuickLogEnv({

@@ -8,7 +8,8 @@ export const QUICKLOG_SMOKE_ACCOUNT_EMAIL = "cheekhimself@gmail.com";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Non-alphanumeric boundaries (not \b) so underscore-joined names such as
 // "E2E_Test_Tent" carry a marker, while "Contest" or "Testing" do not.
-const MARKER = /(?:^|[^A-Za-z0-9])(?:e2e|test|qa)(?:$|[^A-Za-z0-9])/i;
+export const PRODUCTION_FIXTURE_MARKER = /(?:^|[^A-Za-z0-9])(?:e2e|test|qa)(?:$|[^A-Za-z0-9])/i;
+const MARKER = PRODUCTION_FIXTURE_MARKER;
 
 export type FixtureOwnedRow = Readonly<{
   id: string;

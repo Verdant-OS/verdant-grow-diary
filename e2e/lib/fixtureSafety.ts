@@ -22,6 +22,7 @@
  */
 import type { Page } from "@playwright/test";
 import type { ProductionQuickLogFixtureProof } from "./productionQuickLogFixtureProof";
+import { PRODUCTION_FIXTURE_MARKER } from "./productionQuickLogFixtureRules";
 import { isForbiddenRealGrowName as isForbiddenRealGrowNameImpl } from "../../scripts/e2e/real-grow-denylist.mjs";
 
 export type FixtureSafetyEnv = Readonly<{
@@ -139,7 +140,9 @@ export function pageTextMatchesFixture(
   const errors: string[] = [];
   const text = pageText ?? "";
 
-  if (!(options.allowQaMarker ? /\b(?:E2E|Test|QA)\b/i : /E2E|Test/i).test(text)) {
+  // The production lane uses the same marker boundaries as its env policy:
+  // non-alphanumeric, so "E2E_Test_Tent" carries a marker and "Contest" does not.
+  if (!(options.allowQaMarker ? PRODUCTION_FIXTURE_MARKER : /E2E|Test/i).test(text)) {
     const markers = options.allowQaMarker ? "'E2E', 'Test' or 'QA'" : "'E2E' or 'Test'";
     errors.push(
       `Target page does not contain ${markers} markers — refusing to treat as fixture data.`,

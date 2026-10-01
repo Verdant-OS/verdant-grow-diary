@@ -34,6 +34,7 @@ import {
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { stampSlot } from "@/lib/evidencePhotoSlotRules";
 import {
+  buildCheckpointCorrectionIntent,
   appendCheckpointClearMarker,
   buildCheckpointFollowUpNotePrefill,
   derivePendingCheckpoint,
@@ -113,7 +114,7 @@ export default function PendingCheckpointBanner({
             toast.error("Can't safely save this checkpoint right now. Please try again.");
             return;
           }
-          const intent = `${pending.diaryEntryId}:${status}:${nextNote}`;
+          const intent = buildCheckpointCorrectionIntent(pending.diaryEntryId, status, nextNote);
           const claim = checkpointCorrectionJournal.claim(ownerId, pending.diaryEntryId, intent);
           if (claim.status === "conflict") {
             toast.error("The previous checkpoint update is unconfirmed. Retry that action first.");

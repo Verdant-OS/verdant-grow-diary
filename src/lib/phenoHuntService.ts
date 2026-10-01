@@ -7,6 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase as defaultClient } from "@/integrations/supabase/client";
 import { sanitizeBreedingObjectiveTargets } from "@/lib/phenoBreedingObjectiveRules";
+import { normalizePhenoHuntName } from "@/lib/phenoHuntRenameRules";
 
 export interface CreatePhenoHuntInput {
   growId: string;
@@ -366,10 +367,17 @@ export interface UpdatePhenoHuntSetupInput {
    * the hunt's own bar — editable any time, not just during setup.
    */
   breedingObjective?: readonly unknown[];
+  /**
+   * New hunt name (#551). Trimmed and whitespace-collapsed; empty is
+   * rejected before any write. Validate length/unchanged with
+   * phenoHuntRenameRules in the UI first.
+   */
+  name?: string;
 }
 
 /**
- * Update the onboarding-only fields on an existing hunt. Owner-only via RLS
+ * Update the onboarding-only fields (and, since #551, the name) on an
+ * existing hunt. Owner-only via RLS
  * (Users update own pheno_hunts) plus the RESTRICTIVE Pro entitlement policy.
  * Never touches candidate plants, keeper decisions, scores, or lab data.
  */
@@ -393,6 +401,11 @@ export async function updatePhenoHuntSetup(
   }
   if (input.breedingObjective !== undefined) {
     patch.breeding_objective = sanitizeBreedingObjectiveTargets(input.breedingObjective);
+  }
+  if (input.name !== undefined) {
+    const name = normalizePhenoHuntName(input.name);
+    if (!name) throw new PhenoHuntError("Hunt name is required.");
+    patch.name = name;
   }
   if (Object.keys(patch).length === 0) return;
   // Read the row back: RLS (owner + RESTRICTIVE Pro entitlement) filters

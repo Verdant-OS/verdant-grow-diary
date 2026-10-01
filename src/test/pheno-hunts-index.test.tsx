@@ -249,7 +249,8 @@ describe("PhenoHuntsIndex — candidate and keeper counts agree (#550)", () => {
     mockKeepers.mockResolvedValue(DEMO_KEEPERS);
     renderIndex();
     const card = await screen.findByTestId(`pheno-hunts-index-item-${DEMO_HUNT_ID}`);
-    expect(card.textContent).toContain("0 active candidates · 4 keepers");
+    // The exact count is optional enrichment that may land after the list.
+    await waitFor(() => expect(card.textContent).toContain("0 active candidates · 4 keepers"));
     expect(card.textContent).not.toMatch(/(^|\s)0 candidates/);
     // Keepers are attributed only to their own hunt.
     const other = screen.getByTestId("pheno-hunts-index-item-hunt-other");
@@ -272,5 +273,40 @@ describe("PhenoHuntsIndex — candidate and keeper counts agree (#550)", () => {
     const card = await screen.findByTestId(`pheno-hunts-index-item-${DEMO_HUNT_ID}`);
     expect(card.textContent).toContain("0 active candidates");
     expect(card.textContent).not.toMatch(/keeper/i);
+  });
+
+  it("a pending keeper count never holds the index on its spinner (Codex on #1825)", async () => {
+    mockList.mockResolvedValue(DEMO_HUNTS);
+    mockKeepers.mockResolvedValue(DEMO_KEEPERS);
+    mockKeeperCount.mockReturnValue(new Promise<number>(() => {}));
+    renderIndex();
+    const card = await screen.findByTestId(`pheno-hunts-index-item-${DEMO_HUNT_ID}`);
+    // Unknown total → the keeper clause is omitted, never guessed.
+    expect(card.textContent).toContain("0 active candidates");
+    expect(card.textContent).not.toMatch(/keeper/i);
+    expect(screen.getByTestId("pheno-stability-dashboard")).toBeInTheDocument();
+  });
+
+  it("a pending keeper count never hides a roll-up failure notice (Codex on #1825)", async () => {
+    mockList.mockResolvedValue(DEMO_HUNTS);
+    mockKeepers.mockRejectedValue(new Error("boom"));
+    mockKeeperCount.mockReturnValue(new Promise<number>(() => {}));
+    renderIndex();
+    expect(
+      await screen.findByTestId("pheno-hunts-index-stability-unavailable"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId(`pheno-hunts-index-item-${DEMO_HUNT_ID}`)).toBeInTheDocument();
+  });
+
+  it("a keeper count that lands after the list fills in the keeper clause", async () => {
+    mockList.mockResolvedValue(DEMO_HUNTS);
+    mockKeepers.mockResolvedValue(DEMO_KEEPERS);
+    let resolveCount: (n: number) => void = () => {};
+    mockKeeperCount.mockReturnValue(new Promise<number>((r) => (resolveCount = r)));
+    renderIndex();
+    const card = await screen.findByTestId(`pheno-hunts-index-item-${DEMO_HUNT_ID}`);
+    expect(card.textContent).not.toMatch(/keeper/i);
+    resolveCount(DEMO_KEEPERS.length);
+    await waitFor(() => expect(card.textContent).toContain("0 active candidates · 4 keepers"));
   });
 });

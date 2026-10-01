@@ -58,6 +58,21 @@ export default function PhenoHuntsIndex() {
     let cancelled = false;
     setStatus("loading");
     setRollupUnavailable(false);
+    setKeeperTotal(null);
+    // Optional enrichment, decoupled from page readiness (Codex on #1825): a
+    // slow or pending exact count must never hold the hunts list or the
+    // roll-up failure notice on the spinner. Until it lands the total stays
+    // unknown, which only omits the per-hunt keeper clauses.
+    Promise.resolve()
+      .then(() => countKeepersForOwner())
+      .then(
+        (total) => {
+          if (!cancelled) setKeeperTotal(total);
+        },
+        () => {
+          /* best-effort: an unknown total only hides keeper counts */
+        },
+      );
     // Hunts drive the page's load status; the keeper roll-up is best-effort.
     // Hunt-list and candidate-count query failures reject so this page shows
     // an honest error state. A keeper-roll-up failure remains isolated because
@@ -69,16 +84,11 @@ export default function PhenoHuntsIndex() {
         if (!cancelled) setRollupUnavailable(true);
         return [] as KeeperStabilityRow[];
       }),
-      // Best-effort: an unknown total only hides the per-hunt keeper counts.
-      Promise.resolve()
-        .then(() => countKeepersForOwner())
-        .catch(() => null),
     ])
-      .then(([huntRows, keeperRows, total]) => {
+      .then(([huntRows, keeperRows]) => {
         if (cancelled) return;
         setHunts(huntRows);
         setKeepers(keeperRows);
-        setKeeperTotal(total);
         setStatus("ready");
       })
       .catch(() => {

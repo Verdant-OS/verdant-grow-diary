@@ -1,6 +1,9 @@
 name: Gamification staging smoke
 
-# dormant: deliberately main-only (#581). Requires staging Supabase secrets.
+# dormant: Legacy main-only (#581) setup; not production acceptance.
+# Hosted verification is verdantgrowdiary.com. Do not repoint privileged setup;
+# fixture safety/effective gating require a separate reviewed CI slice.
+# Jobs, triggers and credential bindings are unchanged by this comment.
 # WARNING recorded during the 2026-07-30 sweep: its payload steps gate on
 # `env.*` names defined only inside each step's own env: block, which is out
 # of scope for that step's `if:` — so the RLS/smoke steps have NEVER
@@ -11,7 +14,7 @@ name: Gamification staging smoke
 # Manual / protected workflow for live gamification verification.
 #
 # Why separate from ci.yml:
-#   - requires privileged staging credentials (DB URL, anon key, and the
+#   - existing privileged legacy setup credentials (DB URL, anon key, and the
 #     service role key used ONLY to seed/teardown a throwaway test user
 #     inside scripts/smoke-award-nugs.ts)
 #   - must NOT run on untrusted pull_request events

@@ -64,8 +64,8 @@ HISTORICAL — never active instructions
 
 Every agent reads `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK` and records
 `open_handoffs_checked`. After acknowledgment, keep an explicit assignment. If
-unassigned, select the highest-priority eligible unclaimed or older-than-24-hours
-open block under `AGENTS.md`; do not take a fresh claim or bypass a named lock.
+unassigned, select the highest-priority open block as `AGENTS.md` defines it (a pushed
+branch and a PR, with no effective claim or a last activity older than 24 hours); do not take a fresh claim or bypass a named lock.
 Security and Council Chair have no repository access, so they never select or resume a
 block; they act only on an explicit assignment.
 

@@ -74,8 +74,7 @@ external writes unless Cheek explicitly authorizes that as a separate action.
 - Every assigned slice records one current holder and an independent acceptance
   reviewer from the routing above. Any contributor is ineligible for that slice's
   independent acceptance PASS, even after a transfer. Peer observations are permitted.
-- Eligible unclaimed or older-than-24-hours coverage blocks may be resumed under
-  `AGENTS.md`; a fresh claim is not available for takeover. Named locks below remain.
+- Open coverage blocks, as `AGENTS.md` defines them, may be resumed under it; a fresh claim is not available for takeover. Named locks below remain.
 - Do not take Claude's **Tranche B+** product-code named lock unless `CURRENT_STATE.md`
   already marks that work done and unassigned (or Cheek reassigns).
 - Do not take Codex's **Tranche A** / release-gate named lock unless likewise done and

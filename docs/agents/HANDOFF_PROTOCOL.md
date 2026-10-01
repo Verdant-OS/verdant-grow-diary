@@ -19,7 +19,8 @@ Alerts / Action Queue rewrite).
 
 Tasks are not owned by agents. Every open task has a coverage block in
 `docs/agents/HANDOFF_LOG.md` (see `AGENTS.md`, Agent Handoff / Coverage), and any agent
-may resume an eligible unclaimed or older-than-24-hours block after posting a
+may resume an open block (as `AGENTS.md` defines it: a pushed branch and a PR, with no
+effective claim or a last activity older than 24 hours) after posting a
 `claimed_by` claim comment on the task's PR (see `AGENTS.md`).
 Keep explicit assignments and named locks; a fresh claim is not available for takeover.
 Every slice names:

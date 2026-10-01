@@ -45,7 +45,7 @@ strength** is often build / integration leadership — that is preference, **not
 exclusivity. Claude and Grok may research, architect, implement, audit, test, or
 independently review when they hold the claim on (or independently review) the slice.
 
-Coverage allows an eligible unclaimed or older-than-24-hours task to resume. It does
+Coverage allows an open task, as `AGENTS.md` defines it, to resume. It does
 not take a fresh claim or transfer named locks (for example remaining Tranche A edit
 points) without reassignment.
 

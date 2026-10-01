@@ -152,14 +152,17 @@ agent from one written block.
   where artifacts live, the independent reviewer seat, `claimed_by`, and `last_updated`
   (date, time, zone). Use the template at the top of the log.
 - **When to update it.** At least once a day while the task is open, and always before the
-  agent stops, hands off, or expects to run out of budget. Before stopping or handing off,
-  push the branch and make sure it has a PR, because a successor can only claim on a PR.
-  Under `docs/agents/OWNERSHIP.md` Codex opens PRs, as drafts; a holder without that
-  right asks Codex. A block without a pushed branch and a PR is not eligible for coverage
-  until both exist. A block with both, older than 24 hours or with no `claimed_by`, is
-  open for anyone.
-- **Eligible coverage.** Any agent may resume an unclaimed block or one whose
-  `last_updated` is older than 24 hours, subject to explicit assignments and named locks.
+  agent stops, hands off, or expects to run out of budget. Push the branch and have its
+  draft PR open before implementation begins, not only before a planned stop: an agent
+  can be cut off at any time, and a successor can only claim on a PR. Under
+  `docs/agents/OWNERSHIP.md` Codex opens PRs, as drafts; a holder without that right asks
+  Codex first. A block without a pushed branch and a PR is not eligible for coverage until
+  both exist.
+- **Last activity.** A block's last activity is the newer of its `last_updated` and its
+  effective claim (below). A block with both a pushed branch and a PR is open for anyone
+  when it has no effective claim or its last activity is older than 24 hours.
+- **Eligible coverage.** Any agent may resume an open block as defined above, subject to
+  explicit assignments and named locks.
   A fresh claim is not available for takeover. The handoff block carries the context
   needed to resume. A block's effective claim is the newest of its log `claimed_by` and
   any `claimed_by:` comment on its PR, so read the PR's comments before treating a block
@@ -168,8 +171,8 @@ agent from one written block.
   never opens the PR itself; a block without one is not yet eligible.
   The claim takes effect when posted: from then on you hold the branch and the previous
   holder stops pushing. The newest claim, in the log or on the PR, is the current
-  `claimed_by` and counts as `last_updated` for the 24-hour rule; carry it into the block
-  at the next log update. Fetch the branch and confirm `git rev-parse origin/<branch>`
+  `claimed_by` and counts toward the block's last activity; carry it into the block at
+  the next log update. Fetch the branch and confirm `git rev-parse origin/<branch>`
   matches the block's head SHA before running the block's checkout command, which ends
   with the base merge; if it differs, stop and reconcile with the newest claim. Then run
   the checkout command and continue on the same branch. Never rename, recreate, or
@@ -177,9 +180,9 @@ agent from one written block.
 - **Coverage on startup.** Read `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK`
   and truthfully record `open_handoffs_checked`. After the acknowledgment, keep an
   explicit assignment. If you have no assigned task, select the highest-priority
-  eligible open block: its effective claim (log or PR comment, whichever is newer) is
-  absent or older than 24 hours, with no conflicting assignment
-  or named lock. Priority order: publish gate, then P1, then P2, then everything else.
+  eligible open block: a pushed branch and a PR, and either no effective claim or a last
+  activity (the newer of `last_updated` and the effective claim) older than 24 hours, with
+  no conflicting assignment or named lock. Priority order: publish gate, then P1, then P2, then everything else.
   Ties go to the oldest `last_updated`. Agents without repository access (Security,
   Council Chair) cannot set `claimed_by` or touch a branch, so they never select or
   resume a block: they read the log for context and act only on an explicit assignment.

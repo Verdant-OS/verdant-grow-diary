@@ -110,7 +110,8 @@ See docs/production-only-verification-runbook.md.
 - [ ] Exhaust the monthly allowance, run one more AI Doctor review → it succeeds, `funded_by='pack'`, and the badge shows the pack balance (not "0").
 - [ ] Refund the pack in sandbox → a `kind='clawback'` grant appears; balance drops.
 
-Then repeat product + secret setup for **live** and you're done.
+Stop here. Moving to **live** (live products, live secrets or a payment-mode switch) is a separate,
+explicitly approved release step owned by Matthew, not part of this runbook.
 
 ---
 

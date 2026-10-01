@@ -23,6 +23,12 @@ this entry's 2026-10-01T01:58 UTC version.
   (new file; additive columns + `cultivar_profile_sources` with published-only RLS and SELECT-only
   grant; idempotent content upserts). **Committed is not applied. No APPLY.** It still sorts last
   after the base's five new Quick Log migrations.
+  - **`HOLD-CHEEK`:** because #1827 adds a migration, its **merge** waits for Matthew
+    (`OWNERSHIP.md` §4.3), not only its production apply. Green checks plus an independent PASS do
+    not by themselves authorize it to land.
+  - The `supabase/` and migration work was built on the owner's direct instruction for issue
+    `#419` (2026-09-30). `OWNERSHIP.md` §2 keeps migrations off-limits without Matthew's explicit
+    approval.
 - **Release state:** `cultivarDatabaseReadsEnabled = false`. `/cultivars` still renders the bundled
   sample library with no database request. Status language stays "working V1 prototype in
   pre-release validation" — no "database-backed public reads", "shipped", or "live" claim.
@@ -50,9 +56,13 @@ this entry's 2026-10-01T01:58 UTC version.
   run** — later runs were cancelled by newer pushes; the run on `42ad20a74` is pending.
 - **`NOT_MEASURED`:** the full 32-shard suite at `42ad20a74`, the preview and production receipts,
   and the cause of the Vercel block.
-- **Review seat:** independent reviewer is **Grok**, on the owner's instruction (2026-10-01).
-  - Codex is unavailable; the earlier Copilot stand-in could not review (quota).
-  - Grok's review is `NOT_MEASURED` until it is posted. Claude does not self-merge.
+- **Review seat — not satisfied.** No independent review is recorded.
+  - The owner named **Grok** as reviewer on 2026-10-01. Codex is unavailable, and the earlier
+    Copilot stand-in could not review (quota).
+  - Formal routing has **not** happened. Under `OWNERSHIP.md` §2 and §4.3, Chemdawg's pre-check
+    routes the PR by path only after CI settles green. The merge gate needs an exact-head
+    independent PASS from Blue Dream, Durban Poison or Critical Mass.
+  - Grok's review and that PASS are both `NOT_MEASURED`. Claude does not self-merge.
 - **Overlap to watch:** `#1793` also edits `.github/workflows/security-db-local.yml` (different hunk;
   no textual conflict measured). `#1777` merged first (`569ac94a1`); this entry was rebased above its
   entries on 2026-10-01 with both preserved.

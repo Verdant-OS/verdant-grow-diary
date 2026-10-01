@@ -76,10 +76,12 @@ import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
 import { useTents } from "@/hooks/use-tents";
+import { usePlants } from "@/hooks/use-plants";
 import { useGrows } from "@/store/grows";
 import {
   resolvePhenoEvidenceQuickLogTarget,
   type PhenoEvidenceGrowCatalog,
+  type PhenoEvidencePlantCatalog,
   type PhenoEvidenceTentCatalog,
 } from "@/lib/phenoEvidenceQuickLogTargetGate";
 import type { PhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
@@ -882,6 +884,8 @@ interface EditorProps {
   /** The tent catalog Quick Log resolves against (#1005 target gate). */
   evidenceTentCatalog: PhenoEvidenceTentCatalog;
   evidenceGrowCatalog: PhenoEvidenceGrowCatalog;
+  /** Quick Log's live plant catalog — the plant's CURRENT grow/tent. */
+  evidencePlantCatalog: PhenoEvidencePlantCatalog;
   onRetryEvidenceTentCatalog: () => void;
   selected: boolean;
   onToggleSelect: (plantId: string) => void;
@@ -976,6 +980,7 @@ const CandidateEditor = memo(function CandidateEditor({
   evidenceStatus,
   evidenceTentCatalog,
   evidenceGrowCatalog,
+  evidencePlantCatalog,
   onRetryEvidenceTentCatalog,
   selected,
   onToggleSelect,
@@ -1027,16 +1032,18 @@ const CandidateEditor = memo(function CandidateEditor({
 
   // Readiness is derived from THIS card's evidence props, so it only recomputes
   // when this candidate's data changes — one save never re-renders every card.
-  // #1005: the evidence → Quick Log handoff targets this plant's own stored
-  // grow/tent, resolved through the canonical Quick Log target rules.
+  // #1005: the evidence → Quick Log handoff targets this plant's own CURRENT
+  // grow/tent from Quick Log's live plant catalog (never the candidate
+  // snapshot), resolved through the canonical Quick Log target rules.
   const evidenceQuickLogTarget = useMemo(
     () =>
       resolvePhenoEvidenceQuickLogTarget({
-        plant: { plantId, growId: candidate.growId, tentId: candidate.tentId },
+        plantId,
+        plants: evidencePlantCatalog,
         catalog: evidenceTentCatalog,
         grows: evidenceGrowCatalog,
       }),
-    [plantId, candidate.growId, candidate.tentId, evidenceTentCatalog, evidenceGrowCatalog],
+    [plantId, evidencePlantCatalog, evidenceTentCatalog, evidenceGrowCatalog],
   );
   const readiness = useMemo(
     () => candidateReadiness(candidate, score, decision, sexRow, smokeRow, labRow, cloneInsured),
@@ -1464,15 +1471,26 @@ export default function PhenoHuntWorkspace() {
     if (growsCtx.loading || !Array.isArray(growsCtx.grows)) return { status: "loading" };
     return { status: "ready", growIds: new Set(growsCtx.grows.map((g) => g.id)) };
   }, [growsCtx.error, growsCtx.loading, growsCtx.grows]);
+  // Codex on #1825: the plant's CURRENT grow/tent come from the same live
+  // plant catalog (and cache) Quick Log validates the prefill against, so a
+  // plant moved after this page loaded cannot open a dead handoff.
+  const plantsQuery = usePlants();
+  const evidencePlantCatalog = useMemo<PhenoEvidencePlantCatalog>(() => {
+    if (Array.isArray(plantsQuery.data)) return { status: "ready", plants: plantsQuery.data };
+    return plantsQuery.isError ? { status: "error" } : { status: "loading" };
+  }, [plantsQuery.data, plantsQuery.isError]);
   const refetchTents = tentsQuery.refetch;
+  const refetchPlants = plantsQuery.refetch;
+  const plantsFailed = Boolean(plantsQuery.isError);
   const refreshGrows = growsCtx.refresh;
   const growsFailed = Boolean(growsCtx.error);
-  // Retry whichever catalog failed: a grow-catalog error is not cleared by a
-  // tent refetch (Codex on #1825).
+  // Retry whichever catalog failed: a grow- or plant-catalog error is not
+  // cleared by a tent refetch (Codex on #1825).
   const retryEvidenceTentCatalog = useCallback(() => {
     void refetchTents();
+    if (plantsFailed && typeof refetchPlants === "function") void refetchPlants();
     if (growsFailed && typeof refreshGrows === "function") void refreshGrows();
-  }, [refetchTents, refreshGrows, growsFailed]);
+  }, [refetchTents, refetchPlants, plantsFailed, refreshGrows, growsFailed]);
   const { entitlement, refetch: refetchEntitlement } = useMyEntitlements();
   // Owner-only + Pro. Pheno surfaces are owner-only via RLS, so the viewer owns
   // the hunt; the presentation gate is an active Pheno Tracker Pro plan. The
@@ -2195,6 +2213,7 @@ export default function PhenoHuntWorkspace() {
                       evidenceStatus={evidencePackets.status}
                       evidenceTentCatalog={evidenceTentCatalog}
                       evidenceGrowCatalog={evidenceGrowCatalog}
+                      evidencePlantCatalog={evidencePlantCatalog}
                       onRetryEvidenceTentCatalog={retryEvidenceTentCatalog}
                       selected={selectedIds.includes(c.candidateId)}
                       onToggleSelect={onToggleSelect}

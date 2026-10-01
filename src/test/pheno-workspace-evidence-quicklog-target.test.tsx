@@ -28,6 +28,25 @@ vi.mock("@/hooks/use-tents", () => ({
   useTents: () => tentsState.current,
 }));
 
+// Quick Log's live plant catalog (Codex on #1825). Null data → mirror the
+// rendered candidate (the plant has not moved since the page loaded).
+type PlantsState = {
+  data: Array<{ id: string; grow_id: string | null; tent_id: string | null }> | null | undefined;
+  isError: boolean;
+};
+const plantsState: { current: PlantsState } = { current: { data: null, isError: false } };
+const plantsRefetch = vi.fn(() => Promise.resolve());
+const mirroredPlant: { current: { id: string; grow_id: string | null; tent_id: string | null } } = {
+  current: { id: "plant-a", grow_id: null, tent_id: null },
+};
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({
+    data: plantsState.current.data === null ? [mirroredPlant.current] : plantsState.current.data,
+    isError: plantsState.current.isError,
+    refetch: plantsRefetch,
+  }),
+}));
+
 // Active (non-archived) grows, as GrowsProvider lists them (Codex on #1825).
 const growsState: {
   current: { grows: Array<{ id: string }>; loading: boolean; error: string | null };
@@ -107,6 +126,11 @@ function candidate(growId: string | null, tentId: string | null): PhenoCandidate
 }
 
 function renderWorkspace(c: PhenoCandidateInput) {
+  mirroredPlant.current = {
+    id: c.candidateId,
+    grow_id: c.growId ?? null,
+    tent_id: c.tentId ?? null,
+  };
   const state = {
     status: "ok",
     // The HUNT's grow/tent deliberately differ from the candidate's.
@@ -167,6 +191,8 @@ const listener = vi.fn();
 beforeEach(() => {
   hookMock.mockReset();
   listener.mockReset();
+  plantsState.current = { data: null, isError: false };
+  plantsRefetch.mockClear();
   tentsState.current = {
     data: [
       { id: "t-a", grow_id: "g-a" },
@@ -291,5 +317,43 @@ describe("workspace evidence → Quick Log target (#1005)", () => {
     } finally {
       growsState.current = { ...growsState.current, error: null };
     }
+  });
+
+  it("a candidate moved after the page loaded targets its CURRENT grow/tent (Codex on #1825)", () => {
+    // Workspace snapshot says g-a/t-a; Quick Log's live plant row says g-hunt/t-hunt.
+    plantsState.current = {
+      data: [{ id: PLANT, grow_id: "g-hunt", tent_id: "t-hunt" }],
+      isError: false,
+    };
+    renderWorkspace(candidate("g-a", "t-a"));
+    fireEvent.click(screen.getByTestId(`${COVERAGE}-record-structure`));
+    expect((listener.mock.calls[0][0] as CustomEvent).detail).toMatchObject({
+      plantId: PLANT,
+      growId: "g-hunt",
+      tentId: "t-hunt",
+    });
+  });
+
+  it("a candidate missing from Quick Log's live plant catalog is blocked", () => {
+    plantsState.current = { data: [], isError: false };
+    renderWorkspace(candidate("g-a", "t-a"));
+    expect(screen.queryByTestId(`${COVERAGE}-record-structure`)).toBeNull();
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "plant_unavailable",
+    );
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("a failed plant catalog read offers Retry, which refetches plants", () => {
+    plantsState.current = { data: undefined, isError: true };
+    renderWorkspace(candidate("g-a", "t-a"));
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "catalog_error",
+    );
+    fireEvent.click(screen.getByTestId(`${COVERAGE}-target-retry`));
+    expect(plantsRefetch).toHaveBeenCalledTimes(1);
+    expect(listener).not.toHaveBeenCalled();
   });
 });

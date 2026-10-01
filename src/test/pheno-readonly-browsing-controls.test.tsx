@@ -67,6 +67,9 @@ vi.mock("@/hooks/usePhenoEvidencePackets", () => ({
 vi.mock("@/hooks/use-tents", () => ({
   useTents: () => ({ data: [], isError: false, refetch: () => Promise.resolve() }),
 }));
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({ data: [], isError: false, refetch: () => Promise.resolve() }),
+}));
 
 import PhenoHuntWorkspace from "@/pages/PhenoHuntWorkspace";
 import PhenoKeepersPage from "@/pages/PhenoKeepersPage";

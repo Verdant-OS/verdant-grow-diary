@@ -8,8 +8,12 @@
  *
  * This gate decides, per candidate, whether the handoff may fire and with
  * which ids. It never builds its own rule table: the grow/tent triangle is
- * checked by the canonical `resolveQuickLogPrefillTarget`, fed the plant's
- * STORED ids and the same tent catalog Quick Log reads. The plant's grow must
+ * checked by the canonical `resolveQuickLogPrefillTarget`, fed the SAME live
+ * plant and tent catalogs Quick Log reads (`usePlants` / `useTents`). The
+ * candidate row loaded with the workspace is never trusted for grow/tent: a
+ * plant moved after the page loaded would otherwise pass here and then be
+ * rejected by Quick Log's own check, recreating the dead handoff (Codex on
+ * #1825). The plant's grow must
  * also be in the active-grow list Quick Log targets (an archived grow is
  * blocked). It never invents an active grow, never falls back to another
  * tent, and never assigns a tent.
@@ -26,15 +30,20 @@
 import {
   resolveQuickLogPrefillTarget,
   type QuickLogTargetBlockReason,
+  type QuickLogTargetPlant,
   type QuickLogTargetTent,
 } from "@/lib/quickLogTargetIntegrityRules";
+import { isInactiveQuickLogPlant } from "@/lib/quickLogPlantOptionRules";
 
-/** The candidate plant's own stored relationships (plants.grow_id / tent_id). */
-export interface PhenoEvidenceTargetPlant {
-  readonly plantId: string | null | undefined;
-  readonly growId: string | null | undefined;
-  readonly tentId: string | null | undefined;
-}
+/**
+ * Quick Log's live plant catalog (non-archived plants), with its read state.
+ * The plant's CURRENT grow/tent come from here, never from the workspace's
+ * candidate snapshot.
+ */
+export type PhenoEvidencePlantCatalog =
+  | Readonly<{ status: "loading" }>
+  | Readonly<{ status: "error" }>
+  | Readonly<{ status: "ready"; plants: ReadonlyArray<QuickLogTargetPlant> }>;
 
 /** The tent catalog Quick Log resolves against, with its read state. */
 export type PhenoEvidenceTentCatalog =
@@ -132,14 +141,25 @@ function kindForBlockReason(
 }
 
 export function resolvePhenoEvidenceQuickLogTarget(input: {
-  plant: PhenoEvidenceTargetPlant | null | undefined;
+  plantId: string | null | undefined;
+  /** Live plants. Missing → pending: never trust the candidate snapshot. */
+  plants: PhenoEvidencePlantCatalog | null | undefined;
   catalog: PhenoEvidenceTentCatalog | null | undefined;
   /** Active grows. Missing → pending: never assume a grow is active. */
   grows: PhenoEvidenceGrowCatalog | null | undefined;
 }): PhenoEvidenceQuickLogTarget {
-  const plantId = cleanId(input.plant?.plantId);
+  const plantId = cleanId(input.plantId);
   if (!plantId) return { kind: "plant_unavailable" };
-  const growId = cleanId(input.plant?.growId);
+
+  const plants = input.plants;
+  if (!plants || plants.status === "loading") return { kind: "pending" };
+  if (plants.status === "error") return { kind: "catalog_error" };
+  const row = plants.plants.find((p) => cleanId(p?.id) === plantId);
+  // Not in the live (non-archived) list, archived or merged: Quick Log can't
+  // target it either.
+  if (!row || isInactiveQuickLogPlant(row)) return { kind: "plant_unavailable" };
+
+  const growId = cleanId(row.grow_id);
   if (!growId) return { kind: "needs_assignment" };
 
   // The plant's grow must be one Quick Log can target, tentless or not.
@@ -148,7 +168,7 @@ export function resolvePhenoEvidenceQuickLogTarget(input: {
   if (grows.status === "error") return { kind: "catalog_error" };
   if (!grows.growIds.has(growId)) return { kind: "grow_unavailable" };
 
-  const tentId = cleanId(input.plant?.tentId);
+  const tentId = cleanId(row.tent_id);
   // Tentless: exact stored plant + grow, tent decided by Quick Log (header).
   if (!tentId) return { kind: "ready", plantId, growId, tentId: null };
 
@@ -159,7 +179,7 @@ export function resolvePhenoEvidenceQuickLogTarget(input: {
 
   const resolution = resolveQuickLogPrefillTarget({
     prefill: { plantId, growId, tentId },
-    plants: [{ id: plantId, grow_id: growId, tent_id: tentId }],
+    plants: plants.plants,
     tents: catalog.tents,
   });
   if (resolution.status === "blocked") return { kind: kindForBlockReason(resolution.reason) };

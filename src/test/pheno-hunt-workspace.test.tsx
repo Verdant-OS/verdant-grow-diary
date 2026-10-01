@@ -16,6 +16,9 @@ const hookMock = vi.fn<() => UsePhenoHuntWorkspaceState>();
 vi.mock("@/hooks/use-tents", () => ({
   useTents: () => ({ data: [], isError: false, refetch: () => Promise.resolve() }),
 }));
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({ data: [], isError: false, refetch: () => Promise.resolve() }),
+}));
 
 vi.mock("@/hooks/usePhenoHuntWorkspace", () => ({
   usePhenoHuntWorkspace: () => hookMock(),

@@ -368,12 +368,37 @@ describe("cultivar database parity — blocked content", () => {
     expect(report.status).toBe("blocked");
     expect(paths(report)).toEqual(
       expect.arrayContaining([
-        "changed * rows.cultivars.oreoz.normalized_name",
-        "changed * rows.cultivar_aliases.jack-herer|jack.sort_order",
-        "changed * rows.cultivar_claims.gg4|reported_thc_pct|.value_text",
+        "changed oreoz rows.cultivars.oreoz.normalized_name",
+        "changed jack-herer rows.cultivar_aliases.jack-herer|jack.sort_order",
+        "changed gg4 rows.cultivar_claims.gg4|reported_thc_pct|.value_text",
         "changed * rows.breeders.gg strains llc.slug",
       ]),
     );
+  });
+
+  it("never lists a cultivar as matched when only its row-level parity drifted", () => {
+    const snapshot = freshSnapshot();
+    cultivarRow(snapshot, "oreoz").normalized_name = "oreoz renamed";
+    const report = audit(snapshot);
+    expect(report.status).toBe("blocked");
+    expect(paths(report)).toEqual(["changed oreoz rows.cultivars.oreoz.normalized_name"]);
+    expect(report.matchedSlugs).not.toContain("oreoz");
+    expect(report.matchedSlugs).toHaveLength(report.expectedSlugs.length - 1);
+  });
+
+  it("orders rows sharing a natural key by content before suffixing them", () => {
+    const snapshot = freshSnapshot();
+    const jackId = cultivarRow(snapshot, "jack-herer").id;
+    const jack = snapshot.cultivar_aliases.find((item) => item.cultivar_id === jackId);
+    if (!jack) throw new Error("alias");
+    snapshot.cultivar_aliases.push(
+      { ...jack, id: "dup-a", sort_order: 7 },
+      { ...jack, id: "dup-b", sort_order: 3 },
+    );
+    const reordered = structuredClone(snapshot);
+    const [a, b] = reordered.cultivar_aliases.splice(-2);
+    reordered.cultivar_aliases.unshift(b, a);
+    expect(audit(reordered)).toEqual(audit(snapshot));
   });
 
   it("fails a guide whose base template link is missing", () => {
@@ -388,7 +413,7 @@ describe("cultivar database parity — blocked content", () => {
     expect(paths(report)).toEqual(
       expect.arrayContaining([
         "changed sour-stomper guideMetadata.baseTemplateKey",
-        "changed * rows.cultivar_guides.sour-stomper@1.base_template_id",
+        "changed sour-stomper rows.cultivar_guides.sour-stomper@1.base_template_id",
       ]),
     );
   });

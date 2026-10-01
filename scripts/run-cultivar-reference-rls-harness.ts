@@ -155,7 +155,8 @@ async function rowCounts(): Promise<Record<string, number>> {
   return counts;
 }
 
-async function signedInClient(): Promise<{ client: SupabaseClient; userId: string }> {
+/** Creates the harness user, recording its id BEFORE sign-in can fail. */
+async function signedInClient(user: { id: string | null }): Promise<SupabaseClient> {
   const email = `cultivar-reference-${runId}@verdant.test`;
   const password = crypto.randomUUID();
   const { data, error } = await admin.auth.admin.createUser({
@@ -164,80 +165,84 @@ async function signedInClient(): Promise<{ client: SupabaseClient; userId: strin
     email_confirm: true,
   });
   if (error || !data.user) throw new Error(`createUser: ${error?.message ?? "no user"}`);
+  user.id = data.user.id;
   const client = createClient(url!, anonKey!, options);
   const { error: signInError } = await client.auth.signInWithPassword({ email, password });
   if (signInError) throw new Error(`signIn: ${signInError.message}`);
-  return { client, userId: data.user.id };
+  return client;
 }
 
 async function main() {
-  console.log("→ published parity as real anon and authenticated readers");
-  const { client: authenticated, userId } = await signedInClient();
-  await auditAs("anon", anonymous);
-  await auditAs("authenticated", authenticated);
-
-  console.log("→ idempotency: re-apply the V1.1 migration");
-  const before = await rowCounts();
-  try {
-    execFileSync("psql", [dbUrl!, "-v", "ON_ERROR_STOP=1", "-q", "-f", MIGRATION], {
-      stdio: ["ignore", "pipe", "pipe"],
-      encoding: "utf8",
-    });
-    check("migration re-applies without error", true);
-  } catch (error) {
-    check(
-      "migration re-applies without error",
-      false,
-      String((error as { stderr?: string }).stderr ?? error),
-    );
-  }
-  const after = await rowCounts();
-  check(
-    "re-apply leaves every table's row count unchanged",
-    JSON.stringify(before) === JSON.stringify(after),
-    JSON.stringify({ before, after }),
-  );
-  await auditAs("anon after re-apply", anonymous);
-
-  console.log("→ hidden rows: draft/archived cultivars and import staging");
+  // Everything after user creation runs inside one try, so a setup failure
+  // anywhere still reaches the teardown below.
   const created: { table: string; column: string; value: string }[] = [];
-  // Resolve real published rows first: a failed lookup must stop the harness,
-  // never leave probes aimed at an undefined or nonexistent id.
-  const gg4 = {
-    data: seededRow(
-      "gg4 cultivar lookup",
-      await admin.from("cultivars").select("id").eq("slug", "gg4").single(),
-    ),
-  };
-  const watts = {
-    data: seededRow(
-      "watts source lookup",
-      await admin
-        .from("cultivar_sources")
-        .select("id")
-        .eq("source_key", "watts-2021-terpene-genetics")
-        .single(),
-    ),
-  };
-  const sourceIds = new Map<string, string>();
-  for (const key of [
-    "sour-diesel-public-profile",
-    "og-kush-public-profile",
-    "blue-dream-public-profile",
-  ]) {
-    const data = seededRow(
-      `${key} source lookup`,
-      await admin.from("cultivar_sources").select("id").eq("source_key", key).single(),
-    );
-    sourceIds.set(key, data.id);
-  }
-  let hiddenCultivarId: string | null = null;
-  let hiddenSectionId: string | null = null;
-  let draftGuideId: string | null = null;
-  const hiddenGuideIds: string[] = [];
-  const hiddenSectionIds: string[] = [];
-  let batchId: string | null = null;
+  const harnessUser: { id: string | null } = { id: null };
   try {
+    console.log("→ published parity as real anon and authenticated readers");
+    const authenticated = await signedInClient(harnessUser);
+    await auditAs("anon", anonymous);
+    await auditAs("authenticated", authenticated);
+
+    console.log("→ idempotency: re-apply the V1.1 migration");
+    const before = await rowCounts();
+    try {
+      execFileSync("psql", [dbUrl!, "-v", "ON_ERROR_STOP=1", "-q", "-f", MIGRATION], {
+        stdio: ["ignore", "pipe", "pipe"],
+        encoding: "utf8",
+      });
+      check("migration re-applies without error", true);
+    } catch (error) {
+      check(
+        "migration re-applies without error",
+        false,
+        String((error as { stderr?: string }).stderr ?? error),
+      );
+    }
+    const after = await rowCounts();
+    check(
+      "re-apply leaves every table's row count unchanged",
+      JSON.stringify(before) === JSON.stringify(after),
+      JSON.stringify({ before, after }),
+    );
+    await auditAs("anon after re-apply", anonymous);
+
+    console.log("→ hidden rows: draft/archived cultivars and import staging");
+    // Resolve real published rows first: a failed lookup must stop the harness,
+    // never leave probes aimed at an undefined or nonexistent id.
+    const gg4 = {
+      data: seededRow(
+        "gg4 cultivar lookup",
+        await admin.from("cultivars").select("id").eq("slug", "gg4").single(),
+      ),
+    };
+    const watts = {
+      data: seededRow(
+        "watts source lookup",
+        await admin
+          .from("cultivar_sources")
+          .select("id")
+          .eq("source_key", "watts-2021-terpene-genetics")
+          .single(),
+      ),
+    };
+    const sourceIds = new Map<string, string>();
+    for (const key of [
+      "sour-diesel-public-profile",
+      "og-kush-public-profile",
+      "blue-dream-public-profile",
+    ]) {
+      const data = seededRow(
+        `${key} source lookup`,
+        await admin.from("cultivar_sources").select("id").eq("source_key", key).single(),
+      );
+      sourceIds.set(key, data.id);
+    }
+    let hiddenCultivarId: string | null = null;
+    let hiddenSectionId: string | null = null;
+    let draftGuideId: string | null = null;
+    const hiddenGuideIds: string[] = [];
+    const hiddenSectionIds: string[] = [];
+    let batchId: string | null = null;
     for (const status of ["draft", "archived"] as const) {
       const slug = `harness-${status}-${runId}`;
       const { data: cultivar, error } = await admin
@@ -723,9 +728,13 @@ async function main() {
   } finally {
     console.log("→ teardown (service role, harness-owned rows only)");
     for (const item of created.reverse()) {
-      await admin.from(item.table).delete().eq(item.column, item.value);
+      const { error } = await admin.from(item.table).delete().eq(item.column, item.value);
+      check(`teardown removes ${item.table} ${item.column}=${item.value}`, !error, error?.message);
     }
-    await admin.auth.admin.deleteUser(userId);
+    if (harnessUser.id) {
+      const { error } = await admin.auth.admin.deleteUser(harnessUser.id);
+      check("teardown removes the harness auth user", !error, error?.message);
+    }
   }
 
   console.log(`\n[cultivar-reference-rls] ${passed} passed, ${failed} failed`);

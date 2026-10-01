@@ -128,20 +128,52 @@ function canonicalRows(
     const columns = CULTIVAR_DATABASE_READ_SURFACE[table]
       .split(",")
       .filter((column) => column !== "id");
-    const byKey: Record<string, Record<string, unknown>> = {};
+    const groups = new Map<string, Array<{ canonical: Record<string, unknown>; text: string }>>();
     for (const row of rows(table)) {
-      let key = rowKey[table](row);
-      for (let n = 2; byKey[key] !== undefined; n += 1) key = `${rowKey[table](row)}#${n}`;
       const canonical: Record<string, unknown> = {};
       for (const column of columns) {
         const map = foreignKeys[column];
         canonical[column] = map ? ref(map, row[column]) : normalizeCell(column, row[column]);
       }
-      byKey[key] = canonical;
+      const key = rowKey[table](row);
+      const group = groups.get(key) ?? [];
+      group.push({ canonical, text: JSON.stringify(canonical) });
+      groups.set(key, group);
+    }
+    // Rows sharing a natural key are ordered by their canonical contents
+    // before taking #2, #3… suffixes, so findings never depend on the
+    // (unspecified) order the rows were read in.
+    const byKey: Record<string, Record<string, unknown>> = {};
+    for (const [key, group] of groups) {
+      group.sort((a, b) => (a.text < b.text ? -1 : a.text > b.text ? 1 : 0));
+      group.forEach((entry, index) => {
+        byKey[index === 0 ? key : `${key}#${index + 1}`] = entry.canonical;
+      });
     }
     out[table] = byKey;
   }
   return out;
+}
+
+/** Tables whose canonical row key starts with the owning cultivar's slug. */
+const CULTIVAR_SCOPED_TABLES = new Set<string>([
+  "cultivars",
+  "cultivar_aliases",
+  "cultivar_profile_sources",
+  "cultivar_claims",
+  "cultivar_guides",
+  "cultivar_guide_sections",
+  "cultivar_guide_section_sources",
+]);
+
+/**
+ * The cultivar a canonical row belongs to, or null for shared rows
+ * (breeders, sources, templates) and rows whose cultivar does not resolve.
+ */
+function canonicalRowSlug(table: string, key: string): string | null {
+  if (!CULTIVAR_SCOPED_TABLES.has(table)) return null;
+  const slug = key.split(/[|@/#]/)[0];
+  return slug === "" || slug === "null" || slug.startsWith("unresolved:") ? null : slug;
 }
 
 /** Provenance fields of a stored auxiliary claim, in comparable form. */
@@ -300,7 +332,6 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
   });
   const approvedBySlug = new Map(approvedPayload.cultivars.map((row) => [row.slug, row]));
   const expectedSlugs = input.bundledProfiles.map((profile) => profile.slug).sort();
-  const matchedSlugs: string[] = [];
 
   for (const expected of [...input.bundledProfiles].sort((a, b) =>
     a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0,
@@ -318,7 +349,6 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
       }
       continue;
     }
-    const before = issues.length;
 
     diffValues(slug, "profile", projectProfile(expected), projectProfile(actual), issues);
     diffValues(
@@ -504,8 +534,6 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
         issues,
       );
     }
-
-    if (issues.length === before) matchedSlugs.push(slug);
   }
 
   const expectedSlugSet = new Set(expectedSlugs);
@@ -524,8 +552,23 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
   // the rows the approved payload produces, so no column can drift unseen.
   const approvedRows = canonicalRows(cultivarSeedPayloadToSnapshot(approvedPayload));
   const databaseRows = canonicalRows(input.snapshot);
+  // Each finding names the cultivar its row belongs to, so a row-level drift
+  // can never sit beside that cultivar in matchedSlugs.
   for (const table of CULTIVAR_DATABASE_TABLES) {
-    diffValues(null, `rows.${table}`, approvedRows[table], databaseRows[table], issues);
+    const expectedRows = approvedRows[table];
+    const actualRows = databaseRows[table];
+    const keys = [...new Set([...Object.keys(expectedRows), ...Object.keys(actualRows)])].sort();
+    for (const key of keys) {
+      const slug = canonicalRowSlug(table, key);
+      const path = `rows.${table}.${key}`;
+      if (actualRows[key] === undefined) {
+        issues.push({ slug, kind: "missing", path, expected: expectedRows[key] });
+      } else if (expectedRows[key] === undefined) {
+        issues.push({ slug, kind: "unexpected", path, actual: actualRows[key] });
+      } else {
+        diffValues(slug, path, expectedRows[key], actualRows[key], issues);
+      }
+    }
   }
 
   // Every approved source must exist with identical citation fields.
@@ -552,6 +595,11 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
   }
 
   issues.sort(compareIssues);
+  // Matched only after EVERY check, row-level parity included.
+  const slugsWithIssues = new Set(issues.map((issue) => issue.slug));
+  const matchedSlugs = expectedSlugs.filter(
+    (slug) => databaseBySlug.has(slug) && !slugsWithIssues.has(slug),
+  );
   const status: CultivarParityStatus = issues.some((issue) => issue.kind === "malformed")
     ? "invalid"
     : issues.length > 0

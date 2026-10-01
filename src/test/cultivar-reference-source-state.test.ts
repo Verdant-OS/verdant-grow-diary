@@ -255,6 +255,10 @@ describe("cultivar reference source resolution", () => {
   });
 });
 
+// @source-scan-justified: this block proves forbidden constructs are ABSENT from the
+// V1.1 read path (writes, RPCs, Edge Function calls, service_role, private tables,
+// Math.random, Date.now). Absence of a call cannot be observed by importing a module;
+// it is a property of the source text, so a comment-stripped scan is the right tool.
 describe("cultivar V1.1 read path static safety", () => {
   const FILES = [
     "src/lib/cultivarDatabaseReadModel.ts",

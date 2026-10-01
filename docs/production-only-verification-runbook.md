@@ -18,7 +18,7 @@ tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
 use the KEEP account. Stop a write if identity, ownership or tagging cannot
 be verified; report that exact safety gap rather than proposing another host.
 Local/CI fixtures validate code, not production. Repository integration follows
-the explicit merge phases in AGENTS.md; it is not production acceptance. No
+the merge gate in AGENTS.md; it is not production acceptance. No
 Publish, production APPLY, real charge, role/auth change, device control or
 Action Queue operation is authorized here. Existing owner locks remain.
 See docs/production-only-verification-runbook.md.

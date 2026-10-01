@@ -176,7 +176,7 @@ seats below still apply, and a claim never grants self-acceptance or merge autho
   - If the two reviewers split, FAIL wins until GDP decides.
   - If CI is green but the pre-check says NOT READY, nothing is assigned.
 - **Overrides** (GDP, posted in the channel): `REASSIGN #N to Blue Dream|Critical Mass`, `HOLD #N`, `RELEASE #N`. An override lasts for that SHA unless it says "sticky".
-- **Next step fires on its own.** A `[VERDICT]` PASS or PASS-with-P2 (no P1) wakes GDP to make the merge call. A FAIL wakes the slice owner (Copilot or Codex) to push a fix. That new push starts the loop again at 4.1.
+- **Next step fires on its own.** An exact-head `[VERDICT]` PASS or PASS-with-P2 (no P1) wakes Chemdawg, who makes the merge call under the section 5 gate (all required checks plus an independent exact-head PASS). A FAIL wakes the slice owner (Copilot or Codex) to push a fix. That new push starts the loop again at 4.1.
 - **Never** assigns PRs on hold (a GDP `HOLD #N` override or HOLD #1250) or untouchable PRs. HOLD-CHEEK is different: it holds only the merge, so those PRs are still assigned.
 
 ### 4.4 Build order

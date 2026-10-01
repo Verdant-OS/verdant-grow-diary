@@ -152,8 +152,11 @@ agent from one written block.
   where artifacts live, the independent reviewer seat, `claimed_by`, and `last_updated`
   (date, time, zone). Use the template at the top of the log.
 - **When to update it.** At least once a day while the task is open, and always before the
-  agent stops, hands off, or expects to run out of budget. A block older than 24 hours, or
-  with no `claimed_by`, is open for anyone.
+  agent stops, hands off, or expects to run out of budget. Before stopping or handing off,
+  push the branch so the block's head SHA exists on GitHub: a successor can only claim on
+  a PR, and a local-only block (branch not on GitHub) is not eligible for coverage until
+  its holder pushes it. A pushed block older than 24 hours, or with no `claimed_by`, is
+  open for anyone.
 - **Eligible coverage.** Any agent may resume an unclaimed block or one whose
   `last_updated` is older than 24 hours, subject to explicit assignments and named locks.
   A fresh claim is not available for takeover. The handoff block carries the context

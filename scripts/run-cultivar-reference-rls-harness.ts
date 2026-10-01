@@ -679,28 +679,91 @@ async function main() {
       cultivar_import_batches: { column: "status", value: "approved" },
       cultivar_import_rows: { column: "status", value: "approved" },
     };
-    const fixtures = insertProbes("control");
     const fixtureValue = async (probe: InsertProbe, column: string) => {
       const { data } = await admin.from(probe.table).select(column).match(probe.match);
       const rows = (data ?? []) as unknown as Record<string, unknown>[];
       return rows.length === 1 ? rows[0][column] : undefined;
     };
+    // The control fixtures are PUBLICLY VISIBLE: a published harness cultivar
+    // with a published guide, section and links, so a mutation probe that
+    // RLS merely hides cannot pass vacuously. Children are rewired onto those
+    // visible parents as they are inserted (parents come first in the list).
+    const fixtures: InsertProbe[] = [];
     const original = new Map<string, unknown>();
-    for (const probe of fixtures) {
-      const { error } = await admin.from(probe.table).insert(probe.payload);
-      const value = await fixtureValue(probe, mutations[probe.table].column);
-      check(
-        `control: probe payload for ${probe.table} is structurally valid`,
-        !error && value !== undefined,
-        error?.message,
-      );
-      original.set(probe.table, value);
-    }
+    const fixtureIds: Record<string, string | undefined> = {};
+    const fixtureId = async (probe: InsertProbe) => {
+      const { data } = await admin.from(probe.table).select("id").match(probe.match);
+      const rows = (data ?? []) as unknown as { id: string }[];
+      return rows.length === 1 ? rows[0].id : undefined;
+    };
+    const visible = (probe: InsertProbe): InsertProbe => {
+      const rewire = (overrides: Record<string, unknown>, matchKeys: string[]) => {
+        const payload = { ...probe.payload, ...overrides };
+        const match = Object.fromEntries(matchKeys.map((key) => [key, payload[key]]));
+        return { table: probe.table, payload, match };
+      };
+      switch (probe.table) {
+        case "cultivars":
+        case "cultivar_guide_templates":
+          return { ...probe, payload: { ...probe.payload, publication_status: "published" } };
+        case "cultivar_aliases":
+          return rewire({ cultivar_id: fixtureIds.cultivars }, ["cultivar_id", "normalized_alias"]);
+        case "cultivar_profile_sources":
+          return rewire({ cultivar_id: fixtureIds.cultivars }, ["cultivar_id", "source_id"]);
+        case "cultivar_claims":
+          return rewire({ cultivar_id: fixtureIds.cultivars }, ["cultivar_id", "trait_key"]);
+        case "cultivar_guides":
+          return rewire({ cultivar_id: fixtureIds.cultivars, publication_status: "published" }, [
+            "cultivar_id",
+            "version",
+          ]);
+        case "cultivar_guide_sections":
+          return rewire({ guide_id: fixtureIds.cultivar_guides }, ["guide_id", "section_key"]);
+        case "cultivar_guide_section_sources":
+          return rewire({ guide_section_id: fixtureIds.cultivar_guide_sections }, [
+            "guide_section_id",
+            "source_id",
+          ]);
+        default:
+          return probe;
+      }
+    };
     try {
+      for (const base of insertProbes("control")) {
+        const probe = visible(base);
+        const { error } = await admin.from(probe.table).insert(probe.payload);
+        const value = await fixtureValue(probe, mutations[probe.table].column);
+        check(
+          `control: probe payload for ${probe.table} is structurally valid`,
+          !error && value !== undefined,
+          error?.message,
+        );
+        original.set(probe.table, value);
+        fixtures.push(probe);
+        if (["cultivars", "cultivar_guides", "cultivar_guide_sections"].includes(probe.table)) {
+          fixtureIds[probe.table] = await fixtureId(probe);
+          if (!fixtureIds[probe.table]) {
+            throw new Error(`control fixture ${probe.table} has no readable id`);
+          }
+        }
+      }
+      // Staging tables have no client SELECT at all; every other fixture must
+      // be readable by both client roles before its mutation probe counts.
+      const STAGING_TABLES = new Set(["cultivar_import_batches", "cultivar_import_rows"]);
       for (const [label, client] of [
         ["anon", anonymous],
         ["authenticated", authenticated],
       ] as const) {
+        for (const probe of fixtures) {
+          if (!STAGING_TABLES.has(probe.table)) {
+            const { data, error } = await client.from(probe.table).select("*").match(probe.match);
+            check(
+              `${label} can read the ${probe.table} fixture it then tries to mutate`,
+              !error && (data ?? []).length === 1,
+              error?.message ?? `visible rows: ${(data ?? []).length}`,
+            );
+          }
+        }
         for (const probe of fixtures) {
           const { column, value } = mutations[probe.table];
           await client
@@ -721,7 +784,8 @@ async function main() {
       }
     } finally {
       for (const probe of [...fixtures].reverse()) {
-        await admin.from(probe.table).delete().match(probe.match);
+        const { error } = await admin.from(probe.table).delete().match(probe.match);
+        check(`teardown removes the ${probe.table} control fixture`, !error, error?.message);
       }
     }
     await auditAs("anon after write attempts", anonymous);

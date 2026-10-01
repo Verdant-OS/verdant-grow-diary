@@ -13,7 +13,7 @@
  *       Reads the published surface through PostgREST with the PUBLISHABLE /
  *       anon key only (SUPABASE_URL + SUPABASE_ANON_KEY or
  *       VITE_SUPABASE_URL + VITE_SUPABASE_PUBLISHABLE_KEY). This is the
- *       preview/production deployment receipt: it proves the anon key can read
+ *       production deployment receipt: it proves the anon key can read
  *       the published surface with exact approved parity. It does NOT prove
  *       hidden rows are unreadable (its queries filter to published rows);
  *       that is the RLS harness's job. Never pass a service-role key.

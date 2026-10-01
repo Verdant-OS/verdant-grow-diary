@@ -72,6 +72,12 @@ state. Draft, archived, `community`, and `ai_draft` rows never render.
 
 ## Gates and deployment receipt
 
+Verdant is **production only**: there is no sandbox, staging, or preview database or build
+(`AGENTS.md`, Release and Environment Rules; `docs/production-only-verification-runbook.md`).
+Local and CI replays validate code, not production. Every hosted step below targets
+production (`https://verdantgrowdiary.com`) and is read-only except the owner's apply and
+the owner-approved flag change.
+
 Run each step in order. Record the command output as the receipt. Do not skip ahead.
 
 1. **Code review and focused gates.** Typecheck, targeted tests, the migration safety
@@ -82,12 +88,14 @@ Run each step in order. Record the command output as the receipt. Do not skip ah
    authenticated user, re-applies the migration to prove idempotency, confirms that
    drafts, archived rows, draft guide versions, and import staging stay hidden, and
    confirms that client writes are rejected.
-3. **Sandbox/preview apply.** Apply the migration to a sandbox or preview database
-   through the operator's reviewed apply path. Never hot-edit tables.
-4. **Preview receipt (read-only, anon key only):**
+3. **Production apply — owner-controlled.** After the PR merges through the normal merge
+   gate, Matthew applies the migration to production through his own reviewed apply path.
+   No agent applies it, and no table is hot-edited. With the flag still off, the public
+   pages keep rendering the bundled library, so the apply alone changes nothing visible.
+4. **Production receipt (read-only, publishable/anon key only):**
 
    ```bash
-   SUPABASE_URL=<preview url> SUPABASE_ANON_KEY=<preview publishable key> \
+   SUPABASE_URL=<production url> SUPABASE_ANON_KEY=<production publishable key> \
      bun run audit:cultivar-db-parity -- --source=supabase --strict
    ```
 
@@ -95,7 +103,7 @@ Run each step in order. Record the command output as the receipt. Do not skip ah
    cannabinoid claims, 50 profile sources, 140 sections, and 14 sources. The script
    refuses to run with the service-role key.
 
-5. **Operator verification queries** (read-only, run as the operator):
+5. **Owner verification queries** (read-only, run by the owner against production):
 
    ```sql
    select count(*) from public.cultivars where publication_status = 'published';          -- 10
@@ -110,15 +118,18 @@ Run each step in order. Record the command output as the receipt. Do not skip ah
      where table_name = 'cultivar_profile_sources' and grantee in ('anon', 'authenticated'); -- SELECT only
    ```
 
-6. **Enable the flag in a preview build** and smoke `/cultivars`, several slugs (including
-   `sour-stomper` and `oreoz`), alias search (`gorilla glue #4`, `dosi`), an unknown slug,
-   the forced error state, and the page SEO.
-7. **Production apply** under a reviewed deployment plan, then re-run step 4 against
-   production.
-8. **Enable production reads** (`cultivarDatabaseReadsEnabled = true`) only after the
-   production receipt is green. Then re-read `version.json` and record the deploy.
+6. **Enable reads** (`cultivarDatabaseReadsEnabled = true`) in a separate, reviewed PR, only
+   after steps 4 and 5 are green. That PR runs the strain gate (the flag file is a trigger
+   path) and the normal merge gate; publishing it stays with Matthew.
+7. **Production smoke (read-only, after that deploy).** Re-read `version.json` and record the
+   frontend identity. Then, on `https://verdantgrowdiary.com`, confirm
+   `data-cultivar-source-state="database"` on `/cultivars` and several slugs (including
+   `sour-stomper` and `oreoz`), alias search (`gorilla glue #4`, `dosi`), the unknown-slug
+   redirect, and the page SEO. These are public reads: no sign-in and no smoke write are
+   needed. Re-run step 4 and record it with the smoke receipt.
 
-Current gate state: step 1 is in review. Steps 2–8 are `NOT_MEASURED`.
+Current gate state: step 1 is in review; step 2 passed in CI at `a73dbfb40`. Steps 3–7 are
+`NOT_MEASURED`.
 
 ## Rollback
 

@@ -187,11 +187,15 @@ agent from one written block.
   A valid claim takes effect when posted: from then on you hold the branch and the
   previous holder stops pushing. The effective claim is the current `claimed_by` and
   counts toward the block's last activity; carry it into the block at the next log
-  update. Fetch the branch and confirm `git rev-parse origin/<branch>` matches the
-  block's head SHA; if it differs, stop and reconcile with the effective claim. Then
-  check out the branch and run `git merge --ff-only origin/<branch>`, so a stale local
-  copy cannot stand in for the recorded head; if the fast-forward fails, stop and
-  reconcile. Only then run the block's checkout command, which ends with the base merge,
+  update. Fetch the branch and compare `git rev-parse origin/<branch>` with the
+  block's head SHA. If they match, continue. If the remote is ahead (the PR's current
+  head equals `origin/<branch>` and `git merge-base --is-ancestor <head_sha>
+  origin/<branch>` succeeds), the previous holder pushed after the last log update:
+  adopt that remote head, name it in your claim comment, and record it at the next log
+  update. If the remote has diverged from or rewritten the recorded head, stop and
+  reconcile with the effective claim. Then check out the branch and run
+  `git merge --ff-only origin/<branch>`, so a stale local copy cannot stand in for the
+  remote head; if the fast-forward fails, stop and reconcile. Only then run the block's checkout command, which ends with the base merge,
   and continue on the same branch. Never rename, recreate, or force-push it.
 - **Coverage on startup.** Read `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK`
   and truthfully record `open_handoffs_checked`. After the acknowledgment, keep an

@@ -257,6 +257,8 @@ export interface CultivarDatabaseMapResult {
   aliasRecordsBySlug: Readonly<Record<string, readonly CultivarDatabaseAliasRecord[]>>;
   /** Stored-but-not-rendered claims (chemotype, dominant terpenes, unknown traits). */
   auxiliaryClaimsBySlug: Readonly<Record<string, readonly CultivarDatabaseAuxiliaryClaim[]>>;
+  /** verified_at of every rendered (terpene/cannabinoid) claim, per slug, keyed by renderedClaimKey(). */
+  renderedClaimVerifiedAtBySlug: Readonly<Record<string, Readonly<Record<string, string | null>>>>;
   /** Normalized section→source links (`cultivar_guide_section_sources`), per slug. */
   sectionSourceKeysBySlug: Readonly<
     Record<string, Readonly<Partial<Record<CultivarGuideSectionKey, readonly string[]>>>>
@@ -574,6 +576,13 @@ interface MappedClaims {
   terpeneClaims: CultivarTerpeneClaim[];
   cannabinoidClaims: CultivarCannabinoidClaim[];
   auxiliary: CultivarDatabaseAuxiliaryClaim[];
+  /** verified_at of every rendered claim, keyed by renderedClaimKey(). */
+  renderedVerifiedAt: Record<string, string | null>;
+}
+
+/** Stable key for a rendered claim: terpene claims by name, cannabinoid claims by trait. */
+export function renderedClaimKey(traitKey: string, valueText: string | null): string {
+  return traitKey === CULTIVAR_TERPENE_TRAIT ? `terpene:${valueText ?? ""}` : traitKey;
 }
 
 function mapClaims(
@@ -587,6 +596,7 @@ function mapClaims(
   const cannabinoids: CultivarCannabinoidClaim[] = [];
   const auxiliary: CultivarDatabaseAuxiliaryClaim[] = [];
   const seenCannabinoidTraits = new Set<string>();
+  const renderedVerifiedAt: Record<string, string | null> = {};
 
   for (const row of rows) {
     const read = new RowReader(row, slug, "cultivar_claims", issues);
@@ -648,6 +658,9 @@ function mapClaims(
         read.fail("unit", `terpene claim unit ${JSON.stringify(unit)} is not "%"`);
         continue;
       }
+      const terpeneVerifiedAt = read.nullableTimestamp("verified_at");
+      if (terpeneVerifiedAt === undefined) continue;
+      renderedVerifiedAt[renderedClaimKey(traitKey, terpene)] = terpeneVerifiedAt;
       terpenes.push({
         terpene,
         rank: detail.rank,
@@ -709,6 +722,9 @@ function mapClaims(
         continue;
       }
       seenCannabinoidTraits.add(traitKey);
+      const cannabinoidVerifiedAt = read.nullableTimestamp("verified_at");
+      if (cannabinoidVerifiedAt === undefined) continue;
+      renderedVerifiedAt[renderedClaimKey(traitKey, null)] = cannabinoidVerifiedAt;
       cannabinoids.push({
         cannabinoid: cannabinoidTrait.cannabinoid,
         label: cannabinoidTrait.label,
@@ -759,7 +775,12 @@ function mapClaims(
     (a, b) =>
       compareText(a.traitKey, b.traitKey) || compareText(a.valueText ?? "", b.valueText ?? ""),
   );
-  return { terpeneClaims: terpenes, cannabinoidClaims: cannabinoids, auxiliary };
+  return {
+    terpeneClaims: terpenes,
+    cannabinoidClaims: cannabinoids,
+    auxiliary,
+    renderedVerifiedAt,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -809,6 +830,7 @@ export function mapCultivarDatabaseSnapshot(
   const sourcesBySlug: Record<string, readonly CultivarSource[]> = {};
   const aliasRecordsBySlug: Record<string, readonly CultivarDatabaseAliasRecord[]> = {};
   const auxiliaryClaimsBySlug: Record<string, readonly CultivarDatabaseAuxiliaryClaim[]> = {};
+  const renderedClaimVerifiedAtBySlug: Record<string, Record<string, string | null>> = {};
   const guideMetadataBySlug: Record<string, CultivarDatabaseGuideMetadata> = {};
   const sectionMetadataBySlug: Record<
     string,
@@ -1175,6 +1197,7 @@ export function mapCultivarDatabaseSnapshot(
       sourceKey,
     }));
     auxiliaryClaimsBySlug[slug] = claims.auxiliary;
+    renderedClaimVerifiedAtBySlug[slug] = claims.renderedVerifiedAt;
     sectionSourceKeysBySlug[slug] = sectionSourceKeys;
     if (guideMetadata) guideMetadataBySlug[slug] = guideMetadata;
     sectionMetadataBySlug[slug] = sectionMetadata;
@@ -1191,6 +1214,7 @@ export function mapCultivarDatabaseSnapshot(
     },
     aliasRecordsBySlug,
     auxiliaryClaimsBySlug,
+    renderedClaimVerifiedAtBySlug,
     sectionSourceKeysBySlug,
     guideMetadataBySlug,
     sectionMetadataBySlug,

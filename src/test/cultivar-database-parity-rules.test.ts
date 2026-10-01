@@ -332,6 +332,24 @@ describe("cultivar database parity — blocked content", () => {
     );
   });
 
+  it("fails rendered claims whose verified_at drifted", () => {
+    const snapshot = freshSnapshot();
+    const terpene = claimRows(snapshot, "gg4", "terpene").find(
+      (row) => row.value_text === "beta-caryophyllene",
+    );
+    if (!terpene) throw new Error("terpene");
+    terpene.verified_at = "1999-01-01T00:00:00Z";
+    claimRows(snapshot, "gg4", "reported_thc_pct")[0].verified_at = "1999-01-01T00:00:00Z";
+    const report = audit(snapshot);
+    expect(report.status).toBe("blocked");
+    expect(paths(report)).toEqual(
+      expect.arrayContaining([
+        "changed gg4 claimVerifiedAt.terpene:beta-caryophyllene",
+        "changed gg4 claimVerifiedAt.reported_thc_pct",
+      ]),
+    );
+  });
+
   it("fails an extra readable source outside the approved catalog", () => {
     const snapshot = freshSnapshot();
     snapshot.cultivar_sources.push({

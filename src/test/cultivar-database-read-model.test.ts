@@ -359,6 +359,21 @@ describe("cultivar database read model — fails closed", () => {
     expect(slugs(note)).not.toContain("oreoz");
   });
 
+  it("refuses rendered claims with a malformed verified_at", () => {
+    for (const trait of ["terpene", "reported_thc_pct"]) {
+      const snapshot = freshSnapshot();
+      const claim = snapshot.cultivar_claims.find(
+        (item) => item.cultivar_id === row(snapshot, "gg4").id && item.trait_key === trait,
+      );
+      if (!claim) throw new Error(trait);
+      claim.verified_at = "not-a-date";
+      expect(map(snapshot).issues).toContainEqual(
+        expect.objectContaining({ slug: "gg4", path: "cultivar_claims.verified_at" }),
+      );
+      expect(slugs(snapshot)).not.toContain("gg4");
+    }
+  });
+
   it("refuses claims citing an unreadable source", () => {
     const snapshot = freshSnapshot();
     const claim = snapshot.cultivar_claims.find(

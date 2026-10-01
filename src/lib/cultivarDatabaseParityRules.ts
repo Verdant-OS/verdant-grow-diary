@@ -21,6 +21,7 @@ import {
   CULTIVAR_AUXILIARY_TRAITS,
   mapCultivarDatabaseSnapshot,
   normalizeCultivarAliasForDatabase,
+  renderedClaimKey,
   type CultivarDatabaseAuxiliaryClaim,
   type CultivarDatabaseSnapshot,
 } from "@/lib/cultivarDatabaseReadModel";
@@ -288,6 +289,26 @@ export function auditCultivarDatabaseParity(input: CultivarParityInput): Cultiva
           ]),
         ),
         mapped.sectionMetadataBySlug[slug] ?? {},
+        issues,
+      );
+    }
+
+    // Every rendered claim's verified_at must match the approved row.
+    if (approved) {
+      const expectedVerifiedAt: Record<string, string | null> = {};
+      for (const claim of approved.claims) {
+        if (claim.trait_key === "chemotype" || claim.trait_key === "reported_dominant_terpenes") {
+          continue;
+        }
+        expectedVerifiedAt[renderedClaimKey(claim.trait_key, claim.value_text)] = isoOrNull(
+          claim.verified_at,
+        );
+      }
+      diffValues(
+        slug,
+        "claimVerifiedAt",
+        expectedVerifiedAt,
+        mapped.renderedClaimVerifiedAtBySlug[slug] ?? {},
         issues,
       );
     }

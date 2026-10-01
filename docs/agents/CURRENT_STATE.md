@@ -2,7 +2,7 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T16:43 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T16:45 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
@@ -69,16 +69,17 @@ this entry's earlier 2026-10-01 versions.
     denial (that stays with the harness).
   - One P1 claim ("missing `END;` breaks the migration") was **refuted with CI evidence**.
 - **CI DB evidence (`established fact`):** Security DB Local passed on `de12624a2`, `1b66c4f0e`,
-  `d30ac3293`, `42ad20a74`, `d65094aa9`, `a7232e1e1` and `dac35e4fc`.
+  `d30ac3293`, `42ad20a74`, `d65094aa9`, `a7232e1e1`, `dac35e4fc` and `358d69c38`.
   - The expanded harness `test:cultivar-reference-db-security` reported **106 passed, 0 failed**
     at `42ad20a74`, `d65094aa9`, `a7232e1e1` (run `36886278180`, the re-dated migration) and
     `dac35e4fc` (run `36888191319`).
   - Each run used a freshly replayed local database, with strict parity READY and migration
     re-apply idempotency.
   - The runs on `0bcb2464d` and `9ca178156` were cancelled by later pushes.
-  - **None of this evidence covers `358d69c38`** (row-level parity, template link, one-line payload
-    change). Its run (`36892553425`) was **in progress** at 16:43 UTC; until it completes, the
-    row-level check against a real database is `NOT_MEASURED`.
+  - **At `358d69c38` (exact head): `PASS`.** Run `36892553425` reported **113 passed, 0 failed**.
+    It is the first real-database run of the row-level parity check, the base-template link, the
+    template-table write probes and the one-line payload change. Strict parity READY as anon and
+    as authenticated, and migration re-apply idempotent.
 - **Local evidence (`established fact`, Windows clone):**
   - offline strict parity READY 10/10 at `358d69c38`;
   - at `358d69c38`, the PR's tests plus every migration-scanning test: 1,542 passed, with 1 file

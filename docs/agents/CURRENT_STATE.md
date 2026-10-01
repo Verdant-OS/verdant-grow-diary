@@ -16,10 +16,12 @@ this entry's earlier 2026-10-01 versions.
 - **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` and again at `69f2f5b23` (2026-10-01,
   no conflicts). The first brought `#1832` (hono pin), which clears the earlier
   `Dependency & Security CI` red; the second brought `#1836`.
-- **`Published migration integrity` is green:** the earlier red ran on `d65094aa9`, before `#1836`
-  was merged in, and read `#1836`'s migration as "deleted". CI then passed on `a7232e1e1` (run
-  `36886278227`), `dac35e4fc` (run `36888190685`) and `9ca178156` (run `36890471647`). The run on
-  `358d69c38` is queued.
+- **`Published migration integrity` at `358d69c38`: `NOT_MEASURED`** — its CI run (`36892553063`)
+  is queued, and this head changed the migration payload, so earlier passes do not cover it.
+  - Historical, earlier heads only: the red on `d65094aa9` ran before `#1836` was merged in and
+    read `#1836`'s migration as "deleted". CI then passed on `a7232e1e1` (run `36886278227`),
+    `dac35e4fc` (run `36888190685`) and `9ca178156` (run `36890471647`).
+  - Local verifier at `358d69c38` against `origin/verdant-grow-diary`: OK (not a CI receipt).
 - **`Vercel` red is an account block, not code:** status "Account is blocked"; Vercel created **no
   deployment** for any branch commit since `1b66c4f0e`, while the six before it deployed `READY`.
   Not a required context. Clearing it is an owner action in the Vercel dashboard

@@ -113,8 +113,9 @@ export function resolveStarterWaterReceiptTarget(
   child: WaterChild | null | undefined,
   expectedTarget: QuickLogResolvedTarget,
 ): { target: QuickLogResolvedTarget; contextChanged: boolean } | null {
+  // A null occurrence time is the server-assigned contract; the matcher
+  // already skips the time comparison in that case.
   if (
-    payload.p_occurred_at === null ||
     !matchesReusedWaterReceipt(payload, eventId, event, child) ||
     event?.plant_id !== expectedTarget.plantId ||
     !isUuid(event.grow_id) ||

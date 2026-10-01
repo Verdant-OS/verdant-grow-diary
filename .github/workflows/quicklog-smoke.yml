@@ -517,6 +517,9 @@ jobs:
       E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: ${{ vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT }}
       # Optional, off by default. Enables the UI-only fixture bootstrap step.
       E2E_ALLOW_FIXTURE_BOOTSTRAP: ${{ vars.E2E_ALLOW_FIXTURE_BOOTSTRAP }}
+      # "true" only on the daily schedule: no person is present, so the smoke
+      # blocks on agreement re-consent instead of accepting it (#1852).
+      E2E_UNATTENDED_RUN: ${{ github.event_name == 'schedule' }}
       # Performance evidence is one first attempt, never a retry success.
       E2E_MEASURE_SIGNED_IN_PERFORMANCE: "true"
       PLAYWRIGHT_RETRIES: "0"
@@ -668,7 +671,8 @@ jobs:
       # NOT required — fixture verification still runs and gates the smoke.
       - name: Bootstrap disposable E2E fixture
         id: bootstrap_fixture
-        if: steps.e2e_config.outputs.should_run == 'true' && vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'
+        # Never on the unattended schedule: it may only make the two tagged saves.
+        if: steps.e2e_config.outputs.should_run == 'true' && vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true' && github.event_name != 'schedule'
         env:
           E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
           E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}

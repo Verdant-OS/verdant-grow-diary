@@ -34,7 +34,10 @@ Because of this:
   only.** The owner accepted the current fixture as disposable on
   2026-10-01 (#1852), so the workflow runs once a day (09:17 UTC) on the
   deploy branch tip, making two tagged saves. Every other run is manual,
-  push or pull request. Never point a scheduled run at a real grow.
+  push or pull request. Never point a scheduled run at a real grow. A
+  scheduled run has no person present: it never accepts an agreement
+  re-consent (it stops with BLOCKED; run an owner dispatch to accept) and
+  never runs the fixture bootstrap.
 - No automatic data cleanup, deletion, or mutation of existing grow data
   happens outside the intentional Quick Log save flow itself.
 

@@ -10,7 +10,10 @@ import {
   CULTIVAR_REFERENCE_SOURCE_COPY,
   cultivarReferenceSourceNotice,
 } from "@/constants/cultivarReferenceSourceCopy";
-import type { CultivarDatabaseSnapshot } from "@/lib/cultivarDatabaseReadModel";
+import {
+  mapCultivarDatabaseSnapshot,
+  type CultivarDatabaseSnapshot,
+} from "@/lib/cultivarDatabaseReadModel";
 import {
   buildCultivarDatabaseSeedPayload,
   cultivarSeedPayloadToSnapshot,
@@ -229,6 +232,53 @@ describe("cultivar reference source resolution", () => {
     expect(cultivarReferenceSourceNotice(resolution.reason)).toBe(
       CULTIVAR_REFERENCE_SOURCE_COPY.database_incomplete,
     );
+  });
+
+  it.each([
+    ["every claim row", "cultivar_claims"],
+    ["every alias row", "cultivar_aliases"],
+  ] as const)("falls back when an approved cultivar loses %s", (_label, table) => {
+    const data = snapshot() as unknown as Record<string, Record<string, unknown>[]>;
+    const gg4 = data.cultivars.find((row) => row.slug === "gg4");
+    if (!gg4) throw new Error("gg4");
+    const before = data[table].length;
+    data[table] = data[table].filter((row) => row.cultivar_id !== gg4.id);
+    expect(data[table].length).toBeLessThan(before);
+    const resolution = resolveCultivarReferenceSource({
+      databaseReadsEnabled: true,
+      query: {
+        status: "success",
+        result: { ok: true, snapshot: data as unknown as CultivarDatabaseSnapshot },
+      },
+    });
+    expect(resolution).toMatchObject({ state: "bundled_fallback", reason: "database_incomplete" });
+    expect(resolution.catalog).toBe(BUNDLED_CULTIVAR_CATALOG);
+  });
+
+  it("falls back when an approved cultivar's last-ranked terpene claim is deleted", () => {
+    // Removing the LAST rank leaves ranks 1..n-1 gap-free, so the read model
+    // accepts it; only the completeness gate notices the missing evidence.
+    const data = snapshot() as unknown as Record<string, Record<string, unknown>[]>;
+    const gg4 = data.cultivars.find((row) => row.slug === "gg4");
+    if (!gg4) throw new Error("gg4");
+    const terpenes = data.cultivar_claims.filter(
+      (row) => row.cultivar_id === gg4.id && row.trait_key === "terpene",
+    );
+    const rank = (row: Record<string, unknown>) =>
+      Number((row.value_jsonb as { rank?: number } | null)?.rank);
+    const last = terpenes.reduce((a, b) => (rank(b) > rank(a) ? b : a));
+    data.cultivar_claims = data.cultivar_claims.filter((row) => row !== last);
+    expect(mapCultivarDatabaseSnapshot(data as unknown as CultivarDatabaseSnapshot).issues).toEqual(
+      [],
+    );
+    const resolution = resolveCultivarReferenceSource({
+      databaseReadsEnabled: true,
+      query: {
+        status: "success",
+        result: { ok: true, snapshot: data as unknown as CultivarDatabaseSnapshot },
+      },
+    });
+    expect(resolution).toMatchObject({ state: "bundled_fallback", reason: "database_incomplete" });
   });
 
   it("falls back when the database publishes a profile outside the approved set", () => {

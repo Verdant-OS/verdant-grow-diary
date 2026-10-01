@@ -78,6 +78,42 @@ export function buildDatabaseCultivarCatalog(
   });
 }
 
+/**
+ * The approved child records a database profile must still carry: every
+ * bundled claim, alias, source, section and dominant terpene, by identity.
+ * Content may be edited in the database; approved evidence may not vanish.
+ */
+function approvedRecordKeys(
+  profile: VerdantCultivarProfile,
+  sections: readonly CultivarGuideSection[],
+  sources: readonly CultivarSource[],
+): string[] {
+  return [
+    ...profile.terpeneClaims.map((claim) => `terpene:${claim.terpene}`),
+    ...profile.cannabinoidClaims.map((claim) => `cannabinoid:${claim.cannabinoid}`),
+    ...profile.dominantTerpenes.map((terpene) => `dominant:${terpene}`),
+    ...profile.aliases.map((alias) => `alias:${alias}`),
+    ...sources.map((source) => `source:${source.key}`),
+    ...sections.map((section) => `section:${section.key}`),
+  ];
+}
+
+/** True when every approved profile still carries all of its approved child records. */
+function carriesApprovedRecords(database: CultivarReferenceCatalog): boolean {
+  return VERDANT_CULTIVARS.every((approved) => {
+    const actual = database.findBySlug(approved.slug);
+    if (!actual) return false;
+    const present = new Set(
+      approvedRecordKeys(actual, database.sectionsFor(actual), database.sourcesFor(actual)),
+    );
+    return approvedRecordKeys(
+      approved,
+      getCultivarGuideSections(approved),
+      getCultivarSources(approved),
+    ).every((key) => present.has(key));
+  });
+}
+
 function fallback(
   state: CultivarReferenceSourceState,
   reason: CultivarReferenceSourceReason,
@@ -112,10 +148,11 @@ export function resolveCultivarReferenceSource(input: {
   if (mapped.catalog.profiles.some((profile) => !BUNDLED_BY_SLUG.has(profile.slug))) {
     return fallback("bundled_fallback", "database_unapproved");
   }
-  return {
-    state: "database",
-    reason: null,
-    catalog: buildDatabaseCultivarCatalog(mapped.catalog),
-    refusedRowIssues: 0,
-  };
+  // Slug parity is not enough: a profile whose claim or alias rows were
+  // deleted still maps cleanly, so it must also carry every approved record.
+  const catalog = buildDatabaseCultivarCatalog(mapped.catalog);
+  if (!carriesApprovedRecords(catalog)) {
+    return fallback("bundled_fallback", "database_incomplete");
+  }
+  return { state: "database", reason: null, catalog, refusedRowIssues: 0 };
 }

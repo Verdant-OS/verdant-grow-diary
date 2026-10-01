@@ -162,26 +162,6 @@ claimed_by: Codex, 2026-09-29 00:00 CT (implementation resumed after next-day bo
 last_updated: 2026-09-29 00:21 CT, by Codex
 ```
 
-### CHEM-SIGNEDIN-PERFORMANCE-001
-
-```text
-TASK CHEM-SIGNEDIN-PERFORMANCE-001  priority: P2  status: OPEN
-goal: Add exact-live-SHA signed-in performance evidence for Dashboard, Timeline, Sensors and the existing Quick Log save confirmation without adding writes or inventing speed budgets.
-branch: claude/1793-signedin-performance-reland (re-land of codex/chem-signedin-performance-001, which stays unmerged)
-base: verdant-grow-diary
-checkout: git fetch origin claude/1793-signedin-performance-reland verdant-grow-diary && git switch claude/1793-signedin-performance-reland && git merge --ff-only origin/claude/1793-signedin-performance-reland && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1849 (re-land); superseded https://github.com/Verdant-OS/verdant-grow-diary/pull/1793 closes when #1849 merges
-head_sha: c2d473e8e3acf03df521ed9f46b0ec6a2e479ffc, remote-confirmed 2026-10-01 13:35 CT. #1849 starts at #1793's head 074f434949de6dcc74970a9f9a563d652f55b642 plus one normal base merge. Earlier #1793 head 35e7def6 is historical
-state: Pushed draft eight files(+1728/-6). Final7 focused files293 PASS / 0 FAIL / 0 SKIP includes112 extension cases and V0/photo-parser coverage; previous totals overlap. Canonical/E2E typechecks zero diagnostics, changed-three-file lint zero errors/warnings, format/whitespace PASS; current synthetic Chromium5/5, receiver writes0. Source-contract photo display read limited to exact signing endpoint, fixed3600 expiry, unique1–100 positively proved fixture-owned paths and complete successful response. All uploads/deletes/unapproved POST/RPC/WebSockets blocked. Signed tokens and paths never enter receipts. Source auth/application/Supabase untouched, parent guard/Quick Log integration unchanged.
-next_action: #1849 was owner-accepted at c2d473e8e (2026-10-01 13:05 CT) and is in the merge queue. When it merges, close #1793 as superseded and close this block. Earlier plan, now historical: Critical Mass reviews exact 35e7def6; GDP integrates the parent then the normal-retargeted child. Codex continues separate core-loop and AI credit-limit proof. Do not equate three control-readiness measurements with full feature, saved-value or production infrastructure acceptance.
-files: Closed extension: e2e/lib/signedInPerformanceRules.ts; e2e/lib/signedInPerformanceProbe.ts; e2e/lib/signedInReadonlyProof.ts (new); e2e/signed-in-performance.spec.ts; src/test/signed-in-performance-proof.test.ts; src/test/signed-in-readonly-proof.test.ts (new); .github/workflows/signed-in-readonly-performance.yml (new). Existing e2e/quicklog-smoke.spec.ts change stays unchanged. Parent fixture guard, auth bootstrap, application code, CI variables/secrets and database paths are excluded.
-blockers: Current supplemental timing run36536846789/job109302743684 PASS:219 hosted safety tests and4 browser cases, zero failures/skips/retries. App61821446; Dashboard1447.4758849999998ms, Timeline1912.6403689999997ms, Sensors1355.4961920000005ms readiness PASS. All blocked counts0; Timeline completed one fixture-owned photo-sign read. All35 required Main contexts absent on stack, independent acceptance NOT_MEASURED; Quick Log save BLOCKED archived plant. Speed budget/full-data/core-loop/schema/Edge acceptance NOT_MEASURED. Predecessor failures retained.
-artifacts: Downloads CHEM-performance-readonly-2026-09-29.md and baseline/final regression/typecheck/E2E-typecheck/lint/discovery/browser-barrier logs; older CHEM-signedin-performance-2026-09-28-2330CT.md retained. Full 70 open head/base pairs refreshed before push with no drift; only this draft overlaps existing performance paths, parent Quick Log overlap unchanged. No held branch or competing implementation touched.
-reviewer_seat: Critical Mass (tests-only .ts performance evidence); Blue Dream retains #1792 P1 parent
-claimed_by: Claude, 2026-10-01 11:53 CT (owner: "take over #1793"); previously Codex, 2026-09-28 23:21 CT
-last_updated: 2026-10-01 13:36 CT, by Claude. #1849 changes against #1793 (all on the PR): it removed the unreachable matt@ owner QA fixture (owner option (a)); it dropped the duplicate undici pins the deploy branch already carries (TS1117); it added scripts/wait-for-deployed-sha.mjs so production probes wait for the pinned SHA (Codex P1); and it widened the read-only workflow's push paths to src/** and build inputs (Codex P2). The Quick Log smoke push cadence is kept by owner option (b) and tracked in #1852. Earlier Codex entry: 2026-09-29 02:31 CT, by Codex. Artifact11019051579 downloaded/digest5934f74e3b19d051867fcc94a6ce5c7c7f1fb0a39712d5eab833364416b3e496 verified. Full70-head check inventory:58 required35SUCCESS,43 any-latest-FAIL,1pending (overlapping counts). Assigned repair set12required-green/1orphan. No other-owner/deploy drift, no forbidden mutation or authority change. Full goal active.
-```
-
 ### CHEM-REQUIRED-AUDIT-PR-EVIDENCE-001
 
 ```text
@@ -714,6 +694,27 @@ last_updated: 2026-09-28 23:53 CT, by Codex
 ```
 
 ## Closed
+
+### CHEM-SIGNEDIN-PERFORMANCE-001
+
+```text
+TASK CHEM-SIGNEDIN-PERFORMANCE-001  priority: P2  status: CLOSED
+goal: Add exact-live-SHA signed-in performance evidence for Dashboard, Timeline, Sensors and the existing Quick Log save confirmation without adding writes or inventing speed budgets.
+branch: claude/1793-signedin-performance-reland (re-land of codex/chem-signedin-performance-001, which stays unmerged)
+base: verdant-grow-diary
+checkout: git fetch origin claude/1793-signedin-performance-reland verdant-grow-diary && git switch claude/1793-signedin-performance-reland && git merge --ff-only origin/claude/1793-signedin-performance-reland && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1849 (re-land, merged); https://github.com/Verdant-OS/verdant-grow-diary/pull/1793 (closed as superseded)
+head_sha: c2d473e8e3acf03df521ed9f46b0ec6a2e479ffc, remote-confirmed 2026-10-01 13:35 CT. #1849 starts at #1793's head 074f434949de6dcc74970a9f9a563d652f55b642 plus one normal base merge. Earlier #1793 head 35e7def6 is historical
+state: Pushed draft eight files(+1728/-6). Final7 focused files293 PASS / 0 FAIL / 0 SKIP includes112 extension cases and V0/photo-parser coverage; previous totals overlap. Canonical/E2E typechecks zero diagnostics, changed-three-file lint zero errors/warnings, format/whitespace PASS; current synthetic Chromium5/5, receiver writes0. Source-contract photo display read limited to exact signing endpoint, fixed3600 expiry, unique1–100 positively proved fixture-owned paths and complete successful response. All uploads/deletes/unapproved POST/RPC/WebSockets blocked. Signed tokens and paths never enter receipts. Source auth/application/Supabase untouched, parent guard/Quick Log integration unchanged.
+next_action: None; closed. #1849 was owner-accepted at c2d473e8e (2026-10-01 13:05 CT) and merged. Earlier plan, now historical: Critical Mass reviews exact 35e7def6; GDP integrates the parent then the normal-retargeted child. Codex continues separate core-loop and AI credit-limit proof. Do not equate three control-readiness measurements with full feature, saved-value or production infrastructure acceptance.
+files: Closed extension: e2e/lib/signedInPerformanceRules.ts; e2e/lib/signedInPerformanceProbe.ts; e2e/lib/signedInReadonlyProof.ts (new); e2e/signed-in-performance.spec.ts; src/test/signed-in-performance-proof.test.ts; src/test/signed-in-readonly-proof.test.ts (new); .github/workflows/signed-in-readonly-performance.yml (new). Existing e2e/quicklog-smoke.spec.ts change stays unchanged. Parent fixture guard, auth bootstrap, application code, CI variables/secrets and database paths are excluded.
+blockers: Current supplemental timing run36536846789/job109302743684 PASS:219 hosted safety tests and4 browser cases, zero failures/skips/retries. App61821446; Dashboard1447.4758849999998ms, Timeline1912.6403689999997ms, Sensors1355.4961920000005ms readiness PASS. All blocked counts0; Timeline completed one fixture-owned photo-sign read. All35 required Main contexts absent on stack, independent acceptance NOT_MEASURED; Quick Log save BLOCKED archived plant. Speed budget/full-data/core-loop/schema/Edge acceptance NOT_MEASURED. Predecessor failures retained.
+artifacts: Downloads CHEM-performance-readonly-2026-09-29.md and baseline/final regression/typecheck/E2E-typecheck/lint/discovery/browser-barrier logs; older CHEM-signedin-performance-2026-09-28-2330CT.md retained. Full 70 open head/base pairs refreshed before push with no drift; only this draft overlaps existing performance paths, parent Quick Log overlap unchanged. No held branch or competing implementation touched.
+reviewer_seat: Critical Mass (tests-only .ts performance evidence); Blue Dream retains #1792 P1 parent
+claimed_by: Claude, 2026-10-01 11:53 CT (owner: "take over #1793"); previously Codex, 2026-09-28 23:21 CT
+last_updated: 2026-10-01 13:41 CT, by Claude. Earlier Claude entry (13:36 CT): #1849 changes against #1793 (all on the PR): it removed the unreachable matt@ owner QA fixture (owner option (a)); it dropped the duplicate undici pins the deploy branch already carries (TS1117); it added scripts/wait-for-deployed-sha.mjs so production probes wait for the pinned SHA (Codex P1); and it widened the read-only workflow's push paths to src/** and build inputs (Codex P2). The Quick Log smoke push cadence is kept by owner option (b) and tracked in #1852. Earlier Codex entry: 2026-09-29 02:31 CT, by Codex. Artifact11019051579 downloaded/digest5934f74e3b19d051867fcc94a6ce5c7c7f1fb0a39712d5eab833364416b3e496 verified. Full70-head check inventory:58 required35SUCCESS,43 any-latest-FAIL,1pending (overlapping counts). Assigned repair set12required-green/1orphan. No other-owner/deploy drift, no forbidden mutation or authority change. Full goal active.
+closure: Merged via #1849 as b5d064881b71d6cd04156d9a0b1a355f3ecc0cd2 at 2026-10-01 13:38 CT from owner-accepted head c2d473e8e3acf03df521ed9f46b0ec6a2e479ffc. #1793 is closed as superseded. Production timing receipts remain NOT_MEASURED until a qualifying deploy-branch run; save timing on product pushes waits on #1852. Earlier dated observations above remain historical.
+```
 
 ### SENTINEL-AMENDMENT-2026-09-28.3
 

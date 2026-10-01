@@ -44,6 +44,7 @@ import {
   extractCultivarSeedPayloadFromMigration,
 } from "@/lib/cultivarDatabaseSeedPayloadRules";
 import { fetchPublishedCultivarSnapshot } from "@/lib/cultivarReferenceService";
+import { classifySupabasePublicReadKey } from "@/lib/supabasePublicReadKeyRules";
 
 export const CULTIVAR_PARITY_MIGRATION_PATH =
   "supabase/migrations/20260930200000_strain_reference_library_v1_1_parity.sql";
@@ -95,8 +96,13 @@ async function loadSnapshot(source: string): Promise<CultivarDatabaseSnapshot | 
     console.error("BLOCKED: supabase mode needs SUPABASE_URL and SUPABASE_ANON_KEY (publishable).");
     process.exit(2);
   }
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY && key === process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("REFUSED: the parity receipt must read as anon, never with the service role.");
+  // Decide from the key itself: a service-role or secret key mapped into the
+  // anon variable would bypass RLS and turn the receipt into a false proof.
+  const keyClass = classifySupabasePublicReadKey(key);
+  if (!keyClass.ok) {
+    console.error(
+      `REFUSED: the parity receipt must read as anon with a publishable key (${keyClass.reason}).`,
+    );
     process.exit(2);
   }
   const client = createClient(url, key, {

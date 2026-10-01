@@ -36,6 +36,7 @@ import {
   fetchPublishedCultivarSnapshot,
   type CultivarReferenceReadClient,
 } from "../src/lib/cultivarReferenceService";
+import { classifySupabasePublicReadKey } from "../src/lib/supabasePublicReadKeyRules";
 
 const LOCAL_LANE_FLAG = "--confirm-local-security-lane";
 const MIGRATION = resolve(
@@ -63,6 +64,13 @@ for (const [name, value] of [
     console.error(`[cultivar-reference-rls] BLOCKED — missing ${name}`);
     process.exit(2);
   }
+}
+const anonKeyClass = classifySupabasePublicReadKey(anonKey);
+if (!anonKeyClass.ok) {
+  console.error(
+    `[cultivar-reference-rls] REFUSED — SUPABASE_ANON_KEY is not a public key (${anonKeyClass.reason})`,
+  );
+  process.exit(2);
 }
 const loopback = ["localhost", "127.0.0.1", "::1", "[::1]"];
 if (!loopback.includes(new URL(dbUrl!).hostname.toLowerCase())) {
@@ -173,6 +181,23 @@ async function main() {
     .select("id")
     .eq("source_key", "watts-2021-terpene-genetics")
     .single();
+  const sourceIds = new Map<string, string>();
+  for (const key of [
+    "sour-diesel-public-profile",
+    "og-kush-public-profile",
+    "blue-dream-public-profile",
+  ]) {
+    const { data } = await admin
+      .from("cultivar_sources")
+      .select("id")
+      .eq("source_key", key)
+      .single();
+    if (data) sourceIds.set(key, data.id);
+  }
+  let hiddenCultivarId: string | null = null;
+  let hiddenSectionId: string | null = null;
+  let draftGuideId: string | null = null;
+  let batchId: string | null = null;
   try {
     for (const status of ["draft", "archived"] as const) {
       const slug = `harness-${status}-${runId}`;
@@ -200,13 +225,19 @@ async function main() {
         .select("id")
         .single();
       if (guide) {
-        await admin.from("cultivar_guide_sections").insert({
-          guide_id: guide.id,
-          section_key: "overview",
-          sort_order: 10,
-          content: { title: "Harness" },
-        });
+        const { data: section } = await admin
+          .from("cultivar_guide_sections")
+          .insert({
+            guide_id: guide.id,
+            section_key: "overview",
+            sort_order: 10,
+            content: { title: "Harness" },
+          })
+          .select("id")
+          .single();
+        if (status === "draft") hiddenSectionId = section?.id ?? null;
       }
+      if (status === "draft") hiddenCultivarId = cultivar.id;
       await admin.from("cultivar_aliases").insert({
         cultivar_id: cultivar.id,
         alias: `Harness ${status}`,
@@ -235,7 +266,10 @@ async function main() {
       })
       .select("id")
       .single();
-    if (draftGuide) created.push({ table: "cultivar_guides", column: "id", value: draftGuide.id });
+    if (draftGuide) {
+      created.push({ table: "cultivar_guides", column: "id", value: draftGuide.id });
+      draftGuideId = draftGuide.id;
+    }
     const { data: batch } = await admin
       .from("cultivar_import_batches")
       .insert({ filename: "harness.csv", file_checksum: `harness-${runId}` })
@@ -243,6 +277,7 @@ async function main() {
       .single();
     if (batch) {
       created.push({ table: "cultivar_import_batches", column: "id", value: batch.id });
+      batchId = batch.id;
       await admin
         .from("cultivar_import_rows")
         .insert({ batch_id: batch.id, row_number: 1, raw_payload: {} });
@@ -289,16 +324,154 @@ async function main() {
 
     console.log("→ client writes are rejected on every reference and staging table");
     const probeId = gg4.data?.id ?? "00000000-0000-0000-0000-000000000000";
+    const wattsId = watts.data?.id;
+    if (!wattsId || !hiddenCultivarId || !hiddenSectionId || !draftGuideId || !batchId) {
+      throw new Error("harness setup did not produce every id the insert probes need");
+    }
+    const probeSource: Record<string, string | undefined> = {
+      anon: sourceIds.get("sour-diesel-public-profile"),
+      authenticated: sourceIds.get("og-kush-public-profile"),
+      control: sourceIds.get("blue-dream-public-profile"),
+    };
+    const probeSection: Record<string, string> = {
+      anon: "germination",
+      authenticated: "early_growth",
+      control: "vegetative",
+    };
+    const probeOrdinal: Record<string, number> = { anon: 1, authenticated: 2, control: 3 };
+
+    /**
+     * Structurally valid, harness-owned rows: each satisfies NOT NULL, CHECK,
+     * FK and unique constraints, so a refusal can only come from grants or
+     * RLS. `match` identifies the row for the service-role existence check.
+     */
+    interface InsertProbe {
+      table: string;
+      payload: Record<string, unknown>;
+      match: Record<string, unknown>;
+    }
+    const insertProbes = (label: string): InsertProbe[] => {
+      const tag = `${runId}-${label}`;
+      const source = probeSource[label];
+      const ordinal = probeOrdinal[label];
+      return [
+        {
+          table: "breeders",
+          payload: {
+            name: `Harness ${tag}`,
+            normalized_name: `harness ${tag}`,
+            slug: `harness-${tag}`,
+          },
+          match: { slug: `harness-${tag}` },
+        },
+        {
+          table: "cultivars",
+          payload: {
+            canonical_name: `Harness probe ${tag}`,
+            normalized_name: `harness probe ${tag}`,
+            slug: `harness-probe-${tag}`,
+            description: "Harness probe.",
+            publication_status: "draft",
+          },
+          match: { slug: `harness-probe-${tag}` },
+        },
+        {
+          table: "cultivar_aliases",
+          payload: {
+            cultivar_id: probeId,
+            alias: `Harness ${tag}`,
+            normalized_alias: `harness ${tag}`,
+          },
+          match: { cultivar_id: probeId, normalized_alias: `harness ${tag}` },
+        },
+        {
+          table: "cultivar_sources",
+          payload: {
+            source_key: `harness-${tag}`,
+            title: "Harness probe",
+            publisher: "Harness",
+            url: "https://example.com/harness",
+            source_type: "community",
+            retrieved_at: "2026-01-01T00:00:00Z",
+            license_or_usage_notes: "Harness probe.",
+          },
+          match: { source_key: `harness-${tag}` },
+        },
+        {
+          table: "cultivar_profile_sources",
+          payload: { cultivar_id: hiddenCultivarId, source_id: source, sort_order: 50 + ordinal },
+          match: { cultivar_id: hiddenCultivarId, source_id: source },
+        },
+        {
+          table: "cultivar_claims",
+          payload: {
+            cultivar_id: probeId,
+            trait_key: `harness_probe_${label}_${runId}`,
+            value_text: "probe",
+            source_id: wattsId,
+          },
+          match: { cultivar_id: probeId, trait_key: `harness_probe_${label}_${runId}` },
+        },
+        {
+          table: "cultivar_guides",
+          payload: {
+            cultivar_id: probeId,
+            version: 1000 + ordinal,
+            title: "Harness probe",
+            publication_status: "draft",
+          },
+          match: { cultivar_id: probeId, version: 1000 + ordinal },
+        },
+        {
+          table: "cultivar_guide_sections",
+          payload: {
+            guide_id: draftGuideId,
+            section_key: probeSection[label],
+            sort_order: 20,
+            content: { title: "Harness probe" },
+          },
+          match: { guide_id: draftGuideId, section_key: probeSection[label] },
+        },
+        {
+          table: "cultivar_guide_section_sources",
+          payload: {
+            guide_section_id: hiddenSectionId,
+            source_id: source,
+            support_note: "Harness probe.",
+          },
+          match: { guide_section_id: hiddenSectionId, source_id: source },
+        },
+        {
+          table: "cultivar_import_batches",
+          payload: { filename: "harness-probe.csv", file_checksum: `harness-probe-${tag}` },
+          match: { file_checksum: `harness-probe-${tag}` },
+        },
+        {
+          table: "cultivar_import_rows",
+          payload: { batch_id: batchId, row_number: 10 + ordinal, raw_payload: {} },
+          match: { batch_id: batchId, row_number: 10 + ordinal },
+        },
+      ];
+    };
+
+    const rowExists = async (table: string, match: Record<string, unknown>) => {
+      const { count } = await admin
+        .from(table)
+        .select("*", { count: "exact", head: true })
+        .match(match);
+      return (count ?? 0) > 0;
+    };
+
+    const beforeWrites = await rowCounts();
     for (const [label, client] of [
       ["anon", anonymous],
       ["authenticated", authenticated],
     ] as const) {
-      for (const table of [...CULTIVAR_DATABASE_TABLES, ...IMPORT_TABLES]) {
-        const insert = await client.from(table).insert({}).select();
-        check(
-          `${label} cannot insert into ${table}`,
-          Boolean(insert.error) || (insert.data ?? []).length === 0,
-        );
+      for (const probe of insertProbes(label)) {
+        await client.from(probe.table).insert(probe.payload);
+        const leaked = await rowExists(probe.table, probe.match);
+        check(`${label} cannot insert a valid row into ${probe.table}`, !leaked);
+        if (leaked) await admin.from(probe.table).delete().match(probe.match);
       }
       const update = await client
         .from("cultivars")
@@ -328,6 +501,12 @@ async function main() {
         Boolean(removeLinks.error) || (removeLinks.data ?? []).length === 0,
       );
     }
+    const afterWrites = await rowCounts();
+    check(
+      "client update/delete attempts changed no row count (service-role view)",
+      JSON.stringify(beforeWrites) === JSON.stringify(afterWrites),
+      JSON.stringify({ beforeWrites, afterWrites }),
+    );
     const { data: untouched } = await admin
       .from("cultivars")
       .select("description")
@@ -337,6 +516,19 @@ async function main() {
       "published content is unchanged after write attempts",
       untouched?.description !== "tampered",
     );
+
+    // Control: the same probe shapes DO insert as the service role, so a client
+    // refusal above came from grants/RLS, not from an invalid payload.
+    for (const probe of insertProbes("control")) {
+      const { error } = await admin.from(probe.table).insert(probe.payload);
+      const present = await rowExists(probe.table, probe.match);
+      check(
+        `control: probe payload for ${probe.table} is structurally valid`,
+        !error && present,
+        error?.message,
+      );
+      await admin.from(probe.table).delete().match(probe.match);
+    }
     await auditAs("anon after write attempts", anonymous);
   } finally {
     console.log("→ teardown (service role, harness-owned rows only)");

@@ -200,6 +200,11 @@ describe("guided evidence scope and provenance", () => {
     { value: "" },
     { value: Infinity },
     { metric: "humidity_pct", value: 999 },
+    { metric: "humidity_pct", value: 0 },
+    { metric: "humidity_pct", value: 100 },
+    { metric: "soil_moisture_pct", value: 0 },
+    { metric: "soil_moisture_pct", value: 100 },
+    { metric: "ec", value: 8.001 },
     { metric: "unknown_metric" },
     { metric: "constructor" },
     { tent_id: "other" },
@@ -247,12 +252,27 @@ describe("telemetry metric validity", () => {
       readings: [{ ...row, ...change }],
     }).t1;
 
+  it.each(
+    ["humidity_pct", "soil_moisture_pct"].flatMap((metric) =>
+      [0, 100, "0", "100"].map((value) => ({ metric, value })),
+    ),
+  )("review regression: rejects stuck $metric=$value as evidence", (change) => {
+    expect(telemetry(change)).toBeNull();
+  });
+  it.each([0, 1.2, 8, "1.2"])("review regression: accepts canonical ec=%s", (value) => {
+    const result = telemetry({ metric: "ec", value });
+    expect(result).toEqual({ capturedAt: row.captured_at, source: "live", quality: "ok" });
+    expect(isGuidedChecklistReadingFresh(result, now)).toBe(true);
+  });
+  it.each([-0.001, 8.001, 1200, "1200"])("review regression: rejects invalid ec=%s", (value) => {
+    expect(telemetry({ metric: "ec", value })).toBeNull();
+  });
+
   const bounds = [
     ["temperature_c", ((40 - 32) * 5) / 9, ((110 - 32) * 5) / 9],
-    ["humidity_pct", 0, 100],
     ["vpd_kpa", 0.2, 3],
     ["co2_ppm", 0, 10_000],
-    ["soil_moisture_pct", 0, 100],
+    ["ec", 0, 8],
     ["soil_ec_ms_cm", 0, 8],
     ["soil_ec", 0, 8],
     ["soil_temp_c", ((35 - 32) * 5) / 9, ((100 - 32) * 5) / 9],
@@ -273,6 +293,23 @@ describe("telemetry metric validity", () => {
       valid ? { capturedAt: row.captured_at, source: "live", quality: "ok" } : null,
     );
     expect(isGuidedChecklistReadingFresh(result, now)).toBe(valid);
+  });
+
+  it.each(
+    ["humidity_pct", "soil_moisture_pct"].flatMap((metric) =>
+      [
+        { value: -0.001, valid: false },
+        { value: 0, valid: false },
+        { value: 0.001, valid: true },
+        { value: 99.999, valid: true },
+        { value: 100, valid: false },
+        { value: 100.001, valid: false },
+      ].map((test) => ({ metric, ...test })),
+    ),
+  )("excludes stuck percentage bounds for $metric=$value", ({ metric, value, valid }) => {
+    expect(telemetry({ metric, value })).toEqual(
+      valid ? { capturedAt: row.captured_at, source: "live", quality: "ok" } : null,
+    );
   });
 
   it.each([
@@ -313,10 +350,13 @@ describe("telemetry metric validity", () => {
   ])("rejects missing or nonnumeric humidity: %j", (value) => {
     expect(telemetry({ metric: "humidity_pct", value })).toBeNull();
   });
-  it.each(["999", "-0.001", "100.001"])("validates parsed numeric strings: %s", (value) => {
-    expect(telemetry({ metric: "humidity_pct", value })).toBeNull();
-  });
-  it.each(["0", " 55 ", "100"])("preserves valid numeric-string evidence: %s", (value) => {
+  it.each(["999", "-0.001", "100.001", "0", "100"])(
+    "validates parsed numeric strings: %s",
+    (value) => {
+      expect(telemetry({ metric: "humidity_pct", value })).toBeNull();
+    },
+  );
+  it.each(["0.001", " 55 ", "99.999"])("preserves valid numeric-string evidence: %s", (value) => {
     expect(telemetry({ metric: "humidity_pct", value })).toEqual({
       capturedAt: row.captured_at,
       source: "live",
@@ -338,6 +378,11 @@ describe("telemetry metric validity", () => {
 
   it.each([
     { metric: "humidity_pct", value: 999 },
+    { metric: "humidity_pct", value: 0 },
+    { metric: "humidity_pct", value: 100 },
+    { metric: "soil_moisture_pct", value: 0 },
+    { metric: "soil_moisture_pct", value: 100 },
+    { metric: "ec", value: 8.001 },
     { metric: "unknown_metric", value: 25 },
   ])("keeps the valid telemetry survivor regardless of row order: %j", (invalidMetric) => {
     const valid = Object.freeze({ ...row, captured_at: at(120_000) });
@@ -348,6 +393,20 @@ describe("telemetry metric validity", () => {
     expect(isGuidedChecklistReadingFresh(result.t1, now)).toBe(true);
     expect(selectGuidedChecklistEvidence(args)).toEqual(result);
     expect(selectGuidedChecklistEvidence({ ...args, readings: [invalid, valid] })).toEqual(result);
+  });
+  it("preserves valid canonical EC as the survivor of newer stuck percentages", () => {
+    const ec = { ...row, metric: "ec", value: 1.2, captured_at: at(120_000) };
+    const readings = [
+      { ...row, metric: "humidity_pct", value: 100 },
+      { ...row, metric: "soil_moisture_pct", value: 0 },
+      ec,
+    ];
+    const args = { ...input, diaryEntries: [], readings };
+    const result = selectGuidedChecklistEvidence(args);
+    expect(result.t1).toEqual({ capturedAt: ec.captured_at, source: "live", quality: "ok" });
+    expect(selectGuidedChecklistEvidence({ ...args, readings: [...readings].reverse() })).toEqual(
+      result,
+    );
   });
 });
 

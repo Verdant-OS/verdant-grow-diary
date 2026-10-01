@@ -13,18 +13,32 @@ import {
   isGuidedChecklistReadingFresh,
   type GuidedChecklistSensorReading,
 } from "@/lib/guidedActionChecklistRules";
-import { classifyManualMetric, isSoilEcMscmRealistic } from "@/lib/sensorTruthRules";
+import {
+  classifyManualMetric,
+  isHumidityStuckExtreme,
+  isSoilEcMscmRealistic,
+} from "@/lib/sensorTruthRules";
 import { isPpfdValid } from "@/lib/ppfdRules";
-import { PH_PRESENTATION_REALISTIC } from "@/constants/sensorTruthRanges";
+import {
+  PH_PRESENTATION_REALISTIC,
+  SOIL_MOISTURE_STUCK_VALUES,
+} from "@/constants/sensorTruthRanges";
 
 /** Validate before projection drops the value; unknown metrics must fail closed. */
 function isUsableTelemetryMetric(metric: unknown, value: number): boolean {
   switch (metric) {
-    case "temperature_c":
     case "humidity_pct":
+      return classifyManualMetric(metric, value).valid && !isHumidityStuckExtreme(value);
+    case "soil_moisture_pct":
+      return (
+        classifyManualMetric(metric, value).valid &&
+        !(SOIL_MOISTURE_STUCK_VALUES as readonly number[]).includes(value)
+      );
+    case "ec":
+      return classifyManualMetric("soil_ec", value).valid;
+    case "temperature_c":
     case "vpd_kpa":
     case "co2_ppm":
-    case "soil_moisture_pct":
     case "soil_ec_ms_cm":
     case "soil_ec":
     case "soil_temp_c":

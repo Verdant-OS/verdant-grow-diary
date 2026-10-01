@@ -47,6 +47,30 @@ afterEach(() => {
 });
 
 describe("guided checklist evidence honesty", () => {
+  it.each(
+    ["humidity_pct", "soil_moisture_pct"].flatMap((metric) =>
+      [0, 100, "0", "100"].map((value) => ({ metric, value })),
+    ),
+  )("review regression: keeps capture guidance for stuck $metric=$value", (change) => {
+    state.readings.data = [{ ...reading(), ...change }];
+    show();
+    expect(gap()).not.toBeNull();
+    expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+    expect(screen.queryByTestId("guided-action-checklist-empty")).toBeNull();
+  });
+  it.each([0, 1.2, 8, "1.2"])("review regression: recognizes canonical ec=%s", (value) => {
+    state.readings.data = [{ ...reading(), metric: "ec", value }];
+    show();
+    expect(gap()).toBeNull();
+  });
+  it.each([-0.001, 8.001, 1200, "1200"])(
+    "review regression: keeps capture guidance for invalid ec=%s",
+    (value) => {
+      state.readings.data = [{ ...reading(), metric: "ec", value }];
+      show();
+      expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+    },
+  );
   it("keeps capture guidance for recent live humidity 999 despite quality ok", () => {
     state.readings.data = [{ ...reading(), metric: "humidity_pct", value: 999 }];
     show();
@@ -67,20 +91,37 @@ describe("guided checklist evidence honesty", () => {
     expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
     expect(screen.queryByTestId("guided-action-checklist-empty")).toBeNull();
   });
-  it("keeps an older valid telemetry survivor and expires it on its own clock", () => {
-    state.readings.data = [
-      { ...reading("live", 60_000), metric: "humidity_pct", value: 999 },
-      reading("live", 14 * 60_000),
-    ];
-    show();
-    expect(gap()).toBeNull();
-    act(() => {
-      vi.advanceTimersByTime(120_000);
-    });
-    expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
-  });
-  it("keeps valid manual diary evidence despite newer invalid telemetry", () => {
-    state.readings.data = [{ ...reading(), metric: "humidity_pct", value: 999 }];
+  it.each([
+    { metric: "humidity_pct", value: 999 },
+    { metric: "humidity_pct", value: 0 },
+    { metric: "humidity_pct", value: 100 },
+    { metric: "soil_moisture_pct", value: 0 },
+    { metric: "soil_moisture_pct", value: 100 },
+    { metric: "ec", value: 8.001 },
+  ])(
+    "keeps a valid survivor and its expiry despite newer invalid telemetry: %j",
+    (invalidMetric) => {
+      state.readings.data = [
+        { ...reading("live", 60_000), ...invalidMetric },
+        reading("live", 14 * 60_000),
+      ];
+      show();
+      expect(gap()).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(120_000);
+      });
+      expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+    },
+  );
+  it.each([
+    { metric: "humidity_pct", value: 999 },
+    { metric: "humidity_pct", value: 0 },
+    { metric: "humidity_pct", value: 100 },
+    { metric: "soil_moisture_pct", value: 0 },
+    { metric: "soil_moisture_pct", value: 100 },
+    { metric: "ec", value: 8.001 },
+  ])("keeps valid manual diary evidence despite newer invalid telemetry: %j", (invalidMetric) => {
+    state.readings.data = [{ ...reading(), ...invalidMetric }];
     state.diary.data = [
       {
         id: "d1",
@@ -92,6 +133,19 @@ describe("guided checklist evidence honesty", () => {
     ];
     show();
     expect(gap()).toBeNull();
+  });
+  it("keeps valid canonical EC as the survivor of newer stuck percentage readings", () => {
+    state.readings.data = [
+      { ...reading("live", 60_000), metric: "humidity_pct", value: 100 },
+      { ...reading("live", 60_000), metric: "soil_moisture_pct", value: 0 },
+      { ...reading("live", 14 * 60_000), metric: "ec", value: 1.2 },
+    ];
+    show();
+    expect(gap()).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(120_000);
+    });
+    expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
   });
   it.each([
     { manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 55 } },

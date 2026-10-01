@@ -2,7 +2,7 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T18:04 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T18:06 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
@@ -10,18 +10,18 @@ this entry's earlier 2026-10-01 versions.
 - **Open (not draft), awaiting CI and Chemdawg pre-check — review not routed:
   [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
   (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `a73dbfb40`, 24 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 18:04
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 18:06
   UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI restarted on the new
-  head — 23 pass / 75 pending / 8 skipped / **1 failed — `Vercel`**. No approving review.
+  head — 38 pass / 62 pending / 8 skipped / **1 failed — `Vercel`**. No approving review.
   - Exact-head runs created at 17:40 UTC are draining slowly. `established fact` (Actions API):
-    repository-wide, 168 queued / 27 in progress at 17:58 and 145 / 32 at 18:04 — a backed-up
+    repository-wide, 168 queued / 27 in progress at 17:58, 145 / 32 at 18:04 and 136 / 30 at 18:06 — a backed-up
     queue, not a failure on this PR. Cause of the backlog `NOT_MEASURED`.
   - Required contexts (35, `config/required-status-checks.json`): 34 pending, 1 not yet reported
     (`Lint, typecheck, test, build`). None failed.
   - `2d954bda1` merged in `6ed854cee` (`#1835`) and `ebdb1dcd0` merged in `a8af664c5` (`#1742`);
     neither adds a migration.
   - `f2be7e722` merged in `25515a8b9` (`#1810`, Quick Log delivery tests; no migration).
-    **0 commits behind** `verdant-grow-diary` at 18:04 UTC.
+    **0 commits behind** `verdant-grow-diary` at 18:06 UTC.
   - `84cb262ad`, `44af6a8ea`, `5c5568a37`, `9b6a6872d` and `a73dbfb40` are review fixes (below).
 - **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` and again at `69f2f5b23` (2026-10-01,
   no conflicts). The first brought `#1832` (hono pin), which clears the earlier
@@ -29,8 +29,8 @@ this entry's earlier 2026-10-01 versions.
 - **`Published migration integrity` at `a73dbfb40` (exact head): `PASS`** — run `36901103681`
   completed successfully (observed 18:04 UTC).
   - Runs on every head from `2d954bda1` through `9b6a6872d` were cancelled by later pushes.
-  - `Strain Reference Library V1 Gate` at `a73dbfb40`: `NOT_MEASURED` — run `36901103554` was
-    in progress at 18:04 UTC.
+  - **`Strain Reference Library V1 Gate` at `a73dbfb40`: `PASS`** — run `36901103554` completed
+    successfully (observed 18:06 UTC), including its strict parity audit and both migration fences.
   - At `358d69c38` (previous head, same migration file): `PASS`, run `36892553063`, including its
     one-line payload change.
   - Historical, earlier heads only: the red on `d65094aa9` ran before `#1836` was merged in and
@@ -58,7 +58,7 @@ this entry's earlier 2026-10-01 versions.
 - **Release state:** `cultivarDatabaseReadsEnabled = false`. `/cultivars` still renders the bundled
   sample library with no database request. Status language stays "working V1 prototype in
   pre-release validation" — no "database-backed public reads", "shipped", or "live" claim.
-- **Automated review:** 39 review threads (Codex, CodeRabbit), **all resolved** (18:04 UTC).
+- **Automated review:** 39 review threads (Codex, CodeRabbit), **all resolved** (18:06 UTC).
   - Real gaps were fixed, each RED-tested. The read model now fails closed on:
     - unlinked evidence and an ambiguous latest guide;
     - non-percent units, out-of-range percentages, and malformed claim `verified_at`;
@@ -112,8 +112,8 @@ this entry's earlier 2026-10-01 versions.
     template-table write probes and the one-line payload change. Strict parity READY as anon and
     as authenticated, and migration re-apply idempotent.
   - Runs on every head from `2d954bda1` through `9b6a6872d` were cancelled by later pushes.
-  - **At `a73dbfb40` (exact head): `NOT_MEASURED`** — run `36901103567` was still pending at
-    18:04 UTC. This head changes the parity rules, the source-state gate and the harness fixtures, so
+  - **At `a73dbfb40` (exact head): `NOT_MEASURED`** — run `36901103567` was in progress at
+    18:06 UTC. This head changes the parity rules, the source-state gate and the harness fixtures, so
     the `358d69c38` PASS does not carry over.
 - **Local evidence (`established fact`, Windows clone):**
   - at `a73dbfb40`: the five strain test files 110/110, `tsc` 0 diagnostics, scoped eslint clean;

@@ -160,3 +160,17 @@ describe("production probes wait for the pinned SHA to be live", () => {
     expect(job["timeout-minutes"]).toBeGreaterThanOrEqual(45);
   });
 });
+
+describe("signed-in read-only measurement triggers", () => {
+  it("measures after deploy-branch pushes that change the measured application", () => {
+    const doc = load(
+      readFileSync(resolve(ROOT, ".github/workflows/signed-in-readonly-performance.yml"), "utf8"),
+    ) as { on: { push: { branches: string[]; paths?: string[] } } };
+    const push = doc.on.push;
+    expect(push.branches).toEqual(["verdant-grow-diary"]);
+    // Dashboard, Timeline and Sensors are built from src/ (the root route owns the HTML) and build inputs.
+    for (const surface of ["src/**", "public/**", "vite.config.ts", "package.json", "bun.lock"])
+      expect(push.paths).toContain(surface);
+    expect(push.paths).toContain("e2e/signed-in-performance.spec.ts");
+  });
+});

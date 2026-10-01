@@ -15,7 +15,14 @@ on:
       - ".github/workflows/signed-in-readonly-performance.yml"
   push:
     branches: [verdant-grow-diary]
+    # The measured routes (Dashboard, Timeline, Sensors) and their build inputs,
+    # plus the probe itself: product changes are what can regress readiness.
     paths:
+      - "src/**"
+      - "public/**"
+      - "vite.config.ts"
+      - "package.json"
+      - "bun.lock"
       - "e2e/lib/signedInPerformance*.ts"
       - "e2e/lib/signedInReadonlyProof.ts"
       - "e2e/signed-in-performance.spec.ts"

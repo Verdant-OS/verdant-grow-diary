@@ -13,6 +13,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import { QUICK_LOG_TIMELINE_CTA_LABEL } from "@/lib/quickLogTimelineNavigationTarget";
+import { readPendingQuickLogNote } from "@/lib/quickLogPendingNoteStore";
 
 const rpcMock = vi.fn();
 const fromMock = vi.fn();
@@ -66,7 +67,7 @@ function renderSheet(defaultTargetKey: string) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  render(
+  return render(
     <QueryClientProvider client={client}>
       <QuickLogV2Sheet open={true} onOpenChange={vi.fn()} defaultTargetKey={defaultTargetKey} />
     </QueryClientProvider>,
@@ -84,7 +85,16 @@ function prepareNoteSave() {
 /** A successful retry must verify the persisted event, not just the RPC reply. */
 function mockPersistedNote(eventId: string) {
   readbackMock.mockResolvedValueOnce({
-    data: { id: eventId, note: RETRY_NOTE, plant_id: "plant-1", tent_id: "tent-1" },
+    data: {
+      id: eventId,
+      note: RETRY_NOTE,
+      grow_id: "grow-1",
+      plant_id: "plant-1",
+      tent_id: "tent-1",
+      event_type: "observation",
+      source: "manual",
+      is_deleted: false,
+    },
     error: null,
   });
 }
@@ -106,6 +116,87 @@ beforeEach(() => {
 });
 
 describe("QuickLogV2Sheet — failed save Retry button", () => {
+  it("can explicitly discard a remounted historical refusal without claiming or resubmitting it", async () => {
+    rpcMock.mockResolvedValue({
+      data: { ok: false, reason: "idempotency_key_unverified" },
+      error: null,
+    });
+    const mounted = renderSheet("plant:plant-1");
+    prepareNoteSave();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByTestId("qlv2-history-review-link");
+    expect(readPendingQuickLogNote("user-1").status).toBe("pending");
+    mounted.unmount();
+    const restored = renderSheet("plant:plant-1");
+    fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+    expect(readPendingQuickLogNote("user-1").status).toBe("empty");
+    expect(screen.getByLabelText("Note (optional)")).toHaveValue("");
+    expect(screen.queryByTestId("qlv2-exact-retry-lock")).not.toBeInTheDocument();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    restored.unmount();
+    renderSheet("plant:plant-1");
+    expect(screen.queryByTestId("qlv2-exact-retry-lock")).not.toBeInTheDocument();
+    prepareNoteSave();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(2));
+    expect(rpcMock.mock.calls[1][1].p_idempotency_key).not.toBe(
+      rpcMock.mock.calls[0][1].p_idempotency_key,
+    );
+  });
+
+  it("retains the historical draft if verified storage removal fails", async () => {
+    rpcMock.mockResolvedValue({
+      data: { ok: false, reason: "idempotency_receipt_missing" },
+      error: null,
+    });
+    renderSheet("plant:plant-1");
+    prepareNoteSave();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByTestId("qlv2-history-review-link");
+    const pending = readPendingQuickLogNote("user-1");
+    const remove = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("synthetic storage refusal");
+    });
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+      expect(readPendingQuickLogNote("user-1")).toEqual(pending);
+      expect(screen.getByTestId("qlv2-save")).toBeDisabled();
+      expect(screen.getByLabelText("Note (optional)")).toHaveValue(RETRY_NOTE);
+      expect(rpcMock).toHaveBeenCalledTimes(1);
+      expect(toastSuccess).not.toHaveBeenCalled();
+    } finally {
+      remove.mockRestore();
+    }
+  });
+
+  it("does not offer an impossible retry after a refused historical replay", async () => {
+    rpcMock.mockResolvedValue({
+      data: { ok: false, reason: "idempotency_key_unverified" },
+      error: null,
+    });
+    const mounted = renderSheet("plant:plant-1");
+    prepareNoteSave();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.getByTestId("qlv2-error")).toHaveTextContent("Timeline"));
+    expect(screen.queryByTestId("qlv2-save-retry")).not.toBeInTheDocument();
+    expect(screen.getByTestId("qlv2-save")).toBeDisabled();
+    expect(screen.getByTestId("qlv2-history-review-link")).toHaveAttribute(
+      "href",
+      "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1",
+    );
+    expect(screen.getByTestId("qlv2-history-review-link")).toHaveAttribute("target", "_blank");
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+
+    mounted.unmount();
+    renderSheet("plant:plant-1");
+    expect(screen.getByTestId("qlv2-error")).toHaveTextContent("Timeline");
+    expect(screen.queryByTestId("qlv2-save-retry")).not.toBeInTheDocument();
+    expect(screen.getByTestId("qlv2-save")).toBeDisabled();
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+  });
+
   it("renders inline error + Retry button on failed save", async () => {
     rpcMock.mockResolvedValue({
       data: { ok: false, reason: "save_failed" },
@@ -152,7 +243,11 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
         error: null,
       })
       .mockResolvedValueOnce({
-        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", environment_event_id: null },
+        data: {
+          ok: true,
+          grow_event_id: "77777777-7777-4777-8777-000000000001",
+          environment_event_id: null,
+        },
         error: null,
       });
     renderSheet("plant:plant-1");
@@ -172,7 +267,7 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
       ),
     );
     expect(fromMock).toHaveBeenCalledWith("grow_events");
-    expect(selectMock).toHaveBeenCalledWith("id,note,plant_id,tent_id");
+    expect(selectMock).toHaveBeenCalledWith("id,note,grow_id,plant_id,tent_id");
     expect(eqMock).toHaveBeenCalledWith("id", "77777777-7777-4777-8777-000000000001");
     expect(readbackMock).toHaveBeenCalledTimes(1);
     expect(rpcMock.mock.calls[1][1]).toEqual(rpcMock.mock.calls[0][1]);
@@ -194,7 +289,11 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
         error: null,
       })
       .mockResolvedValueOnce({
-        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002", environment_event_id: null },
+        data: {
+          ok: true,
+          grow_event_id: "77777777-7777-4777-8777-000000000002",
+          environment_event_id: null,
+        },
         error: null,
       });
     renderSheet("plant:plant-1");

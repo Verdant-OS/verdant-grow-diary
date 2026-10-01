@@ -64,6 +64,7 @@ export const FORBIDDEN_SENSOR_TRUTH_SOURCE_TOKENS = [
   "mqtt",
   "esp32",
   "webhook",
+  "sim",
 ] as const;
 
 export interface EcowittTentSnapshotV0RowLike {

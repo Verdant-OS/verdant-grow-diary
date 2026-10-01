@@ -78,6 +78,21 @@ class TentIdValidationTests(unittest.TestCase):
 
 
 class ReadinessTests(unittest.TestCase):
+    def test_unsafe_or_malformed_ingest_urls_are_local_refusals(self):
+        for url in ("http://example.invalid/ingest", "https://user@example.invalid/ingest",
+                    "https://@example.invalid/ingest", "https:///ingest",
+                    "https://example.invalid:bad/ingest", "https://example.invalid:65536/ingest",
+                    "https://example.invalid/ingest\n", "   ", {"url": INGEST_URL}):
+            with self.subTest(url=url):
+                result = evaluate_forwarding_readiness(url, BRIDGE_TOKEN, VALID_TENT_UUID)
+                self.assertFalse(result["ready"])
+                self.assertEqual(result["reason"], "blocked_invalid_ingest_url")
+
+    def test_https_ingest_urls_preserve_compatible_paths_and_ports(self):
+        for url in (INGEST_URL, "https://example.invalid:443/ingest?mode=local", "HTTPS://example.invalid/ingest"):
+            with self.subTest(url=url):
+                self.assertTrue(evaluate_forwarding_readiness(url, BRIDGE_TOKEN, VALID_TENT_UUID)["ready"])
+
     def test_missing_url_or_token(self):
         r = evaluate_forwarding_readiness(None, None, VALID_TENT_UUID)
         self.assertFalse(r["ready"])

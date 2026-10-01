@@ -121,6 +121,7 @@ describe("ecowittTentSnapshotV0Rules — Sensor Truth tagging", () => {
     "mqtt",
     "esp32",
     "webhook",
+    "sim",
   ] as const)("never promotes transport/vendor source=%s to live via freshness", (source) => {
     expect(
       classifyEcowittTentSnapshotV0Source({
@@ -180,6 +181,7 @@ describe("ecowittTentSnapshotV0Rules — Sensor Truth tagging", () => {
   it("maps only known metric vocabulary; refuses invented names", () => {
     expect(mapEcowittTentSnapshotV0MetricKey("temperature_c")).toBe("temp");
     expect(mapEcowittTentSnapshotV0MetricKey("humidity_pct")).toBe("rh");
+    expect(mapEcowittTentSnapshotV0MetricKey("humidity_percent")).toBe("rh");
     expect(mapEcowittTentSnapshotV0MetricKey("soil_moisture_pct")).toBe("soil");
     expect(mapEcowittTentSnapshotV0MetricKey("co2_ppm")).toBeNull();
     expect(mapEcowittTentSnapshotV0MetricKey("leaf_vpd")).toBeNull();
@@ -277,6 +279,83 @@ describe("buildEcowittTentSnapshotV0ViewModel", () => {
     expect(vm.unusedFieldNamesRefused).toEqual([...ECOWITT_TENT_SNAPSHOT_V0_UNUSED_FIELD_NAMES]);
     expect(vm.unusedFieldNamesRefused).toContain("co2");
     expect(vm.unusedFieldNamesRefused).toContain("soilmoisture2");
+    expect(vm.unusedFieldNamesRefused).toContain("temp2f");
+  });
+});
+
+describe("ecowittTentSnapshotV0Rules — Safe-by-Design temperature units", () => {
+  it("rejects Fahrenheit-looking temperature_c as invalid (never Live 77 °C)", () => {
+    expect(evaluateEcowittTentSnapshotV0Metric("temp", 77).valid).toBe(false);
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [row({ metric: "temperature_c", value: 77, captured_at: FRESH_AT })],
+      { tentId: TENT, now: NOW },
+    );
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    expect(temp?.truthSource).toBe("invalid");
+    expect(temp?.badgeLabel).toBe("Invalid");
+    expect(temp?.value).toBeNull();
+    expect(temp?.unit).toBe("°C");
+  });
+
+  it("rejects Fahrenheit-looking temp_c and temp keys as invalid (no silent F reinterpret)", () => {
+    for (const metric of ["temp_c", "temp"] as const) {
+      const resolved = resolveEcowittTentSnapshotV0TempCelsius(metric, 77);
+      expect(resolved.fromFahrenheit).toBe(false);
+      expect(resolved.celsius).toBe(77);
+      const vm = buildEcowittTentSnapshotV0ViewModel(
+        [row({ metric, value: 77, captured_at: FRESH_AT })],
+        { tentId: TENT, now: NOW },
+      );
+      const temp = vm.metrics.find((m) => m.key === "temp");
+      expect(temp?.truthSource).toBe("invalid");
+      expect(temp?.value).toBeNull();
+    }
+  });
+
+  it("converts temp_f Fahrenheit to Celsius before Live display", () => {
+    expect(mapEcowittTentSnapshotV0MetricKey("temp_f")).toBe("temp");
+    const resolved = resolveEcowittTentSnapshotV0TempCelsius("temp_f", 77);
+    expect(resolved.fromFahrenheit).toBe(true);
+    expect(resolved.celsius).toBeCloseTo(25, 5);
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [row({ metric: "temp_f", value: 77, captured_at: FRESH_AT })],
+      { tentId: TENT, now: NOW },
+    );
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    expect(temp?.value).toBeCloseTo(25, 5);
+    expect(temp?.unit).toBe("°C");
+    expect(temp?.badgeLabel).toBe("Live");
+    expect(temp?.value).not.toBe(77);
+  });
+
+  it("keeps plausible Celsius temperature_c as Live", () => {
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [row({ metric: "temperature_c", value: 24, captured_at: FRESH_AT })],
+      { tentId: TENT, now: NOW },
+    );
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    expect(temp?.value).toBe(24);
+    expect(temp?.badgeLabel).toBe("Live");
+  });
+
+  it("refuses temp1f as a V0 metric key (null map)", () => {
+    expect(mapEcowittTentSnapshotV0MetricKey("temp1f")).toBeNull();
+  });
+});
+
+describe("ecowittTentSnapshotV0 — UI still only T / RH / soil", () => {
+  it("exposes exactly three metric keys and never surfaces co2/leaf/EC", () => {
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [
+        row({ metric: "temperature_c", value: 24 }),
+        row({ metric: "humidity_pct", value: 55 }),
+        row({ metric: "soil_moisture_pct", value: 40 }),
+        row({ metric: "co2_ppm", value: 800 }),
+      ],
+      { tentId: TENT, now: NOW },
+    );
+    expect(vm.metrics.map((m) => m.key)).toEqual(["temp", "rh", "soil"]);
+    expect(vm.metrics).toHaveLength(3);
   });
 });
 
@@ -564,39 +643,39 @@ describe("post-merge QA — unit ambiguity (V0 temperature_c displayed as-is)", 
    * temp_f converts to °C. The two unit-ambiguity pins are live (not it.fails).
    */
   it("Fahrenheit-looking temperature_c must not present as healthy Live °C without convert", () => {
-      const evaluation = evaluateEcowittTentSnapshotV0Metric("temp", 77);
-      const vm = buildEcowittTentSnapshotV0ViewModel(
-        [row({ metric: "temperature_c", value: 77, captured_at: FRESH_AT })],
-        { tentId: TENT, now: NOW },
-      );
-      const temp = vm.metrics.find((m) => m.key === "temp");
-      expect(temp?.unit).toBe("°C");
+    const evaluation = evaluateEcowittTentSnapshotV0Metric("temp", 77);
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [row({ metric: "temperature_c", value: 77, captured_at: FRESH_AT })],
+      { tentId: TENT, now: NOW },
+    );
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    expect(temp?.unit).toBe("°C");
 
-      // Safe-by-Design: fail closed or convert — never raw F-looking number as Live °C.
-      const presentsFAsHealthyLiveC =
-        evaluation.valid === true &&
-        temp?.valid === true &&
-        temp?.truthSource === "live" &&
-        temp?.badgeLabel === "Live" &&
-        temp?.value === 77 &&
-        temp?.unit === "°C";
-      expect(presentsFAsHealthyLiveC).toBe(false);
+    // Safe-by-Design: fail closed or convert — never raw F-looking number as Live °C.
+    const presentsFAsHealthyLiveC =
+      evaluation.valid === true &&
+      temp?.valid === true &&
+      temp?.truthSource === "live" &&
+      temp?.badgeLabel === "Live" &&
+      temp?.value === 77 &&
+      temp?.unit === "°C";
+    expect(presentsFAsHealthyLiveC).toBe(false);
   });
 
   it("metric temp_f Fahrenheit value must not surface as Celsius-without-convert Live", () => {
-      expect(mapEcowittTentSnapshotV0MetricKey("temp_f")).toBe("temp");
-      const vm = buildEcowittTentSnapshotV0ViewModel(
-        [row({ metric: "temp_f", value: 77, captured_at: FRESH_AT })],
-        { tentId: TENT, now: NOW },
-      );
-      const temp = vm.metrics.find((m) => m.key === "temp");
-      const presentsFAsHealthyLiveC =
-        temp?.valid === true &&
-        temp?.truthSource === "live" &&
-        temp?.badgeLabel === "Live" &&
-        temp?.value === 77 &&
-        temp?.unit === "°C";
-      expect(presentsFAsHealthyLiveC).toBe(false);
+    expect(mapEcowittTentSnapshotV0MetricKey("temp_f")).toBe("temp");
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [row({ metric: "temp_f", value: 77, captured_at: FRESH_AT })],
+      { tentId: TENT, now: NOW },
+    );
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    const presentsFAsHealthyLiveC =
+      temp?.valid === true &&
+      temp?.truthSource === "live" &&
+      temp?.badgeLabel === "Live" &&
+      temp?.value === 77 &&
+      temp?.unit === "°C";
+    expect(presentsFAsHealthyLiveC).toBe(false);
   });
 
   it("temp1f is not a V0 metric key (refused — no silent °C promotion)", () => {

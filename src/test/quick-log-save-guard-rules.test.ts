@@ -5,6 +5,7 @@ import {
   QUICK_LOG_POST_SAVE_VIEW_LABEL,
   buildQuickLogPostSaveMessage,
   rotateQuickLogIdempotencyKey,
+  resolveQuickLogPostSaveTargetLabel,
   shouldAllowQuickLogSave,
 } from "@/lib/quickLogSaveGuardRules";
 
@@ -91,5 +92,53 @@ describe("post-save CTA labels", () => {
     expect(QUICK_LOG_POST_SAVE_VIEW_LABEL).toBe("View diary");
     expect(QUICK_LOG_POST_SAVE_ANOTHER_LABEL).toBe("Log another");
     expect(QUICK_LOG_POST_SAVE_CLOSE_LABEL).toBe("Dismiss");
+  });
+});
+
+describe("resolveQuickLogPostSaveTargetLabel", () => {
+  const options = Object.freeze([
+    Object.freeze({ type: "plant" as const, id: "plant-one", label: "Plant One" }),
+    Object.freeze({ type: "tent" as const, id: "tent-one", label: "Tent One" }),
+  ]);
+
+  it.each([
+    ["plant", "plant-one", "Plant One"],
+    ["tent", "tent-one", "Tent One"],
+  ] as const)("uses the confirmed %s label", (targetType, targetId, label) => {
+    expect(resolveQuickLogPostSaveTargetLabel({ targetType, targetId }, options)).toBe(label);
+  });
+
+  it("does not label a verified null target from the available draft options", () => {
+    expect(
+      resolveQuickLogPostSaveTargetLabel({ targetType: null, targetId: null }, options),
+    ).toBeNull();
+  });
+
+  it.each([null, "", "   ", "unknown-plant"])("handles an unavailable target id %j", (targetId) => {
+    expect(
+      resolveQuickLogPostSaveTargetLabel({ targetType: "plant", targetId }, options),
+    ).toBeNull();
+  });
+
+  it.each([null, undefined])("handles an absent saved state %j", (success) => {
+    expect(resolveQuickLogPostSaveTargetLabel(success, options)).toBeNull();
+  });
+
+  it.each([null, undefined])("handles absent target options %j", (missingOptions) => {
+    expect(
+      resolveQuickLogPostSaveTargetLabel(
+        { targetType: "plant", targetId: "plant-one" },
+        missingOptions,
+      ),
+    ).toBeNull();
+  });
+
+  it("is deterministic and does not mutate its inputs", () => {
+    const success = Object.freeze({ targetType: "plant" as const, targetId: "plant-one" });
+    const before = structuredClone({ success, options });
+    expect(resolveQuickLogPostSaveTargetLabel(success, options)).toBe(
+      resolveQuickLogPostSaveTargetLabel(success, options),
+    );
+    expect({ success, options }).toEqual(before);
   });
 });

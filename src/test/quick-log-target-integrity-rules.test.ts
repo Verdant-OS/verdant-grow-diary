@@ -108,6 +108,20 @@ describe("resolveQuickLogPrefillTarget", () => {
     ).toEqual({ status: "blocked", reason: "plant_tent_unassigned" });
   });
 
+  it("allows an in-grow tentless plant when the caller does not require a tent", () => {
+    expect(
+      resolveQuickLogPrefillTarget({
+        prefill: { plantId: "p1", growId: "g1" },
+        plants: [{ id: "p1", grow_id: "g1", tent_id: null }],
+        tents,
+        requireTent: false,
+      }),
+    ).toEqual({
+      status: "ready",
+      target: { plantId: "p1", growId: "g1", tentId: null },
+    });
+  });
+
   it("requires the assigned tent row and matching tent grow", () => {
     expect(
       resolveQuickLogPrefillTarget({
@@ -219,6 +233,42 @@ describe("resolveQuickLogWriteTarget", () => {
     expect(QUICK_LOG_TARGET_BLOCKED_COPY[result.reason]).toBe(
       "Assign this plant to a grow and tent before saving.",
     );
+  });
+
+  it("allows an in-grow tentless plant only when the caller does not require a tent", () => {
+    expect(
+      resolveQuickLogWriteTarget({
+        activeGrowId: "g1",
+        selectedPlant: { id: "p1", grow_id: "g1", tent_id: null },
+        selectedTent: null,
+        requireTent: false,
+      }),
+    ).toEqual({
+      status: "ready",
+      target: { plantId: "p1", growId: "g1", tentId: null },
+    });
+
+    const blocked = resolveQuickLogWriteTarget({
+      activeGrowId: "g1",
+      selectedPlant: { id: "p1", grow_id: "g1", tent_id: null },
+      selectedTent: null,
+    });
+    expect(blocked).toEqual({ status: "blocked", reason: "plant_tent_unassigned" });
+    if (blocked.status !== "blocked") throw new Error("expected blocked target");
+    expect(QUICK_LOG_TARGET_BLOCKED_COPY[blocked.reason]).toBe(
+      "Assign this plant to a tent before saving.",
+    );
+  });
+
+  it("keeps the grow mismatch fence even when the caller does not require a tent", () => {
+    expect(
+      resolveQuickLogWriteTarget({
+        activeGrowId: "g2",
+        selectedPlant: { id: "p1", grow_id: "g1", tent_id: null },
+        selectedTent: null,
+        requireTent: false,
+      }),
+    ).toEqual({ status: "blocked", reason: "active_grow_mismatch" });
   });
 
   it("does not carry sensor values, automation flags, or a persistence selector", () => {

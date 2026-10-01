@@ -17,7 +17,7 @@ import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface QueryFilter {
-  op: "eq" | "is" | "gte" | "lte" | "lt";
+  op: "eq" | "is" | "not" | "gte" | "lte" | "lt";
   column: string;
   value: unknown;
 }
@@ -80,6 +80,10 @@ vi.mock("@/integrations/supabase/client", () => {
       },
       is(column: string, value: unknown) {
         spec.filters.push({ op: "is", column, value });
+        return query;
+      },
+      not(column: string, operator: string, value: unknown) {
+        spec.filters.push({ op: "not", column, value: { operator, value } });
         return query;
       },
       gte(column: string, value: unknown) {
@@ -308,7 +312,7 @@ describe("Timeline local-day query integration (America/Chicago)", () => {
     expect(findFilter(growEventSpec, "lte", "occurred_at")).toBe(LOCAL_DAY_END_ISO);
   });
 
-  it("the manual sensor effective query receives the same local-day ISO bounds on ts", async () => {
+  it("the captured and legacy manual reads use the same local-day bounds on their observation columns", async () => {
     harness.executeQuery.mockImplementation((spec) => {
       if (spec.table === "diary_entries") return { data: [], error: null, count: 0 };
       if (spec.table === "tents") return { data: [{ id: "tent-1" }], error: null };
@@ -319,15 +323,25 @@ describe("Timeline local-day query integration (America/Chicago)", () => {
     renderTimeline("/timeline?start=2026-07-15&end=2026-07-15");
 
     await waitFor(() => {
-      expect(harness.capturedQueries.some((q) => q.table === "sensor_readings_effective")).toBe(
-        true,
-      );
+      expect(
+        harness.capturedQueries.filter((q) => q.table === "sensor_readings_effective"),
+      ).toHaveLength(2);
     });
 
-    const sensorSpec = harness.capturedQueries.find((q) => q.table === "sensor_readings_effective");
-    expect(findFilter(sensorSpec, "gte", "ts")).toBe(LOCAL_DAY_START_ISO);
-    expect(findFilter(sensorSpec, "lte", "ts")).toBe(LOCAL_DAY_END_ISO);
-    expect(findFilter(sensorSpec, "eq", "source")).toBe("manual");
+    const sensorSpecs = harness.capturedQueries.filter(
+      (q) => q.table === "sensor_readings_effective",
+    );
+    const capturedSpec = sensorSpecs.find((q) =>
+      q.filters.some((f) => f.op === "not" && f.column === "captured_at"),
+    );
+    const legacySpec = sensorSpecs.find((q) => findFilter(q, "is", "captured_at") === null);
+    expect(capturedSpec).toBeDefined();
+    expect(legacySpec).toBeDefined();
+    expect(findFilter(capturedSpec, "gte", "captured_at")).toBe(LOCAL_DAY_START_ISO);
+    expect(findFilter(capturedSpec, "lte", "captured_at")).toBe(LOCAL_DAY_END_ISO);
+    expect(findFilter(legacySpec, "gte", "ts")).toBe(LOCAL_DAY_START_ISO);
+    expect(findFilter(legacySpec, "lte", "ts")).toBe(LOCAL_DAY_END_ISO);
+    expect(sensorSpecs.every((spec) => findFilter(spec, "eq", "source") === "manual")).toBe(true);
   });
 
   it("loadOlder() issues the identical local-day bounds as the initial page", async () => {

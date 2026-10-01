@@ -27,9 +27,14 @@ export interface QuickLogPostSaveSuccess {
    * durable grow-scoped Timeline CTA. Never invent a fallback grow.
    */
   growId: string | null;
-  /** Target the log was attached to. Used for plant/tent URL filters. */
-  targetType: "plant" | "tent";
-  targetId: string;
+  /**
+   * Target the log was attached to, used for plant/tent URL filters.
+   * `null` is a verified, authoritative absence of a target (the save was
+   * confirmed without one), not "unknown": callers must not fall back to
+   * draft labels or filters when it is null.
+   */
+  targetType: "plant" | "tent" | null;
+  targetId: string | null;
   tentId: string | null;
   /** Action that was just saved (e.g. "note", "water", "feed"). */
   action: string;
@@ -42,6 +47,31 @@ export interface QuickLogPostSaveSuccess {
 export const QUICK_LOG_POST_SAVE_VIEW_LABEL = "View diary" as const;
 export const QUICK_LOG_POST_SAVE_ANOTHER_LABEL = "Log another" as const;
 export const QUICK_LOG_POST_SAVE_CLOSE_LABEL = "Dismiss" as const;
+
+interface QuickLogPostSaveTargetLabelOption {
+  type: "plant" | "tent";
+  id: string;
+  label: string;
+}
+
+/** Display only a confirmed target; a verified null has no draft-label fallback. */
+export function resolveQuickLogPostSaveTargetLabel(
+  success: Pick<QuickLogPostSaveSuccess, "targetType" | "targetId"> | null | undefined,
+  options: readonly QuickLogPostSaveTargetLabelOption[] | null | undefined,
+): string | null {
+  if (
+    (success?.targetType !== "plant" && success?.targetType !== "tent") ||
+    typeof success.targetId !== "string" ||
+    success.targetId.trim().length === 0 ||
+    !Array.isArray(options)
+  ) {
+    return null;
+  }
+  return (
+    options.find((option) => option?.type === success.targetType && option.id === success.targetId)
+      ?.label ?? null
+  );
+}
 
 /**
  * Rotate the client-side idempotency counter. Called when the grower

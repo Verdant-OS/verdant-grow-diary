@@ -157,7 +157,9 @@ agent from one written block.
 - **Eligible coverage.** Any agent may resume an unclaimed block or one whose
   `last_updated` is older than 24 hours, subject to explicit assignments and named locks.
   A fresh claim is not available for takeover. The handoff block carries the context
-  needed to resume. Before resuming, claim the task with a comment on its PR that reads
+  needed to resume. A block's effective claim is the newest of its log `claimed_by` and
+  any `claimed_by:` comment on its PR, so read the PR's comments before treating a block
+  as unclaimed or stale. Before resuming, claim the task with a comment on its PR that reads
   `claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC` (owner decision 2026-10-01); a task
   without a PR first opens its draft PR from the block's branch with that line in the body.
   The claim takes effect when posted: from then on you hold the branch and the previous
@@ -169,7 +171,8 @@ agent from one written block.
 - **Coverage on startup.** Read `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK`
   and truthfully record `open_handoffs_checked`. After the acknowledgment, keep an
   explicit assignment. If you have no assigned task, select the highest-priority
-  eligible open block: unclaimed or older than 24 hours, with no conflicting assignment
+  eligible open block: its effective claim (log or PR comment, whichever is newer) is
+  absent or older than 24 hours, with no conflicting assignment
   or named lock. Priority order: publish gate, then P1, then P2, then everything else.
   Ties go to the oldest `last_updated`. Agents without repository access (Security,
   Council Chair) cannot set `claimed_by` or touch a branch, so they never select or
@@ -686,8 +689,9 @@ assigned role and read its file.
 - Council Chair must read `docs/agents/roles/council-chair.md`.
 
 Any agent may resume an open task from its block in `docs/agents/HANDOFF_LOG.md` under
-Agent Handoff / Coverage. Claim it in the log first. Do not start a second implementation
-of a task someone else has claimed within the last 24 hours.
+Agent Handoff / Coverage. Claim it first with a `claimed_by:` comment on the task's PR, as
+that section describes. Do not start a second implementation of a task someone else has
+claimed, in the log or on its PR, within the last 24 hours.
 
 Codex, Claude, and Grok are **peers**: none outranks the others (Cheek, 2026-08-20,
 refined). Explicit assignments, named locks and the current coverage claim control

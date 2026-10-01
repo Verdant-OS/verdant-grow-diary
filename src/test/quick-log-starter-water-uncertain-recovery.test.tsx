@@ -635,9 +635,15 @@ describe("legacy public-starter Water uncertain receipt", () => {
       this: Storage,
       key: string,
     ) {
-      if (this === window.localStorage) throw new Error("Water storage denied");
+      // Water recovery lives in tab sessionStorage; deny only its starter slot.
+      if (
+        this === window.sessionStorage &&
+        key.startsWith("verdant:quick-log:pending-starter-water:")
+      )
+        throw new Error("Water storage denied");
       return originalGetItem.call(this, key);
     });
+    expect(readPendingStarterWater("user-1")).toEqual({ status: "blocked" });
     fireEvent.click(screen.getByTestId("quick-log-save"));
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     expect(saveMock.mock.calls[0][0].p_action).toBe("note");

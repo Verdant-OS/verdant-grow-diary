@@ -9,8 +9,20 @@
  *
  * "Record <goal> evidence" dispatches the EXISTING global Quick Log prefill
  * event with the exact goal the grower clicked — no new modal/route/save.
+ * The action renders only for a target the pure #1005 gate resolved; every
+ * other gate state renders its pinned status line and repair path instead,
+ * so the handoff never fires for an unresolved target.
  */
+import { Link } from "@/lib/react-router-compat";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import {
+  PHENO_EVIDENCE_TARGET_COPY,
+  PHENO_EVIDENCE_TARGET_RETRY_LABEL,
+  PHENO_EVIDENCE_TARGET_REVIEW_PLANT_LABEL,
+  phenoEvidenceTargetNeedsPlantRepair,
+  type PhenoEvidenceQuickLogTarget,
+} from "@/lib/phenoEvidenceQuickLogTargetGate";
+import { plantDetailPath } from "@/lib/routes";
 import {
   buildPhenoEvidenceGoalQuickLogPrefill,
   type PhenoEvidenceGoalQuickLogPrefillInput,
@@ -24,10 +36,14 @@ export interface PhenoCandidateEvidenceCoverageProps {
   packet: PhenoCandidateEvidencePacket | null | undefined;
   /** "loading" renders a calm placeholder; anything else renders the packet. */
   status: "loading" | "ready" | "error" | "disabled";
-  /** Context for the Quick Log handoff. Null pieces simply omit the action. */
   plantName?: string | null;
-  growId?: string | null;
-  tentId?: string | null;
+  /**
+   * The #1005 gate result for this candidate. Record actions render only when
+   * it is "ready"; absent is treated as pending (fail closed).
+   */
+  quickLogTarget?: PhenoEvidenceQuickLogTarget | null;
+  /** Re-read the tent catalog after a failed read. */
+  onRetryQuickLogTarget?: () => void;
   /** Show "Record <goal> evidence" actions (workspace yes, compare no). */
   allowRecordActions?: boolean;
   "data-testid"?: string;
@@ -43,8 +59,8 @@ export default function PhenoCandidateEvidenceCoverage({
   packet,
   status,
   plantName,
-  growId,
-  tentId,
+  quickLogTarget,
+  onRetryQuickLogTarget,
   allowRecordActions = false,
   ...rest
 }: PhenoCandidateEvidenceCoverageProps) {
@@ -59,13 +75,17 @@ export default function PhenoCandidateEvidenceCoverage({
     );
   }
 
+  const target: PhenoEvidenceQuickLogTarget = quickLogTarget ?? { kind: "pending" };
+  const targetReady = target.kind === "ready" && target.plantId === packet.plantId;
+
   const record = (goalId: string) => {
+    if (target.kind !== "ready" || !targetReady) return;
     const prefillInput: PhenoEvidenceGoalQuickLogPrefillInput = {
       huntId: packet.huntId,
-      plantId: packet.plantId,
+      plantId: target.plantId,
       plantName: plantName ?? null,
-      growId: growId ?? null,
-      tentId: tentId ?? null,
+      growId: target.growId,
+      tentId: target.tentId,
       goalId,
       configuredGoals: packet.configuredGoals,
     };
@@ -76,6 +96,12 @@ export default function PhenoCandidateEvidenceCoverage({
 
   const when = formatWhen(packet.latestEntryAt);
   const compromised = packet.state === "unavailable" || packet.state === "truncated";
+  const canRecord = allowRecordActions && !compromised && targetReady;
+  const showTargetStatus =
+    allowRecordActions &&
+    !compromised &&
+    !targetReady &&
+    packet.goals.some((goal) => !goal.recorded);
 
   return (
     <section
@@ -109,6 +135,36 @@ export default function PhenoCandidateEvidenceCoverage({
         </p>
       ) : null}
 
+      {showTargetStatus && target.kind !== "ready" ? (
+        <p
+          role="status"
+          data-testid={`${testId}-target`}
+          data-target-state={target.kind}
+          className="text-muted-foreground"
+        >
+          {PHENO_EVIDENCE_TARGET_COPY[target.kind]}
+          {target.kind === "catalog_error" && onRetryQuickLogTarget ? (
+            <button
+              type="button"
+              data-testid={`${testId}-target-retry`}
+              onClick={onRetryQuickLogTarget}
+              className="ml-1 font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {PHENO_EVIDENCE_TARGET_RETRY_LABEL}
+            </button>
+          ) : null}
+          {phenoEvidenceTargetNeedsPlantRepair(target.kind) ? (
+            <Link
+              to={plantDetailPath(packet.plantId)}
+              data-testid={`${testId}-target-review`}
+              className="ml-1 font-medium text-primary underline-offset-2 hover:underline"
+            >
+              {PHENO_EVIDENCE_TARGET_REVIEW_PLANT_LABEL}
+            </Link>
+          ) : null}
+        </p>
+      ) : null}
+
       {packet.state === "unavailable" ? null : packet.configuredGoalCount === 0 && !compromised ? (
         <p className="text-muted-foreground">This hunt has no evidence goals configured yet.</p>
       ) : (
@@ -123,7 +179,7 @@ export default function PhenoCandidateEvidenceCoverage({
                 >
                   {goal.label} ✓{goal.receiptCount > 1 ? ` ×${goal.receiptCount}` : ""}
                 </span>
-              ) : allowRecordActions && !compromised ? (
+              ) : canRecord ? (
                 <button
                   type="button"
                   data-testid={`${testId}-record-${goal.id}`}

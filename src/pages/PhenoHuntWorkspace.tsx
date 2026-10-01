@@ -75,6 +75,11 @@ import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
+import { useTents } from "@/hooks/use-tents";
+import {
+  resolvePhenoEvidenceQuickLogTarget,
+  type PhenoEvidenceTentCatalog,
+} from "@/lib/phenoEvidenceQuickLogTargetGate";
 import type { PhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
 import { phenoHuntKeepersPath } from "@/lib/routes";
 import {
@@ -872,6 +877,9 @@ interface EditorProps {
    * readiness. Null while its batch is loading. */
   evidencePacket: PhenoCandidateEvidencePacket | null;
   evidenceStatus: "loading" | "ready" | "error" | "disabled";
+  /** The tent catalog Quick Log resolves against (#1005 target gate). */
+  evidenceTentCatalog: PhenoEvidenceTentCatalog;
+  onRetryEvidenceTentCatalog: () => void;
   selected: boolean;
   onToggleSelect: (plantId: string) => void;
   canAssign: boolean;
@@ -963,6 +971,8 @@ const CandidateEditor = memo(function CandidateEditor({
   saving,
   evidencePacket,
   evidenceStatus,
+  evidenceTentCatalog,
+  onRetryEvidenceTentCatalog,
   selected,
   onToggleSelect,
   canAssign,
@@ -1013,6 +1023,16 @@ const CandidateEditor = memo(function CandidateEditor({
 
   // Readiness is derived from THIS card's evidence props, so it only recomputes
   // when this candidate's data changes — one save never re-renders every card.
+  // #1005: the evidence → Quick Log handoff targets this plant's own stored
+  // grow/tent, resolved through the canonical Quick Log target rules.
+  const evidenceQuickLogTarget = useMemo(
+    () =>
+      resolvePhenoEvidenceQuickLogTarget({
+        plant: { plantId, growId: candidate.growId, tentId: candidate.tentId },
+        catalog: evidenceTentCatalog,
+      }),
+    [plantId, candidate.growId, candidate.tentId, evidenceTentCatalog],
+  );
   const readiness = useMemo(
     () => candidateReadiness(candidate, score, decision, sexRow, smokeRow, labRow, cloneInsured),
     [candidate, score, decision, sexRow, smokeRow, labRow, cloneInsured],
@@ -1124,8 +1144,8 @@ const CandidateEditor = memo(function CandidateEditor({
           packet={evidencePacket}
           status={evidenceStatus}
           plantName={candidate.plantLabel ?? null}
-          growId={growId}
-          tentId={tentId}
+          quickLogTarget={evidenceQuickLogTarget}
+          onRetryQuickLogTarget={onRetryEvidenceTentCatalog}
           allowRecordActions
           data-testid={`workspace-evidence-coverage-${plantId}`}
         />
@@ -1423,6 +1443,17 @@ export default function PhenoHuntWorkspace() {
     plantIds: loadedCandidateIds,
     configuredGoals: ws.hunt?.evidenceGoals ?? [],
   });
+  // #1005: the same canonical tent catalog (and cache) Quick Log resolves
+  // against. Loaded data wins over a later background-refetch error.
+  const tentsQuery = useTents();
+  const evidenceTentCatalog = useMemo<PhenoEvidenceTentCatalog>(() => {
+    if (tentsQuery.data) return { status: "ready", tents: tentsQuery.data };
+    return tentsQuery.isError ? { status: "error" } : { status: "loading" };
+  }, [tentsQuery.data, tentsQuery.isError]);
+  const refetchTents = tentsQuery.refetch;
+  const retryEvidenceTentCatalog = useCallback(() => {
+    void refetchTents();
+  }, [refetchTents]);
   const { entitlement, refetch: refetchEntitlement } = useMyEntitlements();
   // Owner-only + Pro. Pheno surfaces are owner-only via RLS, so the viewer owns
   // the hunt; the presentation gate is an active Pheno Tracker Pro plan. The
@@ -2143,6 +2174,8 @@ export default function PhenoHuntWorkspace() {
                       saving={ws.saving === c.candidateId}
                       evidencePacket={evidencePackets.packets.get(c.candidateId) ?? null}
                       evidenceStatus={evidencePackets.status}
+                      evidenceTentCatalog={evidenceTentCatalog}
+                      onRetryEvidenceTentCatalog={retryEvidenceTentCatalog}
                       selected={selectedIds.includes(c.candidateId)}
                       onToggleSelect={onToggleSelect}
                       canAssign={canAssign}

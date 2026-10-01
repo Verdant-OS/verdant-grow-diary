@@ -524,6 +524,27 @@ describe("Package + docs wiring", () => {
     }
   });
 
+  it("README and FIXTURE_SETUP mark bootstrap unavailable for the production lane", () => {
+    // Codex P2 on #1835: the bootstrap keeps the generic guard, which refuses
+    // production, so the workflow's bootstrap step would fail before
+    // verification if an operator enabled it for this lane.
+    expect(read("e2e/lib/fixtureBootstrap.ts")).toContain("validateFixtureEnv(");
+    expect(
+      validateFixtureEnv({
+        E2E_FIXTURE_MODE: "true",
+        E2E_GROW_1_PLANT_URL:
+          "https://verdantgrowdiary.com/plants/11111111-2222-4333-8444-555555555555",
+        E2E_FIXTURE_EXPECTED_TENT_NAME: "E2E Test Tent",
+        E2E_FIXTURE_EXPECTED_PLANT_NAME: "E2E Test Plant",
+      }).ok,
+    ).toBe(false);
+    for (const file of ["e2e/README.md", "e2e/FIXTURE_SETUP.md"]) {
+      const doc = read(file);
+      expect(doc, file).toContain("Unavailable for the production Quick Log smoke lane");
+      expect(doc, file).not.toMatch(/create \(or bootstrap\)|Create or bootstrap/);
+    }
+  });
+
   it("README direct smoke snippets pass the production-only Quick Log guard", () => {
     // QA 2026-09-24 (#1683): snippets once used the retired published Lovable
     // host, which answers HTTP 404, and a dev-server port nothing served.

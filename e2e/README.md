@@ -183,8 +183,9 @@ To rotate the disposable test account safely:
 
 1. Create a **new** dedicated test account through the normal `/auth`
    UI. Do not use a personal or production grower account.
-2. Create or bootstrap **only** the expected E2E fixture data on the
-   new account (see `e2e/FIXTURE_SETUP.md`).
+2. Create **only** the expected E2E fixture data on the new account,
+   manually (see `e2e/FIXTURE_SETUP.md`; bootstrap is unavailable for the
+   production lane).
 3. Update GitHub Actions **secrets**:
    - `E2E_TEST_EMAIL`
    - `E2E_TEST_PASSWORD`
@@ -206,6 +207,13 @@ never reads or prints any secret value, never calls Supabase or
 admin APIs, and never creates or deletes data.
 
 ## Optional UI-only bootstrap
+
+> **Unavailable for the production Quick Log smoke lane.** The bootstrap keeps
+> the generic fixture guard, which refuses `verdantgrowdiary.com`. With
+> `E2E_ALLOW_FIXTURE_BOOTSTRAP=true` and the production plant URL, the
+> workflow's `Bootstrap disposable E2E fixture` step fails before fixture
+> verification. Leave `E2E_ALLOW_FIXTURE_BOOTSTRAP` unset for this lane and
+> create the fixture manually.
 
 The bootstrap spec (`e2e/fixture-bootstrap.spec.ts`) is **off by
 default**. It runs only when:

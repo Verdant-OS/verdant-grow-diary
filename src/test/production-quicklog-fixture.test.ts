@@ -17,6 +17,7 @@ import { observeProductionQuickLogFixture } from "../../e2e/lib/productionQuickL
 import {
   validateFixtureEnv,
   validatePhenoWriteFixtureEnv,
+  validateQuickLogFixturePage,
   pageTextMatchesFixture,
 } from "../../e2e/lib/fixtureSafety";
 
@@ -531,6 +532,59 @@ describe("read-only production fixture observer", () => {
 // @source-scan-justified: Playwright specs register tests on import and cannot be loaded into
 // Vitest; the order of observer install, navigation, assertTarget and the save click is asserted
 // on the spec source.
+describe("visible Plant Detail checks", () => {
+  // Codex P1 on #1835: assertInitial derives an omitted grow name from the owned
+  // grow row, and Plant Detail does not render a grow name. The visible checks
+  // must not wait for the derived name; ownership and saves still use it.
+  function plantDetailPage(bodyText: string) {
+    const textWaits: string[] = [];
+    const visible = (text: string) => {
+      const locator = {
+        waitFor: async () => {
+          if (!bodyText.includes(text)) throw new Error(`timed out waiting for '${text}'`);
+        },
+        innerText: async () => text,
+        first: () => locator,
+      };
+      return locator;
+    };
+    const page = {
+      url: () => plantUrl,
+      getByRole: (_role: string, options: { name: string }) => visible(options.name),
+      getByTestId: () => ({ getByText: (text: string) => visible(text) }),
+      getByText: (text: string) => {
+        textWaits.push(text);
+        return visible(text);
+      },
+      locator: () => ({ innerText: async () => bodyText }),
+    } as unknown as Page;
+    return { page, textWaits };
+  }
+  const derivedProof = {
+    assertInitial: async () => ({ ok: true, errors: [], expected }),
+  } as unknown as Parameters<typeof validateQuickLogFixturePage>[2];
+  const plantDetailText = `${expected.plant}\n${expected.tent}\nE2E fixture`;
+
+  it("keeps a derived grow name for ownership without requiring it on the page", async () => {
+    const { page, textWaits } = plantDetailPage(plantDetailText);
+    const result = await validateQuickLogFixturePage(
+      page,
+      { ...env, E2E_FIXTURE_EXPECTED_GROW_NAME: "" },
+      derivedProof,
+    );
+    expect(result.expected.grow).toBe(expected.grow);
+    expect(textWaits).toEqual([]);
+  });
+
+  it("still requires an explicitly configured grow name to be visible", async () => {
+    const { page, textWaits } = plantDetailPage(plantDetailText);
+    await expect(validateQuickLogFixturePage(page, env, derivedProof)).rejects.toThrow(
+      `timed out waiting for '${expected.grow}'`,
+    );
+    expect(textWaits).toEqual([expected.grow]);
+  });
+});
+
 describe("production smoke save integration", () => {
   const read = (file: string) => fs.readFileSync(path.resolve(__dirname, "../..", file), "utf8");
   it("installs proof before navigation and disposes it in both entry points", () => {

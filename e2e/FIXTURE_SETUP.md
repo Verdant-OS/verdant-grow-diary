@@ -82,7 +82,9 @@ Configure in `Settings → Secrets and variables → Actions`:
   `cheekhimself@gmail.com`; any other value is refused. The guard checks the
   signed-in server identity either way. **Must not** be a password or token.
 - `E2E_ALLOW_FIXTURE_BOOTSTRAP=true` — enables the optional UI-only
-  fixture bootstrap step (see §6). Off by default.
+  fixture bootstrap step (see §6). Off by default. **Leave it unset for the
+  production Quick Log smoke lane**: the bootstrap refuses
+  `verdantgrowdiary.com` and would fail the workflow before verification.
 
 The helper script `bun run e2e:fixture-checklist` prints these names
 without reading or printing any secret value.
@@ -129,6 +131,12 @@ Rules for committed screenshots:
 
 ## 6. Optional UI-only bootstrap
 
+> **Unavailable for the production Quick Log smoke lane.** The bootstrap keeps
+> the generic fixture guard, which refuses `verdantgrowdiary.com`. With
+> `E2E_ALLOW_FIXTURE_BOOTSTRAP=true` and the production plant URL, the
+> workflow's `Bootstrap disposable E2E fixture` step fails before fixture
+> verification. Create the production fixture manually (§2).
+
 A safer alternative to manual creation is the optional bootstrap spec.
 It is **off by default** and must be explicitly opted into.
 
@@ -171,8 +179,8 @@ change to `e2e/lib/productionQuickLogFixtureRules.ts` first.
 
 1. Create a **new** dedicated test account through the normal `/auth`
    UI. Do not reuse a personal or production grower account.
-2. Sign in as the new account and create (or bootstrap) only the
-   expected E2E fixture names (§2).
+2. Sign in as the new account and create only the expected E2E fixture
+   names (§2), manually; bootstrap is unavailable for the production lane.
 3. Update GitHub Actions **secrets**:
    - `E2E_TEST_EMAIL`
    - `E2E_TEST_PASSWORD`

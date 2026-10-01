@@ -17,8 +17,6 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const migration = "20260927002000_quicklog_manual_reuse_fence.sql";
 const migrationSha256 = "5017b8f697f77a358df43d38fae486a21cabf92a65aa3af439bc750d221d6b1b";
 const repair = "20260818010000_quicklog_manual_delegate_forward_repair.sql";
-const databaseUrl =
-  "postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_quicklog_delegate_repair";
 const owner = "11111111-1111-4111-8111-111111111111";
 const other = "22222222-2222-4222-8222-222222222222";
 const ownerPlant = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";

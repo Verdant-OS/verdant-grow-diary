@@ -29,6 +29,14 @@ import { normalizeSharedSearchText } from "@/lib/sharedSearchTextRules";
 export const CULTIVAR_SEED_PAYLOAD_VERSION = 1;
 /** Dollar-quote tag that wraps the payload inside the migration file. */
 export const CULTIVAR_SEED_PAYLOAD_TAG = "verdant_cultivar_payload";
+/**
+ * The migration that currently carries the approved payload. Shared by the
+ * audit script, the RLS harness and the drift guard. When approved content
+ * changes, ship a new additive migration with a fresh payload and move this
+ * constant to it; published migrations are never edited.
+ */
+export const CULTIVAR_PARITY_MIGRATION_PATH =
+  "supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql";
 
 /** Context strings the V1 seed wrote for its stored-but-not-rendered claims. */
 const CHEMOTYPE_CLAIM_CONTEXT = {

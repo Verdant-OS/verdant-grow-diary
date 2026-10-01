@@ -17,6 +17,7 @@ import type {
   CultivarDatabaseSnapshot,
 } from "@/lib/cultivarDatabaseReadModel";
 import {
+  CULTIVAR_PARITY_MIGRATION_PATH,
   CULTIVAR_SEED_PAYLOAD_TAG,
   buildCultivarDatabaseSeedPayload,
   cultivarSeedPayloadToSnapshot,
@@ -24,9 +25,9 @@ import {
   serializeCultivarSeedPayload,
 } from "@/lib/cultivarDatabaseSeedPayloadRules";
 
-const MIGRATION_PATH =
-  "supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql";
-const MIGRATION_SQL = readFileSync(resolve(process.cwd(), MIGRATION_PATH), "utf8");
+// The migration currently carrying the approved payload; a future content
+// change moves this shared constant to its new migration, not this test.
+const MIGRATION_SQL = readFileSync(resolve(process.cwd(), CULTIVAR_PARITY_MIGRATION_PATH), "utf8");
 
 const bundledPayload = () =>
   buildCultivarDatabaseSeedPayload({
@@ -95,11 +96,12 @@ describe("cultivar database parity — approved content", () => {
     });
   });
 
-  it("the checked-in V1.1 migration payload is exactly the payload of the approved library", () => {
+  it("the current payload migration is exactly the payload of the approved library", () => {
     const extraction = extractCultivarSeedPayloadFromMigration(MIGRATION_SQL);
     expect(extraction.ok).toBe(true);
     if (!extraction.ok) return;
-    // Drift guard: editing the bundled library without a new migration turns this red.
+    // Drift guard: a bundled-library change turns this red until a new migration
+    // carries the new payload and CULTIVAR_PARITY_MIGRATION_PATH points to it.
     expect(serializeCultivarSeedPayload(extraction.payload)).toBe(
       serializeCultivarSeedPayload(bundledPayload()),
     );

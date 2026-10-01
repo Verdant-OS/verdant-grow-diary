@@ -32,6 +32,7 @@ import {
 } from "../src/constants/strainReferenceLibrary";
 import { auditCultivarDatabaseParity } from "../src/lib/cultivarDatabaseParityRules";
 import { CULTIVAR_DATABASE_TABLES } from "../src/lib/cultivarDatabaseReadModel";
+import { CULTIVAR_PARITY_MIGRATION_PATH } from "../src/lib/cultivarDatabaseSeedPayloadRules";
 import {
   fetchPublishedCultivarSnapshot,
   type CultivarReferenceReadClient,
@@ -39,10 +40,7 @@ import {
 import { classifySupabasePublicReadKey } from "../src/lib/supabasePublicReadKeyRules";
 
 const LOCAL_LANE_FLAG = "--confirm-local-security-lane";
-const MIGRATION = resolve(
-  process.cwd(),
-  "supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql",
-);
+const MIGRATION = resolve(process.cwd(), CULTIVAR_PARITY_MIGRATION_PATH);
 const IMPORT_TABLES = ["cultivar_import_batches", "cultivar_import_rows"] as const;
 
 if (!process.argv.includes(LOCAL_LANE_FLAG)) {

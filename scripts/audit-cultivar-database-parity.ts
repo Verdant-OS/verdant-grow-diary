@@ -13,8 +13,10 @@
  *       Reads the published surface through PostgREST with the PUBLISHABLE /
  *       anon key only (SUPABASE_URL + SUPABASE_ANON_KEY or
  *       VITE_SUPABASE_URL + VITE_SUPABASE_PUBLISHABLE_KEY). This is the
- *       preview/production deployment receipt: it also proves anon can read
- *       the published surface and nothing else. Never pass a service-role key.
+ *       preview/production deployment receipt: it proves the anon key can read
+ *       the published surface with exact approved parity. It does NOT prove
+ *       hidden rows are unreadable (its queries filter to published rows);
+ *       that is the RLS harness's job. Never pass a service-role key.
  *
  * Flags:
  *   --strict             exit 1 unless status is `ready` (default: report only)
@@ -40,14 +42,13 @@ import {
 } from "@/lib/cultivarDatabaseParityRules";
 import type { CultivarDatabaseSnapshot } from "@/lib/cultivarDatabaseReadModel";
 import {
+  CULTIVAR_PARITY_MIGRATION_PATH,
   cultivarSeedPayloadToSnapshot,
   extractCultivarSeedPayloadFromMigration,
 } from "@/lib/cultivarDatabaseSeedPayloadRules";
 import { fetchPublishedCultivarSnapshot } from "@/lib/cultivarReferenceService";
 import { classifySupabasePublicReadKey } from "@/lib/supabasePublicReadKeyRules";
 
-export const CULTIVAR_PARITY_MIGRATION_PATH =
-  "supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql";
 const DEFAULT_OUT = "artifacts/strain-reference-library/db-parity-report.json";
 
 function arg(name: string): string | undefined {

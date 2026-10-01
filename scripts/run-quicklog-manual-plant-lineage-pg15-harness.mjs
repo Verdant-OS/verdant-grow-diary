@@ -22,8 +22,6 @@ import {
 } from "./run-quicklog-manual-delegate-forward-repair-pg15-harness.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const database =
-  "postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_quicklog_delegate_repair";
 const owner = "11111111-1111-4111-8111-111111111111";
 const plant = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const originalGrow = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";

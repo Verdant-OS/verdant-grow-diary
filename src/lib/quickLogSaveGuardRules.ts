@@ -27,7 +27,12 @@ export interface QuickLogPostSaveSuccess {
    * durable grow-scoped Timeline CTA. Never invent a fallback grow.
    */
   growId: string | null;
-  /** Target the log was attached to. Used for plant/tent URL filters. */
+  /**
+   * Target the log was attached to, used for plant/tent URL filters.
+   * `null` is a verified, authoritative absence of a target (the save was
+   * confirmed without one), not "unknown": callers must not fall back to
+   * draft labels or filters when it is null.
+   */
   targetType: "plant" | "tent" | null;
   targetId: string | null;
   tentId: string | null;

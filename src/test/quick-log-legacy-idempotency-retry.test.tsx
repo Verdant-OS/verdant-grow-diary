@@ -116,6 +116,7 @@ describe("QuickLog legacy failed-save idempotency", () => {
     "idempotency_receipt_missing",
     "idempotency_key_retracted",
     "idempotency_key_conflict",
+    "receipt_target_moved",
   ])("does not rotate or resubmit a history-review draft after %s", async (reason) => {
     saveMock.mockResolvedValue({ ok: false, reason });
     renderQuickLog();
@@ -132,6 +133,29 @@ describe("QuickLog legacy failed-save idempotency", () => {
     expect(saveMock).toHaveBeenCalledTimes(1);
   });
 
+  it("links a moved receipt's history review to the entry's verified current target", async () => {
+    saveMock.mockResolvedValue({
+      ok: false,
+      reason: "receipt_target_moved",
+      persistedGrowId: "grow-2",
+      persistedTentId: "tent-2",
+      persistedPlantId: "plant-2",
+    });
+    renderQuickLog();
+    await typeNote("Possibly saved original.");
+    await clickSave();
+    await screen.findByTestId("quick-log-save-error");
+    const link = screen.getByRole("link", { name: "Open Timeline in a new tab" });
+    expect(link.getAttribute("href")).toContain("growId=grow-2");
+    expect(link.getAttribute("href")).toContain("plantId=plant-2");
+    expect(link.getAttribute("href")).not.toContain("plantId=plant-1");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "I checked Timeline; discard draft" }),
+    ).toBeEnabled();
+    expect(saveMock).toHaveBeenCalledTimes(1);
+  });
+
   it("requires explicit history review to discard the draft before starting a fresh key", async () => {
     saveMock
       .mockResolvedValueOnce({ ok: false, reason: "idempotency_key_unverified" })
@@ -141,7 +165,13 @@ describe("QuickLog legacy failed-save idempotency", () => {
     await clickSave();
     await screen.findByTestId("quick-log-save-error");
     const refusedKey = payloadKey(0);
-    fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+    // The draft fieldset is disabled while review is required; the discard control
+    // must live outside it, or a real browser could never click it (fireEvent
+    // bypasses the disabled-fieldset rule, toBeEnabled() does not).
+    const discard = screen.getByRole("button", { name: "I checked Timeline; discard draft" });
+    expect(screen.getByTestId("quick-log-main-draft-fields")).toBeDisabled();
+    expect(discard).toBeEnabled();
+    fireEvent.click(discard);
     expect(screen.getByRole("dialog").querySelector("textarea")).toHaveValue("");
     expect(saveMock).toHaveBeenCalledTimes(1);
     await typeNote("Deliberately new entry after review.");

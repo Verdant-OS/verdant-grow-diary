@@ -5,7 +5,7 @@
  * access is in usePostGrowLearningReportData. No AI generation, no automation,
  * no device control, and no schema changes.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "@/lib/react-router-compat";
 import { ArrowLeft, Leaf, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,6 +37,7 @@ import { checkPremiumExportEntitlement } from "@/hooks/usePremiumExportServerGat
 import PaywallCta from "@/components/PaywallCta";
 import { buildPaywallCtaViewModel } from "@/lib/paywallCtaViewModel";
 import { canUseCapability } from "@/lib/entitlements";
+import { useAuth } from "@/store/auth";
 
 function resultMessage(result: unknown, fallback: string): string {
   if (typeof result !== "object" || result === null || !("message" in result)) return fallback;
@@ -47,7 +48,7 @@ function resultMessage(result: unknown, fallback: string): string {
 export default function PostGrowLearningReport() {
   const { growId } = useParams<{ growId: string }>();
   const navigate = useNavigate();
-  const { status, report, yieldEfficiency, error, saveLesson, applyLessonToNextGrow } =
+  const { status, report, yieldEfficiency, error, reload, saveLesson, applyLessonToNextGrow } =
     usePostGrowLearningReportData(growId);
   const { state: episodesState } = usePlantMemoryEpisodes({
     growId: growId ?? null,
@@ -62,6 +63,17 @@ export default function PostGrowLearningReport() {
   );
   const [lesson, setLesson] = useState("");
   const [busy, setBusy] = useState(false);
+  const { user } = useAuth();
+  const lessonScope = `${user?.id ?? "anon"}\u0000${growId ?? "none"}`;
+  const lessonDraft = useRef("");
+  // True from the grower's first keystroke until the draft is synced to a saved
+  // record again. Text equality alone cannot tell a deliberate edit that restores
+  // the saved text from a pristine draft.
+  const lessonDirty = useRef(false);
+  const lastSavedLesson = useRef<{ scope: string; entryId: string | null; text: string } | null>(
+    null,
+  );
+  const pendingFirstSave = useRef<{ scope: string; submitted: string } | null>(null);
 
   // Pro gate. Pricing has always sold this report as Pro-only; the page
   // now enforces it: client hint avoids a content flash, and the
@@ -97,15 +109,71 @@ export default function PostGrowLearningReport() {
   }, [growId, gateAttempt]);
 
   useEffect(() => {
-    if (report) setLesson(report.lesson.text);
-  }, [report?.lesson.entryId, report?.lesson.text]);
+    lessonDraft.current = "";
+    lessonDirty.current = false;
+    lastSavedLesson.current = null;
+    pendingFirstSave.current = null;
+    setLesson("");
+  }, [lessonScope]);
+
+  useEffect(() => {
+    if (!report) return;
+    const current = {
+      scope: lessonScope,
+      entryId: report.lesson.entryId,
+      text: report.lesson.text,
+    };
+    const previous = lastSavedLesson.current;
+    const firstSave = pendingFirstSave.current;
+    // An insert changes the lesson ID while its save is still in flight. Match
+    // its saved text so edits typed after submission survive that transition.
+    const preservePostSaveEdit =
+      previous?.entryId === null &&
+      current.entryId !== null &&
+      firstSave?.scope === current.scope &&
+      current.text === firstSave.submitted.trim() &&
+      lessonDraft.current !== firstSave.submitted;
+    if (previous?.entryId === null && current.entryId !== null) pendingFirstSave.current = null;
+    if (
+      !previous ||
+      previous.scope !== current.scope ||
+      (previous.entryId !== current.entryId && !preservePostSaveEdit) ||
+      (!lessonDirty.current && !preservePostSaveEdit)
+    ) {
+      lessonDraft.current = current.text;
+      lessonDirty.current = false;
+      setLesson(current.text);
+    }
+    lastSavedLesson.current = current;
+  }, [lessonScope, report]);
+
+  function changeLesson(value: string) {
+    lessonDraft.current = value;
+    lessonDirty.current = true;
+    setLesson(value);
+  }
 
   async function handleSaveLesson() {
     setBusy(true);
-    const result = await saveLesson(lesson);
+    const submitted = lessonDraft.current;
+    const submittedScope = lessonScope;
+    if (
+      lastSavedLesson.current?.scope === submittedScope &&
+      lastSavedLesson.current.entryId === null
+    )
+      pendingFirstSave.current = { scope: submittedScope, submitted };
+    const result = await saveLesson(submitted);
     setBusy(false);
-    if (result.ok) toast.success("Lesson saved");
-    else toast.error(resultMessage(result, "Lesson could not be saved."));
+    if (result.ok) {
+      if (lastSavedLesson.current?.scope === submittedScope && lessonDraft.current === submitted) {
+        changeLesson(submitted.trim());
+        lessonDirty.current = false;
+      }
+      toast.success("Lesson saved");
+    } else {
+      if (pendingFirstSave.current?.scope === submittedScope) pendingFirstSave.current = null;
+      toast.error(resultMessage(result, "Lesson could not be saved."));
+    }
   }
 
   async function handleApplyLesson() {
@@ -214,6 +282,9 @@ export default function PostGrowLearningReport() {
           title="Report unavailable"
           description={error ?? "This grow report could not be loaded."}
         />
+        <Button type="button" variant="outline" onClick={() => void reload()}>
+          Retry report
+        </Button>
       </div>
     );
   }
@@ -288,7 +359,7 @@ export default function PostGrowLearningReport() {
         <LessonsCard
           vm={report}
           lesson={lesson}
-          onLessonChange={setLesson}
+          onLessonChange={changeLesson}
           onSave={handleSaveLesson}
           onApply={handleApplyLesson}
           busy={busy}

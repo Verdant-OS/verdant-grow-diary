@@ -7,6 +7,10 @@
  * companion photo/video failure double-wrote the diary. These tests pin
  * the migration's guarantees and the client threading so neither side
  * silently regresses.
+ *
+ * @source-scan-justified: the migrations are SQL with no importable module, and
+ * the client-threading pins assert statement order inside handleDiscardHistoryDraft,
+ * which no resolved value exposes.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";

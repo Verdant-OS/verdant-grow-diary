@@ -60,6 +60,7 @@ import { creditPackBlockedCopy, resolveCreditPackPurchaseGate } from "@/lib/cred
 import { buildCreditPackSuccessUrl } from "@/lib/checkoutReturnTo";
 import { isReducedMotionPreferred } from "@/lib/useTimelineHighlightAutoScroll";
 import { buildCheckoutPlanReturnPath, savePlanIntent } from "@/lib/checkoutPlanIntent";
+import { resolvePricingCheckoutRetryGate } from "@/lib/pricingCheckoutRetryRules";
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -229,6 +230,10 @@ export default function Pricing() {
     blockedReasonCode,
     dismissBlocked,
   } = usePaddleCheckout();
+  const checkoutRetryGate = resolvePricingCheckoutRetryGate(
+    lastCheckoutSkuRef.current ?? interestPlan,
+    creditPackGate,
+  );
   const checkoutRecoveryReason = blockedReason ?? unavailableMessage;
   const checkoutRecoveryKind =
     blockedReasonCode === "auth_required"
@@ -877,34 +882,43 @@ export default function Pricing() {
                     {reauthenticating ? "Opening sign in…" : "Sign in again"}
                   </Button>
                 ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    data-testid="pricing-checkout-retry"
-                    disabled={checkoutLoading}
-                    onClick={() => {
-                      // Retry the SKU that actually failed. This read used to be
-                      // lastCheckoutPlanRef, which credit-pack clicks never
-                      // wrote, so a failed "Buy 50 credits" ($9) retried its
-                      // initial value — interestPlan, default pro_annual — and
-                      // opened a $99/yr subscription checkout instead.
-                      const rawSku = lastCheckoutSkuRef.current ?? interestPlan;
-                      const plan = sanitizeCheckoutRecoveryPlanSlug(rawSku);
-                      trackPricingEvent("pricing_checkout_recovery_retry", {
-                        plan,
-                        source: "recovery_panel",
-                      });
-                      trackFunnelEvent("checkout_recovery_retry", { plan });
-                      dismissBlocked();
-                      void openCheckout({
-                        priceId: rawSku,
-                        successUrl: packSuccessUrlFor(rawSku),
-                      });
-                    }}
-                  >
-                    Try again
-                  </Button>
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      data-testid="pricing-checkout-retry"
+                      disabled={checkoutLoading || !checkoutRetryGate.allowed}
+                      onClick={() => {
+                        // Retry the SKU that actually failed. This read used to be
+                        // lastCheckoutPlanRef, which credit-pack clicks never
+                        // wrote, so a failed "Buy 50 credits" ($9) retried its
+                        // initial value — interestPlan, default pro_annual — and
+                        // opened a $99/yr subscription checkout instead.
+                        const rawSku = lastCheckoutSkuRef.current ?? interestPlan;
+                        if (!resolvePricingCheckoutRetryGate(rawSku, creditPackGate).allowed)
+                          return;
+                        const plan = sanitizeCheckoutRecoveryPlanSlug(rawSku);
+                        trackPricingEvent("pricing_checkout_recovery_retry", {
+                          plan,
+                          source: "recovery_panel",
+                        });
+                        trackFunnelEvent("checkout_recovery_retry", { plan });
+                        dismissBlocked();
+                        void openCheckout({
+                          priceId: rawSku,
+                          successUrl: packSuccessUrlFor(rawSku),
+                        });
+                      }}
+                    >
+                      Try again
+                    </Button>
+                    {checkoutRetryGate.message && (
+                      <p role="status" className="basis-full text-sm text-muted-foreground">
+                        {checkoutRetryGate.message}
+                      </p>
+                    )}
+                  </>
                 )}
                 {checkoutRecoveryKind === "configuration" && (
                   <>

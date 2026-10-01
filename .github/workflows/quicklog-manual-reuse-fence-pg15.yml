@@ -2,6 +2,7 @@ name: Quick Log manual reuse fence PG15
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths: &quicklog_manual_reuse_paths
       - "supabase/migrations/20260927002000_quicklog_manual_reuse_fence.sql"
       - "supabase/migrations/20260927160000_quicklog_manual_plant_tent_lineage.sql"
@@ -20,7 +21,6 @@ on:
       - "src/test/quicklog-manual-delivery-bundle.test.ts"
       - "src/test/quicklog-manual-reuse-lock-pg15-harness.test.ts"
       - ".github/workflows/quicklog-manual-reuse-fence-pg15.yml"
-    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - verdant-grow-diary

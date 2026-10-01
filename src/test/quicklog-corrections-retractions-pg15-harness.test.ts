@@ -23,6 +23,35 @@ async function loadHarness() {
 }
 
 describe("Quick Log corrections/retractions PostgreSQL 15 runtime gate", () => {
+  it("extracts the same pinned function from LF and CRLF migration checkouts", async () => {
+    const harness = await loadHarness();
+    const source =
+      "-- before\nCREATE FUNCTION public.sample() RETURNS void\nAS $function$\nBEGIN\n  NULL;\nEND;\n$function$;\n-- after\n";
+    const expected =
+      "CREATE FUNCTION public.sample() RETURNS void\nAS $function$\nBEGIN\n  NULL;\nEND;\n$function$;";
+    expect(
+      harness.extractFunctionDefinitionFromSource(
+        source,
+        "CREATE FUNCTION public.sample()",
+        "$function$;",
+      ),
+    ).toBe(expected);
+    expect(
+      harness.extractFunctionDefinitionFromSource(
+        source.replace(/\n/g, "\r\n"),
+        "CREATE FUNCTION public.sample()",
+        "$function$;",
+      ),
+    ).toBe(expected);
+    expect(() =>
+      harness.extractFunctionDefinitionFromSource(
+        source,
+        "CREATE FUNCTION public.missing()",
+        "$function$;",
+      ),
+    ).toThrow("dependency_source_missing");
+  });
+
   it("uses bounded psql output with tuple-only quiet arguments", async () => {
     const harness = await loadHarness();
     expect(harness.buildPsqlArgs({ quiet: true })).toEqual([
@@ -206,6 +235,11 @@ describe("Quick Log corrections/retractions PostgreSQL 15 runtime gate", () => {
     const harness = await loadHarness();
     const migration = harness.validatePinnedMigrationFile({
       root: resolve("supabase", "migrations"),
+      // Test the committed LF migration bytes even when Git's Windows checkout
+      // has converted this working-tree copy to CRLF. The production runner
+      // still rejects noncanonical bytes; only this fixture input is normalized.
+      readFile: (path: string) =>
+        Buffer.from(readFileSync(path, "utf8").replace(/\r\n?/g, "\n"), "utf8"),
     });
     const prerequisiteMutation = "alter role authenticated bypassrls;";
     const targetMutation =
@@ -252,6 +286,10 @@ describe("Quick Log corrections/retractions PostgreSQL 15 runtime gate", () => {
       expect(source).toContain(proof);
     }
     expect(source).toContain("quicklog_entry_revisions");
+    expect(source).toContain("apply-quicklog-revision-idempotent-replay.mjs");
+    expect(source).toContain("catalog_drift:required_core_baseline");
+    expect(source).toContain("catalog_drift:required_core_false_green");
+    expect(source).toContain("catalog_drift:required_core_restore_failed");
     expect(source).toContain("alter table public.diary_entries add column retracted_at");
     expect(source).toContain("alter role authenticated bypassrls");
     expect(source).toContain("update pg_catalog.pg_index");
@@ -269,6 +307,9 @@ describe("Quick Log corrections/retractions PostgreSQL 15 runtime gate", () => {
     );
     expect(trigger.pull_request.paths).toContain(
       "supabase/migrations/20260811090000_quicklog_corrections_retractions.sql",
+    );
+    expect(trigger.pull_request.paths).toContain(
+      "supabase/migrations/20260916111000_quicklog_revision_idempotent_replay.sql",
     );
     expect(trigger.pull_request.paths).toContain(
       "scripts/assert-required-core-migrations-applied.mjs",

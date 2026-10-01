@@ -5,6 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { QUICK_LOG_V2_OPEN_EVENT, type QuickLogV2OpenIntent } from "@/lib/quickLogV2OpenIntent";
 
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "daily-check-return-owner" }, loading: false }),
+}));
+
 const GROW = "00000000-0000-4000-8000-000000000001";
 const PLANT = "00000000-0000-4000-8000-000000000002";
 const TENT = "00000000-0000-4000-8000-000000000003";
@@ -70,6 +74,20 @@ function renderRoute(source = "dashboard") {
   );
 }
 
+function renderRouteWithoutGrow(source = "dashboard") {
+  render(
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <MemoryRouter initialEntries={[`/daily-check?plantId=${PLANT}&from=${source}`]}>
+        <DailyCheck />
+        <WaterSheetHost />
+        <Probe />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe("Soft P2 weekly batch: Daily Check return", () => {
   it("D cancel/back keeps growId when the watering diary CTA query is already correct", async () => {
     render(
@@ -93,8 +111,11 @@ describe("Soft P2 weekly batch: Daily Check return", () => {
     expect(urlBefore.searchParams.get("method")).toBe("watering");
     await screen.findByTestId("daily-check-all-activities-picker-watering");
     expect(screen.getByTestId("destination").textContent).toBe(before);
+    const dashboardHref = screen.getByRole("link", { name: "Dashboard" }).getAttribute("href");
+    expect(dashboardHref).toBe(`/?growId=${GROW}`);
     await act(async () => fireEvent.click(screen.getByRole("link", { name: "Dashboard" })));
     const url = new URL(screen.getByTestId("destination").textContent!, "https://fixture.invalid");
+    expect(url.pathname).toBe("/");
     expect(url.searchParams.get("growId")).toBe(GROW);
   });
 
@@ -130,5 +151,15 @@ describe("Soft P2 weekly batch: Daily Check return", () => {
       const href = screen.getByTestId(`daily-grow-check-post-submit-${key}`).getAttribute("href")!;
       expect(new URL(href, "https://fixture.invalid").searchParams.get("growId")).toBe(GROW);
     }
+  });
+
+  it("Dashboard breadcrumb falls back to root when growId is absent", async () => {
+    renderRouteWithoutGrow();
+    const dashboardLink = screen.getByRole("link", { name: "Dashboard" });
+    expect(dashboardLink.getAttribute("href")).toBe("/");
+    await act(async () => fireEvent.click(dashboardLink));
+    const url = new URL(screen.getByTestId("destination").textContent!, "https://fixture.invalid");
+    expect(url.pathname).toBe("/");
+    expect(url.searchParams.get("growId")).toBeNull();
   });
 });

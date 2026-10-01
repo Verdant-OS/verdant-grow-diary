@@ -18,7 +18,7 @@ is recorded as `PASS` with its receipt.
 | Pure parity audit             | `src/lib/cultivarDatabaseParityRules.ts`                                             | `established fact` (unit tests)                 |
 | Typed, fail-closed read model | `src/lib/cultivarDatabaseReadModel.ts`                                               | `established fact` (unit tests)                 |
 | Seed payload builder          | `src/lib/cultivarDatabaseSeedPayloadRules.ts`                                        | `established fact` (drift-guard test)           |
-| Additive parity migration     | `supabase/migrations/20260930200000_strain_reference_library_v1_1_parity.sql`        | offline parity `established fact`; replay in CI |
+| Additive parity migration     | `supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql`        | offline parity `established fact`; replay in CI |
 | Read-only service + hook      | `src/lib/cultivarReferenceService.ts`, `src/hooks/usePublishedCultivars.ts`          | `established fact` (unit + page tests)          |
 | Explicit source state         | `src/lib/cultivarReferenceSourceRules.ts`                                            | `established fact` (unit + page tests)          |
 | Default-off release flag      | `cultivarDatabaseReadsEnabled` in `src/lib/featureFlags.ts`                          | `established fact`                              |

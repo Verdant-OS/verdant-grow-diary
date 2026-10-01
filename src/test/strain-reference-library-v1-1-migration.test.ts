@@ -9,7 +9,7 @@ import { CULTIVAR_SEED_PAYLOAD_TAG } from "@/lib/cultivarDatabaseSeedPayloadRule
  * execute; the runtime proof is scripts/run-cultivar-reference-rls-harness.ts
  * in the security-db-local lane. These assertions fence forbidden constructs.
  */
-const FILE = "20260930200000_strain_reference_library_v1_1_parity.sql";
+const FILE = "20261001160000_strain_reference_library_v1_1_parity.sql";
 const MIGRATIONS = resolve(process.cwd(), "supabase/migrations");
 const SQL = readFileSync(resolve(MIGRATIONS, FILE), "utf8");
 const TAG = `$${CULTIVAR_SEED_PAYLOAD_TAG}$`;

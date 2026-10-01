@@ -47,7 +47,7 @@ import { fetchPublishedCultivarSnapshot } from "@/lib/cultivarReferenceService";
 import { classifySupabasePublicReadKey } from "@/lib/supabasePublicReadKeyRules";
 
 export const CULTIVAR_PARITY_MIGRATION_PATH =
-  "supabase/migrations/20260930200000_strain_reference_library_v1_1_parity.sql";
+  "supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql";
 const DEFAULT_OUT = "artifacts/strain-reference-library/db-parity-report.json";
 
 function arg(name: string): string | undefined {

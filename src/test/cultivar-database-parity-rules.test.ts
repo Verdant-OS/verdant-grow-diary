@@ -25,7 +25,7 @@ import {
 } from "@/lib/cultivarDatabaseSeedPayloadRules";
 
 const MIGRATION_PATH =
-  "supabase/migrations/20260930200000_strain_reference_library_v1_1_parity.sql";
+  "supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql";
 const MIGRATION_SQL = readFileSync(resolve(process.cwd(), MIGRATION_PATH), "utf8");
 
 const bundledPayload = () =>

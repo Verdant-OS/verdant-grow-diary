@@ -22,7 +22,7 @@ on:
       - "supabase/functions/_shared/lib/.sync-manifest.json"
       - "supabase/functions/_shared/lib/integrations/supabase/types.ts"
       - "supabase/migrations/20260722203000_strain_reference_library_v1.sql"
-      - "supabase/migrations/20260930200000_strain_reference_library_v1_1_parity.sql"
+      - "supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql"
       - "docs/product/strain-reference-library-v1.md"
       - ".github/workflows/strain-reference-library-v1-gate.yml"
     types: [opened, synchronize, reopened, ready_for_review]

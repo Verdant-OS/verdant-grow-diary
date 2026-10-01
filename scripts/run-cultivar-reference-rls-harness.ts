@@ -41,7 +41,7 @@ import { classifySupabasePublicReadKey } from "../src/lib/supabasePublicReadKeyR
 const LOCAL_LANE_FLAG = "--confirm-local-security-lane";
 const MIGRATION = resolve(
   process.cwd(),
-  "supabase/migrations/20260930200000_strain_reference_library_v1_1_parity.sql",
+  "supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql",
 );
 const IMPORT_TABLES = ["cultivar_import_batches", "cultivar_import_rows"] as const;
 

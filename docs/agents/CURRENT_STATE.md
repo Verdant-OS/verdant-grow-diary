@@ -2,27 +2,29 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T16:51 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T17:03 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
 
 - **Open (not draft), awaiting CI and Chemdawg pre-check — review not routed:
   [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
-  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `358d69c38`, 16 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 16:51
-  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 75 pass / 27 pending /
-  14 skipped / **1 failed — `Vercel`**. No approving review.
-  - Required contexts (35, `config/required-status-checks.json`): 15 pass, 19 pending, 1 not yet
-    reported (`Lint, typecheck, test, build`). None failed.
-  - **1 commit behind `verdant-grow-diary`:** `6ed854cee` (`#1835`, e2e Quick Log fixture check)
-    landed after `358d69c38`. It adds no migration, so it does not affect this PR's migration
-    ordering. Not yet merged into the branch.
+  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `2d954bda1`, 17 commits) implements
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 17:03
+  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI restarted on the new
+  head — 0 pass / 93 pending / 6 skipped / **1 failed — `Vercel`**. No approving review.
+  - Required contexts (35, `config/required-status-checks.json`): 34 pending, 1 not yet reported
+    (`Lint, typecheck, test, build`). None failed.
+  - `2d954bda1` merges `verdant-grow-diary` at `6ed854cee` (`#1835`, e2e Quick Log fixture check;
+    e2e files and tests only, no migration).
+  - **1 commit behind again:** `a8af664c5` (`#1742`, CI lane pin) landed after `2d954bda1`. No
+    migration, merges cleanly. Not yet merged into the branch.
 - **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` and again at `69f2f5b23` (2026-10-01,
   no conflicts). The first brought `#1832` (hono pin), which clears the earlier
   `Dependency & Security CI` red; the second brought `#1836`.
-- **`Published migration integrity` at `358d69c38`: `PASS`** — CI run `36892553063` completed
-  successfully on this exact head, including its one-line payload change.
+- **`Published migration integrity` at `2d954bda1` (exact head): queued** (run `36896127236`).
+  - At `358d69c38` (previous head, same migration file): `PASS`, run `36892553063`, including its
+    one-line payload change.
   - Historical, earlier heads only: the red on `d65094aa9` ran before `#1836` was merged in and
     read `#1836`'s migration as "deleted". CI then passed on `a7232e1e1` (run `36886278227`),
     `dac35e4fc` (run `36888190685`) and `9ca178156` (run `36890471647`).
@@ -81,10 +83,12 @@ this entry's earlier 2026-10-01 versions.
   - Each run used a freshly replayed local database, with strict parity READY and migration
     re-apply idempotency.
   - The runs on `0bcb2464d` and `9ca178156` were cancelled by later pushes.
-  - **At `358d69c38` (exact head): `PASS`.** Run `36892553425` reported **113 passed, 0 failed**.
+  - **At `358d69c38` (previous head): `PASS`.** Run `36892553425` reported **113 passed, 0 failed**.
     It is the first real-database run of the row-level parity check, the base-template link, the
     template-table write probes and the one-line payload change. Strict parity READY as anon and
     as authenticated, and migration re-apply idempotent.
+  - **At `2d954bda1` (exact head): queued** (run `36896125956`). The merge adds only `#1835`'s e2e
+    files, but per-SHA evidence does not carry over, so the exact-head result is `NOT_MEASURED`.
 - **Local evidence (`established fact`, Windows clone):**
   - offline strict parity READY 10/10 at `358d69c38`;
   - at `358d69c38`, the PR's tests plus every migration-scanning test: 1,542 passed, with 1 file

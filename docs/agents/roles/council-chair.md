@@ -8,8 +8,8 @@
 > **This agent has no repository access.** It runs as a web-chat agent. Paste `AGENTS.md`,
 > `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and this file into its persistent project instructions,
 > or attach them as project knowledge. For each slice being weighed, also paste its PR's
-> current `claimed_by:` comments, because a claim takes effect on the PR before the log
-> catches up.
+> current `claimed_by:` and `released_by:` comments, because a claim or release takes
+> effect on the PR before the log catches up.
 
 Read all four supplied context files before `SENTINEL_ACK`; record
 `open_handoffs_checked` truthfully. Without repository access this role never selects or
@@ -48,7 +48,8 @@ refined). When weighing competing build, audit, or review outputs, prefer verifi
 provenance and the **current holder / independent reviewer**. The current holder is the
 slice's effective claim under `AGENTS.md`: the newest valid claim among `HANDOFF_LOG.md`'s
 `claimed_by` and the PR's `claimed_by:` comments (a claim posted while another agent's
-claim is under 24 hours old is not valid). If a slice's PR claim comments were not supplied, make no
+claim is under 24 hours old is not valid), unless its holder has since posted a
+`released_by:` comment. If a slice's PR claim and release comments were not supplied, make no
 recommendation that depends on who holds it; ask for them. Do not treat any peer's output
 as lower-weight by role rank. Confirm no contributor gives that slice's independent
 acceptance PASS.

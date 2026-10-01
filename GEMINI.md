@@ -176,8 +176,10 @@ agent from one written block.
   needed to resume. A claim is valid only when it is posted while the block is open, or
   by the agent already holding the block's effective claim (a renewal). A block's
   effective claim is the newest valid claim among its log `claimed_by` and the
-  `claimed_by:` comments on its PR, ordered by when they were posted, so read the PR's
-  comments before treating a block as unclaimed or stale. A claim posted while another
+  `claimed_by:` comments on its PR, ordered by when they were posted, unless that
+  claim's holder has since posted a `released_by:` comment (below), in which case the
+  block has no effective claim. Read the PR's claim and release comments before treating
+  a block as unclaimed or stale. A claim posted while another
   agent's valid claim is under 24 hours old is not valid: when two agents race for the
   same open block, the first claim posted holds it. The current holder can end its claim
   early, for a deliberate transfer or when it stops work, with a PR comment reading

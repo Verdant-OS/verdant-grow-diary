@@ -64,16 +64,16 @@ describe("PhenoHuntsIndex", () => {
     expect(screen.getByTestId("pheno-hunts-index-loading")).toBeInTheDocument();
   });
 
-  it("lists each hunt with a link into its workspace and a candidate count", async () => {
+  it("lists each hunt with a link into its workspace and an active candidate count", async () => {
     renderIndex();
     await waitFor(() => expect(screen.getByTestId("pheno-hunts-index-list")).toBeInTheDocument());
     const first = screen.getByTestId("pheno-hunts-index-item-hunt-1");
     expect(first).toHaveAttribute("href", "/pheno-hunts/hunt-1/workspace");
     expect(first.textContent).toContain("Blue Dream F2");
-    expect(first.textContent).toContain("12 candidates");
+    expect(first.textContent).toContain("12 active candidates");
 
     const second = screen.getByTestId("pheno-hunts-index-item-hunt-2");
-    expect(second.textContent).toContain("1 candidate");
+    expect(second.textContent).toContain("1 active candidate");
     // Singular, and setup-in-progress surfaced honestly.
     expect(second.textContent).toContain("setup in progress");
   });
@@ -158,6 +158,10 @@ describe("PhenoHuntsIndex — cross-keeper stability dashboard", () => {
     await waitFor(() => expect(screen.getByTestId("pheno-hunts-index-list")).toBeInTheDocument());
     expect(screen.queryByTestId("pheno-hunts-index-error")).not.toBeInTheDocument();
     expect(screen.queryByTestId("pheno-stability-dashboard")).not.toBeInTheDocument();
+    // The failure is flagged, never rendered as an empty ledger or "0 keepers".
+    expect(screen.getByTestId("pheno-hunts-index-stability-unavailable")).toBeInTheDocument();
+    const card = screen.getByTestId("pheno-hunts-index-item-hunt-1");
+    expect(card.textContent).not.toMatch(/keeper/i);
   });
 
   it("rolls up each keeper's own verdict with a hunt label, never a ranking", async () => {
@@ -201,5 +205,58 @@ describe("PhenoHuntsIndex — cross-keeper stability dashboard", () => {
     expect(screen.getByTestId("pheno-stability-dashboard-entry-k1")).toBeInTheDocument();
     expect(screen.queryByTestId("pheno-stability-dashboard-entry-k2")).not.toBeInTheDocument();
     expect(screen.queryByTestId("pheno-stability-dashboard-entry-k3")).not.toBeInTheDocument();
+  });
+});
+
+describe("PhenoHuntsIndex — candidate and keeper counts agree (#550)", () => {
+  // Mirrors the production report: the DEMO hunt's card read "0 candidates"
+  // while the stability panel above it listed four keepers from that hunt.
+  const DEMO_HUNT_ID = "d3110000-0000-4000-8000-000000000003";
+  const DEMO_HUNTS: PhenoHuntListItem[] = [
+    {
+      id: DEMO_HUNT_ID,
+      name: "DEMO — Loud Pack S1 Hunt",
+      createdAt: "2026-07-09T12:00:00.000Z",
+      setupCompletedAt: "2026-07-09T12:00:00.000Z",
+      candidateCount: 0,
+    },
+    {
+      id: "hunt-other",
+      name: "Other hunt",
+      createdAt: "2026-07-10T12:00:00.000Z",
+      setupCompletedAt: "2026-07-10T12:00:00.000Z",
+      candidateCount: 5,
+    },
+  ];
+  const DEMO_KEEPERS: KeeperStabilityRow[] = [
+    "Gas Candy",
+    "Loud Larry",
+    "Purple Punch Cut",
+    "Frosty #19",
+  ].map((keeperName, i) => ({
+    keeperId: `k${i}`,
+    huntId: DEMO_HUNT_ID,
+    keeperName,
+    stabilityRuns: [],
+  }));
+
+  it("states the hunt's keepers beside an honestly named active-candidate count", async () => {
+    mockList.mockResolvedValue(DEMO_HUNTS);
+    mockKeepers.mockResolvedValue(DEMO_KEEPERS);
+    renderIndex();
+    const card = await screen.findByTestId(`pheno-hunts-index-item-${DEMO_HUNT_ID}`);
+    expect(card.textContent).toContain("0 active candidates · 4 keepers");
+    expect(card.textContent).not.toMatch(/(^|\s)0 candidates/);
+    // Keepers are attributed only to their own hunt.
+    const other = screen.getByTestId("pheno-hunts-index-item-hunt-other");
+    expect(other.textContent).toContain("5 active candidates");
+    expect(other.textContent).not.toMatch(/keeper/i);
+    // The panel above lists the same four keepers the card counts.
+    expect(screen.getByTestId("pheno-stability-dashboard")).toBeInTheDocument();
+    for (const k of DEMO_KEEPERS) {
+      expect(
+        screen.getByTestId(`pheno-stability-dashboard-entry-${k.keeperId}`),
+      ).toBeInTheDocument();
+    }
   });
 });

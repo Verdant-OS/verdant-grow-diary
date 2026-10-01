@@ -144,8 +144,15 @@ describe("listKeeperStabilityForOwner — owner-wide read", () => {
     ]);
   });
 
-  it("returns [] on error without throwing (best-effort read)", async () => {
+  it("rejects on error so the index flags the roll-up unavailable — never a false empty ledger (#550)", async () => {
     ownerChain.ownerLimitMock.mockResolvedValue({ data: null, error: { message: "boom" } });
+    await expect(listKeeperStabilityForOwner()).rejects.toThrow(
+      "Could not load the keeper stability roll-up.",
+    );
+  });
+
+  it("resolves [] for a successful read with no keepers", async () => {
+    ownerChain.ownerLimitMock.mockResolvedValue({ data: [], error: null });
     expect(await listKeeperStabilityForOwner()).toEqual([]);
   });
 });

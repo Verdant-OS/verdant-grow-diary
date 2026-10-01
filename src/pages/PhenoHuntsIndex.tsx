@@ -19,6 +19,11 @@ import PageHeader from "@/components/PageHeader";
 import { listPhenoHuntsForOwner, type PhenoHuntListItem } from "@/lib/phenoHuntCandidatesService";
 import { listKeeperStabilityForOwner, type KeeperStabilityRow } from "@/lib/phenoKeepersService";
 import { buildStabilityDashboard } from "@/lib/phenoStabilityDashboardRules";
+import {
+  buildPhenoHuntCardSummary,
+  countKeepersByHunt,
+  keeperCountForHunt,
+} from "@/lib/phenoHuntsIndexCardRules";
 import PhenoStabilityDashboard from "@/components/PhenoStabilityDashboard";
 import { resolveNavigationGrowId } from "@/lib/navigationGrowIdRules";
 import { resolvePhenoHuntsEmptyCta } from "@/lib/phenoHuntsIndexEmptyCtaRules";
@@ -86,6 +91,14 @@ export default function PhenoHuntsIndex() {
       huntNameById,
     );
   }, [hunts, keepers]);
+
+  // #550: keeper counts per hunt, so each card states its keepers beside its
+  // ACTIVE (non-archived) candidate count. Null when the roll-up failed, so a
+  // failed read never renders as "no keepers".
+  const keeperCounts = useMemo(
+    () => (rollupUnavailable ? null : countKeepersByHunt(keepers)),
+    [keepers, rollupUnavailable],
+  );
 
   return (
     <div className="mx-auto min-w-0 max-w-4xl" data-testid="pheno-hunts-index">
@@ -162,9 +175,12 @@ export default function PhenoHuntsIndex() {
                 <div className="min-w-0">
                   <h2 className="truncate font-display font-semibold text-foreground">{h.name}</h2>
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    {h.candidateCount} {h.candidateCount === 1 ? "candidate" : "candidates"}
-                    {h.setupCompletedAt ? "" : " · setup in progress"}
-                    {formatCreated(h.createdAt) ? ` · started ${formatCreated(h.createdAt)}` : ""}
+                    {buildPhenoHuntCardSummary({
+                      activeCandidateCount: h.candidateCount,
+                      keeperCount: keeperCountForHunt(keeperCounts, h.id),
+                      setupCompleted: Boolean(h.setupCompletedAt),
+                      startedLabel: formatCreated(h.createdAt),
+                    })}
                   </p>
                 </div>
                 <ArrowUpRight

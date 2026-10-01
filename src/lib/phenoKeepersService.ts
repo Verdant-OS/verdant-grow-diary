@@ -144,8 +144,10 @@ export interface KeeperStabilityRow {
  * just the fields the cross-keeper stability dashboard needs. RLS scopes the
  * read to the owner (pheno_keepers_select_own: auth.uid() = user_id), so no
  * client-supplied user filter is trusted or needed; a bounded read (keepers
- * accumulate across seasons). Runs are re-sanitized on read. Best-effort:
- * returns [] on any error rather than throwing.
+ * accumulate across seasons). Runs are re-sanitized on read. A failed read
+ * REJECTS (#550): the hunts index catches it and flags the roll-up
+ * unavailable, so a failed read never renders as an empty ledger or as a hunt
+ * with zero keepers. `[]` means the read succeeded and found no keepers.
  */
 export async function listKeeperStabilityForOwner(): Promise<KeeperStabilityRow[]> {
   const { data, error } = await phenoDb
@@ -153,7 +155,7 @@ export async function listKeeperStabilityForOwner(): Promise<KeeperStabilityRow[
     .select("id, hunt_id, keeper_name, stability_runs")
     .order("created_at", { ascending: true })
     .limit(2000);
-  if (error || !data) return [];
+  if (error || !data) throw new Error("Could not load the keeper stability roll-up.");
   return data.map((r) => ({
     keeperId: r.id,
     huntId: r.hunt_id,

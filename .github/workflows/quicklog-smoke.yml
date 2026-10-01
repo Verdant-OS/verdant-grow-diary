@@ -17,6 +17,9 @@ name: Quick Log Playwright smoke
 #  - pull_request to verdant-grow-diary: best-effort; PRs without access to E2E vars/secrets
 #    (e.g. forked PRs) skip cleanly with a clear non-secret message and the job
 #    completes successfully.
+#  - schedule: once a day on the deploy branch tip (owner decision, #1852), so a
+#    product-only push gets a save-timing receipt within a day. Two tagged
+#    fixture saves per run, the same as a push run; skips cleanly without config.
 #
 # Required repository secrets / vars (configure in GitHub → Settings):
 #   secrets.E2E_TEST_EMAIL
@@ -110,6 +113,9 @@ on:
       - "scripts/check-playwright-failure-media.mjs"
       - ".github/workflows/quicklog-smoke.yml"
     types: [opened, synchronize, reopened, ready_for_review]
+  # One daily run (09:17 UTC) measures save timing on whatever is deployed.
+  schedule:
+    - cron: "17 9 * * *"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
@@ -474,7 +480,7 @@ jobs:
     name: Quick Log Playwright smoke
     # Credential-bearing proof only from the owner on immutable deploy source.
     # PR branches receive credential-free regression checks, never smoke writes.
-    if: github.repository == 'Verdant-OS/verdant-grow-diary' && github.ref == 'refs/heads/verdant-grow-diary' && github.actor == 'cheekhimself' && github.triggering_actor == 'cheekhimself' && github.run_attempt == '1' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_mode == 'quicklog_smoke'))
+    if: github.repository == 'Verdant-OS/verdant-grow-diary' && github.ref == 'refs/heads/verdant-grow-diary' && github.actor == 'cheekhimself' && github.triggering_actor == 'cheekhimself' && github.run_attempt == '1' && (github.event_name == 'push' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_mode == 'quicklog_smoke'))
     runs-on: ubuntu-latest
     # Includes up to 20 minutes waiting for publishing to serve the pinned SHA.
     timeout-minutes: 45

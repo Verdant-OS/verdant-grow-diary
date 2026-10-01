@@ -363,6 +363,13 @@ describe("legacy public-starter Water uncertain receipt", () => {
     expect(readPendingStarterWater("user-1")).toMatchObject({ status: "pending" });
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();
     expect(screen.queryByText(/This Watering was saved and later retracted/i)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+    await waitFor(() => expect(readPendingStarterWater("user-1")).toEqual({ status: "empty" }));
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-starter-water-recovery")).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByText("I checked Timeline; discard draft")).toBeNull();
+    expect(saveMock).toHaveBeenCalledTimes(1);
     expect(trackSuccessMock).not.toHaveBeenCalled();
   });
 
@@ -379,6 +386,46 @@ describe("legacy public-starter Water uncertain receipt", () => {
     await screen.findByText(/The original log was retracted\. Check Timeline/i);
     expect(readPendingStarterWater("user-1")).toMatchObject({ status: "pending" });
     expect(screen.queryByText(/This Watering was saved and later retracted/i)).toBeNull();
+    expect(screen.getByTestId("quick-log-starter-water-retry")).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Open Timeline in a new tab" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+    await waitFor(() => expect(readPendingStarterWater("user-1")).toEqual({ status: "empty" }));
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-starter-water-recovery")).not.toBeInTheDocument(),
+    );
+    expect(saveMock).toHaveBeenCalledTimes(2);
+    expect(trackSuccessMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the history lock and Water claim when the discard cannot clear storage", async () => {
+    seed();
+    saveMock
+      .mockResolvedValueOnce({ ok: false, reason: "receipt_unverified" })
+      .mockResolvedValueOnce({ ok: false, reason: "idempotency_key_retracted" });
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await screen.findByTestId("quick-log-starter-water-recovery");
+    fireEvent.click(screen.getByTestId("quick-log-starter-water-retry"));
+    await screen.findByText(/The original log was retracted\. Check Timeline/i);
+    const remove = Storage.prototype.removeItem;
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (
+      this: Storage,
+      key: string,
+    ) {
+      if (
+        this === window.sessionStorage &&
+        key.startsWith("verdant:quick-log:pending-starter-water:")
+      )
+        throw new Error("storage unavailable");
+      remove.call(this, key);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
+    await screen.findByText(/This draft could not be removed from this tab/i);
+    expect(readPendingStarterWater("user-1")).toMatchObject({ status: "pending" });
+    expect(
+      screen.getByRole("button", { name: "I checked Timeline; discard draft" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-starter-water-retry")).toBeDisabled();
     expect(trackSuccessMock).not.toHaveBeenCalled();
   });
 

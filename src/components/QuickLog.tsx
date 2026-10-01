@@ -151,6 +151,7 @@ import {
   QUICK_LOG_HISTORY_REVIEW_LINK_LABEL,
   QUICK_LOG_HISTORY_DISCARD_LABEL,
   QUICK_LOG_HISTORY_DISCARD_HELPER,
+  QUICK_LOG_HISTORY_DISCARD_FAILED,
 } from "@/lib/quickLogSaveErrorMessage";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
 import { buildQuickLogDraftPreview } from "@/lib/quickLogDraftPreviewViewModel";
@@ -482,6 +483,9 @@ export default function QuickLog({
   const [historyCheckRequired, setHistoryCheckRequired] = useState(false);
   const historyCheckRequiredRef = useRef(false);
   const historyDraftOwnerRef = useRef<string | null>(null);
+  // The starter Water recovery claim a history check is about, if any. Only the
+  // grower's explicit "I checked Timeline" discard may release it.
+  const historyWaterRecordRef = useRef<PendingStarterWater | null>(null);
   const [historyReviewNavigation, setHistoryReviewNavigation] =
     useState<ReturnType<typeof buildQuickLogTimelineNavTarget>>(null);
   const [savedTarget, setSavedTarget] = useState<SavedTarget | null>(null);
@@ -1689,6 +1693,7 @@ export default function QuickLog({
         if (quickLogSaveRequiresHistoryCheck(reason)) {
           historyCheckRequiredRef.current = true;
           historyDraftOwnerRef.current = user.id;
+          historyWaterRecordRef.current = waterHistoryCheck ? waterRecord : null;
           setHistoryCheckRequired(true);
           // A moved receipt's original entry no longer lives on the draft's
           // target; review it where the verified readback says it is now.
@@ -1906,11 +1911,26 @@ export default function QuickLog({
           toast.message(message);
           return;
         }
-        setSaveError(
-          quickLogSaveRequiresHistoryCheck(result.reason)
-            ? quickLogDraftPreservedFailureMessage(result.reason)
-            : STARTER_WATER_RECOVERY_PENDING,
-        );
+        if (quickLogSaveRequiresHistoryCheck(result.reason)) {
+          // Every retry of this key returns the same answer, so hand the
+          // claim to the history-review escape instead of retrying forever.
+          historyCheckRequiredRef.current = true;
+          historyDraftOwnerRef.current = user.id;
+          historyWaterRecordRef.current = record;
+          setHistoryCheckRequired(true);
+          setHistoryReviewNavigation(
+            buildQuickLogTimelineNavTarget({
+              growId: record.target.growId,
+              targetType: "plant",
+              targetId: record.target.plantId,
+              plantId: record.target.plantId,
+              tentId: record.target.tentId,
+            }),
+          );
+          setSaveError(quickLogDraftPreservedFailureMessage(result.reason));
+          return;
+        }
+        setSaveError(STARTER_WATER_RECOVERY_PENDING);
         return;
       }
       const confirmedTarget = result.savedWaterTarget ?? record.target;
@@ -2065,8 +2085,24 @@ export default function QuickLog({
     currentOwnerId: user?.id,
     draftOwnerId: historyDraftOwnerRef.current,
   });
-  function handleDiscardHistoryDraft() {
+  async function handleDiscardHistoryDraft() {
     if (!historyDiscardAllowed || saveInFlightRef.current) return;
+    const waterRecord = historyWaterRecordRef.current;
+    if (waterRecord) {
+      // The grower reviewed Timeline and chose to release the unresolved
+      // Watering claim. If tab storage refuses, the lock stays in place.
+      const clearance = await reconcilePendingStarterWaterClear(waterRecord);
+      if (clearance.status !== "cleared" && clearance.status !== "already_cleared") {
+        setStarterWaterStorageBlocked(clearance.status === "blocked");
+        if (clearance.status === "pending") setStarterWaterPending(clearance.record);
+        setSaveError(QUICK_LOG_HISTORY_DISCARD_FAILED);
+        return;
+      }
+      historyWaterRecordRef.current = null;
+      setStarterWaterPending(null);
+      setStarterWaterStorageBlocked(false);
+      lastFailedSaveSigRef.current = null;
+    }
     historyCheckRequiredRef.current = false;
     historyDraftOwnerRef.current = null;
     setHistoryCheckRequired(false);
@@ -3932,7 +3968,7 @@ export default function QuickLog({
                 type="button"
                 variant="outline"
                 disabled={!historyDiscardAllowed}
-                onClick={handleDiscardHistoryDraft}
+                onClick={() => void handleDiscardHistoryDraft()}
               >
                 {QUICK_LOG_HISTORY_DISCARD_LABEL}
               </Button>

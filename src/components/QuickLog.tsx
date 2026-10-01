@@ -142,7 +142,16 @@ import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { resolveQuickLogTargetPlan } from "@/lib/quickLogTargetResolutionRules";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 import { persistedSensorSourceLabel } from "@/lib/quickLogSnapshotStripAdapter";
-import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
+import {
+  quickLogDraftPreservedFailureMessage,
+  quickLogReasonToOperatorMessage,
+  quickLogSaveRequiresHistoryCheck,
+  canDiscardQuickLogHistoryDraft,
+  QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY,
+  QUICK_LOG_HISTORY_REVIEW_LINK_LABEL,
+  QUICK_LOG_HISTORY_DISCARD_LABEL,
+  QUICK_LOG_HISTORY_DISCARD_HELPER,
+} from "@/lib/quickLogSaveErrorMessage";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
 import { buildQuickLogDraftPreview } from "@/lib/quickLogDraftPreviewViewModel";
 import {
@@ -470,6 +479,11 @@ export default function QuickLog({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [starterWaterPending, setStarterWaterPending] = useState<PendingStarterWater | null>(null);
   const [starterWaterStorageBlocked, setStarterWaterStorageBlocked] = useState(false);
+  const [historyCheckRequired, setHistoryCheckRequired] = useState(false);
+  const historyCheckRequiredRef = useRef(false);
+  const historyDraftOwnerRef = useRef<string | null>(null);
+  const [historyReviewNavigation, setHistoryReviewNavigation] =
+    useState<ReturnType<typeof buildQuickLogTimelineNavTarget>>(null);
   const [savedTarget, setSavedTarget] = useState<SavedTarget | null>(null);
   const [savedDraftHandoffKey, setSavedDraftHandoffKey] = useState<string | null>(null);
   const [earlyMilestone, setEarlyMilestone] = useState<EarlyStageMilestone | null>(null);
@@ -521,13 +535,13 @@ export default function QuickLog({
   // One synchronous guard shared by the parent form and the all-activities
   // child. Presenter state complements this ref but never replaces it.
   const saveInFlightRef = useRef(false);
-  const saveLocked = busy || childSaveBusy;
+  const saveLocked = busy || childSaveBusy || historyCheckRequired;
   // A known unresolved Water locks the dialog. If storage is unavailable
   // before any known attempt, only Water dispatch needs the storage fence;
   // Note and other activities have independent receipts and may still save.
   const recoveryLocked = starterWaterPending !== null;
   const isMainDraftMutationLocked = useCallback(
-    () => saveInFlightRef.current || saveLocked || recoveryLocked,
+    () => saveInFlightRef.current || historyCheckRequiredRef.current || saveLocked || recoveryLocked,
     [saveLocked, recoveryLocked],
   );
   // One idempotency key per LOGICAL submission (quickLogIdempotencyKey
@@ -1352,7 +1366,8 @@ export default function QuickLog({
         setStarterWaterStorageBlocked(false);
       }
     }
-    if (saveInFlightRef.current || saveLocked || savedTarget) return;
+    if (saveInFlightRef.current || historyCheckRequiredRef.current || saveLocked || savedTarget)
+      return;
     if (user?.id && resolvedTarget) {
       const recovery = readPendingQuickLogActivity(user.id, resolvedTarget);
       if (recovery.status !== "empty") {
@@ -1664,9 +1679,33 @@ export default function QuickLog({
         lastFailedSaveSigRef.current = attemptSig;
         const reason = result.reason ?? "save_failed";
         const message = quickLogReasonToOperatorMessage(reason);
-        setSaveError(
-          `${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`,
-        );
+        setSaveError(quickLogDraftPreservedFailureMessage(reason));
+        if (quickLogSaveRequiresHistoryCheck(reason)) {
+          historyCheckRequiredRef.current = true;
+          historyDraftOwnerRef.current = user.id;
+          setHistoryCheckRequired(true);
+          // A moved receipt's original entry no longer lives on the draft's
+          // target; review it where the verified readback says it is now.
+          const movedReceipt =
+            reason === "receipt_target_moved" && result.persistedGrowId !== undefined;
+          setHistoryReviewNavigation(
+            buildQuickLogTimelineNavTarget(
+              movedReceipt
+                ? {
+                    growId: result.persistedGrowId ?? null,
+                    plantId: result.persistedPlantId ?? null,
+                    tentId: result.persistedTentId ?? null,
+                  }
+                : {
+                    growId: saveTarget.growId,
+                    targetType: "plant",
+                    targetId: saveTarget.plantId,
+                    plantId: saveTarget.plantId,
+                    tentId: saveTarget.tentId,
+                  },
+            ),
+          );
+        }
         // Surface the (allow-listed) reason code alongside the friendly
         // copy so the operator and tests can correlate the failure with
         // logs without exposing tokens, endpoints, or raw payloads.
@@ -2010,6 +2049,21 @@ export default function QuickLog({
   const emptyDraftNoteWasSaved =
     draftHandoffKey !== null && savedDraftHandoffKey === draftHandoffKey;
 
+  const historyDiscardAllowed = canDiscardQuickLogHistoryDraft({
+    historyCheckRequired,
+    inFlight: busy || childSaveBusy || saveInFlightRef.current,
+    currentOwnerId: user?.id,
+    draftOwnerId: historyDraftOwnerRef.current,
+  });
+  function handleDiscardHistoryDraft() {
+    if (!historyDiscardAllowed || saveInFlightRef.current) return;
+    historyCheckRequiredRef.current = false;
+    historyDraftOwnerRef.current = null;
+    setHistoryCheckRequired(false);
+    setHistoryReviewNavigation(null);
+    reset();
+  }
+
   return (
     <Dialog
       open={open}
@@ -2020,7 +2074,11 @@ export default function QuickLog({
             inFlight: saveInFlightRef.current,
           });
           if (blocked) {
-            toast.message(QUICK_LOG_CLOSE_BLOCKED_HINT);
+            toast.message(
+              historyCheckRequired
+                ? QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY
+                : QUICK_LOG_CLOSE_BLOCKED_HINT,
+            );
             return;
           }
           onOpenChange(false);
@@ -3677,7 +3735,7 @@ export default function QuickLog({
               data-testid="quick-log-save"
               className="gradient-leaf text-primary-foreground"
             >
-              {saveLocked ? (
+              {busy || childSaveBusy ? (
                 <>
                   <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
                   <span>Saving…</span>
@@ -3841,6 +3899,33 @@ export default function QuickLog({
                   </Button>
                 </>
               )}
+            </div>
+          )}
+          {/* Outside the draft fieldset on purpose: that fieldset is disabled while a
+              history check is required, and a button inside a disabled fieldset
+              cannot be clicked in a browser. This panel is the only exit from that
+              state (save, close and Escape are locked), so it must stay enabled. */}
+          {historyCheckRequired && (
+            <div className="rounded-lg border border-amber-500/40 p-3 space-y-2">
+              {historyReviewNavigation && (
+                <a
+                  href={historyReviewNavigation.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block underline"
+                >
+                  {QUICK_LOG_HISTORY_REVIEW_LINK_LABEL}
+                </a>
+              )}
+              <p className="text-sm">{QUICK_LOG_HISTORY_DISCARD_HELPER}</p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!historyDiscardAllowed}
+                onClick={handleDiscardHistoryDraft}
+              >
+                {QUICK_LOG_HISTORY_DISCARD_LABEL}
+              </Button>
             </div>
           )}
         </form>

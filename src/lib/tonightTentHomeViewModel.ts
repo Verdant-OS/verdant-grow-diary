@@ -22,7 +22,8 @@ import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 export const TONIGHT_TENT_HOME_COPY = {
   missing: "Missing",
   unavailable: "Unavailable",
-  loading: "Loading…",
+  // Not "Loading…": that exact text is the app shell's global loading screen.
+  loading: "Checking…",
   invalidValue: "—",
   lastLogPrefix: "Last log in this grow:",
   noLogToday: "No log today",

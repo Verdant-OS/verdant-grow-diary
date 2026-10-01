@@ -99,6 +99,23 @@ describe("TonightTentHomeCard", () => {
     }
   });
 
+  it("never shows the app shell's global Loading… text while metrics are pending", () => {
+    const metrics = buildTonightTentMetrics({
+      rows: [],
+      rowsRead: { status: "loading" },
+      snapshot: { status: "loading", snapshot: null },
+      now: NOW,
+    });
+    renderCard({ metrics });
+    // The authenticated census treats exact "Loading…" as a stuck global loader.
+    expect(screen.queryAllByText("Loading…", { exact: true })).toHaveLength(0);
+    for (const key of ["temp", "rh", "vpd"]) {
+      expect(screen.getByTestId(`tonight-tent-home-metric-${key}`)).toHaveTextContent(
+        TONIGHT_TENT_HOME_COPY.loading,
+      );
+    }
+  });
+
   it("lists tents to choose from instead of picking one", () => {
     renderCard({
       selection: {

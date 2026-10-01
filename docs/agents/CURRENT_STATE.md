@@ -18,9 +18,10 @@ this entry's earlier 2026-10-01 versions.
   deployment** for any branch commit since `1b66c4f0e`, while the six before it deployed `READY`.
   Not a required context. Clearing it is an owner action in the Vercel dashboard
   (`verdantgrowdiary` team). Cause `NOT_MEASURED`.
-- **Adds a migration:** `supabase/migrations/20260930200000_strain_reference_library_v1_1_parity.sql`
+- **Adds a migration:** `supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql`
   (new file; additive columns + `cultivar_profile_sources` with published-only RLS and SELECT-only
-  grant; idempotent content upserts). **Committed is not applied. No APPLY.** It still sorts last.
+  grant; idempotent content upserts). **Committed is not applied. No APPLY.** Re-dated from `20260930200000` on 2026-10-01
+  (`a7232e1e1`, content byte-identical) so it sorts after `#1836`'s `20261001140000` migration.
   - **`HOLD-CHEEK`:** because #1827 adds a migration, its **merge** waits for Matthew
     (`OWNERSHIP.md` §4.3), not only its production apply. Green checks plus an independent PASS do
     not by themselves authorize it to land.

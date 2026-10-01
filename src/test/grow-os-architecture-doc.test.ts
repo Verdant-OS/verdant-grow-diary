@@ -3,7 +3,7 @@
  *
  * Pins the architectural contract for the grower-facing Grow OS so future
  * refactors don't quietly drop the Live/Manual/Demo/Stale/Unavailable
- * sensor labeling rule, the useGrowData mock-fallback disclosure, the
+ * sensor labeling rule, the record that useGrowData has no mock fallback, the
  * Leads admin-only boundary, or the AI safety contract.
  */
 import { describe, it, expect } from "vitest";
@@ -25,9 +25,12 @@ describe("docs/grow-os-architecture.md — contract", () => {
     }
   });
 
-  it("documents the useGrowData mock-fallback risk", () => {
+  it("records that useGrowData no longer falls back to mock data", () => {
+    // The fallback was removed; the doc must not describe it as current.
     expect(DOC).toMatch(/useGrowData/);
-    expect(DOC).toMatch(/silent.*mock.*fallback|mock-fallback|silently falls back to mock/i);
+    expect(DOC).toMatch(/no mock fallback/i);
+    expect(DOC).not.toMatch(/performs a silent mock fallback/i);
+    expect(DOC).not.toMatch(/silently falls back to mock\*\* on empty\/error/i);
   });
 
   it("documents useMockData as a mock surface", () => {

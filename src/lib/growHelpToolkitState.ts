@@ -15,8 +15,8 @@ export interface CycleInputs {
   name: string;
   vegDays: number | null;
   flowerDays: number | null;
-  vegPhotoperiodHours: number;
-  flowerPhotoperiodHours: number;
+  vegPhotoperiodHours: number | null;
+  flowerPhotoperiodHours: number | null;
   electricityRate: number | null;
   currency: string;
 }
@@ -59,6 +59,8 @@ export interface NutrientInputs {
   sourceWaterEc: number | null;
   targetEc: number | null;
   measuredMixedEc: number | null;
+  /** Provenance for the optional comparison reading; this client-only field is grower-entered. */
+  measuredMixedEcSource: "manual";
   ecParts: EcPartInput[];
   /** Grower-entered planning notes only; never used to infer nutrient dose. */
   elementalTargetsPpm: ElementalTargetsPpmInput;
@@ -87,11 +89,11 @@ export interface LightInputs {
   canopyLength: number | null;
   canopyWidth: number | null;
   ppfMode: "ppf" | "watts";
-  fixtureCount: number;
+  fixtureCount: number | null;
   ppfPerFixture: number | null;
   actualWattsPerFixture: number | null;
   efficacy: number | null;
-  canopyEfficiencyPercent: number;
+  canopyEfficiencyPercent: number | null;
   targetMode: "ppfd" | "dli";
   targetPpfd: number | null;
   targetDli: number | null;
@@ -146,7 +148,7 @@ export interface ExpenseInputs {
   setup: SimpleCostInputState[];
   recurring: RecurringCostInputState[];
   driedSaleableGrams: number | null;
-  amortizationCycles: number;
+  amortizationCycles: number | null;
   compareAtPricePerGram: number | null;
 }
 
@@ -179,6 +181,7 @@ export function createDefaultGrowHelpToolkitState(): GrowHelpToolkitState {
       sourceWaterEc: null,
       targetEc: null,
       measuredMixedEc: null,
+      measuredMixedEcSource: "manual",
       ecParts: [{ id: "ec-1", name: "Part A", ecPerMlPerL: null, ratio: 1 }],
       elementalTargetsPpm: {
         nitrogen: null,
@@ -363,8 +366,11 @@ export function normalizeGrowHelpToolkitState(value: unknown): GrowHelpToolkitSt
       name: asString(cycle.name, defaults.cycle.name),
       vegDays: asNullableNumber(cycle.vegDays, defaults.cycle.vegDays),
       flowerDays: asNullableNumber(cycle.flowerDays, defaults.cycle.flowerDays),
-      vegPhotoperiodHours: asNumber(cycle.vegPhotoperiodHours, defaults.cycle.vegPhotoperiodHours),
-      flowerPhotoperiodHours: asNumber(
+      vegPhotoperiodHours: asNullableNumber(
+        cycle.vegPhotoperiodHours,
+        defaults.cycle.vegPhotoperiodHours,
+      ),
+      flowerPhotoperiodHours: asNullableNumber(
         cycle.flowerPhotoperiodHours,
         defaults.cycle.flowerPhotoperiodHours,
       ),
@@ -388,6 +394,7 @@ export function normalizeGrowHelpToolkitState(value: unknown): GrowHelpToolkitSt
       sourceWaterEc: asNullableNumber(nutrient.sourceWaterEc, null),
       targetEc: asNullableNumber(nutrient.targetEc, null),
       measuredMixedEc: asNullableNumber(nutrient.measuredMixedEc, null),
+      measuredMixedEcSource: asEnum(nutrient.measuredMixedEcSource, ["manual"] as const, "manual"),
       ecParts: ecParts.length > 0 ? ecParts : defaults.nutrient.ecParts,
       elementalTargetsPpm: {
         nitrogen: asNullableNumber(elementalTargetsPpm.nitrogen, null),
@@ -414,11 +421,11 @@ export function normalizeGrowHelpToolkitState(value: unknown): GrowHelpToolkitSt
       canopyLength: asNullableNumber(light.canopyLength, null),
       canopyWidth: asNullableNumber(light.canopyWidth, null),
       ppfMode: asEnum(light.ppfMode, ["ppf", "watts"] as const, defaults.light.ppfMode),
-      fixtureCount: asNumber(light.fixtureCount, defaults.light.fixtureCount),
+      fixtureCount: asNullableNumber(light.fixtureCount, defaults.light.fixtureCount),
       ppfPerFixture: asNullableNumber(light.ppfPerFixture, null),
       actualWattsPerFixture: asNullableNumber(light.actualWattsPerFixture, null),
       efficacy: asNullableNumber(light.efficacy, null),
-      canopyEfficiencyPercent: asNumber(
+      canopyEfficiencyPercent: asNullableNumber(
         light.canopyEfficiencyPercent,
         defaults.light.canopyEfficiencyPercent,
       ),
@@ -447,7 +454,10 @@ export function normalizeGrowHelpToolkitState(value: unknown): GrowHelpToolkitSt
       setup,
       recurring,
       driedSaleableGrams: asNullableNumber(expense.driedSaleableGrams, null),
-      amortizationCycles: asNumber(expense.amortizationCycles, defaults.expense.amortizationCycles),
+      amortizationCycles: asNullableNumber(
+        expense.amortizationCycles,
+        defaults.expense.amortizationCycles,
+      ),
       compareAtPricePerGram: asNullableNumber(expense.compareAtPricePerGram, null),
     },
   };

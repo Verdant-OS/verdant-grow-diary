@@ -20,6 +20,22 @@ function FallbackHarness() {
   );
 }
 
+function NullableHarness() {
+  const [value, setValue] = useState<number | null>(18);
+  return (
+    <NumberField
+      id="photoperiod"
+      label="Veg light"
+      value={value}
+      onChange={setValue}
+      min={0.1}
+      max={24}
+      step={0.5}
+      required
+    />
+  );
+}
+
 describe("Grow Help numeric input editing", () => {
   it("keeps a cleared required draft empty long enough to type a replacement", () => {
     render(<FallbackHarness />);
@@ -38,5 +54,16 @@ describe("Grow Help numeric input editing", () => {
     render(<FallbackHarness />);
     fireEvent.change(screen.getByLabelText("Fixture count"), { target: { value: "1.5" } });
     expect(screen.getByRole("alert")).toHaveTextContent("Fixture count must be a whole number.");
+  });
+
+  it("preserves a cleared required value after blur instead of restoring a default", () => {
+    render(<NullableHarness />);
+    const input = screen.getByLabelText("Veg light") as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.blur(input);
+
+    expect(input).toHaveValue(null);
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter veg light.");
   });
 });

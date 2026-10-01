@@ -693,6 +693,17 @@ export default function PublicVpdCalculator() {
             </Link>
             .
           </p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Planning nutrients, canopy light, and cycle costs too? Open the{" "}
+            <Link
+              to="/tools/grow-help-toolkit"
+              className="underline hover:text-foreground"
+              data-testid="vpd-grow-help-toolkit-link"
+            >
+              browser-local Grow Help Toolkit
+            </Link>
+            . Inputs are not transferred between tools.
+          </p>
         </section>
 
         {stage !== "unknown" && (

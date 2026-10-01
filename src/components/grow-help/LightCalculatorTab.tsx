@@ -28,22 +28,13 @@ import {
   type FivePointPpfd,
 } from "@/lib/lightCalc";
 import { M2_PER_FT2, areaM2, areaM2FromFeet } from "@/lib/unitsCalc";
+import {
+  calculateWhenReady as attempt,
+  hasCompleteFivePointReading,
+  hasPositiveCanopyDimensions,
+} from "@/lib/growHelpToolkitReadiness";
 import NumberField from "./NumberField";
 import ResultBlock from "./ResultBlock";
-
-interface SafeResult<T> {
-  value: T | null;
-  error: string | null;
-}
-
-function attempt<T>(ready: boolean, fn: () => T): SafeResult<T> {
-  if (!ready) return { value: null, error: null };
-  try {
-    return { value: fn(), error: null };
-  } catch (error) {
-    return { value: null, error: error instanceof Error ? error.message : "Check the inputs." };
-  }
-}
 
 function fmt(value: number, digits = 2): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: digits });
@@ -64,11 +55,7 @@ export default function LightCalculatorTab({
   onChange,
   onPushLight,
 }: LightCalculatorTabProps) {
-  const dimensionsReady =
-    inputs.canopyLength !== null &&
-    inputs.canopyLength > 0 &&
-    inputs.canopyWidth !== null &&
-    inputs.canopyWidth > 0;
+  const dimensionsReady = hasPositiveCanopyDimensions(inputs);
   const canopyAreaM2 = useMemo(
     () =>
       attempt(dimensionsReady, () =>
@@ -98,13 +85,18 @@ export default function LightCalculatorTab({
 
   const planningPpfd = useMemo(
     () =>
-      attempt(canopyAreaM2.value !== null && fixturePpf.value !== null, () =>
-        planningAveragePpfd(
-          fixturePpf.value?.ppf ?? 0,
-          inputs.fixtureCount,
-          canopyAreaM2.value ?? 0,
-          inputs.canopyEfficiencyPercent / 100,
-        ),
+      attempt(
+        canopyAreaM2.value !== null &&
+          fixturePpf.value !== null &&
+          inputs.fixtureCount !== null &&
+          inputs.canopyEfficiencyPercent !== null,
+        () =>
+          planningAveragePpfd(
+            fixturePpf.value?.ppf ?? 0,
+            inputs.fixtureCount as number,
+            canopyAreaM2.value ?? 0,
+            (inputs.canopyEfficiencyPercent as number) / 100,
+          ),
       ),
     [canopyAreaM2.value, fixturePpf.value, inputs.canopyEfficiencyPercent, inputs.fixtureCount],
   );
@@ -113,8 +105,8 @@ export default function LightCalculatorTab({
     inputs.stage === "veg" ? cycle.vegPhotoperiodHours : cycle.flowerPhotoperiodHours;
   const planningDli = useMemo(
     () =>
-      attempt(planningPpfd.value !== null, () =>
-        calculateDliFromPlanningPpfd(planningPpfd.value ?? 0, photoperiod),
+      attempt(planningPpfd.value !== null && photoperiod !== null, () =>
+        calculateDliFromPlanningPpfd(planningPpfd.value ?? 0, photoperiod as number),
       ),
     [photoperiod, planningPpfd.value],
   );
@@ -122,11 +114,13 @@ export default function LightCalculatorTab({
   const targetPpfd = useMemo(
     () =>
       attempt(
-        inputs.targetMode === "ppfd" ? inputs.targetPpfd !== null : inputs.targetDli !== null,
+        inputs.targetMode === "ppfd"
+          ? inputs.targetPpfd !== null
+          : inputs.targetDli !== null && photoperiod !== null,
         () =>
           inputs.targetMode === "ppfd"
             ? (inputs.targetPpfd ?? 0)
-            : ppfdForTargetDli(inputs.targetDli ?? 0, photoperiod),
+            : ppfdForTargetDli(inputs.targetDli ?? 0, photoperiod as number),
       ),
     [inputs.targetDli, inputs.targetMode, inputs.targetPpfd, photoperiod],
   );
@@ -134,13 +128,16 @@ export default function LightCalculatorTab({
   const fixturePlan = useMemo(
     () =>
       attempt(
-        targetPpfd.value !== null && canopyAreaM2.value !== null && fixturePpf.value !== null,
+        targetPpfd.value !== null &&
+          canopyAreaM2.value !== null &&
+          fixturePpf.value !== null &&
+          inputs.canopyEfficiencyPercent !== null,
         () =>
           fixturesNeeded(
             targetPpfd.value ?? 0,
             canopyAreaM2.value ?? 0,
             fixturePpf.value?.ppf ?? 0,
-            inputs.canopyEfficiencyPercent / 100,
+            (inputs.canopyEfficiencyPercent as number) / 100,
           ),
       ),
     [canopyAreaM2.value, fixturePpf.value, inputs.canopyEfficiencyPercent, targetPpfd.value],
@@ -169,7 +166,7 @@ export default function LightCalculatorTab({
     [inputs.chartHeight, inputs.chartPpfd, targetPpfd.value],
   );
 
-  const pointsReady = Object.values(inputs.fivePoint).every((value) => value !== null);
+  const pointsReady = hasCompleteFivePointReading(inputs);
   const points: FivePointPpfd = useMemo(
     () => ({
       center: inputs.fivePoint.center ?? 0,
@@ -193,16 +190,19 @@ export default function LightCalculatorTab({
     () =>
       attempt(
         inputs.actualWattsPerFixture !== null &&
+          inputs.fixtureCount !== null &&
           cycle.vegDays !== null &&
           cycle.flowerDays !== null &&
+          cycle.vegPhotoperiodHours !== null &&
+          cycle.flowerPhotoperiodHours !== null &&
           cycle.electricityRate !== null,
         () =>
           calculateLightCycleEnergy({
             actualWattsPerFixture: inputs.actualWattsPerFixture ?? 0,
-            fixtureCount: inputs.fixtureCount,
-            vegHoursPerDay: cycle.vegPhotoperiodHours,
+            fixtureCount: inputs.fixtureCount as number,
+            vegHoursPerDay: cycle.vegPhotoperiodHours as number,
             vegDays: cycle.vegDays ?? 0,
-            flowerHoursPerDay: cycle.flowerPhotoperiodHours,
+            flowerHoursPerDay: cycle.flowerPhotoperiodHours as number,
             flowerDays: cycle.flowerDays ?? 0,
             ratePerKwh: cycle.electricityRate ?? 0,
           }),
@@ -224,14 +224,17 @@ export default function LightCalculatorTab({
         fixturePpf.value !== null &&
           energy.value !== null &&
           cycle.vegDays !== null &&
-          cycle.flowerDays !== null,
+          cycle.flowerDays !== null &&
+          cycle.vegPhotoperiodHours !== null &&
+          cycle.flowerPhotoperiodHours !== null &&
+          inputs.fixtureCount !== null,
         () =>
           calculateEnergyCostPerMol({
             ppfPerFixture: fixturePpf.value?.ppf ?? 0,
-            fixtureCount: inputs.fixtureCount,
-            vegHoursPerDay: cycle.vegPhotoperiodHours,
+            fixtureCount: inputs.fixtureCount as number,
+            vegHoursPerDay: cycle.vegPhotoperiodHours as number,
             vegDays: cycle.vegDays ?? 0,
-            flowerHoursPerDay: cycle.flowerPhotoperiodHours,
+            flowerHoursPerDay: cycle.flowerPhotoperiodHours as number,
             flowerDays: cycle.flowerDays ?? 0,
             cycleElectricityCost: energy.value?.cycleCost ?? 0,
           }),
@@ -256,6 +259,7 @@ export default function LightCalculatorTab({
     inputs.stage === "flower" &&
     flowerBand &&
     planningDli.value !== null &&
+    photoperiod !== null &&
     photoperiod > 0 &&
     photoperiod <= 24
       ? {
@@ -271,6 +275,7 @@ export default function LightCalculatorTab({
   const areaFt2 = canopyAreaM2.value === null ? null : canopyAreaM2.value / M2_PER_FT2;
   const canPush =
     inputs.actualWattsPerFixture !== null &&
+    inputs.fixtureCount !== null &&
     inputs.actualWattsPerFixture >= 0 &&
     cycle.vegDays !== null &&
     cycle.flowerDays !== null;
@@ -281,7 +286,7 @@ export default function LightCalculatorTab({
       id: "linked-light-plan",
       name: "Grow lights (from Light plan)",
       actualWatts: inputs.actualWattsPerFixture,
-      quantity: inputs.fixtureCount,
+      quantity: inputs.fixtureCount as number,
       // Null means "follow the shared Cycle bar" in Expense. A grower can
       // still override either phase after the row is copied.
       vegHoursPerDay: null,
@@ -345,9 +350,7 @@ export default function LightCalculatorTab({
                 id="light-fixture-count"
                 label="Fixture count"
                 value={inputs.fixtureCount}
-                onChange={(fixtureCount) =>
-                  onChange({ ...inputs, fixtureCount: fixtureCount ?? 1 })
-                }
+                onChange={(fixtureCount) => onChange({ ...inputs, fixtureCount })}
                 min={1}
                 max={1000}
                 step={1}
@@ -360,7 +363,7 @@ export default function LightCalculatorTab({
                 label="Canopy efficiency"
                 value={inputs.canopyEfficiencyPercent}
                 onChange={(canopyEfficiencyPercent) =>
-                  onChange({ ...inputs, canopyEfficiencyPercent: canopyEfficiencyPercent ?? 80 })
+                  onChange({ ...inputs, canopyEfficiencyPercent })
                 }
                 min={50}
                 max={100}

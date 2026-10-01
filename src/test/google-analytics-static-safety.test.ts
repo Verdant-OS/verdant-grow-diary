@@ -10,6 +10,8 @@ const ANALYTICS_FILES = [
   "src/constants/analytics.ts",
   "src/hooks/useGoogleAnalyticsPageViews.ts",
   "src/lib/analyticsPageViewRules.ts",
+  "src/lib/ahrefsAnalyticsLoader.ts",
+  "src/lib/analyticsConsentRuntime.ts",
   "src/routes/__root.tsx",
 ];
 

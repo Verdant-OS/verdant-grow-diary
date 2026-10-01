@@ -31,16 +31,17 @@ vi.mock("@/components/BrandLogo", () => ({
   default: () => <div data-testid="brand-logo" />,
 }));
 
-const ALL_STAGES = [
-  "seedling",
-  "veg",
-  "preflower",
-  "flower",
-  "late_flower",
-  "harvest",
-] as const;
+const ALL_STAGES = ["seedling", "veg", "preflower", "flower", "late_flower", "harvest"] as const;
 
 describe("BlueprintTargetsGuide", () => {
+  it("links to the complementary local Grow Help Toolkit", () => {
+    render(<BlueprintTargetsGuide />);
+    expect(screen.getByTestId("blueprint-targets-grow-help-link")).toHaveAttribute(
+      "href",
+      "/tools/grow-help-toolkit",
+    );
+  });
+
   it("renders every stage on first paint with no interaction", () => {
     render(<BlueprintTargetsGuide />);
     for (const stage of ALL_STAGES) {
@@ -108,8 +109,7 @@ describe("BlueprintTargetsGuide", () => {
 
   it("sends the CTA to signup mode, not the sign-in tab", () => {
     render(<BlueprintTargetsGuide />);
-    const href =
-      screen.getByTestId("blueprint-targets-signup").getAttribute("href") ?? "";
+    const href = screen.getByTestId("blueprint-targets-signup").getAttribute("href") ?? "";
     // Bare /auth resolves to mode "signin" and skips the signup page-view path.
     expect(href).toContain("mode=signup");
     expect(href).not.toBe("/auth");
@@ -150,13 +150,11 @@ describe("BlueprintTargetsGuide", () => {
     // table rendered directly beneath it. Peak feed and peak light are FLOWER
     // (ec 1.8-2.6, ppfd 700-1000), not pre-flower (1.6-2.0, 600-800), so guard
     // the superlative mechanically rather than by proofreading.
-    const ecMax = (s: keyof typeof SOP_BLUEPRINT_TARGETS) =>
-      SOP_BLUEPRINT_TARGETS[s].ec?.max ?? 0;
+    const ecMax = (s: keyof typeof SOP_BLUEPRINT_TARGETS) => SOP_BLUEPRINT_TARGETS[s].ec?.max ?? 0;
     expect(ecMax("flower")).toBeGreaterThan(ecMax("preflower"));
 
     render(<BlueprintTargetsGuide />);
-    const preflower =
-      screen.getByTestId("blueprint-targets-stage-preflower").textContent ?? "";
+    const preflower = screen.getByTestId("blueprint-targets-stage-preflower").textContent ?? "";
     expect(preflower).not.toMatch(/feed peaks|peak feed/i);
   });
 
@@ -197,9 +195,7 @@ describe("BlueprintTargetsGuide structured data", () => {
     const faqNode = head.scripts
       .map((s) => JSON.parse(s.children))
       .find((n) => n["@type"] === "FAQPage");
-    const schemaQuestions = (faqNode?.mainEntity ?? []).map(
-      (e: { name: string }) => e.name,
-    );
+    const schemaQuestions = (faqNode?.mainEntity ?? []).map((e: { name: string }) => e.name);
     expect(schemaQuestions).toEqual(VERDANT_BLUEPRINT_TARGETS_FAQ.map((f) => f.question));
 
     render(<BlueprintTargetsGuide />);

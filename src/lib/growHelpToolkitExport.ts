@@ -4,6 +4,7 @@ import {
   type ExpenseUnitCosts,
 } from "./expenseCalc";
 import type { GrowHelpToolkitState } from "./growHelpToolkitState";
+import { isExpenseSummaryReady } from "./growHelpToolkitReadiness";
 import {
   calculateDliFromPlanningPpfd,
   calculateEnergyCostPerMol,
@@ -104,8 +105,20 @@ export function createGrowHelpExportSnapshot(
   const cycleDays = (cycle.vegDays ?? 0) + (cycle.flowerDays ?? 0);
   add("Cycle", "Vegetative phase", cycle.vegDays ?? "Not entered", "days", "grower-entered");
   add("Cycle", "Flower phase", cycle.flowerDays ?? "Not entered", "days", "grower-entered");
-  add("Cycle", "Vegetative photoperiod", cycle.vegPhotoperiodHours, "h/day", "shared Cycle bar");
-  add("Cycle", "Flower photoperiod", cycle.flowerPhotoperiodHours, "h/day", "shared Cycle bar");
+  add(
+    "Cycle",
+    "Vegetative photoperiod",
+    cycle.vegPhotoperiodHours ?? "Not entered",
+    "h/day",
+    "shared Cycle bar",
+  );
+  add(
+    "Cycle",
+    "Flower photoperiod",
+    cycle.flowerPhotoperiodHours ?? "Not entered",
+    "h/day",
+    "shared Cycle bar",
+  );
   add(
     "Cycle",
     "Electricity rate",
@@ -314,18 +327,23 @@ export function createGrowHelpExportSnapshot(
       fixturePpf.formula,
     );
   }
-  if (canopyArea !== null && fixturePpf) {
+  const completePlanningLight =
+    canopyArea !== null &&
+    fixturePpf !== null &&
+    light.fixtureCount !== null &&
+    light.canopyEfficiencyPercent !== null;
+  const photoperiod =
+    light.stage === "veg" ? cycle.vegPhotoperiodHours : cycle.flowerPhotoperiodHours;
+  if (completePlanningLight && fixturePpf) {
     const plannedPpfd = tryValue(() =>
       planningAveragePpfd(
         fixturePpf.ppf,
-        light.fixtureCount,
+        light.fixtureCount as number,
         canopyArea,
-        light.canopyEfficiencyPercent / 100,
+        (light.canopyEfficiencyPercent as number) / 100,
       ),
     );
-    if (plannedPpfd !== null) {
-      const photoperiod =
-        light.stage === "veg" ? cycle.vegPhotoperiodHours : cycle.flowerPhotoperiodHours;
+    if (plannedPpfd !== null && photoperiod !== null) {
       add(
         "Light plan",
         "Planning average PPFD",
@@ -341,14 +359,12 @@ export function createGrowHelpExportSnapshot(
         "DLI = PPFD × hours × 0.0036",
       );
     }
-    const targetPpfd = tryValue(() =>
+    const targetPpfd =
       light.targetMode === "ppfd"
-        ? (light.targetPpfd as number)
-        : ppfdForTargetDli(
-            light.targetDli as number,
-            light.stage === "veg" ? cycle.vegPhotoperiodHours : cycle.flowerPhotoperiodHours,
-          ),
-    );
+        ? light.targetPpfd
+        : light.targetDli !== null && photoperiod !== null
+          ? tryValue(() => ppfdForTargetDli(light.targetDli as number, photoperiod))
+          : null;
     const fixtureTarget =
       targetPpfd === null
         ? null
@@ -357,7 +373,7 @@ export function createGrowHelpExportSnapshot(
               targetPpfd,
               canopyArea,
               fixturePpf.ppf,
-              light.canopyEfficiencyPercent / 100,
+              (light.canopyEfficiencyPercent as number) / 100,
             ),
           );
     if (fixtureTarget) {
@@ -393,14 +409,12 @@ export function createGrowHelpExportSnapshot(
       "PPFDnew = PPFDchart × (hchart ÷ hnew)²",
     );
   }
-  const targetForHeight = tryValue(() =>
+  const targetForHeight =
     light.targetMode === "ppfd"
-      ? (light.targetPpfd as number)
-      : ppfdForTargetDli(
-          light.targetDli as number,
-          light.stage === "veg" ? cycle.vegPhotoperiodHours : cycle.flowerPhotoperiodHours,
-        ),
-  );
+      ? light.targetPpfd
+      : light.targetDli !== null && photoperiod !== null
+        ? tryValue(() => ppfdForTargetDli(light.targetDli as number, photoperiod))
+        : null;
   const height =
     targetForHeight === null
       ? null
@@ -445,17 +459,27 @@ export function createGrowHelpExportSnapshot(
       uniformity.formula,
     );
   }
-  const lightEnergy = tryValue(() =>
-    calculateLightCycleEnergy({
-      actualWattsPerFixture: light.actualWattsPerFixture as number,
-      fixtureCount: light.fixtureCount,
-      vegHoursPerDay: cycle.vegPhotoperiodHours,
-      vegDays: cycle.vegDays as number,
-      flowerHoursPerDay: cycle.flowerPhotoperiodHours,
-      flowerDays: cycle.flowerDays as number,
-      ratePerKwh: cycle.electricityRate as number,
-    }),
-  );
+  const completeLightEnergy =
+    light.actualWattsPerFixture !== null &&
+    light.fixtureCount !== null &&
+    cycle.vegPhotoperiodHours !== null &&
+    cycle.flowerPhotoperiodHours !== null &&
+    cycle.vegDays !== null &&
+    cycle.flowerDays !== null &&
+    cycle.electricityRate !== null;
+  const lightEnergy = completeLightEnergy
+    ? tryValue(() =>
+        calculateLightCycleEnergy({
+          actualWattsPerFixture: light.actualWattsPerFixture as number,
+          fixtureCount: light.fixtureCount as number,
+          vegHoursPerDay: cycle.vegPhotoperiodHours as number,
+          vegDays: cycle.vegDays as number,
+          flowerHoursPerDay: cycle.flowerPhotoperiodHours as number,
+          flowerDays: cycle.flowerDays as number,
+          ratePerKwh: cycle.electricityRate as number,
+        }),
+      )
+    : null;
   if (lightEnergy) {
     add(
       "Light plan",
@@ -477,10 +501,10 @@ export function createGrowHelpExportSnapshot(
       ? tryValue(() =>
           calculateEnergyCostPerMol({
             ppfPerFixture: fixturePpf.ppf,
-            fixtureCount: light.fixtureCount,
-            vegHoursPerDay: cycle.vegPhotoperiodHours,
+            fixtureCount: light.fixtureCount as number,
+            vegHoursPerDay: cycle.vegPhotoperiodHours as number,
             vegDays: cycle.vegDays as number,
-            flowerHoursPerDay: cycle.flowerPhotoperiodHours,
+            flowerHoursPerDay: cycle.flowerPhotoperiodHours as number,
             flowerDays: cycle.flowerDays as number,
             cycleElectricityCost: lightEnergy.cycleCost,
           }),
@@ -514,23 +538,7 @@ export function createGrowHelpExportSnapshot(
     (expense.waterPricePerGallon !== null &&
       expense.waterGallonsPerChange !== null &&
       expense.waterChangesPerWeek !== null);
-  const completeExpense =
-    cycleDays > 0 &&
-    cycle.electricityRate !== null &&
-    completeWater &&
-    expense.devices.every(
-      (row) =>
-        row.actualWatts !== null &&
-        (row.vegHoursPerDay ?? cycle.vegPhotoperiodHours) > 0 &&
-        (row.flowerHoursPerDay ?? cycle.flowerPhotoperiodHours) > 0,
-    ) &&
-    expense.nutrients.every((row) =>
-      row.pricingMode === "manual_weekly"
-        ? row.manualWeeklyCost !== null
-        : row.packagePrice !== null && row.usableAmount !== null && row.usagePerWeek !== null,
-    ) &&
-    expense.setup.every((row) => row.amount !== null) &&
-    expense.recurring.every((row) => row.amount !== null);
+  const completeExpense = cycleDays > 0 && isExpenseSummaryReady(expense, cycle);
   const expenseSummary = completeExpense
     ? tryValue(() =>
         calculateExpenseSummary({
@@ -539,8 +547,8 @@ export function createGrowHelpExportSnapshot(
             name: row.name,
             actualWatts: row.actualWatts as number,
             quantity: row.quantity,
-            vegHoursPerDay: row.vegHoursPerDay ?? cycle.vegPhotoperiodHours,
-            flowerHoursPerDay: row.flowerHoursPerDay ?? cycle.flowerPhotoperiodHours,
+            vegHoursPerDay: row.vegHoursPerDay ?? (cycle.vegPhotoperiodHours as number),
+            flowerHoursPerDay: row.flowerHoursPerDay ?? (cycle.flowerPhotoperiodHours as number),
             vegDays: row.vegDaysOverride ?? (cycle.vegDays as number),
             flowerDays: row.flowerDaysOverride ?? (cycle.flowerDays as number),
             linkedFromLight: row.linkedFromLight,
@@ -572,7 +580,7 @@ export function createGrowHelpExportSnapshot(
           electricityRate: cycle.electricityRate as number,
           cycleDays,
           driedSaleableGrams: expense.driedSaleableGrams,
-          amortizationCycles: expense.amortizationCycles,
+          amortizationCycles: expense.amortizationCycles as number,
           compareAtPricePerGram: expense.compareAtPricePerGram,
         }),
       )

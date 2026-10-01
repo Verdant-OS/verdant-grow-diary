@@ -21,23 +21,10 @@ import type {
 } from "@/lib/growHelpToolkitState";
 import NumberField from "./NumberField";
 import ResultBlock from "./ResultBlock";
-
-interface SafeResult<T> {
-  value: T | null;
-  error: string | null;
-}
-
-function attempt<T>(ready: boolean, fn: () => T): SafeResult<T> {
-  if (!ready) return { value: null, error: null };
-  try {
-    return { value: fn(), error: null };
-  } catch (error) {
-    return {
-      value: null,
-      error: error instanceof Error ? error.message : "Check the expense inputs.",
-    };
-  }
-}
+import {
+  calculateWhenReady as attempt,
+  isExpenseSummaryReady,
+} from "@/lib/growHelpToolkitReadiness";
 
 function fmt(value: number, digits = 2): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: digits });
@@ -81,23 +68,7 @@ export default function ExpenseCalculatorTab({
     inputs.waterPricePerGallon !== null ||
     inputs.waterGallonsPerChange !== null ||
     inputs.waterChangesPerWeek !== null;
-  const waterReady =
-    !waterStarted ||
-    (inputs.waterPricePerGallon !== null &&
-      inputs.waterGallonsPerChange !== null &&
-      inputs.waterChangesPerWeek !== null);
-  const devicesReady = inputs.devices.every((row) => row.actualWatts !== null);
-  const nutrientsReady = inputs.nutrients.every((row) =>
-    row.pricingMode === "manual_weekly"
-      ? row.manualWeeklyCost !== null
-      : row.packagePrice !== null && row.usableAmount !== null && row.usagePerWeek !== null,
-  );
-  const setupReady = inputs.setup.every((row) => row.amount !== null);
-  const recurringReady = inputs.recurring.every((row) => row.amount !== null);
-  const coreReady =
-    cycle.vegDays !== null && cycle.flowerDays !== null && cycle.electricityRate !== null;
-  const summaryReady =
-    coreReady && waterReady && devicesReady && nutrientsReady && setupReady && recurringReady;
+  const summaryReady = isExpenseSummaryReady(inputs, cycle);
 
   const summary = useMemo(
     () =>
@@ -108,8 +79,8 @@ export default function ExpenseCalculatorTab({
             name: row.name,
             actualWatts: row.actualWatts ?? 0,
             quantity: row.quantity,
-            vegHoursPerDay: row.vegHoursPerDay ?? cycle.vegPhotoperiodHours,
-            flowerHoursPerDay: row.flowerHoursPerDay ?? cycle.flowerPhotoperiodHours,
+            vegHoursPerDay: row.vegHoursPerDay ?? (cycle.vegPhotoperiodHours as number),
+            flowerHoursPerDay: row.flowerHoursPerDay ?? (cycle.flowerPhotoperiodHours as number),
             vegDays: row.vegDaysOverride ?? cycle.vegDays ?? 0,
             flowerDays: row.flowerDaysOverride ?? cycle.flowerDays ?? 0,
             linkedFromLight: row.linkedFromLight,
@@ -144,16 +115,17 @@ export default function ExpenseCalculatorTab({
           electricityRate: cycle.electricityRate ?? 0,
           cycleDays,
           driedSaleableGrams: inputs.driedSaleableGrams,
-          amortizationCycles: inputs.amortizationCycles,
+          amortizationCycles: inputs.amortizationCycles as number,
           compareAtPricePerGram: inputs.compareAtPricePerGram,
         }),
       ),
     [cycle, cycleDays, inputs, summaryReady],
   );
 
-  const amortizationError = Number.isInteger(inputs.amortizationCycles)
-    ? null
-    : "Amortization cycles must be a whole number.";
+  const amortizationError =
+    inputs.amortizationCycles === null || Number.isInteger(inputs.amortizationCycles)
+      ? null
+      : "Amortization cycles must be a whole number.";
   const comparisonNeedsWeight =
     inputs.compareAtPricePerGram !== null && inputs.driedSaleableGrams === null;
   const firstError = summary.error ?? amortizationError;
@@ -352,8 +324,10 @@ export default function ExpenseCalculatorTab({
                   max={24}
                   step={0.1}
                   unit="h/day"
-                  placeholder={String(cycle.vegPhotoperiodHours)}
-                  help={`Blank uses shared veg light: ${fmt(cycle.vegPhotoperiodHours, 1)} h/day.`}
+                  placeholder={
+                    cycle.vegPhotoperiodHours === null ? "Cycle" : String(cycle.vegPhotoperiodHours)
+                  }
+                  help={`Blank uses shared veg light: ${cycle.vegPhotoperiodHours === null ? "not entered" : `${fmt(cycle.vegPhotoperiodHours, 1)} h/day`}.`}
                 />
                 <NumberField
                   id={`expense-device-${index}-flower-hours`}
@@ -364,8 +338,12 @@ export default function ExpenseCalculatorTab({
                   max={24}
                   step={0.1}
                   unit="h/day"
-                  placeholder={String(cycle.flowerPhotoperiodHours)}
-                  help={`Blank uses shared flower light: ${fmt(cycle.flowerPhotoperiodHours, 1)} h/day.`}
+                  placeholder={
+                    cycle.flowerPhotoperiodHours === null
+                      ? "Cycle"
+                      : String(cycle.flowerPhotoperiodHours)
+                  }
+                  help={`Blank uses shared flower light: ${cycle.flowerPhotoperiodHours === null ? "not entered" : `${fmt(cycle.flowerPhotoperiodHours, 1)} h/day`}.`}
                 />
                 <NumberField
                   id={`expense-device-${index}-veg-days`}
@@ -726,9 +704,7 @@ export default function ExpenseCalculatorTab({
               id="expense-amortization-cycles"
               label="Setup amortization"
               value={inputs.amortizationCycles}
-              onChange={(amortizationCycles) =>
-                onChange({ ...inputs, amortizationCycles: amortizationCycles ?? 4 })
-              }
+              onChange={(amortizationCycles) => onChange({ ...inputs, amortizationCycles })}
               min={1}
               max={1000}
               step={1}

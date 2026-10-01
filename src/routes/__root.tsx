@@ -19,7 +19,7 @@ import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
 import { useAnalyticsConsent } from "@/hooks/useAnalyticsConsent";
-import { loadGoogleAnalytics } from "@/lib/googleAnalyticsLoader";
+import { applyAnalyticsConsentDecision } from "@/lib/analyticsConsentRuntime";
 import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
 import FunnelEventDbSink from "@/components/FunnelEventDbSink";
 import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
@@ -153,10 +153,17 @@ function useClearQueryCacheBeforeAuthIdentityChange() {
 
 function AnalyticsShell() {
   const { decision } = useAnalyticsConsent();
+  const location = useRouterState({
+    select: (state) => ({
+      pathname: state.location.pathname,
+      search: state.location.searchStr,
+      hash: state.location.hash,
+    }),
+  });
 
   useEffect(() => {
-    if (decision === "granted") loadGoogleAnalytics();
-  }, [decision]);
+    if (applyAnalyticsConsentDecision(decision, location)) window.location.reload();
+  }, [decision, location]);
 
   useGoogleAnalyticsPageViews();
   return <AnalyticsConsentBanner />;

@@ -9,6 +9,8 @@ export const ANALYTICS_CONSENT_STORAGE_KEY = "verdant.analytics-consent.v1";
 
 export type AnalyticsConsentDecision = "granted" | "denied" | "unset";
 
+let documentDecision: AnalyticsConsentDecision = "unset";
+
 /** Narrow an untrusted stored string to a known decision. */
 export function parseAnalyticsConsentValue(
   raw: string | null | undefined,
@@ -22,9 +24,12 @@ export function parseAnalyticsConsentValue(
 export function readAnalyticsConsent(): AnalyticsConsentDecision {
   if (typeof window === "undefined") return "unset";
   try {
-    return parseAnalyticsConsentValue(window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY));
+    const stored = parseAnalyticsConsentValue(
+      window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY),
+    );
+    return stored;
   } catch {
-    return "unset";
+    return documentDecision;
   }
 }
 
@@ -35,10 +40,16 @@ export function writeAnalyticsConsent(decision: Exclude<AnalyticsConsentDecision
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, decision);
+    documentDecision = "unset";
   } catch {
     // Storage blocked: the decision still applies for this page lifetime.
+    documentDecision = decision;
   }
   window.dispatchEvent(new CustomEvent(CONSENT_CHANGE_EVENT, { detail: decision }));
+}
+
+export function __resetAnalyticsConsentForTests(): void {
+  documentDecision = "unset";
 }
 
 /** Subscribe to decision changes from this tab or another tab. */

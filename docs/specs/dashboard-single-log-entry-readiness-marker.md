@@ -2,7 +2,8 @@
 
 Status: **SPEC — implementation BLOCKED on preconditions** (see §1).
 Author: Claude, 2026-10-01. Audited at deploy tip `0107d9406` (`verdant-grow-diary`, #1836),
-#1833 head `f296a953`, #1793 head `074f4349`.
+#1833 head `f296a953`, #1793 head `074f4349`. Updated 2026-10-01 17:35 UTC for #1849 (re-land of #1793,
+head `c2d473e8`).
 
 Every claim carries a label: `established fact` (read from source at the SHAs above),
 `source claim`, `inference`, `uncertainty`, `missing evidence`.
@@ -11,14 +12,20 @@ Every claim carries a label: `established fact` (read from source at the SHAs ab
 
 ## 1. Preconditions (unchanged from the brief)
 
-| Gate                                                             | State at 2026-10-01                                                                                                | Label              |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------ |
-| #1833 `feat(dashboard): One-Tent Home first fold` merged         | OPEN, draft, head `f296a953`                                                                                       | `established fact` |
-| #1793 `test(e2e): measure signed-in readiness…` merged or closed | OPEN, draft, head `074f4349`, stacked on `codex/chem-production-quicklog-fixture-001`; #1799 and #1800 stack on it | `established fact` |
+| Gate                                                             | State at 2026-10-01                                                                                                                  | Label              |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------ |
+| #1833 `feat(dashboard): One-Tent Home first fold` merged         | OPEN, draft, head `f296a953`                                                                                                         | `established fact` |
+| #1793 `test(e2e): measure signed-in readiness…` merged or closed | Superseded. OPEN draft at `074f4349`, stranded on closed #1792's branch; to be closed once #1849 merges                              | `established fact` |
+| #1849 `test(e2e): … (re-land of #1793)` merged                   | OPEN, ready for review, head `c2d473e8`, base `verdant-grow-diary`; owner reassigned from Codex to another Claude session 2026-10-01 | `established fact` |
 
-If #1793 is still open when #1833 lands: the owner hands Codex the one-line change in §5.1
-instead of editing #1793. #1799 / #1800 do not reference the header test ID
-(`established fact`, `gh pr diff`), so they need nothing.
+The second gate is effectively "#1849 merged": #1793's work moved to #1849, and #1793 closes
+when #1849 merges. #1849 still uses `control: "dashboard-daily-grow-check-entry"` at `c2d473e8`.
+Its owner acknowledged the handoff (issuecomment-5936713821) and keeps that control until
+the marker exists. So when #1849 lands first (the expected order), this slice edits E1 on the
+deploy branch in the same commit (§5.2). If #1849 is still open when this slice is ready,
+the slice waits for #1849 or asks its owner to apply the line; it never pushes to #1849.
+#1799 / #1800 do not reference the header test ID (`established fact`, `gh pr diff`), so they
+need nothing.
 
 ---
 
@@ -40,11 +47,11 @@ So for a one-tent grower the first fold shows two adjacent `/daily-check` CTAs
 
 ---
 
-## 3. Every consumer of `dashboard-daily-grow-check-entry` (deploy tip + #1793)
+## 3. Every consumer of `dashboard-daily-grow-check-entry` (deploy tip + #1793/#1849)
 
 | #   | File                                                                      | Use                                                                                                            | How it breaks                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| E1  | `e2e/signed-in-performance.spec.ts:35` (#1793 only)                       | `control:` for `dashboard-ready`; asserts `toBeVisible()` then `toBeEnabled()`                                 | element gone → timeout → `BLOCKED` receipt                                                                                                                                                                                                                                                                                                                                                                                                    |
+| E1  | `e2e/signed-in-performance.spec.ts:35` (#1849; #1793)                     | `control:` for `dashboard-ready`; asserts `toBeVisible()` then `toBeEnabled()`                                 | element gone → timeout → `BLOCKED` receipt                                                                                                                                                                                                                                                                                                                                                                                                    |
 | E2  | `e2e/core-link-form-census.spec.ts:1994`                                  | `toHaveAttribute("href", "/daily-check")`                                                                      | element gone                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | E3  | `e2e/ui-overhaul-responsive.spec.ts:253`                                  | `readySelector`, cardinality `exact-one` + `toBeVisible()` (`expectSelectorCardinality`, line 1062)            | element gone                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | E4  | `e2e/dashboard-mobile-overflow.spec.ts:149`                               | `getByRole("link", { name: "Quick Log", exact: true }).first()` visible at 390/320 px                          | **not in the brief.** On mobile the only Dashboard link named `Quick Log` is the header link: `AppShell` `header-quick-log-trigger` is a `<button>` and `hidden md:inline-flex`; `QuickLogV2Fab` is a `<button>` and `hidden md:inline-flex`; `MobileNav`'s `Quick Log` link lives in the closed More sheet (`inference` — sheet content not mounted while closed; verify). Fixture has one tent, so the card renders `Log`, not `Quick Log`. |
@@ -111,16 +118,18 @@ Add a one-line load-bearing comment on the wrapper, in the style of the `__root.
    `AppShell`, `MobileNav`, routes, `withGrowId`, or #1833's card/view model.
 5. Do not reformat the file (pins elsewhere depend on line shape).
 
-Handoff to Codex for #1793 (if still open), E1: `control: "dashboard-ready"`. No other change;
-`toBeEnabled()` stays.
+E1 handoff (`control: "dashboard-ready"`, `toBeEnabled()` stays) is posted on #1793
+(issuecomment-5935387971) and carried forward to #1849 (issuecomment-5936685946). The
+owner of #1849 acknowledged it. The edit itself is in §5.2 once #1849 has landed.
 
 ### 5.2 E2E (route to **Critical Mass**)
 
-| Spec                                       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| E2 `core-link-form-census.spec.ts:1994`    | Replace the href assertion with: `await expect(page.getByTestId("dashboard-ready")).toBeVisible();` and `await expect(page.getByTestId("dashboard-daily-grow-check-entry")).toHaveCount(0);`. The fixture has one tent (`TENT`, `grow_id: GROW_ID`) → selection `tent/only`, so also assert `await expect(page.getByTestId("tonight-tent-home-log")).toHaveAttribute("href", \`/daily-check?growId=${GROW_ID}\`);`—`inference`that #1833's`toTent`maps`grow_id`→`growId`; owner confirms on the landed code and drops this line if not. |
-| E3 `ui-overhaul-responsive.spec.ts:253`    | `readySelector: '[data-testid="dashboard-ready"]'`. Cardinality stays `exact-one`.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| E4 `dashboard-mobile-overflow.spec.ts:149` | Replace with `await expect(page.getByTestId("dashboard-ready")).toBeVisible();`. Keep the `Open tents` assertion. Re-run at 390 and 320 px: the card's `size="lg"` Log button now sits in the first fold, so `expectNoOverflow` is the real check here.                                                                                                                                                                                                                                                                                 |
+| Spec                                                                        | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E2 `core-link-form-census.spec.ts:1994`                                     | Replace the href assertion with: `await expect(page.getByTestId("dashboard-ready")).toBeVisible();` and `await expect(page.getByTestId("dashboard-daily-grow-check-entry")).toHaveCount(0);`. The fixture has one tent (`TENT`, `grow_id: GROW_ID`) → selection `tent/only`, so also assert `await expect(page.getByTestId("tonight-tent-home-log")).toHaveAttribute("href", \`/daily-check?growId=${GROW_ID}\`);`—`inference`that #1833's`toTent`maps`grow_id`→`growId`; owner confirms on the landed code and drops this line if not. |
+| E1 `signed-in-performance.spec.ts` (on the deploy branch after #1849 lands) | `control: "dashboard-ready"` for `dashboard-ready`; leave `toBeVisible()` / `toBeEnabled()` unchanged. If #1849 has not landed, do not edit #1849; wait or ask its owner.                                                                                                                                                                                                                                                                                                                                                               |
+| E3 `ui-overhaul-responsive.spec.ts:253`                                     | `readySelector: '[data-testid="dashboard-ready"]'`. Cardinality stays `exact-one`.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| E4 `dashboard-mobile-overflow.spec.ts:149`                                  | Replace with `await expect(page.getByTestId("dashboard-ready")).toBeVisible();`. Keep the `Open tents` assertion. Re-run at 390 and 320 px: the card's `size="lg"` Log button now sits in the first fold, so `expectNoOverflow` is the real check here.                                                                                                                                                                                                                                                                                 |
 
 Every e2e run uses `--project=chromium-mocked` **with an explicit spec filter** and
 `E2E_BASE_URL=http://127.0.0.1:8080`.
@@ -173,9 +182,9 @@ show GREEN.
    branch for `none`, `choose`, `tent`, and never while loading/error.
 3. U1–U4 renegotiated in the same commit; new test shown RED then GREEN with counts.
 4. Validation: `bun run typecheck`; targeted `bunx vitest run` on U1–U4 + new file +
-   `tonight-tent-home-*`; `bun run lint` on touched files; the three/four e2e specs as in
-   §5.2. Full suite is CI's (32 shards).
-5. Diff touches only: `Dashboard.tsx`, the e2e specs E2–E4, U1–U4, the new test. No route,
+   `tonight-tent-home-*`; `bun run lint` on touched files; the e2e specs as in §5.2
+   (E1 runs only in its credentialed lane; locally, prove it at least compiles and lists). Full suite is CI's (32 shards).
+5. Diff touches only: `Dashboard.tsx`, the e2e specs E2–E4 (plus E1 once #1849 has landed), U1–U4, the new test. No route,
    schema, RLS, auth, edge-function, migration, dependency or copy-constant change.
 6. Reviewers: Blue Dream (`Dashboard.tsx`), Critical Mass (tests/e2e). The owner does not
    self-review.
@@ -212,5 +221,6 @@ show GREEN.
 
 - **Owner (implementation):** Claude, per user assignment 2026-10-01, once §1 clears.
 - **Independent reviewers:** Blue Dream (`.tsx`), Critical Mass (tests, e2e).
-- **Coordination:** Codex — §5.1 one-line `control` change in #1793 if it is still open.
-- **Integration:** GDP; PR stays draft, no auto-merge.
+- **Coordination:** #1849's owner (a Claude session, reassigned from Codex 2026-10-01). E1 is
+  handled by this slice after #1849 lands; acknowledged in issuecomment-5936713821.
+- **Integration:** GDP; no auto-merge.

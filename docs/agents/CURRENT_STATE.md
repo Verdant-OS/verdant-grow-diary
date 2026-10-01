@@ -2,18 +2,23 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T15:34 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T15:43 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
 
 - **Open, ready for review: [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
-  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `d65094aa9`, 10 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 15:34
-  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 2 pass / 91 pending /
-  10 skipped / **1 failed — `Vercel`**. No approving review. 0 commits behind `verdant-grow-diary`.
-- **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` (2026-10-01, no conflicts), bringing
-  `#1832` (hono pin) that clears the earlier `Dependency & Security CI` red.
+  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `a7232e1e1`, 12 commits) implements
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 15:43
+  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 1 pass / 92 pending /
+  6 skipped / **1 failed — `Vercel`**. No approving review. 0 commits behind `verdant-grow-diary`.
+- **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` and again at `69f2f5b23` (2026-10-01,
+  no conflicts). The first brought `#1832` (hono pin), which clears the earlier
+  `Dependency & Security CI` red; the second brought `#1836`.
+- **`Published migration integrity` red is stale:** it ran on `d65094aa9`, before `#1836` was
+  merged in, so it read `#1836`'s migration as "deleted". At `a7232e1e1` the same verifier, run
+  locally against `origin/verdant-grow-diary`, reports 291/291 matched, 0 deleted, 1 new. The CI
+  rerun on `a7232e1e1` is queued.
 - **`Vercel` red is an account block, not code:** status "Account is blocked"; Vercel created **no
   deployment** for any branch commit since `1b66c4f0e`, while the six before it deployed `READY`.
   Not a required context. Clearing it is an owner action in the Vercel dashboard
@@ -45,16 +50,20 @@ this entry's earlier 2026-10-01 versions.
     lookup checks. The receipt accepts anon keys only.
   - One P1 claim ("missing `END;` breaks the migration") was **refuted with CI evidence**.
 - **CI DB evidence (`established fact`):** Security DB Local passed on `de12624a2`, `1b66c4f0e`,
-  `d30ac3293` and `42ad20a74`. At `42ad20a74` (run `36882965813`) the expanded harness
-  `test:cultivar-reference-db-security` reported **106 passed, 0 failed** against a freshly replayed
-  local database, including strict parity READY and migration re-apply idempotency. The run on
-  `d65094aa9` (metadata/provenance/%-bound and loopback-API changes) is queued.
-- **Local evidence (`established fact`, Windows clone at `d65094aa9`):**
-  - offline strict parity READY 10/10;
-  - focused suite 103/103;
+  `d30ac3293`, `42ad20a74` and `d65094aa9`. The expanded harness
+  `test:cultivar-reference-db-security` reported **106 passed, 0 failed** at `42ad20a74` (run
+  `36882965813`) and again at `d65094aa9` (run `36884507525`, including the metadata, provenance,
+  %-bound and loopback-API changes), against a freshly replayed local database, with strict parity
+  READY and migration re-apply idempotency. The run on `a7232e1e1` (re-dated migration) is queued.
+- **Local evidence (`established fact`, Windows clone):**
+  - offline strict parity READY 10/10 at `a7232e1e1`;
+  - focused suite 103/103 at `d65094aa9`; at `a7232e1e1`, the PR's tests plus every
+    migration-scanning test: 1,530 passed, with 1 file failing machine-locally (needs Unix psql),
+    identically on base;
+  - published-migration integrity verifier OK at `a7232e1e1`;
   - `tsc` 0 diagnostics;
   - `bun run build` exit 0 with all postbuild SEO validators OK (measured at `fd75bb832`).
-- **`NOT_MEASURED`:** the full 32-shard suite at `d65094aa9`, the preview and production receipts,
+- **`NOT_MEASURED`:** the full 32-shard suite at `a7232e1e1`, the preview and production receipts,
   and the cause of the Vercel block.
 - **Review seat — not satisfied.** No independent review is recorded.
   - The owner named **Grok** as reviewer on 2026-10-01. Codex is unavailable, and the earlier

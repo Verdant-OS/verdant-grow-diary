@@ -528,6 +528,9 @@ describe("read-only production fixture observer", () => {
   });
 });
 
+// @source-scan-justified: Playwright specs register tests on import and cannot be loaded into
+// Vitest; the order of observer install, navigation, assertTarget and the save click is asserted
+// on the spec source.
 describe("production smoke save integration", () => {
   const read = (file: string) => fs.readFileSync(path.resolve(__dirname, "../..", file), "utf8");
   it("installs proof before navigation and disposes it in both entry points", () => {

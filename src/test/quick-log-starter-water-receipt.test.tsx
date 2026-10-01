@@ -410,7 +410,7 @@ describe("starter Water manual receipt validation", () => {
     });
   });
 
-  it("resolves the RPC's retracted-key rejection as a retracted save", async () => {
+  it("keeps the RPC's unverified retracted-key rejection a history check", async () => {
     mocks.rpc.mockResolvedValue({
       data: { ok: false, reason: "idempotency_key_retracted" },
       error: null,
@@ -421,12 +421,9 @@ describe("starter Water manual receipt validation", () => {
         await result.current.save(payload, {
           expectedWaterTarget: { plantId: payload.p_target_id, growId, tentId },
         }),
-      ).toMatchObject({
-        ok: false,
-        reason: "saved_then_retracted",
-        savedThenRetracted: true,
-      });
+      ).toEqual({ ok: false, reason: "idempotency_key_retracted" });
     });
+    expect(mocks.eventRead).not.toHaveBeenCalled();
     expect(mocks.track).not.toHaveBeenCalled();
   });
 });

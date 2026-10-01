@@ -1650,8 +1650,14 @@ export default function QuickLog({
           : { telemetryIntent: saveEventType },
       );
       if (!result.ok) {
+        // A history-check reason cannot confirm or rule out the original
+        // Watering, so its recovery claim is kept while the form locks for
+        // review; it is neither cleared nor left silently pending.
+        const waterHistoryCheck =
+          waterRecord !== null && quickLogSaveRequiresHistoryCheck(result.reason);
         if (
           waterRecord &&
+          !waterHistoryCheck &&
           result.definitiveRejected !== true &&
           result.savedThenRetracted !== true
         ) {
@@ -1659,7 +1665,7 @@ export default function QuickLog({
           toast.message(STARTER_WATER_RECOVERY_PENDING);
           return;
         }
-        if (waterRecord) {
+        if (waterRecord && !waterHistoryCheck) {
           const clearance = await reconcilePendingStarterWaterClear(waterRecord);
           if (clearance.status !== "cleared" && clearance.status !== "already_cleared") {
             setStarterWaterStorageBlocked(true);
@@ -1900,7 +1906,11 @@ export default function QuickLog({
           toast.message(message);
           return;
         }
-        setSaveError(STARTER_WATER_RECOVERY_PENDING);
+        setSaveError(
+          quickLogSaveRequiresHistoryCheck(result.reason)
+            ? quickLogDraftPreservedFailureMessage(result.reason)
+            : STARTER_WATER_RECOVERY_PENDING,
+        );
         return;
       }
       const confirmedTarget = result.savedWaterTarget ?? record.target;

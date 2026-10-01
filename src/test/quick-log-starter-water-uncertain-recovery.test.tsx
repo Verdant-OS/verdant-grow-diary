@@ -353,6 +353,35 @@ describe("legacy public-starter Water uncertain receipt", () => {
     expect(trackSuccessMock).not.toHaveBeenCalled();
   });
 
+  it("keeps the claim and locks for history review on an unverified retracted key", async () => {
+    seed();
+    saveMock.mockResolvedValueOnce({ ok: false, reason: "idempotency_key_retracted" });
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    await screen.findByText(/The original log was retracted\. Check Timeline/i);
+    expect(readPendingStarterWater("user-1")).toMatchObject({ status: "pending" });
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(screen.queryByText(/This Watering was saved and later retracted/i)).toBeNull();
+    expect(trackSuccessMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a recovery claim pending with history-check copy on an unverified retracted key", async () => {
+    seed();
+    saveMock
+      .mockResolvedValueOnce({ ok: false, reason: "receipt_unverified" })
+      .mockResolvedValueOnce({ ok: false, reason: "idempotency_key_retracted" });
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await screen.findByTestId("quick-log-starter-water-recovery");
+    fireEvent.click(screen.getByTestId("quick-log-starter-water-retry"));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    await screen.findByText(/The original log was retracted\. Check Timeline/i);
+    expect(readPendingStarterWater("user-1")).toMatchObject({ status: "pending" });
+    expect(screen.queryByText(/This Watering was saved and later retracted/i)).toBeNull();
+    expect(trackSuccessMock).not.toHaveBeenCalled();
+  });
+
   it("keeps a retracted claim pending with honest copy when storage clearance fails", async () => {
     seed();
     saveMock

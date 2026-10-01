@@ -106,17 +106,10 @@ export function useQuickLogV2Save() {
         ) as RpcResponse;
         if (r.ok !== true) {
           const reason = typeof r.reason === "string" && r.reason ? r.reason : "save_failed";
-          // The RPC reports a key whose committed event was later retracted as
-          // a failed envelope. That resolves the original write; it must not be
-          // retried or left pending.
-          if (
-            r.ok === false &&
-            reason === "idempotency_key_retracted" &&
-            payload.p_action === "water"
-          ) {
-            setError("saved_then_retracted");
-            return { ok: false, reason: "saved_then_retracted", savedThenRetracted: true };
-          }
+          // `idempotency_key_retracted` is reported before the server compares
+          // request hashes and carries no event id, so it cannot prove that the
+          // retracted event was this submission. It stays a history-check
+          // reason; only a verified readback may resolve a retracted save.
           setError(reason);
           return {
             ok: false,

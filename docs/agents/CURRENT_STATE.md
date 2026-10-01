@@ -2,7 +2,7 @@
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T16:45 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-01T16:51 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
@@ -10,9 +10,14 @@ this entry's earlier 2026-10-01 versions.
 - **Open (not draft), awaiting CI and Chemdawg pre-check — review not routed:
   [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
   (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `358d69c38`, 16 commits) implements
-  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 16:43
-  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 32 pass / 68 pending /
-  11 skipped / **1 failed — `Vercel`**. No approving review. 0 commits behind `verdant-grow-diary`.
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 16:51
+  UTC): mergeable, `mergeStateStatus: BLOCKED` on pending required checks; CI 75 pass / 27 pending /
+  14 skipped / **1 failed — `Vercel`**. No approving review.
+  - Required contexts (35, `config/required-status-checks.json`): 15 pass, 19 pending, 1 not yet
+    reported (`Lint, typecheck, test, build`). None failed.
+  - **1 commit behind `verdant-grow-diary`:** `6ed854cee` (`#1835`, e2e Quick Log fixture check)
+    landed after `358d69c38`. It adds no migration, so it does not affect this PR's migration
+    ordering. Not yet merged into the branch.
 - **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` and again at `69f2f5b23` (2026-10-01,
   no conflicts). The first brought `#1832` (hono pin), which clears the earlier
   `Dependency & Security CI` red; the second brought `#1836`.

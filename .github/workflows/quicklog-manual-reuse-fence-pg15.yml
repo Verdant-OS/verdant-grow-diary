@@ -95,7 +95,7 @@ jobs:
           QUICKLOG_MANUAL_REUSE_PG15_CONTAINER: ${{ job.services.postgres.id }}
         run: node scripts/run-quicklog-manual-reuse-fence-pg15-harness.mjs
 
-      - name: Prove ordered full manual chain and unchanged database after reverse refusal
+      - name: Prove ordered full manual chain and unchanged covered state after reverse refusal
         env:
           QUICKLOG_MANUAL_LINEAGE_PG15_CONTAINER: ${{ job.services.postgres.id }}
         run: node scripts/run-quicklog-manual-plant-lineage-pg15-harness.mjs

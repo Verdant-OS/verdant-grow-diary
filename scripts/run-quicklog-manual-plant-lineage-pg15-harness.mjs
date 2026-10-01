@@ -503,7 +503,7 @@ export async function runPlantLineageHarness({
     return 1;
   }
   process.stdout.write(
-    "Quick Log plant lineage PG15 harness PASS: full chain 002000 -> 160000 -> 183000; reverse and skipped-lineage refused, database unchanged\n",
+    "Quick Log plant lineage PG15 harness PASS: full chain 002000 -> 160000 -> 183000; reverse and skipped-lineage refused, covered persistent state unchanged\n",
   );
   return 0;
 }

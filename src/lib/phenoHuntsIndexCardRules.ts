@@ -52,9 +52,10 @@ export function countKeepersByHunt(
 /**
  * Per-hunt keeper counts from the owner-wide roll-up, or `null` when they
  * cannot be proven exact: the read failed, it returned `limit` rows or more,
- * the server count is unknown, or the server count exceeds the rows read (a
- * lower server-side cap). A partial read never renders as an undercount; the
- * clause is omitted instead (Codex on #1825).
+ * the server count is unknown, or the server count differs from the rows read
+ * (a lower server-side cap, or rows changed between the two reads). A
+ * partial or stale read never renders as an exact count; the clause is
+ * omitted instead (Codex on #1825).
  */
 export function keeperCountsFromRollup(
   keepers: readonly KeeperHuntRef[] | null | undefined,
@@ -72,7 +73,9 @@ export function keeperCountsFromRollup(
   if (opts.unavailable) return null;
   const n = Array.isArray(keepers) ? keepers.length : 0;
   if (n >= opts.limit) return null;
-  if (opts.total === null || n < opts.total) return null;
+  // Any mismatch is unverified: fewer rows than the count means a truncated
+  // read; more means keepers were deleted between the two reads (Codex on #1825).
+  if (opts.total === null || n !== opts.total) return null;
   return countKeepersByHunt(keepers);
 }
 

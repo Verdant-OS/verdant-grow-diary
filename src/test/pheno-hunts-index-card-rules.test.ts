@@ -156,6 +156,11 @@ describe("keeperCountsFromRollup (Codex on #1825)", () => {
     expect(keeperCountsFromRollup(rows(5), { limit: 10, unavailable: false, total: 6 })).toBeNull();
   });
 
+  it("returns null when the rows read exceed the server count (deleted between reads)", () => {
+    // Codex on #1825: any mismatch is unverified, not just the truncation direction.
+    expect(keeperCountsFromRollup(rows(6), { limit: 10, unavailable: false, total: 5 })).toBeNull();
+  });
+
   it("returns null when the roll-up read failed", () => {
     expect(keeperCountsFromRollup(rows(1), { limit: 10, unavailable: true, total: 1 })).toBeNull();
   });

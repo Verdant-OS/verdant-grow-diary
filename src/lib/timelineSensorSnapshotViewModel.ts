@@ -59,7 +59,14 @@ export type TimelineSensorSnapshotViewModel =
 
 export type TimelineCardSensorResolution = {
   sensor: Record<string, unknown> | undefined;
+  /** Manual provenance/compatibility copy; never a metric-validation exemption. */
   useManualValidation: boolean;
+};
+
+export type TimelineCardSensorSnapshotViewModel = TimelineCardSensorResolution & {
+  sensorViewModel: TimelineSensorSnapshotViewModel;
+  reviewMessage: string;
+  warningMessage: string;
 };
 
 const UNAVAILABLE_MESSAGE = "Sensor snapshot unavailable";
@@ -102,8 +109,8 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 /**
- * Resolve the snapshot payload used on Timeline cards plus whether it must go
- * through manual compatibility validation (instead of raw chip rendering).
+ * Resolve the snapshot payload and whether its provenance uses manual copy.
+ * All resolved payloads are validated by the card view model, regardless of source.
  */
 export function resolveTimelineCardSensorResolution(
   details: Record<string, unknown> | null | undefined,
@@ -131,6 +138,30 @@ export function resolveTimelineCardSensorResolution(
   };
 }
 
+/** Validate every persisted source; manual provenance only selects the existing copy. */
+export function buildTimelineCardSensorSnapshotViewModel(
+  input: TimelineCardSensorResolution | null | undefined,
+  options: { validateManualCompatibility: true } = { validateManualCompatibility: true },
+): TimelineCardSensorSnapshotViewModel {
+  const resolution = input ?? { sensor: undefined, useManualValidation: false };
+  return {
+    ...resolution,
+    sensorViewModel: buildTimelineSensorSnapshotViewModel(resolution.sensor, {
+      preferUnit: "F",
+      validateManualCompatibility: options.validateManualCompatibility,
+      // Retain Timeline's persisted generic-temperature Celsius convention.
+      genericTempUnit: "C",
+      preserveLegacyPrecision: !resolution.useManualValidation,
+    }),
+    reviewMessage: resolution.useManualValidation
+      ? MANUAL_REVIEW_MESSAGE
+      : "Review sensor snapshot — invalid readings were not shown.",
+    warningMessage: resolution.useManualValidation
+      ? "Check manual snapshot — a reading may need confirmation."
+      : "Check sensor snapshot — a reading may need confirmation.",
+  };
+}
+
 /** Only a displayed, plausible VPD with eligible provenance may get a stage hint. */
 export function resolveTimelineCardVpdStageValue(
   input:
@@ -148,9 +179,8 @@ export function resolveTimelineCardVpdStageValue(
   const value = pick(input.sensor, "vpd", "vpd_kpa", "vpdKpa");
   if (!isFiniteNumber(value) || !classifyManualMetric("vpd_kpa", value).valid) return null;
   if (
-    input.useManualValidation &&
-    (input.sensorViewModel?.kind !== "chips" ||
-      !input.sensorViewModel.chips.some((chip) => chip.metric === "vpd"))
+    input.sensorViewModel?.kind !== "chips" ||
+    !input.sensorViewModel.chips.some((chip) => chip.metric === "vpd")
   )
     return null;
   return value;
@@ -178,6 +208,8 @@ export function buildTimelineSensorSnapshotViewModel(
     validateManualCompatibility?: boolean;
     /** Timeline's persisted generic-temperature convention; absent means unit unverified. */
     genericTempUnit?: "F" | "C";
+    /** Preserve the old raw non-manual chip precision after validating the metric. */
+    preserveLegacyPrecision?: boolean;
   } = {},
 ): TimelineSensorSnapshotViewModel {
   if (input === null || input === undefined) return { kind: "none" };
@@ -228,10 +260,11 @@ export function buildTimelineSensorSnapshotViewModel(
       ? "C"
       : (options.genericTempUnit ?? "C");
   const legacyPrecision =
-    options.genericTempUnit === "C" &&
-    !isFiniteNumber(tempF) &&
-    !isFiniteNumber(tempC) &&
-    isFiniteNumber(tempGeneric);
+    options.preserveLegacyPrecision ||
+    (options.genericTempUnit === "C" &&
+      !isFiniteNumber(tempF) &&
+      !isFiniteNumber(tempC) &&
+      isFiniteNumber(tempGeneric));
 
   const manualValidation = options.validateManualCompatibility
     ? validateManualSnapshot({
@@ -366,7 +399,7 @@ export function buildTimelineSensorSnapshotViewModel(
   }
 
   if (isFiniteNumber(rh) && allows("humidity_pct")) {
-    const v = roundTo(rh, 1);
+    const v = options.preserveLegacyPrecision ? rh : roundTo(rh, 1);
     chips.push({
       metric: "rh",
       label: "RH",
@@ -404,7 +437,7 @@ export function buildTimelineSensorSnapshotViewModel(
   }
 
   if (isFiniteNumber(soil) && allows("soil_moisture_pct")) {
-    const v = roundTo(soil, 1);
+    const v = options.preserveLegacyPrecision ? soil : roundTo(soil, 1);
     chips.push({
       metric: "soil_moisture",
       label: "Soil",

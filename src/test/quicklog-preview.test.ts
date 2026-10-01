@@ -103,12 +103,11 @@ describe("QuickLog component wiring", () => {
 
   it("does not gate save on validation warnings (submit not blocked)", () => {
     // Save is gated on either parent/child persistence being busy and on
-    // an unresolved activity on this exact target, or missing required plant
-    // context (Gate 1 bug fix: visible picker and save validator must agree).
-    // It must NOT be gated on soft preview/validation warnings.
+    // an unresolved activity on this exact target, or missing activity-appropriate
+    // plant/tent context. It must not be gated on soft preview warnings.
     expect(QUICKLOG).toMatch(/const saveLocked = busy \|\| childSaveBusy/);
     expect(QUICKLOG).toMatch(
-      /disabled=\{saveLocked\s*\|\|\s*sameTargetRecoveryLocked\s*\|\|\s*!resolvedTarget\s*\|\|\s*!!savedTarget\}/,
+      /disabled=\{\s*saveLocked\s*\|\|\s*sameTargetRecoveryLocked\s*\|\|\s*!mainFormResolvedTarget\s*\|\|\s*!!savedTarget\s*\}/,
     );
     expect(QUICKLOG).not.toMatch(/disabled=\{[^}]*preview[^}]*\}/);
     expect(QUICKLOG).not.toMatch(/disabled=\{[^}]*hasIssues[^}]*\}/);

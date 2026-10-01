@@ -98,6 +98,26 @@ function storedHash(env, spawnImpl, key) {
   );
 }
 
+/**
+ * "true|<offset>" when the key's single diary companion holds logged_at equal to
+ * its event's logged_at, both as a column and parsed from details.logged_at.
+ */
+function companionLoggedAt(env, spawnImpl, key) {
+  return executeSql(
+    `select (count(*)=1 and bool_and(
+    de.logged_at = ge.logged_at
+    and public.quicklog_try_parse_logged_at(de.details->>'logged_at') = ge.logged_at
+  ))::text || '|' || coalesce(string_agg(right(de.details->>'logged_at', 6), ','), '')
+from public.quicklog_idempotency qi
+join public.grow_events ge on ge.id = qi.grow_event_id
+join public.diary_entries de on de.user_id = qi.user_id
+  and (de.details->>'linked_grow_event_id' = ge.id::text or de.details->>'grow_event_id' = ge.id::text)
+where qi.user_id='${owner}' and qi.idempotency_key='${key}';`,
+    env,
+    { stage: "companion_logged_at", spawnImpl },
+  );
+}
+
 function expectReceipt(label, receipt, { ok, reused, reason, event }) {
   if (
     receipt?.ok !== ok ||
@@ -253,6 +273,11 @@ export async function runManualOccurredAtUtcHarness({
     freshSave(env, spawnImpl, "kolkata_new", { key: "utc-hash-kolkata-new", tz: "Asia/Kolkata" });
     if (storedHash(env, spawnImpl, "utc-hash-kolkata-new") !== expectedUtc)
       throw new Error("kolkata_new:hash_not_utc_session_form");
+    // logged_at residual: the companion's details.logged_at text keeps the
+    // saving session's offset, but manual_v1 excludes it, so the instant is
+    // unchanged and a cross-zone retry still reuses without rewriting it.
+    if (companionLoggedAt(env, spawnImpl, "utc-hash-kolkata-new") !== "true|+05:30")
+      throw new Error("kolkata_new:companion_logged_at_rejected");
     expectReceipt(
       "kolkata_new_retry",
       save(env, spawnImpl, { key: "utc-hash-kolkata-new", tz: "America/New_York" }),
@@ -261,6 +286,11 @@ export async function runManualOccurredAtUtcHarness({
         reused: true,
       },
     );
+    if (
+      storedHash(env, spawnImpl, "utc-hash-kolkata-new") !== expectedUtc ||
+      companionLoggedAt(env, spawnImpl, "utc-hash-kolkata-new") !== "true|+05:30"
+    )
+      throw new Error("kolkata_new_retry:companion_logged_at_rejected");
     pass();
     for (const [index, occurred] of EDGE_INSTANTS.entries()) {
       const key = `utc-hash-edge-${index}`;
@@ -335,7 +365,7 @@ and has_function_privilege('authenticated','public.quicklog_save_manual(${signat
     pass();
 
     process.stdout.write(
-      `Manual occurred_at UTC hash PG15: ${passed} passed, 0 failed (legacy zone conflict witnessed; UTC-stored, same-zone legacy, NULL and edge retries accepted; cross-zone legacy residual and changed requests refused; ACL and preflight drift fenced)\n`,
+      `Manual occurred_at UTC hash PG15: ${passed} passed, 0 failed (legacy zone conflict witnessed; UTC-stored, same-zone legacy, NULL and edge retries accepted; cross-zone legacy residual and changed requests refused; companion logged_at offset residual pinned (same instant, cross-zone reuse); ACL and preflight drift fenced)\n`,
     );
     return 0;
   } catch {

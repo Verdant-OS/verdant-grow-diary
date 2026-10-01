@@ -7,6 +7,7 @@
  * verify the safety-critical strings, IDs, and conditional branches.
  */
 import { describe, it, expect } from "vitest";
+import { buildDashboardEmptyEnvironmentViewModel } from "@/lib/dashboardEmptyEnvironmentViewModel";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
@@ -27,13 +28,21 @@ const SRC_LABEL_RULES = readFileSync(resolve(ROOT, "src/lib/sensorSourceLabelRul
 describe("Dashboard Environment Snapshot · empty / stale / invalid states", () => {
   it("renders an honest empty title when there is no latest reading", () => {
     expect(DASH).toContain('data-testid="dashboard-environment-snapshot-empty"');
-    expect(DASH).toMatch(/No sensor snapshot yet/);
+    expect(
+      buildDashboardEmptyEnvironmentViewModel({ scoped: false, state: null, selectedTents: [] })
+        .heading,
+    ).toBe("No sensor readings in this view");
   });
 
-  it("empty state includes the Ecowitt-or-manual helper copy", () => {
-    expect(DASH).toMatch(/Add a manual reading or/);
-    expect(DASH).toMatch(/connect Ecowitt/);
-    expect(DASH).toMatch(/to see your environment here\./);
+  it("empty state distinguishes sensor history from saved diary evidence", () => {
+    const model = buildDashboardEmptyEnvironmentViewModel({
+      scoped: false,
+      state: null,
+      selectedTents: [],
+    });
+    expect(model.description).toContain("No sensor-history readings were returned");
+    expect(model.description).toContain("review saved diary entries in the Timeline");
+    expect(DASH).toContain("Set up a sensor.");
   });
 
   it("empty state has Import sensor data link to Sensors page anchor", () => {

@@ -131,6 +131,7 @@ import {
   resolveQuickLogWriteTarget,
   type QuickLogResolvedTarget,
 } from "@/lib/quickLogTargetIntegrityRules";
+import { legacyQuickLogEventRequiresTent } from "@/lib/quickLogTentRequirementRules";
 import {
   buildRecentTargetStorageKey,
   getRecentTargetSuggestionWakeDelayMs,
@@ -572,11 +573,23 @@ export default function QuickLog({
       plantsQuery.isLoading ||
       tentsQuery.isPending ||
       tentsQuery.isLoading);
-  const prefillTarget = useMemo(
+  const strictPrefillTarget = useMemo(
     () =>
       namedPrefillQueryPending || namedPrefillQueryError
         ? ({ status: "blocked", reason: "prefill_target_pending" } as const)
         : resolveQuickLogPrefillTarget({ prefill, plants, tents: activeTents }),
+    [prefill, plants, activeTents, namedPrefillQueryPending, namedPrefillQueryError],
+  );
+  const prefillTarget = useMemo(
+    () =>
+      namedPrefillQueryPending || namedPrefillQueryError
+        ? ({ status: "blocked", reason: "prefill_target_pending" } as const)
+        : resolveQuickLogPrefillTarget({
+            prefill,
+            plants,
+            tents: activeTents,
+            requireTent: false,
+          }),
     [prefill, plants, activeTents, namedPrefillQueryPending, namedPrefillQueryError],
   );
   const prefillPlantId = prefillTarget.status === "ready" ? prefillTarget.target.plantId : null;
@@ -817,7 +830,7 @@ export default function QuickLog({
     [activeTents, selectedPlant?.tent_id],
   );
 
-  const writeTarget = useMemo(
+  const strictWriteTarget = useMemo(
     () =>
       resolveQuickLogWriteTarget({
         activeGrowId,
@@ -825,6 +838,26 @@ export default function QuickLog({
         selectedTent,
       }),
     [activeGrowId, selectedPlant, selectedTent],
+  );
+  const writeTarget = useMemo(
+    () =>
+      resolveQuickLogWriteTarget({
+        activeGrowId,
+        selectedPlant,
+        selectedTent,
+        requireTent: false,
+      }),
+    [activeGrowId, selectedPlant, selectedTent],
+  );
+  const strictEditorTarget = useMemo(
+    () =>
+      resolveQuickLogEditorTarget({
+        prefill,
+        prefillResolution: strictPrefillTarget,
+        writeResolution: strictWriteTarget,
+        dismissedBlockedPrefillKey,
+      }),
+    [prefill, strictPrefillTarget, strictWriteTarget, dismissedBlockedPrefillKey],
   );
   const editorTarget = useMemo(
     () =>
@@ -860,19 +893,21 @@ export default function QuickLog({
 
   const beginAllActivitiesSave = useCallback(
     (target: QuickLogAllActivitiesSaveTarget): boolean => {
-      if (saveInFlightRef.current || !target.plantId || !target.tentId || !target.growId) {
+      if (saveInFlightRef.current || !target.plantId || !target.growId) {
         return false;
       }
       const targetPlant = plants.find((plant) => plant.id === target.plantId) ?? null;
-      const targetTent = activeTents.find((tent) => tent.id === target.tentId) ?? null;
+      const targetTent = target.tentId
+        ? (activeTents.find((tent) => tent.id === target.tentId) ?? null)
+        : null;
       const targetGrow = grows.find((grow) => grow.id === target.growId) ?? null;
       if (
         !targetPlant ||
-        !targetTent ||
+        (target.tentId !== null && !targetTent) ||
         !targetGrow ||
         targetPlant.grow_id !== target.growId ||
-        targetPlant.tent_id !== target.tentId ||
-        targetTent.grow_id !== target.growId
+        (targetPlant.tent_id ?? null) !== (target.tentId ?? null) ||
+        (targetTent !== null && targetTent.grow_id !== target.growId)
       ) {
         return false;
       }
@@ -887,7 +922,7 @@ export default function QuickLog({
             growId: target.growId,
           }),
           plantName: targetPlant.name,
-          tentName: targetTent.name ?? null,
+          tentName: targetTent?.name ?? null,
           growName: targetGrow.name ?? null,
           eventType,
           stage,
@@ -1350,17 +1385,25 @@ export default function QuickLog({
       toast.message(UNSUPPORTED_EVENT_TYPE_COPY);
       return;
     }
-    if (editorTarget.status !== "ready" || !selectedPlant || !selectedTent) {
+    const saveTargetResolution =
+      legacyQuickLogEventRequiresTent(effectiveEventType) || snapshot
+        ? strictEditorTarget
+        : editorTarget;
+    if (
+      saveTargetResolution.status !== "ready" ||
+      !selectedPlant ||
+      (legacyQuickLogEventRequiresTent(effectiveEventType) && !selectedTent)
+    ) {
       const message =
-        editorTarget.status === "blocked"
-          ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
+        saveTargetResolution.status === "blocked"
+          ? QUICK_LOG_TARGET_BLOCKED_COPY[saveTargetResolution.reason]
           : "Review the Quick Log target before saving.";
       setSaveError(message);
       toast.error(message);
       if (!selectedPlant) focusPlant();
       return;
     }
-    const saveTarget = Object.freeze({ ...editorTarget.target });
+    const saveTarget = Object.freeze({ ...saveTargetResolution.target });
     const saveDraftHandoffKey = draftHandoffKey;
     const saveStage = stage;
     const saveStageWasUserTouched = stageUserTouchedRef.current;
@@ -1407,7 +1450,7 @@ export default function QuickLog({
       Object.freeze({
         target: saveTarget,
         plantName: savePlant.name,
-        tentName: saveTent.name ?? null,
+        tentName: saveTent?.name ?? null,
         growName: saveGrow?.name ?? null,
         eventType: saveEventType,
         stage: saveStage,
@@ -1552,7 +1595,7 @@ export default function QuickLog({
           payload: built.payload,
           target: saveTarget,
           plantName: savePlant.name,
-          tentName: saveTent.name ?? null,
+          tentName: saveTent?.name ?? null,
           growName: saveGrow?.name ?? null,
           stageWasUserTouched: saveStageWasUserTouched,
           reviewedDraftId: prefill?.publicStarterDraftId ?? null,
@@ -1721,10 +1764,10 @@ export default function QuickLog({
       setSavedTarget({
         id: savePlant.id,
         name: plantLabel,
-        tentName: waterContextChanged ? null : (saveTent.name ?? null),
+        tentName: waterContextChanged ? null : (saveTent?.name ?? null),
         growName: waterContextChanged ? null : (saveGrow?.name ?? null),
-        growId: confirmedTarget.growId,
-        tentId: confirmedTarget.tentId,
+        growId: confirmedTarget.growId ?? null,
+        tentId: confirmedTarget.tentId ?? null,
         growEventId: result.growEventId ?? null,
         eventType: saveEventType,
         savedAt: new Date().toISOString(),
@@ -1899,7 +1942,8 @@ export default function QuickLog({
   // is attachable. Usable-but-non-attachable rows render a disabled,
   // unchecked toggle and save as manual logs only.
   const snapshotAttachable = stripView.trustBadge.attachable;
-  const attachDisabled = saveLocked || !resolvedTarget || !snapshotUsable || !snapshotAttachable;
+  const attachDisabled =
+    saveLocked || !resolvedTarget?.tentId || !snapshotUsable || !snapshotAttachable;
   const showMismatch = !!(
     prefill?.plantId &&
     selectedPlant &&
@@ -1924,15 +1968,28 @@ export default function QuickLog({
     (resolvedTarget ? (resolvedTargetPlant?.name ?? "Assigned plant") : "Choose a plant");
   const targetTentName =
     inFlightSaveContext?.tentName ??
-    (resolvedTarget ? (resolvedTargetTent?.name ?? "Assigned tent") : "Plant required before save");
+    (resolvedTarget
+      ? (resolvedTargetTent?.name ?? "No tent assigned")
+      : "Plant required before save");
   const targetGrowName =
     inFlightSaveContext?.growName ??
     (resolvedTarget ? (resolvedTargetGrow?.name ?? "Assigned grow") : "No setup selected");
+  const mainFormRequiresTent = legacyQuickLogEventRequiresTent(displayedEventType) || snapshot;
+  const mainFormTarget =
+    inFlightSaveContext === null && mainFormRequiresTent ? strictEditorTarget : editorTarget;
+  const mainFormResolvedTarget =
+    mainFormTarget.status === "ready"
+      ? mainFormTarget.target
+      : (inFlightSaveContext?.target ?? null);
+  const allActivitiesTentRequiredBlockReason =
+    strictEditorTarget.status === "blocked"
+      ? QUICK_LOG_TARGET_BLOCKED_COPY[strictEditorTarget.reason]
+      : null;
   const editorTargetBlocked =
     inFlightSaveContext === null &&
     !targetQueryPending &&
     !targetQueryError &&
-    editorTarget.status === "blocked";
+    mainFormTarget.status === "blocked";
   const showTargetError = editorTargetBlocked && (prefillHoldActive || selectedPlant !== null);
   const plantSelectErrorId = targetQueryPending
     ? "quick-log-target-loading"
@@ -2021,12 +2078,13 @@ export default function QuickLog({
           growId={resolvedTarget?.growId ?? activeGrow?.id ?? null}
           tentId={resolvedTarget?.tentId ?? null}
           plantId={resolvedTarget?.plantId ?? null}
+          tentRequiredBlockReason={allActivitiesTentRequiredBlockReason}
           externalPersistenceBlockReason={
             targetQueryPending
               ? QUICK_LOG_TARGET_BLOCKED_COPY.prefill_target_pending
               : targetQueryError
                 ? `We couldn't load the ${targetQueryErrorSubject} needed to confirm this Quick Log target.`
-                : editorTargetBlocked && editorTarget.status === "blocked"
+                : editorTarget.status === "blocked"
                   ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
                   : null
           }
@@ -2467,14 +2525,14 @@ export default function QuickLog({
                     Retry
                   </Button>
                 </div>
-              ) : showTargetError && editorTarget.status === "blocked" ? (
+              ) : showTargetError && mainFormTarget.status === "blocked" ? (
                 <p
                   id="quick-log-target-error"
                   role="alert"
                   className="text-[11px] text-destructive"
                   data-testid="quick-log-target-error"
                 >
-                  {QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]}
+                  {QUICK_LOG_TARGET_BLOCKED_COPY[mainFormTarget.reason]}
                 </p>
               ) : !selectedPlant ? (
                 <p
@@ -3613,7 +3671,7 @@ export default function QuickLog({
                 saveLocked ||
                 recoveryLocked ||
                 sameTargetRecoveryLocked ||
-                !resolvedTarget ||
+                !mainFormResolvedTarget ||
                 !!savedTarget
               }
               data-testid="quick-log-save"

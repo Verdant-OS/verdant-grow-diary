@@ -1506,18 +1506,27 @@ describe("ecowitt windows testbench — forwarding tests CI workflow", () => {
     expect(wf).toMatch(/push:/);
     expect(wf).toContain("tools/ecowitt-testbench/**");
     expect(wf).toContain("docs/ecowitt-windows-testbench.md");
+    expect(wf).toContain("src/lib/ecowittCustomHttpBridgeIngestRules.ts");
     expect(wf).toContain("src/test/ecowitt-windows-testbench-static-safety.test.ts");
+    // #1783 triggers on the bridge-test glob, which covers the ingest-readiness test.
+    expect(wf).toContain("src/test/ecowitt-custom-http-bridge-*.test.ts");
   });
 
   it("workflow runs python forwarding tests", () => {
     expect(wf).toMatch(/python3?\s+-m\s+unittest\s+test_forwarding_config/);
     expect(wf).toMatch(/python3?\s+-m\s+unittest\s+test_source_labeling/);
+    // #1783 runs test_ingest_readiness inside one combined unittest step.
+    expect(wf).toMatch(/python3?\s+-m\s+unittest\s+[^\n]*\btest_ingest_readiness\b/);
     expect(wf).toMatch(/python3?\s+-m\s+unittest\s+test_forwarding_contract/);
   });
 
   it("workflow runs the static safety vitest suite + typecheck", () => {
     expect(wf).toContain(
       "bunx vitest run src/test/ecowitt-windows-testbench-static-safety.test.ts",
+    );
+    // #1783 runs the bridge tests in the same vitest invocation as static safety.
+    expect(wf).toMatch(
+      /bunx vitest run src\/test\/ecowitt-windows-testbench-static-safety\.test\.ts[^\n]*src\/test\/ecowitt-custom-http-bridge-\*\.test\.ts/,
     );
     expect(wf).toMatch(/bun run typecheck/);
   });

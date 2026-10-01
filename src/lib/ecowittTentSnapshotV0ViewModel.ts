@@ -77,12 +77,19 @@ const METRIC_UNIT: Record<EcowittTentSnapshotV0MetricKey, string> = {
   soil: "%",
 };
 
-/** Known EcoWitt FIELD_MAP keys V0 intentionally does not surface. */
+/** Known EcoWitt FIELD_MAP keys V0 intentionally does not surface on the card. */
 export const ECOWITT_TENT_SNAPSHOT_V0_UNUSED_FIELD_NAMES = [
   "co2",
   "co2in",
   "co2_ppm",
   "soilmoisture2",
+  "soilmoisture3",
+  "temp2f",
+  "humidity2",
+  "tempinf",
+  "humidityin",
+  "leafwetness1",
+  "tf_ch1",
 ] as const;
 
 /**

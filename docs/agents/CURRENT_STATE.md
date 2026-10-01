@@ -228,7 +228,7 @@ Carried rows keep their original labels.
 
 ---
 
-**Superseded restamp chain (2026-09-24 ~08:11 UTC back to 2026-08-18, `f6b2fb97` → `87ae05e`): archived — see `docs/agents/CURRENT_STATE_ARCHIVE.md`, "Archived 2026-09-29".** Moved verbatim on 2026-09-29 (503,873 bytes, 7,258 lines, every block already marked SUPERSEDED by the stamp above it). Standing fences that appeared only in the moved chain, kept here so nothing operative is lost: **Do not ping Tolu.** **Stay on Paddle; live checkout off.** `#1174` and `#1221` stay draft. All other locks (`HOLD #1250`, No Publish, No History-restore, No APPLY, No production SQL, Never KEEP, No owner email, `knk`) are carried in §11 above and in `docs/agents/OWNERSHIP.md` §3.
+**Superseded restamp chain (2026-09-24 ~08:11 UTC back to 2026-08-18, `f6b2fb97` → `87ae05e`): archived — see `docs/agents/CURRENT_STATE_ARCHIVE.md`, "Archived 2026-09-29".** Moved verbatim on 2026-09-29 (503,873 bytes, 7,258 lines, every block already marked SUPERSEDED by the stamp above it). Standing fences that appeared only in the moved chain, kept here so nothing operative is lost: **Do not ping Tolu.** **Stay on Paddle; live checkout off.** **Do not revoke the existing `live_` token.** `#1221` merged on 2026-09-25; `#1174` is open and non-draft. Current holds and routing defer to `docs/agents/OWNERSHIP.md`; this pointer does not lift any hold. All other locks (`HOLD #1250`, No Publish, No History-restore, No APPLY, No production SQL, Never KEEP, No owner email, `knk`) are carried in §11 above and in `docs/agents/OWNERSHIP.md` §3.
 
 **Prior same-day update:** 2026-08-18 UTC
 **Updated by:** Claude (2026-08-18, later edit: executes the Cheek-approved

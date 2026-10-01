@@ -19,6 +19,7 @@ import {
   isSoilEcMscmRealistic,
 } from "@/lib/sensorTruthRules";
 import { isPpfdValid } from "@/lib/ppfdRules";
+import { validateEcWithUnit } from "@/lib/sensorValidation";
 import {
   PH_PRESENTATION_REALISTIC,
   SOIL_MOISTURE_STUCK_VALUES,
@@ -35,7 +36,10 @@ function isUsableTelemetryMetric(metric: unknown, value: number): boolean {
         !(SOIL_MOISTURE_STUCK_VALUES as readonly number[]).includes(value)
       );
     case "ec":
+    case "soil_ec_mscm":
       return classifyManualMetric("soil_ec", value).valid;
+    case "reservoir_ec_mscm":
+      return validateEcWithUnit(value, "mS/cm") === null;
     case "temperature_c":
     case "vpd_kpa":
     case "co2_ppm":

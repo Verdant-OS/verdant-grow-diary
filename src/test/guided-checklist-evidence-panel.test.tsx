@@ -47,6 +47,34 @@ afterEach(() => {
 });
 
 describe("guided checklist evidence honesty", () => {
+  it.each(["soil_ec_mscm", "reservoir_ec_mscm"])(
+    "persisted EC regression: recognizes a valid %s reading",
+    (metric) => {
+      state.readings.data = [{ ...reading(), metric, value: 1.2 }];
+      show();
+      expect(gap()).toBeNull();
+    },
+  );
+  it.each(
+    (
+      [
+        ["soil_ec_mscm", 8],
+        ["reservoir_ec_mscm", 5],
+      ] as const
+    ).flatMap(([metric, max]) => [
+      { metric, value: 0, valid: true },
+      { metric, value: max, valid: true },
+      { metric, value: "1.2", valid: true },
+      { metric, value: -0.001, valid: false },
+      { metric, value: max + 0.001, valid: false },
+      { metric, value: 1200, valid: false },
+    ]),
+  )("uses the evidence bound for persisted $metric=$value", ({ metric, value, valid }) => {
+    state.readings.data = [{ ...reading(), metric, value }];
+    show();
+    if (valid) expect(gap()).toBeNull();
+    else expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+  });
   it.each(
     ["humidity_pct", "soil_moisture_pct"].flatMap((metric) =>
       [0, 100, "0", "100"].map((value) => ({ metric, value })),
@@ -134,19 +162,22 @@ describe("guided checklist evidence honesty", () => {
     show();
     expect(gap()).toBeNull();
   });
-  it("keeps valid canonical EC as the survivor of newer stuck percentage readings", () => {
-    state.readings.data = [
-      { ...reading("live", 60_000), metric: "humidity_pct", value: 100 },
-      { ...reading("live", 60_000), metric: "soil_moisture_pct", value: 0 },
-      { ...reading("live", 14 * 60_000), metric: "ec", value: 1.2 },
-    ];
-    show();
-    expect(gap()).toBeNull();
-    act(() => {
-      vi.advanceTimersByTime(120_000);
-    });
-    expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
-  });
+  it.each(["ec", "soil_ec_mscm", "reservoir_ec_mscm"])(
+    "keeps valid %s as the survivor of newer stuck percentage readings",
+    (metric) => {
+      state.readings.data = [
+        { ...reading("live", 60_000), metric: "humidity_pct", value: 100 },
+        { ...reading("live", 60_000), metric: "soil_moisture_pct", value: 0 },
+        { ...reading("live", 14 * 60_000), metric, value: 1.2 },
+      ];
+      show();
+      expect(gap()).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(120_000);
+      });
+      expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+    },
+  );
   it.each([
     { manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 55 } },
     { manual_sensor_snapshot: { source: "manual", ph: 6.2 } },

@@ -143,6 +143,8 @@ export default function PhenoHuntNew() {
   // already respects a non-empty name, so a restored name survives it.
   useEffect(() => {
     if (!draftKey) return;
+    // A new draft scope never inherits a goals review from another scope.
+    setGoalsReviewed(false);
     const draft = readHuntDraft(draftKey);
     if (!draft) return;
     const hasContent =
@@ -152,7 +154,7 @@ export default function PhenoHuntNew() {
     setNotes((prev) => (prev.trim() !== "" ? prev : draft.notes));
     setSelected((prev) => (prev.size > 0 ? prev : new Set(draft.selected)));
     if (draft.evidenceGoals.length > 0) setEvidenceGoals(draft.evidenceGoals);
-    setGoalsReviewed((prev) => prev || draft.goalsReviewed);
+    setGoalsReviewed(draft.goalsReviewed);
     // A draft saved on a locked confirmation step reopens on Goals instead.
     setCurrentStep(
       draft.currentStep === "confirmation" && !draft.goalsReviewed ? "goals" : draft.currentStep,
@@ -195,6 +197,8 @@ export default function PhenoHuntNew() {
     setNotes("");
     setSelected(new Set());
     setEvidenceGoals(defaultEvidenceGoalSelection());
+    // Starting over means the default goals must be reviewed again (#573).
+    setGoalsReviewed(false);
     setCurrentStep("basics");
   };
 

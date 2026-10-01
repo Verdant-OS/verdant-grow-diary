@@ -408,4 +408,37 @@ describe("PhenoHuntNew onboarding flow", () => {
       clearLocalStorageForTest();
     }
   });
+
+  // Codex review on #1840: discarding a reviewed draft must not carry the
+  // goals-reviewed flag into the fresh draft.
+  it("discarding a reviewed draft re-locks confirmation until Goals is opened again", async () => {
+    entMode.current = "pro";
+    setLocalStorageItemForTest(
+      "verdant:pheno-hunt-draft:u1:grow-1:all",
+      JSON.stringify({
+        name: "Resumed hunt",
+        notes: "",
+        selected: ["p1", "p2"],
+        evidenceGoals: ["structure"],
+        currentStep: "confirmation",
+        goalsReviewed: true,
+      }),
+    );
+    try {
+      renderPage();
+      await waitFor(() => screen.getByTestId("ph-draft-restored"));
+      fireEvent.click(screen.getByTestId("ph-draft-discard"));
+      fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-candidates"));
+      fireEvent.click(screen.getByTestId("ph-toggle-p1"));
+      fireEvent.click(screen.getByTestId("ph-toggle-p2"));
+      const confirmStep = screen.getByTestId(
+        "pheno-onboarding-stepper-step-confirmation",
+      ) as HTMLButtonElement;
+      expect(confirmStep.disabled).toBe(true);
+      fireEvent.click(confirmStep);
+      expect(screen.queryByTestId("pheno-step-confirmation")).toBeNull();
+    } finally {
+      clearLocalStorageForTest();
+    }
+  });
 });

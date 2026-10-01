@@ -17,7 +17,7 @@ TASK CHEM-ACTIONS-READONLY-PROOF-001  priority: P2  status: OPEN
 goal: Measure the real fixture-owned Actions list, successful empty versus row readback, read-only refresh and grower-approval framing on production. No Action Queue mutation or device operation.
 branch: codex/chem-actions-readonly-proof-001
 base: verdant-grow-diary (was codex/chem-signedin-performance-001 at 35e7def61992753d34fb04c10a99febfcce5e130; that parent was superseded by #1849)
-checkout: git switch codex/chem-actions-readonly-proof-001 && git merge --ff-only <verified-sha> && git merge origin/verdant-grow-diary
+checkout: git switch codex/chem-actions-readonly-proof-001 && git merge --ff-only "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1800
 head_sha: b25e8cfa93b2ba4fd8e1c3c0bf2194afcf00cbfd
 state: Four-file stay-draft (+810/-0) normal-pushed. Terminal production run36540923804/job109315857747 PASS: hosted3 files267 PASS / 0 FAIL / 0 SKIP; browser2 PASS / 0 FAIL / 0 SKIP / zero retries includes normal sign-in and owned Actions readback/refresh. Receipt proves four real rows before/after, all six checks and clean appSHA61821446ebd7e4fb30a36a5a95b7526a34515df5; elapsed1317.959747ms for whole sequence; zero blocked writes/runtime errors, two existing fixture operator reads. Artifact11020881186 downloaded, digest2b175b38203a523059f47ba888df09332c82bfd4be7eda5a7058f0fbd0b784e2 matches. Final local267 PASS includes97 new cases; initial86 PASS/11 FAIL from malformed UUID helper retained and corrected. Canonical/E2E types0, lint0/0, format/import/docs guards PASS. SeparateV026/26; static AQ/docs102 PASS/0 FAIL/16 SKIP, policy-detector skips are not runtime proof. Canonical build PASS; two generated build stamps restored to HEAD without changing the four-file diff. Fresh72 open heads, no other-owner/deploy drift.
@@ -38,7 +38,7 @@ TASK <id>  priority: publish-gate | P1 | P2 | other  status: OPEN | CLOSED
 goal:
 branch: codex/<task-id>-<slug> for new Codex tasks; preserve existing names
 base: verdant-grow-diary or the recorded parent branch
-checkout: git switch <branch> && git merge --ff-only <verified-sha> && git merge origin/<base>
+checkout: git switch <branch> && git merge --ff-only "$VERIFIED_SHA" && git merge origin/<base>
 pr: URL or NOT_MEASURED
 head_sha: full exact remote SHA, with observation time
 state: implemented / local only / pushed draft / CI / review / merged / live measured
@@ -53,11 +53,11 @@ last_updated: YYYY-MM-DD HH:MM CT, by agent
 
 Before the checkout command, run `git fetch origin <branch> <base>`, then compare the
 freshly fetched `git rev-parse origin/<branch>` with head_sha as AGENTS.md (Agent Handoff /
-Coverage) describes: equal, continue; ahead (it
-equals the PR's current head and head_sha is its ancestor), adopt that head and name it in
-your claim; diverged or rewritten, stop and reconcile. `<verified-sha>` is the SHA that
-passed that check, so `--ff-only` lands exactly on the verified head, never on a newer tip,
-and a stale local copy cannot stand in for it. Any mismatch invalidates the block's
+Coverage) describes: equal, continue; ahead (it equals the PR's current head and head_sha
+is its ancestor), adopt that head and name it in your claim; diverged or rewritten, stop
+and reconcile. Then set `VERIFIED_SHA` to the SHA that passed that check
+(`VERIFIED_SHA=<sha>`), so `--ff-only` lands exactly on the verified head, never on a newer
+tip, and a stale local copy cannot stand in for it. Any mismatch invalidates the block's
 current-head CI/review claims: refresh the block and preserve the existing branch. Never
 rename, recreate or force-push.
 Use the original base and declared closed scope. The example command assumes no other
@@ -72,7 +72,7 @@ TASK CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001  priority: P2  status: OPEN
 goal: Measure real Settings browser-preference save/reload, own-account readback and analytics refusal on production without backend mutations. Do not infer billing/credit/security acceptance from read-only UI.
 branch: codex/chem-settings-account-consent-proof-001
 base: verdant-grow-diary (was codex/chem-signedin-performance-001 at 35e7def61992753d34fb04c10a99febfcce5e130; that parent was superseded by #1849)
-checkout: git switch codex/chem-settings-account-consent-proof-001 && git merge --ff-only <verified-sha> && git merge origin/verdant-grow-diary
+checkout: git switch codex/chem-settings-account-consent-proof-001 && git merge --ff-only "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1799
 head_sha: 3b81addb65fbe17f206193e3cf4643861def3132, normal push and draft/base/body read back 2026-09-29 02:51 CT
 state: Pushed four-file stay-draft (+706/-0). Local 9 files / 369 PASS / 0 FAIL / 0 SKIP includes 66 new cases; separate V0 26/26 and docs-safety 67/67, not additive unique totals. Canonical and explicit E2E typechecks 0 diagnostics, final 3-file scoped lint 0 errors/0 warnings after one unsafe-finally correction. Format, whitespace, import and three strict docs scanners PASS. Existing parent read-only barrier reused unchanged; normal fixture auth bootstrap only. Fresh audit of 70 open heads and 15 recent closed PRs; no competing settings/account/consent paths. Archived QuickLog fixture cannot authorize writes. AI credit-limit hosted denial still needs genuine exhausted fixture credit state and usable review evidence; no model spend or fake denial planned.

@@ -30,6 +30,26 @@ export interface PhenoEvidenceGoalSelectionSummary {
 const KNOWN_GOAL_IDS: ReadonlySet<string> = new Set(PHENO_EVIDENCE_GOALS.map((g) => g.id));
 const SUGGESTED: ReadonlySet<string> = new Set(DEFAULT_SELECTED_EVIDENCE_GOALS);
 
+/**
+ * Known goal ids from untrusted input (e.g. a restored localStorage draft),
+ * trimmed, in order, de-duplicated. Unknown or removed ids are dropped so the
+ * summary, step readiness and Create all see the same selection (Codex on
+ * #1843).
+ */
+export function normalizeEvidenceGoalIds(input: unknown): PhenoEvidenceGoalId[] {
+  if (!Array.isArray(input)) return [];
+  const out: PhenoEvidenceGoalId[] = [];
+  const seen = new Set<string>();
+  for (const raw of input) {
+    if (typeof raw !== "string") continue;
+    const id = raw.trim();
+    if (!KNOWN_GOAL_IDS.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id as PhenoEvidenceGoalId);
+  }
+  return out;
+}
+
 /** True when `id` is part of the suggested starting set. */
 export function isSuggestedEvidenceGoal(id: PhenoEvidenceGoalId): boolean {
   return SUGGESTED.has(id);

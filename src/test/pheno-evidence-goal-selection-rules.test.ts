@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import {
   describePhenoEvidenceGoalSelection,
+  normalizeEvidenceGoalIds,
   PHENO_EVIDENCE_GOALS_STEP_INTRO,
 } from "@/lib/phenoEvidenceGoalSelectionRules";
 import {
@@ -77,5 +78,17 @@ describe("PHENO_EVIDENCE_GOALS_STEP_INTRO", () => {
     // `yield` is recorded at harvest; stretch and resin come later too.
     expect(PHENO_EVIDENCE_GOALS_STEP_INTRO).not.toMatch(/day one|day-one/i);
     expect(PHENO_EVIDENCE_GOALS_STEP_INTRO).toMatch(/later in the hunt/i);
+  });
+});
+
+describe("normalizeEvidenceGoalIds (Codex on #1843)", () => {
+  it("keeps known ids in order, drops unknown, duplicate and non-string entries", () => {
+    expect(
+      normalizeEvidenceGoalIds(["vigor", "removed_goal", "vigor", 3, " aroma ", null, "structure"]),
+    ).toEqual(["vigor", "aroma", "structure"]);
+  });
+  it("non-array input is empty", () => {
+    expect(normalizeEvidenceGoalIds(undefined)).toEqual([]);
+    expect(normalizeEvidenceGoalIds("vigor")).toEqual([]);
   });
 });

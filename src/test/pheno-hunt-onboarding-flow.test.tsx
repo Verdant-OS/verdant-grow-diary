@@ -16,6 +16,10 @@ import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/re
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { resolveEntitlements } from "@/lib/entitlements/resolveEntitlements";
 import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 
 const NOW = new Date("2026-08-01T00:00:00Z");
 const entMode = vi.hoisted(() => ({
@@ -327,5 +331,33 @@ describe("PhenoHuntNew onboarding flow", () => {
     expect(screen.getByTestId("pheno-evidence-goals-summary").textContent).toBe(
       "7 of 12 selected — changed from the suggested 8",
     );
+  });
+
+  // Codex on #1843: a restored draft holding only unknown goal ids must not
+  // read "None selected" while readiness still treats goals as chosen.
+  it("a restored draft with only unknown goal ids falls back to the suggested set consistently", async () => {
+    entMode.current = "pro";
+    setLocalStorageItemForTest(
+      "verdant:pheno-hunt-draft:u1:grow-1:all",
+      JSON.stringify({
+        name: "Resumed hunt",
+        notes: "",
+        selected: ["p1", "p2"],
+        evidenceGoals: ["removed_goal"],
+        currentStep: "goals",
+      }),
+    );
+    try {
+      renderPage();
+      await waitFor(() => screen.getByTestId("ph-draft-restored"));
+      expect(screen.getByTestId("pheno-evidence-goals-summary").textContent).toBe(
+        "8 of 12 selected — the suggested starting set",
+      );
+      expect(
+        screen.getByTestId("pheno-onboarding-stepper-step-goals").getAttribute("data-complete"),
+      ).toBe("true");
+    } finally {
+      clearLocalStorageForTest();
+    }
   });
 });

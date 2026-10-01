@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   claimPendingQuickLogNote,
   clearPendingQuickLogNote,
+  markPendingQuickLogNoteHistoryCheck,
   readPendingQuickLogNote,
   type PendingQuickLogNote,
 } from "@/lib/quickLogPendingNoteStore";
@@ -250,5 +251,119 @@ describe("clearPendingQuickLogNote", () => {
     });
     expect(clearPendingQuickLogNote(record)).toBe(false);
     vi.restoreAllMocks();
+  });
+});
+
+describe("markPendingQuickLogNoteHistoryCheck", () => {
+  it("persists a replay refusal on only the matching owner and save, then clears by the new record", () => {
+    const record = validRecord();
+    expect(claimPendingQuickLogNote(record).status).toBe("claimed");
+    const marked = markPendingQuickLogNoteHistoryCheck(record, "idempotency_key_unverified");
+    expect(marked).toEqual({
+      status: "marked",
+      record: { ...record, historyCheckReason: "idempotency_key_unverified" },
+    });
+    if (marked.status !== "marked") throw new Error("Expected the matching refusal to persist");
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "pending", record: marked.record });
+    expect(readPendingQuickLogNote(ownerB)).toEqual({ status: "empty" });
+    expect(
+      markPendingQuickLogNoteHistoryCheck(marked.record, "idempotency_key_unverified"),
+    ).toEqual(marked);
+    expect(clearPendingQuickLogNote(record)).toBe(false);
+    expect(clearPendingQuickLogNote(marked.record)).toBe(true);
+  });
+
+  it("persists the verified moved scope only for a target-moved refusal", () => {
+    const record = validRecord();
+    claimPendingQuickLogNote(record);
+    const target = {
+      growId: "66666666-6666-4666-8666-666666666666",
+      tentId: "55555555-5555-4555-8555-555555555555",
+      plantId: "44444444-4444-4444-8444-444444444444",
+    };
+    expect(
+      markPendingQuickLogNoteHistoryCheck(record, "idempotency_key_unverified", target),
+    ).toEqual({ status: "blocked" });
+    expect(
+      markPendingQuickLogNoteHistoryCheck(record, "receipt_target_moved", {
+        ...target,
+        plantId: 7,
+      } as unknown as typeof target),
+    ).toEqual({ status: "blocked" });
+    const marked = markPendingQuickLogNoteHistoryCheck(record, "receipt_target_moved", target);
+    expect(marked).toEqual({
+      status: "marked",
+      record: { ...record, historyCheckReason: "receipt_target_moved", historyReviewTarget: target },
+    });
+    if (marked.status !== "marked") throw new Error("Expected the moved refusal to persist");
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "pending", record: marked.record });
+    expect(clearPendingQuickLogNote(marked.record)).toBe(true);
+  });
+
+  it("treats a stored review target without the moved reason as unreadable", () => {
+    const record = validRecord();
+    claimPendingQuickLogNote(record);
+    window.sessionStorage.setItem(
+      `verdant:quick-log:pending-note:v1:${ownerA}`,
+      JSON.stringify({
+        ...record,
+        historyCheckReason: "idempotency_key_conflict",
+        historyReviewTarget: { growId: null, tentId: null, plantId: null },
+      }),
+    );
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "blocked" });
+  });
+
+  it("refuses unknown reasons and changed or missing pending records", () => {
+    const record = validRecord();
+    expect(markPendingQuickLogNoteHistoryCheck(record, "network_error")).toEqual({
+      status: "blocked",
+    });
+    expect(claimPendingQuickLogNote(record).status).toBe("claimed");
+    const changed = validRecord({
+      payload: { ...record.payload, p_idempotency_key: "different-save-key-12345678" },
+    });
+    expect(markPendingQuickLogNoteHistoryCheck(changed, "idempotency_key_retracted")).toEqual({
+      status: "blocked",
+    });
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "pending", record });
+  });
+
+  it("fails closed if the refusal marker cannot be written or read back", () => {
+    const record = validRecord();
+    claimPendingQuickLogNote(record);
+    try {
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+        throw new Error("Storage unavailable");
+      });
+      expect(markPendingQuickLogNoteHistoryCheck(record, "idempotency_receipt_missing")).toEqual({
+        status: "blocked",
+      });
+    } finally {
+      vi.restoreAllMocks();
+    }
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "pending", record });
+  });
+
+  it("fails closed when storage silently ignores the refusal marker", () => {
+    const record = validRecord();
+    claimPendingQuickLogNote(record);
+    try {
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {});
+      expect(markPendingQuickLogNoteHistoryCheck(record, "idempotency_key_conflict")).toEqual({
+        status: "blocked",
+      });
+    } finally {
+      vi.restoreAllMocks();
+    }
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "pending", record });
+  });
+
+  it("blocks a tampered refusal marker instead of discarding the pending save", () => {
+    window.sessionStorage.setItem(
+      pendingKey(),
+      JSON.stringify({ ...validRecord(), historyCheckReason: "network_error" }),
+    );
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "blocked" });
   });
 });

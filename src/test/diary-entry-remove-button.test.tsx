@@ -6,20 +6,42 @@ import { fireEvent, render as rtlRender, screen, waitFor } from "@testing-librar
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const { deleteEq, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
-  const deleteEq = vi.fn((): Promise<{ error: { code: string; message: string } | null }> =>
-    Promise.resolve({ error: null }),
-  );
-  const deleteFn = vi.fn(() => ({ eq: deleteEq }));
-  return {
-    deleteEq,
-    deleteFn,
-    toastSuccess: vi.fn(),
-    toastError: vi.fn(),
-  };
-});
+const { readMaybeSingle, readEq, deleteMaybeSingle, deleteEq, deleteFn, toastSuccess, toastError } =
+  vi.hoisted(() => {
+    type QueryError = { code: string; message: string };
+    const readMaybeSingle = vi.fn(
+      async (): Promise<{ data: { details: unknown } | null; error: QueryError | null }> => ({
+        data: { details: {} },
+        error: null,
+      }),
+    );
+    const readEq = vi.fn((_field: string, _value: string) => ({ maybeSingle: readMaybeSingle }));
+    const deleteMaybeSingle = vi.fn(
+      async (): Promise<{ data: { id: string } | null; error: QueryError | null }> => ({
+        data: { id: deleteEq.mock.lastCall?.[1] ?? "" },
+        error: null,
+      }),
+    );
+    const deleteSelect = vi.fn(() => ({ maybeSingle: deleteMaybeSingle }));
+    const deleteEq = vi.fn((_field: string, _value: string) => ({ select: deleteSelect }));
+    const deleteFn = vi.fn(() => ({ eq: deleteEq }));
+    return {
+      readMaybeSingle,
+      readEq,
+      deleteMaybeSingle,
+      deleteEq,
+      deleteFn,
+      toastSuccess: vi.fn(),
+      toastError: vi.fn(),
+    };
+  });
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: vi.fn(() => ({ delete: deleteFn })) },
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({ eq: readEq })),
+      delete: deleteFn,
+    })),
+  },
 }));
 vi.mock("sonner", () => ({
   toast: { success: toastSuccess, error: toastError },
@@ -35,8 +57,14 @@ function render(ui: React.ReactElement) {
 }
 
 beforeEach(() => {
+  readMaybeSingle.mockReset();
+  readMaybeSingle.mockImplementation(() => Promise.resolve({ data: { details: {} }, error: null }));
+  readEq.mockClear();
+  deleteMaybeSingle.mockReset();
+  deleteMaybeSingle.mockImplementation(() =>
+    Promise.resolve({ data: { id: deleteEq.mock.lastCall?.[1] ?? "" }, error: null }),
+  );
   deleteEq.mockClear();
-  deleteEq.mockImplementation(() => Promise.resolve({ error: null }));
   deleteFn.mockClear();
   toastSuccess.mockClear();
   toastError.mockClear();
@@ -67,6 +95,16 @@ describe("DiaryEntryRemoveButton — visibility", () => {
   it("does NOT render for sensor readings", () => {
     const { container } = render(
       <DiaryEntryRemoveButton entry={{ id: "s1", kind: "sensor_reading" }} viewer={VIEWER} />,
+    );
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("does NOT offer hard removal for a linked Quick Log companion", () => {
+    const { container } = render(
+      <DiaryEntryRemoveButton
+        entry={{ id: "e1", kind: "diary", details: { linked_grow_event_id: "event-1" } }}
+        viewer={VIEWER}
+      />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -156,8 +194,8 @@ describe("DiaryEntryRemoveButton — confirmation + mutation", () => {
 
   it("Error path shows generic toast and does not invoke onRemoved", async () => {
     const onRemoved = vi.fn();
-    deleteEq.mockImplementationOnce(() =>
-      Promise.resolve({ error: { code: "23503", message: "fk violation" } }),
+    deleteMaybeSingle.mockImplementationOnce(() =>
+      Promise.resolve({ data: null, error: { code: "23503", message: "fk violation" } }),
     );
     render(
       <DiaryEntryRemoveButton
@@ -175,5 +213,44 @@ describe("DiaryEntryRemoveButton — confirmation + mutation", () => {
     // Toast never echoes raw DB details
     const args = toastError.mock.calls[0][0] as string;
     expect(args.toLowerCase()).not.toMatch(/fk|violation|23503|constraint/);
+  });
+
+  it("refuses a linked row discovered by the owner read before deleting", async () => {
+    readMaybeSingle.mockImplementationOnce(() =>
+      Promise.resolve({ data: { details: { grow_event_id: "event-1" } }, error: null }),
+    );
+    render(<DiaryEntryRemoveButton entry={{ id: "e4", kind: "diary" }} viewer={VIEWER} />);
+    fireEvent.click(screen.getByTestId("diary-entry-remove-button"));
+    fireEvent.click(screen.getByTestId("diary-entry-remove-confirm"));
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        "This Quick Log has linked history. Use Correct or Retract in Quick Log history.",
+      ),
+    );
+    expect(deleteFn).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("does not claim success when the owner read has no row", async () => {
+    readMaybeSingle.mockImplementationOnce(() => Promise.resolve({ data: null, error: null }));
+    render(<DiaryEntryRemoveButton entry={{ id: "e5", kind: "diary" }} viewer={VIEWER} />);
+    fireEvent.click(screen.getByTestId("diary-entry-remove-button"));
+    fireEvent.click(screen.getByTestId("diary-entry-remove-confirm"));
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("Couldn't remove this log. Please try again."),
+    );
+    expect(deleteFn).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("does not claim success when the delete returns zero rows", async () => {
+    deleteMaybeSingle.mockImplementationOnce(() => Promise.resolve({ data: null, error: null }));
+    render(<DiaryEntryRemoveButton entry={{ id: "e6", kind: "diary" }} viewer={VIEWER} />);
+    fireEvent.click(screen.getByTestId("diary-entry-remove-button"));
+    fireEvent.click(screen.getByTestId("diary-entry-remove-confirm"));
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("Couldn't remove this log. Please try again."),
+    );
+    expect(toastSuccess).not.toHaveBeenCalled();
   });
 });

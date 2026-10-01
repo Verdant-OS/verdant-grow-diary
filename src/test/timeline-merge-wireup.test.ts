@@ -81,7 +81,8 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
 
   it("reads effective manual sensor values as a supplemental Timeline source", () => {
     expect(TIMELINE_SRC).toContain("effectiveSensorReadingsQuery()");
-    expect(TIMELINE_SRC).toContain("requireEffectiveSensorReadings(sensorResult.data)");
+    expect(TIMELINE_SRC).toContain("requireEffectiveSensorReadings(capturedResult.data)");
+    expect(TIMELINE_SRC).toContain("requireEffectiveSensorReadings(legacyResult.data)");
     expect(TIMELINE_SRC).toMatch(/eq\(\s*["']source["']\s*,\s*["']manual["']\s*\)/);
     expect(findSupabaseTableWrites(TIMELINE_SRC, "sensor_readings", "Timeline.tsx")).toEqual([]);
   });
@@ -101,10 +102,16 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
 
   it("applies the active date bounds to manual sensor effective reads at query and receipt layers", () => {
     expect(TIMELINE_SRC).toMatch(
-      /sensorQuery\s*=\s*sensorQuery\.gte\(\s*["']ts["']\s*,\s*timelineDateRangeBounds\.startIso\s*\)/,
+      /capturedQuery\s*=\s*capturedQuery\.gte\(\s*["']captured_at["']\s*,\s*timelineDateRangeBounds\.startIso\s*\)/,
     );
     expect(TIMELINE_SRC).toMatch(
-      /sensorQuery\s*=\s*sensorQuery\.lte\(\s*["']ts["']\s*,\s*timelineDateRangeBounds\.endIso\s*\)/,
+      /capturedQuery\s*=\s*capturedQuery\.lte\(\s*["']captured_at["']\s*,\s*timelineDateRangeBounds\.endIso\s*\)/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /legacyQuery\s*=\s*legacyQuery\.gte\(\s*["']ts["']\s*,\s*timelineDateRangeBounds\.startIso\s*\)/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /legacyQuery\s*=\s*legacyQuery\.lte\(\s*["']ts["']\s*,\s*timelineDateRangeBounds\.endIso\s*\)/,
     );
     expect(TIMELINE_SRC).toMatch(
       /receipts\s*=\s*receipts\.filter\([\s\S]*row\.entry_at\s*>=\s*timelineDateRangeBounds\.startIso/,

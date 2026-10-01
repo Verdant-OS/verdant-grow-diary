@@ -218,6 +218,123 @@ describe("Onboarding · guided starter setup", () => {
     expect(trackFunnelEvent).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["quick log", "/onboarding", "starter-setup-button"],
+    ["CSV history", "/onboarding?intent=csv_history", "csv-history-onboarding-setup-button"],
+  ])(
+    "starts only one %s setup when activations arrive before the busy render",
+    async (_label, route, testId) => {
+      let finishSetup!: (value: unknown) => void;
+      runStarterSetupMock.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finishSetup = resolve;
+          }),
+      );
+      renderPageAt(route);
+      const button = screen.getByTestId(testId);
+
+      act(() => {
+        button.click();
+        button.click();
+      });
+
+      expect(runStarterSetupMock).toHaveBeenCalledTimes(1);
+      await act(async () =>
+        finishSetup({
+          growId: "00000000-0000-4000-8000-00000000000b",
+          tentId: "00000000-0000-4000-8000-00000000000a",
+          plantId: "00000000-0000-4000-8000-00000000000c",
+          reused: { grow: true, tent: true, plant: true },
+        }),
+      );
+    },
+  );
+
+  it("starts only one entitlement retry when activations arrive before the busy render", async () => {
+    entitlementState.lookupFailed = true;
+    let finishRetry!: (value: boolean) => void;
+    entitlementState.refetch.mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishRetry = resolve;
+        }),
+    );
+    renderPage();
+    const button = screen.getByTestId("starter-setup-entitlement-retry");
+
+    act(() => {
+      button.click();
+      button.click();
+    });
+
+    expect(entitlementState.refetch).toHaveBeenCalledTimes(1);
+    await act(async () => finishRetry(true));
+    expect(runStarterSetupMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["quick log", "/onboarding", "starter-setup-button", "starter-setup-error"],
+    [
+      "CSV history",
+      "/onboarding?intent=csv_history",
+      "csv-history-onboarding-setup-button",
+      "csv-history-onboarding-error",
+    ],
+  ])(
+    "allows a later %s setup after the previous attempt fails",
+    async (_label, route, buttonId, errorId) => {
+      runStarterSetupMock.mockRejectedValueOnce(new Error("setup failed")).mockResolvedValueOnce({
+        growId: "00000000-0000-4000-8000-00000000000b",
+        tentId: "00000000-0000-4000-8000-00000000000a",
+        plantId: "00000000-0000-4000-8000-00000000000c",
+        reused: { grow: true, tent: true, plant: true },
+      });
+      renderPageAt(route);
+
+      await userEvent.click(screen.getByTestId(buttonId));
+      expect(await screen.findByTestId(errorId)).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId(buttonId)).toBeEnabled());
+      await userEvent.click(screen.getByTestId(buttonId));
+
+      await waitFor(() => expect(runStarterSetupMock).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(screen.queryByTestId(errorId)).not.toBeInTheDocument());
+      expect(trackFunnelEvent).not.toHaveBeenCalledWith("grow_created");
+    },
+  );
+
+  it("allows another sequential setup after the previous setup succeeds", async () => {
+    runStarterSetupMock.mockResolvedValue({
+      growId: "g",
+      tentId: "t",
+      plantId: "p",
+      reused: { grow: true, tent: true, plant: true },
+    });
+    renderPage();
+
+    await userEvent.click(screen.getByTestId("starter-setup-button"));
+    await waitFor(() => expect(screen.getByTestId("starter-setup-button")).toBeEnabled());
+    await userEvent.click(screen.getByTestId("starter-setup-button"));
+
+    await waitFor(() => expect(runStarterSetupMock).toHaveBeenCalledTimes(2));
+    expect(trackFunnelEvent).not.toHaveBeenCalled();
+  });
+
+  it("allows another plan check after the previous check completes", async () => {
+    entitlementState.lookupFailed = true;
+    entitlementState.refetch.mockResolvedValue(true);
+    renderPage();
+
+    await userEvent.click(screen.getByTestId("starter-setup-entitlement-retry"));
+    await waitFor(() =>
+      expect(screen.getByTestId("starter-setup-entitlement-retry")).toBeEnabled(),
+    );
+    await userEvent.click(screen.getByTestId("starter-setup-entitlement-retry"));
+
+    await waitFor(() => expect(entitlementState.refetch).toHaveBeenCalledTimes(2));
+    expect(runStarterSetupMock).not.toHaveBeenCalled();
+  });
+
   it("shows a safe error message and does not redirect on failure", async () => {
     runStarterSetupMock.mockRejectedValue(new Error("boom"));
     renderPage();

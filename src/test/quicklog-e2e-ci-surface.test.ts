@@ -179,6 +179,7 @@ describe("Quick Log Playwright CI surface", () => {
     const expectedPaths = [
       "e2e/**",
       "playwright.config.ts",
+      "scripts/check-playwright-failure-media.mjs",
       ".github/workflows/quicklog-smoke.yml",
     ];
     // Extract paths: blocks that use list items (not the pipe block used by upload-artifact)

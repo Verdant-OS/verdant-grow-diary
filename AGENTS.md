@@ -1,8 +1,12 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-09-28.2**
+**Sentinel-Version: 2026-09-28.3**
 
-Ownership and routing: see `docs/agents/OWNERSHIP.md`. On ownership and routing, it wins on conflicts.
+_Amended 2026-09-28 (Matthew Cheek): added Release and Environment Rules and Agent
+Handoff / Coverage; open tasks are resumable by any agent from `docs/agents/HANDOFF_LOG.md`._
+
+Ownership and review routing: see `docs/agents/OWNERSHIP.md`. It wins on those
+points; Matthew Cheek's explicit current instructions control any conflicting permission.
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -52,7 +56,7 @@ Automation last.
 Default workflow:
 
 ```text
-Build -> Audit -> Fix -> Test -> Publish -> Measure
+Build -> Audit -> Fix -> CI Test -> Publish -> Measure on live -> Fix
 ```
 
 A merge is not a deployment. Green CI is not proof of indexing. A public estimate is not
@@ -63,6 +67,62 @@ Use small, scoped changes. Avoid broad rewrites.
 
 ---
 
+## Release and Environment Rules
+
+- **Production only.** Verdant has no sandbox, staging, preview, or non-production smoke
+  environment. Build, verify, and smoke against production
+  (`https://verdantgrowdiary.com`). Smoke writes by `cheekhimself@gmail.com` go only to its own
+  grow, tagged `[smoke <timestamp>]`. Never touch customer data or use the KEEP account.
+  Verify the fixture identity and ownership before a write. A task that asks for a
+  non-production target is out of date; report it instead of building one.
+- **CI probes production or nothing.** No push-triggered job may probe a non-production
+  database. The production schema verifier runs only by manual dispatch from the deploy
+  branch, in its protected environment. A red check that probes a retired environment is
+  a CI defect to fix, not a schema verdict.
+- **How a release reaches users.** Measure the configured publisher and its actual
+  deployment checks before asserting delivery. Agents never publish, promote, or roll back. They prepare a
+  release packet (live SHA, target SHA, commits, checks at the target, the deployment URL,
+  the rollback target) and hand over one promotion step. A merge is not a release until
+  `/version.json` on live reports the SHA.
+- **Ship before test.** Once CI is green and the reviewer has passed a fix, getting it live
+  comes before more testing. Public-page probes against a live build that doesn't contain
+  the fix measure nothing; report them `NOT_MEASURED`. Signed-in verification starts after
+  the fix is live.
+- **Git and merges.** Never push directly to `verdant-grow-diary` or `main`, force-push,
+  or rewrite history. Update branches by merging from base. Open PRs as drafts.
+  Codex uses normal PR-branch pushes only: no force-push, merge, Publish, SQL apply,
+  or production Supabase writes. Drafts remain draft. Chemdawg owns merge only after
+  **35/35 required checks** succeed and Blue Dream, Durban Poison or Critical Mass
+  gives an independent **PASS at the exact head SHA**. A skipped, missing, pending
+  or failed required check is not green. There is no author-integration exception.
+  Off-limits paths and named holds still require explicit reassignment before editing.
+  Production database changes, spend, publish gates and the publish decision remain
+  with Matthew; repository work does not authorize those operations.
+- **One task, one branch, one holder.** New Codex branches use
+  `codex/<task-id>-<slug>` in lowercase. There is no shared working branch.
+  Only the agent currently holding a
+  branch, per the effective claim (see Agent Handoff / Coverage) in `docs/agents/HANDOFF_LOG.md` or on the task's PR, pushes to it, and no agent edits files on
+  another holder's branch. The task goes with the branch: whoever holds the branch holds
+  the task. Preserve the original names of existing branches when resuming them.
+  A block records one branch and one PR; stacked work (a parent and a child PR) uses one
+  block per branch. A block that still lists several branches counts as one block per
+  branch: a claim on one of its PRs covers only that PR's branch, and the holder splits
+  the block at the next log update.
+- **Repair ownership and intake.** Codex fixes every discovered defect in its assigned
+  repository scope itself. New work arrives as `@codex` PR comments. A coverage record
+  preserves resumable evidence; it does not delegate implementation or grant new authority.
+- **Matthew Cheek keeps four decisions:** production database changes, the spend ceiling,
+  anything that gates a publish, and the publish decision itself. Everything else runs
+  without waiting on him.
+- **Off-limits without Matthew's approval:** migrations and SQL, `supabase/`, RLS, auth,
+  Edge functions, the Action Queue, lockfiles, and device control. If a fix needs one,
+  stop that item, write it up as an escalation, and move on.
+- **Standing locks** (the production database lock, named PR holds such as HOLD #1250)
+  are listed in `docs/agents/CURRENT_STATE.md` and bind every agent until removed there.
+
+Local/CI fixtures validate code, not production. See
+`docs/production-only-verification-runbook.md` for fixture identity, tagging and receipts.
+
 ## Multi-Agent Coordination
 
 This repo is worked on by more than one AI agent (Codex, Claude Code, Grok, Lovable) at once, sometimes on the same feature independently, without either side knowing.
@@ -71,6 +131,86 @@ This repo is worked on by more than one AI agent (Codex, Claude Code, Grok, Lova
 - If you discover another agent already has open, unmerged work in your target area, stop and report the collision rather than silently building a competing version.
 - Only one implementation of a given feature should ever be merged. If two exist, surface the collision in your report instead of resolving it unilaterally.
 - Clean up your own disposable worktrees/branches once work lands or is abandoned. Don't leave scratch checkouts behind for someone else to find and puzzle over later.
+
+---
+
+## Agent Handoff / Coverage
+
+Work belongs to the task, not to the agent doing it. Any agent can be cut off at any time
+(token limit, outage, session end), so every open task must be resumable by a different
+agent from one written block.
+
+- **One place to look.** Every in-flight task has a handoff block in
+  `docs/agents/HANDOFF_LOG.md`. The log is not a versioned governance file; editing it
+  needs no `Sentinel-Version` bump.
+- **What a block holds.** Task id and priority, goal, branch, base, the exact checkout
+  command, PR and exact head SHA, current state, next action, files touched, blockers,
+  where artifacts live, the independent reviewer seat, `claimed_by`, and `last_updated`
+  (date, time, zone). Use the template at the top of the log.
+- **When to update it.** At least once a day while the task is open, and always before the
+  agent stops, hands off, or expects to run out of budget. Every daily update includes a
+  renewal comment on the task's PR (`claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC`, posted
+  by the current holder): a log edit made on a task branch is invisible to a successor
+  until it merges, so the PR comment is what keeps the task's activity visible. Push the branch and have its
+  draft PR open before implementation begins, not only before a planned stop: an agent
+  can be cut off at any time, and a successor can only claim on a PR. Under
+  `docs/agents/OWNERSHIP.md` Codex opens PRs, as drafts; a holder without that right asks
+  Codex first. A block without a pushed branch and a PR is not eligible for coverage until
+  both exist.
+- **Last activity.** A block's last activity is the newer of its `last_updated` as
+  recorded on the deploy branch (`verdant-grow-diary`) and its effective claim (below),
+  which includes the holder's renewal comments. A `last_updated` that exists only on a
+  task branch does not count. A block with both a pushed branch and a PR is open for anyone
+  when it has no effective claim or its last activity is older than 24 hours.
+- **Eligible coverage.** Any agent may resume an open block as defined above, subject to
+  explicit assignments and named locks.
+  A fresh claim is not available for takeover. The handoff block carries the context
+  needed to resume. A claim is valid only when it is posted while the block is open, or
+  by the agent already holding the block's effective claim (a renewal). A block's
+  effective claim is the newest valid claim among its log `claimed_by` and the
+  `claimed_by:` comments on its PR, ordered by when they were posted, unless that
+  claim's holder has since posted a `released_by:` comment (below), in which case the
+  block has no effective claim. Read the PR's claim and release comments before treating
+  a block as unclaimed or stale. A claim posted while another
+  agent's valid claim is under 24 hours old is not valid: when two agents race for the
+  same open block, the first claim posted holds it. The current holder can end its claim
+  early, for a deliberate transfer or when it stops work, with a PR comment reading
+  `released_by: <agent>, <YYYY-MM-DD HH:MM> UTC`, optionally followed by
+  `to <successor>`; it stops pushing before posting. A release leaves the block with no
+  effective claim, so the block is open at once. A release that names a successor makes
+  only that agent's claim valid for the next 24 hours. Before resuming, claim the task with a
+  comment on its PR that reads `claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC` (owner
+  decision 2026-10-01), then re-read the PR's comments; if another agent's valid claim was
+  posted before yours, yours is not valid, so stop and touch nothing. A successor never
+  opens the PR itself; a block without one is not yet eligible.
+  A valid claim takes effect when posted: from then on you hold the branch and the
+  previous holder stops pushing. The effective claim is the current `claimed_by` and
+  counts toward the block's last activity; carry it into the block at the next log
+  update. Fetch the branch and compare `git rev-parse origin/<branch>` with the
+  block's head SHA. If they match, continue. If the remote is ahead (the PR's current
+  head equals `origin/<branch>` and `git merge-base --is-ancestor <head_sha>
+  origin/<branch>` succeeds), the previous holder pushed after the last log update:
+  adopt that remote head, name it in your claim comment, and record it at the next log
+  update. If the remote has diverged from or rewritten the recorded head, stop and
+  reconcile with the effective claim. Then check out the branch and run
+  `git merge --ff-only origin/<branch>`, so a stale local copy cannot stand in for the
+  remote head; if the fast-forward fails, stop and reconcile. Only then run the block's checkout command, which ends with the base merge,
+  and continue on the same branch. Never rename, recreate, or force-push it.
+- **Coverage on startup.** Read `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK`
+  and truthfully record `open_handoffs_checked`. After the acknowledgment, keep an
+  explicit assignment. If you have no assigned task, select the highest-priority
+  eligible open block: a pushed branch and a PR, and either no effective claim or a last
+  activity (the newer of `last_updated` and the effective claim) older than 24 hours, with
+  no conflicting assignment or named lock. Priority order: publish gate, then P1, then P2, then everything else.
+  Ties go to the oldest `last_updated`. Agents without repository access (Security,
+  Council Chair) cannot set `claimed_by` or touch a branch, so they never select or
+  resume a block: they read the log for context and act only on an explicit assignment.
+- **Role seats still hold.** Resuming a task does not change who merges, who reviews, or
+  who owns CI; those stay as `docs/agents/OWNERSHIP.md` lists them. An agent that touched
+  a task can never give its independent acceptance PASS. Peer observations do not
+  replace independent acceptance.
+- **Closing.** When a task merges, is superseded, or is dropped, mark the block `CLOSED`
+  with the reason and the final SHA, and move it to the log's Closed section the same day.
 
 ---
 
@@ -576,19 +716,33 @@ assigned role and read its file.
 - Security reviewer must read `docs/agents/roles/security.md`.
 - Council Chair must read `docs/agents/roles/council-chair.md`.
 
-Do not adopt another agent's **owned** slice unless Cheek explicitly reassigns it or
-`CURRENT_STATE.md` marks that work done and unassigned.
+Any agent may resume an open task from its block in `docs/agents/HANDOFF_LOG.md` under
+Agent Handoff / Coverage. Claim it first with a `claimed_by:` comment on the task's PR, as
+that section describes. Do not start a second implementation of a task someone else has
+claimed, in the log or on its PR, within the last 24 hours.
 
 Codex, Claude, and Grok are **peers**: none outranks the others (Cheek, 2026-08-20,
-refined). Explicit task ownership controls who researches, architects, implements,
+refined). Explicit assignments, named locks and the current coverage claim control
+who researches, architects, implements,
 audits, tests, or independently reviews. Default strengths differ; they are preference,
 not exclusivity. Standing collision fences in `CURRENT_STATE.md` still bind (for
 example remaining Tranche A edit points for Codex, Tranche B+ product code for Claude,
 and no competing Timeline / Alerts / Action Queue rewrite).
 
-Every assigned slice names **one owner** and a **different peer** as **independent
-reviewer**. The owner cannot review their own work. **No code ships without peer
-review** — an owned slice without a named independent reviewer is incomplete.
+Every slice names its independent review route, and at any moment one agent holds the
+claim to build it. An agent that touched a slice cannot give it an independent PASS.
+Codex does not integrate its own work. Chemdawg owns the required-check and independent
+exact-head PASS gate. High-risk work, publish gates and named owner locks retain their
+review and acceptance fences.
+
+Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
+publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
+may supply an independently assigned acceptance. Codex cannot give its own work an
+independent PASS. Claude may add peer observations but is not the acceptance reviewer.
+Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
+Durban Poison or Critical Mass gives an independent **PASS at the exact head SHA**.
+Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
+Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
 
 Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The preferred sequence is:
 
@@ -600,8 +754,8 @@ That sequence is a preferred path, not rank. The current task may require only a
 subset of those stages. Do not create parallel implementations of the same slice.
 
 The only action permitted before the gate below is read-only acquisition of
-`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and the assigned role file so the
-acknowledgment can be truthful. Listing files solely to locate those three documents, or
+`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
+acknowledgment can be truthful. Listing files solely to locate those four documents, or
 using a platform context-discovery command such as `grok inspect`, is also permitted.
 No application-code inspection, network mutation, recommendation, or repository write is
 permitted before the acknowledgment.
@@ -617,6 +771,7 @@ agent:
 assigned_role:
 sentinel_version:
 files_read:
+open_handoffs_checked:
 current_task:
 scope:
 out_of_scope:
@@ -718,6 +873,8 @@ snapshots can differ.
   `/quick-log` (Quick Log
   starter — saves a draft locally), `/tools/vpd-calculator`, `/pheno-comparison`,
   `/welcome`, and `/internal/demo-proof-walkthrough`.
+  These count as evidence only when live `/version.json` reports the SHA under test;
+  otherwise report `NOT_MEASURED`.
 - **Governance edit gate.** If you change any of the **twelve versioned governance
   files** — `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.grok/rules/verdant-grok-role.md`,
   `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, and the six

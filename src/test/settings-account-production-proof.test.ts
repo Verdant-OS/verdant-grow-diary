@@ -180,22 +180,59 @@ describe("finite settings proof receipts", () => {
 });
 
 describe("Settings proof workflow on the deploy branch", () => {
-  type Step = { name?: string; run?: string };
+  type Step = {
+    name?: string;
+    run?: string;
+    env?: Record<string, string>;
+    with?: Record<string, unknown>;
+  };
+  type Job = {
+    if?: string;
+    "timeout-minutes": number;
+    env?: Record<string, string>;
+    steps: Step[];
+  };
   const workflow = load(
     readFileSync(".github/workflows/settings-account-consent-proof.yml", "utf8"),
   ) as {
-    jobs: Record<string, { if: string; "timeout-minutes": number; steps: Step[] }>;
+    jobs: Record<string, Job>;
   };
   const job = workflow.jobs["settings-account-consent-proof"];
+  const safety = workflow.jobs["settings-account-consent-proof-safety-regressions"];
   const index = (name: string) => job.steps.findIndex((step) => step.name === name);
+  const usesSecrets = (value: unknown) => JSON.stringify(value ?? {}).includes("secrets.");
 
-  it("runs pull-request proofs only from the same-repository re-land branch", () => {
-    expect(job.if).toContain("github.event.pull_request.head.repo.full_name == github.repository");
-    expect(job.if).toContain("github.head_ref == 'claude/chem-settings-account-consent-proof-001'");
-    expect(job.if).not.toContain("codex/");
+  it("runs the credentialed proof only from the protected deploy ref and owner", () => {
+    for (const guard of [
+      "github.repository == 'Verdant-OS/verdant-grow-diary'",
+      "github.ref == 'refs/heads/verdant-grow-diary'",
+      "github.actor == 'cheekhimself'",
+      "github.triggering_actor == 'cheekhimself'",
+      "github.run_attempt == '1'",
+      "(github.event_name == 'push' || github.event_name == 'workflow_dispatch')",
+    ])
+      expect(job.if).toContain(guard);
+    // A branch name is not trust: no pull_request path may reach the login.
+    expect(job.if).not.toContain("pull_request");
+    expect(job.if).not.toContain("head_ref");
   });
 
-  it("waits for the pinned SHA to be live before measuring production", () => {
+  it("keeps fixture credentials out of PR code and scoped to the login steps", () => {
+    expect(safety.if).toBeUndefined();
+    expect(usesSecrets(safety)).toBe(false);
+    expect(usesSecrets(job.env)).toBe(false);
+    expect(job.steps.filter((step) => usesSecrets(step)).map((step) => step.name)).toEqual([
+      "Verify production fixture configuration",
+      "Measure settings/account/consent on production",
+    ]);
+  });
+
+  it("pins the checked-out deploy SHA and waits for it to be live before measuring", () => {
+    expect(job.steps[index("Checkout proof source")].with?.ref).toBe("${{ github.sha }}");
+    const pin = job.steps[index("Pin current deploy SHA")].run ?? "";
+    expect(pin).toContain('expected_sha="$(git rev-parse HEAD)"');
+    expect(pin).toContain('[ "$expected_sha" = "$GITHUB_SHA" ]');
+    expect(pin).not.toContain("git fetch");
     const wait = index("Wait for the pinned SHA to be live");
     expect(wait).toBeGreaterThan(index("Pin current deploy SHA"));
     expect(wait).toBeLessThan(index("Measure settings/account/consent on production"));

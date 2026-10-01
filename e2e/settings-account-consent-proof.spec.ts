@@ -48,7 +48,7 @@ test.describe("production settings/account/consent proof", () => {
         applicationErrors: 0,
         elapsedMs: null,
       };
-      let receipt = buildSettingsProofReceipt(sample);
+      let receipt: ReturnType<typeof buildSettingsProofReceipt>;
       let stage = "fixture-precondition";
       let analyticsRequests = 0;
       page.on("pageerror", () => sample.applicationErrors++);

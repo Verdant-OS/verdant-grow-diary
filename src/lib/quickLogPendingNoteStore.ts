@@ -15,6 +15,28 @@ export interface PendingQuickLogNote {
   attachments: { photo: boolean; video: boolean };
   /** Durable refusal of this same key. Missing on older pending records. */
   historyCheckReason?: QuickLogHistoryCheckReason;
+  /**
+   * Verified current scope of the original entry, kept only for
+   * receipt_target_moved so a reload still links the grower to the Timeline
+   * where that entry lives now. Never a confirmed receipt.
+   */
+  historyReviewTarget?: PendingQuickLogNoteReviewTarget;
+}
+
+export interface PendingQuickLogNoteReviewTarget {
+  growId: string | null;
+  tentId: string | null;
+  plantId: string | null;
+}
+
+function validReviewTarget(value: unknown): value is PendingQuickLogNoteReviewTarget {
+  return (
+    object(value) &&
+    onlyKeys(value, ["growId", "tentId", "plantId"]) &&
+    nullableString(value.growId) &&
+    nullableString(value.tentId) &&
+    nullableString(value.plantId)
+  );
 }
 
 export const NOTE_RECOVERY_UNAVAILABLE =
@@ -67,6 +89,7 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogN
       "resolved",
       "attachments",
       "historyCheckReason",
+      "historyReviewTarget",
     ])
   )
     return false;
@@ -74,6 +97,12 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogN
   if (
     value.historyCheckReason !== undefined &&
     !quickLogSaveRequiresHistoryCheck(value.historyCheckReason)
+  )
+    return false;
+  if (
+    value.historyReviewTarget !== undefined &&
+    (value.historyCheckReason !== "receipt_target_moved" ||
+      !validReviewTarget(value.historyReviewTarget))
   )
     return false;
   if (typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt)))
@@ -189,16 +218,36 @@ export function claimPendingQuickLogNote(
 export function markPendingQuickLogNoteHistoryCheck(
   record: PendingQuickLogNote,
   reason: string | null | undefined,
+  reviewTarget?: PendingQuickLogNoteReviewTarget | null,
 ): { status: "marked"; record: PendingQuickLogNote } | { status: "blocked" } {
   try {
     if (!quickLogSaveRequiresHistoryCheck(reason) || !validRecord(record, record.ownerId)) {
+      return { status: "blocked" };
+    }
+    // Only a moved receipt carries a review target, and it must be well formed.
+    if (
+      reviewTarget != null &&
+      (reason !== "receipt_target_moved" || !validReviewTarget(reviewTarget))
+    ) {
       return { status: "blocked" };
     }
     const current = readPendingQuickLogNote(record.ownerId);
     if (current.status !== "pending" || !sameRecord(current.record, record)) {
       return { status: "blocked" };
     }
-    const marked: PendingQuickLogNote = { ...current.record, historyCheckReason: reason };
+    const marked: PendingQuickLogNote = {
+      ...current.record,
+      historyCheckReason: reason,
+      ...(reviewTarget != null
+        ? {
+            historyReviewTarget: {
+              growId: reviewTarget.growId,
+              tentId: reviewTarget.tentId,
+              plantId: reviewTarget.plantId,
+            },
+          }
+        : {}),
+    };
     window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
     const verified = readPendingQuickLogNote(record.ownerId);
     return verified.status === "pending" && sameRecord(verified.record, marked)

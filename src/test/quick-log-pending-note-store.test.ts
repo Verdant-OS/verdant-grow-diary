@@ -273,6 +273,47 @@ describe("markPendingQuickLogNoteHistoryCheck", () => {
     expect(clearPendingQuickLogNote(marked.record)).toBe(true);
   });
 
+  it("persists the verified moved scope only for a target-moved refusal", () => {
+    const record = validRecord();
+    claimPendingQuickLogNote(record);
+    const target = {
+      growId: "66666666-6666-4666-8666-666666666666",
+      tentId: "55555555-5555-4555-8555-555555555555",
+      plantId: "44444444-4444-4444-8444-444444444444",
+    };
+    expect(
+      markPendingQuickLogNoteHistoryCheck(record, "idempotency_key_unverified", target),
+    ).toEqual({ status: "blocked" });
+    expect(
+      markPendingQuickLogNoteHistoryCheck(record, "receipt_target_moved", {
+        ...target,
+        plantId: 7,
+      } as unknown as typeof target),
+    ).toEqual({ status: "blocked" });
+    const marked = markPendingQuickLogNoteHistoryCheck(record, "receipt_target_moved", target);
+    expect(marked).toEqual({
+      status: "marked",
+      record: { ...record, historyCheckReason: "receipt_target_moved", historyReviewTarget: target },
+    });
+    if (marked.status !== "marked") throw new Error("Expected the moved refusal to persist");
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "pending", record: marked.record });
+    expect(clearPendingQuickLogNote(marked.record)).toBe(true);
+  });
+
+  it("treats a stored review target without the moved reason as unreadable", () => {
+    const record = validRecord();
+    claimPendingQuickLogNote(record);
+    window.sessionStorage.setItem(
+      `verdant:quick-log:pending-note:v1:${ownerA}`,
+      JSON.stringify({
+        ...record,
+        historyCheckReason: "idempotency_key_conflict",
+        historyReviewTarget: { growId: null, tentId: null, plantId: null },
+      }),
+    );
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "blocked" });
+  });
+
   it("refuses unknown reasons and changed or missing pending records", () => {
     const record = validRecord();
     expect(markPendingQuickLogNoteHistoryCheck(record, "network_error")).toEqual({

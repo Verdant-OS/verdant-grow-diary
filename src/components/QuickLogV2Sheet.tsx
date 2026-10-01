@@ -9,6 +9,7 @@ import {
   NOTE_RECOVERY_PENDING,
   NOTE_RECOVERY_CLEAR_FAILED,
   type PendingQuickLogNote,
+  type PendingQuickLogNoteReviewTarget,
 } from "@/lib/quickLogPendingNoteStore";
 import {
   readPendingQuickLogWatering,
@@ -526,10 +527,9 @@ function QuickLogV2SheetForOwner({
     navigation: NonNullable<ReturnType<typeof buildQuickLogTimelineNavTarget>>;
   } | null>(null);
   // Where a target-moved original entry lives now, from the verified readback.
-  // In-memory only: after a reload the review link falls back to the draft scope.
-  const [historyReviewScope, setHistoryReviewScope] = useState<ReturnType<
-    typeof resolveQuickLogConfirmedScope
-  > | null>(null);
+  // Persisted on the pending Note so a reload still links to the right Timeline.
+  const [historyReviewScope, setHistoryReviewScope] =
+    useState<PendingQuickLogNoteReviewTarget | null>(initialNote?.historyReviewTarget ?? null);
   const retryPending = wateringRetryPending || exactRetryPending;
   const [submissionLocked, setSubmissionLocked] = useState(Boolean(initialSubmission));
   // Synchronous in-flight guard. The save-state flags are React
@@ -1326,6 +1326,7 @@ function QuickLogV2SheetForOwner({
     setExactRetryPending(true);
     historyCheckRequiredRef.current = Boolean(record.historyCheckReason);
     setHistoryCheckRequired(Boolean(record.historyCheckReason));
+    setHistoryReviewScope(record.historyReviewTarget ?? null);
     keepSubmissionLockedRef.current = true;
     submissionLockedRef.current = true;
     setSubmissionLocked(true);
@@ -1926,7 +1927,16 @@ function QuickLogV2SheetForOwner({
       if (exactSubmission && !canContinueNote()) return;
       const reason = res.reason || "save_failed";
       if (quickLogSaveRequiresHistoryCheck(reason) && exactManualSubmission) {
-        const marked = markPendingQuickLogNoteHistoryCheck(exactManualSubmission.recovery, reason);
+        const movedScope =
+          reason === "receipt_target_moved" ? resolveQuickLogConfirmedScope(resolved, res) : null;
+        const reviewTarget = movedScope
+          ? { growId: movedScope.growId, tentId: movedScope.tentId, plantId: movedScope.plantId }
+          : null;
+        const marked = markPendingQuickLogNoteHistoryCheck(
+          exactManualSubmission.recovery,
+          reason,
+          reviewTarget,
+        );
         if (marked.status === "marked") {
           manualRetrySubmissionRef.current = {
             ...exactManualSubmission,
@@ -1936,9 +1946,7 @@ function QuickLogV2SheetForOwner({
         // Even when storage fails, keep this mounted sheet fail-closed.
         historyCheckRequiredRef.current = true;
         setHistoryCheckRequired(true);
-        setHistoryReviewScope(
-          reason === "receipt_target_moved" ? resolveQuickLogConfirmedScope(resolved, res) : null,
-        );
+        setHistoryReviewScope(reviewTarget);
       } else {
         historyCheckRequiredRef.current = false;
         setHistoryCheckRequired(false);

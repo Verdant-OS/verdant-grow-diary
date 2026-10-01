@@ -502,6 +502,18 @@ describe("ASTRA-001 exact Note recovery", () => {
     );
     expect(screen.queryByTestId("qlv2-save-retry")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Note (optional)")).toHaveValue(originalNote);
+    // The verified moved scope is persisted, so the review link still targets
+    // the entry's current Timeline after a reload, not the original draft target.
+    const restoredLink = screen.getByTestId("qlv2-history-review-link");
+    expect(restoredLink.getAttribute("href")).toContain(
+      "growId=66666666-6666-4666-8666-666666666666",
+    );
+    expect(restoredLink.getAttribute("href")).toContain(
+      "plantId=44444444-4444-4444-8444-444444444444",
+    );
+    expect(restoredLink.getAttribute("href")).not.toContain(
+      "plantId=33333333-3333-4333-8333-333333333333",
+    );
     fireEvent.click(screen.getByRole("button", { name: "I checked Timeline; discard draft" }));
     expect(screen.queryByTestId("qlv2-exact-retry-lock")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Note (optional)")).toHaveValue("");

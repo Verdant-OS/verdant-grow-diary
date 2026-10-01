@@ -105,16 +105,19 @@ export function sensorEvidenceRefIdsToRead(
 
 /**
  * Provenance of a stored row in the timeline-evidence vocabulary. Stored
- * quality wins; live needs quality "ok"; unrecognized tokens are "unknown".
+ * quality wins: stale/invalid map to themselves, any other non-"ok" quality
+ * is "unknown"; unrecognized tokens are "unknown".
  */
 export function storedEvidenceSource(row: EvidenceSensorRow): OriginatingTimelineEventSource {
   const quality = (row.quality ?? "").trim().toLowerCase();
   if (quality === "invalid") return "invalid";
   if (quality === "stale") return "stale";
+  // Any quality other than "ok" (degraded, missing, unknown) is never shown
+  // as trusted evidence, whatever the source (#1845 review).
+  if (quality !== "ok") return "unknown";
   const raw = (row.source ?? "").trim().toLowerCase();
   const canonical = normalizeSensorSource(raw);
   if (canonical === "invalid" && raw !== "invalid") return "unknown";
-  if (canonical === "live" && quality !== "ok") return "unknown";
   return canonical;
 }
 

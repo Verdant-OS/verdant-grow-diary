@@ -133,6 +133,23 @@ describe("verifyActionEvidenceRefs — persisted provenance wins", () => {
     expect(v?.displaySource).toBe("unknown");
   });
 
+  it("degraded or missing quality is never trusted, for manual and csv too", () => {
+    for (const source of ["manual", "csv", "live"]) {
+      expect(
+        verifyOne(ref({ source: "unknown" }), [row({ source, quality: "degraded" })])
+          ?.displaySource,
+      ).toBe("unknown");
+    }
+    expect(
+      verifyOne(ref({ source: "unknown" }), [row({ source: "manual", quality: null })])
+        ?.displaySource,
+    ).toBe("unknown");
+    expect(
+      verifyOne(ref({ source: "manual" }), [row({ source: "manual", quality: "ok" })])
+        ?.displaySource,
+    ).toBe("manual");
+  });
+
   it("demo / sim rows verify but stay demo", () => {
     expect(verifyOne(ref({ source: "demo" }), [row({ source: "sim" })])?.displaySource).toBe(
       "demo",

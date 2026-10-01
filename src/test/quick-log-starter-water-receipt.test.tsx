@@ -374,4 +374,56 @@ describe("starter Water manual receipt validation", () => {
     });
     expect(mocks.track).not.toHaveBeenCalled();
   });
+  it("confirms a starter Watering whose occurrence time the server assigned", async () => {
+    // Starter Water deliberately sends p_occurred_at: null so the server
+    // stamps the event; the receipt must not be rejected for that.
+    const serverTimed: QuickLogV2SavePayload = { ...payload, p_occurred_at: null };
+    mocks.rpc.mockResolvedValue({
+      data: { ok: true, grow_event_id: id, reused: false },
+      error: null,
+    });
+    mocks.eventRead.mockResolvedValue({
+      data: {
+        id,
+        event_type: "watering",
+        source: "manual",
+        is_deleted: false,
+        grow_id: growId,
+        tent_id: tentId,
+        plant_id: serverTimed.p_target_id,
+        occurred_at: "2026-09-26T04:00:07.123Z",
+        note: serverTimed.p_note,
+      },
+      error: null,
+    });
+    const { result } = renderHook(() => useQuickLogV2Save());
+    await act(async () => {
+      expect(
+        await result.current.save(serverTimed, {
+          expectedWaterTarget: { plantId: serverTimed.p_target_id, growId, tentId },
+        }),
+      ).toMatchObject({
+        ok: true,
+        waterContextChanged: false,
+        savedWaterTarget: { plantId: serverTimed.p_target_id, growId, tentId },
+      });
+    });
+  });
+
+  it("keeps the RPC's unverified retracted-key rejection a history check", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: { ok: false, reason: "idempotency_key_retracted" },
+      error: null,
+    });
+    const { result } = renderHook(() => useQuickLogV2Save());
+    await act(async () => {
+      expect(
+        await result.current.save(payload, {
+          expectedWaterTarget: { plantId: payload.p_target_id, growId, tentId },
+        }),
+      ).toEqual({ ok: false, reason: "idempotency_key_retracted" });
+    });
+    expect(mocks.eventRead).not.toHaveBeenCalled();
+    expect(mocks.track).not.toHaveBeenCalled();
+  });
 });

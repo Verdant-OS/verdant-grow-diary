@@ -4,7 +4,18 @@ import path from "node:path";
 import type { Locator, Request } from "@playwright/test";
 import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
 import { validateQuickLogFixturePage } from "./lib/fixtureSafety";
+import { observeProductionQuickLogFixture } from "./lib/productionQuickLogFixtureProof";
+import { buildQuickLogSmokeNote } from "./lib/productionQuickLogFixtureRules";
+import {
+  measureQuickLogSavePerformance,
+  readLivePerformanceIdentity,
+} from "./lib/signedInPerformanceProbe";
 import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
+import {
+  UNATTENDED_RECONSENT_BLOCKED,
+  isUnattendedRun,
+  reconsentAction,
+} from "./lib/unattendedRunRules";
 
 /**
  * Authenticated Quick Log smoke checklist.
@@ -28,6 +39,7 @@ import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
  *   - Does not attach stale/non-usable snapshots.
  */
 const PLANT_URL = process.env.E2E_GROW_1_PLANT_URL;
+const MEASURE_PERFORMANCE = process.env.E2E_MEASURE_SIGNED_IN_PERFORMANCE === "true";
 // `??` alone is not enough: an unset GitHub Actions var referenced via
 // `env:` arrives as an EMPTY STRING (not undefined), which would produce an
 // empty exact name that cannot identify a plant option.
@@ -133,7 +145,8 @@ async function openQuickLogDialog(page: import("@playwright/test").Page) {
  * this checklist at the first click for a full test-timeout. Accept it for
  * the disposable fixture account (a real, persisted acceptance — the same
  * click-through a returning grower performs) and continue. No-op when the
- * gate is not shown.
+ * gate is not shown. A scheduled run has no person present, so it stops with
+ * BLOCKED instead of accepting (#1852).
  */
 async function acceptReconsentGateIfShown(page: import("@playwright/test").Page) {
   const gate = page.getByTestId("agreement-reconsent-gate");
@@ -141,13 +154,20 @@ async function acceptReconsentGateIfShown(page: import("@playwright/test").Page)
     .waitFor({ state: "visible", timeout: 5_000 })
     .then(() => true)
     .catch(() => false);
+  if (reconsentAction(shown, isUnattendedRun(process.env)) === "block")
+    throw new Error(UNATTENDED_RECONSENT_BLOCKED);
   if (!shown) return;
   await gate.locator("#reconsent-accept").click();
   await gate.getByRole("button", { name: /accept and continue/i }).click();
   await gate.waitFor({ state: "hidden", timeout: 15_000 });
 }
 
+if (MEASURE_PERFORMANCE) test.use({ trace: "off", video: "off", screenshot: "off" });
+
 test.describe("Quick Log smoke checklist", () => {
+  if (MEASURE_PERFORMANCE) {
+    test.describe.configure({ retries: 0 });
+  }
   test.skip(!PLANT_URL, "Set E2E_GROW_1_PLANT_URL to a Grow #1 plant page to run this smoke test.");
 
   test.beforeEach(async ({ page }) => {
@@ -171,6 +191,8 @@ test.describe("Quick Log smoke checklist", () => {
 
   test("authenticated end-to-end checklist", async ({ page }, testInfo) => {
     const report = new SmokeChecklistReporter();
+    const productionProof = observeProductionQuickLogFixture(page);
+    const smokeTime = new Date();
     let observedRpcTargetId: string | null = null;
 
     page.on("request", (request) => {
@@ -186,8 +208,19 @@ test.describe("Quick Log smoke checklist", () => {
     });
 
     try {
+      if (MEASURE_PERFORMANCE) {
+        const expectedSha = process.env.E2E_EXPECTED_SHA ?? "";
+        expect(expectedSha).toMatch(/^[0-9a-f]{40}$/);
+        // Refuse a source/deployment mismatch before navigation or any save.
+        const identity = await readLivePerformanceIdentity(page);
+        expect(identity).toEqual({
+          origin: "https://verdantgrowdiary.com",
+          commit: expectedSha,
+          dirty: false,
+        });
+      }
       await page.goto(PLANT_URL!);
-      await validateQuickLogFixturePage(page);
+      const fixture = await validateQuickLogFixturePage(page, undefined, productionProof);
       let routePlantId = "";
       await report.run(1, "Validate initial plant route target", async () => {
         routePlantId = readPlantRouteId(PLANT_URL!);
@@ -212,6 +245,7 @@ test.describe("Quick Log smoke checklist", () => {
           })
           .toBe(routePlantId);
         initialTarget = await readTargetTuple(dialog);
+        await productionProof.assertTarget(initialTarget, fixture.expected, fixture.expected.plant);
         if (initialTarget.plantId !== routePlantId) {
           throw new Error("Quick Log target does not match the Plant Detail route.");
         }
@@ -231,6 +265,7 @@ test.describe("Quick Log smoke checklist", () => {
           )
           .not.toBe(routePlantId);
         const selectedTarget = await readTargetTuple(dialog);
+        await productionProof.assertTarget(selectedTarget, fixture.expected, TARGET_NAME);
         if (initialTarget && selectedTarget.growId !== initialTarget.growId) {
           throw new Error("Selected target plant is not in the routed plant's grow.");
         }
@@ -362,23 +397,50 @@ test.describe("Quick Log smoke checklist", () => {
             dialog.getByTestId("quick-log-target-card").getAttribute("data-target-plant-id"),
           )
           .toBe(structuredWaterTargetId);
-        await dialog.getByTestId("quicklog-note").fill("Smoke checklist observation");
+        await dialog.getByTestId("quicklog-note").fill(buildQuickLogSmokeNote(smokeTime, 1));
         return "structured sheet closed; target reselected and observation prepared";
       });
 
       await report.run(15, "Save uses displayed target", async () => {
-        const displayedTargetId = await dialog
-          .getByTestId("quick-log-target-card")
-          .getAttribute("data-target-plant-id");
-        if (!isSafeTargetId(displayedTargetId)) {
-          throw new Error("Displayed Quick Log target is missing or invalid before Save.");
+        const displayedTarget = await readTargetTuple(dialog);
+        await productionProof.assertTarget(displayedTarget, fixture.expected, TARGET_NAME);
+        const displayedTargetId = displayedTarget.plantId;
+        const saveAndConfirm = async () => {
+          observedRpcTargetId = null;
+          await dialog.getByTestId("quick-log-save").click();
+          await expect.poll(() => observedRpcTargetId).toBe(displayedTargetId);
+          await expect(dialog.getByTestId("quick-log-post-save")).toBeVisible({
+            timeout: 15_000,
+          });
+        };
+        if (MEASURE_PERFORMANCE) {
+          const result = await measureQuickLogSavePerformance(
+            {
+              origin: new URL(page.url()).origin,
+              expectedSha: process.env.E2E_EXPECTED_SHA ?? "",
+              fixtureVerified: true,
+            },
+            {
+              readIdentity: () => readLivePerformanceIdentity(page),
+              target: displayedTarget,
+              readTarget: () => readTargetTuple(dialog),
+              assertTarget: (target) =>
+                productionProof.assertTarget(target, fixture.expected, TARGET_NAME),
+              run: saveAndConfirm,
+            },
+          );
+          const receiptPath = testInfo.outputPath("quicklog-save-confirmed-performance.json");
+          fs.mkdirSync(path.dirname(receiptPath), { recursive: true });
+          fs.writeFileSync(receiptPath, JSON.stringify(result.receipt, null, 2));
+          await testInfo.attach("quicklog-save-confirmed-performance", {
+            path: receiptPath,
+            contentType: "application/json",
+          });
+          if (result.error) throw result.error;
+          expect(result.receipt.status, result.receipt.reason).toBe("PASS");
+        } else {
+          await saveAndConfirm();
         }
-        observedRpcTargetId = null;
-        await dialog.getByTestId("quick-log-save").click();
-        await expect.poll(() => observedRpcTargetId).toBe(displayedTargetId);
-        await expect(dialog.getByTestId("quick-log-post-save")).toBeVisible({
-          timeout: 15_000,
-        });
         return "post-save shown and RPC target matched displayed target";
       });
 
@@ -414,7 +476,12 @@ test.describe("Quick Log smoke checklist", () => {
       });
 
       await report.run(21, "Save quick Observation", async () => {
-        await dialog.getByTestId("quicklog-note").fill("Smoke checklist observation");
+        await productionProof.assertTarget(
+          await readTargetTuple(dialog),
+          fixture.expected,
+          TARGET_NAME,
+        );
+        await dialog.getByTestId("quicklog-note").fill(buildQuickLogSmokeNote(smokeTime, 2));
         await dialog.getByTestId("quick-log-save").click();
         await expect(dialog.getByTestId("quick-log-post-save")).toBeVisible({
           timeout: 15_000,
@@ -437,7 +504,23 @@ test.describe("Quick Log smoke checklist", () => {
         await expect(reopened.getByTestId("quicklog-note")).toHaveValue("");
         return "clean dialog";
       });
+
+      // The production-only runbook requires each tagged save to be read back
+      // from the grow's persisted Timeline; a post-save UI alone is not proof.
+      await report.run(24, "Read both tagged saves back from the grow Timeline", async () => {
+        if (!initialTarget) throw new Error("Grow target unknown; cannot read the saves back.");
+        await page.goto(`/timeline?growId=${encodeURIComponent(initialTarget.growId)}`);
+        for (const sequence of [1, 2] as const) {
+          const note = buildQuickLogSmokeNote(smokeTime, sequence);
+          await expect(page.getByTestId("timeline-entry").filter({ hasText: note })).toHaveCount(
+            1,
+            { timeout: 20_000 },
+          );
+        }
+        return "both tagged saves read back exactly once from the grow Timeline";
+      });
     } finally {
+      productionProof.dispose();
       // Always write the smoke report to a stable path so CI can upload it
       // even when a step fails. Mirrored copy into testInfo.outputDir for
       // Playwright's per-test artifact bundle.

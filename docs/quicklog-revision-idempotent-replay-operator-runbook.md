@@ -124,6 +124,7 @@ all of these workflows to have no `queued`, `in_progress`, `waiting`,
 - `apply-agreement-acceptance-insert-forward-repair.yml`
 - `apply-quicklog-revision-idempotent-replay.yml`
 - `apply-plants-health-unassessed-default.yml`
+- `apply-linked-quicklog-diary-client-write-fence.yml`
 
 Run this read-only check from an authenticated GitHub CLI session:
 
@@ -140,6 +141,7 @@ writers=(
   apply-agreement-acceptance-insert-forward-repair.yml
   apply-quicklog-revision-idempotent-replay.yml
   apply-plants-health-unassessed-default.yml
+  apply-linked-quicklog-diary-client-write-fence.yml
 )
 for workflow in "${writers[@]}"; do
   for status in queued in_progress waiting pending requested; do

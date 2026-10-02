@@ -1,29 +1,30 @@
 # Dashboard — one Log entry, stable readiness marker
 
-Status: **SPEC — implementation BLOCKED on preconditions** (see §1).
+Status: **SPEC — implementation BLOCKED on #1833 and on decision D1** (see §1, §7).
 Author: Claude, 2026-10-01. Audited at deploy tip `0107d9406` (`verdant-grow-diary`, #1836),
 #1833 head `f296a953`, #1793 head `074f4349`. Updated 2026-10-01 17:35 UTC for #1849 (re-land of #1793,
-head `c2d473e8`).
+head `c2d473e8`). Updated 2026-10-02 15:20 UTC: #1849 merged, #1793 closed, review findings on
+#1844 addressed (routing to GDP; single-entry test counts buttons too).
 
 Every claim carries a label: `established fact` (read from source at the SHAs above),
 `source claim`, `inference`, `uncertainty`, `missing evidence`.
 
 ---
 
-## 1. Preconditions (unchanged from the brief)
+## 1. Preconditions
 
-| Gate                                                             | State at 2026-10-01                                                                                                                  | Label              |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------ |
-| #1833 `feat(dashboard): One-Tent Home first fold` merged         | OPEN, draft, head `f296a953`                                                                                                         | `established fact` |
-| #1793 `test(e2e): measure signed-in readiness…` merged or closed | Superseded. OPEN draft at `074f4349`, stranded on closed #1792's branch; to be closed once #1849 merges                              | `established fact` |
-| #1849 `test(e2e): … (re-land of #1793)` merged                   | OPEN, ready for review, head `c2d473e8`, base `verdant-grow-diary`; owner reassigned from Codex to another Claude session 2026-10-01 | `established fact` |
+| Gate                                                             | State at 2026-10-02 15:07 UTC                        | Label              |
+| ---------------------------------------------------------------- | ---------------------------------------------------- | ------------------ |
+| #1833 `feat(dashboard): One-Tent Home first fold` merged         | OPEN, draft, head `f296a953`                         | `established fact` |
+| #1849 `test(e2e): … (re-land of #1793)` merged                   | **MERGED** 2026-10-01 18:38 UTC as `b5d06488`        | `established fact` |
+| #1793 `test(e2e): measure signed-in readiness…` merged or closed | **CLOSED** 2026-10-01 18:38 UTC, superseded by #1849 | `established fact` |
+| D1 decided by GDP (§7)                                           | OPEN                                                 | `established fact` |
 
-The second gate is effectively "#1849 merged": #1793's work moved to #1849, and #1793 closes
-when #1849 merges. #1849 still uses `control: "dashboard-daily-grow-check-entry"` at `c2d473e8`.
-Its owner acknowledged the handoff (issuecomment-5936713821) and keeps that control until
-the marker exists. So when #1849 lands first (the expected order), this slice edits E1 on the
-deploy branch in the same commit (§5.2). If #1849 is still open when this slice is ready,
-the slice waits for #1849 or asks its owner to apply the line; it never pushes to #1849.
+#1793's work landed through #1849. The deploy branch (`80176bad`) now carries
+`e2e/signed-in-performance.spec.ts:35` with `control: "dashboard-daily-grow-check-entry"`, as
+#1849's owner agreed (issuecomment-5936713821), so this slice edits E1 on the deploy branch in
+the same commit (§5.2). The deploy branch has exactly the 11 references listed in §3 and no
+others (`git grep`, 2026-10-02).
 #1799 / #1800 do not reference the header test ID (`established fact`, `gh pr diff`), so they
 need nothing.
 
@@ -104,7 +105,7 @@ Add a one-line load-bearing comment on the wrapper, in the style of the `__root.
 
 ---
 
-## 5. Change list (one commit, PR stays draft)
+## 5. Change list (one commit)
 
 ### 5.1 Production — `src/pages/Dashboard.tsx` (route to **Blue Dream**)
 
@@ -155,20 +156,44 @@ not contract tests over config, so `check-contract-test-resolution` does not app
 `dashboard-grow-scoped-cta-render.test.tsx` (copy its mocks; do not import across test
 files). Render `Dashboard` and assert inside `getByTestId("dashboard-root")`:
 
-| Case     | Tents fixture         | Expect                                                                                                                                                                    |
-| -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| one tent | 1                     | `getAllByRole("link", { name: /^(Quick )?Log$/ })` length **1**, and it is `tonight-tent-home-log`; `dashboard-daily-grow-check-entry` absent; `dashboard-ready` length 1 |
-| no tent  | 0                     | `dashboard-ready` length 1; no `tonight-tent-home*`; header entry absent                                                                                                  |
-| choose   | 2, no activation tent | `dashboard-ready` length 1; `tonight-tent-home-choose` present; zero links named `/^(Quick )?Log$/`                                                                       |
-| loading  | tents query pending   | `dashboard-ready` absent                                                                                                                                                  |
-| error    | tents query error     | `dashboard-ready` absent                                                                                                                                                  |
+| Case     | Tents fixture         | Expect                                                                                                                                               |
+| -------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| one tent | 1                     | Log controls (below) count **per D1**; `tonight-tent-home-log` is one of them; `dashboard-daily-grow-check-entry` absent; `dashboard-ready` length 1 |
+| no tent  | 0                     | `dashboard-ready` length 1; no `tonight-tent-home*`; header entry absent                                                                             |
+| choose   | 2, no activation tent | `dashboard-ready` length 1; `tonight-tent-home-choose` present; no `tonight-tent-home-log`                                                           |
+| loading  | tents query pending   | `dashboard-ready` absent                                                                                                                             |
+| error    | tents query error     | `dashboard-ready` absent                                                                                                                             |
 
-Role query note: `QuickLogV2Fab` is a `<button>` (not a link) and the `AppShell` trigger is
-outside `Dashboard`, so the link-role count isolates the page's primary Log link.
-`established fact`
+**Log controls** = `[...getAllByRole("link"), ...getAllByRole("button")]` inside `dashboard-root`,
+filtered by accessible name `/^(Quick )?Log$/`. Counting links alone is not enough: on desktop
+the page's own `QuickLogV2Fab` is a visible `<button>` named `Quick Log` (`hidden md:inline-flex`;
+jsdom applies no CSS, so it is always in the count). `established fact` A link-only count would
+let the one-tent case pass with two visible Log controls (finding on #1844, comment 4158072693).
+
+Expected one-tent count by D1 outcome:
+
+- **D1-A (recommended): drop `QuickLogV2Fab` from `Dashboard`.** Count is exactly 1. The desktop
+  sheet entry stays available through `AppShell`'s `header-quick-log-trigger`, which sits outside
+  `dashboard-root` and whose own comment calls it the single desktop logging entry. This adds `QuickLogV2Fab` removal to §5.1 and renegotiates the pins on its Dashboard render:
+  `first-plant-memory-cta.test.tsx` "retains the single Quick Log FAB entry point" (expects exactly
+  one `<QuickLogV2Fab` in `Dashboard.tsx`), and the title of the `onboarding-checklist-view-model`
+  case "first log step routes to Dashboard where QuickLogV2Fab opens the sheet". That case asserts
+  only the href `/dashboard?open=quick-log`, and the `open=quick-log` intent is handled by
+  `AppShell` (`globalSearchQuickLogFallbackRules.ts`), so first-log onboarding keeps working
+  (`inference`, to be proven by the e2e run). About 20 other Dashboard render tests only
+  `vi.mock` the component; an unused mock is harmless. `dashboard-mobile-layout-safety` reads
+  `QuickLogV2Fab.tsx` itself, not its Dashboard render, so it is unaffected. `established fact`
+  (`git grep` at `80176bad`)
+- **D1-B: keep it, as a deliberate exemption.** Count is exactly 2: `tonight-tent-home-log` plus
+  one `button` named `Quick Log`. The test names the exemption and links the GDP decision, so a
+  third control still fails.
+
+The AppShell trigger and `Start Check` are outside this count; whether they also fall under
+"one visible Log control" is part of D1 (§7).
 
 RED proof: run the file on the post-#1833 tree **before** §5.1. Expected: the one-tent case
-fails (two matching links: `Quick Log` + `Log`), and every `dashboard-ready` assertion that
+fails (header `Quick Log` link + card `Log` + `QuickLogV2Fab` = 3 controls, against 1 or 2),
+and every `dashboard-ready` assertion that
 expects presence fails. Record the exact failing count in the PR body, then apply §5.1 and
 show GREEN.
 
@@ -176,8 +201,8 @@ show GREEN.
 
 ## 6. Acceptance
 
-1. Signed-in Dashboard with one tent: exactly one page-body link named `Log`/`Quick Log`
-   (the home card's). Proven by §5.4 + E2.
+1. Signed-in Dashboard with one tent: the page-body Log controls (links and buttons) match the
+   D1 outcome, which is 1 under D1-A (the home card's `Log`). Proven by §5.4 + E2.
 2. `dashboard-ready` is the only selector E1–E4 use; it renders exactly once in the loaded
    branch for `none`, `choose`, `tent`, and never while loading/error.
 3. U1–U4 renegotiated in the same commit; new test shown RED then GREEN with counts.
@@ -187,22 +212,29 @@ show GREEN.
 5. Diff touches only: `Dashboard.tsx`, the e2e specs E2–E4 (plus E1 once #1849 has landed), U1–U4, the new test. No route,
    schema, RLS, auth, edge-function, migration, dependency or copy-constant change.
 6. Reviewers: Blue Dream (`Dashboard.tsx`), Critical Mass (tests/e2e). The owner does not
-   self-review.
+   self-review. Chemdawg merges only after 35/35 required checks and an independent PASS on
+   the exact head (OWNERSHIP.md §2).
 
 ---
 
-## 7. Open decisions for Cheek (not resolved by this slice)
+## 7. Open decisions for GDP
 
-- **D1 — other Log-like entries remain.** On desktop the Dashboard still shows the
+OWNERSHIP.md assigns product calls to GDP, and Matthew is never a blocker in the review path
+(OWNERSHIP.md §1, "GDP: routing and product calls"). Earlier revisions routed these to Cheek;
+that was wrong (finding on #1844, comment 4158072653).
+
+- **D1 — other Log-like entries remain. BLOCKING:** the §5.4 count needs an answer. On desktop the Dashboard still shows the
   `AppShell` `Quick Log` header trigger and the page's own `QuickLogV2Fab` (`Quick Log`),
   both opening the Quick Log sheet; the page body keeps `DailyGrowCheckStatusCard`'s
   `Start Check` → `/daily-check`. `established fact`. This slice satisfies "one primary
   Log entry" for the **page header / first fold** only. Whether the brief's "one visible
-  Log control" also covers app-chrome triggers and `Start Check` is a product decision.
+  Log control" also covers app-chrome triggers and `Start Check` is a product decision. The
+  minimum GDP must decide before implementation is `QuickLogV2Fab` on Dashboard: D1-A (drop it,
+  recommended) or D1-B (keep it as an exemption); see §5.4.
 - **D2 — `none` / `choose` have no first-fold Log.** After removal, a grower with no tent
   or with several tents and no activation tent sees no first-fold Log; they keep the chrome
   triggers and `Start Check`. `inference`: acceptable, since logging needs a target and
-  target selection must stay explicit (auto-selection is banned and test-pinned). If Cheek
+  target selection must stay explicit (auto-selection is banned and test-pinned). Non-blocking. If GDP
   wants a first-fold Log in `choose`, that belongs in #1833's card, not a revived header button.
 
 ---
@@ -223,4 +255,6 @@ show GREEN.
 - **Independent reviewers:** Blue Dream (`.tsx`), Critical Mass (tests, e2e).
 - **Coordination:** #1849's owner (a Claude session, reassigned from Codex 2026-10-01). E1 is
   handled by this slice after #1849 lands; acknowledged in issuecomment-5936713821.
-- **Integration:** GDP; no auto-merge.
+- **Routing and product calls:** GDP (D1 blocking, D2 non-blocking).
+- **Merge:** Chemdawg, after 35/35 required checks and an independent PASS on the exact head; no
+  auto-merge.

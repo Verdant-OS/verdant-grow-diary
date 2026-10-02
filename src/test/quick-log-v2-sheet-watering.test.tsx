@@ -19,7 +19,6 @@ import {
 import {
   clearLocalStorageForTest,
   getLocalStorageItemForTest,
-  removeLocalStorageItemForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
 
@@ -278,9 +277,10 @@ async function expectOriginalWaterAndRetry(original: Record<string, unknown>) {
 }
 
 describe("QuickLogV2Sheet — uncertain Water recovery", () => {
-  it("does not fence the next Watering when another tab cleared the confirmed record", async () => {
+  it("does not fence the next Watering when the confirmed record was already cleared", async () => {
     wateringWriterMock.mockImplementation(async () => {
-      removeLocalStorageItemForTest(
+      // The Water journal is tab-scoped (sessionStorage); remove it where it lives.
+      window.sessionStorage.removeItem(
         "verdant:quick-log:pending-watering:v1:11111111-1111-4111-8111-111111111111",
       );
       return { ok: true, eventId: "water-event-1", reused: true };
@@ -805,6 +805,81 @@ describe("QuickLogV2Sheet — structured watering", () => {
     expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeVisible();
     expect(readPendingQuickLogWatering(authState.ownerId).status).toBe("pending");
     expect(wateringWriterMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("discards a history-review Water whose marker readback failed once, without reload", async () => {
+    const getItem = Storage.prototype.getItem;
+    let failedReadback = false;
+    const readSpy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (
+      this: Storage,
+      k: string,
+    ) {
+      const raw = getItem.call(this, k);
+      if (
+        !failedReadback &&
+        k.startsWith("verdant:quick-log:pending-watering:v1:") &&
+        raw?.includes("historyCheckReason")
+      ) {
+        failedReadback = true;
+        throw new Error("transient readback failure");
+      }
+      return raw;
+    });
+    try {
+      await reachRetractedWaterHistoryReview();
+    } finally {
+      readSpy.mockRestore();
+    }
+    expect(failedReadback).toBe(true);
+    // The marker reached storage even though its verification read failed.
+    const stored = readPendingQuickLogWatering(authState.ownerId);
+    expect(stored.status === "pending" && stored.record.historyCheckReason).toBe(
+      "idempotency_key_retracted",
+    );
+    fireEvent.click(screen.getByRole("button", { name: QUICK_LOG_HISTORY_DISCARD_LABEL }));
+    await waitFor(() =>
+      expect(readPendingQuickLogWatering(authState.ownerId)).toEqual({ status: "empty" }),
+    );
+    await waitFor(() => expect(screen.queryByTestId("qlv2-exact-retry-lock")).toBeNull());
+    expect(screen.queryByText(QUICK_LOG_HISTORY_DISCARD_FAILED)).toBeNull();
+    expect(wateringWriterMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not dispatch Water when the sheet unmounts while the pre-dispatch claim waits", async () => {
+    let requests = 0;
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    let tail: Promise<unknown> = Promise.resolve();
+    Object.defineProperty(window.navigator, "locks", {
+      configurable: true,
+      value: {
+        request: (_name: string, _options: unknown, callback: () => unknown) => {
+          requests += 1;
+          // Hold the second Water claim: the one taken just before dispatch.
+          const wait = requests === 2 ? gate : Promise.resolve();
+          const turn = tail.then(() => wait).then(callback);
+          tail = turn.then(
+            () => undefined,
+            () => undefined,
+          );
+          return turn;
+        },
+      },
+    });
+    const view = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+    enterVolume("500");
+    clickSave();
+    await waitFor(() => expect(requests).toBe(2));
+    view.unmount();
+    releaseGate();
+    await gate;
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(wateringWriterMock).not.toHaveBeenCalled();
+    // The claimed journal stays for the next sheet to recover exactly.
+    expect(readPendingQuickLogWatering(authState.ownerId).status).toBe("pending");
   });
 
   it("restores a history-review Water after unmount as review, never as a retry", async () => {

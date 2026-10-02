@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CLAUDE-LOOP-ENGINEERING-001
+
+```text
+TASK CLAUDE-LOOP-ENGINEERING-001  priority: other  status: OPEN
+goal: Close the three gaps between Verdant's loop discipline and the Karpathy-loop workflow (AI LABS video qLfSDQ5NGh0): a scorer lock as a PreToolUse hook, a loop-habits skill with a check-safe amendment path, and docs/agents/loop-engineering.md with the four-condition eligibility gate and never-loop list. Docs plus tooling; no src/ product code, no supabase/, no workflow, no lockfile, no governance file.
+branch: claude/fervent-mccarthy-ga3vwv
+base: verdant-grow-diary at 80176bad5 (#1864)
+checkout: git switch claude/fervent-mccarthy-ga3vwv && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1866
+head_sha: 639892d544bd0747183b5dd7cb503b41be925586, normal push 2026-10-02 18:16 CT; this log edit is the next commit on the same branch
+state: pushed draft. Two new tests RED before the implementation (module not found, document absent), 41 passed / 0 failed / 0 skipped after; typecheck 0; eslint 0/0; prettier, contract-resolution, sentinel-parity (0 governance files changed) and docs-safety PASS; pre-commit 67/67. Full suite and build NOT_MEASURED locally; hook behaviour inside a live Claude Code session NOT_MEASURED.
+next_action: Critical Mass independent review at the exact head; Claude answers review threads and keeps CI green. No ready, auto-merge or merge; GDP owns integration.
+files: .claude/settings.json (new); .claude/skills/verdant-loop-habits/SKILL.md (new); .gitignore; docs/agents/loop-engineering.md (new); scripts/lib/scorerLockRules.mjs (new); scripts/scorer-lock.mjs (new); src/test/scorer-lock-rules.test.ts (new); src/test/loop-engineering-doc.test.ts (new); docs/agents/HANDOFF_LOG.md (this block).
+blockers: none for review. Deferred, recorded in the doc section 7: moving the scorer rule into verdant-guard waits for #1865; a link from docs/agents/claude-slices.md waits for #1774; a CI job running scorer-lock --report --strict is a Codex-routed CI slice. Dependency bootstrap in a cloud container needs xlsx re-pointed to the public registry for validation only (cdn.sheetjs.com is egress-denied); neither manifest is in the diff.
+artifacts: PR #1866 body (TDD evidence and validation table); src/test/scorer-lock-rules.test.ts; src/test/loop-engineering-doc.test.ts.
+reviewer_seat: Critical Mass (no .tsx outside src/test/, not P1, not a publish gate); Grok may add an independent review under the standing architecture assignment
+claimed_by: Claude, 2026-10-02 18:20 CT (owner instruction in session: "Build the three gaps as a draft PR")
+last_updated: 2026-10-02 18:20 CT, by Claude
+```
+
 ### CHEM-MOVE-TENT-READ-HONESTY-001
 
 ```text

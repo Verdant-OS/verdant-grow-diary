@@ -15,6 +15,11 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { runInNewContext } from "node:vm";
+import {
+  QUICKLOG_SMOKE_DAILY_CRON,
+  loadQuickLogSmokeWorkflow,
+} from "./helpers/quicklogSmokeWorkflow";
 import { readWorkflowYamlScalar } from "./helpers/yamlScalarText";
 
 const ROOT = path.resolve(__dirname, "../..");
@@ -26,12 +31,49 @@ describe("Quick Log Playwright CI surface", () => {
     expect(fs.existsSync(path.join(ROOT, "e2e/.auth/session-storage.json"))).toBe(false);
   });
 
-  it("CI workflow has NO schedule/cron trigger (no automated writes to a real grow)", () => {
-    const wf = read(".github/workflows/quicklog-smoke.yml");
-    // The smoke creates real diary entries. Until a disposable test fixture
-    // exists, scheduled runs are unsafe and must not be enabled.
-    expect(wf).not.toMatch(/^\s*schedule\s*:/m);
-    expect(wf).not.toMatch(/-\s*cron\s*:/);
+  it("CI workflow has exactly one daily schedule, and only the smoke job accepts it", () => {
+    // The smoke creates real diary entries. The owner accepted the current
+    // fixture as disposable on 2026-10-01 (#1852) and chose one daily run.
+    const workflow = loadQuickLogSmokeWorkflow(ROOT);
+    // Exactly one daily schedule (#1852); no other cron entry may be added.
+    expect(workflow.on.schedule).toEqual([{ cron: QUICKLOG_SMOKE_DAILY_CRON }]);
+    // Evaluate the parsed job guards (GitHub/JS shared equality and boolean subset).
+    const allowed = (job: string, github: Record<string, string>) =>
+      runInNewContext(
+        workflow.jobs[job].if ?? "false",
+        {
+          github: {
+            repository: "Verdant-OS/verdant-grow-diary",
+            ref: "refs/heads/verdant-grow-diary",
+            run_attempt: "1",
+            event_name: "schedule",
+            // GitHub attributes a schedule to whoever last edited the cron.
+            actor: "github-merge-queue[bot]",
+            triggering_actor: "github-merge-queue[bot]",
+            ...github,
+          },
+          inputs: {},
+        },
+        { timeout: 100 },
+      ) as boolean;
+    expect(allowed("quicklog-smoke", {})).toBe(true);
+    expect(allowed("quicklog-smoke", { actor: "cheekhimself" })).toBe(true);
+    // The schedule keeps every non-actor guard of the push path.
+    expect(allowed("quicklog-smoke", { repository: "outsider/fork" })).toBe(false);
+    expect(allowed("quicklog-smoke", { ref: "refs/heads/unreviewed" })).toBe(false);
+    expect(allowed("quicklog-smoke", { run_attempt: "2" })).toBe(false);
+    // Human-triggered events still need the owner as actor and triggering actor.
+    expect(allowed("quicklog-smoke", { event_name: "push" })).toBe(false);
+    expect(
+      allowed("quicklog-smoke", {
+        event_name: "push",
+        actor: "cheekhimself",
+        triggering_actor: "cheekhimself",
+      }),
+    ).toBe(true);
+    expect(allowed("one-tent-authenticated-proof", {})).toBe(false);
+    // The guarded One-Tent proof stays dispatch-only.
+    expect(workflow.jobs["one-tent-authenticated-proof"].if).not.toContain("schedule");
   });
 
   it("README warns smoke writes real diary entries and requires a dedicated test account/plant", () => {
@@ -47,11 +89,10 @@ describe("Quick Log Playwright CI surface", () => {
     // Dedicated test account and test plant required
     expect(readme.toLowerCase()).toContain("dedicated test account");
     expect(readme.toLowerCase()).toContain("test plant");
-    // Manual-only until a disposable test fixture exists
-    expect(readme).toMatch(/manual(ly)?\s+only|run the workflow\s+manually\s+only/i);
+    // One scheduled daily run against the disposable fixture, never a real grow
     expect(readme.toLowerCase()).toContain("disposable test fixture");
-    // No scheduled/nightly trigger is enabled
-    expect(readme).toMatch(/no\s+(scheduled|nightly)/i);
+    expect(readme).toMatch(/exactly one scheduled daily run/i);
+    expect(readme).toMatch(/never point a scheduled run at a real grow/i);
   });
 
   it("ignores .auth/ and results/ in e2e/.gitignore", () => {
@@ -561,10 +602,11 @@ describe("Quick Log Playwright CI surface", () => {
     }
   });
 
-  it("CI workflow still has no schedule/cron and no pull_request_target", () => {
+  it("CI workflow still has only the one daily schedule and no pull_request_target", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
-    expect(wf).not.toMatch(/^\s*schedule\s*:/m);
-    expect(wf).not.toMatch(/-\s*cron\s*:/);
+    const workflow = loadQuickLogSmokeWorkflow(ROOT);
+    // Exactly one daily schedule (#1852); no other cron entry may be added.
+    expect(workflow.on.schedule).toEqual([{ cron: QUICKLOG_SMOKE_DAILY_CRON }]);
     expect(wf).not.toMatch(/pull_request_target/);
   });
 
@@ -586,8 +628,8 @@ describe("Quick Log Playwright CI surface", () => {
     expect(readme).toContain("e2e/results");
     expect(readme).toContain("test-results");
     expect(readme).toContain("playwright-report");
-    // No scheduled smoke reaffirmation
-    expect(readme).toMatch(/no scheduled or nightly/i);
+    // Single daily schedule reaffirmation
+    expect(readme).toMatch(/exactly one scheduled daily run/i);
   });
 
   // ---------- Hardened cache guardrails ----------
@@ -804,6 +846,6 @@ describe("Quick Log Playwright CI surface", () => {
     expect(readme).toContain("runner.os");
     expect(readme).toMatch(/downloads,?\s*not hosted/i);
     expect(readme).toContain("index.html");
-    expect(readme).toMatch(/no scheduled or nightly/i);
+    expect(readme).toMatch(/exactly one scheduled daily run/i);
   });
 });

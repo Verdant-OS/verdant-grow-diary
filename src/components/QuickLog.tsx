@@ -145,6 +145,7 @@ import { persistedSensorSourceLabel } from "@/lib/quickLogSnapshotStripAdapter";
 import {
   quickLogDraftPreservedFailureMessage,
   quickLogReasonToOperatorMessage,
+  quickLogSaveRecoveryAction,
   quickLogSaveRequiresHistoryCheck,
   canDiscardQuickLogHistoryDraft,
   QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY,
@@ -545,7 +546,8 @@ export default function QuickLog({
   // Note and other activities have independent receipts and may still save.
   const recoveryLocked = starterWaterPending !== null;
   const isMainDraftMutationLocked = useCallback(
-    () => saveInFlightRef.current || historyCheckRequiredRef.current || saveLocked || recoveryLocked,
+    () =>
+      saveInFlightRef.current || historyCheckRequiredRef.current || saveLocked || recoveryLocked,
     [saveLocked, recoveryLocked],
   );
   // One idempotency key per LOGICAL submission (quickLogIdempotencyKey
@@ -1887,7 +1889,14 @@ export default function QuickLog({
     try {
       const result = await saveViaRpc(record.payload, { expectedWaterTarget: record.target });
       if (!result.ok) {
-        if (result.definitiveRejected === true || result.savedThenRetracted === true) {
+        // A sign-in refusal is returned before the idempotency lookup, so on a
+        // retry it cannot show that the original key never committed. Keep the
+        // exact claim for a retry after sign-in instead of releasing the key.
+        const signInRefused = result.reason === "not_authenticated";
+        if (
+          (result.definitiveRejected === true && !signInRefused) ||
+          result.savedThenRetracted === true
+        ) {
           const clearance = await reconcilePendingStarterWaterClear(record);
           if (clearance.status !== "cleared" && clearance.status !== "already_cleared") {
             setStarterWaterStorageBlocked(clearance.status === "blocked");
@@ -1930,7 +1939,11 @@ export default function QuickLog({
           setSaveError(quickLogDraftPreservedFailureMessage(result.reason));
           return;
         }
-        setSaveError(STARTER_WATER_RECOVERY_PENDING);
+        setSaveError(
+          signInRefused
+            ? `${quickLogSaveRecoveryAction(result.reason)} ${STARTER_WATER_RECOVERY_PENDING}`
+            : STARTER_WATER_RECOVERY_PENDING,
+        );
         return;
       }
       const confirmedTarget = result.savedWaterTarget ?? record.target;

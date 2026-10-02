@@ -2,6 +2,10 @@
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-02T15:50 UTC
+
+- **BLOCKED, decision D1 widened (GDP):** Codex automated review on #1844 (comment 4167087657, P2) found that a page-body count misses AppShell's chrome triggers. The thread was marked resolved by the shared `cheekhimself` account with no reply or change. Measured by class names in source: after the header link goes, a one-tent Dashboard shows card `Log` + page `QuickLogV2Fab` + `header-quick-log-trigger` on desktop, and card `Log` + `mobile-quick-log-fab` ("Open Quick Log") on mobile. The spec adds a browser-level visible-control count to E2 (desktop) and E4 (390/320 px), and splits D1 into two blocking parts plus one non-blocking: D1.1 page FAB (A drop, recommended / B exempt), D1.2 AppShell triggers on Dashboard (A named chrome exemption, recommended / B hide on Dashboard / C card `Log` opens the sheet, separate slice), and D1.3 `Start Check` (non-blocking, unchanged). This supersedes the 15:20 checkpoint's two-option D1. #1833 still blocks; no merge, auto-merge, Publish or production operation.
+
 ## Follow-up observation — 2026-10-02T15:20 UTC
 
 - **PASS, landed / BLOCKED, dashboard slice:** #1849 merged 2026-10-01 18:38 UTC as `b5d06488`; #1793 closed at 18:38 UTC as superseded. #1833 is still an open draft at `f296a953` (no activity since 2026-10-01 04:42 UTC), so the dashboard implementation stays BLOCKED. Deploy tip `80176bad`. `git grep` there shows exactly the 11 `dashboard-daily-grow-check-entry` references the spec plans for, including #1849's `e2e/signed-in-performance.spec.ts:35`. The overnight re-lands #1859/#1860 added none. #1837 (`881a64ba`) is still an open draft, with no `Dashboard.tsx` overlap on the deploy branch yet.

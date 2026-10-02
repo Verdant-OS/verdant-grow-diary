@@ -1,10 +1,11 @@
 # Dashboard — one Log entry, stable readiness marker
 
-Status: **SPEC — implementation BLOCKED on #1833 and on decision D1** (see §1, §7).
+Status: **SPEC — implementation BLOCKED on #1833 and on decision D1 (D1.1 and D1.2)** (see §1, §7).
 Author: Claude, 2026-10-01. Audited at deploy tip `0107d9406` (`verdant-grow-diary`, #1836),
 #1833 head `f296a953`, #1793 head `074f4349`. Updated 2026-10-01 17:35 UTC for #1849 (re-land of #1793,
 head `c2d473e8`). Updated 2026-10-02 15:20 UTC: #1849 merged, #1793 closed, review findings on
-#1844 addressed (routing to GDP; single-entry test counts buttons too).
+#1844 addressed (routing to GDP; single-entry test counts buttons too). Updated 2026-10-02
+15:50 UTC: browser-level count includes app-chrome triggers; D1 split into D1.1–D1.3.
 
 Every claim carries a label: `established fact` (read from source at the SHAs above),
 `source claim`, `inference`, `uncertainty`, `missing evidence`.
@@ -115,8 +116,9 @@ Add a one-line load-bearing comment on the wrapper, in the style of the `__root.
 3. Replace the stale comment at lines 495-497 ("single Quick Log entry point
    (QuickLogV2Fab)") with one that names the home-card `Log` as the page's single primary
    Log entry. Keep it to two lines.
-4. Do **not** touch `QuickLogV2Fab`, `DailyGrowCheckStatusCard`, `DashboardDailyGrowCheckPanel`,
-   `AppShell`, `MobileNav`, routes, `withGrowId`, or #1833's card/view model.
+4. Do **not** touch `DailyGrowCheckStatusCard`, `DashboardDailyGrowCheckPanel`, `MobileNav`,
+   routes, `withGrowId`, or #1833's card/view model. Touch `QuickLogV2Fab`'s Dashboard render only
+   under D1.1-A, and `AppShell` only if GDP picks D1.2-B (§7); otherwise leave both alone.
 5. Do not reformat the file (pins elsewhere depend on line shape).
 
 E1 handoff (`control: "dashboard-ready"`, `toBeEnabled()` stays) is posted on #1793
@@ -131,6 +133,23 @@ owner of #1849 acknowledged it. The edit itself is in §5.2 once #1849 has lande
 | E1 `signed-in-performance.spec.ts` (on the deploy branch after #1849 lands) | `control: "dashboard-ready"` for `dashboard-ready`; leave `toBeVisible()` / `toBeEnabled()` unchanged. If #1849 has not landed, do not edit #1849; wait or ask its owner.                                                                                                                                                                                                                                                                                                                                                               |
 | E3 `ui-overhaul-responsive.spec.ts:253`                                     | `readySelector: '[data-testid="dashboard-ready"]'`. Cardinality stays `exact-one`.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | E4 `dashboard-mobile-overflow.spec.ts:149`                                  | Replace with `await expect(page.getByTestId("dashboard-ready")).toBeVisible();`. Keep the `Open tents` assertion. Re-run at 390 and 320 px: the card's `size="lg"` Log button now sits in the first fold, so `expectNoOverflow` is the real check here.                                                                                                                                                                                                                                                                                 |
+
+**Browser-level single-entry check (added to E2 and E4).** The unit test in §5.4 only sees the
+page body. Growers also see app-chrome Log controls, so add a whole-page count of **visible**
+controls (roles `link` and `button`) whose accessible name matches `/^(open )?(quick )?log$/i`.
+That matches `Log`, `Quick Log` and `Open Quick Log`, but not `Log out` or `Start Check`. Expect
+the exact set GDP's D1 answer allows (§7), named by test ID where one exists, so a new
+duplicate fails:
+
+| Viewport                                                     | Spec | Visible Log controls today, after removing the header link                                        | Under D1.1-A + D1.2-A (recommended)                                                |
+| ------------------------------------------------------------ | ---- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Desktop (`chromium-mocked` uses `devices["Desktop Chrome"]`) | E2   | card `Log`, page `QuickLogV2Fab` (`Quick Log`), AppShell `header-quick-log-trigger` (`Quick Log`) | 2: card `Log` + `header-quick-log-trigger`, the second as a named chrome exemption |
+| Mobile 390 / 320 px                                          | E4   | card `Log`, AppShell `mobile-quick-log-fab` (`Open Quick Log`)                                    | 2: card `Log` + `mobile-quick-log-fab`, the second as a named chrome exemption     |
+
+In the mobile case, `QuickLogV2Fab` and `header-quick-log-trigger` are `hidden md:inline-flex`, and
+`mobile-quick-log-fab` is `md:hidden`. `established fact` (class names in source; actual
+visibility is proven by the e2e run). This check closes the gap raised on #1844 (comment
+4167087657): a page-body count alone could pass while the grower still sees two controls.
 
 Every e2e run uses `--project=chromium-mocked` **with an explicit spec filter** and
 `E2E_BASE_URL=http://127.0.0.1:8080`.
@@ -170,9 +189,9 @@ the page's own `QuickLogV2Fab` is a visible `<button>` named `Quick Log` (`hidde
 jsdom applies no CSS, so it is always in the count). `established fact` A link-only count would
 let the one-tent case pass with two visible Log controls (finding on #1844, comment 4158072693).
 
-Expected one-tent count by D1 outcome:
+Expected one-tent page-body count by D1.1 outcome:
 
-- **D1-A (recommended): drop `QuickLogV2Fab` from `Dashboard`.** Count is exactly 1. The desktop
+- **D1.1-A (recommended): drop `QuickLogV2Fab` from `Dashboard`.** Count is exactly 1. The desktop
   sheet entry stays available through `AppShell`'s `header-quick-log-trigger`, which sits outside
   `dashboard-root` and whose own comment calls it the single desktop logging entry. This adds `QuickLogV2Fab` removal to §5.1 and renegotiates the pins on its Dashboard render:
   `first-plant-memory-cta.test.tsx` "retains the single Quick Log FAB entry point" (expects exactly
@@ -184,12 +203,13 @@ Expected one-tent count by D1 outcome:
   `vi.mock` the component; an unused mock is harmless. `dashboard-mobile-layout-safety` reads
   `QuickLogV2Fab.tsx` itself, not its Dashboard render, so it is unaffected. `established fact`
   (`git grep` at `80176bad`)
-- **D1-B: keep it, as a deliberate exemption.** Count is exactly 2: `tonight-tent-home-log` plus
+- **D1.1-B: keep it, as a deliberate exemption.** Count is exactly 2: `tonight-tent-home-log` plus
   one `button` named `Quick Log`. The test names the exemption and links the GDP decision, so a
   third control still fails.
 
-The AppShell trigger and `Start Check` are outside this count; whether they also fall under
-"one visible Log control" is part of D1 (§7).
+This unit count covers the page body only. App-chrome controls (`header-quick-log-trigger` on
+desktop, `mobile-quick-log-fab` on mobile) are counted by the browser-level check in §5.2.
+`Start Check` is not named "Log" and is outside both counts (D1.3, §7).
 
 RED proof: run the file on the post-#1833 tree **before** §5.1. Expected: the one-tent case
 fails (header `Quick Log` link + card `Log` + `QuickLogV2Fab` = 3 controls, against 1 or 2),
@@ -201,15 +221,18 @@ show GREEN.
 
 ## 6. Acceptance
 
-1. Signed-in Dashboard with one tent: the page-body Log controls (links and buttons) match the
-   D1 outcome, which is 1 under D1-A (the home card's `Log`). Proven by §5.4 + E2.
+1. Signed-in Dashboard with one tent: the page-body Log controls (§5.4) and the whole-page
+   visible Log controls at desktop and mobile widths (§5.2, E2 and E4) match GDP's D1 answer
+   exactly. Under the recommended answer that is 1 in the page body (the home card's `Log`) and
+   2 on the whole page (card `Log` plus one named chrome trigger per viewport).
 2. `dashboard-ready` is the only selector E1–E4 use; it renders exactly once in the loaded
    branch for `none`, `choose`, `tent`, and never while loading/error.
 3. U1–U4 renegotiated in the same commit; new test shown RED then GREEN with counts.
 4. Validation: `bun run typecheck`; targeted `bunx vitest run` on U1–U4 + new file +
    `tonight-tent-home-*`; `bun run lint` on touched files; the e2e specs as in §5.2
    (E1 runs only in its credentialed lane; locally, prove it at least compiles and lists). Full suite is CI's (32 shards).
-5. Diff touches only: `Dashboard.tsx`, the e2e specs E2–E4 (plus E1 once #1849 has landed), U1–U4, the new test. No route,
+5. Diff touches only: `Dashboard.tsx`, the e2e specs E2–E4 (plus E1 once #1849 has landed), U1–U4, the new test,
+   the D1.1-A pins in §5.4 if chosen, and `AppShell.tsx` only under D1.2-B. No route,
    schema, RLS, auth, edge-function, migration, dependency or copy-constant change.
 6. Reviewers: Blue Dream (`Dashboard.tsx`), Critical Mass (tests/e2e). The owner does not
    self-review. Chemdawg merges only after 35/35 required checks and an independent PASS on
@@ -223,14 +246,23 @@ OWNERSHIP.md assigns product calls to GDP, and Matthew is never a blocker in the
 (OWNERSHIP.md §1, "GDP: routing and product calls"). Earlier revisions routed these to Cheek;
 that was wrong (finding on #1844, comment 4158072653).
 
-- **D1 — other Log-like entries remain. BLOCKING:** the §5.4 count needs an answer. On desktop the Dashboard still shows the
-  `AppShell` `Quick Log` header trigger and the page's own `QuickLogV2Fab` (`Quick Log`),
-  both opening the Quick Log sheet; the page body keeps `DailyGrowCheckStatusCard`'s
-  `Start Check` → `/daily-check`. `established fact`. This slice satisfies "one primary
-  Log entry" for the **page header / first fold** only. Whether the brief's "one visible
-  Log control" also covers app-chrome triggers and `Start Check` is a product decision. The
-  minimum GDP must decide before implementation is `QuickLogV2Fab` on Dashboard: D1-A (drop it,
-  recommended) or D1-B (keep it as an exemption); see §5.4.
+- **D1 — which Log controls may stay visible. BLOCKING, both parts.** After the header link is
+  removed, a one-tent Dashboard still shows more than one Log control (`established fact`, §5.2
+  table). This slice only meets the brief's "one visible Log control" if GDP says which ones
+  stay. The tests then pin exactly that set.
+  - **D1.1 — the page's own `QuickLogV2Fab` (desktop).** **A (recommended):** drop it from
+    Dashboard; other pages keep theirs. **B:** keep it as a named exemption. See §5.4 for the
+    counts and pins.
+  - **D1.2 — AppShell's chrome triggers on Dashboard** (`header-quick-log-trigger` on desktop,
+    `mobile-quick-log-fab` on mobile). These are global chrome on every signed-in page and open
+    the Quick Log sheet, while the card's `Log` goes to `/daily-check` for that tent.
+    **A (recommended):** keep them as named chrome exemptions; the brief targets the Dashboard
+    page body, and changing global chrome is a wider slice. **B:** hide them on Dashboard while
+    the card shows `Log`. That puts Dashboard state into `AppShell` and widens this slice's diff
+    (§6.5). **C:** keep them, but the card's `Log` opens the same sheet instead of
+    `/daily-check`. That changes #1833's behavior and belongs in a separate slice.
+  - **D1.3 — `Start Check`** (`DailyGrowCheckStatusCard`, below the fold, `/daily-check`).
+    Non-blocking: it is not named "Log", so neither count includes it. Default: unchanged.
 - **D2 — `none` / `choose` have no first-fold Log.** After removal, a grower with no tent
   or with several tents and no activation tent sees no first-fold Log; they keep the chrome
   triggers and `Start Check`. `inference`: acceptable, since logging needs a target and
@@ -255,6 +287,6 @@ that was wrong (finding on #1844, comment 4158072653).
 - **Independent reviewers:** Blue Dream (`.tsx`), Critical Mass (tests, e2e).
 - **Coordination:** #1849's owner (a Claude session, reassigned from Codex 2026-10-01). E1 is
   handled by this slice after #1849 lands; acknowledged in issuecomment-5936713821.
-- **Routing and product calls:** GDP (D1 blocking, D2 non-blocking).
+- **Routing and product calls:** GDP (D1.1 and D1.2 blocking; D1.3 and D2 non-blocking).
 - **Merge:** Chemdawg, after 35/35 required checks and an independent PASS on the exact head; no
   auto-merge.

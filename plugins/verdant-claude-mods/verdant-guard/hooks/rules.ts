@@ -1,0 +1,289 @@
+// Pure rules for verdant-guard: no engine, no I/O, deterministic.
+// Each check returns a refusal reason, or null when the call may run.
+// Source of every rule: AGENTS.md / CLAUDE.md on the verdant-grow-diary deploy branch.
+
+export const PROTECTED_BRANCHES = ["verdant-grow-diary", "main"] as const;
+
+// The production Supabase project ref (CURRENT_STATE.md, standing directive 2026-08-25).
+export const PRODUCTION_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
+
+const SEGMENT_SPLIT = /&&|\|\||;|\||\n/;
+
+/** Splits a shell command into simple-command segments and naive tokens. */
+export function segments(command: string): string[][] {
+  return command
+    .split(SEGMENT_SPLIT)
+    .map((s) =>
+      s
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((t) => t.replace(/^['"]|['"]$/g, "")),
+    )
+    .filter((t) => t.length > 0);
+}
+
+/** Drops leading `VAR=value` assignments and `sudo`/`env`/`exec` wrappers. */
+function stripPrefix(tokens: string[]): string[] {
+  let i = 0;
+  for (const t of tokens) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*=/.test(t) && !["sudo", "env", "exec", "time"].includes(t)) break;
+    i += 1;
+  }
+  return tokens.slice(i);
+}
+
+/** For `git -C dir push ...` returns ["push", ...]. */
+function gitArgs(tokens: string[]): string[] | null {
+  if (tokens[0] !== "git") return null;
+  let i = 1;
+  for (let t = tokens[i]; t !== undefined && t.startsWith("-"); t = tokens[i]) {
+    // -C <dir> and -c <k=v> consume a value
+    i += t === "-C" || t === "-c" ? 2 : 1;
+  }
+  return tokens.slice(i);
+}
+
+const FORCE_FLAGS = /^(--force|-f|--force-with-lease(=.*)?|--force-if-includes)$/;
+
+function checkGit(args: string[]): string | null {
+  const [sub, ...rest] = args;
+  if (sub === "push") {
+    if (rest.some((t) => FORCE_FLAGS.test(t) || (/^\+/.test(t) && !t.startsWith("+-")))) {
+      return "Force-push is forbidden (AGENTS.md › Git and merges: never force-push or rewrite history). Update the branch by merging from base.";
+    }
+    if (rest.includes("--no-verify")) {
+      return "`--no-verify` skips the repo's pre-commit/pre-push safety gates. Run the hooks and fix what they report.";
+    }
+    const positional = rest.filter((t) => !t.startsWith("-"));
+    for (const ref of positional.slice(1)) {
+      const target = ref.includes(":") ? ref.split(":").pop()! : ref;
+      const branch = target.replace(/^refs\/heads\//, "");
+      if ((PROTECTED_BRANCHES as readonly string[]).includes(branch)) {
+        return `Pushing to \`${branch}\` is forbidden (AGENTS.md: never push directly to verdant-grow-diary or main). Push your own task branch and open a draft PR.`;
+      }
+    }
+    return null;
+  }
+  if (sub === "rebase" && !rest.some((t) => t === "--abort" || t === "--quit")) {
+    return "`git rebase` rewrites history (AGENTS.md: update branches by merging from base). Use `git merge origin/<base>`.";
+  }
+  if (
+    sub === "pull" &&
+    rest.some((t) => t === "--rebase" || t === "-r" || t.startsWith("--rebase="))
+  ) {
+    return "`git pull --rebase` rewrites history. Use `git pull --no-rebase` or `git merge`.";
+  }
+  if (sub === "commit" && rest.some((t) => t === "--no-verify" || t === "-n")) {
+    return "`git commit --no-verify` skips lint-staged, the full-project tsc and the docs-safety asserts. Commit without it and fix what fails.";
+  }
+  if (sub === "filter-branch" || sub === "filter-repo") {
+    return "History rewriting is forbidden (AGENTS.md › Git and merges).";
+  }
+  return null;
+}
+
+const LOCK_MSG =
+  "Dependency and lockfile changes are off-limits without Matthew's approval (AGENTS.md › Off-limits). Bun is canonical; never add/change deps with npm/yarn/pnpm.";
+
+function checkPackageManager(tokens: string[]): string | null {
+  const [pm, sub, ...rest] = tokens;
+  const positional = rest.filter((t) => !t.startsWith("-"));
+  if (pm === "npm") {
+    if (["add", "uninstall", "remove", "rm", "un", "update", "up", "upgrade"].includes(sub ?? ""))
+      return LOCK_MSG;
+    // Bare `npm install` is the SKILL's sanctioned public-registry bootstrap; with a package it is a dependency change.
+    if ((sub === "install" || sub === "i") && positional.length > 0) return LOCK_MSG;
+    return null;
+  }
+  if (pm === "yarn" || pm === "pnpm") {
+    if (["add", "remove", "install", "i", "up", "upgrade", "update"].includes(sub ?? ""))
+      return LOCK_MSG;
+    return null;
+  }
+  if (pm === "bun") {
+    if (["add", "a", "remove", "rm", "update"].includes(sub ?? "")) return LOCK_MSG;
+    if (sub === "install" || sub === "i") {
+      if (positional.length > 0) return LOCK_MSG;
+      return "Don't run `bun install` here: bun.lock pins ~137 tarballs on a Lovable registry that 403s outside its sandbox. If node_modules exists, use it; otherwise follow the verified bootstrap in .claude/skills/run-verdant-grow-diary/SKILL.md.";
+    }
+  }
+  return null;
+}
+
+const PW_VALUE_FLAGS = new Set([
+  "--project",
+  "--grep",
+  "-g",
+  "--grep-invert",
+  "--reporter",
+  "--workers",
+  "-j",
+  "--config",
+  "-c",
+  "--retries",
+  "--timeout",
+  "--output",
+  "--shard",
+  "--repeat-each",
+  "--max-failures",
+  "-x",
+  "--trace",
+]);
+
+function checkPlaywright(tokens: string[]): string | null {
+  let t = tokens;
+  if (t[0] === "bunx" || t[0] === "npx") t = t.slice(1);
+  else if (t[0] === "bun" && t[1] === "x") t = t.slice(2);
+  if (t[0] !== "playwright" || t[1] !== "test") return null;
+  const args = t.slice(2);
+  let project: string | null = null;
+  let specs = 0;
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i] ?? "";
+    if (a.startsWith("--project=")) project = a.slice("--project=".length);
+    else if (a === "--project") project = args[i + 1] ?? null;
+    if (PW_VALUE_FLAGS.has(a)) {
+      i += 1;
+      continue;
+    }
+    if (!a.startsWith("-")) specs += 1;
+  }
+  if (project && project.includes("mocked") && specs === 0) {
+    return `\`--project=${project}\` without a spec filter can reach real Supabase (that project installs no global route mocks). Pass an explicit spec path.`;
+  }
+  return null;
+}
+
+const PROD_MSG =
+  "Production database changes, deploys, promotion and rollback are Matthew's decisions (AGENTS.md › Release and Environment Rules). Prepare a release packet or escalation instead.";
+
+function checkProductionOps(tokens: string[], whole: string): string | null {
+  const [cmd, a, b] = tokens;
+  if (cmd === "supabase") {
+    if (a === "db" && (b === "push" || (b === "reset" && tokens.includes("--linked"))))
+      return PROD_MSG;
+    if (a === "migration" && (b === "up" || b === "repair")) return PROD_MSG;
+    if (a === "functions" && b === "deploy") return PROD_MSG;
+    if (a === "secrets" && (b === "set" || b === "unset")) return PROD_MSG;
+  }
+  if (cmd === "vercel") {
+    if (tokens.includes("--prod") || ["promote", "rollback", "alias"].includes(a ?? ""))
+      return PROD_MSG;
+  }
+  if (cmd === "gh" && a === "pr" && (b === "merge" || b === "ready")) {
+    return "Merging and marking PRs ready belong to Chemdawg after 35/35 required checks plus an independent exact-head PASS (AGENTS.md). Drafts remain draft.";
+  }
+  if (
+    (cmd === "psql" || cmd === "pg_dump" || cmd === "pg_restore") &&
+    whole.includes(PRODUCTION_PROJECT_REF)
+  ) {
+    return PROD_MSG;
+  }
+  return null;
+}
+
+/** The whole Bash rule set. */
+export function checkBash(command: string): string | null {
+  for (const raw of segments(command)) {
+    const tokens = stripPrefix(raw);
+    if (tokens.length === 0) continue;
+    const git = gitArgs(tokens);
+    const reason =
+      (git ? checkGit(git) : null) ??
+      checkPackageManager(tokens) ??
+      checkPlaywright(tokens) ??
+      checkProductionOps(tokens, command);
+    if (reason) return reason;
+  }
+  return null;
+}
+
+/** Normalises a path to its repo-relative form by anchoring on known roots. */
+export function repoRelative(filePath: string): string {
+  const p = filePath.replace(/\\/g, "/");
+  for (const root of ["src/", "supabase/", "scripts/", "docs/", "e2e/", "config/", ".github/"]) {
+    const i = p.indexOf(`/${root}`);
+    if (i >= 0) return p.slice(i + 1);
+    if (p.startsWith(root)) return p;
+  }
+  return p.replace(/^.*\//, "");
+}
+
+const GENERATED = [
+  /^src\/routeTree\.gen\.ts$/,
+  /^src\/integrations\/supabase\/types\.ts$/,
+  /^supabase\/functions\/mcp\/index\.ts$/,
+  /^supabase\/functions\/_shared\/lib\//,
+];
+
+const LOCKFILES = new Set([
+  "bun.lock",
+  "bun.lockb",
+  "package-lock.json",
+  "yarn.lock",
+  "pnpm-lock.yaml",
+]);
+
+export const MIGRATION_PATH = /^supabase\/migrations\/[^/]+\.sql$/;
+
+/**
+ * Static file-edit rules. Published-migration immutability needs a git lookup,
+ * so it is decided in register.ts with `isPublished`.
+ */
+export function checkFileEdit(filePath: string): string | null {
+  const rel = repoRelative(filePath);
+  if (GENERATED.some((re) => re.test(rel))) {
+    return `\`${rel}\` is generated — never hand-edit it (CLAUDE.md › Conventions). Regenerate it with the repo's tooling.`;
+  }
+  if (LOCKFILES.has(rel)) return LOCK_MSG;
+  return null;
+}
+
+export const PUBLISHED_MIGRATION_MSG = (rel: string) =>
+  `\`${rel}\` is a published migration and is permanent history (AGENTS.md › Migration Immutability). Ship a new additive migration, or check config/local-supabase-replay-compatibility.json.`;
+
+/** MCP tools that publish, merge, promote or write production. Exact names. */
+const MCP_DENY: Record<string, string> = {
+  mcp__github__merge_pull_request: "merge",
+  mcp__github__enable_pr_auto_merge: "merge",
+  mcp__Supabase__apply_migration: "prod",
+  mcp__Supabase__execute_sql: "prod",
+  mcp__Supabase__deploy_edge_function: "prod",
+  mcp__Supabase__merge_branch: "prod",
+  mcp__Supabase__reset_branch: "prod",
+  mcp__Supabase__delete_branch: "prod",
+  mcp__Supabase__pause_project: "prod",
+  mcp__Supabase__restore_project: "prod",
+  mcp__Vercel__request_promote: "prod",
+  mcp__Vercel__request_rollback: "prod",
+  mcp__Vercel__create_deployment: "prod",
+  mcp__Vercel__start_rolling_release: "prod",
+  mcp__Vercel__complete_rolling_release: "prod",
+  mcp__Vercel__approve_rolling_release_stage: "prod",
+  mcp__Lovable__deploy_project: "prod",
+};
+
+export function checkMcp(tool: string, input: Record<string, unknown>): string | null {
+  const kind = MCP_DENY[tool];
+  if (kind === "merge") {
+    return "Merging belongs to Chemdawg after 35/35 required checks plus an independent exact-head PASS (AGENTS.md).";
+  }
+  if (kind === "prod") return PROD_MSG;
+  if (tool === "mcp__github__update_pull_request" && input.draft === false) {
+    return "Drafts remain draft (AGENTS.md › Git and merges). Readiness is decided by the merge owner.";
+  }
+  return null;
+}
+
+/** CLAUDE.md › Check-in cadence: the prompt cache lives 60 min; arm at <= 55. */
+export const CHECK_IN_MAX_MINUTES = 55;
+
+export function checkInWarning(tool: string, input: Record<string, unknown>): string | null {
+  if (!/send_later$/.test(tool)) return null;
+  const minutes = typeof input.delay_minutes === "number" ? input.delay_minutes : null;
+  if (minutes !== null && minutes > CHECK_IN_MAX_MINUTES && minutes <= 75) {
+    return `verdant-guard: this check-in is armed at ${minutes} min. CLAUDE.md asks for <= ${CHECK_IN_MAX_MINUTES} min so the wake lands inside the 60-minute prompt cache; a 56–75 min gap is usually an accidental near-miss.`;
+  }
+  return null;
+}

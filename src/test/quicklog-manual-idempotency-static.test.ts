@@ -238,7 +238,9 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
       /if \(clearance\.status !== "cleared" && clearance\.status !== "already_cleared"\) \{\s*setLocalError\(QUICK_LOG_HISTORY_DISCARD_FAILED\);\s*return;\s*\}/,
     );
     expect(rotation).toBeGreaterThan(
-      HISTORY_DISCARD.indexOf("reconcilePendingQuickLogWateringClear(pendingWater.recovery)"),
+      HISTORY_DISCARD.indexOf(
+        "reconcilePendingQuickLogWateringHistoryDiscard(pendingWater.recovery)",
+      ),
     );
     expect(
       HISTORY_DISCARD.match(/saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/g),
@@ -246,7 +248,7 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
     // The only await is that locked Water journal clear; discard never saves.
     expect(HISTORY_DISCARD.match(/\bawait\b/g)).toEqual(["await"]);
     expect(HISTORY_DISCARD).toMatch(
-      /await reconcilePendingQuickLogWateringClear\(pendingWater\.recovery\)/,
+      /await reconcilePendingQuickLogWateringHistoryDiscard\(pendingWater\.recovery\)/,
     );
     expect(HISTORY_DISCARD).not.toMatch(/trackQuickLogSuccess|setPostSave|\bsave\(/);
   });

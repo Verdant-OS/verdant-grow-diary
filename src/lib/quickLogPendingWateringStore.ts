@@ -338,3 +338,43 @@ export async function reconcilePendingQuickLogWateringClear(
   if (current.status === "empty") return { status: "already_cleared" };
   return current;
 }
+
+/** The same claim, ignoring only a recognized history-review marker on either side. */
+function sameClaimIgnoringHistoryMarker(
+  a: PendingQuickLogWatering,
+  b: PendingQuickLogWatering,
+): boolean {
+  const { historyCheckReason: _a, ...restA } = a;
+  const { historyCheckReason: _b, ...restB } = b;
+  return JSON.stringify(restA) === JSON.stringify(restB);
+}
+
+/**
+ * The grower's explicit discard after history review. The marker write can land
+ * while its verification read fails, leaving the sheet holding the unmarked
+ * claim; that stored record is still this claim. A completion clear stays exact.
+ */
+export async function reconcilePendingQuickLogWateringHistoryDiscard(
+  record: PendingQuickLogWatering | null | undefined,
+): Promise<
+  | { status: "cleared" }
+  | { status: "already_cleared" }
+  | Exclude<PendingWateringRead, { status: "empty" }>
+> {
+  try {
+    if (!record || !validRecord(record, record.ownerId)) return { status: "blocked" };
+    const locks = window.navigator.locks;
+    if (!locks?.request) return { status: "blocked" };
+    return await locks.request(waterRecoveryLockKey(record.ownerId), { mode: "exclusive" }, () => {
+      const current = readPendingQuickLogWatering(record.ownerId);
+      if (current.status === "empty") return { status: "already_cleared" as const };
+      if (current.status !== "pending" || !sameClaimIgnoringHistoryMarker(current.record, record))
+        return current;
+      window.sessionStorage.removeItem(storageKey(record.ownerId));
+      const after = readPendingQuickLogWatering(record.ownerId);
+      return after.status === "empty" ? { status: "cleared" as const } : after;
+    });
+  } catch {
+    return { status: "blocked" };
+  }
+}

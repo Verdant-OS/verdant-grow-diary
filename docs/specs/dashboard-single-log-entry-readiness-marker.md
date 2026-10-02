@@ -3,9 +3,9 @@
 Status: **SPEC — implementation BLOCKED on #1833 and on decision D1 (D1.1 and D1.2)** (see §1, §7).
 Author: Claude, 2026-10-01. Audited at deploy tip `0107d9406` (`verdant-grow-diary`, #1836),
 #1833 head `f296a953`, #1793 head `074f4349`. Updated 2026-10-01 17:35 UTC for #1849 (re-land of #1793,
-head `c2d473e8`). Updated 2026-10-02 15:20 UTC: #1849 merged, #1793 closed, review findings on
+head `c2d473e8`). Updated 2026-10-02 15:12 UTC: #1849 merged, #1793 closed, review findings on
 #1844 addressed (routing to GDP; single-entry test counts buttons too). Updated 2026-10-02
-15:50 UTC: browser-level count includes app-chrome triggers; D1 split into D1.1–D1.3.
+15:39 UTC: browser-level count includes app-chrome triggers; D1 split into D1.1–D1.3.
 
 Every claim carries a label: `established fact` (read from source at the SHAs above),
 `source claim`, `inference`, `uncertainty`, `missing evidence`.

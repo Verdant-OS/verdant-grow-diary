@@ -331,6 +331,30 @@ describe("legacy public-starter Water uncertain receipt", () => {
     expect(trackSuccessMock).not.toHaveBeenCalled();
   });
 
+  it("keeps the exact Water claim when a recovery retry is refused for sign-in", async () => {
+    seed();
+    saveMock
+      .mockResolvedValueOnce({ ok: false, reason: "receipt_unverified" })
+      .mockResolvedValueOnce({ ok: false, reason: "not_authenticated", definitiveRejected: true });
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await screen.findByTestId("quick-log-starter-water-recovery");
+    const original = structuredClone(saveMock.mock.calls[0][0]);
+    fireEvent.click(screen.getByTestId("quick-log-starter-water-retry"));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    expect(saveMock.mock.calls[1][0]).toEqual(original);
+    // The sign-in refusal precedes the idempotency lookup, so the first key may
+    // still have committed. The claim stays for an exact retry after sign-in.
+    await waitFor(() => expect(screen.getByText(/sign in again, then retry/i)).toBeInTheDocument());
+    const pending = readPendingStarterWater("user-1");
+    expect(pending.status).toBe("pending");
+    if (pending.status === "pending") {
+      expect(pending.record.payload.p_idempotency_key).toBe(original.p_idempotency_key);
+    }
+    expect(screen.getByTestId("quick-log-starter-water-recovery")).toBeInTheDocument();
+    expect(trackSuccessMock).not.toHaveBeenCalled();
+  });
+
   it("clears an exact saved-then-retracted replay without counting an active Watering", async () => {
     seed();
     saveMock

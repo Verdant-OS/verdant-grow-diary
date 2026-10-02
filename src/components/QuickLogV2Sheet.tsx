@@ -14,7 +14,6 @@ import {
 import {
   readPendingQuickLogWatering,
   claimPendingQuickLogWatering,
-  clearPendingQuickLogWatering,
   reconcilePendingQuickLogWateringClear,
   reconcilePendingQuickLogWateringHistoryDiscard,
   markPendingQuickLogWateringHistoryCheck,
@@ -2320,11 +2319,17 @@ function QuickLogV2SheetForOwner({
     }
     const confirmedWatering = confirmedWateringRecoveryRef.current;
     if (confirmedWatering) {
-      const current = readPendingQuickLogWatering(confirmedWatering.ownerId);
-      const cleared =
-        current.status === "empty" ||
-        (current.status === "pending" && (await clearPendingQuickLogWatering(confirmedWatering)));
+      // Hold the same-tick guard across the locked clear so a second click
+      // cannot race it, and treat a concurrent clear as success.
+      saveInFlightRef.current = true;
+      let clearance: Awaited<ReturnType<typeof reconcilePendingQuickLogWateringClear>>;
+      try {
+        clearance = await reconcilePendingQuickLogWateringClear(confirmedWatering);
+      } finally {
+        if (lifetime.active) saveInFlightRef.current = false;
+      }
       if (!lifetime.active || noteLifetimeRef.current !== lifetime) return;
+      const cleared = clearance.status === "cleared" || clearance.status === "already_cleared";
       if (!cleared) {
         setLocalError(WATERING_RECOVERY_CLEAR_FAILED);
         return;

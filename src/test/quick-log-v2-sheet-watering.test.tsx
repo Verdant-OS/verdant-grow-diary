@@ -3,9 +3,11 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
 import {
   claimPendingQuickLogWatering,
   readPendingQuickLogWatering,
+  WATERING_RECOVERY_CLEAR_FAILED,
 } from "@/lib/quickLogPendingWateringStore";
 import {
   QUICK_LOG_HISTORY_DISCARD_FAILED,
@@ -19,7 +21,6 @@ import {
 import {
   clearLocalStorageForTest,
   getLocalStorageItemForTest,
-  removeLocalStorageItemForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
 
@@ -200,6 +201,40 @@ function clickSave() {
   fireEvent.click(screen.getByTestId("qlv2-save"));
 }
 
+/** Serialize Web Locks like the default stub, but hold request `gateAt` until released. */
+function installGatedWaterLocks(gateAt: number) {
+  let requests = 0;
+  let releaseGate!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    releaseGate = resolve;
+  });
+  let tail: Promise<unknown> = Promise.resolve();
+  Object.defineProperty(window.navigator, "locks", {
+    configurable: true,
+    value: {
+      request: (_name: string, _options: unknown, callback: () => unknown) => {
+        requests += 1;
+        const wait = requests === gateAt ? gate : Promise.resolve();
+        const turn = tail.then(() => wait).then(callback);
+        tail = turn.then(
+          () => undefined,
+          () => undefined,
+        );
+        return turn;
+      },
+    },
+  });
+  return {
+    requests: () => requests,
+    release: async () => {
+      releaseGate();
+      await gate;
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    },
+  };
+}
+
 const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 beforeEach(() => {
   authState.ownerId = "11111111-1111-4111-8111-111111111111";
@@ -317,9 +352,10 @@ async function expectOriginalWaterAndRetry(original: Record<string, unknown>) {
 }
 
 describe("QuickLogV2Sheet — uncertain Water recovery", () => {
-  it("does not fence the next Watering when another tab cleared the confirmed record", async () => {
+  it("does not fence the next Watering when the confirmed record was already cleared", async () => {
     wateringWriterMock.mockImplementation(async () => {
-      removeLocalStorageItemForTest(
+      // The Water journal is tab-scoped (sessionStorage); remove it where it lives.
+      window.sessionStorage.removeItem(
         "verdant:quick-log:pending-watering:v1:11111111-1111-4111-8111-111111111111",
       );
       return { ok: true, eventId: "water-event-1", reused: true };
@@ -480,6 +516,38 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
     } finally {
       blockedRemoval.mockRestore();
     }
+  });
+
+  it("reconciles a rapid double Try again on a confirmed Water without a false cleanup failure", async () => {
+    await installAcceptedWaterLedger(false);
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+    enterVolume("750");
+    const originalRemove = Storage.prototype.removeItem;
+    const blockedRemoval = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (
+      this: Storage,
+      key: string,
+    ) {
+      if (this === window.sessionStorage) throw new Error("cleanup unavailable");
+      originalRemove.call(this, key);
+    });
+    try {
+      clickSave();
+      await screen.findByTestId("qlv2-post-save");
+      expect(screen.getByTestId("quick-log-post-save-another")).toBeDisabled();
+    } finally {
+      blockedRemoval.mockRestore();
+    }
+    // Storage recovered. Two same-tick clicks race for the same exact journal.
+    const recheck = screen.getByTestId("qlv2-note-storage-recheck");
+    fireEvent.click(recheck);
+    fireEvent.click(recheck);
+    await waitFor(() => expect(screen.getByTestId("quick-log-post-save-another")).toBeEnabled());
+    await act(async () => {
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    });
+    expect(screen.queryByText(WATERING_RECOVERY_CLEAR_FAILED)).toBeNull();
+    expect(readPendingQuickLogWatering(authState.ownerId)).toEqual({ status: "empty" });
+    expect(rpcMock).toHaveBeenCalledTimes(1);
   });
 
   it.each(["another owner", "the original owner after a round trip"] as const)(
@@ -844,6 +912,118 @@ describe("QuickLogV2Sheet — structured watering", () => {
     expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeVisible();
     expect(readPendingQuickLogWatering(authState.ownerId).status).toBe("pending");
     expect(wateringWriterMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("discards a history-review Water whose marker readback failed once, without reload", async () => {
+    const getItem = Storage.prototype.getItem;
+    let failedReadback = false;
+    const readSpy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (
+      this: Storage,
+      k: string,
+    ) {
+      const raw = getItem.call(this, k);
+      if (
+        !failedReadback &&
+        k.startsWith("verdant:quick-log:pending-watering:v1:") &&
+        raw?.includes("historyCheckReason")
+      ) {
+        failedReadback = true;
+        throw new Error("transient readback failure");
+      }
+      return raw;
+    });
+    try {
+      await reachRetractedWaterHistoryReview();
+    } finally {
+      readSpy.mockRestore();
+    }
+    expect(failedReadback).toBe(true);
+    // The marker reached storage even though its verification read failed.
+    const stored = readPendingQuickLogWatering(authState.ownerId);
+    expect(stored.status === "pending" && stored.record.historyCheckReason).toBe(
+      "idempotency_key_retracted",
+    );
+    fireEvent.click(screen.getByRole("button", { name: QUICK_LOG_HISTORY_DISCARD_LABEL }));
+    await waitFor(() =>
+      expect(readPendingQuickLogWatering(authState.ownerId)).toEqual({ status: "empty" }),
+    );
+    await waitFor(() => expect(screen.queryByTestId("qlv2-exact-retry-lock")).toBeNull());
+    expect(screen.queryByText(QUICK_LOG_HISTORY_DISCARD_FAILED)).toBeNull();
+    expect(wateringWriterMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not dispatch Water when the sheet unmounts while the pre-dispatch claim waits", async () => {
+    let requests = 0;
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    let tail: Promise<unknown> = Promise.resolve();
+    Object.defineProperty(window.navigator, "locks", {
+      configurable: true,
+      value: {
+        request: (_name: string, _options: unknown, callback: () => unknown) => {
+          requests += 1;
+          // Hold the second Water claim: the one taken just before dispatch.
+          const wait = requests === 2 ? gate : Promise.resolve();
+          const turn = tail.then(() => wait).then(callback);
+          tail = turn.then(
+            () => undefined,
+            () => undefined,
+          );
+          return turn;
+        },
+      },
+    });
+    const view = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+    enterVolume("500");
+    clickSave();
+    await waitFor(() => expect(requests).toBe(2));
+    view.unmount();
+    releaseGate();
+    await gate;
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(wateringWriterMock).not.toHaveBeenCalled();
+    // The claimed journal stays for the next sheet to recover exactly.
+    expect(readPendingQuickLogWatering(authState.ownerId).status).toBe("pending");
+  });
+
+  it("does not upload a Water photo when the sheet unmounts while the first claim waits", async () => {
+    const locks = installGatedWaterLocks(1);
+    const view = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+    enterVolume("500");
+    const photo = new File([new Uint8Array([1])], "roots.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId("qlv2-photo-library-input"), {
+      target: { files: [photo] },
+    });
+    clickSave();
+    await waitFor(() => expect(locks.requests()).toBe(1));
+    view.unmount();
+    await locks.release();
+    expect(storageUpload).not.toHaveBeenCalled();
+    expect(wateringWriterMock).not.toHaveBeenCalled();
+    // The claimed journal stays for the next sheet to recover exactly.
+    expect(readPendingQuickLogWatering(authState.ownerId).status).toBe("pending");
+  });
+
+  it("does not confirm or announce a Water save after unmount while its journal clear waits", async () => {
+    const locks = installGatedWaterLocks(3);
+    const created = vi.fn();
+    window.addEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, created);
+    try {
+      const view = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+      enterVolume("500");
+      clickSave();
+      await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(locks.requests()).toBe(3));
+      view.unmount();
+      await locks.release();
+      expect(toastSuccess).not.toHaveBeenCalled();
+      expect(created).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, created);
+    }
   });
 
   it("restores a history-review Water after unmount as review, never as a retry", async () => {

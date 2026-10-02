@@ -14,8 +14,8 @@ import {
 import {
   readPendingQuickLogWatering,
   claimPendingQuickLogWatering,
-  clearPendingQuickLogWatering,
   reconcilePendingQuickLogWateringClear,
+  reconcilePendingQuickLogWateringHistoryDiscard,
   markPendingQuickLogWateringHistoryCheck,
   WATERING_RECOVERY_UNAVAILABLE,
   WATERING_RECOVERY_PENDING,
@@ -1759,6 +1759,9 @@ function QuickLogV2SheetForOwner({
     if (exactWateringSubmission) {
       if (!canContinueNote() || exactWateringSubmission.recovery.ownerId !== user?.id) return;
       const claim = await claimPendingQuickLogWatering(exactWateringSubmission.recovery);
+      // The claim waits on a cross-tab lock; a closed or remounted sheet must
+      // not upload media or continue this submission from its old lifetime.
+      if (!canContinueNote()) return;
       if (claim.status !== "claimed") {
         if (claim.status === "pending") restorePendingWatering(claim.record);
         else {
@@ -1899,6 +1902,9 @@ function QuickLogV2SheetForOwner({
       }
       if (!canContinueNote() || exactWateringSubmission.recovery.ownerId !== user?.id) return;
       const claim = await claimPendingQuickLogWatering(exactWateringSubmission.recovery);
+      // The claim waits on a cross-tab lock; an unmount or account change
+      // (which remounts this sheet) must not dispatch from the old lifetime.
+      if (!canContinueNote()) return;
       if (claim.status !== "claimed") {
         keepSubmissionLockedRef.current = true;
         setWateringRetryPending(true);
@@ -2197,6 +2203,9 @@ function QuickLogV2SheetForOwner({
       const clearance = await reconcilePendingQuickLogWateringClear(
         exactWateringSubmission.recovery,
       );
+      // Same fence as above: a sheet closed during the locked clear must not
+      // confirm, refresh, or announce the save from its old lifetime.
+      if (!canContinueNote()) return;
       recoveryClearFailed =
         clearance.status !== "cleared" && clearance.status !== "already_cleared";
       setWateringStorageFence(recoveryClearFailed);
@@ -2289,6 +2298,7 @@ function QuickLogV2SheetForOwner({
    */
   async function handleRecheckNoteStorage() {
     if (!postSave || !recoveryStorageFence || saveInFlightRef.current) return;
+    const lifetime = noteLifetimeRef.current;
     const confirmedFeeding = confirmedFeedingRecoveryRef.current;
     if (confirmedFeeding) {
       const current = readPendingQuickLogFeeding(confirmedFeeding.ownerId);
@@ -2306,10 +2316,17 @@ function QuickLogV2SheetForOwner({
     }
     const confirmedWatering = confirmedWateringRecoveryRef.current;
     if (confirmedWatering) {
-      const current = readPendingQuickLogWatering(confirmedWatering.ownerId);
-      const cleared =
-        current.status === "empty" ||
-        (current.status === "pending" && (await clearPendingQuickLogWatering(confirmedWatering)));
+      // Hold the same-tick guard across the locked clear so a second click
+      // cannot race it, and treat a concurrent clear as success.
+      saveInFlightRef.current = true;
+      let clearance: Awaited<ReturnType<typeof reconcilePendingQuickLogWateringClear>>;
+      try {
+        clearance = await reconcilePendingQuickLogWateringClear(confirmedWatering);
+      } finally {
+        if (lifetime.active) saveInFlightRef.current = false;
+      }
+      if (!lifetime.active || noteLifetimeRef.current !== lifetime) return;
+      const cleared = clearance.status === "cleared" || clearance.status === "already_cleared";
       if (!cleared) {
         setLocalError(WATERING_RECOVERY_CLEAR_FAILED);
         return;
@@ -2374,9 +2391,9 @@ function QuickLogV2SheetForOwner({
     if (pendingWater) {
       const lifetime = noteLifetimeRef.current;
       saveInFlightRef.current = true;
-      let clearance: Awaited<ReturnType<typeof reconcilePendingQuickLogWateringClear>>;
+      let clearance: Awaited<ReturnType<typeof reconcilePendingQuickLogWateringHistoryDiscard>>;
       try {
-        clearance = await reconcilePendingQuickLogWateringClear(pendingWater.recovery);
+        clearance = await reconcilePendingQuickLogWateringHistoryDiscard(pendingWater.recovery);
       } finally {
         saveInFlightRef.current = false;
       }

@@ -18,6 +18,10 @@ import {
   type TypedQuickLogEventReader,
   type TypedQuickLogChildReader,
 } from "./quickLogTypedReusedReceipt";
+import {
+  quickLogSaveRequiresHistoryCheck,
+  type QuickLogHistoryCheckReason,
+} from "./quickLogSaveErrorMessage";
 
 export interface QuickLogWateringRpcPayload {
   volume_ml: number;
@@ -77,6 +81,7 @@ export interface WateringTypedEventInput {
 }
 
 export type WriteWateringFailureReason =
+  | QuickLogHistoryCheckReason
   | "idempotency_key:invalid"
   | "grow_id:missing"
   | "volume_ml:invalid"
@@ -279,6 +284,12 @@ export async function writeQuickLogWateringTypedEvent(
   if (response.error) return { ok: false, reason: "rpc:error" };
 
   const envelope = isPlainRecord(response.data) ? response.data : null;
+  // A retracted or receipt-less replay answers the same way on every retry of
+  // this key. Keep the server's reason so the caller routes the draft to
+  // history review instead of an exact retry that can never resolve.
+  if (envelope?.ok === false && quickLogSaveRequiresHistoryCheck(envelope.reason)) {
+    return { ok: false, reason: envelope.reason };
+  }
   if (envelope?.ok === false && envelope.reason === "invalid_typed_payload") {
     return { ok: false, reason: "rpc:invalid_typed_payload" };
   }

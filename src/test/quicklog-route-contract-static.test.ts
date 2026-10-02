@@ -31,7 +31,11 @@ describe("Quick Log authenticated route target contract", () => {
       /report\.run\(15,\s*"Save uses displayed target"[\s\S]*?(?=report\.run\(16,)/,
     );
     expect(step, "step 15 target assertion missing").toBeTruthy();
-    expect(step![0]).toContain('getAttribute("data-target-plant-id")');
+    const readTarget = SMOKE.match(/async function readTargetTuple\([\s\S]*?(?=async function )/);
+    expect(readTarget, "displayed target tuple reader missing").toBeTruthy();
+    expect(readTarget![0]).toContain('getAttribute("data-target-plant-id")');
+    expect(step![0]).toContain("const displayedTarget = await readTargetTuple(dialog)");
+    expect(step![0]).toContain("const displayedTargetId = displayedTarget.plantId");
     expect(step![0]).toMatch(/expect\.poll\(\(\)\s*=>\s*observedRpcTargetId\)/);
     expect(step![0]).toMatch(/toBe\(displayedTargetId\)/);
     expect(step![0]).toContain('getByTestId("quick-log-save").click()');

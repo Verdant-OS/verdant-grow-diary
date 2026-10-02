@@ -8,6 +8,11 @@ import {
   readPendingQuickLogWatering,
 } from "@/lib/quickLogPendingWateringStore";
 import {
+  QUICK_LOG_HISTORY_DISCARD_FAILED,
+  QUICK_LOG_HISTORY_DISCARD_LABEL,
+  QUICK_LOG_HISTORY_REVIEW_LOCK_COPY,
+} from "@/lib/quickLogSaveErrorMessage";
+import {
   clearTemperatureUnitPreference,
   saveTemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
@@ -775,6 +780,85 @@ describe("QuickLogV2Sheet — structured watering", () => {
     expect(screen.getByLabelText("Volume (ml)")).toBeDisabled();
     expect(readPendingQuickLogWatering(authState.ownerId).status).toBe("pending");
     expect(screen.queryByTestId("qlv2-post-save")).toBeNull();
+  });
+
+  async function reachRetractedWaterHistoryReview(reason = "idempotency_key_retracted") {
+    wateringWriterMock
+      .mockResolvedValueOnce({ ok: false, reason: "rpc:error" })
+      .mockResolvedValueOnce({ ok: false, reason });
+    const view = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+    enterVolume("500");
+    clickSave();
+    await waitFor(() => expect(screen.getByTestId("qlv2-watering-retry-lock")).toBeVisible());
+    const firstKey = wateringWriterMock.mock.calls[0][0].idempotency_key;
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+    await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByTestId("qlv2-exact-retry-lock")).toHaveTextContent(
+        QUICK_LOG_HISTORY_REVIEW_LOCK_COPY,
+      ),
+    );
+    expect(wateringWriterMock.mock.calls[1][0].idempotency_key).toBe(firstKey);
+    return view;
+  }
+
+  it.each(["idempotency_key_retracted", "idempotency_receipt_missing"])(
+    "moves a Water replay refused with %s into history review instead of endless Retry",
+    async (reason) => {
+      await reachRetractedWaterHistoryReview(reason);
+      expect(screen.queryByTestId("qlv2-watering-retry-lock")).toBeNull();
+      expect(screen.queryByTestId("qlv2-save-retry")).toBeNull();
+      expect(screen.getByTestId("qlv2-history-review-link")).toBeVisible();
+      expect(screen.getByLabelText("Volume (ml)")).toBeDisabled();
+      const pending = readPendingQuickLogWatering(authState.ownerId);
+      expect(pending.status).toBe("pending");
+      if (pending.status === "pending") expect(pending.record.historyCheckReason).toBe(reason);
+      expect(screen.queryByTestId("qlv2-post-save")).toBeNull();
+    },
+  );
+
+  it("releases a history-review Water only on the grower's explicit discard, without resending", async () => {
+    await reachRetractedWaterHistoryReview();
+    fireEvent.click(screen.getByRole("button", { name: QUICK_LOG_HISTORY_DISCARD_LABEL }));
+    await waitFor(() =>
+      expect(readPendingQuickLogWatering(authState.ownerId)).toEqual({ status: "empty" }),
+    );
+    await waitFor(() => expect(screen.queryByTestId("qlv2-exact-retry-lock")).toBeNull());
+    // Discard starts a fresh draft, exactly as Log another does.
+    clickWater();
+    expect(screen.getByLabelText("Volume (ml)")).not.toBeDisabled();
+    expect(screen.getByLabelText("Volume (ml)")).toHaveValue("");
+    expect(wateringWriterMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a history-review Water locked when tab storage refuses the discard", async () => {
+    await reachRetractedWaterHistoryReview();
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("disabled");
+    });
+    fireEvent.click(screen.getByRole("button", { name: QUICK_LOG_HISTORY_DISCARD_LABEL }));
+    await waitFor(() =>
+      expect(screen.getByTestId("qlv2-error")).toHaveTextContent(QUICK_LOG_HISTORY_DISCARD_FAILED),
+    );
+    vi.mocked(Storage.prototype.removeItem).mockRestore();
+    expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeVisible();
+    expect(readPendingQuickLogWatering(authState.ownerId).status).toBe("pending");
+    expect(wateringWriterMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("restores a history-review Water after unmount as review, never as a retry", async () => {
+    const first = await reachRetractedWaterHistoryReview();
+    first.unmount();
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "note");
+    await waitFor(() =>
+      expect(screen.getByTestId("qlv2-exact-retry-lock")).toHaveTextContent(
+        QUICK_LOG_HISTORY_REVIEW_LOCK_COPY,
+      ),
+    );
+    expect(screen.queryByTestId("qlv2-watering-retry-lock")).toBeNull();
+    expect(screen.queryByTestId("qlv2-save-retry")).toBeNull();
+    expect(screen.getByRole("button", { name: QUICK_LOG_HISTORY_DISCARD_LABEL })).toBeEnabled();
+    expect(wateringWriterMock).toHaveBeenCalledTimes(2);
   });
 
   it("keeps a first rejected Water locked if its pending claim cannot be cleared", async () => {

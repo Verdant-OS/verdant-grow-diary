@@ -10,11 +10,20 @@
 //              allowed (that is how checks get written before the code); editing one that
 //              already exists needs a declared unlock.
 //   unlocked - a path (or directory, written with a trailing slash) listed in the unlock
-//              file with a reason. The unlock file is git-ignored and never ships.
+//              file with a reason, an expiry and the branch it was declared on. The unlock
+//              file is git-ignored and never ships.
 
 export const UNLOCK_FILE = ".claude/scorer-unlock.json";
 
 export const DOC_PATH = "docs/agents/loop-engineering.md";
+
+/**
+ * How long a declared unlock stays valid. Agents can be cut off at any time
+ * (AGENTS.md › Agent Handoff / Coverage), so an unlock that outlives its task would let
+ * every later task in the checkout edit the scorer without its own declaration. One day
+ * matches the handoff log's own claim window.
+ */
+export const UNLOCK_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Which repository paths count as scorers. Order does not matter; the first matching
@@ -33,9 +42,14 @@ export const SCORER_PATH_RULES = Object.freeze([
     why: "Playwright specs and their fixture-safety fences",
   }),
   Object.freeze({
+    kind: "prefix",
+    value: "e2e-local/",
+    why: "native local-browser Playwright lanes and their fixtures",
+  }),
+  Object.freeze({
     kind: "regex",
-    value: /^src\/.*\.(test|spec)\.(ts|tsx)$/,
-    why: "co-located Vitest files outside src/test/",
+    value: /(^|\/)[^/]+\.(test|spec)\.(ts|tsx|mts|cts|js|mjs|cjs)$/,
+    why: "any test or spec file wherever it lives: co-located src/, supabase/ Deno tests, scripts/, spikes/, plugins/",
   }),
   Object.freeze({
     kind: "regex",
@@ -69,16 +83,55 @@ export function isScorerPath(relPath) {
   return false;
 }
 
+function parseTime(value) {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "string" || typeof value === "number") {
+    const t = new Date(value).getTime();
+    return Number.isNaN(t) ? null : t;
+  }
+  return null;
+}
+
 /**
- * True when an unlock entry covers the path. An entry is an exact path, or a directory
- * written with a trailing slash. A bare prefix never matches, so unlocking
- * `src/test/a.test.ts` does not unlock `src/test/a.test.tsx`.
+ * True when an unlock entry is still in force for the given moment and branch.
+ *
+ * An entry is valid only while `now` is before its `expires_at` and, when the entry
+ * records a `branch`, only on that branch. An entry without an `expires_at` is never
+ * valid: an unlock that cannot expire is the hazard this check exists to remove.
+ *
+ * @param {{ path?: string, expires_at?: string, branch?: string }} entry
+ * @param {{ now: string | number | Date, branch?: string }} context
  */
-export function isUnlocked(relPath, unlockedEntries) {
+export function isUnlockEntryValid(entry, context) {
+  if (!entry || typeof entry !== "object" || !context) return false;
+  const now = parseTime(context.now);
+  const expires = parseTime(entry.expires_at);
+  if (now === null || expires === null) return false;
+  if (now >= expires) return false;
+  if (typeof entry.branch === "string" && entry.branch.length > 0) {
+    if (typeof context.branch !== "string" || context.branch !== entry.branch) return false;
+  }
+  return true;
+}
+
+/**
+ * True when a valid unlock entry covers the path. An entry is an exact path, or a
+ * directory written with a trailing slash. A bare prefix never matches, so unlocking
+ * `src/test/a.test.ts` does not unlock `src/test/a.test.tsx`.
+ *
+ * `context` carries the moment and branch the decision is made for; without it every
+ * entry is treated as expired, so a caller cannot forget the clock and get a lenient answer.
+ *
+ * @param {string} relPath
+ * @param {Array<{ path: string, expires_at?: string, branch?: string }> | undefined} unlockedEntries
+ * @param {{ now: string | number | Date, branch?: string } | undefined} context
+ */
+export function isUnlocked(relPath, unlockedEntries, context) {
   const path = normalizeRelPath(relPath);
   if (!path || !Array.isArray(unlockedEntries)) return false;
   for (const entry of unlockedEntries) {
-    const target = normalizeRelPath(entry && entry.path);
+    if (!isUnlockEntryValid(entry, context)) continue;
+    const target = normalizeRelPath(entry.path);
     if (!target) continue;
     if (target.endsWith("/")) {
       if (path.startsWith(target)) return true;
@@ -103,7 +156,7 @@ function refusal(relPath) {
 /**
  * The one decision the hook makes.
  *
- * @param {{ relPath: string, trackedAtHead: boolean, unlockedEntries?: Array<{path: string}> }} input
+ * @param {{ relPath: string, trackedAtHead: boolean, unlockedEntries?: Array<{path: string}>, now?: string | number | Date, branch?: string }} input
  * @returns {{ decision: "allow" | "deny", reason: string }}
  */
 export function evaluateScorerEdit(input) {
@@ -111,7 +164,8 @@ export function evaluateScorerEdit(input) {
   if (!relPath) return { decision: "allow", reason: "no repository path" };
   if (!isScorerPath(relPath)) return { decision: "allow", reason: "not a scorer path" };
   if (!input.trackedAtHead) return { decision: "allow", reason: "new check, not yet tracked" };
-  if (isUnlocked(relPath, input.unlockedEntries)) {
+  const context = { now: input.now, branch: input.branch };
+  if (isUnlocked(relPath, input.unlockedEntries, context)) {
     return { decision: "allow", reason: "unlocked with a declared reason" };
   }
   return { decision: "deny", reason: refusal(relPath) };
@@ -129,4 +183,34 @@ export function hookFilePaths(hookInput) {
   if (typeof toolInput.file_path === "string") paths.push(toolInput.file_path);
   if (typeof toolInput.notebook_path === "string") paths.push(toolInput.notebook_path);
   return paths;
+}
+
+/**
+ * Parses `git diff --name-status` output into scorer rows. Modified (M), deleted (D) and
+ * renamed (R) entries all count: a deleted or moved check is a weakened check. For a
+ * rename both the old and the new path are reported when either is a scorer, and the
+ * unlock is judged on the old path, the one that existed at the base.
+ *
+ * @param {string} nameStatus
+ * @returns {Array<{ change: "modified" | "deleted" | "renamed", path: string, from?: string }>}
+ */
+export function scorerRowsFromNameStatus(nameStatus) {
+  const rows = [];
+  if (typeof nameStatus !== "string") return rows;
+  for (const rawLine of nameStatus.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const parts = line.split("\t").map((p) => normalizeRelPath(p.trim()));
+    const status = parts[0] ?? "";
+    if (status.startsWith("M") && parts[1]) {
+      if (isScorerPath(parts[1])) rows.push({ change: "modified", path: parts[1] });
+    } else if (status.startsWith("D") && parts[1]) {
+      if (isScorerPath(parts[1])) rows.push({ change: "deleted", path: parts[1] });
+    } else if (status.startsWith("R") && parts[1] && parts[2]) {
+      if (isScorerPath(parts[1]) || isScorerPath(parts[2])) {
+        rows.push({ change: "renamed", path: parts[2], from: parts[1] });
+      }
+    }
+  }
+  return rows;
 }

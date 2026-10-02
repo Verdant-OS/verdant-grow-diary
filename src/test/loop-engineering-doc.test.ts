@@ -62,6 +62,16 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     expect(DOC).toMatch(/not a security boundary/i);
   });
 
+  it("covers both Playwright lanes and says unlocks expire and bind to the branch", () => {
+    expect(DOC).toContain("`e2e-local/`");
+    expect(DOC).toMatch(/24 hours/);
+    expect(DOC).toMatch(/bound to the branch/i);
+  });
+
+  it("says the report covers deleted and renamed checks, not only edits", () => {
+    expect(DOC).toMatch(/deleted or renamed/i);
+  });
+
   it("forbids the habits process from editing checks", () => {
     expect(DOC).toMatch(/habit[^.]*never[^.]*(check|test|scorer)/i);
   });

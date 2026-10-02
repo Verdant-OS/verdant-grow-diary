@@ -85,8 +85,9 @@ never loosen a pin to make a round pass.
   as the behavior change; never whole-file-format a legacy file") and
   `AGENTS.md` › Testing Standard. The mechanism that turns the convention into a tripwire is
   `docs/agents/loop-engineering.md` §3.
-- **Label:** established fact (the rule); the tripwire's behaviour inside a live agent session
-  is NOT_MEASURED until a session reports it.
+- **Label:** established fact (the rule); practical observation for the tripwire: on
+  2026-10-02 the hook refused two test-file edits inside the authoring session until the
+  unlock was declared in the current format, then allowed them.
 - **Status:** active. Added 2026-10-02 by Claude.
 
 ## Amending this list

@@ -35,14 +35,14 @@ supplies them:
 
 ## 1. Vocabulary
 
-| Term         | Meaning here                                                                                                                                                                                 |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Loop         | An agent repeating build, run checks, keep or revert, without a human directing each round                                                                                                   |
-| Scorer       | A file whose job is to judge other code: a Vitest file under `src/test/` or co-located, a Playwright spec, a `scripts/{check,verify,assert}-*` gate, or `config/required-status-checks.json` |
-| Locked       | A scorer already tracked at `HEAD`. New scorers are always writable; that is how checks get written before code                                                                              |
-| Unlock       | A declared, reasoned exception recorded in `.claude/scorer-unlock.json` (git-ignored) for one task                                                                                           |
-| Results file | `docs/agents/HANDOFF_LOG.md`: what each round tried, whether it was kept, and which checks still failed                                                                                      |
-| Habit        | A mistake that recurred across rounds, written as a working rule in `.claude/skills/verdant-loop-habits/SKILL.md`                                                                            |
+| Term         | Meaning here                                                                                                                                                                                                                                                                                                                                  |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Loop         | An agent repeating build, run checks, keep or revert, without a human directing each round                                                                                                                                                                                                                                                    |
+| Scorer       | A file whose job is to judge other code: anything under `src/test/`, `e2e/` or `e2e-local/` (specs and their fixtures), any `*.test.*` or `*.spec.*` file wherever it lives (co-located `src/`, `supabase/` Deno tests, `scripts/`, `spikes/`, `plugins/`), a `scripts/{check,verify,assert}-*` gate, or `config/required-status-checks.json` |
+| Locked       | A scorer already tracked at `HEAD`. New scorers are always writable; that is how checks get written before code                                                                                                                                                                                                                               |
+| Unlock       | A declared, reasoned exception recorded in `.claude/scorer-unlock.json` (git-ignored) for one task: bound to the branch it was declared on and expiring after 24 hours                                                                                                                                                                        |
+| Results file | `docs/agents/HANDOFF_LOG.md`: what each round tried, whether it was kept, and which checks still failed                                                                                                                                                                                                                                       |
+| Habit        | A mistake that recurred across rounds, written as a working rule in `.claude/skills/verdant-loop-habits/SKILL.md`                                                                                                                                                                                                                             |
 
 ## 2. Eligibility gate — when a loop is allowed at all
 
@@ -91,8 +91,11 @@ runs, the hook reads the call, resolves the path against the repository root, an
 - allows it when the path is not a scorer (§1 vocabulary; the rule table is
   `SCORER_PATH_RULES` in `scripts/lib/scorerLockRules.mjs`);
 - allows it when the scorer is not yet tracked at `HEAD` (a new check being written);
-- allows it when the path, or a directory containing it written with a trailing slash, is in
-  `.claude/scorer-unlock.json` with a reason;
+- allows it when the path, or a directory containing it written with a trailing slash, has an
+  unlock in `.claude/scorer-unlock.json` that is still in force: declared with a reason, on the
+  current branch, less than 24 hours ago. An unlock from another branch, or one that has
+  expired, is ignored, so a declaration left behind by a session that was cut off never carries
+  over to the next task (`AGENTS.md` › Agent Handoff / Coverage);
 - otherwise exits 2 with a refusal that names the path and the unlock command, which Claude Code
   feeds back to the model.
 
@@ -100,23 +103,30 @@ Declaring an exception, for a task that genuinely renegotiates a pin with its be
 
 ```bash
 node scripts/scorer-lock.mjs --unlock src/test/quick-log-save.test.tsx --reason "pin follows the new copy in quickLogCopy.ts"
-node scripts/scorer-lock.mjs --status
-node scripts/scorer-lock.mjs --report --strict   # modified tracked scorers vs HEAD; exit 2 if any is still locked
+node scripts/scorer-lock.mjs --status            # current unlocks, expired ones marked
+node scripts/scorer-lock.mjs --report --strict   # tracked scorers modified, deleted or renamed vs HEAD; exit 2 if any is still locked
 node scripts/scorer-lock.mjs --lock              # end of task: every check locked again
 ```
 
-The unlock file is git-ignored, so an unlock never ships. `--report` is for the PR body: it lists
-every modified tracked scorer and whether it was declared, which is the "list the checks in plain
-words" step from the source workflow, applied to changes rather than to new checks.
+The unlock file is git-ignored, so an unlock never ships; declaring the same path again refreshes
+its 24-hour window, and `--lock` ends every unlock at once. `--report` is for the PR body: it lists
+every tracked scorer that was modified, deleted or renamed relative to the base and whether it was
+declared, which is the "list the checks in plain words" step from the source workflow, applied to
+changes rather than to new checks. A deleted or moved check counts because removing a check is the
+quietest way to weaken one; a rename is judged on the old path, the one that existed at the base.
 
 **Limits, stated honestly.** This is a tripwire against accidents, not a security boundary. The
 agent that is refused can run `--unlock` itself; the hook can be routed around with a shell
-redirect; a session started before the hook existed does not load it until `/hooks` is opened or
+redirect; a session started before the hook existed may not load it until `/hooks` is opened or
 the session restarts; and Claude Code hooks are not consulted by CI. What the lock changes is that
 weakening a check becomes an explicit, logged, reasoned act that a reviewer can find, instead of a
 side effect. The real enforcement stays where it was: the 35 required checks, the
-`Published migration integrity` gate, branch rulesets, and RLS. Behaviour inside a live agent
-session is `NOT_MEASURED` until a session reports a refusal.
+`Published migration integrity` gate, branch rulesets, and RLS. `practical observation`,
+2026-10-02: inside the session that authored this slice, Claude Code picked up the new settings
+file without a restart, and the hook refused two edits to tracked test files (exit 2, refusal
+text fed back to the model) because the unlock on disk had been written without an expiry; after
+`--unlock` in the current format the same edits went through. That is one session's reading, not
+a guarantee for every host.
 
 **Collision note.** Open Verdant-OS/verdant-grow-diary#1865 adds a `verdant-guard` Claude Code
 mod with refusals for force-push, protected-branch pushes, migration edits and production

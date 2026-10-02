@@ -3,18 +3,21 @@
 //
 //   --hook                     PreToolUse hook. Reads the tool call JSON on stdin and exits 2
 //                              with the refusal on stderr when the call would edit a tracked
-//                              scorer that has not been unlocked. Exits 0 otherwise, and
+//                              scorer that has no valid unlock. Exits 0 otherwise, and
 //                              fails open (exit 0, note on stderr) when it cannot decide.
 //   --unlock <path...> --reason "<why>"
 //                              Declares that this task may edit the named checks. Writes
 //                              .claude/scorer-unlock.json (git-ignored). A directory is
-//                              unlocked by writing it with a trailing slash.
+//                              unlocked by writing it with a trailing slash. An unlock is
+//                              bound to the current branch and expires after 24 hours;
+//                              declaring it again refreshes the window.
 //   --lock                     Removes every unlock.
-//   --status                   Prints the current unlocks.
+//   --status                   Prints the current unlocks, expired ones marked.
 //   --report [--base <ref>] [--strict]
-//                              Lists every tracked scorer modified relative to <ref>
-//                              (default HEAD) and whether it is unlocked. --strict exits 2
-//                              when any modified scorer is still locked, for CI or a PR body.
+//                              Lists every tracked scorer modified, deleted or renamed
+//                              relative to <ref> (default HEAD) and whether it is unlocked.
+//                              --strict exits 2 when any such scorer is still locked, for
+//                              CI or a PR body.
 //
 // Pure rules live in scripts/lib/scorerLockRules.mjs; this file is the I/O shell.
 // The lock is a tripwire against accidents, not a security boundary: an agent can run
@@ -27,11 +30,14 @@ import process from "node:process";
 
 import {
   UNLOCK_FILE,
+  UNLOCK_TTL_MS,
   evaluateScorerEdit,
   hookFilePaths,
   isScorerPath,
+  isUnlockEntryValid,
   isUnlocked,
   normalizeRelPath,
+  scorerRowsFromNameStatus,
 } from "./lib/scorerLockRules.mjs";
 
 const NOTE = "scorer-lock:";
@@ -46,6 +52,19 @@ function repoRoot(cwd) {
   } catch {
     return null;
   }
+}
+
+function currentBranch(root) {
+  try {
+    const name = git(["rev-parse", "--abbrev-ref", "HEAD"], root).trim();
+    return name === "HEAD" ? git(["rev-parse", "HEAD"], root).trim() : name;
+  } catch {
+    return "";
+  }
+}
+
+function decisionContext(root) {
+  return { now: new Date().toISOString(), branch: currentBranch(root) };
 }
 
 function trackedAtHead(root, relPath) {
@@ -106,6 +125,7 @@ function runHook() {
     return 0;
   }
   const unlocked = readUnlocks(root);
+  const context = decisionContext(root);
   for (const filePath of paths) {
     const rel = toRelPath(root, filePath);
     if (!rel) continue;
@@ -113,6 +133,8 @@ function runHook() {
       relPath: rel,
       trackedAtHead: trackedAtHead(root, rel),
       unlockedEntries: unlocked,
+      now: context.now,
+      branch: context.branch,
     });
     if (verdict.decision === "deny") {
       process.stderr.write(`${verdict.reason}\n`);
@@ -158,21 +180,27 @@ function runUnlock(args) {
     process.stderr.write(`${NOTE} --unlock needs --reason "<why the check changes>" (8+ chars).\n`);
     return 1;
   }
-  const existing = readUnlocks(root);
-  const at = new Date().toISOString();
+  const context = decisionContext(root);
+  const atMs = Date.parse(context.now);
+  const at = context.now;
+  const expiresAt = new Date(atMs + UNLOCK_TTL_MS).toISOString();
+  // Drop entries that have already expired or belong to another branch; a stale
+  // declaration from an earlier task is exactly what must not carry over.
+  const kept = readUnlocks(root).filter((e) => isUnlockEntryValid(e, context));
   for (const p of args.paths) {
     const rel = normalizeRelPath(p);
     if (!isScorerPath(rel)) {
       process.stderr.write(`${NOTE} ${rel} is not a scorer path; nothing to unlock.\n`);
       continue;
     }
-    if (!existing.some((e) => normalizeRelPath(e.path) === rel)) {
-      existing.push({ path: rel, reason, at });
-    }
+    const entry = { path: rel, reason, at, expires_at: expiresAt, branch: context.branch };
+    const index = kept.findIndex((e) => normalizeRelPath(e.path) === rel);
+    if (index === -1) kept.push(entry);
+    else kept[index] = entry;
   }
-  writeUnlocks(root, existing);
+  writeUnlocks(root, kept);
   process.stdout.write(
-    `${NOTE} unlocked ${existing.length} path(s); recorded in ${UNLOCK_FILE}.\n`,
+    `${NOTE} ${kept.length} unlock(s) in force on ${context.branch} until ${expiresAt}; recorded in ${UNLOCK_FILE}.\n`,
   );
   return 0;
 }
@@ -194,7 +222,13 @@ function runStatus() {
     process.stdout.write(`${NOTE} no unlocks; every tracked check is locked.\n`);
     return 0;
   }
-  for (const e of unlocked) process.stdout.write(`UNLOCKED ${e.path}  (${e.reason}; ${e.at})\n`);
+  const context = decisionContext(root);
+  for (const e of unlocked) {
+    const label = isUnlockEntryValid(e, context) ? "UNLOCKED" : "EXPIRED ";
+    process.stdout.write(
+      `${label} ${e.path}  (${e.reason}; declared ${e.at} on ${e.branch ?? "?"}; until ${e.expires_at ?? "never, so invalid"})\n`,
+    );
+  }
   return 0;
 }
 
@@ -203,27 +237,32 @@ function runReport(args) {
   if (!root) return 1;
   let changed = "";
   try {
-    changed = git(["diff", "--name-only", "--diff-filter=M", args.base, "--"], root);
+    changed = git(["diff", "--name-status", "--diff-filter=MDR", args.base, "--"], root);
   } catch {
     process.stderr.write(`${NOTE} git diff against ${args.base} failed.\n`);
     return 1;
   }
   const unlocked = readUnlocks(root);
-  const rows = changed
-    .split(/\r?\n/)
-    .map((l) => normalizeRelPath(l.trim()))
-    .filter((p) => p && isScorerPath(p))
-    .map((p) => ({ path: p, unlocked: isUnlocked(p, unlocked) }));
+  const context = decisionContext(root);
+  const rows = scorerRowsFromNameStatus(changed).map((row) => ({
+    ...row,
+    unlocked: isUnlocked(row.from ?? row.path, unlocked, context),
+  }));
   if (rows.length === 0) {
-    process.stdout.write(`${NOTE} no tracked scorer modified relative to ${args.base}.\n`);
+    process.stdout.write(
+      `${NOTE} no tracked scorer modified, deleted or renamed relative to ${args.base}.\n`,
+    );
     return 0;
   }
   for (const r of rows) {
-    process.stdout.write(`${r.unlocked ? "UNLOCKED" : "LOCKED  "} ${r.path}\n`);
+    const where = r.change === "renamed" ? `${r.from} -> ${r.path}` : r.path;
+    process.stdout.write(
+      `${r.unlocked ? "UNLOCKED" : "LOCKED  "} ${r.change.padEnd(8)} ${where}\n`,
+    );
   }
   const locked = rows.filter((r) => !r.unlocked).length;
   process.stdout.write(
-    `${NOTE} ${rows.length} modified scorer(s), ${locked} still locked. Name each renegotiated pin in the PR body.\n`,
+    `${NOTE} ${rows.length} changed scorer(s), ${locked} still locked. Name each renegotiated, removed or moved check in the PR body.\n`,
   );
   return args.strict && locked > 0 ? 2 : 0;
 }

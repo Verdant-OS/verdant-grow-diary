@@ -10,27 +10,6 @@ Owner locks remain binding even when a block is unclaimed or older than 24 hours
 Remote heads below are observations at their named times; confirm them before resuming.
 An unpushed candidate is not a remote head and must never be treated as hosted CI evidence.
 
-## CHEM-ACTIONS-READONLY-PROOF-001
-
-```text
-TASK CHEM-ACTIONS-READONLY-PROOF-001  priority: P2  status: OPEN
-goal: Measure the real fixture-owned Actions list, successful empty versus row readback, read-only refresh and grower-approval framing on production. No Action Queue mutation or device operation.
-branch: codex/chem-actions-readonly-proof-001
-base: verdant-grow-diary (was codex/chem-signedin-performance-001 at 35e7def61992753d34fb04c10a99febfcce5e130; that parent was superseded by #1849)
-checkout: git switch codex/chem-actions-readonly-proof-001 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1800
-head_sha: b25e8cfa93b2ba4fd8e1c3c0bf2194afcf00cbfd
-state: Four-file stay-draft (+810/-0) normal-pushed. Terminal production run36540923804/job109315857747 PASS: hosted3 files267 PASS / 0 FAIL / 0 SKIP; browser2 PASS / 0 FAIL / 0 SKIP / zero retries includes normal sign-in and owned Actions readback/refresh. Receipt proves four real rows before/after, all six checks and clean appSHA61821446ebd7e4fb30a36a5a95b7526a34515df5; elapsed1317.959747ms for whole sequence; zero blocked writes/runtime errors, two existing fixture operator reads. Artifact11020881186 downloaded, digest2b175b38203a523059f47ba888df09332c82bfd4be7eda5a7058f0fbd0b784e2 matches. Final local267 PASS includes97 new cases; initial86 PASS/11 FAIL from malformed UUID helper retained and corrected. Canonical/E2E types0, lint0/0, format/import/docs guards PASS. SeparateV026/26; static AQ/docs102 PASS/0 FAIL/16 SKIP, policy-detector skips are not runtime proof. Canonical build PASS; two generated build stamps restored to HEAD without changing the four-file diff. Fresh72 open heads, no other-owner/deploy drift.
-next_action: Re-land onto verdant-grow-diary (see observation; the parent was superseded by #1849), then obtain Critical Mass exact-head acceptance on fresh standalone required checks. Continue the full goal's remaining live Timeline, auth/reset, credit-denial and core-loop acceptance.
-files: e2e/lib/actionsReadonlyProofRules.ts; e2e/actions-readonly-proof.spec.ts; src/test/actions-production-readonly-proof.test.ts; .github/workflows/actions-readonly-proof.yml
-blockers: Transition/device/security/full-core-loop acceptance excluded and remains NOT_MEASURED. Archived Quick Log write fixture remains separate; no fixture replacement or unarchive. All35 standalone Main contexts absent on this stack; two census jobs still pending at08:12 UTC, zero supplemental FAIL. Existing16 source-policy skips remain a coverage gap, not a hosted policy FAIL; locked AQ/RLS paths untouched. Parent stack requires independent review/integration and fresh standalone checks.
-artifacts: #1793 read-only identity/mutation barrier reused byte unchanged; run36540923804; Downloads CHEM-actions-production-receipt-2026-09-29.json and CHEM-actions-proof-* logs. Sanitized finite receipts only; no ids, action content, tokens or account responses exported. PR attachment UI hit100-identity limit; draft creation/head/body verified and no duplicate created.
-reviewer_seat: Critical Mass (new .ts test/proof and CI files; no own review)
-claimed_by: Codex, 2026-09-29 03:03 CT, before implementation
-last_updated: 2026-09-29 03:12 CT, by Codex
-observation: 2026-10-01 13:47 CT, by Claude (log maintenance, #1847; not a claim, so last_updated and claimed_by are unchanged): the parent #1793 (codex/chem-signedin-performance-001) was superseded by its re-land #1849, merged as b5d064881b71d6cd04156d9a0b1a355f3ecc0cd2. #1849 also removed the matt@ owner QA fixture, dropped duplicate undici pins, added the deployed-SHA wait (scripts/wait-for-deployed-sha.mjs) and widened the read-only workflow's push paths. GitHub refuses base changes for PRs in a stack, so this child needs the same treatment: one normal merge of verdant-grow-diary, three-way against 35e7def6 for any shared files, keeping #1849's versions; then a re-land PR on verdant-grow-diary and fresh standalone CI.
-```
-
 ## Template
 
 ```text
@@ -65,27 +44,6 @@ Use the original base and declared closed scope. The example command assumes no 
 active checkout has the branch open; inspect worktree ownership before selecting a checkout.
 
 ## Open
-
-### CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001
-
-```text
-TASK CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001  priority: P2  status: OPEN
-goal: Measure real Settings browser-preference save/reload, own-account readback and analytics refusal on production without backend mutations. Do not infer billing/credit/security acceptance from read-only UI.
-branch: codex/chem-settings-account-consent-proof-001
-base: verdant-grow-diary (was codex/chem-signedin-performance-001 at 35e7def61992753d34fb04c10a99febfcce5e130; that parent was superseded by #1849)
-checkout: git switch codex/chem-settings-account-consent-proof-001 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1799
-head_sha: 3b81addb65fbe17f206193e3cf4643861def3132, normal push and draft/base/body read back 2026-09-29 02:51 CT
-state: Pushed four-file stay-draft (+706/-0). Local 9 files / 369 PASS / 0 FAIL / 0 SKIP includes 66 new cases; separate V0 26/26 and docs-safety 67/67, not additive unique totals. Canonical and explicit E2E typechecks 0 diagnostics, final 3-file scoped lint 0 errors/0 warnings after one unsafe-finally correction. Format, whitespace, import and three strict docs scanners PASS. Existing parent read-only barrier reused unchanged; normal fixture auth bootstrap only. Fresh audit of 70 open heads and 15 recent closed PRs; no competing settings/account/consent paths. Archived QuickLog fixture cannot authorize writes. AI credit-limit hosted denial still needs genuine exhausted fixture credit state and usable review evidence; no model spend or fake denial planned.
-next_action: Re-land onto verdant-grow-diary (see observation; the parent was superseded by #1849), then Critical Mass reviews the exact head on fresh standalone required checks. Historical: Current proof run36538876591/job109309263434 terminal SUCCESS: hosted safety236/236; browser4 PASS / 0 FAIL / 0 SKIP / zero retries. Artifact11019502703 digest verified; all three receipts PASS at appSHA61821446. GDP serializes parent integration/normal retarget for fresh required CI. Account preferences and legal-acceptance writes are outside the grow-only smoke write scope; do not click those controls.
-files: e2e/lib/settingsAccountProofRules.ts; e2e/settings-account-consent-proof.spec.ts; src/test/settings-account-production-proof.test.ts; .github/workflows/settings-account-consent-proof.yml
-blockers: Full required CI does not run on the parent stack; independent Critical Mass review and fresh standalone CI after parent integration required. No merge, ready, auto-merge, Publish, production SQL, auth/Edge/Supabase changes, lockfile, customer or KEEP writes.
-artifacts: Existing #1793 proof source and terminal run 36536846789. Predecessor 1df2e35d run36538588974 had browser2 PASS/2 FAIL from premature teardown; all UI checks completed, transport correctly blocked PASS. +11-line current fix settles pending auth/role reads before reload/close, retaining final fence. Current run terminal PASS; no writes, application errors or analytics requests. Downloads CHEM-settings-proof-* validation logs. Task attachment failed because app attachment identity count exceeds 100; PR exists and URL/head read back, no duplicate PR created. Receipts supplement, not replace full feature/core-loop acceptance.
-reviewer_seat: Critical Mass (test/proof/CI .ts and .yml; Codex cannot review its own work)
-claimed_by: Codex, 2026-09-29 before the 02:41 CT first regression run (claim written before implementation)
-last_updated: 2026-09-29 02:51 CT, by Codex
-observation: 2026-10-01 13:47 CT, by Claude (log maintenance, #1847; not a claim, so last_updated and claimed_by are unchanged): the parent #1793 (codex/chem-signedin-performance-001) was superseded by its re-land #1849, merged as b5d064881b71d6cd04156d9a0b1a355f3ecc0cd2. #1849 also removed the matt@ owner QA fixture, dropped duplicate undici pins, added the deployed-SHA wait (scripts/wait-for-deployed-sha.mjs) and widened the read-only workflow's push paths. GitHub refuses base changes for PRs in a stack, so this child needs the same treatment: one normal merge of verdant-grow-diary, three-way against 35e7def6 for any shared files, keeping #1849's versions; then a re-land PR on verdant-grow-diary and fresh standalone CI.
-```
 
 ### CHEM-MOVE-TENT-READ-HONESTY-001
 
@@ -699,6 +657,50 @@ last_updated: 2026-09-28 23:53 CT, by Codex
 ```
 
 ## Closed
+
+### CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001
+
+```text
+TASK CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001  priority: P2  status: CLOSED
+goal: Measure real Settings browser-preference save/reload, own-account readback and analytics refusal on production without backend mutations. Do not infer billing/credit/security acceptance from read-only UI.
+branch: claude/chem-settings-account-consent-proof-001 (re-land of codex/chem-settings-account-consent-proof-001, which stays unmerged)
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical: git switch codex/chem-settings-account-consent-proof-001 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1859 (re-land, merged); https://github.com/Verdant-OS/verdant-grow-diary/pull/1799 (closed as superseded)
+head_sha: 00af20804addb6e36fc80901a2b779ec4e56c664, the owner-accepted merged head of #1859. Earlier #1799 log head, historical: 3b81addb65fbe17f206193e3cf4643861def3132, normal push and draft/base/body read back 2026-09-29 02:51 CT
+state: Merged via #1859 as aca91a28f from owner-accepted head 00af20804. On that head: required checks 35/35 PASS; Codex code and security review PASS (no findings). Production browser proof NOT_MEASURED (first run waits for a deploy-branch push that touches its paths); independent Critical Mass review NOT_MEASURED (Codex review and owner acceptance gated the merge). Historical, pre-re-land state of #1799: Pushed four-file stay-draft (+706/-0). Local 9 files / 369 PASS / 0 FAIL / 0 SKIP includes 66 new cases; separate V0 26/26 and docs-safety 67/67, not additive unique totals. Canonical and explicit E2E typechecks 0 diagnostics, final 3-file scoped lint 0 errors/0 warnings after one unsafe-finally correction. Format, whitespace, import and three strict docs scanners PASS. Existing parent read-only barrier reused unchanged; normal fixture auth bootstrap only. Fresh audit of 70 open heads and 15 recent closed PRs; no competing settings/account/consent paths. Archived QuickLog fixture cannot authorize writes. AI credit-limit hosted denial still needs genuine exhausted fixture credit state and usable review evidence; no model spend or fake denial planned.
+next_action: None; closed. The first production browser run is NOT_MEASURED until a deploy-branch push touches its paths. Historical: Re-land onto verdant-grow-diary (see observation; the parent was superseded by #1849), then Critical Mass reviews the exact head on fresh standalone required checks. Historical: Current proof run36538876591/job109309263434 terminal SUCCESS: hosted safety236/236; browser4 PASS / 0 FAIL / 0 SKIP / zero retries. Artifact11019502703 digest verified; all three receipts PASS at appSHA61821446. GDP serializes parent integration/normal retarget for fresh required CI. Account preferences and legal-acceptance writes are outside the grow-only smoke write scope; do not click those controls.
+files: e2e/lib/settingsAccountProofRules.ts; e2e/settings-account-consent-proof.spec.ts; src/test/settings-account-production-proof.test.ts; .github/workflows/settings-account-consent-proof.yml
+blockers: None for this closed task. Open measurement only: the first production browser run is NOT_MEASURED. Historical, pre-re-land blockers of #1799: Full required CI does not run on the parent stack; independent Critical Mass review and fresh standalone CI after parent integration required. No merge, ready, auto-merge, Publish, production SQL, auth/Edge/Supabase changes, lockfile, customer or KEEP writes.
+artifacts: Existing #1793 proof source and terminal run 36536846789. Predecessor 1df2e35d run36538588974 had browser2 PASS/2 FAIL from premature teardown; all UI checks completed, transport correctly blocked PASS. +11-line current fix settles pending auth/role reads before reload/close, retaining final fence. Current run terminal PASS; no writes, application errors or analytics requests. Downloads CHEM-settings-proof-* validation logs. Task attachment failed because app attachment identity count exceeds 100; PR exists and URL/head read back, no duplicate PR created. Receipts supplement, not replace full feature/core-loop acceptance.
+reviewer_seat: Critical Mass (test/proof/CI .ts and .yml; Codex cannot review its own work)
+claimed_by: Claude, 2026-10-01 14:40 CT (owner: "take and fix so things keep moving"); previously Codex, 2026-09-29 before the 02:41 CT first regression run (claim written before implementation)
+last_updated: 2026-10-01 16:10 CT, by Claude. Earlier entry: 2026-09-29 02:51 CT, by Codex
+observation: 2026-10-01 13:47 CT, by Claude (log maintenance, #1847; not a claim, so last_updated and claimed_by are unchanged): the parent #1793 (codex/chem-signedin-performance-001) was superseded by its re-land #1849, merged as b5d064881b71d6cd04156d9a0b1a355f3ecc0cd2. #1849 also removed the matt@ owner QA fixture, dropped duplicate undici pins, added the deployed-SHA wait (scripts/wait-for-deployed-sha.mjs) and widened the read-only workflow's push paths. GitHub refuses base changes for PRs in a stack, so this child needs the same treatment: one normal merge of verdant-grow-diary, three-way against 35e7def6 for any shared files, keeping #1849's versions; then a re-land PR on verdant-grow-diary and fresh standalone CI.
+closure: Merged via #1859 as aca91a28fa5d1e650878a02c0c00e4cc85a119ab at 2026-10-01 16:05 CT from owner-accepted head 00af20804addb6e36fc80901a2b779ec4e56c664. #1799 is closed as superseded. The re-land carries the four files plus: a credential-free safety job for pull requests; the browser proof only on owner-gated push or dispatch on the deploy ref, with secrets scoped to two steps; GITHUB_SHA pinned and waited for; push paths covering product code, build inputs, e2e/**, playwright.config.ts and the SHA wait (Codex P1 and P2s). Earlier dated observations above remain historical.
+```
+
+### CHEM-ACTIONS-READONLY-PROOF-001
+
+```text
+TASK CHEM-ACTIONS-READONLY-PROOF-001  priority: P2  status: CLOSED
+goal: Measure the real fixture-owned Actions list, successful empty versus row readback, read-only refresh and grower-approval framing on production. No Action Queue mutation or device operation.
+branch: claude/chem-actions-readonly-proof-001 (re-land of codex/chem-actions-readonly-proof-001, which stays unmerged)
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical: git switch codex/chem-actions-readonly-proof-001 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1860 (re-land, merged); https://github.com/Verdant-OS/verdant-grow-diary/pull/1800 (closed as superseded)
+head_sha: 3ba38ad4d9365ee7e4deca7ab97fdab81a700299, the owner-accepted merged head of #1860. Earlier #1800 log head, historical: b25e8cfa93b2ba4fd8e1c3c0bf2194afcf00cbfd
+state: Merged via #1860 as 77336cd3f from owner-accepted head 3ba38ad4d. On that head: required checks 35/35 PASS; Codex code and security review PASS (no findings). Production browser proof NOT_MEASURED (first run waits for a deploy-branch push that touches its paths); independent Critical Mass review NOT_MEASURED (Codex review and owner acceptance gated the merge). Historical, pre-re-land state of #1800: Four-file stay-draft (+810/-0) normal-pushed. Terminal production run36540923804/job109315857747 PASS: hosted3 files267 PASS / 0 FAIL / 0 SKIP; browser2 PASS / 0 FAIL / 0 SKIP / zero retries includes normal sign-in and owned Actions readback/refresh. Receipt proves four real rows before/after, all six checks and clean appSHA61821446ebd7e4fb30a36a5a95b7526a34515df5; elapsed1317.959747ms for whole sequence; zero blocked writes/runtime errors, two existing fixture operator reads. Artifact11020881186 downloaded, digest2b175b38203a523059f47ba888df09332c82bfd4be7eda5a7058f0fbd0b784e2 matches. Final local267 PASS includes97 new cases; initial86 PASS/11 FAIL from malformed UUID helper retained and corrected. Canonical/E2E types0, lint0/0, format/import/docs guards PASS. SeparateV026/26; static AQ/docs102 PASS/0 FAIL/16 SKIP, policy-detector skips are not runtime proof. Canonical build PASS; two generated build stamps restored to HEAD without changing the four-file diff. Fresh72 open heads, no other-owner/deploy drift.
+next_action: None; closed. The first production browser run is NOT_MEASURED until a deploy-branch push touches its paths. Historical: Re-land onto verdant-grow-diary (see observation; the parent was superseded by #1849), then obtain Critical Mass exact-head acceptance on fresh standalone required checks. Continue the full goal's remaining live Timeline, auth/reset, credit-denial and core-loop acceptance.
+files: e2e/lib/actionsReadonlyProofRules.ts; e2e/actions-readonly-proof.spec.ts; src/test/actions-production-readonly-proof.test.ts; .github/workflows/actions-readonly-proof.yml
+blockers: None for this closed task. Open measurement only: the first production browser run is NOT_MEASURED. Historical, pre-re-land blockers of #1800: Transition/device/security/full-core-loop acceptance excluded and remains NOT_MEASURED. Archived Quick Log write fixture remains separate; no fixture replacement or unarchive. All35 standalone Main contexts absent on this stack; two census jobs still pending at08:12 UTC, zero supplemental FAIL. Existing16 source-policy skips remain a coverage gap, not a hosted policy FAIL; locked AQ/RLS paths untouched. Parent stack requires independent review/integration and fresh standalone checks.
+artifacts: #1793 read-only identity/mutation barrier reused byte unchanged; run36540923804; Downloads CHEM-actions-production-receipt-2026-09-29.json and CHEM-actions-proof-* logs. Sanitized finite receipts only; no ids, action content, tokens or account responses exported. PR attachment UI hit100-identity limit; draft creation/head/body verified and no duplicate created.
+reviewer_seat: Critical Mass (new .ts test/proof and CI files; no own review)
+claimed_by: Claude, 2026-10-01 14:40 CT (owner: "take and fix so things keep moving"); previously Codex, 2026-09-29 03:03 CT, before implementation
+last_updated: 2026-10-01 16:10 CT, by Claude. Earlier entry: 2026-09-29 03:12 CT, by Codex
+observation: 2026-10-01 13:47 CT, by Claude (log maintenance, #1847; not a claim, so last_updated and claimed_by are unchanged): the parent #1793 (codex/chem-signedin-performance-001) was superseded by its re-land #1849, merged as b5d064881b71d6cd04156d9a0b1a355f3ecc0cd2. #1849 also removed the matt@ owner QA fixture, dropped duplicate undici pins, added the deployed-SHA wait (scripts/wait-for-deployed-sha.mjs) and widened the read-only workflow's push paths. GitHub refuses base changes for PRs in a stack, so this child needs the same treatment: one normal merge of verdant-grow-diary, three-way against 35e7def6 for any shared files, keeping #1849's versions; then a re-land PR on verdant-grow-diary and fresh standalone CI.
+closure: Merged via #1860 as 77336cd3f3b35b5468d5a066e6f36d6cf6a1a6fe at 2026-10-01 16:05 CT from owner-accepted head 3ba38ad4d9365ee7e4deca7ab97fdab81a700299. #1800 is closed as superseded. The re-land carries the four files plus: a credential-free safety job for pull requests; the browser proof only on owner-gated push or dispatch on the deploy ref, with secrets scoped to two steps; GITHUB_SHA pinned and waited for; push paths covering product code, build inputs, e2e/**, playwright.config.ts and the SHA wait (Codex P1 and P2s). Earlier dated observations above remain historical.
+```
 
 ### CHEM-SIGNEDIN-PERFORMANCE-001
 

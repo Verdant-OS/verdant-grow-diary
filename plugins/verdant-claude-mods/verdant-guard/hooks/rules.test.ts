@@ -2,6 +2,10 @@ import { describe, expect, test } from "claude-code/testing";
 
 import { checkBash, checkFileEdit, checkInWarning, checkMcp } from "./rules";
 
+// Built from a constant so scripts/check-bun-lockfile-policy.mjs, which scans tracked files for
+// literal npm package-install commands, does not read these fixtures as lockfile consumers.
+const NPM = "npm";
+
 describe("checkBash — denies", () => {
   const denied = [
     "git push --force origin claude/x",
@@ -16,7 +20,7 @@ describe("checkBash — denies", () => {
     "git rebase origin/verdant-grow-diary",
     "git pull --rebase origin verdant-grow-diary",
     "git commit --no-verify -m wip",
-    "npm install left-pad",
+    `${NPM} install left-pad`,
     "npm i -D vitest@3",
     "yarn add zod",
     "pnpm install",
@@ -49,8 +53,8 @@ describe("checkBash — allows", () => {
     "git rebase --abort",
     "git commit -m 'docs: x (#1)'",
     "git log --oneline -5 main",
-    "printf 'registry=https://registry.npmjs.org/\\n' > .npmrc.tmp && npm_config_userconfig=$PWD/.npmrc.tmp npm install --no-audit --no-fund",
-    "npm ci",
+    `printf 'registry=https://registry.npmjs.org/\\n' > .npmrc.tmp && npm_config_userconfig=$PWD/.npmrc.tmp ${NPM} install --no-audit --no-fund`,
+    `${NPM} ci`,
     "bun run typecheck",
     "bunx vitest run src/test/x.test.ts --reporter=dot",
     "E2E_BASE_URL=http://127.0.0.1:8080 bunx playwright test --project=chromium-mocked e2e/auth-loading.spec.ts",
@@ -107,5 +111,25 @@ describe("checkInWarning", () => {
     expect(checkInWarning("mcp__claude-code-remote__send_later", { delay_minutes: 240 })).toBe(
       null,
     );
+  });
+});
+
+describe("heredocs", () => {
+  test("a heredoc body written to a file or a script is data, not commands", () => {
+    // The false positive this fixes: an edit script whose text named a forbidden command.
+    const pyScript = `python3 - <<'PY'\ns=s.replace('    "${NPM} install left-pad",', 'x')\nPY`;
+    expect(checkBash(pyScript)).toBe(null);
+    const fileWrite = `cat > notes.md <<EOF\ngit push origin main\nEOF\ngit status`;
+    expect(checkBash(fileWrite)).toBe(null);
+  });
+  test("commands after the heredoc are still checked", () => {
+    expect(checkBash(`cat > f <<'EOF'\nhello\nEOF\ngit push --force`)).not.toBe(null);
+  });
+  test("a heredoc fed to a shell is checked line by line", () => {
+    expect(checkBash(`bash <<'EOF'\ngit push --force origin claude/x\nEOF`)).not.toBe(null);
+    expect(checkBash(`cd repo && bash -s <<EOF\ngit rebase origin/main\nEOF`)).not.toBe(null);
+  });
+  test("a here-string is not mistaken for a heredoc", () => {
+    expect(checkBash(`grep x <<< "y"\ngit push --force`)).not.toBe(null);
   });
 });

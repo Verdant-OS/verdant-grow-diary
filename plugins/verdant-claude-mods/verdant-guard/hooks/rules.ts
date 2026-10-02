@@ -9,9 +9,36 @@ export const PRODUCTION_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 
 const SEGMENT_SPLIT = /&&|\|\||;|\||\n/;
 
+const HEREDOC_START = /(?<!<)<<(?!<)-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/;
+const SHELL_READS_STDIN = /(^|[\s|;&(])(bash|sh|zsh|dash)(\s+-[a-z]+)*\s*(<<|$)/;
+
+/**
+ * Drops heredoc bodies: they are data (a file being written, a script for python or node),
+ * not shell commands. A body fed to a shell (`bash <<EOF`) is kept, since the shell runs it.
+ */
+export function stripHeredocs(command: string): string {
+  const out: string[] = [];
+  let end: string | null = null;
+  let keep = false;
+  for (const line of command.split("\n")) {
+    if (end !== null) {
+      if (line.trim() === end) end = null;
+      else if (keep) out.push(line);
+      continue;
+    }
+    out.push(line);
+    const m = HEREDOC_START.exec(line);
+    if (m && m[2]) {
+      end = m[2];
+      keep = SHELL_READS_STDIN.test(line.slice(0, m.index).trimEnd() + " <<");
+    }
+  }
+  return out.join("\n");
+}
+
 /** Splits a shell command into simple-command segments and naive tokens. */
 export function segments(command: string): string[][] {
-  return command
+  return stripHeredocs(command)
     .split(SEGMENT_SPLIT)
     .map((s) =>
       s
@@ -92,7 +119,7 @@ function checkPackageManager(tokens: string[]): string | null {
   if (pm === "npm") {
     if (["add", "uninstall", "remove", "rm", "un", "update", "up", "upgrade"].includes(sub ?? ""))
       return LOCK_MSG;
-    // Bare `npm install` is the SKILL's sanctioned public-registry bootstrap; with a package it is a dependency change.
+    // A bare install (no package named) is the run skill's public-registry bootstrap; naming a package is a dependency change.
     if ((sub === "install" || sub === "i") && positional.length > 0) return LOCK_MSG;
     return null;
   }

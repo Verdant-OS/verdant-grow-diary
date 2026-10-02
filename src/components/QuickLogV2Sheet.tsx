@@ -1763,6 +1763,9 @@ function QuickLogV2SheetForOwner({
     if (exactWateringSubmission) {
       if (!canContinueNote() || exactWateringSubmission.recovery.ownerId !== user?.id) return;
       const claim = await claimPendingQuickLogWatering(exactWateringSubmission.recovery);
+      // The claim waits on a cross-tab lock; a closed or remounted sheet must
+      // not upload media or continue this submission from its old lifetime.
+      if (!canContinueNote()) return;
       if (claim.status !== "claimed") {
         if (claim.status === "pending") restorePendingWatering(claim.record);
         else {
@@ -2204,6 +2207,9 @@ function QuickLogV2SheetForOwner({
       const clearance = await reconcilePendingQuickLogWateringClear(
         exactWateringSubmission.recovery,
       );
+      // Same fence as above: a sheet closed during the locked clear must not
+      // confirm, refresh, or announce the save from its old lifetime.
+      if (!canContinueNote()) return;
       recoveryClearFailed =
         clearance.status !== "cleared" && clearance.status !== "already_cleared";
       setWateringStorageFence(recoveryClearFailed);
@@ -2296,6 +2302,7 @@ function QuickLogV2SheetForOwner({
    */
   async function handleRecheckNoteStorage() {
     if (!postSave || !recoveryStorageFence || saveInFlightRef.current) return;
+    const lifetime = noteLifetimeRef.current;
     const confirmedFeeding = confirmedFeedingRecoveryRef.current;
     if (confirmedFeeding) {
       const current = readPendingQuickLogFeeding(confirmedFeeding.ownerId);
@@ -2317,6 +2324,7 @@ function QuickLogV2SheetForOwner({
       const cleared =
         current.status === "empty" ||
         (current.status === "pending" && (await clearPendingQuickLogWatering(confirmedWatering)));
+      if (!lifetime.active || noteLifetimeRef.current !== lifetime) return;
       if (!cleared) {
         setLocalError(WATERING_RECOVERY_CLEAR_FAILED);
         return;

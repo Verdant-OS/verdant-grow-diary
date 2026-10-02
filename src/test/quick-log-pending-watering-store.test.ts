@@ -4,6 +4,7 @@ import {
   clearPendingQuickLogWatering,
   markPendingQuickLogWateringHistoryCheck,
   reconcilePendingQuickLogWateringClear,
+  reconcilePendingQuickLogWateringHistoryDiscard,
   readPendingQuickLogWatering,
   type PendingQuickLogWatering,
 } from "@/lib/quickLogPendingWateringStore";
@@ -627,6 +628,65 @@ describe("storage failures and exact completion", () => {
     if (marked.status !== "marked") throw new Error("expected a marked record");
     expect(await reconcilePendingQuickLogWateringClear(marked.record)).toEqual({
       status: "cleared",
+    });
+  });
+
+  it("discards a marked claim even when the marker readback failed and the caller kept the unmarked record", async () => {
+    const original = record();
+    expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
+    const getItem = Storage.prototype.getItem;
+    let failNextRead = false;
+    const readSpy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (
+      this: Storage,
+      k: string,
+    ) {
+      const raw = getItem.call(this, k);
+      if (k === key() && raw?.includes("historyCheckReason") && !failNextRead) {
+        failNextRead = true;
+        throw new Error("transient readback failure");
+      }
+      return raw;
+    });
+    try {
+      // The marker write lands, but its verification read fails once.
+      expect(
+        await markPendingQuickLogWateringHistoryCheck(original, "idempotency_key_retracted"),
+      ).toEqual({ status: "blocked" });
+    } finally {
+      readSpy.mockRestore();
+    }
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({
+      status: "pending",
+      record: { ...original, historyCheckReason: "idempotency_key_retracted" },
+    });
+    // Storage has recovered; the caller still holds the unmarked claim.
+    expect(await reconcilePendingQuickLogWateringHistoryDiscard(original)).toEqual({
+      status: "cleared",
+    });
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "empty" });
+  });
+
+  it("history discard never removes a different claim or an unrecognized marker", async () => {
+    const original = record();
+    const edited = record();
+    edited.payload.volume_ml = 900;
+    window.sessionStorage.setItem(
+      key(),
+      JSON.stringify({ ...edited, historyCheckReason: "idempotency_key_retracted" }),
+    );
+    expect(await reconcilePendingQuickLogWateringHistoryDiscard(original)).toEqual({
+      status: "pending",
+      record: { ...edited, historyCheckReason: "idempotency_key_retracted" },
+    });
+    window.sessionStorage.setItem(key(), JSON.stringify(original));
+    expect(await reconcilePendingQuickLogWateringHistoryDiscard(original)).toEqual({
+      status: "cleared",
+    });
+    expect(await reconcilePendingQuickLogWateringHistoryDiscard(original)).toEqual({
+      status: "already_cleared",
+    });
+    expect(await reconcilePendingQuickLogWateringHistoryDiscard(null)).toEqual({
+      status: "blocked",
     });
   });
 

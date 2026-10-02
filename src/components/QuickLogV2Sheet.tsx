@@ -16,6 +16,7 @@ import {
   claimPendingQuickLogWatering,
   clearPendingQuickLogWatering,
   reconcilePendingQuickLogWateringClear,
+  reconcilePendingQuickLogWateringHistoryDiscard,
   markPendingQuickLogWateringHistoryCheck,
   WATERING_RECOVERY_UNAVAILABLE,
   WATERING_RECOVERY_PENDING,
@@ -1902,6 +1903,9 @@ function QuickLogV2SheetForOwner({
       }
       if (!canContinueNote() || exactWateringSubmission.recovery.ownerId !== user?.id) return;
       const claim = await claimPendingQuickLogWatering(exactWateringSubmission.recovery);
+      // The claim waits on a cross-tab lock; an unmount or account change
+      // (which remounts this sheet) must not dispatch from the old lifetime.
+      if (!canContinueNote()) return;
       if (claim.status !== "claimed") {
         keepSubmissionLockedRef.current = true;
         setWateringRetryPending(true);
@@ -2377,9 +2381,9 @@ function QuickLogV2SheetForOwner({
     if (pendingWater) {
       const lifetime = noteLifetimeRef.current;
       saveInFlightRef.current = true;
-      let clearance: Awaited<ReturnType<typeof reconcilePendingQuickLogWateringClear>>;
+      let clearance: Awaited<ReturnType<typeof reconcilePendingQuickLogWateringHistoryDiscard>>;
       try {
-        clearance = await reconcilePendingQuickLogWateringClear(pendingWater.recovery);
+        clearance = await reconcilePendingQuickLogWateringHistoryDiscard(pendingWater.recovery);
       } finally {
         saveInFlightRef.current = false;
       }

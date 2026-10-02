@@ -24,9 +24,16 @@ similar constraint) destroys forensic evidence and makes real recovery harder.
 2. **Preserve logs.** Capture Postgres logs, Edge Function logs, and the
    failing SQL text (including any `-- comment` lines) for the incident
    record before they roll off.
-3. **Confirm the environment.** Verify whether the affected database is
-   production, staging, or local dev. Never run recovery steps against the
-   wrong project ref.
+3. **Confirm the environment.** Identify and record the actual affected
+   environment (production, a legacy staging/sandbox database, or a disposable
+   local/CI fixture) and its exact project/target identity before investigation.
+   Verify whether it is the pinned production target for
+   https://verdantgrowdiary.com; an answer of "not production" still requires
+   identifying the real target. Incident classification does not approve another
+   hosted smoke site: current live verification remains production-only.
+   Historical local/CI evidence retains its actual target and cannot substitute
+   for live verification. Never run recovery against the wrong project ref;
+   this verification task authorizes no repair/APPLY.
 4. **Do not run any repair script that inserts into `grows`, `tents`,
    `plants`, `action_queue`, or related tables.** No "one-shot" placeholders.
 

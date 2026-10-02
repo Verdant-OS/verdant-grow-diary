@@ -17,12 +17,18 @@ name: Quick Log Playwright smoke
 #  - pull_request to verdant-grow-diary: best-effort; PRs without access to E2E vars/secrets
 #    (e.g. forked PRs) skip cleanly with a clear non-secret message and the job
 #    completes successfully.
+#  - schedule: once a day on the deploy branch tip (owner decision, #1852), so a
+#    product-only push gets a save-timing receipt within a day. Two tagged
+#    fixture saves per run, the same as a push run; skips cleanly without config.
 #
 # Required repository secrets / vars (configure in GitHub → Settings):
 #   secrets.E2E_TEST_EMAIL
 #   secrets.E2E_TEST_PASSWORD
-#   vars.E2E_BASE_URL              (e.g. https://<preview-or-staging>.example)
-#   vars.E2E_GROW_1_PLANT_URL      (full URL of a Grow #1 plant page)
+#   vars.E2E_BASE_URL              (https://verdantgrowdiary.com only)
+#   vars.E2E_GROW_1_PLANT_URL      (production URL in the test fixture's own grow)
+# Before writes, verify fixture/account ownership; tag [smoke <timestamp>].
+# Never customer data or the KEEP account. Any missing harness guard needs a
+# separate reviewed CI slice; this comment changes no executable settings.
 #   vars.E2E_GROW_1_SECOND_PLANT_NAME (optional; defaults to "E2E Test Plant 2")
 #
 # PR-comment controls (workflow_dispatch only; push/pull_request use the
@@ -97,14 +103,19 @@ on:
     paths:
       - "e2e/**"
       - "playwright.config.ts"
+      - "scripts/check-playwright-failure-media.mjs"
       - ".github/workflows/quicklog-smoke.yml"
   pull_request:
     branches: [verdant-grow-diary]
     paths:
       - "e2e/**"
       - "playwright.config.ts"
+      - "scripts/check-playwright-failure-media.mjs"
       - ".github/workflows/quicklog-smoke.yml"
     types: [opened, synchronize, reopened, ready_for_review]
+  # One daily run (09:17 UTC) measures save timing on whatever is deployed.
+  schedule:
+    - cron: "17 9 * * *"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
@@ -467,9 +478,17 @@ jobs:
 
   quicklog-smoke:
     name: Quick Log Playwright smoke
-    if: github.event_name != 'workflow_dispatch' || inputs.run_mode == 'quicklog_smoke'
+    # Credential-bearing proof only from the owner on immutable deploy source.
+    # PR branches receive credential-free regression checks, never smoke writes.
+    # A schedule has no human trigger: GitHub attributes it to whoever last edited
+    # the cron, so it is trusted by the protected deploy ref and merged source alone.
+    if: github.repository == 'Verdant-OS/verdant-grow-diary' && github.ref == 'refs/heads/verdant-grow-diary' && github.run_attempt == '1' && (github.event_name == 'schedule' || (github.actor == 'cheekhimself' && github.triggering_actor == 'cheekhimself' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_mode == 'quicklog_smoke'))))
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Includes up to 20 minutes waiting for publishing to serve the pinned SHA.
+    timeout-minutes: 45
+    concurrency:
+      group: quicklog-production-fixture
+      cancel-in-progress: false
 
     # Job scope: read code, post a sticky PR comment linking to Playwright
     # artifact bundles for failed/flaky tests. No other write scopes.
@@ -484,11 +503,11 @@ jobs:
       # run_attempt (bumps on re-run) and a short commit SHA for at-a-glance
       # traceability from the Artifacts dropdown.
       ARTIFACT_SUFFIX: run-${{ github.run_id }}-attempt-${{ github.run_attempt }}-sha-${{ github.sha }}
+      # Includes login setup and the separate fixture-verification command.
+      E2E_DISABLE_FAILURE_MEDIA: "true"
       E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
       E2E_GROW_1_PLANT_URL: ${{ vars.E2E_GROW_1_PLANT_URL }}
       E2E_GROW_1_SECOND_PLANT_NAME: ${{ vars.E2E_GROW_1_SECOND_PLANT_NAME }}
-      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
-      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
       E2E_FIXTURE_MODE: ${{ vars.E2E_FIXTURE_MODE }}
       E2E_FIXTURE_EXPECTED_GROW_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_GROW_NAME }}
       E2E_FIXTURE_EXPECTED_TENT_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_TENT_NAME }}
@@ -498,9 +517,12 @@ jobs:
       E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: ${{ vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT }}
       # Optional, off by default. Enables the UI-only fixture bootstrap step.
       E2E_ALLOW_FIXTURE_BOOTSTRAP: ${{ vars.E2E_ALLOW_FIXTURE_BOOTSTRAP }}
-      # Playwright retry policy for flake triage. Defaults to 1 retry in CI
-      # (playwright.config.ts). workflow_dispatch can override for deeper runs.
-      PLAYWRIGHT_RETRIES: ${{ github.event_name == 'workflow_dispatch' && inputs.playwright_retries || '1' }}
+      # "true" only on the daily schedule: no person is present, so the smoke
+      # blocks on agreement re-consent instead of accepting it (#1852).
+      E2E_UNATTENDED_RUN: ${{ github.event_name == 'schedule' }}
+      # Performance evidence is one first attempt, never a retry success.
+      E2E_MEASURE_SIGNED_IN_PERFORMANCE: "true"
+      PLAYWRIGHT_RETRIES: "0"
       # PR-comment posting mode, read by the two "Post ... PR comment" steps'
       # own `if:` conditions below. push/pull_request always default to
       # 'sticky'; only workflow_dispatch can choose 'new-per-run'.
@@ -526,9 +548,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Pin Quick Log proof SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_sha="$(git rev-parse HEAD)"
+          [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]]
+          [ "$expected_sha" = "$GITHUB_SHA" ]
+          echo "E2E_EXPECTED_SHA=$expected_sha" >> "$GITHUB_ENV"
 
       - name: Verify required configuration
         id: e2e_config
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         shell: bash
         run: |
           # Track presence (never echo values). Only NAMES of missing config
@@ -544,6 +581,13 @@ jobs:
           [ -n "$E2E_FIXTURE_MODE" ] || missing+=("vars.E2E_FIXTURE_MODE")
           [ -n "$E2E_FIXTURE_EXPECTED_TENT_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_TENT_NAME")
           [ -n "$E2E_FIXTURE_EXPECTED_PLANT_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_PLANT_NAME")
+
+          if [ "$E2E_BASE_URL" != "https://verdantgrowdiary.com" ] ||
+             [ "$E2E_TEST_EMAIL" != "cheekhimself@gmail.com" ]; then
+            echo "BLOCKED: exact production host and approved fixture-account credentials required." >&2
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
 
           event="${{ github.event_name }}"
 
@@ -571,6 +615,12 @@ jobs:
             echo "Quick Log smoke configuration present. Proceeding."
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # A merge is not a deployment: verify the fixture and save only once
+      # production serves the pinned SHA, so timing never measures the old build.
+      - name: Wait for the pinned SHA to be live
+        if: steps.e2e_config.outputs.should_run == 'true'
+        run: node scripts/wait-for-deployed-sha.mjs
 
       - name: Setup Bun
         if: steps.e2e_config.outputs.should_run == 'true'
@@ -621,18 +671,37 @@ jobs:
       # NOT required — fixture verification still runs and gates the smoke.
       - name: Bootstrap disposable E2E fixture
         id: bootstrap_fixture
-        if: steps.e2e_config.outputs.should_run == 'true' && vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'
+        # Never on the unattended schedule: it may only make the two tagged saves.
+        if: steps.e2e_config.outputs.should_run == 'true' && vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true' && github.event_name != 'schedule'
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         run: bun run e2e:bootstrap-fixture
 
       - name: Verify disposable E2E fixture
         id: verify_fixture
         if: steps.e2e_config.outputs.should_run == 'true'
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         run: bun run e2e:verify-fixture
 
       - name: Run Quick Log Playwright smoke
         id: quicklog_smoke
         if: steps.e2e_config.outputs.should_run == 'true' && steps.verify_fixture.outcome == 'success'
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         run: bun run e2e:quicklog-smoke
+
+      - name: Upload sanitized Quick Log timing receipt
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: quicklog-save-performance-${{ env.ARTIFACT_SUFFIX }}
+          path: test-results/**/*quicklog-save-confirmed-performance.json
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Verify Quick Log smoke artifacts
         if: always() && steps.e2e_config.outputs.should_run == 'true'
@@ -671,6 +740,11 @@ jobs:
           fi
 
           exit "$status"
+
+      - name: Verify Quick Log media boundary
+        id: media_boundary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        run: node scripts/check-playwright-failure-media.mjs
 
       - name: Summarize failed step metadata in Job Summary
         if: failure()
@@ -803,6 +877,7 @@ jobs:
         if: >-
           always()
           && steps.e2e_config.outputs.should_run == 'true'
+          && steps.media_boundary.outcome == 'success'
           && (github.event_name != 'workflow_dispatch' || inputs.upload_html_report != 'false')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -1210,7 +1285,7 @@ jobs:
 
       - name: Upload smoke artifacts
         id: upload_smoke_bundle
-        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        if: always() && steps.e2e_config.outputs.should_run == 'true' && steps.media_boundary.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: quicklog-smoke-artifacts-${{ env.ARTIFACT_SUFFIX }}
@@ -1336,6 +1411,7 @@ jobs:
         if: >-
           always()
           && steps.e2e_config.outputs.should_run == 'true'
+          && env.E2E_DISABLE_FAILURE_MEDIA != 'true'
           && steps.trace_files.outputs.present == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -1482,7 +1558,7 @@ jobs:
       - name: Upload Playwright media (screenshots/videos)
         id: upload_playwright_media
 
-        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        if: always() && steps.e2e_config.outputs.should_run == 'true' && env.E2E_DISABLE_FAILURE_MEDIA != 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: quicklog-playwright-media-${{ env.ARTIFACT_SUFFIX }}
@@ -1570,7 +1646,7 @@ jobs:
 
       - name: Upload per-test failure artifacts
         id: upload_per_test_artifacts
-        if: always() && steps.e2e_config.outputs.should_run == 'true' && env.PR_COMMENT_CONTEXT_OK == 'true' && env.PR_COMMENT_DISABLED != 'true'
+        if: always() && steps.e2e_config.outputs.should_run == 'true' && env.PR_COMMENT_CONTEXT_OK == 'true' && env.PR_COMMENT_DISABLED != 'true' && env.E2E_DISABLE_FAILURE_MEDIA != 'true'
         shell: bash
         run: |
           # One dedicated artifact per failed/flaky test, so the PR comment
@@ -1745,7 +1821,11 @@ jobs:
             else
               echo "- Playwright traces: intentionally disabled/unavailable for this authenticated run"
             fi
-            echo "- [Playwright media (screenshots/videos)](${pw_media_url})"
+            if [ "${E2E_DISABLE_FAILURE_MEDIA}" = "true" ]; then
+              echo "- Playwright media: disabled for this authenticated proof; no media upload."
+            else
+              echo "- [Playwright media (screenshots/videos)](${pw_media_url})"
+            fi
             echo "- [Smoke report JSON](${smoke_json_url})"
             echo "- [Smoke report TXT](${smoke_txt_url})"
             echo ""
@@ -1771,7 +1851,7 @@ jobs:
               echo "- Command: \`bun run e2e:quicklog-smoke\`"
               echo "- Browser: \`chromium\`"
               echo "- Playwright: \`${PLAYWRIGHT_VERSION:-unavailable}\`"
-              echo "- Playwright retries per test: \`${PLAYWRIGHT_RETRIES:-1}\` (override via workflow_dispatch \`playwright_retries\` input)"
+              echo "- Playwright retries per test: \`${PLAYWRIGHT_RETRIES:-0}\` (Quick Log timing proof always uses zero retries)"
               echo ""
               echo "  Retry artifacts use sibling directories such as \`test-results/<test>-retry1/\`. Authenticated tracing is intentionally off; screenshots/videos may still be retained by Playwright."
               echo ""
@@ -1823,7 +1903,11 @@ jobs:
               else
                 echo "- Playwright traces artifact: not uploaded — trace intentionally disabled/unavailable"
               fi
-              echo "- Playwright media artifact: \`quicklog-playwright-media\` (retention: 30 days)"
+              if [ "${E2E_DISABLE_FAILURE_MEDIA}" = "true" ]; then
+                echo "- Playwright media artifact: not uploaded — media disabled for this proof."
+              else
+                echo "- Playwright media artifact: \`quicklog-playwright-media\` (retention: 30 days)"
+              fi
               echo "- Smoke report JSON artifact: \`quicklog-smoke-report-json\` (retention: 30 days)"
               echo "- Smoke report TXT artifact: \`quicklog-smoke-report-txt\` (retention: 30 days)"
               echo "- Run artifacts page: ${ARTIFACTS_URL}"

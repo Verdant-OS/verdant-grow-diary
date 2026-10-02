@@ -6,20 +6,35 @@ import { fireEvent, render as rtlRender, screen, waitFor } from "@testing-librar
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const { deleteEq, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
-  const deleteEq = vi.fn((): Promise<{ error: { code: string; message: string } | null }> =>
-    Promise.resolve({ error: null }),
+const { deleteEq, deleteResult, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
+  type QueryError = { code: string; message: string };
+  const deleteResult = vi.fn(
+    async (): Promise<{ data: { id: string } | null; error: QueryError | null }> => ({
+      data: { id: deleteEq.mock.lastCall?.[1] ?? "" },
+      error: null,
+    }),
   );
+  const deleteEq = vi.fn((_field: string, _id: string) => ({
+    select: () => ({ maybeSingle: deleteResult }),
+  }));
   const deleteFn = vi.fn(() => ({ eq: deleteEq }));
   return {
     deleteEq,
+    deleteResult,
     deleteFn,
     toastSuccess: vi.fn(),
     toastError: vi.fn(),
   };
 });
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: vi.fn(() => ({ delete: deleteFn })) },
+  supabase: {
+    from: vi.fn(() => ({
+      select: () => ({
+        eq: () => ({ maybeSingle: async () => ({ data: { details: {} }, error: null }) }),
+      }),
+      delete: deleteFn,
+    })),
+  },
 }));
 vi.mock("sonner", () => ({
   toast: { success: toastSuccess, error: toastError },
@@ -35,8 +50,12 @@ function render(ui: React.ReactElement) {
 const VIEWER = { currentUserId: "user-1" };
 
 beforeEach(() => {
-  deleteEq.mockReset();
-  deleteEq.mockImplementation(() => Promise.resolve({ error: null }));
+  deleteEq.mockClear();
+  deleteResult.mockReset();
+  deleteResult.mockImplementation(async () => ({
+    data: { id: deleteEq.mock.lastCall?.[1] ?? "" },
+    error: null,
+  }));
   deleteFn.mockClear();
   toastSuccess.mockClear();
   toastError.mockClear();
@@ -95,9 +114,10 @@ describe("DiaryEntryRemoveButton — follow-up visibility", () => {
   });
 
   it("does NOT show follow-up on removal error", async () => {
-    deleteEq.mockImplementationOnce(() =>
-      Promise.resolve({ error: { code: "42501", message: "denied" } }),
-    );
+    deleteResult.mockImplementationOnce(async () => ({
+      data: null,
+      error: { code: "42501", message: "denied" },
+    }));
     render(
       <DiaryEntryRemoveButton
         entry={{ id: "e3", kind: "diary" }}

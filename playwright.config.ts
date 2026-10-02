@@ -36,6 +36,12 @@ const parsedRetries = Number.parseInt(process.env.PLAYWRIGHT_RETRIES ?? "", 10);
 const RETRIES =
   Number.isFinite(parsedRetries) && parsedRetries >= 0 ? parsedRetries : process.env.CI ? 1 : 0;
 
+// Applies to every project, including auth setup and fixture verification.
+// Proof runs retain sanitized receipts without authenticated browser media.
+const DISABLE_FAILURE_MEDIA =
+  process.env.E2E_MEASURE_SIGNED_IN_PERFORMANCE === "true" ||
+  process.env.E2E_DISABLE_FAILURE_MEDIA === "true";
+
 // Trace policy.
 //
 // `on-first-retry` guarantees a trace zip for the retried attempt whenever a
@@ -43,11 +49,10 @@ const RETRIES =
 // exact evidence needed to pinpoint a Quick Log smoke failure. Real-auth runs
 // (E2E_TEST_EMAIL present) still turn tracing OFF because trace zips would
 // bake the disposable test account's Supabase bearer/session tokens into a
-// publicly-downloadable CI artifact; those runs rely on screenshots + video
-// (pixels only, no headers) for triage.
-const TRACE_MODE: "off" | "on-first-retry" | "retain-on-failure" = process.env.E2E_TEST_EMAIL
-  ? "off"
-  : "on-first-retry";
+// CI artifact. Ordinary smoke runs may retain pixel media for triage; proof
+// modes disable that media too, including when auth setup fails.
+const TRACE_MODE: "off" | "on-first-retry" | "retain-on-failure" =
+  DISABLE_FAILURE_MEDIA || process.env.E2E_TEST_EMAIL ? "off" : "on-first-retry";
 
 // TestDino streams results during the run. The package prints a hard
 // configuration error (then no-ops) when the token is missing, so we only
@@ -93,8 +98,8 @@ export default defineConfig({
     // land in test-results/ and are uploaded by the workflow. See TRACE_MODE
     // above for the token-safety carve-out on real-auth runs.
     trace: TRACE_MODE,
-    video: "retain-on-failure",
-    screenshot: "only-on-failure",
+    video: DISABLE_FAILURE_MEDIA ? "off" : "retain-on-failure",
+    screenshot: DISABLE_FAILURE_MEDIA ? "off" : "only-on-failure",
   },
 
   // Mocked, non-destructive specs navigate to relative routes

@@ -1,5 +1,9 @@
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
 import type { ResolvedQuickLogV2Target } from "./quickLogV2Rules";
+import {
+  quickLogSaveRequiresHistoryCheck,
+  type QuickLogHistoryCheckReason,
+} from "./quickLogSaveErrorMessage";
 
 export interface PendingQuickLogNote {
   version: 1;
@@ -9,6 +13,30 @@ export interface PendingQuickLogNote {
   resolved: ResolvedQuickLogV2Target;
   // File objects cannot survive reload. Retain intent, never fabricate Files.
   attachments: { photo: boolean; video: boolean };
+  /** Durable refusal of this same key. Missing on older pending records. */
+  historyCheckReason?: QuickLogHistoryCheckReason;
+  /**
+   * Verified current scope of the original entry, kept only for
+   * receipt_target_moved so a reload still links the grower to the Timeline
+   * where that entry lives now. Never a confirmed receipt.
+   */
+  historyReviewTarget?: PendingQuickLogNoteReviewTarget;
+}
+
+export interface PendingQuickLogNoteReviewTarget {
+  growId: string | null;
+  tentId: string | null;
+  plantId: string | null;
+}
+
+function validReviewTarget(value: unknown): value is PendingQuickLogNoteReviewTarget {
+  return (
+    object(value) &&
+    onlyKeys(value, ["growId", "tentId", "plantId"]) &&
+    nullableString(value.growId) &&
+    nullableString(value.tentId) &&
+    nullableString(value.plantId)
+  );
 }
 
 export const NOTE_RECOVERY_UNAVAILABLE =
@@ -19,9 +47,7 @@ export const NOTE_RECOVERY_CLEAR_FAILED =
   "Your Note is saved. We couldn’t finish preparing the next Note. Try again before logging another.";
 
 export type PendingNoteRead =
-  | { status: "empty" }
-  | { status: "pending"; record: PendingQuickLogNote }
-  | { status: "blocked" };
+  { status: "empty" } | { status: "pending"; record: PendingQuickLogNote } | { status: "blocked" };
 
 function storageKey(ownerId: string): string {
   return `verdant:quick-log:pending-note:v1:${ownerId}`;
@@ -32,7 +58,7 @@ function object(value: unknown): value is Record<string, unknown> {
 }
 
 function onlyKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
-  return Object.keys(value).every(key => keys.includes(key));
+  return Object.keys(value).every((key) => keys.includes(key));
 }
 
 function nullableString(value: unknown): boolean {
@@ -53,30 +79,94 @@ function jsonValue(value: unknown): boolean {
 
 /** A closed, versioned projection; unknown/corrupt data never means "no pending Note". */
 function validRecord(value: unknown, ownerId: string): value is PendingQuickLogNote {
-  if (!object(value) || !onlyKeys(value, ["version", "ownerId", "createdAt", "payload", "resolved", "attachments"])) return false;
+  if (
+    !object(value) ||
+    !onlyKeys(value, [
+      "version",
+      "ownerId",
+      "createdAt",
+      "payload",
+      "resolved",
+      "attachments",
+      "historyCheckReason",
+      "historyReviewTarget",
+    ])
+  )
+    return false;
   if (value.version !== 1 || value.ownerId !== ownerId || !ownerId.trim()) return false;
-  if (typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt))) return false;
+  if (
+    value.historyCheckReason !== undefined &&
+    !quickLogSaveRequiresHistoryCheck(value.historyCheckReason)
+  )
+    return false;
+  if (
+    value.historyReviewTarget !== undefined &&
+    (value.historyCheckReason !== "receipt_target_moved" ||
+      !validReviewTarget(value.historyReviewTarget))
+  )
+    return false;
+  if (typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt)))
+    return false;
   const p = value.payload;
   const r = value.resolved;
   const a = value.attachments;
-  if (!object(p) || !onlyKeys(p, [
-    "p_target_type", "p_target_id", "p_action", "p_volume_ml", "p_note",
-    "p_temperature_c", "p_humidity_pct", "p_vpd_kpa", "p_occurred_at",
-    "p_details", "p_stage", "p_idempotency_key",
-  ])) return false;
+  if (
+    !object(p) ||
+    !onlyKeys(p, [
+      "p_target_type",
+      "p_target_id",
+      "p_action",
+      "p_volume_ml",
+      "p_note",
+      "p_temperature_c",
+      "p_humidity_pct",
+      "p_vpd_kpa",
+      "p_occurred_at",
+      "p_details",
+      "p_stage",
+      "p_idempotency_key",
+    ])
+  )
+    return false;
   if (p.p_action !== "note" || !["plant", "tent"].includes(p.p_target_type as string)) return false;
   if (typeof p.p_target_id !== "string" || !p.p_target_id.trim()) return false;
-  if (typeof p.p_idempotency_key !== "string" || p.p_idempotency_key.length < 8 || p.p_idempotency_key.length > 200) return false;
+  if (
+    typeof p.p_idempotency_key !== "string" ||
+    p.p_idempotency_key.length < 8 ||
+    p.p_idempotency_key.length > 200
+  )
+    return false;
   if (p.p_volume_ml !== null || !nullableString(p.p_note)) return false;
   if (![p.p_temperature_c, p.p_humidity_pct, p.p_vpd_kpa].every(nullableNumber)) return false;
-  if (p.p_occurred_at !== null && (typeof p.p_occurred_at !== "string" || !Number.isFinite(Date.parse(p.p_occurred_at)))) return false;
+  if (
+    p.p_occurred_at !== null &&
+    (typeof p.p_occurred_at !== "string" || !Number.isFinite(Date.parse(p.p_occurred_at)))
+  )
+    return false;
   if (p.p_stage !== undefined && !nullableString(p.p_stage)) return false;
-  if (p.p_details !== undefined && p.p_details !== null && (!object(p.p_details) || !jsonValue(p.p_details))) return false;
-  if (!object(r) || !onlyKeys(r, ["ok", "targetType", "targetId", "tentId", "plantId", "growId"])) return false;
-  if (r.ok !== true || r.targetType !== p.p_target_type || r.targetId !== p.p_target_id) return false;
+  if (
+    p.p_details !== undefined &&
+    p.p_details !== null &&
+    (!object(p.p_details) || !jsonValue(p.p_details))
+  )
+    return false;
+  if (!object(r) || !onlyKeys(r, ["ok", "targetType", "targetId", "tentId", "plantId", "growId"]))
+    return false;
+  if (r.ok !== true || r.targetType !== p.p_target_type || r.targetId !== p.p_target_id)
+    return false;
   if (![r.tentId, r.plantId, r.growId].every(nullableString)) return false;
-  if (p.p_target_type === "plant" ? r.plantId !== p.p_target_id : r.tentId !== p.p_target_id || r.plantId !== null) return false;
-  return object(a) && onlyKeys(a, ["photo", "video"]) && typeof a.photo === "boolean" && typeof a.video === "boolean";
+  if (
+    p.p_target_type === "plant"
+      ? r.plantId !== p.p_target_id
+      : r.tentId !== p.p_target_id || r.plantId !== null
+  )
+    return false;
+  return (
+    object(a) &&
+    onlyKeys(a, ["photo", "video"]) &&
+    typeof a.photo === "boolean" &&
+    typeof a.video === "boolean"
+  );
 }
 
 export function readPendingQuickLogNote(ownerId: string | null): PendingNoteRead {
@@ -99,7 +189,9 @@ function sameRecord(a: PendingQuickLogNote, b: PendingQuickLogNote): boolean {
  * Synchronous same-tab claim before any Note dispatch. A second mounted sheet
  * must recover the first record, never overwrite it. No expiry or consume-on-read.
  */
-export function claimPendingQuickLogNote(record: PendingQuickLogNote):
+export function claimPendingQuickLogNote(
+  record: PendingQuickLogNote,
+):
   | { status: "claimed"; record: PendingQuickLogNote }
   | Exclude<PendingNoteRead, { status: "empty" }> {
   try {
@@ -107,13 +199,60 @@ export function claimPendingQuickLogNote(record: PendingQuickLogNote):
     const current = readPendingQuickLogNote(record.ownerId);
     if (current.status === "blocked") return current;
     if (current.status === "pending") {
-      return sameRecord(current.record, record) ? { status: "claimed", record: current.record } : current;
+      return sameRecord(current.record, record)
+        ? { status: "claimed", record: current.record }
+        : current;
     }
     const raw = JSON.stringify(record);
     window.sessionStorage.setItem(storageKey(record.ownerId), raw);
     // A blocked/no-op storage implementation must not permit the RPC either.
-    if (window.sessionStorage.getItem(storageKey(record.ownerId)) !== raw) return { status: "blocked" };
+    if (window.sessionStorage.getItem(storageKey(record.ownerId)) !== raw)
+      return { status: "blocked" };
     return { status: "claimed", record: JSON.parse(raw) as PendingQuickLogNote };
+  } catch {
+    return { status: "blocked" };
+  }
+}
+
+/** Preserve a server refusal across remounts without changing the original save key or payload. */
+export function markPendingQuickLogNoteHistoryCheck(
+  record: PendingQuickLogNote,
+  reason: string | null | undefined,
+  reviewTarget?: PendingQuickLogNoteReviewTarget | null,
+): { status: "marked"; record: PendingQuickLogNote } | { status: "blocked" } {
+  try {
+    if (!quickLogSaveRequiresHistoryCheck(reason) || !validRecord(record, record.ownerId)) {
+      return { status: "blocked" };
+    }
+    // Only a moved receipt carries a review target, and it must be well formed.
+    if (
+      reviewTarget != null &&
+      (reason !== "receipt_target_moved" || !validReviewTarget(reviewTarget))
+    ) {
+      return { status: "blocked" };
+    }
+    const current = readPendingQuickLogNote(record.ownerId);
+    if (current.status !== "pending" || !sameRecord(current.record, record)) {
+      return { status: "blocked" };
+    }
+    const marked: PendingQuickLogNote = {
+      ...current.record,
+      historyCheckReason: reason,
+      ...(reviewTarget != null
+        ? {
+            historyReviewTarget: {
+              growId: reviewTarget.growId,
+              tentId: reviewTarget.tentId,
+              plantId: reviewTarget.plantId,
+            },
+          }
+        : {}),
+    };
+    window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
+    const verified = readPendingQuickLogNote(record.ownerId);
+    return verified.status === "pending" && sameRecord(verified.record, marked)
+      ? { status: "marked", record: verified.record }
+      : { status: "blocked" };
   } catch {
     return { status: "blocked" };
   }

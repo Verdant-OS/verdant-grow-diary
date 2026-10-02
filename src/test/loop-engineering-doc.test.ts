@@ -1,0 +1,101 @@
+/**
+ * Contract test for docs/agents/loop-engineering.md and the verdant-loop-habits skill.
+ *
+ * Pins the loop-eligibility gate (the four conditions and the never-loop list), the
+ * scorer-lock mechanism description, and the habits amendment rules so a later edit
+ * cannot quietly make loops eligible for production verification or let the habits
+ * process touch the checks.
+ */
+import { describe, it, expect } from "vitest";
+import { readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
+
+const DOC_PATH = resolve(process.cwd(), "docs/agents/loop-engineering.md");
+const SKILL_PATH = resolve(process.cwd(), ".claude/skills/verdant-loop-habits/SKILL.md");
+
+const DOC = existsSync(DOC_PATH) ? readFileSync(DOC_PATH, "utf8") : "";
+const SKILL = existsSync(SKILL_PATH) ? readFileSync(SKILL_PATH, "utf8") : "";
+
+describe("docs/agents/loop-engineering.md — contract", () => {
+  it("exists", () => {
+    expect(existsSync(DOC_PATH)).toBe(true);
+  });
+
+  it("carries no Sentinel-Version stamp, so editing it needs no twelve-file bump", () => {
+    // The governance files open with `**Sentinel-Version: YYYY-MM-DD.N**`; prose that
+    // says the page carries none is allowed, a stamp line is not.
+    expect(DOC).not.toMatch(/^\*\*Sentinel-Version: /m);
+  });
+
+  it("states the four eligibility conditions", () => {
+    for (const heading of ["Repeated", "Budgeted", "Scorable", "Runnable"]) {
+      expect(DOC).toContain(`**${heading}.**`);
+    }
+  });
+
+  it("names the surfaces a loop may never run against", () => {
+    for (const term of [
+      "production-only verification",
+      "supabase/migrations",
+      "RLS",
+      "Edge Functions",
+      "Action Queue",
+      "device control",
+      "lockfile",
+      "Publish",
+      "docs/agents/CURRENT_STATE.md",
+    ]) {
+      expect(DOC).toContain(term);
+    }
+  });
+
+  it("keeps the score honest: NOT_MEASURED is never a passing score", () => {
+    expect(DOC).toMatch(/NOT_MEASURED/);
+    expect(DOC).toMatch(/one feature per loop/i);
+  });
+
+  it("describes the scorer lock, its unlock command, and its limits", () => {
+    expect(DOC).toContain("scripts/scorer-lock.mjs");
+    expect(DOC).toContain("--unlock");
+    expect(DOC).toContain("--reason");
+    expect(DOC).toMatch(/tripwire/i);
+    expect(DOC).toMatch(/not a security boundary/i);
+  });
+
+  it("forbids the habits process from editing checks", () => {
+    expect(DOC).toMatch(/habit[^.]*never[^.]*(check|test|scorer)/i);
+  });
+
+  it("points at the habits skill and the handoff log as the results file", () => {
+    expect(DOC).toContain(".claude/skills/verdant-loop-habits/SKILL.md");
+    expect(DOC).toContain("docs/agents/HANDOFF_LOG.md");
+  });
+
+  it("records the open PRs it must not collide with", () => {
+    expect(DOC).toContain("#1865");
+    expect(DOC).toContain("#1774");
+  });
+});
+
+describe(".claude/skills/verdant-loop-habits/SKILL.md — contract", () => {
+  it("exists with frontmatter name and description", () => {
+    expect(existsSync(SKILL_PATH)).toBe(true);
+    expect(SKILL).toMatch(/^---\nname: verdant-loop-habits\ndescription: /);
+  });
+
+  it("every habit entry carries evidence and a status", () => {
+    const entries = SKILL.split(/\n### H\d+/).slice(1);
+    expect(entries.length).toBeGreaterThanOrEqual(3);
+    for (const entry of entries) {
+      expect(entry).toMatch(/\*\*Evidence:\*\*/);
+      expect(entry).toMatch(/\*\*Status:\*\* (active|retired)/);
+      expect(entry).toMatch(/\*\*Label:\*\* (established fact|inference|source claim)/);
+    }
+  });
+
+  it("states the amendment rules, including that habits never edit checks", () => {
+    expect(SKILL).toContain("## Amending this list");
+    expect(SKILL).toMatch(/never[^.]*(edit|change|weaken)[^.]*(check|test|scorer)/i);
+    expect(SKILL).toContain("docs/agents/HANDOFF_LOG.md");
+  });
+});

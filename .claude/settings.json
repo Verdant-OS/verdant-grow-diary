@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/scorer-lock.mjs --hook",
+            "timeout": 15,
+            "statusMessage": "scorer-lock: checking whether this edits a locked check"
+          }
+        ]
+      }
+    ]
+  }
+}

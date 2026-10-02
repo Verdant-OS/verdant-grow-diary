@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   claimPendingQuickLogWatering,
   clearPendingQuickLogWatering,
+  markPendingQuickLogWateringHistoryCheck,
   reconcilePendingQuickLogWateringClear,
   readPendingQuickLogWatering,
   type PendingQuickLogWatering,
@@ -595,6 +596,46 @@ describe("storage failures and exact completion", () => {
       record: edited,
     });
     expect(await clearPendingQuickLogWatering(original)).toBe(false);
+  });
+
+  it("marks only the exact claim for history review and keeps it clearable by discard", async () => {
+    const original = record();
+    expect((await claimPendingQuickLogWatering(original)).status).toBe("claimed");
+    const edited = record();
+    edited.payload.volume_ml = 900;
+    expect(
+      await markPendingQuickLogWateringHistoryCheck(edited, "idempotency_key_retracted"),
+    ).toEqual({ status: "blocked" });
+    expect(await markPendingQuickLogWateringHistoryCheck(original, "rpc:rejected")).toEqual({
+      status: "blocked",
+    });
+    const marked = await markPendingQuickLogWateringHistoryCheck(
+      original,
+      "idempotency_receipt_missing",
+    );
+    expect(marked).toEqual({
+      status: "marked",
+      record: { ...original, historyCheckReason: "idempotency_receipt_missing" },
+    });
+    // The marked record survives a reload and is still exactly clearable.
+    const reread = readPendingQuickLogWatering(ownerA);
+    expect(reread).toEqual({
+      status: "pending",
+      record: { ...original, historyCheckReason: "idempotency_receipt_missing" },
+    });
+    expect(await clearPendingQuickLogWatering(original)).toBe(false);
+    if (marked.status !== "marked") throw new Error("expected a marked record");
+    expect(await reconcilePendingQuickLogWateringClear(marked.record)).toEqual({
+      status: "cleared",
+    });
+  });
+
+  it("blocks a stored history reason that is not a recognized replay refusal", () => {
+    window.sessionStorage.setItem(
+      key(),
+      JSON.stringify({ ...record(), historyCheckReason: "rpc:rejected" }),
+    );
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
   });
 
   it.each(["throw", "no-op"])("reports failed cleanup when removeItem is %s", async (failure) => {

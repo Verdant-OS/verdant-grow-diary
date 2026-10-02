@@ -172,7 +172,7 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
   const SHEET = readFileSync(resolve(ROOT, "src/components/QuickLogV2Sheet.tsx"), "utf8");
   const PAYLOAD = readFileSync(resolve(ROOT, "src/lib/quickLogV2SavePayload.ts"), "utf8");
   const HISTORY_DISCARD =
-    SHEET.match(/ {2}function handleDiscardHistoryDraft\(\) \{[\s\S]*?\n {2}\}/)?.[0] ?? "";
+    SHEET.match(/ {2}async function handleDiscardHistoryDraft\(\) \{[\s\S]*?\n {2}\}/)?.[0] ?? "";
 
   it("payload builder requires and threads the key", () => {
     expect(PAYLOAD).toMatch(/p_idempotency_key: string/);
@@ -214,8 +214,9 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
 
   it("rotates an abandoned history draft only after guarded exact journal clearance", () => {
     expect(HISTORY_DISCARD).not.toBe("");
+    // Exactly one Note, Feed or typed Water draft may be abandoned at a time.
     expect(HISTORY_DISCARD).toMatch(
-      /!historyDiscardAllowed\s*\|\|\s*saveInFlightRef\.current\s*\|\|\s*\(!pending && !pendingFeed\)\s*\|\|\s*\(pending && pendingFeed\)/,
+      /!historyDiscardAllowed\s*\|\|\s*saveInFlightRef\.current\s*\|\|\s*\[pending, pendingFeed, pendingWater\]\.filter\(\(draft\) => draft !== null\)\.length !== 1/,
     );
     expect(HISTORY_DISCARD).toMatch(
       /if \(pending && !clearPendingQuickLogNote\(pending\.recovery\)\) \{\s*setLocalError\(QUICK_LOG_HISTORY_DISCARD_FAILED\);\s*return;\s*\}/,
@@ -231,10 +232,23 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
     expect(rotation).toBeGreaterThan(
       HISTORY_DISCARD.indexOf("clearPendingQuickLogFeeding(pendingFeed.recovery)"),
     );
+    // Typed Water clears its exact journal under the Water recovery lock, and a
+    // refused clear keeps the draft locked before any rotation.
+    expect(HISTORY_DISCARD).toMatch(
+      /if \(clearance\.status !== "cleared" && clearance\.status !== "already_cleared"\) \{\s*setLocalError\(QUICK_LOG_HISTORY_DISCARD_FAILED\);\s*return;\s*\}/,
+    );
+    expect(rotation).toBeGreaterThan(
+      HISTORY_DISCARD.indexOf("reconcilePendingQuickLogWateringClear(pendingWater.recovery)"),
+    );
     expect(
       HISTORY_DISCARD.match(/saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/g),
     ).toHaveLength(1);
-    expect(HISTORY_DISCARD).not.toMatch(/\bawait\b|trackQuickLogSuccess|setPostSave|\bsave\(/);
+    // The only await is that locked Water journal clear; discard never saves.
+    expect(HISTORY_DISCARD.match(/\bawait\b/g)).toEqual(["await"]);
+    expect(HISTORY_DISCARD).toMatch(
+      /await reconcilePendingQuickLogWateringClear\(pendingWater\.recovery\)/,
+    );
+    expect(HISTORY_DISCARD).not.toMatch(/trackQuickLogSuccess|setPostSave|\bsave\(/);
   });
 
   it("companion-media failure is partial success — the save flow no longer aborts", () => {

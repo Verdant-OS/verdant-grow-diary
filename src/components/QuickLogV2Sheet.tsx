@@ -16,6 +16,7 @@ import {
   claimPendingQuickLogWatering,
   clearPendingQuickLogWatering,
   reconcilePendingQuickLogWateringClear,
+  markPendingQuickLogWateringHistoryCheck,
   WATERING_RECOVERY_UNAVAILABLE,
   WATERING_RECOVERY_PENDING,
   WATERING_RECOVERY_CLEAR_FAILED,
@@ -502,7 +503,9 @@ function QuickLogV2SheetForOwner({
         ? quickLogReasonToOperatorMessage(initialNote.historyCheckReason)
         : NOTE_RECOVERY_PENDING
       : initialWatering
-        ? WATERING_RECOVERY_PENDING
+        ? initialWatering.historyCheckReason
+          ? quickLogReasonToOperatorMessage(initialWatering.historyCheckReason)
+          : WATERING_RECOVERY_PENDING
         : initialFeeding
           ? initialFeeding.historyCheckReason
             ? quickLogReasonToOperatorMessage(initialFeeding.historyCheckReason)
@@ -520,14 +523,22 @@ function QuickLogV2SheetForOwner({
   const [wateringVolumeDefaultsApplied, setWateringVolumeDefaultsApplied] = useState(false);
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
   const [visitMode, setVisitMode] = useState<GrowWalkVisitMode>("fast_check");
-  const [wateringRetryPending, setWateringRetryPending] = useState(Boolean(initialWatering));
+  // A Watering refused for history review is not retryable; it uses the
+  // shared exact-entry lock with its Timeline review and explicit discard.
+  const [wateringRetryPending, setWateringRetryPending] = useState(
+    Boolean(initialWatering && !initialWatering.historyCheckReason),
+  );
   const [failedWaterPhotoUpload, setFailedWaterPhotoUpload] = useState(false);
   const [waterPhotoOmitted, setWaterPhotoOmitted] = useState(false);
   const [exactRetryPending, setExactRetryPending] = useState(
-    Boolean(initialNote || initialFeeding),
+    Boolean(initialNote || initialFeeding || initialWatering?.historyCheckReason),
   );
   const historyCheckRequiredRef = useRef(
-    Boolean(initialNote?.historyCheckReason || initialFeeding?.historyCheckReason),
+    Boolean(
+      initialNote?.historyCheckReason ||
+      initialFeeding?.historyCheckReason ||
+      initialWatering?.historyCheckReason,
+    ),
   );
   const [historyCheckRequired, setHistoryCheckRequired] = useState(historyCheckRequiredRef.current);
   const [persistedNote, setPersistedNote] = useState<string | null | undefined>(undefined);
@@ -864,6 +875,7 @@ function QuickLogV2SheetForOwner({
   const historyReviewResolved =
     manualRetrySubmissionRef.current?.resolved ??
     feedingRetrySubmissionRef.current?.resolved ??
+    wateringRetrySubmissionRef.current?.resolved ??
     resolvedTarget;
   const historyReviewNavigation = !historyCheckRequired
     ? null
@@ -1358,14 +1370,22 @@ function QuickLogV2SheetForOwner({
     setWateringForm(restored.wateringForm);
     manualTempEntryUnitRef.current = "celsius";
     wateringTempEntryUnitRef.current = "celsius";
-    setWateringRetryPending(true);
+    const historyCheck = Boolean(record.historyCheckReason);
+    setWateringRetryPending(!historyCheck);
+    if (historyCheck) setExactRetryPending(true);
+    historyCheckRequiredRef.current = historyCheck;
+    setHistoryCheckRequired(historyCheck);
     setFailedWaterPhotoUpload(false);
     setWaterPhotoOmitted(false);
     keepSubmissionLockedRef.current = true;
     submissionLockedRef.current = true;
     setSubmissionLocked(true);
     setRestoredMediaPending(record.attachments.photo || record.attachments.video);
-    setLocalError(WATERING_RECOVERY_PENDING);
+    setLocalError(
+      record.historyCheckReason
+        ? quickLogReasonToOperatorMessage(record.historyCheckReason)
+        : WATERING_RECOVERY_PENDING,
+    );
     resetPhotoSelection();
     resetVideoSelection();
   }
@@ -1922,6 +1942,32 @@ function QuickLogV2SheetForOwner({
             .catch(() => {});
         }
         if (!canContinueNote()) return;
+        if (quickLogSaveRequiresHistoryCheck(wateringResult.reason)) {
+          const marked = await markPendingQuickLogWateringHistoryCheck(
+            exactWateringSubmission.recovery,
+            wateringResult.reason,
+          );
+          if (!canContinueNote()) return;
+          if (marked.status === "marked") {
+            wateringRetrySubmissionRef.current = {
+              ...exactWateringSubmission,
+              recovery: marked.record,
+            };
+          }
+          // Every retry of this key gets the same refusal. Keep the claim and
+          // the draft locked for Timeline review; an unmarked claim (storage
+          // refused) still needs the unchanged journal cleared by discard.
+          historyCheckRequiredRef.current = true;
+          setHistoryCheckRequired(true);
+          setWateringRetryPending(false);
+          setExactRetryPending(true);
+          keepSubmissionLockedRef.current = true;
+          const message = quickLogReasonToOperatorMessage(wateringResult.reason);
+          setLocalError(message);
+          toast.error(message);
+          setSaveStatus("");
+          return;
+        }
         const correctable = mayCorrectRejectedWatering({
           reason: wateringResult.reason,
           priorClaim: pendingWateringSubmission !== null,
@@ -2295,10 +2341,13 @@ function QuickLogV2SheetForOwner({
     setLocalError(null);
   }
 
+  const historyDrafts = [
+    manualRetrySubmissionRef.current,
+    feedingRetrySubmissionRef.current,
+    wateringRetrySubmissionRef.current,
+  ].filter((draft) => draft !== null);
   const historyDraftOwnerId =
-    manualRetrySubmissionRef.current && feedingRetrySubmissionRef.current
-      ? null
-      : (manualRetrySubmissionRef.current ?? feedingRetrySubmissionRef.current)?.recovery.ownerId;
+    historyDrafts.length === 1 ? historyDrafts[0]?.recovery.ownerId : null;
   // A ref update does not repaint the button after a synchronous restoration.
   // The handler retains the authoritative same-tick in-flight ref guard.
   const historyDiscardAllowed = canDiscardQuickLogHistoryDraft({
@@ -2307,14 +2356,14 @@ function QuickLogV2SheetForOwner({
     currentOwnerId: user?.id,
     draftOwnerId: historyDraftOwnerId,
   });
-  function handleDiscardHistoryDraft() {
+  async function handleDiscardHistoryDraft() {
     const pending = manualRetrySubmissionRef.current;
     const pendingFeed = feedingRetrySubmissionRef.current;
+    const pendingWater = wateringRetrySubmissionRef.current;
     if (
       !historyDiscardAllowed ||
       saveInFlightRef.current ||
-      (!pending && !pendingFeed) ||
-      (pending && pendingFeed)
+      [pending, pendingFeed, pendingWater].filter((draft) => draft !== null).length !== 1
     )
       return;
     if (pending && !clearPendingQuickLogNote(pending.recovery)) {
@@ -2324,6 +2373,26 @@ function QuickLogV2SheetForOwner({
     if (pendingFeed && !clearPendingQuickLogFeeding(pendingFeed.recovery)) {
       setLocalError(QUICK_LOG_HISTORY_DISCARD_FAILED);
       return;
+    }
+    if (pendingWater) {
+      const lifetime = noteLifetimeRef.current;
+      saveInFlightRef.current = true;
+      let clearance: Awaited<ReturnType<typeof reconcilePendingQuickLogWateringClear>>;
+      try {
+        clearance = await reconcilePendingQuickLogWateringClear(pendingWater.recovery);
+      } finally {
+        saveInFlightRef.current = false;
+      }
+      if (
+        !lifetime.active ||
+        noteLifetimeRef.current !== lifetime ||
+        wateringRetrySubmissionRef.current !== pendingWater
+      )
+        return;
+      if (clearance.status !== "cleared" && clearance.status !== "already_cleared") {
+        setLocalError(QUICK_LOG_HISTORY_DISCARD_FAILED);
+        return;
+      }
     }
     // Explicit abandonment after history review, never a confirmed server receipt.
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
@@ -3163,7 +3232,7 @@ function QuickLogV2SheetForOwner({
                     variant="outline"
                     className="mt-2"
                     disabled={!historyDiscardAllowed}
-                    onClick={handleDiscardHistoryDraft}
+                    onClick={() => void handleDiscardHistoryDraft()}
                   >
                     {QUICK_LOG_HISTORY_DISCARD_LABEL}
                   </Button>

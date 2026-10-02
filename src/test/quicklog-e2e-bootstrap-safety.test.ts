@@ -11,6 +11,10 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  QUICKLOG_SMOKE_DAILY_CRON,
+  loadQuickLogSmokeWorkflow,
+} from "./helpers/quicklogSmokeWorkflow";
 import { evaluateBootstrapGate } from "../../e2e/lib/fixtureBootstrap";
 import { readWorkflowYamlScalar } from "./helpers/yamlScalarText";
 
@@ -222,9 +226,10 @@ describe("Workflow: bootstrap step + media expansion + summary", () => {
     expect(block).not.toMatch(/\/artifacts\/\d+/);
   });
 
-  it("workflow still has no schedule/cron/pull_request_target/service_role and no checked-in storageState", () => {
-    expect(wf).not.toMatch(/^\s*schedule\s*:/m);
-    expect(wf).not.toMatch(/-\s*cron\s*:/);
+  it("workflow has only the one daily schedule and no pull_request_target/service_role or checked-in storageState", () => {
+    const workflow = loadQuickLogSmokeWorkflow(ROOT);
+    // Exactly one daily schedule (#1852); no other cron entry may be added.
+    expect(workflow.on.schedule).toEqual([{ cron: QUICKLOG_SMOKE_DAILY_CRON }]);
     expect(wf).not.toMatch(/pull_request_target/);
     expect(wf).not.toMatch(/service_role/i);
     expect(wf).not.toMatch(/password\s*:\s*["'][^"'$]+["']/i);
@@ -297,7 +302,7 @@ describe("Docs: rotation + fixture setup + screenshots", () => {
     expect(body).not.toMatch(/\.delete\(/);
   });
 
-  it("docs reflect current UI flow (no Grow page in setup) and mark grow optional", () => {
+  it("legacy docs keep their generic flow and optional grow name still requires production ownership", () => {
     const setup = read("e2e/FIXTURE_SETUP.md");
     const readme = read("e2e/README.md");
     const checklist = read("e2e/scripts/print-fixture-config-checklist.ts");
@@ -316,14 +321,16 @@ describe("Docs: rotation + fixture setup + screenshots", () => {
     expect(readme).toMatch(/optional/i);
     expect(readme).not.toMatch(/Grow\s+named\s+exactly/i);
 
-    // Checklist marks grow as optional, not required.
+    // Grow naming is optional; positive owned-grow evidence is mandatory.
     const requiredBlock = checklist.match(/const REQUIRED_VARS = \[([\s\S]*?)\] as const/);
     const optionalBlock = checklist.match(/const OPTIONAL_VARS = \[([\s\S]*?)\] as const/);
     expect(requiredBlock).toBeTruthy();
     expect(optionalBlock).toBeTruthy();
     expect(requiredBlock![1]).not.toMatch(/E2E_FIXTURE_EXPECTED_GROW_NAME/);
     expect(optionalBlock![1]).toMatch(/E2E_FIXTURE_EXPECTED_GROW_NAME/);
-    expect(checklist).toMatch(/optional\/future|optional.*Grow/i);
+    expect(checklist).toContain("owned grow read");
+    expect(checklist).toContain("cheekhimself@gmail.com");
+    expect(checklist).toContain("[smoke <timestamp>]");
   });
 
   it("package.json exposes e2e:bootstrap-fixture and e2e:fixture-checklist", () => {

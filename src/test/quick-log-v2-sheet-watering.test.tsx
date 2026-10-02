@@ -7,6 +7,7 @@ import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEv
 import {
   claimPendingQuickLogWatering,
   readPendingQuickLogWatering,
+  WATERING_RECOVERY_CLEAR_FAILED,
 } from "@/lib/quickLogPendingWateringStore";
 import {
   QUICK_LOG_HISTORY_DISCARD_FAILED,
@@ -476,6 +477,38 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
     } finally {
       blockedRemoval.mockRestore();
     }
+  });
+
+  it("reconciles a rapid double Try again on a confirmed Water without a false cleanup failure", async () => {
+    await installAcceptedWaterLedger(false);
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+    enterVolume("750");
+    const originalRemove = Storage.prototype.removeItem;
+    const blockedRemoval = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (
+      this: Storage,
+      key: string,
+    ) {
+      if (this === window.sessionStorage) throw new Error("cleanup unavailable");
+      originalRemove.call(this, key);
+    });
+    try {
+      clickSave();
+      await screen.findByTestId("qlv2-post-save");
+      expect(screen.getByTestId("quick-log-post-save-another")).toBeDisabled();
+    } finally {
+      blockedRemoval.mockRestore();
+    }
+    // Storage recovered. Two same-tick clicks race for the same exact journal.
+    const recheck = screen.getByTestId("qlv2-note-storage-recheck");
+    fireEvent.click(recheck);
+    fireEvent.click(recheck);
+    await waitFor(() => expect(screen.getByTestId("quick-log-post-save-another")).toBeEnabled());
+    await act(async () => {
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    });
+    expect(screen.queryByText(WATERING_RECOVERY_CLEAR_FAILED)).toBeNull();
+    expect(readPendingQuickLogWatering(authState.ownerId)).toEqual({ status: "empty" });
+    expect(rpcMock).toHaveBeenCalledTimes(1);
   });
 
   it.each(["another owner", "the original owner after a round trip"] as const)(

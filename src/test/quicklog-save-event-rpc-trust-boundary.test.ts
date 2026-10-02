@@ -57,16 +57,24 @@ const bodyMatch = sql.match(
 const wrapperBody = bodyMatch?.[1] ?? "";
 
 function findDelegatedRpcBody(): string {
-  if (
-    !mig ||
-    !/RENAME\s+TO\s+quicklog_save_event_pre_logged_at/i.test(sql) ||
-    !/quicklog_save_event_pre_logged_at\s*\(/i.test(wrapperBody)
-  ) {
+  if (!mig || !/quicklog_save_event_pre_logged_at\s*\(/i.test(wrapperBody)) {
     return "";
   }
 
+  // The rename happened in the dual-timestamp foundation migration. Later
+  // public-wrapper replacements must still be checked with that delegate.
+  const renameMigration = readdirSync(MIG_DIR)
+    .filter((name) => name.localeCompare(mig.path.split(/[\\/]/).pop() ?? "") <= 0)
+    .sort((a, b) => b.localeCompare(a))
+    .find((name) =>
+      /RENAME\s+TO\s+quicklog_save_event_pre_logged_at/i.test(
+        readFileSync(join(MIG_DIR, name), "utf8"),
+      ),
+    );
+  if (!renameMigration) return "";
+
   const earlier = readdirSync(MIG_DIR)
-    .filter((name) => name.localeCompare(mig.path.split(/[\\/]/).pop() ?? "") < 0)
+    .filter((name) => name.localeCompare(renameMigration) < 0)
     .sort((a, b) => b.localeCompare(a));
   for (const name of earlier) {
     const priorSql = readFileSync(join(MIG_DIR, name), "utf8");

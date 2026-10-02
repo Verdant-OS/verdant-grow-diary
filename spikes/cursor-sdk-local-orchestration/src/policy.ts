@@ -1,5 +1,5 @@
 import { realpathSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 
 import {
@@ -49,11 +49,11 @@ export function isProductionPath(candidate: string, repoRoot: string): boolean {
     resolvedRoot = resolve(repoRoot);
   }
   if (resolvedCandidate === resolvedRoot) return true;
-  const prefix = resolvedRoot.endsWith("/") ? resolvedRoot : `${resolvedRoot}/`;
+  const prefix = resolvedRoot.endsWith(sep) ? resolvedRoot : `${resolvedRoot}${sep}`;
   if (!resolvedCandidate.startsWith(prefix)) return false;
   const rel = resolvedCandidate.slice(prefix.length);
   return PRODUCTION_SEGMENTS.some(
-    (segment) => rel === segment || rel.startsWith(`${segment}/`),
+    (segment) => rel === segment || rel.startsWith(`${segment}${sep}`),
   );
 }
 
@@ -68,7 +68,7 @@ export function assertTemporarySyntheticCwd(cwd: string, repoRoot: string): void
     });
   }
   const tmpRoot = realpathSync(tmpdir());
-  if (resolvedCwd === tmpRoot || !resolvedCwd.startsWith(`${tmpRoot}/`)) {
+  if (resolvedCwd === tmpRoot || !resolvedCwd.startsWith(`${tmpRoot}${sep}`)) {
     throw new OrchestrationError("cwd must be an OS temporary directory", {
       code: "POLICY_REJECTED",
       retryable: false,
@@ -97,7 +97,12 @@ export function validatePolicy(input: PolicyInput): HostAgentPolicy {
       retryable: false,
     });
   }
-  if (input.extra?.mcpServers || input.extra?.agents || input.extra?.customTools || input.extra?.hooks) {
+  if (
+    input.extra?.mcpServers ||
+    input.extra?.agents ||
+    input.extra?.customTools ||
+    input.extra?.hooks
+  ) {
     throw new OrchestrationError("MCP, custom tools, hooks, and subagent maps are forbidden", {
       code: "POLICY_REJECTED",
       retryable: false,
@@ -146,7 +151,7 @@ export function validatePolicy(input: PolicyInput): HostAgentPolicy {
     });
   }
   const tmpRoot = realpathSync(tmpdir());
-  if (!resolvedStore.startsWith(`${tmpRoot}/`)) {
+  if (!resolvedStore.startsWith(`${tmpRoot}${sep}`)) {
     throw new OrchestrationError("store root must be an OS temporary directory", {
       code: "POLICY_REJECTED",
       retryable: false,
@@ -205,7 +210,10 @@ export function assertCreateOptionsMatchPolicy(
     });
   }
   if (options.mode !== "plan") {
-    throw new OrchestrationError("mode must be plan", { code: "POLICY_REJECTED", retryable: false });
+    throw new OrchestrationError("mode must be plan", {
+      code: "POLICY_REJECTED",
+      retryable: false,
+    });
   }
   const tools = options.tools;
   if (!Array.isArray(tools) || tools.join(",") !== policy.tools.join(",")) {
@@ -215,7 +223,10 @@ export function assertCreateOptionsMatchPolicy(
     });
   }
   const disallowed = options.disallowedTools;
-  if (!Array.isArray(disallowed) || !policy.disallowedTools.every((name) => disallowed.includes(name))) {
+  if (
+    !Array.isArray(disallowed) ||
+    !policy.disallowedTools.every((name) => disallowed.includes(name))
+  ) {
     throw new OrchestrationError("disallowedTools mismatch", {
       code: "POLICY_REJECTED",
       retryable: false,

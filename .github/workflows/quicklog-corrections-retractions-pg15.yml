@@ -16,6 +16,8 @@ on:
       - ".github/workflows/quicklog-corrections-retractions-pg15.yml"
       - ".github/workflows/required-core-migrations.yml"
       - "supabase/migrations/20260811090000_quicklog_corrections_retractions.sql"
+      - "scripts/apply-quicklog-revision-idempotent-replay.mjs"
+      - "supabase/migrations/20260916111000_quicklog_revision_idempotent_replay.sql"
       - "src/test/apply-quicklog-corrections-retractions.test.ts"
       - "src/test/verify-quicklog-corrections-preflight-artifact.test.ts"
       - "src/test/quicklog-corrections-retractions-pg15-harness.test.ts"

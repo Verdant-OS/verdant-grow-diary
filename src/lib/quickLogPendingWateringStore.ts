@@ -3,6 +3,10 @@ import type { ResolvedQuickLogV2Target } from "./quickLogV2Rules";
 import { projectRootZoneManualObservationFromDetails } from "./rootZoneManualObservationRules";
 import { isUuid } from "./isUuid";
 import {
+  quickLogSaveRequiresHistoryCheck,
+  type QuickLogHistoryCheckReason,
+} from "./quickLogSaveErrorMessage";
+import {
   starterWaterRecoveryKey,
   typedWaterRecoveryKey,
   waterRecoveryLockKey,
@@ -16,6 +20,9 @@ export interface PendingQuickLogWatering {
   resolved: ResolvedQuickLogV2Target;
   // Files cannot survive reload. Preserve intent without inventing attachments.
   attachments: { photo: boolean; video: boolean };
+  // Set when the server refuses this key in a way no exact retry can resolve.
+  // The draft then waits for Timeline review and an explicit discard.
+  historyCheckReason?: QuickLogHistoryCheckReason;
 }
 
 export const WATERING_RECOVERY_UNAVAILABLE =
@@ -130,7 +137,20 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogW
   if (
     !object(value) ||
     !jsonValue(value) ||
-    !onlyKeys(value, ["version", "ownerId", "createdAt", "payload", "resolved", "attachments"])
+    !onlyKeys(value, [
+      "version",
+      "ownerId",
+      "createdAt",
+      "payload",
+      "resolved",
+      "attachments",
+      "historyCheckReason",
+    ])
+  )
+    return false;
+  if (
+    value.historyCheckReason !== undefined &&
+    !quickLogSaveRequiresHistoryCheck(value.historyCheckReason)
   )
     return false;
   if (
@@ -250,6 +270,36 @@ export async function claimPendingQuickLogWatering(
       if (window.sessionStorage.getItem(storageKey(record.ownerId)) !== raw)
         return { status: "blocked" as const };
       return { status: "claimed" as const, record: JSON.parse(raw) as PendingQuickLogWatering };
+    });
+  } catch {
+    return { status: "blocked" };
+  }
+}
+
+/** Record, under the same lock, that only history review can resolve this exact claim. */
+export async function markPendingQuickLogWateringHistoryCheck(
+  record: PendingQuickLogWatering | null | undefined,
+  reason: unknown,
+): Promise<{ status: "marked"; record: PendingQuickLogWatering } | { status: "blocked" }> {
+  try {
+    if (
+      !record ||
+      !validRecord(record, record.ownerId) ||
+      !quickLogSaveRequiresHistoryCheck(reason)
+    )
+      return { status: "blocked" };
+    const locks = window.navigator.locks;
+    if (!locks?.request) return { status: "blocked" };
+    return await locks.request(waterRecoveryLockKey(record.ownerId), { mode: "exclusive" }, () => {
+      const current = readPendingQuickLogWatering(record.ownerId);
+      if (current.status !== "pending" || !sameRecord(current.record, record))
+        return { status: "blocked" as const };
+      const marked: PendingQuickLogWatering = { ...current.record, historyCheckReason: reason };
+      window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
+      const verified = readPendingQuickLogWatering(record.ownerId);
+      return verified.status === "pending" && sameRecord(verified.record, marked)
+        ? { status: "marked" as const, record: verified.record }
+        : { status: "blocked" as const };
     });
   } catch {
     return { status: "blocked" };

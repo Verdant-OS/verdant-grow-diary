@@ -69,7 +69,6 @@ longer exist; see §4 for the history.
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/mock/index.ts`                                | Static fake tents, plants, sensors, cameras, alerts. Many modules import its **types** (`SensorReading`, `Stage`); those carry no fixture data |
 | `src/hooks/useMockData.ts`                         | React Query wrappers over `src/mock`. No production module imports it                                                                          |
-| `src/lib/diary.ts` `snapshotForTent`               | Reads the `src/mock` sensor fixture. No caller in `src/`; it must not gain one                                                                 |
 | `src/hooks/useGrowData.ts`                         | Supabase only, **no mock fallback**: empty reads stay empty, failed tent/plant reads stay React Query errors                                   |
 | `src/lib/growSensorEvidenceRules.ts`               | Labels rows whose source is `demo` as `isDemoData: true` (disclosure, not substitution)                                                        |
 | `src/pages/Dashboard.tsx`                          | Grow-, alert-, action- and sensor-backed hooks; AI Insights remains an honest empty state                                                      |
@@ -132,8 +131,6 @@ The rule the fallback broke still stands and is still fenced:
 
 Residual items, measured from source, not from production:
 
-- `snapshotForTent` in `src/lib/diary.ts` still reads the sensor fixture.
-  It has no caller; giving it one would reintroduce fake sensor data.
 - Plant and alert counts are not telemetry. `deriveTentHealthChip`
   (`src/lib/tentHealthChip.ts`) therefore never returns a healthy chip:
   zero open alerts reads as a neutral "No open alerts", and an unknown

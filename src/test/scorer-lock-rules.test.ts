@@ -98,6 +98,28 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("supabase/tests/permissions.sql")).toBe(true);
     // Pester suites, and shell or PowerShell gates named like the JavaScript ones.
     expect(isScorerPath("scripts/p3-preservation/Invoke-P3Preservation.Tests.ps1")).toBe(true);
+    // Every file inside a test directory, helpers included, and the fixture inputs tests judge
+    // against; shipped product data under src/fixtures and docs stay out.
+    expect(isScorerPath("spikes/cursor-sdk-local-orchestration/test/resolvedConfig.ts")).toBe(true);
+    expect(isScorerPath("plugins/verdant-grow-os/__tests__/helpers.ts")).toBe(true);
+    expect(isScorerPath("fixtures/demo-ai-doctor-cases.json")).toBe(true);
+    expect(
+      isScorerPath("fixtures/ecowitt-bridge-config/failing/channel_map_tent_mismatch.env"),
+    ).toBe(true);
+    expect(isScorerPath("tools/ecowitt-testbench/fixtures/golden_forwarded_payload.json")).toBe(
+      true,
+    );
+    expect(isScorerPath("tools/ggs-ble-testbench/fixtures/ggs_ble_sample_notification.json")).toBe(
+      true,
+    );
+    expect(isScorerPath("src/fixtures/ecowitt-preview-samples.ts")).toBe(false);
+    expect(
+      isScorerPath(
+        "spikes/cursor-sdk-local-orchestration/fixtures/synthetic-repository/diary-note.synthetic.json",
+      ),
+    ).toBe(false);
+    expect(isScorerPath("docs/testing/static-guards.md")).toBe(false);
+    expect(isScorerPath("docs/integrations/fixtures/README.md")).toBe(false);
     expect(isScorerPath("tools/x/New-Thing.Tests.ps1")).toBe(true);
     expect(isScorerPath("scripts/p3-preservation/Invoke-P3Preservation.ps1")).toBe(false);
     expect(isScorerPath("scripts/releases/check-pheno-live-smoke-local.ps1")).toBe(true);
@@ -306,9 +328,6 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("supabase/functions/_shared/lib/x.ts")).toBe(false);
     expect(isScorerPath("supabase/migrations/20261001160000_x.sql")).toBe(false);
     expect(isScorerPath("tools/ecowitt-testbench/ecowitt_delivery.py")).toBe(false);
-    expect(isScorerPath("tools/ecowitt-testbench/fixtures/golden_forwarded_payload.json")).toBe(
-      false,
-    );
     expect(isScorerPath("src/lib/testimonialsRules.ts")).toBe(false);
     expect(isScorerPath("src/lib/spectrumRules.ts")).toBe(false);
   });

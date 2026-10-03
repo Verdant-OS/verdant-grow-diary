@@ -108,6 +108,8 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     expect(DOC).toContain("`supabase/tests/`");
     expect(DOC).toContain("`test_*.py`");
     expect(DOC).toContain("`*.Tests.ps1`");
+    expect(DOC).toMatch(/helpers included/);
+    expect(DOC).toContain("`fixtures/`");
     expect(DOC).toContain("$CLAUDE_PROJECT_DIR");
   });
 

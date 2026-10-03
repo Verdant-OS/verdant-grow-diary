@@ -73,6 +73,26 @@ export const SCORER_PATH_RULES = Object.freeze([
   }),
   Object.freeze({
     kind: "regex",
+    value: /(^|\/)(test|tests|__tests__)\//,
+    why: "every file inside a test directory, helpers included: spikes/cursor-sdk-local-orchestration/test/resolvedConfig.ts resolves vitest.config.ts and package.json for three contract suites, so a helper that returned constants would keep them green while checking nothing",
+  }),
+  Object.freeze({
+    kind: "prefix",
+    value: "fixtures/",
+    why: "golden inputs and config cases the tests and gates judge against (ai-doctor-output-golden-cases, diary-baseline-fixture-safety, the ecowitt-bridge-config failing/passing cases ci-ecowitt-config-validate-* reads); editing a golden fixture moves the expectation without touching the test",
+  }),
+  Object.freeze({
+    kind: "prefix",
+    value: "tools/ecowitt-testbench/fixtures/",
+    why: "golden forwarded payload ecowitt-v0-golden-fixtures.test.ts and the ingest contract test compare against",
+  }),
+  Object.freeze({
+    kind: "prefix",
+    value: "tools/ggs-ble-testbench/fixtures/",
+    why: "the sample notification the GGS BLE frame tests compare against",
+  }),
+  Object.freeze({
+    kind: "regex",
     value: /\.Tests\.ps1$/,
     why: "Pester suites (scripts/p3-preservation/Invoke-P3Preservation.Tests.ps1 carries executable Describe/It assertions)",
   }),

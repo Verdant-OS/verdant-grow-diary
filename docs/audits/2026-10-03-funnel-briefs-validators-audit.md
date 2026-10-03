@@ -20,7 +20,8 @@ Three deliverables from the agent prompt deck (prompts 36, 37 and 38), run again
 
 - **Branch and tip:** verdant-grow-diary at `80176ba` (#1864)
 - **Method:** Source reads and greps; one attempted local install and test run; hosted check runs read through the GitHub API.
-- **Status vocabulary:** PASS · FAIL · GAP · BLOCKED · NOT_MEASURED · OBSERVATION · UNKNOWN
+- **Status vocabulary:** PASS · FAIL · GAP · BLOCKED · NOT_MEASURED · OBSERVATION
+- **Legend:** UNKNOWN is used only for search volume, because prompt 37 requires that word. It means NOT_MEASURED.
 - **Locks in force:** HOLD #1250, production database lock, publishing stop. Unchanged.
 
 > **Calibrated verdict.** The funnel is complete for the email path and consent-correct, with one FAIL: Google OAuth signups never emit `signup`, so acquisition is undercounted by the OAuth share, which is NOT_MEASURED. The three briefs are ready for an evidence editor; two carry explicit “missing evidence” on their cultivation claims because the repository registers no source for them yet. The SEO validators are green on hosted CI and could not run here, a network limit of this session rather than a repository defect.
@@ -31,12 +32,12 @@ Three deliverables from the agent prompt deck (prompts 36, 37 and 38), run again
 
 | Check | Status | Evidence |
 | --- | --- | --- |
-| Provider order in the root | **PASS** | `AnalyticsShell` and `FunnelEventDbSink` render before `Outlet` (`src/routes/__root.tsx:254-256`); the load-bearing comment at line 245 is intact. |
-| Catalogue versus emitters | **PASS** | All 30 names in `FUNNEL_EVENTS` (`src/lib/funnelAnalytics.ts:32-87`) are emitted at least once in production code; no emitter uses a name outside the list. |
+| Provider order in the root | **PASS** | `AnalyticsShell` and `FunnelEventDbSink` render before `Outlet` (`src/routes/__root.tsx:254-256`); the load-bearing comment at lines 244-253 is intact. |
+| Catalogue versus emitters | **PASS** | All 30 names in `FUNNEL_EVENTS` (`src/lib/funnelAnalytics.ts:32-80`) are emitted at least once in production code; no emitter uses a name outside the list. _Superseded, see index §4 errata: the array has 29 names, and all 29 have an emitter._ |
 | Signup-to-paid chain | **PASS** | signup → grow_created → tent_created → plant_created → quick_log_saved → ai_doctor_cta_clicked → ai_doctor_review_started → ai_doctor_result_received → paywall_viewed → paywall_cta_clicked → checkout_started → subscription_activated → checkout_return_completed. Each step has an emitter (Onboarding, CreateTentDialog, CreatePlantDialog, quickLogSuccessTelemetry, Plant Detail, Pricing, CheckoutSuccess). |
-| Consent respected | **PASS** | gtag fires only if the consent-gated script loaded; the DB sink writes only when consent is `granted` and a user id exists, queues pre-hydration events (max bounded) rather than dropping or back-filling them, and re-sanitizes and re-schema-checks every detail because the CustomEvent boundary is untrusted (`funnelEventDbSinkRules.ts`, `FunnelEventDbSink.tsx:66-120`). |
+| Consent respected | **PASS** | gtag fires only if the consent-gated script loaded; the DB sink writes only when consent is `granted` and a user id exists, queues pre-hydration events (max bounded) rather than dropping or back-filling them, and re-sanitizes and re-schema-checks every detail because the CustomEvent boundary is untrusted (`src/lib/funnelEventDbSinkRules.ts`, `src/components/FunnelEventDbSink.tsx:66-120`). |
 | Signup covers OAuth | **FAIL** | `trackFunnelEvent("signup", { method: "email" })` is the only signup emitter (`src/pages/Auth.tsx:421`). The Google OAuth path (`signInWithOAuth`, line 163) emits nothing on return. OAuth signups are invisible to the funnel. |
-| Signup carries acquisition source | **GAP** | The schema allows only `method` on `signup` (`funnelEventSchema.ts:35`). `verdant_signup_source` is written to auth metadata but never to the funnel, so attribution cannot be joined server-side. |
+| Signup carries acquisition source | **GAP** | The schema allows only `method` on `signup` (`src/lib/funnelEventSchema.ts:35`). `verdant_signup_source` is written to auth metadata but never to the funnel, so attribution cannot be joined server-side. _Superseded, see index §4 errata: the source is stored server-side by migration `20260714231627`; the join is NOT_MEASURED and only the `funnel_events` gap stands._ |
 | Anonymous top of funnel | **GAP** by design | The DB sink is user-scoped. Public pages reach only gtag. Covered in the previous audit page. |
 | First-AI-value marker | **OBSERVATION** | `ai_doctor_result_received` exists, but nothing marks a user's first ever result; cohort questions need a server-side derivation from the credit ledger. |
 
@@ -111,7 +112,7 @@ Format follows `docs/seo/content-briefs/autoflower-light-schedule-and-grow-log.m
 | Local `bun run test:legal-seo` and `test:postbuild-seo-artifacts` | **BLOCKED** | The container had no `node_modules`. The documented npm public-registry bootstrap failed with HTTP 403 fetching `cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`, a host this session's network policy does not allow. Vitest never started (exit 127). `package-lock.json` restored; `git status` clean. |
 | Hosted `test:legal-seo` | **PASS** | Required check concluded `success` at 2026-10-02 01:15:35 UTC on the head of PR 1864 (run 36949669776). |
 | Hosted postbuild SEO validators | **PASS** | They run inside `bun run build` in the required `Lint, typecheck, test, build` job, `success` at 01:21:47 UTC. `sitemap parity + head fidelity` also `success`. |
-| Caveat | **NOTE** | Those checks ran on the PR head; the deploy tip `80176ba` is its squash commit. The ruleset accepts this. It is not a separate measurement of the tip itself. |
+| Caveat | **OBSERVATION** | Those checks ran on the PR head; the deploy tip `80176ba` is its squash commit. The ruleset accepts this. It is not a separate measurement of the tip itself. _Superseded, see index §4 errata: push run 36950533886 ran on `80176bad5c9c` itself, and it passed._ |
 
 No validator failure exists to specify. Nothing was loosened. The bootstrap gap is an environment finding: the run skill's verified recipe assumes `cdn.sheetjs.com` is reachable, and this session's policy denies it.
 

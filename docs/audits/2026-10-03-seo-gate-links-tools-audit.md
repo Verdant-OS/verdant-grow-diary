@@ -20,7 +20,8 @@ Three read-only audits from the agent prompt deck (prompts 33, 34 and 35), run a
 
 - **Branch and tip:** verdant-grow-diary at `80176ba` (#1864)
 - **Method:** Source reads, a graph rebuilt from `verdantSeoContent.ts`, sitemap and workflow greps. No GA4, Search Console or live site access.
-- **Status vocabulary:** PASS · FAIL · HOLD · REJECT · NOT_APPLICABLE · BLOCKED · OBSERVATION
+- **Status vocabulary:** PASS · FAIL · HOLD · NOT_APPLICABLE · BLOCKED · OBSERVATION
+- **Legend:** REJECT is the third verdict that prompt 33 allows (PASS, HOLD or REJECT), and it means do not build the template. NO_BASELINE in Audit 35 is quoted from `docs/seo/seo-baseline-2026-08-26.md`, and it means NOT_MEASURED.
 - **Locks in force:** HOLD #1250, production database lock, publishing stop. Unchanged.
 
 > **Calibrated verdict.** Cultivar pages are HOLD on governance alone: the data is careful and sourced, but every profile is hard-set to “sample” and indexed as if reviewed. Breeders have no eligible public source and are not a programmatic candidate today. The guide link graph is healthy at its core with seven orphans at the edge, fixable in content. The two public tools convert through honest paths, but the Quick Log starter is unmeasured and the database funnel cannot see signup source, so acquisition cannot be optimised until those two gaps close and an analytics read is authorised.
@@ -34,11 +35,11 @@ Three read-only audits from the agent prompt deck (prompts 33, 34 and 35), run a
 
 | Gate criterion (cultivars) | Status | Evidence |
 | --- | --- | --- |
-| Unique useful data | **PASS** | Lineage, flower weeks, stage environment ranges, reported tendencies with per-claim source keys, FAQ built from the same visible rows. `src/constants/strainReferenceLibrary.ts`: 10 seeds, 14 sources, 27 source-key references. |
+| Unique useful data | **PASS** | Lineage, flower weeks, stage environment ranges, reported tendencies with per-claim source keys, FAQ built from the same visible rows. `src/constants/strainReferenceLibrary.ts`: 10 seeds, 14 sources, 27 source-key references (the 27 is unverified). |
 | Distinct user need | **PASS** | Each page answers “what should I expect from this cultivar and how sure is anyone”, framed as a starting hypothesis the grower's own logs override. |
 | Trustworthy source and update path | **PASS** | `.github/workflows/strain-reference-library-v1-gate.yml` runs `scripts/verify-cultivar-sources.mjs` on push and PR: structural validation plus network reachability with a JSON report. The script never auto-elevates a source. Not one of the 35 required checks. |
-| Human review defined | **FAIL** | `buildProfile` hard-sets every profile to `publicationStatus: "published"` and `verificationStatus: "sample"` (lines 1019-1020). The ladder sample → community → reviewed → verified exists in the type; no profile has climbed it, and no reviewer or review date is recorded anywhere. |
-| Noindex for weak records | **FAIL** | The only noindex rule is for query-string variants of the index page (`cultivarIndexSeoRules.ts:46`). A “sample” profile is indexed identically to a “verified” one; all 10 are in `public/sitemap.xml`. |
+| Human review defined | **FAIL** | `buildProfile` hard-sets every profile to `publicationStatus: "published"` and `verificationStatus: "sample"` (`src/constants/strainReferenceLibrary.ts:1019-1020`). The ladder sample → community → reviewed → verified exists in the type; no profile has climbed it, and no reviewer or review date is recorded anywhere. |
+| Noindex for weak records | **FAIL** | The only noindex rule is for query-string variants of the index page (`src/lib/cultivarIndexSeoRules.ts:46`). A “sample” profile is indexed identically to a “verified” one; all 10 are in `public/sitemap.xml`. |
 | Duplicate control | **PASS** | Unique slugs, aliases listed, `/strains/*` redirects to `/cultivars/*` with a static noindex head. |
 | No private data | **PASS** | Public reference only. The P7 pillar draft correctly flags that per-accession screening history must never appear on these pages. |
 | No unsupported strain, yield or diagnosis claims | **PASS** with caution | Lineage labelled “Reported lineage”; banner reads “Sample reference data — not plant-specific advice”; THC fields typed as reported and total. No certainty asserted. |
@@ -83,10 +84,10 @@ Fix is content-only. Extend the link-map document from “lighting cluster” to
 
 | Surface | Status | Path to signup | Funnel visibility |
 | --- | --- | --- | --- |
-| `/tools/vpd-calculator` | **PASS** | Attributed signup and pricing links built with `source: "vpd_calculator"`; a signup CTA fires after a completed calculation. `src/pages/PublicVpdCalculator.tsx:41-42, 644` | Eight gtag events: page view, completed, reset, pricing clicked, signup clicked, share clicked, completed, failed (`pricingAnalytics.ts:23-30`). Browser-side, consent-dependent. |
-| `/quick-log` starter | **OBSERVATION** | Draft lives in localStorage only. One outbound CTA to `/auth?mode=signup&redirectTo=/onboarding` carrying only the five allow-listed UTMs (`quickLogStarterLinks.ts:46-56`). After signup, `PublicQuickLogHandoffCard` offers “Continue your Quick Log” and seeds the real form; no background upload, the only mutation is clearing the local draft. | No event of any kind. The starter page emits nothing to gtag and nothing to the database sink. |
+| `/tools/vpd-calculator` | **PASS** | Attributed signup and pricing links built with `source: "vpd_calculator"`; a signup CTA fires after a completed calculation. `src/pages/PublicVpdCalculator.tsx:41-42, 644` | Eight gtag events: page view, completed, reset, pricing clicked, signup clicked, share clicked, completed, failed (`src/lib/pricingAnalytics.ts:23-30`). Browser-side, consent-dependent. |
+| `/quick-log` starter | **OBSERVATION** | Draft lives in localStorage only. One outbound CTA to `/auth?mode=signup&redirectTo=/onboarding` carrying only the five allow-listed UTMs (`src/lib/quickLogStarterLinks.ts:46-56`). After signup, `PublicQuickLogHandoffCard` offers “Continue your Quick Log” and seeds the real form; no background upload, the only mutation is clearing the local draft. | No event of any kind. The starter page emits nothing to gtag and nothing to the database sink. |
 | Guides to tools | **PASS** | 15 guides route to the starter, 2 to the calculator, with `utm_source=organic_guide` and `utm_content=`. | Carried into the attributed URL; visible only if the destination records it. |
-| Signup attribution | **OBSERVATION** | `verdant_signup_source` is written to auth metadata from the attributed URL (`signupAcquisitionRules.ts:8, 67`). | The database funnel `signup` event records only `method` (`funnelEventSchema.ts:35`). The sink writes only after consent and only for signed-in users, so the anonymous half of the funnel is invisible by design. |
+| Signup attribution | **OBSERVATION** | `verdant_signup_source` is written to auth metadata from the attributed URL (`src/lib/signupAcquisitionRules.ts:8, 67`). | The database funnel `signup` event records only `method` (`src/lib/funnelEventSchema.ts:35`). The sink writes only after consent and only for signed-in users, so the anonymous half of the funnel is invisible by design. |
 | GA4 and Search Console figures | **BLOCKED** | `docs/seo/seo-baseline-2026-08-26.md`: NO_BASELINE / BLOCKED. No authorised export or read access exists in this session. No number is quoted on this page. |
 
 ### What is lost when the visitor leaves

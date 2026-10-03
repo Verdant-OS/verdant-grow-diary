@@ -90,6 +90,8 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     expect(DOC).toContain("`playwright*.config.*`");
     expect(DOC).toContain("`scripts/vitest-controlled/`");
     expect(DOC).toContain("`scripts/run-vitest-batches.mjs`");
+    expect(DOC).toContain("`.github/workflows/`");
+    expect(DOC).toContain("`scripts/lib/`");
   });
 
   it("counts the Python testbench and pgTAP suites as scorers and anchors the hook to the project dir", () => {

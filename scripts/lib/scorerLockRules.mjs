@@ -138,6 +138,30 @@ export const SCORER_PATH_RULES = Object.freeze([
     value: "scripts/required-core-migrations.mjs",
     why: "the manifest assert-required-core-migrations*.mjs judges against: the core-migration pin",
   }),
+  // Gate wiring and delegated gate implementations: the files that decide which judges
+  // run and what a judge's pass/fail means, beyond the judge's own basename. A loop that
+  // can edit the workflow that invokes a scan, the package script that selects it, or the
+  // library module a wrapper delegates to can remove a check without touching a scorer.
+  Object.freeze({
+    kind: "prefix",
+    value: ".github/workflows/",
+    why: "CI wiring: which jobs run, which scripts they call, and which steps fail the job (107 workflow files tracked on 2026-10-03)",
+  }),
+  Object.freeze({
+    kind: "prefix",
+    value: ".husky/",
+    why: "pre-commit wiring: lint-staged, docs-safety asserts and the pre-commit vitest file",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "package.json",
+    why: "the script manifest CI and the hooks select judges through (test:*, check:*, lint-staged); an edit there can retarget or drop a gate",
+  }),
+  Object.freeze({
+    kind: "prefix",
+    value: "scripts/lib/",
+    why: "the delegated gate library: wrappers such as assert-required-ci-secret.mjs hand their pass/fail decision to a module here, and new helpers land here too",
+  }),
   Object.freeze({
     kind: "exact",
     value: "scripts/scorer-lock.mjs",

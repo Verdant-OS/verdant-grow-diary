@@ -144,6 +144,20 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("scripts/e2e/create-pheno-paid-smoke-sessions.mjs")).toBe(false);
   });
 
+  it("treats gate wiring and the delegated gate library as scorers, not only judge basenames", () => {
+    expect(isScorerPath(".github/workflows/ci.yml")).toBe(true);
+    expect(isScorerPath(".github/workflows/security-regression.yml")).toBe(true);
+    expect(isScorerPath(".husky/pre-commit")).toBe(true);
+    expect(isScorerPath("package.json")).toBe(true);
+    expect(isScorerPath("scripts/lib/assertRequiredCiSecret.mjs")).toBe(true);
+    expect(isScorerPath("scripts/lib/vitest-utils.mjs")).toBe(true);
+    // Wiring that selects nothing and libraries outside scripts/ stay out.
+    expect(isScorerPath(".github/CODEOWNERS")).toBe(false);
+    expect(isScorerPath("bun.lock")).toBe(false);
+    expect(isScorerPath("src/lib/quickLogRules.ts")).toBe(false);
+    expect(isScorerPath("supabase/functions/_shared/lib/x.ts")).toBe(false);
+  });
+
   it("treats every run-* orchestrator and the gate and harnesses tokens as scorers", () => {
     // Measured 2026-10-03: all 68 tracked scripts/**/run-* files are suite orchestrators or
     // runtime harnesses that decide whether their suite fails the job.

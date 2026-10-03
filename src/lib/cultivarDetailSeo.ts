@@ -39,8 +39,11 @@ export function cultivarVerificationIsSearchIndexable(status: CultivarVerificati
     case "community":
       return false;
     default: {
+      // Compile-time exhaustiveness check. At runtime an unknown status
+      // (for example a DB string) fails closed to noindex.
       const unexpected: never = status;
-      return unexpected;
+      void unexpected;
+      return false;
     }
   }
 }

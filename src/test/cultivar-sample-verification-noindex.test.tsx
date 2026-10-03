@@ -44,6 +44,14 @@ describe("cultivar verification search index gate", () => {
     }
   });
 
+  it("fails closed to noindex for an unknown verification status", () => {
+    for (const raw of ["pending", "", "REVIEWED"]) {
+      const status = raw as unknown as CultivarVerificationStatus;
+      expect(cultivarVerificationIsSearchIndexable(status)).toBe(false);
+      expect(cultivarDetailRobots(status)).toBe("noindex, follow");
+    }
+  });
+
   it("applies that gate to every published cultivar static head and sitemap entry", () => {
     const samples = VERDANT_CULTIVARS.filter(
       (cultivar) => cultivar.verificationStatus === "sample",

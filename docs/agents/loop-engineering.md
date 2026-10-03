@@ -91,8 +91,9 @@ runs, the hook reads the call, resolves the path against the repository root, an
   `SCORER_PATH_RULES` in `scripts/lib/scorerLockRules.mjs`);
 - allows it when the scorer is not yet tracked at `HEAD` (a new check being written);
 - allows it when the path, or a directory containing it written with a trailing slash, has an
-  unlock in `.claude/scorer-unlock.json` that is still in force: declared with a reason of at
-  least 8 characters, on the current branch, with a declaration time no later than now and an
+  unlock in `.claude/scorer-unlock.json` that is still in force: declared for a path that is itself
+  a scorer (a file or a directory the rule table covers, so `src/test/../` cannot unlock all of
+  `src/`), with a reason of at least 8 characters, on the current branch, with a declaration time no later than now and an
   expiry at most 24 hours after it. The consumer enforces that whole contract, not only the expiry, so a hand-made
   record with a bare path and a far-off expiry is not in force. An unlock from another branch, or one that has
   expired, is ignored, so a declaration left behind by a session that was cut off never carries

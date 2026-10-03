@@ -335,7 +335,12 @@ function parseTime(value) {
  */
 export function isUnlockEntryValid(entry, context) {
   if (!entry || typeof entry !== "object" || !context) return false;
-  if (typeof entry.path !== "string" || !normalizeRelPath(entry.path)) return false;
+  if (typeof entry.path !== "string") return false;
+  const entryPath = normalizeRelPath(entry.path);
+  // The CLI refuses to unlock a path that is not itself a scorer; the consumer holds the
+  // same line, so a hand-made `src/test/../` (which normalizes to `src/`) cannot unlock
+  // every scorer below a non-scorer parent.
+  if (!entryPath || !isScorerPath(entryPath)) return false;
   if (typeof entry.reason !== "string" || entry.reason.trim().length < UNLOCK_MIN_REASON_LENGTH) {
     return false;
   }

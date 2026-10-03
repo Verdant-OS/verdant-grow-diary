@@ -411,6 +411,18 @@ describe("scorerLockRules — unlock validity", () => {
     ).toBe(false);
     const { path: _p, ...withoutPath } = declared;
     expect(isUnlockEntryValid(withoutPath, context)).toBe(false);
+    // The entry path must itself be a scorer, as the CLI requires at declaration time: a
+    // hand-made `src/test/../` normalizes to `src/` and must not unlock everything below it.
+    expect(isUnlockEntryValid({ ...declared, path: "src/test/../" }, context)).toBe(false);
+    expect(isUnlockEntryValid({ ...declared, path: "src/" }, context)).toBe(false);
+    expect(isUnlockEntryValid({ ...declared, path: "src/lib/quickLogRules.ts" }, context)).toBe(
+      false,
+    );
+    expect(isUnlockEntryValid({ ...declared, path: "src/test/" }, context)).toBe(true);
+    expect(isUnlockEntryValid({ ...declared, path: "scripts/ci/" }, context)).toBe(true);
+    expect(isUnlocked("src/test/a.test.ts", [{ ...declared, path: "src/test/../" }], context)).toBe(
+      false,
+    );
   });
 
   it("is never valid without an expiry, and never without a context", () => {

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { VERDANT_CULTIVAR_SLUGS } from "@/constants/verdantCultivars";
+import { VERDANT_CULTIVARS, VERDANT_CULTIVAR_SLUGS } from "@/constants/verdantCultivars";
+import { cultivarVerificationIsSearchIndexable } from "@/lib/cultivarDetailSeo";
 import { VERDANT_GUIDE_SLUGS } from "@/constants/verdantSeoContent";
 import {
   STATIC_PUBLIC_ALIAS_DOCUMENTS,
@@ -50,8 +51,15 @@ describe("static public SEO documents", () => {
     for (const slug of VERDANT_GUIDE_SLUGS) {
       expect(paths).toContain(`/guides/${slug}`);
     }
-    for (const slug of VERDANT_CULTIVAR_SLUGS) {
-      expect(paths).toContain(`/cultivars/${slug}`);
+    const outputPaths = new Set(STATIC_PUBLIC_OUTPUT_DOCUMENTS.map((document) => document.path));
+    for (const cultivar of VERDANT_CULTIVARS) {
+      const path = `/cultivars/${cultivar.slug}`;
+      expect(outputPaths).toContain(path);
+      if (cultivarVerificationIsSearchIndexable(cultivar.verificationStatus)) {
+        expect(paths).toContain(path);
+      } else {
+        expect(paths.has(path)).toBe(false);
+      }
     }
   });
 
@@ -182,7 +190,7 @@ describe("static public SEO documents", () => {
 
   it("keeps rich page schema available in the static crawler documents", () => {
     const byPath = new Map(
-      STATIC_PUBLIC_SEO_DOCUMENTS.map((document) => [document.path, document]),
+      STATIC_PUBLIC_OUTPUT_DOCUMENTS.map((document) => [document.path, document]),
     );
     const typesAt = (path: string) =>
       (byPath.get(path)?.metadata.jsonLd ?? []).flatMap((block) => {

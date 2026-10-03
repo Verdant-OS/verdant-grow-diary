@@ -72,6 +72,7 @@ import PhenoHuntSetupProgressCard from "@/components/PhenoHuntSetupProgressCard"
 import PhenoCompareCandidatesAction from "@/components/PhenoCompareCandidatesAction";
 import { buildPhenoComparisonActionState } from "@/lib/phenoComparisonActionState";
 import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
+import PhenoHuntRenameControl from "@/components/PhenoHuntRenameControl";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
@@ -1447,6 +1448,10 @@ export default function PhenoHuntWorkspace() {
     BreedingObjectiveTarget[] | null
   >(null);
   const [objectiveSaving, setObjectiveSaving] = useState(false);
+  // #551: optimistic name after a confirmed rename; the hunt row stays
+  // authoritative on the next load.
+  const [huntNameLocal, setHuntNameLocal] = useState<string | null>(null);
+  const effectiveHuntName = huntNameLocal ?? ws.hunt?.name ?? null;
   const effectiveBreedingObjective: BreedingObjectiveTarget[] =
     breedingObjectiveLocal ?? ws.hunt?.breedingObjective ?? [];
   const selectedRoundLoadState =
@@ -1487,6 +1492,19 @@ export default function PhenoHuntWorkspace() {
       return false;
     } finally {
       setObjectiveSaving(false);
+    }
+  };
+
+  // #551: rename resolves true only after the row is read back (RLS + the
+  // Pro entitlement policy filter blocked writes silently otherwise).
+  const handleRenameHunt = async (name: string): Promise<boolean> => {
+    if (!canWrite || !ws.hunt?.id) return false;
+    try {
+      await updatePhenoHuntSetup({ huntId: ws.hunt.id, name });
+      setHuntNameLocal(name);
+      return true;
+    } catch {
+      return false;
     }
   };
 
@@ -1656,7 +1674,7 @@ export default function PhenoHuntWorkspace() {
       };
     }
     const csv = buildPhenoHuntCsv({
-      huntName: ws.hunt?.name ?? "hunt",
+      huntName: effectiveHuntName ?? "hunt",
       huntId: ws.hunt?.id ?? null,
       candidates,
       scoresByPlant: ws.scoresByPlant,
@@ -1683,7 +1701,7 @@ export default function PhenoHuntWorkspace() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = phenoHuntCsvFilename(ws.hunt?.name ?? "hunt");
+    a.download = phenoHuntCsvFilename(effectiveHuntName ?? "hunt");
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1734,7 +1752,18 @@ export default function PhenoHuntWorkspace() {
         className="container mx-auto max-w-5xl space-y-4 px-4 py-6"
       >
         <header className="space-y-1">
-          <h1 className="text-2xl font-semibold">Hunt workspace: {ws.hunt?.name ?? "this hunt"}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold">
+              Hunt workspace: {effectiveHuntName ?? "this hunt"}
+            </h1>
+            {ws.hunt?.id ? (
+              <PhenoHuntRenameControl
+                currentName={effectiveHuntName ?? ""}
+                canWrite={canWrite}
+                onRename={handleRenameHunt}
+              />
+            ) : null}
+          </div>
           <p className="text-xs text-muted-foreground">{PHENO_KEEPER_DECISION_CAVEAT}</p>
           {id ? (
             <nav

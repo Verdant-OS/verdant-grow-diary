@@ -345,6 +345,42 @@ describe("writeQuickLogWateringTypedEvent — RPC behavior and idempotency", () 
     });
   });
 
+  it("distinguishes a structured pre-write invalid-payload rejection from an unknown rejection", async () => {
+    const invalid = makeClient({ data: { ok: false, reason: "invalid_typed_payload" } });
+    const malformed = makeClient({ data: { ok: "false", reason: "invalid_typed_payload" } });
+
+    expect(await writeQuickLogWateringTypedEvent(baseInput(), { client: invalid.client })).toEqual({
+      ok: false,
+      reason: "rpc:invalid_typed_payload",
+    });
+    expect(
+      await writeQuickLogWateringTypedEvent(baseInput(), { client: malformed.client }),
+    ).toEqual({
+      ok: false,
+      reason: "rpc:rejected",
+    });
+  });
+
+  it.each([
+    "idempotency_key_retracted",
+    "idempotency_receipt_missing",
+    "idempotency_key_unverified",
+    "idempotency_key_conflict",
+  ])("keeps the replay refusal %s for history review instead of an exact retry", async (reason) => {
+    const refused = makeClient({ data: { ok: false, reason } });
+    expect(await writeQuickLogWateringTypedEvent(baseInput(), { client: refused.client })).toEqual({
+      ok: false,
+      reason,
+    });
+  });
+
+  it("does not pass through a history reason from a malformed envelope", async () => {
+    const malformed = makeClient({ data: { ok: "false", reason: "idempotency_key_retracted" } });
+    expect(
+      await writeQuickLogWateringTypedEvent(baseInput(), { client: malformed.client }),
+    ).toEqual({ ok: false, reason: "rpc:rejected" });
+  });
+
   it("turns transport and thrown errors into a safe reason", async () => {
     const errored = makeClient({ error: { message: "permission denied" } });
     const throwingClient: WateringRpcClient = {

@@ -42,7 +42,7 @@ Three read-only audits from the agent prompt deck (prompts 21, 23 and 43), run a
 
 ### Observations for the reviewer
 
-- **Staff lift mismatch.** `resolveEntitlements.ts` describes the staff lift as presentation-only with AI "enforced server-side at the Pro monthly cap". The spend RPC (migration `20260728090736:256-262`) grants staff 10,000 credits per month under plan id `staff`. Documentation and code disagree; no customer-facing grant is involved.
+- **Staff lift mismatch.** The `isStaff` comment in `src/lib/entitlements/types.ts:76-82` describes the staff lift as UX display only, with AI credits "enforced server-side at the Pro monthly cap". The spend RPC (migration `20260728090736:256-262`) grants staff 10,000 credits per month under plan id `staff`. Documentation and code disagree; no customer-facing grant is involved.
 - **Constitution omits Craft.** AGENTS.md lists Free, Pro monthly, Pro annual and Founder. The catalog and the allowance function also carry `craft_monthly` and `craft_annual` at 300 credits per month. Doc drift, not a defect.
 - **Hardening spec, if assigned:** remove the `byoRow` parameter from `pickStrongestBilling` and `resolveUnionEntitlements`, retire the mirror comment in `types.ts`, and route the seven compatibility-resolver callers through the strict resolver with an explicit fail-closed branch. Out of scope here.
 
@@ -105,7 +105,7 @@ Token estimates use the ratio CLAUDE.md itself measured on 2026-08-21: 153,142 b
 ## Independent review checklist for Grok
 
 1. Re-read `unionEntitlementLookup.ts:56-62` and decide whether the compatibility resolver's sandbox default is a FAIL against AGENTS.md's "explicitly resolved PAYMENTS_ENVIRONMENT=sandbox" wording or an accepted fail-safe. Claude rates it FAIL by letter, low risk in practice.
-2. Confirm the staff 10,000 per month grant in the spend RPC is intended and that the resolver comment, not the RPC, is what should change.
+2. Confirm the staff 10,000 per month grant in the spend RPC is intended and that the `isStaff` comment in `src/lib/entitlements/types.ts`, not the RPC, is what should change.
 3. Decide whether the dead `byoRow` path warrants a hardening slice now or a note in the architecture contract.
 4. Run `scripts/run-ai-credits-rls-harness.ts` if you hold the credentials; Claude could not. Report races as measured, not inferred.
 5. Approve or reject the three MOVE rows for Tranche 2 of the archival slice, and advise Matthew on a keep-latest-N rule for the follow-up chain.

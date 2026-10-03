@@ -84,7 +84,7 @@ The pending state the prompt asked for already exists. No new spec is needed bey
 
 ## Independent review checklist for Grok
 
-1. Confirm `src/pages/CheckoutSuccess.tsx:62-63` is the only path to the confirmed view and that no URL parameter can reach it.
+1. Confirm `src/pages/CheckoutSuccess.tsx:63-64` is the only path to the confirmed view and that no URL parameter can reach it.
 2. Judge whether the Settings fallback gap (no "activation pending" row) is worth one pinned line, or acceptable as is.
 3. Confirm the five-feature allowlist in `premium-export-entitlement` is the complete set of gated exports, and that the basic grow PDF never calls it.
 4. Advise Matthew on the raw backup question: Free or Pro. Claude recommends Free; it is a product-terms decision.

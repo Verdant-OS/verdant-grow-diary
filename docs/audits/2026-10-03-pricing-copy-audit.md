@@ -77,7 +77,7 @@ Prices and feature lists live in `src/constants/pricing.ts`; capabilities and cr
 | Annual savings percentages | **PASS** | Pro 99 against 144 is 31 percent; Craft 249 against 348 is 28 percent. Both match `annualSavingsPercent`. |
 | Credit pack copy | **PASS** | “50 for $9, 150 for $19” equals `CREDIT_PACKS`. Live Paddle prices are resolved by `get-paddle-price` and NOT_MEASURED here. |
 | Free "90 days" sensor history | **OBSERVATION** | Matches `sensorHistoryDays: 90` in the catalog, but nothing enforces it (Audit 24). Copy ahead of code. |
-| Staff copy in Settings | **PASS** | “Internal staff — Pro capabilities, 10,000 AI credits/month” matches the spend RPC. The resolver comment claiming a Pro cap is the outlier (billing audit, Audit 21). |
+| Staff copy in Settings | **PASS** | “Internal staff — Pro capabilities, 10,000 AI credits/month” matches the spend RPC. The `isStaff` comment in `src/lib/entitlements/types.ts` claiming a Pro cap is the outlier (billing audit, Audit 21). |
 | Catalog entries the UI omits | **PASS** | None are omitted. Every plan id and capability in `planCatalog.ts` has a UI representation; Founder's Blueprint is the only under-stated one. |
 
 ### Spec note

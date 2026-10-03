@@ -89,7 +89,10 @@ This follow-up applies those five wording P2s in place. No verdict changed.
   - `src/lib/entitlements/unionEntitlements.ts:49` → `:52-76` (`pickStrongestBilling`).
   - `src/lib/entitlements/types.ts:22` → `:17`.
   - `src/hooks/useMyEntitlements.ts:11` → `:10-13`.
-  - `src/pages/CheckoutSuccess.tsx:64` → `:62-63`.
+  - `src/pages/CheckoutSuccess.tsx:64` → `:63-64` (`const confirmed =`).
+  - The billing audit's Staff lift quote ("enforced server-side at the Pro monthly cap") was
+    credited to `resolveEntitlements.ts`. It is now cited to `src/lib/entitlements/types.ts:76-82`,
+    the `isStaff` comment.
   - `payments-webhook/index.ts` line 316 → lines 313-318.
   - `src/lib/funnelAnalytics.ts:32-87` → `:32-80`.
   - `src/routes/__root.tsx` comment at line 245 → lines 244-253.

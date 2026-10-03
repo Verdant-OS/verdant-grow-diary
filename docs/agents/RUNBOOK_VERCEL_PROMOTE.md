@@ -158,9 +158,9 @@ Force Promote to bypass an unresolved publish or security gate. See
 
 ## Rollback — Matthew only
 
-If the release must be reversed, Matthew selects the packet's known-good production
-artifact (packet item 5), then works through three steps. He records a UTC time for
-every read.
+If the release must be reversed, Matthew selects a known-good production artifact,
+the packet's item 5 when a packet exists, then works through three steps. He records
+a UTC time for every read.
 
 1. **Resolve any active rollout first.** If a rollout is active, including the one
    being reversed, he aborts it (an owner control, see Rolling Releases above) and
@@ -184,13 +184,22 @@ every read.
    - each hostname's current serving deployment, for every hostname in that
      re-enumerated inventory.
 
-   Then one of three outcomes applies:
-   - **Stop.** The rollback target's `meta.githubCommitSha` differs from the packet's
-     known-good SHA, the target is not `READY`, production-target and Git-sourced, or
-     a hostname listed in packet item 1 is missing from the re-enumerated inventory.
-     The packet no longer describes this rollback. He records a blocker naming the
-     mismatch and does not run the command until a corrected packet names a valid
-     known-good artifact.
+   A read that cannot be completed is recorded as `BLOCKED`, not as a value, and never
+   counts as a match in step 3. He completes the read, or records the blocker and his
+   decision to proceed without it.
+
+   Then one of four outcomes applies:
+   - **Back to step 1.** The record shows an active rollout. No rollback is decided
+     while a rollout is advancing.
+   - **Reselect the artifact.** There is no packet item 5 (a release promoted
+     automatically has no packet), or the rollback target's `meta.githubCommitSha`
+     differs from the known-good SHA it was selected for, or the target is not
+     `READY`, production-target and Git-sourced. He selects a known-good artifact himself (an
+     owner control, see Rolling Releases above) that is `READY`, production-target and
+     Git-sourced in this project, records why, and records step 2 again for it. A
+     missing or stale packet never blocks a rollback by itself. A hostname listed in
+     packet item 1 that is missing from the re-enumerated inventory is recorded and
+     carried into Verify; it does not block the rollback either.
    - **Nothing to roll back.** Every hostname in the re-enumerated inventory already
      serves the rollback target deployment at the known-good SHA, as an abort in
      step 1 can leave it. He records that no rollback was run and goes to Verify.
@@ -212,8 +221,9 @@ every read.
 vercel rollback <deployment-url> --scope verdantgrowdiary
 ```
 
-Here `<deployment-url>` is the rollback artifact, not the failed target. Rollback
-changes routing without rebuilding. It does not reverse a database migration or
+Here `<deployment-url>` is the rollback artifact, not the failed target. The
+rollback is a publish action, recorded like the abort. Rollback changes routing
+without rebuilding. It does not reverse a database migration or
 an Edge deployment. Do not assume rollback paused automatic production domain
 assignment: the observed pause after an earlier rollback does not establish its
 cause or the current project setting. Matthew checks and records the production

@@ -155,8 +155,8 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("tsconfig.json")).toBe(true);
     expect(isScorerPath("tsconfig.irrigation-harness.json")).toBe(true);
     expect(isScorerPath("supabase/functions/_shared/lib/.sync-manifest.json")).toBe(true);
-    // Spelled in two parts: release-workbook-concurrent-read-isolation.test.ts treats any
-    // src/test suite whose source carries that marker as a workbook suite and forbids its
+    // Spelled in two parts: the workbook concurrent-read isolation fence treats any src/test
+    // suite whose source carries the joined marker as a workbook suite and forbids its
     // child_process import, which this suite needs to drive the CLI.
     expect(
       isScorerPath(["docs/artifacts/release-", "workbook-template-manifest.json"].join("")),

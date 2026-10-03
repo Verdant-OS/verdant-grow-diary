@@ -4,13 +4,9 @@
   "canonicalLockfile": "bun.lock",
   "compatibilityLockfile": "package-lock.json",
   "owner": "Verdant dependency security",
-  "reason": "The 2026-10-03 review, on the owner's instruction, retained the synchronized npm compatibility lock through 2026-10-10 after re-inventorying the same four repository npm references at deploy tip 80176bad; only the SEO workflow is confirmed to invoke lock-dependent npm ci. See docs/dependency-lockfile-transition-review-2026-10-03.md (prior: 2026-09-25). Bun remains canonical, and vercel.json pins Bun install/build. Preview dashboard settings are not verified by this repository review.",
+  "reason": "The 2026-10-03 review, on the owner's instruction, retained the synchronized npm compatibility lock through 2026-10-10 after re-inventorying the same four repository npm references at deploy tip 80176bad. The SEO monitoring workflow, the only reference confirmed to install from the npm lock, then moved to a frozen Bun install, so no remaining reference depends on package-lock.json; the other three are documentation and local-setup instructions. See docs/dependency-lockfile-transition-review-2026-10-03.md (prior: 2026-09-25). Bun remains canonical, and vercel.json pins Bun install/build. Preview dashboard settings are not verified by this repository review.",
   "reviewBy": "2026-10-10",
   "consumerContracts": [
-    {
-      "path": ".github/workflows/seo-monitoring.yml",
-      "markers": ["run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund"]
-    },
     {
       "path": "README.md",
       "markers": ["npm run build"]

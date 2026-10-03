@@ -91,6 +91,7 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     expect(DOC).toContain("`scripts/vitest-controlled/`");
     expect(DOC).toContain("`scripts/run-vitest-batches.mjs`");
     expect(DOC).toContain("`.github/workflows/`");
+    expect(DOC).toContain("`.github/actions/`");
     expect(DOC).toContain("`scripts/lib/`");
     expect(DOC).toContain("`scripts/config/`");
     expect(DOC).toMatch(/widening an allowlist/);

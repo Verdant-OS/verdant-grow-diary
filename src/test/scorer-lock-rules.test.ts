@@ -173,11 +173,17 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath(".github/workflows/ci.yml")).toBe(true);
     expect(isScorerPath(".github/workflows/security-regression.yml")).toBe(true);
     expect(isScorerPath(".husky/pre-commit")).toBe(true);
+    // Local composite actions: 18 workflows delegate their protected-secret preflight to
+    // require-ci-secret, so editing the action neutralises the judge without touching either.
+    expect(isScorerPath(".github/actions/require-ci-secret/action.yml")).toBe(true);
+    expect(isScorerPath(".github/actions/new-action/action.yml")).toBe(true);
     expect(isScorerPath("package.json")).toBe(true);
     expect(isScorerPath("scripts/lib/assertRequiredCiSecret.mjs")).toBe(true);
     expect(isScorerPath("scripts/lib/vitest-utils.mjs")).toBe(true);
     // Wiring that selects nothing and libraries outside scripts/ stay out.
     expect(isScorerPath(".github/CODEOWNERS")).toBe(false);
+    expect(isScorerPath(".github/pull_request_template.md")).toBe(false);
+    expect(isScorerPath(".github/ISSUE_TEMPLATE/bug.md")).toBe(false);
     expect(isScorerPath("bun.lock")).toBe(false);
     expect(isScorerPath("src/lib/quickLogRules.ts")).toBe(false);
     expect(isScorerPath("supabase/functions/_shared/lib/x.ts")).toBe(false);

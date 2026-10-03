@@ -149,6 +149,11 @@ export const SCORER_PATH_RULES = Object.freeze([
   }),
   Object.freeze({
     kind: "prefix",
+    value: ".github/actions/",
+    why: "local composite actions the workflows delegate preflights to (require-ci-secret: 29 uses across 18 workflows on 2026-10-03); neutralising the action skips the judge without touching a workflow or a script",
+  }),
+  Object.freeze({
+    kind: "prefix",
     value: ".husky/",
     why: "pre-commit wiring: lint-staged, docs-safety asserts and the pre-commit vitest file",
   }),

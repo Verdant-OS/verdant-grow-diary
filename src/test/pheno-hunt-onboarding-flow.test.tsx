@@ -16,6 +16,10 @@ import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/re
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { resolveEntitlements } from "@/lib/entitlements/resolveEntitlements";
 import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 
 const NOW = new Date("2026-08-01T00:00:00Z");
 const entMode = vi.hoisted(() => ({
@@ -304,5 +308,56 @@ describe("PhenoHuntNew onboarding flow", () => {
     expect(toastMock.error.mock.calls[0]?.[0]).toMatch(/couldn't verify pheno tracker access/i);
     expect(toastMock.error.mock.calls[0]?.[0]).not.toMatch(/upgrade/i);
     expect(createPhenoHuntMock).not.toHaveBeenCalled();
+  });
+
+  // #574: the Goals step must describe the pre-selected defaults rather than
+  // imply the grower picked them, and say when the selection was changed.
+  it("Goals step labels the pre-selected set as suggested and tracks changes", async () => {
+    entMode.current = "pro";
+    renderPage();
+    await waitFor(() => screen.getByTestId("pheno-onboarding-stepper"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-goals"));
+
+    const step = screen.getByTestId("pheno-step-goals");
+    expect(step.textContent).toMatch(/pre-selected/i);
+    expect(step.textContent).not.toMatch(/Choose what you plan to track/);
+    expect(screen.getByTestId("pheno-evidence-goals-summary").textContent).toBe(
+      "8 of 12 selected — the suggested starting set",
+    );
+    expect(screen.getByTestId("pheno-evidence-goals-suggested-structure")).toBeDefined();
+    expect(screen.queryByTestId("pheno-evidence-goals-suggested-post_cure")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("pheno-evidence-goals-toggle-yield"));
+    expect(screen.getByTestId("pheno-evidence-goals-summary").textContent).toBe(
+      "7 of 12 selected — changed from the suggested 8",
+    );
+  });
+
+  // Codex on #1843: a restored draft holding only unknown goal ids must not
+  // read "None selected" while readiness still treats goals as chosen.
+  it("a restored draft with only unknown goal ids falls back to the suggested set consistently", async () => {
+    entMode.current = "pro";
+    setLocalStorageItemForTest(
+      "verdant:pheno-hunt-draft:u1:grow-1:all",
+      JSON.stringify({
+        name: "Resumed hunt",
+        notes: "",
+        selected: ["p1", "p2"],
+        evidenceGoals: ["removed_goal"],
+        currentStep: "goals",
+      }),
+    );
+    try {
+      renderPage();
+      await waitFor(() => screen.getByTestId("ph-draft-restored"));
+      expect(screen.getByTestId("pheno-evidence-goals-summary").textContent).toBe(
+        "8 of 12 selected — the suggested starting set",
+      );
+      expect(
+        screen.getByTestId("pheno-onboarding-stepper-step-goals").getAttribute("data-complete"),
+      ).toBe("true");
+    } finally {
+      clearLocalStorageForTest();
+    }
   });
 });

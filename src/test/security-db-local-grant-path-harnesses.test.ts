@@ -98,7 +98,7 @@ describe("local-lane harness launcher refuses anything but the disposable loopba
     expect(Object.keys(LOCAL_LANE_HARNESSES).sort()).toEqual(
       GRANT_PATH_LANE.map((entry) => entry.name).sort(),
     );
-    for (const harness of Object.values(LOCAL_LANE_HARNESSES)) {
+    for (const harness of Object.values(LOCAL_LANE_HARNESSES) as string[]) {
       expect(existsSync(resolve(ROOT, harness)), harness).toBe(true);
     }
   });

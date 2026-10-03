@@ -19,7 +19,10 @@
  *     unless another relevant read already proved a paid entitlement.
  */
 import { describe, it, expect } from "vitest";
-import { loadUnionEntitlement } from "../../supabase/functions/_shared/unionEntitlementLookup.ts";
+import {
+  loadUnionEntitlement,
+  resolveServerBillingEnvironment,
+} from "../../supabase/functions/_shared/unionEntitlementLookup.ts";
 import type { BillingSubscriptionRow, LovableSubscriptionRow } from "@/lib/entitlements";
 
 const NOW = new Date("2026-07-16T12:00:00.000Z");
@@ -466,6 +469,38 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
 
     expect(lookupFailed).toBe(false);
     expect(entitlement.displayPlanId).toBe("pro_monthly");
+    expect(entitlement.capabilities.advancedExports).toBe(true);
+  });
+});
+
+describe("unresolved billing environment fails closed end to end (grant-path audit, 2026-10-03)", () => {
+  // The standard Lovable posture: both Paddle keys configured and no explicit
+  // PAYMENTS_ENVIRONMENT. Before the fix this resolved to sandbox, so a
+  // sandbox test-card subscription unlocked paid capabilities.
+  const ambiguous = (name: string) =>
+    ({ PADDLE_LIVE_API_KEY: "live-key", PADDLE_SANDBOX_API_KEY: "sandbox-key" })[
+      name as "PADDLE_LIVE_API_KEY" | "PADDLE_SANDBOX_API_KEY"
+    ];
+
+  it("a sandbox Pro row does not unlock paid capabilities", async () => {
+    const { entitlement, lookupFailed } = await loadUnionEntitlement(
+      fakeClient({ subsByEnv: { sandbox: [proRow({ environment: "sandbox" })] } }),
+      resolveServerBillingEnvironment(ambiguous),
+      NOW,
+    );
+    expect(lookupFailed).toBe(false);
+    expect(entitlement.effectivePlanId).toBe("free");
+    expect(entitlement.capabilities.advancedExports).toBe(false);
+    expect(entitlement.capabilities.liveSensors).toBe(false);
+  });
+
+  it("a verified live Founder Lifetime row still unlocks", async () => {
+    const { entitlement } = await loadUnionEntitlement(
+      fakeClient({ subsByEnv: { live: [liveFounderRow()] } }),
+      resolveServerBillingEnvironment(ambiguous),
+      NOW,
+    );
+    expect(entitlement.displayPlanId).toBe("founder_lifetime");
     expect(entitlement.capabilities.advancedExports).toBe(true);
   });
 });

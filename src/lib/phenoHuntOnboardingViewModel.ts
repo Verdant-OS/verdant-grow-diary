@@ -57,6 +57,13 @@ export interface PhenoOnboardingDraft {
    */
   readonly setupCompleted?: boolean;
   /**
+   * True once the grower has opened the Evidence goals step in this draft
+   * (#573). Confirmation — and therefore Create — stays locked until then, so
+   * the pre-selected default goals are never accepted unseen. Missing
+   * (legacy drafts) fails closed: treated as not reviewed.
+   */
+  readonly goalsReviewed?: boolean;
+  /**
    * Optional per-candidate data the grower has already recorded (e.g. an
    * initial phenotype note or a photo). Passed in from the workspace once
    * the hunt exists; during first-run onboarding this is usually empty.
@@ -74,6 +81,8 @@ export interface PhenoOnboardingStep {
   readonly label: string;
   readonly complete: boolean;
   readonly reason?: string;
+  /** True when the step cannot be opened yet; `reason` says why. */
+  readonly locked?: boolean;
 }
 
 export interface PhenoOnboardingViewModel {
@@ -94,6 +103,10 @@ export interface PhenoOnboardingViewModel {
   /** Human-readable reasons the draft cannot be created yet. */
   readonly blockingReasons: ReadonlyArray<string>;
 }
+
+/** Blocking / lock reason while the Evidence goals step is unreviewed (#573). */
+export const PHENO_GOALS_REVIEW_REQUIRED_REASON =
+  "Review the evidence goals step before confirming setup";
 
 const STEP_LABEL: Record<PhenoOnboardingStepId, string> = {
   basics: "Hunt basics",
@@ -144,6 +157,7 @@ export function computePhenoHuntOnboardingViewModel(
   const candidateCount = draft.candidateIds.length;
   const status = candidateStatus(candidateCount);
   const goalsOk = draft.evidenceGoals.length > 0;
+  const goalsReviewed = draft.goalsReviewed === true;
 
   const steps: PhenoOnboardingStep[] = [
     {
@@ -179,8 +193,19 @@ export function computePhenoHuntOnboardingViewModel(
     {
       id: "confirmation",
       label: STEP_LABEL.confirmation,
-      complete: !!draft.setupCompleted && nameOk && growOk && candidateCount >= 1 && goalsOk,
-      reason: draft.setupCompleted ? undefined : "Confirm setup to enter the workspace",
+      complete:
+        goalsReviewed &&
+        !!draft.setupCompleted &&
+        nameOk &&
+        growOk &&
+        candidateCount >= 1 &&
+        goalsOk,
+      locked: !goalsReviewed,
+      reason: !goalsReviewed
+        ? PHENO_GOALS_REVIEW_REQUIRED_REASON
+        : draft.setupCompleted
+          ? undefined
+          : "Confirm setup to enter the workspace",
     },
   ];
 
@@ -287,6 +312,7 @@ export function computePhenoHuntOnboardingViewModel(
   if (!growOk) blockingReasons.push("Linked grow is required");
   if (candidateCount === 0) blockingReasons.push("Select at least one candidate plant");
   if (!goalsOk) blockingReasons.push("Select at least one evidence goal");
+  if (!goalsReviewed) blockingReasons.push(PHENO_GOALS_REVIEW_REQUIRED_REASON);
   if (!draft.setupCompleted) blockingReasons.push("Confirm setup to enter the workspace");
 
   return {

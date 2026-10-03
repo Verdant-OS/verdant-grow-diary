@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest";
 import {
   computePhenoHuntOnboardingViewModel,
   defaultEvidenceGoalSelection,
+  PHENO_GOALS_REVIEW_REQUIRED_REASON,
   PHENO_ONBOARDING_STEP_ORDER,
   type PhenoOnboardingDraft,
 } from "@/lib/phenoHuntOnboardingViewModel";
@@ -18,6 +19,7 @@ function draft(over: Partial<PhenoOnboardingDraft> = {}): PhenoOnboardingDraft {
     candidateIds: ["p1", "p2"],
     evidenceGoals: defaultEvidenceGoalSelection(),
     setupCompleted: true,
+    goalsReviewed: true,
     ...over,
   };
 }
@@ -144,6 +146,39 @@ describe("computePhenoHuntOnboardingViewModel", () => {
   it("allows creation after confirmation when all required fields are present", () => {
     const vm = computePhenoHuntOnboardingViewModel(draft({ setupCompleted: true }));
 
+    expect(vm.canCreate).toBe(true);
+    expect(vm.blockingReasons).toEqual([]);
+  });
+
+  // ---- #573: Goals step must be reviewed before Confirmation / Create ----
+
+  it("goals not reviewed → creation blocked with a goals-review reason", () => {
+    const vm = computePhenoHuntOnboardingViewModel(draft({ goalsReviewed: false }));
+    expect(vm.canCreate).toBe(false);
+    expect(vm.blockingReasons).toContain(PHENO_GOALS_REVIEW_REQUIRED_REASON);
+  });
+
+  it("goalsReviewed missing (legacy draft) fails closed", () => {
+    const { goalsReviewed: _omit, ...legacy } = draft();
+    const vm = computePhenoHuntOnboardingViewModel(legacy);
+    expect(vm.canCreate).toBe(false);
+    expect(vm.blockingReasons).toContain(PHENO_GOALS_REVIEW_REQUIRED_REASON);
+  });
+
+  it("confirmation step is locked and incomplete until goals are reviewed", () => {
+    const vm = computePhenoHuntOnboardingViewModel(draft({ goalsReviewed: false }));
+    const confirmation = vm.steps.find((s) => s.id === "confirmation")!;
+    expect(confirmation.locked).toBe(true);
+    expect(confirmation.complete).toBe(false);
+    expect(confirmation.reason).toBe(PHENO_GOALS_REVIEW_REQUIRED_REASON);
+    // Only the confirmation step is locked; steps 1-5 stay freely navigable.
+    expect(vm.steps.filter((s) => s.locked).map((s) => s.id)).toEqual(["confirmation"]);
+  });
+
+  it("goals reviewed → confirmation unlocked and creation allowed", () => {
+    const vm = computePhenoHuntOnboardingViewModel(draft({ goalsReviewed: true }));
+    const confirmation = vm.steps.find((s) => s.id === "confirmation")!;
+    expect(confirmation.locked).toBe(false);
     expect(vm.canCreate).toBe(true);
     expect(vm.blockingReasons).toEqual([]);
   });

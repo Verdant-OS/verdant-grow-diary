@@ -97,7 +97,8 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     expect(DOC).toContain("`scripts/lib/`");
     expect(DOC).toContain("`scripts/config/`");
     expect(DOC).toContain("`*.config.*` modules under `scripts/`");
-    expect(DOC).toContain("`scripts/ci/merge-queue-thresholds.json`");
+    expect(DOC).toContain("`scripts/ci/`");
+    expect(DOC).toContain("release-receipt derivation");
     expect(DOC).toMatch(/widening an allowlist/);
   });
 

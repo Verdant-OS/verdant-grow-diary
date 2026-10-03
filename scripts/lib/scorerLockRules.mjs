@@ -197,9 +197,38 @@ export const SCORER_PATH_RULES = Object.freeze([
     why: "gate pins kept as *.config.* modules anywhere under scripts/ (public-route-parity.config.mjs feeds sitemap-public-route-parity.test.ts; public-route-head-invariants.config.mjs feeds validate-static-route-head-fidelity.mjs); adding a route to an allowlist there makes a parity failure disappear without touching the test",
   }),
   Object.freeze({
+    kind: "prefix",
+    value: "scripts/ci/",
+    why: "CI helpers whose exit codes and outputs the workflows judge on: merge-queue-snapshot.mjs --alert (exit 4 on a critical breach) and its thresholds JSON, compose-release-receipt-inputs.mjs, pr-file-overlap-audit.mjs",
+  }),
+  // Verb-less judges invoked by a workflow whose exit code or derived status fails the job:
+  // the release-receipt derivation chain and the two smoke-lane runners. Measured on
+  // 2026-10-03 across the 157 workflow-referenced scripts/ files; precondition probes
+  // (wait-for-deployed-sha.mjs), apply-*/prepare-*/generate-* tooling and reporters stay out.
+  Object.freeze({
     kind: "exact",
-    value: "scripts/ci/merge-queue-thresholds.json",
-    why: "the thresholds merge-queue-snapshot.mjs --alert exits non-zero against in merge-queue-snapshot.yml",
+    value: "scripts/build-release-receipt-input.mjs",
+    why: "release-receipt-ci.yml cross-checks the composed receipt input against this derivation",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/emit-release-receipt.mjs",
+    why: "derives the release receipt whose status release-receipt-ci.yml validates and preserves as the job result",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/print-release-receipt-status.mjs",
+    why: "prints the derived receipt status the release-receipt lane reads",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/sandbox-credit-packs-smoke.ts",
+    why: "the sandbox credit-packs smoke lane's judge (sandbox-credit-packs-smoke.yml); exits non-zero on a failed verification",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/smoke-award-nugs.ts",
+    why: "the gamification smoke lane's judge (gamification-staging-smoke.yml); exits non-zero on a failed award_nugs path",
   }),
   Object.freeze({
     kind: "regex",

@@ -160,6 +160,19 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("scripts/public-route-head-invariants.config.mjs")).toBe(true);
     expect(isScorerPath("scripts/seo/new-gate.config.ts")).toBe(true);
     expect(isScorerPath("scripts/ci/merge-queue-thresholds.json")).toBe(true);
+    // The judge that reads those thresholds, and the rest of scripts/ci/, are scorers too;
+    // so are the verb-less workflow-invoked judges measured on 2026-10-03.
+    expect(isScorerPath("scripts/ci/merge-queue-snapshot.mjs")).toBe(true);
+    expect(isScorerPath("scripts/ci/compose-release-receipt-inputs.mjs")).toBe(true);
+    expect(isScorerPath("scripts/emit-release-receipt.mjs")).toBe(true);
+    expect(isScorerPath("scripts/build-release-receipt-input.mjs")).toBe(true);
+    expect(isScorerPath("scripts/print-release-receipt-status.mjs")).toBe(true);
+    expect(isScorerPath("scripts/sandbox-credit-packs-smoke.ts")).toBe(true);
+    expect(isScorerPath("scripts/smoke-award-nugs.ts")).toBe(true);
+    // Precondition probes, migration appliers and generators invoked by workflows are not judges.
+    expect(isScorerPath("scripts/wait-for-deployed-sha.mjs")).toBe(false);
+    expect(isScorerPath("scripts/apply-pinned-production-migrations.mjs")).toBe(false);
+    expect(isScorerPath("scripts/generate-build-summary.mjs")).toBe(false);
     expect(isScorerPath("scripts/configure-ecowitt-bridge.mjs")).toBe(false);
     expect(isScorerPath("scripts/x.config.md")).toBe(false);
     expect(isScorerPath("config/dependency-security-exceptions.json")).toBe(true);
@@ -281,7 +294,6 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("docs/agents/loop-engineering.md")).toBe(false);
     expect(isScorerPath("scripts/stamp-version.mjs")).toBe(false);
     expect(isScorerPath("scripts/sync-edge-shared.mjs")).toBe(false);
-    expect(isScorerPath("scripts/ci/compose-release-receipt-inputs.mjs")).toBe(false);
     expect(isScorerPath("supabase/functions/_shared/lib/x.ts")).toBe(false);
     expect(isScorerPath("supabase/migrations/20261001160000_x.sql")).toBe(false);
     expect(isScorerPath("tools/ecowitt-testbench/ecowitt_delivery.py")).toBe(false);

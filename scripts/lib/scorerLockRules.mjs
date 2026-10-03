@@ -59,6 +59,11 @@ export const SCORER_PATH_RULES = Object.freeze([
     why: "Python testbench suites (tools/ecowitt-testbench, tools/ggs-ble-testbench)",
   }),
   Object.freeze({
+    kind: "regex",
+    value: /(^|\/)[^/]+_test\.(ts|tsx|js|mjs|cjs)$/,
+    why: "Deno underscore-named tests (supabase/functions/*/handler_e2e_test.ts and the mint/revoke bridge-token suites that sensor-ingest-webhook-edge-tests.yml runs)",
+  }),
+  Object.freeze({
     kind: "prefix",
     value: "supabase/tests/",
     why: "pgTAP and RLS harness SQL suites",
@@ -66,8 +71,8 @@ export const SCORER_PATH_RULES = Object.freeze([
   Object.freeze({
     kind: "regex",
     value:
-      /^scripts\/(?:[^/]+\/)*(check|verify|assert|validate|audit|scan|precommit|preflight|test)-[^/]+\.(mjs|cjs|js|ts)$/,
-    why: "repository gate scripts that CI, pre-commit and package scripts run as judges, at any depth under scripts/ (prefixes measured from the workflow and package.json invocations on 2026-10-03)",
+      /^scripts\/(?:[^/]+\/)*(?:test-[^/]+|(?:[^/]*-)?(?:check|checks|verify|assert|validate|audit|scan|precommit|preflight|harness|db-security)(?:-[^/]*)?)\.(mjs|cjs|js|ts)$/,
+    why: "repository gate scripts that CI, pre-commit and package scripts run as judges, at any depth under scripts/: a judge verb as a hyphen-delimited token anywhere in the basename (static-client-secret-scan, sensor-safety-check, run-*-harness, run-*-db-security) or a test- prefix (verbs measured from the workflow and package.json invocations on 2026-10-03; test- stays prefix-only because measure-test-estate and send-ecowitt-test-payload are not judges)",
   }),
   Object.freeze({
     kind: "exact",

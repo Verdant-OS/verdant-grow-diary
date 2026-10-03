@@ -79,7 +79,11 @@ describe("docs/agents/loop-engineering.md — contract", () => {
   });
 
   it("names the gate-script prefixes CI invokes and the merge-base default for --report", () => {
-    for (const prefix of ["`validate-`", "`audit-`", "`scan-`"]) expect(DOC).toContain(prefix);
+    for (const prefix of ["`validate-`", "`audit-`", "`scan-`", "`-harness`", "`-db-security`"]) {
+      expect(DOC).toContain(prefix);
+    }
+    expect(DOC).toContain("`*_test.ts`");
+    expect(DOC).toMatch(/judge verb as a hyphen-delimited token/);
     expect(DOC).toMatch(/merge-base with (the deploy branch|verdant-grow-diary)/);
   });
 

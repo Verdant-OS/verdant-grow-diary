@@ -87,6 +87,15 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("supabase/tests/billing_subscriptions_rls.sql")).toBe(true);
   });
 
+  it("treats the Deno underscore-named tests under supabase/functions as scorers", () => {
+    expect(isScorerPath("supabase/functions/ecowitt-ingest/handler_e2e_test.ts")).toBe(true);
+    expect(isScorerPath("supabase/functions/mint-bridge-token/handler_e2e_test.ts")).toBe(true);
+    expect(isScorerPath("supabase/functions/save-founder-prefs/validate_test.ts")).toBe(true);
+    expect(isScorerPath("supabase/functions/sensor-ingest-webhook/cors_e2e_test.ts")).toBe(true);
+    expect(isScorerPath("supabase/functions/ecowitt-ingest/handler.ts")).toBe(false);
+    expect(isScorerPath("supabase/functions/ecowitt-ingest/index.ts")).toBe(false);
+  });
+
   it("treats every gate-script prefix CI invokes as a scorer, at any depth under scripts/", () => {
     expect(isScorerPath("scripts/check-contract-test-resolution.mjs")).toBe(true);
     expect(isScorerPath("scripts/verify-edge-shared-in-sync.mjs")).toBe(true);
@@ -102,6 +111,28 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("config/required-status-checks.json")).toBe(true);
   });
 
+  it("treats gate scripts whose judge verb is a later token as scorers too", () => {
+    expect(isScorerPath("scripts/security/static-client-secret-scan.mjs")).toBe(true);
+    expect(isScorerPath("scripts/security/bridge-sensor-ingest-evidence-checks.mjs")).toBe(true);
+    expect(isScorerPath("scripts/sensor-safety-check.mjs")).toBe(true);
+    expect(isScorerPath("scripts/ci-ecowitt-config-validate-contract.mjs")).toBe(true);
+    expect(isScorerPath("scripts/ci/pr-file-overlap-audit.mjs")).toBe(true);
+    expect(isScorerPath("scripts/run-billing-rls-harness.ts")).toBe(true);
+    expect(isScorerPath("scripts/security/run-profiles-db-security.mjs")).toBe(true);
+    expect(isScorerPath("scripts/run-privilege-matrix-preflight.ts")).toBe(true);
+    expect(isScorerPath("scripts/p3-preservation/preflight.mjs")).toBe(true);
+  });
+
+  it("keeps test- as a prefix verb and does not match a verb embedded in a longer word", () => {
+    expect(isScorerPath("scripts/measure-test-estate.mjs")).toBe(false);
+    expect(isScorerPath("scripts/send-ecowitt-test-payload.ts")).toBe(false);
+    expect(isScorerPath("scripts/upload-per-test-artifacts.mjs")).toBe(false);
+    expect(isScorerPath("scripts/dev/print-ecowitt-pc-checklist.ts")).toBe(false);
+    expect(isScorerPath("scripts/clean-scanner-guardrail-artifacts.mjs")).toBe(false);
+    expect(isScorerPath("scripts/run-scanner-guardrails-ci.mjs")).toBe(false);
+    expect(isScorerPath("scripts/e2e/create-pheno-paid-smoke-sessions.mjs")).toBe(false);
+  });
+
   it("does not treat production code, docs, migrations, runners or other scripts as scorers", () => {
     expect(isScorerPath("src/lib/quickLogRules.ts")).toBe(false);
     expect(isScorerPath("src/components/QuickLog.tsx")).toBe(false);
@@ -109,7 +140,8 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("scripts/scorer-lock.mjs")).toBe(false);
     expect(isScorerPath("scripts/lib/scorerLockRules.mjs")).toBe(false);
     expect(isScorerPath("scripts/stamp-version.mjs")).toBe(false);
-    expect(isScorerPath("scripts/run-billing-rls-harness.ts")).toBe(false);
+    expect(isScorerPath("scripts/run-vitest-batches.mjs")).toBe(false);
+    expect(isScorerPath("scripts/sync-edge-shared.mjs")).toBe(false);
     expect(isScorerPath("scripts/ci/compose-release-receipt-inputs.mjs")).toBe(false);
     expect(isScorerPath("supabase/functions/_shared/lib/x.ts")).toBe(false);
     expect(isScorerPath("supabase/migrations/20261001160000_x.sql")).toBe(false);

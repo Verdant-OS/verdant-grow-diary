@@ -159,23 +159,38 @@ Force Promote to bypass an unresolved publish or security gate. See
 ## Rollback — Matthew only
 
 If the release must be reversed, Matthew selects the packet's known-good production
-artifact. **Immediately before** rolling back, he rereads the following and records
-a UTC time for each read:
+artifact, then works through three steps. He records a UTC time for every read.
 
-- the rollback target deployment's project, `target: production`, `READY` state,
-  `source: git` and `meta.githubCommitSha`, which must still match the packet's
-  known-good SHA;
-- the rolling-release record and configuration (`get_rolling_release` and
-  `get_rolling_release_config`);
-- the production-host inventory from packet item 1, re-enumerated: the M2 apex
-  holder, the production domains bound to the project, the aliases
-  (`list_promote_aliases`) and each custom hostname's DNS, which must still equal
-  the packet's inventory;
-- each hostname's current serving deployment, for every hostname in that
-  re-enumerated inventory.
-
-If a rollout started, or the inventory or routing changed, after the packet was
-prepared, he stops and resolves it before any rollback. He then runs:
+1. **Resolve any active rollout first.** If a rollout is active, including the one
+   being reversed, he aborts it (an owner control, see Rolling Releases above) and
+   waits until the rolling-release record shows no active rollout. A rollout that is
+   still advancing changes its own record from minute to minute, so no rollback is
+   decided against it.
+2. **Record the rollback decision.** With no rollout active, he records the state he
+   is deciding to reverse. This record, not the pre-promote packet, is the baseline
+   for step 3, because a promote is expected to change the rolling-release record and
+   the serving deployments.
+   - the rollback target deployment's project, `target: production`, `READY` state,
+     `source: git` and `meta.githubCommitSha`, which must match the packet's
+     known-good SHA;
+   - the rolling-release record and configuration (`get_rolling_release` and
+     `get_rolling_release_config`): state, substate, current and canary deployments,
+     canary percentage, stage, queued deployment, `startedAt`, `updatedAt`,
+     configured stages and advancement type;
+   - the production-host inventory from packet item 1, re-enumerated: the M2 apex
+     holder, the production domains bound to the project, the aliases
+     (`list_promote_aliases`) and each custom hostname's DNS, which must still equal
+     the packet's inventory;
+   - each hostname's current serving deployment, for every hostname in that
+     re-enumerated inventory.
+3. **Reread immediately before the command.** He reads every item in step 2 again.
+   If any value differs from the step 2 record, he stops and returns to step 1. That
+   covers a rollout that started, advanced a stage, completed (a forced complete
+   included) or was aborted after step 2, any rolling-release configuration change,
+   and any inventory or routing change. Each of these changes what production serves
+   ([release topology specification](../specs/release-topology-specification.md),
+   D-RT-13), so a rollback decided against the earlier state is stale. Only when every
+   read matches the step 2 record does he run:
 
 ```sh
 vercel rollback <deployment-url> --scope verdantgrowdiary

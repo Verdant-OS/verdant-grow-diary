@@ -61,7 +61,46 @@ vi.mock("@/integrations/supabase/client", () => ({
     storage: {
       from: () => ({ upload: storageUpload, remove: storageRemove }),
     },
-    from: () => ({ insert: diaryInsert }),
+    from: (table: string) =>
+      table === "grow_events"
+        ? {
+            select: () => ({
+              eq: (_column: string, id: string) => ({
+                maybeSingle: async () => {
+                  const args = rpcMock.mock.calls.at(-1)?.[1];
+                  return {
+                    data: args
+                      ? {
+                          id,
+                          event_type: args.p_event_type,
+                          source: "manual",
+                          is_deleted: false,
+                          grow_id: args.p_grow_id,
+                          tent_id: args.p_tent_id,
+                          plant_id: args.p_plant_id,
+                        }
+                      : null,
+                    error: null,
+                  };
+                },
+              }),
+            }),
+          }
+        : table === "watering_events"
+          ? {
+              select: () => ({
+                eq: (_column: string, id: string) => ({
+                  maybeSingle: async () => {
+                    const args = rpcMock.mock.calls.at(-1)?.[1];
+                    return {
+                      data: args ? { event_id: id, volume_ml: args.p_water.volume_ml } : null,
+                      error: null,
+                    };
+                  },
+                }),
+              }),
+            }
+          : { insert: diaryInsert },
   },
 }));
 

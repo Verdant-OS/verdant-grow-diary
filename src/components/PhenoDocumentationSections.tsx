@@ -13,8 +13,13 @@ import {
   mergeDocumentationValues,
   type PhenoDocumentationValues,
 } from "@/constants/phenoDocumentationDefaults";
+import { phenoDocStorageKey, type PhenoDocRecordType } from "@/lib/phenoDocumentationBackupRules";
 
-export type PhenoDocRecordType = "candidate" | "breeding_program";
+// Storage keys are USER-scoped when signed in (see phenoDocStorageKey): the
+// old device-scoped key let another signed-in account on the same device see
+// the previous grower's values; legacy device-scoped data is never read under
+// a user id.
+export type { PhenoDocRecordType };
 type DeviceSaveStatus = "idle" | "saved" | "failed";
 
 export interface PhenoDocDiaryOption {
@@ -41,20 +46,6 @@ interface Props {
   defaultOpen?: boolean;
 }
 
-function storageKey(
-  recordType: PhenoDocRecordType,
-  recordId: string,
-  userId: string | null,
-): string {
-  // USER-scoped when signed in: the old device-scoped key let another
-  // signed-in account on the same device see and edit the previous grower's
-  // values for the same record. Legacy device-scoped data is deliberately
-  // NOT read under a user id — it cannot be attributed to this user safely.
-  return userId
-    ? `phenoDocs:${userId}:${recordType}:${recordId}`
-    : `phenoDocs:${recordType}:${recordId}`;
-}
-
 function loadSaved(
   storage: Pick<Storage, "getItem" | "setItem"> | null,
   recordType: PhenoDocRecordType,
@@ -63,7 +54,7 @@ function loadSaved(
 ): PhenoDocumentationValues | null {
   if (storage === null) return null;
   try {
-    const raw = storage.getItem(storageKey(recordType, recordId, userId));
+    const raw = storage.getItem(phenoDocStorageKey(recordType, recordId, userId));
     if (!raw) return null;
     return JSON.parse(raw) as PhenoDocumentationValues;
   } catch {
@@ -147,7 +138,7 @@ export default function PhenoDocumentationSections({
       return;
     }
     try {
-      store.setItem(storageKey(recordType, recordId, userId), JSON.stringify(hydrated()));
+      store.setItem(phenoDocStorageKey(recordType, recordId, userId), JSON.stringify(hydrated()));
       setSaveStatus("saved");
     } catch {
       // storage may be unavailable; keep values in-memory
@@ -165,6 +156,9 @@ export default function PhenoDocumentationSections({
         <p className="text-xs text-muted-foreground">
           Saved on this device only. This documentation is not saved to your Verdant account or
           synced to another browser. Defaults never overwrite what you have already entered.
+          {recordType === "candidate"
+            ? " Use “Download backup” on the hunt page to keep a copy."
+            : ""}
         </p>
       </header>
 

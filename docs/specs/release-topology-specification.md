@@ -995,6 +995,38 @@ Verdict: **safe to merge as documentation.** It changes what readers believe, no
 | Closing the release-state `FAIL` (start a rolling release of the tip build, or promote it) | Owner — a publish action (D-RT-13)                                                                      |
 | Credential inventory and scoping (D-RT-14)                                                 | Owner                                                                                                   |
 | A scheduled M10 promotion-drift probe                                                      | Workflow slice after this merges; signal only (D-RT-10)                                                 |
+| Rollback-procedure gaps found by `#1892`'s doubt check (list below)                        | Owner decides each design question; then a spec slice and a runbook PR                                  |
+
+The rollback-procedure gaps are open design questions for the `Rollback — Matthew only`
+section of `docs/agents/RUNBOOK_VERCEL_PROMOTE.md`. They are `NOT_MEASURED` against a
+live project and none is closed by `#1892`:
+
+1. **Serving identity.** Step 2 records the M2 apex holder and the rollback target's
+   project but compares neither. If the apex or `www` has moved to another project or
+   platform, a project-scoped `vercel rollback` changes routing nobody is served from.
+   The question is what the rollback checks first: that this project holds every
+   production hostname, and that the target is in this project (contract §14, no
+   identically named substitute).
+2. **A queued deployment.** The rolling-release record can show a deployment queued
+   behind the aborted rollout, which can start a new rollout as soon as the abort lands.
+   How a queued deployment is resolved, and which record states count as "no active
+   rollout", is not defined.
+3. **An abort that fails.** The runbook does not say whether a rollback may run, or
+   whom to escalate to, when an abort is refused or the record never leaves the active
+   state.
+4. **DNS equality.** Step 3 compares each custom hostname's DNS with the step 2
+   record. Resolver order, TTL and anycast variance can differ with no production
+   change. The comparison needs a definition: record set by type, unordered, without
+   TTL, from a named source.
+5. **Is it still the failure?** Nothing checks that the serving deployment is the
+   failed release. If a fixed build was promoted after the decision, or step 1 aborted
+   a rollout whose canary was the fix, the rollback reverses the fix.
+6. **The no-op exit.** When an abort already left the known-good build serving, no
+   rollback runs, so the later auto-assignment check written for "after rollback"
+   does not apply. A queued deployment or the next deploy-branch build can return the
+   failed version.
+7. **Known-good provenance.** A selected known-good artifact is not required to carry
+   M4 merge-queue provenance, so an earlier out-of-band publish can be selected.
 
 **Rejected — decided, with a reason**
 

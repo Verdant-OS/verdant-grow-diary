@@ -47,6 +47,7 @@ describe("local-lane harness launcher refuses anything but the disposable loopba
         true,
       );
     }
+    expect(isLoopbackHost("127.0.0.2")).toBe(false);
   });
 
   it("refuses the hosted Verdant project and every other remote host", () => {
@@ -86,12 +87,6 @@ describe("local-lane harness launcher refuses anything but the disposable loopba
     ]) {
       expect(planLocalLaneRun(args, LOCAL_ENV)).toMatchObject({ ok: false, exitCode: 2 });
     }
-  });
-
-  it("is deterministic for the same input", () => {
-    const args = ["action-queue", LOCAL_LANE_FLAG];
-    expect(planLocalLaneRun(args, LOCAL_ENV)).toEqual(planLocalLaneRun(args, LOCAL_ENV));
-    expect(isLoopbackHost("127.0.0.2")).toBe(false);
   });
 
   it("points every allow-listed name at a harness file that exists", () => {

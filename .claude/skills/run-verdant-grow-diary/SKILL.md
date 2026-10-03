@@ -42,7 +42,7 @@ sandbox, and a registry override cannot rewrite bun's locked URLs. The
 printf 'registry=https://registry.npmjs.org/\n' > .npmrc.tmp
 npm_config_userconfig=$PWD/.npmrc.tmp npm install --no-audit --no-fund
 rm .npmrc.tmp
-git checkout -- package-lock.json   # npm rewrites resolved URLs; restore it
+rm -f package-lock.json   # npm writes one; bun.lock is the only lockfile (policy forbids it)
 ```
 
 ---
@@ -193,7 +193,8 @@ Targeted sub-suites exist (`bun run test:payments-security`,
   locked URLs** — any `bun install` against this lockfile keeps fetching the
   mirror. Recovery is the npm bootstrap in Prerequisites → "Dependencies
   (first run)" (verified in a clean worktree: 602 packages, ~14s); npm
-  re-resolves against the override registry, then restore `package-lock.json`.
+  re-resolves against the override registry, then delete the `package-lock.json` it
+  writes.
 - **Playwright can't find a browser / revision mismatch.** Set
   `CHROMIUM=/opt/pw-browsers/chromium-1228/chrome-linux/chrome` (the driver reads
   it) or `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` for `bunx playwright test`.

@@ -133,3 +133,30 @@ describe("heredocs", () => {
     expect(checkBash(`grep x <<< "y"\ngit push --force`)).not.toBe(null);
   });
 });
+
+describe("quoted operators", () => {
+  test("a pipe, semicolon or && inside quotes is data, not a command separator", () => {
+    // The false positive this fixes: a grep alternation whose second branch named a forbidden
+    // command was split at the quoted `|` and read as a command of its own.
+    expect(checkBash(`grep -n "foo\\|git push --force" AGENTS.md`)).toBe(null);
+    expect(checkBash(`grep -nE 'a|${NPM} install left-pad' x.md`)).toBe(null);
+    expect(checkBash(`echo "done; git rebase origin/main"`)).toBe(null);
+    expect(checkBash(`git commit -m "fix: x && gh pr merge 1"`)).toBe(null);
+    expect(checkBash(`git commit -m "line one\ngit push --force"`)).toBe(null);
+  });
+  test("operators outside quotes still split", () => {
+    expect(checkBash(`grep -n "foo|bar" x | git push --force`)).not.toBe(null);
+    expect(checkBash(`echo 'a;b'; git rebase origin/main`)).not.toBe(null);
+    expect(checkBash(`echo "a" && git push origin "main"`)).not.toBe(null);
+  });
+  test("an escaped quote does not open or close a quoted span", () => {
+    expect(checkBash(`echo \\" | git push --force`)).not.toBe(null);
+    expect(checkBash(`echo "a \\" | b" ; git status`)).toBe(null);
+  });
+  test("an unclosed quote cannot hide a later command", () => {
+    expect(checkBash(`echo "unterminated; git push --force`)).not.toBe(null);
+  });
+  test("a backslash-newline continues the command", () => {
+    expect(checkBash(`git push \\\n  --force origin claude/x`)).not.toBe(null);
+  });
+});

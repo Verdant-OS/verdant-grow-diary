@@ -7,8 +7,6 @@ export const PROTECTED_BRANCHES = ["verdant-grow-diary", "main"] as const;
 // The production Supabase project ref (CURRENT_STATE.md, standing directive 2026-08-25).
 export const PRODUCTION_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 
-const SEGMENT_SPLIT = /&&|\|\||;|\||\n/;
-
 const HEREDOC_START = /(?<!<)<<(?!<)-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/;
 const SHELL_READS_STDIN = /(^|[\s|;&(])(bash|sh|zsh|dash)(\s+-[a-z]+)*\s*(<<|$)/;
 
@@ -36,10 +34,67 @@ export function stripHeredocs(command: string): string {
   return out.join("\n");
 }
 
-/** Splits a shell command into simple-command segments and naive tokens. */
+/**
+ * Splits a shell command into simple-command segments and tokens. Quote-aware: `&&`, `||`,
+ * `;`, `|` and newlines split only outside quotes, so `grep "a|git push --force"` stays one
+ * command. Quotes are removed from tokens; a backslash escapes the next character outside
+ * single quotes. It does not expand `$(…)`, backticks or `bash -c` strings (see README).
+ */
 export function segments(command: string): string[][] {
-  return stripHeredocs(command)
-    .split(SEGMENT_SPLIT)
+  const text = stripHeredocs(command);
+  const out: string[][] = [];
+  let tokens: string[] = [];
+  let token = "";
+  let inToken = false;
+  let quote: "'" | '"' | null = null;
+  const endToken = () => {
+    if (inToken) tokens.push(token);
+    token = "";
+    inToken = false;
+  };
+  const endSegment = () => {
+    endToken();
+    if (tokens.length > 0) out.push(tokens);
+    tokens = [];
+  };
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i]!;
+    if (quote !== null) {
+      if (c === quote) quote = null;
+      else if (c === "\\" && quote === '"' && i + 1 < text.length) token += text[++i];
+      else token += c;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      quote = c;
+      inToken = true;
+    } else if (c === "\\" && i + 1 < text.length) {
+      // A backslash-newline is a line continuation, not a character.
+      if (text[i + 1] !== "\n") {
+        token += text[i + 1];
+        inToken = true;
+      }
+      i += 1;
+    } else if (c === "\n" || c === ";" || c === "|" || (c === "&" && text[i + 1] === "&")) {
+      if ((c === "|" || c === "&") && text[i + 1] === c) i += 1;
+      endSegment();
+    } else if (/\s/.test(c)) {
+      endToken();
+    } else {
+      token += c;
+      inToken = true;
+    }
+  }
+  endSegment();
+  // An unclosed quote would hide everything after it, so fall back to the conservative
+  // split that treats every operator as a separator.
+  if (quote !== null) return [...out, ...naiveSegments(text)];
+  return out;
+}
+
+function naiveSegments(text: string): string[][] {
+  return text
+    .split(/&&|\|\||;|\||\n/)
     .map((s) =>
       s
         .trim()

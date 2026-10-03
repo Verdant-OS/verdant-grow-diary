@@ -16,8 +16,11 @@ They add no new policy: every refusal names the existing rule it enforces.
 guard's Bash and file checks turns two engine tests red. Behaviour inside a live agent
 session is `NOT_MEASURED`.
 
-The guard is a tripwire against accidents, not a security boundary. It tokenizes shell
-commands naively, so `bash -c "…"`, `eval` or a script file can route around it. CI, the
+The guard is a tripwire against accidents, not a security boundary. It splits shell
+commands on `&&`, `||`, `;`, `|` and newlines outside quotes, so a quoted pattern such as
+`grep "a|git push --force"` is one command, and an unclosed quote falls back to splitting on
+every operator. It does not expand `$(…)` or backticks, so `bash -c "…"`, `eval` or a script
+file can route around it. CI, the
 `Published migration integrity` gate, branch rulesets and RLS remain the real enforcement.
 
 ## Loading

@@ -33,20 +33,33 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     }
   });
 
-  it("names the surfaces a loop may never run against", () => {
+  it("names the surfaces a loop may never run against, inside the never-loop list itself", () => {
+    // Pin the list, not the words: each protected surface must sit in the bullet list that
+    // follows the "Never loop against these" lead, so a rewrite that moves a surface out of
+    // the list (or softens the lead to "may") fails here rather than passing on word presence.
+    const leadIndex = DOC.indexOf("**Never loop against these**");
+    expect(leadIndex).toBeGreaterThan(-1);
+    const afterLead = DOC.slice(leadIndex);
+    const listEnd = afterLead.search(/\n\n[^-\s]/);
+    const neverList = afterLead.slice(0, listEnd === -1 ? undefined : listEnd);
+    expect(neverList).toMatch(/whatever the score says/);
     for (const term of [
       "production-only verification",
-      "supabase/migrations",
+      "`supabase/migrations`",
       "RLS",
       "Edge Functions",
       "Action Queue",
       "device control",
       "lockfile",
+      "`Sentinel-Version` governance files",
+      "`docs/agents/CURRENT_STATE.md`",
       "Publish",
-      "docs/agents/CURRENT_STATE.md",
+      "AI Doctor provider or model selection",
+      "billing and entitlement rules",
     ]) {
-      expect(DOC).toContain(term);
+      expect(neverList, `never-loop list is missing: ${term}`).toContain(term);
     }
+    expect(neverList).not.toMatch(/\bmay loop\b/i);
   });
 
   it("keeps the score honest: NOT_MEASURED is never a passing score", () => {
@@ -62,10 +75,12 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     expect(DOC).toMatch(/not a security boundary/i);
   });
 
-  it("covers both Playwright lanes and says unlocks expire and bind to the branch", () => {
+  it("covers both Playwright lanes and says unlocks expire, bind to the branch, and are checked whole", () => {
     expect(DOC).toContain("`e2e-local/`");
     expect(DOC).toMatch(/24 hours/);
     expect(DOC).toMatch(/bound to the branch/i);
+    expect(DOC).toMatch(/enforces that whole contract/);
+    expect(DOC).toMatch(/hook input's `cwd`/);
   });
 
   it("says the report covers deleted, renamed and retyped checks, not only edits", () => {

@@ -3,8 +3,10 @@
 //
 //   --hook                     PreToolUse hook. Reads the tool call JSON on stdin and exits 2
 //                              with the refusal on stderr when the call would edit a tracked
-//                              scorer that has no valid unlock. Exits 0 otherwise, and
-//                              fails open (exit 0, note on stderr) when it cannot decide.
+//                              scorer that has no valid unlock. The repository is discovered
+//                              from the input's cwd (the active worktree), not the process
+//                              cwd. Exits 0 otherwise, and fails open (exit 0, note on
+//                              stderr) when it cannot decide.
 //   --unlock <path...> --reason "<why>"
 //                              Declares that this task may edit the named checks. Writes
 //                              .claude/scorer-unlock.json (git-ignored). A directory is
@@ -36,6 +38,7 @@ import process from "node:process";
 
 import {
   UNLOCK_FILE,
+  UNLOCK_MIN_REASON_LENGTH,
   UNLOCK_TTL_MS,
   evaluateScorerEdit,
   hookFilePaths,
@@ -99,8 +102,8 @@ function writeUnlocks(root, unlocked) {
   writeFileSync(file, `${JSON.stringify({ unlocked }, null, 2)}\n`);
 }
 
-function toRelPath(root, filePath) {
-  const absolute = isAbsolute(filePath) ? filePath : resolve(process.cwd(), filePath);
+function toRelPath(root, filePath, cwd) {
+  const absolute = isAbsolute(filePath) ? filePath : resolve(cwd, filePath);
   const rel = normalizeRelPath(relative(root, absolute));
   if (!rel || rel.startsWith("../") || rel === "..") return null;
   return rel;
@@ -125,7 +128,12 @@ function runHook() {
   }
   const paths = hookFilePaths(input);
   if (paths.length === 0) return 0;
-  const root = repoRoot(process.cwd());
+  // The hook input's cwd follows the active worktree; the process cwd is the session-start
+  // project dir (CLAUDE_PROJECT_DIR). Discover the repository from the former, so an edit
+  // inside a worktree is judged against that worktree's HEAD instead of being skipped as
+  // "outside the repository", which would fail open.
+  const cwd = typeof input.cwd === "string" && input.cwd.length > 0 ? input.cwd : process.cwd();
+  const root = repoRoot(cwd);
   if (!root) {
     process.stderr.write(`${NOTE} not inside a git repository; allowing the call.\n`);
     return 0;
@@ -133,7 +141,7 @@ function runHook() {
   const unlocked = readUnlocks(root);
   const context = decisionContext(root);
   for (const filePath of paths) {
-    const rel = toRelPath(root, filePath);
+    const rel = toRelPath(root, filePath, cwd);
     if (!rel) continue;
     const verdict = evaluateScorerEdit({
       relPath: rel,
@@ -213,8 +221,10 @@ function runUnlock(args) {
     return 1;
   }
   const reason = (args.reason ?? "").trim();
-  if (reason.length < 8) {
-    process.stderr.write(`${NOTE} --unlock needs --reason "<why the check changes>" (8+ chars).\n`);
+  if (reason.length < UNLOCK_MIN_REASON_LENGTH) {
+    process.stderr.write(
+      `${NOTE} --unlock needs --reason "<why the check changes>" (${UNLOCK_MIN_REASON_LENGTH}+ chars).\n`,
+    );
     return 1;
   }
   const context = decisionContext(root);

@@ -84,15 +84,17 @@ Copilot-sized UI slices whose checks run under `chromium-mocked` with an explici
 
 ## 3. The locked scorer
 
-`established fact` (this slice): `scripts/scorer-lock.mjs` is wired as a `PreToolUse` command hook on `Edit|Write|MultiEdit|NotebookEdit` in `.claude/settings.json`, run from `$CLAUDE_PROJECT_DIR` so a `cd` into a subdirectory during the session cannot make the script path fail to resolve (a hook that errors with exit 1 is non-blocking, which would silently open the gate). Before a file-writing tool call
+`established fact` (this slice): `scripts/scorer-lock.mjs` is wired as a `PreToolUse` command hook on `Edit|Write|MultiEdit|NotebookEdit` in `.claude/settings.json`, run from `$CLAUDE_PROJECT_DIR` so a `cd` into a subdirectory during the session cannot make the script path fail to resolve (a hook that errors with exit 1 is non-blocking, which would silently open the gate); the repository itself is discovered from the hook input's `cwd`, which follows the active git worktree, so an edit inside a worktree is judged against that worktree's `HEAD` rather than skipped as outside the session-start checkout. Before a file-writing tool call
 runs, the hook reads the call, resolves the path against the repository root, and:
 
 - allows it when the path is not a scorer (§1 vocabulary; the rule table is
   `SCORER_PATH_RULES` in `scripts/lib/scorerLockRules.mjs`);
 - allows it when the scorer is not yet tracked at `HEAD` (a new check being written);
 - allows it when the path, or a directory containing it written with a trailing slash, has an
-  unlock in `.claude/scorer-unlock.json` that is still in force: declared with a reason, on the
-  current branch, less than 24 hours ago. An unlock from another branch, or one that has
+  unlock in `.claude/scorer-unlock.json` that is still in force: declared with a reason of at
+  least 8 characters, on the current branch, with a declaration time and an expiry at most 24
+  hours after it. The consumer enforces that whole contract, not only the expiry, so a hand-made
+  record with a bare path and a far-off expiry is not in force. An unlock from another branch, or one that has
   expired, is ignored, so a declaration left behind by a session that was cut off never carries
   over to the next task (`AGENTS.md` › Agent Handoff / Coverage);
 - otherwise exits 2 with a refusal that names the path and the unlock command, which Claude Code

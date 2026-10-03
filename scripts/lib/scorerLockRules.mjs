@@ -27,6 +27,9 @@ export const DOC_PATH = "docs/agents/loop-engineering.md";
  */
 export const UNLOCK_TTL_MS = 24 * 60 * 60 * 1000;
 
+/** The shortest reason `--unlock` accepts, and the shortest one a consumed entry may carry. */
+export const UNLOCK_MIN_REASON_LENGTH = 8;
+
 /**
  * Which repository paths count as scorers. Order does not matter; the first matching
  * rule wins and every rule yields the same answer. Kept as frozen data so a test can
@@ -171,22 +174,29 @@ function parseTime(value) {
 /**
  * True when an unlock entry is still in force for the given moment and branch.
  *
- * An entry is valid only while `now` is before its `expires_at` and, when the entry
- * records a `branch`, only on that branch. An entry without an `expires_at` is never
- * valid: an unlock that cannot expire is the hazard this check exists to remove.
+ * The consumer enforces the same contract `--unlock` writes, so a hand-made or stale record
+ * cannot be weaker than a declared one: the entry must carry a path, a reason of at least
+ * `UNLOCK_MIN_REASON_LENGTH` characters, a declaration time `at`, a non-empty `branch` equal
+ * to the current one, and an `expires_at` later than `at` by at most `UNLOCK_TTL_MS`; and
+ * `now` must still be before `expires_at`. Anything missing or out of bounds is not in force.
  *
- * @param {{ path?: string, expires_at?: string, branch?: string }} entry
+ * @param {{ path?: string, reason?: string, at?: string, expires_at?: string, branch?: string }} entry
  * @param {{ now: string | number | Date, branch?: string }} context
  */
 export function isUnlockEntryValid(entry, context) {
   if (!entry || typeof entry !== "object" || !context) return false;
-  const now = parseTime(context.now);
-  const expires = parseTime(entry.expires_at);
-  if (now === null || expires === null) return false;
-  if (now >= expires) return false;
-  if (typeof entry.branch === "string" && entry.branch.length > 0) {
-    if (typeof context.branch !== "string" || context.branch !== entry.branch) return false;
+  if (typeof entry.path !== "string" || !normalizeRelPath(entry.path)) return false;
+  if (typeof entry.reason !== "string" || entry.reason.trim().length < UNLOCK_MIN_REASON_LENGTH) {
+    return false;
   }
+  if (typeof entry.branch !== "string" || entry.branch.length === 0) return false;
+  if (typeof context.branch !== "string" || context.branch !== entry.branch) return false;
+  const now = parseTime(context.now);
+  const at = parseTime(entry.at);
+  const expires = parseTime(entry.expires_at);
+  if (now === null || at === null || expires === null) return false;
+  if (expires <= at || expires - at > UNLOCK_TTL_MS) return false;
+  if (now >= expires) return false;
   return true;
 }
 

@@ -32,6 +32,7 @@ import { join, resolve } from "node:path";
 import {
   SCORER_PATH_RULES,
   UNLOCK_FILE,
+  UNLOCK_MIN_REASON_LENGTH,
   UNLOCK_TTL_MS,
   evaluateScorerEdit,
   hookFilePaths,
@@ -56,6 +57,9 @@ const NOW = "2026-10-02T12:00:00.000Z";
 const LATER = "2026-10-03T11:00:00.000Z";
 const EARLIER = "2026-10-02T11:00:00.000Z";
 const BRANCH = "claude/example-task";
+// A declaration made an hour before NOW; LATER is 23 hours after it, inside the 24-hour TTL.
+const DECLARED_AT = EARLIER;
+const REASON = "pin renegotiated with the behaviour change";
 
 describe("scorerLockRules — which paths are scorers", () => {
   it("treats every file under src/test/ as a scorer, helpers, setup and snapshots included", () => {
@@ -223,47 +227,68 @@ describe("scorerLockRules — which paths are scorers", () => {
 
 describe("scorerLockRules — unlock validity", () => {
   const context = { now: NOW, branch: BRANCH };
+  const declared = {
+    path: "src/test/a.test.ts",
+    reason: REASON,
+    at: DECLARED_AT,
+    expires_at: LATER,
+    branch: BRANCH,
+  };
 
   it("is valid before its expiry on the branch it was declared on", () => {
-    expect(
-      isUnlockEntryValid(
-        { path: "src/test/a.test.ts", expires_at: LATER, branch: BRANCH },
-        context,
-      ),
-    ).toBe(true);
+    expect(isUnlockEntryValid(declared, context)).toBe(true);
   });
 
   it("is invalid once expired", () => {
-    expect(
-      isUnlockEntryValid(
-        { path: "src/test/a.test.ts", expires_at: EARLIER, branch: BRANCH },
-        context,
-      ),
-    ).toBe(false);
-    expect(
-      isUnlockEntryValid({ path: "src/test/a.test.ts", expires_at: NOW, branch: BRANCH }, context),
-    ).toBe(false);
+    expect(isUnlockEntryValid({ ...declared, expires_at: EARLIER }, context)).toBe(false);
+    expect(isUnlockEntryValid({ ...declared, expires_at: NOW }, context)).toBe(false);
   });
 
-  it("is invalid on a different branch", () => {
+  it("is invalid on a different branch, and when the entry names no branch at all", () => {
+    expect(isUnlockEntryValid({ ...declared, branch: "codex/other-task" }, context)).toBe(false);
+    expect(isUnlockEntryValid({ ...declared, branch: "" }, context)).toBe(false);
+    const { branch: _omitted, ...withoutBranch } = declared;
+    expect(isUnlockEntryValid(withoutBranch, context)).toBe(false);
+  });
+
+  it("enforces the whole declaration contract, not only the expiry: reason, at, and a bounded window", () => {
+    const { reason: _r, ...withoutReason } = declared;
+    expect(isUnlockEntryValid(withoutReason, context)).toBe(false);
+    expect(isUnlockEntryValid({ ...declared, reason: "short" }, context)).toBe(false);
+    expect(isUnlockEntryValid({ ...declared, reason: "        " }, context)).toBe(false);
+    const { at: _a, ...withoutAt } = declared;
+    expect(isUnlockEntryValid(withoutAt, context)).toBe(false);
+    // A window longer than the TTL is a hand-made record, not a declaration.
+    expect(
+      isUnlockEntryValid({ ...declared, expires_at: "2026-10-10T00:00:00.000Z" }, context),
+    ).toBe(false);
+    // Exactly the TTL is the window --unlock writes, so it is accepted.
     expect(
       isUnlockEntryValid(
-        { path: "src/test/a.test.ts", expires_at: LATER, branch: "codex/other-task" },
+        {
+          ...declared,
+          at: NOW,
+          expires_at: new Date(Date.parse(NOW) + UNLOCK_TTL_MS).toISOString(),
+        },
         context,
       ),
-    ).toBe(false);
+    ).toBe(true);
+    // An expiry before or at the declaration time is nonsense.
+    expect(isUnlockEntryValid({ ...declared, at: LATER, expires_at: LATER }, context)).toBe(false);
+    const { path: _p, ...withoutPath } = declared;
+    expect(isUnlockEntryValid(withoutPath, context)).toBe(false);
   });
 
   it("is never valid without an expiry, and never without a context", () => {
-    expect(isUnlockEntryValid({ path: "src/test/a.test.ts", branch: BRANCH }, context)).toBe(false);
-    expect(
-      isUnlockEntryValid({ path: "src/test/a.test.ts", expires_at: LATER, branch: BRANCH }),
-    ).toBe(false);
+    const { expires_at: _e, ...withoutExpiry } = declared;
+    expect(isUnlockEntryValid(withoutExpiry, context)).toBe(false);
+    expect(isUnlockEntryValid(declared)).toBe(false);
     expect(isUnlockEntryValid(null, context)).toBe(false);
   });
 
-  it("pins the TTL at 24 hours, the handoff log's claim window", () => {
+  it("pins the TTL at 24 hours, the handoff log's claim window, and the reason floor at 8", () => {
     expect(UNLOCK_TTL_MS).toBe(24 * 60 * 60 * 1000);
+    expect(UNLOCK_MIN_REASON_LENGTH).toBe(8);
   });
 });
 
@@ -273,18 +298,21 @@ describe("scorerLockRules — unlock matching", () => {
     {
       path: "src/test/a.test.ts",
       reason: "pin renegotiated with the behaviour change",
+      at: DECLARED_AT,
       expires_at: LATER,
       branch: BRANCH,
     },
     {
       path: "src/test/helpers/",
       reason: "helper refactor approved in the task",
+      at: DECLARED_AT,
       expires_at: LATER,
       branch: BRANCH,
     },
     {
       path: "src/test/stale.test.ts",
       reason: "left behind by a session that was cut off",
+      at: "2026-10-01T10:00:00.000Z",
       expires_at: EARLIER,
       branch: BRANCH,
     },
@@ -358,6 +386,7 @@ describe("scorerLockRules — evaluateScorerEdit", () => {
     const entry = {
       path: "src/test/existing.test.ts",
       reason: "renegotiating the pin",
+      at: DECLARED_AT,
       expires_at: LATER,
       branch: BRANCH,
     };
@@ -551,6 +580,43 @@ describe("scripts/scorer-lock.mjs --hook and --unlock against a disposable repos
     });
     const result = run(["--hook"], outside);
     expect(result.status).toBe(0);
+  });
+
+  it("judges an edit inside a git worktree against that worktree, using the hook input's cwd", () => {
+    // Claude Code runs the hook from CLAUDE_PROJECT_DIR (the session-start checkout) but the
+    // input's cwd follows the active worktree. Without the cwd the file reads as outside the
+    // repository and the hook fails open; with it, the worktree's own tracked check is refused.
+    const worktree = mkdtempSync(join(tmpdir(), "scorer-lock-worktree-"));
+    rmSync(worktree, { recursive: true, force: true });
+    execFileSync("git", ["-C", repo, "worktree", "add", "-q", "-b", "task/worktree", worktree]);
+    try {
+      const target = join(worktree, "src/test/tracked.test.ts");
+      const withCwd = spawnSync("node", [SCRIPT, "--hook"], {
+        cwd: repo,
+        input: JSON.stringify({
+          tool_name: "Edit",
+          cwd: worktree,
+          tool_input: { file_path: target },
+        }),
+        encoding: "utf8",
+      });
+      expect(withCwd.status).toBe(2);
+      expect(withCwd.stderr).toContain("src/test/tracked.test.ts");
+      // A relative path is resolved against the input's cwd too.
+      const relativeWithCwd = spawnSync("node", [SCRIPT, "--hook"], {
+        cwd: repo,
+        input: JSON.stringify({
+          tool_name: "Write",
+          cwd: worktree,
+          tool_input: { file_path: "src/test/tracked.test.ts" },
+        }),
+        encoding: "utf8",
+      });
+      expect(relativeWithCwd.status).toBe(2);
+    } finally {
+      execFileSync("git", ["-C", repo, "worktree", "remove", "--force", worktree]);
+      execFileSync("git", ["-C", repo, "branch", "-D", "task/worktree"]);
+    }
   });
 
   it("still decides correctly when invoked from a subdirectory, as the hook does after a cd", () => {

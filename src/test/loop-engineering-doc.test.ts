@@ -99,7 +99,16 @@ describe("docs/agents/loop-engineering.md — contract", () => {
   });
 
   it("names the gate-script prefixes CI invokes and the merge-base default for --report", () => {
-    for (const prefix of ["`validate-`", "`audit-`", "`scan-`", "`-harness`", "`-db-security`"]) {
+    for (const prefix of [
+      "`validate-`",
+      "`audit-`",
+      "`scan-`",
+      "`-harness`",
+      "`-harnesses`",
+      "`-gate`",
+      "`-db-security`",
+      "`run-`",
+    ]) {
       expect(DOC).toContain(prefix);
     }
     expect(DOC).toContain("`*_test.ts`");

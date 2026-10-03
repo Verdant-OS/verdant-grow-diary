@@ -141,8 +141,24 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("scripts/upload-per-test-artifacts.mjs")).toBe(false);
     expect(isScorerPath("scripts/dev/print-ecowitt-pc-checklist.ts")).toBe(false);
     expect(isScorerPath("scripts/clean-scanner-guardrail-artifacts.mjs")).toBe(false);
-    expect(isScorerPath("scripts/run-scanner-guardrails-ci.mjs")).toBe(false);
     expect(isScorerPath("scripts/e2e/create-pheno-paid-smoke-sessions.mjs")).toBe(false);
+  });
+
+  it("treats every run-* orchestrator and the gate and harnesses tokens as scorers", () => {
+    // Measured 2026-10-03: all 68 tracked scripts/**/run-* files are suite orchestrators or
+    // runtime harnesses that decide whether their suite fails the job.
+    expect(isScorerPath("scripts/run-scanner-guardrails-ci.mjs")).toBe(true);
+    expect(isScorerPath("scripts/run-quicklog-rpc-rls-harnesses.ts")).toBe(true);
+    expect(isScorerPath("scripts/run-irrigation-integrity-suite.mjs")).toBe(true);
+    expect(isScorerPath("scripts/run-lighthouse-ci.mjs")).toBe(true);
+    expect(isScorerPath("scripts/run-postbuild-seo.mjs")).toBe(true);
+    expect(isScorerPath("scripts/run-ecowitt-bridge-ci-validation.mjs")).toBe(true);
+    expect(isScorerPath("scripts/e2e/run-pheno-disabled-compare-e2e.mjs")).toBe(true);
+    expect(isScorerPath("scripts/releases/run-pheno-live-release-gate.mjs")).toBe(true);
+    expect(isScorerPath("scripts/releases/subscriber-growth-launch-gate-rules.mjs")).toBe(true);
+    // Cleanup and repair tooling that merely mentions a scanner or a delegate is not a judge.
+    expect(isScorerPath("scripts/clean-scanner-guardrail-artifacts.mjs")).toBe(false);
+    expect(isScorerPath("scripts/apply-quicklog-manual-delegate-forward-repair.mjs")).toBe(false);
   });
 
   it("treats the active Vitest suite runners and their test-selection modules as scorers", () => {
@@ -192,7 +208,7 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath(".claude/skills/verdant-loop-habits/SKILL.md")).toBe(false);
   });
 
-  it("does not treat production code, docs, migrations, runners or other scripts as scorers", () => {
+  it("does not treat production code, docs, migrations, sync or release tooling as scorers", () => {
     expect(isScorerPath("src/lib/quickLogRules.ts")).toBe(false);
     expect(isScorerPath("src/components/QuickLog.tsx")).toBe(false);
     expect(isScorerPath("docs/agents/loop-engineering.md")).toBe(false);

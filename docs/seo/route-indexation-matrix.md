@@ -10,7 +10,7 @@
 - **Build artifacts** from `scripts/generate-seo-artifacts.ts` are `dist/seo-manifest.json` and per-route Open Graph PNGs. That script does not write per-route `index.html` files. There is no root `index.html` in this repository. `fileName` on each document is retained metadata.
 - **Client head** means `usePageSeo` (`src/hooks/usePageSeo.ts`). The default is `index, follow` and a self-canonical. `noindex: true` emits `noindex, follow`. It runs after hydration.
 - **Root shell** is `src/routes/__root.tsx`: `robots` `index, follow`, no canonical link, and sitewide Organization, WebSite, and SoftwareApplication JSON-LD. A route with no `head()` keeps that shell until a client head replaces it.
-- **Sitemap** means a concrete `<loc>` in `public/sitemap.xml` (62 URLs, all on `https://verdantgrowdiary.com`). Pattern routes are not sitemap URLs.
+- **Sitemap** means a concrete `<loc>` in `public/sitemap.xml` (52 URLs, all on `https://verdantgrowdiary.com`). Pattern routes are not sitemap URLs.
 - **robots.txt** crawl rules are separate from meta robots. `src/test/robots-private-route-coverage.test.ts` treats a rule as matching when the path equals it or starts with it. Whether a live crawler fetches a URL is **NOT_MEASURED**.
 - `vercel.json` redirects and the `/unsubscribe` `X-Robots-Tag` header are repository configuration. Whether the live host applies that file is **NOT_MEASURED**.
 
@@ -73,17 +73,17 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 - `/guides/cannabis-leaf-spots-lesions` — robots `index, follow`; sitemap yes; canonical `/guides/cannabis-leaf-spots-lesions`
 - `/guides/cannabis-burnt-crispy-leaf-tips` — robots `index, follow`; sitemap yes; canonical `/guides/cannabis-burnt-crispy-leaf-tips`
 - `/cultivars` — robots `index, follow`; sitemap yes; canonical `/cultivars`
-- `/cultivars/sour-diesel` — robots `index, follow`; sitemap yes; canonical `/cultivars/sour-diesel`
-- `/cultivars/og-kush` — robots `index, follow`; sitemap yes; canonical `/cultivars/og-kush`
-- `/cultivars/blue-dream` — robots `index, follow`; sitemap yes; canonical `/cultivars/blue-dream`
-- `/cultivars/gg4` — robots `index, follow`; sitemap yes; canonical `/cultivars/gg4`
-- `/cultivars/lemon-cherry-gelato` — robots `index, follow`; sitemap yes; canonical `/cultivars/lemon-cherry-gelato`
-- `/cultivars/oreoz` — robots `index, follow`; sitemap yes; canonical `/cultivars/oreoz`
-- `/cultivars/do-si-dos` — robots `index, follow`; sitemap yes; canonical `/cultivars/do-si-dos`
-- `/cultivars/blue-cookies` — robots `index, follow`; sitemap yes; canonical `/cultivars/blue-cookies`
-- `/cultivars/jack-herer` — robots `index, follow`; sitemap yes; canonical `/cultivars/jack-herer`
-- `/cultivars/sour-stomper` — robots `index, follow`; sitemap yes; canonical `/cultivars/sour-stomper`
 - `/customer/guide/oreoz-vs-gelonade-comparison` — robots `noindex, follow`; sitemap no; canonical `/customer/guide/oreoz-vs-gelonade-comparison`
+- `/cultivars/sour-diesel` — robots `noindex, follow`; sitemap no; canonical `/cultivars/sour-diesel`
+- `/cultivars/og-kush` — robots `noindex, follow`; sitemap no; canonical `/cultivars/og-kush`
+- `/cultivars/blue-dream` — robots `noindex, follow`; sitemap no; canonical `/cultivars/blue-dream`
+- `/cultivars/gg4` — robots `noindex, follow`; sitemap no; canonical `/cultivars/gg4`
+- `/cultivars/lemon-cherry-gelato` — robots `noindex, follow`; sitemap no; canonical `/cultivars/lemon-cherry-gelato`
+- `/cultivars/oreoz` — robots `noindex, follow`; sitemap no; canonical `/cultivars/oreoz`
+- `/cultivars/do-si-dos` — robots `noindex, follow`; sitemap no; canonical `/cultivars/do-si-dos`
+- `/cultivars/blue-cookies` — robots `noindex, follow`; sitemap no; canonical `/cultivars/blue-cookies`
+- `/cultivars/jack-herer` — robots `noindex, follow`; sitemap no; canonical `/cultivars/jack-herer`
+- `/cultivars/sour-stomper` — robots `noindex, follow`; sitemap no; canonical `/cultivars/sour-stomper`
 - `/checkout/success` — robots `noindex, follow`; sitemap no; canonical `/checkout/success`
 - `/checkout/cancel` — robots `noindex, follow`; sitemap no; canonical `/checkout/cancel`
 - `/strains` — robots `noindex, follow`; sitemap no; canonical `/cultivars`
@@ -98,6 +98,8 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 - `/strains/jack-herer` — robots `noindex, follow`; sitemap no; canonical `/cultivars/jack-herer`
 - `/strains/sour-stomper` — robots `noindex, follow`; sitemap no; canonical `/cultivars/sour-stomper`
 
+`/cultivars` is the hub. It is `index, follow` and a sitemap URL. Each `/cultivars/<slug>` document takes its robots from `cultivarDetailRobots(cultivar.verificationStatus)` in `src/lib/cultivarDetailSeo.ts`. `cultivarVerificationIsSearchIndexable` returns true only for `reviewed` and `verified`. `sample` and `community` return false, and any other value at runtime fails closed to false, which gives `noindex, follow`. Indexable slugs go into `STATIC_PUBLIC_SEO_DOCUMENTS`. The other slugs go into `STATIC_CULTIVAR_NOINDEX_DOCUMENTS`, which is still part of `STATIC_PUBLIC_OUTPUT_DOCUMENTS`, so each keeps a self-canonical static head. `src/pages/CultivarPage.tsx` passes `noindex` to `usePageSeo` from the same gate. `public/sitemap.xml` lists no `/cultivars/<slug>` URL; its comment says only reviewed and verified profiles belong there. Today all ten `VERDANT_CULTIVARS` entries are `sample`, so all ten slugs are `noindex, follow` and not in the sitemap. A slug becomes indexable and sitemap-eligible only when its status moves to `reviewed` or `verified` and its `<loc>` is added.
+
 `/docs/mcp-api` is in `public/sitemap.xml` and is not in `STATIC_ONLY_ROUTES`. A comment above that document in `src/lib/build/staticPublicSeoDocuments.ts` still says the route is static-only and absent from the sitemap. This inventory follows the document array, the allowlist, and `public/sitemap.xml`.
 
 `/breeder-beta` stays `index, follow` and points its canonical at `/creator-beta` (`crossCanonicalDocument` and `usePageSeo({ canonicalPath: "/creator-beta" })` in `src/pages/BreederBeta.tsx`). It is the only `STATIC_ONLY_ROUTES` entry, so it is not a sitemap URL.
@@ -106,8 +108,8 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 
 ## Schema on indexable documents
 
-- Guide documents (`buildStaticGuideJsonLd`) emit WebPage, FAQPage, and BreadcrumbList. Article is added only when `publishedOn` is set. These seven guides set it: `/guides/cannabis-grow-light-distance-and-schedule`, `/guides/cannabis-light-stress-light-burn-bleaching-or-heat`, `/guides/oreoz-vs-gelonade-comparison`, `/guides/cannabis-leaf-symptoms`, `/guides/cannabis-leaves-turning-yellow`, `/guides/cannabis-leaf-spots-lesions`, `/guides/cannabis-burnt-crispy-leaf-tips`.
-- Cultivar documents emit WebPage, a cultivar collection node, FAQPage, BreadcrumbList, and Article (`buildStaticCultivarJsonLd`). The manifest pattern is `/cultivars/:slug`. The ten concrete slugs are the inventory rows above, from `VERDANT_CULTIVARS`.
+- Guide documents (`buildStaticGuideJsonLd`) emit WebPage, FAQPage, and BreadcrumbList. Article is added only when `publishedOn` is set. These 7 guides set it: `/guides/cannabis-grow-light-distance-and-schedule`, `/guides/cannabis-light-stress-light-burn-bleaching-or-heat`, `/guides/oreoz-vs-gelonade-comparison`, `/guides/cannabis-leaf-symptoms`, `/guides/cannabis-leaves-turning-yellow`, `/guides/cannabis-leaf-spots-lesions`, `/guides/cannabis-burnt-crispy-leaf-tips`.
+- No cultivar detail document is indexable today. `buildStaticCultivarJsonLd` still gives each `/cultivars/<slug>` document WebPage, a cultivar collection node, FAQPage, BreadcrumbList, and Article, but all ten are `noindex, follow` (see the inventory), so that schema is not on an indexable document. It would be once a slug reaches `reviewed` or `verified`. The `/cultivars` hub document is indexable and uses the default WebPage node.
 - `/guides` emits WebPage, FAQPage, and BreadcrumbList. `/guides/:slug` is the manifest pattern for `VERDANT_SEO_GUIDES` (28 slugs). `/guides/grow-stage-care-guide` is its own manifest route and its own document.
 - `/tools/blueprint-targets` emits WebPage, FAQPage, and BreadcrumbList. `/quick-log` emits WebPage, SoftwareApplication, and FAQPage. Other acquisition documents in the inventory use the default WebPage node unless the row above says otherwise.
 - `/cultivars` with a non-empty query string is a client `noindex, follow` variant (`buildCultivarsIndexSeo` in `src/lib/cultivarIndexSeoRules.ts`). The canonical stays `/cultivars`. Those query URLs are not sitemap locs. The clean `/cultivars` document stays `index, follow`.
@@ -135,6 +137,12 @@ These manifest paths are public and are not in `STATIC_PUBLIC_OUTPUT_DOCUMENTS`.
 
 `/customer/guide/oreoz-vs-gelonade-comparison` is in the inventory (`noindex, follow`, not in the sitemap). `src/pages/CustomerOreozGelonadeGuide.tsx` also sets `noindex: true`. `Disallow: /customer/` covers the path. This is the only manifest path under `/customer/`.
 
+Every public manifest path, with or without a static document. `/cultivars/:slug` and `/guides/:slug` are patterns; their concrete paths are inventory lines.
+
+Manifest paths (`access: "public"`, 42):
+
+`*`; `/`; `/.lovable/oauth/consent`; `/ai-doctor-readiness-check`; `/auth`; `/breeder-beta`; `/checkout/cancel`; `/checkout/success`; `/contact`; `/creator-beta`; `/cultivars`; `/cultivars/:slug`; `/customer/guide/oreoz-vs-gelonade-comparison`; `/docs/mcp-api`; `/feedback`; `/founder`; `/glossary`; `/guides`; `/guides/:slug`; `/guides/grow-stage-care-guide`; `/hardware-integrations`; `/how-ai-doctor-works`; `/internal/contextual-pheno-comparison-demo`; `/internal/demo-proof-walkthrough`; `/internal/pheno-hunt-demo`; `/partners/csv-preview`; `/pheno-comparison`; `/pheno-expression-showcase`; `/pheno-hunts/:id/compare`; `/pheno-hunts/:id/showcase`; `/pricing`; `/privacy`; `/quick-log`; `/refund`; `/reset-password`; `/sensors/csv-preview`; `/terms`; `/tools/blueprint-targets`; `/tools/grow-help-toolkit`; `/tools/vpd-calculator`; `/unsubscribe`; `/welcome`.
+
 ## Authenticated routes — sitemap excluded, robots.txt disallowed
 
 `public/robots.txt` disallows these prefixes for `Googlebot`, `Bingbot`, and `*`: `/onboarding`, `/start-room`, `/dashboard`, `/daily-check`, `/tents`, `/plants`, `/sensors` (with the public CSV allow above), `/timeline`, `/alerts`, `/doctor`, `/actions`, `/grow-lineage`, `/genetics`, `/breeding`, `/grows`, `/pheno-hunts`, `/reports`, `/diary`, `/settings`, `/account/preferences`, `/invite`, `/health`. None of these paths are sitemap `<loc>` values.
@@ -148,7 +156,7 @@ Route-level robots meta on authenticated routes:
 
 Other authenticated routes have no route `head()` robots meta and no `noindex: true` in the page module found for that route. Their first head is the root shell `index, follow`. robots.txt still disallows them. Live crawl behavior is **NOT_MEASURED**.
 
-Manifest paths (46):
+Manifest paths (`access: "auth"`, 46):
 
 `/account/preferences`; `/actions`; `/actions/:actionId`; `/alerts`; `/alerts/:alertId`; `/breeding`; `/breeding/:programId`; `/breeding/log/new`; `/breeding/new`; `/daily-check`; `/dashboard`; `/diary/environment-summary`; `/diary/pheno-expression-comparison`; `/diary/strains/:slug`; `/doctor`; `/doctor/sessions`; `/doctor/sessions/:sessionId`; `/genetics`; `/genetics/accessions/:id`; `/genetics/batches/:id`; `/genetics/health/:kind/:id`; `/genetics/trace/:kind/:id`; `/grow-lineage`; `/grows`; `/grows/:growId`; `/grows/:growId/learning`; `/health`; `/invite`; `/onboarding`; `/pheno-hunts`; `/pheno-hunts/:id/keepers`; `/pheno-hunts/:id/workspace`; `/pheno-hunts/new`; `/plants`; `/plants/:id`; `/reports`; `/reports/diary-range`; `/reports/post-grow/:growId`; `/sensors`; `/settings`; `/settings/agent-integrations`; `/settings/analytics`; `/start-room`; `/tents`; `/tents/:id`; `/timeline`.
 
@@ -171,7 +179,7 @@ Route-level robots meta:
 
 `/diagnostics/quicklog` has no route `head()` and `src/pages/QuicklogDiagnostics.tsx` does not set `noindex`. The other operator pages in this list have no `noindex: true`. First head for those routes is the root shell `index, follow`. Live crawl behavior is **NOT_MEASURED**.
 
-Manifest paths (32):
+Manifest paths (`access: "operator"`, 32):
 
 `/demo/one-tent-live-proof`; `/diagnostics`; `/diagnostics-lighting-measurement`; `/diagnostics-seo-artifacts`; `/diagnostics/quicklog`; `/ingest-inspector`; `/one-tent-loop-proof`; `/operator/ai-doctor-phase1`; `/operator/billing-entitlement-resolution`; `/operator/billing-subscription-updates`; `/operator/credits-audit`; `/operator/demo-preview`; `/operator/ecowitt`; `/operator/ecowitt-bridge-debug`; `/operator/ecowitt-bridge-status`; `/operator/ecowitt-live-bringup`; `/operator/ecowitt-tent-preview`; `/operator/edge-alerts`; `/operator/edge-metrics`; `/operator/mode`; `/operator/one-tent-live-proof`; `/operator/one-tent-loop-smoke-test`; `/operator/one-tent-proof-record`; `/operator/paddle-processing-audit`; `/operator/post-grow-reflection-dry-run`; `/operator/release-readiness`; `/operator/schema-audit`; `/operator/subscriber-growth`; `/operator/support-inbox`; `/pi-ingest-status`; `/sensors/ecowitt-audit`; `/sensors/ingest-normalizer`.
 
@@ -179,7 +187,7 @@ Manifest paths (32):
 
 `Disallow: /admin/`, `Disallow: /internal/`, and `Disallow: /leads`. No route `head()` robots meta was found on these six modules beyond the public `/internal/*` demos already listed above. Those public demos are `access: "public"` in the manifest, not `internal`.
 
-Manifest paths (6):
+Manifest paths (`access: "internal"`, 6):
 
 `/admin/leads`; `/internal/ai-doctor-confidence-audit`; `/internal/ai-doctor-phase1-preview`; `/internal/one-tent-loop-proof`; `/internal/sensor-truth-audit`; `/leads`.
 
@@ -204,6 +212,10 @@ Client redirects in route modules:
 - `/upgrade` renders `LegacyUpgradeRedirect` (`/pricing` with allow-listed plan, acquisition, and return intent).
 
 `Disallow` lines also name `/login`, `/signup`, `/register`, `/logs`, `/tasks`, `/action-queue`, and `/billing/`.
+
+Manifest paths (`access: "redirect"`, 18):
+
+`/action-queue`; `/ai-doctor`; `/billing/:plan`; `/demo`; `/features`; `/grow-room`; `/login`; `/logs`; `/privacy-policy`; `/refund-policy`; `/refunds`; `/register`; `/signup`; `/strains`; `/strains/:slug`; `/tasks`; `/terms-of-service`; `/upgrade`.
 
 ## Retired routes
 

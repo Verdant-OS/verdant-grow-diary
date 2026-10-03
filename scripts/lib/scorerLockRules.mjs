@@ -82,6 +82,29 @@ export const SCORER_PATH_RULES = Object.freeze([
     value: /(^|\/)(vitest|playwright)(\.[^/]+)?\.(config|workspace)\.(ts|mts|cts|js|mjs|cjs)$/,
     why: "test-runner configs decide which checks execute (vitest include, Playwright testDir/testMatch/testIgnore/projects); six tracked on 2026-10-03, including the native-local Playwright lanes",
   }),
+  // The active Vitest suite runners and their test-selection modules: they decide which
+  // tests execute, how they are sharded, and what exit status CI sees. Measured from the
+  // workflow and package.json invocations on 2026-10-03; reporters of their logs stay out.
+  Object.freeze({
+    kind: "prefix",
+    value: "scripts/vitest-controlled/",
+    why: "controlled Vitest runner: discovery, manifest, sharding, execution, aggregation (vitest-controlled-full-suite.yml and the test:vitest:* package scripts)",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/run-vitest-batches.mjs",
+    why: "batched Vitest runner that supplies the exit status for vitest-full-suite-pr-gate.yml and vitest-batched-full-suite.yml",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/vitest-batch-utils.mjs",
+    why: "discovery and batching utilities the batched runner selects tests with",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/run-vitest-shard4-isolated.mjs",
+    why: "the isolated fourth-shard runner that selects and runs that shard's files",
+  }),
   Object.freeze({
     kind: "exact",
     value: "config/required-status-checks.json",

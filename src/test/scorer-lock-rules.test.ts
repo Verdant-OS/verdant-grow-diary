@@ -145,6 +145,19 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("scripts/e2e/create-pheno-paid-smoke-sessions.mjs")).toBe(false);
   });
 
+  it("treats the active Vitest suite runners and their test-selection modules as scorers", () => {
+    expect(isScorerPath("scripts/run-vitest-batches.mjs")).toBe(true);
+    expect(isScorerPath("scripts/vitest-batch-utils.mjs")).toBe(true);
+    expect(isScorerPath("scripts/run-vitest-shard4-isolated.mjs")).toBe(true);
+    expect(isScorerPath("scripts/vitest-controlled/cli.mjs")).toBe(true);
+    expect(isScorerPath("scripts/vitest-controlled/sharding.mjs")).toBe(true);
+    expect(isScorerPath("scripts/vitest-controlled/manifest.mjs")).toBe(true);
+    expect(isScorerPath("scripts/vitest-controlled/reporter.mjs")).toBe(true);
+    // Reporters that only read the runners' logs are not judges.
+    expect(isScorerPath("scripts/summarize-vitest-timeouts.mjs")).toBe(false);
+    expect(isScorerPath("scripts/parse-vitest-batched-workflow-logs.mjs")).toBe(false);
+  });
+
   it("treats the test-runner configs as scorers, because they decide which checks execute", () => {
     expect(isScorerPath("vitest.config.ts")).toBe(true);
     expect(isScorerPath("playwright.config.ts")).toBe(true);
@@ -184,7 +197,6 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("src/components/QuickLog.tsx")).toBe(false);
     expect(isScorerPath("docs/agents/loop-engineering.md")).toBe(false);
     expect(isScorerPath("scripts/stamp-version.mjs")).toBe(false);
-    expect(isScorerPath("scripts/run-vitest-batches.mjs")).toBe(false);
     expect(isScorerPath("scripts/sync-edge-shared.mjs")).toBe(false);
     expect(isScorerPath("scripts/ci/compose-release-receipt-inputs.mjs")).toBe(false);
     expect(isScorerPath("supabase/functions/_shared/lib/x.ts")).toBe(false);

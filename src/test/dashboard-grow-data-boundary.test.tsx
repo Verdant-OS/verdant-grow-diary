@@ -25,6 +25,8 @@ const H = vi.hoisted(() => ({
   alertsStatus: "ok" as "idle" | "loading" | "ok" | "unavailable",
   kpiRenders: [] as string[],
   alertsCommits: [] as { kpi: string; latestEnvCount: string | null | undefined }[],
+  // The per-tent hook has not reported a status for the first tent yet.
+  omitTentStatus: false,
 }));
 
 vi.mock("@/hooks/useGrowData", () => ({
@@ -85,7 +87,7 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
       [H.secondTentId]: H.secondTentRows,
     },
     statusByTent: {
-      [H.tentId]: H.perTentStatus,
+      ...(H.omitTentStatus ? {} : { [H.tentId]: H.perTentStatus }),
       [H.secondTentId]: H.secondTentStatus,
     },
     isLoading: H.perTentStatus === "loading",
@@ -263,6 +265,7 @@ describe("Dashboard private-read honesty boundary", () => {
     H.secondTentEnabled = false;
     H.secondTentStatus = "success";
     H.secondTentRows = [];
+    H.omitTentStatus = false;
     H.tentQueryOverride = {};
     H.plantQueryOverride = {};
     H.refetch.mockClear();
@@ -672,6 +675,20 @@ describe("Dashboard private-read honesty boundary", () => {
       /No empty-state or environment conclusion is shown/,
     );
     expect(screen.queryByTestId("dashboard-environment-snapshot-empty")).toBeNull();
+  });
+
+  it("shows the home tent card's metrics as loading, not missing, before its sensor read reports", () => {
+    H.growStatus = "success";
+    H.perTentStatus = "success";
+    H.perTentRows = [];
+    H.omitTentStatus = true;
+    renderDashboard();
+    for (const key of ["temp", "rh", "vpd"]) {
+      expect(screen.getByTestId(`tonight-tent-home-metric-${key}`)).toHaveAttribute(
+        "data-state",
+        "loading",
+      );
+    }
   });
 
   // One-Tent Home demotion: the equal-weight KPI wall is not first-fold

@@ -94,7 +94,7 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("scripts/validate-sarif.mjs")).toBe(true);
     expect(isScorerPath("scripts/audit-required-checks.mjs")).toBe(true);
     expect(isScorerPath("scripts/scan-gamification-direct-inserts.mjs")).toBe(true);
-    expect(isScorerPath("scripts/precommit-release-workbooks.mjs")).toBe(true);
+    expect(isScorerPath("scripts/precommit-ai-doctor-preview-safety.mjs")).toBe(true);
     expect(isScorerPath("scripts/test-legal-seo.mjs")).toBe(true);
     expect(isScorerPath("scripts/knowledge/validate-governance.mjs")).toBe(true);
     expect(isScorerPath("scripts/e2e/check-pheno-live-smoke-env.mjs")).toBe(true);

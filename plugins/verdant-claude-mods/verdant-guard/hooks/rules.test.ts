@@ -209,3 +209,36 @@ describe("review P2 fixes", () => {
     expect(checkMcp("mcp__notsupabase_x__execute_sql", {})).toBe(null);
   });
 });
+
+// Critical Mass re-review of #1865 at 1d14afd, P2 1–3.
+describe("re-review P2 fixes", () => {
+  test("P2-1: runner flags do not hide the tool", () => {
+    for (const cmd of [
+      "npx -y supabase db push",
+      "npx --yes vercel --prod",
+      "npx -p supabase supabase db push",
+      "npx --package=vercel vercel promote x",
+      'npx -c "supabase db push"',
+      "bunx --bun supabase functions deploy x",
+      "pnpm dlx --silent vercel --prod",
+    ]) {
+      expect(checkBash(cmd), cmd).not.toBe(null);
+    }
+    expect(checkBash("npx -y prettier --check x.ts")).toBe(null);
+  });
+  test("P2-2: a $(…) inside double quotes is inspected", () => {
+    expect(checkBash('echo "$(git push --force)"')).not.toBe(null);
+    expect(checkBash('msg="done: $(git rebase origin/main)"')).not.toBe(null);
+    expect(checkBash('echo "x $(echo "$(git push --force)")"')).not.toBe(null);
+    expect(checkBash("echo '$(git push --force)'")).toBe(null);
+    expect(checkBash('echo "$(git rev-parse --short HEAD)"')).toBe(null);
+  });
+  test("P2-3: MCP server names with hyphens match by service", () => {
+    expect(checkMcp("mcp__claude-ai-supabase__execute_sql", {})).not.toBe(null);
+    expect(checkMcp("mcp__supabase-prod__apply_migration", {})).not.toBe(null);
+    expect(checkMcp("mcp__my-vercel__request_promote", {})).not.toBe(null);
+    expect(checkMcp("mcp__github-enterprise__merge_pull_request", {})).not.toBe(null);
+    expect(checkMcp("mcp__notsupabase-x__execute_sql", {})).toBe(null);
+    expect(checkMcp("mcp__supabasex__execute_sql", {})).toBe(null);
+  });
+});

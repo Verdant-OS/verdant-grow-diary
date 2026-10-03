@@ -40,6 +40,25 @@ export function stripHeredocs(command: string): string {
  * command. Quotes are removed from tokens; a backslash escapes the next character outside
  * single quotes. It does not expand `$(…)`, backticks or `bash -c` strings (see README).
  */
+/** Index of the `)` closing the `(` at `open`, respecting nested parens and quotes; -1 if none. */
+function matchingParen(text: string, open: number): number {
+  let depth = 0;
+  let quote: "'" | '"' | null = null;
+  for (let i = open; i < text.length; i += 1) {
+    const c = text[i];
+    if (quote !== null) {
+      if (c === "\\" && quote === '"') i += 1;
+      else if (c === quote) quote = null;
+      continue;
+    }
+    if (c === "\\") i += 1;
+    else if (c === "'" || c === '"') quote = c;
+    else if (c === "(") depth += 1;
+    else if (c === ")" && --depth === 0) return i;
+  }
+  return -1;
+}
+
 export function segments(command: string): string[][] {
   const text = stripHeredocs(command);
   const out: string[][] = [];
@@ -60,6 +79,16 @@ export function segments(command: string): string[][] {
   for (let i = 0; i < text.length; i += 1) {
     const c = text[i]!;
     if (quote !== null) {
+      if (quote === '"' && c === "$" && text[i + 1] === "(") {
+        // A command substitution still runs inside double quotes: check its body as commands.
+        const end = matchingParen(text, i + 1);
+        if (end > i + 1) {
+          out.push(...segments(text.slice(i + 2, end)));
+          token += text.slice(i, end + 1);
+          i = end;
+          continue;
+        }
+      }
       if (c === quote) quote = null;
       else if (c === "\\" && quote === '"' && i + 1 < text.length) token += text[++i];
       else token += c;
@@ -219,10 +248,23 @@ const PW_VALUE_FLAGS = new Set([
 /** Drops a package-runner prefix: `bunx`, `npx`, `bun x`, `pnpm dlx|exec`, `yarn dlx|exec`. */
 function stripRunner(tokens: string[]): string[] {
   const [a, b] = tokens;
-  if (a === "bunx" || a === "npx") return tokens.slice(1);
-  if (a === "bun" && b === "x") return tokens.slice(2);
-  if ((a === "pnpm" || a === "yarn") && (b === "dlx" || b === "exec")) return tokens.slice(2);
-  return tokens;
+  let rest: string[];
+  if (a === "bunx" || a === "npx") rest = tokens.slice(1);
+  else if (a === "bun" && b === "x") rest = tokens.slice(2);
+  else if ((a === "pnpm" || a === "yarn") && (b === "dlx" || b === "exec")) rest = tokens.slice(2);
+  else return tokens;
+  // Skip the runner's own flags (`-y`, `--yes`, `--bun`, `--silent`, …). `-p`/`--package`
+  // take a value; `-c`/`--call` take the command itself, which is what gets checked.
+  for (let i = 0; i < rest.length; i += 1) {
+    const t = rest[i] ?? "";
+    if (!t.startsWith("-")) return rest.slice(i);
+    if ((t === "-c" || t === "--call") && rest[i + 1] !== undefined) {
+      return rest[i + 1]!.split(/\s+/).filter(Boolean);
+    }
+    if (t.startsWith("--call=")) return t.slice("--call=".length).split(/\s+/).filter(Boolean);
+    if (t === "-p" || t === "--package") i += 1;
+  }
+  return [];
 }
 
 function checkPlaywright(tokens: string[]): string | null {
@@ -372,7 +414,10 @@ function mcpServiceTool(tool: string): string | null {
   const m = /^mcp__(.+?)__([^_].*)$/.exec(tool);
   if (!m || !m[1] || !m[2]) return null;
   const server = m[1].toLowerCase();
-  const service = MCP_SERVICES.find((s) => server === s || server.endsWith(`_${s}`));
+  // The service must be a whole `_`- or `-`-separated part of the server name, so
+  // `claude-ai-supabase` and `supabase_prod` match while `notsupabase` does not.
+  const parts = server.split(/[_-]/);
+  const service = MCP_SERVICES.find((s) => parts.includes(s));
   return service ? `${service}__${m[2]}` : null;
 }
 

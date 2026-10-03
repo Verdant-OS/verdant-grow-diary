@@ -79,6 +79,34 @@ export const SCORER_PATH_RULES = Object.freeze([
     value: "config/required-status-checks.json",
     why: "the pinned mirror of the ruleset's required checks",
   }),
+  // Invoked gates whose basename carries no judge verb, and the manifests a gate reads as
+  // its pin. Measured from the workflow invocations on 2026-10-03; extend by measurement,
+  // not by guess.
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/diff-money-migration-prefixes.mjs",
+    why: "money-migration drift judge run by prefix-diff-sarif.yml and required-money-migrations.yml; exits non-zero on drift or unknown state",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/probe-migration-drift.mjs",
+    why: "production migration drift probe run by migration-drift-probe.yml; exits non-zero on drift",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/annotate-edge-shared-drift.mjs",
+    why: "edge-shared drift annotator run by edge-shared-sync.yml; its exit code mirrors the checker",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/required-money-migrations.mjs",
+    why: "the manifest assert-required-money-migrations*.mjs judges against: the money-migration pin",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/required-core-migrations.mjs",
+    why: "the manifest assert-required-core-migrations*.mjs judges against: the core-migration pin",
+  }),
   Object.freeze({
     kind: "exact",
     value: "scripts/scorer-lock.mjs",
@@ -231,13 +259,14 @@ export function hookFilePaths(hookInput) {
 
 /**
  * Parses `git diff --name-status` output into scorer rows. Modified (M), deleted (D) and
- * renamed (R) entries all count: a deleted or moved check is a weakened check. A rename
+ * renamed (R) and type-changed (T, a check replaced by a symlink) entries all count: a
+ * deleted, moved or retyped check is a weakened check. A rename
  * is a row only when the old path was a scorer, and the unlock is judged on that old
  * path, the one that existed at the base. A rename from a non-scorer into a scorer path
  * is a new check, which the policy always allows, so it is not a row.
  *
  * @param {string} nameStatus
- * @returns {Array<{ change: "modified" | "deleted" | "renamed", path: string, from?: string }>}
+ * @returns {Array<{ change: "modified" | "deleted" | "renamed" | "retyped", path: string, from?: string }>}
  */
 export function scorerRowsFromNameStatus(nameStatus) {
   const rows = [];
@@ -251,6 +280,8 @@ export function scorerRowsFromNameStatus(nameStatus) {
       if (isScorerPath(parts[1])) rows.push({ change: "modified", path: parts[1] });
     } else if (status.startsWith("D") && parts[1]) {
       if (isScorerPath(parts[1])) rows.push({ change: "deleted", path: parts[1] });
+    } else if (status.startsWith("T") && parts[1]) {
+      if (isScorerPath(parts[1])) rows.push({ change: "retyped", path: parts[1] });
     } else if (status.startsWith("R") && parts[1] && parts[2]) {
       if (isScorerPath(parts[1])) {
         rows.push({ change: "renamed", path: parts[2], from: parts[1] });

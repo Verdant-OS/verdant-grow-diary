@@ -14,7 +14,8 @@
 //   --lock                     Removes every unlock.
 //   --status                   Prints the current unlocks, expired ones marked.
 //   --report [--base <ref>] [--strict]
-//                              Lists every tracked scorer modified, deleted or renamed
+//                              Lists every tracked scorer modified, deleted, renamed or
+//                              retyped (replaced by a symlink)
 //                              relative to <ref> and whether it is unlocked. Without --base
 //                              the ref is the merge-base with the deploy branch
 //                              (origin/verdant-grow-diary), so committed changes on a task
@@ -282,7 +283,7 @@ function runReport(args) {
   }
   let changed = "";
   try {
-    changed = git(["diff", "--name-status", "--diff-filter=MDR", resolved.base, "--"], root);
+    changed = git(["diff", "--name-status", "--diff-filter=MDRT", resolved.base, "--"], root);
   } catch {
     process.stderr.write(`${NOTE} git diff against ${resolved.label} failed.\n`);
     return 1;
@@ -296,7 +297,7 @@ function runReport(args) {
   }));
   if (rows.length === 0) {
     process.stdout.write(
-      `${NOTE} no tracked scorer modified, deleted or renamed relative to ${resolved.label}.\n`,
+      `${NOTE} no tracked scorer modified, deleted, renamed or retyped relative to ${resolved.label}.\n`,
     );
     return 0;
   }
@@ -308,7 +309,7 @@ function runReport(args) {
   }
   const locked = rows.filter((r) => !r.unlocked).length;
   process.stdout.write(
-    `${NOTE} ${rows.length} changed scorer(s), ${locked} still locked. Name each renegotiated, removed or moved check in the PR body.\n`,
+    `${NOTE} ${rows.length} changed scorer(s), ${locked} still locked. Name each renegotiated, removed, moved or retyped check in the PR body.\n`,
   );
   return args.strict && locked > 0 ? 2 : 0;
 }

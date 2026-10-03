@@ -17,7 +17,15 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+  existsSync,
+  readFileSync,
+  symlinkSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -131,6 +139,18 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("scripts/clean-scanner-guardrail-artifacts.mjs")).toBe(false);
     expect(isScorerPath("scripts/run-scanner-guardrails-ci.mjs")).toBe(false);
     expect(isScorerPath("scripts/e2e/create-pheno-paid-smoke-sessions.mjs")).toBe(false);
+  });
+
+  it("treats invoked gates without a verb token, and the migration manifests they judge against, as scorers", () => {
+    expect(isScorerPath("scripts/diff-money-migration-prefixes.mjs")).toBe(true);
+    expect(isScorerPath("scripts/probe-migration-drift.mjs")).toBe(true);
+    expect(isScorerPath("scripts/annotate-edge-shared-drift.mjs")).toBe(true);
+    expect(isScorerPath("scripts/required-money-migrations.mjs")).toBe(true);
+    expect(isScorerPath("scripts/required-core-migrations.mjs")).toBe(true);
+    // Report and notify wrappers around the same checkers are not judges.
+    expect(isScorerPath("scripts/report-edge-shared-drift.mjs")).toBe(false);
+    expect(isScorerPath("scripts/notify-edge-shared-drift.mjs")).toBe(false);
+    expect(isScorerPath("scripts/summarize-prefix-diff-json.mjs")).toBe(false);
   });
 
   it("treats the lock's own control files as scorers, so the guard cannot be quietly weakened", () => {
@@ -387,10 +407,12 @@ describe("scorerLockRules — hookFilePaths", () => {
 });
 
 describe("scorerLockRules — scorerRowsFromNameStatus", () => {
-  it("keeps modified, deleted and renamed scorers and drops everything else", () => {
+  it("keeps modified, deleted, renamed and retyped scorers and drops everything else", () => {
     const rows = scorerRowsFromNameStatus(
       [
         "M\tsrc/test/a.test.ts",
+        "T\tsrc/test/symlinked.test.ts",
+        "T\tsrc/lib/symlinked.ts",
         "M\tsrc/lib/rules.ts",
         "D\te2e/old.spec.ts",
         "D\tdocs/x.md",
@@ -404,6 +426,7 @@ describe("scorerLockRules — scorerRowsFromNameStatus", () => {
     );
     expect(rows).toEqual([
       { change: "modified", path: "src/test/a.test.ts" },
+      { change: "retyped", path: "src/test/symlinked.test.ts" },
       { change: "deleted", path: "e2e/old.spec.ts" },
       { change: "renamed", path: "src/test/renamed.test.ts", from: "src/test/b.test.ts" },
       { change: "deleted", path: "supabase/tests/permissions.sql" },
@@ -449,6 +472,7 @@ function makeRepo(prefix: string): string {
   writeFileSync(join(repo, "src/test/tracked.test.ts"), "export const tracked = 1;\n");
   writeFileSync(join(repo, "src/test/doomed.test.ts"), "export const doomed = 2;\n");
   writeFileSync(join(repo, "src/test/moving.test.ts"), "export const moving = 3;\n");
+  writeFileSync(join(repo, "src/test/typed.test.ts"), "export const typed = 7;\n");
   writeFileSync(join(repo, "e2e-local/native.spec.ts"), "export const native = 4;\n");
   writeFileSync(join(repo, "tools/testbench/test_frame.py"), "def test_frame():\n    pass\n");
   writeFileSync(join(repo, "supabase/tests/permissions.sql"), "select plan(1);\n");
@@ -678,6 +702,18 @@ describe("scripts/scorer-lock.mjs --report against a disposable repository", () 
     );
   });
 
+  it.skipIf(process.platform === "win32")(
+    "lists a check replaced by a symlink as retyped, which --diff-filter=MDR alone would have hidden",
+    () => {
+      rmSync(join(repo, "src/test/typed.test.ts"));
+      symlinkSync("../lib/rules.ts", join(repo, "src/test/typed.test.ts"));
+      execFileSync("git", ["-C", repo, "add", "src/test/typed.test.ts"]);
+      const report = run(["--report", "--strict"]);
+      expect(report.status).toBe(2);
+      expect(report.stdout).toContain("LOCKED   retyped  src/test/typed.test.ts");
+    },
+  );
+
   it("does not list a rename from a non-scorer into a scorer path: a new check needs no unlock", () => {
     execFileSync("git", ["-C", repo, "mv", "src/lib/helper.ts", "src/test/helper.test.ts"]);
     const report = run(["--report"]);
@@ -690,15 +726,19 @@ describe("scripts/scorer-lock.mjs --report against a disposable repository", () 
       "src/test/tracked.test.ts",
       "src/test/doomed.test.ts",
       "src/test/moving.test.ts",
+      "src/test/typed.test.ts",
       "supabase/tests/permissions.sql",
       "--reason",
-      "pins renegotiated, two obsolete checks removed, one moved with its module",
+      "pins renegotiated, two obsolete checks removed, one moved with its module, one symlinked",
     ]);
     expect(unlock.status).toBe(0);
     const report = run(["--report", "--strict"]);
     expect(report.status).toBe(0);
     expect(report.stdout).not.toContain("LOCKED  ");
     expect(report.stdout).toContain("UNLOCKED modified src/test/tracked.test.ts");
+    if (process.platform !== "win32") {
+      expect(report.stdout).toContain("UNLOCKED retyped  src/test/typed.test.ts");
+    }
     expect(report.stdout).toContain("UNLOCKED deleted  src/test/doomed.test.ts");
     expect(report.stdout).toContain("UNLOCKED deleted  supabase/tests/permissions.sql");
     expect(report.stdout).toContain("UNLOCKED renamed  src/test/moving.test.ts");

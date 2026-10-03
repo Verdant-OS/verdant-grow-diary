@@ -1,5 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { readNativeWaterRecovery } from "./lib/nativeWaterRecoveryStorage";
+import { typedWaterRecoveryKey } from "../src/lib/quickLogWaterRecoveryKeys";
 import {
   acceptedReceipt,
   createLocalFixture,
@@ -29,15 +31,7 @@ async function openQuickLog(page: Page): Promise<void> {
 }
 
 async function pendingWater(page: Page, ownerId: string): Promise<Row | null> {
-  // Read this operation only; never enumerate auth/session storage.
-  const raw = await page.evaluate(
-    (key) => sessionStorage.getItem(key),
-    "verdant:quick-log:pending-watering:v1:" + ownerId,
-  );
-  if (raw === null) return null;
-  const value: unknown = JSON.parse(raw);
-  if (!isRow(value)) throw new Error("Pending Water envelope is malformed.");
-  return value;
+  return page.evaluate(readNativeWaterRecovery, typedWaterRecoveryKey(ownerId));
 }
 
 async function wateringRows(account: Account): Promise<Row[]> {

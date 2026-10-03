@@ -80,6 +80,8 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     expect(DOC).toMatch(/24 hours/);
     expect(DOC).toMatch(/bound to the branch/i);
     expect(DOC).toMatch(/enforces that whole contract/);
+    expect(DOC).toMatch(/declaration time (no later than|not after) now/);
+    expect(DOC).toContain("nested `package.json`");
     expect(DOC).toMatch(/hook input's `cwd`/);
   });
 

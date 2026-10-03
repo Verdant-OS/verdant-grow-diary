@@ -154,6 +154,13 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("eslint.config.js")).toBe(true);
     expect(isScorerPath("tsconfig.json")).toBe(true);
     expect(isScorerPath("tsconfig.irrigation-harness.json")).toBe(true);
+    // The Cursor SDK lane runs `bun run validate` (tsc -p tsconfig.json && vitest) with
+    // working-directory set to the spike, so its nested manifest and tsconfig are gates too.
+    expect(isScorerPath("spikes/cursor-sdk-local-orchestration/tsconfig.json")).toBe(true);
+    expect(isScorerPath("spikes/cursor-sdk-local-orchestration/package.json")).toBe(true);
+    expect(isScorerPath("plugins/verdant-grow-os/package.json")).toBe(true);
+    expect(isScorerPath("spikes/x/package.json.bak")).toBe(false);
+    expect(isScorerPath("spikes/x/tsconfig.json.md")).toBe(false);
     expect(isScorerPath("supabase/functions/_shared/lib/.sync-manifest.json")).toBe(true);
     // Spelled in two parts: the workbook concurrent-read isolation fence treats any src/test
     // suite whose source carries the joined marker as a workbook suite and forbids its
@@ -347,6 +354,24 @@ describe("scorerLockRules — unlock validity", () => {
     ).toBe(true);
     // An expiry before or at the declaration time is nonsense.
     expect(isUnlockEntryValid({ ...declared, at: LATER, expires_at: LATER }, context)).toBe(false);
+    // A declaration dated after now, with a window inside the TTL, is a hand-made record: it
+    // must not be in force for the whole interval before that future declaration.
+    expect(
+      isUnlockEntryValid(
+        { ...declared, at: "2027-10-03T00:00:00.000Z", expires_at: "2027-10-03T23:00:00.000Z" },
+        context,
+      ),
+    ).toBe(false);
+    expect(
+      isUnlockEntryValid(
+        {
+          ...declared,
+          at: LATER,
+          expires_at: new Date(Date.parse(LATER) + 3_600_000).toISOString(),
+        },
+        context,
+      ),
+    ).toBe(false);
     const { path: _p, ...withoutPath } = declared;
     expect(isUnlockEntryValid(withoutPath, context)).toBe(false);
   });

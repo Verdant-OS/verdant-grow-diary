@@ -158,9 +158,9 @@ export const SCORER_PATH_RULES = Object.freeze([
     why: "pre-commit wiring: lint-staged, docs-safety asserts and the pre-commit vitest file",
   }),
   Object.freeze({
-    kind: "exact",
-    value: "package.json",
-    why: "the script manifest CI and the hooks select judges through (test:*, check:*, lint-staged); an edit there can retarget or drop a gate",
+    kind: "regex",
+    value: /(^|\/)package\.json$/,
+    why: "a script manifest CI and the hooks select judges through (test:*, check:*, lint-staged at the root; `validate` in the nested spike manifest the Cursor SDK lane runs with working-directory); an edit there can retarget or drop a gate",
   }),
   Object.freeze({
     kind: "prefix",
@@ -193,8 +193,8 @@ export const SCORER_PATH_RULES = Object.freeze([
   }),
   Object.freeze({
     kind: "regex",
-    value: /^tsconfig(\.[^/]+)?\.json$/,
-    why: "the typecheck gate's strictness (tsconfig.json keeps four flags deliberately off and says why; the irrigation harness tsconfig gates that lane)",
+    value: /(^|\/)tsconfig(\.[^/]+)?\.json$/,
+    why: "a typecheck gate's strictness and include set (tsconfig.json keeps four flags deliberately off and says why; the irrigation harness tsconfig gates that lane; the nested spike tsconfig gates the Cursor SDK lane's typecheck)",
   }),
   Object.freeze({
     kind: "exact",
@@ -287,6 +287,9 @@ export function isUnlockEntryValid(entry, context) {
   const expires = parseTime(entry.expires_at);
   if (now === null || at === null || expires === null) return false;
   if (expires <= at || expires - at > UNLOCK_TTL_MS) return false;
+  // A declaration dated after now is a hand-made record; the bounded window would otherwise
+  // hold for the whole interval before that future declaration.
+  if (at > now) return false;
   if (now >= expires) return false;
   return true;
 }

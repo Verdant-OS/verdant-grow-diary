@@ -24,7 +24,12 @@ const H = vi.hoisted(() => ({
   targets: null as Record<string, { min: number | null; max: number | null }> | null,
   alertsStatus: "ok" as "idle" | "loading" | "ok" | "unavailable",
   kpiRenders: [] as string[],
-  alertsCommits: [] as { kpi: string; latestEnvCount: string | null | undefined }[],
+  alertsCommits: [] as {
+    kpi: string;
+    latestEnvCount: string | null | undefined;
+    alertRows: number;
+  }[],
+  alertRows: [] as unknown[],
   // The per-tent hook has not reported a status for the first tent yet.
   omitTentStatus: false,
 }));
@@ -160,7 +165,12 @@ vi.mock("@/hooks/usePersistEnvironmentAlerts", () => ({
   usePersistEnvironmentAlerts: (input: unknown) => H.persist(input),
 }));
 vi.mock("@/hooks/useAlertsList", () => ({
-  useAlertsList: () => ({ status: H.alertsStatus, alerts: [], error: null, reload: vi.fn() }),
+  useAlertsList: () => ({
+    status: H.alertsStatus,
+    alerts: H.alertRows,
+    error: null,
+    reload: vi.fn(),
+  }),
 }));
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => undefined }));
 vi.mock("@/hooks/useNowTick", () => ({ useNowTick: () => Date.now() }));
@@ -207,6 +217,8 @@ vi.mock("@/components/KpiCard", async () => {
           kpi: String(value),
           latestEnvCount: document.querySelector('[data-testid="latest-env-persisted-count"]')
             ?.textContent,
+          alertRows: document.querySelectorAll('[data-testid="dashboard-active-alert-item"]')
+            .length,
         });
       });
       return (
@@ -255,6 +267,7 @@ function pendingFirstRead(fetchStatus: "paused" | "idle") {
 describe("Dashboard private-read honesty boundary", () => {
   beforeEach(() => {
     H.alertsStatus = "ok";
+    H.alertRows = [];
     H.snapshotState = null;
     H.scoped = false;
     H.persist.mockClear();
@@ -744,12 +757,26 @@ describe("Dashboard private-read honesty boundary", () => {
   );
 
   it("does not confirm the previous grow's alerts read for a new grow scope", () => {
+    const openAlert = (id: string) => ({
+      id,
+      status: "open",
+      severity: "warning",
+      metric: "rh",
+      source: "derived",
+      title: `Old scope alert ${id}`,
+      reason: "Belongs to the previous scope",
+      created_at: "2026-10-01T00:00:00Z",
+    });
     H.growStatus = "success";
     H.alertsStatus = "ok";
+    // The previous scope has two open alerts, so a leak would be visible.
+    H.alertRows = [openAlert("old-1"), openAlert("old-2")];
     const view = renderDashboard();
-    expect(H.kpiRenders).toContain("Open alerts: 0");
+    expect(H.kpiRenders).toContain("Open alerts: 2");
+    expect(screen.getAllByTestId("dashboard-active-alert-item")).toHaveLength(2);
 
-    // useAlertsList keeps reporting the old scope's 'ok' until its effect runs.
+    // useAlertsList keeps reporting the old scope's 'ok' and rows until its
+    // effect runs.
     H.scoped = true;
     H.kpiRenders = [];
     H.alertsCommits = [];
@@ -757,15 +784,24 @@ describe("Dashboard private-read honesty boundary", () => {
 
     const alertsRenders = H.kpiRenders.filter((r) => r.startsWith("Open alerts"));
     expect(alertsRenders[0]).toBe("Open alerts: Checking…");
-    // The first commit for the new grow paints neither the KPI count nor the
-    // Latest Environment persisted-alerts line from the previous read.
-    expect(H.alertsCommits[0]).toEqual({ kpi: "Checking…", latestEnvCount: undefined });
+    // The first commit for the new grow paints neither the old count, the
+    // Latest Environment persisted-alerts line, nor the old alert rows.
+    expect(H.alertsCommits[0]).toEqual({
+      kpi: "Checking…",
+      latestEnvCount: undefined,
+      alertRows: 0,
+    });
 
     // The hook's effect then starts the new grow's read: still pending.
     H.alertsStatus = "loading";
+    H.alertRows = [];
     H.alertsCommits = [];
     view.rerenderDashboard();
-    expect(H.alertsCommits.at(-1)).toEqual({ kpi: "Checking…", latestEnvCount: undefined });
+    expect(H.alertsCommits.at(-1)).toEqual({
+      kpi: "Checking…",
+      latestEnvCount: undefined,
+      alertRows: 0,
+    });
 
     // Only the new grow's own successful read confirms zero.
     H.alertsStatus = "ok";
@@ -774,6 +810,7 @@ describe("Dashboard private-read honesty boundary", () => {
     expect(H.alertsCommits.at(-1)).toEqual({
       kpi: "0",
       latestEnvCount: "No persisted open alerts for this grow.",
+      alertRows: 0,
     });
   });
 

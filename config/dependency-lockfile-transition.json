@@ -1,11 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "canonicalPackageManager": "bun",
   "canonicalLockfile": "bun.lock",
-  "compatibilityLockfile": "package-lock.json",
   "owner": "Verdant dependency security",
-  "reason": "The 2026-10-03 review, on the owner's instruction, retained the synchronized npm compatibility lock through 2026-10-10 after re-inventorying the same four repository npm references at deploy tip 80176bad. The SEO monitoring workflow, the only reference confirmed to install from the npm lock, then moved to a frozen Bun install, so no remaining reference depends on package-lock.json; the other three are documentation and local-setup instructions. See docs/dependency-lockfile-transition-review-2026-10-03.md (prior: 2026-09-25). Bun remains canonical, and vercel.json pins Bun install/build. Preview dashboard settings are not verified by this repository review.",
-  "reviewBy": "2026-10-10",
+  "reason": "The npm compatibility lock (package-lock.json) was retired on 2026-10-03 on the owner's instruction, after the SEO monitoring workflow, its last lock-dependent consumer, moved to a frozen Bun install. bun.lock is the only lockfile and package-lock.json is forbidden. The three references below are an exact allowlist of npm command text in documentation and the local public-registry bootstrap; none installs from a committed npm lock. See docs/dependency-lockfile-transition-review-2026-10-03.md. vercel.json pins Bun install/build.",
   "consumerContracts": [
     {
       "path": "README.md",

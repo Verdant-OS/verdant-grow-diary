@@ -45,7 +45,6 @@
     "e2e:one-tent:ui": "playwright test e2e/one-tent-loop-golden-path-ui.spec.ts --project=chromium-mocked",
     "test:symptom-check:e2e": "playwright test e2e/symptom-check-branch.spec.ts e2e/symptom-guides-burden.spec.ts --project=chromium-mocked",
     "check:lockfile": "node scripts/check-bun-lockfile-policy.mjs",
-    "check:npm-lock-semantic": "node scripts/check-npm-lock-semantic.mjs",
     "check:sitemap-robots": "node scripts/check-sitemap-robots-parity.mjs",
     "check:edge-domain-reach": "node scripts/check-edge-function-domain-reach.mjs",
     "test:restricted-role": "bun run scripts/run-restricted-role-harness.ts --confirm-local-security-lane",

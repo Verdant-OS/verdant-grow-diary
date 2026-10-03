@@ -5,6 +5,8 @@ import { load as loadYaml } from "js-yaml";
 import { describe, expect, it, vi } from "vitest";
 import {
   extractDefinition,
+  FORWARD_MIGRATION_FILE,
+  FORWARD_MIGRATION_SHA256,
   MIGRATION_FILE,
   MIGRATION_SHA256,
   mutateLockWait,
@@ -77,6 +79,23 @@ describe("event replay locking disposable PostgreSQL proof", () => {
     expect(source.trimEnd()).toMatch(/COMMIT;$/);
   });
 
+  it("pins the self-transactional forward repair and proves it on its live wrapper", () => {
+    const forward = readFileSync(
+      resolve("supabase/migrations", FORWARD_MIGRATION_FILE),
+      "utf8",
+    ).replace(/\r/g, "");
+    expect(createHash("sha256").update(forward).digest("hex")).toBe(FORWARD_MIGRATION_SHA256);
+    expect(forward).toContain("BEGIN;");
+    expect(forward.trimEnd()).toMatch(/COMMIT;$/);
+    // The lock controls mutate the wrapper the forward repair installs.
+    const live = extractDefinition(
+      forward,
+      "CREATE OR REPLACE FUNCTION public.quicklog_save_event(",
+    );
+    expect(mutateLockWait(live, "receipt")).toContain("FOR UPDATE OF de;");
+    expect(mutateLockWait(live, "metadata")).not.toContain("SKIP LOCKED");
+  });
+
   it("sets the real INSERT timestamp context and verifies fixture stamps before applying", async () => {
     const responses = ["verdant_quicklog_delegate_repair_pg15_disposable_v1", "", "", "f"];
     const sync = vi.fn((_command: string, _args: string[], _options: { input: string }) => ({
@@ -141,6 +160,9 @@ describe("event replay locking disposable PostgreSQL proof", () => {
     };
     expect(Object.keys(workflow.on).sort()).toEqual(["merge_group", "pull_request", "push"]);
     expect(workflow.on.pull_request.paths).toContain(`supabase/migrations/${MIGRATION_FILE}`);
+    expect(workflow.on.pull_request.paths).toContain(
+      `supabase/migrations/${FORWARD_MIGRATION_FILE}`,
+    );
     expect(workflow.on.push.branches).toEqual(["verdant-grow-diary"]);
     expect(workflow.permissions).toEqual({ contents: "read" });
     expect(workflow.jobs.pg15_runtime.env.QUICKLOG_EVENT_REPLAY_LOCK_PG15_URL).toBe(localUrl);

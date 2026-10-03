@@ -59,7 +59,7 @@ export function isGoogleOAuthSignupUser(
     return providers.length === 1 && providers[0] === GOOGLE_OAUTH_SIGNUP_FUNNEL_METHOD;
   }
 
-  const identities = user.identities ?? [];
+  const identities = Array.isArray(user.identities) ? user.identities : [];
   return (
     identities.length > 0 &&
     identities.every((identity) => identity?.provider === GOOGLE_OAUTH_SIGNUP_FUNNEL_METHOD)

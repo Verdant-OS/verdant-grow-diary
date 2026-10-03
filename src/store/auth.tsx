@@ -279,10 +279,15 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
   // Google OAuth returns to the public origin with a session, not through
   // Auth.tsx signUp. Emit the existing signup event once for a first Google
   // account. Email signup keeps its own emit. A later Google sign-in does not.
+  // Analytics must never break auth: a throw here is swallowed.
   useEffect(() => {
-    emitFirstGoogleOAuthSignup(session?.user ?? null, () => {
-      trackFunnelEvent("signup", { method: "google" });
-    });
+    try {
+      emitFirstGoogleOAuthSignup(session?.user ?? null, () => {
+        trackFunnelEvent("signup", { method: "google" });
+      });
+    } catch {
+      // The session and loading state are already applied; skip the event.
+    }
   }, [session]);
 
   // Verified referral conversion: once a CONFIRMED session exists, hand the

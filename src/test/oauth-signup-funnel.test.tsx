@@ -127,6 +127,69 @@ describe("first Google OAuth signup vs returning sign-in", () => {
     ).toBe(false);
     expect(tracked).toEqual(["signup"]);
   });
+
+  it("emits once from the in-memory claim when sessionStorage throws or is missing", () => {
+    const throwingStorage: Pick<Storage, "getItem" | "setItem"> = {
+      getItem: () => {
+        throw new Error("storage blocked");
+      },
+      setItem: () => {
+        throw new Error("storage blocked");
+      },
+    };
+    const tracked: string[] = [];
+    const throwingUser = googleUser("storage-throws", CREATED_AT);
+    expect(emitFirstGoogleOAuthSignup(throwingUser, () => tracked.push("a"), throwingStorage)).toBe(
+      true,
+    );
+    expect(emitFirstGoogleOAuthSignup(throwingUser, () => tracked.push("a"), throwingStorage)).toBe(
+      false,
+    );
+    expect(tracked).toEqual(["a"]);
+
+    const nullStorageUser = googleUser("storage-null", CREATED_AT);
+    expect(emitFirstGoogleOAuthSignup(nullStorageUser, () => tracked.push("b"), null)).toBe(true);
+    expect(emitFirstGoogleOAuthSignup(nullStorageUser, () => tracked.push("b"), null)).toBe(false);
+    expect(tracked).toEqual(["a", "b"]);
+  });
+
+  it("does not treat an email account that linked Google as a Google signup", () => {
+    const email = { provider: "email" };
+    const google = { provider: "google" };
+    const stamps = { created_at: CREATED_AT, last_sign_in_at: CREATED_AT };
+    expect(
+      isFirstGoogleOAuthSignup({
+        id: "email-linked-google",
+        ...stamps,
+        app_metadata: { provider: "email", providers: ["email", "google"] },
+        identities: [email, google],
+      }),
+    ).toBe(false);
+    expect(
+      isFirstGoogleOAuthSignup({
+        id: "providers-only-linked-google",
+        ...stamps,
+        app_metadata: { providers: ["email", "google"] },
+        identities: [email, google],
+      }),
+    ).toBe(false);
+    // The email provider decides on its own, even if the other fields look Google-only.
+    expect(
+      isFirstGoogleOAuthSignup({
+        id: "email-provider-google-identities",
+        ...stamps,
+        app_metadata: { provider: "email" },
+        identities: [google],
+      }),
+    ).toBe(false);
+    expect(
+      isFirstGoogleOAuthSignup({
+        id: "non-array-identities",
+        ...stamps,
+        identities: { provider: "google" } as unknown as GoogleOAuthSignupCandidate["identities"],
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("AuthProvider Google OAuth signup funnel", () => {

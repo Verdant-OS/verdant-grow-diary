@@ -46,11 +46,12 @@ describe("plant timeline invalidation — QuickLog (mobile FAB)", () => {
     expect(body).toMatch(/verdant:entry-created/);
   });
 
-  it("passes the exact captured save target to applyQuickLogV2Refresh", () => {
+  it("refreshes the captured plant and the verified saved tent after a move", () => {
     const body = src(QUICK_LOG);
+    expect(body).toMatch(/const confirmedTarget = result\.savedWaterTarget \?\? saveTarget/);
     expect(body).toMatch(/targetType:\s*["']plant["']/);
     expect(body).toMatch(/targetId:\s*saveTarget\.plantId/);
-    expect(body).toMatch(/tentId:\s*saveTarget\.tentId/);
+    expect(body).toMatch(/tentId:\s*confirmedTarget\.tentId/);
   });
 
   it("does not write to new tables or invoke Edge Functions", () => {

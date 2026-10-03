@@ -123,6 +123,23 @@ const SOIL_METRIC_KEYS: ReadonlySet<SensorSnapshotMetricKey> = new Set(["soil", 
 // Allow lowercase ASCII vendor labels only. No spaces, no quotes, no slashes.
 const SAFE_SOURCE_DETAIL_RE = /^[a-z0-9][a-z0-9_.-]{0,63}$/;
 
+// Slug-shaped is not safe-shaped (issue #1003): separator-free MACs
+// ("accb88af4c01"), dash MACs, UUIDs, 32-hex passkeys and MAC-bearing
+// station ids ("gw2000a-wifi4c01") all satisfy SAFE_SOURCE_DETAIL_RE.
+// Any run of 4+ hex characters mixing a digit and a hex letter, or any
+// 12+ hex run, reads as hardware/credential material and is dropped.
+// Vendor slugs ("ecowitt", "pi_bridge", "esp32", "ggs_controller") have
+// no such run.
+const HARDWARE_ID_SHAPES: readonly RegExp[] = [
+  /(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{4,}/,
+  /[0-9a-f]{12,}/,
+];
+
+function looksLikeHardwareOrCredentialId(lower: string): boolean {
+  const compact = lower.replace(/[-:]/g, "");
+  return HARDWARE_ID_SHAPES.some((re) => re.test(lower) || re.test(compact));
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -144,10 +161,31 @@ function safeSourceDetail(detail: unknown): { value: string | null; isValid: boo
   if (detail === null || detail === undefined) return { value: null, isValid: true };
   if (typeof detail !== "string") return { value: null, isValid: false };
   const trimmed = detail.trim().toLowerCase();
-  if (!trimmed || !SAFE_SOURCE_DETAIL_RE.test(trimmed)) {
+  if (
+    !trimmed ||
+    !SAFE_SOURCE_DETAIL_RE.test(trimmed) ||
+    looksLikeHardwareOrCredentialId(trimmed)
+  ) {
     return { value: null, isValid: true };
   }
   return { value: trimmed, isValid: true };
+}
+
+/**
+ * Public form of the source-detail sanitizer, for adapters that build a
+ * SensorSnapshotInput from upstream rows: returns the safe slug or null.
+ */
+export function sanitizeSensorSourceDetail(detail: unknown): string | null {
+  return safeSourceDetail(detail).value;
+}
+
+/**
+ * The raw caller label is echoed only when it is itself a safe slug; a
+ * hardware id or credential value in `source` is never carried (#1003).
+ */
+function safeOriginalSource(source: unknown): string | null {
+  if (typeof source !== "string" || source.length === 0) return null;
+  return safeSourceDetail(source).value === null ? null : source;
 }
 
 function parseCapturedAt(value: unknown): { iso: string; ms: number } | null {
@@ -214,8 +252,7 @@ export function resolveSensorSnapshotDisplay(
   const reasonCodes: SensorSnapshotReasonCode[] = [];
   const safeInput: SensorSnapshotInput = input ?? {};
   const normalizedSource = normalizeSource(safeInput.source);
-  const originalSource =
-    typeof safeInput.source === "string" && safeInput.source.length > 0 ? safeInput.source : null;
+  const originalSource = safeOriginalSource(safeInput.source);
   const safeSourceDetailResult = safeSourceDetail(safeInput.sourceDetail);
   const sourceDetail = safeSourceDetailResult.value;
   const captured = parseCapturedAt(safeInput.capturedAt);

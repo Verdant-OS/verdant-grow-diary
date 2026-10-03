@@ -760,7 +760,17 @@ describe("Dashboard private-read honesty boundary", () => {
     // The first commit for the new grow paints neither the KPI count nor the
     // Latest Environment persisted-alerts line from the previous read.
     expect(H.alertsCommits[0]).toEqual({ kpi: "Checking…", latestEnvCount: undefined });
-    // Once the read scope is current, the confirmed result renders as before.
+
+    // The hook's effect then starts the new grow's read: still pending.
+    H.alertsStatus = "loading";
+    H.alertsCommits = [];
+    view.rerenderDashboard();
+    expect(H.alertsCommits.at(-1)).toEqual({ kpi: "Checking…", latestEnvCount: undefined });
+
+    // Only the new grow's own successful read confirms zero.
+    H.alertsStatus = "ok";
+    H.alertsCommits = [];
+    view.rerenderDashboard();
     expect(H.alertsCommits.at(-1)).toEqual({
       kpi: "0",
       latestEnvCount: "No persisted open alerts for this grow.",

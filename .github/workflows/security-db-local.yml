@@ -204,6 +204,46 @@ jobs:
           set -o pipefail
           bun run test:restricted-role 2>&1 | tee restricted-role.log
 
+      # Grant-path harnesses: no client self-grant of billing state, AI
+      # credits, Action Queue lineage or roles. They run here as their own
+      # steps, not inside the aggregate: the staff-grant trigger harness seeds
+      # the exact allow-listed addresses and is single-run per database. The
+      # launcher refuses any non-loopback SUPABASE_URL.
+      - name: Billing subscriptions RLS (grant path)
+        if: env.ENABLED == 'true'
+        id: billing-rls
+        run: |
+          set -o pipefail
+          bun run test:billing-rls:local-lane 2>&1 | tee billing-rls.log
+
+      - name: AI credits RLS + spend contract (grant path)
+        if: env.ENABLED == 'true'
+        id: ai-credits-rls
+        run: |
+          set -o pipefail
+          bun run test:ai-credits-rls:local-lane 2>&1 | tee ai-credits-rls.log
+
+      - name: Action Queue RLS lineage (grant path)
+        if: env.ENABLED == 'true'
+        id: action-queue-rls
+        run: |
+          set -o pipefail
+          bun run test:action-queue-rls:local-lane 2>&1 | tee action-queue-rls.log
+
+      - name: Staff role RLS (grant path)
+        if: env.ENABLED == 'true'
+        id: staff-role-rls
+        run: |
+          set -o pipefail
+          bun run test:staff-role-rls:local-lane 2>&1 | tee staff-role-rls.log
+
+      - name: Staff grant trigger allow-list (grant path)
+        if: env.ENABLED == 'true'
+        id: staff-grant-trigger
+        run: |
+          set -o pipefail
+          bun run test:staff-grant-trigger:local-lane 2>&1 | tee staff-grant-trigger.log
+
       - name: Aggregate DB security lane
         if: env.ENABLED == 'true'
         id: aggregate
@@ -228,6 +268,11 @@ jobs:
             public-support-forms-db.log
             ai-doctor-sessions-rls.log
             bridge-tokens-db.log
+            billing-rls.log
+            ai-credits-rls.log
+            action-queue-rls.log
+            staff-role-rls.log
+            staff-grant-trigger.log
             security-db-local.log
             test-results/**
             artifacts/security-db/**
@@ -264,6 +309,7 @@ jobs:
               echo "- customer mode isolation (\`test:customer-mode-db-security\`)"
               echo "- subscriber interest RLS (\`test:subscriber-interest-db-security\`)"
               echo "- public support forms RLS (\`test:public-support-forms-db-security\`)"
+              echo "- grant paths: billing, AI credits, Action Queue, staff role, staff grant trigger (\`test:*:local-lane\`)"
               echo "- AI Doctor sessions RLS (\`test:ai-doctor-sessions-rls\`)"
               echo "- bridge tokens RLS + revocation integrity, strict zero-skip mode (\`test:bridge-tokens-db-security\`)"
               echo "- VPD calibration provenance RLS (via aggregate lane)"
@@ -274,6 +320,7 @@ jobs:
               echo "Artifact paths (when uploaded):"
               echo "- \`migration-replay-compatibility.json\`, \`local-supabase-replay-report.json\`"
               echo "- \`profiles-db.log\`, \`customer-mode-db.log\`, \`subscriber-interest-db.log\`, \`public-support-forms-db.log\`, \`ai-doctor-sessions-rls.log\`, \`security-db-local.log\`"
+              echo "- \`billing-rls.log\`, \`ai-credits-rls.log\`, \`action-queue-rls.log\`, \`staff-role-rls.log\`, \`staff-grant-trigger.log\`"
               echo "- \`supabase-start.log\`, \`supabase-db-reset.log\` (sanitized)"
               echo "- \`test-results/\`, \`artifacts/security-db/\` (if produced)"
               echo ""

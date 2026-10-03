@@ -177,6 +177,16 @@ jobs:
           set -o pipefail
           bun run test:public-support-forms-db-security 2>&1 | tee public-support-forms-db.log
 
+      # Grant-path audit (2026-10-03): browser clients must not write the two
+      # tables that decide paid access and Founder status. The harness refuses
+      # a non-loopback SUPABASE_URL.
+      - name: Subscriptions + founders write denial
+        if: env.ENABLED == 'true'
+        id: subscriptions-founders-write-denial
+        run: |
+          set -o pipefail
+          bun run test:subscriptions-founders-write-denial 2>&1 | tee subscriptions-founders-write-denial.log
+
       - name: AI Doctor sessions RLS
         if: env.ENABLED == 'true'
         id: ai-doctor-sessions-rls
@@ -226,6 +236,7 @@ jobs:
             customer-mode-db.log
             subscriber-interest-db.log
             public-support-forms-db.log
+            subscriptions-founders-write-denial.log
             ai-doctor-sessions-rls.log
             bridge-tokens-db.log
             security-db-local.log
@@ -264,6 +275,7 @@ jobs:
               echo "- customer mode isolation (\`test:customer-mode-db-security\`)"
               echo "- subscriber interest RLS (\`test:subscriber-interest-db-security\`)"
               echo "- public support forms RLS (\`test:public-support-forms-db-security\`)"
+              echo "- subscriptions + founders write denial (\`test:subscriptions-founders-write-denial\`)"
               echo "- AI Doctor sessions RLS (\`test:ai-doctor-sessions-rls\`)"
               echo "- bridge tokens RLS + revocation integrity, strict zero-skip mode (\`test:bridge-tokens-db-security\`)"
               echo "- VPD calibration provenance RLS (via aggregate lane)"

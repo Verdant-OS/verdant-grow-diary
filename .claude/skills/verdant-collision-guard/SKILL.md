@@ -18,9 +18,10 @@ memory. Where this file and `AGENTS.md` (Agent Handoff / Coverage) differ on cla
 ## 1. Contract
 
 - **No working-tree or remote changes.** Allowed: `git fetch`, `git log`, `git show`,
-  `git ls-tree`, `git merge-tree`, `git status`, `gh api` GET requests, reading files, listing
-  sessions, and deleting the scratch refs S3 creates under `refs/guard/`. Fetching and
-  `merge-tree` update local refs and the object store only; none of these touches the working
+  `git ls-tree`, `git merge-tree`, `git --no-optional-locks status`, `gh api` GET requests,
+  reading files, listing sessions, and deleting the scratch refs S3 creates under `refs/guard/`.
+  Fetching and `merge-tree` update local refs and the object store only; with
+  `--no-optional-locks`, `status` does not rewrite the index. None of these touches the working
   tree, the index or the remote. Not allowed: editing,
   staging, committing, pushing, commenting, labelling, claiming, releasing, closing, re-running
   checks, or messaging another session to change its work.
@@ -44,9 +45,18 @@ Run every step. A step that cannot be measured is `BLOCKED` (a required read fai
 
 ### S1. Current state
 
-1. `git fetch origin verdant-grow-diary` and record the full tip SHA. The deploy branch is
-   `verdant-grow-diary`, not `main`; never audit `main`.
-2. `git status --short` and the current branch. Report uncommitted or unpushed local work; do
+1. Fetch the deploy branch with an explicit refspec, so a single-branch clone still updates
+   the ref every later step reads, then record the full tip SHA:
+
+   ```bash
+   git fetch origin +refs/heads/verdant-grow-diary:refs/remotes/origin/verdant-grow-diary
+   git rev-parse origin/verdant-grow-diary
+   ```
+
+   The deploy branch is `verdant-grow-diary`, not `main`; never audit `main`. If the fetch fails,
+   the verdict is `BLOCKED`.
+
+2. `git --no-optional-locks status --short` and the current branch. Report uncommitted or unpushed local work; do
    not discard it.
 3. If a session branch is assigned: does it exist on the remote, does it carry commits not in
    the deploy tip, and does it already have an open, merged or closed PR? A merged PR means
@@ -63,15 +73,15 @@ Resolve the edit to a concrete path list against the deploy tip
 (`git ls-tree -r --name-only origin/verdant-grow-diary`). Mark each path `EXISTS` or `NEW`, and
 name the symbol or line anchor when the edit is narrower than a file. Then classify each path:
 
-| Class         | Paths or areas                                                                                                                                                                                   | Effect                                                                                                 |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| Owner fence   | Migrations and SQL not yet merged, anything under `supabase/`, RLS, auth, Edge Functions, the Action Queue, lockfiles, device control, and any area `OWNERSHIP.md` currently lists as off-limits | `NEEDS_OWNER` (Matthew). A slice assignment alone does not lift it.                                    |
-| Immutable     | Any migration file already on the deploy branch                                                                                                                                                  | `REJECT`. No approval route exists; the valid proposal is a new additive migration.                    |
-| Held          | A path in the diff of a PR on hold, or any path `OWNERSHIP.md` or `CURRENT_STATE.md` marks untouchable                                                                                           | `COLLISION`. Never touch while the hold stands.                                                        |
-| Never by hand | `src/routeTree.gen.ts`, `src/integrations/supabase/types.ts`, `supabase/functions/mcp/index.ts`, `supabase/functions/_shared/lib`                                                                | `REJECT` as a hand edit. The valid proposal regenerates them with the repo's tooling.                  |
-| Governance    | The twelve versioned files: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.grok/rules/verdant-grok-role.md`, `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, `docs/agents/roles/*.md`      | Allowed, but the same change bumps all twelve `Sentinel-Version`s. Report it; not a verdict by itself. |
-| Merge gate    | `config/required-status-checks.json`, `.github/workflows/**`                                                                                                                                     | `NEEDS_OWNER` (the CI owner `OWNERSHIP.md` names).                                                     |
-| Pinned        | Any path or exported name a test reads as source text (`git grep -l "<path or name>" origin/verdant-grow-diary -- src/test`)                                                                     | Informational. The edit must renegotiate those pins in the same change.                                |
+| Class         | Paths or areas                                                                                                                                                                                                                                                                                     | Effect                                                                                                 |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Owner fence   | Production database access of any kind (the standing production-database lock in `OWNERSHIP.md`), migrations and SQL not yet merged, anything under `supabase/`, RLS, auth, Edge Functions, the Action Queue, lockfiles, device control, and any area `OWNERSHIP.md` currently lists as off-limits | `NEEDS_OWNER` (Matthew alone). A slice assignment alone does not lift it.                              |
+| Immutable     | Any migration file already on the deploy branch                                                                                                                                                                                                                                                    | `REJECT`. No approval route exists; the valid proposal is a new additive migration.                    |
+| Held          | A path in the diff of a PR on hold, or any path `OWNERSHIP.md` or `CURRENT_STATE.md` marks untouchable                                                                                                                                                                                             | `COLLISION`. Never touch while the hold stands.                                                        |
+| Never by hand | `src/routeTree.gen.ts`, `src/integrations/supabase/types.ts`, `supabase/functions/mcp/index.ts`, `supabase/functions/_shared/lib`                                                                                                                                                                  | `REJECT` as a hand edit. The valid proposal regenerates them with the repo's tooling.                  |
+| Governance    | The twelve versioned files: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.grok/rules/verdant-grok-role.md`, `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, `docs/agents/roles/*.md`                                                                                                        | Allowed, but the same change bumps all twelve `Sentinel-Version`s. Report it; not a verdict by itself. |
+| Merge gate    | `config/required-status-checks.json`, `.github/workflows/**`                                                                                                                                                                                                                                       | `NEEDS_OWNER` (the CI owner `OWNERSHIP.md` names).                                                     |
+| Pinned        | Any path or exported name a test reads as source text (`git grep -l "<path or name>" origin/verdant-grow-diary -- src/test`)                                                                                                                                                                       | Informational. The edit must renegotiate those pins in the same change.                                |
 
 ### S3. Existing changes
 
@@ -106,9 +116,11 @@ For the path list from S2:
    git update-ref -d refs/guard/pr-<n>
    ```
 
-   The leading `+` lets a re-run follow a rewritten PR head. Note which PR would need a merge-up
-   if the other lands first. If the fetch fails for any reason, report merge risk as
-   `NOT_MEASURED` and do not test a ref left from an earlier run.
+   The leading `+` lets a re-run follow a rewritten PR head. `git merge-tree --write-tree` needs
+   git 2.38 or later; exit status 0 means clean and 1 means conflicts. Note which PR would need
+   a merge-up if the other lands first. If the fetch fails, or `merge-tree` exits with any other
+   status or errors, report merge risk as `NOT_MEASURED`, never as clean, and do not test a ref
+   left from an earlier run. Delete the scratch ref in every case.
 
 ### S4. Ownership
 
@@ -125,12 +137,16 @@ For each overlapping PR, branch or handoff block, apply `AGENTS.md` (Agent Hando
 
    The effective claim is the newest valid `claimed_by` among the deploy-branch log and the PR's
    claim comments, unless its holder later posted `released_by`. A release that names a
-   successor reserves the block for that successor for 24 hours. A fresh claim, an explicit
-   assignment and a named lock are not available for takeover. A block needs a pushed branch
+   successor reserves the block for that successor for 24 hours. A fresh claim is a valid claim
+   whose block's last activity, as `AGENTS.md` defines it, is under 24 hours old; a claim posted
+   while another agent's valid claim is under 24 hours old is not valid. A fresh claim, an
+   explicit assignment and a named lock are not available for takeover. A block needs a pushed branch
    and a PR before it is eligible for coverage at all.
 
-3. **Role seats and locks.** `OWNERSHIP.md` names who merges, who reviews and who owns CI,
-   connectors and governance files, plus standing holds and untouchable PRs. Precedence:
+3. **Role seats and locks.** `OWNERSHIP.md` names who merges, who reviews and who owns CI and
+   connectors, plus standing locks, holds and untouchable PRs. It names no single owner for the
+   twelve versioned governance files; report governance edits for review rather than routing
+   them to a seat. Precedence:
    Matthew Cheek's own words, then `OWNERSHIP.md`, then `AGENTS.md`, then `CURRENT_STATE.md`.
    If `OWNERSHIP.md` and `CURRENT_STATE.md` disagree on whether a lock or hold still stands,
    treat it as standing and report the disagreement.

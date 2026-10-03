@@ -66,6 +66,12 @@ export interface PhenoCandidateInput {
   readonly candidateLabel?: string | null;
   readonly growLabel?: string | null;
   readonly tentLabel?: string | null;
+  /**
+   * The plant's own stored plants.grow_id / plants.tent_id (#1005). The
+   * evidence → Quick Log handoff targets these exact ids, never the hunt's.
+   */
+  readonly growId?: string | null;
+  readonly tentId?: string | null;
   readonly plantLabel?: string | null;
   readonly strain?: string | null;
   readonly stage?: string | null;

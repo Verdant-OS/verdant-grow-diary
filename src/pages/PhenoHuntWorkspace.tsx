@@ -75,6 +75,15 @@ import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
+import { useTents } from "@/hooks/use-tents";
+import { usePlants } from "@/hooks/use-plants";
+import { useGrows } from "@/store/grows";
+import {
+  resolvePhenoEvidenceQuickLogTarget,
+  type PhenoEvidenceGrowCatalog,
+  type PhenoEvidencePlantCatalog,
+  type PhenoEvidenceTentCatalog,
+} from "@/lib/phenoEvidenceQuickLogTargetGate";
 import type { PhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
 import { phenoHuntKeepersPath } from "@/lib/routes";
 import {
@@ -872,6 +881,12 @@ interface EditorProps {
    * readiness. Null while its batch is loading. */
   evidencePacket: PhenoCandidateEvidencePacket | null;
   evidenceStatus: "loading" | "ready" | "error" | "disabled";
+  /** The tent catalog Quick Log resolves against (#1005 target gate). */
+  evidenceTentCatalog: PhenoEvidenceTentCatalog;
+  evidenceGrowCatalog: PhenoEvidenceGrowCatalog;
+  /** Quick Log's live plant catalog — the plant's CURRENT grow/tent. */
+  evidencePlantCatalog: PhenoEvidencePlantCatalog;
+  onRetryEvidenceTentCatalog: () => void;
   selected: boolean;
   onToggleSelect: (plantId: string) => void;
   canAssign: boolean;
@@ -963,6 +978,10 @@ const CandidateEditor = memo(function CandidateEditor({
   saving,
   evidencePacket,
   evidenceStatus,
+  evidenceTentCatalog,
+  evidenceGrowCatalog,
+  evidencePlantCatalog,
+  onRetryEvidenceTentCatalog,
   selected,
   onToggleSelect,
   canAssign,
@@ -1013,6 +1032,19 @@ const CandidateEditor = memo(function CandidateEditor({
 
   // Readiness is derived from THIS card's evidence props, so it only recomputes
   // when this candidate's data changes — one save never re-renders every card.
+  // #1005: the evidence → Quick Log handoff targets this plant's own CURRENT
+  // grow/tent from Quick Log's live plant catalog (never the candidate
+  // snapshot), resolved through the canonical Quick Log target rules.
+  const evidenceQuickLogTarget = useMemo(
+    () =>
+      resolvePhenoEvidenceQuickLogTarget({
+        plantId,
+        plants: evidencePlantCatalog,
+        catalog: evidenceTentCatalog,
+        grows: evidenceGrowCatalog,
+      }),
+    [plantId, evidencePlantCatalog, evidenceTentCatalog, evidenceGrowCatalog],
+  );
   const readiness = useMemo(
     () => candidateReadiness(candidate, score, decision, sexRow, smokeRow, labRow, cloneInsured),
     [candidate, score, decision, sexRow, smokeRow, labRow, cloneInsured],
@@ -1124,8 +1156,8 @@ const CandidateEditor = memo(function CandidateEditor({
           packet={evidencePacket}
           status={evidenceStatus}
           plantName={candidate.plantLabel ?? null}
-          growId={growId}
-          tentId={tentId}
+          quickLogTarget={evidenceQuickLogTarget}
+          onRetryQuickLogTarget={onRetryEvidenceTentCatalog}
           allowRecordActions
           data-testid={`workspace-evidence-coverage-${plantId}`}
         />
@@ -1423,6 +1455,48 @@ export default function PhenoHuntWorkspace() {
     plantIds: loadedCandidateIds,
     configuredGoals: ws.hunt?.evidenceGoals ?? [],
   });
+  // #1005: the same canonical tent catalog (and cache) Quick Log resolves
+  // against. An error wins over cached data, exactly as Quick Log's own
+  // named-prefill check does (QuickLog.tsx `namedPrefillQueryError`): a
+  // failed background refetch keeps `data` but Quick Log holds the target
+  // empty, so this surface must not offer the handoff either (Codex on #1825).
+  const tentsQuery = useTents();
+  const evidenceTentCatalog = useMemo<PhenoEvidenceTentCatalog>(() => {
+    if (tentsQuery.isError) return { status: "error" };
+    if (tentsQuery.data) return { status: "ready", tents: tentsQuery.data };
+    return { status: "loading" };
+  }, [tentsQuery.data, tentsQuery.isError]);
+  // Codex on #1825: Quick Log only targets ACTIVE grows (GrowsProvider lists
+  // non-archived grows), so a candidate in an archived grow must not offer
+  // the handoff. Missing provider/state → loading (fail closed).
+  const growsCtx = useGrows();
+  const evidenceGrowCatalog = useMemo<PhenoEvidenceGrowCatalog>(() => {
+    if (growsCtx.error) return { status: "error" };
+    if (growsCtx.loading || !Array.isArray(growsCtx.grows)) return { status: "loading" };
+    return { status: "ready", growIds: new Set(growsCtx.grows.map((g) => g.id)) };
+  }, [growsCtx.error, growsCtx.loading, growsCtx.grows]);
+  // Codex on #1825: the plant's CURRENT grow/tent come from the same live
+  // plant catalog (and cache) Quick Log validates the prefill against, so a
+  // plant moved after this page loaded cannot open a dead handoff.
+  const plantsQuery = usePlants();
+  const evidencePlantCatalog = useMemo<PhenoEvidencePlantCatalog>(() => {
+    // Error first, as for tents above and in Quick Log.
+    if (plantsQuery.isError) return { status: "error" };
+    if (Array.isArray(plantsQuery.data)) return { status: "ready", plants: plantsQuery.data };
+    return { status: "loading" };
+  }, [plantsQuery.data, plantsQuery.isError]);
+  const refetchTents = tentsQuery.refetch;
+  const refetchPlants = plantsQuery.refetch;
+  const plantsFailed = Boolean(plantsQuery.isError);
+  const refreshGrows = growsCtx.refresh;
+  const growsFailed = Boolean(growsCtx.error);
+  // Retry whichever catalog failed: a grow- or plant-catalog error is not
+  // cleared by a tent refetch (Codex on #1825).
+  const retryEvidenceTentCatalog = useCallback(() => {
+    void refetchTents();
+    if (plantsFailed && typeof refetchPlants === "function") void refetchPlants();
+    if (growsFailed && typeof refreshGrows === "function") void refreshGrows();
+  }, [refetchTents, refetchPlants, plantsFailed, refreshGrows, growsFailed]);
   const { entitlement, refetch: refetchEntitlement } = useMyEntitlements();
   // Owner-only + Pro. Pheno surfaces are owner-only via RLS, so the viewer owns
   // the hunt; the presentation gate is an active Pheno Tracker Pro plan. The
@@ -2143,6 +2217,10 @@ export default function PhenoHuntWorkspace() {
                       saving={ws.saving === c.candidateId}
                       evidencePacket={evidencePackets.packets.get(c.candidateId) ?? null}
                       evidenceStatus={evidencePackets.status}
+                      evidenceTentCatalog={evidenceTentCatalog}
+                      evidenceGrowCatalog={evidenceGrowCatalog}
+                      evidencePlantCatalog={evidencePlantCatalog}
+                      onRetryEvidenceTentCatalog={retryEvidenceTentCatalog}
                       selected={selectedIds.includes(c.candidateId)}
                       onToggleSelect={onToggleSelect}
                       canAssign={canAssign}

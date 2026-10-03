@@ -105,7 +105,7 @@ vi.mock("@/hooks/useOneTentActivationEvidence", () => ({
 }));
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   useLatestSensorSnapshot: () => ({
-    status: "idle",
+    status: "ok",
     snapshot: {
       source: "unavailable",
       ts: null,

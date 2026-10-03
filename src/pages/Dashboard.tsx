@@ -14,7 +14,8 @@ import {
   computeStabilityRollup,
   STABILITY_ROLLUP_TONE_CLASS,
 } from "@/lib/dashboardStabilityRollupRules";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@/lib/react-router-compat";
 
 import { AlertTriangle, Box, Sprout, Sparkles, ArrowRight } from "lucide-react";
@@ -52,6 +53,7 @@ import SafeByDesignNotice from "@/components/SafeByDesignNotice";
 import DashboardSensorHealthSummary from "@/components/DashboardSensorHealthSummary";
 import { buildDashboardSensorHealthSummary } from "@/lib/dashboardSensorHealthViewModel";
 import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
+import { buildDashboardEmptyEnvironmentViewModel } from "@/lib/dashboardEmptyEnvironmentViewModel";
 import { sanitizeActionCopy } from "@/lib/actionQueueRowView";
 import { APPROVAL_QUEUE_EMPTY_COPY, mapRiskToSeverity } from "@/lib/dashboardActionQueueViewModel";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
@@ -145,7 +147,14 @@ import {
 } from "@/lib/dashboardSensorEvidenceRules";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
 
+/**
+ * Renders the grower's overview for a valid URL-selected grow or the full account.
+ * Keeps sensor history and saved environment evidence distinct, with scoped
+ * evidence retries and in-page access to the existing reading details.
+ */
 export default function Dashboard() {
+  const queryClient = useQueryClient();
+  const latestEnvironmentRef = useRef<HTMLElement>(null);
   usePageSeo({
     title: "Grow Room Dashboard | Verdant Grow Diary",
     description:
@@ -230,6 +239,11 @@ export default function Dashboard() {
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
   const snapshotReadState = buildSensorSnapshotReadState(sensorState);
   const currentSensorSnapshot = snapshotReadState.confirmedSnapshot;
+  const emptyEnvironment = buildDashboardEmptyEnvironmentViewModel({
+    scoped: !!scopedGrowId,
+    state: sensorState,
+    selectedTents: stageContextTents,
+  });
   // Tent attribution for a manually saved alert, taken from the same snapshot
   // the alert was derived from. Null when the current view spans several tents
   // — inventing a winner there would pin a real breach on an arbitrary tent.
@@ -500,23 +514,6 @@ export default function Dashboard() {
 
       <GuidedActionChecklistPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
-        <KpiCard
-          label="Plants"
-          value={plants.length}
-          icon={<Sprout className="h-3.5 w-3.5" />}
-          hint={`${plants.filter((p) => p.health === "healthy").length} marked healthy · user-assigned, not sensor-derived`}
-          accent="success"
-        />
-        <KpiCard
-          label="Open alerts"
-          value={openAlerts}
-          icon={<AlertTriangle className="h-3.5 w-3.5" />}
-          accent={openAlerts > 0 ? "destructive" : "success"}
-        />
-      </div>
-
       {tents.length === 0 ? (
         <DashboardZeroTentEmptyState growId={activationGraph.growId} />
       ) : (
@@ -604,24 +601,71 @@ export default function Dashboard() {
                 );
               }
               if (!anyReading) {
+                if (emptyEnvironment.kind !== "empty") {
+                  return (
+                    <div
+                      data-testid={
+                        emptyEnvironment.kind === "evidence"
+                          ? "dashboard-environment-snapshot-evidence"
+                          : `dashboard-environment-snapshot-evidence-${emptyEnvironment.kind}`
+                      }
+                      className="glass rounded-2xl p-6 space-y-2"
+                      role="status"
+                    >
+                      <h3 className="font-display font-semibold text-base">
+                        {emptyEnvironment.heading}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {emptyEnvironment.description}
+                      </p>
+                      {emptyEnvironment.kind === "evidence" && (
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="h-auto p-0"
+                          onClick={() => {
+                            latestEnvironmentRef.current?.scrollIntoView({ block: "start" });
+                            latestEnvironmentRef.current?.focus({ preventScroll: true });
+                          }}
+                        >
+                          Review saved environment evidence
+                        </Button>
+                      )}
+                      {emptyEnvironment.kind === "error" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            void queryClient.invalidateQueries({
+                              predicate: (query) =>
+                                query.queryKey[0] === "latest-sensor-snapshot" &&
+                                query.queryKey[2] === scopedGrowId,
+                            });
+                          }}
+                        >
+                          Retry environment evidence
+                        </Button>
+                      )}
+                    </div>
+                  );
+                }
                 return (
                   <div
                     data-testid="dashboard-environment-snapshot-empty"
                     className="glass rounded-2xl p-6 text-center"
                   >
                     <h3 className="font-display font-semibold text-base mb-1">
-                      No sensor snapshot yet
+                      {emptyEnvironment.heading}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      Add a manual reading or{" "}
+                      {emptyEnvironment.description}{" "}
                       <Link
                         to={sensorsPath(scopedGrowId)}
                         data-testid="dashboard-environment-snapshot-empty-sensors-link"
                         className="underline text-primary hover:opacity-80"
                       >
-                        connect Ecowitt
-                      </Link>{" "}
-                      to see your environment here.
+                        Set up a sensor.
+                      </Link>
                     </p>
                     <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
                       {/* Sensors entry-point dedupe: a single primary "Go to
@@ -1032,6 +1076,26 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* One-Tent Home: the equal-weight KPI wall is summary context, not
+          first-fold content. It sits below the daily loop, Environment and
+          Needs attention. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
+        <KpiCard
+          label="Plants"
+          value={plants.length}
+          icon={<Sprout className="h-3.5 w-3.5" />}
+          hint={`${plants.filter((p) => p.health === "healthy").length} marked healthy · user-assigned, not sensor-derived`}
+          accent="success"
+        />
+        <KpiCard
+          label="Open alerts"
+          value={openAlerts}
+          icon={<AlertTriangle className="h-3.5 w-3.5" />}
+          accent={openAlerts > 0 ? "destructive" : "success"}
+        />
+      </div>
       {scopedGrowId ? (
         <>
           <DashboardSensorHealthSummary
@@ -1040,7 +1104,13 @@ export default function Dashboard() {
             growId={scopedGrowId}
             className="mt-4"
           />
-          <section className="glass rounded-2xl p-4 mt-4" aria-label="Latest environment">
+          <section
+            id="latest-environment"
+            ref={latestEnvironmentRef}
+            tabIndex={-1}
+            className="glass rounded-2xl p-4 mt-4 scroll-mt-24"
+            aria-label="Latest environment"
+          >
             <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
               <div>
                 <h2 className="font-display font-semibold">Latest Environment</h2>

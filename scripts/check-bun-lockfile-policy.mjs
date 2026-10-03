@@ -23,7 +23,7 @@ const REQUIRED_LOCKFILES = Object.freeze(["bun.lock", "package-lock.json"]);
 export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
   "@hono/node-server": "2.0.10",
   "@modelcontextprotocol/sdk": "1.30.0",
-  hono: "4.13.5",
+  hono: "4.13.7",
   vite: "6.4.3",
   postcss: "8.5.18",
   "brace-expansion": "1.1.21",
@@ -46,7 +46,7 @@ export const BUN_LOCK_OPTIONAL_SECURITY_FLOORS = PACKAGE_LOCK_OPTIONAL_SECURITY_
 export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   "@hono/node-server": "2.0.10",
   "@modelcontextprotocol/sdk": "1.30.0",
-  hono: "4.13.5",
+  hono: "4.13.7",
   "js-yaml": "4.3.2",
   qs: "6.16.0",
   vitest: "4.1.11",

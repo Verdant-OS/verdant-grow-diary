@@ -6,20 +6,35 @@ import { renderHook, act } from "@testing-library/react";
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const { deleteEq, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
-  const deleteEq = vi.fn((): Promise<{ error: { code: string; message: string } | null }> =>
-    Promise.resolve({ error: null }),
+const { deleteEq, deleteResult, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
+  type QueryError = { code: string; message: string };
+  const deleteResult = vi.fn(
+    async (): Promise<{ data: { id: string } | null; error: QueryError | null }> => ({
+      data: { id: deleteEq.mock.lastCall?.[1] ?? "" },
+      error: null,
+    }),
   );
+  const deleteEq = vi.fn((_field: string, _id: string) => ({
+    select: () => ({ maybeSingle: deleteResult }),
+  }));
   const deleteFn = vi.fn(() => ({ eq: deleteEq }));
   return {
     deleteEq,
+    deleteResult,
     deleteFn,
     toastSuccess: vi.fn(),
     toastError: vi.fn(),
   };
 });
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: vi.fn(() => ({ delete: deleteFn })) },
+  supabase: {
+    from: vi.fn(() => ({
+      select: () => ({
+        eq: () => ({ maybeSingle: async () => ({ data: { details: {} }, error: null }) }),
+      }),
+      delete: deleteFn,
+    })),
+  },
 }));
 vi.mock("sonner", () => ({
   toast: { success: toastSuccess, error: toastError },
@@ -34,8 +49,12 @@ function wrapper(client: QueryClient) {
 }
 
 beforeEach(() => {
-  deleteEq.mockReset();
-  deleteEq.mockImplementation(() => Promise.resolve({ error: null }));
+  deleteEq.mockClear();
+  deleteResult.mockReset();
+  deleteResult.mockImplementation(async () => ({
+    data: { id: deleteEq.mock.lastCall?.[1] ?? "" },
+    error: null,
+  }));
   deleteFn.mockClear();
   toastSuccess.mockClear();
   toastError.mockClear();
@@ -108,9 +127,10 @@ describe("useRemoveDiaryEntry — query invalidation", () => {
   });
 
   it("does NOT invalidate when the delete fails", async () => {
-    deleteEq.mockImplementationOnce(() =>
-      Promise.resolve({ error: { code: "42501", message: "denied" } }),
-    );
+    deleteResult.mockImplementationOnce(async () => ({
+      data: null,
+      error: { code: "42501", message: "denied" },
+    }));
     const client = new QueryClient();
     const spy = vi.spyOn(client, "invalidateQueries");
     const { result } = renderHook(() => useRemoveDiaryEntry(), {
@@ -129,7 +149,7 @@ describe("useRemoveDiaryEntry — query invalidation", () => {
   });
 
   it("does NOT invalidate when the delete throws", async () => {
-    deleteEq.mockImplementationOnce(() => Promise.reject(new Error("network")));
+    deleteResult.mockImplementationOnce(() => Promise.reject(new Error("network")));
     const client = new QueryClient();
     const spy = vi.spyOn(client, "invalidateQueries");
     const { result } = renderHook(() => useRemoveDiaryEntry(), {

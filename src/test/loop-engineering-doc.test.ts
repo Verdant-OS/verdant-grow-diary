@@ -104,6 +104,7 @@ describe("docs/agents/loop-engineering.md — contract", () => {
   it("counts the Python testbench and pgTAP suites as scorers and anchors the hook to the project dir", () => {
     expect(DOC).toContain("`supabase/tests/`");
     expect(DOC).toContain("`test_*.py`");
+    expect(DOC).toContain("`*.Tests.ps1`");
     expect(DOC).toContain("$CLAUDE_PROJECT_DIR");
   });
 
@@ -127,6 +128,12 @@ describe("docs/agents/loop-engineering.md — contract", () => {
 
   it("says a strict report refuses without a deploy-branch ref, and that the lock's control files are scorers", () => {
     expect(DOC).toMatch(/--strict.*(refuses|exit 1)/);
+    // The strict report reads the git-ignored unlock file, so it is a local gate; the page
+    // must not advertise it as a CI verdict, and the deferred CI item must name what such a
+    // job would need instead.
+    expect(DOC).toMatch(/local pre-push gate/);
+    expect(DOC).toMatch(/reviewable input/);
+    expect(DOC).not.toMatch(/the command is ready for it/);
     expect(DOC).toContain(
       "`scripts/scorer-lock.mjs`, `scripts/lib/scorerLockRules.mjs` and `.claude/settings.json`, are scorers too",
     );

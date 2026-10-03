@@ -73,8 +73,13 @@ export const SCORER_PATH_RULES = Object.freeze([
   }),
   Object.freeze({
     kind: "regex",
+    value: /\.Tests\.ps1$/,
+    why: "Pester suites (scripts/p3-preservation/Invoke-P3Preservation.Tests.ps1 carries executable Describe/It assertions)",
+  }),
+  Object.freeze({
+    kind: "regex",
     value:
-      /^scripts\/(?:[^/]+\/)*(?:(?:test|run)-[^/]+|(?:[^/]*-)?(?:check|checks|verify|assert|validate|audit|scan|precommit|preflight|harness|harnesses|gate|db-security)(?:-[^/]*)?)\.(mjs|cjs|js|ts)$/,
+      /^scripts\/(?:[^/]+\/)*(?:(?:test|run)-[^/]+|(?:[^/]*-)?(?:check|checks|verify|assert|validate|audit|scan|precommit|preflight|harness|harnesses|gate|db-security)(?:-[^/]*)?)\.(mjs|cjs|js|ts|ps1|sh)$/,
     why: "repository gate scripts that CI, pre-commit and package scripts run as judges, at any depth under scripts/: a judge verb as a hyphen-delimited token anywhere in the basename (static-client-secret-scan, sensor-safety-check, run-*-harness, run-*-db-security, *-launch-gate), or a test- / run- prefix. Every tracked scripts/**/run-* is a suite orchestrator or runtime harness that decides whether its suite fails the job (run-scanner-guardrails-ci, run-quicklog-rpc-rls-harnesses, run-irrigation-integrity-suite, run-lighthouse-ci, run-postbuild-seo, e2e/run-pheno-*); measured 2026-10-03. test- stays prefix-only because measure-test-estate and send-ecowitt-test-payload are not judges",
   }),
   Object.freeze({

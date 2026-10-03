@@ -25,7 +25,11 @@
 //                              a plain report falls back to HEAD and says so; --strict
 //                              refuses (exit 1) rather than certify a comparison that
 //                              cannot see committed changes. --strict exits 2 when any
-//                              such scorer is still locked, for CI or a PR body.
+//                              such scorer is still locked: a local pre-push gate whose
+//                              output goes into the PR body. It reads the git-ignored
+//                              unlock file, so a clean CI checkout would see every change
+//                              as locked; a CI form needs declarations from a reviewable
+//                              input and is not provided here.
 //
 // Pure rules live in scripts/lib/scorerLockRules.mjs; this file is the I/O shell.
 // The lock is a tripwire against accidents, not a security boundary: an agent can run

@@ -96,6 +96,13 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("tools/ggs-ble-testbench/test_ggs_ble_frame.py")).toBe(true);
     expect(isScorerPath("tools/any/frame_test.py")).toBe(true);
     expect(isScorerPath("supabase/tests/permissions.sql")).toBe(true);
+    // Pester suites, and shell or PowerShell gates named like the JavaScript ones.
+    expect(isScorerPath("scripts/p3-preservation/Invoke-P3Preservation.Tests.ps1")).toBe(true);
+    expect(isScorerPath("tools/x/New-Thing.Tests.ps1")).toBe(true);
+    expect(isScorerPath("scripts/p3-preservation/Invoke-P3Preservation.ps1")).toBe(false);
+    expect(isScorerPath("scripts/releases/check-pheno-live-smoke-local.ps1")).toBe(true);
+    expect(isScorerPath("scripts/ecowitt-canary-harness.sh")).toBe(true);
+    expect(isScorerPath("scripts/ecowitt-canary-harness.ps1")).toBe(true);
     expect(isScorerPath("supabase/tests/billing_subscriptions_rls.sql")).toBe(true);
   });
 

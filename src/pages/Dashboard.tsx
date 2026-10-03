@@ -289,8 +289,14 @@ export default function Dashboard() {
   );
   const homeMetrics = buildTonightTentMetrics({
     rows: homeTent ? (readingsByTent[homeTent.id] ?? []) : [],
-    // Non-UUID ids are never queried, so their absence is established.
-    rowsRead: { status: homeTent ? (sensorStatusByTent[homeTent.id] ?? "success") : "success" },
+    // Same rule as the tent strip: a UUID tent with no reported status is still
+    // loading; non-UUID ids are never queried, so their absence is established.
+    rowsRead: {
+      status:
+        homeTent && isUuid(homeTent.id)
+          ? (sensorStatusByTent[homeTent.id] ?? "loading")
+          : "success",
+    },
     snapshot: { status: homeSnapshotState.status, snapshot: homeSnapshotState.snapshot },
     now: new Date(nowTick),
   });
@@ -495,12 +501,6 @@ export default function Dashboard() {
           </div>
         }
       />
-      <TonightTentHomeCard
-        selection={homeSelection}
-        metrics={homeMetrics}
-        lastLog={homeLastLog}
-        logHref={withGrowId("/daily-check", homeTent?.growId ?? scopedGrowId)}
-      />
 
       {urlGrowId && (
         <ScopedGrowBanner
@@ -511,6 +511,12 @@ export default function Dashboard() {
           backHref={backHref}
         />
       )}
+      <TonightTentHomeCard
+        selection={homeSelection}
+        metrics={homeMetrics}
+        lastLog={homeLastLog}
+        logHref={withGrowId("/daily-check", homeTent?.growId ?? scopedGrowId)}
+      />
 
       <div className="my-3">
         <PublicQuickLogHandoffCard className="mb-3" />

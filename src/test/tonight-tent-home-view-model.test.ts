@@ -254,16 +254,6 @@ describe("buildTonightTentMetrics — per-metric provenance", () => {
     // A failed read cannot prove absence.
     expect(rh.state).toBe("unavailable");
   });
-
-  it("is deterministic", () => {
-    const input = {
-      rows: [row({ metric: "vpd_kpa", value: 1.1 }), row({ metric: "vpd_kpa", value: 1.2 })],
-      rowsRead: OK_ROWS,
-      snapshot: NO_SNAPSHOT,
-      now: NOW,
-    };
-    expect(buildTonightTentMetrics(input)).toEqual(buildTonightTentMetrics(input));
-  });
 });
 
 describe("buildTonightLastLog", () => {

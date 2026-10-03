@@ -22,6 +22,7 @@ Three read-only audits from the agent prompt deck (prompts 30, 31 and 32), run a
 - **Method:** Source and documentation reads, byte counts, route and sitemap greps. No Search Console, GA4 or live site access.
 - **Status vocabulary:** PASS · FAIL · HOLD · NOT_MEASURED · OBSERVATION
 - **Legend:** In Audit 30, the Mark column holds document-currency marks, not status words. The marks are CURRENT, CURRENT HEADER, CURRENT DATED, SUPERSEDED IN PART, DESIGN ONLY, SANDBOX PREMISE and SANDBOX-ONLY, which answer prompt 30's "current, superseded or sandbox-only". REJECT is the third verdict that prompt 32 allows (PASS, HOLD or REJECT), and it means do not proceed.
+- **Legend (NO_BASELINE):** `docs/seo/route-indexation-matrix.md` uses NO_BASELINE to mean no Search Console baseline exists. This page quotes the word but reports the status as NOT_MEASURED.
 - **Locks in force:** HOLD #1250, production database lock, publishing stop. Unchanged.
 
 > **Calibrated verdict.** The billing documentation set is one current page scattered across ten files, four of which still carry a sandbox-only premise the 2026-08-25 standing directive retired. The indexation matrix is stale by three public routes and an unresolvable tip stamp, a documentation defect with no production effect. _Superseded in part, see index §4 errata: the tip stamp resolves (#558) and is about two months stale._ Both pillar drafts are HOLD for the same reason: they wait on independent evidence review an author cannot supply, not on more writing. REJECT applies to neither.

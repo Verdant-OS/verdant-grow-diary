@@ -28,8 +28,10 @@ ends with an independent-review checklist pinned to `80176ba`.
 | [2026-10-03-funnel-briefs-validators-audit.md](2026-10-03-funnel-briefs-validators-audit.md) | 36, 37, 38 | Funnel instrumentation, three content briefs, SEO validator gate |
 
 The audits were published first as claude.ai pages and are committed here unchanged in substance.
-Where Grok's review corrected a page, the correction is recorded in §4 below rather than edited
-into the original, so the published page and the committed file stay the same document.
+Substantive errata from Grok's review are recorded in §4 below rather than rewritten into the
+pages, so each page keeps its original findings. Wording and citation corrections from the
+#1881/#1883 reviews are applied in place and listed in §4a. Rows that §4 supersedes carry a pointer
+to it.
 
 ## 2. Findings Claude rated FAIL
 
@@ -90,6 +92,7 @@ This follow-up applies those five wording P2s in place. No verdict changed.
   - `src/lib/entitlements/types.ts:22` → `:17`.
   - `src/hooks/useMyEntitlements.ts:11` → `:10-13`.
   - `src/pages/CheckoutSuccess.tsx:64` → `:63-64` (`const confirmed =`).
+  - The `CheckoutSuccess.tsx` returnTo range, lines 69-80 → 66-82 (the three sanitized URL reads).
   - The billing audit's Staff lift quote ("enforced server-side at the Pro monthly cap") was
     credited to `resolveEntitlements.ts`. It is now cited to `src/lib/entitlements/types.ts:76-82`,
     the `isStaff` comment.

@@ -13,6 +13,8 @@ import type { Session, User } from "@supabase/supabase-js";
 import { SIGN_OUT_LOADING_LABEL } from "@/lib/authSessionExitRules";
 import { getAuthSignOutOperation } from "@/lib/authSignOutOperationService";
 import { runAuthOAuthBootstrap } from "@/lib/authOAuthBootstrapService";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
+import { emitFirstGoogleOAuthSignup } from "@/lib/oauthSignupFunnelRules";
 import {
   flushPendingOAuthSignupAcquisition,
   type SignupAcquisitionRpcClient,
@@ -273,6 +275,15 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
     if (!sessionUserId) return;
     void flushPendingOAuthSignupAcquisition(supabase as unknown as SignupAcquisitionRpcClient);
   }, [sessionUserId]);
+
+  // Google OAuth returns to the public origin with a session, not through
+  // Auth.tsx signUp. Emit the existing signup event once for a first Google
+  // account. Email signup keeps its own emit. A later Google sign-in does not.
+  useEffect(() => {
+    emitFirstGoogleOAuthSignup(session?.user ?? null, () => {
+      trackFunnelEvent("signup", { method: "google" });
+    });
+  }, [session]);
 
   // Verified referral conversion: once a CONFIRMED session exists, hand the
   // referee's code claim to the redeem-referral edge fn (server re-verifies

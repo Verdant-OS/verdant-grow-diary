@@ -60,6 +60,10 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   "20260914212330_founder_refund_subscription_reference.sql",
   // Founder grant/refund serialization and authoritative refund recheck.
   "20260915193000_founder_refund_grant_serialization.sql",
+  // Referrer reward cap: 10 rewarded conversions per UTC month per
+  // environment (grant-path audit 2026-10-03). Absence silently restores
+  // unbounded referral credit farming.
+  "20261003020000_referral_referrer_monthly_cap.sql",
 ];
 
 /**

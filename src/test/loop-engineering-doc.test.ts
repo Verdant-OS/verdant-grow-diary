@@ -72,6 +72,7 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     expect(DOC).toMatch(/deleted, renamed or retyped/i);
     expect(DOC).toContain("`diff-money-migration-prefixes.mjs`");
     expect(DOC).toContain("`required-money-migrations.mjs`");
+    expect(DOC).toContain("`playwright*.config.*`");
   });
 
   it("counts the Python testbench and pgTAP suites as scorers and anchors the hook to the project dir", () => {

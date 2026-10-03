@@ -75,6 +75,11 @@ export const SCORER_PATH_RULES = Object.freeze([
     why: "repository gate scripts that CI, pre-commit and package scripts run as judges, at any depth under scripts/: a judge verb as a hyphen-delimited token anywhere in the basename (static-client-secret-scan, sensor-safety-check, run-*-harness, run-*-db-security) or a test- prefix (verbs measured from the workflow and package.json invocations on 2026-10-03; test- stays prefix-only because measure-test-estate and send-ecowitt-test-payload are not judges)",
   }),
   Object.freeze({
+    kind: "regex",
+    value: /(^|\/)(vitest|playwright)(\.[^/]+)?\.(config|workspace)\.(ts|mts|cts|js|mjs|cjs)$/,
+    why: "test-runner configs decide which checks execute (vitest include, Playwright testDir/testMatch/testIgnore/projects); six tracked on 2026-10-03, including the native-local Playwright lanes",
+  }),
+  Object.freeze({
     kind: "exact",
     value: "config/required-status-checks.json",
     why: "the pinned mirror of the ruleset's required checks",

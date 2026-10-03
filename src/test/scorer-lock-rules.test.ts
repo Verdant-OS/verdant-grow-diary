@@ -141,6 +141,19 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("scripts/e2e/create-pheno-paid-smoke-sessions.mjs")).toBe(false);
   });
 
+  it("treats the test-runner configs as scorers, because they decide which checks execute", () => {
+    expect(isScorerPath("vitest.config.ts")).toBe(true);
+    expect(isScorerPath("playwright.config.ts")).toBe(true);
+    expect(isScorerPath("playwright.manual-correction-local.config.ts")).toBe(true);
+    expect(isScorerPath("playwright.native-local.config.ts")).toBe(true);
+    expect(isScorerPath("playwright.native-sensor-idle.config.ts")).toBe(true);
+    expect(isScorerPath("spikes/cursor-sdk-local-orchestration/vitest.config.ts")).toBe(true);
+    expect(isScorerPath("vitest.workspace.ts")).toBe(true);
+    expect(isScorerPath("vite.config.ts")).toBe(false);
+    expect(isScorerPath("eslint.config.js")).toBe(false);
+    expect(isScorerPath("tailwind.config.ts")).toBe(false);
+  });
+
   it("treats invoked gates without a verb token, and the migration manifests they judge against, as scorers", () => {
     expect(isScorerPath("scripts/diff-money-migration-prefixes.mjs")).toBe(true);
     expect(isScorerPath("scripts/probe-migration-drift.mjs")).toBe(true);

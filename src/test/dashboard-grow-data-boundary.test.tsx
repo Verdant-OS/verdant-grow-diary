@@ -24,6 +24,7 @@ const H = vi.hoisted(() => ({
   targets: null as Record<string, { min: number | null; max: number | null }> | null,
   alertsStatus: "ok" as "idle" | "loading" | "ok" | "unavailable",
   kpiRenders: [] as string[],
+  alertsCommits: [] as { kpi: string; latestEnvCount: string | null | undefined }[],
 }));
 
 vi.mock("@/hooks/useGrowData", () => ({
@@ -191,16 +192,29 @@ vi.mock("@/components/DailyGrowCheckStatusCard", () => ({ default: () => null })
 vi.mock("@/components/DashboardDailyGrowCheckPanel", () => ({ default: () => null }));
 vi.mock("@/components/SensorSourceBadge", () => ({ default: () => null }));
 
-vi.mock("@/components/KpiCard", () => ({
-  default: ({ label, value }: { label: string; value: number }) => {
-    H.kpiRenders.push(`${label}: ${value}`);
-    return (
-      <div data-testid="dashboard-kpi-card">
-        {label}: {value}
-      </div>
-    );
-  },
-}));
+vi.mock("@/components/KpiCard", async () => {
+  const { useLayoutEffect } = await import("react");
+  return {
+    default: function KpiCardMock({ label, value }: { label: string; value: number }) {
+      H.kpiRenders.push(`${label}: ${value}`);
+      // Layout effects run after this commit's DOM is written and before passive
+      // effects, so this sees exactly what that commit painted.
+      useLayoutEffect(() => {
+        if (!label.startsWith("Open alerts")) return;
+        H.alertsCommits.push({
+          kpi: String(value),
+          latestEnvCount: document.querySelector('[data-testid="latest-env-persisted-count"]')
+            ?.textContent,
+        });
+      });
+      return (
+        <div data-testid="dashboard-kpi-card">
+          {label}: {value}
+        </div>
+      );
+    },
+  };
+});
 vi.mock("@/components/DashboardZeroTentEmptyState", () => ({
   default: () => <div data-testid="dashboard-zero-tent-empty-state">No tents</div>,
 }));
@@ -721,10 +735,19 @@ describe("Dashboard private-read honesty boundary", () => {
     // useAlertsList keeps reporting the old scope's 'ok' until its effect runs.
     H.scoped = true;
     H.kpiRenders = [];
+    H.alertsCommits = [];
     view.rerenderDashboard();
 
     const alertsRenders = H.kpiRenders.filter((r) => r.startsWith("Open alerts"));
     expect(alertsRenders[0]).toBe("Open alerts: Checking…");
+    // The first commit for the new grow paints neither the KPI count nor the
+    // Latest Environment persisted-alerts line from the previous read.
+    expect(H.alertsCommits[0]).toEqual({ kpi: "Checking…", latestEnvCount: undefined });
+    // Once the read scope is current, the confirmed result renders as before.
+    expect(H.alertsCommits.at(-1)).toEqual({
+      kpi: "0",
+      latestEnvCount: "No persisted open alerts for this grow.",
+    });
   });
 
   it("reports zero open alerts only after the alerts read succeeds", () => {

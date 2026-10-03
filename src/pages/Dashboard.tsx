@@ -1179,7 +1179,8 @@ export default function Dashboard() {
                 </Link>
               </div>
             </div>
-            {persistedAlertsState.status === "ok" && (
+            {/* Known means this grow's read succeeded, not a previous scope's. */}
+            {openAlertsView.kind === "known" && (
               <div
                 className="mb-3 text-xs text-muted-foreground"
                 data-testid="latest-env-persisted-count"

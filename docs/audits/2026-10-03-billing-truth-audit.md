@@ -21,6 +21,7 @@ Three read-only audits from the agent prompt deck (prompts 21, 23 and 43), run a
 - **Branch and tip:** verdant-grow-diary at `80176ba` (#1864)
 - **Method:** Source reads and greps only. No production, Supabase, payments or analytics access.
 - **Status vocabulary:** PASS · FAIL · BLOCKED · NOT_MEASURED · OBSERVATION
+- **Legend:** In Audit 43, the Disposition column holds proposed archival actions, not status words. KEEP means it stays in CURRENT_STATE. MOVE means verbatim to the archive. RELOCATE means to docs/. TRIAGE means a per-row owner pass is needed. POLICY means it waits on an owner rule.
 - **Locks in force:** HOLD #1250, production database lock, publishing stop. Unchanged.
 
 > **Calibrated verdict.** Billing truth and credit metering PASS at source level. One letter-of-the-rule gap: the compatibility environment resolver can treat sandbox as expected without an explicit PAYMENTS_ENVIRONMENT. The runtime harness is BLOCKED here. The memory chain is the measured cost problem; the archival wins available under current policy are small, and the real lever needs an owner decision.
@@ -31,17 +32,17 @@ Three read-only audits from the agent prompt deck (prompts 21, 23 and 43), run a
 
 | Rule (AGENTS.md) | Status | Evidence |
 | --- | --- | --- |
-| public.subscriptions is the only entitlement read | **PASS** | `src/hooks/useMyEntitlements.ts:11` states the canonical lane and reads only `subscriptions`; `supabase/functions/_shared/unionEntitlementLookup.ts:1-9` does the same server-side. Both pass `byoRow: null`. |
+| public.subscriptions is the only entitlement read | **PASS** | `src/hooks/useMyEntitlements.ts:10-13` states the canonical lane and reads only `subscriptions`; `supabase/functions/_shared/unionEntitlementLookup.ts:1-9` does the same server-side. Both pass `byoRow: null`. |
 | profiles.tier is never used as billing | **PASS** | No reference to `profiles` or `.tier` in `src/lib/entitlements/*`, the hook, the server lookup, `ai-doctor-review` or `ai-coach`. |
-| billing_subscriptions never grants an entitlement | **PASS** **OBS** | No live caller supplies a row. The pure picker `src/lib/entitlements/unionEntitlements.ts:49` still accepts a `byoRow` and would let it win, and `types.ts:22` still documents the row as a mirror of `billing_subscriptions`. Dead today, re-enableable by a single future caller. |
-| Absence of an entitling row resolves to Free | **PASS** | `src/lib/entitlements/resolveEntitlements.ts:95`, reason `null_row_free`. Unknown plan or status also falls to Free. |
-| Sandbox rows grant access only when the server explicitly resolved sandbox | **PASS** AI and DB gates **FAIL** by letter, other gates | AI Doctor, AI Coach, cultivar QA and referral use `resolveRequiredServerBillingEnvironment`, which refuses to infer. DB gates (migration `20260728050000`) consider `environment='live'` only. The compatibility resolver at `unionEntitlementLookup.ts:56-62` infers sandbox from Paddle key presence and defaults to sandbox when nothing is set; it feeds live-sensor, premium-export, environment-summary, pheno-tracker and the three ingest functions. Whether production sets PAYMENTS_ENVIRONMENT is NOT_MEASURED, so impact is unknown. |
+| billing_subscriptions never grants an entitlement | **PASS** with **OBSERVATION** | No live caller supplies a row. The pure picker `src/lib/entitlements/unionEntitlements.ts:52-76` still accepts a `byoRow` and would let it win, and `src/lib/entitlements/types.ts:17` still documents the row as a mirror of `billing_subscriptions`. Dead today, re-enableable by a single future caller. |
+| Absence of an entitling row resolves to Free | **PASS** | `src/lib/entitlements/resolveEntitlements.ts:95-104`, reason `null_row_free`. Unknown plan or status also falls to Free. |
+| Sandbox rows grant access only when the server explicitly resolved sandbox | **PASS** AI and DB gates **FAIL** by letter, other gates | AI Doctor, AI Coach, cultivar QA and referral use `resolveRequiredServerBillingEnvironment`, which refuses to infer. DB gates (migration `20260728050000`) consider `environment='live'` only. The compatibility resolver at `supabase/functions/_shared/unionEntitlementLookup.ts:56-62` infers sandbox from Paddle key presence and defaults to sandbox when nothing is set; it feeds live-sensor, premium-export, environment-summary, pheno-tracker and the three ingest functions. Whether production sets PAYMENTS_ENVIRONMENT is NOT_MEASURED, so impact is unknown. |
 | Founder Lifetime is Pro-like with capped AI, never unlimited | **PASS** | `planCatalog.ts` pins `aiMonthlyCredits: 100`; the adapter requires price `founder_lifetime`, status active, subscription id prefix `lifetime_` and a null period end, all four together. |
 | Client entitlement reads are presentation-only | **PASS** | Hook header says so; cost gates re-check server-side (see Audit 23). |
 
 ### Observations for the reviewer
 
-- **Staff lift mismatch.** `resolveEntitlements.ts` describes the staff lift as presentation-only with AI "enforced server-side at the Pro monthly cap". The spend RPC (`20260728090736:256-262`) grants staff 10,000 credits per month under plan id `staff`. Documentation and code disagree; no customer-facing grant is involved.
+- **Staff lift mismatch.** `resolveEntitlements.ts` describes the staff lift as presentation-only with AI "enforced server-side at the Pro monthly cap". The spend RPC (migration `20260728090736:256-262`) grants staff 10,000 credits per month under plan id `staff`. Documentation and code disagree; no customer-facing grant is involved.
 - **Constitution omits Craft.** AGENTS.md lists Free, Pro monthly, Pro annual and Founder. The catalog and the allowance function also carry `craft_monthly` and `craft_annual` at 300 credits per month. Doc drift, not a defect.
 - **Hardening spec, if assigned:** remove the `byoRow` parameter from `pickStrongestBilling` and `resolveUnionEntitlements`, retire the mirror comment in `types.ts`, and route the seven compatibility-resolver callers through the strict resolver with an explicit fail-closed branch. Out of scope here.
 
@@ -53,12 +54,12 @@ Three read-only audits from the agent prompt deck (prompts 21, 23 and 43), run a
 | --- | --- | --- |
 | Free 3 per grow; Pro and Founder 100 per UTC month | **PASS** | `ai_credit_allowance` in migration `20260721194118:15-38`. Period key is `to_char(now() AT TIME ZONE 'UTC','YYYY-MM')` (`20260728090736:54`). Craft 300. |
 | Server-side check before the model call | **PASS** | `supabase/functions/ai-doctor-review/index.ts:411` and `ai-coach/index.ts:301` call `ai_credit_spend` before any upstream request. |
-| Client cannot set user_id, weight, model tier or plan | **PASS** | User id from `supabase.auth.getUser()` (`ai-doctor-review:290`, `ai-coach:269`). `MODEL_TIER` is a server constant (line 70 and 149). Weight is computed inside the RPC. The RPC re-reads the plan from `subscriptions` and `has_role`; it never trusts a client plan. |
-| Spend RPC is service-only and race-safe | **PASS** by source | `SECURITY DEFINER`, `pg_advisory_xact_lock(hashtext(uid))` at line 94, legacy signatures revoked from PUBLIC, anon, authenticated and service_role (lines 392-408). |
+| Client cannot set user_id, weight, model tier or plan | **PASS** | User id from `supabase.auth.getUser()` (`supabase/functions/ai-doctor-review/index.ts:290`, `supabase/functions/ai-coach/index.ts:269`). `MODEL_TIER` is a server constant (`ai-doctor-review/index.ts:70`, `ai-coach/index.ts:149`). Weight is computed inside the RPC. The RPC re-reads the plan from `subscriptions` and `has_role`; it never trusts a client plan. |
+| Spend RPC is service-only and race-safe | **PASS** by source | `SECURITY DEFINER`, `pg_advisory_xact_lock(hashtext(uid))` at migration `20260728090736` line 94, legacy signatures revoked from PUBLIC, anon, authenticated and service_role (same migration, lines 392-408). |
 | Failed calls refund via append-only reversal rows | **PASS** | `ai_credit_refund` (migration `20260727050000:420-434`) inserts a row with `-weight`, status `refunded`, `refund_of` set; idempotent by key; executable by service_role only. |
 | Ledger: select-own, no client writes | **PASS** | Policy `ai_credit_spends_select_own`; GRANT SELECT to authenticated, ALL to service_role; no client insert, update or delete policy. |
 | Append-only enforced mechanically | **NOT_MEASURED** | Append-only is stated in five migration comments and enforced by RLS plus convention. No UPDATE or DELETE-blocking trigger on `ai_credit_spends` was found; service_role holds ALL. |
-| Denials are calm, expected responses | **PASS** | `calmFailure("credit_denied", { credit })` at `ai-doctor-review:469`. |
+| Denials are calm, expected responses | **PASS** | `calmFailure("credit_denied", { credit })` at `supabase/functions/ai-doctor-review/index.ts:469`. |
 | Runtime RLS and race harness | **BLOCKED** | `scripts/run-ai-credits-rls-harness.ts:35-45` needs SUPABASE_URL and a service role key. Neither is present in this session. Race behavior is therefore NOT_MEASURED at runtime. |
 
 ### Observations for the reviewer
@@ -85,7 +86,7 @@ Token estimates use the ratio CLAUDE.md itself measured on 2026-08-21: 153,142 b
 
 | Section | Bytes | Dates inside | Disposition |
 | --- | --- | --- | --- |
-| Production status (line 1973) | 81,888 | 2026-08 only, 53 date stamps | **TRIAGE** Holds production rows; cannot move wholesale. The 2026-09-28 release measurement supersedes its tip and live rows. Needs per-row triage, owner-gated. |
+| Production status (`docs/agents/CURRENT_STATE.md` line 1973) | 81,888 | 2026-08 only, 53 date stamps | **TRIAGE** Holds production rows; cannot move wholesale. The 2026-09-28 release measurement supersedes its tip and live rows. Needs per-row triage, owner-gated. |
 | Follow-up observation chain, 25 sections (lines 5-170) | 59,995 | 2026-09-29 | **POLICY** Each supersedes parts of the one before. Archiving needs a keep-latest-N rule the archival spec does not yet grant. |
 | Migration-drift alarm (line 1483) | 26,722 | 2026-08 | **KEEP** Open issue. |
 | Function default-privilege exposure (line 1065) | 23,922 | 2026-08-21 | **KEEP** Open, "not yet actioned". |

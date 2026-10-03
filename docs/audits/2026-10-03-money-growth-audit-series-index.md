@@ -68,9 +68,49 @@ Claude re-verified each of Grok's four collisions against source on 2026-10-03.
 | Page | Claude wrote | Correction | Evidence |
 | --- | --- | --- | --- |
 | Docs and indexation | Matrix tip `1c40c21f2` is "not an object" and unresolvable | The commit exists (#558, 2026-07-29). Claude's clone was shallow, so the object was missing locally, not in the repository. The finding becomes "stamp is about two months stale", which was the material point. | `git rev-parse --is-shallow-repository` returned `true`; GitHub commit `1c40c21f2e3d…` |
-| Funnel | `FUNNEL_EVENTS` has 30 names | It has 29. Claude's range-based count captured one string outside the array. All 29 have an emitter; that conclusion stands. | `src/lib/funnelAnalytics.ts:32-87`, array parse |
+| Funnel | `FUNNEL_EVENTS` has 30 names | It has 29. Claude's range-based count captured one string outside the array. All 29 have an emitter; that conclusion stands. | `src/lib/funnelAnalytics.ts:32-80` (the array; lines 81-87 are outside it), array parse |
 | Funnel | Validators ran on the PR head, not the tip itself | Overturned. CI run 36950533886 ran on the push to `verdant-grow-diary` with head sha `80176bad5c9c…`, conclusion success. `test:legal-seo` and `Lint, typecheck, test, build` PASS on the tip. | GitHub Actions, `ci.yml`, push event |
-| Funnel | Acquisition source "cannot be joined server-side" | Downgraded. `Auth.tsx` queues the source for both email and Google paths and migration `20260714231627` stores it with an operator snapshot RPC. The remaining gap is narrower: the source is absent from the `funnel_events` table specifically. | `src/pages/Auth.tsx:96-136, 351-374`; `supabase/migrations/20260714231627_signup_acquisition_attribution.sql` |
+| Funnel | Acquisition source "cannot be joined server-side" | **NOT_MEASURED** (was GAP). `Auth.tsx` queues the source for both email and Google paths and migration `20260714231627` stores it with an operator snapshot RPC. The remaining gap is narrower: the source is absent from the `funnel_events` table specifically. Whether the join works in production is NOT_MEASURED. | `src/pages/Auth.tsx:96-136, 351-374`; `supabase/migrations/20260714231627_signup_acquisition_attribution.sql` |
+
+### 4a. Follow-up to the #1881 review
+
+Blue Dream reviewed #1881 at `37b0e85d17a58803e3144dea8920f38ee9d26c83` and returned PASS-with-P2
+([comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/1881#issuecomment-5966523297)).
+This follow-up applies those five wording P2s in place. No verdict changed.
+
+- The attribution erratum above now says NOT_MEASURED literally.
+- Each page's legend now defines its labels that sit outside the series vocabulary (document marks,
+  archival dispositions, REJECT, UNKNOWN). Ad hoc labels (OBS, NOTE, NONE, NO_BASELINE, CODEX HOLDS)
+  were mapped to OBSERVATION, PASS or NOT_MEASURED.
+- Rows that §4 supersedes carry a one-line pointer back to §4.
+- File and line citations were re-checked with `rg` at deploy tip `08dd55e8`. None of the cited
+  source files changed between `80176ba` and that tip. Wrong citations were corrected in place, and
+  anything that couldn't be confirmed is marked "(unverified)". Corrections:
+  - `src/lib/entitlements/unionEntitlements.ts:49` → `:52-76` (`pickStrongestBilling`).
+  - `src/lib/entitlements/types.ts:22` → `:17`.
+  - `src/hooks/useMyEntitlements.ts:11` → `:10-13`.
+  - `src/pages/CheckoutSuccess.tsx:64` → `:62-63`.
+  - `payments-webhook/index.ts` line 316 → lines 313-318.
+  - `src/lib/funnelAnalytics.ts:32-87` → `:32-80`.
+  - `src/routes/__root.tsx` comment at line 245 → lines 244-253.
+  - `Pricing.tsx:70-150` → `:70-164`.
+  - The docs-indexation claim that the matrix and manifest were "last touched in the same commit
+    (`a695f5d`, 2026-09-30)" is wrong. The matrix was last changed in `16a575129` (#685,
+    2026-08-02), and the manifest in `816894ba9` (#1141, 2026-08-26). `a695f5d` touches neither
+    file; it was the boundary of a shallow clone.
+  - The pricing footer's `Founder.tsx` is now `src/routes/founder.tsx`, which renders
+    `src/pages/Founder.tsx`.
+  - Bare file names were expanded to full repository paths where they were ambiguous.
+- Confirmed unchanged at `08dd55e8`:
+  - `src/pages/Auth.tsx:163` and `:421`.
+  - `src/pages/Pricing.tsx:823`.
+  - `src/constants/strainReferenceLibrary.ts:1019-1020`.
+  - `src/lib/cultivarIndexSeoRules.ts:46`.
+  - `supabase/functions/_shared/unionEntitlementLookup.ts:56-62`.
+  - Migration `20260719052812` lines 31-33, 60-61 and 121-123.
+  - The manifest counts: 144 routes, made up of 42 public, 46 auth, 32 operator, 6 internal and
+    18 redirects.
+  - The three routes missing from the matrix.
 
 ## 5. Decisions escalated to Matthew
 

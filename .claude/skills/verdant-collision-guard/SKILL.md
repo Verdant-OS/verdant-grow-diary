@@ -19,8 +19,9 @@ memory. Where this file and `AGENTS.md` (Agent Handoff / Coverage) differ on cla
 
 - **No working-tree or remote changes.** Allowed: `git fetch`, `git log`, `git show`,
   `git ls-tree`, `git merge-tree`, `git status`, `gh api` GET requests, reading files, listing
-  sessions. `git fetch` and `git merge-tree --write-tree` update local refs and the object store
-  only; neither touches the working tree, the index or the remote. Not allowed: editing,
+  sessions, and deleting the scratch refs S3 creates under `refs/guard/`. Fetching and
+  `merge-tree` update local refs and the object store only; none of these touches the working
+  tree, the index or the remote. Not allowed: editing,
   staging, committing, pushing, commenting, labelling, claiming, releasing, closing, re-running
   checks, or messaging another session to change its work.
 - **Stops after the verdict.** The guard never proceeds to the edit, even on `CLEAR`. The user,
@@ -62,14 +63,15 @@ Resolve the edit to a concrete path list against the deploy tip
 (`git ls-tree -r --name-only origin/verdant-grow-diary`). Mark each path `EXISTS` or `NEW`, and
 name the symbol or line anchor when the edit is narrower than a file. Then classify each path:
 
-| Class         | Paths or areas                                                                                                                                                                              | Effect                                                                                                                                             |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Owner fence   | Migrations and SQL, anything under `supabase/`, RLS, auth, Edge Functions, the Action Queue, lockfiles, device control, and any area `OWNERSHIP.md` currently lists as off-limits           | `NEEDS_OWNER`. Requires Matthew's explicit approval; a slice assignment alone does not lift it. A migration already merged is never edited at all. |
-| Held          | A path in the diff of a PR on hold, or any path `OWNERSHIP.md` or `CURRENT_STATE.md` marks untouchable                                                                                      | `COLLISION`. Never touch while the hold stands.                                                                                                    |
-| Never by hand | `src/routeTree.gen.ts`, `src/integrations/supabase/types.ts`, `supabase/functions/mcp/index.ts`, `supabase/functions/_shared/lib`                                                           | Regenerate with the repo's tooling; a hand edit is not a valid proposal.                                                                           |
-| Governance    | The twelve versioned files: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.grok/rules/verdant-grok-role.md`, `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, `docs/agents/roles/*.md` | Allowed, but the same change bumps all twelve `Sentinel-Version`s. Report it; not a verdict by itself.                                             |
-| Merge gate    | `config/required-status-checks.json`, `.github/workflows/**`                                                                                                                                | CI owner per `OWNERSHIP.md`. Report who; `NEEDS_OWNER` only if `OWNERSHIP.md` says so.                                                             |
-| Pinned        | Any path or exported name a test reads as source text (`git grep -l "<path or name>" origin/verdant-grow-diary -- src/test`)                                                                | Informational. The edit must renegotiate those pins in the same change.                                                                            |
+| Class         | Paths or areas                                                                                                                                                                                   | Effect                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Owner fence   | Migrations and SQL not yet merged, anything under `supabase/`, RLS, auth, Edge Functions, the Action Queue, lockfiles, device control, and any area `OWNERSHIP.md` currently lists as off-limits | `NEEDS_OWNER` (Matthew). A slice assignment alone does not lift it.                                    |
+| Immutable     | Any migration file already on the deploy branch                                                                                                                                                  | `REJECT`. No approval route exists; the valid proposal is a new additive migration.                    |
+| Held          | A path in the diff of a PR on hold, or any path `OWNERSHIP.md` or `CURRENT_STATE.md` marks untouchable                                                                                           | `COLLISION`. Never touch while the hold stands.                                                        |
+| Never by hand | `src/routeTree.gen.ts`, `src/integrations/supabase/types.ts`, `supabase/functions/mcp/index.ts`, `supabase/functions/_shared/lib`                                                                | `REJECT` as a hand edit. The valid proposal regenerates them with the repo's tooling.                  |
+| Governance    | The twelve versioned files: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.grok/rules/verdant-grok-role.md`, `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, `docs/agents/roles/*.md`      | Allowed, but the same change bumps all twelve `Sentinel-Version`s. Report it; not a verdict by itself. |
+| Merge gate    | `config/required-status-checks.json`, `.github/workflows/**`                                                                                                                                     | `NEEDS_OWNER` (the CI owner `OWNERSHIP.md` names).                                                     |
+| Pinned        | Any path or exported name a test reads as source text (`git grep -l "<path or name>" origin/verdant-grow-diary -- src/test`)                                                                     | Informational. The edit must renegotiate those pins in the same change.                                |
 
 ### S3. Existing changes
 
@@ -99,12 +101,14 @@ For the path list from S2:
 4. **Merge risk.** For each overlapping open PR, fetch its head first, then test the merge:
 
    ```bash
-   git fetch origin "pull/<n>/head:refs/guard/pr-<n>"
+   git fetch origin "+pull/<n>/head:refs/guard/pr-<n>"
    git merge-tree --write-tree origin/verdant-grow-diary refs/guard/pr-<n>
+   git update-ref -d refs/guard/pr-<n>
    ```
 
-   Note which PR would need a merge-up if the other lands first. If the fetch is refused,
-   report merge risk as `NOT_MEASURED`.
+   The leading `+` lets a re-run follow a rewritten PR head. Note which PR would need a merge-up
+   if the other lands first. If the fetch fails for any reason, report merge risk as
+   `NOT_MEASURED` and do not test a ref left from an earlier run.
 
 ### S4. Ownership
 
@@ -127,21 +131,27 @@ For each overlapping PR, branch or handoff block, apply `AGENTS.md` (Agent Hando
 
 3. **Role seats and locks.** `OWNERSHIP.md` names who merges, who reviews and who owns CI,
    connectors and governance files, plus standing holds and untouchable PRs. Precedence:
-   Matthew Cheek's own words, then `OWNERSHIP.md`, then `CURRENT_STATE.md` and `AGENTS.md`.
+   Matthew Cheek's own words, then `OWNERSHIP.md`, then `AGENTS.md`, then `CURRENT_STATE.md`.
+   If `OWNERSHIP.md` and `CURRENT_STATE.md` disagree on whether a lock or hold still stands,
+   treat it as standing and report the disagreement.
 4. **Live sessions.** Where session tools are available, list sessions and match branch names,
    to catch work in progress but not yet pushed. If unavailable, record `NOT_MEASURED`; this
    alone never makes the verdict `BLOCKED`.
 
 ## 4. Verdict
 
-Exactly one. When several apply, the first in this order wins:
+This session's own assigned branch, its own PR and its own valid claim are never a collision
+with itself. Everything else counts.
 
-| Verdict       | Meaning                                                                                                                                                                        |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `BLOCKED`     | A required read failed: the deploy branch, the open-PR list, a PR's file list, or the deploy-branch ownership files. Say which, and what clears it.                            |
-| `COLLISION`   | An open PR, effective claim, explicit assignment, hold or untouchable entry covers the files or the behaviour, or a merged change already does it. Name it; do not resolve it. |
-| `NEEDS_OWNER` | No collision, but an owner-fence path is in scope. Name the fence and whose approval it needs.                                                                                 |
-| `CLEAR`       | None of the above. Report governance, CI-owner and pinned-test notes alongside.                                                                                                |
+Exactly one verdict. When several apply, the first in this order wins:
+
+| Verdict       | Meaning                                                                                                                                                                                                                                                                                                   |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BLOCKED`     | A required read failed: the deploy branch, the deploy-branch ownership files, the open-PR list or any PR's file list, the same-behaviour search, the merged-history log, or the PR comments of an overlapping PR. Say which, and what clears it. Only live sessions and merge risk may be `NOT_MEASURED`. |
+| `REJECT`      | The proposal edits an immutable migration or hand-edits a generated file. No approval makes it valid; state the valid alternative.                                                                                                                                                                        |
+| `COLLISION`   | An open PR, effective claim, explicit assignment, hold or untouchable entry covers the files or the behaviour, or a merged change already does it. Name it; do not resolve it.                                                                                                                            |
+| `NEEDS_OWNER` | No collision, but an owner-fence or merge-gate path is in scope. Name the fence and whose approval it needs.                                                                                                                                                                                              |
+| `CLEAR`       | None of the above. Report governance, CI-owner and pinned-test notes alongside.                                                                                                                                                                                                                           |
 
 A collision is reported, never fixed: do not merge into, rebase, push to or comment on another
 agent's branch, open a competing PR, or close anything. Offer the user the routes: relay the
@@ -154,14 +164,14 @@ COLLISION GUARD — <one-line edit>
 deploy_tip: <full sha>  observed: <UTC time>
 local: <branch>, <clean | N uncommitted | N unpushed>
 files:
-  - <path> [EXISTS|NEW] [owner-fence | held | never-by-hand | governance | merge-gate | pinned | —]
+  - <path> [EXISTS|NEW] [owner-fence | immutable | held | never-by-hand | governance | merge-gate | pinned | —]
 existing_changes:
   - #<n> <draft|ready> <branch> — overlaps: <paths or "same behaviour"> — merge-tree: <clean|conflict|NOT_MEASURED>
   - merged: <sha> <subject> (<date>) — <duplicate | context>
 ownership:
   - #<n>: author <seat>, effective claim <who, when | released | none>, lock/hold <name | none>, live session <id | none | NOT_MEASURED>
 checks: state PASS|BLOCKED · files PASS|BLOCKED · changes PASS|BLOCKED · ownership PASS|BLOCKED · sessions PASS|NOT_MEASURED
-verdict: BLOCKED | COLLISION | NEEDS_OWNER | CLEAR
+verdict: BLOCKED | REJECT | COLLISION | NEEDS_OWNER | CLEAR
 next: <the single smallest next step, for the user to approve>
 ```
 

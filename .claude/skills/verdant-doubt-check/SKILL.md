@@ -86,9 +86,11 @@ declines, say "single-model doubt only" in the record.
 
 Re-read the artifact against each finding, then classify it. The first class that fits wins:
 
-1. **Hard fence:** the finding shows a break of an `AGENTS.md` Hard Safety Rule, migration
+1. **Hard fence:** the finding alleges a break of an `AGENTS.md` Hard Safety Rule, migration
    immutability, RLS or auth, the approval-required Action Queue, sensor-truth labelling or AI
-   Doctor caution. Always fix it. It can never be a trade-off or noise.
+   Doctor caution. Check it against the artifact text. If the break is real, fix it and re-run;
+   it can never be a trade-off. If it is not, record it as "fence checked, not broken" with the
+   line that proves it. If you cannot tell, escalate to the user before the decision stands.
 2. **Valid, fix it:** change the artifact, then re-run.
 3. **Contract gap:** the artifact meets the true rule and the reviewer was misled by a missing or
    vague contract. Quote the source rule you added; never loosen a rule to make a finding go
@@ -117,7 +119,7 @@ Put this in the PR body or the report, so the reviewer seat sees what was alread
 ```text
 DOUBT CHECK — <claim, one line>
 cycles: <n>   second opinion: <seat / declined / non-interactive>
-findings: <hard fence fixed: n> <fixed: n> <contract gap: n> <trade-off: n> <noise: n>
+findings: <hard fence fixed: n | checked, not broken: n | escalated: n> <fixed: n> <contract gap: n> <trade-off: n> <noise: n>
 trade-offs kept: <one line each, or none>
 residual risk: <what still is not proven, or none>
 ```

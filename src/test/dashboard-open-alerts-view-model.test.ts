@@ -8,39 +8,32 @@ describe("buildDashboardOpenAlertsView", () => {
   it("reports a count only after the alerts read succeeds", () => {
     expect(buildDashboardOpenAlertsView({ status: "ok", openCount: 2 })).toEqual({
       kind: "known",
-      count: 2,
       kpiValue: 2,
       accent: "destructive",
-      showEmpty: false,
     });
   });
 
   it("never styles a confirmed zero as success", () => {
     const view = buildDashboardOpenAlertsView({ status: "ok", openCount: 0 });
-    expect(view).toMatchObject({ kind: "known", count: 0, kpiValue: 0, showEmpty: true });
+    expect(view).toEqual({ kind: "known", kpiValue: 0, accent: "primary" });
     expect(view.accent).not.toBe("success");
   });
 
-  it.each(["idle", "loading", undefined, null, "something-else"])(
-    "treats a %s read as pending, not zero",
-    (status) => {
-      const view = buildDashboardOpenAlertsView({ status, openCount: 0 });
-      expect(view).toEqual({
-        kind: "pending",
-        kpiValue: DASHBOARD_OPEN_ALERTS_COPY.checking,
-        accent: "primary",
-        showEmpty: false,
-        detail: DASHBOARD_OPEN_ALERTS_COPY.checkingDetail,
-      });
-    },
-  );
+  it.each(["idle", "loading"] as const)("treats a %s read as pending, not zero", (status) => {
+    const view = buildDashboardOpenAlertsView({ status, openCount: 0 });
+    expect(view).toEqual({
+      kind: "pending",
+      kpiValue: DASHBOARD_OPEN_ALERTS_COPY.checking,
+      accent: "primary",
+      detail: DASHBOARD_OPEN_ALERTS_COPY.checkingDetail,
+    });
+  });
 
   it("treats a failed read as unavailable, not zero", () => {
     expect(buildDashboardOpenAlertsView({ status: "unavailable", openCount: 0 })).toEqual({
       kind: "unavailable",
       kpiValue: DASHBOARD_OPEN_ALERTS_COPY.unavailable,
       accent: "primary",
-      showEmpty: false,
       detail: DASHBOARD_OPEN_ALERTS_COPY.unavailableDetail,
     });
   });
@@ -51,12 +44,11 @@ describe("buildDashboardOpenAlertsView", () => {
     }
   });
 
-  it.each(["ok", "unavailable"])(
+  it.each(["ok", "unavailable"] as const)(
     "treats a previous grow scope's %s read as pending, not this grow's result",
     (status) => {
       const view = buildDashboardOpenAlertsView({ status, openCount: 0, readScopeCurrent: false });
       expect(view.kind).toBe("pending");
-      expect(view.showEmpty).toBe(false);
       expect(view.kpiValue).toBe(DASHBOARD_OPEN_ALERTS_COPY.checking);
     },
   );

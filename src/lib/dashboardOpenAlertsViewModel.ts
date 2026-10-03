@@ -7,6 +7,7 @@
  *
  * Pure. No I/O. No React.
  */
+import type { AlertsListStatus } from "@/hooks/useAlertsList";
 
 export const DASHBOARD_OPEN_ALERTS_COPY = {
   // Not "Loading…": that exact text is the app shell's global loading screen.
@@ -21,21 +22,18 @@ export type DashboardOpenAlertsAccent = "destructive" | "primary";
 export type DashboardOpenAlertsView =
   | {
       kind: "known";
-      count: number;
       kpiValue: number;
       accent: DashboardOpenAlertsAccent;
-      showEmpty: boolean;
     }
   | {
       kind: "pending" | "unavailable";
       kpiValue: string;
       accent: "primary";
-      showEmpty: false;
       detail: string;
     };
 
 export function buildDashboardOpenAlertsView(input: {
-  status: string | null | undefined;
+  status: AlertsListStatus;
   openCount: number;
   /**
    * False while the alerts read still belongs to a previous grow scope. The
@@ -45,14 +43,13 @@ export function buildDashboardOpenAlertsView(input: {
    */
   readScopeCurrent?: boolean;
 }): DashboardOpenAlertsView {
-  const validCount = Number.isFinite(input.openCount) && input.openCount >= 0;
   const stale = input.readScopeCurrent === false;
+  const validCount = Number.isFinite(input.openCount) && input.openCount >= 0;
   if (!stale && (input.status === "unavailable" || (input.status === "ok" && !validCount))) {
     return {
       kind: "unavailable",
       kpiValue: DASHBOARD_OPEN_ALERTS_COPY.unavailable,
       accent: "primary",
-      showEmpty: false,
       detail: DASHBOARD_OPEN_ALERTS_COPY.unavailableDetail,
     };
   }
@@ -61,16 +58,12 @@ export function buildDashboardOpenAlertsView(input: {
       kind: "pending",
       kpiValue: DASHBOARD_OPEN_ALERTS_COPY.checking,
       accent: "primary",
-      showEmpty: false,
       detail: DASHBOARD_OPEN_ALERTS_COPY.checkingDetail,
     };
   }
-  const count = input.openCount;
   return {
     kind: "known",
-    count,
-    kpiValue: count,
-    accent: count > 0 ? "destructive" : "primary",
-    showEmpty: count === 0,
+    kpiValue: input.openCount,
+    accent: input.openCount > 0 ? "destructive" : "primary",
   };
 }

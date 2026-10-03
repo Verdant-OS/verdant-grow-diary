@@ -11,7 +11,7 @@ import type { ReactNode } from "react";
 import { render, screen, act, within } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import MobileNav, { primary, more } from "@/components/MobileNav";
+import MobileNav, { primary, more, moreGroups } from "@/components/MobileNav";
 import { isNavigationItemActive } from "@/lib/navigationActiveRules";
 import { resolveMobilePrimaryHref } from "@/lib/growerNavigationRules";
 
@@ -127,14 +127,24 @@ describe("resolveMobilePrimaryHref (pure)", () => {
     expect(resolveMobilePrimaryHref("/daily-check", "  a b  ")).toBe("/daily-check?growId=a%20b");
   });
 
-  it("is deterministic", () => {
-    const a = resolveMobilePrimaryHref("/daily-check", "g-9");
-    const b = resolveMobilePrimaryHref("/daily-check", "g-9");
-    expect(a).toBe(b);
+  it("keeps query delimiters inside the grow value", () => {
+    const href = resolveMobilePrimaryHref("/daily-check", "g&tab=x#frag");
+    const url = new URL(href, "https://verdant.test");
+    expect(url.pathname).toBe("/daily-check");
+    expect([...url.searchParams.keys()]).toEqual(["growId"]);
+    expect(url.searchParams.get("growId")).toBe("g&tab=x#frag");
+    expect(url.hash).toBe("");
   });
 });
 
 describe("destinations that left the first row stay under More", () => {
+  it("gives My Grows, Tents and Plants distinct icons", () => {
+    const cultivation = moreGroups.find((group) => group.heading === "Cultivation");
+    const icons = cultivation?.items.map((item) => item.icon) ?? [];
+    expect(cultivation?.items.map((item) => item.label)).toEqual(["My Grows", "Tents", "Plants"]);
+    expect(new Set(icons).size).toBe(icons.length);
+  });
+
   it("lists Tents, Plants and Alerts in More with their existing routes", () => {
     const routes = more.map((m) => [m.label, m.to]);
     expect(routes).toContainEqual(["Tents", "/tents"]);

@@ -7,6 +7,7 @@ import {
   Bell,
   MoreHorizontal,
   Sprout,
+  Leaf,
   Activity,
   Stethoscope,
   Settings,
@@ -95,7 +96,7 @@ export const moreGroups: MoreGroup[] = [
     items: [
       { to: "/grows", label: "My Grows", icon: Sprout },
       { to: "/tents", label: "Tents", icon: Box },
-      { to: "/plants", label: "Plants", icon: Sprout },
+      { to: "/plants", label: "Plants", icon: Leaf },
     ],
   },
   {

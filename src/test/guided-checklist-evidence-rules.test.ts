@@ -4,6 +4,8 @@ import {
   selectGuidedChecklistEvidence,
 } from "@/lib/guidedChecklistEvidenceRules";
 import { isGuidedChecklistReadingFresh } from "@/lib/guidedActionChecklistRules";
+import type { SensorReadingMetric } from "@/lib/sensorReadingRangeValidation";
+import type { CanonicalMetric } from "@/lib/sensorWebhookIngestRules";
 const now = Date.parse("2026-09-23T12:00:00Z");
 const at = (age: number) => new Date(now - age).toISOString();
 const manual = {
@@ -24,6 +26,15 @@ const row = {
 const input = { now, growId: "g1", tentIds: ["t1"], readings: [], diaryEntries: [manual] };
 
 describe("guided evidence scope and provenance", () => {
+  it("rejects recent live humidity 999 despite quality ok", () => {
+    const result = selectGuidedChecklistEvidence({
+      ...input,
+      diaryEntries: [],
+      readings: [{ ...row, metric: "humidity_pct", value: 999 }],
+    }).t1;
+    expect(result).toBeNull();
+    expect(isGuidedChecklistReadingFresh(result, now)).toBe(false);
+  });
   it.each([{ ph: 6.2 }, { ec: 1.2 }, { ph: 6.2, ec: 1.2 }])(
     "counts usable root-zone-only manual evidence without projecting air metrics: %j",
     (metrics) => {
@@ -190,6 +201,16 @@ describe("guided evidence scope and provenance", () => {
     { value: null },
     { value: "" },
     { value: Infinity },
+    { metric: "humidity_pct", value: 999 },
+    { metric: "humidity_pct", value: 0 },
+    { metric: "humidity_pct", value: 100 },
+    { metric: "soil_moisture_pct", value: 0 },
+    { metric: "soil_moisture_pct", value: 100 },
+    { metric: "ec", value: 8.001 },
+    { metric: "soil_ec_mscm", value: 8.001 },
+    { metric: "reservoir_ec_mscm", value: 5.001 },
+    { metric: "unknown_metric" },
+    { metric: "constructor" },
     { tent_id: "other" },
   ])("cannot hide usable manual evidence with a newer unusable row: %j", (change) => {
     expect(
@@ -225,6 +246,232 @@ describe("guided evidence scope and provenance", () => {
   it("never uses another grow without an active grow", () => {
     expect(selectGuidedChecklistEvidence({ ...input, growId: null }).t1).toBeNull();
   });
+});
+
+describe("telemetry metric validity", () => {
+  const telemetry = (change: Record<string, unknown>) =>
+    selectGuidedChecklistEvidence({
+      ...input,
+      diaryEntries: [],
+      readings: [{ ...row, ...change }],
+    }).t1;
+
+  it.each(["soil_ec_mscm", "reservoir_ec_mscm"])(
+    "persisted EC regression: accepts a valid %s reading",
+    (metric) => {
+      expect(telemetry({ metric, value: 1.2 })).toEqual({
+        capturedAt: row.captured_at,
+        source: "live",
+        quality: "ok",
+      });
+    },
+  );
+
+  // Exhaustive over the persisted/manual and webhook contracts, plus existing compatibility names.
+  const supportedReadings = {
+    temperature_c: 25,
+    humidity_pct: 55,
+    vpd_kpa: 1.2,
+    co2_ppm: 450,
+    soil_moisture_pct: 45,
+    soil_temp_c: 20,
+    soil_ec_mscm: 1.2,
+    reservoir_ph: 6.2,
+    reservoir_ec_mscm: 1.2,
+    ppfd: 500,
+    ph: 6.2,
+    ec: 1.2,
+    soil_ec: 1.2,
+    soil_ec_ms_cm: 1.2,
+  } satisfies Record<SensorReadingMetric | CanonicalMetric | "soil_ec" | "soil_ec_ms_cm", number>;
+  it.each(Object.entries(supportedReadings))(
+    "admits the supported persisted/webhook/compatibility metric %s",
+    (metric, value) => {
+      expect(telemetry({ metric, value })).toEqual({
+        capturedAt: row.captured_at,
+        source: "live",
+        quality: "ok",
+      });
+    },
+  );
+  it.each(
+    ["soil_ec_mscm", "reservoir_ec_mscm"].flatMap((metric) =>
+      [null, undefined, "", " ", NaN, Infinity, "Infinity", true, {}, 100, 1200, "1200"].map(
+        (value) => ({ metric, value }),
+      ),
+    ),
+  )("rejects invalid persisted EC without conversion: $metric=$value", (change) => {
+    expect(telemetry(change)).toBeNull();
+  });
+
+  it.each(
+    ["humidity_pct", "soil_moisture_pct"].flatMap((metric) =>
+      [0, 100, "0", "100"].map((value) => ({ metric, value })),
+    ),
+  )("review regression: rejects stuck $metric=$value as evidence", (change) => {
+    expect(telemetry(change)).toBeNull();
+  });
+  it.each([0, 1.2, 8, "1.2"])("review regression: accepts canonical ec=%s", (value) => {
+    const result = telemetry({ metric: "ec", value });
+    expect(result).toEqual({ capturedAt: row.captured_at, source: "live", quality: "ok" });
+    expect(isGuidedChecklistReadingFresh(result, now)).toBe(true);
+  });
+  it.each([-0.001, 8.001, 1200, "1200"])("review regression: rejects invalid ec=%s", (value) => {
+    expect(telemetry({ metric: "ec", value })).toBeNull();
+  });
+
+  const bounds = [
+    ["temperature_c", ((40 - 32) * 5) / 9, ((110 - 32) * 5) / 9],
+    ["vpd_kpa", 0.2, 3],
+    ["co2_ppm", 0, 10_000],
+    ["ec", 0, 8],
+    ["soil_ec_mscm", 0, 8],
+    ["reservoir_ec_mscm", 0, 5],
+    ["soil_ec_ms_cm", 0, 8],
+    ["soil_ec", 0, 8],
+    ["soil_temp_c", ((35 - 32) * 5) / 9, ((100 - 32) * 5) / 9],
+    ["reservoir_ph", 3, 9],
+    ["ph", 3, 9],
+    ["ppfd", 0, 2500],
+  ] as const;
+  it.each(
+    bounds.flatMap(([metric, min, max]) => [
+      { metric, value: min, valid: true },
+      { metric, value: max, valid: true },
+      { metric, value: min - 0.001, valid: false },
+      { metric, value: max + 0.001, valid: false },
+    ]),
+  )("applies canonical bounds to $metric=$value (valid=$valid)", ({ metric, value, valid }) => {
+    const result = telemetry({ metric, value });
+    expect(result).toEqual(
+      valid ? { capturedAt: row.captured_at, source: "live", quality: "ok" } : null,
+    );
+    expect(isGuidedChecklistReadingFresh(result, now)).toBe(valid);
+  });
+
+  it.each(
+    ["humidity_pct", "soil_moisture_pct"].flatMap((metric) =>
+      [
+        { value: -0.001, valid: false },
+        { value: 0, valid: false },
+        { value: 0.001, valid: true },
+        { value: 99.999, valid: true },
+        { value: 100, valid: false },
+        { value: 100.001, valid: false },
+      ].map((test) => ({ metric, ...test })),
+    ),
+  )("excludes stuck percentage bounds for $metric=$value", ({ metric, value, valid }) => {
+    expect(telemetry({ metric, value })).toEqual(
+      valid ? { capturedAt: row.captured_at, source: "live", quality: "ok" } : null,
+    );
+  });
+
+  it.each([
+    "unknown_metric",
+    "temperature",
+    "temperature_f",
+    "temp_f",
+    "humidity_percent",
+    "air_temp_c",
+    "ec_ms_cm",
+    "substrate_temperature",
+    "humidity",
+    "constructor",
+    "__proto__",
+    "toString",
+    " humidity_pct ",
+    "HUMIDITY_PCT",
+    "",
+    " ",
+    null,
+    undefined,
+    1,
+    {},
+  ])("rejects an unrecognized metric even with a plausible value: %j", (metric) => {
+    expect(telemetry({ metric, value: 25 })).toBeNull();
+  });
+
+  it.each([
+    null,
+    undefined,
+    "",
+    " ",
+    "not-a-number",
+    "Infinity",
+    "NaN",
+    NaN,
+    Infinity,
+    -Infinity,
+    true,
+    false,
+    [],
+    {},
+  ])("rejects missing or nonnumeric humidity: %j", (value) => {
+    expect(telemetry({ metric: "humidity_pct", value })).toBeNull();
+  });
+  it.each(["999", "-0.001", "100.001", "0", "100"])(
+    "validates parsed numeric strings: %s",
+    (value) => {
+      expect(telemetry({ metric: "humidity_pct", value })).toBeNull();
+    },
+  );
+  it.each(["0.001", " 55 ", "99.999"])("preserves valid numeric-string evidence: %s", (value) => {
+    expect(telemetry({ metric: "humidity_pct", value })).toEqual({
+      capturedAt: row.captured_at,
+      source: "live",
+      quality: "ok",
+    });
+  });
+
+  it.each([
+    ["live", "live", true],
+    ["pi_bridge", "live", true],
+    ["manual", "manual", true],
+    ["csv", "csv", false],
+  ] as const)("preserves the %s source and freshness policy", (source, expectedSource, fresh) => {
+    const result = telemetry({ source, metric: "humidity_pct", value: 55 });
+    expect(result).toEqual({ capturedAt: row.captured_at, source: expectedSource, quality: "ok" });
+    expect(isGuidedChecklistReadingFresh(result, now)).toBe(fresh);
+    expect(telemetry({ source, metric: "humidity_pct", value: 999 })).toBeNull();
+  });
+
+  it.each([
+    { metric: "humidity_pct", value: 999 },
+    { metric: "humidity_pct", value: 0 },
+    { metric: "humidity_pct", value: 100 },
+    { metric: "soil_moisture_pct", value: 0 },
+    { metric: "soil_moisture_pct", value: 100 },
+    { metric: "ec", value: 8.001 },
+    { metric: "soil_ec_mscm", value: 8.001 },
+    { metric: "reservoir_ec_mscm", value: 5.001 },
+    { metric: "unknown_metric", value: 25 },
+  ])("keeps the valid telemetry survivor regardless of row order: %j", (invalidMetric) => {
+    const valid = Object.freeze({ ...row, captured_at: at(120_000) });
+    const invalid = Object.freeze({ ...row, ...invalidMetric });
+    const args = { ...input, diaryEntries: [], readings: Object.freeze([valid, invalid]) };
+    const result = selectGuidedChecklistEvidence(args);
+    expect(result.t1).toEqual({ capturedAt: valid.captured_at, source: "live", quality: "ok" });
+    expect(isGuidedChecklistReadingFresh(result.t1, now)).toBe(true);
+    expect(selectGuidedChecklistEvidence(args)).toEqual(result);
+    expect(selectGuidedChecklistEvidence({ ...args, readings: [invalid, valid] })).toEqual(result);
+  });
+  it.each(["ec", "soil_ec_mscm", "reservoir_ec_mscm"])(
+    "preserves valid %s as the survivor of newer stuck percentages",
+    (metric) => {
+      const ec = { ...row, metric, value: 1.2, captured_at: at(120_000) };
+      const readings = [
+        { ...row, metric: "humidity_pct", value: 100 },
+        { ...row, metric: "soil_moisture_pct", value: 0 },
+        ec,
+      ];
+      const args = { ...input, diaryEntries: [], readings };
+      const result = selectGuidedChecklistEvidence(args);
+      expect(result.t1).toEqual({ capturedAt: ec.captured_at, source: "live", quality: "ok" });
+      expect(selectGuidedChecklistEvidence({ ...args, readings: [...readings].reverse() })).toEqual(
+        result,
+      );
+    },
+  );
 });
 
 describe("source-specific freshness", () => {

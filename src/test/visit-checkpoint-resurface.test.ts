@@ -163,9 +163,12 @@ describe("wiring + GDP gate (static)", () => {
     expect(PAGE).toMatch(/plantId=\{plant\.id\}/);
   });
 
-  it("banner clears via diary_entries note update and opens Quick Log prefill", () => {
+  it("banner routes linked diary changes through the revision RPC and ordinary rows through update", () => {
+    expect(BANNER).toMatch(/isLinkedQuickLogDiaryDetails/);
+    expect(BANNER).toMatch(/correctQuickLogEntry/);
     expect(BANNER).toMatch(/diary_entries/);
     expect(BANNER).toMatch(/\.update\(\{\s*note:/);
+    expect(BANNER).toMatch(/\.select\("id"\)/);
     expect(BANNER).toMatch(/PLANT_QUICKLOG_PREFILL_EVENT|verdant:open-quicklog/);
     expect(BANNER).not.toMatch(/action_queue/);
   });

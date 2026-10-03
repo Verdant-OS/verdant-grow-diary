@@ -13,6 +13,65 @@ import { getTypedEventWriteReadiness } from "@/lib/quickLogTypedEventPayloadRule
 
 const REPO_ROOT = resolve(__dirname, "..", "..");
 
+describe("typed Feed permanent refusal boundary", () => {
+  const reasons = [
+    "idempotency_key_unverified",
+    "idempotency_receipt_missing",
+    "idempotency_key_retracted",
+    "idempotency_key_conflict",
+  ];
+  it.each(reasons)("preserves the explicit %s server refusal", async (reason) => {
+    const { client, rpc } = makeClient({ data: { ok: false, reason } });
+    expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({ ok: false, reason });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0][1].p_idempotency_key).toBe("feed-save-123");
+  });
+  it.each([null, undefined, "unknown", "plant_tent_grow_mismatch", 42])(
+    "keeps unknown or repairable rejection %s generic",
+    async (reason) => {
+      const { client } = makeClient({ data: { ok: false, reason } });
+      expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
+        ok: false,
+        reason: "rpc:rejected",
+      });
+    },
+  );
+  it.each([undefined, null, "false", 0])(
+    "does not infer permanent refusal from malformed ok=%s",
+    async (ok) => {
+      const { client } = makeClient({ data: { ok, reason: "idempotency_key_retracted" } });
+      expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
+        ok: false,
+        reason: "rpc:rejected",
+      });
+    },
+  );
+  it("does not override an accepted receipt with a stray refusal reason", async () => {
+    const { client } = makeClient({
+      data: {
+        ok: true,
+        grow_event_id: "aaaaaaaa-3333-4333-8333-333333333333",
+        reason: "idempotency_key_retracted",
+      },
+    });
+    expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
+      ok: true,
+      eventId: "aaaaaaaa-3333-4333-8333-333333333333",
+      reused: false,
+    });
+  });
+  it("keeps an RPC transport error uncertain even if its data contains a refusal", async () => {
+    const { client } = makeClient({
+      data: { ok: false, reason: "idempotency_key_retracted" },
+      error: new Error("network"),
+    });
+    expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
+      ok: false,
+      reason: "rpc:error",
+    });
+  });
+});
+
 function baseInput(overrides: Partial<FeedingTypedEventInput> = {}): FeedingTypedEventInput {
   return {
     idempotency_key: "feed-save-123",
@@ -37,7 +96,7 @@ function baseInput(overrides: Partial<FeedingTypedEventInput> = {}): FeedingType
 
 function makeClient(
   result: { data?: unknown; error?: unknown } = {
-    data: { ok: true, grow_event_id: "evt-uuid-123", reused: false },
+    data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: false },
   },
 ) {
   const rpc = vi.fn().mockResolvedValue({
@@ -191,11 +250,11 @@ describe("writeFeedingTypedEvent — validation", () => {
 describe("writeFeedingTypedEvent — RPC behavior", () => {
   it("returns the event id and replay state from a successful envelope", async () => {
     const { client, rpc } = makeClient({
-      data: { ok: true, grow_event_id: "evt-uuid-123", reused: true },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
     });
     expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
       ok: true,
-      eventId: "evt-uuid-123",
+      eventId: "77777777-7777-4777-8777-000000000001",
       reused: true,
     });
     expect(rpc).toHaveBeenCalledTimes(1);
@@ -251,4 +310,17 @@ describe("writeFeedingTypedEvent — static safety guards", () => {
     expect(src).not.toMatch(/\.upsert\s*\(/);
     expect(src).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|createClient\s*\(/);
   });
+});
+
+describe("receipt identity", () => {
+  it.each(["not-an-event", "", " ", null, undefined, 42, {}])(
+    "rejects malformed event ID %j",
+    async (id) => {
+      const { client } = makeClient({ data: { ok: true, grow_event_id: id } });
+      expect(await writeFeedingTypedEvent(baseInput(), { client })).toEqual({
+        ok: false,
+        reason: "rpc:no_event_id",
+      });
+    },
+  );
 });

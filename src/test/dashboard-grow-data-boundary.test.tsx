@@ -670,4 +670,32 @@ describe("Dashboard private-read honesty boundary", () => {
       );
     }
   });
+
+  // One-Tent Home demotion: the equal-weight KPI wall is not first-fold
+  // content. It renders after the Environment loop and Needs attention.
+  it("renders the KPI wall after the Environment and Needs attention sections", () => {
+    H.growStatus = "success";
+    renderDashboard();
+
+    const firstKpi = screen.getAllByTestId("dashboard-kpi-card")[0];
+    for (const id of [
+      "dashboard-section-heading-environment",
+      "dashboard-section-heading-needs-attention",
+    ]) {
+      const heading = screen.getByTestId(id);
+      expect(
+        heading.compareDocumentPosition(firstKpi) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+  });
+
+  it("renders the zero-tent empty state before the KPI wall", () => {
+    H.growStatus = "success";
+    H.tentQueryOverride = { data: [], status: "success", isPending: false, fetchStatus: "idle" };
+    renderDashboard();
+
+    const empty = screen.getByTestId("dashboard-zero-tent-empty-state");
+    const firstKpi = screen.getAllByTestId("dashboard-kpi-card")[0];
+    expect(empty.compareDocumentPosition(firstKpi) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

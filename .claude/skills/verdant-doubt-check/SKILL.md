@@ -88,9 +88,10 @@ Re-read the artifact against each finding, then classify it. The first class tha
 
 1. **Hard fence:** the finding alleges a break of an `AGENTS.md` Hard Safety Rule, migration
    immutability, RLS or auth, the approval-required Action Queue, sensor-truth labelling or AI
-   Doctor caution. Check it against the artifact text. If the break is real, fix it and re-run;
-   it can never be a trade-off. If it is not, record it as "fence checked, not broken" with the
-   line that proves it. If you cannot tell, escalate to the user before the decision stands.
+   Doctor caution. If the break is real, fix it and re-run; it can never be a trade-off. If you
+   believe it is not real, you cannot settle that alone: record it as "fence disputed" with your
+   evidence and put it in front of the user and the independent reviewer seat. A disputed fence
+   finding is never "already handled" for the stop rule below.
 2. **Valid, fix it:** change the artifact, then re-run.
 3. **Contract gap:** the artifact meets the true rule and the reviewer was misled by a missing or
    vague contract. Quote the source rule you added; never loosen a rule to make a finding go
@@ -104,7 +105,7 @@ Neither rubber-stamp the reviewer nor dismiss it. Disagreement is information.
 
 ### Step 5 — Stop
 
-Stop when a cycle returns only trivial or already-handled findings, after three cycles, or when
+Stop when a cycle returns only trivial or already-handled findings (a disputed fence finding never counts as handled), after three cycles, or when
 the user says to proceed. Three cycles with substantive findings means the artifact is not ready:
 report that to the user instead of running a fourth. If the artifact is too large for three
 cycles, go back to Step 2 and split it.
@@ -119,7 +120,7 @@ Put this in the PR body or the report, so the reviewer seat sees what was alread
 ```text
 DOUBT CHECK — <claim, one line>
 cycles: <n>   second opinion: <seat / declined / non-interactive>
-findings: <hard fence fixed: n | checked, not broken: n | escalated: n> <fixed: n> <contract gap: n> <trade-off: n> <noise: n>
+findings: <hard fence fixed: n | disputed, sent to user and reviewer seat: n> <fixed: n> <contract gap: n> <trade-off: n> <noise: n>
 trade-offs kept: <one line each, or none>
 residual risk: <what still is not proven, or none>
 ```

@@ -159,38 +159,54 @@ Force Promote to bypass an unresolved publish or security gate. See
 ## Rollback — Matthew only
 
 If the release must be reversed, Matthew selects the packet's known-good production
-artifact, then works through three steps. He records a UTC time for every read.
+artifact (packet item 5), then works through three steps. He records a UTC time for
+every read.
 
 1. **Resolve any active rollout first.** If a rollout is active, including the one
    being reversed, he aborts it (an owner control, see Rolling Releases above) and
    waits until the rolling-release record shows no active rollout. A rollout that is
    still advancing changes its own record from minute to minute, so no rollback is
-   decided against it.
+   decided against it. The abort is itself a publish action: record it as the
+   publish-action list under Verify below requires.
 2. **Record the rollback decision.** With no rollout active, he records the state he
    is deciding to reverse. This record, not the pre-promote packet, is the baseline
-   for step 3, because a promote is expected to change the rolling-release record and
-   the serving deployments.
+   for step 3, because a promote is expected to change the rolling-release record,
+   the aliases and the serving deployments.
    - the rollback target deployment's project, `target: production`, `READY` state,
-     `source: git` and `meta.githubCommitSha`, which must match the packet's
-     known-good SHA;
+     `source: git` and `meta.githubCommitSha`;
    - the rolling-release record and configuration (`get_rolling_release` and
      `get_rolling_release_config`): state, substate, current and canary deployments,
      canary percentage, stage, queued deployment, `startedAt`, `updatedAt`,
      configured stages and advancement type;
-   - the production-host inventory from packet item 1, re-enumerated: the M2 apex
-     holder, the production domains bound to the project, the aliases
-     (`list_promote_aliases`) and each custom hostname's DNS, which must still equal
-     the packet's inventory;
+   - the production-host inventory, re-enumerated: the M2 apex holder, the production
+     domains bound to the project, the aliases (`list_promote_aliases`) and each
+     custom hostname's DNS;
    - each hostname's current serving deployment, for every hostname in that
      re-enumerated inventory.
+
+   Then one of three outcomes applies:
+   - **Stop.** The rollback target's `meta.githubCommitSha` differs from the packet's
+     known-good SHA, the target is not `READY`, production-target and Git-sourced, or
+     a hostname listed in packet item 1 is missing from the re-enumerated inventory.
+     The packet no longer describes this rollback. He records a blocker naming the
+     mismatch and does not run the command until a corrected packet names a valid
+     known-good artifact.
+   - **Nothing to roll back.** Every hostname in the re-enumerated inventory already
+     serves the rollback target deployment at the known-good SHA, as an abort in
+     step 1 can leave it. He records that no rollback was run and goes to Verify.
+   - **Continue** to step 3 otherwise.
+
 3. **Reread immediately before the command.** He reads every item in step 2 again.
    If any value differs from the step 2 record, he stops and returns to step 1. That
    covers a rollout that started, advanced a stage, completed (a forced complete
    included) or was aborted after step 2, any rolling-release configuration change,
    and any inventory or routing change. Each of these changes what production serves
    ([release topology specification](../specs/release-topology-specification.md),
-   D-RT-13), so a rollback decided against the earlier state is stale. Only when every
-   read matches the step 2 record does he run:
+   D-RT-13), so a rollback decided against the earlier state is stale. If a second
+   reread in the same rollback also differs, he does not start a third attempt: he
+   records a blocker naming what changed between reads, and identifies what is
+   changing production (an automatic advance, a new Git deployment or another actor)
+   before trying again. Only when every read matches the step 2 record does he run:
 
 ```sh
 vercel rollback <deployment-url> --scope verdantgrowdiary

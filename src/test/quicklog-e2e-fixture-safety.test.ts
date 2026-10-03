@@ -16,11 +16,20 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import {
+  QUICKLOG_SMOKE_DAILY_CRON,
+  loadQuickLogSmokeWorkflow,
+} from "./helpers/quicklogSmokeWorkflow";
+import {
   fixturePageRelationshipMatchesExpected,
   validateFixtureEnv,
   pageTextMatchesFixture,
   isLikelyRealPlantUrl,
 } from "../../e2e/lib/fixtureSafety";
+import {
+  QUICKLOG_SMOKE_ACCOUNT_EMAIL,
+  QUICKLOG_SMOKE_APP_ORIGIN,
+  validateProductionQuickLogEnv,
+} from "../../e2e/lib/productionQuickLogFixtureRules";
 
 const ROOT = path.resolve(__dirname, "../..");
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8");
@@ -241,7 +250,9 @@ describe("E2E fixture safety: source-level guardrails", () => {
     );
     expect(goto).toBeGreaterThan(0);
     expect(validate).toBeGreaterThan(goto);
-    expect(smoke.slice(goto, validate)).toMatch(/await page\.goto\(PLANT_URL!\);\s*$/);
+    expect(smoke.slice(goto, validate)).toMatch(
+      /await page\.goto\(PLANT_URL!\);\s*const fixture =\s*$/,
+    );
     expect(validate).toBeLessThan(reconsent);
     expect(validate).toBeLessThan(openQuickLog);
     expect(validate).toBeLessThan(firstSave);
@@ -261,7 +272,9 @@ describe("E2E fixture safety: source-level guardrails", () => {
     );
 
     const fixtureGoto = fixtureSpec.indexOf("await page.goto(env.E2E_GROW_1_PLANT_URL!)");
-    const fixtureValidate = fixtureSpec.indexOf("await validateQuickLogFixturePage(page, env)");
+    const fixtureValidate = fixtureSpec.indexOf(
+      "await validateQuickLogFixturePage(page, env, productionProof)",
+    );
     expect(fixtureSpec).toMatch(
       /import\s*\{[^}]*validateQuickLogFixturePage[^}]*\}\s*from\s*["']\.\/lib\/fixtureSafety["']/s,
     );
@@ -375,9 +388,10 @@ describe("Workflow: fixture verification gates smoke", () => {
     expect(smoke).not.toMatch(/TARGET_NAME.*(?:RegExp| · )/);
   });
 
-  it("no schedule, no cron, no pull_request_target, no service_role, no checked-in storageState", () => {
-    expect(wf).not.toMatch(/^\s*schedule\s*:/m);
-    expect(wf).not.toMatch(/-\s*cron\s*:/);
+  it("only the one daily schedule, no pull_request_target, no service_role, no checked-in storageState", () => {
+    const workflow = loadQuickLogSmokeWorkflow(ROOT);
+    // Exactly one daily schedule (#1852); no other cron entry may be added.
+    expect(workflow.on.schedule).toEqual([{ cron: QUICKLOG_SMOKE_DAILY_CRON }]);
     expect(wf).not.toMatch(/pull_request_target/);
     expect(wf).not.toMatch(/service_role/i);
     expect(fs.existsSync(path.join(ROOT, "e2e/.auth/user.json"))).toBe(false);
@@ -489,8 +503,8 @@ describe("Package + docs wiring", () => {
     }
     // No automated bootstrap promise
     expect(readme.toLowerCase()).toContain("deferred");
-    // Reaffirm no scheduled smoke
-    expect(readme).toMatch(/no scheduled or nightly/i);
+    // Reaffirm the single daily schedule
+    expect(readme).toMatch(/exactly one scheduled daily run/i);
   });
 
   it("README says direct smoke invocation performs the same internal fixture validation", () => {
@@ -507,7 +521,7 @@ describe("Package + docs wiring", () => {
       .map((match) => match[1])
       .filter((block) => /(?:^|\r?\n)bun run e2e:quicklog-smoke\r?\n?$/.test(block));
 
-    expect(directSmokeBlocks).toHaveLength(4);
+    expect(directSmokeBlocks).toHaveLength(2);
     for (const block of directSmokeBlocks) {
       expect(block).toContain("E2E_FIXTURE_MODE");
       expect(block).toContain("E2E_FIXTURE_EXPECTED_TENT_NAME");
@@ -515,39 +529,71 @@ describe("Package + docs wiring", () => {
     }
   });
 
-  it("README direct local smoke snippets name a host the fixture guard accepts and the dev server serves", () => {
-    // QA 2026-09-24 (#1683): two snippets still used the retired published
-    // Lovable host, which answers HTTP 404 "No Lovable project found at this
-    // address". The obvious swap, verdantgrowdiary.com, is refused by
-    // validateFixtureEnv, so each snippet's values go through the real guard.
-    // Two more set E2E_BASE_URL to localhost:5173 and then ran a bare
-    // `bun run dev`, which the Lovable preset binds to [::]:8080 — nothing
-    // answered on 5173.
+  it("README and FIXTURE_SETUP mark bootstrap unavailable for the production lane", () => {
+    // Codex P2 on #1835: the bootstrap keeps the generic guard, which refuses
+    // production, so the workflow's bootstrap step would fail before
+    // verification if an operator enabled it for this lane.
+    expect(read("e2e/lib/fixtureBootstrap.ts")).toContain("validateFixtureEnv(");
+    expect(
+      validateFixtureEnv({
+        E2E_FIXTURE_MODE: "true",
+        E2E_GROW_1_PLANT_URL:
+          "https://verdantgrowdiary.com/plants/11111111-2222-4333-8444-555555555555",
+        E2E_FIXTURE_EXPECTED_TENT_NAME: "E2E Test Tent",
+        E2E_FIXTURE_EXPECTED_PLANT_NAME: "E2E Test Plant",
+      }).ok,
+    ).toBe(false);
+    for (const file of ["e2e/README.md", "e2e/FIXTURE_SETUP.md"]) {
+      const doc = read(file);
+      expect(doc, file).toContain("Unavailable for the production Quick Log smoke lane");
+      expect(doc, file).not.toMatch(/create \(or bootstrap\)|Create or bootstrap/);
+    }
+  });
+
+  it("README direct smoke snippets pass the production-only Quick Log guard", () => {
+    // QA 2026-09-24 (#1683): snippets once used the retired published Lovable
+    // host, which answers HTTP 404, and a dev-server port nothing served.
+    // Owner decision 2026-09-28 (docs/production-only-verification-runbook.md):
+    // the Quick Log smoke runs against https://verdantgrowdiary.com only, as the
+    // approved smoke account. #1792 enforces that in the fixture guard, so each
+    // snippet's values go through the real production policy (Codex P2 on #1835:
+    // the README must not document a host the guard refuses).
     const RETIRED_LOVABLE_HOST = "verdantgrowdiary-com.lovable.app";
+    const PLANT_PLACEHOLDER = "YOUR_TEST_PLANT_UUID";
+    const SAMPLE_PLANT_UUID = "11111111-2222-4333-8444-555555555555";
     const readme = read("e2e/README.md");
     const directSmokeBlocks = [...readme.matchAll(/```(?:bash|powershell)\r?\n([\s\S]*?)```/g)]
       .map((match) => match[1])
       .filter((block) => /(?:^|\r?\n)bun run e2e:quicklog-smoke\r?\n?$/.test(block));
 
-    expect(directSmokeBlocks).toHaveLength(4);
+    expect(directSmokeBlocks).toHaveLength(2);
     for (const block of directSmokeBlocks) {
       const env: Record<string, string> = {};
       for (const m of block.matchAll(/(?:export\s+|\$env:)(E2E_[A-Z0-9_]+)\s*=\s*"([^"]*)"/g)) {
         env[m[1]] = m[2];
       }
-      expect(validateFixtureEnv(env).errors, block).toEqual([]);
+      expect(env.E2E_GROW_1_PLANT_URL, block).toContain(PLANT_PLACEHOLDER);
+      const resolved = {
+        ...env,
+        E2E_GROW_1_PLANT_URL: env.E2E_GROW_1_PLANT_URL.replace(
+          PLANT_PLACEHOLDER,
+          SAMPLE_PLANT_UUID,
+        ),
+      };
+      expect(validateProductionQuickLogEnv(resolved).errors, block).toEqual([]);
       const base = new URL(env.E2E_BASE_URL);
+      expect(base.origin, block).toBe(QUICKLOG_SMOKE_APP_ORIGIN);
       // One origin for both: the signed-in session lives in that origin's
       // sessionStorage.
-      expect(new URL(env.E2E_GROW_1_PLANT_URL).origin, block).toBe(base.origin);
+      expect(new URL(resolved.E2E_GROW_1_PLANT_URL).origin, block).toBe(base.origin);
       expect(base.hostname, block).not.toBe(RETIRED_LOVABLE_HOST);
-      // A snippet that starts the dev server must start it on E2E_BASE_URL.
-      const devCommand = block.match(/^bun run dev\b(.*)$/m);
-      if (devCommand) {
-        const host = devCommand[1].match(/--host\s+(\S+)/)?.[1];
-        const port = devCommand[1].match(/--port\s+(\d+)/)?.[1];
-        expect(`http://${host}:${port}`, block).toBe(base.origin);
-      }
+      expect(env.E2E_TEST_EMAIL, block).toBe(QUICKLOG_SMOKE_ACCOUNT_EMAIL);
+      // A local dev server cannot satisfy the production guard.
+      expect(block, block).not.toMatch(/^bun run dev\b/m);
     }
+    // The README no longer documents a non-production host for this smoke.
+    expect(readme).not.toContain("YOUR_TEST_HOST");
+    expect(readme).not.toMatch(/Do not use `verdantgrowdiary\.com`/);
+    expect(readme).toContain("docs/production-only-verification-runbook.md");
   });
 });

@@ -3,36 +3,60 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-09-28.2**
+**Sentinel-Version: 2026-09-28.3**
+
+Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
+publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
+may supply an independently assigned acceptance. Codex cannot give its own work an
+independent PASS. Claude may add peer observations but is not the acceptance reviewer.
+Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
+Durban Poison or Critical Mass gives an independent **PASS at the exact head SHA**.
+Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
+Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
+
+Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
+E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
+disposable test account owns the fixture grow and its selected tent/plant;
+tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
+use the KEEP account. Stop a write if identity, ownership or tagging cannot
+be verified; report that exact safety gap rather than proposing another host.
+Local/CI fixtures validate code, not production. Repository integration follows
+the explicit merge gate in AGENTS.md; it is not production acceptance. No
+Publish, production APPLY, real charge, role/auth change, device control or
+Action Queue operation is authorized here. Existing owner locks remain.
+See docs/production-only-verification-runbook.md.
 
 Claude Code reads this file at the start of every project session. The two `@` imports
 above load the universal constitution and Claude's assigned role. They are imports, not
 suggestions.
 
 **`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file tool
-before you acknowledge.** It is still the third required context file and nothing about
-its authority has changed. Measured 2026-08-21 at 153,142 bytes / ~27,400 tokens, it was
+before you acknowledge.** Also read `docs/agents/HANDOFF_LOG.md` before acknowledging;
+these are the two required files beyond the imported constitution and role. Nothing about
+their authority has changed. Measured 2026-08-21 at 153,142 bytes / ~27,400 tokens, CURRENT_STATE.md was
 68.9% of the whole memory chain and 19.1% of every context window, re-sent on every turn
 of every session whether or not that session touched operating state. It is also the
 changing shift report, revised several times a day, so most of what it costs on any given
 turn is history that has already been superseded. Loading it on demand costs the same
 tokens once, in the sessions that actually need it, instead of in all of them.
 
-Nothing else carries what it carries. Every claim about branch state, production, applied
-migrations, blockers, approved slices, and agent assignment lives in that file and nowhere
-else — reasoning about any of them from this file, from `AGENTS.md`, or from memory is how
-an agent ends up confidently wrong about production.
+CURRENT_STATE.md carries production, applied-migration and approved-scope evidence;
+HANDOFF_LOG.md records current task claims, branches, checkpoints and blockers. Confirm
+branch state against GitHub before continuing. Reasoning about production from this file,
+from `AGENTS.md`, or from memory is how an agent ends up confidently wrong.
 
 Before planning, writing specifications, using tools, or proposing implementation:
 
 1. Read `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.
-   `files_read:` must name it truthfully, or state that it was not read and why.
+   Also read `docs/agents/HANDOFF_LOG.md` as the fourth required context file before
+   acknowledgment. `files_read:` must name all four truthfully, or
+   state which was not read and why; `open_handoffs_checked:` records the log check.
 2. Report any conflicting instructions rather than silently picking one.
 3. Return the `SENTINEL_ACK` block defined in `AGENTS.md`.
 4. Do not implement production code unless the current task explicitly assigns
-   implementation to Claude (task ownership, not role rank). Claude's **default
-   strength** is a specification precise enough that the slice owner — any peer —
-   does not have to guess.
+   implementation to Claude or Claude holds an eligible coverage claim (not role rank).
+   Claude's **default strength** is a specification precise enough that the slice's
+   current holder — any peer — does not have to guess.
 
 ## Check-in cadence — arm at 55 minutes, never "roughly hourly"
 
@@ -51,8 +75,10 @@ genuinely needs one — take the miss knowingly. What this rule forbids is the a
 
 Claude is the Knowledge Library and Product Specification Architect by default
 strength. Inspecting code is in scope. Claude may also implement, audit, test, or
-independently review when owning or reviewing a slice. Codex, Claude, and Grok are
-peers — none outranks the others. Explicit task ownership controls.
+add peer review observations when assigned or holding an eligible coverage claim.
+Codex, Claude, and Grok are peers — none outranks the others. Explicit assignments
+and named locks control; otherwise `claimed_by` identifies the current task holder.
+Peer observations do not replace the independent acceptance routing above.
 
 If a task would be better served by a different role, say so before starting rather than
 absorbing the work.
@@ -370,7 +396,7 @@ pre-resolution SHA do not count. See `docs/agents/merge-queue.md` and
 ---
 
 The only action permitted before this gate is read-only acquisition of
-`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and the assigned role file so the
+`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
 acknowledgment can be truthful. No application-code inspection, network mutation, or
 recommendation is permitted before the acknowledgment.
 
@@ -385,6 +411,7 @@ agent:
 assigned_role:
 sentinel_version:
 files_read:
+open_handoffs_checked:
 current_task:
 scope:
 out_of_scope:

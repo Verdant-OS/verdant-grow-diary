@@ -34,6 +34,8 @@ export const REMOVE_LOG_DIALOG_CONFIRM = "Remove log";
 export const REMOVE_LOG_SUCCESS_TOAST = "Log removed.";
 export const REMOVE_PHOTO_LOG_SUCCESS_TOAST = "Photo log removed.";
 export const REMOVE_LOG_ERROR_TOAST = "Couldn't remove this log. Please try again.";
+export const LINKED_QUICKLOG_REVISION_COPY =
+  "This Quick Log has linked history. Use Correct or Retract in Quick Log history.";
 
 export const REMOVE_LOG_FOLLOWUP_HINT = "Add a new Quick Log to the correct plant when ready.";
 
@@ -54,6 +56,14 @@ export interface DiaryEntryRemovalCandidate {
    * by callers via this flag.
    */
   kind?: "diary" | "sensor_reading" | "imported_telemetry" | string | null;
+  /** diary_entries.details; linked Quick Log companions require a revision. */
+  details?: unknown;
+}
+
+/** A linked event must be corrected or retracted as one audited unit. */
+export function isLinkedQuickLogDiaryDetails(details: unknown): boolean {
+  if (details === null || typeof details !== "object" || Array.isArray(details)) return false;
+  return Object.hasOwn(details, "linked_grow_event_id") || Object.hasOwn(details, "grow_event_id");
 }
 
 export interface DiaryEntryRemovalViewerContext {
@@ -80,6 +90,7 @@ export function canRemoveDiaryEntry(
   if (viewer.isReadOnlyReportView === true) return false;
   if (!viewer.currentUserId) return false;
   if (entry.kind && entry.kind !== "diary") return false;
+  if (isLinkedQuickLogDiaryDetails(entry.details)) return false;
   if (entry.ownerUserId && entry.ownerUserId !== viewer.currentUserId) {
     return false;
   }

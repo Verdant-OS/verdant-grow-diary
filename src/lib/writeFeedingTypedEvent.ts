@@ -11,8 +11,13 @@
  *   - No direct table writes, service role, alerts, actions, or device control.
  */
 
+import { isUuid } from "@/lib/isUuid";
 import { supabase as defaultSupabase } from "@/integrations/supabase/client";
 import { ROOT_ZONE_PRODUCT_CAP } from "./rootZoneObservationRules";
+import {
+  quickLogSaveRequiresHistoryCheck,
+  type QuickLogHistoryCheckReason,
+} from "./quickLogSaveErrorMessage";
 
 export interface QuickLogFeedingRpcPayload {
   line_id: string;
@@ -76,6 +81,7 @@ export type WriteFeedingTypedEventResult =
   { ok: true; eventId: string; reused: boolean } | { ok: false; reason: WriteFeedingFailureReason };
 
 export type WriteFeedingFailureReason =
+  | QuickLogHistoryCheckReason
   | "idempotency_key:invalid"
   | "grow_id:missing"
   | "line_id:missing"
@@ -253,6 +259,9 @@ export async function writeFeedingTypedEvent(
     response.data && typeof response.data === "object"
       ? (response.data as Record<string, unknown>)
       : null;
+  if (envelope?.ok === false && quickLogSaveRequiresHistoryCheck(envelope.reason)) {
+    return { ok: false, reason: envelope.reason };
+  }
   // The server answered and explicitly rejected the payload during
   // validation, before any write. Unlike a transport failure or an unknown
   // rejection, this outcome is definitive: nothing was saved under this key,
@@ -264,7 +273,7 @@ export async function writeFeedingTypedEvent(
     return { ok: false, reason: "rpc:rejected" };
   }
   const eventId = trimOrNull(envelope.grow_event_id);
-  if (!eventId) return { ok: false, reason: "rpc:no_event_id" };
+  if (!isUuid(eventId)) return { ok: false, reason: "rpc:no_event_id" };
 
   return {
     ok: true,

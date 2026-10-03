@@ -144,6 +144,7 @@ vi.mock("@/hooks/useTimelineHashAnchorHandoff", () => ({
 vi.mock("@/components/OneTentLoopNextStepCard", () => ({ default: () => null }));
 vi.mock("@/components/GrowBreadcrumbs", () => ({ default: () => null }));
 vi.mock("@/components/EntryEditDialog", () => ({ default: () => null }));
+vi.mock("@/components/QuickLogEntryIntegrityControls", () => ({ default: () => null }));
 vi.mock("@/components/ScopedGrowBanner", () => ({ default: () => null }));
 vi.mock("@/components/DiaryEntryBadges", () => ({ default: () => null }));
 vi.mock("@/components/EnvironmentCheckTimelineBadge", () => ({ default: () => null }));

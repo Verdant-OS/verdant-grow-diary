@@ -6,6 +6,12 @@ Owner-only runbook for granting and verifying operator access to
 This document does **not** contain credentials, service keys, raw user IDs,
 or any bypass mechanism.
 
+The demo-preview name is a read-only product route, not a deployment host.
+Verify only at https://verdantgrowdiary.com using the test-fixture account;
+never customer data or the KEEP account. No role provisioning is authorized
+by this task. An unavailable operator fixture is an access gap, not permission
+to bypass the guard. See docs/production-only-verification-runbook.md.
+
 ---
 
 ## What the route requires
@@ -18,7 +24,7 @@ No JWT claim, profile flag, environment variable, or query parameter can
 substitute. The guard (`src/components/RequireOperatorRole.tsx`) defers to
 the server every time.
 
-## Why a preview session can read "Access restricted"
+## Why a production session can read "Access restricted"
 
 The session is authenticated, but the signed-in account has no operator
 row in `public.user_roles`. The guard is working as designed. This is an
@@ -26,7 +32,7 @@ row in `public.user_roles`. The guard is working as designed. This is an
 
 ## Step 1 — Confirm environment alignment
 
-1. In the embedded preview, confirm the signed-in account by its email
+1. At https://verdantgrowdiary.com, confirm the signed-in account by its email
    shown in the app shell account menu.
 2. Confirm this is the same Lovable Cloud project the operator role will
    be granted in. Use the email, not raw IDs.
@@ -40,7 +46,9 @@ row in `public.user_roles`. The guard is working as designed. This is an
 
 ## Step 3 — Grant the operator role (owner-only)
 
-Performed by the project owner from the backend admin surface. One row,
+Separate owner-approved provisioning only; this task authorizes no auth/role
+writes. If explicitly approved for the fixture, the project owner uses the
+protected backend admin surface. One row,
 one account, by email lookup:
 
 - Look up the auth user by email.
@@ -54,9 +62,9 @@ Do **not**:
 - Grant operator to shared/test accounts that are also used for customer
   demos.
 
-## Step 4 — Re-test in the preview
+## Step 4 — Re-test on the live app
 
-1. Sign out of the embedded preview.
+1. Sign out of the live app.
 2. Sign back in as the operator-role account.
 3. Navigate to `/operator/demo-preview`.
 4. Expect the read-only One-Tent Evidence Chain walkthrough (no
@@ -64,9 +72,9 @@ Do **not**:
 
 If the gate still renders, the most likely causes are:
 
-- A different account is signed into the preview than was granted the
+- A different account is signed into the live app than was granted the
   role.
-- The role row was inserted in a different project than the preview is
+- The role row was inserted in a different project than the live app is
   pointed at.
 
 ## Do-not list (hard rules)

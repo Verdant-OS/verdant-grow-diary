@@ -13,6 +13,8 @@
 //              file with a reason, an expiry and the branch it was declared on. The unlock
 //              file is git-ignored and never ships.
 
+import { posix } from "node:path";
+
 export const UNLOCK_FILE = ".claude/scorer-unlock.json";
 
 export const DOC_PATH = "docs/agents/loop-engineering.md";
@@ -53,6 +55,16 @@ export const SCORER_PATH_RULES = Object.freeze([
   }),
   Object.freeze({
     kind: "regex",
+    value: /(^|\/)(test_[^/]+|[^/]+_test)\.py$/,
+    why: "Python testbench suites (tools/ecowitt-testbench, tools/ggs-ble-testbench)",
+  }),
+  Object.freeze({
+    kind: "prefix",
+    value: "supabase/tests/",
+    why: "pgTAP and RLS harness SQL suites",
+  }),
+  Object.freeze({
+    kind: "regex",
     value: /^scripts\/(check|verify|assert)-[^/]+\.(mjs|cjs|js|ts)$/,
     why: "repository gate scripts that CI and pre-commit run as judges",
   }),
@@ -63,11 +75,21 @@ export const SCORER_PATH_RULES = Object.freeze([
   }),
 ]);
 
-/** Normalises a repository-relative path: forward slashes, no leading `./`. */
+/**
+ * Normalises a repository-relative path: forward slashes, `.` and `..` segments
+ * resolved, no leading `./`. Canonical form matters because an unlock is matched by
+ * string equality against the hook's canonical path: `src/test/../../` must not pass
+ * the prefix check and then never match anything.
+ */
 export function normalizeRelPath(relPath) {
   if (typeof relPath !== "string") return "";
-  let out = relPath.replace(/\\/g, "/");
+  let out = relPath.replace(/\\/g, "/").trim();
+  if (!out) return "";
+  const keepTrailingSlash = out.endsWith("/");
+  out = posix.normalize(out);
   while (out.startsWith("./")) out = out.slice(2);
+  if (!out || out === "." || out === "/" || out.startsWith("../") || out === "..") return "";
+  if (keepTrailingSlash && !out.endsWith("/")) out = `${out}/`;
   return out;
 }
 

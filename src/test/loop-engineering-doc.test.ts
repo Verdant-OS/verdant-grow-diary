@@ -72,6 +72,12 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     expect(DOC).toMatch(/deleted or renamed/i);
   });
 
+  it("counts the Python testbench and pgTAP suites as scorers and anchors the hook to the project dir", () => {
+    expect(DOC).toContain("`supabase/tests/`");
+    expect(DOC).toContain("`test_*.py`");
+    expect(DOC).toContain("$CLAUDE_PROJECT_DIR");
+  });
+
   it("forbids the habits process from editing checks", () => {
     expect(DOC).toMatch(/habit[^.]*never[^.]*(check|test|scorer)/i);
   });

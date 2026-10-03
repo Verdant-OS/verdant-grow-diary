@@ -151,8 +151,14 @@ function parseArgs(argv) {
     if (["--hook", "--unlock", "--lock", "--status", "--report"].includes(arg)) {
       out.mode = arg;
     } else if (arg === "--reason") {
-      out.reason = argv[i + 1] ?? "";
-      i += 1;
+      // A flag token is not a reason: `--reason --strict` must be refused, not recorded.
+      const next = argv[i + 1];
+      if (typeof next === "string" && !next.startsWith("--")) {
+        out.reason = next;
+        i += 1;
+      } else {
+        out.reason = "";
+      }
     } else if (arg === "--base") {
       out.base = argv[i + 1] ?? "HEAD";
       i += 1;

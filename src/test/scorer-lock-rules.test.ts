@@ -50,10 +50,11 @@ const EARLIER = "2026-10-02T11:00:00.000Z";
 const BRANCH = "claude/example-task";
 
 describe("scorerLockRules — which paths are scorers", () => {
-  it("treats every file under src/test/ as a scorer, helpers and setup included", () => {
+  it("treats every file under src/test/ as a scorer, helpers, setup and snapshots included", () => {
     expect(isScorerPath("src/test/quick-log-save.test.tsx")).toBe(true);
     expect(isScorerPath("src/test/setup.ts")).toBe(true);
     expect(isScorerPath("src/test/helpers/reactRouterCompat.vitest.tsx")).toBe(true);
+    expect(isScorerPath("src/test/__snapshots__/upgrade-page.test.tsx.snap")).toBe(true);
   });
 
   it("treats co-located *.test.* and *.spec.* files under src/ as scorers", () => {
@@ -78,6 +79,14 @@ describe("scorerLockRules — which paths are scorers", () => {
     );
   });
 
+  it("treats the Python testbench suites and the pgTAP SQL suites as scorers", () => {
+    expect(isScorerPath("tools/ecowitt-testbench/test_delivery.py")).toBe(true);
+    expect(isScorerPath("tools/ggs-ble-testbench/test_ggs_ble_frame.py")).toBe(true);
+    expect(isScorerPath("tools/any/frame_test.py")).toBe(true);
+    expect(isScorerPath("supabase/tests/permissions.sql")).toBe(true);
+    expect(isScorerPath("supabase/tests/billing_subscriptions_rls.sql")).toBe(true);
+  });
+
   it("treats repository gate scripts and the required-checks pin as scorers", () => {
     expect(isScorerPath("scripts/check-contract-test-resolution.mjs")).toBe(true);
     expect(isScorerPath("scripts/verify-edge-shared-in-sync.mjs")).toBe(true);
@@ -85,13 +94,18 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("config/required-status-checks.json")).toBe(true);
   });
 
-  it("does not treat production code, docs, or other scripts as scorers", () => {
+  it("does not treat production code, docs, migrations, or other scripts as scorers", () => {
     expect(isScorerPath("src/lib/quickLogRules.ts")).toBe(false);
     expect(isScorerPath("src/components/QuickLog.tsx")).toBe(false);
     expect(isScorerPath("docs/agents/loop-engineering.md")).toBe(false);
     expect(isScorerPath("scripts/scorer-lock.mjs")).toBe(false);
     expect(isScorerPath("scripts/lib/scorerLockRules.mjs")).toBe(false);
     expect(isScorerPath("supabase/functions/_shared/lib/x.ts")).toBe(false);
+    expect(isScorerPath("supabase/migrations/20261001160000_x.sql")).toBe(false);
+    expect(isScorerPath("tools/ecowitt-testbench/ecowitt_delivery.py")).toBe(false);
+    expect(isScorerPath("tools/ecowitt-testbench/fixtures/golden_forwarded_payload.json")).toBe(
+      false,
+    );
     expect(isScorerPath("src/lib/testimonialsRules.ts")).toBe(false);
     expect(isScorerPath("src/lib/spectrumRules.ts")).toBe(false);
   });
@@ -103,11 +117,24 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("e2e-local\\native-save-retrieve.spec.ts")).toBe(true);
   });
 
+  it("canonicalises traversal-shaped paths so an unlock cannot pass the prefix check and match nothing", () => {
+    expect(normalizeRelPath("src/test/../../src/test/a.test.ts")).toBe("src/test/a.test.ts");
+    expect(normalizeRelPath("src/test/./a.test.ts")).toBe("src/test/a.test.ts");
+    expect(normalizeRelPath("src/test/../../")).toBe("");
+    expect(normalizeRelPath("../outside/src/test/a.test.ts")).toBe("");
+    expect(normalizeRelPath("src/test/helpers/../")).toBe("src/test/");
+    expect(isScorerPath("src/test/../../")).toBe(false);
+    expect(isScorerPath("src/test/../lib/rules.ts")).toBe(false);
+    expect(isScorerPath("src/lib/../test/a.test.ts")).toBe(true);
+  });
+
   it("exposes the rule table as frozen data so a test can pin it", () => {
     expect(Object.isFrozen(SCORER_PATH_RULES)).toBe(true);
-    expect(SCORER_PATH_RULES.length).toBeGreaterThanOrEqual(6);
+    expect(SCORER_PATH_RULES.length).toBeGreaterThanOrEqual(8);
     const prefixes = SCORER_PATH_RULES.filter((r) => r.kind === "prefix").map((r) => r.value);
-    expect(prefixes).toEqual(expect.arrayContaining(["src/test/", "e2e/", "e2e-local/"]));
+    expect(prefixes).toEqual(
+      expect.arrayContaining(["src/test/", "e2e/", "e2e-local/", "supabase/tests/"]),
+    );
   });
 });
 
@@ -192,6 +219,10 @@ describe("scorerLockRules — unlock matching", () => {
   it("does not match a sibling or a prefix without a slash", () => {
     expect(isUnlocked("src/test/a.test.tsx", entries, context)).toBe(false);
     expect(isUnlocked("src/test/b.test.ts", entries, context)).toBe(false);
+  });
+
+  it("matches a traversal-shaped spelling of an unlocked path once canonicalised", () => {
+    expect(isUnlocked("src/lib/../test/a.test.ts", entries, context)).toBe(true);
   });
 
   it("ignores an expired entry even though its path matches", () => {
@@ -316,12 +347,16 @@ describe("scorerLockRules — scorerRowsFromNameStatus", () => {
         "R100\tsrc/test/b.test.ts\tsrc/test/renamed.test.ts",
         "R087\tsrc/lib/one.ts\tsrc/lib/two.ts",
         "A\tsrc/test/new.test.ts",
+        "D\tsupabase/tests/permissions.sql",
+        "M\ttools/ggs-ble-testbench/test_ggs_ble_frame.py",
       ].join("\n"),
     );
     expect(rows).toEqual([
       { change: "modified", path: "src/test/a.test.ts" },
       { change: "deleted", path: "e2e/old.spec.ts" },
       { change: "renamed", path: "src/test/renamed.test.ts", from: "src/test/b.test.ts" },
+      { change: "deleted", path: "supabase/tests/permissions.sql" },
+      { change: "modified", path: "tools/ggs-ble-testbench/test_ggs_ble_frame.py" },
     ]);
   });
 
@@ -344,11 +379,15 @@ function makeRepo(prefix: string): string {
   mkdirSync(join(repo, "src/test"), { recursive: true });
   mkdirSync(join(repo, "src/lib"), { recursive: true });
   mkdirSync(join(repo, "e2e-local"), { recursive: true });
+  mkdirSync(join(repo, "tools/testbench"), { recursive: true });
+  mkdirSync(join(repo, "supabase/tests"), { recursive: true });
   // Distinct contents, so git's rename detection pairs moving -> moved and nothing else.
   writeFileSync(join(repo, "src/test/tracked.test.ts"), "export const tracked = 1;\n");
   writeFileSync(join(repo, "src/test/doomed.test.ts"), "export const doomed = 2;\n");
   writeFileSync(join(repo, "src/test/moving.test.ts"), "export const moving = 3;\n");
   writeFileSync(join(repo, "e2e-local/native.spec.ts"), "export const native = 4;\n");
+  writeFileSync(join(repo, "tools/testbench/test_frame.py"), "def test_frame():\n    pass\n");
+  writeFileSync(join(repo, "supabase/tests/permissions.sql"), "select plan(1);\n");
   writeFileSync(join(repo, "src/lib/rules.ts"), "export const rules = 5;\n");
   execFileSync("git", ["-C", repo, "add", "."]);
   execFileSync("git", ["-C", repo, "commit", "-q", "-m", "approve checks"]);
@@ -379,9 +418,10 @@ describe("scripts/scorer-lock.mjs --hook and --unlock against a disposable repos
     expect(result.stderr).toContain("--unlock");
   });
 
-  it("exit 2 for a tracked e2e-local spec, the lane Codex found uncovered", () => {
-    const result = run(["--hook"], hookInput("e2e-local/native.spec.ts"));
-    expect(result.status).toBe(2);
+  it("exit 2 for a tracked e2e-local spec, a Python testbench test and a pgTAP suite", () => {
+    expect(run(["--hook"], hookInput("e2e-local/native.spec.ts")).status).toBe(2);
+    expect(run(["--hook"], hookInput("tools/testbench/test_frame.py")).status).toBe(2);
+    expect(run(["--hook"], hookInput("supabase/tests/permissions.sql")).status).toBe(2);
   });
 
   it("exit 0 for a new check file that is not tracked yet", () => {
@@ -401,6 +441,15 @@ describe("scripts/scorer-lock.mjs --hook and --unlock against a disposable repos
     });
     const result = run(["--hook"], outside);
     expect(result.status).toBe(0);
+  });
+
+  it("still decides correctly when invoked from a subdirectory, as the hook does after a cd", () => {
+    const fromSubdir = spawnSync("node", [SCRIPT, "--hook"], {
+      cwd: join(repo, "src"),
+      input: hookInput("src/test/tracked.test.ts"),
+      encoding: "utf8",
+    });
+    expect(fromSubdir.status).toBe(2);
   });
 
   it("--unlock records path, reason, branch and a 24-hour expiry, after which the hook allows the edit", () => {
@@ -425,6 +474,33 @@ describe("scripts/scorer-lock.mjs --hook and --unlock against a disposable repos
   it("--unlock without --reason is refused, so every unlock is explained", () => {
     const result = run(["--unlock", "src/test/tracked.test.ts"]);
     expect(result.status).not.toBe(0);
+  });
+
+  it("--unlock with a flag token where the reason should be is refused, not recorded", () => {
+    run(["--lock"]);
+    const result = run(["--unlock", "src/test/tracked.test.ts", "--reason", "--strict"]);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("--reason");
+    expect(existsSync(join(repo, UNLOCK_FILE))).toBe(false);
+  });
+
+  it("--unlock with a traversal-shaped path is canonicalised before it is stored", () => {
+    const unlock = run([
+      "--unlock",
+      "src/lib/../test/tracked.test.ts",
+      "--reason",
+      "pin renegotiated; path spelled through a sibling directory",
+    ]);
+    expect(unlock.status).toBe(0);
+    const stored = JSON.parse(readFileSync(join(repo, UNLOCK_FILE), "utf8"));
+    expect(stored.unlocked.map((e: { path: string }) => e.path)).toEqual([
+      "src/test/tracked.test.ts",
+    ]);
+    expect(run(["--hook"], hookInput("src/test/tracked.test.ts")).status).toBe(0);
+    run(["--lock"]);
+    const escape = run(["--unlock", "src/test/../../", "--reason", "trying to unlock the world"]);
+    expect(escape.stderr).toContain("not a scorer path");
+    expect(run(["--hook"], hookInput("src/test/tracked.test.ts")).status).toBe(2);
   });
 
   it("an expired unlock no longer allows the edit, and --status marks it EXPIRED", () => {
@@ -512,6 +588,13 @@ describe("scripts/scorer-lock.mjs --report against a disposable repository", () 
     expect(report.stdout).toContain("LOCKED   deleted  src/test/doomed.test.ts");
   });
 
+  it("lists a deleted pgTAP suite, the non-JavaScript case Codex found uncovered", () => {
+    rmSync(join(repo, "supabase/tests/permissions.sql"));
+    const report = run(["--report", "--strict"]);
+    expect(report.status).toBe(2);
+    expect(report.stdout).toContain("LOCKED   deleted  supabase/tests/permissions.sql");
+  });
+
   it("lists a staged rename with both paths, judged on the old one", () => {
     execFileSync("git", ["-C", repo, "mv", "src/test/moving.test.ts", "src/test/moved.test.ts"]);
     const report = run(["--report", "--strict"]);
@@ -527,8 +610,9 @@ describe("scripts/scorer-lock.mjs --report against a disposable repository", () 
       "src/test/tracked.test.ts",
       "src/test/doomed.test.ts",
       "src/test/moving.test.ts",
+      "supabase/tests/permissions.sql",
       "--reason",
-      "pins renegotiated, one obsolete check removed, one moved with its module",
+      "pins renegotiated, two obsolete checks removed, one moved with its module",
     ]);
     expect(unlock.status).toBe(0);
     const report = run(["--report", "--strict"]);
@@ -536,12 +620,19 @@ describe("scripts/scorer-lock.mjs --report against a disposable repository", () 
     expect(report.stdout).not.toContain("LOCKED  ");
     expect(report.stdout).toContain("UNLOCKED modified src/test/tracked.test.ts");
     expect(report.stdout).toContain("UNLOCKED deleted  src/test/doomed.test.ts");
+    expect(report.stdout).toContain("UNLOCKED deleted  supabase/tests/permissions.sql");
     expect(report.stdout).toContain("UNLOCKED renamed  src/test/moving.test.ts");
   });
 });
 
 describe(".claude/settings.json — the hook is wired on the resolved object", () => {
   const preToolUse = (projectSettings as { hooks?: { PreToolUse?: unknown[] } }).hooks?.PreToolUse;
+
+  const commands = () =>
+    ((preToolUse ?? []) as Array<{ hooks?: Array<{ type?: string; command?: string }> }>)
+      .flatMap((g) => g.hooks ?? [])
+      .filter((h) => h.type === "command")
+      .map((h) => h.command ?? "");
 
   it("declares a PreToolUse group for the file-writing tools", () => {
     expect(Array.isArray(preToolUse)).toBe(true);
@@ -556,13 +647,18 @@ describe(".claude/settings.json — the hook is wired on the resolved object", (
   });
 
   it("runs scripts/scorer-lock.mjs --hook as a command hook", () => {
-    const commands = (preToolUse as Array<{ hooks?: Array<{ type?: string; command?: string }> }>)
-      .flatMap((g) => g.hooks ?? [])
-      .filter((h) => h.type === "command")
-      .map((h) => h.command ?? "");
     expect(
-      commands.some((c) => c.includes("scripts/scorer-lock.mjs") && c.includes("--hook")),
+      commands().some((c) => c.includes("scripts/scorer-lock.mjs") && c.includes("--hook")),
     ).toBe(true);
+  });
+
+  it("anchors the command to CLAUDE_PROJECT_DIR so a cd in the session cannot unresolve the script", () => {
+    const hook = commands().find((c) => c.includes("scripts/scorer-lock.mjs"));
+    expect(hook).toBeDefined();
+    expect(hook).toContain("CLAUDE_PROJECT_DIR");
+    expect(hook!.indexOf("CLAUDE_PROJECT_DIR")).toBeLessThan(
+      hook!.indexOf("scripts/scorer-lock.mjs"),
+    );
   });
 
   it("the unlock file is ignored by git so an unlock never ships", () => {

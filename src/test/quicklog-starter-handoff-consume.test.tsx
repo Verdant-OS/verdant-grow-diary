@@ -18,7 +18,7 @@
  * supabase client + auth/grows/plants), with the REAL draft store running
  * against test localStorage.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
@@ -69,21 +69,34 @@ vi.mock("@/store/auth", () => ({
 
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
-    grows: [{ id: "grow-1", name: "Test Grow", stage: "veg" }],
-    activeGrow: { id: "grow-1", name: "Test Grow", stage: "veg" },
-    activeGrowId: "grow-1",
+    grows: [{ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Test Grow", stage: "veg" }],
+    activeGrow: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Test Grow", stage: "veg" },
+    activeGrowId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     setActiveGrowId: vi.fn(),
   }),
 }));
 
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [{ id: "plant-1", name: "Test Plant", tent_id: "tent-1", grow_id: "grow-1" }],
+    data: [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        name: "Test Plant",
+        tent_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        grow_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
   useTents: () => ({
-    data: [{ id: "tent-1", name: "Test Tent", grow_id: "grow-1" }],
+    data: [
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        name: "Test Tent",
+        grow_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
   }),
 }));
 
@@ -137,10 +150,10 @@ function storedDraftRaw(): string | null {
 
 function handoffPrefill(overrides: Partial<QuickLogPrefill> = {}): QuickLogPrefill {
   return {
-    plantId: "plant-1",
+    plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     plantName: "Test Plant",
-    growId: "grow-1",
-    tentId: "tent-1",
+    growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     eventType: "observation",
     note: "First true leaves look healthy.",
     wateringVolumeMl: null,
@@ -156,10 +169,25 @@ function saveButton() {
   return screen.getByTestId("quick-log-save");
 }
 
+const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 describe("Quick Log starter-handoff consume-once", () => {
   beforeEach(() => {
     clearLocalStorageForTest();
     window.sessionStorage.clear();
+    let tail: Promise<unknown> = Promise.resolve();
+    Object.defineProperty(window.navigator, "locks", {
+      configurable: true,
+      value: {
+        request: (_name: string, _options: unknown, callback: () => unknown) => {
+          const turn = tail.then(callback);
+          tail = turn.then(
+            () => undefined,
+            () => undefined,
+          );
+          return turn;
+        },
+      },
+    });
     saveMock.mockReset();
     saveMock.mockResolvedValue({ ok: true });
     insertMock.mockReset();
@@ -168,6 +196,11 @@ describe("Quick Log starter-handoff consume-once", () => {
       data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" },
       error: null,
     });
+  });
+
+  afterEach(() => {
+    if (originalLocks) Object.defineProperty(window.navigator, "locks", originalLocks);
+    else Reflect.deleteProperty(window.navigator, "locks");
   });
 
   it("rendering the prefilled dialog performs ZERO writes and never clears the draft", () => {
@@ -227,9 +260,9 @@ describe("Quick Log starter-handoff consume-once", () => {
         createdAt,
         input: {
           activityId: "training",
-          growId: "grow-1",
-          tentId: "tent-1",
-          plantId: "plant-1",
+          growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
           note: "Older training",
           occurredAt: createdAt,
           extraDetails: { technique: "topping" },
@@ -473,9 +506,9 @@ describe("Quick Log starter-handoff consume-once", () => {
     setLocalStorageItemForTest(
       "verdant.quickLog.lastTarget.v2.user-1",
       JSON.stringify({
-        plantId: "plant-1",
-        growId: "grow-1",
-        tentId: "tent-1",
+        plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         savedAt: "2026-07-15T09:00:00.000Z",
       }),
     );
@@ -538,9 +571,9 @@ describe("Quick Log starter-handoff consume-once", () => {
     setLocalStorageItemForTest(
       "verdant.quickLog.lastTarget.v2.user-1",
       JSON.stringify({
-        plantId: "plant-1",
-        growId: "grow-1",
-        tentId: "tent-1",
+        plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         savedAt: "2026-07-15T09:00:00.000Z",
       }),
     );

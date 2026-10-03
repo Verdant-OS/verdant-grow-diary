@@ -514,23 +514,6 @@ export default function Dashboard() {
 
       <GuidedActionChecklistPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
-        <KpiCard
-          label="Plants"
-          value={plants.length}
-          icon={<Sprout className="h-3.5 w-3.5" />}
-          hint={`${plants.filter((p) => p.health === "healthy").length} marked healthy · user-assigned, not sensor-derived`}
-          accent="success"
-        />
-        <KpiCard
-          label="Open alerts"
-          value={openAlerts}
-          icon={<AlertTriangle className="h-3.5 w-3.5" />}
-          accent={openAlerts > 0 ? "destructive" : "success"}
-        />
-      </div>
-
       {tents.length === 0 ? (
         <DashboardZeroTentEmptyState growId={activationGraph.growId} />
       ) : (
@@ -1092,6 +1075,26 @@ export default function Dashboard() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* One-Tent Home: the equal-weight KPI wall is summary context, not
+          first-fold content. It sits below the daily loop, Environment and
+          Needs attention. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
+        <KpiCard
+          label="Plants"
+          value={plants.length}
+          icon={<Sprout className="h-3.5 w-3.5" />}
+          hint={`${plants.filter((p) => p.health === "healthy").length} marked healthy · user-assigned, not sensor-derived`}
+          accent="success"
+        />
+        <KpiCard
+          label="Open alerts"
+          value={openAlerts}
+          icon={<AlertTriangle className="h-3.5 w-3.5" />}
+          accent={openAlerts > 0 ? "destructive" : "success"}
+        />
       </div>
       {scopedGrowId ? (
         <>

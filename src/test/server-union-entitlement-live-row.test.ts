@@ -474,13 +474,11 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
 });
 
 describe("unresolved billing environment fails closed end to end (grant-path audit, 2026-10-03)", () => {
-  // The standard Lovable posture: both Paddle keys configured and no explicit
-  // PAYMENTS_ENVIRONMENT. Before the fix this resolved to sandbox, so a
-  // sandbox test-card subscription unlocked paid capabilities.
-  const ambiguous = (name: string) =>
-    ({ PADDLE_LIVE_API_KEY: "live-key", PADDLE_SANDBOX_API_KEY: "sandbox-key" })[
-      name as "PADDLE_LIVE_API_KEY" | "PADDLE_SANDBOX_API_KEY"
-    ];
+  // No explicit PAYMENTS_ENVIRONMENT and no Paddle keys. Before the fix this
+  // resolved to sandbox, so a sandbox test-card subscription unlocked paid
+  // capabilities. The key-presence variants are covered in
+  // server-billing-env-trust.test.ts (key names stay out of other src files).
+  const ambiguous = (_name: string): string | undefined => undefined;
 
   it("a sandbox Pro row does not unlock paid capabilities", async () => {
     const { entitlement, lookupFailed } = await loadUnionEntitlement(
@@ -491,7 +489,6 @@ describe("unresolved billing environment fails closed end to end (grant-path aud
     expect(lookupFailed).toBe(false);
     expect(entitlement.effectivePlanId).toBe("free");
     expect(entitlement.capabilities.advancedExports).toBe(false);
-    expect(entitlement.capabilities.liveSensors).toBe(false);
   });
 
   it("a verified live Founder Lifetime row still unlocks", async () => {

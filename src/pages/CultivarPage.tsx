@@ -12,13 +12,12 @@ import CultivarFollowButton from "@/components/CultivarFollowButton";
 import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
 import CultivarQaPanel from "@/components/CultivarQaPanel";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import { usePublishedCultivars } from "@/hooks/usePublishedCultivars";
 import {
-  findCultivarBySlug,
   formatVerificationStatus,
-  getCultivarGuideSections,
-  getCultivarSources,
   type CultivarGuideSectionKey,
 } from "@/constants/verdantCultivars";
+import { cultivarReferenceSourceNotice } from "@/constants/cultivarReferenceSourceCopy";
 import { VERDANT_SITE_ORIGIN } from "@/constants/verdantSeoContent";
 import {
   buildArticleJsonLd,
@@ -43,9 +42,14 @@ function formatDate(value: string): string {
 
 export default function CultivarPage() {
   const { slug } = useParams<{ slug: string }>();
-  const cultivar = findCultivarBySlug(slug);
-  const sections = cultivar ? getCultivarGuideSections(cultivar) : [];
-  const sources = cultivar ? getCultivarSources(cultivar) : [];
+  // V1.1: bundled library unless the default-off database read flag is on;
+  // the resolved source state is explicit and never silent.
+  const referenceSource = usePublishedCultivars();
+  const { catalog } = referenceSource;
+  const sourceNotice = cultivarReferenceSourceNotice(referenceSource.reason);
+  const cultivar = catalog.findBySlug(slug);
+  const sections = cultivar ? catalog.sectionsFor(cultivar) : [];
+  const sources = cultivar ? catalog.sourcesFor(cultivar) : [];
   const summaryRows = cultivar
     ? buildCultivarSummaryRows(cultivar, formatDate(cultivar.lastVerifiedAt))
     : [];
@@ -119,6 +123,7 @@ export default function CultivarPage() {
     <main
       data-testid="cultivar-page"
       data-cultivar-slug={cultivar.slug}
+      data-cultivar-source-state={referenceSource.state}
       className="min-h-screen bg-background text-foreground"
     >
       <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-5 sm:px-6">
@@ -166,6 +171,14 @@ export default function CultivarPage() {
               source-labeled sensors, and observed response remain authoritative.
             </p>
           </div>
+          {sourceNotice ? (
+            <p
+              data-testid="cultivar-reference-source-notice"
+              className="mt-3 text-xs text-muted-foreground"
+            >
+              {sourceNotice}
+            </p>
+          ) : null}
         </div>
 
         <dl className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -178,6 +178,12 @@ Until that gate is green:
 - the migration remains unapplied to production;
 - no “database-backed public reads” or “shipped” claim is allowed.
 
+V1.1 (issue #419) adds the parity audit, an additive parity migration, the typed
+read model, and a default-off release flag. Their state, the deployment receipt,
+and rollback live in
+[`strain-reference-library-v1-1-db-cutover.md`](strain-reference-library-v1-1-db-cutover.md).
+Status remains: working V1 prototype in pre-release validation.
+
 ## Deferred work
 
 - Production database seed/cutover after content-parity verification.

@@ -9,16 +9,23 @@ on:
       - "src/constants/strainReferenceLibrary.ts"
       - "src/constants/verdantCultivars.ts"
       - "src/lib/cultivarReference*.ts"
+      - "src/lib/cultivarDatabase*.ts"
+      - "src/hooks/usePublishedCultivars.ts"
+      - "src/lib/featureFlags.ts"
+      - "src/lib/supabasePublicReadKeyRules.ts"
+      - "scripts/audit-cultivar-database-parity.ts"
       - "src/lib/sharedSearchTextRules.ts"
       - "src/lib/strainSourceVerification.ts"
       - "src/pages/Cultivar*.tsx"
       - "src/test/cultivar*.test.*"
       - "src/test/shared-search-text-rules.test.ts"
       - "src/test/strain-reference-library*.test.ts"
+      - "src/test/supabase-public-read-key-rules.test.ts"
       - "scripts/verify-cultivar-sources.mjs"
       - "supabase/functions/_shared/lib/.sync-manifest.json"
       - "supabase/functions/_shared/lib/integrations/supabase/types.ts"
       - "supabase/migrations/20260722203000_strain_reference_library_v1.sql"
+      - "supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql"
       - "docs/product/strain-reference-library-v1.md"
       - ".github/workflows/strain-reference-library-v1-gate.yml"
     types: [opened, synchronize, reopened, ready_for_review]
@@ -72,6 +79,12 @@ jobs:
             src/test/cultivar-page-v1.test.tsx \
             src/test/cultivar-index-seo-rules.test.tsx \
             src/test/static-public-seo-documents.test.ts \
+            src/test/cultivar-database-parity-rules.test.ts \
+            src/test/cultivar-database-read-model.test.ts \
+            src/test/cultivar-reference-source-state.test.ts \
+            src/test/cultivar-pages-database-source.test.tsx \
+            src/test/strain-reference-library-v1-1-migration.test.ts \
+            src/test/supabase-public-read-key-rules.test.ts \
             --reporter=verbose \
             --reporter=json \
             --outputFile=artifacts/strain-reference-library/targeted-tests.json
@@ -90,6 +103,9 @@ jobs:
         continue-on-error: true
         run: bun scripts/verify-cultivar-sources.mjs
 
+      - name: V1.1 database parity audit (offline, strict)
+        run: bun run audit:cultivar-db-parity -- --strict
+
       - name: Upload source verification evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -103,7 +119,7 @@ jobs:
         if: steps.source_verification.outcome == 'failure'
         run: exit 1
 
-      - name: Supabase migration safety — V1 finding fence
+      - name: Supabase migration safety — V1 / V1.1 finding fence
         shell: bash
         run: |
           set +e
@@ -116,21 +132,26 @@ jobs:
           cat /tmp/supabase-safety.err
           node - <<'NODE'
           const { readFileSync } = require("node:fs");
-          const target = "20260722203000_strain_reference_library_v1.sql";
+          const targets = [
+            "20260722203000_strain_reference_library_v1.sql",
+            "20261001160000_strain_reference_library_v1_1_parity.sql",
+          ];
           const report = JSON.parse(readFileSync("/tmp/supabase-safety.json", "utf8"));
-          const targetFindings = (report.new ?? []).filter((finding) => finding.migration === target);
+          const targetFindings = (report.new ?? []).filter((finding) =>
+            targets.includes(finding.migration),
+          );
           if (targetFindings.length > 0) {
-            console.error(`Migration safety found ${targetFindings.length} issue(s) in ${target}.`);
+            console.error(`Migration safety found ${targetFindings.length} issue(s) in the Strain Reference Library migrations.`);
             console.error(JSON.stringify(targetFindings, null, 2));
             process.exit(1);
           }
-          console.log(`Migration safety: no new findings in ${target}.`);
+          console.log(`Migration safety: no new findings in ${targets.join(", ")}.`);
           if ((report.new ?? []).length > 0) {
             console.log(`Whole-repo scanner also reported ${(report.new ?? []).length} unrelated pre-existing baseline finding(s); baseline remains untouched.`);
           }
           NODE
           if [ "$scanner_status" -ne 0 ]; then
-            echo "::warning::Whole-repo migration safety remains red only for findings outside the Strain Reference Library V1 migration."
+            echo "::warning::Whole-repo migration safety remains red only for findings outside the Strain Reference Library V1 / V1.1 migrations."
           fi
 
       - name: Sensor and no-control safety scan
@@ -141,12 +162,16 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          mkdir -p .diagnostics
+          # Keep diagnostics OUTSIDE the checkout: an untracked file in the
+          # working tree makes prebuild's stamp report dirty:true, and the
+          # publish provenance preflight (#1175) then fails the build.
+          diag="$RUNNER_TEMP/strain-reference-diagnostics"
+          mkdir -p "$diag"
           set +e
-          bun run build > .diagnostics/strain-reference-build.txt 2>&1
+          bun run build > "$diag/strain-reference-build.txt" 2>&1
           status=$?
           set -e
-          cat .diagnostics/strain-reference-build.txt
+          cat "$diag/strain-reference-build.txt"
           exit "$status"
 
       - name: Upload focused build diagnostics
@@ -154,7 +179,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: strain-reference-build-diagnostics
-          path: .diagnostics/strain-reference-build.txt
+          path: ${{ runner.temp }}/strain-reference-diagnostics/strain-reference-build.txt
           if-no-files-found: error
           retention-days: 3
 

@@ -188,6 +188,16 @@ export const SCORER_PATH_RULES = Object.freeze([
   }),
   Object.freeze({
     kind: "regex",
+    value: /^scripts\/(?:[^/]+\/)*[^/]+\.config\.(mjs|cjs|js|ts|json)$/,
+    why: "gate pins kept as *.config.* modules anywhere under scripts/ (public-route-parity.config.mjs feeds sitemap-public-route-parity.test.ts; public-route-head-invariants.config.mjs feeds validate-static-route-head-fidelity.mjs); adding a route to an allowlist there makes a parity failure disappear without touching the test",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/ci/merge-queue-thresholds.json",
+    why: "the thresholds merge-queue-snapshot.mjs --alert exits non-zero against in merge-queue-snapshot.yml",
+  }),
+  Object.freeze({
+    kind: "regex",
     value: /^eslint\.config\.(js|mjs|cjs|ts)$/,
     why: "the lint gate's rule set; disabling a rule here weakens the Lint, typecheck, test, build required check",
   }),

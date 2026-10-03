@@ -146,6 +146,15 @@ describe("scorerLockRules — which paths are scorers", () => {
 
   it("treats gate-owned configuration as scorers: allowlists, pins, baselines, lint and typecheck configs", () => {
     expect(isScorerPath("scripts/config/ai-doctor-preview-safety-allowlist.json")).toBe(true);
+    // Root-level *.config.* modules under scripts/ are gate pins too: the SEO parity lane
+    // resolves its allowlists from them, and the merge-queue snapshot exits non-zero
+    // against its thresholds file.
+    expect(isScorerPath("scripts/public-route-parity.config.mjs")).toBe(true);
+    expect(isScorerPath("scripts/public-route-head-invariants.config.mjs")).toBe(true);
+    expect(isScorerPath("scripts/seo/new-gate.config.ts")).toBe(true);
+    expect(isScorerPath("scripts/ci/merge-queue-thresholds.json")).toBe(true);
+    expect(isScorerPath("scripts/configure-ecowitt-bridge.mjs")).toBe(false);
+    expect(isScorerPath("scripts/x.config.md")).toBe(false);
     expect(isScorerPath("config/dependency-security-exceptions.json")).toBe(true);
     expect(isScorerPath("config/seo-allowlist.json")).toBe(true);
     expect(isScorerPath("config/local-supabase-replay-compatibility.json")).toBe(true);

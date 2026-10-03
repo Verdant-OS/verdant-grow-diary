@@ -258,6 +258,7 @@ jobs:
             apply-agreement-acceptance-insert-forward-repair.yml
             apply-quicklog-revision-idempotent-replay.yml
             apply-plants-health-unassessed-default.yml
+            apply-linked-quicklog-diary-client-write-fence.yml
           )
           active_statuses=(queued in_progress waiting pending requested)
           guard_root="${RUNNER_TEMP}/quicklog-manual-delegate-writer-guard"

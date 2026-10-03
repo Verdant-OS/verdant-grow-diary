@@ -22,6 +22,8 @@ const H = vi.hoisted(() => ({
   secondTentId: "6b2d7f10-3c4e-4d6f-9a01-2b3c4d5e6f70",
   targetsStatus: "idle" as "idle" | "ok",
   targets: null as Record<string, { min: number | null; max: number | null }> | null,
+  // The per-tent hook has not reported a status for the first tent yet.
+  omitTentStatus: false,
 }));
 
 vi.mock("@/hooks/useGrowData", () => ({
@@ -82,7 +84,7 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
       [H.secondTentId]: H.secondTentRows,
     },
     statusByTent: {
-      [H.tentId]: H.perTentStatus,
+      ...(H.omitTentStatus ? {} : { [H.tentId]: H.perTentStatus }),
       [H.secondTentId]: H.secondTentStatus,
     },
     isLoading: H.perTentStatus === "loading",
@@ -243,6 +245,7 @@ describe("Dashboard private-read honesty boundary", () => {
     H.secondTentEnabled = false;
     H.secondTentStatus = "success";
     H.secondTentRows = [];
+    H.omitTentStatus = false;
     H.tentQueryOverride = {};
     H.plantQueryOverride = {};
     H.refetch.mockClear();
@@ -652,5 +655,47 @@ describe("Dashboard private-read honesty boundary", () => {
       /No empty-state or environment conclusion is shown/,
     );
     expect(screen.queryByTestId("dashboard-environment-snapshot-empty")).toBeNull();
+  });
+
+  it("shows the home tent card's metrics as loading, not missing, before its sensor read reports", () => {
+    H.growStatus = "success";
+    H.perTentStatus = "success";
+    H.perTentRows = [];
+    H.omitTentStatus = true;
+    renderDashboard();
+    for (const key of ["temp", "rh", "vpd"]) {
+      expect(screen.getByTestId(`tonight-tent-home-metric-${key}`)).toHaveAttribute(
+        "data-state",
+        "loading",
+      );
+    }
+  });
+
+  // One-Tent Home demotion: the equal-weight KPI wall is not first-fold
+  // content. It renders after the Environment loop and Needs attention.
+  it("renders the KPI wall after the Environment and Needs attention sections", () => {
+    H.growStatus = "success";
+    renderDashboard();
+
+    const firstKpi = screen.getAllByTestId("dashboard-kpi-card")[0];
+    for (const id of [
+      "dashboard-section-heading-environment",
+      "dashboard-section-heading-needs-attention",
+    ]) {
+      const heading = screen.getByTestId(id);
+      expect(
+        heading.compareDocumentPosition(firstKpi) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+  });
+
+  it("renders the zero-tent empty state before the KPI wall", () => {
+    H.growStatus = "success";
+    H.tentQueryOverride = { data: [], status: "success", isPending: false, fetchStatus: "idle" };
+    renderDashboard();
+
+    const empty = screen.getByTestId("dashboard-zero-tent-empty-state");
+    const firstKpi = screen.getAllByTestId("dashboard-kpi-card")[0];
+    expect(empty.compareDocumentPosition(firstKpi) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

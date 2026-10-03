@@ -146,6 +146,12 @@ import {
   selectDashboardSensorEvidenceRows,
 } from "@/lib/dashboardSensorEvidenceRules";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
+import TonightTentHomeCard from "@/components/TonightTentHomeCard";
+import {
+  buildTonightLastLog,
+  buildTonightTentMetrics,
+  resolveTonightTentSelection,
+} from "@/lib/tonightTentHomeViewModel";
 
 /**
  * Renders the grower's overview for a valid URL-selected grow or the full account.
@@ -268,6 +274,38 @@ export default function Dashboard() {
     preferredGrowId: scopedGrowId ?? activeGrowId,
   });
   const activationEvidence = useOneTentActivationEvidence(activationGraph);
+  // One-Tent Home first fold: one tent, never an arbitrary pick among several.
+  const homeSelection = resolveTonightTentSelection({
+    tents,
+    plants,
+    connectedTentId: activationGraph.tentId,
+  });
+  const homeTent = homeSelection.kind === "tent" ? homeSelection.tent : null;
+  // Diary-inclusive snapshot for this tent alone, so Quick Log manual readings
+  // count; idle (never "missing") when the tent has no grow id.
+  const homeSnapshotState = useLatestSensorSnapshot(
+    homeTent?.growId ?? null,
+    homeTent ? [homeTent.id] : [],
+  );
+  const homeMetrics = buildTonightTentMetrics({
+    rows: homeTent ? (readingsByTent[homeTent.id] ?? []) : [],
+    // Same rule as the tent strip: a UUID tent with no reported status is still
+    // loading; non-UUID ids are never queried, so their absence is established.
+    rowsRead: {
+      status:
+        homeTent && isUuid(homeTent.id)
+          ? (sensorStatusByTent[homeTent.id] ?? "loading")
+          : "success",
+    },
+    snapshot: { status: homeSnapshotState.status, snapshot: homeSnapshotState.snapshot },
+    now: new Date(nowTick),
+  });
+  const homeLastLog = buildTonightLastLog({
+    applies: !!homeTent && activationGraph.tentId === homeTent.id,
+    status: activationEvidence.status,
+    latestAt: activationEvidence.summary.latestAt,
+    now: new Date(nowTick),
+  });
   const connectedSensorReadingCount = activationGraph.tentId
     ? countActivatingSensorReadings(readingsByTent[activationGraph.tentId] ?? [])
     : 0;
@@ -463,6 +501,7 @@ export default function Dashboard() {
           </div>
         }
       />
+
       {urlGrowId && (
         <ScopedGrowBanner
           growId={urlGrowId}
@@ -472,6 +511,12 @@ export default function Dashboard() {
           backHref={backHref}
         />
       )}
+      <TonightTentHomeCard
+        selection={homeSelection}
+        metrics={homeMetrics}
+        lastLog={homeLastLog}
+        logHref={withGrowId("/daily-check", homeTent?.growId ?? scopedGrowId)}
+      />
 
       <div className="my-3">
         <PublicQuickLogHandoffCard className="mb-3" />
@@ -513,23 +558,6 @@ export default function Dashboard() {
       <DashboardDailyGrowCheckPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
 
       <GuidedActionChecklistPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
-        <KpiCard
-          label="Plants"
-          value={plants.length}
-          icon={<Sprout className="h-3.5 w-3.5" />}
-          hint={`${plants.filter((p) => p.health === "healthy").length} marked healthy · user-assigned, not sensor-derived`}
-          accent="success"
-        />
-        <KpiCard
-          label="Open alerts"
-          value={openAlerts}
-          icon={<AlertTriangle className="h-3.5 w-3.5" />}
-          accent={openAlerts > 0 ? "destructive" : "success"}
-        />
-      </div>
 
       {tents.length === 0 ? (
         <DashboardZeroTentEmptyState growId={activationGraph.growId} />
@@ -1092,6 +1120,26 @@ export default function Dashboard() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* One-Tent Home: the equal-weight KPI wall is summary context, not
+          first-fold content. It sits below the daily loop, Environment and
+          Needs attention. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
+        <KpiCard
+          label="Plants"
+          value={plants.length}
+          icon={<Sprout className="h-3.5 w-3.5" />}
+          hint={`${plants.filter((p) => p.health === "healthy").length} marked healthy · user-assigned, not sensor-derived`}
+          accent="success"
+        />
+        <KpiCard
+          label="Open alerts"
+          value={openAlerts}
+          icon={<AlertTriangle className="h-3.5 w-3.5" />}
+          accent={openAlerts > 0 ? "destructive" : "success"}
+        />
       </div>
       {scopedGrowId ? (
         <>

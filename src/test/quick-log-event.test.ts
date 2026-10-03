@@ -110,6 +110,7 @@ describe("createQuickLogEvent — RPC contract", () => {
       p_event_type: "watering",
       p_note: "  half gallon ",
       p_photo_url: null,
+      p_occurred_at: null,
     });
   });
 

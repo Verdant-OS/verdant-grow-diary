@@ -52,17 +52,14 @@ describe("dependency-security CI workflow", () => {
 
   it("checks the canonical lockfile policy before installing dependencies", () => {
     const policyIndex = workflow.indexOf("- name: Lockfile policy check");
-    const npmSemanticIndex = workflow.indexOf("- name: npm compatibility lock semantic check");
     const installIndex = workflow.indexOf("- name: Install dependencies (frozen lockfile)");
 
     expect(policyIndex).toBeGreaterThan(0);
-    expect(npmSemanticIndex).toBeGreaterThan(policyIndex);
-    expect(installIndex).toBeGreaterThan(npmSemanticIndex);
-    expect(workflow.slice(policyIndex, npmSemanticIndex)).toContain("run: bun run check:lockfile");
-    expect(workflow.slice(npmSemanticIndex, installIndex)).toContain(
-      "run: bun run check:npm-lock-semantic",
-    );
+    expect(installIndex).toBeGreaterThan(policyIndex);
+    expect(workflow.slice(policyIndex, installIndex)).toContain("run: bun run check:lockfile");
     expect(workflow.slice(installIndex)).toContain("run: bun install --frozen-lockfile");
+    // The npm compatibility lock was retired on 2026-10-03.
+    expect(workflow).not.toContain("check:npm-lock-semantic");
   });
 
   it("keys caches only from bun.lock and runs the focused security contracts", () => {

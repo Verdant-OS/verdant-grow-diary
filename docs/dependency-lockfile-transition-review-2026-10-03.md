@@ -132,4 +132,6 @@ Follow-ups not done here:
 - `docs/architecture-contract.md` AC-8.1 states the old two-lockfile rule. Correcting it
   needs a §15 restamp.
 - The reviewed-exception schema still carries npm-specific fields. There are no
-  exceptions today, so nothing exercises them.
+  exceptions today, so nothing exercises them. _Done in a later stacked change:_
+  `config/dependency-security-exceptions.json` moves to `schemaVersion: 2`, which binds an
+  exception to `bun.lock` only and rejects the six retired `expectedNpm*` fields.

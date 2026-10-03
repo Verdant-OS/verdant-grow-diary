@@ -12,7 +12,6 @@ import {
   BLOCKED_SEVERITIES,
   evaluateExceptionLockResolutions,
   evaluateExceptionManifestReachability,
-  evaluateExceptionNpmLockResolutions,
   evaluateExceptionRootAncestors,
   evaluateExceptionSourceImports,
   evaluateFindings,
@@ -20,6 +19,7 @@ import {
   parseAuditOutput,
   parseReviewedExceptions,
   redactSecrets,
+  RETIRED_NPM_EXCEPTION_FIELDS,
 } from "../../scripts/check-dependency-security.mjs";
 
 const CLEAN_JSON = JSON.stringify({ advisories: {} });
@@ -28,8 +28,6 @@ const VALID_EXCEPTION = {
   package: "ajv",
   advisoryId: "1113714",
   severity: "moderate",
-  expectedNpmAdvisoryUrl: "https://github.com/advisories/GHSA-example",
-  expectedNpmVulnerableRange: "<=6.15.0",
   owner: "Verdant dependency security",
   reason: "No patched release exists in the constrained major.",
   reachability: "The affected copy is used only by repository lint tooling.",
@@ -37,18 +35,14 @@ const VALID_EXCEPTION = {
   expiresOn: "2026-08-25",
   expectedLockResolutions: [{ key: "ajv", version: "6.15.0" }],
   expectedBunAffectedKeys: ["ajv"],
-  expectedNpmLockResolutions: [{ path: "node_modules/ajv", version: "6.15.0" }],
   expectedParentKeys: ["eslint"],
-  expectedNpmParentPaths: ["node_modules/eslint"],
-  expectedNpmAffectedPaths: ["node_modules/ajv"],
   allowedImportPaths: [],
   allowedScriptNames: [],
   expectedBunDirectRootAncestors: [{ package: "eslint", group: "devDependencies", spec: "^9.0.0" }],
-  expectedNpmDirectRootAncestors: [{ package: "eslint", group: "devDependencies", spec: "^9.0.0" }],
 };
 
 function exceptionDocument(exceptions = [VALID_EXCEPTION]) {
-  return JSON.stringify({ schemaVersion: 1, exceptions });
+  return JSON.stringify({ schemaVersion: 2, exceptions });
 }
 
 function finding(overrides: Record<string, unknown> = {}) {
@@ -237,8 +231,8 @@ describe("check-dependency-security reviewed exceptions", () => {
     expect(parseReviewedExceptions(exceptionDocument())).toEqual([VALID_EXCEPTION]);
 
     expect(() =>
-      parseReviewedExceptions(JSON.stringify({ schemaVersion: 2, exceptions: [] })),
-    ).toThrow(/schemaVersion 1/);
+      parseReviewedExceptions(JSON.stringify({ schemaVersion: 1, exceptions: [] })),
+    ).toThrow(/schemaVersion 2/);
     expect(() =>
       parseReviewedExceptions(exceptionDocument([{ ...VALID_EXCEPTION, reachability: "" }])),
     ).toThrow(/reachability/);
@@ -250,11 +244,6 @@ describe("check-dependency-security reviewed exceptions", () => {
         exceptionDocument([{ ...VALID_EXCEPTION, expectedLockResolutions: [] }]),
       ),
     ).toThrow(/expectedLockResolutions/);
-    expect(() =>
-      parseReviewedExceptions(
-        exceptionDocument([{ ...VALID_EXCEPTION, expectedNpmLockResolutions: [] }]),
-      ),
-    ).toThrow(/expectedNpmLockResolutions/);
     expect(() =>
       parseReviewedExceptions(exceptionDocument([{ ...VALID_EXCEPTION, expectedParentKeys: [] }])),
     ).toThrow(/expectedParentKeys/);
@@ -292,33 +281,40 @@ describe("check-dependency-security reviewed exceptions", () => {
     }
   });
 
-  it("requires npm advisory identity, range, and affected paths to match exactly", () => {
-    const exceptions = parseReviewedExceptions(exceptionDocument());
-    const npmFinding = {
-      ...finding(),
-      url: VALID_EXCEPTION.expectedNpmAdvisoryUrl,
-      range: VALID_EXCEPTION.expectedNpmVulnerableRange,
-      paths: VALID_EXCEPTION.expectedNpmAffectedPaths,
-    };
-    expect(
-      evaluateReviewedExceptions([npmFinding], exceptions, {
-        today: "2026-07-25",
-        auditSource: "npm",
-      }).blocked,
-    ).toHaveLength(0);
-
-    for (const drift of [
-      { url: "https://github.com/advisories/GHSA-different" },
-      { range: "<=99.0.0" },
-      { paths: ["node_modules/new-runtime-path/ajv"] },
-    ]) {
-      const result = evaluateReviewedExceptions([{ ...npmFinding, ...drift }], exceptions, {
-        today: "2026-07-25",
-        auditSource: "npm",
-      });
-      expect(result.blocked).toHaveLength(1);
-      expect(result.reasons.join(" ")).toContain("drifted");
+  it("rejects every retired npm field, even alongside a complete Bun binding", () => {
+    expect(RETIRED_NPM_EXCEPTION_FIELDS).toEqual([
+      "expectedNpmAdvisoryUrl",
+      "expectedNpmVulnerableRange",
+      "expectedNpmLockResolutions",
+      "expectedNpmParentPaths",
+      "expectedNpmAffectedPaths",
+      "expectedNpmDirectRootAncestors",
+    ]);
+    for (const field of RETIRED_NPM_EXCEPTION_FIELDS) {
+      expect(
+        () => parseReviewedExceptions(exceptionDocument([{ ...VALID_EXCEPTION, [field]: [] }])),
+        field,
+      ).toThrow(new RegExp(`${field} is retired with package-lock\\.json`));
     }
+    const parsedKeys = Object.keys(parseReviewedExceptions(exceptionDocument())[0]);
+    expect(parsedKeys.filter((key) => /Npm/.test(key))).toEqual([]);
+  });
+
+  it("matches a finding without npm advisory metadata", () => {
+    const exceptions = parseReviewedExceptions(exceptionDocument());
+    const result = evaluateReviewedExceptions(
+      [
+        finding({
+          url: "https://github.com/advisories/GHSA-any",
+          range: "<=99.0.0",
+          paths: ["node_modules/anything/ajv"],
+        }),
+      ],
+      exceptions,
+      { today: "2026-07-25" },
+    );
+    expect(result.blocked).toHaveLength(0);
+    expect(result.reviewed).toHaveLength(1);
   });
 
   it("allows an exception through its expiry date and blocks it afterward", () => {
@@ -401,30 +397,6 @@ describe("check-dependency-security reviewed exceptions", () => {
     },
   );
 
-  it("binds npm exception resolutions and parents to exact package-lock paths", () => {
-    const exceptions = parseReviewedExceptions(exceptionDocument());
-    const npmLock = JSON.stringify({
-      lockfileVersion: 3,
-      packages: {
-        "node_modules/ajv": { version: "6.15.0" },
-        "node_modules/eslint": {
-          version: "9.0.0",
-          dependencies: { ajv: "^6.0.0" },
-        },
-      },
-    });
-    expect(evaluateExceptionNpmLockResolutions(npmLock, exceptions)).toEqual({
-      ok: true,
-      errors: [],
-    });
-
-    const drifted = npmLock.replace(
-      '"node_modules/ajv":{"version":"6.15.0"}',
-      '"node_modules/runtime/ajv":{"version":"6.15.0"}',
-    );
-    expect(evaluateExceptionNpmLockResolutions(drifted, exceptions).ok).toBe(false);
-  });
-
   it("fails closed when exception reachability becomes direct or a package script invokes it", () => {
     const exceptions = parseReviewedExceptions(exceptionDocument());
     const baseline = {
@@ -465,23 +437,12 @@ describe("check-dependency-security reviewed exceptions", () => {
     );
   });
 
-  it("pins complete direct-root ancestor closure in both lock graphs", () => {
+  it("pins complete direct-root ancestor closure in the Bun lock graph", () => {
     const exceptions = parseReviewedExceptions(exceptionDocument());
     const bunLock = [
       '"ajv": ["ajv@6.15.0", "", {}]',
       '"eslint": ["eslint@9.0.0", "", { "dependencies": { "ajv": "^6.0.0" } }]',
     ].join("\n");
-    const npmLockDocument = {
-      lockfileVersion: 3,
-      packages: {
-        "": {},
-        "node_modules/ajv": { version: "6.15.0" },
-        "node_modules/eslint": {
-          version: "9.0.0",
-          dependencies: { ajv: "^6.0.0" },
-        },
-      },
-    };
     const packageJson = {
       dependencies: {},
       devDependencies: { eslint: "^9.0.0" },
@@ -489,7 +450,6 @@ describe("check-dependency-security reviewed exceptions", () => {
     expect(
       evaluateExceptionRootAncestors({
         bunLockText: bunLock,
-        npmLockText: JSON.stringify(npmLockDocument),
         packageJson,
         exceptions,
       }),
@@ -500,19 +460,8 @@ describe("check-dependency-security reviewed exceptions", () => {
         bunLock,
         `"runtime-parent": ["runtime-parent@1.0.0", "", { "${edgeGroup}": { "eslint": "^9.0.0" } }]`,
       ].join("\n");
-      const driftedNpmLock = {
-        ...npmLockDocument,
-        packages: {
-          ...npmLockDocument.packages,
-          "node_modules/runtime-parent": {
-            version: "1.0.0",
-            [edgeGroup]: { eslint: "^9.0.0" },
-          },
-        },
-      };
       const drifted = evaluateExceptionRootAncestors({
         bunLockText: driftedBunLock,
-        npmLockText: JSON.stringify(driftedNpmLock),
         packageJson: {
           dependencies: { "runtime-parent": "1.0.0" },
           devDependencies: { eslint: "^9.0.0" },
@@ -522,33 +471,6 @@ describe("check-dependency-security reviewed exceptions", () => {
       expect(drifted.ok, edgeGroup).toBe(false);
       expect(drifted.errors.join(" "), edgeGroup).toContain("runtime-parent");
     }
-  });
-
-  it("checks the Bun graph alone when no npm lock is supplied", () => {
-    const exceptions = parseReviewedExceptions(exceptionDocument());
-    const bunLock = [
-      '"ajv": ["ajv@6.15.0", "", {}]',
-      '"eslint": ["eslint@9.0.0", "", { "dependencies": { "ajv": "^6.0.0" } }]',
-    ].join("\n");
-    const packageJson = { dependencies: {}, devDependencies: { eslint: "^9.0.0" } };
-    expect(
-      evaluateExceptionRootAncestors({ bunLockText: bunLock, packageJson, exceptions }),
-    ).toEqual({ ok: true, errors: [] });
-
-    const drifted = evaluateExceptionRootAncestors({
-      bunLockText: [
-        bunLock,
-        '"runtime-parent": ["runtime-parent@1.0.0", "", { "dependencies": { "eslint": "^9.0.0" } }]',
-      ].join("\n"),
-      packageJson: {
-        dependencies: { "runtime-parent": "1.0.0" },
-        devDependencies: { eslint: "^9.0.0" },
-      },
-      exceptions,
-    });
-    expect(drifted.ok).toBe(false);
-    expect(drifted.errors.join(" ")).toContain("Bun direct-root ancestors");
-    expect(drifted.errors.join(" ")).not.toContain("npm direct-root ancestors");
   });
 
   it("fails closed when production code directly imports an excepted transitive", () => {

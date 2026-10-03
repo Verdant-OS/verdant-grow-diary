@@ -1,0 +1,47 @@
+# Codex + Claude ownership handoff (from Chemdawg), 2026-09-29 22:30 CT
+
+From this point, Codex and Claude finish the open Verdant repo work without Chemdawg. Matthew is still the only person who publishes, applies SQL, or lifts a hold.
+
+Precedence: `docs/agents/OWNERSHIP.md` wins over this page on ownership, routing and holds. Where the two disagree, this page is a working note, not the rule.
+
+## Who owns what
+
+**Codex is the writer.** It owns every code change on open PRs: fixes, base merges and PR descriptions. It never reviews or merges its own PR.
+
+**Claude is the reviewer and merge owner.** It reviews Codex's PRs at the exact head SHA, runs the merge gate below, and enqueues merges. It never merges a PR it wrote itself. If Claude wrote a PR, Codex reviews it, and Matthew enqueues the merge.
+
+## Merge gate (all of these must be true at the exact head SHA)
+
+1. The PR is not a draft and targets `verdant-grow-diary`, not a stacked branch.
+2. Every check is passing: all required checks (the set pinned in `config/required-status-checks.json`), and no red or pending non-required check either. The dependency-audit job counts. If it's red only because the branch is behind, merge the base in first.
+3. The reviewer (not the writer) has given a PASS or PASS-with-P2 with 0 P1 at that SHA, and there are no unresolved review threads or requested changes.
+4. The PR isn't on the hold list.
+
+Enqueue: `gh api -X PUT repos/Verdant-OS/verdant-grow-diary/pulls/<PR_NUMBER>/merge-async -f sha=<HEAD_SHA> -f merge_action=merge_queue`, where `<HEAD_SHA>` is the full 40-character head SHA of the PR at review time (re-read it immediately before enqueueing; a moved head voids the review).
+
+Never force-push, rebase a pushed branch, publish, apply SQL, or touch the production Supabase project. If the head moves after a review, the review is void; review it again.
+
+## Holds (don't merge; Matthew only)
+
+#1735, #1741, #1810 (migration/SQL stack); #1737; #1736; #1369. #1740 is never-merge until Codex's save/retrieve proof is final and green, and it gets a security-focused review.
+
+Update 2026-09-30: Matthew lifted the holds on #1737, #1735 and #1369 in a live session and instructed that every open PR be merged once its required checks are green. HOLD #1250 is moot: #1250 merged on 2026-09-29 (GitHub `merged_at` 2026-09-29T21:43:13Z), so there is nothing left to hold. The list above is kept as it stood at handoff.
+
+## Open work ledger
+
+| PR | State at handoff | Owner | Next step |
+|---|---|---|---|
+| #1761 | Open, not draft, at `a0c5f3c7` (2026-09-30). Was FAIL, 1 P1 at `dde3a9ec` (tent gating lets Training, Defoliation and Harvest save without a tent) | Codex | Follow the fix request comment on the PR: only Note, Photo and Issue save without a tent, add tests, merge the base, fix the PR body. Then Claude reviews. |
+| #1816 | Merged 2026-09-30 (was draft at `aad349f9`, CI queued) | — | Done. |
+| #1798 | Still draft at `d61f23c4` (2026-09-30); PASS-with-P2 at `c076016c`, base merged since | Claude | Once all checks are green at `d61f23c4`, review again, mark ready, enqueue. |
+| #1783 | Merged 2026-09-30 (EcoWitt multi-tent) | — | Done. |
+| #1676 | Conflicts with tip `4a94ca27` | Codex | Merge the tip in with a normal merge commit and push. Then Claude reviews. |
+| #1760 | Draft; shard 10 fails (`daily-check-active-grow-fallback.test.ts:93`) | Codex | Fix the test failure. |
+| #1675 | Draft; CI pending | Claude | Review once green. |
+| #1763 | 7 required checks fail; the Timeline wiring was asked of Copilot | Codex | Finish the wiring or close the PR. |
+| #1815 | Merged 2026-09-30 (PR description check) | — | Done. Add it to required checks only after one green PR run and one green merge-queue run. |
+| 23 branches updated after #1812 | CI rerunning | Claude | Sweep them on weekdays and review/merge any that clear the gate. |
+
+## Weekday cadence
+
+Weekdays at 9 AM CT, Claude sweeps the open, non-draft PRs against the gate, merges what passes, and posts a short status summary on this PR. Codex picks up any PR with a FAIL or conflict. At 8:45 PM CT, Claude tells Matthew whether the live site is behind the tip; publishing stays his call.

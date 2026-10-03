@@ -5,6 +5,10 @@ import {
   isFeedingNumericRangeReason,
 } from "./quickLogFeedingFormViewModel";
 import { buildFeedingRecoveryForm } from "./quickLogFeedingRecoveryViewModel";
+import {
+  quickLogSaveRequiresHistoryCheck,
+  type QuickLogHistoryCheckReason,
+} from "./quickLogSaveErrorMessage";
 
 export interface PendingQuickLogFeeding {
   version: 1;
@@ -12,6 +16,8 @@ export interface PendingQuickLogFeeding {
   createdAt: string;
   payload: FeedingTypedEventInput;
   resolved: ResolvedQuickLogV2Target;
+  /** Durable refusal of this same key; absent on older pending records. */
+  historyCheckReason?: QuickLogHistoryCheckReason;
 }
 
 export const FEEDING_RECOVERY_UNAVAILABLE =
@@ -80,7 +86,14 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogF
   if (
     !object(value) ||
     !jsonValue(value) ||
-    !onlyKeys(value, ["version", "ownerId", "createdAt", "payload", "resolved"])
+    !onlyKeys(value, [
+      "version",
+      "ownerId",
+      "createdAt",
+      "payload",
+      "resolved",
+      "historyCheckReason",
+    ])
   )
     return false;
   if (
@@ -88,6 +101,11 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogF
     !id(ownerId) ||
     value.ownerId !== ownerId ||
     !timestamp(value.createdAt)
+  )
+    return false;
+  if (
+    value.historyCheckReason !== undefined &&
+    !quickLogSaveRequiresHistoryCheck(value.historyCheckReason)
   )
     return false;
   const p = value.payload;
@@ -199,7 +217,33 @@ export function claimPendingQuickLogFeeding(
   }
 }
 
-/** Clear only the exact owner/payload/target that received confirmation. */
+/** Preserve a refusal only on its exact claimed record, with verified storage readback. */
+export function markPendingQuickLogFeedingHistoryCheck(
+  record: PendingQuickLogFeeding | null | undefined,
+  reason: unknown,
+): { status: "marked"; record: PendingQuickLogFeeding } | { status: "blocked" } {
+  try {
+    if (
+      !record ||
+      !validRecord(record, record.ownerId) ||
+      !quickLogSaveRequiresHistoryCheck(reason)
+    )
+      return { status: "blocked" };
+    const current = readPendingQuickLogFeeding(record.ownerId);
+    if (current.status !== "pending" || !sameRecord(current.record, record))
+      return { status: "blocked" };
+    const marked: PendingQuickLogFeeding = { ...current.record, historyCheckReason: reason };
+    window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
+    const verified = readPendingQuickLogFeeding(record.ownerId);
+    return verified.status === "pending" && sameRecord(verified.record, marked)
+      ? { status: "marked", record: verified.record }
+      : { status: "blocked" };
+  } catch {
+    return { status: "blocked" };
+  }
+}
+
+/** Clear only the exact owner/payload/target after confirmation or explicit abandonment. */
 export function clearPendingQuickLogFeeding(
   record: PendingQuickLogFeeding | null | undefined,
 ): boolean {

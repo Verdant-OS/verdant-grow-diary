@@ -3,9 +3,14 @@
 Rerun this whenever the billing surface changes — checkout, webhook, entitlement
 gates, price IDs, env config. Mirrors the release-gate items in
 `docs/paddle-paid-launch-runbook.md` §Release gate. Everything below is
-**sandbox-only** on preview and production hosts; no real charges, no live
+**provider-sandbox-only** at https://verdantgrowdiary.com; no real charges, no live
 secrets required. This verifies the current product policy, not a rehearsal
 that silently authorizes live checkout.
+
+Use the designated test-fixture account and its own grow only; never the KEEP
+account or customer data. Tag grow records `[smoke <timestamp>]`. Provider sandbox
+is accounting mode, not another app host. No payment-mode change or charge is
+authorized by this host decision. See docs/production-only-verification-runbook.md.
 
 Canonical lane since 2026-07-16: `payments-webhook` → `public.subscriptions`.
 The BYO `paddle-webhook` / `billing_subscriptions` path is audit-only and

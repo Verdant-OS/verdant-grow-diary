@@ -23,6 +23,7 @@ const H = vi.hoisted(() => ({
   targetsStatus: "idle" as "idle" | "ok",
   targets: null as Record<string, { min: number | null; max: number | null }> | null,
   alertsStatus: "ok" as "idle" | "loading" | "ok" | "unavailable",
+  kpiRenders: [] as string[],
 }));
 
 vi.mock("@/hooks/useGrowData", () => ({
@@ -191,11 +192,14 @@ vi.mock("@/components/DashboardDailyGrowCheckPanel", () => ({ default: () => nul
 vi.mock("@/components/SensorSourceBadge", () => ({ default: () => null }));
 
 vi.mock("@/components/KpiCard", () => ({
-  default: ({ label, value }: { label: string; value: number }) => (
-    <div data-testid="dashboard-kpi-card">
-      {label}: {value}
-    </div>
-  ),
+  default: ({ label, value }: { label: string; value: number }) => {
+    H.kpiRenders.push(`${label}: ${value}`);
+    return (
+      <div data-testid="dashboard-kpi-card">
+        {label}: {value}
+      </div>
+    );
+  },
 }));
 vi.mock("@/components/DashboardZeroTentEmptyState", () => ({
   default: () => <div data-testid="dashboard-zero-tent-empty-state">No tents</div>,
@@ -707,6 +711,21 @@ describe("Dashboard private-read honesty boundary", () => {
       expect(screen.queryByText("No active alerts right now.")).toBeNull();
     },
   );
+
+  it("does not confirm the previous grow's alerts read for a new grow scope", () => {
+    H.growStatus = "success";
+    H.alertsStatus = "ok";
+    const view = renderDashboard();
+    expect(H.kpiRenders).toContain("Open alerts: 0");
+
+    // useAlertsList keeps reporting the old scope's 'ok' until its effect runs.
+    H.scoped = true;
+    H.kpiRenders = [];
+    view.rerenderDashboard();
+
+    const alertsRenders = H.kpiRenders.filter((r) => r.startsWith("Open alerts"));
+    expect(alertsRenders[0]).toBe("Open alerts: Checking…");
+  });
 
   it("reports zero open alerts only after the alerts read succeeds", () => {
     H.growStatus = "success";

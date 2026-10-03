@@ -37,9 +37,17 @@ export type DashboardOpenAlertsView =
 export function buildDashboardOpenAlertsView(input: {
   status: string | null | undefined;
   openCount: number;
+  /**
+   * False while the alerts read still belongs to a previous grow scope. The
+   * hook starts each new read in a passive effect, so on a scope change its
+   * previous 'ok' would otherwise confirm another grow's alerts. Defaults to
+   * true.
+   */
+  readScopeCurrent?: boolean;
 }): DashboardOpenAlertsView {
   const validCount = Number.isFinite(input.openCount) && input.openCount >= 0;
-  if (input.status === "unavailable" || (input.status === "ok" && !validCount)) {
+  const stale = input.readScopeCurrent === false;
+  if (!stale && (input.status === "unavailable" || (input.status === "ok" && !validCount))) {
     return {
       kind: "unavailable",
       kpiValue: DASHBOARD_OPEN_ALERTS_COPY.unavailable,
@@ -48,7 +56,7 @@ export function buildDashboardOpenAlertsView(input: {
       detail: DASHBOARD_OPEN_ALERTS_COPY.unavailableDetail,
     };
   }
-  if (input.status !== "ok") {
+  if (stale || input.status !== "ok") {
     return {
       kind: "pending",
       kpiValue: DASHBOARD_OPEN_ALERTS_COPY.checking,

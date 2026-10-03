@@ -14,7 +14,7 @@ import {
   computeStabilityRollup,
   STABILITY_ROLLUP_TONE_CLASS,
 } from "@/lib/dashboardStabilityRollupRules";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@/lib/react-router-compat";
 
@@ -306,6 +306,15 @@ export default function Dashboard() {
     scopedGrowId ? { growId: scopedGrowId, status: "open" } : { status: "open" },
   );
   const persistedOpenCount = scopedGrowId ? persistedAlertsState.alerts.length : 0;
+  // useAlertsList starts each read in a passive effect, so right after a grow
+  // scope change it still reports the previous scope's 'ok'. This effect
+  // follows that hook's effect, so the new scope and its loading state land
+  // together (same guard as usePlantAssignedTentAlerts).
+  const alertsScopeKey = scopedGrowId ?? null;
+  const [alertsReadScope, setAlertsReadScope] = useState(alertsScopeKey);
+  useEffect(() => {
+    setAlertsReadScope(alertsScopeKey);
+  }, [alertsScopeKey]);
 
   // Persist derived Environment Alerts into public.alerts when (and only
   // when) they are backed by real, valid sensor readings. Idempotent and
@@ -332,6 +341,7 @@ export default function Dashboard() {
   const openAlertsView = buildDashboardOpenAlertsView({
     status: persistedAlertsState.status,
     openCount: openAlerts,
+    readScopeCurrent: alertsReadScope === alertsScopeKey,
   });
 
   // Latest reading per tent for the strip + a read-only stability summary
@@ -367,7 +377,9 @@ export default function Dashboard() {
     };
   });
 
-  const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
+  // Another scope's rows are not this grow's alerts.
+  const recentAlerts =
+    openAlertsView.kind === "known" ? persistedAlertsState.alerts.slice(0, 3) : [];
 
   if (tentsQuery.isError || plantsQuery.isError) {
     return (

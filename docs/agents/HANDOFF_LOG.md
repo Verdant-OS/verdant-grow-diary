@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CLAUDE-LOOP-ENGINEERING-001
+
+```text
+TASK CLAUDE-LOOP-ENGINEERING-001  priority: other  status: OPEN
+goal: Close the three gaps between Verdant's loop discipline and the Karpathy-loop workflow (AI LABS video qLfSDQ5NGh0): a scorer lock as a PreToolUse hook, a loop-habits skill with a check-safe amendment path, and docs/agents/loop-engineering.md with the four-condition eligibility gate and never-loop list. Docs plus tooling; no src/ product code, no supabase/, no workflow, no lockfile, no governance file.
+branch: claude/fervent-mccarthy-ga3vwv
+base: verdant-grow-diary at 80176bad5 (#1864)
+checkout: git switch claude/fervent-mccarthy-ga3vwv && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1866
+head_sha: a9bb2997f9747ea2fd8b8688fbd2dc7415fe28d2, observed on origin/claude/fervent-mccarthy-ga3vwv at 2026-10-03T01:52:55Z (20:52 CT). This log edit travels in that head's direct child on the task branch, so a successor will find origin ahead of this value: apply AGENTS.md › Eligible coverage, adopt the remote head when `git merge-base --is-ancestor a9bb2997f9747ea2fd8b8688fbd2dc7415fe28d2 origin/claude/fervent-mccarthy-ga3vwv` succeeds, and stop only if it fails. The PR integrates by squash: the merged commit's sole parent is the deploy tip, so this block closes with that squash SHA, not with any branch head. Earlier heads, oldest first: 639892d544bd0747183b5dd7cb503b41be925586, a665161a7e57be0086a6db3c4a1b535421009a56, 28ad3b0e958f961b84df46221a9d883331d7d705, 20cd4a97ceb3684e9ea856dc77e39f82c73e11aa, 3715dac6f1f68e0361d647c0afb6d94c6e822b4d, 4f9aff416044346e5fe6dc2eab84a91939f676d2, a715d25e16f0a0b0a0c5e6bf1695af83895bb8aa, 97455693e32f2fc92e82123607dab5a0161f7d49, 2a7ada309b2b820863595fc24348379ad21f9db1, d3f7fd4233e0ad3794500338046b13d204841806, 109aba953c25d0d2d26de4b26597d3688c4367cf, f1a165844d9ba22a7ff958dbfc1174f7f85b2427, 2a1e01f4f46ac818b5751a9ee0e4a6e4d051fca0
+state: ready for review (owner instruction 2026-10-02 18:46 CT). Head d3f7fd423 (round 7) was measured 35/35 required SUCCESS (ci.yml run 37084559423); every later head touches only scripts/scorer-lock.mjs, scripts/lib/scorerLockRules.mjs, the two tests and docs/agents/loop-engineering.md. Codex rounds 1 to 11 (twenty-one P2 findings) and CodeRabbit (one Major, four Minors, one security Low, one merge-risk note) are each fixed in the following push and named in the thread reply; the PR body carries the per-head test evidence. Scorer set now: tests and specs (src/test, e2e, e2e-local, *.test.*, *.spec.*, Deno *_test.ts, Python test_*.py, supabase/tests), scripts/ judges by verb token or run-/test- prefix, test-runner configs, the Vitest suite runners, the verb-less migration gates and their manifests, gate wiring (.github/workflows, .husky, package.json), the delegated gate library (scripts/lib), gate-owned configuration (config/, scripts/config/, scripts/fixtures/, eslint and tsconfig, the edge sync manifest, the workbook manifest), and the lock's own control files. Unlocks carry a full declaration contract (path, reason, at, branch, bounded expiry) and the hook judges worktree edits from the hook input's cwd. Non-blocking reds on every head, each stood down with one PR comment: Vercel (owner account block, #1842 notice), copilot-pull-request-reviewer (Copilot quota), the dependency-policy job (config/dependency-lockfile-transition.json reviewBy=2026-10-02 overdue; owner decision), and one native save/retrieve scenario timeout at d3f7fd423 (not this PR's; re-run on the current head pending).
+next_action: fresh CI at the new head, then Critical Mass independent review at that exact head; Claude answers review threads and keeps CI green. No auto-merge or merge; GDP owns integration.
+files: .claude/settings.json (new); .claude/skills/verdant-loop-habits/SKILL.md (new); .gitignore; docs/agents/loop-engineering.md (new); scripts/lib/scorerLockRules.mjs (new); scripts/scorer-lock.mjs (new); src/test/scorer-lock-rules.test.ts (new); src/test/loop-engineering-doc.test.ts (new); docs/agents/HANDOFF_LOG.md (this block).
+blockers: none for review. Deferred, recorded in the doc section 7: moving the scorer rule into verdant-guard waits for #1865; a link from docs/agents/claude-slices.md waits for #1774; a CI job running scorer-lock --report --strict is a Codex-routed CI slice. Dependency bootstrap in a cloud container needs xlsx re-pointed to the public registry for validation only (cdn.sheetjs.com is egress-denied); neither manifest is in the diff.
+artifacts: PR #1866 body (TDD evidence and validation table); src/test/scorer-lock-rules.test.ts; src/test/loop-engineering-doc.test.ts.
+reviewer_seat: Critical Mass (no .tsx outside src/test/, not P1, not a publish gate); Grok may add an independent review under the standing architecture assignment
+claimed_by: Claude, 2026-10-02 18:20 CT (owner instruction in session: "Build the three gaps as a draft PR")
+last_updated: 2026-10-02 20:58 CT, by Claude
+```
+
 ### CHEM-MOVE-TENT-READ-HONESTY-001
 
 ```text

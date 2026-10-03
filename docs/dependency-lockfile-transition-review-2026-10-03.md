@@ -64,7 +64,7 @@ Before 2026-10-10 the dependency security owner should do one of the following,
 and record it:
 
 1. Retire or reconcile the four npm contracts, starting with the SEO workflow's
-   `npm ci`, then remove `package-lock.json` and this transition config together.
+   `ci` subcommand, then remove `package-lock.json` and this transition config together.
 2. Or renew again with a fresh inventory and a reason that names the blocker.
 
 ## Risk and rollback

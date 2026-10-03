@@ -15,7 +15,7 @@ The 2026-10-02 review date began rejecting the policy on 2026-10-03 UTC: the
 `check-bun-lockfile-policy` lane failed with only the overdue-review diagnostic. The
 2026-09-25 review asked the owner to retire or reconcile the remaining npm contracts
 before the next review. That has not happened. The four references below are unchanged,
-and removing the compatibility lock today would still break the SEO workflow's `npm ci`.
+and removing the compatibility lock today would still break the SEO workflow's lock-dependent install.
 The owner chose to extend rather than remove. This review records the re-inventory and
 the reason, as the 2026-09-25 review required for any later extension.
 

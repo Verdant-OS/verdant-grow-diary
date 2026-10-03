@@ -3,8 +3,10 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { load as loadYaml } from "js-yaml";
 import {
   UTC_HASH_MIGRATION,
+  UTC_HASH_SHA256,
   UTC_HASH_WRAPPER_MD5,
   pinnedUtcHashSql,
   runEventRequestHashUtcHarness,
@@ -65,6 +67,13 @@ describe("Quick Log event request hash UTC PostgreSQL 15 proof", () => {
     expect(() => pinnedUtcHashSql(repair.replace("ELSE 'UTC'", "ELSE v_caller_time_zone"))).toThrow(
       "utc_hash_migration_fingerprint_mismatch",
     );
+  });
+
+  it("pins the additive repair migration bytes", () => {
+    const repair = read(UTC_HASH_MIGRATION);
+    expect(createHash("sha256").update(repair).digest("hex")).toBe(UTC_HASH_SHA256);
+    expect(repair).toContain("BEGIN;");
+    expect(repair.trimEnd()).toMatch(/COMMIT;$/);
   });
 
   it("is versioned after its predecessor and every merged migration", () => {
@@ -172,15 +181,38 @@ describe("Quick Log event request hash UTC PostgreSQL 15 proof", () => {
   });
 
   it("runs in the dedicated disposable PG15 job for these paths", () => {
-    const workflow = readFileSync(
-      resolve(root, ".github/workflows/quicklog-event-replay-lock-pg15.yml"),
+    const workflow = loadYaml(
+      readFileSync(resolve(root, ".github/workflows/quicklog-event-replay-lock-pg15.yml"), "utf8"),
+    ) as {
+      on: Record<string, { paths?: string[]; branches?: string[] }>;
+      jobs: { pg15_runtime: { steps: Array<{ run?: string; name?: string }> } };
+    };
+    expect(Object.keys(workflow.on).sort()).toEqual(["merge_group", "pull_request", "push"]);
+    expect(workflow.on.merge_group ?? {}).toEqual({});
+    for (const trigger of ["pull_request", "push"] as const) {
+      expect(workflow.on[trigger]?.paths).toContain(`supabase/migrations/${UTC_HASH_MIGRATION}`);
+      expect(workflow.on[trigger]?.paths).toContain(
+        "scripts/run-quicklog-event-request-hash-utc-pg15-harness.mjs",
+      );
+      expect(workflow.on[trigger]?.paths).toContain(
+        "src/test/quicklog-event-request-hash-utc-pg15-harness.test.ts",
+      );
+    }
+    expect(workflow.on.push?.branches).toEqual(["verdant-grow-diary"]);
+    expect(
+      workflow.jobs.pg15_runtime.steps.some(
+        (step) => step.run === "node scripts/run-quicklog-event-request-hash-utc-pg15-harness.mjs",
+      ),
+    ).toBe(true);
+  });
+
+  it("documents the RED stage the harness must fail before the UTC repair lands", () => {
+    const harness = readFileSync(
+      resolve(root, "scripts/run-quicklog-event-request-hash-utc-pg15-harness.mjs"),
       "utf8",
     );
-    expect(workflow).toContain(UTC_HASH_MIGRATION);
-    expect(workflow).toContain("scripts/run-quicklog-event-request-hash-utc-pg15-harness.mjs");
-    expect(workflow).toContain("src/test/quicklog-event-request-hash-utc-pg15-harness.test.ts");
-    expect(workflow).toContain(
-      "run: node scripts/run-quicklog-event-request-hash-utc-pg15-harness.mjs",
-    );
+    expect(harness).toContain('stage = "legacy_session_dependence"');
+    expect(harness).toContain('stage = "utc_stored_hash_retries"');
+    expect(harness).toContain("idempotency_key_conflict");
   });
 });

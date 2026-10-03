@@ -137,16 +137,17 @@ describe("mapWateringInputToRpcArgs", () => {
     expect(result.args.p_water).not.toHaveProperty("ec_ms_cm");
   });
 
-  it("normalizes date and numeric timestamps to ISO", () => {
-    const dateResult = mapWateringInputToRpcArgs(
-      baseInput({ occurred_at: new Date("2026-07-20T10:30:00.000Z") }),
-    );
-    const numberResult = mapWateringInputToRpcArgs(
-      baseInput({ occurred_at: Date.parse("2026-07-20T10:30:00.000Z") }),
+  it("normalizes date, numeric, and offset timestamps to the same UTC ISO", () => {
+    const iso = "2026-07-20T10:30:00.000Z";
+    const dateResult = mapWateringInputToRpcArgs(baseInput({ occurred_at: new Date(iso) }));
+    const numberResult = mapWateringInputToRpcArgs(baseInput({ occurred_at: Date.parse(iso) }));
+    const offsetResult = mapWateringInputToRpcArgs(
+      baseInput({ occurred_at: "2026-07-20T06:30:00-04:00" }),
     );
 
-    expect(dateResult.ok && dateResult.args.p_occurred_at).toBe("2026-07-20T10:30:00.000Z");
-    expect(numberResult.ok && numberResult.args.p_occurred_at).toBe("2026-07-20T10:30:00.000Z");
+    expect(dateResult.ok && dateResult.args.p_occurred_at).toBe(iso);
+    expect(numberResult.ok && numberResult.args.p_occurred_at).toBe(iso);
+    expect(offsetResult.ok && offsetResult.args.p_occurred_at).toBe(iso);
   });
 
   it("is deterministic and leaves nested evidence untouched", () => {

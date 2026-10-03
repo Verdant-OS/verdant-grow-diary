@@ -45,6 +45,10 @@ interface MemoryFixture {
     paddle_transaction_id: string;
     environment: "sandbox" | "live";
   }>;
+  clawbackCalls: Array<{
+    paddle_transaction_id: string;
+    environment: "sandbox" | "live";
+  }>;
   upsertCalls: Array<Parameters<Deps["upsertSubscription"]>[0]>;
   insertCalls: Array<Parameters<Deps["insertEventReceived"]>[0]>;
   markCalls: Array<{ id: string; patch: Parameters<Deps["markEvent"]>[1] }>;
@@ -53,6 +57,7 @@ interface MemoryFixture {
 function makeMemoryFixture(): MemoryFixture {
   const existingByEventId = new Map<string, ExistingEventRow>();
   const revokeCalls: MemoryFixture["revokeCalls"] = [];
+  const clawbackCalls: MemoryFixture["clawbackCalls"] = [];
   const upsertCalls: MemoryFixture["upsertCalls"] = [];
   const insertCalls: MemoryFixture["insertCalls"] = [];
   const markCalls: MemoryFixture["markCalls"] = [];
@@ -85,9 +90,24 @@ function makeMemoryFixture(): MemoryFixture {
       });
       return { ok: true, subscriptionsUpdated: 0, foundersUpdated: 0 };
     },
+    clawbackCreditPack: async (input) => {
+      clawbackCalls.push({
+        paddle_transaction_id: input.paddle_transaction_id,
+        environment: input.environment,
+      });
+      return { ok: true, reason: "no_grant" };
+    },
   };
 
-  return { deps, existingByEventId, revokeCalls, upsertCalls, insertCalls, markCalls };
+  return {
+    deps,
+    existingByEventId,
+    revokeCalls,
+    clawbackCalls,
+    upsertCalls,
+    insertCalls,
+    markCalls,
+  };
 }
 
 function founderPurchase(eventId = "evt_purchase") {
@@ -384,5 +404,103 @@ describe("unused dep wiring stays fail-closed", () => {
     );
     expect(res.httpStatus).toBe(500);
     expect(res.reason).toMatch(/founder_refund_revoke_unwired/);
+  });
+
+  it("approved refund without a credit-pack clawback still cannot 200 as processed", async () => {
+    const f = makeMemoryFixture();
+    delete f.deps.clawbackCreditPack;
+    const res = await handleVerifiedEvent(
+      f.deps,
+      {
+        eventId: "evt_unwired_clawback",
+        eventType: "adjustment.created",
+        data: { action: "chargeback", status: "approved", transactionId: "txn_refund_001" },
+      },
+      "live",
+      NOW,
+      {},
+    );
+    expect(res.httpStatus).toBe(500);
+    expect(res.reason).toMatch(/credit_pack_clawback_unwired/);
+    expect(f.existingByEventId.get("evt_unwired_clawback")?.processing_status).toBe("failed");
+  });
+});
+
+describe("approved refunds also claw back a credit-pack grant (grant-path audit, 2026-10-03)", () => {
+  it.each([
+    ["refund", "live"],
+    ["chargeback", "sandbox"],
+  ] as const)(
+    "an approved %s in %s calls the clawback with its transaction",
+    async (action, env) => {
+      const f = makeMemoryFixture();
+      const res = await handleVerifiedEvent(
+        f.deps,
+        {
+          eventId: `evt_${action}_${env}`,
+          eventType: "adjustment.created",
+          data: { action, status: "approved", transactionId: "txn_pack_001" },
+        },
+        env,
+        NOW,
+        {},
+      );
+      expect(res).toEqual({ httpStatus: 200, reason: "processed:revoke_lifetime" });
+      expect(f.clawbackCalls).toEqual([
+        { paddle_transaction_id: "txn_pack_001", environment: env },
+      ]);
+    },
+  );
+
+  it("a pending refund calls neither the revoke nor the clawback", async () => {
+    const f = makeMemoryFixture();
+    await handleVerifiedEvent(
+      f.deps,
+      {
+        eventId: "evt_pending",
+        eventType: "adjustment.created",
+        data: { action: "refund", status: "pending_approval", transactionId: "txn_pack_001" },
+      },
+      "live",
+      NOW,
+      {},
+    );
+    expect(f.revokeCalls).toEqual([]);
+    expect(f.clawbackCalls).toEqual([]);
+  });
+
+  it("a rejected clawback fails the refund so Paddle retries", async () => {
+    const f = makeMemoryFixture();
+    f.deps.clawbackCreditPack = async () => ({ ok: false, error: "rpc_error:boom" });
+    const res = await handleVerifiedEvent(
+      f.deps,
+      {
+        eventId: "evt_clawback_fails",
+        eventType: "adjustment.created",
+        data: { action: "refund", status: "approved", transactionId: "txn_pack_001" },
+      },
+      "live",
+      NOW,
+      {},
+    );
+    expect(res.httpStatus).toBe(500);
+    expect(res.reason).toMatch(/rpc_error:boom/);
+  });
+
+  it("does not claw back when the founder revoke itself failed", async () => {
+    const f = makeMemoryFixture();
+    f.deps.revokeFounderLifetime = async () => ({ ok: false, error: "revoke_failed" });
+    await handleVerifiedEvent(
+      f.deps,
+      {
+        eventId: "evt_revoke_fails",
+        eventType: "adjustment.created",
+        data: { action: "refund", status: "approved", transactionId: "txn_pack_001" },
+      },
+      "live",
+      NOW,
+      {},
+    );
+    expect(f.clawbackCalls).toEqual([]);
   });
 });

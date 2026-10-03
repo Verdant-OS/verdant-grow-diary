@@ -89,6 +89,13 @@ idempotently on `paddle_event_id` (23505 = duplicate no-op), and writes
 `public.subscriptions` directly for recurring plans + calls
 `allocate_lovable_founder_lifetime` for Founder Lifetime.
 
+An approved refund or chargeback (partial refunds included) revokes Founder
+Lifetime and calls `clawback_lovable_credit_pack`, which appends one reversal
+for the full credit-pack grant on that transaction. If credits were already
+spent, the pack balance goes negative and pack-funded AI stops until later
+grants cover it; the monthly allowance is unaffected. A refund that arrives
+before the purchase blocks the grant (`credit_pack_refund_precedes_purchase`).
+
 Audit-only: `paddle-webhook` (BYO lane). Sandbox-only. Still verifies
 signatures and writes `paddle_events` / `paddle_event_processing` /
 `billing_subscriptions` for operator audit pages, but no longer contributes

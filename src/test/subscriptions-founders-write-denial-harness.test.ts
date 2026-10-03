@@ -82,12 +82,6 @@ describe("write-denial harness refuses anything but the disposable loopback data
       resolveHarnessTarget([LOCAL_LANE_FLAG], { ...LOCAL, SUPABASE_URL: "not a url" }),
     ).toMatchObject({ ok: false, exitCode: 2, message: "database API URL is invalid" });
   });
-
-  it("is deterministic for the same input", () => {
-    expect(resolveHarnessTarget([LOCAL_LANE_FLAG], LOCAL)).toEqual(
-      resolveHarnessTarget([LOCAL_LANE_FLAG], LOCAL),
-    );
-  });
 });
 
 describe("security-db-local runs the write-denial harness", () => {

@@ -161,7 +161,8 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
   const uidB = await createUser(emailB, passB);
   const users = [uidA, uidB];
 
-  // Two free founder numbers, chosen from the top so a populated replay never collides.
+  // Three free founder numbers (A, B and a spare that must stay unclaimed), chosen from
+  // the top so a populated replay never collides.
   const { data: taken, error: takenError } = await admin.from("founders").select("founder_number");
   if (takenError) throw new Error(`founder numbers: ${takenError.message}`);
   const used = new Set((taken ?? []).map((r: { founder_number: number }) => r.founder_number));

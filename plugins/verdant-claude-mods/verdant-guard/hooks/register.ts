@@ -26,12 +26,19 @@ async function isPublished(git: Git, rel: string): Promise<boolean> {
   return r !== null && r.exitCode === 0;
 }
 
+/** The checkout root, so paths anchor exactly even when the checkout sits under ~/src or ~/docs. */
+async function repoRoot(git: Git): Promise<string | null> {
+  const r = await git(["git", "rev-parse", "--show-toplevel"]);
+  return r && r.exitCode === 0 ? r.stdout.trim() || null : null;
+}
+
 /** The refusal reason for writing `filePath`, or null. */
 async function fileReason(git: Git, filePath: unknown): Promise<string | null> {
   if (typeof filePath !== "string") return null;
-  const reason = checkFileEdit(filePath);
+  const root = await repoRoot(git);
+  const reason = checkFileEdit(filePath, root);
   if (reason) return reason;
-  const rel = repoRelative(filePath);
+  const rel = repoRelative(filePath, root);
   if (MIGRATION_PATH.test(rel) && (await isPublished(git, rel)))
     return PUBLISHED_MIGRATION_MSG(rel);
   return null;

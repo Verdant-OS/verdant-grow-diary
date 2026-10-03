@@ -12,15 +12,19 @@ They add no new policy: every refusal names the existing rule it enforces.
 ## Status
 
 `practical observation`: both mods pass `claude plugin validate` and `claude plugin test`
-(`verdant-guard` 53/53, `verdant-cache-clock` 6/6) on Claude Code 2.1.288. Removing the
+(`verdant-guard` 67/67, `verdant-cache-clock` 6/6) on Claude Code 2.1.288. Removing the
 guard's Bash and file checks turns two engine tests red. Behaviour inside a live agent
 session is `NOT_MEASURED`.
 
 The guard is a tripwire against accidents, not a security boundary. It splits shell
-commands on `&&`, `||`, `;`, `|` and newlines outside quotes, so a quoted pattern such as
-`grep "a|git push --force"` is one command, and an unclosed quote falls back to splitting on
-every operator. It does not expand `$(…)` or backticks, so `bash -c "…"`, `eval` or a script
-file can route around it. CI, the
+commands on `&&`, `||`, `;`, `|`, a background `&`, `(`, `)` and newlines outside quotes, so a
+quoted pattern such as `grep "a|git push --force"` is one command, a subshell or `$(…)` body is
+checked as its own command, and an unclosed quote falls back to splitting on every operator. It
+strips `bunx`, `npx`, `bun x`, `pnpm dlx|exec` and `yarn dlx|exec` before matching, anchors file
+paths on the checkout root from `git rev-parse --show-toplevel`, and matches MCP tools by
+service (`…supabase__`, `…vercel__`, `…github__`, `…lovable__`) whatever the server prefix.
+Backticks, `bash -c "…"`, `eval`, a script file or an unrecognised MCP server can still route
+around it. CI, the
 `Published migration integrity` gate, branch rulesets and RLS remain the real enforcement.
 
 ## Loading

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "claude-code/testing";
 
-import { checkBash, checkFileEdit, checkInWarning, checkMcp } from "./rules";
+import { checkBash, checkFileEdit, checkInWarning, checkMcp, repoRelative } from "./rules";
 
 // Built from a constant so scripts/check-bun-lockfile-policy.mjs, which scans tracked files for
 // literal npm package-install commands, does not read these fixtures as lockfile consumers.
@@ -158,5 +158,54 @@ describe("quoted operators", () => {
   });
   test("a backslash-newline continues the command", () => {
     expect(checkBash(`git push \\\n  --force origin claude/x`)).not.toBe(null);
+  });
+});
+
+// Critical Mass review of #1865 at e2b0c27, P2 1–5.
+describe("review P2 fixes", () => {
+  test("P2-1: the repo root anchors paths in a checkout under a src/ or docs/ directory", () => {
+    const root = "/home/x/src/verdant-grow-diary";
+    expect(repoRelative(`${root}/src/routeTree.gen.ts`, root)).toBe("src/routeTree.gen.ts");
+    expect(checkFileEdit(`${root}/src/routeTree.gen.ts`, root)).not.toBe(null);
+    const docsRoot = "/home/x/docs/repo";
+    expect(repoRelative(`${docsRoot}/supabase/migrations/1_a.sql`, docsRoot)).toBe(
+      "supabase/migrations/1_a.sql",
+    );
+    expect(checkFileEdit(`${docsRoot}/bun.lock`, docsRoot)).not.toBe(null);
+  });
+  test("P2-2: package runners do not hide production commands", () => {
+    for (const cmd of [
+      "bunx supabase db push",
+      "npx vercel --prod",
+      "bun x supabase functions deploy x",
+      "pnpm dlx vercel promote x",
+      "yarn dlx supabase db push",
+    ]) {
+      expect(checkBash(cmd), cmd).not.toBe(null);
+    }
+  });
+  test("P2-3: a lone & and ( … ) subshells split commands; redirections do not", () => {
+    expect(checkBash("sleep 1 & git push --force")).not.toBe(null);
+    expect(checkBash("(git push --force)")).not.toBe(null);
+    expect(checkBash("(cd x && git rebase origin/main)")).not.toBe(null);
+    expect(checkBash("echo $(git push --force)")).not.toBe(null);
+    expect(checkBash("bun run typecheck 2>&1 | tail -5")).toBe(null);
+    expect(checkBash("bun run lint &> lint.log")).toBe(null);
+  });
+  test("P2-4: -x is a boolean Playwright flag, not one that takes a value", () => {
+    expect(
+      checkBash("bunx playwright test --project=chromium-mocked -x e2e/auth-loading.spec.ts"),
+    ).toBe(null);
+  });
+  test("P2-5: MCP deny rules match whatever the server is prefixed", () => {
+    expect(checkMcp("mcp__claude_ai_Supabase__apply_migration", {})).not.toBe(null);
+    expect(checkMcp("mcp__supabase__execute_sql", {})).not.toBe(null);
+    expect(checkMcp("mcp__my_vercel__request_rollback", {})).not.toBe(null);
+    expect(checkMcp("mcp__GitHub__merge_pull_request", {})).not.toBe(null);
+    expect(checkMcp("mcp__gh_enterprise_github__update_pull_request", { draft: false })).not.toBe(
+      null,
+    );
+    expect(checkMcp("mcp__claude_ai_Supabase__list_tables", {})).toBe(null);
+    expect(checkMcp("mcp__notsupabase_x__execute_sql", {})).toBe(null);
   });
 });

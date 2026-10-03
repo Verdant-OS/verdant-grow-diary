@@ -75,8 +75,12 @@ export function segments(command: string): string[][] {
         inToken = true;
       }
       i += 1;
-    } else if (c === "\n" || c === ";" || c === "|" || (c === "&" && text[i + 1] === "&")) {
-      if ((c === "|" || c === "&") && text[i + 1] === c) i += 1;
+    } else if (c === "\n" || c === ";" || c === "|" || c === "(" || c === ")") {
+      if (c === "|" && text[i + 1] === "|") i += 1;
+      endSegment();
+    } else if (c === "&" && text[i - 1] !== ">" && text[i + 1] !== ">") {
+      // `&&` and a lone background `&` both end a command; `2>&1` and `&>` are redirections.
+      if (text[i + 1] === "&") i += 1;
       endSegment();
     } else if (/\s/.test(c)) {
       endToken();
@@ -94,7 +98,7 @@ export function segments(command: string): string[][] {
 
 function naiveSegments(text: string): string[][] {
   return text
-    .split(/&&|\|\||;|\||\n/)
+    .split(/&&|\|\||;|\||\n|\(|\)|(?<![>])&(?![>])/)
     .map((s) =>
       s
         .trim()
@@ -209,14 +213,20 @@ const PW_VALUE_FLAGS = new Set([
   "--shard",
   "--repeat-each",
   "--max-failures",
-  "-x",
   "--trace",
 ]);
 
+/** Drops a package-runner prefix: `bunx`, `npx`, `bun x`, `pnpm dlx|exec`, `yarn dlx|exec`. */
+function stripRunner(tokens: string[]): string[] {
+  const [a, b] = tokens;
+  if (a === "bunx" || a === "npx") return tokens.slice(1);
+  if (a === "bun" && b === "x") return tokens.slice(2);
+  if ((a === "pnpm" || a === "yarn") && (b === "dlx" || b === "exec")) return tokens.slice(2);
+  return tokens;
+}
+
 function checkPlaywright(tokens: string[]): string | null {
-  let t = tokens;
-  if (t[0] === "bunx" || t[0] === "npx") t = t.slice(1);
-  else if (t[0] === "bun" && t[1] === "x") t = t.slice(2);
+  const t = stripRunner(tokens);
   if (t[0] !== "playwright" || t[1] !== "test") return null;
   const args = t.slice(2);
   let project: string | null = null;
@@ -240,7 +250,8 @@ function checkPlaywright(tokens: string[]): string | null {
 const PROD_MSG =
   "Production database changes, deploys, promotion and rollback are Matthew's decisions (AGENTS.md › Release and Environment Rules). Prepare a release packet or escalation instead.";
 
-function checkProductionOps(tokens: string[], whole: string): string | null {
+function checkProductionOps(rawTokens: string[], whole: string): string | null {
+  const tokens = stripRunner(rawTokens);
   const [cmd, a, b] = tokens;
   if (cmd === "supabase") {
     if (a === "db" && (b === "push" || (b === "reset" && tokens.includes("--linked"))))
@@ -282,8 +293,12 @@ export function checkBash(command: string): string | null {
 }
 
 /** Normalises a path to its repo-relative form by anchoring on known roots. */
-export function repoRelative(filePath: string): string {
+export function repoRelative(filePath: string, repoRoot?: string | null): string {
   const p = filePath.replace(/\\/g, "/");
+  // With the repository root known, strip it exactly: the heuristic below would anchor on the
+  // first `/src/` or `/docs/` anywhere, which is wrong for a checkout under ~/src/ or ~/docs/.
+  const root = repoRoot ? repoRoot.replace(/\\/g, "/").replace(/\/+$/, "") : "";
+  if (root && p.startsWith(`${root}/`)) return p.slice(root.length + 1);
   for (const root of ["src/", "supabase/", "scripts/", "docs/", "e2e/", "config/", ".github/"]) {
     const i = p.indexOf(`/${root}`);
     if (i >= 0) return p.slice(i + 1);
@@ -313,8 +328,8 @@ export const MIGRATION_PATH = /^supabase\/migrations\/[^/]+\.sql$/;
  * Static file-edit rules. Published-migration immutability needs a git lookup,
  * so it is decided in register.ts with `isPublished`.
  */
-export function checkFileEdit(filePath: string): string | null {
-  const rel = repoRelative(filePath);
+export function checkFileEdit(filePath: string, repoRoot?: string | null): string | null {
+  const rel = repoRelative(filePath, repoRoot);
   if (GENERATED.some((re) => re.test(rel))) {
     return `\`${rel}\` is generated — never hand-edit it (CLAUDE.md › Conventions). Regenerate it with the repo's tooling.`;
   }
@@ -325,34 +340,50 @@ export function checkFileEdit(filePath: string): string | null {
 export const PUBLISHED_MIGRATION_MSG = (rel: string) =>
   `\`${rel}\` is a published migration and is permanent history (AGENTS.md › Migration Immutability). Ship a new additive migration, or check config/local-supabase-replay-compatibility.json.`;
 
-/** MCP tools that publish, merge, promote or write production. Exact names. */
+/**
+ * MCP tools that publish, merge, promote or write production, keyed by service and tool name.
+ * The server segment of `mcp__<server>__<tool>` varies by how a connector is installed
+ * (`Supabase`, `supabase`, `claude_ai_Supabase`), so it is matched by service, not exactly.
+ */
 const MCP_DENY: Record<string, string> = {
-  mcp__github__merge_pull_request: "merge",
-  mcp__github__enable_pr_auto_merge: "merge",
-  mcp__Supabase__apply_migration: "prod",
-  mcp__Supabase__execute_sql: "prod",
-  mcp__Supabase__deploy_edge_function: "prod",
-  mcp__Supabase__merge_branch: "prod",
-  mcp__Supabase__reset_branch: "prod",
-  mcp__Supabase__delete_branch: "prod",
-  mcp__Supabase__pause_project: "prod",
-  mcp__Supabase__restore_project: "prod",
-  mcp__Vercel__request_promote: "prod",
-  mcp__Vercel__request_rollback: "prod",
-  mcp__Vercel__create_deployment: "prod",
-  mcp__Vercel__start_rolling_release: "prod",
-  mcp__Vercel__complete_rolling_release: "prod",
-  mcp__Vercel__approve_rolling_release_stage: "prod",
-  mcp__Lovable__deploy_project: "prod",
+  github__merge_pull_request: "merge",
+  github__enable_pr_auto_merge: "merge",
+  supabase__apply_migration: "prod",
+  supabase__execute_sql: "prod",
+  supabase__deploy_edge_function: "prod",
+  supabase__merge_branch: "prod",
+  supabase__reset_branch: "prod",
+  supabase__delete_branch: "prod",
+  supabase__pause_project: "prod",
+  supabase__restore_project: "prod",
+  vercel__request_promote: "prod",
+  vercel__request_rollback: "prod",
+  vercel__create_deployment: "prod",
+  vercel__start_rolling_release: "prod",
+  vercel__complete_rolling_release: "prod",
+  vercel__approve_rolling_release_stage: "prod",
+  lovable__deploy_project: "prod",
 };
 
+const MCP_SERVICES = ["github", "supabase", "vercel", "lovable"] as const;
+
+/** `mcp__claude_ai_Supabase__execute_sql` → `supabase__execute_sql`; null for other servers. */
+function mcpServiceTool(tool: string): string | null {
+  const m = /^mcp__(.+?)__([^_].*)$/.exec(tool);
+  if (!m || !m[1] || !m[2]) return null;
+  const server = m[1].toLowerCase();
+  const service = MCP_SERVICES.find((s) => server === s || server.endsWith(`_${s}`));
+  return service ? `${service}__${m[2]}` : null;
+}
+
 export function checkMcp(tool: string, input: Record<string, unknown>): string | null {
-  const kind = MCP_DENY[tool];
+  const key = mcpServiceTool(tool);
+  const kind = key ? MCP_DENY[key] : undefined;
   if (kind === "merge") {
     return "Merging belongs to Chemdawg after 35/35 required checks plus an independent exact-head PASS (AGENTS.md).";
   }
   if (kind === "prod") return PROD_MSG;
-  if (tool === "mcp__github__update_pull_request" && input.draft === false) {
+  if (key === "github__update_pull_request" && input.draft === false) {
     return "Drafts remain draft (AGENTS.md › Git and merges). Readiness is decided by the merge owner.";
   }
   return null;

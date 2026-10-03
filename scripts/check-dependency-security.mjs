@@ -29,6 +29,14 @@ export const BLOCKED_PACKAGES = Object.freeze([
 ]);
 export const BLOCKED_SEVERITIES = Object.freeze(["high", "critical"]);
 export const KNOWN_SEVERITIES = Object.freeze(["info", "low", "moderate", "high", "critical"]);
+export const RETIRED_NPM_EXCEPTION_FIELDS = Object.freeze([
+  "expectedNpmAdvisoryUrl",
+  "expectedNpmVulnerableRange",
+  "expectedNpmLockResolutions",
+  "expectedNpmParentPaths",
+  "expectedNpmAffectedPaths",
+  "expectedNpmDirectRootAncestors",
+]);
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPO_ROOT = resolve(SCRIPT_DIR, "..");
@@ -37,7 +45,6 @@ export const DEFAULT_EXCEPTIONS_PATH = resolve(
   "../config/dependency-security-exceptions.json",
 );
 export const DEFAULT_LOCKFILE_PATH = resolve(SCRIPT_DIR, "../bun.lock");
-export const DEFAULT_NPM_LOCKFILE_PATH = resolve(SCRIPT_DIR, "../package-lock.json");
 export const DEFAULT_MANIFEST_PATH = resolve(SCRIPT_DIR, "../package.json");
 
 /**
@@ -368,8 +375,8 @@ export function parseReviewedExceptions(raw) {
   } catch {
     throw new Error("Dependency security exception file is not valid JSON.");
   }
-  if (!isObject(document) || document.schemaVersion !== 1) {
-    throw new Error("Dependency security exceptions must use schemaVersion 1.");
+  if (!isObject(document) || document.schemaVersion !== 2) {
+    throw new Error("Dependency security exceptions must use schemaVersion 2.");
   }
   if (!Array.isArray(document.exceptions)) {
     throw new Error("Dependency security exceptions must contain an exceptions array.");
@@ -381,6 +388,17 @@ export function parseReviewedExceptions(raw) {
       throw new Error(`exceptions[${index}] must be an object.`);
     }
 
+    // bun.lock is the only lockfile (package-lock.json retired 2026-10-03), so an
+    // exception binds to the Bun graph only. A leftover npm field means the entry
+    // was written for the retired schema and must be reviewed again.
+    for (const field of RETIRED_NPM_EXCEPTION_FIELDS) {
+      if (Object.hasOwn(exception, field)) {
+        throw new Error(
+          `exceptions[${index}].${field} is retired with package-lock.json; remove it.`,
+        );
+      }
+    }
+
     const normalized = {
       package: requireNonEmptyString(exception.package, `exceptions[${index}].package`),
       advisoryId: requireNonEmptyString(exception.advisoryId, `exceptions[${index}].advisoryId`),
@@ -388,14 +406,6 @@ export function parseReviewedExceptions(raw) {
         exception.severity,
         `exceptions[${index}].severity`,
       ).toLowerCase(),
-      expectedNpmAdvisoryUrl: requireNonEmptyString(
-        exception.expectedNpmAdvisoryUrl,
-        `exceptions[${index}].expectedNpmAdvisoryUrl`,
-      ),
-      expectedNpmVulnerableRange: requireNonEmptyString(
-        exception.expectedNpmVulnerableRange,
-        `exceptions[${index}].expectedNpmVulnerableRange`,
-      ),
       owner: requireNonEmptyString(exception.owner, `exceptions[${index}].owner`),
       reason: requireNonEmptyString(exception.reason, `exceptions[${index}].reason`),
       reachability: requireNonEmptyString(
@@ -406,14 +416,10 @@ export function parseReviewedExceptions(raw) {
       expiresOn: requireIsoDate(exception.expiresOn, `exceptions[${index}].expiresOn`),
       expectedLockResolutions: null,
       expectedBunAffectedKeys: null,
-      expectedNpmLockResolutions: null,
       expectedParentKeys: null,
-      expectedNpmParentPaths: null,
-      expectedNpmAffectedPaths: null,
       allowedImportPaths: null,
       allowedScriptNames: null,
       expectedBunDirectRootAncestors: null,
-      expectedNpmDirectRootAncestors: null,
     };
 
     if (!KNOWN_SEVERITIES.includes(normalized.severity)) {
@@ -488,49 +494,6 @@ export function parseReviewedExceptions(raw) {
         return key;
       },
     );
-    if (
-      !Array.isArray(exception.expectedNpmLockResolutions) ||
-      exception.expectedNpmLockResolutions.length === 0
-    ) {
-      throw new Error(`exceptions[${index}].expectedNpmLockResolutions must be a non-empty array.`);
-    }
-    const npmResolutionPaths = new Set();
-    normalized.expectedNpmLockResolutions = exception.expectedNpmLockResolutions.map(
-      (resolution, resolutionIndex) => {
-        if (!isObject(resolution)) {
-          throw new Error(
-            `exceptions[${index}].expectedNpmLockResolutions[${resolutionIndex}] must be an object.`,
-          );
-        }
-        const path = requireNonEmptyString(
-          resolution.path,
-          `exceptions[${index}].expectedNpmLockResolutions[${resolutionIndex}].path`,
-        ).replaceAll("\\", "/");
-        const version = requireNonEmptyString(
-          resolution.version,
-          `exceptions[${index}].expectedNpmLockResolutions[${resolutionIndex}].version`,
-        );
-        if (!path.startsWith("node_modules/") || path.includes("../")) {
-          throw new Error(
-            `exceptions[${index}].expectedNpmLockResolutions[${resolutionIndex}].path ` +
-              "must be a package-lock node_modules path.",
-          );
-        }
-        if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
-          throw new Error(
-            `exceptions[${index}].expectedNpmLockResolutions[${resolutionIndex}].version ` +
-              "must be an exact semver.",
-          );
-        }
-        if (npmResolutionPaths.has(path)) {
-          throw new Error(
-            `exceptions[${index}].expectedNpmLockResolutions contains duplicate path "${path}".`,
-          );
-        }
-        npmResolutionPaths.add(path);
-        return { path, version };
-      },
-    );
     if (!Array.isArray(exception.expectedParentKeys) || exception.expectedParentKeys.length === 0) {
       throw new Error(`exceptions[${index}].expectedParentKeys must be a non-empty array.`);
     }
@@ -546,62 +509,6 @@ export function parseReviewedExceptions(raw) {
       parentKeys.add(key);
       return key;
     });
-    if (
-      !Array.isArray(exception.expectedNpmParentPaths) ||
-      exception.expectedNpmParentPaths.length === 0
-    ) {
-      throw new Error(`exceptions[${index}].expectedNpmParentPaths must be a non-empty array.`);
-    }
-    const npmParentPaths = new Set();
-    normalized.expectedNpmParentPaths = exception.expectedNpmParentPaths.map(
-      (parentPath, parentIndex) => {
-        const path = requireNonEmptyString(
-          parentPath,
-          `exceptions[${index}].expectedNpmParentPaths[${parentIndex}]`,
-        ).replaceAll("\\", "/");
-        if (!path.startsWith("node_modules/") || path.includes("../")) {
-          throw new Error(
-            `exceptions[${index}].expectedNpmParentPaths[${parentIndex}] ` +
-              "must be a package-lock node_modules path.",
-          );
-        }
-        if (npmParentPaths.has(path)) {
-          throw new Error(
-            `exceptions[${index}].expectedNpmParentPaths contains duplicate path "${path}".`,
-          );
-        }
-        npmParentPaths.add(path);
-        return path;
-      },
-    );
-    if (
-      !Array.isArray(exception.expectedNpmAffectedPaths) ||
-      exception.expectedNpmAffectedPaths.length === 0
-    ) {
-      throw new Error(`exceptions[${index}].expectedNpmAffectedPaths must be a non-empty array.`);
-    }
-    const npmAffectedPaths = new Set();
-    normalized.expectedNpmAffectedPaths = exception.expectedNpmAffectedPaths.map(
-      (affectedPath, affectedIndex) => {
-        const path = requireNonEmptyString(
-          affectedPath,
-          `exceptions[${index}].expectedNpmAffectedPaths[${affectedIndex}]`,
-        ).replaceAll("\\", "/");
-        if (!npmResolutionPaths.has(path)) {
-          throw new Error(
-            `exceptions[${index}].expectedNpmAffectedPaths[${affectedIndex}] ` +
-              `"${path}" is not an expected npm lock resolution.`,
-          );
-        }
-        if (npmAffectedPaths.has(path)) {
-          throw new Error(
-            `exceptions[${index}].expectedNpmAffectedPaths contains duplicate path "${path}".`,
-          );
-        }
-        npmAffectedPaths.add(path);
-        return path;
-      },
-    );
     if (!Array.isArray(exception.allowedImportPaths)) {
       throw new Error(`exceptions[${index}].allowedImportPaths must be an array.`);
     }
@@ -685,9 +592,6 @@ export function parseReviewedExceptions(raw) {
     };
     normalized.expectedBunDirectRootAncestors = parseAncestorDeclarations(
       "expectedBunDirectRootAncestors",
-    );
-    normalized.expectedNpmDirectRootAncestors = parseAncestorDeclarations(
-      "expectedNpmDirectRootAncestors",
     );
 
     const key = `${normalized.package}\u0000${normalized.advisoryId}`;
@@ -787,72 +691,6 @@ export function evaluateExceptionLockResolutions(lockText, exceptions) {
   return { ok: errors.length === 0, errors };
 }
 
-/**
- * Bind reviewed exceptions to the npm compatibility graph as tightly as the
- * Bun graph: exact install paths, versions, and immediate parent paths.
- */
-export function evaluateExceptionNpmLockResolutions(lockText, exceptions) {
-  if (!Array.isArray(exceptions)) {
-    throw new Error("Reviewed exceptions must be an array.");
-  }
-  if (exceptions.length === 0) return { ok: true, errors: [] };
-  if (typeof lockText !== "string" || lockText.trim() === "") {
-    throw new Error("package-lock.json is empty.");
-  }
-
-  let document;
-  try {
-    document = JSON.parse(lockText);
-  } catch {
-    throw new Error("package-lock.json is not valid JSON.");
-  }
-  if (!isObject(document) || document.lockfileVersion !== 3 || !isObject(document.packages)) {
-    throw new Error("package-lock.json must be lockfileVersion 3 with a packages object.");
-  }
-
-  const entries = Object.entries(document.packages);
-  const errors = [];
-  for (const exception of exceptions) {
-    const suffix = `/node_modules/${exception.package}`;
-    const actualResolutions = entries
-      .filter(
-        ([path, entry]) =>
-          (path === `node_modules/${exception.package}` || path.endsWith(suffix)) &&
-          isObject(entry) &&
-          typeof entry.version === "string",
-      )
-      .map(([path, entry]) => `${path}@${entry.version}`)
-      .sort();
-    const expectedResolutions = exception.expectedNpmLockResolutions
-      .map(({ path, version }) => `${path}@${version}`)
-      .sort();
-    if (JSON.stringify(actualResolutions) !== JSON.stringify(expectedResolutions)) {
-      errors.push(
-        `npm lock resolutions for exception "${exception.package}" drifted ` +
-          `(expected ${expectedResolutions.join(", ")}; found ${actualResolutions.join(", ") || "none"}).`,
-      );
-    }
-
-    const actualParents = entries
-      .filter(([, entry]) => {
-        if (!isObject(entry)) return false;
-        return ["dependencies", "optionalDependencies", "peerDependencies"].some(
-          (group) => isObject(entry[group]) && Object.hasOwn(entry[group], exception.package),
-        );
-      })
-      .map(([path]) => path || "<root>")
-      .sort();
-    const expectedParents = [...exception.expectedNpmParentPaths].sort();
-    if (JSON.stringify(actualParents) !== JSON.stringify(expectedParents)) {
-      errors.push(
-        `npm dependency parents for exception "${exception.package}" drifted ` +
-          `(expected ${expectedParents.join(", ")}; found ${actualParents.join(", ") || "none"}).`,
-      );
-    }
-  }
-  return { ok: errors.length === 0, errors };
-}
-
 function directManifestDeclarations(packageJson) {
   const declarations = [];
   for (const group of [
@@ -897,15 +735,10 @@ function formatDeclarations(declarations) {
 
 /**
  * Pin the complete direct-root ancestor closure for every affected resolution
- * in both lock graphs. This prevents a new runtime dependency from reusing an
+ * in the Bun lock graph. This prevents a new runtime dependency from reusing an
  * already-excepted transitive path without forcing review.
  */
-export function evaluateExceptionRootAncestors({
-  bunLockText,
-  npmLockText,
-  packageJson,
-  exceptions,
-}) {
+export function evaluateExceptionRootAncestors({ bunLockText, packageJson, exceptions }) {
   if (!isObject(packageJson)) throw new Error("package.json must be an object.");
   if (!Array.isArray(exceptions)) throw new Error("Reviewed exceptions must be an array.");
   if (exceptions.length === 0) return { ok: true, errors: [] };
@@ -938,48 +771,6 @@ export function evaluateExceptionRootAncestors({
     }
   }
 
-  let npmDocument;
-  try {
-    npmDocument = JSON.parse(npmLockText);
-  } catch {
-    throw new Error("package-lock.json is not valid JSON.");
-  }
-  if (!isObject(npmDocument) || !isObject(npmDocument.packages)) {
-    throw new Error("package-lock.json is missing a packages object.");
-  }
-  const npmEntries = Object.entries(npmDocument.packages);
-  const npmPaths = new Set(npmEntries.map(([path]) => path));
-  const npmReverseEdges = new Map();
-  const packageContainer = (path) => {
-    const segments = path.split("/");
-    const nodeModulesIndex = segments.lastIndexOf("node_modules");
-    return nodeModulesIndex < 0 ? null : segments.slice(0, nodeModulesIndex).join("/");
-  };
-  const resolveNpmDependency = (parentPath, dependency) => {
-    let currentPath = parentPath;
-    while (currentPath !== null) {
-      const candidate = `${currentPath ? `${currentPath}/` : ""}node_modules/${dependency}`;
-      if (npmPaths.has(candidate)) return candidate;
-      currentPath = packageContainer(currentPath);
-    }
-    return null;
-  };
-  for (const [parentPath, entry] of npmEntries) {
-    if (parentPath === "" || !isObject(entry)) continue;
-    for (const group of ["dependencies", "optionalDependencies", "peerDependencies"]) {
-      if (!isObject(entry[group])) continue;
-      for (const dependency of Object.keys(entry[group])) {
-        const child = resolveNpmDependency(parentPath, dependency);
-        if (child === null) {
-          if (group === "peerDependencies") continue;
-          throw new Error(`Unable to resolve npm dependency edge ${parentPath} -> ${dependency}.`);
-        }
-        if (!npmReverseEdges.has(child)) npmReverseEdges.set(child, []);
-        npmReverseEdges.get(child).push(parentPath);
-      }
-    }
-  }
-
   const declarations = directManifestDeclarations(packageJson);
   const byIdentity = (left, right) =>
     declarationIdentity(left).localeCompare(declarationIdentity(right));
@@ -995,19 +786,6 @@ export function evaluateExceptionRootAncestors({
         `Bun direct-root ancestors for exception "${exception.package}" drifted ` +
           `(expected ${formatDeclarations(expectedBunAncestors)}; ` +
           `found ${formatDeclarations(actualBunAncestors)}).`,
-      );
-    }
-
-    const npmClosure = reverseClosure(npmReverseEdges, exception.expectedNpmAffectedPaths);
-    const actualNpmAncestors = declarations
-      .filter(({ package: packageName }) => npmClosure.has(`node_modules/${packageName}`))
-      .sort(byIdentity);
-    const expectedNpmAncestors = [...exception.expectedNpmDirectRootAncestors].sort(byIdentity);
-    if (JSON.stringify(actualNpmAncestors) !== JSON.stringify(expectedNpmAncestors)) {
-      errors.push(
-        `npm direct-root ancestors for exception "${exception.package}" drifted ` +
-          `(expected ${formatDeclarations(expectedNpmAncestors)}; ` +
-          `found ${formatDeclarations(actualNpmAncestors)}).`,
       );
     }
   }
@@ -1151,37 +929,14 @@ export function evaluateReviewedExceptions(findings, exceptions, options = {}) {
   core.blocked.forEach((finding, index) => {
     const key = findingKey(finding);
     const exception = key === null ? null : exceptionsByKey.get(key);
-    let npmMetadataMatches = true;
-    if (
-      exception &&
-      options.auditSource === "npm" &&
-      (finding.url !== exception.expectedNpmAdvisoryUrl ||
-        finding.range !== exception.expectedNpmVulnerableRange ||
-        JSON.stringify([...(finding.paths ?? [])].sort()) !==
-          JSON.stringify([...exception.expectedNpmAffectedPaths].sort()))
-    ) {
-      npmMetadataMatches = false;
-    }
-    if (
-      exception &&
-      exception.severity === finding.severity &&
-      today <= exception.expiresOn &&
-      npmMetadataMatches
-    ) {
+    if (exception && exception.severity === finding.severity && today <= exception.expiresOn) {
       matchedKeys.add(key);
       reviewed.push({ finding, exception });
       return;
     }
 
     blocked.push(finding);
-    if (exception && options.auditSource === "npm" && !npmMetadataMatches) {
-      reasons.push(
-        `npm advisory identity, vulnerable range, or affected paths drifted for ` +
-          `"${finding.package}" id=${finding.id}.`,
-      );
-    } else {
-      reasons.push(core.reasons[index]);
-    }
+    reasons.push(core.reasons[index]);
   });
 
   const expired = [];
@@ -1215,10 +970,8 @@ function parseCliArgs(argv) {
     stdin: false,
     exceptionsPath: DEFAULT_EXCEPTIONS_PATH,
     lockfilePath: DEFAULT_LOCKFILE_PATH,
-    npmLockfilePath: DEFAULT_NPM_LOCKFILE_PATH,
     manifestPath: DEFAULT_MANIFEST_PATH,
     repoRoot: DEFAULT_REPO_ROOT,
-    npmInputPath: null,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -1231,10 +984,8 @@ function parseCliArgs(argv) {
       argument === "--input" ||
       argument === "--exceptions" ||
       argument === "--lockfile" ||
-      argument === "--npm-lockfile" ||
       argument === "--manifest" ||
-      argument === "--repo-root" ||
-      argument === "--npm-input"
+      argument === "--repo-root"
     ) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) {
@@ -1243,10 +994,8 @@ function parseCliArgs(argv) {
       if (argument === "--input") parsed.inputPath = value;
       else if (argument === "--exceptions") parsed.exceptionsPath = value;
       else if (argument === "--lockfile") parsed.lockfilePath = value;
-      else if (argument === "--npm-lockfile") parsed.npmLockfilePath = value;
       else if (argument === "--manifest") parsed.manifestPath = value;
-      else if (argument === "--repo-root") parsed.repoRoot = value;
-      else parsed.npmInputPath = value;
+      else parsed.repoRoot = value;
       index += 1;
       continue;
     }
@@ -1255,12 +1004,6 @@ function parseCliArgs(argv) {
 
   if (parsed.stdin && parsed.inputPath) {
     throw new Error("Use only one of --stdin or --input.");
-  }
-  if (parsed.stdin && parsed.npmInputPath) {
-    throw new Error("--stdin cannot be combined with --npm-input.");
-  }
-  if (parsed.npmInputPath && !parsed.inputPath) {
-    throw new Error("--npm-input requires --input for the paired Bun audit fixture.");
   }
   return parsed;
 }
@@ -1287,46 +1030,20 @@ function runAuditCommand(command, commandArgs, label) {
   return result.stdout;
 }
 
-export function npmAuditInvocation(platform = process.platform, environment = process.env) {
-  if (platform === "win32") {
-    return {
-      command: environment.ComSpec || "cmd.exe",
-      args: ["/d", "/s", "/c", "npm audit --package-lock-only --json"],
-    };
-  }
-  return {
-    command: "npm",
-    args: ["audit", "--package-lock-only", "--json"],
-  };
-}
-
 function readAuditSources(args) {
   if (args.stdin) {
     return [{ name: "fixture", raw: readFileSync(0, "utf8") }];
   }
   if (args.inputPath) {
-    const sources = [
-      { name: args.npmInputPath ? "bun" : "fixture", raw: readFileSync(args.inputPath, "utf8") },
-    ];
-    if (args.npmInputPath) {
-      sources.push({ name: "npm", raw: readFileSync(args.npmInputPath, "utf8") });
-    }
-    return sources;
+    return [{ name: "fixture", raw: readFileSync(args.inputPath, "utf8") }];
   }
 
-  const npmInvocation = npmAuditInvocation();
+  // bun.lock is the only lockfile (package-lock.json retired 2026-10-03), so
+  // `bun audit` is the only live audit source.
   return [
     {
       name: "bun",
       raw: runAuditCommand("bun", ["audit", "--json"], "bun audit"),
-    },
-    {
-      name: "npm",
-      raw: runAuditCommand(
-        npmInvocation.command,
-        npmInvocation.args,
-        "npm audit --package-lock-only",
-      ),
     },
   ];
 }
@@ -1340,24 +1057,17 @@ function main() {
       return {
         ...source,
         findings,
-        result: evaluateReviewedExceptions(findings, exceptions, {
-          auditSource: source.name,
-        }),
+        result: evaluateReviewedExceptions(findings, exceptions),
       };
     });
     const lockResult = evaluateExceptionLockResolutions(
       readFileSync(args.lockfilePath, "utf8"),
       exceptions,
     );
-    const npmLockResult = evaluateExceptionNpmLockResolutions(
-      readFileSync(args.npmLockfilePath, "utf8"),
-      exceptions,
-    );
     const manifest = JSON.parse(readFileSync(args.manifestPath, "utf8"));
     const manifestResult = evaluateExceptionManifestReachability(manifest, exceptions);
     const rootAncestorResult = evaluateExceptionRootAncestors({
       bunLockText: readFileSync(args.lockfilePath, "utf8"),
-      npmLockText: readFileSync(args.npmLockfilePath, "utf8"),
       packageJson: manifest,
       exceptions,
     });
@@ -1373,7 +1083,6 @@ function main() {
     if (
       auditBlocked ||
       !lockResult.ok ||
-      !npmLockResult.ok ||
       !manifestResult.ok ||
       !rootAncestorResult.ok ||
       !sourceImportResult.ok
@@ -1384,7 +1093,6 @@ function main() {
           result.reasons.map((reason) => `${name}: ${reason}`),
         ),
         ...lockResult.errors,
-        ...npmLockResult.errors,
         ...manifestResult.errors,
         ...rootAncestorResult.errors,
         ...sourceImportResult.errors,

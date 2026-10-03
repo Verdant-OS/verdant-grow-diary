@@ -69,3 +69,69 @@ version-floor gates continue to enforce it. Reverting this two-file change resto
 2026-10-02 deadline and its fail-closed result. No data rollback is needed. No merge,
 Publish, production APPLY, device or Action Queue operation, credential, or production
 acceptance is authorized by this review.
+
+## Addendum — SEO monitoring moved to Bun (2026-10-03)
+
+On the owner's instruction, the first follow-up option above is taken in a stacked
+change. `.github/workflows/seo-monitoring.yml` now installs with
+`bun install --frozen-lockfile`, after the same pinned `oven-sh/setup-bun` 1.3.14 and
+`bun.lock`-keyed install cache that the other Bun workflows use. `setup-node` stays at
+Node 20 because the job runs its scripts with `node` and its own workflow test pins that
+version. Its `consumerContracts` entry is removed, because a declared consumer that no
+longer carries its marker fails the policy.
+
+That leaves three npm references, none of which installs from `package-lock.json`:
+
+| Contract                                         | What it is                                                | Lock-dependent? |
+| ------------------------------------------------ | --------------------------------------------------------- | --------------- |
+| `README.md`                                      | Documented build command.                                 | No              |
+| `.claude/skills/run-verdant-grow-diary/SKILL.md` | Local public-registry bootstrap; restores the lock after. | No              |
+| `docs/preview-deployment-verification.md`        | Preview dashboard checklist.                              | No              |
+
+Every script the SEO job runs, and every test it spawns, imports only Node built-ins
+(measured over `scripts/seo/*.mjs` and the ten `scripts/test-seo-*.mjs` files the job
+runs). The job therefore needs no installed packages. The install step is kept to match
+the requested Bun move and the repository pattern; removing it would be a separate
+change.
+
+Removing `package-lock.json` itself is still the dependency security owner's decision,
+and lockfile changes stay owner-gated. This addendum does not remove it. Hosted
+execution of the edited workflow is NOT_MEASURED until it runs, which happens after a
+successful `ci` run on `verdant-grow-diary` or a manual dispatch.
+
+## Addendum — npm compatibility lock retired (2026-10-03)
+
+On the owner's instruction, `package-lock.json` is removed in a third stacked change, and
+the transition ends. `bun.lock` is now the only lockfile.
+
+- `scripts/check-bun-lockfile-policy.mjs` requires only `bun.lock` and lists
+  `package-lock.json` among the forbidden lockfiles. Every security floor the removed
+  `package-lock.json` checks enforced now applies to `bun.lock`: vite, postcss, fast-uri,
+  form-data, ajv and picomatch join the Bun floors, and the minimatch 3.x/9.x floors move
+  over too. All were already satisfied by `bun.lock` at the time of removal.
+- `config/dependency-lockfile-transition.json` moves to `schemaVersion: 2`. It drops
+  `compatibilityLockfile` and `reviewBy`; the policy rejects either key. It keeps the
+  exact allowlist of npm command text, so any new undeclared npm package-install
+  entrypoint still fails the policy.
+- `scripts/check-npm-lock-semantic.mjs` and its `check:npm-lock-semantic` script are
+  removed, with nothing left to check.
+- `scripts/check-dependency-security.mjs` audits with `bun audit` only. The npm audit
+  source, the `--npm-input` and `--npm-lockfile` flags, and the npm-lock reads are gone.
+  The npm graph comparison runs only if a caller passes an npm lock explicitly.
+- `.gitignore` ignores `package-lock.json`. The run skill's bootstrap now deletes the
+  lock that npm writes, instead of restoring a tracked one.
+
+The bootstrap table row above, "restores the lock after", described that skill before
+this change.
+
+Follow-ups not done here:
+
+- `CLAUDE.md` still calls `package-lock.json` a synchronized compatibility lock. It is a
+  versioned governance file, so its correction needs the twelve-file `Sentinel-Version`
+  bump.
+- `docs/architecture-contract.md` AC-8.1 states the old two-lockfile rule. Correcting it
+  needs a §15 restamp.
+- The reviewed-exception schema still carries npm-specific fields. There are no
+  exceptions today, so nothing exercises them. _Done in a later stacked change:_
+  `config/dependency-security-exceptions.json` moves to `schemaVersion: 2`, which binds an
+  exception to `bun.lock` only and rejects the six retired `expectedNpm*` fields.

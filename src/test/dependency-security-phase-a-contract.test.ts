@@ -1,7 +1,7 @@
 /**
  * Dependency-resolution contract for Phase A security patches.
- * Reads package.json, canonical bun.lock, and the synchronized npm
- * compatibility lock.
+ * Reads package.json and bun.lock, the only lockfile (the npm compatibility
+ * lock was retired on 2026-10-03).
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
@@ -11,7 +11,6 @@ import { describe, expect, it } from "vitest";
 const root = resolve(__dirname, "../..");
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const bunLock = readFileSync(resolve(root, "bun.lock"), "utf8");
-const packageLock = JSON.parse(readFileSync(resolve(root, "package-lock.json"), "utf8"));
 const exceptionDocument = JSON.parse(
   readFileSync(resolve(root, "config/dependency-security-exceptions.json"), "utf8"),
 );
@@ -47,17 +46,6 @@ function resolvedVersions(packageName: string): Version[] {
     new RegExp(`\\["${escaped}@(\\d+\\.\\d+\\.\\d+)(?:[-+][^"]+)?",`, "g"),
   );
   return [...matches].map((match) => parseVersion(match[1]));
-}
-
-function npmResolvedVersions(packageName: string): Version[] {
-  const suffix = `/node_modules/${packageName}`;
-  return Object.entries(packageLock.packages)
-    .filter(
-      ([path, value]) =>
-        (path === `node_modules/${packageName}` || path.endsWith(suffix)) &&
-        typeof (value as { version?: unknown }).version === "string",
-    )
-    .map(([, value]) => parseVersion((value as { version: string }).version));
 }
 
 function productionSourceFiles(directory: string): string[] {
@@ -177,11 +165,8 @@ describe("dependency security Phase A resolution floors", () => {
     ["@vitest/mocker", [4, 1, 11] as const],
     ["nanoid", [3, 3, 18] as const],
     ["undici", [6, 28, 1] as const],
-  ])("resolves every %s instance at or above %s in both locks", (packageName, minimum) => {
-    for (const [lockName, versions] of [
-      ["bun.lock", resolvedVersions(packageName)],
-      ["package-lock.json", npmResolvedVersions(packageName)],
-    ] as const) {
+  ])("resolves every %s instance at or above %s in bun.lock", (packageName, minimum) => {
+    for (const [lockName, versions] of [["bun.lock", resolvedVersions(packageName)]] as const) {
       expect(versions.length, `${packageName} must be present in ${lockName}`).toBeGreaterThan(0);
       for (const version of versions) {
         expect(
@@ -193,11 +178,8 @@ describe("dependency security Phase A resolution floors", () => {
   });
 
   it("keeps any remaining Rollup resolutions patched without requiring its retired subtree", () => {
-    // Vitest 4 can reuse root Vite/Rolldown; npm removes the old Vite 7/Rollup graph.
-    for (const [lockName, versions] of [
-      ["bun.lock", resolvedVersions("rollup")],
-      ["package-lock.json", npmResolvedVersions("rollup")],
-    ] as const) {
+    // Vitest 4 can reuse root Vite/Rolldown, so the old Vite 7/Rollup graph may be absent.
+    for (const [lockName, versions] of [["bun.lock", resolvedVersions("rollup")]] as const) {
       for (const version of versions) {
         expect(isAtLeast(version, [4, 59, 0]), `${lockName}: rollup@${version.join(".")}`).toBe(
           true,
@@ -209,7 +191,6 @@ describe("dependency security Phase A resolution floors", () => {
   it("keeps every brace-expansion resolution outside the current vulnerable ranges", () => {
     for (const [lockName, versions] of [
       ["bun.lock", resolvedVersions("brace-expansion")],
-      ["package-lock.json", npmResolvedVersions("brace-expansion")],
     ] as const) {
       expect(versions.length, `brace-expansion must be present in ${lockName}`).toBeGreaterThan(0);
       for (const version of versions) {

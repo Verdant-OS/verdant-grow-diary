@@ -18,9 +18,11 @@
 //                              relative to <ref> and whether it is unlocked. Without --base
 //                              the ref is the merge-base with the deploy branch
 //                              (origin/verdant-grow-diary), so committed changes on a task
-//                              branch are covered; HEAD only when no such ref exists.
-//                              --strict exits 2 when any such scorer is still locked, for
-//                              CI or a PR body.
+//                              branch are covered. Without --base and without such a ref,
+//                              a plain report falls back to HEAD and says so; --strict
+//                              refuses (exit 1) rather than certify a comparison that
+//                              cannot see committed changes. --strict exits 2 when any
+//                              such scorer is still locked, for CI or a PR body.
 //
 // Pure rules live in scripts/lib/scorerLockRules.mjs; this file is the I/O shell.
 // The lock is a tripwire against accidents, not a security boundary: an agent can run
@@ -168,6 +170,7 @@ function defaultReportBase(root) {
   return {
     base: "HEAD",
     label: "HEAD (no deploy-branch ref found; committed changes are not covered)",
+    fallback: true,
   };
 }
 
@@ -269,6 +272,14 @@ function runReport(args) {
   const root = repoRoot(process.cwd());
   if (!root) return 1;
   const resolved = args.base ? { base: args.base, label: args.base } : defaultReportBase(root);
+  if (args.strict && resolved.fallback) {
+    // A strict report certifies the whole branch. Against HEAD it can only see the working
+    // tree, so a committed scorer change would read as clean; refuse rather than certify.
+    process.stderr.write(
+      `${NOTE} --strict needs a deploy-branch merge-base and none of ${DEPLOY_BRANCH_REFS.join(", ")} exists here; fetch the deploy branch or pass --base <ref>.\n`,
+    );
+    return 1;
+  }
   let changed = "";
   try {
     changed = git(["diff", "--name-status", "--diff-filter=MDR", resolved.base, "--"], root);

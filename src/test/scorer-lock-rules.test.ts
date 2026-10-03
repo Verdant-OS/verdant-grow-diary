@@ -133,12 +133,19 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("scripts/e2e/create-pheno-paid-smoke-sessions.mjs")).toBe(false);
   });
 
+  it("treats the lock's own control files as scorers, so the guard cannot be quietly weakened", () => {
+    expect(isScorerPath("scripts/scorer-lock.mjs")).toBe(true);
+    expect(isScorerPath("scripts/lib/scorerLockRules.mjs")).toBe(true);
+    expect(isScorerPath(".claude/settings.json")).toBe(true);
+    // The unlock record and the habits skill are not checks.
+    expect(isScorerPath(".claude/scorer-unlock.json")).toBe(false);
+    expect(isScorerPath(".claude/skills/verdant-loop-habits/SKILL.md")).toBe(false);
+  });
+
   it("does not treat production code, docs, migrations, runners or other scripts as scorers", () => {
     expect(isScorerPath("src/lib/quickLogRules.ts")).toBe(false);
     expect(isScorerPath("src/components/QuickLog.tsx")).toBe(false);
     expect(isScorerPath("docs/agents/loop-engineering.md")).toBe(false);
-    expect(isScorerPath("scripts/scorer-lock.mjs")).toBe(false);
-    expect(isScorerPath("scripts/lib/scorerLockRules.mjs")).toBe(false);
     expect(isScorerPath("scripts/stamp-version.mjs")).toBe(false);
     expect(isScorerPath("scripts/run-vitest-batches.mjs")).toBe(false);
     expect(isScorerPath("scripts/sync-edge-shared.mjs")).toBe(false);
@@ -436,6 +443,8 @@ function makeRepo(prefix: string): string {
   mkdirSync(join(repo, "e2e-local"), { recursive: true });
   mkdirSync(join(repo, "tools/testbench"), { recursive: true });
   mkdirSync(join(repo, "supabase/tests"), { recursive: true });
+  mkdirSync(join(repo, "scripts/lib"), { recursive: true });
+  mkdirSync(join(repo, ".claude"), { recursive: true });
   // Distinct contents, so git's rename detection pairs moving -> moved and nothing else.
   writeFileSync(join(repo, "src/test/tracked.test.ts"), "export const tracked = 1;\n");
   writeFileSync(join(repo, "src/test/doomed.test.ts"), "export const doomed = 2;\n");
@@ -445,6 +454,8 @@ function makeRepo(prefix: string): string {
   writeFileSync(join(repo, "supabase/tests/permissions.sql"), "select plan(1);\n");
   writeFileSync(join(repo, "src/lib/rules.ts"), "export const rules = 5;\n");
   writeFileSync(join(repo, "src/lib/helper.ts"), "export const helper = 6;\n");
+  writeFileSync(join(repo, "scripts/lib/scorerLockRules.mjs"), "export const rules = [];\n");
+  writeFileSync(join(repo, ".claude/settings.json"), '{ "hooks": {} }\n');
   execFileSync("git", ["-C", repo, "add", "."]);
   execFileSync("git", ["-C", repo, "commit", "-q", "-m", "approve checks"]);
   execFileSync("git", ["-C", repo, "switch", "-q", "-c", "task/example"]);
@@ -479,6 +490,11 @@ describe("scripts/scorer-lock.mjs --hook and --unlock against a disposable repos
     expect(run(["--hook"], hookInput("e2e-local/native.spec.ts")).status).toBe(2);
     expect(run(["--hook"], hookInput("tools/testbench/test_frame.py")).status).toBe(2);
     expect(run(["--hook"], hookInput("supabase/tests/permissions.sql")).status).toBe(2);
+  });
+
+  it("exit 2 for the lock's own tracked control files", () => {
+    expect(run(["--hook"], hookInput("scripts/lib/scorerLockRules.mjs")).status).toBe(2);
+    expect(run(["--hook"], hookInput(".claude/settings.json")).status).toBe(2);
   });
 
   it("exit 0 for a new check file that is not tracked yet", () => {
@@ -702,6 +718,54 @@ describe("scripts/scorer-lock.mjs --report against a disposable repository", () 
     const headOnly = run(["--report", "--strict", "--base", "HEAD"]);
     expect(headOnly.status).toBe(0);
     expect(headOnly.stdout).toContain("no tracked scorer");
+  });
+});
+
+describe("scripts/scorer-lock.mjs --report when no deploy-branch ref exists", () => {
+  let repo = "";
+
+  const run = (args: string[]) =>
+    spawnSync("node", [SCRIPT, ...args], { cwd: repo, encoding: "utf8" });
+
+  beforeAll(() => {
+    // A fresh or shallow checkout: a `main` branch only, with a scorer change already committed.
+    repo = mkdtempSync(join(tmpdir(), "scorer-lock-nobase-"));
+    execFileSync("git", ["init", "-q", "-b", "main", repo]);
+    execFileSync("git", ["-C", repo, "config", "user.email", "scorer-lock@test.invalid"]);
+    execFileSync("git", ["-C", repo, "config", "user.name", "scorer lock test"]);
+    mkdirSync(join(repo, "src/test"), { recursive: true });
+    writeFileSync(join(repo, "src/test/a.test.ts"), "export const a = 1;\n");
+    execFileSync("git", ["-C", repo, "add", "."]);
+    execFileSync("git", ["-C", repo, "commit", "-q", "-m", "approve checks"]);
+    writeFileSync(join(repo, "src/test/a.test.ts"), "export const a = 2;\n");
+    execFileSync("git", ["-C", repo, "add", "."]);
+    execFileSync("git", ["-C", repo, "commit", "-q", "-m", "weaken a check"]);
+  });
+
+  afterAll(() => {
+    if (repo) rmSync(repo, { recursive: true, force: true });
+  });
+
+  it("--strict refuses with exit 1 instead of certifying a HEAD-only comparison", () => {
+    const strict = run(["--report", "--strict"]);
+    expect(strict.status).toBe(1);
+    expect(strict.stderr).toContain("--strict needs a deploy-branch merge-base");
+    expect(strict.stderr).toContain("--base <ref>");
+    expect(strict.stdout).not.toContain("no tracked scorer");
+  });
+
+  it("a plain report still runs against HEAD and says committed changes are not covered", () => {
+    const plain = run(["--report"]);
+    expect(plain.status).toBe(0);
+    expect(plain.stdout).toContain(
+      "HEAD (no deploy-branch ref found; committed changes are not covered)",
+    );
+  });
+
+  it("--strict with an explicit --base sees the committed change and exits 2", () => {
+    const based = run(["--report", "--strict", "--base", "HEAD^"]);
+    expect(based.status).toBe(2);
+    expect(based.stdout).toContain("LOCKED   modified src/test/a.test.ts");
   });
 });
 

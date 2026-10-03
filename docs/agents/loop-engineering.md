@@ -103,7 +103,7 @@ Declaring an exception, for a task that genuinely renegotiates a pin with its be
 ```bash
 node scripts/scorer-lock.mjs --unlock src/test/quick-log-save.test.tsx --reason "pin follows the new copy in quickLogCopy.ts"
 node scripts/scorer-lock.mjs --status            # current unlocks, expired ones marked
-node scripts/scorer-lock.mjs --report --strict   # vs the merge-base with verdant-grow-diary (HEAD only if that ref is absent); exit 2 if any changed scorer is still locked
+node scripts/scorer-lock.mjs --report --strict   # vs the merge-base with verdant-grow-diary; exit 2 if any changed scorer is still locked, exit 1 if no deploy-branch ref exists (pass --base <ref>)
 node scripts/scorer-lock.mjs --lock              # end of task: every check locked again
 ```
 
@@ -111,7 +111,7 @@ The unlock file is git-ignored, so an unlock never ships; declaring the same pat
 its 24-hour window, and `--lock` ends every unlock at once. `--report` is for the PR body: it lists
 every tracked scorer that was modified, deleted or renamed relative to the base and whether it was
 declared, which is the "list the checks in plain words" step from the source workflow, applied to
-changes rather than to new checks. A deleted or moved check counts because removing a check is the quietest way to weaken one; a rename is judged on the old path, the one that existed at the base, and a rename from a non-scorer into a scorer path is a new check, always allowed. The default base is the merge-base with the deploy branch, so the report stays correct after the changes are committed, which is when a PR body is written.
+changes rather than to new checks. A deleted or moved check counts because removing a check is the quietest way to weaken one; a rename is judged on the old path, the one that existed at the base, and a rename from a non-scorer into a scorer path is a new check, always allowed. The default base is the merge-base with the deploy branch, so the report stays correct after the changes are committed, which is when a PR body is written. When no deploy-branch ref exists (a fresh or shallow checkout), a plain report falls back to `HEAD` and says so, and `--strict` refuses with exit 1 rather than certify a comparison that cannot see committed changes. The lock's own control files, `scripts/scorer-lock.mjs`, `scripts/lib/scorerLockRules.mjs` and `.claude/settings.json`, are scorers too: they decide which checks are protected and whether the hook runs, so editing one needs the same declared unlock.
 
 **Limits, stated honestly.** This is a tripwire against accidents, not a security boundary. The
 agent that is refused can run `--unlock` itself; the hook can be routed around with a shell

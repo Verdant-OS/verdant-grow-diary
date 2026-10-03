@@ -79,6 +79,21 @@ export const SCORER_PATH_RULES = Object.freeze([
     value: "config/required-status-checks.json",
     why: "the pinned mirror of the ruleset's required checks",
   }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/scorer-lock.mjs",
+    why: "the lock's own I/O shell: it decides whether the hook refuses at all",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/lib/scorerLockRules.mjs",
+    why: "the lock's own rule table: it decides which checks are protected",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: ".claude/settings.json",
+    why: "the project hook wiring: removing the PreToolUse entry disables the lock",
+  }),
 ]);
 
 /**
@@ -173,8 +188,9 @@ export function isUnlocked(relPath, unlockedEntries, context) {
 function refusal(relPath) {
   return [
     `scorer-lock: refusing to edit \`${relPath}\`.`,
-    "It is an existing check (test, spec, gate script or required-checks pin), and a loop",
-    "must not make its own checks easier. If this task genuinely renegotiates the pin,",
+    "It is an existing check (test, spec, gate script, required-checks pin, or one of the",
+    "lock's own control files), and a loop must not make its own checks easier. If this",
+    "task genuinely renegotiates the pin,",
     "declare it first:",
     `  node scripts/scorer-lock.mjs --unlock ${relPath} --reason "<why the check changes>"`,
     `then edit, and name the renegotiated pin in the commit. See ${DOC_PATH} §3.`,

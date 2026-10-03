@@ -87,6 +87,13 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     expect(DOC).toMatch(/merge-base with (the deploy branch|verdant-grow-diary)/);
   });
 
+  it("says a strict report refuses without a deploy-branch ref, and that the lock's control files are scorers", () => {
+    expect(DOC).toMatch(/--strict.*(refuses|exit 1)/);
+    expect(DOC).toContain(
+      "`scripts/scorer-lock.mjs`, `scripts/lib/scorerLockRules.mjs` and `.claude/settings.json`, are scorers too",
+    );
+  });
+
   it("forbids the habits process from editing checks", () => {
     expect(DOC).toMatch(/habit[^.]*never[^.]*(check|test|scorer)/i);
   });

@@ -65,8 +65,9 @@ export const SCORER_PATH_RULES = Object.freeze([
   }),
   Object.freeze({
     kind: "regex",
-    value: /^scripts\/(check|verify|assert)-[^/]+\.(mjs|cjs|js|ts)$/,
-    why: "repository gate scripts that CI and pre-commit run as judges",
+    value:
+      /^scripts\/(?:[^/]+\/)*(check|verify|assert|validate|audit|scan|precommit|preflight|test)-[^/]+\.(mjs|cjs|js|ts)$/,
+    why: "repository gate scripts that CI, pre-commit and package scripts run as judges, at any depth under scripts/ (prefixes measured from the workflow and package.json invocations on 2026-10-03)",
   }),
   Object.freeze({
     kind: "exact",
@@ -209,9 +210,10 @@ export function hookFilePaths(hookInput) {
 
 /**
  * Parses `git diff --name-status` output into scorer rows. Modified (M), deleted (D) and
- * renamed (R) entries all count: a deleted or moved check is a weakened check. For a
- * rename both the old and the new path are reported when either is a scorer, and the
- * unlock is judged on the old path, the one that existed at the base.
+ * renamed (R) entries all count: a deleted or moved check is a weakened check. A rename
+ * is a row only when the old path was a scorer, and the unlock is judged on that old
+ * path, the one that existed at the base. A rename from a non-scorer into a scorer path
+ * is a new check, which the policy always allows, so it is not a row.
  *
  * @param {string} nameStatus
  * @returns {Array<{ change: "modified" | "deleted" | "renamed", path: string, from?: string }>}
@@ -229,7 +231,7 @@ export function scorerRowsFromNameStatus(nameStatus) {
     } else if (status.startsWith("D") && parts[1]) {
       if (isScorerPath(parts[1])) rows.push({ change: "deleted", path: parts[1] });
     } else if (status.startsWith("R") && parts[1] && parts[2]) {
-      if (isScorerPath(parts[1]) || isScorerPath(parts[2])) {
+      if (isScorerPath(parts[1])) {
         rows.push({ change: "renamed", path: parts[2], from: parts[1] });
       }
     }

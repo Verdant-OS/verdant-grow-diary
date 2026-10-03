@@ -15,7 +15,10 @@
 //   --status                   Prints the current unlocks, expired ones marked.
 //   --report [--base <ref>] [--strict]
 //                              Lists every tracked scorer modified, deleted or renamed
-//                              relative to <ref> (default HEAD) and whether it is unlocked.
+//                              relative to <ref> and whether it is unlocked. Without --base
+//                              the ref is the merge-base with the deploy branch
+//                              (origin/verdant-grow-diary), so committed changes on a task
+//                              branch are covered; HEAD only when no such ref exists.
 //                              --strict exits 2 when any such scorer is still locked, for
 //                              CI or a PR body.
 //
@@ -144,8 +147,32 @@ function runHook() {
   return 0;
 }
 
+/**
+ * The base a report is measured against when none is given: the merge-base with the
+ * deploy branch, so committed scorer changes on a task branch are still reported. HEAD
+ * alone would be empty the moment the changes are committed, which is exactly when a PR
+ * body is written. Falls back to HEAD only when no deploy-branch ref exists (a fresh or
+ * disposable repository), and says so.
+ */
+const DEPLOY_BRANCH_REFS = ["origin/verdant-grow-diary", "verdant-grow-diary"];
+
+function defaultReportBase(root) {
+  for (const ref of DEPLOY_BRANCH_REFS) {
+    try {
+      const sha = git(["merge-base", "HEAD", ref], root).trim();
+      if (sha) return { base: sha, label: `merge-base with ${ref} (${sha.slice(0, 9)})` };
+    } catch {
+      // try the next ref
+    }
+  }
+  return {
+    base: "HEAD",
+    label: "HEAD (no deploy-branch ref found; committed changes are not covered)",
+  };
+}
+
 function parseArgs(argv) {
-  const out = { mode: null, paths: [], reason: null, base: "HEAD", strict: false };
+  const out = { mode: null, paths: [], reason: null, base: null, strict: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (["--hook", "--unlock", "--lock", "--status", "--report"].includes(arg)) {
@@ -160,7 +187,7 @@ function parseArgs(argv) {
         out.reason = "";
       }
     } else if (arg === "--base") {
-      out.base = argv[i + 1] ?? "HEAD";
+      out.base = argv[i + 1] ?? null;
       i += 1;
     } else if (arg === "--strict") {
       out.strict = true;
@@ -241,13 +268,15 @@ function runStatus() {
 function runReport(args) {
   const root = repoRoot(process.cwd());
   if (!root) return 1;
+  const resolved = args.base ? { base: args.base, label: args.base } : defaultReportBase(root);
   let changed = "";
   try {
-    changed = git(["diff", "--name-status", "--diff-filter=MDR", args.base, "--"], root);
+    changed = git(["diff", "--name-status", "--diff-filter=MDR", resolved.base, "--"], root);
   } catch {
-    process.stderr.write(`${NOTE} git diff against ${args.base} failed.\n`);
+    process.stderr.write(`${NOTE} git diff against ${resolved.label} failed.\n`);
     return 1;
   }
+  process.stdout.write(`${NOTE} base: ${resolved.label}\n`);
   const unlocked = readUnlocks(root);
   const context = decisionContext(root);
   const rows = scorerRowsFromNameStatus(changed).map((row) => ({
@@ -256,7 +285,7 @@ function runReport(args) {
   }));
   if (rows.length === 0) {
     process.stdout.write(
-      `${NOTE} no tracked scorer modified, deleted or renamed relative to ${args.base}.\n`,
+      `${NOTE} no tracked scorer modified, deleted or renamed relative to ${resolved.label}.\n`,
     );
     return 0;
   }

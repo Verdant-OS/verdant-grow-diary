@@ -87,19 +87,30 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("supabase/tests/billing_subscriptions_rls.sql")).toBe(true);
   });
 
-  it("treats repository gate scripts and the required-checks pin as scorers", () => {
+  it("treats every gate-script prefix CI invokes as a scorer, at any depth under scripts/", () => {
     expect(isScorerPath("scripts/check-contract-test-resolution.mjs")).toBe(true);
     expect(isScorerPath("scripts/verify-edge-shared-in-sync.mjs")).toBe(true);
     expect(isScorerPath("scripts/assert-docs-safety.mjs")).toBe(true);
+    expect(isScorerPath("scripts/validate-sarif.mjs")).toBe(true);
+    expect(isScorerPath("scripts/audit-required-checks.mjs")).toBe(true);
+    expect(isScorerPath("scripts/scan-gamification-direct-inserts.mjs")).toBe(true);
+    expect(isScorerPath("scripts/precommit-release-workbooks.mjs")).toBe(true);
+    expect(isScorerPath("scripts/test-legal-seo.mjs")).toBe(true);
+    expect(isScorerPath("scripts/knowledge/validate-governance.mjs")).toBe(true);
+    expect(isScorerPath("scripts/e2e/check-pheno-live-smoke-env.mjs")).toBe(true);
+    expect(isScorerPath("scripts/e2e/verify-one-tent-supabase-target.mjs")).toBe(true);
     expect(isScorerPath("config/required-status-checks.json")).toBe(true);
   });
 
-  it("does not treat production code, docs, migrations, or other scripts as scorers", () => {
+  it("does not treat production code, docs, migrations, runners or other scripts as scorers", () => {
     expect(isScorerPath("src/lib/quickLogRules.ts")).toBe(false);
     expect(isScorerPath("src/components/QuickLog.tsx")).toBe(false);
     expect(isScorerPath("docs/agents/loop-engineering.md")).toBe(false);
     expect(isScorerPath("scripts/scorer-lock.mjs")).toBe(false);
     expect(isScorerPath("scripts/lib/scorerLockRules.mjs")).toBe(false);
+    expect(isScorerPath("scripts/stamp-version.mjs")).toBe(false);
+    expect(isScorerPath("scripts/run-billing-rls-harness.ts")).toBe(false);
+    expect(isScorerPath("scripts/ci/compose-release-receipt-inputs.mjs")).toBe(false);
     expect(isScorerPath("supabase/functions/_shared/lib/x.ts")).toBe(false);
     expect(isScorerPath("supabase/migrations/20261001160000_x.sql")).toBe(false);
     expect(isScorerPath("tools/ecowitt-testbench/ecowitt_delivery.py")).toBe(false);
@@ -349,6 +360,7 @@ describe("scorerLockRules — scorerRowsFromNameStatus", () => {
         "A\tsrc/test/new.test.ts",
         "D\tsupabase/tests/permissions.sql",
         "M\ttools/ggs-ble-testbench/test_ggs_ble_frame.py",
+        "M\tscripts/knowledge/validate-governance.mjs",
       ].join("\n"),
     );
     expect(rows).toEqual([
@@ -357,6 +369,7 @@ describe("scorerLockRules — scorerRowsFromNameStatus", () => {
       { change: "renamed", path: "src/test/renamed.test.ts", from: "src/test/b.test.ts" },
       { change: "deleted", path: "supabase/tests/permissions.sql" },
       { change: "modified", path: "tools/ggs-ble-testbench/test_ggs_ble_frame.py" },
+      { change: "modified", path: "scripts/knowledge/validate-governance.mjs" },
     ]);
   });
 
@@ -365,15 +378,25 @@ describe("scorerLockRules — scorerRowsFromNameStatus", () => {
     expect(rows).toEqual([{ change: "renamed", path: "src/lib/c.ts", from: "src/test/c.test.ts" }]);
   });
 
+  it("does not report a rename from a non-scorer into a scorer path: that is a new check", () => {
+    const rows = scorerRowsFromNameStatus("R090\tsrc/lib/helper.ts\tsrc/test/helper.test.ts");
+    expect(rows).toEqual([]);
+  });
+
   it("is null-safe", () => {
     expect(scorerRowsFromNameStatus("")).toEqual([]);
     expect(scorerRowsFromNameStatus(undefined as unknown as string)).toEqual([]);
   });
 });
 
+/**
+ * A disposable repository with a `verdant-grow-diary` branch at the approving commit and a
+ * task branch checked out on top of it, mirroring how a slice branch sits on the deploy
+ * branch; `--report` resolves its default base from that ref.
+ */
 function makeRepo(prefix: string): string {
   const repo = mkdtempSync(join(tmpdir(), prefix));
-  execFileSync("git", ["init", "-q", "-b", "task/example", repo]);
+  execFileSync("git", ["init", "-q", "-b", "verdant-grow-diary", repo]);
   execFileSync("git", ["-C", repo, "config", "user.email", "scorer-lock@test.invalid"]);
   execFileSync("git", ["-C", repo, "config", "user.name", "scorer lock test"]);
   mkdirSync(join(repo, "src/test"), { recursive: true });
@@ -389,8 +412,10 @@ function makeRepo(prefix: string): string {
   writeFileSync(join(repo, "tools/testbench/test_frame.py"), "def test_frame():\n    pass\n");
   writeFileSync(join(repo, "supabase/tests/permissions.sql"), "select plan(1);\n");
   writeFileSync(join(repo, "src/lib/rules.ts"), "export const rules = 5;\n");
+  writeFileSync(join(repo, "src/lib/helper.ts"), "export const helper = 6;\n");
   execFileSync("git", ["-C", repo, "add", "."]);
   execFileSync("git", ["-C", repo, "commit", "-q", "-m", "approve checks"]);
+  execFileSync("git", ["-C", repo, "switch", "-q", "-c", "task/example"]);
   return repo;
 }
 
@@ -567,10 +592,11 @@ describe("scripts/scorer-lock.mjs --report against a disposable repository", () 
     if (repo) rmSync(repo, { recursive: true, force: true });
   });
 
-  it("reports nothing when no tracked scorer changed", () => {
+  it("reports nothing when no tracked scorer changed, and names the deploy-branch merge-base it used", () => {
     const report = run(["--report", "--strict"]);
     expect(report.status).toBe(0);
     expect(report.stdout).toContain("no tracked scorer");
+    expect(report.stdout).toContain("merge-base with verdant-grow-diary");
   });
 
   it("lists a modified scorer as LOCKED and --strict exits 2", () => {
@@ -604,6 +630,12 @@ describe("scripts/scorer-lock.mjs --report against a disposable repository", () 
     );
   });
 
+  it("does not list a rename from a non-scorer into a scorer path: a new check needs no unlock", () => {
+    execFileSync("git", ["-C", repo, "mv", "src/lib/helper.ts", "src/test/helper.test.ts"]);
+    const report = run(["--report"]);
+    expect(report.stdout).not.toContain("helper");
+  });
+
   it("shows UNLOCKED once each changed scorer is declared, and --strict exits 0", () => {
     const unlock = run([
       "--unlock",
@@ -622,6 +654,22 @@ describe("scripts/scorer-lock.mjs --report against a disposable repository", () 
     expect(report.stdout).toContain("UNLOCKED deleted  src/test/doomed.test.ts");
     expect(report.stdout).toContain("UNLOCKED deleted  supabase/tests/permissions.sql");
     expect(report.stdout).toContain("UNLOCKED renamed  src/test/moving.test.ts");
+  });
+
+  it("still reports the changes after they are committed, because the base is the deploy-branch merge-base, not HEAD", () => {
+    execFileSync("git", ["-C", repo, "add", "-A"]);
+    execFileSync("git", ["-C", repo, "commit", "-q", "-m", "task commit"]);
+    const declared = run(["--report", "--strict"]);
+    expect(declared.status).toBe(0);
+    expect(declared.stdout).toContain("UNLOCKED modified src/test/tracked.test.ts");
+    expect(declared.stdout).toContain("UNLOCKED renamed  src/test/moving.test.ts");
+    run(["--lock"]);
+    const undeclared = run(["--report", "--strict"]);
+    expect(undeclared.status).toBe(2);
+    expect(undeclared.stdout).toContain("LOCKED   modified src/test/tracked.test.ts");
+    const headOnly = run(["--report", "--strict", "--base", "HEAD"]);
+    expect(headOnly.status).toBe(0);
+    expect(headOnly.stdout).toContain("no tracked scorer");
   });
 });
 

@@ -78,6 +78,11 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     expect(DOC).toContain("$CLAUDE_PROJECT_DIR");
   });
 
+  it("names the gate-script prefixes CI invokes and the merge-base default for --report", () => {
+    for (const prefix of ["`validate-`", "`audit-`", "`scan-`"]) expect(DOC).toContain(prefix);
+    expect(DOC).toMatch(/merge-base with (the deploy branch|verdant-grow-diary)/);
+  });
+
   it("forbids the habits process from editing checks", () => {
     expect(DOC).toMatch(/habit[^.]*never[^.]*(check|test|scorer)/i);
   });

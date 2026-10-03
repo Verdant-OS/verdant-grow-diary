@@ -144,6 +144,31 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("scripts/e2e/create-pheno-paid-smoke-sessions.mjs")).toBe(false);
   });
 
+  it("treats gate-owned configuration as scorers: allowlists, pins, baselines, lint and typecheck configs", () => {
+    expect(isScorerPath("scripts/config/ai-doctor-preview-safety-allowlist.json")).toBe(true);
+    expect(isScorerPath("config/dependency-security-exceptions.json")).toBe(true);
+    expect(isScorerPath("config/seo-allowlist.json")).toBe(true);
+    expect(isScorerPath("config/local-supabase-replay-compatibility.json")).toBe(true);
+    expect(isScorerPath("config/local-supabase-replay/irrigation-acl-baseline.sql")).toBe(true);
+    expect(isScorerPath("scripts/fixtures/release-receipt-ci-artifact-input.pass.json")).toBe(true);
+    expect(isScorerPath("eslint.config.js")).toBe(true);
+    expect(isScorerPath("tsconfig.json")).toBe(true);
+    expect(isScorerPath("tsconfig.irrigation-harness.json")).toBe(true);
+    expect(isScorerPath("supabase/functions/_shared/lib/.sync-manifest.json")).toBe(true);
+    // Spelled in two parts: release-workbook-concurrent-read-isolation.test.ts treats any
+    // src/test suite whose source carries that marker as a workbook suite and forbids its
+    // child_process import, which this suite needs to drive the CLI.
+    expect(
+      isScorerPath(["docs/artifacts/release-", "workbook-template-manifest.json"].join("")),
+    ).toBe(true);
+    // Generated outputs, data a gate validates, and the formatter stay out.
+    expect(isScorerPath("public/version.json")).toBe(false);
+    expect(isScorerPath("artifacts/seo/seo-job-summary.json")).toBe(false);
+    expect(isScorerPath("docs/knowledge-library/roadmap-500.json")).toBe(false);
+    expect(isScorerPath(".prettierrc.json")).toBe(false);
+    expect(isScorerPath("components.json")).toBe(false);
+  });
+
   it("treats gate wiring and the delegated gate library as scorers, not only judge basenames", () => {
     expect(isScorerPath(".github/workflows/ci.yml")).toBe(true);
     expect(isScorerPath(".github/workflows/security-regression.yml")).toBe(true);
@@ -197,7 +222,6 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("spikes/cursor-sdk-local-orchestration/vitest.config.ts")).toBe(true);
     expect(isScorerPath("vitest.workspace.ts")).toBe(true);
     expect(isScorerPath("vite.config.ts")).toBe(false);
-    expect(isScorerPath("eslint.config.js")).toBe(false);
     expect(isScorerPath("tailwind.config.ts")).toBe(false);
   });
 

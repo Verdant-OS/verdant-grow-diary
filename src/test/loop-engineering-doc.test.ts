@@ -92,6 +92,8 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     expect(DOC).toContain("`scripts/run-vitest-batches.mjs`");
     expect(DOC).toContain("`.github/workflows/`");
     expect(DOC).toContain("`scripts/lib/`");
+    expect(DOC).toContain("`scripts/config/`");
+    expect(DOC).toMatch(/widening an allowlist/);
   });
 
   it("counts the Python testbench and pgTAP suites as scorers and anchors the hook to the project dir", () => {

@@ -162,6 +162,45 @@ export const SCORER_PATH_RULES = Object.freeze([
     value: "scripts/lib/",
     why: "the delegated gate library: wrappers such as assert-required-ci-secret.mjs hand their pass/fail decision to a module here, and new helpers land here too",
   }),
+  // Gate-owned configuration: exception lists, pins, baselines and fixtures a protected
+  // gate reads to decide its result. Widening an allowlist is as quiet a weakening as
+  // editing the gate (a phrase added to the AI Doctor preview-safety allowlist makes the
+  // scanner skip the line that mentions it).
+  Object.freeze({
+    kind: "prefix",
+    value: "config/",
+    why: "pinned JSON contracts and replay baselines the gates judge against: required checks, lockfile transition, dependency-security exceptions, migration-safety baseline, SEO allowlist and last GSC finding, replay compatibility",
+  }),
+  Object.freeze({
+    kind: "prefix",
+    value: "scripts/config/",
+    why: "gate-owned allowlists under scripts/ (ai-doctor-preview-safety-allowlist.json is read by precommit-ai-doctor-preview-safety.mjs)",
+  }),
+  Object.freeze({
+    kind: "prefix",
+    value: "scripts/fixtures/",
+    why: "fixtures the release-receipt gate tests judge against",
+  }),
+  Object.freeze({
+    kind: "regex",
+    value: /^eslint\.config\.(js|mjs|cjs|ts)$/,
+    why: "the lint gate's rule set; disabling a rule here weakens the Lint, typecheck, test, build required check",
+  }),
+  Object.freeze({
+    kind: "regex",
+    value: /^tsconfig(\.[^/]+)?\.json$/,
+    why: "the typecheck gate's strictness (tsconfig.json keeps four flags deliberately off and says why; the irrigation harness tsconfig gates that lane)",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "supabase/functions/_shared/lib/.sync-manifest.json",
+    why: "the manifest the edge shared-lib preflight (a required check) compares the mirror against; generated, never hand-edited",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "docs/artifacts/release-workbook-template-manifest.json",
+    why: "the manifest verify-release-workbooks.mjs judges the tracked workbooks against",
+  }),
   Object.freeze({
     kind: "exact",
     value: "scripts/scorer-lock.mjs",

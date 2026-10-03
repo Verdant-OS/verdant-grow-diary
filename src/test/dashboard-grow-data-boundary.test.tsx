@@ -792,9 +792,9 @@ describe("Dashboard private-read honesty boundary", () => {
       alertRows: 0,
     });
 
-    // The hook's effect then starts the new grow's read: still pending.
+    // The hook's effect then starts the new grow's read: still pending. Like
+    // the real useAlertsList, loading keeps the previous rows until it settles.
     H.alertsStatus = "loading";
-    H.alertRows = [];
     H.alertsCommits = [];
     view.rerenderDashboard();
     expect(H.alertsCommits.at(-1)).toEqual({
@@ -803,8 +803,9 @@ describe("Dashboard private-read honesty boundary", () => {
       alertRows: 0,
     });
 
-    // Only the new grow's own successful read confirms zero.
+    // Only the new grow's own successful read replaces the rows and confirms zero.
     H.alertsStatus = "ok";
+    H.alertRows = [];
     H.alertsCommits = [];
     view.rerenderDashboard();
     expect(H.alertsCommits.at(-1)).toEqual({

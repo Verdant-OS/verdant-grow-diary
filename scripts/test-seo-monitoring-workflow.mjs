@@ -88,3 +88,12 @@ test("GSC runner always emits the terminal summary even when OAuth is unavailabl
   assert.match(inspectionScript, /observedGscRun\.explicitlySkipped = true/);
   assert.match(inspectionScript, /gscObservation: observedGscRun/);
 });
+
+test("SEO monitoring installs dependencies with Bun from bun.lock", () => {
+  assert.match(workflow, /uses: oven-sh\/setup-bun@[0-9a-f]{40}\b/);
+  assert.match(workflow, /bun-version: 1\.3\.14/);
+  assert.match(workflow, /key: \$\{\{ runner\.os \}\}-bun-\$\{\{ hashFiles\('bun\.lock'\) \}\}/);
+  assert.match(workflow, /run: bun install --frozen-lockfile/);
+  assert.doesNotMatch(workflow, /\bnpm\s+(?:ci|install)\b/);
+  assert.doesNotMatch(workflow, /package-lock\.json/);
+});

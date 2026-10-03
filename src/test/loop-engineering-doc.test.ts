@@ -99,6 +99,7 @@ describe("docs/agents/loop-engineering.md — contract", () => {
     expect(DOC).toContain("`*.config.*` modules under `scripts/`");
     expect(DOC).toContain("`scripts/ci/`");
     expect(DOC).toContain("release-receipt derivation");
+    expect(DOC).toContain("`scripts/releases/`");
     expect(DOC).toMatch(/widening an allowlist/);
   });
 

@@ -226,6 +226,21 @@ export const SCORER_PATH_RULES = Object.freeze([
     why: "the sandbox credit-packs smoke lane's judge (sandbox-credit-packs-smoke.yml); exits non-zero on a failed verification",
   }),
   Object.freeze({
+    kind: "prefix",
+    value: "scripts/releases/",
+    why: "release-gate tooling: the gate runners, their rules modules, the subscriber-growth migration contract (imported by run-subscriber-growth-launch-gate.mjs and three tests to decide which markers and forbidden patterns are required), remote verification, receipt writing",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/p3-preservation/contract.mjs",
+    why: "the contract the Pester suite, verify-staged-bytes.mjs and preflight.mjs judge against",
+  }),
+  Object.freeze({
+    kind: "exact",
+    value: "scripts/seo/seoAllowlist.mjs",
+    why: "the allowlist loader the four test-seo-allowlist* judges and verify-last-gsc-finding.mjs read; its parsing decides what the allowlist exempts",
+  }),
+  Object.freeze({
     kind: "exact",
     value: "scripts/smoke-award-nugs.ts",
     why: "the gamification smoke lane's judge (gamification-staging-smoke.yml); exits non-zero on a failed award_nugs path",

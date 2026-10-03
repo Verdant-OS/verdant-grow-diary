@@ -169,6 +169,15 @@ describe("scorerLockRules — which paths are scorers", () => {
     expect(isScorerPath("scripts/print-release-receipt-status.mjs")).toBe(true);
     expect(isScorerPath("scripts/sandbox-credit-packs-smoke.ts")).toBe(true);
     expect(isScorerPath("scripts/smoke-award-nugs.ts")).toBe(true);
+    // Release-gate tooling and the contract modules gates and their tests derive from.
+    expect(isScorerPath("scripts/releases/subscriber-growth-migration-contract.mjs")).toBe(true);
+    expect(isScorerPath("scripts/releases/write-pheno-release-receipt.mjs")).toBe(true);
+    expect(isScorerPath("scripts/releases/fetch-pheno-live-build-id.mjs")).toBe(true);
+    expect(isScorerPath("scripts/p3-preservation/contract.mjs")).toBe(true);
+    expect(isScorerPath("scripts/seo/seoAllowlist.mjs")).toBe(true);
+    // SEO data clients beside the allowlist loader are not judges.
+    expect(isScorerPath("scripts/seo/gscClient.mjs")).toBe(false);
+    expect(isScorerPath("scripts/seo/gsc-oauth.mjs")).toBe(false);
     // Precondition probes, migration appliers and generators invoked by workflows are not judges.
     expect(isScorerPath("scripts/wait-for-deployed-sha.mjs")).toBe(false);
     expect(isScorerPath("scripts/apply-pinned-production-migrations.mjs")).toBe(false);

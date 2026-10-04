@@ -4,32 +4,35 @@ Run this before you hand a PR to Blue Dream, Durban Poison or Critical Mass. Eac
 
 ## How this was built
 
-- **Source:** the 60 most recently modified files in the agents' shared handoff folder (`/workspace/shared/handoffs/`), read on 2026-10-03.
-- **What counted:** 12 of those 60 are reviewer verdicts with substantive P1 or P2 findings:
-  - #1494, #1674, #1729, #1761, #1769 and #1868;
+- **Source:** the 60 most recently modified files in the agents' shared handoff folder (`/workspace/shared/handoffs/`) as of **2026-10-03 8:25 PM CT**, sorted by modification time. Note that 47 of those files carry the same 2026-10-02 10:58 PM CT time from a bulk copy, so their order is copy order, not authoring order. Positions 60 and 61 tie (`1625-…checks.tsv`, `1491-…sentinel.md`); neither has countable findings, so the tie changes no count.
+- **What counted:** 13 of those 60 are reviewer verdicts with substantive P1 or P2 findings:
+  - #1494, #1674, #1729, #1761, #1769, #1774 and #1868;
   - #1871 and #1894;
   - #1887 (2 packets) and #1888 (2 packets).
-- **What didn't:** the rest are handoffs, check exports, remeasure notes, clean PASS packets, or packets whose P2s only park repo-wide CI noise (for example #1505, #1607).
+- **What didn't:** the rest are handoffs, check exports, remeasure notes, clean PASS packets, or packets whose P2s only park repo-wide CI noise (#1491, #1505, #1525, #1607, #1621).
 - **How counts work:** a count is the number of distinct PRs where the pattern appeared in that sample. One PR can show up under several patterns.
 - **Outside the sample:** two of Blue Dream's verdicts from the same week (#1857, #1893) were posted as PR comments rather than packets. They are listed under "also seen" and are not in the counts.
 
 ## Checklist
 
-### 1. The PR description claims more than the code does (6 PRs)
+### 1. The PR description, a doc or the handoff claims more than the code does (7 PRs)
+
+Five PRs had the over-claim in the PR description or a doc changed in the PR, one in a doc only (#1774), and one in the handoff only (#1868).
 
 - **Seen in:**
   - #1494: the title says `test(...)`, but the PR also refactors `QuickLog.tsx`.
-  - #1729: the body is stale.
+  - #1729: the body is stale and partly inaccurate.
   - #1761: the body lists only Note/Photo/Issue as tentless, but more types fail open.
   - #1769: the body leaves out an unrelated `ci.yml` change.
-  - #1868: the body says "only `reviewBy` changed", but `reason` changed too.
+  - #1774: the doc says raw push, merge and ready commands are denied, which is true only for Claude's direct tool calls; the doc's concurrency sentence doesn't match the workflow.
+  - #1868: the handoff said "only `reviewBy` changed", but `reason` changed too. The PR body disclosed it and was accurate.
   - #1894: "in merge order and in version order", and an advisory-lock claim that is false for one file.
 - **Also seen:** #1857 ("live only when provenance corroborates" doesn't hold for one path) and #1893 ("unresolved → loading" doesn't hold for `[]`).
-- **Before review:** reread every sentence in the body and in any doc you changed. For each claim, point to the line or test that proves it. Cut or soften anything you can't point to. List every file you touched, including CI and config files.
+- **Before review:** reread every sentence in the body, the handoff, and any doc you changed. For each claim, point to the line or test that proves it. Cut or soften anything you can't point to. List every file you touched, including CI and config files.
 
-### 2. Stale head, draft-state or CI lines in the body (2 PRs, plus 1 nit)
+### 2. Stale head, draft-state or CI lines in the body (4 PRs)
 
-- **Seen in:** #1729 and #1761 (the old head SHA, "stay draft" on a PR that was no longer a draft, old CI lines). #1887 got the same point as a nit: "CI had just started" and "NOT_MEASURED until CI finishes" were superseded.
+- **Seen in:** #1729, #1761, #1769 (body cites old head `919ab08` and says "STAY DRAFT" on a PR that isn't a draft) and #1774 (body stale or wrong). The pattern: the old head SHA, "stay draft" on a PR that was no longer a draft, old CI lines. #1887's 9a8d43e5 packet raised the same point as a nit.
 - **Before review:** label every count and CI line with the SHA it was measured at, or drop it. Refresh it after each push.
 
 ### 3. A guard or claim that no test pins: mutation survivors (6 PRs)
@@ -88,6 +91,11 @@ Run this before you hand a PR to Blue Dream, Durban Poison or Critical Mass. Eac
 
 - **Seen in:** #1888 (a content conflict with #1889 in the same doc).
 - **Before review:** run `git merge-tree` against any open PR that touches the same files, and name the merge order in the body.
+
+### 11. Code you run inside a credentialed CI job can read the secrets (1 PR)
+
+- **Seen in:** #1774 (P1): the workflow's tool limits only constrain the agent's own tool calls. Tests, scripts or `package.json` entries it writes and then runs can still read the tokens from the environment or the git config.
+- **Before review:** if a job holds secrets, don't let it run code the job itself wrote. Split it into a no-secret build-and-test job and a separate publisher job.
 
 ## Keeping this current
 

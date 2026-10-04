@@ -7,16 +7,18 @@ description: The review and merge loop for Verdant-OS/verdant-grow-diary. Use wh
 
 This skill writes down the review loop that the Verdant agents already follow, so authors, reviewers and the merge-queue owner all work from one copy.
 
-Use the shared box skill `code-review-and-quality` as the review checklist (correctness, readability, architecture, security, performance). Before asking for review, authors run the checklist in [docs/agents/recurring-review-findings.md](../../../docs/agents/recurring-review-findings.md).
+Use the shared box skill `code-review-and-quality` (on the agents' box at `/home/box/agent-data/workflows/code-review-and-quality/SKILL.md`; not in this repo) as the review checklist (correctness, readability, architecture, security, performance). Before asking for review, authors run the checklist in [docs/agents/recurring-review-findings.md](../../../docs/agents/recurring-review-findings.md).
 
 ## Roles
 
-| Role                     | Who                                                         | Does                                                                                                                     | Never                                               |
-| ------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| Merge-queue owner        | Grok 91 / Chemdawg                                          | Routes PRs to reviewers, sends findings back to authors, enqueues a merge only after a clean PASS and Matthew's go-ahead | Reviews its own work                                |
-| Code reviewer            | Blue Dream, Durban Poison (peers)                           | Returns one verdict on one exact SHA for `.tsx`/UI, auth, RLS, DB and Edge changes                                       | Writes code, pushes, merges, publishes, applies SQL |
-| Docs / QA / SEO reviewer | Critical Mass                                               | Returns one verdict on one exact SHA for docs, QA, SEO and release-risk changes                                          | Same as above                                       |
-| Author                   | Claude, Codex (or the owner, when the owner fixes findings) | Writes the change and fixes findings                                                                                     | Reviews its own change                              |
+| Role                                    | Who                                                              | Does                                                                                                                                                                                                      | Never                                               |
+| --------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Merge-queue owner                       | Grok 91 (formerly Chemdawg / GDP)                                | Routes PRs to reviewers, sends findings back to authors, and merges under section 4                                                                                                                       | Reviews its own work                                |
+| Code reviewer                           | Blue Dream, Durban Poison (peers)                                | Returns one verdict on one exact SHA for `.tsx`/UI, auth, RLS, DB and Edge changes                                                                                                                        | Writes code, pushes, merges, publishes, applies SQL |
+| Lib / logic / test / docs / QA reviewer | Critical Mass                                                    | Returns one verdict on one exact SHA for lib and logic, tests, docs, CI, dependencies, QA, accessibility, search and content changes (lane per [OWNERSHIP.md](../../../docs/agents/OWNERSHIP.md) line 74) | Same as above                                       |
+| Author                                  | Claude, Codex, Grok 91 (when the owner writes or fixes a change) | Writes the change and fixes findings                                                                                                                                                                      | Reviews its own change                              |
+
+Every PR type has a reviewer. A PR that spans both lanes (for example a `.tsx` change plus a `*Rules.ts` helper) goes to Blue Dream or Durban Poison, and the owner may also ask Critical Mass for the lib or docs part. GDP retired on 2026-09-29; where [OWNERSHIP.md](../../../docs/agents/OWNERSHIP.md) still names GDP or "Chemdawg only", this skill and the "Start here" section of `docs/agents/CURRENT_STATE.md` supersede it until OWNERSHIP.md is updated (pending).
 
 The owner of a change can't review it. Each slice has one owner and a different reviewer.
 
@@ -41,8 +43,8 @@ Return exactly one:
 
 ## 3. Findings
 
-- **P1:** wrong behaviour, a safety or data-integrity break, a fail-open guard, or a claim the code contradicts.
-- **P2:** a fixable gap that doesn't break behaviour today. Examples: an unpinned guard, a PR description that claims more than the code does, duplicated logic, untested doc wording.
+- **P1:** a code defect: wrong behaviour, a safety, security or data-integrity break, or a fail-open guard.
+- **P2:** a fixable gap that doesn't break behaviour today. That includes every wrong or overstated statement in a doc, PR body or handoff (it is P2 even when the code contradicts it), an unpinned guard, duplicated logic and untested doc wording.
 - Every finding gives `file:line`, the evidence (a command, a mutation, or a quoted line), and a concrete fix.
 - Nits are optional and never block.
 - Each verdict ends with what it does **not** claim (for example production behaviour, a full `tsc`, test suite or build run).
@@ -52,8 +54,11 @@ Return exactly one:
 - `PASS-with-P2` and `FAIL` both go back to the author. The author pushes a new commit with a normal push (hooks on, no `--no-verify`, no force-push of reviewed history).
 - The new head gets a **full re-review**, not a diff-only skim. Earlier verdicts don't carry over.
 - A PR stays **draft** until it merges.
-- Before merge, **all 35 required checks must be green at the merge head** (`gh pr checks <N> --required`). Checks from an older head don't count.
-- Merging also needs Matthew's go-ahead, and it goes through the merge queue (see [docs/agents/merge-queue.md](../../../docs/agents/merge-queue.md)).
+- Before merge, **all 35 required checks must be green at the merge head** (`gh pr checks <N> --required`). Checks from an older head don't count. The Vercel "Account is blocked." status (and "Vercel Deployments") is not a required check and doesn't block.
+- **Matthew's standing merge-when-green rule covers non-migration PRs:** once a non-migration PR has a clean `PASS` at its exact head SHA and 35/35 required checks are green at that same SHA, the merge-queue owner marks it ready and squash-merges at that SHA, with no further wait (see [docs/agents/merge-queue.md](../../../docs/agents/merge-queue.md)). If the head moves first, the PASS no longer applies.
+- **Migration PRs need Matthew's explicit decision** (section 6), even after a clean PASS.
+- `PASS-with-P2` is never merged "as is". It always goes back to the author.
+- **Never merge #1740.**
 
 ## 5. Re-review triggers
 
@@ -68,6 +73,7 @@ The reviewer lists them in every verdict. At minimum:
 
 - **Migration PRs** (anything under `supabase/migrations/`) are held for Matthew's decision even after a clean PASS. A reviewer PASS is not permission to apply SQL.
 - Production database writes, Publish, Edge deploys, device control and the automatic Action Queue need Matthew to name the exact action.
+- **GitHub comments** (PR comments, reviews, issue comments) need Matthew's approval. Verdicts go in a handoff packet and in chat, not in a GitHub comment, unless he approved that comment.
 
 ## 7. Standing gates
 
@@ -75,8 +81,12 @@ These stand until Matthew lifts them. The live list is kept on the agents' share
 
 - **No Publish** without Matthew.
 - **knk production database lock:** no writes, no drive-by queries.
-- **HOLD #1250:** recorded as a standing gate. Check the live list for its current state.
+- **HOLD #1250:** PR #1250 merged on 2026-09-29 as `d2e8dbc3`, so there's nothing left to ready or merge. The "don't touch" part still stands until Matthew clears it: don't edit its 4 files (`.github/workflows/migration-drift-probe.yml`, `.github/workflows/money-migration-drift-alert.yml`, `src/test/migration-drift-probe.test.ts`, `src/test/money-migration-drift-alert.test.ts`).
 - Migration PRs held for Matthew (section 6).
+- **Never merge #1740.**
+- **GitHub comments need Matthew's approval** (section 6).
+- **No staging or sandbox site.** Smoke tests run on production only, and only on the test fixture grow.
+- The Vercel "Account is blocked." status is not a required check (section 4).
 - Off-limits to agents unless Matthew names the action: auth, RLS, migrations, Edge functions, `supabase/`, lockfiles.
 
 ## Verdict template

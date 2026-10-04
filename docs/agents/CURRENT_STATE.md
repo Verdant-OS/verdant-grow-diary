@@ -4,22 +4,28 @@
 
 Read this section first. It doesn't replace the observation log below.
 
+- **This section supersedes stale OWNERSHIP.md rows.** Line 1 says OWNERSHIP.md wins on conflicts, but its GDP routing and product-call rows and its "Chemdawg only" merge rows are out of date. GDP retired on 2026-09-29, and Grok 91 (formerly Chemdawg / GDP) now routes and merges. Where OWNERSHIP.md and this section disagree on roles or merging, this section wins until OWNERSHIP.md is updated. That update is pending.
 - **Roles:**
-  - Grok 91 / Chemdawg: merge-queue owner. Routes PRs to reviewers, sends findings back, enqueues only after a clean PASS and Matthew's go-ahead.
-  - Blue Dream and Durban Poison: code reviewers (peers).
-  - Critical Mass: docs, QA and SEO reviewer.
-  - Claude and Codex: authors.
+  - Grok 91: merge-queue owner. Routes PRs to reviewers, sends findings back, and merges under the rule below.
+  - Blue Dream and Durban Poison: code reviewers (peers) for `.tsx`/UI, auth, RLS, DB and Edge.
+  - Critical Mass: reviewer for lib and logic, tests, docs, CI, dependencies, QA, accessibility, search and content (OWNERSHIP.md line 74).
+  - Claude, Codex and Grok 91: authors.
   - Nobody reviews their own work.
 - **Review loop:** [`.agents/skills/verdant-exact-sha-review/SKILL.md`](../../.agents/skills/verdant-exact-sha-review/SKILL.md).
   - Every verdict is tied to one exact SHA, or it is BLOCKED.
-  - Only a clean PASS merges. PASS-with-P2 goes back for a full re-review at the new head.
-  - PRs stay draft until merge, with 35/35 required checks green at the merge head.
+  - PASS-with-P2 always goes back to the author for a full re-review at the new head. It is never merged as is.
+  - PRs stay draft until merge.
+  - **Merge rule:** Matthew's standing merge-when-green rule covers non-migration PRs. A clean PASS at the exact head SHA plus 35/35 required checks green at that SHA means mark it ready and squash-merge at that SHA, with no further wait. Migration PRs need Matthew's explicit decision.
 - **Before asking for review:** run [`recurring-review-findings.md`](recurring-review-findings.md).
 - **Gates (until Matthew lifts them):**
   - No Publish.
   - knk production database lock: no writes.
-  - HOLD #1250.
+  - HOLD #1250: PR #1250 merged on 2026-09-29 as `d2e8dbc3`. Its 4 files (`migration-drift-probe.yml`, `money-migration-drift-alert.yml` and their two tests) still must not be touched until Matthew clears it.
   - Migration PRs held for Matthew.
+  - Never merge #1740.
+  - GitHub comments (PR, review or issue comments) need Matthew's approval.
+  - There's no staging site. Smoke tests run on production only, and only on the test fixture grow.
+  - The Vercel "Account is blocked." status isn't a required check.
   - No agent changes to auth, RLS, migrations, Edge, `supabase/` or lockfiles unless Matthew names the action.
   - The live list is on the agents' shared box at `/workspace/shared/context/fleet-locks.md`.
 

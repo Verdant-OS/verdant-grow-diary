@@ -1138,7 +1138,7 @@ its appendices hold dated results, later `docs/agents/CURRENT_STATE.md` stamps r
 An earlier draft said publishing "ships frontend and edge functions". No repository evidence supports
 an automatic joint ship, and a release operator relying on it could publish a frontend expecting
 newer edge code while the backend stays stale.
-_Source:_ `package.json:21-22` (`deploy:functions`, `deploy:functions:all`) and `:218`
+_Source:_ `package.json:21-22` (`deploy:functions`, `deploy:functions:all`) and `:224`
 (`sb:functions:deploy`). The Actions absence was established by grep over `.github/workflows/` at the
 stamped SHA for `functions deploy`, `supabase functions`, `supabase link` and `db push`: only comments
 and help text match. The eight workflows that install the Supabase CLI run local stacks only.

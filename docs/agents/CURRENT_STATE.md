@@ -1,5 +1,28 @@
 > Ownership and the connector spec: see [docs/agents/OWNERSHIP.md](OWNERSHIP.md). It wins on conflicts.
 
+## Start here (agents)
+
+Read this section first. It doesn't replace the observation log below.
+
+- **Roles:**
+  - Grok 91 / Chemdawg: merge-queue owner. Routes PRs to reviewers, sends findings back, enqueues only after a clean PASS and Matthew's go-ahead.
+  - Blue Dream and Durban Poison: code reviewers (peers).
+  - Critical Mass: docs, QA and SEO reviewer.
+  - Claude and Codex: authors.
+  - Nobody reviews their own work.
+- **Review loop:** [`.agents/skills/verdant-exact-sha-review/SKILL.md`](../../.agents/skills/verdant-exact-sha-review/SKILL.md).
+  - Every verdict is tied to one exact SHA, or it is BLOCKED.
+  - Only a clean PASS merges. PASS-with-P2 goes back for a full re-review at the new head.
+  - PRs stay draft until merge, with 35/35 required checks green at the merge head.
+- **Before asking for review:** run [`recurring-review-findings.md`](recurring-review-findings.md).
+- **Gates (until Matthew lifts them):**
+  - No Publish.
+  - knk production database lock: no writes.
+  - HOLD #1250.
+  - Migration PRs held for Matthew.
+  - No agent changes to auth, RLS, migrations, Edge, `supabase/` or lockfiles unless Matthew names the action.
+  - The live list is on the agents' shared box at `/workspace/shared/context/fleet-locks.md`.
+
 # Verdant — Current Operating State
 
 ## Follow-up observation — 2026-09-29T08:38 UTC
@@ -304,7 +327,9 @@ OWNERSHIP.md controls ownership. HOLD #1250; #1369 REVIEW ONLY;
 #1741/#1745 retain protected database-approval holds. No Publish, production
 APPLY, device or Action Queue operation was performed in this docs change.
 Live acceptance remains NOT_MEASURED here.
+
 ### Historical operating receipts — unchanged below
+
 **Last updated:** 2026-09-24 UTC (~11:25 UTC; tip, live and board measured 11:14–11:17 UTC)
 **Updated by:** Claude (2026-09-24 late morning, restamp on **deploy tip
 `b0bfdb028600b63ec7b8bff914632a20b06020b7`**, the `#1685` squash. **Four commits** merged since the

@@ -184,11 +184,16 @@ a UTC time for every read.
    - each hostname's current serving deployment, for every hostname in that
      re-enumerated inventory.
 
-   A read that cannot be completed is recorded as `BLOCKED`, not as a value. He completes
-   the read, or records the blocker and his decision to proceed without it. An accepted
-   blocker is left out of the step 3 comparison and carried into Verify as `BLOCKED`; it
-   never counts as a match. Two reads can never be waived: the rolling-release record and
-   the rollback target's metadata. If either is `BLOCKED`, no rollback is run.
+   A read that cannot be completed is recorded as `BLOCKED`, not as a value. Only
+   production-host inventory reads (apex holder, bound domains, aliases and DNS) and
+   per-hostname serving-deployment reads may be accepted as blocked by Matthew. For
+   each accepted read, he records the exact item or hostname, the UTC time, the
+   failure reason and his explicit decision to proceed without it. That recorded
+   list is the only exclusion from the step 3 comparison and is carried into Verify
+   as `BLOCKED`; an excluded read never counts as a match or establishes complete
+   hostname coverage. The rolling-release record and configuration and the rollback
+   target's metadata can never be waived. If any of those critical reads is
+   `BLOCKED`, or any other blocker is not explicitly accepted, no rollback is run.
 
    Then one of four outcomes applies:
    - **Back to step 1.** The record shows an active rollout. No rollback is decided
@@ -208,8 +213,13 @@ a UTC time for every read.
    - **Continue** to step 3 otherwise.
 
 3. **Reread immediately before the command.** He reads every item in step 2 again.
-   If any value differs from the step 2 record, he stops and returns to step 1. That
-   covers a rollout that started, advanced a stage, completed (a forced complete
+   Only reads on the accepted-blocker list recorded in step 2 are excluded from the
+   comparison and remain `BLOCKED` in Verify. If an excluded read now succeeds, he
+   records a new step 2 baseline before continuing; it cannot match a prior
+   `BLOCKED`. If any non-excluded read cannot be completed, he stops and records the
+   blocker; step 3 grants no new waiver. If any compared value differs from the
+   step 2 record, he stops and returns to step 1. That covers a rollout that started,
+   advanced a stage, completed (a forced complete
    included) or was aborted after step 2, any rolling-release configuration change,
    and any inventory or routing change. Each of these changes what production serves
    ([release topology specification](../specs/release-topology-specification.md),
@@ -217,7 +227,8 @@ a UTC time for every read.
    reread in the same rollback also differs, he does not start a third attempt: he
    records a blocker naming what changed between reads, and identifies what is
    changing production (an automatic advance, a new Git deployment or another actor)
-   before trying again. Only when every read matches the step 2 record does he run:
+   before trying again. Only when every non-excluded read, including all critical
+   reads, matches the step 2 record does he run:
 
 ```sh
 vercel rollback <deployment-url> --scope verdantgrowdiary

@@ -6,7 +6,9 @@ before this cutoff; see "Edge of window" below.
 
 Status: inventory only. No SQL, deploy, publish, secret or production query was run to
 produce this. Applied/published state comes **only** from `docs/agents/CURRENT_STATE.md`
-at deploy tip `cf929cf7baf0011045430e3a38b28b09632847c6`. Anything that file doesn't record
+at the deploy tip. This inventory was built at `cf929cf7baf0011045430e3a38b28b09632847c6`; the tip
+is now `5ea8f1f74209c3576afea0317a471370222fbae3`, and `cf929cf7..5ea8f1f7` touches neither
+`supabase/` nor `CURRENT_STATE.md`, so nothing below changes. Anything that file doesn't record
 is `NOT_MEASURED`. Applying migrations and publishing edge functions remain Matthew's
 decisions under the existing locks (production database knk, HOLD #1250).
 
@@ -26,8 +28,9 @@ gh pr view <n> --json mergedAt,mergeCommit
 
 The `--since` bound is midnight CT, i.e. 2026-09-26 05:00 UTC (not 00:00 UTC). With that
 cutoff the query returns **8** squash commits touching `supabase/migrations/*` or
-`supabase/functions/*` (it filters on commit date, which can differ from GitHub `mergedAt` by
-up to ~30 minutes; that does not change the set here). Two more server-changing merges sit
+`supabase/functions/*`. It filters on commit date, not GitHub `mergedAt`; the two can differ by
+more than an hour (#1655: 66 min, #1683: 77 min). Every row was cross-checked against
+`gh pr view --json mergedAt`, and the gap doesn't change the set here. Two more server-changing merges sit
 just before the cutoff (between 00:00 and 05:00 UTC on 2026-09-26) and are listed separately
 under "Edge of window". The handoff also named #1762, #1776, #1813, #1880 and #1783. Those
 five merged in the window but change **no** file under `supabase/` (see "Named in the
@@ -73,13 +76,18 @@ server changes that are also not recorded as shipped, and they interact with thi
 | #1703 | 2026-09-26 01:55 | `4ddb23225918ee1fdfb238ab84708a2e765adb43` | Migration                 | `A migrations/20260924120000_plants_health_unassessed_default.sql` (BUG-009)                                                                                                                     |
 | #1683 | 2026-09-26 04:19 | `dccaf7324055b91cad0a5b51a40c449bb3b6bcf2` | Edge functions (16 files) | including `M functions/ai-doctor-review/index.ts`, `functions/_shared/lib/*` mirror, `auth-email-hook/index.ts`, `sensor-ingest-webhook/index.ts`, `operator-ggs-real-payload-commit/handler.ts` |
 
-- **Applied/published state:** `CURRENT_STATE.md` :446-447 (written while #1683 still carried
+- **Applied/published state:** `CURRENT_STATE.md` :448 (written while #1683 still carried
   the migration) says only "Committed is not applied". Applied state of `20260924120000` and
   publish state of #1683's functions are **NOT_MEASURED**.
-- **Redeploying `ai-doctor-review` ships #1683 too.** #1658 and #1869 both require an
-  `ai-doctor-review` redeploy; that deploy is built from the deploy tip, so it also publishes
-  #1683's `ai-doctor-review/index.ts` and shared-lib changes. Review #1683 as part of that
-  deploy, not separately.
+- **Redeploying for #1658/#1869 ships #1683 too, in two functions.** Deploys are built from
+  the deploy tip. #1658 and #1869 both require an `ai-doctor-review` redeploy, which also
+  publishes #1683's `ai-doctor-review/index.ts` and shared-lib changes. #1869 also requires a
+  `sensor-ingest-webhook` redeploy (one of its 12 consumers above), which publishes #1683's
+  `sensor-ingest-webhook/index.ts` change. Review #1683 as part of those deploys, not
+  separately.
+- **#1683 also reaches `auth-email-hook` and `operator-ggs-real-payload-commit`.** Those
+  changes ship whenever those functions are next deployed, even though neither is part of the
+  #1658/#1869 redeploy set. Their publish state is **NOT_MEASURED**.
 - **`20260924120000` sorts ahead of every migration in the table below.** If it is not yet
   applied, a version-ordered apply runs it first.
 

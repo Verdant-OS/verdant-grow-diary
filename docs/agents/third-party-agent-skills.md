@@ -39,9 +39,9 @@ role files keep authority over any third-party instruction.
 hooks as supplied.**
 
 - **Source:** an owner-supplied upload of 24 files (18 unique: 12 Markdown documents and six
-  shell scripts), plus a separate 25th file, `SKILL(4).md`, holding the `idea-refine` skill
-  definition. The upload names `addyosmani/agent-skills` but carries no pinned commit,
-  manifest or license. Provenance is `missing evidence`.
+  shell scripts), plus a separate 25th file, the `idea-refine` skill definition. The upload
+  names `addyosmani/agent-skills` but carries no pinned commit, manifest or license.
+  Provenance is `missing evidence`.
 - **Review:** an owner-supplied static review, shared in an agent session on 2026-10-04 UTC.
   It is not archived in this repository. The component findings below are `source claim`s
   from that review and were not re-verified here. No uploaded script or test was run, sourced

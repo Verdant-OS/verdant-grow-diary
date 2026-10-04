@@ -25,9 +25,25 @@ export type RpcResultLike =
 
 const MAX_FIELD_CHARS = 500;
 
-function clip(value: unknown): unknown {
-  if (typeof value !== "string") return value ?? null;
+function clipString(value: string): string {
   return value.length > MAX_FIELD_CHARS ? `${value.slice(0, MAX_FIELD_CHARS)}…` : value;
+}
+
+/**
+ * Strings are clipped to MAX_FIELD_CHARS. Other values stay structured when
+ * their JSON form fits; otherwise they are replaced by their clipped JSON text.
+ */
+function clip(value: unknown): unknown {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") return clipString(value);
+  let json: string | undefined;
+  try {
+    json = JSON.stringify(value);
+  } catch {
+    return clipString(String(value));
+  }
+  if (json === undefined) return clipString(String(value));
+  return json.length > MAX_FIELD_CHARS ? clipString(json) : value;
 }
 
 export function classifyRpcResult(result: RpcResultLike): string {
@@ -42,9 +58,18 @@ export function classifyRpcResult(result: RpcResultLike): string {
   return "ok_data";
 }
 
-export function describeRpcResult(result: RpcResultLike): string {
+export type RpcResultDetail = {
+  kind: string;
+  status: unknown;
+  statusText: unknown;
+  error: { code: unknown; message: unknown; details: unknown; hint: unknown } | null;
+  data: unknown;
+};
+
+/** Object form, for embedding several results in one JSON detail. */
+export function rpcResultDetail(result: RpcResultLike): RpcResultDetail {
   const error = result?.error ?? null;
-  return JSON.stringify({
+  return {
     kind: classifyRpcResult(result),
     status: result?.status ?? null,
     statusText: result?.statusText ?? null,
@@ -56,6 +81,10 @@ export function describeRpcResult(result: RpcResultLike): string {
           hint: clip(error.hint),
         }
       : null,
-    data: result?.data ?? null,
-  });
+    data: clip(result?.data),
+  };
+}
+
+export function describeRpcResult(result: RpcResultLike): string {
+  return JSON.stringify(rpcResultDetail(result));
 }

@@ -10,7 +10,7 @@
  * Temporary @verdant.test users and all fixture rows are deleted in finally.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { describeRpcResult } from "./lib/rpcResultDetail";
+import { describeRpcResult, rpcResultDetail } from "./lib/rpcResultDetail";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? "";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -472,6 +472,7 @@ async function proveManualResponseLoss(seedA: Seed, seedB: Seed, clientB: Supaba
           rejected.data?.reason === "invalid_logged_at" &&
           rpcFetches === 1 &&
           discardedResponses === 0,
+        describeRpcResult(rejected),
       );
       const afterRejection = await readNoteFixture(seedA.uid);
       check(
@@ -495,6 +496,7 @@ async function proveManualResponseLoss(seedA: Seed, seedB: Seed, clientB: Supaba
         rpcFetches - fetchesBeforeLoss === 1 &&
           lost.data == null &&
           Boolean(lost.error?.message?.includes("harness discarded accepted Note response")),
+        describeRpcResult(lost),
       );
     }
 
@@ -596,6 +598,7 @@ async function proveManualResponseLoss(seedA: Seed, seedB: Seed, clientB: Supaba
         retry.data?.ok === true &&
         retry.data?.reused === true &&
         retry.data?.grow_event_id === receipt.grow_event_id,
+      describeRpcResult(retry),
     );
     const recovered = await readNoteFixture(seedA.uid);
     check(
@@ -780,8 +783,8 @@ async function main() {
           rawMirrors.length === 1 &&
           !("__verdant_request_details_hash_v1" in (rawMirrorDetails ?? {})),
         JSON.stringify({
-          initial: rawInitial.data,
-          exact: rawExactRetry.data,
+          initial: rpcResultDetail(rawInitial),
+          exact: rpcResultDetail(rawExactRetry),
           mirrors: rawMirrors,
         }),
       );
@@ -881,8 +884,8 @@ async function main() {
         (reservedMarkerChangedRetry.data as { reason?: string } | null)?.reason ===
           "idempotency_key_conflict",
       JSON.stringify({
-        initial: reservedMarkerDetails.data,
-        changed: reservedMarkerChangedRetry.data,
+        initial: rpcResultDetail(reservedMarkerDetails),
+        changed: rpcResultDetail(reservedMarkerChangedRetry),
         mirrors: reservedMarkerMirrors,
       }),
     );
@@ -1005,7 +1008,7 @@ async function main() {
       !legacyMarkerRetry.error &&
         (legacyMarkerRetry.data as { reused?: boolean } | null)?.reused === true &&
         legacyMarkerDetails?.__verdant_request_details_hash_v1 === legacyMarkerValue,
-      JSON.stringify({ retry: legacyMarkerRetry.data, mirrors: legacyMarkerMirrors }),
+      JSON.stringify({ retry: rpcResultDetail(legacyMarkerRetry), mirrors: legacyMarkerMirrors }),
     );
 
     const manualOccurred = "2026-07-19T19:30:00.000Z";
@@ -1157,7 +1160,7 @@ async function main() {
           (result) => !result.error && (result.data as { ok?: boolean } | null)?.ok === true,
         ) &&
         concurrentIds.every((id) => id === concurrentId),
-      concurrentIds.join(","),
+      JSON.stringify(concurrent.map((result) => rpcResultDetail(result))),
     );
     if (concurrentId) {
       const beforeRetry = await readEvent(concurrentId);
@@ -1168,6 +1171,7 @@ async function main() {
         (retry.data as { reused?: boolean } | null)?.reused === true &&
           sameInstant(beforeRetry.logged_at, afterRetry.logged_at) &&
           sameInstant(beforeRetry.updated_at, afterRetry.updated_at),
+        describeRpcResult(retry),
       );
     }
 

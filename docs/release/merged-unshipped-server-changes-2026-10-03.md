@@ -1,4 +1,8 @@
-# Merged server changes not yet confirmed shipped (since 2026-09-26)
+# Merged server changes not yet confirmed shipped (since 2026-09-26 00:00 CT = 2026-09-26 05:00 UTC)
+
+Window cutoff: midnight Central time at the start of 2026-09-26, which is **2026-09-26 05:00 UTC**.
+Every other time in this doc is UTC. Two server-changing merges landed on 2026-09-26 UTC but
+before this cutoff; see "Edge of window" below.
 
 Status: inventory only. No SQL, deploy, publish, secret or production query was run to
 produce this. Applied/published state comes **only** from `docs/agents/CURRENT_STATE.md`
@@ -20,14 +24,19 @@ git diff --name-status <sha>^ <sha> -- supabase/
 gh pr view <n> --json mergedAt,mergeCommit
 ```
 
-That query returns **8** squash commits touching `supabase/migrations/*` or
-`supabase/functions/*`. The handoff also named #1762, #1776, #1813, #1880 and #1783.
-Those five merged in the window but change **no** file under `supabase/` (see
-"Named in the handoff but not server changes" below).
+The `--since` bound is midnight CT, i.e. 2026-09-26 05:00 UTC (not 00:00 UTC). With that
+cutoff the query returns **8** squash commits touching `supabase/migrations/*` or
+`supabase/functions/*` (it filters on commit date, which can differ from GitHub `mergedAt` by
+up to ~30 minutes; that does not change the set here). Two more server-changing merges sit
+just before the cutoff (between 00:00 and 05:00 UTC on 2026-09-26) and are listed separately
+under "Edge of window". The handoff also named #1762, #1776, #1813, #1880 and #1783. Those
+five merged in the window but change **no** file under `supabase/` (see "Named in the
+handoff but not server changes" below).
 
 ## Inventory (merge order)
 
-Times are merge times from GitHub (UTC).
+Times are merge times from GitHub (UTC). The window starts at 2026-09-26 05:00 UTC
+(midnight CT); every row below merged after that.
 
 | PR    | Merged (UTC)     | Merge SHA                                  | Kind                       | Files under `supabase/`                                                                                                                                                                                     |
 | ----- | ---------------- | ------------------------------------------ | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -54,10 +63,31 @@ Derived from the relative-import graph under `supabase/functions/` at `cf929cf7`
   `sensor-ingest-webhook`. A shared-module change only reaches production when each
   consuming function is redeployed.
 
+### Edge of window (merged 2026-09-26 UTC, before the midnight-CT cutoff)
+
+Not in the 8-row inventory because they merged before 2026-09-26 05:00 UTC, but they are
+server changes that are also not recorded as shipped, and they interact with this plan:
+
+| PR    | Merged (UTC)     | Merge SHA                                  | Kind                      | Files under `supabase/`                                                                                                                                                                          |
+| ----- | ---------------- | ------------------------------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| #1703 | 2026-09-26 01:55 | `4ddb23225918ee1fdfb238ab84708a2e765adb43` | Migration                 | `A migrations/20260924120000_plants_health_unassessed_default.sql` (BUG-009)                                                                                                                     |
+| #1683 | 2026-09-26 04:19 | `dccaf7324055b91cad0a5b51a40c449bb3b6bcf2` | Edge functions (16 files) | including `M functions/ai-doctor-review/index.ts`, `functions/_shared/lib/*` mirror, `auth-email-hook/index.ts`, `sensor-ingest-webhook/index.ts`, `operator-ggs-real-payload-commit/handler.ts` |
+
+- **Applied/published state:** `CURRENT_STATE.md` :446-447 (written while #1683 still carried
+  the migration) says only "Committed is not applied". Applied state of `20260924120000` and
+  publish state of #1683's functions are **NOT_MEASURED**.
+- **Redeploying `ai-doctor-review` ships #1683 too.** #1658 and #1869 both require an
+  `ai-doctor-review` redeploy; that deploy is built from the deploy tip, so it also publishes
+  #1683's `ai-doctor-review/index.ts` and shared-lib changes. Review #1683 as part of that
+  deploy, not separately.
+- **`20260924120000` sorts ahead of every migration in the table below.** If it is not yet
+  applied, a version-ordered apply runs it first.
+
 ## Migrations in dependency order
 
-Supabase applies by version (timestamp), not by merge order. In merge order and in
-version order they are:
+Supabase applies by version (timestamp), not by merge order. The table is in **version
+order only**, not merge order: #1834 (row 2) merged after #1741 (row 3) and after all three
+#1831 files. In version order they are:
 
 | #   | Version        | File                                       | PR    | Recorded prerequisite (from the file)                                                                                                |
 | --- | -------------- | ------------------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -79,11 +109,18 @@ order is:
 1. #1831 `20260927002000`, then `20260927160000` and `20260928183000` (each preflights on #1's wrapper).
 2. #1741 `20260927094000` (independent of the quicklog wrappers).
 3. #1834 `20260927012000` **only if** the apply path accepts an out-of-order version.
-   Otherwise skip it; #1836 covers it.
+   Otherwise skip it; #1836 covers the function. **A skip must be recorded.** A skipped
+   `20260927012000` stays a pending local version in migration history. A later
+   `supabase db push` then either refuses it as out of order or, with `--include-all`, runs
+   it after #1836, where its preflight (which requires the pre-#1834 wrapper hash
+   `0043154b…`) rejects #1836's wrapper and the push stops. The owner has to record the skip,
+   e.g. `supabase migration repair --status applied 20260927012000`. Doc note only: this
+   inventory never runs it, and nobody should run it without the owner's decision.
 4. #1836 `20261001140000` last.
 
-Each file takes a transaction-scoped advisory lock and fails its own preflight instead
-of half-applying.
+Each of the six files runs in a single transaction (`BEGIN`/`COMMIT`) with a preflight
+check, so a failed preflight aborts the file instead of half-applying it. Five of the six
+also take a transaction-scoped advisory lock; #1741's `20260927094000` takes none.
 
 ## Applied / published state (as recorded in CURRENT_STATE.md only)
 

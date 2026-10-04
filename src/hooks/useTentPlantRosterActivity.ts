@@ -101,11 +101,19 @@ export function useTentPlantRosterActivity(
   });
   const byPlantId = useMemo<Record<string, TentPlantRosterActivityEntry>>(() => {
     const out: Record<string, TentPlantRosterActivityEntry> = {};
+
+    // Create an index map for O(1) lookups instead of O(N) ids.indexOf(id) inside the loop
+    const idToIndex = new Map<string, number>();
+    for (let i = 0; i < ids.length; i++) {
+      idToIndex.set(ids[i], i);
+    }
+
     for (const plant of safePlants) {
       const id = typeof plant?.id === "string" ? plant.id : null;
       if (!id) continue;
-      const queryIndex = ids.indexOf(id);
-      const raw = (results[queryIndex]?.data as unknown[] | undefined) ?? null;
+
+      const queryIndex = idToIndex.get(id);
+      const raw = queryIndex !== undefined ? (results[queryIndex]?.data as unknown[] | undefined) ?? null : null;
       if (!raw) {
         out[id] = EMPTY_ENTRY;
         continue;

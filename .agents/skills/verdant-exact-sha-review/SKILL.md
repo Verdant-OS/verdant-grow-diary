@@ -5,7 +5,7 @@ description: The review and merge loop for Verdant-OS/verdant-grow-diary. Use wh
 
 # Verdant exact-SHA review loop
 
-This skill writes down the review loop that the Verdant agents already follow, so authors, reviewers and the merge-queue owner all work from one copy.
+This skill writes down the Verdant review and merge loop as the rule from 2026-10-03 on, so authors, reviewers and the merge-queue owner all work from one copy. Where it differs from what some earlier merges did, this skill is the rule.
 
 Use the shared box skill `code-review-and-quality` (on the agents' box at `/home/box/agent-data/workflows/code-review-and-quality/SKILL.md`; not in this repo) as the review checklist (correctness, readability, architecture, security, performance). Before asking for review, authors run the checklist in [docs/agents/recurring-review-findings.md](../../../docs/agents/recurring-review-findings.md).
 
@@ -55,8 +55,10 @@ Return exactly one:
 - The new head gets a **full re-review**, not a diff-only skim. Earlier verdicts don't carry over.
 - A PR stays **draft** until it merges.
 - Before merge, **all 35 required checks must be green at the merge head** (`gh pr checks <N> --required`). Checks from an older head don't count. The Vercel "Account is blocked." status (and "Vercel Deployments") is not a required check and doesn't block.
-- **Matthew's standing merge-when-green rule covers non-migration PRs:** once a non-migration PR has a clean `PASS` at its exact head SHA and 35/35 required checks are green at that same SHA, the merge-queue owner marks it ready and enqueues it at that SHA with `gh pr merge <N> --squash --auto --match-head-commit <SHA>`, so the merge queue re-runs the required checks against the latest tip before it lands (see [docs/agents/merge-queue.md](../../../docs/agents/merge-queue.md)). There is no extra wait for a go-ahead. If the head moves first, the PASS no longer applies.
-- **The merge queue is the normal path.** The `verdant-grow-diary merge queue` ruleset (id 20421416) was active when checked on 2026-10-03: squash, all-green grouping, the 35 required checks, linear history. A direct `gh pr merge` that skips the queue is the repository-admin bypass, which merge-queue.md reserves for emergencies and Matthew.
+- **The merge queue is the rule.** **Matthew's decision (2026-10-03, 10:53 PM CT):** all merges go through the merge queue, and the `--admin` bypass is emergency-only, at his call. The `verdant-grow-diary merge queue` ruleset (id 20421416) was active when read on 2026-10-03: squash, all-green grouping, the 35 required checks, linear history, with a bypass for the repository admin role.
+- **Matthew's standing merge-when-green rule covers non-migration PRs:** once a non-migration PR has a clean `PASS` at its exact head SHA and 35/35 required checks are green at that same SHA, the merge-queue owner marks it ready and enqueue it at that SHA with `gh pr merge <N> --squash --auto --match-head-commit <SHA>`. On this branch a plain `gh pr merge <N>` also joins the queue rather than merging directly. The queue re-runs the required checks against the latest tip before the PR lands (see [docs/agents/merge-queue.md](../../../docs/agents/merge-queue.md)). There is no extra wait for a go-ahead. If the head moves first, the PASS no longer applies.
+- **Bypass:** Skipping the queue takes `gh pr merge --admin` (the repository-admin bypass). merge-queue.md line 9 calls that emergency-only, and whether a bypass on green is ever allowed is Matthew's call.
+- Dated note (2026-10-03): #1867, #1869, #1887, #1888, #1889 and #1890 merged 1–28 s after being marked ready, with no merge-queue event in their GitHub event history, so they used the admin bypass. That was before the 10:53 PM CT decision above.
 - **Migration PRs need Matthew's explicit decision** (section 6), even after a clean PASS.
 - `PASS-with-P2` is never merged "as is". It always goes back to the author.
 - **Never merge #1740.**

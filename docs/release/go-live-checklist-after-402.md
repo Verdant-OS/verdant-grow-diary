@@ -57,9 +57,14 @@ anything.
    `schedule: "17 9 * * *"` active, and `schedule` runs skip the actor gate. Once production
    serves the tip SHA, the next 09:17 UTC run makes two tagged fixture writes on its own,
    possibly before steps 1–3 or the step 2 server publish. Pick one before promoting:
-   - **(a) Disable it until step 4 passes.** This is owner-only, e.g.
-     `gh workflow disable quicklog-smoke.yml -R Verdant-OS/verdant-grow-diary`. Re-enable it
-     at step 6 with `gh workflow enable quicklog-smoke.yml -R Verdant-OS/verdant-grow-diary`.
+   - **(a) Disable it until steps 1–3 pass.** This is owner-only, e.g.
+     `gh workflow disable quicklog-smoke.yml -R Verdant-OS/verdant-grow-diary`. The owner
+     re-enables it **right before step 4**, after steps 1–3 pass, with
+     `gh workflow enable quicklog-smoke.yml -R Verdant-OS/verdant-grow-diary`. It can't wait
+     until later: GitHub rejects `workflow_dispatch` on a disabled workflow (HTTP 422), so
+     step 4's `gh workflow run` would fail. Once it's re-enabled, a 09:17 UTC scheduled run
+     can fall in the step 4 window. The `quicklog-production-fixture` concurrency group
+     (`quicklog-smoke.yml:489-491`) serializes the runs, so they never overlap.
    - **(b) Accept that a scheduled run may be the first write.** Record that choice in the
      receipt; step 4 is then not necessarily "the first write".
 
@@ -110,7 +115,9 @@ from #1894:
    - #1831 `20260927002000`, then `20260927160000` and `20260928183000` (each preflights on
      the first file's wrapper).
    - #1741 `20260927094000` (independent of the quicklog wrappers).
-   - #1834 `20260927012000` **only if** the apply path accepts an out-of-order version.
+   - #1834 `20260927012000`. If none of `20260927094000`/`20260927160000`/`20260928183000`
+     is recorded yet, it isn't out of order and plain version order applies it with no skip.
+     Otherwise, apply it **only if** the apply path accepts an out-of-order version.
      Otherwise skip it, because #1836 covers the function. **A skip must be recorded.** A
      skipped `20260927012000` stays pending in migration history, and a later `db push` either
      refuses it as out of order or, with `--include-all`, runs it after #1836. There its
@@ -135,6 +142,9 @@ Repeat step 1 after step 2. This separates "server publish broke a read" from "n
 frontend broke a read". The same stop conditions apply.
 
 ### Step 4: Quick Log save + readback (#1849), the first deliberate write
+
+If step 0.0 chose (a), the owner re-enables `quicklog-smoke.yml` first (see step 0.0). A
+dispatch on the disabled workflow fails with 422.
 
 ```bash
 gh workflow run quicklog-smoke.yml -R Verdant-OS/verdant-grow-diary --ref verdant-grow-diary -f run_mode=quicklog_smoke
@@ -171,11 +181,11 @@ What to check (manual, owner or the fixture account in the browser, production o
    pass, because it's indistinguishable from token stripping. **FAIL** if the response
    treats the reading as live or trustworthy.
 
-### Step 6: re-enable (or keep) the daily save-timing smoke (#1861)
+### Step 6: keep the daily save-timing smoke (#1861)
 
 The schedule (`17 9 * * *`, 09:17 UTC, which is 4:17 AM CDT) is already on. It runs on its
-own from the deploy branch with `E2E_UNATTENDED_RUN=true`. If step 0.0 chose (a), the owner
-re-enables it now. After steps 1–4 pass, let the next scheduled run land and record its
+own from the deploy branch with `E2E_UNATTENDED_RUN=true`. Under step 0.0 (a) it was already
+re-enabled before step 4, so nothing changes here. After steps 1–4 pass, let the next scheduled run land and record its
 receipt (two tagged saves).
 **Stop condition:** two consecutive red scheduled runs mean the run is left unattended
 with a report to the owner, not re-triggered. Red at `verify-fixture` while the fixture is

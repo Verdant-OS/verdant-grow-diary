@@ -455,6 +455,27 @@ describe("evaluatePolicy", () => {
     expect(skill.split("## Troubleshooting")[1]).toContain("not a supported recovery path");
   });
 
+  it("keeps AGENTS setup guidance on the frozen Bun path", () => {
+    const root = resolve(__dirname, "../..");
+    const agents = readFileSync(resolve(root, "AGENTS.md"), "utf8");
+    const guidance = agents
+      .split("**Package manager — check `node_modules` first;")[1]
+      .split("- **Dev server.")[0];
+    const prose = guidance.replace(/\s+/g, " ");
+    expect(prose).toContain(
+      "absent, use `bun install --frozen-lockfile` as the SKILL's supported setup path.",
+    );
+    expect(prose).toContain(
+      "Historical install observations below do not authorize an unpinned npm fallback",
+    );
+    expect(prose).toContain(
+      "If the frozen install fails, report the exact blocker as `BLOCKED`; do not install an unpinned npm tree or regenerate the lockfile.",
+    );
+    // Forbidden-instruction absence scan over documentation, not resolved config.
+    expect(prose).not.toContain("do **not** reach for `bun install --frozen-lockfile`");
+    expect(prose).not.toContain("SKILL's verified npm public-registry-override bootstrap");
+  });
+
   it("rejects drive-absolute transition consumer paths", () => {
     expect(() =>
       evaluate(

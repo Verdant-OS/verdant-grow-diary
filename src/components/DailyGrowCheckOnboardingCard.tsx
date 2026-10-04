@@ -3,6 +3,7 @@
  * surfaces the single most useful next setup step for the Daily Grow Check
  * loop. Reuses existing add/edit/move surfaces. No writes here.
  */
+import { useMemo } from "react";
 import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, ClipboardCheck, HelpCircle, X } from "lucide-react";
 
@@ -75,7 +76,10 @@ export default function DailyGrowCheckOnboardingCard({
   const rawReadings = Array.isArray(sensorsQuery.data) ? sensorsQuery.data : [];
   const rawDiary = Array.isArray(diaryQuery.data) ? diaryQuery.data : [];
 
-  const scoped = tentIds && tentIds.length > 0 ? new Set(tentIds) : null;
+  const scoped = useMemo(
+    () => (tentIds && tentIds.length > 0 ? new Set(tentIds) : null),
+    [tentIds],
+  );
 
   const manualReadings = rawReadings.filter((r) => r.source === "manual");
   const scopedManual = scoped

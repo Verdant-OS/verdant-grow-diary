@@ -45,17 +45,20 @@ cannot enter the Claude builder. There is no schedule or `pull_request_target`.
 
 GDP must provide a closed file plan and a slice ID in the issue. Claude checks
 for collisions, branches from `verdant-grow-diary` as `claude/<slice-id>`, and
-opens one draft PR. Nudges continue the existing Claude draft. Raw push, merge,
-ready, review and PR-creation commands are denied. Trusted helpers restrict
-pushes to the current `claude/*` branch and execute `gh pr create --draft` with
-base `verdant-grow-diary`; the PR helper refuses a second PR for the same branch.
-Claude names its owner and independent reviewer in the PR body.
+commits locally. Nudges continue the existing Claude draft. Claude cannot push,
+merge, mark ready, review or open a PR: its job holds only a read-only token. A
+separate publish job, with no Claude in it, checks the committed diff against the
+locked-path policy, pushes the `claude/*` branch with a normal (fast-forward)
+push and opens one draft PR into `verdant-grow-diary`; it never opens a second PR
+for the same branch. Claude's final commit message becomes the PR title and body,
+which names its owner and independent reviewer.
 
 ## Matthew: setup steps
 
-1. Install the [Claude GitHub App](https://github.com/apps/claude) on Verdant-OS,
-   limited to the `verdant-grow-diary` repository only.
-2. Confirm it has Contents, Issues and Pull requests read and write.
+1. No GitHub App is required. The builder passes the job's read-only
+   `GITHUB_TOKEN` to the action, and the publish job pushes with its own token.
+2. Workflow tokens must be allowed to create pull requests (Settings, Actions,
+   General, "Allow GitHub Actions to create and approve pull requests").
 3. Billing mode selected by Matthew: **Claude Max subscription**. On Matthew's
    machine, run `claude setup-token` while signed in to the intended Max account.
    Add the resulting token as repo secret `CLAUDE_CODE_OAUTH_TOKEN` under Settings,
@@ -79,12 +82,14 @@ a separately approved monthly spend limit in that Console before the key is
 added. This slice selects Max and sets no API spend cap. When both secrets exist,
 Max OAuth takes precedence and the API key is not passed to Claude. When neither
 exists, the first step writes **Claude billing secret not configured**, succeeds,
-and skips checkout, policy/helper preparation and the Claude action.
+and skips checkout, policy preparation, the Claude action and publishing.
 
-The workflow deliberately uses the Claude App's token exchange, rather than
-passing `GITHUB_TOKEN` to the action, so Claude-created PRs can start normal CI.
-The app and billing credential must be configured by Matthew; this slice does
-not install an app, add a secret, or change a spend ceiling.
+Because the publish job uses the workflow token, GitHub does not start CI for a
+Claude draft on its own (workflow-token events never trigger workflows). A
+maintainer starts CI by pushing to the draft's branch or by closing and
+reopening the draft; there is no earlier run to re-run. The billing credential
+must be configured by Matthew; this slice does not add a secret or change a
+spend ceiling.
 
 ## Locked paths and verification
 
@@ -97,7 +102,7 @@ database access on knk. HOLD #1250 remains on HOLD. PRs #1625, #1727, #1737,
 The policy also protects governance files, `.github/`, `.claude/`, `.grok/`,
 Git metadata, `docs/agents/OWNERSHIP.md`, `docs/agents/CURRENT_STATE.md`, and private
 environment files. File-edit denials cover the common locked paths. Before any
-push or new PR, a trusted helper checks the committed diff using the same path
+push or new PR, the publish job checks the committed diff using the same path
 policy as the Claude PR guard. SQL and lockfiles are blocked anywhere in the
 tree. Auth, RLS, Action Queue and device-control code are blocked in source,
 script, test, E2E and package paths; Markdown explanations can remain eligible.
@@ -120,17 +125,29 @@ three jobs report skipped: the builder still requires an authorized comment or
 label, and both validation jobs are gated on `pull_request` events, where
 `github.head_ref` and the PR SHAs exist.
 
-The builder's GitHub permissions are limited to Contents, Pull requests, Issues
-and ID token write. Full Claude output and the Claude-authored report are off.
-Standing instructions prohibit reading, printing or committing credentials.
-Because issue text is untrusted, the Claude step sets
-`CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`, so the action scrubs Anthropic, cloud and
-Actions secrets from the commands Claude runs; the pinned action enables this
-only for `allowed_non_write_users` unless the workflow sets it. The scrub is
-best-effort. `CLAUDE_CODE_SCRIPT_CAPS` limits a run to five branch pushes and
-one draft PR through the trusted helpers. The token the action writes into the
-checkout's git remote is not covered by the scrub; removing it is follow-up
-work for the guard PR.
+Issue text is untrusted, so the design assumes Claude may be steered by it and
+keeps both credentials out of reach:
+
+- **GitHub token.** The builder job has Contents and Pull requests read and
+  Issues write only, and passes that token to the action instead of the Claude
+  App token. The action writes it into the checkout's git remote, so Claude may
+  be able to see it, but it cannot push, merge or open a PR, and it expires with
+  the job. Pushing and draft creation happen only in the publish job, which runs
+  no Claude and no repository code and treats Claude's commits as a git bundle.
+- **Max or API credential.** The Claude step sets
+  `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` (the pinned action enables it only for
+  `allowed_non_write_users` otherwise), which removes Anthropic credentials from
+  every command Claude runs and isolates those commands from the Claude process
+  with bubblewrap. Read access to `/proc` is denied.
+- **No repository code runs.** Installs, tests, builds and other runners (`bun`,
+  `bunx`, `npm`, `npx`, `node` and similar) are denied, and git hooks point at an
+  empty read-only directory, so code planted in the checkout never executes while
+  a credential is present. CI tests the draft instead.
+- The pinned action grants its own `scripts/git-push.sh` wrapper; it is denied
+  explicitly, and a push would fail with the read-only token in any case.
+
+Full Claude output and the Claude-authored report are off. Standing instructions
+prohibit reading, printing or committing credentials.
 
 ## Evidence boundaries
 

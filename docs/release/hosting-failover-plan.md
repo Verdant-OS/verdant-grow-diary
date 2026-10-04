@@ -5,10 +5,27 @@ DNS change, project creation or publisher switch is **Matthew's decision** under
 existing publish hold. Agents don't promote, publish, repoint DNS or move hosts. Handoff
 item 6. Owner: Grok. Reviewer seat: Critical Mass.
 
-Facts below come from the deploy tip source (`cf929cf7`) and the merged release docs:
+Facts below come from the deploy tip source (read at `cf929cf7`; the tip is now `5ea8f1f7`,
+and that delta touches no file cited here) and the merged release docs:
 `docs/specs/release-topology-specification.md` (#1725) and
 `docs/agents/RUNBOOK_VERCEL_PROMOTE.md` (#1780). Anything not read from those is marked
 `NOT_MEASURED` or listed as an owner question.
+
+## 0. Trigger criteria (when failover would even be considered)
+
+This doc is a contingency map, not a standing plan. The default is to **wait for Vercel to
+clear the 402** (payment expected 2026-10-06). Failover is considered only when the owner
+decides it, and only if at least one of these holds:
+
+- The 402 isn't cleared after the expected payment date, and Vercel support gives no
+  restoration date the owner accepts.
+- Vercel restores the account but production stays down or degraded (wrong SHA, failing
+  hostnames) for longer than the owner accepts. The threshold is the owner's to set; this doc
+  doesn't pick a number.
+- Vercel ends or suspends the account or project.
+
+**Who calls it:** Matthew only. An agent can report that a trigger condition is observed,
+with evidence, but never starts a move.
 
 ## 1. How the build is host-neutral today
 
@@ -50,11 +67,13 @@ Equivalents (pick one mechanism; don't use both):
 
 - **Nitro `routeRules`** (host-neutral, in source): `{ "/strains": { redirect: { to: "/cultivars", statusCode: 308 } }, "/strains/**": … }`,
   passed through the Lovable config's `nitro: { … }` option. Note that setting any
-  `nitro` option must keep `cloudflare-module` behavior. Verify on a preview build before
-  relying on it.
+  `nitro` option must keep `cloudflare-module` behavior. Verify it on a preview build on the
+  hypothetical new host before relying on it. That preview doesn't exist today, and
+  acceptance stays production-only (`docs/production-only-verification-runbook.md`).
 - **Cloudflare Workers static assets**: a `_redirects` file in the client output dir
-  (`/strains /cultivars 308`, `/strains/:slug /cultivars/:slug 308`, …). Applies only
-  to asset-served paths; SSR paths need the Worker or `routeRules`.
+  (`/strains /cultivars 308`, `/strains/:slug /cultivars/:slug 308`, …). Whether it applies
+  only to asset-served paths (so SSR paths need the Worker or `routeRules`) is
+  **NOT_MEASURED**.
 - **Redirect 1 (`/~oauth`)** exists only because a non-Lovable host must hop Google SSO to
   the Lovable project host (`src/integrations/lovable/index.ts` comment). On Lovable hosting
   `/~oauth` is expected to be served natively. On plain Cloudflare it must stay a
@@ -68,7 +87,8 @@ Equivalents (pick one mechanism; don't use both):
 `/((?!assets/|~oauth).*)` → `/` (everything except assets and `~oauth`). Under TanStack
 Start SSR the Nitro server handles routing itself. Whether this rewrite still does anything
 on Vercel's Nitro output is **NOT_MEASURED**. On Cloudflare, don't port it: the Worker
-serves SSR routes, and a catch-all rewrite to `/` would mask real 404s. Verify on a preview.
+serves SSR routes, and a catch-all rewrite to `/` would mask real 404s. Verify on a preview on
+the hypothetical new host (not an existing environment). Acceptance stays production-only.
 
 ### Header rules (3)
 
@@ -104,8 +124,9 @@ domain-wide: keep it identical, never weaker. The more specific `/unsubscribe`
 - `scripts/stamp-version.mjs`: `isVercelBuildEnvironment()` (`VERCEL=1` or `VERCEL_ENV`)
   excludes `.vercel/**` and `vercel.json` from the dirty check, and takes the branch from
   `VERCEL_GIT_COMMIT_REF`. Off Vercel it falls back to git, so `/version.json` keeps working.
-  Confirm the new host's builder has a git checkout (not a tarball) so `sha` and `dirty`
-  are real.
+  Confirm the new host's builder has a git checkout (not a tarball) so the `commit` and
+  `dirty` fields are real (`stamp-version.mjs:276` writes `commit`, and
+  `wait-for-deployed-sha` reads `body.commit`).
 - `scripts/audit-subscriber-growth-live-parity.mjs` reads `x-deployment-id` or
   `x-vercel-id` response headers for identity. On another host this reads `null`, and the
   audit should rely on `/version.json` instead.
@@ -133,9 +154,19 @@ domain-wide: keep it identical, never weaker. The more specific `/unsubscribe`
 1. Which target, if any: Lovable hosting (re-bind the domain to the already-published
    Lovable project) or Cloudflare Workers directly? Who holds the Cloudflare account?
 2. **Is any server-side secret or environment variable set only in the Vercel dashboard?**
-   The source read found no SSR `process.env` secret consumer in `src/` other than
-   `src/lib/mcp/tools/_supabase.ts`, which is bundled into the `mcp` edge function.
-   Dashboard-only variables can't be read from the repo: list them before any move.
+   Server-side `process.env` readers in `src/` at `cf929cf7`:
+   - `src/integrations/supabase/client.server.ts:36-37` reads `SUPABASE_URL` and
+     **`SUPABASE_SERVICE_ROLE_KEY`**. It's a generated service-role admin client ("Load inside
+     server handlers") with **no product importer** today (only tests reference it).
+   - `src/integrations/supabase/auth-middleware.ts:36-37` reads `SUPABASE_URL` and
+     `SUPABASE_PUBLISHABLE_KEY`. It also has no product importer.
+   - `src/lib/mcp/tools/_supabase.ts` reads only `SUPABASE_URL` and the publishable/anon key
+     (not secrets).
+
+   Any future server function that imports `client.server` needs `SUPABASE_SERVICE_ROLE_KEY`
+   set on the new host. That makes this question more pressing, not less. Dashboard-only
+   variables can't be read from the repo: list them before any move.
+
 3. On the chosen host, does `/~oauth/*` need the redirect to the Lovable project host, or
    is it served natively?
 4. Keep or remove `@vercel/analytics` / `@vercel/speed-insights` off Vercel? Is there a
@@ -147,13 +178,26 @@ domain-wide: keep it identical, never weaker. The more specific `/unsubscribe`
 
 ## 6. What a move would require (not authorized here)
 
-In order, each step an owner action: answer the questions above → port redirects/headers
-as `routeRules` on a branch (draft PR, independent review) → preview build on the target
-with header/redirect `curl` checks → owner promotion → DNS cutover for apex + `www` →
-per-hostname `/version.json` + header verification → run
-`docs/release/go-live-checklist-after-402.md` (handoff item 5) against the new host. The
-publish hold stays until Matthew lifts it.
+Each step is an owner action. The publish hold stays until Matthew lifts it. Every step that
+moves something has a rollback back to Vercel. Each rollback ends with the same
+verification: `/version.json` (`commit`, `dirty:false`) and `curl -sI` headers on **both**
+apex and `www`.
 
-## Rollback
+| #   | Step                                                                                                                                                                                                                   | Rollback back to Vercel                                                                                                                                                                                                           |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Answer the owner questions in §5.                                                                                                                                                                                      | none needed                                                                                                                                                                                                                       |
+| 2   | Port redirects/headers as Nitro `routeRules` on a branch (draft PR, independent review). Merge only on a clean PASS.                                                                                                   | Revert the merged PR with a normal revert PR. Confirm the Vercel build still serves all 9 redirects and the 9 headers (`vercel.json` stays in place throughout, so Vercel keeps working).                                         |
+| 3   | Preview build on the hypothetical new host, with header/redirect `curl` checks. Not an existing environment; acceptance stays production-only.                                                                         | Delete or ignore the preview. Nothing in production changed.                                                                                                                                                                      |
+| 4   | Owner promotion of the tip on the new host.                                                                                                                                                                            | Production is still on Vercel until DNS moves. If DNS has already moved, re-promote the known-good deployment on Vercel (`RUNBOOK_VERCEL_PROMOTE.md`, "Rollback — Matthew only") and continue with step 5's rollback.             |
+| 5   | DNS cutover of apex **and** `www` together (lower TTL first). Keep HSTS identical.                                                                                                                                     | Re-point apex and `www` to the Vercel records recorded before the cutover (capture them in §5 Q5 first). Restore the Vercel project's domain binding for both hostnames. Wait out the TTL, then run the per-hostname check above. |
+| 6   | Supabase Auth redirect URLs / OAuth allowed origins (§5 Q6), only if the move changes a listed host.                                                                                                                   | Restore the exact prior lists (capture them before editing). Re-test Google SSO through `/~oauth` on the production domain.                                                                                                       |
+| 7   | Per-hostname `/version.json` + header verification on the new host.                                                                                                                                                    | If any hostname fails: run the rollbacks for steps 6, 5 and 4, in that order.                                                                                                                                                     |
+| 8   | Run `docs/release/go-live-checklist-after-402.md` (handoff item 5, #1895). Its workflows refuse any `E2E_BASE_URL` other than `https://verdantgrowdiary.com`, so this works only after the cutover on the same domain. | Its stop conditions apply. A red result after cutover is a trigger for the step 6 → 5 → 4 rollbacks, on the owner's call.                                                                                                         |
 
-Docs only; revert this file. No host, DNS, project or deployment was touched.
+#1895 step 0.1 cites the Vercel promote runbook. On a new host, §3's "equivalent
+promote/rollback/verify sections" must exist before step 4.
+
+## Rollback (this document)
+
+Docs only; revert this file. No host, DNS, project or deployment was touched. The
+operational rollback for each move step is in the §6 table.

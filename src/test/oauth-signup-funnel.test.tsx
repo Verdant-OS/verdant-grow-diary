@@ -182,13 +182,18 @@ describe("first Google OAuth signup vs returning sign-in", () => {
         identities: [google],
       }),
     ).toBe(false);
-    expect(
-      isFirstGoogleOAuthSignup({
-        id: "non-array-identities",
-        ...stamps,
-        identities: { provider: "google" } as unknown as GoogleOAuthSignupCandidate["identities"],
-      }),
-    ).toBe(false);
+    // Malformed (non-array) identities must be rejected without throwing. A string
+    // and an array-like object both have a positive `length` but no `every`, so
+    // these fixtures fail (TypeError) if the `Array.isArray` guard is removed.
+    for (const identities of [
+      "google",
+      { 0: google, length: 1 },
+      { provider: "google" },
+    ] as unknown as GoogleOAuthSignupCandidate["identities"][]) {
+      const candidate = { id: "non-array-identities", ...stamps, identities };
+      expect(() => isFirstGoogleOAuthSignup(candidate)).not.toThrow();
+      expect(isFirstGoogleOAuthSignup(candidate)).toBe(false);
+    }
   });
 });
 

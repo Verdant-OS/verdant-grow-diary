@@ -63,7 +63,9 @@ headers), plus `cleanUrls: true`, `installCommand`, `buildCommand`, `bunVersion`
 | 8   | `/terms-of-service` | `/terms`                                                                        | permanent |
 | 9   | `/privacy-policy`   | `/privacy`                                                                      | permanent |
 
-Equivalents (pick one mechanism; don't use both):
+Equivalents. On the new host, pick one mechanism and don't use both. While Vercel still
+builds the same source (§6 step 2), merged `routeRules` and the `vercel.json` redirects/headers
+both apply on Vercel, so the two sets must be **identical** until `vercel.json` is retired:
 
 - **Nitro `routeRules`** (host-neutral, in source): `{ "/strains": { redirect: { to: "/cultivars", statusCode: 308 } }, "/strains/**": … }`,
   passed through the Lovable config's `nitro: { … }` option. Note that setting any
@@ -146,8 +148,10 @@ domain-wide: keep it identical, never weaker. The more specific `/unsubscribe`
   (**NOT_MEASURED**). A failover to Lovable hosting may therefore be a domain re-binding,
   not a new deploy. Owner question 1.
 - A cutover must move apex and `www` together, keep HSTS identical, and be followed by the
-  runbook's per-hostname `/version.json` check. Lower the TTL ahead of time if the registrar
-  allows it. The values are owner-side.
+  runbook's per-hostname `/version.json` check. Lower the TTL (if the registrar allows it) at
+  least **one old-TTL period before** the cutover, so resolvers have already dropped the old
+  long TTL. Keep it low through the whole rollback window, otherwise a rollback waits out the
+  old TTL, not the lowered one. The values are owner-side.
 
 ## 5. Owner questions (do not guess)
 
@@ -178,21 +182,35 @@ domain-wide: keep it identical, never weaker. The more specific `/unsubscribe`
 
 ## 6. What a move would require (not authorized here)
 
-Each step is an owner action. The publish hold stays until Matthew lifts it. Every step that
-moves something has a rollback back to Vercel. Each rollback ends with the same
-verification: `/version.json` (`commit`, `dirty:false`) and `curl -sI` headers on **both**
-apex and `www`.
+Each step is an owner action. The publish hold stays until Matthew lifts it. Each rollback
+ends with the same verification: `/version.json` (`commit`, `dirty:false`) and `curl -sI`
+headers on **both** apex and `www`.
 
-| #   | Step                                                                                                                                                                                                                   | Rollback back to Vercel                                                                                                                                                                                                           |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Answer the owner questions in §5.                                                                                                                                                                                      | none needed                                                                                                                                                                                                                       |
-| 2   | Port redirects/headers as Nitro `routeRules` on a branch (draft PR, independent review). Merge only on a clean PASS.                                                                                                   | Revert the merged PR with a normal revert PR. Confirm the Vercel build still serves all 9 redirects and the 9 headers (`vercel.json` stays in place throughout, so Vercel keeps working).                                         |
-| 3   | Preview build on the hypothetical new host, with header/redirect `curl` checks. Not an existing environment; acceptance stays production-only.                                                                         | Delete or ignore the preview. Nothing in production changed.                                                                                                                                                                      |
-| 4   | Owner promotion of the tip on the new host.                                                                                                                                                                            | Production is still on Vercel until DNS moves. If DNS has already moved, re-promote the known-good deployment on Vercel (`RUNBOOK_VERCEL_PROMOTE.md`, "Rollback — Matthew only") and continue with step 5's rollback.             |
-| 5   | DNS cutover of apex **and** `www` together (lower TTL first). Keep HSTS identical.                                                                                                                                     | Re-point apex and `www` to the Vercel records recorded before the cutover (capture them in §5 Q5 first). Restore the Vercel project's domain binding for both hostnames. Wait out the TTL, then run the per-hostname check above. |
-| 6   | Supabase Auth redirect URLs / OAuth allowed origins (§5 Q6), only if the move changes a listed host.                                                                                                                   | Restore the exact prior lists (capture them before editing). Re-test Google SSO through `/~oauth` on the production domain.                                                                                                       |
-| 7   | Per-hostname `/version.json` + header verification on the new host.                                                                                                                                                    | If any hostname fails: run the rollbacks for steps 6, 5 and 4, in that order.                                                                                                                                                     |
-| 8   | Run `docs/release/go-live-checklist-after-402.md` (handoff item 5, #1895). Its workflows refuse any `E2E_BASE_URL` other than `https://verdantgrowdiary.com`, so this works only after the cutover on the same domain. | Its stop conditions apply. A red result after cutover is a trigger for the step 6 → 5 → 4 rollbacks, on the owner's call.                                                                                                         |
+**A rollback to Vercel needs an active, unblocked Vercel account.** That holds only under
+§0's second trigger (account restored but production degraded). Under the first trigger
+(402 not cleared: deployments are disabled, "Account is blocked.") and the third (account or
+project ended/suspended), there is **no Vercel fallback**. Re-promoting is impossible, and
+re-pointing DNS or restoring the domain binding returns the site to a 402 or to nothing. In
+those cases the fallback is **Matthew's call**, from:
+
+- **fix forward** on the new host,
+- **switch to the other candidate**, e.g. re-bind the domain to the already-published Lovable
+  publisher (§4, owner question 1), or
+- **accept downtime** until the new host or Vercel is fixed.
+
+The "Rollback back to Vercel" column below applies only while the Vercel account is active and
+unblocked.
+
+| #   | Step                                                                                                                                                                                                                   | Rollback back to Vercel (active, unblocked account only)                                                                                                                                                                                                                                                                                                      |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Answer the owner questions in §5.                                                                                                                                                                                      | none needed                                                                                                                                                                                                                                                                                                                                                   |
+| 2   | Port redirects/headers as Nitro `routeRules` on a branch (draft PR, independent review). Merge only on a clean PASS.                                                                                                   | Revert the merged PR with a normal revert PR. Confirm the Vercel build still serves all 9 redirects and the 9 headers (`vercel.json` stays in place, identical to the `routeRules`, so Vercel keeps working). Not checkable while Vercel serves a 402.                                                                                                        |
+| 3   | Preview build on the hypothetical new host, with header/redirect `curl` checks. Not an existing environment; acceptance stays production-only.                                                                         | Delete or ignore the preview. Nothing in production changed.                                                                                                                                                                                                                                                                                                  |
+| 4   | Owner promotion of the tip on the new host.                                                                                                                                                                            | Before DNS moves, production is still wherever Vercel serves it (under §0 trigger 1 that is a 402, so there's nothing to protect). If DNS has already moved and the account is active, re-promote the known-good deployment on Vercel (`RUNBOOK_VERCEL_PROMOTE.md`, "Rollback — Matthew only") and continue with step 5's rollback.                           |
+| 5   | DNS cutover of apex **and** `www` together. Lower the TTL at least one old-TTL period before, and keep it low through the rollback window. Keep HSTS identical.                                                        | Re-point apex and `www` to the Vercel records recorded before the cutover (capture them in §5 Q5 first). Restore the Vercel project's domain binding for both hostnames. Wait out the (lowered) TTL, then run the per-hostname check above. With a blocked or ended account, this returns the site to a 402 or nothing: use the owner fallback above instead. |
+| 6   | Supabase Auth redirect URLs / OAuth allowed origins (§5 Q6), only if the move changes a listed host.                                                                                                                   | Restore the exact prior lists (capture them before editing). Re-test Google SSO through `/~oauth` on the production domain.                                                                                                                                                                                                                                   |
+| 7   | Per-hostname `/version.json` + header verification on the new host.                                                                                                                                                    | If any hostname fails: run the rollbacks for steps 6, 5 and 4, in that order.                                                                                                                                                                                                                                                                                 |
+| 8   | Run `docs/release/go-live-checklist-after-402.md` (handoff item 5, #1895). Its workflows refuse any `E2E_BASE_URL` other than `https://verdantgrowdiary.com`, so this works only after the cutover on the same domain. | Its stop conditions apply. A red result after cutover is a trigger for the step 6 → 5 → 4 rollbacks, on the owner's call.                                                                                                                                                                                                                                     |
 
 #1895 step 0.1 cites the Vercel promote runbook. On a new host, §3's "equivalent
 promote/rollback/verify sections" must exist before step 4.

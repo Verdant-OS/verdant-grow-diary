@@ -8,8 +8,11 @@ Status: inventory only. No SQL, deploy, publish, secret or production query was 
 produce this. Applied/published state comes **only** from `docs/agents/CURRENT_STATE.md`
 at the deploy tip. This inventory was built at `cf929cf7baf0011045430e3a38b28b09632847c6`; the tip
 is now `5ea8f1f74209c3576afea0317a471370222fbae3`, and `cf929cf7..5ea8f1f7` touches neither
-`supabase/` nor `CURRENT_STATE.md`, so nothing below changes. Anything that file doesn't record
-is `NOT_MEASURED`. Applying migrations and publishing edge functions remain Matthew's
+`supabase/` nor `CURRENT_STATE.md`, so nothing below changes. The later amendment (#1704's
+`20260925090000` and the parked #1460/#1545 versions) re-read `supabase/migrations/`,
+`CURRENT_STATE.md` and `CURRENT_STATE_ARCHIVE.md` at tip
+`a980489ad5188e36eba89461117c2b60fc10f927`. Anything those files don't record is
+`NOT_MEASURED`. Applying migrations and publishing edge functions remain Matthew's
 decisions under the existing locks (production database knk, HOLD #1250).
 
 Handoff item 3. Owner: Grok. Reviewer seat: Critical Mass.
@@ -88,9 +91,29 @@ server changes that are also not recorded as shipped, and they interact with thi
 - **#1683 also reaches `auth-email-hook` and `operator-ggs-real-payload-commit`.** Those
   changes ship whenever those functions are next deployed, even though neither is part of the
   #1658/#1869 redeploy set. Their publish state is **NOT_MEASURED**.
-- **`20260924120000` sorts ahead of every migration in the table below.** If it is not yet
-  applied, a version-ordered apply runs it first. `20260925090000` (#1704, next section)
-  sorts right after it.
+- **`20260924120000` sorts ahead of every migration in the table below**, but it is not the
+  earliest version that may be pending. If it is not yet applied, a version-ordered apply
+  runs it after any earlier pending version (including the parked `20260916111000` and
+  `20260917183000`, next section) and before `20260925090000` (#1704) and the table below.
+
+### Parked earlier migrations: `20260916111000` (#1460) and `20260917183000` (#1545)
+
+`CURRENT_STATE_ARCHIVE.md` (section "Two committed migrations sit inside the lag window")
+records `20260916111000_quicklog_revision_idempotent_replay.sql` (#1460, `c8194a3d`) and
+`20260917183000_manual_sensor_correction_operations.sql` (#1545, `c00b2e29`) as "committed,
+not applied", with production applied-migration state `NOT_MEASURED`. The live
+`CURRENT_STATE.md` locks list still says "No Publish. No APPLY. `#1460` and `#1545` stay
+parked." Both versions sort **before** `20260924120000`, `20260925090000` and every
+migration in this doc. So if either is still pending in production, a version-ordered apply
+(`supabase db push`) runs it **first** and applies a parked migration nobody approved.
+
+**Before any version-ordered apply, the owner checks whether `20260916111000` and
+`20260917183000` are recorded in production** (same check as below:
+`supabase_migrations.schema_migrations` or the Remote column of `supabase migration list`).
+If either is pending, a version-ordered apply must not run until Matthew decides how to
+handle the park: lift it and apply in order, or keep it parked and use an apply path that
+doesn't run them. Record the decision in the release receipt. Doc note only: this amendment
+didn't read production.
 
 ### Also not recorded as shipped: `20260925090000` (#1704, merged 2026-09-25)
 
@@ -117,9 +140,12 @@ query doesn't return it. Nothing above mentioned it until this amendment.
   and aborts if they differ.
 - Runs in one transaction (`BEGIN`/`COMMIT`) with `lock_timeout = '5s'`,
   `statement_timeout = '30s'` and a transaction-scoped advisory lock (`20260925, 90000`).
-  It fails closed with SQLSTATE `55000`, changing nothing, if a prerequisite differs (the
-  table is missing, RLS is off, the owner isn't `postgres`, one of the four expected roles is
-  missing, or `anon`/`authenticated` has superuser, BYPASSRLS, CREATEROLE or CREATEDB). It
+  It fails closed with SQLSTATE `55000`, changing nothing, if a prerequisite differs: the
+  table is missing or isn't a plain table (`relkind = 'r'`), RLS is off, the owner isn't
+  `postgres`, the migration role isn't a member of the owner role
+  (`pg_has_role(current_user, owner, 'MEMBER')`), one of the four expected roles
+  (`postgres`, `anon`, `authenticated`, `service_role`) is missing, or `anon`/`authenticated`
+  has superuser, BYPASSRLS, CREATEROLE or CREATEDB. It
   also fails closed if a browser role would still hold a privilege afterwards, for example
   through membership in another role. Re-running it is a no-op.
 - Client effect: a signed-in browser session can still read its roles, but no browser
@@ -143,8 +169,10 @@ Doc note only: this amendment didn't read production, and the knk lock and migra
 still stand.
 
 - **Recorded:** nothing to do for #1704.
-- **Pending:** a version-ordered apply runs it **second**, after #1703's `20260924120000`
-  and before `20260927002000` (row 1 below) and every later version. If any later version
+- **Pending:** a version-ordered apply runs it after any earlier pending version (including
+  #1460's `20260916111000` and #1545's `20260917183000` if still pending, which need the
+  owner's call above), then #1703's `20260924120000` if pending, and before
+  `20260927002000` (row 1 below) and every later version. If any later version
   is already recorded in production, it is an out-of-order pending version like
   `20260927012000` (step 3 below): `supabase db push` refuses it unless `--include-all` is
   used. Before applying:
@@ -159,12 +187,18 @@ still stand.
      without the owner's decision.
   3. Record the decision (applied in order, or skipped and why) in the release receipt.
 
+**Cross-doc gap.** #1895's `docs/release/go-live-checklist-after-402.md` (open at
+`c380a439`) restates #1894's order without `20260925090000` or the parked
+`20260916111000`/`20260917183000`, and says `20260924120000` "runs first". Whichever of
+#1895 and this amendment merges second adds them there.
+
 ## Migrations in dependency order
 
-Supabase applies by version (timestamp), not by merge order. `20260924120000` (#1703) and
-`20260925090000` (#1704) sort ahead of row 1 if either is still pending; see the two sections
-above. The table is in **version order only**, not merge order: #1834 (row 2) merged after
-#1741 (row 3) and after all three #1831 files. In version order they are:
+Supabase applies by version (timestamp), not by merge order. Any pending earlier version
+sorts ahead of row 1: the parked `20260916111000` (#1460) and `20260917183000` (#1545), then
+`20260924120000` (#1703) and `20260925090000` (#1704); see the sections above.
+The table is in **version order only**, not merge order: #1834 (row 2) merged after #1741
+(row 3) and after all three #1831 files. In version order they are:
 
 | #   | Version        | File                                       | PR    | Recorded prerequisite (from the file)                                                                                                |
 | --- | -------------- | ------------------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------ |

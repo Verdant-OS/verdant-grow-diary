@@ -10,14 +10,25 @@ on:
   pull_request:
     branches: [verdant-grow-diary]
     types: [opened, synchronize, reopened, ready_for_review]
+  # Merge-queue entries report here so this workflow never stalls the queue.
+  # The builder and the Claude-branch guard are unreachable from this event.
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
 
-# Builder runs share one serialized group; PR validation gets a per-PR group so
-# it never waits behind a builder run and superseded PR pushes cancel.
+# Builder runs share one serialized group. PR validation gets a per-PR group so
+# it never waits behind a builder run and superseded PR pushes cancel. Each
+# merge-queue entry gets its own group keyed on the queued head SHA, so it can
+# neither wait behind a builder run nor be cancelled by a newer request.
 concurrency:
-  group: claude-slices-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'builder' }}
+  group: >-
+    claude-slices-${{
+      github.event_name == 'merge_group' && format('mq-{0}', github.event.merge_group.head_sha) ||
+      github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) ||
+      'builder'
+    }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

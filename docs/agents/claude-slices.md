@@ -62,8 +62,13 @@ Claude names its owner and independent reviewer in the PR body.
    then Secrets and variables, then Actions. The Max plan's own usage limit acts
    as the cap. Never commit a key or token and never print one in logs.
 4. Explicit model selected by Matthew: `claude-sonnet-5-5`. The workflow limits
-   a session to 40 turns and 45 minutes. The shared `claude-slices` concurrency
-   group permits one workflow run at a time and does not cancel a running job.
+   a session to 40 turns and 45 minutes. Builder runs share one `builder`
+   concurrency group: at most one runs at a time and a running build is never
+   cancelled. GitHub keeps only one _pending_ run per group, so a newer request
+   replaces an older one that is still waiting; check the Actions history and
+   repost a request that shows as cancelled. PR validation uses a per-PR group,
+   and each merge-queue entry uses its own group keyed on the queued head SHA,
+   so neither waits behind or is cancelled by a builder run.
 5. After this workflow is independently reviewed and lands through the normal
    release process, GDP can post one real authorized slice. Confirm the real run
    opens a draft into `verdant-grow-diary` and that its locked-path check passes.
@@ -110,7 +115,10 @@ locked path fails the real check. `claude-configuration` runs checksum-verified
 actionlint and focused policy regressions on PRs, including this Codex draft. It
 also checks out the base, verifies the PR head and extracts only the workflow
 file for actionlint; it does not check out or execute PR application code.
-Neither job impersonates an existing required check.
+Neither job impersonates an existing required check. In a `merge_group` run all
+three jobs report skipped: the builder still requires an authorized comment or
+label, and both validation jobs are gated on `pull_request` events, where
+`github.head_ref` and the PR SHAs exist.
 
 The builder's GitHub permissions are limited to Contents, Pull requests, Issues
 and ID token write. Full Claude output and the Claude-authored report are off.

@@ -89,13 +89,82 @@ server changes that are also not recorded as shipped, and they interact with thi
   changes ship whenever those functions are next deployed, even though neither is part of the
   #1658/#1869 redeploy set. Their publish state is **NOT_MEASURED**.
 - **`20260924120000` sorts ahead of every migration in the table below.** If it is not yet
-  applied, a version-ordered apply runs it first.
+  applied, a version-ordered apply runs it first. `20260925090000` (#1704, next section)
+  sorts right after it.
+
+### Also not recorded as shipped: `20260925090000` (#1704, merged 2026-09-25)
+
+#1704 merged before both the window and the edge-of-window rows, so the 8-row inventory
+query doesn't return it. Nothing above mentioned it until this amendment.
+
+| PR    | Merged (UTC)     | Merge SHA                                  | Kind      | Files under `supabase/`                                             |
+| ----- | ---------------- | ------------------------------------------ | --------- | ------------------------------------------------------------------- |
+| #1704 | 2026-09-25 20:30 | `0f7b12dbf7a935bf6440beb77077e66a468d6b39` | Migration | `A migrations/20260925090000_user_roles_client_grant_hardening.sql` |
+
+**What the file does** (from its header and body, not inferred):
+
+- Changes privileges on one table, `public.user_roles`, and nothing else. It runs
+  `REVOKE ALL PRIVILEGES ON TABLE public.user_roles FROM PUBLIC, anon, authenticated` and
+  then `GRANT SELECT ON TABLE public.user_roles TO authenticated`.
+- End state: `PUBLIC` and `anon` hold **no** privilege on `user_roles`, not even `SELECT`.
+  `authenticated` holds `SELECT` only, and the existing "Users view own roles" policy still
+  decides which rows it sees. The header records that, measured read-only on 2026-09-25,
+  both browser roles held every table privilege (Supabase's default grants on new public
+  tables).
+- Every other grantee (`postgres`, `service_role`, platform roles) keeps its exact table
+  and column privileges. Rows, policies, `has_role()`, triggers and ownership are untouched.
+  The postcondition compares a hash of all non-browser grants and policies before and after,
+  and aborts if they differ.
+- Runs in one transaction (`BEGIN`/`COMMIT`) with `lock_timeout = '5s'`,
+  `statement_timeout = '30s'` and a transaction-scoped advisory lock (`20260925, 90000`).
+  It fails closed with SQLSTATE `55000`, changing nothing, if a prerequisite differs (the
+  table is missing, RLS is off, the owner isn't `postgres`, one of the four expected roles is
+  missing, or `anon`/`authenticated` has superuser, BYPASSRLS, CREATEROLE or CREATEDB). It
+  also fails closed if a browser role would still hold a privilege afterwards, for example
+  through membership in another role. Re-running it is a no-op.
+- Client effect: a signed-in browser session can still read its roles, but no browser
+  session can insert, update or delete `user_roles` rows. The header says that is intended,
+  because roles come from the SECURITY DEFINER staff-grant trigger, `service_role` scripts
+  and operators with database access. At the current deploy tip the only browser write
+  path, `assignRole()` (`src/lib/db.ts`), is called only from `assignRoleAsOperator()`
+  (`src/lib/permissions.ts`), which has no non-test caller. The client reads
+  (`fetchUserRoles()`, `useMyEntitlements`) are `SELECT`s as `authenticated`, which stays
+  granted.
+- No other migration from `20260924120000` onward references `user_roles`, and this file
+  doesn't depend on any of them.
+
+**Applied state:** `CURRENT_STATE.md` has no entry for #1704 or `20260925090000`, so its
+applied state is **NOT_MEASURED**.
+
+**Before any version-ordered apply, the owner checks whether `20260925090000` is
+recorded in production** (for example, a row with that version in
+`supabase_migrations.schema_migrations`, or the Remote column of `supabase migration list`).
+Doc note only: this amendment didn't read production, and the knk lock and migration hold
+still stand.
+
+- **Recorded:** nothing to do for #1704.
+- **Pending:** a version-ordered apply runs it **second**, after #1703's `20260924120000`
+  and before `20260927002000` (row 1 below) and every later version. If any later version
+  is already recorded in production, it is an out-of-order pending version like
+  `20260927012000` (step 3 below): `supabase db push` refuses it unless `--include-all` is
+  used. Before applying:
+  1. Review its effect on client grants (above). After it, `anon` can't read `user_roles` at
+     all and no browser session can write it. Confirm nothing in production depends on
+     either.
+  2. The owner decides: apply it in version order, or record a deliberate skip. A skip
+     means the broad browser grants stay in place, and `20260925090000` stays a pending
+     local version until it is applied or marked with
+     `supabase migration repair --status applied 20260925090000`. Marking it applied
+     without running it leaves the grants unchanged. Doc note only: nobody runs that
+     without the owner's decision.
+  3. Record the decision (applied in order, or skipped and why) in the release receipt.
 
 ## Migrations in dependency order
 
-Supabase applies by version (timestamp), not by merge order. The table is in **version
-order only**, not merge order: #1834 (row 2) merged after #1741 (row 3) and after all three
-#1831 files. In version order they are:
+Supabase applies by version (timestamp), not by merge order. `20260924120000` (#1703) and
+`20260925090000` (#1704) sort ahead of row 1 if either is still pending; see the two sections
+above. The table is in **version order only**, not merge order: #1834 (row 2) merged after
+#1741 (row 3) and after all three #1831 files. In version order they are:
 
 | #   | Version        | File                                       | PR    | Recorded prerequisite (from the file)                                                                                                |
 | --- | -------------- | ------------------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------ |

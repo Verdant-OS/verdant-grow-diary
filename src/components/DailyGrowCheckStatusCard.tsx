@@ -5,6 +5,7 @@
  * QuickLog diary entries. No writes. No new persistence. Never claims
  * "completed" — only describes activity that has been observed today.
  */
+import { useMemo } from "react";
 import { Link } from "@/lib/react-router-compat";
 import { ClipboardCheck, ArrowRight, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -49,7 +50,9 @@ export default function DailyGrowCheckStatusCard({
   const { data: tents = [] } = useTents();
   const { data: plants = [] } = usePlants();
 
-  const scoped = tentIds && tentIds.length > 0 ? new Set(tentIds) : null;
+  const scoped = useMemo(() => {
+    return tentIds && tentIds.length > 0 ? new Set(tentIds) : null;
+  }, [tentIds]);
   const evidenceError = readingsQuery.isError || diaryQuery.isError;
   const evidenceLoading = readingsQuery.isLoading || diaryQuery.isLoading;
 

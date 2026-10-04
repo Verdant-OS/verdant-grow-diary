@@ -27,10 +27,10 @@ Ground rules (from `docs/production-only-verification-runbook.md` and
 | Ref   | What it proves                                          | Spec                                                                                                          | Workflow                                                           | Writes?                                                                                  |
 | ----- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
 | #1849 | signed-in route readiness timings                       | `e2e/signed-in-performance.spec.ts` (+ `e2e/lib/signedInPerformance*.ts`, `e2e/lib/signedInReadonlyProof.ts`) | `.github/workflows/signed-in-readonly-performance.yml`             | no                                                                                       |
-| #1849 | existing Quick Log save + readback with timings         | `e2e/quicklog-smoke.spec.ts`                                                                                  | `.github/workflows/quicklog-smoke.yml` (`run_mode=quicklog_smoke`) | **yes**, one tagged fixture record                                                       |
+| #1849 | existing Quick Log save + readback with timings         | `e2e/quicklog-smoke.spec.ts`                                                                                  | `.github/workflows/quicklog-smoke.yml` (`run_mode=quicklog_smoke`) | **yes**, two tagged fixture records per run                                              |
 | #1859 | settings / account / browser-consent proof              | `e2e/settings-account-consent-proof.spec.ts` (+ `e2e/lib/settingsAccountProofRules.ts`)                       | `.github/workflows/settings-account-consent-proof.yml`             | no server write; preference saves stay in the disposable browser context's local storage |
 | #1860 | Actions readback and refresh, approval-required framing | `e2e/actions-readonly-proof.spec.ts` (+ `e2e/lib/actionsReadonlyProofRules.ts`)                               | `.github/workflows/actions-readonly-proof.yml`                     | no; no transitions                                                                       |
-| #1861 | daily Quick Log save-timing smoke                       | `e2e/quicklog-smoke.spec.ts` (+ `e2e/lib/unattendedRunRules.ts`)                                              | `quicklog-smoke.yml` `schedule: "17 9 * * *"` (09:17 UTC daily)    | **yes**, tagged                                                                          |
+| #1861 | daily Quick Log save-timing smoke                       | `e2e/quicklog-smoke.spec.ts` (+ `e2e/lib/unattendedRunRules.ts`)                                              | `quicklog-smoke.yml` `schedule: "17 9 * * *"` (09:17 UTC daily)    | **yes**, two tagged fixture records per run; **already on**                              |
 
 Every production job is gated in the workflow itself: it runs only on
 `Verdant-OS/verdant-grow-diary` at `refs/heads/verdant-grow-diary`, on attempt 1, with
@@ -40,9 +40,32 @@ fixture email matches. Each pins `E2E_EXPECTED_SHA` to the checked-out commit an
 `node scripts/wait-for-deployed-sha.mjs` (reads public `/version.json` only), so it
 measures nothing until production serves that SHA.
 
+The `cheekhimself` actor gate is a workflow rule, not a technical block on agents:
+`cheekhimself` is also the `gh` identity agents use on the shared box. "Owner action" in this
+doc is policy. Agents don't dispatch these workflows unless Matthew asks for that specific run.
+
+Freeze the deploy branch for the whole sequence. Any merge to `verdant-grow-diary` after the
+promotion moves the tip, and every dispatched run then pins a SHA production doesn't serve.
+`wait-for-deployed-sha` waits its full 20 minutes and the run goes red without measuring
+anything.
+
 ## Run sequence
 
 ### Step 0: preconditions (stop if any fails)
+
+0. **Owner choice: the daily smoke schedule is already on.** `quicklog-smoke.yml` has
+   `schedule: "17 9 * * *"` active, and `schedule` runs skip the actor gate. Once production
+   serves the tip SHA, the next 09:17 UTC run makes two tagged fixture writes on its own,
+   possibly before steps 1–3 or the step 2 server publish. Pick one before promoting:
+   - **(a) Disable it until step 4 passes.** This is owner-only, e.g.
+     `gh workflow disable quicklog-smoke.yml -R Verdant-OS/verdant-grow-diary`. Re-enable it
+     at step 6 with `gh workflow enable quicklog-smoke.yml -R Verdant-OS/verdant-grow-diary`.
+   - **(b) Accept that a scheduled run may be the first write.** Record that choice in the
+     receipt; step 4 is then not necessarily "the first write".
+
+   While the fixture is archived (step 0.3), every scheduled run goes red at
+   `verify-fixture`. Two such runs trip step 6's "two consecutive red" stop condition. That
+   red means BLOCKED (archived fixture), not a product regression.
 
 1. The Vercel 402 has cleared and the owner has published (promoted) a production build of
    the deploy tip. See `docs/agents/RUNBOOK_VERCEL_PROMOTE.md`. Promotion is Matthew only.
@@ -73,18 +96,34 @@ after its offline contract tests.
 build isn't live); the receipt shows a read outside the fixture's own scope; or the Actions
 proof shows any approval-free framing.
 
-### Step 2: publish the merged server changes, in the item 3 order
+### Step 2: publish the merged server changes, in #1894's order
 
-Follow `docs/release/merged-unshipped-server-changes-2026-10-03.md` (handoff item 3,
-draft #1894). Owner actions only (production database lock knk, HOLD #1250):
+Follow `docs/release/merged-unshipped-server-changes-2026-10-03.md` (handoff item 3, draft
+#1894 at `25b55c71b9356e73539eb7cdf93936805c25076b`). That doc is the source of truth for the
+order and caveats. Owner actions only (production database lock knk, HOLD #1250). Restated
+from #1894:
 
-1. Migrations by version: #1831 `20260927002000`, then #1741 `20260927094000`, then #1831
-   `20260927160000` and `20260928183000`. #1834 `20260927012000` only if the apply path accepts
-   an out-of-order version. #1836 `20261001140000` last (it accepts either predecessor).
+1. Migrations:
+   - **Edge of window first.** #1703 `20260924120000_plants_health_unassessed_default.sql`
+     sorts ahead of every migration below, so a version-ordered apply runs it first. Its applied
+     state is NOT_MEASURED.
+   - #1831 `20260927002000`, then `20260927160000` and `20260928183000` (each preflights on
+     the first file's wrapper).
+   - #1741 `20260927094000` (independent of the quicklog wrappers).
+   - #1834 `20260927012000` **only if** the apply path accepts an out-of-order version.
+     Otherwise skip it, because #1836 covers the function. **A skip must be recorded.** A
+     skipped `20260927012000` stays pending in migration history, and a later `db push` either
+     refuses it as out of order or, with `--include-all`, runs it after #1836. There its
+     preflight fails and the push stops. The owner records the skip, e.g.
+     `supabase migration repair --status applied 20260927012000`. Agents never run this.
+   - #1836 `20261001140000` last (it accepts either predecessor).
 2. Before any edge deploy that includes #1869: confirm `PAYMENTS_ENVIRONMENT=live` in the
    Supabase function secrets. If it's unset, checkout returns 503 by design.
 3. Redeploy the edge functions listed there: `mcp` (#1651, #1655), `ai-doctor-review`
-   (#1658), and all 12 consumers of `_shared/unionEntitlementLookup.ts` (#1869).
+   (#1658), and all 12 consumers of `_shared/unionEntitlementLookup.ts` (#1869). These
+   deploys are built from the tip, so the `ai-doctor-review` and `sensor-ingest-webhook`
+   redeploys also ship #1683. #1683's `auth-email-hook` and `operator-ggs-real-payload-commit`
+   changes ship whenever those functions are next deployed.
 
 **Stop conditions:** any migration preflight raises (each file fails closed in its own
 transaction); `PAYMENTS_ENVIRONMENT` isn't confirmed; any function deploy fails. Don't
@@ -95,7 +134,7 @@ continue to the write steps with a partially applied server.
 Repeat step 1 after step 2. This separates "server publish broke a read" from "new
 frontend broke a read". The same stop conditions apply.
 
-### Step 4: Quick Log save + readback (#1849), the first write
+### Step 4: Quick Log save + readback (#1849), the first deliberate write
 
 ```bash
 gh workflow run quicklog-smoke.yml -R Verdant-OS/verdant-grow-diary --ref verdant-grow-diary -f run_mode=quicklog_smoke
@@ -104,10 +143,11 @@ gh workflow run quicklog-smoke.yml -R Verdant-OS/verdant-grow-diary --ref verdan
 The job runs `bun run e2e:fixture-checklist`, `bun run e2e:bootstrap-fixture` (only if
 `E2E_ALLOW_FIXTURE_BOOTSTRAP` allows it), `bun run e2e:verify-fixture`, then
 `bun run e2e:quicklog-smoke` (`playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed`).
-The saved record is tagged `[smoke <ISO timestamp>]` (`e2e/lib/productionQuickLogFixtureRules.ts`).
+Each run saves **two** records, each tagged `[smoke <ISO timestamp>]`
+(`e2e/lib/productionQuickLogFixtureRules.ts`), and reads both back.
 
 **Stop conditions:** fixture verification fails (wrong account, grow, tent or plant, or an
-archived target); the save succeeds but the tagged record doesn't read back in the fixture
+archived target); a save succeeds but either tagged record doesn't read back in the fixture
 grow's Timeline; any write lands outside the fixture grow. On a stop, record the run link
 and don't retry blindly.
 
@@ -124,19 +164,22 @@ What to check (manual, owner or the fixture account in the browser, production o
    `source: "live"` sensor snapshot **with no provenance rows**. Use an existing record.
    Don't seed one into production. If none exists, the check is **BLOCKED** (record it).
 2. Run AI Coach on that grow (one fixture run; it uses the fixture's own credits, with no
-   entitlement or credit grant).
+   entitlement or credit grant). Record the credit spend in the receipt. The Coach output is
+   not smoke-tagged, so the receipt is its only trace.
 3. **PASS** if the Coach response labels that sensor data `invalid` (unknown provenance).
    That proves the label reached the model. Plain absence of the sensor tokens does **not**
    pass, because it's indistinguishable from token stripping. **FAIL** if the response
    treats the reading as live or trustworthy.
 
-### Step 6: enable or keep the daily save-timing smoke (#1861)
+### Step 6: re-enable (or keep) the daily save-timing smoke (#1861)
 
-The schedule (`17 9 * * *`, 09:17 UTC, which is 4:17 AM CDT) runs on its own from the
-deploy branch with `E2E_UNATTENDED_RUN=true`. After steps 1–4 pass, let the next scheduled
-run land and record its receipt.
+The schedule (`17 9 * * *`, 09:17 UTC, which is 4:17 AM CDT) is already on. It runs on its
+own from the deploy branch with `E2E_UNATTENDED_RUN=true`. If step 0.0 chose (a), the owner
+re-enables it now. After steps 1–4 pass, let the next scheduled run land and record its
+receipt (two tagged saves).
 **Stop condition:** two consecutive red scheduled runs mean the run is left unattended
-with a report to the owner, not re-triggered.
+with a report to the owner, not re-triggered. Red at `verify-fixture` while the fixture is
+archived counts as BLOCKED, not a regression.
 
 ## Receipt for each step
 

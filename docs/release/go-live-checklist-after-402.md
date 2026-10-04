@@ -64,7 +64,10 @@ anything.
      until later: GitHub rejects `workflow_dispatch` on a disabled workflow (HTTP 422), so
      step 4's `gh workflow run` would fail. Once it's re-enabled, a 09:17 UTC scheduled run
      can fall in the step 4 window. The `quicklog-production-fixture` concurrency group
-     (`quicklog-smoke.yml:489-491`) serializes the runs, so they never overlap.
+     (`quicklog-smoke.yml:489-491`) serializes the runs, so they never overlap. If the
+     sequence stops during steps 1–3, the workflow stays disabled, so the daily schedule and
+     its receipt stop too. Whether and when to re-enable it after a stop is **Matthew's call**,
+     and goes in the receipt.
    - **(b) Accept that a scheduled run may be the first write.** Record that choice in the
      receipt; step 4 is then not necessarily "the first write".
 
@@ -103,10 +106,17 @@ proof shows any approval-free framing.
 
 ### Step 2: publish the merged server changes, in #1894's order
 
-Follow `docs/release/merged-unshipped-server-changes-2026-10-03.md` (handoff item 3, draft
-#1894 at `25b55c71b9356e73539eb7cdf93936805c25076b`). That doc is the source of truth for the
-order and caveats. Owner actions only (production database lock knk, HOLD #1250). Restated
-from #1894:
+Follow `docs/release/merged-unshipped-server-changes-2026-10-03.md` (handoff item 3, merged
+#1894 from head `25b55c71b9356e73539eb7cdf93936805c25076b`, queue merge `98477208`). That doc is the source of truth for the
+order and caveats. Owner actions only (production database lock knk, HOLD #1250).
+
+**Check before starting step 2:** if none of `20260927094000`, `20260927160000` or
+`20260928183000` is recorded in production migration history, a single version-ordered apply
+runs `20260927012000` in place, with no skip. Otherwise use the order below. Both paths are
+safe: `20260927160000`/`20260928183000` need only `20260927002000`, and `20261001140000`
+accepts either predecessor.
+
+Restated from #1894:
 
 1. Migrations:
    - **Edge of window first.** #1703 `20260924120000_plants_health_unassessed_default.sql`
@@ -115,9 +125,8 @@ from #1894:
    - #1831 `20260927002000`, then `20260927160000` and `20260928183000` (each preflights on
      the first file's wrapper).
    - #1741 `20260927094000` (independent of the quicklog wrappers).
-   - #1834 `20260927012000`. If none of `20260927094000`/`20260927160000`/`20260928183000`
-     is recorded yet, it isn't out of order and plain version order applies it with no skip.
-     Otherwise, apply it **only if** the apply path accepts an out-of-order version.
+   - #1834 `20260927012000` (unless the pre-step-2 check above already applied it in
+     version order): apply it **only if** the apply path accepts an out-of-order version.
      Otherwise skip it, because #1836 covers the function. **A skip must be recorded.** A
      skipped `20260927012000` stays pending in migration history, and a later `db push` either
      refuses it as out of order or, with `--include-all`, runs it after #1836. There its

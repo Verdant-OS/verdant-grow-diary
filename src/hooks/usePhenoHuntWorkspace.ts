@@ -241,8 +241,8 @@ export function usePhenoHuntWorkspace(
     Record<string, KeeperDecisionLogEntry[]>
   >({});
   const [sexByPlant, setSexByPlant] = useState<Record<string, SexObservationRow>>({});
-  const [reversedPlantIds, setReversedPlantIds] = useState<Set<string>>(new Set());
-  const [clonedPlantIds, setClonedPlantIds] = useState<Set<string>>(new Set());
+  const [reversedPlantIds, setReversedPlantIds] = useState<Set<string>>(() => new Set());
+  const [clonedPlantIds, setClonedPlantIds] = useState<Set<string>>(() => new Set());
   const [smokeByPlant, setSmokeByPlant] = useState<Record<string, SmokeTestRow>>({});
   const [labByKey, setLabByKey] = useState<Record<string, LabResultRow>>({});
   const [error, setError] = useState<string | null>(null);

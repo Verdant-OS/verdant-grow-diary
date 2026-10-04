@@ -122,7 +122,7 @@ export default function PhenoHuntNew() {
   const [reloadTick, setReloadTick] = useState(0);
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [evidenceGoals, setEvidenceGoals] = useState<PhenoEvidenceGoalId[]>(() =>
     defaultEvidenceGoalSelection(),
   );

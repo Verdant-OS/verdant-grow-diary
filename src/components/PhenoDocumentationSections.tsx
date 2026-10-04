@@ -101,7 +101,7 @@ export default function PhenoDocumentationSections({
     defaultOpen ? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId)) : null,
   );
   const [saveStatus, setSaveStatus] = useState<DeviceSaveStatus>("idle");
-  const [openSections, setOpenSections] = useState<ReadonlySet<string>>(new Set());
+  const [openSections, setOpenSections] = useState<ReadonlySet<string>>(() => new Set());
 
   // Re-hydrate if the record identity changes (e.g. switching candidates).
   useEffect(() => {

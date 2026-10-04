@@ -123,7 +123,7 @@ export default function StructuredDiagnosisCard({
   aiDoctorSessionId,
   testId = "ai-doctor-diagnosis",
 }: StructuredDiagnosisCardProps) {
-  const [queuedIdx, setQueuedIdx] = useState<Set<number>>(new Set());
+  const [queuedIdx, setQueuedIdx] = useState<Set<number>>(() => new Set());
   const [busyIdx, setBusyIdx] = useState<number | null>(null);
   // Ref-backed guards so synchronous duplicate clicks (before React commits
   // the state update) cannot enqueue twice.

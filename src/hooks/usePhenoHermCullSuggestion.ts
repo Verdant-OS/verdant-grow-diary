@@ -22,7 +22,7 @@ export interface UsePhenoHermCullSuggestionState {
 
 export function usePhenoHermCullSuggestion(): UsePhenoHermCullSuggestionState {
   const [queuing, setQueuing] = useState<string | null>(null);
-  const [queuedPlantIds, setQueuedPlantIds] = useState<ReadonlySet<string>>(new Set());
+  const [queuedPlantIds, setQueuedPlantIds] = useState<ReadonlySet<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
 
   const queueRemoval = useCallback(

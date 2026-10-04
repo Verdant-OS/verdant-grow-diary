@@ -92,7 +92,7 @@ export default function Coach() {
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
   const photoPreviewCanvasRef = useRef<HTMLCanvasElement>(null);
-  const [queuedIdx, setQueuedIdx] = useState<Set<number>>(new Set());
+  const [queuedIdx, setQueuedIdx] = useState<Set<number>>(() => new Set());
   const [queuingIdx, setQueuingIdx] = useState<number | null>(null);
   // Persisted AI Doctor session id for the *currently rendered* diagnosis.
   // Reset whenever a new ask() starts; only applied if the persistence
@@ -191,7 +191,7 @@ export default function Coach() {
     if (!result?.diagnosis) return null;
     return validateAndSanitizeDiagnosis(result.diagnosis).diagnosis;
   }, [result?.diagnosis]);
-  const [doctorQueuedKeys, setDoctorQueuedKeys] = useState<Set<string>>(new Set());
+  const [doctorQueuedKeys, setDoctorQueuedKeys] = useState<Set<string>>(() => new Set());
 
   // SECURITY: never send user_id from the client. status pins pending_approval
   // server-side. Source is "ai_doctor"; no device commands. Idempotent per

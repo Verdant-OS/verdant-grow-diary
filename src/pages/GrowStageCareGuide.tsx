@@ -94,7 +94,7 @@ export default function GrowStageCareGuide() {
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<StageFilter>("all");
   const [activeCategory, setActiveCategory] = useState<CareCategory | "all">("all");
-  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [checked, setChecked] = useState<Set<string>>(() => new Set());
 
   const normalizedQuery = useMemo(() => normalizeSearch(query), [query]);
 

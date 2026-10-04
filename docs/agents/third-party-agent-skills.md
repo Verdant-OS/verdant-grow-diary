@@ -88,11 +88,13 @@ Decisions by component:
 `anthropic-skills:browser-testing-with-devtools`. Their names match this bundle, but their
 source, revision and license could not be read from a session container. Treat them as
 unvetted until their exact contents are pinned and read. They never stand in for a named
-independent reviewer seat. A copy of `code-review-and-quality` kept outside this repository on
-the agents' shared box, and referenced by the open review-loop proposal in `#1897`, is in the
-same position: unpinned and not in this register. Using any copy as a standing review
-checklist is an adoption decision under the next step below. Whichever of `#1897` and this
-register merges second must reconcile the two.
+independent reviewer seat. `#1897` merged as `a980489a`. Its
+`.agents/skills/verdant-exact-sha-review/SKILL.md:10` references the unpinned box copy of
+`code-review-and-quality` for review axes only: correctness, readability, architecture,
+security and performance. That copy's approval standard does not apply; the Verdant review
+loop governs verdicts, and `docs/agents/recurring-review-findings.md` is the checklist authors
+run before review. This register records that axes-only use. Pinning the copy or adopting it
+as a standing review checklist is a separate step under the next step below.
 
 **Smallest next step, if wanted.** Pin one complete `code-review-and-quality` skill and its
 references. Run it by hand in a read-only session against a closed historical diff, with no

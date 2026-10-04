@@ -18,14 +18,19 @@ import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { deriveDailyGrowCheckStatus, type DailyCheckStatus } from "@/lib/dailyGrowCheckStatusRules";
 import { withGrowId } from "@/lib/routes";
+import { resolveSensorReadingTentScope } from "@/lib/tentScopedSensorReadingsRules";
 
 interface Props {
   /** Compact strip variant (used inside the legacy operator view). */
   compact?: boolean;
   /** Optional grow scope for Start Check. Absent/blank keeps global /daily-check. */
   growId?: string | null;
-  /** Optional scope filter; when set, only activity for this tent counts. */
-  tentIds?: string[] | null;
+  /**
+   * Optional caller scope. Omitted: every active tent. `null`: the caller's
+   * tents are still loading (card stays loading). `[]`: resolved empty scope
+   * (no readings or activity). Otherwise only activity for these tents counts.
+   */
+  tentIds?: readonly string[] | null;
   className?: string;
 }
 
@@ -39,22 +44,19 @@ function relTime(iso: string | null): string {
 export default function DailyGrowCheckStatusCard({
   compact = false,
   growId = null,
-  tentIds = null,
+  tentIds,
   className,
 }: Props) {
   const tentsQuery = useTents();
-  const hasExplicitTentScope = Boolean(tentIds && tentIds.length > 0);
   // Per-tent windows (the caller's tents, else every tent); never the
   // unscoped all-tents read, which hit the Postgres statement timeout
-  // (BUG-003). Unresolved tents keep the read pending and a failed tents
-  // read is an error, so neither renders as "no check activity".
+  // (BUG-003). A caller scope of `null` is unresolved (loading), `[]` is an
+  // empty scope (no readings, no activity), and a failed tents read is an
+  // error, so none of them renders another grow's activity or "no activity".
+  const tentScope = resolveSensorReadingTentScope({ explicitTentIds: tentIds, tents: tentsQuery });
   const readingsQuery = useSensorReadings({
-    tentIds: hasExplicitTentScope
-      ? (tentIds as string[])
-      : Array.isArray(tentsQuery.data)
-        ? tentsQuery.data.map((tent) => tent.id)
-        : null,
-    scopeError: !hasExplicitTentScope && tentsQuery.isError,
+    tentIds: tentScope.tentIds,
+    scopeError: tentScope.scopeError,
     retryScope: tentsQuery.refetch,
   });
   const { data: rawReadings = [] } = readingsQuery;
@@ -63,7 +65,9 @@ export default function DailyGrowCheckStatusCard({
   const tents = Array.isArray(tentsQuery.data) ? tentsQuery.data : [];
   const { data: plants = [] } = usePlants();
 
-  const scoped = tentIds && tentIds.length > 0 ? new Set(tentIds) : null;
+  // Any caller scope (including []) filters activity; only an omitted scope
+  // means every tent.
+  const scoped = tentIds === undefined ? null : new Set(tentScope.tentIds ?? []);
   const evidenceError = readingsQuery.isError || diaryQuery.isError;
   const evidenceLoading = readingsQuery.isLoading || diaryQuery.isLoading;
 

@@ -230,6 +230,38 @@ describe("DailyGrowCheckStatusCard reads per-tent windows (BUG-003 residual)", (
   });
 });
 
+describe("DailyGrowCheckStatusCard caller scope: null = unresolved, [] = empty (Blue Dream P2-1)", () => {
+  function diaryToday(id: string, tentId: string) {
+    const now = new Date().toISOString();
+    return { id, tent_id: tentId, plant_id: null, entry_at: now, created_at: now };
+  }
+
+  it("stays loading for tentIds={null} and never falls back to every active tent", async () => {
+    io.responses.set(TENT_A, [manualRow("m-a", TENT_A)]);
+    mount(<DailyGrowCheckStatusCard tentIds={null} />);
+    await flush();
+    expect(dailyKind()).toBe("loading");
+    expect(sensorRequests()).toEqual([]);
+  });
+
+  it("treats tentIds={[]} as an empty scope: no sensor reads and no other grow's activity", async () => {
+    io.responses.set(TENT_A, [manualRow("m-a", TENT_A)]);
+    io.reads.diary = ok([diaryToday("d-a", TENT_A)]);
+    mount(<DailyGrowCheckStatusCard tentIds={[]} />);
+    await waitFor(() => expect(dailyKind()).not.toBe("loading"));
+    expect(dailyKind()).toBe("none");
+    expect(sensorRequests()).toEqual([]);
+  });
+
+  it("still counts in-scope diary activity for an explicit tent scope", async () => {
+    io.reads.diary = ok([diaryToday("d-a", TENT_A), diaryToday("d-c", TENT_C)]);
+    mount(<DailyGrowCheckStatusCard tentIds={[TENT_C]} />);
+    await waitFor(() => expect(dailyKind()).not.toBe("loading"));
+    expect(dailyKind()).not.toBe("none");
+    expect(sensorRequests().map((r) => r.tentId)).toEqual([TENT_C]);
+  });
+});
+
 describe("GuidedActionChecklistPanel reads per-tent windows (BUG-003 residual)", () => {
   it("never sends an unscoped read; reads one 500-row window per grow tent", async () => {
     mount(<GuidedActionChecklistPanel scopedGrowId={GROW} />);

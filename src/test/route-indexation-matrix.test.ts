@@ -7,8 +7,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { VERDANT_CULTIVARS } from "@/constants/strainReferenceLibrary";
 import { VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
 import { APP_ROUTE_ACCESS_VALUES, APP_ROUTES, getRoutesByAccess } from "@/lib/appRouteManifest";
+import { cultivarVerificationIsSearchIndexable } from "@/lib/cultivarDetailSeo";
 import {
   STATIC_CULTIVAR_NOINDEX_DOCUMENTS,
   STATIC_PUBLIC_OUTPUT_DOCUMENTS,
@@ -387,6 +389,33 @@ describe("route indexation matrix", () => {
     );
   });
 
+  it("pins the cultivar indexability prose to the live verification statuses", () => {
+    const indexableSlugs = VERDANT_CULTIVARS.filter((cultivar) =>
+      cultivarVerificationIsSearchIndexable(cultivar.verificationStatus),
+    ).map((cultivar) => cultivar.slug);
+    // The two sentences below are only true while no slug is indexable and the
+    // library holds ten sample entries. When either changes, the doc must change.
+    expect(
+      indexableSlugs,
+      "A cultivar is now reviewed/verified (indexable): update docs/seo/route-indexation-matrix.md " +
+        'line ~101 ("Today all ten … noindex, follow …") and line ~112 ("No cultivar detail ' +
+        'document is indexable today…"), then this test.',
+    ).toEqual([]);
+    expect(
+      VERDANT_CULTIVARS.length,
+      'The cultivar count changed: update "all ten" in docs/seo/route-indexation-matrix.md line ~101.',
+    ).toBe(10);
+    expect(VERDANT_CULTIVARS.every((cultivar) => cultivar.verificationStatus === "sample")).toBe(
+      true,
+    );
+    expect(MATRIX).toContain(
+      "Today all ten `VERDANT_CULTIVARS` entries are `sample`, so all ten slugs are `noindex, follow` and not in the sitemap.",
+    );
+    expect(MATRIX).toContain(
+      "- No cultivar detail document is indexable today. `buildStaticCultivarJsonLd` still gives each `/cultivars/<slug>` document WebPage, a cultivar collection node, FAQPage, BreadcrumbList, and Article, but all ten are `noindex, follow` (see the inventory), so that schema is not on an indexable document.",
+    );
+  });
+
   it.each(ROBOTS_CLAIMS)("pins the $route robots claim to $source", (claim) => {
     expect(APP_ROUTES.some((route) => route.path === claim.route)).toBe(true);
     // Table cells are padded; compare with runs of spaces collapsed.
@@ -409,8 +438,10 @@ describe("route indexation matrix", () => {
     const pageName = claim.source.replace(/^src\/pages\//, "").replace(/\.tsx$/, "");
     expect(readSource(claim.routeModule)).toMatch(new RegExp(`from "@/pages/${pageName}"`));
     if (claim.kind === "client-noindex") {
-      expect(source).toMatch(/usePageSeo\(/);
-      expect(source).toMatch(/^\s*noindex: true,$/m);
+      // Scope the marker to the usePageSeo({...}) call, not anywhere in the file.
+      const seoCall = source.match(/usePageSeo\(\{[\s\S]*?\n\s*\}\);/)?.[0] ?? "";
+      expect(seoCall).not.toBe("");
+      expect(seoCall).toMatch(/^\s*noindex: true,$/m);
     } else {
       expect(source).not.toMatch(/noindex/);
     }

@@ -4,12 +4,12 @@ Run this before you hand a PR to Blue Dream, Durban Poison or Critical Mass. Eac
 
 ## How this was built
 
-- **Source:** the 60 most recently modified files in the agents' shared handoff folder (`/workspace/shared/handoffs/`) as of **2026-10-03 8:25 PM CT**, sorted by modification time. Note that 47 of those files carry the same 2026-10-02 10:58 PM CT time from a bulk copy, so their order is copy order, not authoring order. Positions 60 and 61 tie (`1625-…checks.tsv`, `1491-…sentinel.md`); neither has countable findings, so the tie changes no count.
+- **Source:** the 60 most recently modified files in the agents' shared handoff folder (`/workspace/shared/handoffs/`) as of **2026-10-03 8:25 PM CT**, sorted by modification time. Note that positions 14–60 (47 files) carry 2026-10-02 bulk-copy times between 10:58:12 and 10:59:07 PM CT (42 at 10:58, 5 at 10:59), so their order is copy order, not authoring order. Positions 60 and 61 tie (`1625-…checks.tsv` and `1491-…sentinel.md`, the #1491 tie); neither has countable findings, so the tie changes no count.
 - **What counted:** 13 of those 60 are reviewer verdicts with substantive P1 or P2 findings:
   - #1494, #1674, #1729, #1761, #1769, #1774 and #1868;
   - #1871 and #1894;
   - #1887 (2 packets) and #1888 (2 packets).
-- **What didn't:** the rest are handoffs, check exports, remeasure notes, clean PASS packets, or packets whose P2s only park repo-wide CI noise (#1491, #1505, #1525, #1607, #1621).
+- **What didn't:** the rest are handoffs, check exports, remeasure notes, clean PASS packets, or packets whose P2s only park repo-wide CI noise (#1491 (the tie at position 60/61), #1505, #1525, #1607, #1621).
 - **How counts work:** a count is the number of distinct PRs where the pattern appeared in that sample. One PR can show up under several patterns.
 - **Outside the sample:** two of Blue Dream's verdicts from the same week (#1857, #1893) were posted as PR comments rather than packets. They are listed under "also seen" and are not in the counts.
 

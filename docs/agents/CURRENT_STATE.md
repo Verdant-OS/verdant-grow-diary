@@ -4,18 +4,18 @@
 
 Read this section first. It doesn't replace the observation log below.
 
-- **This section supersedes stale OWNERSHIP.md rows.** Line 1 says OWNERSHIP.md wins on conflicts, but its GDP routing and product-call rows and its "Chemdawg only" merge rows are out of date. GDP retired on 2026-09-29, and Grok 91 (formerly Chemdawg / GDP) now routes and merges. Where OWNERSHIP.md and this section disagree on roles or merging, this section wins until OWNERSHIP.md is updated. That update is pending.
+- **This section supersedes stale OWNERSHIP.md rows.** Line 1 says OWNERSHIP.md wins on conflicts, but its GDP routing and product-call rows and its "Chemdawg only" merge rows are out of date. GDP retired on 2026-09-29. Grok 91 routes and merges in practice; older docs and other bots may still call this role Chemdawg or GDP. Where OWNERSHIP.md and this section disagree on roles or merging, this section describes current practice until OWNERSHIP.md is updated (pending).
 - **Roles:**
   - Grok 91: merge-queue owner. Routes PRs to reviewers, sends findings back, and merges under the rule below.
   - Blue Dream and Durban Poison: code reviewers (peers) for `.tsx`/UI, auth, RLS, DB and Edge.
-  - Critical Mass: reviewer for lib and logic, tests, docs, CI, dependencies, QA, accessibility, search and content (OWNERSHIP.md line 74).
+  - Critical Mass: reviewer for lib and logic, tests, docs-only, QA, accessibility, search and content (OWNERSHIP.md line 74). Until OWNERSHIP.md assigns it, Critical Mass also gives the independent verdict on CI, build and dependency PRs; line 75 gives Codex only _technical_ CI/build review.
   - Claude, Codex and Grok 91: authors.
   - Nobody reviews their own work.
 - **Review loop:** [`.agents/skills/verdant-exact-sha-review/SKILL.md`](../../.agents/skills/verdant-exact-sha-review/SKILL.md).
   - Every verdict is tied to one exact SHA, or it is BLOCKED.
   - PASS-with-P2 always goes back to the author for a full re-review at the new head. It is never merged as is.
   - PRs stay draft until merge.
-  - **Merge rule:** Matthew's standing merge-when-green rule covers non-migration PRs. A clean PASS at the exact head SHA plus 35/35 required checks green at that SHA means mark it ready and squash-merge at that SHA, with no further wait. Migration PRs need Matthew's explicit decision.
+  - **Merge rule:** Matthew's standing merge-when-green rule covers non-migration PRs. A clean PASS at the exact head SHA plus 35/35 required checks green at that SHA means mark it ready and enqueue it with `gh pr merge <N> --squash --auto --match-head-commit <SHA>`, so the merge queue re-runs the checks (see [`merge-queue.md`](merge-queue.md)). There is no extra wait for a go-ahead. A direct merge that skips the queue is the admin bypass, emergencies only. Migration PRs need Matthew's explicit decision.
 - **Before asking for review:** run [`recurring-review-findings.md`](recurring-review-findings.md).
 - **Gates (until Matthew lifts them):**
   - No Publish.

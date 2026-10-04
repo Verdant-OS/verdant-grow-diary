@@ -19,10 +19,13 @@ role files keep authority over any third-party instruction.
    owner hold, or replaces a governance file. Setup snippets that overwrite `AGENTS.md`,
    `GEMINI.md` or another root instruction file are not applied.
 2. **Procedures before code.** A Markdown procedure can be adapted into a Verdant skill. Hooks
-   and scripts are not enabled until they have been read in full and their failure paths have
-   been tested in an isolated fixture with no credentials or production connections.
-3. **Pin what is used.** Record the upstream source, the exact revision and the license before
-   adoption. A link to a repository does not prove that a given copy came from it.
+   and scripts are not enabled until they have been read in full, their failure paths have
+   been tested in an isolated fixture with no credentials or production connections, and an
+   authorized task enables them.
+3. **Pin what is copied.** Before any third-party text or code is copied in, record the
+   upstream source, the exact revision and the license. A link to a repository does not prove
+   that a given copy came from it. A Verdant skill written from scratch from an outside
+   concept copies nothing, so it needs no pin, but its entry must say that no text was copied.
 4. **One router per host.** A host that routes skills natively does not also get a startup
    router hook.
 5. **Evidence keeps its label.** A cached summary is not current evidence, a lexical routing
@@ -30,17 +33,19 @@ role files keep authority over any third-party instruction.
 
 ## Register
 
-### `addyosmani/agent-skills` upload (reviewed 2026-10-04)
+### `addyosmani/agent-skills` upload (reviewed 2026-10-04 UTC)
 
 **Verdict: adopt selected workflow ideas; do not install the upload as a pack or enable its
 hooks as supplied.**
 
 - **Source:** an owner-supplied upload of 24 files (18 unique: 12 Markdown documents and six
-  shell scripts) plus one `idea-refine` skill definition. The upload names
-  `addyosmani/agent-skills` but carries no pinned commit, manifest or license. Provenance is
-  `missing evidence`.
-- **Review:** static only. No uploaded script or test was run, sourced or installed. No pass
-  or fail count was measured.
+  shell scripts), plus a separate 25th file, `SKILL(4).md`, holding the `idea-refine` skill
+  definition. The upload names `addyosmani/agent-skills` but carries no pinned commit,
+  manifest or license. Provenance is `missing evidence`.
+- **Review:** an owner-supplied static review, shared in an agent session on 2026-10-04 UTC.
+  It is not archived in this repository. The component findings below are `source claim`s
+  from that review and were not re-verified here. No uploaded script or test was run, sourced
+  or installed, and no pass or fail count was measured.
 
 Decisions by component:
 
@@ -50,7 +55,9 @@ Decisions by component:
   **adopted as authoring guidance.** The eval runner, cases and results were not supplied, so
   no score from them is evidence.
 - **`doubt-driven-development` procedure:** **adapted** as
-  `.claude/skills/verdant-doubt-check/SKILL.md` (`#1890`), with no hooks or scripts.
+  `.claude/skills/verdant-doubt-check/SKILL.md` (`#1890`). It was written from scratch from the
+  concept, and no text was copied because the upload has no license. It has no hooks or
+  scripts.
 - **Host setup guides** (Copilot, Cursor, Gemini, OpenCode): **reference only.** The snippets
   that overwrite `GEMINI.md`, replace `AGENTS.md` with a generic template, or run a broad
   `rsync` over customized skills are rejected.
@@ -81,7 +88,11 @@ Decisions by component:
 `anthropic-skills:browser-testing-with-devtools`. Their names match this bundle, but their
 source, revision and license could not be read from a session container. Treat them as
 unvetted until their exact contents are pinned and read. They never stand in for a named
-independent reviewer seat.
+independent reviewer seat. A copy of `code-review-and-quality` kept outside this repository on
+the agents' shared box, and referenced by the open review-loop proposal in `#1897`, is in the
+same position: unpinned and not in this register. Using any copy as a standing review
+checklist is an adoption decision under the next step below. Whichever of `#1897` and this
+register merges second must reconcile the two.
 
 **Smallest next step, if wanted.** Pin one complete `code-review-and-quality` skill and its
 references. Run it by hand in a read-only session against a closed historical diff, with no

@@ -123,6 +123,14 @@ label, and both validation jobs are gated on `pull_request` events, where
 The builder's GitHub permissions are limited to Contents, Pull requests, Issues
 and ID token write. Full Claude output and the Claude-authored report are off.
 Standing instructions prohibit reading, printing or committing credentials.
+Because issue text is untrusted, the Claude step sets
+`CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`, so the action scrubs Anthropic, cloud and
+Actions secrets from the commands Claude runs; the pinned action enables this
+only for `allowed_non_write_users` unless the workflow sets it. The scrub is
+best-effort. `CLAUDE_CODE_SCRIPT_CAPS` limits a run to five branch pushes and
+one draft PR through the trusted helpers. The token the action writes into the
+checkout's git remote is not covered by the scrub; removing it is follow-up
+work for the guard PR.
 
 ## Evidence boundaries
 

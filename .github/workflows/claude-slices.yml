@@ -242,6 +242,12 @@ jobs:
       - name: Implement one Claude slice
         if: steps.billing.outputs.configured == 'true'
         uses: anthropics/claude-code-action@8ce9314fa9a404564fa7e954cd84f25bcba2b829 # v1, verified 2026-09-28
+        # Issue text is untrusted. The pinned action scrubs Anthropic, cloud and
+        # Actions secrets from Claude's subprocesses only when allowed_non_write_users
+        # is set, so enable the scrub explicitly. The caps bound each write helper.
+        env:
+          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
+          CLAUDE_CODE_SCRIPT_CAPS: '{"claude-slice-push":5,"claude-slice-pr":1}'
         with:
           # Max OAuth wins if both credentials exist; never pass both to Claude.
           claude_code_oauth_token: ${{ steps.billing.outputs.mode == 'oauth' && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}

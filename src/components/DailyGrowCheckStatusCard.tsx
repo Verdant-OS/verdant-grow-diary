@@ -42,11 +42,25 @@ export default function DailyGrowCheckStatusCard({
   tentIds = null,
   className,
 }: Props) {
-  const readingsQuery = useSensorReadings();
+  const tentsQuery = useTents();
+  const hasExplicitTentScope = Boolean(tentIds && tentIds.length > 0);
+  // Per-tent windows (the caller's tents, else every tent); never the
+  // unscoped all-tents read, which hit the Postgres statement timeout
+  // (BUG-003). Unresolved tents keep the read pending and a failed tents
+  // read is an error, so neither renders as "no check activity".
+  const readingsQuery = useSensorReadings({
+    tentIds: hasExplicitTentScope
+      ? (tentIds as string[])
+      : Array.isArray(tentsQuery.data)
+        ? tentsQuery.data.map((tent) => tent.id)
+        : null,
+    scopeError: !hasExplicitTentScope && tentsQuery.isError,
+    retryScope: tentsQuery.refetch,
+  });
   const { data: rawReadings = [] } = readingsQuery;
   const diaryQuery = useDiaryEntries();
   const { data: rawDiary = [] } = diaryQuery;
-  const { data: tents = [] } = useTents();
+  const tents = Array.isArray(tentsQuery.data) ? tentsQuery.data : [];
   const { data: plants = [] } = usePlants();
 
   const scoped = tentIds && tentIds.length > 0 ? new Set(tentIds) : null;

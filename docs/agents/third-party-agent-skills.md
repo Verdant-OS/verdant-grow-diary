@@ -89,9 +89,11 @@ Decisions by component:
 source, revision and license could not be read from a session container. Treat them as
 unvetted until their exact contents are pinned and read. They never stand in for a named
 independent reviewer seat. `#1897` merged as `a980489a`. Its
-`.agents/skills/verdant-exact-sha-review/SKILL.md:10` references the unpinned box copy of
-`code-review-and-quality` for review axes only: correctness, readability, architecture,
-security and performance. That copy's approval standard does not apply; the Verdant review
+[`SKILL.md:10`](https://github.com/Verdant-OS/verdant-grow-diary/blob/a980489ad5188e36eba89461117c2b60fc10f927/.agents/skills/verdant-exact-sha-review/SKILL.md#L10)
+references the unpinned box copy of `code-review-and-quality` at
+`/home/box/agent-data/workflows/code-review-and-quality/SKILL.md` for review axes only:
+correctness, readability, architecture, security and performance. That copy's approval
+standard does not apply; the Verdant review
 loop governs verdicts, and `docs/agents/recurring-review-findings.md` is the checklist authors
 run before review. This register records that axes-only use. Pinning the copy or adopting it
 as a standing review checklist is a separate step under the next step below.

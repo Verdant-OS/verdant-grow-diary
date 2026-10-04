@@ -184,9 +184,11 @@ a UTC time for every read.
    - each hostname's current serving deployment, for every hostname in that
      re-enumerated inventory.
 
-   A read that cannot be completed is recorded as `BLOCKED`, not as a value, and never
-   counts as a match in step 3. He completes the read, or records the blocker and his
-   decision to proceed without it.
+   A read that cannot be completed is recorded as `BLOCKED`, not as a value. He completes
+   the read, or records the blocker and his decision to proceed without it. An accepted
+   blocker is left out of the step 3 comparison and carried into Verify as `BLOCKED`; it
+   never counts as a match. Two reads can never be waived: the rolling-release record and
+   the rollback target's metadata. If either is `BLOCKED`, no rollback is run.
 
    Then one of four outcomes applies:
    - **Back to step 1.** The record shows an active rollout. No rollback is decided

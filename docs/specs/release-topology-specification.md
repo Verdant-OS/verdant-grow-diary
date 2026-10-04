@@ -1002,7 +1002,7 @@ section of `docs/agents/RUNBOOK_VERCEL_PROMOTE.md`. They are `NOT_MEASURED` agai
 live project and none is closed by `#1892`:
 
 1. **Serving identity.** Step 2 records the M2 apex holder and the rollback target's
-   project but compares neither. If the apex or `www` has moved to another project or
+   project but checks neither against the project `vercel rollback` acts on. If the apex or `www` has moved to another project or
    platform, a project-scoped `vercel rollback` changes routing nobody is served from.
    The question is what the rollback checks first: that this project holds every
    production hostname, and that the target is in this project (contract §14, no

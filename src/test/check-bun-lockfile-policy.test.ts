@@ -405,6 +405,56 @@ describe("evaluatePolicy", () => {
     );
   });
 
+  it.each([
+    ["npm cache", "    cache: npm", "npm cache"],
+    ["quoted npm cache", '    cache: "npm" # setup-node', "npm cache"],
+    ["single-quoted npm cache", "    cache: 'npm'", "npm cache"],
+    ["inline npm cache", 'with: { "cache": "npm" }', "npm cache"],
+    ["uppercase npm cache", "    cache: NPM", "npm cache"],
+    ["npm lock hash", "key: ${{ hashFiles('package-lock.json') }}", "retired npm lock"],
+    [
+      "mixed lock hash",
+      "key: ${{ hashFiles('bun.lock', '**/package-lock.json') }}",
+      "retired npm lock",
+    ],
+    [
+      "multiline npm lock hash",
+      "key: ${{ hashFiles(\n  'package-lock.json'\n) }}",
+      "retired npm lock",
+    ],
+  ])("rejects workflow %s without an install command", (_label, contents, diagnostic) => {
+    const path = ".github/workflows/cache-only.yml";
+    const files = policyFiles({ extra: { [at(path)]: contents } });
+    const result = evaluate(files);
+    expect(result.ok).toBe(false);
+    expect(result.errors.join(" ")).toContain(diagnostic);
+    expect(result.errors.join(" ")).toContain(path);
+  });
+
+  it.each([
+    "cache: bun\nkey: ${{ hashFiles('bun.lock') }}",
+    "# cache: npm\n# key: ${{ hashFiles('package-lock.json') }}",
+  ])("accepts Bun caching and commented historical cache examples: %s", (contents) => {
+    expect(
+      evaluate(policyFiles({ extra: { [at(".github/workflows/cache-only.yaml")]: contents } })),
+    ).toMatchObject({ ok: true, errors: [] });
+  });
+
+  it("documents a frozen Bun setup with no executable npm bootstrap", () => {
+    const root = resolve(__dirname, "../..");
+    const skill = readFileSync(
+      resolve(root, ".claude/skills/run-verdant-grow-diary/SKILL.md"),
+      "utf8",
+    );
+    const setup = skill.split("### Dependencies (first run)")[1].split("\n---")[0];
+    const commands = [...setup.matchAll(/```bash\n([\s\S]*?)```/g)].map((match) => match[1].trim());
+    expect(commands).toEqual(["bun install --frozen-lockfile"]);
+    // Absence scan over executable documentation, not effective configuration.
+    const allCommands = [...skill.matchAll(/```bash\n([\s\S]*?)```/g)].map((match) => match[1]);
+    expect(allCommands.join("\n")).not.toMatch(/\bnpm(?:\.cmd|\.exe)?\s+(?:ci|install)\b/i);
+    expect(skill.split("## Troubleshooting")[1]).toContain("not a supported recovery path");
+  });
+
   it("rejects drive-absolute transition consumer paths", () => {
     expect(() =>
       evaluate(
@@ -464,6 +514,7 @@ describe("evaluatePolicy", () => {
     expect(consumerPaths).toContain("docs/preview-deployment-verification.md");
     // The SEO monitoring workflow moved to Bun; it must not return to the allowlist.
     expect(consumerPaths).not.toContain(".github/workflows/seo-monitoring.yml");
+    expect(consumerPaths).not.toContain(".claude/skills/run-verdant-grow-diary/SKILL.md");
   }, 15_000);
 
   it("runs as a CLI on Windows and finds uppercase undeclared consumers", () => {
@@ -507,6 +558,23 @@ describe("evaluatePolicy", () => {
       });
       expect(rejected.status).toBe(1);
       expect(rejected.stderr).toContain("Undeclared npm install/ci consumer found at rogue.ps1");
+
+      rmSync(join(root, "rogue.ps1"));
+      const workflow = join(root, ".github/workflows/cache-only.yaml");
+      mkdirSync(join(root, ".github/workflows"), { recursive: true });
+      for (const [contents, diagnostic] of [
+        ["cache: npm", "npm cache"],
+        ["key: ${{ hashFiles('package-lock.json') }}", "retired npm lock"],
+      ]) {
+        writeFileSync(workflow, contents, "utf8");
+        expect(spawnSync("git", ["add", "."], { cwd: root, encoding: "utf8" }).status).toBe(0);
+        const cacheRejected = spawnSync(process.execPath, [script], {
+          cwd: root,
+          encoding: "utf8",
+        });
+        expect(cacheRejected.status).toBe(1);
+        expect(cacheRejected.stderr).toContain(diagnostic);
+      }
 
       writeFileSync(join(root, "package-lock.json"), "{}", "utf8");
       const relocked = spawnSync(process.execPath, [script], { cwd: root, encoding: "utf8" });

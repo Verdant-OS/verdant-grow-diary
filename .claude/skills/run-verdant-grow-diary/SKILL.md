@@ -31,19 +31,16 @@ headless Linux container against pre-installed `node_modules`.
 ### Dependencies (first run)
 
 If `node_modules` already exists (managed environments pre-provision it), use
-it as-is — do **not** reinstall. If it is absent, do NOT reach for
-`bun install --frozen-lockfile`: `bun.lock` pins ~137 tarball URLs on a private
-registry mirror (`*.pkg.dev/lovable-core-prod`) that 403s outside the Lovable
-sandbox, and a registry override cannot rewrite bun's locked URLs. The
-**verified bootstrap** is npm with a public-registry override (npm re-resolves;
-602 packages in ~14s here):
+it as-is — do **not** reinstall. If it is absent, install the canonical locked tree:
 
 ```bash
-printf 'registry=https://registry.npmjs.org/\n' > .npmrc.tmp
-npm_config_userconfig=$PWD/.npmrc.tmp npm install --no-audit --no-fund
-rm .npmrc.tmp
-rm -f package-lock.json   # npm writes one; bun.lock is the only lockfile (policy forbids it)
+bun install --frozen-lockfile
 ```
+
+This setup uses `bun.lock` and the repository's Bun minimum-release-age policy,
+with the locked security floors checked by `scripts/check-bun-lockfile-policy.mjs`.
+If the frozen install fails, report the exact blocker; do not replace it with an
+unpinned npm bootstrap or regenerate the lockfile.
 
 ---
 
@@ -188,13 +185,12 @@ Targeted sub-suites exist (`bun run test:payments-security`,
 ## Troubleshooting
 
 - **`bun install --frozen-lockfile` → `403` from `*.pkg.dev/lovable-core-prod`.**
-  `bun.lock` hardcodes ~137 tarball URLs on that private mirror (hit firsthand
-  on `playwright-core`, `hono`), and **no registry override can rewrite bun's
-  locked URLs** — any `bun install` against this lockfile keeps fetching the
-  mirror. Recovery is the npm bootstrap in Prerequisites → "Dependencies
-  (first run)" (verified in a clean worktree: 602 packages, ~14s); npm
-  re-resolves against the override registry, then delete the `package-lock.json` it
-  writes.
+  Some locked tarballs use that private mirror, and a registry override cannot
+  rewrite locked URLs. Reuse pre-provisioned `node_modules` if available; otherwise
+  report the frozen-install failure as **BLOCKED**. Ask the dependency owner to
+  repair registry access or approve a separate lockfile repair before retrying.
+  An unpinned npm bootstrap bypasses Bun's minimum-age delay and `bun.lock` security
+  floors, so it is not a supported recovery path.
 - **Playwright can't find a browser / revision mismatch.** Set
   `CHROMIUM=/opt/pw-browsers/chromium-1228/chrome-linux/chrome` (the driver reads
   it) or `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` for `bunx playwright test`.

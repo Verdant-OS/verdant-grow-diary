@@ -107,14 +107,15 @@ proof shows any approval-free framing.
 ### Step 2: publish the merged server changes, in #1894's order
 
 Follow `docs/release/merged-unshipped-server-changes-2026-10-03.md` (handoff item 3, merged
-#1894 from head `25b55c71b9356e73539eb7cdf93936805c25076b`, queue merge `98477208`). That doc is the source of truth for the
-order and caveats. Owner actions only (production database lock knk, HOLD #1250).
+#1894 from head `25b55c71b9356e73539eb7cdf93936805c25076b`, queue merge `98477208`). That
+doc is the source of truth for the order and caveats. Owner actions only (production
+database lock knk, HOLD #1250).
 
-**Check before starting step 2:** if none of `20260927094000`, `20260927160000` or
-`20260928183000` is recorded in production migration history, a single version-ordered apply
-runs `20260927012000` in place, with no skip. Otherwise use the order below. Both paths are
-safe: `20260927160000`/`20260928183000` need only `20260927002000`, and `20261001140000`
-accepts either predecessor.
+**Check before starting step 2:** if none of `20260927094000`, `20260927160000`,
+`20260928183000` or `20261001140000` is recorded in production migration history, a single
+version-ordered apply runs `20260927012000` in place, with no skip. Otherwise use the order
+below. Both paths are safe: `20260927160000`/`20260928183000` need only `20260927002000`,
+and `20261001140000` accepts either predecessor.
 
 Restated from #1894:
 
@@ -194,8 +195,8 @@ What to check (manual, owner or the fixture account in the browser, production o
 
 The schedule (`17 9 * * *`, 09:17 UTC, which is 4:17 AM CDT) is already on. It runs on its
 own from the deploy branch with `E2E_UNATTENDED_RUN=true`. Under step 0.0 (a) it was already
-re-enabled before step 4, so nothing changes here. After steps 1–4 pass, let the next scheduled run land and record its
-receipt (two tagged saves).
+re-enabled before step 4, so nothing changes here. After steps 1–4 pass, let the next
+scheduled run land and record its receipt (two tagged saves).
 **Stop condition:** two consecutive red scheduled runs mean the run is left unattended
 with a report to the owner, not re-triggered. Red at `verify-fixture` while the fixture is
 archived counts as BLOCKED, not a regression.

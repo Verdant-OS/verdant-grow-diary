@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildAiSensorSnapshotContext } from "@/lib/aiSensorSnapshotContextRules";
 import {
@@ -263,5 +265,42 @@ describe("resolveQuickLogSensorSnapshotForAi — allowlisted output", () => {
     expect(second).toEqual(first);
     expect(JSON.stringify(input)).toBe(before);
     expect(first).not.toBe(input);
+  });
+});
+
+/** Quoted string keys inside the first `<marker> ... ]` block of a source file. */
+function quotedKeysAfter(file: string, marker: string): string[] {
+  const src = readFileSync(resolve(process.cwd(), file), "utf8");
+  const start = src.indexOf(marker);
+  expect(start, `${marker} not found in ${file}`).toBeGreaterThanOrEqual(0);
+  const end = src.indexOf("]", start);
+  const block = src.slice(start, end).replace(/\/\/.*$/gm, "");
+  return [...block.matchAll(/"([a-z0-9_]+)"/g)].map((m) => m[1]).sort();
+}
+
+describe("AI reading-key allowlist stays in step with the annotator", () => {
+  it("AI_READING_KEYS equals READING_KEYS in aiSensorSnapshotContextRules.ts", () => {
+    const allowlist = quotedKeysAfter(
+      "src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts",
+      "const AI_READING_KEYS",
+    );
+    const annotator = quotedKeysAfter(
+      "src/lib/aiSensorSnapshotContextRules.ts",
+      "const READING_KEYS",
+    );
+    expect(allowlist.length).toBeGreaterThan(0);
+    expect(allowlist).toEqual(annotator);
+  });
+});
+
+describe("flat (no-metrics) live snapshot — current behavior, pinned", () => {
+  it("keeps source=live without provenance rows (only nested snapshots require corroboration)", () => {
+    const capturedAt = new Date().toISOString();
+    const resolved = resolveQuickLogSensorSnapshotForAi({
+      source: "live",
+      captured_at: capturedAt,
+      temperature_c: 24,
+    });
+    expect(resolved).toEqual({ source: "live", captured_at: capturedAt, temperature_c: 24 });
   });
 });

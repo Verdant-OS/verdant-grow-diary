@@ -29,7 +29,8 @@ function isForbidden(error: unknown): boolean {
 // Extract Retry-After seconds from a structured EmailAPIError, or default to 60s.
 function getRetryAfterSeconds(error: unknown): number {
   if (error && typeof error === "object" && "retryAfterSeconds" in error) {
-    return (error as { retryAfterSeconds: number | null }).retryAfterSeconds ?? 60;
+    return (error as { retryAfterSeconds: number | null }).retryAfterSeconds ??
+      60;
   }
   return 60;
 }
@@ -74,7 +75,12 @@ async function moveToDlq(
     payload,
   });
   if (error) {
-    console.error("Failed to move message to DLQ", { queue, msg_id: msg.msg_id, reason, error });
+    console.error("Failed to move message to DLQ", {
+      queue,
+      msg_id: msg.msg_id,
+      reason,
+      error,
+    });
   }
 }
 
@@ -85,10 +91,13 @@ Deno.serve(async (req) => {
 
   if (!apiKey || !supabaseUrl || !supabaseServiceKey) {
     console.error("Missing required environment variables");
-    return new Response(JSON.stringify({ error: "Server configuration error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: "Server configuration error" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 
   const authHeader = req.headers.get("Authorization");
@@ -121,29 +130,37 @@ Deno.serve(async (req) => {
     )
     .single();
 
-  if (state?.retry_after_until && new Date(state.retry_after_until) > new Date()) {
-    return new Response(JSON.stringify({ skipped: true, reason: "rate_limited" }), {
-      headers: { "Content-Type": "application/json" },
-    });
+  if (
+    state?.retry_after_until && new Date(state.retry_after_until) > new Date()
+  ) {
+    return new Response(
+      JSON.stringify({ skipped: true, reason: "rate_limited" }),
+      {
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 
   const batchSize = state?.batch_size ?? DEFAULT_BATCH_SIZE;
   const sendDelayMs = state?.send_delay_ms ?? DEFAULT_SEND_DELAY_MS;
   const ttlMinutes: Record<string, number> = {
     auth_emails: state?.auth_email_ttl_minutes ?? DEFAULT_AUTH_TTL_MINUTES,
-    transactional_emails:
-      state?.transactional_email_ttl_minutes ?? DEFAULT_TRANSACTIONAL_TTL_MINUTES,
+    transactional_emails: state?.transactional_email_ttl_minutes ??
+      DEFAULT_TRANSACTIONAL_TTL_MINUTES,
   };
 
   let totalProcessed = 0;
 
   // 2. Process auth_emails first (priority), then transactional_emails
   for (const queue of ["auth_emails", "transactional_emails"]) {
-    const { data: messages, error: readError } = await supabase.rpc("read_email_batch", {
-      queue_name: queue,
-      batch_size: batchSize,
-      vt: 30,
-    });
+    const { data: messages, error: readError } = await supabase.rpc(
+      "read_email_batch",
+      {
+        queue_name: queue,
+        batch_size: batchSize,
+        vt: 30,
+      },
+    );
 
     if (readError) {
       console.error("Failed to read email batch", { queue, error: readError });
@@ -159,37 +176,52 @@ Deno.serve(async (req) => {
       new Set(
         messages
           .map((msg) =>
-            msg?.message?.message_id && typeof msg.message.message_id === "string"
+            msg?.message?.message_id &&
+              typeof msg.message.message_id === "string"
               ? msg.message.message_id
-              : null,
+              : null
           )
           .filter((id): id is string => Boolean(id)),
       ),
     );
     const failedAttemptsByMessageId = new Map<string, number>();
-    if (messageIds.length > 0) {
-      const { data: failedRows, error: failedRowsError } = await supabase
-        .from("email_send_log")
-        .select("message_id")
-        .in("message_id", messageIds)
-        .eq("status", "failed");
+    const sentMessageIds = new Set<string>();
 
-      if (failedRowsError) {
-        console.error("Failed to load failed-attempt counters", {
+    if (messageIds.length > 0) {
+      const { data: logRows, error: logRowsError } = await supabase
+        .from("email_send_log")
+        .select("message_id, status")
+        .in("message_id", messageIds)
+        .in("status", ["failed", "sent"]);
+
+      if (logRowsError) {
+        console.error("Failed to load email log history", {
           queue,
-          error: failedRowsError,
+          error: logRowsError,
         });
       } else {
-        for (const row of failedRows ?? []) {
+        for (const row of logRows ?? []) {
           const messageId = row?.message_id;
+          const status = row?.status;
           if (typeof messageId !== "string" || !messageId) continue;
-          failedAttemptsByMessageId.set(
-            messageId,
-            (failedAttemptsByMessageId.get(messageId) ?? 0) + 1,
-          );
+
+          if (status === "failed") {
+            failedAttemptsByMessageId.set(
+              messageId,
+              (failedAttemptsByMessageId.get(messageId) ?? 0) + 1,
+            );
+          } else if (status === "sent") {
+            sentMessageIds.add(messageId);
+          }
         }
       }
     }
+
+    const logsToInsert: any[] = [];
+    const deletePromises: Promise<any>[] = [];
+    const dlqPromises: Promise<void>[] = [];
+
+    let stoppedReason: string | null = null;
 
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
@@ -213,30 +245,34 @@ Deno.serve(async (req) => {
             queued_at: queuedAt,
             ttl_minutes: ttlMinutes[queue],
           });
-          await moveToDlq(supabase, queue, msg, `TTL exceeded (${ttlMinutes[queue]} minutes)`);
+          dlqPromises.push(
+            moveToDlq(
+              supabase,
+              queue,
+              msg,
+              `TTL exceeded (${ttlMinutes[queue]} minutes)`,
+            ),
+          );
           continue;
         }
       }
 
       // Move to DLQ if max failed send attempts reached.
       if (failedAttempts >= MAX_RETRIES) {
-        await moveToDlq(
-          supabase,
-          queue,
-          msg,
-          `Max retries (${MAX_RETRIES}) exceeded (attempted ${failedAttempts} times)`,
+        dlqPromises.push(
+          moveToDlq(
+            supabase,
+            queue,
+            msg,
+            `Max retries (${MAX_RETRIES}) exceeded (attempted ${failedAttempts} times)`,
+          ),
         );
         continue;
       }
 
       // Guard: skip if another worker already sent this message (VT expired race)
-      if (payload.message_id) {
-        const { data: alreadySent } = await supabase
-          .from("email_send_log")
-          .select("id")
-          .eq("message_id", payload.message_id)
-          .eq("status", "sent")
-          .maybeSingle();
+      if (payload.message_id && typeof payload.message_id === "string") {
+        const alreadySent = sentMessageIds.has(payload.message_id);
 
         if (alreadySent) {
           console.warn("Skipping duplicate send (already sent)", {
@@ -244,17 +280,25 @@ Deno.serve(async (req) => {
             msg_id: msg.msg_id,
             message_id: payload.message_id,
           });
-          const { error: dupDelError } = await supabase.rpc("delete_email", {
-            queue_name: queue,
-            message_id: msg.msg_id,
-          });
-          if (dupDelError) {
-            console.error("Failed to delete duplicate message from queue", {
-              queue,
-              msg_id: msg.msg_id,
-              error: dupDelError,
-            });
-          }
+          deletePromises.push(
+            supabase
+              .rpc("delete_email", {
+                queue_name: queue,
+                message_id: msg.msg_id,
+              })
+              .then(({ error: dupDelError }) => {
+                if (dupDelError) {
+                  console.error(
+                    "Failed to delete duplicate message from queue",
+                    {
+                      queue,
+                      msg_id: msg.msg_id,
+                      error: dupDelError,
+                    },
+                  );
+                }
+              }),
+          );
           continue;
         }
       }
@@ -282,25 +326,34 @@ Deno.serve(async (req) => {
         );
 
         // Log success
-        await supabase.from("email_send_log").insert({
+        logsToInsert.push({
           message_id: payload.message_id,
           template_name: payload.label || queue,
           recipient_email: payload.to,
           status: "sent",
         });
 
-        // Delete from queue
-        const { error: delError } = await supabase.rpc("delete_email", {
-          queue_name: queue,
-          message_id: msg.msg_id,
-        });
-        if (delError) {
-          console.error("Failed to delete sent message from queue", {
-            queue,
-            msg_id: msg.msg_id,
-            error: delError,
-          });
+        if (payload.message_id && typeof payload.message_id === "string") {
+          sentMessageIds.add(payload.message_id);
         }
+
+        // Delete from queue
+        deletePromises.push(
+          supabase
+            .rpc("delete_email", {
+              queue_name: queue,
+              message_id: msg.msg_id,
+            })
+            .then(({ error: delError }) => {
+              if (delError) {
+                console.error("Failed to delete sent message from queue", {
+                  queue,
+                  msg_id: msg.msg_id,
+                  error: delError,
+                });
+              }
+            }),
+        );
         totalProcessed++;
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
@@ -313,48 +366,41 @@ Deno.serve(async (req) => {
         });
 
         if (isRateLimited(error)) {
-          const { error: rateLimitLogError } = await supabase.from("email_send_log").insert({
+          logsToInsert.push({
             message_id: payload.message_id,
             template_name: payload.label || queue,
             recipient_email: payload.to,
             status: "rate_limited",
             error_message: errorMsg.slice(0, 1000),
           });
-          if (rateLimitLogError) {
-            console.error("Failed to record email rate-limit audit", {
-              queue,
-              msg_id: msg.msg_id,
-              error_code: rateLimitLogError.code ?? "unknown",
-            });
-          }
 
           const retryAfterSecs = getRetryAfterSeconds(error);
           await supabase
             .from("email_send_state")
             .update({
-              retry_after_until: new Date(Date.now() + retryAfterSecs * 1000).toISOString(),
+              retry_after_until: new Date(Date.now() + retryAfterSecs * 1000)
+                .toISOString(),
               updated_at: new Date().toISOString(),
             })
             .eq("id", 1);
 
           // Stop processing — remaining messages stay in queue (VT expires, retried next cycle)
-          return new Response(
-            JSON.stringify({ processed: totalProcessed, stopped: "rate_limited" }),
-            { headers: { "Content-Type": "application/json" } },
-          );
+          stoppedReason = "rate_limited";
+          break;
         }
 
         // 403s are permanent configuration or authorization failures for this
         // message, so move straight to DLQ and stop processing the rest of the batch.
         if (isForbidden(error)) {
-          await moveToDlq(supabase, queue, msg, errorMsg.slice(0, 1000));
-          return new Response(JSON.stringify({ processed: totalProcessed, stopped: "forbidden" }), {
-            headers: { "Content-Type": "application/json" },
-          });
+          dlqPromises.push(
+            moveToDlq(supabase, queue, msg, errorMsg.slice(0, 1000)),
+          );
+          stoppedReason = "forbidden";
+          break;
         }
 
         // Log non-429 failures to track real retry attempts.
-        await supabase.from("email_send_log").insert({
+        logsToInsert.push({
           message_id: payload.message_id,
           template_name: payload.label || queue,
           recipient_email: payload.to,
@@ -369,9 +415,34 @@ Deno.serve(async (req) => {
       }
 
       // Small delay between sends to smooth bursts
+      // Only delay if we are not breaking out and not the last message
       if (i < messages.length - 1) {
         await new Promise((r) => setTimeout(r, sendDelayMs));
       }
+    }
+
+    // Flush batch DB operations for this queue
+    if (logsToInsert.length > 0) {
+      const { error: logsError } = await supabase.from("email_send_log").insert(
+        logsToInsert,
+      );
+      if (logsError) {
+        console.error("Failed to bulk insert email logs", {
+          queue,
+          error: logsError,
+        });
+      }
+    }
+    await Promise.all(deletePromises);
+    await Promise.all(dlqPromises);
+
+    if (stoppedReason) {
+      return new Response(
+        JSON.stringify({ processed: totalProcessed, stopped: stoppedReason }),
+        {
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
   }
 

@@ -157,10 +157,13 @@ function toRelPath(root, filePath, cwd) {
  */
 function candidateRelPaths(root, filePath, cwd) {
   const absolute = isAbsolute(filePath) ? filePath : resolve(cwd, filePath);
+  // Not resolve()/join(): those fold `..` lexically, so `link/../x` would skip the symlink.
+  // realpath must see the path as written to follow `..` from the link's physical target.
+  const unnormalised = isAbsolute(filePath) ? filePath : `${cwd}/${filePath}`;
   const out = new Set();
   const literal = toRelPath(root, absolute, cwd);
   if (literal) out.add(literal);
-  const real = toRelPath(realPathOf(root), realPathOf(absolute), cwd);
+  const real = toRelPath(realPathOf(root), realPathOf(unnormalised), cwd);
   if (real) out.add(real);
   return [...out];
 }

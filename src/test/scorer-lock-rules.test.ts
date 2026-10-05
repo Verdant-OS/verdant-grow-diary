@@ -769,6 +769,27 @@ describe("scripts/scorer-lock.mjs --hook and --unlock against a disposable repos
     }
   });
 
+  it("exit 2 for a relative path through a symlinked directory and then `..` onto a locked check", () => {
+    // `deep` -> src/test/sub, so `src/lib/deep/../tracked.test.ts` is physically
+    // src/test/tracked.test.ts, though it folds lexically to src/lib/tracked.test.ts.
+    const sub = join(repo, "src/test/sub");
+    const dirLink = join(repo, "src/lib/deep");
+    mkdirSync(sub, { recursive: true });
+    symlinkSync("../test/sub", dirLink);
+    // Built by hand: join()/hookInput() would fold the `..` before the hook sees it.
+    const raw = (filePath: string) =>
+      JSON.stringify({ tool_name: "Edit", cwd: repo, tool_input: { file_path: filePath } });
+    try {
+      expect(run(["--hook"], raw("src/lib/deep/../tracked.test.ts")).status).toBe(2);
+      expect(run(["--hook"], raw(`${repo}/src/lib/deep/../tracked.test.ts`)).status).toBe(2);
+      // A new file reached the same way is a new check, still allowed.
+      expect(run(["--hook"], raw("src/lib/deep/../brand-new.test.ts")).status).toBe(0);
+    } finally {
+      rmSync(dirLink, { force: true });
+      rmSync(sub, { recursive: true, force: true });
+    }
+  });
+
   it("exit 0 for a new check file that is not tracked yet", () => {
     const result = run(["--hook"], hookInput("src/test/brand-new.test.ts"));
     expect(result.status).toBe(0);

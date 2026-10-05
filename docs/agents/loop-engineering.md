@@ -87,6 +87,13 @@ Copilot-sized UI slices whose checks run under `chromium-mocked` with an explici
 `established fact` (this slice): `scripts/scorer-lock.mjs` is wired as a `PreToolUse` command hook on `Edit|Write|MultiEdit|NotebookEdit` in `.claude/settings.json`, run from `$CLAUDE_PROJECT_DIR` so a `cd` into a subdirectory during the session cannot make the script path fail to resolve (a hook that errors with exit 1 is non-blocking, which would silently open the gate); the repository itself is discovered from the hook input's `cwd`, which follows the active git worktree, so an edit inside a worktree is judged against that worktree's `HEAD` rather than skipped as outside the session-start checkout. Before a file-writing tool call
 runs, the hook reads the call, resolves the path against the repository root, and:
 
+(Each path is judged twice: as written, and as the real path it resolves to, with symlinks
+followed and `..` taken from a symlink's physical target. Tracked checks are also matched
+case-insensitively. So a case variant, a symlink, or a path through a symlinked directory that
+lands on a tracked check is refused like the check itself. On a case-sensitive filesystem this also
+refuses creating a new file whose name differs from a tracked check only by case. That fails
+closed, on purpose.)
+
 - allows it when the path is not a scorer (§1 vocabulary; the rule table is
   `SCORER_PATH_RULES` in `scripts/lib/scorerLockRules.mjs`);
 - allows it when the scorer is not yet tracked at `HEAD` (a new check being written);

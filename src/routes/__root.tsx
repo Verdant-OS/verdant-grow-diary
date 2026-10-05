@@ -80,7 +80,7 @@ export const Route = createRootRouteWithContext<RootRouteContext>()({
       { name: "robots", content: "index, follow" },
       {
         name: "google-site-verification",
-        content: "xPFb9yyxbDpIFrPhumD9-10JIkCO_gUlu09ZsF2nevo",
+        content: "DeisqZwffOPY4Q8UtqBcDP1UOPKPqFO2kwUjn2LL7eM",
       },
       { title: SITE_NAME },
       { name: "description", content: SITE_DESCRIPTION },

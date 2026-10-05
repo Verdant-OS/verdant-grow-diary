@@ -6,7 +6,7 @@
  * so saved values survive across sessions without touching schema or RLS.
  * Defaults populate empty fields but never overwrite anything already saved.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/store/auth";
 import {
   PHENO_DOCUMENTATION_DEFAULTS,
@@ -27,7 +27,7 @@ import {
 // the previous grower's values; legacy device-scoped data is never read under
 // a user id.
 export type { PhenoDocRecordType };
-type DeviceSaveStatus = "idle" | "saved" | "failed" | "stale";
+type DeviceSaveStatus = "idle" | "saved" | "failed" | "stale" | "conflict";
 
 export interface PhenoDocDiaryOption {
   readonly id: string;
@@ -119,6 +119,9 @@ export default function PhenoDocumentationSections({
     defaultOpen ? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId)) : null,
   );
   const [saveStatus, setSaveStatus] = useState<DeviceSaveStatus>("idle");
+  // True while the form holds typing that has not been saved. A record change
+  // from a restore or another tab must not replace that typing silently.
+  const dirtyRef = useRef(false);
   const [openSections, setOpenSections] = useState<ReadonlySet<string>>(new Set());
 
   // Re-hydrate if the record identity changes (e.g. switching candidates).
@@ -128,14 +131,21 @@ export default function PhenoDocumentationSections({
     setValues(defaultOpen ? mergeDocumentationValues(parseSaved(raw ?? null)) : null);
     setOpenSections(new Set());
     setSaveStatus("idle");
+    dirtyRef.current = false;
   }, [store, recordKey, defaultOpen]);
 
   // A restore (same tab) or a write from another tab replaced this record:
-  // show the stored values instead of keeping pre-restore ones on screen.
+  // show the stored values instead of keeping pre-restore ones on screen. If
+  // the form has unsaved typing, keep it, warn, and block Save until the
+  // grower discards it and loads the stored record.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const refresh = (changedKeys: ReadonlyArray<string> | null) => {
       if (!phenoDocChangeAffectsRecord(changedKeys, recordKey)) return;
+      if (dirtyRef.current) {
+        setSaveStatus("conflict");
+        return;
+      }
       const raw = readRaw(store, recordKey);
       setValues((prev) =>
         prev === null && !defaultOpen ? null : mergeDocumentationValues(parseSaved(raw)),
@@ -166,8 +176,23 @@ export default function PhenoDocumentationSections({
     return values ?? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId));
   }
 
-  function setField(sectionKey: string, fieldKey: string, value: string) {
+  /** Edits keep a conflict notice up: Save stays blocked until discard. */
+  function markEdited() {
+    dirtyRef.current = true;
+    setSaveStatus((prev) => (prev === "conflict" ? "conflict" : "idle"));
+  }
+
+  /** Drop unsaved typing and show the record as stored now. */
+  function discardAndReload() {
+    const raw = readRaw(store, recordKey);
+    dirtyRef.current = false;
+    setHydratedRaw(raw);
+    setValues(mergeDocumentationValues(parseSaved(raw)));
     setSaveStatus("idle");
+  }
+
+  function setField(sectionKey: string, fieldKey: string, value: string) {
+    markEdited();
     hydrateForEdit();
     setValues((prev) => {
       const base = prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId));
@@ -182,7 +207,7 @@ export default function PhenoDocumentationSections({
   }
 
   function setDiary(sectionKey: string, diaryEntryId: string | null) {
-    setSaveStatus("idle");
+    markEdited();
     hydrateForEdit();
     setValues((prev) => {
       const base = prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId));
@@ -194,12 +219,18 @@ export default function PhenoDocumentationSections({
   }
 
   function onSave() {
+    if (saveStatus === "conflict") return;
     if (store === null) {
       setSaveStatus("failed");
       return;
     }
     const currentRaw = readRaw(store, recordKey);
     if (values !== null && !canSavePhenoDocOverStored(hydratedRaw ?? null, currentRaw)) {
+      if (dirtyRef.current) {
+        // Unsaved typing over a newer stored record: keep it, never write.
+        setSaveStatus("conflict");
+        return;
+      }
       // Stale form: never write over the newer stored record. Show it instead.
       setValues(mergeDocumentationValues(parseSaved(currentRaw)));
       setHydratedRaw(currentRaw);
@@ -210,6 +241,7 @@ export default function PhenoDocumentationSections({
       const next = JSON.stringify(hydrated());
       store.setItem(recordKey, next);
       setHydratedRaw(next);
+      dirtyRef.current = false;
       setSaveStatus("saved");
     } catch {
       // storage may be unavailable; keep values in-memory
@@ -320,6 +352,7 @@ export default function PhenoDocumentationSections({
           type="button"
           data-testid={`pheno-doc-save-${recordType}-${recordId}`}
           onClick={onSave}
+          disabled={saveStatus === "conflict"}
           className="rounded-md border border-border bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
         >
           Save on this device
@@ -353,6 +386,27 @@ export default function PhenoDocumentationSections({
           </span>
         )}
       </div>
+      {saveStatus === "conflict" && (
+        <div
+          role="alert"
+          data-testid={`pheno-doc-conflict-${recordType}-${recordId}`}
+          className="space-y-2 rounded border border-amber-500/50 p-2 text-xs text-amber-700 dark:text-amber-300"
+        >
+          <p>
+            This record changed on this device after you started typing (a restore or another tab).
+            Your unsaved changes are still shown, but saving is blocked so they can&apos;t overwrite
+            the newer record. Copy anything you want to keep, then load the saved record.
+          </p>
+          <button
+            type="button"
+            data-testid={`pheno-doc-conflict-reload-${recordType}-${recordId}`}
+            onClick={discardAndReload}
+            className="rounded-md border border-border px-2 py-1 font-medium"
+          >
+            Discard my changes and load the saved record
+          </button>
+        </div>
+      )}
     </section>
   );
 }

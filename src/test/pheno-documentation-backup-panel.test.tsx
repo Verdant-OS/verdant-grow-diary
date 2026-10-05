@@ -2,7 +2,7 @@
  * #552 — hunt-level Download / Restore of device-saved candidate documentation.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import PhenoDocumentationBackupPanel from "@/components/PhenoDocumentationBackupPanel";
 import PhenoDocumentationSections from "@/components/PhenoDocumentationSections";
 import {
@@ -240,7 +240,7 @@ describe("restore while a candidate's documentation form is open (#552 review P1
     expect(JSON.parse(storage.getItem(key)!).phenotype.fields.unique_traits).toBe("restored");
   });
 
-  it("refreshes a collapsed form the grower already opened and edited", async () => {
+  it("keeps unsaved typing in a collapsed form, warns, and blocks Save until discard", async () => {
     const key = phenoDocStorageKey("candidate", "p1", "u1");
     const storage = memoryStorage({ [key]: JSON.stringify(notes("old")) });
     render(
@@ -267,11 +267,42 @@ describe("restore while a candidate's documentation form is open (#552 review P1
 
     await restore(storage, "restored");
 
-    await waitFor(() =>
-      expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("restored"),
-    );
-    fireEvent.click(screen.getByTestId("pheno-doc-save-candidate-p1"));
+    await waitFor(() => expect(screen.getByTestId("pheno-doc-conflict-candidate-p1")).toBeTruthy());
+    expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("unsaved edit");
+    const save = screen.getByTestId("pheno-doc-save-candidate-p1") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(save);
     expect(JSON.parse(storage.getItem(key)!).phenotype.fields.unique_traits).toBe("restored");
+
+    fireEvent.click(screen.getByTestId("pheno-doc-conflict-reload-candidate-p1"));
+    expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("restored");
+    expect(screen.queryByTestId("pheno-doc-conflict-candidate-p1")).toBeNull();
+    expect(save.disabled).toBe(false);
+  });
+
+  it("warns instead of silently replacing typing when a restore writes a record that was never saved", async () => {
+    const key = phenoDocStorageKey("candidate", "p1", "u1");
+    const storage = memoryStorage();
+    const confirm = vi.fn(() => true);
+    render(
+      <>
+        <PhenoDocumentationBackupPanel
+          storage={storage}
+          download={vi.fn()}
+          now={() => "x"}
+          confirm={confirm}
+        />
+        <PhenoDocumentationSections recordId="p1" recordType="candidate" storage={storage} />
+      </>,
+    );
+    fireEvent.change(screen.getByTestId(field), { target: { value: "first draft" } });
+
+    await restore(storage, "from backup");
+
+    expect(confirm).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByTestId("pheno-doc-conflict-candidate-p1")).toBeTruthy());
+    expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("first draft");
+    expect(JSON.parse(storage.getItem(key)!).phenotype.fields.unique_traits).toBe("from backup");
   });
 
   it("refuses to Save a stale form when the record changed without a restore event", () => {
@@ -287,7 +318,10 @@ describe("restore while a candidate's documentation form is open (#552 review P1
     expect(JSON.parse(storage.getItem(key)!).phenotype.fields.unique_traits).toBe(
       "newer elsewhere",
     );
-    expect(screen.getByTestId("pheno-doc-save-stale-candidate-p1")).toBeTruthy();
+    // The typing is kept and Save is blocked until the grower discards it.
+    expect(screen.getByTestId("pheno-doc-conflict-candidate-p1")).toBeTruthy();
+    expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("stale edit");
+    fireEvent.click(screen.getByTestId("pheno-doc-conflict-reload-candidate-p1"));
     expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("newer elsewhere");
     // Once it shows the stored record, a deliberate Save works again.
     fireEvent.change(screen.getByTestId(field), { target: { value: "after refresh" } });
@@ -312,5 +346,59 @@ describe("restore while a candidate's documentation form is open (#552 review P1
     fireEvent.change(screen.getByTestId(field), { target: { value: "p2 unsaved" } });
     await restore(storage, "p1 restored");
     expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("p2 unsaved");
+  });
+});
+
+describe("cross-tab storage events (#552 review P2-2)", () => {
+  const field = "pheno-doc-field-phenotype-unique_traits";
+  const key = phenoDocStorageKey("candidate", "p1", "u1");
+
+  function otherTabWrites(
+    storage: ReturnType<typeof memoryStorage>,
+    text: string,
+    eventKey: string | null,
+  ) {
+    storage.setItem(key, JSON.stringify(notes(text)));
+    act(() => {
+      window.dispatchEvent(new StorageEvent("storage", { key: eventKey }));
+    });
+  }
+
+  it("refreshes a clean form when another tab writes its record", () => {
+    const storage = memoryStorage({ [key]: JSON.stringify(notes("old")) });
+    render(<PhenoDocumentationSections recordId="p1" recordType="candidate" storage={storage} />);
+    otherTabWrites(storage, "from other tab", key);
+    expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("from other tab");
+    expect(screen.queryByTestId("pheno-doc-conflict-candidate-p1")).toBeNull();
+  });
+
+  it("ignores a storage event for another record", () => {
+    const storage = memoryStorage({ [key]: JSON.stringify(notes("old")) });
+    render(<PhenoDocumentationSections recordId="p1" recordType="candidate" storage={storage} />);
+    fireEvent.change(screen.getByTestId(field), { target: { value: "typing" } });
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", { key: phenoDocStorageKey("candidate", "p2", "u1") }),
+      );
+    });
+    expect(screen.queryByTestId("pheno-doc-conflict-candidate-p1")).toBeNull();
+  });
+
+  it.each([
+    ["the record key", key],
+    ["key: null (storage cleared)", null],
+  ])("keeps unsaved typing and blocks Save on a storage event for %s", (_label, eventKey) => {
+    const storage = memoryStorage({ [key]: JSON.stringify(notes("old")) });
+    render(<PhenoDocumentationSections recordId="p1" recordType="candidate" storage={storage} />);
+    fireEvent.change(screen.getByTestId(field), { target: { value: "my typing" } });
+
+    otherTabWrites(storage, "from other tab", eventKey);
+
+    expect(screen.getByTestId("pheno-doc-conflict-candidate-p1")).toBeTruthy();
+    expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("my typing");
+    fireEvent.click(screen.getByTestId("pheno-doc-save-candidate-p1"));
+    expect(JSON.parse(storage.getItem(key)!).phenotype.fields.unique_traits).toBe("from other tab");
+    fireEvent.click(screen.getByTestId("pheno-doc-conflict-reload-candidate-p1"));
+    expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("from other tab");
   });
 });

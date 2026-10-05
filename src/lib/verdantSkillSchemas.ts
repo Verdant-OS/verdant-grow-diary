@@ -649,15 +649,25 @@ function pickErrorCode(
 // Envelope parse
 // ---------------------------------------------------------------------------
 
+function validateSkillSchema<T>(
+  schema: z.ZodType<T>,
+  input: unknown,
+  errorCode: SkillErrorCode,
+): { ok: true; data: T } | { ok: false; error: SkillError } {
+  const stripped = stripSensitiveDeep(input);
+  const parsed = schema.safeParse(stripped);
+  if (!parsed.success) {
+    return { ok: false, error: toSkillError(parsed.error, errorCode, stripped) };
+  }
+  return { ok: true, data: parsed.data };
+}
+
 export function parseVerdantSkillInputEnvelope(
   input: unknown,
 ): { ok: true; envelope: VerdantSkillInputEnvelope } | { ok: false; error: SkillError } {
-  const stripped = stripSensitiveDeep(input);
-  const parsed = envelopeObjectSchema.safeParse(stripped);
-  if (!parsed.success) {
-    return { ok: false, error: toSkillError(parsed.error, "invalid_envelope", stripped) };
-  }
-  return { ok: true, envelope: deepFreeze(parsed.data) as VerdantSkillInputEnvelope };
+  const result = validateSkillSchema(envelopeObjectSchema, input, "invalid_envelope");
+  if (!result.ok) return result;
+  return { ok: true, envelope: deepFreeze(result.data) as VerdantSkillInputEnvelope };
 }
 
 // ---------------------------------------------------------------------------
@@ -768,13 +778,11 @@ export function parseVerdantSkillRunResult(
       }),
     };
   }
-  const stripped = stripSensitiveDeep(input);
-  const parsed = runResultObjectSchema.safeParse(stripped);
-  if (!parsed.success) {
-    return { ok: false, error: toSkillError(parsed.error, "invalid_model_output", stripped) };
-  }
+  const validation = validateSkillSchema(runResultObjectSchema, input, "invalid_model_output");
+  if (!validation.ok) return validation;
+
   const confidence = deriveVerdantSkillConfidence(
-    parsed.data.confidence,
+    validation.data.confidence,
     deps.evidenceConfidence,
     deps.ceiling,
   );
@@ -805,7 +813,7 @@ export function parseVerdantSkillRunResult(
       };
     }
   }
-  const { confidence: _modelConfidenceInput, ...rest } = parsed.data;
+  const { confidence: _modelConfidenceInput, ...rest } = validation.data;
   void _modelConfidenceInput;
   // zod v4 infers transformed (piped) object fields as optional in the output
   // type; runtime validation above guarantees presence, so one cast is safe.

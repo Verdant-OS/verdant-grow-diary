@@ -168,7 +168,10 @@ recorded in production** (for example, a row with that version in
 Doc note only: this amendment didn't read production, and the knk lock and migration hold
 still stand.
 
-- **Recorded:** nothing to do for #1704.
+- **Recorded:** confirm whether the migration executed or was only marked applied.
+  Preserve any deliberate skip and its reason in the owner's release receipt. A
+  migration-history row alone does not prove the grants changed; treat grant hardening
+  as **NOT_MEASURED** until execution or the intended effective grants are confirmed.
 - **Pending:** a version-ordered apply runs it after any earlier pending version (including
   #1460's `20260916111000` and #1545's `20260917183000` if still pending, which need the
   owner's call above), then #1703's `20260924120000` if pending, and before

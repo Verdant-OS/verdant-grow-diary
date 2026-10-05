@@ -230,16 +230,39 @@ describe("resolveQuickLogSensorSnapshotForAi — allowlisted output", () => {
     expect(fixture.source).toBe("demo");
   });
 
-  it("does not echo a token-shaped or non-date captured_at", () => {
-    for (const capturedAt of [TOKEN, MAC, UUID, { raw_payload: RAW_MARKER }, ""]) {
+  it("does not echo a token-shaped or non-date captured_at, and marks it invalid", () => {
+    for (const capturedAt of [TOKEN, MAC, UUID, { raw_payload: RAW_MARKER }, "not a date"]) {
       const resolved = resolveQuickLogSensorSnapshotForAi({
         source: "manual",
         captured_at: capturedAt,
         temperature_c: 24,
       }) as Record<string, unknown>;
       expectNoSensitiveData(resolved);
-      expect(resolved.captured_at).toBeNull();
+      expect(resolved).toEqual({ source: "invalid", captured_at: null });
     }
+  });
+
+  it.each(["live", "manual", "csv"])(
+    "a present but unreadable %s captured_at reads as invalid in the AI context, not missing",
+    (source) => {
+      const resolved = resolveQuickLogSensorSnapshotForAi({
+        source,
+        captured_at: "garbage-timestamp",
+        metrics: { temperature_c: 24 },
+      });
+      expect(resolved).toEqual({ source: "invalid", captured_at: null });
+      const context = JSON.stringify(buildAiSensorSnapshotContext(resolved));
+      expect(context).not.toMatch(/captured_at missing/);
+    },
+  );
+
+  it("an empty captured_at counts as missing, not invalid", () => {
+    const resolved = resolveQuickLogSensorSnapshotForAi({
+      source: "manual",
+      captured_at: "  ",
+      temperature_c: 24,
+    });
+    expect(resolved).toEqual({ source: "manual", captured_at: null, temperature_c: 24 });
   });
 
   it("non-object inputs never echo their content", () => {
@@ -293,14 +316,15 @@ describe("AI reading-key allowlist stays in step with the annotator", () => {
   });
 });
 
-describe("flat (no-metrics) live snapshot — current behavior, pinned", () => {
-  it("keeps source=live without provenance rows (only nested snapshots require corroboration)", () => {
+describe("flat (no-metrics) live snapshot needs provenance like a nested one", () => {
+  it("fails closed to invalid without provenance rows, forwarding no values", () => {
     const capturedAt = new Date().toISOString();
     const resolved = resolveQuickLogSensorSnapshotForAi({
       source: "live",
       captured_at: capturedAt,
       temperature_c: 24,
     });
-    expect(resolved).toEqual({ source: "live", captured_at: capturedAt, temperature_c: 24 });
+    expect(resolved).toEqual({ source: "invalid", captured_at: capturedAt });
+    expect(JSON.stringify(buildAiSensorSnapshotContext(resolved))).not.toMatch(/trust=high/);
   });
 });

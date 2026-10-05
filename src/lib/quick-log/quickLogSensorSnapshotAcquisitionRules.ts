@@ -233,33 +233,54 @@ function canonicalAiSource(object: Record<string, unknown>): QuickLogAiSensorSou
   return "invalid";
 }
 
+type CapturedAtState =
+  | { readonly kind: "missing" }
+  | { readonly kind: "invalid" }
+  | { readonly kind: "ok"; readonly iso: string };
+
 /**
- * Re-emit a timestamp as ISO-8601, or null. The raw value is never echoed,
- * so a token-shaped or structured `captured_at` cannot reach the prompt.
+ * Read the first timestamp field as ISO-8601. The raw value is never echoed,
+ * so a token-shaped or structured `captured_at` cannot reach the prompt. A
+ * field that is present but unreadable is `invalid`, not `missing`.
  */
-function canonicalCapturedAt(object: Record<string, unknown>): string | null {
+function capturedAtState(object: Record<string, unknown>): CapturedAtState {
   for (const key of ["captured_at", "capturedAt", "timestamp", "ts", "time"]) {
     const raw = object[key];
     if (raw === undefined || raw === null) continue;
+    if (typeof raw === "string" && raw.trim() === "") continue;
     let ms: number | null = null;
     if (typeof raw === "number" && Number.isFinite(raw)) {
       ms = raw < 1e12 ? raw * 1000 : raw;
-    } else if (typeof raw === "string" && raw.trim() !== "") {
+    } else if (typeof raw === "string") {
       const parsed = Date.parse(raw.trim());
       ms = Number.isFinite(parsed) ? parsed : null;
     }
-    if (ms === null) return null;
+    if (ms === null) return { kind: "invalid" };
     const date = new Date(ms);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    return Number.isNaN(date.getTime())
+      ? { kind: "invalid" }
+      : { kind: "ok", iso: date.toISOString() };
   }
-  return null;
+  return { kind: "missing" };
 }
 
+function canonicalCapturedAt(object: Record<string, unknown>): string | null {
+  const state = capturedAtState(object);
+  return state.kind === "ok" ? state.iso : null;
+}
+
+/**
+ * Source and timestamp header. An unreadable timestamp makes the whole
+ * snapshot `invalid` (values omitted, trust low), so the AI context reports
+ * it as invalid rather than as a missing timestamp.
+ */
 function aiSnapshotHeader(
   source: QuickLogAiSensorSource,
   object: Record<string, unknown>,
 ): QuickLogAiSensorSnapshot {
-  return { source, captured_at: canonicalCapturedAt(object) };
+  const state = capturedAtState(object);
+  if (state.kind === "invalid") return { source: "invalid", captured_at: null };
+  return { source, captured_at: state.kind === "ok" ? state.iso : null };
 }
 
 function withAllowlistedReadings(
@@ -284,9 +305,11 @@ function withAllowlistedReadings(
  * an ISO `captured_at`, and finite numbers under known reading keys. Raw
  * payloads, tokens, hardware ids and every other input field are dropped.
  *
- * Nested Quick Log snapshots declaring `source=live` must be corroborated by
- * provenance-bearing sensor rows. Older live snapshots that discarded raw
- * lineage fail closed to `invalid`; diagnostic-only matches become `demo`.
+ * Any snapshot declaring `source=live`, flat or nested, must be corroborated
+ * by provenance-bearing sensor rows. Live snapshots without that lineage fail
+ * closed to `invalid` (unverified data is never presented as live);
+ * diagnostic-only matches become `demo`. A present but unreadable timestamp
+ * also resolves to `invalid`.
  */
 export function resolveQuickLogSensorSnapshotForAi(
   snapshot: unknown,
@@ -302,12 +325,13 @@ export function resolveQuickLogSensorSnapshotForAi(
 
   const source = canonicalAiSource(object);
   const metrics = asObject(object.metrics);
-  if (!metrics) {
-    return withAllowlistedReadings(aiSnapshotHeader(source, object), object, {});
-  }
-
   if (source !== "live") {
-    return withAllowlistedReadings(aiSnapshotHeader(source, object), metrics, AI_METRIC_MAP);
+    // An unreadable timestamp: invalid, and no values are forwarded.
+    if (capturedAtState(object).kind === "invalid") return { source: "invalid", captured_at: null };
+    const header = aiSnapshotHeader(source, object);
+    return metrics
+      ? withAllowlistedReadings(header, metrics, AI_METRIC_MAP)
+      : withAllowlistedReadings(header, object, {});
   }
 
   const acquired = acquireQuickLogSensorSnapshot(provenanceRows ?? []);

@@ -78,7 +78,7 @@
     "src/lib/plantRecentActivityRules.ts": "bcaa46c8afc72f12aa023108b377b2d7bc78ac677019a26bedb792ef01c773bd",
     "src/lib/plantTypeRules.ts": "f0fa64df2cf165e8902b9ed900d1765ffe825ad0333ea3bc9d7813ddb80382bb",
     "src/lib/ppfdRules.ts": "8ac7ead78f3ae9cfe682d37d36c6594cac3ece2c2862fa6edc7ed853dce14261",
-    "src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts": "7c20a4e421457d76fa775b2fe2a5a79f0c4f63c123b2f6d35f1ddea41bc7794e",
+    "src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts": "d10d29d8a2366776b225bf8d9c069920d4463dc706b08b0171c4a538ce4449dd",
     "src/lib/quick-log/quickLogSnapshotMetricNormalizer.ts": "c458e70f476d3d1bb70c5d22b425865eeeb8cce3c4ab1baa9921208b988fe0ce",
     "src/lib/quickLogEventIdentityRules.ts": "51b5f4a9637591c00816dc0caec3f19ea6adfe41cb09d5fa52fc6c78707bffb0",
     "src/lib/quickLogHardwareReadingsDisplayRules.ts": "57b3a026337bbc98f6dd1eac3b217a61a0cd4595fe1db1c810b05662dd6ef9fe",

@@ -657,6 +657,62 @@ describe("verdant skill contracts", () => {
       if (parsed.ok === false) expect(parsed.error.code).toBe("insufficient_context");
     });
 
+    describe("readiness ceiling validation", () => {
+      const runWithReadiness = (
+        modelConfidence: number,
+        readiness: "insufficient" | "partial" | "strong" | undefined,
+      ) =>
+        parseVerdantSkillRunResult(
+          { ...validRunResult(), confidence: { modelConfidence } },
+          { ...deps(), ceiling: "high", readiness },
+        );
+
+      it("accepts displayed confidence exactly at the partial readiness ceiling", () => {
+        const parsed = runWithReadiness(0.5, "partial");
+        expect(parsed.ok).toBe(true);
+        if (parsed.ok) expect(parsed.result.confidence.system.displayedConfidence).toBe(0.5);
+      });
+
+      it("rejects displayed confidence one step above the partial readiness ceiling", () => {
+        const parsed = runWithReadiness(0.51, "partial");
+        expect(parsed.ok).toBe(false);
+        if (parsed.ok === false) {
+          expect(parsed.error.code).toBe("insufficient_context");
+          expect(parsed.error.message).toBe(
+            "confidence: displayed confidence exceeds the context readiness ceiling",
+          );
+          expect(parsed.error.field).toBe("confidence");
+        }
+      });
+
+      it("accepts displayed confidence exactly at the strong readiness ceiling", () => {
+        const parsed = runWithReadiness(0.95, "strong");
+        expect(parsed.ok).toBe(true);
+        if (parsed.ok) expect(parsed.result.confidence.system.displayedConfidence).toBe(0.95);
+      });
+
+      it("rejects displayed confidence above the strong readiness ceiling", () => {
+        const parsed = runWithReadiness(0.96, "strong");
+        expect(parsed.ok).toBe(false);
+        if (parsed.ok === false) expect(parsed.error.code).toBe("insufficient_context");
+      });
+
+      it("skips the readiness fence when readiness is omitted from deps", () => {
+        const parsed = parseVerdantSkillRunResult(
+          { ...validRunResult(), confidence: { modelConfidence: 0.99 } },
+          { ...deps(), ceiling: "high" },
+        );
+        expect(parsed.ok).toBe(true);
+        if (parsed.ok) expect(parsed.result.confidence.system.displayedConfidence).toBe(0.99);
+      });
+
+      it("deep-freezes readiness fence errors", () => {
+        const parsed = runWithReadiness(0.62, "insufficient");
+        expect(parsed.ok).toBe(false);
+        if (parsed.ok === false) expect(Object.isFrozen(parsed.error)).toBe(true);
+      });
+    });
+
     it("accepts an explicit null follow-up (backward-compatible optionality)", () => {
       const parsed = parseVerdantSkillRunResult({ ...validRunResult(), followUp: null }, deps());
       expect(parsed.ok).toBe(true);

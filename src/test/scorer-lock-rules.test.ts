@@ -34,6 +34,7 @@ import {
   UNLOCK_FILE,
   UNLOCK_MIN_REASON_LENGTH,
   UNLOCK_TTL_MS,
+  caseFoldTrackedPath,
   evaluateScorerEdit,
   hookFilePaths,
   isScorerPath,
@@ -596,6 +597,23 @@ describe("scorerLockRules — evaluateScorerEdit", () => {
   });
 });
 
+describe("scorerLockRules — caseFoldTrackedPath", () => {
+  const tracked = ["src/test/tracked.test.ts", "src/lib/rules.ts"];
+
+  it("maps a case variant onto the tracked path it would write", () => {
+    expect(caseFoldTrackedPath("SRC/Test/Tracked.Test.ts", tracked)).toBe(
+      "src/test/tracked.test.ts",
+    );
+  });
+
+  it("returns the input for an exact tracked path, an untracked path, or an ambiguous fold", () => {
+    expect(caseFoldTrackedPath("src/lib/rules.ts", tracked)).toBe("src/lib/rules.ts");
+    expect(caseFoldTrackedPath("src/test/New.test.ts", tracked)).toBe("src/test/New.test.ts");
+    expect(caseFoldTrackedPath("A.ts", ["a.ts", "A.TS"])).toBe("A.ts");
+    expect(caseFoldTrackedPath("", tracked)).toBe("");
+  });
+});
+
 describe("scorerLockRules — hookFilePaths", () => {
   it("reads file_path for Edit and Write, notebook_path for NotebookEdit", () => {
     expect(hookFilePaths({ tool_name: "Edit", tool_input: { file_path: "/r/a.ts" } })).toEqual([
@@ -726,6 +744,29 @@ describe("scripts/scorer-lock.mjs --hook and --unlock against a disposable repos
   it("exit 2 for the lock's own tracked control files", () => {
     expect(run(["--hook"], hookInput("scripts/lib/scorerLockRules.mjs")).status).toBe(2);
     expect(run(["--hook"], hookInput(".claude/settings.json")).status).toBe(2);
+  });
+
+  it("exit 2 for a tracked check named in a different case (case-insensitive filesystems)", () => {
+    const result = run(["--hook"], hookInput("SRC/Test/Tracked.Test.ts"));
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("src/test/tracked.test.ts");
+    expect(run(["--hook"], hookInput("Scripts/Lib/ScorerLockRules.mjs")).status).toBe(2);
+  });
+
+  it("exit 2 for a symlink, or a path through a symlinked directory, that resolves to a locked check", () => {
+    const fileLink = join(repo, "src/lib/alias.ts");
+    const dirLink = join(repo, "src/lib/checks");
+    symlinkSync("../test/tracked.test.ts", fileLink);
+    symlinkSync("../test", dirLink);
+    try {
+      expect(run(["--hook"], hookInput("src/lib/alias.ts")).status).toBe(2);
+      expect(run(["--hook"], hookInput("src/lib/checks/tracked.test.ts")).status).toBe(2);
+      // A new file through the symlinked directory is a new check, still allowed.
+      expect(run(["--hook"], hookInput("src/lib/checks/brand-new.test.ts")).status).toBe(0);
+    } finally {
+      rmSync(fileLink, { force: true });
+      rmSync(dirLink, { force: true });
+    }
   });
 
   it("exit 0 for a new check file that is not tracked yet", () => {

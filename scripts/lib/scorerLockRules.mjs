@@ -320,6 +320,32 @@ export function normalizeRelPath(relPath) {
   return out;
 }
 
+/**
+ * Maps a repository-relative path onto the tracked file it would write on a
+ * case-insensitive filesystem (macOS, Windows). `SRC/Test/a.test.ts` opens the tracked
+ * `src/test/a.test.ts` there, yet as a string it is neither a scorer nor tracked, so the
+ * hook would allow it. When the path is not itself tracked and exactly one tracked path
+ * equals it case-insensitively, that tracked path is returned; otherwise the normalised
+ * input. Matching only TRACKED paths keeps the fold from over-matching a genuinely new file.
+ *
+ * @param {string} relPath
+ * @param {Iterable<string>} trackedPaths repository-relative paths tracked at HEAD
+ */
+export function caseFoldTrackedPath(relPath, trackedPaths) {
+  const path = normalizeRelPath(relPath);
+  if (!path || !trackedPaths) return path;
+  const folded = path.toLowerCase();
+  let match = null;
+  for (const tracked of trackedPaths) {
+    if (tracked === path) return path;
+    if (tracked.toLowerCase() === folded) {
+      if (match !== null && match !== tracked) return path;
+      match = tracked;
+    }
+  }
+  return match ?? path;
+}
+
 /** True when the path is one of the files the loop may not weaken. */
 export function isScorerPath(relPath) {
   const path = normalizeRelPath(relPath);

@@ -36,14 +36,22 @@
 // --unlock itself. Its value is that the unlock is an explicit, logged, reasoned act.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import process from "node:process";
 
 import {
   UNLOCK_FILE,
   UNLOCK_MIN_REASON_LENGTH,
   UNLOCK_TTL_MS,
+  caseFoldTrackedPath,
   evaluateScorerEdit,
   hookFilePaths,
   isScorerPath,
@@ -89,6 +97,35 @@ function trackedAtHead(root, relPath) {
   }
 }
 
+/** Every path tracked at HEAD (read lazily, once per hook call). */
+function headPaths(root) {
+  try {
+    return git(["ls-tree", "-r", "--name-only", "-z", "HEAD"], root).split("\0").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The real path of `absolute`, following symlinks. A path that does not exist yet (a new
+ * file) resolves through its nearest existing ancestor, so a symlinked directory still
+ * counts. Falls back to the input when nothing resolves.
+ */
+function realPathOf(absolute) {
+  const rest = [];
+  let current = absolute;
+  for (;;) {
+    try {
+      return join(realpathSync.native(current), ...[...rest].reverse());
+    } catch {
+      const parent = dirname(current);
+      if (parent === current) return absolute;
+      rest.push(basename(current));
+      current = parent;
+    }
+  }
+}
+
 function readUnlocks(root) {
   const file = resolve(root, UNLOCK_FILE);
   if (!existsSync(file)) return [];
@@ -111,6 +148,21 @@ function toRelPath(root, filePath, cwd) {
   const rel = normalizeRelPath(relative(root, absolute));
   if (!rel || rel.startsWith("../") || rel === "..") return null;
   return rel;
+}
+
+/**
+ * Every repository path an edit of `filePath` may land on: the literal path and, when a
+ * symlink is involved, the real path it resolves to. Each is judged on its own, so a
+ * symlink (or a symlinked directory) pointing at a locked check is refused like the check.
+ */
+function candidateRelPaths(root, filePath, cwd) {
+  const absolute = isAbsolute(filePath) ? filePath : resolve(cwd, filePath);
+  const out = new Set();
+  const literal = toRelPath(root, absolute, cwd);
+  if (literal) out.add(literal);
+  const real = toRelPath(realPathOf(root), realPathOf(absolute), cwd);
+  if (real) out.add(real);
+  return [...out];
 }
 
 function readStdin() {
@@ -144,19 +196,31 @@ function runHook() {
   }
   const unlocked = readUnlocks(root);
   const context = decisionContext(root);
+  let tracked = null;
   for (const filePath of paths) {
-    const rel = toRelPath(root, filePath, cwd);
-    if (!rel) continue;
-    const verdict = evaluateScorerEdit({
-      relPath: rel,
-      trackedAtHead: trackedAtHead(root, rel),
-      unlockedEntries: unlocked,
-      now: context.now,
-      branch: context.branch,
-    });
-    if (verdict.decision === "deny") {
-      process.stderr.write(`${verdict.reason}\n`);
-      return 2;
+    for (const candidate of candidateRelPaths(root, filePath, cwd)) {
+      let rel = candidate;
+      let isTracked = trackedAtHead(root, rel);
+      if (!isTracked) {
+        // A case-insensitive filesystem writes the tracked file whatever the case.
+        tracked = tracked ?? headPaths(root);
+        const folded = caseFoldTrackedPath(rel, tracked);
+        if (folded !== rel) {
+          rel = folded;
+          isTracked = true;
+        }
+      }
+      const verdict = evaluateScorerEdit({
+        relPath: rel,
+        trackedAtHead: isTracked,
+        unlockedEntries: unlocked,
+        now: context.now,
+        branch: context.branch,
+      });
+      if (verdict.decision === "deny") {
+        process.stderr.write(`${verdict.reason}\n`);
+        return 2;
+      }
     }
   }
   return 0;

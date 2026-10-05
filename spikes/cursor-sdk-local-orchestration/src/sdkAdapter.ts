@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 
 import { ALLOWED_TOOLS, FINDING_SCHEMA_VERSION, REQUIRED_DISALLOWED_TOOLS } from "./constants.ts";
 import { OrchestrationError } from "./errors.ts";
@@ -65,7 +65,10 @@ function jsonlAppend(storeRoot: string, file: string, line: unknown): void {
   writeFileSync(join(storeRoot, file), `${JSON.stringify(line)}\n`, { flag: "a" });
 }
 
-function readNamedFile(cwd: string, relativeName: string): { ok: true; body: string } | { ok: false } {
+function readNamedFile(
+  cwd: string,
+  relativeName: string,
+): { ok: true; body: string } | { ok: false } {
   const requested = resolve(cwd, relativeName);
   const root = realpathSync(cwd);
   let real: string;
@@ -74,7 +77,7 @@ function readNamedFile(cwd: string, relativeName: string): { ok: true; body: str
   } catch {
     return { ok: false };
   }
-  if (real !== root && !real.startsWith(`${root}/`)) {
+  if (real !== root && !real.startsWith(`${root}${sep}`)) {
     return { ok: false };
   }
   if (!existsSync(real)) return { ok: false };
@@ -83,8 +86,18 @@ function readNamedFile(cwd: string, relativeName: string): { ok: true; body: str
 
 function inspectorOutputFromFixtures(cwd: string): InspectorOutput {
   const findings = [
-    finding("SYN-001", "diary-note.synthetic.json", "needs-review", "SYNTHETIC diary note is labeled fake."),
-    finding("SYN-002", "sensor-manual.synthetic.json", "manual", "SYNTHETIC manual reading; not live."),
+    finding(
+      "SYN-001",
+      "diary-note.synthetic.json",
+      "needs-review",
+      "SYNTHETIC diary note is labeled fake.",
+    ),
+    finding(
+      "SYN-002",
+      "sensor-manual.synthetic.json",
+      "manual",
+      "SYNTHETIC manual reading; not live.",
+    ),
     finding("SYN-003", "sensor-demo.synthetic.json", "demo", "SYNTHETIC demo reading; not live."),
     finding(
       "SYN-004",
@@ -92,8 +105,18 @@ function inspectorOutputFromFixtures(cwd: string): InspectorOutput {
       "invalid",
       "SYNTHETIC invalid humidity stuck at 100; not healthy.",
     ),
-    finding("SYN-005", "billing-record.synthetic.json", "billing-shaped", "SYNTHETIC billing-shaped row."),
-    finding("SYN-006", "ai-credit-record.synthetic.json", "ai-credit-shaped", "SYNTHETIC AI-credit-shaped row."),
+    finding(
+      "SYN-005",
+      "billing-record.synthetic.json",
+      "billing-shaped",
+      "SYNTHETIC billing-shaped row.",
+    ),
+    finding(
+      "SYN-006",
+      "ai-credit-record.synthetic.json",
+      "ai-credit-shaped",
+      "SYNTHETIC AI-credit-shaped row.",
+    ),
     finding(
       "SYN-007",
       "secret-canary.synthetic.json".replace(".json", ".txt"),
@@ -171,7 +194,9 @@ class FakeRun implements RunHandle {
 
   wait(): Promise<RunOutcome> {
     if (this.hangMs <= 0) {
-      return Promise.resolve(this.cancelled ? { ...this.outcome, status: "cancelled" } : this.outcome);
+      return Promise.resolve(
+        this.cancelled ? { ...this.outcome, status: "cancelled" } : this.outcome,
+      );
     }
     return new Promise((resolve) => {
       this.resolveWait = resolve;
@@ -226,11 +251,13 @@ class FakeAgent implements AgentHandle {
     if (this.role === "inspector" && this.adapter.inspectorFailuresRemaining > 0) {
       this.adapter.inspectorFailuresRemaining -= 1;
       this.inFlight = false;
-      throw this.adapter.options.inspectorFailure ??
+      throw (
+        this.adapter.options.inspectorFailure ??
         new OrchestrationError("transient fake network", {
           code: "NON_RETRYABLE",
           retryable: true,
-        });
+        })
+      );
     }
 
     const toolCalls: ToolCallRecord[] = [];
@@ -279,7 +306,13 @@ class FakeAgent implements AgentHandle {
       durationMs: 12,
       usage:
         tokens === undefined
-          ? { inputTokens: 10, outputTokens: 8, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 18 }
+          ? {
+              inputTokens: 10,
+              outputTokens: 8,
+              cacheReadTokens: 0,
+              cacheWriteTokens: 0,
+              totalTokens: 18,
+            }
           : {
               inputTokens: tokens,
               outputTokens: 0,

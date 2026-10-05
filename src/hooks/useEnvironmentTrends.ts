@@ -62,24 +62,50 @@ export function useEnvironmentTrends(
         try {
           // Keep the current window first, then the established historical
           // fallback only after a successfully completed empty window read.
-          for (const limit of [500, 60]) {
-            let readingsQuery = effectiveSensorReadingsQuery()
+          let query500 = effectiveSensorReadingsQuery()
+            .select("*")
+            .in("tent_id", tentIds)
+            .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"])
+            .or(`captured_at.gte.${since},and(captured_at.is.null,ts.gte.${since})`)
+            .order("captured_at", { ascending: false, nullsFirst: false })
+            .order("ts", { ascending: false })
+            .limit(500);
+
+          const { data, error } = await query500;
+
+          if (error) throw error;
+
+          const readings = requireEffectiveSensorReadings(data);
+          const samples = samplesFromReadings(
+            readings.map((r) => ({
+              ts: r.ts,
+              captured_at: r.captured_at,
+              metric: r.metric,
+              value: r.value,
+              source: r.source,
+              tent_id: r.tent_id,
+              raw_payload: r.raw_payload,
+            })),
+          );
+          if (samples.length > 0) {
+             return computeEnvironmentTrends(selectWindow(samples));
+          }
+
+          if (readings.length === 0) {
+            let query60 = effectiveSensorReadingsQuery()
               .select("*")
               .in("tent_id", tentIds)
-              .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"]);
-            if (limit === 500) {
-              readingsQuery = readingsQuery.or(
-                `captured_at.gte.${since},and(captured_at.is.null,ts.gte.${since})`,
-              );
-            }
-            const { data, error } = await readingsQuery
+              .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"])
               .order("captured_at", { ascending: false, nullsFirst: false })
               .order("ts", { ascending: false })
-              .limit(limit);
-            if (error) throw error;
-            const readings = requireEffectiveSensorReadings(data);
-            const samples = samplesFromReadings(
-              readings.map((r) => ({
+              .limit(60);
+
+            const { data: data60, error: error60 } = await query60;
+            if (error60) throw error60;
+
+            const readings60 = requireEffectiveSensorReadings(data60);
+            const samples60 = samplesFromReadings(
+              readings60.map((r) => ({
                 ts: r.ts,
                 captured_at: r.captured_at,
                 metric: r.metric,
@@ -89,9 +115,9 @@ export function useEnvironmentTrends(
                 raw_payload: r.raw_payload,
               })),
             );
-            if (samples.length > 0) return computeEnvironmentTrends(selectWindow(samples));
-            if (readings.length > 0) break;
+            if (samples60.length > 0) return computeEnvironmentTrends(selectWindow(samples60));
           }
+
         } catch {
           sensorReadFailed = true;
         }

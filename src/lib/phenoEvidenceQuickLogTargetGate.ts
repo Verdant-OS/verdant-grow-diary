@@ -18,13 +18,11 @@
  * blocked). It never invents an active grow, never falls back to another
  * tent, and never assigns a tent.
  *
- * Tentless candidates are deliberately NOT decided here. Whether a tentless
- * plant may save an observation is owned by Quick Log's own tent gating
- * (`quickLogTentRequirementRules`, #1824: "observation" is tent-optional for
- * in-grow plants). The gate
- * passes the exact stored plant + grow with `tentId: null`, and Quick Log's
- * gating decides, so this surface follows that decision instead of competing
- * with it.
+ * Tentless candidates get an Assign tent step before this evidence handoff
+ * (#1005 owner decision, issuecomment-5998044976). Ordinary Quick Log's
+ * tent-optional observation rule (#1824) remains unchanged; this gate blocks
+ * the Pheno evidence entry point until the live plant row has a valid tent.
+ * Assignment stays in the existing Plant Detail flow, chosen by the grower.
  *
  * Pure. No React, no I/O, no clock, no randomness.
  */
@@ -103,6 +101,7 @@ export type PhenoEvidenceQuickLogTargetKind =
   | "catalog_error"
   | "plant_unavailable"
   | "needs_assignment"
+  | "needs_tent_assignment"
   | "grow_unavailable"
   | "tent_unavailable"
   | "mismatch";
@@ -112,7 +111,7 @@ export type PhenoEvidenceQuickLogTarget =
       kind: "ready";
       plantId: string;
       growId: string;
-      /** null = tentless; Quick Log's own tent gating decides (see header). */
+      /** The validated tent from the live plant catalog. */
       tentId: string | null;
     }>
   | Readonly<{ kind: Exclude<PhenoEvidenceQuickLogTargetKind, "ready"> }>;
@@ -123,6 +122,7 @@ export const PHENO_EVIDENCE_TARGET_COPY = {
   catalog_error: "Couldn't confirm this plant's grow and tent right now.",
   plant_unavailable: "This plant is no longer available, so evidence can't be recorded here.",
   needs_assignment: "Assign this plant to a grow before recording evidence.",
+  needs_tent_assignment: "Assign this plant to a tent before recording evidence.",
   grow_unavailable: "This plant's grow is archived or no longer available.",
   tent_unavailable: "This plant's tent is archived or no longer available.",
   mismatch: "This plant's tent belongs to a different grow. Review the plant before recording.",
@@ -130,6 +130,7 @@ export const PHENO_EVIDENCE_TARGET_COPY = {
 
 export const PHENO_EVIDENCE_TARGET_RETRY_LABEL = "Retry" as const;
 export const PHENO_EVIDENCE_TARGET_REVIEW_PLANT_LABEL = "Review plant" as const;
+export const PHENO_EVIDENCE_TARGET_ASSIGN_TENT_LABEL = "Assign tent" as const;
 
 /** Blocked states whose repair is on the plant itself (link to Plant Detail). */
 export function phenoEvidenceTargetNeedsPlantRepair(
@@ -137,6 +138,7 @@ export function phenoEvidenceTargetNeedsPlantRepair(
 ): boolean {
   return (
     kind === "needs_assignment" ||
+    kind === "needs_tent_assignment" ||
     kind === "grow_unavailable" ||
     kind === "tent_unavailable" ||
     kind === "mismatch"
@@ -158,8 +160,9 @@ function kindForBlockReason(
     case "plant_inactive":
       return "plant_unavailable";
     case "plant_grow_unassigned":
-    case "plant_tent_unassigned":
       return "needs_assignment";
+    case "plant_tent_unassigned":
+      return "needs_tent_assignment";
     case "tent_not_found":
     case "tent_inactive":
       return "tent_unavailable";
@@ -213,8 +216,8 @@ export function resolvePhenoEvidenceQuickLogTarget(input: {
   if (catalog.status === "error") return { kind: "catalog_error" };
 
   const tentId = cleanId(row.tent_id);
-  // Tentless: exact stored plant + grow, tent decided by Quick Log (header).
-  if (!tentId) return { kind: "ready", plantId, growId, tentId: null };
+  // Require the owner's Assign tent step before the Pheno evidence handoff.
+  if (!tentId) return { kind: "needs_tent_assignment" };
 
   const resolution = resolveQuickLogPrefillTarget({
     prefill: { plantId, growId, tentId },

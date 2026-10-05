@@ -3,8 +3,8 @@
  *
  * The handoff targets the candidate plant's OWN stored grow/tent, resolved
  * through the canonical Quick Log target rules against the tent catalog.
- * Tentless candidates pass through with tentId null so Quick Log's own tent
- * gating decides (`quickLogTentRequirementRules`, #1824, owns that rule).
+ * Tentless candidates get an Assign tent step before the evidence handoff
+ * (#1005 owner decision); ordinary Quick Log tent requirements stay separate.
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -87,13 +87,10 @@ describe("resolvePhenoEvidenceQuickLogTarget", () => {
     ).toEqual({ kind: "ready", plantId: "p1", growId: "g1", tentId: "t1" });
   });
 
-  it("tentless plant in a grow → exact plant + grow, tent deferred to Quick Log (null)", () => {
-    expect(resolve({ grows: ACTIVE_GROWS, plant: plant("g1", null), catalog: READY })).toEqual({
-      kind: "ready",
-      plantId: "p1",
-      growId: "g1",
-      tentId: null,
-    });
+  it.each([null, "", "  "])("tentless plant (%s) needs Assign tent before evidence", (tentId) => {
+    const input = { grows: ACTIVE_GROWS, plant: plant("g1", tentId), catalog: READY };
+    expect(resolve(input)).toEqual({ kind: "needs_tent_assignment" });
+    expect(resolve(input)).toEqual(resolve(input));
   });
 
   it("tentless plant still waits for the tent catalog, as Quick Log does (Codex on #1825)", () => {
@@ -223,6 +220,7 @@ describe("blocked-state copy and repair paths", () => {
       catalog_error: "Couldn't confirm this plant's grow and tent right now.",
       plant_unavailable: "This plant is no longer available, so evidence can't be recorded here.",
       needs_assignment: "Assign this plant to a grow before recording evidence.",
+      needs_tent_assignment: "Assign this plant to a tent before recording evidence.",
       grow_unavailable: "This plant's grow is archived or no longer available.",
       tent_unavailable: "This plant's tent is archived or no longer available.",
       mismatch: "This plant's tent belongs to a different grow. Review the plant before recording.",
@@ -231,6 +229,7 @@ describe("blocked-state copy and repair paths", () => {
 
   it("only plant-fixable states offer the Plant Detail repair path", () => {
     expect(phenoEvidenceTargetNeedsPlantRepair("needs_assignment")).toBe(true);
+    expect(phenoEvidenceTargetNeedsPlantRepair("needs_tent_assignment")).toBe(true);
     expect(phenoEvidenceTargetNeedsPlantRepair("tent_unavailable")).toBe(true);
     expect(phenoEvidenceTargetNeedsPlantRepair("mismatch")).toBe(true);
     expect(phenoEvidenceTargetNeedsPlantRepair("pending")).toBe(false);

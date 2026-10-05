@@ -19,6 +19,7 @@ import {
   PHENO_EVIDENCE_TARGET_COPY,
   PHENO_EVIDENCE_TARGET_RETRY_LABEL,
   PHENO_EVIDENCE_TARGET_REVIEW_PLANT_LABEL,
+  PHENO_EVIDENCE_TARGET_ASSIGN_TENT_LABEL,
   phenoEvidenceTargetNeedsPlantRepair,
   type PhenoEvidenceQuickLogTarget,
 } from "@/lib/phenoEvidenceQuickLogTargetGate";
@@ -157,9 +158,11 @@ export default function PhenoCandidateEvidenceCoverage({
             <Link
               to={plantDetailPath(packet.plantId)}
               data-testid={`${testId}-target-review`}
-              className="ml-1 font-medium text-primary underline-offset-2 hover:underline"
+              className="ml-1 font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {PHENO_EVIDENCE_TARGET_REVIEW_PLANT_LABEL}
+              {target.kind === "needs_tent_assignment"
+                ? PHENO_EVIDENCE_TARGET_ASSIGN_TENT_LABEL
+                : PHENO_EVIDENCE_TARGET_REVIEW_PLANT_LABEL}
             </Link>
           ) : null}
         </p>

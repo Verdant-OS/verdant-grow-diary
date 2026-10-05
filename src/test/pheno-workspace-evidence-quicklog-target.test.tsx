@@ -224,14 +224,46 @@ describe("workspace evidence → Quick Log target (#1005)", () => {
     });
   });
 
-  it("a tentless candidate passes its own grow with tent null, deferring to Quick Log", () => {
+  it("a tentless candidate gets Assign tent before any evidence prefill", () => {
     renderWorkspace(candidate("g-a", null));
+    expect(screen.queryByRole("button", { name: /Record .* evidence/ })).toBeNull();
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "needs_tent_assignment",
+    );
+    const assign = screen.getByRole("link", { name: "Assign tent" });
+    expect(assign).toHaveAttribute("href", `/plants/${PLANT}`);
+    fireEvent.click(assign);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("a live tent removal blocks a stale tented candidate; assignment restores exact targeting", () => {
+    plantsState.current = {
+      data: [{ id: PLANT, grow_id: "g-a", tent_id: null }],
+      isError: false,
+    };
+    renderWorkspace(candidate("g-a", "t-a"));
+    expect(screen.getByRole("link", { name: "Assign tent" })).toHaveAttribute(
+      "href",
+      `/plants/${PLANT}`,
+    );
+    expect(screen.queryByRole("button", { name: /Record .* evidence/ })).toBeNull();
+    expect(listener).not.toHaveBeenCalled();
+    cleanup();
+
+    plantsState.current = {
+      data: [{ id: PLANT, grow_id: "g-hunt", tent_id: "t-hunt" }],
+      isError: false,
+    };
+    renderWorkspace(candidate("g-a", null));
+    expect(screen.queryByRole("link", { name: "Assign tent" })).toBeNull();
     fireEvent.click(screen.getByTestId(`${COVERAGE}-record-aroma`));
+    expect(listener).toHaveBeenCalledTimes(1);
     expect((listener.mock.calls[0][0] as CustomEvent).detail).toMatchObject({
       plantId: PLANT,
-      growId: "g-a",
-      tentId: null,
-      suggestSnapshot: false,
+      growId: "g-hunt",
+      tentId: "t-hunt",
+      phenoEvidenceGoal: "aroma",
     });
   });
 

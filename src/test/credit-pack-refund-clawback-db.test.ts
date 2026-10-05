@@ -6,6 +6,9 @@
  * disabled and a scrubbed child environment. No hosted DB or credentials.
  * Replays the committed event, founder and grant-ledger migrations unchanged.
  * This tests verified-event orchestration, not signature transport or PostgREST.
+ * The negative-balance case also replays the ai-credit spend chain (through
+ * 20260728090736) so the real `ai_credit_spend` decides after a clawback; only
+ * `grows` and `has_role` are minimal stand-ins.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -22,6 +25,8 @@ import { insertPaddleEventLog } from "../../supabase/functions/payments-webhook/
 
 const OWNER = "00000000-0000-4000-8000-00000000c101";
 const TX = "txn_credit_pack_clawback_fixture";
+const GROW_A = "00000000-0000-4000-8000-0000000a0001";
+const GROW_B = "00000000-0000-4000-8000-0000000a0002";
 const REFUND_AT = new Date("2026-10-03T20:00:00.000Z");
 const PURCHASE_AT = new Date("2026-10-03T20:01:00.000Z");
 const childEnv = { PATH: process.env.PATH, LC_ALL: "C" };
@@ -37,6 +42,17 @@ const migrations = [
   "20260721103000_ai_credit_grants.sql",
   "20260721105000_ai_credit_grants_non_paddle_grants.sql",
   "20261003010000_credit_pack_refund_clawback.sql",
+  // ai_credit_spend chain, so pack-funded spends exist before the refund.
+  "20260605230401_45a4c0c5-1c7f-4d79-8490-d2649114ed83.sql",
+  "20260620231000_harden_ai_credit_effective_entitlement.sql",
+  "20260710010000_ai_credit_spend_union_hardening.sql",
+  "20260718160000_ai_credit_server_billing_environment_expand.sql",
+  "20260719043000_ai_credit_result_cache.sql",
+  "20260719180000_ai_doctor_review_evidence_receipts.sql",
+  "20260720093000_ai_credit_grow_scope_integrity.sql",
+  "20260721104000_ai_credit_spend_pack_overflow.sql",
+  "20260727050000_ai_credit_service_contract_forward_reassert.sql",
+  "20260728090736_ai_credit_pack_portability.sql",
 ].sort();
 let workdir = "";
 let dataDir = "";
@@ -133,6 +149,13 @@ beforeAll(() => {
     GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
     GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
     INSERT INTO auth.users VALUES ('${OWNER}');
+    CREATE TABLE public.grows (id uuid PRIMARY KEY, user_id uuid NOT NULL);
+    CREATE TYPE public.app_role AS ENUM ('admin', 'staff', 'user');
+    CREATE TABLE public.user_roles (user_id uuid NOT NULL, role public.app_role NOT NULL);
+    CREATE FUNCTION public.has_role(_user_id uuid, _role public.app_role) RETURNS boolean
+      LANGUAGE sql STABLE AS
+      $$ SELECT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = _user_id AND role = _role) $$;
+    INSERT INTO public.grows VALUES ('${GROW_A}', '${OWNER}'), ('${GROW_B}', '${OWNER}');
   `);
   for (const file of migrations) sql(readFileSync(resolve("supabase/migrations", file), "utf8"));
 }, 60_000);
@@ -149,7 +172,8 @@ afterAll(() => {
 
 beforeEach(() =>
   sql(
-    "TRUNCATE public.lovable_paddle_events, public.founders, public.subscriptions, public.ai_credit_grants;",
+    "TRUNCATE public.lovable_paddle_events, public.founders, public.subscriptions, " +
+      "public.ai_credit_spends, public.ai_credit_grants CASCADE;",
   ),
 );
 
@@ -426,6 +450,44 @@ describe("credit-pack refund clawback — real orchestrator and PostgreSQL", () 
     expect(balance()).toBe(0);
   });
 
+  it("a refund after pack credits were spent leaves a negative pack balance that denies further pack spends", async () => {
+    await deliver(packPurchase());
+    expect(balance()).toBe(50);
+    // Free plan: 3 included credits per grow, spent first.
+    for (let i = 1; i <= 3; i += 1) {
+      expect(spend(GROW_A, "standard", `allowance-key-${i}`)).toMatchObject({
+        ok: true,
+        funded_by: "allowance",
+      });
+    }
+    // Six escalated spends at weight 5 draw 30 credits from the pack.
+    for (let i = 1; i <= 6; i += 1) {
+      expect(spend(GROW_A, "escalated", `pack-key-${i}`)).toMatchObject({
+        ok: true,
+        funded_by: "pack",
+        pack_balance: 50 - 5 * i,
+      });
+    }
+
+    await deliver(refund());
+
+    // The grant is fully reversed even though 30 credits were already used.
+    expect(balance()).toBe(0);
+    expect(packBalance()).toBe(-30);
+    // Allowance exhausted on this grow: the negative pack pool denies, reported as 0.
+    expect(spend(GROW_A, "standard", "after-refund-key-1")).toMatchObject({
+      ok: false,
+      status: "denied",
+      reason: "limit_reached",
+      pack_balance: 0,
+    });
+    // A spend still inside an included allowance is unaffected.
+    expect(spend(GROW_B, "standard", "after-refund-key-2")).toMatchObject({
+      ok: true,
+      funded_by: "allowance",
+    });
+  });
+
   it("only service_role can execute the clawback", () => {
     for (const role of ["anon", "authenticated"]) {
       const result = rawSql(
@@ -456,5 +518,32 @@ function eventStatus(id: string) {
     "SELECT processing_status || '|' || processed_ok || '|' || coalesce(skip_reason, '') " +
       "FROM public.lovable_paddle_events WHERE paddle_event_id = " +
       literal(id),
+  );
+}
+
+function spend(growId: string, tier: "standard" | "escalated", key: string) {
+  return JSON.parse(
+    serviceSql(
+      "SELECT public.ai_credit_spend(" +
+        [OWNER, "live", "ai_coach", growId, tier, key].map(literal).join(",") +
+        ", NULL);",
+    ),
+  );
+}
+
+/** Grant ledger minus pack-funded spend weight: the derived pool ai_credit_spend reads. */
+function packBalance(env = "live") {
+  return Number(
+    sql(
+      "SELECT (SELECT coalesce(sum(credits), 0) FROM public.ai_credit_grants " +
+        "WHERE user_id = '" +
+        OWNER +
+        "' AND environment = " +
+        literal(env) +
+        ") - (SELECT coalesce(sum(weight), 0) FROM public.ai_credit_spends " +
+        "WHERE user_id = '" +
+        OWNER +
+        "' AND meta ->> 'funded_by' = 'pack');",
+    ),
   );
 }

@@ -37,14 +37,15 @@ export function useIngestInspectorReadings(): UseQueryResult<InspectorQueryResul
       const tentIds = Array.from(
         new Set(rows.map((r) => r.tent_id).filter((v): v is string => !!v)),
       );
-      const tentNames: Record<string, string> = {};
+      let tentNames: Record<string, string> = {};
       if (tentIds.length > 0) {
         const { data: tents } = await supabase.from("tents").select("id, name").in("id", tentIds);
-        for (const t of tents ?? []) {
+        tentNames = (tents ?? []).reduce<Record<string, string>>((acc, t) => {
           if (t && typeof t.id === "string" && typeof t.name === "string") {
-            tentNames[t.id] = t.name;
+            acc[t.id] = t.name;
           }
-        }
+          return acc;
+        }, {});
       }
       return { rows, tentNames };
     },

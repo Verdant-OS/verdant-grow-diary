@@ -5,6 +5,8 @@ import { describe, it, expect } from "vitest";
 import {
   computePhenoHuntOnboardingViewModel,
   defaultEvidenceGoalSelection,
+  isPhenoOnboardingStepLocked,
+  resolvePhenoOnboardingResumeStep,
   PHENO_GOALS_REVIEW_REQUIRED_REASON,
   PHENO_ONBOARDING_STEP_ORDER,
   type PhenoOnboardingDraft,
@@ -273,5 +275,31 @@ describe("computePhenoHuntOnboardingViewModel", () => {
       }),
     );
     expect(full.checklist.find((c) => c.id === "replication_readiness")!.status).toBe("pending");
+  });
+});
+
+describe("resume step follows the lock rule (#1840 review P2)", () => {
+  it("reopens a locked confirmation draft on Goals", () => {
+    expect(resolvePhenoOnboardingResumeStep("confirmation", false)).toBe("goals");
+    expect(resolvePhenoOnboardingResumeStep("confirmation", undefined)).toBe("goals");
+  });
+
+  it("keeps the saved step once goals were reviewed, and for every unlocked step", () => {
+    expect(resolvePhenoOnboardingResumeStep("confirmation", true)).toBe("confirmation");
+    for (const step of PHENO_ONBOARDING_STEP_ORDER.filter((s) => s !== "confirmation")) {
+      expect(resolvePhenoOnboardingResumeStep(step, false)).toBe(step);
+    }
+  });
+
+  it("agrees with the stepper's locked flag for every step", () => {
+    for (const goalsReviewed of [true, false]) {
+      const vm = computePhenoHuntOnboardingViewModel(draft({ goalsReviewed }));
+      for (const step of vm.steps) {
+        expect(step.locked === true).toBe(isPhenoOnboardingStepLocked(step.id, goalsReviewed));
+        expect(resolvePhenoOnboardingResumeStep(step.id, goalsReviewed) !== step.id).toBe(
+          step.locked === true,
+        );
+      }
+    }
   });
 });

@@ -24,6 +24,7 @@ import {
   PHENO_ONBOARDING_STEP_ORDER,
   computePhenoHuntOnboardingViewModel,
   defaultEvidenceGoalSelection,
+  resolvePhenoOnboardingResumeStep,
   type PhenoOnboardingStepId,
 } from "@/lib/phenoHuntOnboardingViewModel";
 import type { PhenoEvidenceGoalId } from "@/lib/phenoEvidenceGoals";
@@ -156,9 +157,7 @@ export default function PhenoHuntNew() {
     if (draft.evidenceGoals.length > 0) setEvidenceGoals(draft.evidenceGoals);
     setGoalsReviewed(draft.goalsReviewed);
     // A draft saved on a locked confirmation step reopens on Goals instead.
-    setCurrentStep(
-      draft.currentStep === "confirmation" && !draft.goalsReviewed ? "goals" : draft.currentStep,
-    );
+    setCurrentStep(resolvePhenoOnboardingResumeStep(draft.currentStep, draft.goalsReviewed));
     setDraftRestored(true);
   }, [draftKey]);
 

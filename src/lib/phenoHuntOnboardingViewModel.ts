@@ -30,6 +30,26 @@ export const PHENO_ONBOARDING_STEP_ORDER: ReadonlyArray<PhenoOnboardingStepId> =
   "confirmation",
 ];
 
+/**
+ * The one lock rule (#573): Confirmation stays locked until the grower has
+ * reviewed the Evidence goals step. The stepper's `locked` flag and the
+ * resume step both read this, so they cannot drift apart.
+ */
+export function isPhenoOnboardingStepLocked(
+  step: PhenoOnboardingStepId,
+  goalsReviewed: boolean | undefined,
+): boolean {
+  return step === "confirmation" && goalsReviewed !== true;
+}
+
+/** Where a restored draft reopens: a locked step reopens on Goals instead. */
+export function resolvePhenoOnboardingResumeStep(
+  step: PhenoOnboardingStepId,
+  goalsReviewed: boolean | undefined,
+): PhenoOnboardingStepId {
+  return isPhenoOnboardingStepLocked(step, goalsReviewed) ? "goals" : step;
+}
+
 export type PhenoCandidateCountStatus = "none" | "tracking_only" | "comparison_eligible";
 
 export type PhenoChecklistItemStatus = "ok" | "missing" | "pending";
@@ -200,7 +220,7 @@ export function computePhenoHuntOnboardingViewModel(
         growOk &&
         candidateCount >= 1 &&
         goalsOk,
-      locked: !goalsReviewed,
+      locked: isPhenoOnboardingStepLocked("confirmation", goalsReviewed),
       reason: !goalsReviewed
         ? PHENO_GOALS_REVIEW_REQUIRED_REASON
         : draft.setupCompleted

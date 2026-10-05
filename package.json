@@ -137,6 +137,7 @@
     "test:customer-mode-db-security": "node scripts/security/run-customer-mode-db-security.mjs",
     "test:subscriber-interest-db-security": "bun run scripts/run-subscriber-interest-rls-harness.ts",
     "test:public-support-forms-db-security": "bun run scripts/run-support-forms-rls-harness.ts --confirm-local-security-lane",
+    "test:subscriptions-founders-write-denial": "bun run scripts/run-subscriptions-founders-write-denial-harness.ts --confirm-local-security-lane",
     "test:security-advisor-hardening-followup-db-security": "bun run scripts/run-security-advisor-hardening-followup-db-security.ts --confirm-local-security-lane",
     "test:pgmq-email-wrapper-grants-db-security": "bun run scripts/run-pgmq-email-wrapper-grants-db-security.ts --confirm-local-security-lane",
     "test:quicklog-private-helper-grants-db-security": "bun run scripts/run-quicklog-private-helper-grants-db-security.ts --confirm-local-security-lane",

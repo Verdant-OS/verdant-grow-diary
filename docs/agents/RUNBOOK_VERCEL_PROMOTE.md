@@ -158,31 +158,85 @@ Force Promote to bypass an unresolved publish or security gate. See
 
 ## Rollback — Matthew only
 
-If the release must be reversed, Matthew selects the packet's known-good production
-artifact. **Immediately before** rolling back, he rereads the following and records
-a UTC time for each read:
+If the release must be reversed, Matthew selects a known-good production artifact,
+the packet's item 5 when a packet exists, then works through three steps. He records
+a UTC time for every read.
 
-- the rollback target deployment's project, `target: production`, `READY` state,
-  `source: git` and `meta.githubCommitSha`, which must still match the packet's
-  known-good SHA;
-- the rolling-release record and configuration (`get_rolling_release` and
-  `get_rolling_release_config`);
-- the production-host inventory from packet item 1, re-enumerated: the M2 apex
-  holder, the production domains bound to the project, the aliases
-  (`list_promote_aliases`) and each custom hostname's DNS, which must still equal
-  the packet's inventory;
-- each hostname's current serving deployment, for every hostname in that
-  re-enumerated inventory.
+1. **Resolve any active rollout first.** If a rollout is active, including the one
+   being reversed, he aborts it (an owner control, see Rolling Releases above) and
+   waits until the rolling-release record shows no active rollout. A rollout that is
+   still advancing changes its own record from minute to minute, so no rollback is
+   decided against it. The abort is itself a publish action: record it as the
+   publish-action list under Verify below requires.
+2. **Record the rollback decision.** With no rollout active, he records the state he
+   is deciding to reverse. This record, not the pre-promote packet, is the baseline
+   for step 3, because a promote is expected to change the rolling-release record,
+   the aliases and the serving deployments.
+   - the rollback target deployment's project, `target: production`, `READY` state,
+     `source: git` and `meta.githubCommitSha`;
+   - the rolling-release record and configuration (`get_rolling_release` and
+     `get_rolling_release_config`): state, substate, current and canary deployments,
+     canary percentage, stage, queued deployment, `startedAt`, `updatedAt`,
+     configured stages and advancement type;
+   - the production-host inventory, re-enumerated: the M2 apex holder, the production
+     domains bound to the project, the aliases (`list_promote_aliases`) and each
+     custom hostname's DNS;
+   - each hostname's current serving deployment, for every hostname in that
+     re-enumerated inventory.
 
-If a rollout started, or the inventory or routing changed, after the packet was
-prepared, he stops and resolves it before any rollback. He then runs:
+   A read that cannot be completed is recorded as `BLOCKED`, not as a value. Only
+   production-host inventory reads (apex holder, bound domains, aliases and DNS) and
+   per-hostname serving-deployment reads may be accepted as blocked by Matthew. For
+   each accepted read, he records the exact item or hostname, the UTC time, the
+   failure reason and his explicit decision to proceed without it. That recorded
+   list is the only exclusion from the step 3 comparison and is carried into Verify
+   as `BLOCKED`; an excluded read never counts as a match or establishes complete
+   hostname coverage. The rolling-release record and configuration and the rollback
+   target's metadata can never be waived. If any of those critical reads is
+   `BLOCKED`, or any other blocker is not explicitly accepted, no rollback is run.
+
+   Then one of four outcomes applies:
+   - **Back to step 1.** The record shows an active rollout. No rollback is decided
+     while a rollout is advancing.
+   - **Reselect the artifact.** There is no packet item 5 (a release promoted
+     automatically has no packet), or the rollback target's `meta.githubCommitSha`
+     differs from the known-good SHA it was selected for, or the target is not
+     `READY`, production-target and Git-sourced. He selects a known-good artifact himself (an
+     owner control, see Rolling Releases above) that is `READY`, production-target and
+     Git-sourced in this project, records why, and records step 2 again for it. A
+     missing or stale packet never blocks a rollback by itself. A hostname listed in
+     packet item 1 that is missing from the re-enumerated inventory is recorded and
+     carried into Verify; it does not block the rollback either.
+   - **Nothing to roll back.** Every hostname in the re-enumerated inventory already
+     serves the rollback target deployment at the known-good SHA, as an abort in
+     step 1 can leave it. He records that no rollback was run and goes to Verify.
+   - **Continue** to step 3 otherwise.
+
+3. **Reread immediately before the command.** He reads every item in step 2 again.
+   Only reads on the accepted-blocker list recorded in step 2 are excluded from the
+   comparison and remain `BLOCKED` in Verify. If an excluded read now succeeds, he
+   records a new step 2 baseline before continuing; it cannot match a prior
+   `BLOCKED`. If any non-excluded read cannot be completed, he stops and records the
+   blocker; step 3 grants no new waiver. If any compared value differs from the
+   step 2 record, he stops and returns to step 1. That covers a rollout that started,
+   advanced a stage, completed (a forced complete
+   included) or was aborted after step 2, any rolling-release configuration change,
+   and any inventory or routing change. Each of these changes what production serves
+   ([release topology specification](../specs/release-topology-specification.md),
+   D-RT-13), so a rollback decided against the earlier state is stale. If a second
+   reread in the same rollback also differs, he does not start a third attempt: he
+   records a blocker naming what changed between reads, and identifies what is
+   changing production (an automatic advance, a new Git deployment or another actor)
+   before trying again. Only when every non-excluded read, including all critical
+   reads, matches the step 2 record does he run:
 
 ```sh
 vercel rollback <deployment-url> --scope verdantgrowdiary
 ```
 
-Here `<deployment-url>` is the rollback artifact, not the failed target. Rollback
-changes routing without rebuilding. It does not reverse a database migration or
+Here `<deployment-url>` is the rollback artifact, not the failed target. The
+rollback is a publish action, recorded like the abort. Rollback changes routing
+without rebuilding. It does not reverse a database migration or
 an Edge deployment. Do not assume rollback paused automatic production domain
 assignment: the observed pause after an earlier rollback does not establish its
 cause or the current project setting. Matthew checks and records the production

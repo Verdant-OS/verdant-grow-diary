@@ -7,7 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase as defaultClient } from "@/integrations/supabase/client";
 import { sanitizeBreedingObjectiveTargets } from "@/lib/phenoBreedingObjectiveRules";
-import { normalizePhenoHuntName } from "@/lib/phenoHuntRenameRules";
+import { PHENO_HUNT_NAME_MAX_LENGTH, normalizePhenoHuntName } from "@/lib/phenoHuntRenameRules";
 
 export interface CreatePhenoHuntInput {
   growId: string;
@@ -405,6 +405,11 @@ export async function updatePhenoHuntSetup(
   if (input.name !== undefined) {
     const name = normalizePhenoHuntName(input.name);
     if (!name) throw new PhenoHuntError("Hunt name is required.");
+    if (name.length > PHENO_HUNT_NAME_MAX_LENGTH) {
+      throw new PhenoHuntError(
+        `Hunt name must be ${PHENO_HUNT_NAME_MAX_LENGTH} characters or fewer.`,
+      );
+    }
     patch.name = name;
   }
   if (Object.keys(patch).length === 0) return;

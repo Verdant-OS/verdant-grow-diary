@@ -4,7 +4,11 @@
  * repaired in-app. Pure validation for the rename control.
  */
 import { describe, it, expect } from "vitest";
-import { PHENO_HUNT_NAME_MAX_LENGTH, validatePhenoHuntRename } from "@/lib/phenoHuntRenameRules";
+import {
+  PHENO_HUNT_NAME_MAX_LENGTH,
+  huntScopedOverrideValue,
+  validatePhenoHuntRename,
+} from "@/lib/phenoHuntRenameRules";
 
 describe("validatePhenoHuntRename", () => {
   it("accepts a new name and trims it", () => {
@@ -41,5 +45,15 @@ describe("validatePhenoHuntRename", () => {
   });
   it("is deterministic", () => {
     expect(validatePhenoHuntRename("A", "B")).toEqual(validatePhenoHuntRename("A", "B"));
+  });
+});
+
+describe("huntScopedOverrideValue (#551 review P2)", () => {
+  it("applies an optimistic value only to the hunt it was saved on", () => {
+    const override = { huntId: "hunt-a", value: "Renamed A" };
+    expect(huntScopedOverrideValue(override, "hunt-a")).toBe("Renamed A");
+    expect(huntScopedOverrideValue(override, "hunt-b")).toBeNull();
+    expect(huntScopedOverrideValue(override, null)).toBeNull();
+    expect(huntScopedOverrideValue(null, "hunt-a")).toBeNull();
   });
 });

@@ -41,6 +41,24 @@ export function validatePhenoHuntRename(
   return { ok: true, name };
 }
 
+/**
+ * An optimistic value saved for ONE hunt. The workspace route isn't keyed by
+ * hunt id, so the same page instance can move to another hunt; an override is
+ * only honoured for the hunt it was saved on (#551 review P2).
+ */
+export interface HuntScopedOverride<T> {
+  readonly huntId: string;
+  readonly value: T;
+}
+
+export function huntScopedOverrideValue<T>(
+  override: HuntScopedOverride<T> | null,
+  huntId: string | null | undefined,
+): T | null {
+  if (!override || !huntId || override.huntId !== huntId) return null;
+  return override.value;
+}
+
 export function phenoHuntRenameHint(result: PhenoHuntRenameResult): string {
   if (result.ok) return "";
   if (result.reason === "empty") return PHENO_HUNT_RENAME_COPY.empty;

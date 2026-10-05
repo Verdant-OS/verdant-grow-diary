@@ -73,6 +73,7 @@ import PhenoCompareCandidatesAction from "@/components/PhenoCompareCandidatesAct
 import { buildPhenoComparisonActionState } from "@/lib/phenoComparisonActionState";
 import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
 import PhenoHuntRenameControl from "@/components/PhenoHuntRenameControl";
+import { huntScopedOverrideValue, type HuntScopedOverride } from "@/lib/phenoHuntRenameRules";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
@@ -1444,16 +1445,20 @@ export default function PhenoHuntWorkspace() {
   const [setupCompletedLocal, setSetupCompletedLocal] = useState<string | null>(null);
   // Same optimistic-override pattern for the breeding objective: the grower's
   // save should reflect instantly without waiting on a full hunt refetch.
-  const [breedingObjectiveLocal, setBreedingObjectiveLocal] = useState<
-    BreedingObjectiveTarget[] | null
-  >(null);
+  // Scoped to the hunt it was saved on: the route isn't keyed by hunt id.
+  const [breedingObjectiveLocal, setBreedingObjectiveLocal] = useState<HuntScopedOverride<
+    BreedingObjectiveTarget[]
+  > | null>(null);
   const [objectiveSaving, setObjectiveSaving] = useState(false);
   // #551: optimistic name after a confirmed rename; the hunt row stays
   // authoritative on the next load.
-  const [huntNameLocal, setHuntNameLocal] = useState<string | null>(null);
-  const effectiveHuntName = huntNameLocal ?? ws.hunt?.name ?? null;
+  const [huntNameLocal, setHuntNameLocal] = useState<HuntScopedOverride<string> | null>(null);
+  const effectiveHuntName =
+    huntScopedOverrideValue(huntNameLocal, ws.hunt?.id) ?? ws.hunt?.name ?? null;
   const effectiveBreedingObjective: BreedingObjectiveTarget[] =
-    breedingObjectiveLocal ?? ws.hunt?.breedingObjective ?? [];
+    huntScopedOverrideValue(breedingObjectiveLocal, ws.hunt?.id) ??
+    ws.hunt?.breedingObjective ??
+    [];
   const selectedRoundLoadState =
     round === "overall"
       ? null
@@ -1486,7 +1491,7 @@ export default function PhenoHuntWorkspace() {
     setObjectiveSaving(true);
     try {
       await updatePhenoHuntSetup({ huntId: ws.hunt.id, breedingObjective: targets });
-      setBreedingObjectiveLocal([...targets]);
+      setBreedingObjectiveLocal({ huntId: ws.hunt.id, value: [...targets] });
       return true;
     } catch {
       return false;
@@ -1501,7 +1506,7 @@ export default function PhenoHuntWorkspace() {
     if (!canWrite || !ws.hunt?.id) return false;
     try {
       await updatePhenoHuntSetup({ huntId: ws.hunt.id, name });
-      setHuntNameLocal(name);
+      setHuntNameLocal({ huntId: ws.hunt.id, value: name });
       return true;
     } catch {
       return false;

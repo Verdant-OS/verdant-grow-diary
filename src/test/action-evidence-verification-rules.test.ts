@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import {
   MAX_VERIFIED_EVIDENCE_REFS,
   sensorEvidenceRefIdsToRead,
+  unverifiedEvidenceCaution,
   verifyActionEvidenceRefs,
   type EvidenceSensorRow,
 } from "@/lib/actionEvidenceVerificationRules";
@@ -197,5 +198,14 @@ describe("sensorEvidenceRefIdsToRead", () => {
     expect(out).toHaveLength(MAX_VERIFIED_EVIDENCE_REFS);
     expect(out).toEqual([...out].sort());
     expect(new Set(out).size).toBe(out.length);
+  });
+});
+
+describe("unverifiedEvidenceCaution copy (DP P2-3)", () => {
+  it("never claims a reading doesn't exist: it may be hidden by the Free window or past the cap", () => {
+    const copy = unverifiedEvidenceCaution("not_found");
+    expect(copy).toMatch(/couldn't be matched to a stored sensor reading you can see/);
+    expect(copy).not.toMatch(/doesn't match/);
+    expect(copy).toMatch(/Review before approving/);
   });
 });

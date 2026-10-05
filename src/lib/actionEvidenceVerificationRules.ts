@@ -6,8 +6,10 @@
  * proves nothing. Sensor evidence is trusted only when the referenced
  * `sensor_readings` row:
  *   - is readable by the grower (RLS returns own rows only),
- *   - belongs to the action's tent (the RPC already bound the action's
- *     plant to that tent server-side; readings carry no plant_id),
+ *   - belongs to the action's tent. Evidence is verified against the
+ *     action's TENT only: readings carry no plant_id, and action_queue_create
+ *     accepts a tentless plant against any tent, so plant binding is NOT
+ *     checked here,
  *   - has the same captured instant as the ref,
  *   - and does not contradict the ref's claimed source.
  * The displayed provenance then comes from the STORED row (canonical
@@ -77,7 +79,10 @@ export function unverifiedEvidenceCaution(reason: EvidenceVerificationReason): s
     case "read_failed":
       return "Unverified context — couldn't check this against your stored sensor readings.";
     default:
-      return "Unverified context — this doesn't match a stored sensor reading for this tent. Review before approving.";
+      // Also shown when a real reading exists but is hidden (Free history
+      // window under RLS) or sits past the verification cap, so don't claim
+      // it doesn't exist — only that it couldn't be matched (DP P2-3).
+      return "Unverified context — this couldn't be matched to a stored sensor reading you can see for this tent. Review before approving.";
   }
 }
 

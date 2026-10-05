@@ -79,6 +79,9 @@ import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useGrows } from "@/store/grows";
 import {
+  phenoEvidenceGrowCatalogFromProvider,
+  phenoEvidencePlantCatalogFromQuery,
+  phenoEvidenceTentCatalogFromQuery,
   resolvePhenoEvidenceQuickLogTarget,
   type PhenoEvidenceGrowCatalog,
   type PhenoEvidencePlantCatalog,
@@ -1461,30 +1464,32 @@ export default function PhenoHuntWorkspace() {
   // failed background refetch keeps `data` but Quick Log holds the target
   // empty, so this surface must not offer the handoff either (Codex on #1825).
   const tentsQuery = useTents();
-  const evidenceTentCatalog = useMemo<PhenoEvidenceTentCatalog>(() => {
-    if (tentsQuery.isError) return { status: "error" };
-    if (tentsQuery.data) return { status: "ready", tents: tentsQuery.data };
-    return { status: "loading" };
-  }, [tentsQuery.data, tentsQuery.isError]);
+  const evidenceTentCatalog = useMemo<PhenoEvidenceTentCatalog>(
+    () => phenoEvidenceTentCatalogFromQuery({ isError: tentsQuery.isError, data: tentsQuery.data }),
+    [tentsQuery.data, tentsQuery.isError],
+  );
   // Codex on #1825: Quick Log only targets ACTIVE grows (GrowsProvider lists
   // non-archived grows), so a candidate in an archived grow must not offer
   // the handoff. Missing provider/state → loading (fail closed).
   const growsCtx = useGrows();
-  const evidenceGrowCatalog = useMemo<PhenoEvidenceGrowCatalog>(() => {
-    if (growsCtx.error) return { status: "error" };
-    if (growsCtx.loading || !Array.isArray(growsCtx.grows)) return { status: "loading" };
-    return { status: "ready", growIds: new Set(growsCtx.grows.map((g) => g.id)) };
-  }, [growsCtx.error, growsCtx.loading, growsCtx.grows]);
+  const evidenceGrowCatalog = useMemo<PhenoEvidenceGrowCatalog>(
+    () =>
+      phenoEvidenceGrowCatalogFromProvider({
+        error: growsCtx.error,
+        loading: growsCtx.loading,
+        grows: growsCtx.grows,
+      }),
+    [growsCtx.error, growsCtx.loading, growsCtx.grows],
+  );
   // Codex on #1825: the plant's CURRENT grow/tent come from the same live
   // plant catalog (and cache) Quick Log validates the prefill against, so a
   // plant moved after this page loaded cannot open a dead handoff.
   const plantsQuery = usePlants();
-  const evidencePlantCatalog = useMemo<PhenoEvidencePlantCatalog>(() => {
-    // Error first, as for tents above and in Quick Log.
-    if (plantsQuery.isError) return { status: "error" };
-    if (Array.isArray(plantsQuery.data)) return { status: "ready", plants: plantsQuery.data };
-    return { status: "loading" };
-  }, [plantsQuery.data, plantsQuery.isError]);
+  const evidencePlantCatalog = useMemo<PhenoEvidencePlantCatalog>(
+    () =>
+      phenoEvidencePlantCatalogFromQuery({ isError: plantsQuery.isError, data: plantsQuery.data }),
+    [plantsQuery.data, plantsQuery.isError],
+  );
   const refetchTents = tentsQuery.refetch;
   const refetchPlants = plantsQuery.refetch;
   const plantsFailed = Boolean(plantsQuery.isError);

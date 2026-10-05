@@ -62,6 +62,41 @@ export type PhenoEvidenceGrowCatalog =
   | Readonly<{ status: "error" }>
   | Readonly<{ status: "ready"; growIds: ReadonlySet<string> }>;
 
+/**
+ * Catalog read-state adapters (#1825 review P2-3). Same precedence as Quick
+ * Log's named-prefill check: an ERROR wins over cached data (a failed
+ * background refetch keeps `data`, but Quick Log holds the target empty), and
+ * anything not yet loaded is `loading` (fail closed).
+ */
+export function phenoEvidenceTentCatalogFromQuery(query: {
+  readonly isError?: boolean;
+  readonly data?: ReadonlyArray<QuickLogTargetTent> | null;
+}): PhenoEvidenceTentCatalog {
+  if (query.isError) return { status: "error" };
+  if (Array.isArray(query.data)) return { status: "ready", tents: query.data };
+  return { status: "loading" };
+}
+
+export function phenoEvidencePlantCatalogFromQuery(query: {
+  readonly isError?: boolean;
+  readonly data?: ReadonlyArray<QuickLogTargetPlant> | null;
+}): PhenoEvidencePlantCatalog {
+  if (query.isError) return { status: "error" };
+  if (Array.isArray(query.data)) return { status: "ready", plants: query.data };
+  return { status: "loading" };
+}
+
+/** Active grows from GrowsProvider. Missing provider/state is `loading`. */
+export function phenoEvidenceGrowCatalogFromProvider(ctx: {
+  readonly error?: unknown;
+  readonly loading?: boolean;
+  readonly grows?: ReadonlyArray<{ readonly id: string }> | null;
+}): PhenoEvidenceGrowCatalog {
+  if (ctx.error) return { status: "error" };
+  if (ctx.loading || !Array.isArray(ctx.grows)) return { status: "loading" };
+  return { status: "ready", growIds: new Set(ctx.grows.map((g) => g.id)) };
+}
+
 export type PhenoEvidenceQuickLogTargetKind =
   | "ready"
   | "pending"

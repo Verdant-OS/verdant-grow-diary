@@ -9,6 +9,9 @@
 import { describe, it, expect } from "vitest";
 import {
   PHENO_EVIDENCE_TARGET_COPY,
+  phenoEvidenceGrowCatalogFromProvider,
+  phenoEvidencePlantCatalogFromQuery,
+  phenoEvidenceTentCatalogFromQuery,
   phenoEvidenceTargetNeedsPlantRepair,
   resolvePhenoEvidenceQuickLogTarget,
   type PhenoEvidenceGrowCatalog,
@@ -322,5 +325,45 @@ describe("resolvePhenoEvidenceQuickLogTarget — Quick Log's live plant catalog 
     expect(resolvePhenoEvidenceQuickLogTarget({ ...base, plants: null })).toEqual({
       kind: "pending",
     });
+  });
+});
+
+describe("catalog read-state adapters (#1825 review P2-3)", () => {
+  const tents = [{ id: "t1" }] as never;
+  const plants = [{ id: "p1" }] as never;
+
+  it("an error wins over cached data for tents and plants", () => {
+    expect(phenoEvidenceTentCatalogFromQuery({ isError: true, data: tents })).toEqual({
+      status: "error",
+    });
+    expect(phenoEvidencePlantCatalogFromQuery({ isError: true, data: plants })).toEqual({
+      status: "error",
+    });
+  });
+
+  it("ready only with loaded data; otherwise loading (fail closed)", () => {
+    expect(phenoEvidenceTentCatalogFromQuery({ data: tents })).toEqual({
+      status: "ready",
+      tents,
+    });
+    expect(phenoEvidencePlantCatalogFromQuery({ data: plants })).toEqual({
+      status: "ready",
+      plants,
+    });
+    expect(phenoEvidenceTentCatalogFromQuery({})).toEqual({ status: "loading" });
+    expect(phenoEvidencePlantCatalogFromQuery({ data: null })).toEqual({ status: "loading" });
+  });
+
+  it("grows: error first, then loading or missing state, then the active grow ids", () => {
+    expect(
+      phenoEvidenceGrowCatalogFromProvider({ error: new Error("x"), grows: [{ id: "g1" }] }),
+    ).toEqual({ status: "error" });
+    expect(phenoEvidenceGrowCatalogFromProvider({ loading: true, grows: [{ id: "g1" }] })).toEqual({
+      status: "loading",
+    });
+    expect(phenoEvidenceGrowCatalogFromProvider({})).toEqual({ status: "loading" });
+    const ready = phenoEvidenceGrowCatalogFromProvider({ grows: [{ id: "g1" }, { id: "g2" }] });
+    expect(ready.status).toBe("ready");
+    if (ready.status === "ready") expect([...ready.growIds]).toEqual(["g1", "g2"]);
   });
 });

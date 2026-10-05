@@ -148,6 +148,7 @@ import {
 } from "@/lib/dashboardSensorEvidenceRules";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
 import TonightTentHomeCard from "@/components/TonightTentHomeCard";
+import { resolveSensorReadingTentScope } from "@/lib/tentScopedSensorReadingsRules";
 import {
   buildTonightLastLog,
   buildTonightTentMetrics,
@@ -178,9 +179,10 @@ export default function Dashboard() {
   const { data: plants = [] } = plantsQuery;
   // Per-tent windows over this scope's tents; never the unscoped all-tents
   // read, which hit the Postgres statement timeout (QA 2026-09-24).
+  const dashboardTentScope = resolveSensorReadingTentScope({ tents: tentsQuery });
   const dashboardReadingsQuery = useSensorReadings({
-    tentIds: tentsQuery.data ? tentsQuery.data.map((tent) => tent.id) : null,
-    scopeError: tentsQuery.isError,
+    tentIds: dashboardTentScope.tentIds,
+    scopeError: dashboardTentScope.scopeError,
     retryScope: tentsQuery.refetch,
   });
   const { data: rawReadings = [] } = dashboardReadingsQuery;
@@ -570,7 +572,9 @@ export default function Dashboard() {
       <DailyGrowCheckStatusCard
         className="mb-6"
         growId={scopedGrowId ?? null}
-        tentIds={tents.map((t) => t.id)}
+        // null while this scope's tents load (card stays loading); [] for a
+        // grow with no tents (empty scope), never "every active tent".
+        tentIds={dashboardTentScope.tentIds}
       />
 
       <DashboardDailyGrowCheckPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />

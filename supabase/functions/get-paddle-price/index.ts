@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { gatewayFetch, type PaddleEnv } from "../_shared/paddle.ts";
 import {
   loadUnionEntitlementForUser,
+  resolveRequiredServerBillingEnvironment,
   resolveServerBillingEnvironment,
 } from "../_shared/unionEntitlementLookup.ts";
 import {
@@ -25,9 +26,10 @@ import { creditPackPurchaseEligible } from "../_shared/lib/lib/creditPackEligibi
  *    Anonymous price scraping through our gateway credentials is not a
  *    supported surface.
  *  - Environment selection is SERVER-controlled via
- *    resolveServerBillingEnvironment (PAYMENTS_ENVIRONMENT, else key
- *    presence, else sandbox). A browser-supplied `environment` field is
- *    ignored entirely.
+ *    resolveRequiredServerBillingEnvironment: only an explicit
+ *    PAYMENTS_ENVIRONMENT of live or sandbox picks the gateway; anything else
+ *    returns 503 price_resolution_unavailable. A browser-supplied
+ *    `environment` field is ignored entirely.
  *  - Returns ONLY the resolved public Paddle price id ({ paddleId }) — the
  *    same response contract the checkout client already consumes.
  *  - Errors are sanitized constants. No upstream error text, no gateway
@@ -98,6 +100,7 @@ function logCatalogUnavailable(fields: {
     | "method"
     | "allowlist"
     | "entitlement"
+    | "environment"
     | "founder_cap"
     | "gateway"
     | "gateway_body"
@@ -247,8 +250,19 @@ Deno.serve(async (req) => {
     }
 
     // 3. Server-controlled environment. Any client-supplied environment
-    //    field is ignored — the server decides sandbox vs live.
-    environment = resolveServerBillingEnvironment();
+    //    field is ignored — the server decides sandbox vs live, and only an
+    //    explicit PAYMENTS_ENVIRONMENT may pick the gateway. An unset,
+    //    invalid or key-implied setting refuses instead of guessing.
+    const environmentResolution = resolveRequiredServerBillingEnvironment();
+    if (!environmentResolution.ok) {
+      logCatalogUnavailable({
+        plan: requested,
+        reason: "price_resolution_unavailable",
+        stage: "environment",
+      });
+      return json(503, { error: "price_resolution_unavailable" });
+    }
+    environment = environmentResolution.environment;
 
     const response = await gatewayFetch(
       environment,

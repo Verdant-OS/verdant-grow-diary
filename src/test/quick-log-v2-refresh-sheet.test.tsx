@@ -6,15 +6,18 @@
  * that failed or photo-blocked saves do NOT invalidate or inject any
  * optimistic timeline rows.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const rpcMock = vi.fn();
 
-vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "11111111-1111-4111-8111-111111111111" } }),
+}));
 const invalidateSpy = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -23,17 +26,30 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [{ id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" }],
+    data: [
+      {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Plant 1",
+        tent_id: "55555555-5555-4555-8555-555555555555",
+        grow_id: "66666666-6666-4666-8666-666666666666",
+      },
+    ],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
   useTents: () => ({
-    data: [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }],
+    data: [
+      {
+        id: "55555555-5555-4555-8555-555555555555",
+        name: "Tent 1",
+        grow_id: "66666666-6666-4666-8666-666666666666",
+      },
+    ],
   }),
 }));
 
 vi.mock("@/store/grows", () => ({
-  useGrows: () => ({ grows: [{ id: "grow-1", name: "Grow 1" }] }),
+  useGrows: () => ({ grows: [{ id: "66666666-6666-4666-8666-666666666666", name: "Grow 1" }] }),
 }));
 
 const toastSuccess = vi.fn();
@@ -90,21 +106,45 @@ function clickSave() {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
 }
 
+const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 beforeEach(() => {
   window.sessionStorage.clear();
+  clearLocalStorageForTest();
+  let tail: Promise<unknown> = Promise.resolve();
+  Object.defineProperty(window.navigator, "locks", {
+    configurable: true,
+    value: {
+      request: (_name: string, _options: unknown, callback: () => unknown) => {
+        const turn = tail.then(callback);
+        tail = turn.then(
+          () => undefined,
+          () => undefined,
+        );
+        return turn;
+      },
+    },
+  });
   rpcMock.mockReset();
   invalidateSpy.mockReset();
   toastSuccess.mockReset();
   toastError.mockReset();
 });
+afterEach(() => {
+  if (originalLocks) Object.defineProperty(window.navigator, "locks", originalLocks);
+  else Reflect.deleteProperty(window.navigator, "locks");
+});
 
 describe("QuickLogV2Sheet — post-save refresh", () => {
   it("plant-targeted save invalidates plant grouped timeline and plant-scoped keys", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "ge-1", environment_event_id: null },
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000001",
+        environment_event_id: null,
+      },
       error: null,
     });
-    const { onOpenChange } = renderSheet("plant:plant-1");
+    const { onOpenChange } = renderSheet("plant:33333333-3333-4333-8333-333333333333");
     clickWater();
     clickSave();
     await waitFor(() =>
@@ -113,7 +153,9 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
     const keys = invalidatedKeys().map((k) => JSON.stringify(k));
     expect(keys).toContain(JSON.stringify(["quick_log_grouped_timeline"]));
     expect(keys).toContain(JSON.stringify(["timeline_memory"]));
-    expect(keys).toContain(JSON.stringify(["plant_recent_activity", "plant-1"]));
+    expect(keys).toContain(
+      JSON.stringify(["plant_recent_activity", "33333333-3333-4333-8333-333333333333"]),
+    );
     // Post-save hardening: successful save shows the post-save panel and
     // keeps the sheet open until the grower explicitly closes it.
     expect(await screen.findByTestId("qlv2-post-save")).toBeInTheDocument();
@@ -122,10 +164,14 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
 
   it("tent-targeted save invalidates tent grouped timeline keys", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002", environment_event_id: null },
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000002",
+        environment_event_id: null,
+      },
       error: null,
     });
-    renderSheet("tent:tent-1");
+    renderSheet("tent:55555555-5555-4555-8555-555555555555");
     clickNote();
     clickSave();
     await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Log saved", expect.anything()));
@@ -138,10 +184,14 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
 
   it("plant-in-tent save also refreshes tent grouped timeline (broad prefix)", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000003", environment_event_id: null },
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000003",
+        environment_event_id: null,
+      },
       error: null,
     });
-    renderSheet("plant:plant-1");
+    renderSheet("plant:33333333-3333-4333-8333-333333333333");
     clickNote();
     clickSave();
     await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Log saved", expect.anything()));
@@ -155,7 +205,7 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
       data: { ok: false, reason: "save_failed" },
       error: null,
     });
-    const { onOpenChange } = renderSheet("plant:plant-1");
+    const { onOpenChange } = renderSheet("plant:33333333-3333-4333-8333-333333333333");
     clickNote();
     clickSave();
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
@@ -185,7 +235,7 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
       data: { ok: false, reason: "save_failed" },
       error: null,
     });
-    renderSheet("plant:plant-1");
+    renderSheet("plant:33333333-3333-4333-8333-333333333333");
     clickNote();
     clickSave();
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());

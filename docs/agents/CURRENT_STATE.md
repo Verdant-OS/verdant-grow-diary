@@ -1,5 +1,34 @@
 > Ownership and the connector spec: see [docs/agents/OWNERSHIP.md](OWNERSHIP.md). It wins on conflicts.
 
+## Start here (agents)
+
+Read this section first. It doesn't replace the observation log below.
+
+- **This section supersedes stale OWNERSHIP.md rows.** Line 1 says OWNERSHIP.md wins on conflicts, but its GDP routing and product-call rows and its "Chemdawg only" merge rows are out of date. GDP retired on 2026-09-29. Grok 91 routes and merges in practice; older docs and other bots may still call this role Chemdawg or GDP. Where OWNERSHIP.md and this section disagree on roles or merging, this section describes current practice until OWNERSHIP.md is updated (pending).
+- **Roles:**
+  - Grok 91: merge-queue owner. Routes PRs to reviewers, sends findings back, and merges under the rule below.
+  - Blue Dream and Durban Poison: code reviewers (peers) for `.tsx`/UI, auth, RLS, DB and Edge.
+  - Critical Mass: reviewer for lib and logic, tests, docs-only, QA, accessibility, search and content (OWNERSHIP.md line 74). Until OWNERSHIP.md assigns it, Critical Mass also gives the independent verdict on CI, build and dependency PRs; line 75 gives Codex only _technical_ CI/build review.
+  - Claude, Codex and Grok 91: authors.
+  - Nobody reviews their own work.
+- **Review loop:** [`.agents/skills/verdant-exact-sha-review/SKILL.md`](../../.agents/skills/verdant-exact-sha-review/SKILL.md).
+  - Every verdict is tied to one exact SHA, or it is BLOCKED.
+  - PASS-with-P2 always goes back to the author for a full re-review at the new head. It is never merged as is.
+  - PRs stay draft until merge.
+  - **Merge rule:** **Matthew's decision (2026-10-03, 10:53 PM CT):** all merges go through the merge queue, and the `--admin` bypass is emergency-only, at his call. Matthew's standing merge-when-green rule covers non-migration PRs: a clean PASS at the exact head SHA plus 35/35 required checks green at that SHA means mark it ready and enqueue it at that SHA with `gh pr merge <N> --squash --auto --match-head-commit <SHA>`. On this branch a plain `gh pr merge <N>` also joins the queue rather than merging directly. The queue re-runs the required checks against the latest tip before the PR lands (see [`merge-queue.md`](merge-queue.md)). There is no extra wait for a go-ahead. Skipping the queue takes the repository-admin bypass. In gh that is `gh pr merge --admin`; because the bypass belongs to the admin role, any admin merge path (the UI bypass option, or a REST or MCP merge by an admin) likely skips the queue too (untested). merge-queue.md line 9 calls that emergency-only, and whether a bypass on green is ever allowed is Matthew's call. Migration PRs need Matthew's explicit decision. Dated note (2026-10-03): #1867, #1869, #1887, #1888 and #1890 merged 5–28 s after being marked ready; #1889 (ready since 2026-10-03 11:13 UTC) merged 53 s after #1890. None has a merge-queue event, so (an inference from the GitHub events, not measured directly) they used the admin bypass. All six merged before the 10:53 PM CT decision above.
+- **Before asking for review:** run [`recurring-review-findings.md`](recurring-review-findings.md).
+- **Gates (until Matthew lifts them):**
+  - No Publish.
+  - knk production database lock: no writes.
+  - HOLD #1250: PR #1250 merged on 2026-09-29 as `d2e8dbc3`. Its 4 files (`migration-drift-probe.yml`, `money-migration-drift-alert.yml` and their two tests) still must not be touched until Matthew clears it.
+  - Migration PRs held for Matthew.
+  - Never merge #1740.
+  - GitHub comments (PR, review or issue comments) need Matthew's approval.
+  - There's no staging site. Smoke tests run on production only, and only on the test fixture grow.
+  - The Vercel "Account is blocked." status isn't a required check.
+  - No agent changes to auth, RLS, migrations, Edge, `supabase/` or lockfiles unless Matthew names the action.
+  - The live list is on the agents' shared box at `/workspace/shared/context/fleet-locks.md`.
+
 # Verdant — Current Operating State
 
 ## Follow-up observation — 2026-10-01T20:03 UTC — Strain Reference Library V1.1 (#1827)
@@ -497,7 +526,9 @@ OWNERSHIP.md controls ownership. HOLD #1250; #1369 REVIEW ONLY;
 #1741/#1745 retain protected database-approval holds. No Publish, production
 APPLY, device or Action Queue operation was performed in this docs change.
 Live acceptance remains NOT_MEASURED here.
+
 ### Historical operating receipts — unchanged below
+
 **Last updated:** 2026-09-24 UTC (~11:25 UTC; tip, live and board measured 11:14–11:17 UTC)
 **Updated by:** Claude (2026-09-24 late morning, restamp on **deploy tip
 `b0bfdb028600b63ec7b8bff914632a20b06020b7`**, the `#1685` squash. **Four commits** merged since the

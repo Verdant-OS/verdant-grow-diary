@@ -235,13 +235,13 @@ export function isReleaseReceiptArtifactV1(input: unknown): input is ReleaseRece
 }
 
 export function parseReleaseReceiptArtifact(input: unknown): ParsedReleaseReceiptResult {
+  if (!isPlainObject(input)) {
+    return { ok: false, errors: ["artifact must be an object"], warnings: [] };
+  }
+  const raw = input;
+
   const errors: string[] = [];
   const warnings: string[] = [];
-
-  if (!isPlainObject(input)) {
-    return { ok: false, errors: ["artifact must be an object"], warnings };
-  }
-  const raw = input as Record<string, unknown>;
 
   if (raw.schema_version !== RELEASE_RECEIPT_SCHEMA_VERSION) {
     return {

@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import PhenoDocumentationBackupPanel from "@/components/PhenoDocumentationBackupPanel";
+import PhenoDocumentationSections from "@/components/PhenoDocumentationSections";
 import {
   PHENO_DOC_BACKUP_COPY,
   PHENO_DOC_BACKUP_FORMAT,
@@ -154,5 +155,162 @@ describe("PhenoDocumentationBackupPanel", () => {
       ),
     );
     expect(storage.length).toBe(0);
+  });
+
+  it("reports a partial restore when storage fills up partway", async () => {
+    const storage = memoryStorage();
+    let writes = 0;
+    const quotaStorage = {
+      ...storage,
+      get length() {
+        return storage.length;
+      },
+      setItem: (k: string, v: string) => {
+        writes += 1;
+        if (writes > 1) throw new Error("QuotaExceededError");
+        storage.setItem(k, v);
+      },
+    };
+    render(
+      <PhenoDocumentationBackupPanel
+        storage={quotaStorage}
+        download={vi.fn()}
+        now={() => "x"}
+        confirm={() => true}
+      />,
+    );
+    fireEvent.change(screen.getByTestId("pheno-doc-backup-restore-input"), {
+      target: {
+        files: [
+          backupFile([
+            { recordType: "candidate", recordId: "p1", values: notes("a") },
+            { recordType: "candidate", recordId: "p2", values: notes("b") },
+          ]),
+        ],
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("pheno-doc-backup-status").textContent).toBe(
+        PHENO_DOC_BACKUP_COPY.restoredPartial(1, 2),
+      ),
+    );
+    expect(storage.getItem(phenoDocStorageKey("candidate", "p1", "u1"))).not.toBeNull();
+    expect(storage.getItem(phenoDocStorageKey("candidate", "p2", "u1"))).toBeNull();
+  });
+});
+
+describe("restore while a candidate's documentation form is open (#552 review P1)", () => {
+  const field = "pheno-doc-field-phenotype-unique_traits";
+
+  function restore(storage: ReturnType<typeof memoryStorage>, text: string) {
+    fireEvent.change(screen.getByTestId("pheno-doc-backup-restore-input"), {
+      target: {
+        files: [backupFile([{ recordType: "candidate", recordId: "p1", values: notes(text) }])],
+      },
+    });
+    return waitFor(() =>
+      expect(screen.getByTestId("pheno-doc-backup-status").textContent).toBe(
+        PHENO_DOC_BACKUP_COPY.restored(1),
+      ),
+    );
+  }
+
+  it("shows the restored values in an open form, and Save does not revert them", async () => {
+    const key = phenoDocStorageKey("candidate", "p1", "u1");
+    const storage = memoryStorage({ [key]: JSON.stringify(notes("old")) });
+    render(
+      <>
+        <PhenoDocumentationBackupPanel
+          storage={storage}
+          download={vi.fn()}
+          now={() => "x"}
+          confirm={() => true}
+        />
+        <PhenoDocumentationSections recordId="p1" recordType="candidate" storage={storage} />
+      </>,
+    );
+    expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("old");
+
+    await restore(storage, "restored");
+
+    await waitFor(() =>
+      expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("restored"),
+    );
+    fireEvent.click(screen.getByTestId("pheno-doc-save-candidate-p1"));
+    expect(JSON.parse(storage.getItem(key)!).phenotype.fields.unique_traits).toBe("restored");
+  });
+
+  it("refreshes a collapsed form the grower already opened and edited", async () => {
+    const key = phenoDocStorageKey("candidate", "p1", "u1");
+    const storage = memoryStorage({ [key]: JSON.stringify(notes("old")) });
+    render(
+      <>
+        <PhenoDocumentationBackupPanel
+          storage={storage}
+          download={vi.fn()}
+          now={() => "x"}
+          confirm={() => true}
+        />
+        <PhenoDocumentationSections
+          recordId="p1"
+          recordType="candidate"
+          storage={storage}
+          defaultOpen={false}
+        />
+      </>,
+    );
+    const details = screen.getByTestId("pheno-doc-section-phenotype") as HTMLDetailsElement;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    await waitFor(() => expect(screen.getByTestId(field)).toBeTruthy());
+    fireEvent.change(screen.getByTestId(field), { target: { value: "unsaved edit" } });
+
+    await restore(storage, "restored");
+
+    await waitFor(() =>
+      expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("restored"),
+    );
+    fireEvent.click(screen.getByTestId("pheno-doc-save-candidate-p1"));
+    expect(JSON.parse(storage.getItem(key)!).phenotype.fields.unique_traits).toBe("restored");
+  });
+
+  it("refuses to Save a stale form when the record changed without a restore event", () => {
+    const key = phenoDocStorageKey("candidate", "p1", "u1");
+    const storage = memoryStorage({ [key]: JSON.stringify(notes("old")) });
+    render(<PhenoDocumentationSections recordId="p1" recordType="candidate" storage={storage} />);
+    fireEvent.change(screen.getByTestId(field), { target: { value: "stale edit" } });
+    // e.g. another tab wrote the record and no storage event reached this form
+    storage.setItem(key, JSON.stringify(notes("newer elsewhere")));
+
+    fireEvent.click(screen.getByTestId("pheno-doc-save-candidate-p1"));
+
+    expect(JSON.parse(storage.getItem(key)!).phenotype.fields.unique_traits).toBe(
+      "newer elsewhere",
+    );
+    expect(screen.getByTestId("pheno-doc-save-stale-candidate-p1")).toBeTruthy();
+    expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("newer elsewhere");
+    // Once it shows the stored record, a deliberate Save works again.
+    fireEvent.change(screen.getByTestId(field), { target: { value: "after refresh" } });
+    fireEvent.click(screen.getByTestId("pheno-doc-save-candidate-p1"));
+    expect(JSON.parse(storage.getItem(key)!).phenotype.fields.unique_traits).toBe("after refresh");
+  });
+
+  it("leaves forms for other candidates untouched", async () => {
+    const otherKey = phenoDocStorageKey("candidate", "p2", "u1");
+    const storage = memoryStorage({ [otherKey]: JSON.stringify(notes("p2 notes")) });
+    render(
+      <>
+        <PhenoDocumentationBackupPanel
+          storage={storage}
+          download={vi.fn()}
+          now={() => "x"}
+          confirm={() => true}
+        />
+        <PhenoDocumentationSections recordId="p2" recordType="candidate" storage={storage} />
+      </>,
+    );
+    fireEvent.change(screen.getByTestId(field), { target: { value: "p2 unsaved" } });
+    await restore(storage, "p1 restored");
+    expect((screen.getByTestId(field) as HTMLInputElement).value).toBe("p2 unsaved");
   });
 });

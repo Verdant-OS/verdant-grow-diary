@@ -12,11 +12,14 @@ import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import {
   PHENO_DOC_BACKUP_COPY,
+  PHENO_DOCS_RESTORED_EVENT,
   buildPhenoDocumentationBackup,
+  listExistingPhenoDocKeys,
   listPhenoDocRecordsInStorage,
   parsePhenoDocumentationBackup,
   planPhenoDocumentationRestore,
   type PhenoDocStorageReader,
+  type PhenoDocsRestoredDetail,
 } from "@/lib/phenoDocumentationBackupRules";
 
 type BackupStorage = PhenoDocStorageReader & { setItem(key: string, value: string): void };
@@ -48,6 +51,13 @@ function defaultDownload(filename: string, text: string) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Tell mounted documentation forms which records the restore replaced. */
+function announceRestored(keys: string[]) {
+  if (keys.length === 0 || typeof window === "undefined") return;
+  const detail: PhenoDocsRestoredDetail = { keys };
+  window.dispatchEvent(new CustomEvent(PHENO_DOCS_RESTORED_EVENT, { detail }));
 }
 
 function readFileText(file: File): Promise<string> {
@@ -98,23 +108,34 @@ export default function PhenoDocumentationBackupPanel({
     }
     const parsed = parsePhenoDocumentationBackup(text);
     if (!parsed.ok) return setStatus(PHENO_DOC_BACKUP_COPY.invalid[parsed.reason]);
-    const existingKeys = new Set<string>();
-    for (let i = 0; i < store.length; i += 1) {
-      const k = store.key(i);
-      if (k) existingKeys.add(k);
-    }
-    const plan = planPhenoDocumentationRestore({ userId, existingKeys, records: parsed.records });
+    const plan = planPhenoDocumentationRestore({
+      userId,
+      existingKeys: listExistingPhenoDocKeys(store),
+      records: parsed.records,
+    });
     if (
       plan.overwriteCount > 0 &&
       !confirm(PHENO_DOC_BACKUP_COPY.confirmOverwrite(plan.overwriteCount))
     ) {
       return setStatus(PHENO_DOC_BACKUP_COPY.cancelled);
     }
+    const written: string[] = [];
     try {
-      for (const w of plan.writes) store.setItem(w.key, w.value);
+      for (const w of plan.writes) {
+        store.setItem(w.key, w.value);
+        written.push(w.key);
+      }
     } catch {
-      return setStatus(PHENO_DOC_BACKUP_COPY.storageUnavailable);
+      // Storage filled up (quota) partway: the records already written stay
+      // written, so say exactly how many landed instead of hiding it.
+      announceRestored(written);
+      return setStatus(
+        written.length === 0
+          ? PHENO_DOC_BACKUP_COPY.storageUnavailable
+          : PHENO_DOC_BACKUP_COPY.restoredPartial(written.length, plan.writes.length),
+      );
     }
+    announceRestored(written);
     setStatus(PHENO_DOC_BACKUP_COPY.restored(plan.writes.length));
   };
 

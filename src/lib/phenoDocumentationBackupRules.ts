@@ -20,7 +20,50 @@ import {
 
 export type PhenoDocRecordType = "candidate" | "breeding_program";
 
-const RECORD_TYPES: ReadonlySet<string> = new Set(["candidate", "breeding_program"]);
+/**
+ * Record types a backup may restore. Download only exports candidate records
+ * and every message says "candidate", so restore accepts candidates only;
+ * breeding_program entries in a file are ignored (#552 review P2).
+ */
+const RESTORABLE_RECORD_TYPES: ReadonlySet<string> = new Set(["candidate"]);
+
+/**
+ * Same-tab signal the restore panel dispatches after it writes records, so
+ * every mounted PhenoDocumentationSections re-reads storage instead of keeping
+ * pre-restore values that a later Save would write back over the restore.
+ * Cross-tab writes arrive as the browser's own `storage` event.
+ */
+export const PHENO_DOCS_RESTORED_EVENT = "verdant:pheno-docs-restored";
+
+export interface PhenoDocsRestoredDetail {
+  /** Storage keys the restore wrote. */
+  readonly keys: ReadonlyArray<string>;
+}
+
+/**
+ * True when a restore / storage change touching `changedKeys` affects the
+ * record stored at `recordKey`. A null list (storage cleared) affects every
+ * record.
+ */
+export function phenoDocChangeAffectsRecord(
+  changedKeys: ReadonlyArray<string> | null,
+  recordKey: string,
+): boolean {
+  if (changedKeys === null) return true;
+  return changedKeys.includes(recordKey);
+}
+
+/**
+ * Save guard: a form may write only if the stored value is still the one it
+ * hydrated from. Anything else (a restore, another tab) means the form is
+ * stale and saving would silently revert the newer record (#1073).
+ */
+export function canSavePhenoDocOverStored(
+  hydratedRaw: string | null,
+  currentRaw: string | null,
+): boolean {
+  return hydratedRaw === currentRaw;
+}
 
 export const PHENO_DOC_BACKUP_FORMAT = "verdant.pheno-documentation-backup";
 export const PHENO_DOC_BACKUP_VERSION = 1;
@@ -76,8 +119,10 @@ export const PHENO_DOC_BACKUP_COPY = {
   downloaded: (n: number) =>
     `Backup downloaded with ${n} candidate ${n === 1 ? "record" : "records"}.`,
   restored: (n: number) => `Restored ${n} candidate ${n === 1 ? "record" : "records"}.`,
+  restoredPartial: (written: number, total: number) =>
+    `Restored ${written} of ${total} candidate ${total === 1 ? "record" : "records"}. This browser's storage is full, so the rest weren't restored.`,
   confirmOverwrite: (n: number) =>
-    `${n} ${n === 1 ? "candidate already has" : "candidates already have"} documentation on this device. Replace with the backup?`,
+    `${n} ${n === 1 ? "candidate already has" : "candidates already have"} documentation on this device. Replace with the backup? This replaces the whole record for ${n === 1 ? "that candidate" : "each of them"}.`,
   cancelled: "Restore cancelled. Nothing was changed.",
   storageUnavailable: "This browser's storage is unavailable, so the backup can't be used here.",
   signedOut: "Sign in to back up or restore your candidate documentation.",
@@ -127,6 +172,16 @@ export interface PhenoDocStorageReader {
   readonly length: number;
   key(index: number): string | null;
   getItem(key: string): string | null;
+}
+
+/** Every key currently in storage (input to planPhenoDocumentationRestore). */
+export function listExistingPhenoDocKeys(storage: PhenoDocStorageReader): Set<string> {
+  const keys = new Set<string>();
+  for (let i = 0; i < storage.length; i += 1) {
+    const k = storage.key(i);
+    if (k) keys.add(k);
+  }
+  return keys;
 }
 
 /** This user's saved records of one type, sorted by id. Unparsable values skipped. */
@@ -186,7 +241,7 @@ export function parsePhenoDocumentationBackup(text: string): PhenoDocBackupParse
   const byKey = new Map<string, PhenoDocRecord>();
   for (const r of rawRecords) {
     if (!isPlainObject(r)) continue;
-    if (typeof r.recordType !== "string" || !RECORD_TYPES.has(r.recordType)) continue;
+    if (typeof r.recordType !== "string" || !RESTORABLE_RECORD_TYPES.has(r.recordType)) continue;
     if (typeof r.recordId !== "string" || !RECORD_ID_RE.test(r.recordId)) continue;
     const rec: PhenoDocRecord = {
       recordType: r.recordType as PhenoDocRecordType,

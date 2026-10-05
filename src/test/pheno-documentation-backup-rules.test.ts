@@ -7,8 +7,11 @@ import {
   PHENO_DOC_BACKUP_FORMAT,
   PHENO_DOC_BACKUP_MAX_RECORDS,
   buildPhenoDocumentationBackup,
+  canSavePhenoDocOverStored,
+  listExistingPhenoDocKeys,
   listPhenoDocRecordsInStorage,
   parsePhenoDocumentationBackup,
+  phenoDocChangeAffectsRecord,
   phenoDocStorageKey,
   planPhenoDocumentationRestore,
 } from "@/lib/phenoDocumentationBackupRules";
@@ -157,5 +160,55 @@ describe("planPhenoDocumentationRestore", () => {
       phenoDocStorageKey("candidate", "p1", U),
       phenoDocStorageKey("candidate", "p2", U),
     ]);
+  });
+});
+
+describe("#552 review follow-ups", () => {
+  it("restores candidate records only; breeding_program entries are ignored", () => {
+    const text = JSON.stringify({
+      format: PHENO_DOC_BACKUP_FORMAT,
+      version: 1,
+      exportedAt: "x",
+      records: [
+        { recordType: "breeding_program", recordId: "b1", values: notes("bp") },
+        { recordType: "candidate", recordId: "p1", values: notes("c") },
+      ],
+    });
+    const parsed = parsePhenoDocumentationBackup(text);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.records.map((r) => `${r.recordType}:${r.recordId}`)).toEqual(["candidate:p1"]);
+  });
+
+  it("treats a breeding_program-only file as empty", () => {
+    const text = JSON.stringify({
+      format: PHENO_DOC_BACKUP_FORMAT,
+      version: 1,
+      exportedAt: "x",
+      records: [{ recordType: "breeding_program", recordId: "b1", values: notes("bp") }],
+    });
+    expect(parsePhenoDocumentationBackup(text)).toEqual({ ok: false, reason: "empty" });
+  });
+
+  it("lists every existing storage key", () => {
+    const k = phenoDocStorageKey("candidate", "p1", U);
+    expect([...listExistingPhenoDocKeys(store({ [k]: "{}", other: "1" }))].sort()).toEqual(
+      [k, "other"].sort(),
+    );
+  });
+
+  it("matches a change to the record it touched, and a cleared storage to every record", () => {
+    const k = phenoDocStorageKey("candidate", "p1", U);
+    expect(phenoDocChangeAffectsRecord([k], k)).toBe(true);
+    expect(phenoDocChangeAffectsRecord([phenoDocStorageKey("candidate", "p2", U)], k)).toBe(false);
+    expect(phenoDocChangeAffectsRecord(null, k)).toBe(true);
+  });
+
+  it("allows Save only over the exact stored value the form hydrated from", () => {
+    expect(canSavePhenoDocOverStored(null, null)).toBe(true);
+    expect(canSavePhenoDocOverStored('{"a":1}', '{"a":1}')).toBe(true);
+    expect(canSavePhenoDocOverStored('{"a":1}', '{"a":2}')).toBe(false);
+    expect(canSavePhenoDocOverStored(null, '{"a":2}')).toBe(false);
+    expect(canSavePhenoDocOverStored('{"a":1}', null)).toBe(false);
   });
 });

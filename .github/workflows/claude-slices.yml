@@ -111,6 +111,9 @@ jobs:
             if (/(?:^|\/)(?:vitest|vite|playwright)\.(?:setup|workspace)[^/]*$/i.test(path)) return true;
             if (/(?:^|\/)(?:setup-?tests?|test-?setup|global[-_.]?(?:setup|teardown))[^/]*$/i.test(path)) return true;
             if (/^src\/test\/setup/i.test(path)) return true;
+            // Prettier and legacy ESLint configs can load plugins; scripts/e2e runs with E2E secrets.
+            if (/(?:^|\/)(?:\.prettierrc|\.eslintrc)[^/]*$/i.test(path)) return true;
+            if (/^scripts\/e2e(?:\/|$)/i.test(path)) return true;
             const executable = /^(?:src|scripts|tests|e2e|packages)\//i.test(path) && !/\.md$/i.test(path);
             return executable && (
               /auth|oauth|rls|action[-_]?(?:queue|detail|outcome|follow[-_]?up|response[-_]?memory|completion|status)|linked[-_]?actions?|assigned[-_]?tent[-_]?actions?|live[-_]?proof[-_]?action[-_]?status|recent[-_]?action[-_]?response|device[-_]?(?:control|command)|actuator/i.test(path) ||
@@ -153,7 +156,7 @@ jobs:
               './**/*.config.*', './**/vitest.setup*', './**/vite.setup*', './**/playwright.setup*',
               './**/vitest.workspace*', './**/*setupTests*', './**/*setup-tests*', './**/*test-setup*',
               './**/*global-setup*', './**/*global-teardown*', './**/*globalSetup*', './**/*globalTeardown*',
-              './src/test/setup*',
+              './src/test/setup*', './**/.prettierrc*', './**/.eslintrc*', './scripts/e2e/**',
             ];
             const codeGlobs = [
               '*auth*', '*Auth*', '*OAuth*', '*[rR][lL][sS]*',
@@ -177,6 +180,8 @@ jobs:
                   ...lockedGlobs.flatMap(path => [`Edit(${path})`, `Write(${path})`]),
                   'Read(./.git/**)', 'Read(./**/.env*)', 'Read(//proc/**)',
                   'Bash(git config *)', 'Bash(git remote *)',
+                  // git add/commit print each line of a --pathspec-from-file file in their errors.
+                  'Bash(*--pathspec-from-file*)', 'Bash(*--pathspec-file-nul*)',
                   // No repository code runs while Claude holds a token: CI tests the draft.
                   ...CODE_RUNNERS.map(command => `Bash(${command} *)`),
                   // The pinned action grants its own push wrapper; the builder never pushes.
@@ -217,6 +222,8 @@ jobs:
               'eslint.config.js', 'tsconfig.json', 'tsconfig.app.json', 'packages/x/tsconfig.json',
               '.npmrc', 'bunfig.toml', 'src/test/setup.ts', 'src/test/setupTests.ts',
               'vitest.setup.ts', 'vitest.workspace.ts', 'e2e/global-setup.ts', 'e2e/global-teardown.ts',
+              '.prettierrc', '.prettierrc.json', 'nested/.prettierrc.cjs', '.eslintrc', '.eslintrc.json',
+              'scripts/e2e/materialize-managed-session.mjs',
             ];
             const allowed = [
               'docs/library.md', 'docs/auth-guide.md', 'docs/agents/claude-slices.md',
@@ -224,7 +231,8 @@ jobs:
               'src/test/libraryRules.test.ts', 'src/test/component.test.tsx',
               'src/pages/Knowledge.tsx', 'docs/authorization-guide.md', 'docs/package-json.md',
               'src/lib/guidedActionChecklistRules.ts', 'src/lib/actionResponsePairingRules.ts',
-              'src/test/action-response-pairing-rules.test.ts',
+              'src/test/action-response-pairing-rules.test.ts', 'scripts/sync-edge-shared-notes.md',
+              'docs/prettierrc-notes.md',
             ];
             blocked.forEach(path => assert.equal(lockedPath(path), true, path));
             allowed.forEach(path => assert.equal(lockedPath(path), false, path));
@@ -237,6 +245,8 @@ jobs:
               'Bash(npx *)', 'Bash(*/scripts/git-push.sh*)', `Bash(${ACTION_PUSH_WRAPPER}:*)`,
               'Edit(./**/package.json)', 'Write(./**/package.json)', 'Edit(./**/*.config.*)',
               'Write(./**/*.config.*)', 'Edit(./**/tsconfig*.json)', 'Write(./src/test/setup*)',
+              'Edit(./**/.prettierrc*)', 'Edit(./**/.eslintrc*)', 'Write(./scripts/e2e/**)',
+              'Bash(*--pathspec-from-file*)', 'Bash(*--pathspec-file-nul*)',
             ];
             requiredDenies.forEach(rule => assert.ok(deny.includes(rule), rule));
             console.log(`Claude policy regression tests: PASS (${blocked.length + allowed.length + 3 + requiredDenies.length} cases)`);
@@ -295,7 +305,9 @@ jobs:
         # is set, so enable the scrub explicitly. Subprocess PID isolation needs a
         # working bubblewrap, which the previous step installs and verifies (the job
         # fails if it doesn't work). The scrub itself is best-effort per the action's
-        # docs, so commands that can read a file path and publish it are not allowed.
+        # docs, so known file-reading command forms are denied (see the
+        # disallowedTools list); that list is a denylist, not a proof that no
+        # allowed command can read a file and echo it back to Claude.
         env:
           CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
         with:
@@ -316,7 +328,7 @@ jobs:
             --max-turns 40
             --permission-mode acceptEdits
             --allowedTools "Read,Glob,Grep,Bash(git status *),Bash(git diff),Bash(git diff --stat),Bash(git diff --cached),Bash(git diff --cached --stat),Bash(git log *),Bash(git switch -c claude/*),Bash(git add *),Bash(git commit -m *),Bash(gh issue view *),Bash(gh pr view *),Bash(gh pr list *)"
-            --disallowedTools "Bash(gh issue comment),Bash(gh issue comment *),Bash(*--no-index*),Bash(*--output*),Bash(*/proc/*),Bash(*environ*),Bash(git commit *-F*),Bash(git commit *--file*),Bash(git commit *-t *),Bash(git commit *--template*),Bash(git commit *-C *),Bash(git commit *-c *),Bash(git commit *--reuse-message*),Bash(git commit *--reedit-message*),Bash(gh pr merge),Bash(gh pr merge *),Bash(gh pr ready),Bash(gh pr ready *),Bash(gh pr review),Bash(gh pr review *),Bash(gh pr create *),Bash(git push *),Bash(git *push*),Bash(gh api *),Bash(gh workflow *),Bash(bun *),Bash(bunx *),Bash(npm *),Bash(npx *),Bash(node *),WebFetch,WebSearch"
+            --disallowedTools "Bash(gh issue comment),Bash(gh issue comment *),Bash(*--no-index*),Bash(*--output*),Bash(*/proc/*),Bash(*environ*),Bash(git commit *-F*),Bash(git commit *--file*),Bash(git commit *-t *),Bash(git commit *--template*),Bash(git commit *-C *),Bash(git commit *-c *),Bash(git commit *--reuse-message*),Bash(git commit *--reedit-message*),Bash(*--pathspec-from-file*),Bash(*--pathspec-file-nul*),Bash(gh pr merge),Bash(gh pr merge *),Bash(gh pr ready),Bash(gh pr ready *),Bash(gh pr review),Bash(gh pr review *),Bash(gh pr create *),Bash(git push *),Bash(git *push*),Bash(gh api *),Bash(gh workflow *),Bash(bun *),Bash(bunx *),Bash(npm *),Bash(npx *),Bash(node *),WebFetch,WebSearch"
           prompt: |
             You are Claude, builder of one Verdant slice. Read AGENTS.md, CLAUDE.md
             and docs/agents/CURRENT_STATE.md first, and return SENTINEL_ACK.
@@ -524,7 +536,7 @@ jobs:
           for (const bad of ['Bash(gh issue comment *)', 'Bash(git diff *)', 'Bash(git commit *)']) {
             assert.ok(!allow.includes(bad), `${bad} must not be allowed`);
           }
-          for (const rule of ['Bash(gh issue comment *)', 'Bash(*--no-index*)', 'Bash(*--output*)', 'Bash(*/proc/*)', 'Bash(git commit *-F*)']) {
+          for (const rule of ['Bash(gh issue comment *)', 'Bash(*--no-index*)', 'Bash(*--output*)', 'Bash(*/proc/*)', 'Bash(git commit *-F*)', 'Bash(*--pathspec-from-file*)', 'Bash(*--pathspec-file-nul*)']) {
             assert.ok(denied.split(',').includes(rule), `${rule} must be denied`);
           }
           const gate = yml.indexOf('bwrap --unshare-pid');

@@ -109,7 +109,9 @@ when a maintainer starts CI on a draft: every `package.json` (its scripts), ever
 `*.config.*` module (Vite, Vitest, Playwright, ESLint and the rest),
 `tsconfig*.json`/`jsconfig*.json`, `.npmrc`, `.yarnrc*`, `bunfig.toml`, Node version
 files, Vitest/Playwright setup and workspace files, `src/test/setup*`, and
-Playwright global setup and teardown files. File-edit denials cover the common locked paths. Before any
+Playwright global setup and teardown files, `.prettierrc*` and legacy
+`.eslintrc*` (both can load plugins), and `scripts/e2e/**` (run with E2E
+secrets). File-edit denials cover the common locked paths. Before any
 push or new PR, the publish job checks the committed diff using the same path
 policy as the Claude PR guard. SQL and lockfiles are blocked anywhere in the
 tree. Auth, RLS, Action Queue and device-control code are blocked in source,
@@ -154,13 +156,19 @@ keeps both credentials out of reach:
     own PIDs. If it can't, the job fails and Claude never runs. That the Claude CLI
     then uses bubblewrap for its subprocesses rests on Anthropic's documentation
     (`NOT_MEASURED` until a real run).
-  - **No command that can read a file path and publish it.** `gh issue comment`
-    is not allowed (Claude reports through the action's own tracking comment).
+  - **Known file-reading command forms are denied.** This is a denylist, not a
+    guarantee: Claude can still post through the action's tracking comment, so
+    any allowed command that echoes a file's contents would be a leak path. A
+    review found one (`git add`/`git commit --pathspec-from-file=.git/config`
+    prints each line of the file, including the job token the action embeds in
+    the remote URL); `--pathspec-from-file` and `--pathspec-file-nul` are now
+    denied. `gh issue comment` is not allowed (Claude reports through the
+    action's own tracking comment).
     `git diff` is allowed only without arguments (plain, `--stat`, `--cached`),
     so it can't use `--no-index` or a path outside the repository. `git commit`
     is allowed only with `-m`, and `-F`/`--file`/`--template`/`-C`/`-c` are denied.
-    Any command mentioning `--no-index`, `--output`, `/proc/` or `environ` is
-    denied. The `Read(//proc/**)` denial covers only the Read tool.
+    Any command mentioning `--no-index`, `--output`, `--pathspec-from-file`,
+    `--pathspec-file-nul`, `/proc/` or `environ` is denied. The `Read(//proc/**)` denial covers only the Read tool.
   - The configuration job fails if the gate is removed, moved after the Claude
     step, or stops failing the job, or if any of these commands is allowed again.
 - **No repository code runs.** Installs, tests, builds and other runners (`bun`,

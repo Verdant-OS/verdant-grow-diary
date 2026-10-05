@@ -1,11 +1,13 @@
 # Dashboard — one Log entry, stable readiness marker
 
-Status: **SPEC — implementation BLOCKED on #1833 and on decision D1 (D1.1 and D1.2)** (see §1, §7).
+Status: **SPEC — implementation BLOCKED only on GDP decisions D1.1 and D1.2** (see §1, §7). #1833
+merged 2026-10-03 as `04a36937`.
 Author: Claude, 2026-10-01. Audited at deploy tip `0107d9406` (`verdant-grow-diary`, #1836),
 #1833 head `f296a953`, #1793 head `074f4349`. Updated 2026-10-01 17:35 UTC for #1849 (re-land of #1793,
 head `c2d473e8`). Updated 2026-10-02 15:12 UTC: #1849 merged, #1793 closed, review findings on
 #1844 addressed (routing to GDP; single-entry test counts buttons too). Updated 2026-10-02
-15:39 UTC: browser-level count includes app-chrome triggers; D1 split into D1.1–D1.3.
+15:39 UTC: browser-level count includes app-chrome triggers; D1 split into D1.1–D1.3. Re-stamped
+2026-10-04 against deploy tip `a980489a`: #1833 merged, §1 and §3 re-checked with `git grep`.
 
 Every claim carries a label: `established fact` (read from source at the SHAs above),
 `source claim`, `inference`, `uncertainty`, `missing evidence`.
@@ -14,9 +16,9 @@ Every claim carries a label: `established fact` (read from source at the SHAs ab
 
 ## 1. Preconditions
 
-| Gate                                                             | State at 2026-10-02 15:07 UTC                        | Label              |
+| Gate                                                             | State at 2026-10-04 (deploy tip `a980489a`)          | Label              |
 | ---------------------------------------------------------------- | ---------------------------------------------------- | ------------------ |
-| #1833 `feat(dashboard): One-Tent Home first fold` merged         | OPEN, draft, head `f296a953`                         | `established fact` |
+| #1833 `feat(dashboard): One-Tent Home first fold` merged         | **MERGED** 2026-10-03 15:21 UTC as `04a36937`        | `established fact` |
 | #1849 `test(e2e): … (re-land of #1793)` merged                   | **MERGED** 2026-10-01 18:38 UTC as `b5d06488`        | `established fact` |
 | #1793 `test(e2e): measure signed-in readiness…` merged or closed | **CLOSED** 2026-10-01 18:38 UTC, superseded by #1849 | `established fact` |
 | D1 decided by GDP (§7)                                           | OPEN                                                 | `established fact` |
@@ -24,8 +26,11 @@ Every claim carries a label: `established fact` (read from source at the SHAs ab
 #1793's work landed through #1849. The deploy branch (`80176bad`) now carries
 `e2e/signed-in-performance.spec.ts:35` with `control: "dashboard-daily-grow-check-entry"`, as
 #1849's owner agreed (issuecomment-5936713821), so this slice edits E1 on the deploy branch in
-the same commit (§5.2). The deploy branch has exactly the 11 references listed in §3 and no
-others (`git grep`, 2026-10-02).
+the same commit (§5.2). At `a980489a`, `git grep -n dashboard-daily-grow-check-entry` (excluding
+`docs/agents/CURRENT_STATE.md` receipts) returns 12 lines: the producer at
+`src/pages/Dashboard.tsx:509`, plus 11 consumer lines that are exactly the rows in §3 (E1 :35, E2
+:1994, E3 :253, U1 :40/:44/:49, U2 :260/:266, U3 :176/:315, U4 :60). The unit is grep lines, not
+rows. E4 and U4 :48 don't name the test ID, so grep doesn't count them. (Re-run 2026-10-04.)
 #1799 / #1800 do not reference the header test ID (`established fact`, `gh pr diff`), so they
 need nothing.
 
@@ -37,7 +42,8 @@ need nothing.
   `<Button data-testid="dashboard-daily-grow-check-entry">` → `withGrowId("/daily-check", scopedGrowId)`,
   label `Quick Log`. It exists **only in the loaded branch** (lines 437+); the error branch
   (366-389) and loading branch (391-433) render a header with no actions. `established fact`
-- #1833 adds `<TonightTentHomeCard … logHref={withGrowId("/daily-check", homeTent?.growId ?? scopedGrowId)} />`
+- #1833 (merged as `04a36937`) adds `<TonightTentHomeCard … logHref={withGrowId("/daily-check", homeTent?.growId ?? scopedGrowId)} />`
+  (`Dashboard.tsx:536` at `a980489a`)
   directly below the `PageHeader`. Its `Log` link (`data-testid="tonight-tent-home-log"`,
   label `Log`) renders only when `selection.kind === "tent"`; `"none"` returns `null`,
   `"choose"` renders tent links with no Log. `established fact`
@@ -49,7 +55,7 @@ So for a one-tent grower the first fold shows two adjacent `/daily-check` CTAs
 
 ---
 
-## 3. Every consumer of `dashboard-daily-grow-check-entry` (deploy tip + #1793/#1849)
+## 3. Every consumer of `dashboard-daily-grow-check-entry` (deploy tip `a980489a`, re-checked 2026-10-04)
 
 | #   | File                                                                      | Use                                                                                                            | How it breaks                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -70,7 +76,7 @@ history and are **not** edited. `established fact` (repo-wide grep)
 ## 4. Decision — the readiness marker
 
 **`data-testid="dashboard-ready"` on the existing loaded-branch `PageHeader` actions
-wrapper** (`<div className="flex items-center gap-2 flex-wrap">`, `Dashboard.tsx:451`).
+wrapper** (`<div className="flex items-center gap-2 flex-wrap">`, `Dashboard.tsx:507` at `a980489a`).
 
 Why this element:
 
@@ -273,8 +279,8 @@ that was wrong (finding on #1844, comment 4158072653).
 
 ## 8. Risks / rollback
 
-- `uncertainty`: #1833 may change before merging (line numbers, `logHref` expression, copy
-  `Log`). The owner re-reads the landed code and adjusts U3/U4 patterns and the role-name
+- `uncertainty` (partly resolved): #1833 merged 2026-10-03 as `04a36937`, so the line numbers
+  above are as of `a980489a` and may drift again. The owner re-reads the landed code and adjusts U3/U4 patterns and the role-name
   regex to match; the marker design does not depend on #1833's internals.
 - `uncertainty`: E4's More-sheet assumption — if a mounted `Quick Log` link exists on mobile,
   the old line 149 might have been passing on it rather than the header; switching to the

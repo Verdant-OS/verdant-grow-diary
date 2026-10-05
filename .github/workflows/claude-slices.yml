@@ -22,12 +22,20 @@ permissions:
 # it never waits behind a builder run and superseded PR pushes cancel. Each
 # merge-queue entry gets its own group keyed on the queued head SHA, so it can
 # neither wait behind a builder run nor be cancelled by a newer request.
+# Concurrency is evaluated before the job `if`, so only events that pass the
+# builder's own trigger gate join `builder`. Every other comment or label event
+# gets a unique group and can never replace a pending real request.
 concurrency:
   group: >-
     claude-slices-${{
       github.event_name == 'merge_group' && format('mq-{0}', github.event.merge_group.head_sha) ||
       github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) ||
-      'builder'
+      (github.actor == 'cheekhimself' &&
+        ((github.event_name == 'issue_comment' && github.event.action == 'created' &&
+          contains(github.event.comment.body, '@claude')) ||
+         (github.event_name == 'issues' && github.event.action == 'labeled' &&
+          github.event.label.name == 'claude-slice'))) && 'builder' ||
+      format('noop-{0}', github.run_id)
     }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -95,6 +103,14 @@ jobs:
             if (/\.sql$/i.test(path)) return true;
             if (/(?:\.lockb?$|(?:^|\/)(?:package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|Pipfile\.lock)$)/i.test(path)) return true;
             if (/(?:^|\/)\.env(?:\.|$)/i.test(path)) return true;
+            // Code CI executes with repository secrets: manifests (scripts), tool
+            // configs and test setup. A draft could otherwise plant code there.
+            if (/(?:^|\/)package\.json$/i.test(path)) return true;
+            if (/(?:^|\/)(?:[tj]sconfig[^/]*\.json|\.npmrc|\.yarnrc(?:\.yml)?|bunfig\.toml|\.nvmrc|\.node-version)$/i.test(path)) return true;
+            if (/(?:^|\/)[^/]+\.config\.[^/]+$/i.test(path)) return true;
+            if (/(?:^|\/)(?:vitest|vite|playwright)\.(?:setup|workspace)[^/]*$/i.test(path)) return true;
+            if (/(?:^|\/)(?:setup-?tests?|test-?setup|global[-_.]?(?:setup|teardown))[^/]*$/i.test(path)) return true;
+            if (/^src\/test\/setup/i.test(path)) return true;
             const executable = /^(?:src|scripts|tests|e2e|packages)\//i.test(path) && !/\.md$/i.test(path);
             return executable && (
               /auth|oauth|rls|action[-_]?(?:queue|detail|outcome|follow[-_]?up|response[-_]?memory|completion|status)|linked[-_]?actions?|assigned[-_]?tent[-_]?actions?|live[-_]?proof[-_]?action[-_]?status|recent[-_]?action[-_]?response|device[-_]?(?:control|command)|actuator/i.test(path) ||
@@ -132,6 +148,12 @@ jobs:
               './**/*.lock', './**/*.lockb',
               './**/package-lock.json', './**/npm-shrinkwrap.json', './**/pnpm-lock.yaml',
               './**/.env*',
+              './**/package.json', './**/tsconfig*.json', './**/jsconfig*.json',
+              './**/.npmrc', './**/.yarnrc*', './**/bunfig.toml', './**/.nvmrc', './**/.node-version',
+              './**/*.config.*', './**/vitest.setup*', './**/vite.setup*', './**/playwright.setup*',
+              './**/vitest.workspace*', './**/*setupTests*', './**/*setup-tests*', './**/*test-setup*',
+              './**/*global-setup*', './**/*global-teardown*', './**/*globalSetup*', './**/*globalTeardown*',
+              './src/test/setup*',
             ];
             const codeGlobs = [
               '*auth*', '*Auth*', '*OAuth*', '*[rR][lL][sS]*',
@@ -190,12 +212,17 @@ jobs:
               'AGENTS.md', 'CLAUDE.md', 'GEMINI.md', 'docs/agents/OWNERSHIP.md',
               'docs/agents/CURRENT_STATE.md', '.env.production', 'src\\store\\auth.tsx',
               '../src/lib/libraryRules.ts', '/src/lib/libraryRules.ts', '',
+              'package.json', 'nested/app/package.json', 'vite.config.ts', 'vitest.config.ts',
+              'vitest.config.mts', 'playwright.config.ts', 'e2e/playwright.ci.config.ts',
+              'eslint.config.js', 'tsconfig.json', 'tsconfig.app.json', 'packages/x/tsconfig.json',
+              '.npmrc', 'bunfig.toml', 'src/test/setup.ts', 'src/test/setupTests.ts',
+              'vitest.setup.ts', 'vitest.workspace.ts', 'e2e/global-setup.ts', 'e2e/global-teardown.ts',
             ];
             const allowed = [
               'docs/library.md', 'docs/auth-guide.md', 'docs/agents/claude-slices.md',
               'src/lib/libraryRules.ts', 'src/lib/sensorDeviceLabels.ts',
               'src/test/libraryRules.test.ts', 'src/test/component.test.tsx',
-              'src/pages/Knowledge.tsx', 'docs/authorization-guide.md', 'package.json',
+              'src/pages/Knowledge.tsx', 'docs/authorization-guide.md', 'docs/package-json.md',
               'src/lib/guidedActionChecklistRules.ts', 'src/lib/actionResponsePairingRules.ts',
               'src/test/action-response-pairing-rules.test.ts',
             ];
@@ -208,6 +235,8 @@ jobs:
             const requiredDenies = [
               'Read(./.git/**)', 'Read(//proc/**)', 'Bash(bun *)', 'Bash(bunx *)', 'Bash(node *)',
               'Bash(npx *)', 'Bash(*/scripts/git-push.sh*)', `Bash(${ACTION_PUSH_WRAPPER}:*)`,
+              'Edit(./**/package.json)', 'Write(./**/package.json)', 'Edit(./**/*.config.*)',
+              'Write(./**/*.config.*)', 'Edit(./**/tsconfig*.json)', 'Write(./src/test/setup*)',
             ];
             requiredDenies.forEach(rule => assert.ok(deny.includes(rule), rule));
             console.log(`Claude policy regression tests: PASS (${blocked.length + allowed.length + 3 + requiredDenies.length} cases)`);
@@ -235,13 +264,38 @@ jobs:
           chmod 444 "$RUNNER_TEMP/claude-slice-policy.cjs" "$RUNNER_TEMP/claude-slice-settings.json"
           echo "base=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      - name: Require bubblewrap PID isolation before Claude runs
+        if: steps.billing.outputs.configured == 'true'
+        # The pinned action installs bubblewrap and relaxes the Ubuntu AppArmor
+        # user-namespace restriction only when allowed_non_write_users is set, which
+        # this workflow does not set. Without a PID namespace, a subprocess can read
+        # the Claude process's /proc/<pid>/environ, credential included. So install
+        # and enable it here and fail the job, before any credential is passed,
+        # unless a PID-isolated sandbox demonstrably works.
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap
+          if sysctl -n kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          visible=$(bwrap --unshare-pid --die-with-parent --ro-bind / / --proc /proc --dev /dev \
+            sh -c 'ls /proc | grep -cE "^[0-9]+$"')
+          if [ "$visible" -gt 3 ]; then
+            echo "bubblewrap PID isolation is not effective ($visible processes visible); refusing to run Claude." >&2
+            exit 1
+          fi
+          echo "bubblewrap PID isolation verified ($visible processes visible inside the sandbox)."
+
       - name: Implement one Claude slice
         if: steps.billing.outputs.configured == 'true'
         uses: anthropics/claude-code-action@8ce9314fa9a404564fa7e954cd84f25bcba2b829 # v1, verified 2026-09-28
         # Issue text is untrusted. The pinned action scrubs Anthropic, cloud and
         # Actions secrets from Claude's subprocesses only when allowed_non_write_users
-        # is set, so enable the scrub explicitly. It requires bubblewrap, which the
-        # action installs, and isolates subprocesses from the Claude process.
+        # is set, so enable the scrub explicitly. Subprocess PID isolation needs a
+        # working bubblewrap, which the previous step installs and verifies (the job
+        # fails if it doesn't work). The scrub itself is best-effort per the action's
+        # docs, so commands that can read a file path and publish it are not allowed.
         env:
           CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
         with:
@@ -261,8 +315,8 @@ jobs:
             --model claude-sonnet-5-5
             --max-turns 40
             --permission-mode acceptEdits
-            --allowedTools "Read,Glob,Grep,Bash(git status *),Bash(git diff *),Bash(git log *),Bash(git switch -c claude/*),Bash(git add *),Bash(git commit *),Bash(gh issue view *),Bash(gh issue comment *),Bash(gh pr view *),Bash(gh pr list *)"
-            --disallowedTools "Bash(gh pr merge),Bash(gh pr merge *),Bash(gh pr ready),Bash(gh pr ready *),Bash(gh pr review),Bash(gh pr review *),Bash(gh pr create *),Bash(git push *),Bash(git *push*),Bash(gh api *),Bash(gh workflow *),Bash(bun *),Bash(bunx *),Bash(npm *),Bash(npx *),Bash(node *),WebFetch,WebSearch"
+            --allowedTools "Read,Glob,Grep,Bash(git status *),Bash(git diff),Bash(git diff --stat),Bash(git diff --cached),Bash(git diff --cached --stat),Bash(git log *),Bash(git switch -c claude/*),Bash(git add *),Bash(git commit -m *),Bash(gh issue view *),Bash(gh pr view *),Bash(gh pr list *)"
+            --disallowedTools "Bash(gh issue comment),Bash(gh issue comment *),Bash(*--no-index*),Bash(*--output*),Bash(*/proc/*),Bash(*environ*),Bash(git commit *-F*),Bash(git commit *--file*),Bash(git commit *-t *),Bash(git commit *--template*),Bash(git commit *-C *),Bash(git commit *-c *),Bash(git commit *--reuse-message*),Bash(git commit *--reedit-message*),Bash(gh pr merge),Bash(gh pr merge *),Bash(gh pr ready),Bash(gh pr ready *),Bash(gh pr review),Bash(gh pr review *),Bash(gh pr create *),Bash(git push *),Bash(git *push*),Bash(gh api *),Bash(gh workflow *),Bash(bun *),Bash(bunx *),Bash(npm *),Bash(npx *),Bash(node *),WebFetch,WebSearch"
           prompt: |
             You are Claude, builder of one Verdant slice. Read AGENTS.md, CLAUDE.md
             and docs/agents/CURRENT_STATE.md first, and return SENTINEL_ACK.
@@ -297,7 +351,8 @@ jobs:
             Never edit migrations/SQL, supabase/, RLS, auth, Edge functions, Action Queue
             code, lockfiles or device control. Also leave governance, .github/, .claude/,
             docs/agents/OWNERSHIP.md and docs/agents/CURRENT_STATE.md alone. If the slice
-            needs a locked path, stop and comment "HOLD-CHEEK: needs locked path <path>".
+            needs a locked path, stop and write "HOLD-CHEEK: needs locked path <path>" in
+            your tracking comment (gh issue comment is not available in this job).
             No production database access on knk. HOLD #1250 stays on HOLD.
             Do not touch PRs #1625, #1727, #1737, #1735, #1369 or #1767.
             Never read, print or commit credentials, private environment values or tokens.
@@ -455,3 +510,26 @@ jobs:
         run: *locked_path_policy
       - name: Test locked and allowed paths, empty diffs and mixed diffs
         run: node "$RUNNER_TEMP/claude-slice-policy.cjs" --self-test
+      - name: Test the credential guards in the extracted workflow
+        # Fails closed if the bubblewrap gate is dropped or a file-reading command
+        # that can publish is allowed again.
+        run: |
+          node - "$RUNNER_TEMP/claude-slices.yml" <<'NODE'
+          const assert = require('node:assert/strict');
+          const yml = require('node:fs').readFileSync(process.argv[2], 'utf8');
+          const allowed = yml.match(/--allowedTools "([^"]*)"/)?.[1];
+          const denied = yml.match(/--disallowedTools "([^"]*)"/)?.[1];
+          assert.ok(allowed && denied, 'allowedTools and disallowedTools must be present');
+          const allow = allowed.split(',');
+          for (const bad of ['Bash(gh issue comment *)', 'Bash(git diff *)', 'Bash(git commit *)']) {
+            assert.ok(!allow.includes(bad), `${bad} must not be allowed`);
+          }
+          for (const rule of ['Bash(gh issue comment *)', 'Bash(*--no-index*)', 'Bash(*--output*)', 'Bash(*/proc/*)', 'Bash(git commit *-F*)']) {
+            assert.ok(denied.split(',').includes(rule), `${rule} must be denied`);
+          }
+          const gate = yml.indexOf('bwrap --unshare-pid');
+          const claude = yml.indexOf('uses: anthropics/claude-code-action@');
+          assert.ok(gate > 0 && gate < claude, 'the bubblewrap PID-isolation gate must run before the Claude step');
+          assert.ok(/refusing to run Claude[\s\S]{0,40}exit 1/.test(yml), 'the gate must fail the job');
+          console.log('Claude credential guards: PASS');
+          NODE

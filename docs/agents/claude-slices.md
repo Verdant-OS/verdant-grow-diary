@@ -67,9 +67,12 @@ which names its owner and independent reviewer.
 4. Explicit model selected by Matthew: `claude-sonnet-5-5`. The workflow limits
    a session to 40 turns and 45 minutes. Builder runs share one `builder`
    concurrency group: at most one runs at a time and a running build is never
-   cancelled. GitHub keeps only one _pending_ run per group, so a newer request
-   replaces an older one that is still waiting; check the Actions history and
-   repost a request that shows as cancelled. PR validation uses a per-PR group,
+   cancelled. GitHub keeps only one _pending_ run per group, so a newer
+   authorized request (an `@claude` comment from Matthew or a `claude-slice`
+   label) replaces an older one that is still waiting; check the Actions history
+   and repost a request that shows as cancelled. Concurrency is evaluated before
+   the job's trigger gate, so every other comment or label event gets its own
+   one-off group and can never cancel a waiting request. PR validation uses a per-PR group,
    and each merge-queue entry uses its own group keyed on the queued head SHA,
    so neither waits behind or is cancelled by a builder run.
 5. After this workflow is independently reviewed and lands through the normal
@@ -95,13 +98,18 @@ spend ceiling.
 
 Claude must not edit migrations/SQL, `supabase/`, RLS, auth, Edge functions,
 Action Queue code, lockfiles, or device control. If a slice needs a locked path,
-Claude stops and comments `HOLD-CHEEK: needs locked path <path>`. No production
+Claude stops and writes `HOLD-CHEEK: needs locked path <path>` in its tracking comment. No production
 database access on knk. HOLD #1250 remains on HOLD. PRs #1625, #1727, #1737,
 #1735, #1369 and #1767 are outside this slice.
 
 The policy also protects governance files, `.github/`, `.claude/`, `.grok/`,
 Git metadata, `docs/agents/OWNERSHIP.md`, `docs/agents/CURRENT_STATE.md`, and private
-environment files. File-edit denials cover the common locked paths. Before any
+environment files. It also locks code that CI executes with repository secrets
+when a maintainer starts CI on a draft: every `package.json` (its scripts), every
+`*.config.*` module (Vite, Vitest, Playwright, ESLint and the rest),
+`tsconfig*.json`/`jsconfig*.json`, `.npmrc`, `.yarnrc*`, `bunfig.toml`, Node version
+files, Vitest/Playwright setup and workspace files, `src/test/setup*`, and
+Playwright global setup and teardown files. File-edit denials cover the common locked paths. Before any
 push or new PR, the publish job checks the committed diff using the same path
 policy as the Claude PR guard. SQL and lockfiles are blocked anywhere in the
 tree. Auth, RLS, Action Queue and device-control code are blocked in source,
@@ -121,7 +129,7 @@ actionlint and focused policy regressions on PRs, including this Codex draft. It
 also checks out the base, verifies the PR head and extracts only the workflow
 file for actionlint; it does not check out or execute PR application code.
 Neither job impersonates an existing required check. In a `merge_group` run all
-three jobs report skipped: the builder still requires an authorized comment or
+four jobs (builder, publish, locked paths, configuration) report skipped: the builder still requires an authorized comment or
 label, and both validation jobs are gated on `pull_request` events, where
 `github.head_ref` and the PR SHAs exist.
 
@@ -137,8 +145,24 @@ keeps both credentials out of reach:
 - **Max or API credential.** The Claude step sets
   `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` (the pinned action enables it only for
   `allowed_non_write_users` otherwise), which removes Anthropic credentials from
-  every command Claude runs and isolates those commands from the Claude process
-  with bubblewrap. Read access to `/proc` is denied.
+  the environment of every command Claude runs. The scrub alone doesn't protect
+  the Claude process's own `/proc/<pid>/environ`, and the action's docs call it
+  best-effort, so the workflow adds two layers:
+  - **A fail-closed isolation gate.** Before the credential is passed, a step
+    installs bubblewrap, lifts Ubuntu's AppArmor user-namespace restriction, and
+    runs `bwrap --unshare-pid` to confirm that a sandboxed process sees only its
+    own PIDs. If it can't, the job fails and Claude never runs. That the Claude CLI
+    then uses bubblewrap for its subprocesses rests on Anthropic's documentation
+    (`NOT_MEASURED` until a real run).
+  - **No command that can read a file path and publish it.** `gh issue comment`
+    is not allowed (Claude reports through the action's own tracking comment).
+    `git diff` is allowed only without arguments (plain, `--stat`, `--cached`),
+    so it can't use `--no-index` or a path outside the repository. `git commit`
+    is allowed only with `-m`, and `-F`/`--file`/`--template`/`-C`/`-c` are denied.
+    Any command mentioning `--no-index`, `--output`, `/proc/` or `environ` is
+    denied. The `Read(//proc/**)` denial covers only the Read tool.
+  - The configuration job fails if the gate is removed, moved after the Claude
+    step, or stops failing the job, or if any of these commands is allowed again.
 - **No repository code runs.** Installs, tests, builds and other runners (`bun`,
   `bunx`, `npm`, `npx`, `node` and similar) are denied, and git hooks point at an
   empty read-only directory, so code planted in the checkout never executes while
@@ -154,8 +178,9 @@ prohibit reading, printing or committing credentials.
 Source configuration and fixture tests can establish the trigger gates,
 no-credential exit, locked-path policy and workflow syntax. A real Claude trigger,
 Max model access, draft creation, and automatic review routing remain
-**NOT_MEASURED** until Matthew installs the app, adds the secret, and a real
-`@claude` run opens a draft. GDP owns its routing/stall handling and the #1767
+**NOT_MEASURED** until Matthew adds the secret and a real `@claude` run opens a
+draft (no GitHub App is needed). Whether the bubblewrap gate passes on
+`ubuntu-latest` is also measured only by that first real run. GDP owns its routing/stall handling and the #1767
 ownership follow-up; this slice provides the entry point and instructions.
 
 The repository's existing `required-check-audit` workflow is a post-merge audit

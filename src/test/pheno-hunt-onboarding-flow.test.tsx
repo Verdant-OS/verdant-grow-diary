@@ -242,6 +242,9 @@ describe("PhenoHuntNew onboarding flow", () => {
     fireEvent.click(screen.getByTestId("ph-toggle-p2"));
     const save = screen.getByTestId("ph-save-btn") as HTMLButtonElement;
     expect(save.disabled).toBe(true);
+    // #573: Confirmation unlocks only after the Goals step has been opened.
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-goals"));
+    expect(save.disabled).toBe(true);
     fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-confirmation"));
     const confirmation = screen.getByTestId("pheno-setup-confirm-toggle");
     expect(confirmation).toBeDefined();
@@ -277,6 +280,8 @@ describe("PhenoHuntNew onboarding flow", () => {
     fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-candidates"));
     fireEvent.click(screen.getByTestId("ph-toggle-p1"));
     fireEvent.click(screen.getByTestId("ph-toggle-p2"));
+    // #573: Confirmation unlocks only after the Goals step has been opened.
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-goals"));
     fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-confirmation"));
     fireEvent.click(screen.getByTestId("pheno-setup-confirm-toggle"));
 
@@ -297,6 +302,8 @@ describe("PhenoHuntNew onboarding flow", () => {
     fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-candidates"));
     fireEvent.click(screen.getByTestId("ph-toggle-p1"));
     fireEvent.click(screen.getByTestId("ph-toggle-p2"));
+    // #573: Confirmation unlocks only after the Goals step has been opened.
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-goals"));
     fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-confirmation"));
     fireEvent.click(screen.getByTestId("pheno-setup-confirm-toggle"));
 
@@ -356,6 +363,131 @@ describe("PhenoHuntNew onboarding flow", () => {
       expect(
         screen.getByTestId("pheno-onboarding-stepper-step-goals").getAttribute("data-complete"),
       ).toBe("true");
+    } finally {
+      clearLocalStorageForTest();
+    }
+  });
+
+  // #573: Create was reachable from step 2 with the default evidence goals
+  // never shown. Confirmation (and so Create) now stays locked until the
+  // Goals step has been opened in this draft.
+  it("confirmation and create stay locked until the Goals step is reviewed", async () => {
+    entMode.current = "pro";
+    renderPage();
+    await waitFor(() => screen.getByTestId("pheno-onboarding-stepper"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-candidates"));
+    fireEvent.click(screen.getByTestId("ph-toggle-p1"));
+    fireEvent.click(screen.getByTestId("ph-toggle-p2"));
+
+    const confirmStep = screen.getByTestId(
+      "pheno-onboarding-stepper-step-confirmation",
+    ) as HTMLButtonElement;
+    expect(confirmStep.disabled).toBe(true);
+    fireEvent.click(confirmStep);
+    expect(screen.queryByTestId("pheno-step-confirmation")).toBeNull();
+    expect((screen.getByTestId("ph-save-btn") as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-goals"));
+    expect(confirmStep.disabled).toBe(false);
+    fireEvent.click(confirmStep);
+    expect(screen.getByTestId("pheno-step-confirmation")).toBeDefined();
+  });
+
+  it("Next cannot advance onto a locked confirmation from a resumed checklist draft", async () => {
+    entMode.current = "pro";
+    setLocalStorageItemForTest(
+      "verdant:pheno-hunt-draft:u1:grow-1:all",
+      JSON.stringify({
+        name: "Resumed hunt",
+        notes: "",
+        selected: ["p1", "p2"],
+        evidenceGoals: ["structure"],
+        currentStep: "checklist",
+      }),
+    );
+    try {
+      renderPage();
+      await waitFor(() => screen.getByTestId("ph-draft-restored"));
+      fireEvent.click(screen.getByTestId("pheno-step-next"));
+      expect(screen.queryByTestId("pheno-step-confirmation")).toBeNull();
+      expect((screen.getByTestId("ph-save-btn") as HTMLButtonElement).disabled).toBe(true);
+    } finally {
+      clearLocalStorageForTest();
+    }
+  });
+
+  it("a resumed draft saved on confirmation without a goals review reopens on Goals", async () => {
+    entMode.current = "pro";
+    setLocalStorageItemForTest(
+      "verdant:pheno-hunt-draft:u1:grow-1:all",
+      JSON.stringify({
+        name: "Resumed hunt",
+        notes: "",
+        selected: ["p1", "p2"],
+        evidenceGoals: ["structure"],
+        currentStep: "confirmation",
+      }),
+    );
+    try {
+      renderPage();
+      await waitFor(() => screen.getByTestId("ph-draft-restored"));
+      expect(screen.queryByTestId("pheno-step-confirmation")).toBeNull();
+      expect(screen.getByTestId("pheno-evidence-goals")).toBeDefined();
+    } finally {
+      clearLocalStorageForTest();
+    }
+  });
+
+  it("a resumed draft that already reviewed goals keeps confirmation unlocked", async () => {
+    entMode.current = "pro";
+    setLocalStorageItemForTest(
+      "verdant:pheno-hunt-draft:u1:grow-1:all",
+      JSON.stringify({
+        name: "Resumed hunt",
+        notes: "",
+        selected: ["p1", "p2"],
+        evidenceGoals: ["structure"],
+        currentStep: "confirmation",
+        goalsReviewed: true,
+      }),
+    );
+    try {
+      renderPage();
+      await waitFor(() => screen.getByTestId("ph-draft-restored"));
+      expect(screen.getByTestId("pheno-step-confirmation")).toBeDefined();
+    } finally {
+      clearLocalStorageForTest();
+    }
+  });
+
+  // Codex review on #1840: discarding a reviewed draft must not carry the
+  // goals-reviewed flag into the fresh draft.
+  it("discarding a reviewed draft re-locks confirmation until Goals is opened again", async () => {
+    entMode.current = "pro";
+    setLocalStorageItemForTest(
+      "verdant:pheno-hunt-draft:u1:grow-1:all",
+      JSON.stringify({
+        name: "Resumed hunt",
+        notes: "",
+        selected: ["p1", "p2"],
+        evidenceGoals: ["structure"],
+        currentStep: "confirmation",
+        goalsReviewed: true,
+      }),
+    );
+    try {
+      renderPage();
+      await waitFor(() => screen.getByTestId("ph-draft-restored"));
+      fireEvent.click(screen.getByTestId("ph-draft-discard"));
+      fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-candidates"));
+      fireEvent.click(screen.getByTestId("ph-toggle-p1"));
+      fireEvent.click(screen.getByTestId("ph-toggle-p2"));
+      const confirmStep = screen.getByTestId(
+        "pheno-onboarding-stepper-step-confirmation",
+      ) as HTMLButtonElement;
+      expect(confirmStep.disabled).toBe(true);
+      fireEvent.click(confirmStep);
+      expect(screen.queryByTestId("pheno-step-confirmation")).toBeNull();
     } finally {
       clearLocalStorageForTest();
     }

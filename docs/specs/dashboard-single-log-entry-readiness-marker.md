@@ -38,10 +38,10 @@ need nothing.
 
 ## 2. Problem, restated against source
 
-- `src/pages/Dashboard.tsx:453-459` renders a `PageHeader` action
+- `src/pages/Dashboard.tsx:509-515` (at `a980489a`) renders a `PageHeader` action
   `<Button data-testid="dashboard-daily-grow-check-entry">` → `withGrowId("/daily-check", scopedGrowId)`,
-  label `Quick Log`. It exists **only in the loaded branch** (lines 437+); the error branch
-  (366-389) and loading branch (391-433) render a header with no actions. `established fact`
+  label `Quick Log`. It exists **only in the loaded branch** (return from line 493); the error branch
+  (422-445) and loading branch (447-489) render a header with no actions. `established fact`
 - #1833 (merged as `04a36937`) adds `<TonightTentHomeCard … logHref={withGrowId("/daily-check", homeTent?.growId ?? scopedGrowId)} />`
   (`Dashboard.tsx:536` at `a980489a`)
   directly below the `PageHeader`. Its `Log` link (`data-testid="tonight-tent-home-log"`,
@@ -117,9 +117,9 @@ Add a one-line load-bearing comment on the wrapper, in the style of the `__root.
 ### 5.1 Production — `src/pages/Dashboard.tsx` (route to **Blue Dream**)
 
 1. Delete the `<Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">…</Button>`
-   block (lines 453-459 at deploy tip) and its comment.
+   block (lines 509-515 at `a980489a`) and its comment.
 2. Add `data-testid="dashboard-ready"` + the comment above to the actions wrapper.
-3. Replace the stale comment at lines 495-497 ("single Quick Log entry point
+3. Replace the stale comment at lines 558-560 (at `a980489a`) ("single Quick Log entry point
    (QuickLogV2Fab)") with one that names the home-card `Log` as the page's single primary
    Log entry. Keep it to two lines.
 4. Do **not** touch `DailyGrowCheckStatusCard`, `DashboardDailyGrowCheckPanel`, `MobileNav`,

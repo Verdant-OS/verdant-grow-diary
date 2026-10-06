@@ -154,6 +154,30 @@ describe("Feed reused receipt now on another plant", () => {
       "receipt_target_moved",
     );
   });
+
+  it("keeps the verified destination for history review after a reload", async () => {
+    acceptedThenLost();
+    const first = sheet();
+    fill();
+    await uncertain();
+    readbackOverride.event = { grow_id: "grow-b", tent_id: "tent-b", plant_id: "plant-b" };
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+    await waitFor(() => expect(screen.getByTestId("qlv2-history-review-link")).toBeVisible());
+    first.unmount();
+
+    sheet();
+    const href = screen.getByTestId("qlv2-history-review-link").getAttribute("href")!;
+    expect(href).toContain("grow-b");
+    expect(href).toContain("plantId=plant-b");
+    expect(href).not.toContain("plant-a");
+    expect(screen.queryByTestId("qlv2-save-retry")).toBeNull();
+    expect(JSON.parse(window.sessionStorage.getItem(storageKey())!).historyReviewTarget).toEqual({
+      growId: "grow-b",
+      tentId: "tent-b",
+      plantId: "plant-b",
+    });
+    expect(rpc).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("Feed permanent replay refusal recovery", () => {

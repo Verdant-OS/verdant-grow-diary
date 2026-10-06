@@ -1,4 +1,9 @@
 import type { WateringTypedEventInput } from "./writeQuickLogWateringTypedEvent";
+import {
+  copyHistoryReviewTarget,
+  historyReviewTargetAllowed,
+  type PendingQuickLogHistoryReviewTarget,
+} from "./quickLogHistoryReviewTargetRules";
 import type { ResolvedQuickLogV2Target } from "./quickLogV2Rules";
 import { projectRootZoneManualObservationFromDetails } from "./rootZoneManualObservationRules";
 import { isUuid } from "./isUuid";
@@ -23,6 +28,8 @@ export interface PendingQuickLogWatering {
   // Set when the server refuses this key in a way no exact retry can resolve.
   // The draft then waits for Timeline review and an explicit discard.
   historyCheckReason?: QuickLogHistoryCheckReason;
+  /** Only with receipt_target_moved: where the original entry lives now. */
+  historyReviewTarget?: PendingQuickLogHistoryReviewTarget;
 }
 
 export const WATERING_RECOVERY_UNAVAILABLE =
@@ -145,6 +152,7 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogW
       "resolved",
       "attachments",
       "historyCheckReason",
+      "historyReviewTarget",
     ])
   )
     return false;
@@ -152,6 +160,8 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogW
     value.historyCheckReason !== undefined &&
     !quickLogSaveRequiresHistoryCheck(value.historyCheckReason)
   )
+    return false;
+  if (!historyReviewTargetAllowed(value.historyCheckReason, value.historyReviewTarget))
     return false;
   if (
     value.version !== 1 ||
@@ -280,12 +290,15 @@ export async function claimPendingQuickLogWatering(
 export async function markPendingQuickLogWateringHistoryCheck(
   record: PendingQuickLogWatering | null | undefined,
   reason: unknown,
+  reviewTarget?: PendingQuickLogHistoryReviewTarget | null,
 ): Promise<{ status: "marked"; record: PendingQuickLogWatering } | { status: "blocked" }> {
   try {
     if (
       !record ||
       !validRecord(record, record.ownerId) ||
-      !quickLogSaveRequiresHistoryCheck(reason)
+      !quickLogSaveRequiresHistoryCheck(reason) ||
+      // Only a moved receipt carries a review target, and it must be well formed.
+      (reviewTarget != null && !historyReviewTargetAllowed(reason, reviewTarget))
     )
       return { status: "blocked" };
     const locks = window.navigator.locks;
@@ -294,7 +307,13 @@ export async function markPendingQuickLogWateringHistoryCheck(
       const current = readPendingQuickLogWatering(record.ownerId);
       if (current.status !== "pending" || !sameRecord(current.record, record))
         return { status: "blocked" as const };
-      const marked: PendingQuickLogWatering = { ...current.record, historyCheckReason: reason };
+      const marked: PendingQuickLogWatering = {
+        ...current.record,
+        historyCheckReason: reason,
+        ...(reviewTarget != null
+          ? { historyReviewTarget: copyHistoryReviewTarget(reviewTarget) }
+          : {}),
+      };
       window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
       const verified = readPendingQuickLogWatering(record.ownerId);
       return verified.status === "pending" && sameRecord(verified.record, marked)
@@ -344,8 +363,8 @@ function sameClaimIgnoringHistoryMarker(
   a: PendingQuickLogWatering,
   b: PendingQuickLogWatering,
 ): boolean {
-  const { historyCheckReason: _a, ...restA } = a;
-  const { historyCheckReason: _b, ...restB } = b;
+  const { historyCheckReason: _a, historyReviewTarget: _ta, ...restA } = a;
+  const { historyCheckReason: _b, historyReviewTarget: _tb, ...restB } = b;
   return JSON.stringify(restA) === JSON.stringify(restB);
 }
 

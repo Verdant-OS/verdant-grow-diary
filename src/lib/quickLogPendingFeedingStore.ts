@@ -1,4 +1,9 @@
 import type { FeedingTypedEventInput } from "./writeFeedingTypedEvent";
+import {
+  copyHistoryReviewTarget,
+  historyReviewTargetAllowed,
+  type PendingQuickLogHistoryReviewTarget,
+} from "./quickLogHistoryReviewTargetRules";
 import type { ResolvedQuickLogV2Target } from "./quickLogV2Rules";
 import {
   buildFeedingFormPayload,
@@ -22,6 +27,8 @@ export interface PendingQuickLogFeeding {
   resolved: ResolvedQuickLogV2Target;
   /** Durable refusal of this same key; absent on older pending records. */
   historyCheckReason?: QuickLogHistoryCheckReason | FeedingRejectionHistoryReason;
+  /** Only with receipt_target_moved: where the original entry lives now. */
+  historyReviewTarget?: PendingQuickLogHistoryReviewTarget;
 }
 
 export const FEEDING_RECOVERY_UNAVAILABLE =
@@ -97,6 +104,7 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogF
       "payload",
       "resolved",
       "historyCheckReason",
+      "historyReviewTarget",
     ])
   )
     return false;
@@ -111,6 +119,8 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogF
     value.historyCheckReason !== undefined &&
     !feedingHistoryCheckReason(value.historyCheckReason)
   )
+    return false;
+  if (!historyReviewTargetAllowed(value.historyCheckReason, value.historyReviewTarget))
     return false;
   const p = value.payload;
   const r = value.resolved;
@@ -232,14 +242,24 @@ function feedingHistoryCheckReason(
 export function markPendingQuickLogFeedingHistoryCheck(
   record: PendingQuickLogFeeding | null | undefined,
   reason: unknown,
+  reviewTarget?: PendingQuickLogHistoryReviewTarget | null,
 ): { status: "marked"; record: PendingQuickLogFeeding } | { status: "blocked" } {
   try {
     if (!record || !validRecord(record, record.ownerId) || !feedingHistoryCheckReason(reason))
       return { status: "blocked" };
+    // Only a moved receipt carries a review target, and it must be well formed.
+    if (reviewTarget != null && !historyReviewTargetAllowed(reason, reviewTarget))
+      return { status: "blocked" };
     const current = readPendingQuickLogFeeding(record.ownerId);
     if (current.status !== "pending" || !sameRecord(current.record, record))
       return { status: "blocked" };
-    const marked: PendingQuickLogFeeding = { ...current.record, historyCheckReason: reason };
+    const marked: PendingQuickLogFeeding = {
+      ...current.record,
+      historyCheckReason: reason,
+      ...(reviewTarget != null
+        ? { historyReviewTarget: copyHistoryReviewTarget(reviewTarget) }
+        : {}),
+    };
     window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
     const verified = readPendingQuickLogFeeding(record.ownerId);
     return verified.status === "pending" && sameRecord(verified.record, marked)

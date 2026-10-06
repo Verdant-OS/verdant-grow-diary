@@ -554,7 +554,12 @@ function QuickLogV2SheetForOwner({
   // Where a target-moved original entry lives now, from the verified readback.
   // Persisted on the pending Note so a reload still links to the right Timeline.
   const [historyReviewScope, setHistoryReviewScope] =
-    useState<PendingQuickLogNoteReviewTarget | null>(initialNote?.historyReviewTarget ?? null);
+    useState<PendingQuickLogNoteReviewTarget | null>(
+      initialNote?.historyReviewTarget ??
+        initialWatering?.historyReviewTarget ??
+        initialFeeding?.historyReviewTarget ??
+        null,
+    );
   const retryPending = wateringRetryPending || exactRetryPending;
   const [submissionLocked, setSubmissionLocked] = useState(Boolean(initialSubmission));
   // Synchronous in-flight guard. The save-state flags are React
@@ -1380,6 +1385,7 @@ function QuickLogV2SheetForOwner({
     if (historyCheck) setExactRetryPending(true);
     historyCheckRequiredRef.current = historyCheck;
     setHistoryCheckRequired(historyCheck);
+    setHistoryReviewScope(record.historyReviewTarget ?? null);
     setFailedWaterPhotoUpload(false);
     setWaterPhotoOmitted(false);
     keepSubmissionLockedRef.current = true;
@@ -1424,6 +1430,7 @@ function QuickLogV2SheetForOwner({
     setExactRetryPending(true);
     historyCheckRequiredRef.current = Boolean(record.historyCheckReason);
     setHistoryCheckRequired(historyCheckRequiredRef.current);
+    setHistoryReviewScope(record.historyReviewTarget ?? null);
     keepSubmissionLockedRef.current = true;
     submissionLockedRef.current = true;
     setSubmissionLocked(true);
@@ -1588,6 +1595,7 @@ function QuickLogV2SheetForOwner({
           const marked = markPendingQuickLogFeedingHistoryCheck(
             exactFeedingSubmission.recovery,
             result.reason,
+            result.reviewTarget ?? null,
           );
           if (marked.status === "marked") {
             feedingRetrySubmissionRef.current = {
@@ -1963,6 +1971,7 @@ function QuickLogV2SheetForOwner({
           const marked = await markPendingQuickLogWateringHistoryCheck(
             exactWateringSubmission.recovery,
             wateringResult.reason,
+            wateringResult.reviewTarget ?? null,
           );
           if (!canContinueNote()) return;
           if (marked.status === "marked") {

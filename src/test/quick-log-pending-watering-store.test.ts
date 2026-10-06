@@ -708,3 +708,48 @@ describe("storage failures and exact completion", () => {
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: input });
   });
 });
+
+describe("moved-receipt review target on a pending Water", () => {
+  const target = { growId, tentId: "66666666-6666-4666-8666-666666666666", plantId: null };
+
+  it("persists the verified destination with receipt_target_moved across reads", async () => {
+    const original = record();
+    await claimPendingQuickLogWatering(original);
+    const marked = {
+      ...record(),
+      historyCheckReason: "receipt_target_moved" as const,
+      historyReviewTarget: target,
+    };
+    await expect(
+      markPendingQuickLogWateringHistoryCheck(original, "receipt_target_moved", target),
+    ).resolves.toEqual({ status: "marked", record: marked });
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: marked });
+    await expect(reconcilePendingQuickLogWateringHistoryDiscard(original)).resolves.toEqual({
+      status: "cleared",
+    });
+  });
+
+  it("refuses a review target with any reason other than receipt_target_moved", async () => {
+    const original = record();
+    await claimPendingQuickLogWatering(original);
+    const raw = window.sessionStorage.getItem(key());
+    await expect(
+      markPendingQuickLogWateringHistoryCheck(original, "idempotency_key_retracted", target),
+    ).resolves.toEqual({ status: "blocked" });
+    expect(window.sessionStorage.getItem(key())).toBe(raw);
+  });
+
+  it.each([
+    ["a target without the moved reason", { historyCheckReason: "idempotency_key_conflict" }],
+    ["a target with no reason", {}],
+    ["a malformed target", { historyCheckReason: "receipt_target_moved", bad: true }],
+  ])("fails closed on a stored record with %s", (_case, extra) => {
+    const { bad, ...rest } = extra as Record<string, unknown>;
+    const historyReviewTarget = bad ? { growId: 42, tentId: null, plantId: null } : target;
+    window.sessionStorage.setItem(
+      key(),
+      JSON.stringify({ ...record(), ...rest, historyReviewTarget }),
+    );
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
+  });
+});

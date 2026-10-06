@@ -74,7 +74,7 @@ branch: claude/strain-library-v1-1-db-parity-cutover
 base: verdant-grow-diary
 checkout: git switch claude/strain-library-v1-1-db-parity-cutover && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1827
-head_sha: 7067077129f51a54e0c25ba8734ffed1df430256, observed 2026-10-06 22:04 UTC (CodeRabbit fix on top of the base merge; 35/35 required PASS)
+head_sha: 7067077129f51a54e0c25ba8734ffed1df430256, observed 2026-10-06 22:06 UTC (CodeRabbit fix on top of the base merge; 35/35 required PASS)
 state: review — PR open, not draft; 35/35 required PASS, awaiting independent acceptance. Head 706707712 (0 behind) refuses out-of-range cultivar THC/CBD percentages; Security DB Local 150/150, migration integrity, strain gate, GA E2E and dispatch history PASS; required 35/35 PASS. Previous head aa6306ab4: CI workflow (35 required) success, Security DB Local 150/150. At the previous head 2a2de17dc: 35/35 required PASS; GA E2E (webkit) re-run PASS; Security DB Local 150/150, Strain gate, migration integrity and dispatch history PASS (b4e569ea2 pins the parity receipt to production; d7a753f29 adds its guard to the strain gate; 2a2de17dc refuses non-sample verification and repeated terpenes). At a73dbfb40 (earlier head): 35/35 required PASS, Security DB Local 150/150, Strain gate PASS, migration integrity PASS. All automated review threads resolved; no independent acceptance yet.
 next_action: Chemdawg routes 706707712 for an independent exact-head PASS (Blue Dream seat); merge then waits for Matthew (HOLD-CHEEK); record results in docs/agents/CURRENT_STATE.md (PR #1830).
 files: supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql; src/lib/cultivarDatabase{ReadModel,ParityRules,SeedPayloadRules}.ts; src/lib/cultivarReference{Service,SourceRules}.ts; src/lib/supabasePublicReadKeyRules.ts; src/hooks/usePublishedCultivars.ts; src/constants/cultivarReferenceSourceCopy.ts; src/lib/featureFlags.ts; src/pages/Cultivar{Page,sIndex}.tsx; scripts/audit-cultivar-database-parity.ts; scripts/run-cultivar-reference-rls-harness.ts; .github/workflows/{strain-reference-library-v1-gate,security-db-local}.yml; package.json; docs/product/strain-reference-library-v1-1-db-cutover.md; six src/test/cultivar*/strain* tests
@@ -82,7 +82,7 @@ blockers: HOLD-CHEEK — adds a migration, so merge waits for Matthew (OWNERSHIP
 artifacts: PR #1827 checks; Security DB Local runs; docs/product/strain-reference-library-v1-1-db-cutover.md (production-only runbook); CURRENT_STATE entry via PR #1830
 reviewer_seat: Blue Dream (.tsx product files and migration); Claude cannot accept its own work
 claimed_by: Claude, 2026-10-06 20:34 UTC (renewal comments posted on PR #1827 and PR #1830)
-last_updated: 2026-10-06 17:04 CT, by Claude (status refresh)
+last_updated: 2026-10-06 17:06 CT, by Claude (status refresh)
 ```
 
 ### CLAUDE-CURRENT-STATE-1827-STATUS
@@ -94,15 +94,15 @@ branch: claude/current-state-1827-status
 base: verdant-grow-diary
 checkout: git switch claude/current-state-1827-status && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1830
-head_sha: 1c198e8c60dc0b205d13334de74cb2ce2a64e5b5, verified source checkpoint 2026-10-06 22:04 UTC. Later merge-from-base and handoff-only commits sit on top of it, so the PR head is ahead of this SHA: per the template, confirm this SHA is an ancestor of the PR's current head, adopt that head and name it in your claim. Do not inherit this checkpoint's CI or review claims.
-state: CI — PR open, not draft. The CURRENT_STATE entry records #1827 at 706707712 (2026-10-06 22:04 UTC; 35/35 required PASS); both PRs are non-draft pending the owner's draft decision; for #1827's current head use only the head_sha of the block above; this block names no #1827 head of its own.
+head_sha: 32edf2b72a814a89d71ffd567cfd65ecbcb41769, verified source checkpoint 2026-10-06 22:06 UTC. Later merge-from-base and handoff-only commits sit on top of it, so the PR head is ahead of this SHA: per the template, confirm this SHA is an ancestor of the PR's current head, adopt that head and name it in your claim. Do not inherit this checkpoint's CI or review claims.
+state: CI — PR open, not draft. The CURRENT_STATE entry records #1827 at 706707712 (2026-10-06 22:06 UTC; 35/35 required PASS); both PRs are non-draft pending the owner's draft decision; for #1827's current head use only the head_sha of the block above; this block names no #1827 head of its own.
 next_action: Refresh the #1827 entry once exact-head CI on #1827 reports; merge origin/verdant-grow-diary into the branch when it moves (normal push; never rebase or force-push).
 files: docs/agents/CURRENT_STATE.md; docs/agents/HANDOFF_LOG.md
 blockers: Vercel check red = account block (owner). Rebase conflicts possible with other CURRENT_STATE/HANDOFF_LOG edits; resolve by keeping every entry.
 artifacts: PR #1830
 reviewer_seat: Critical Mass (docs/state); Claude cannot accept its own work
 claimed_by: Claude, 2026-10-06 20:34 UTC (renewal comments posted on PR #1827 and PR #1830)
-last_updated: 2026-10-06 17:04 CT, by Claude (status refresh)
+last_updated: 2026-10-06 17:06 CT, by Claude (status refresh)
 ```
 
 ### CHEM-MOVE-TENT-READ-HONESTY-001

@@ -47,10 +47,9 @@ this entry's earlier 2026-10-01 versions.
     community cultivar profiles, `src/lib/cultivarDetailSeo.ts`), and `#1867` / `#1877` /
     `#1848` (edits to `.github/workflows/security-db-local.yml` and the local replay lane).
     Merging base restarts CI and awaits the owner's go-ahead.
-  - **Claims are stale:** both `docs/agents/HANDOFF_LOG.md` blocks carry
-    `claimed_by: Claude, 2026-10-01 13:41 CT` and no PR renewal comment has been posted, so under
-    `AGENTS.md` (Agent Handoff / Coverage) the blocks are open for coverage once this branch
-    merges. Posting renewals awaits the owner's decision.
+  - **Claims renewed (owner instruction, 2026-10-06):** `claimed_by: Claude, 2026-10-06 20:34 UTC`
+    posted on `#1827` and `#1830` (no competing claim or release on either PR); both
+    `docs/agents/HANDOFF_LOG.md` blocks carry the same claim.
   - `#1830`'s own CI at `69ded12a4` was cancelled on 2026-10-05 because GitHub-hosted runners
     were not acquired ("The job was not acquired by Runner of type hosted even after multiple
     attempts"); failed runs were re-run 2026-10-06 ~20:12 UTC. The CodeQL run could not be

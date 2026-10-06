@@ -81,8 +81,8 @@ files: supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.s
 blockers: HOLD-CHEEK — adds a migration, so merge waits for Matthew (OWNERSHIP.md §4.3); production apply is Matthew's only. Vercel check red = account block (owner, dashboard). Independent exact-head PASS from Blue Dream / Durban Poison / Critical Mass not yet recorded; owner named Grok as reviewer 2026-10-01.
 artifacts: PR #1827 checks; Security DB Local runs; docs/product/strain-reference-library-v1-1-db-cutover.md (production-only runbook); CURRENT_STATE entry via PR #1830
 reviewer_seat: Blue Dream (.tsx product files and migration); Claude cannot accept its own work
-claimed_by: Claude, 2026-10-01 13:41 CT
-last_updated: 2026-10-06 15:15 CT, by Claude (status refresh only; claim not renewed)
+claimed_by: Claude, 2026-10-06 20:34 UTC (renewal comments posted on PR #1827 and PR #1830)
+last_updated: 2026-10-06 15:34 CT, by Claude (claim renewed on the task PR)
 ```
 
 ### CLAUDE-CURRENT-STATE-1827-STATUS
@@ -101,8 +101,8 @@ files: docs/agents/CURRENT_STATE.md; docs/agents/HANDOFF_LOG.md
 blockers: Vercel check red = account block (owner). Rebase conflicts possible with other CURRENT_STATE/HANDOFF_LOG edits; resolve by keeping every entry.
 artifacts: PR #1830
 reviewer_seat: Critical Mass (docs/state); Claude cannot accept its own work
-claimed_by: Claude, 2026-10-01 13:41 CT
-last_updated: 2026-10-06 15:15 CT, by Claude (status refresh only; claim not renewed)
+claimed_by: Claude, 2026-10-06 20:34 UTC (renewal comments posted on PR #1827 and PR #1830)
+last_updated: 2026-10-06 15:34 CT, by Claude (claim renewed on the task PR)
 ```
 
 ### CHEM-MOVE-TENT-READ-HONESTY-001

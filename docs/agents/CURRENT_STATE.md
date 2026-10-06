@@ -31,7 +31,7 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-06T20:47 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-06T20:50 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
@@ -42,17 +42,20 @@ this entry's earlier 2026-10-01 versions.
     **1 failed — `Vercel`** (account block, non-required). `GA E2E (webkit)` re-run (attempt 2)
     **`PASS`**. 45 review threads, all resolved; no approving or changes-requested review.
   - **Base merged (owner instruction, 2026-10-06):** `aa6306ab4` merges `verdant-grow-diary` at
-    `cfe09322e` (43 commits; merge committed 20:35:53 UTC) with no conflicts; **0 behind** at 20:47 UTC. No new migration
+    `cfe09322e` (43 commits; merge committed 20:35:53 UTC) with no conflicts; **0 behind** at 20:50 UTC. No new migration
     landed, so `20261001160000` still sorts last; published-migration integrity verifier OK against
     the base. Local checks at `aa6306ab4` (`established fact`, Windows clone): `tsc` 0 diagnostics;
     14 strain, cultivar and security-lane test files 182/182, including `#1889`'s
     `cultivar-sample-verification-noindex` and `#1867`'s grant-path lane test; offline strict
     parity READY 10/10; harness `bun build` OK; `Sentinel-Version` `2026-09-28.3` OK. The merged
     `test:security-db-local` chain keeps every base harness plus `test:cultivar-reference-db-security`.
+  - **Security DB Local at `aa6306ab4`: `PASS`** — run `37528498605` reported
+    `[cultivar-reference-rls] 150 passed, 0 failed` (observed 20:50 UTC), the first real-database
+    run after the 43-commit base merge.
   - **Exact-head CI at `aa6306ab4` (`established fact`, 20:47 UTC):** these four **`PASS`**:
     `Published migration integrity`, `Strain Reference Library V1 Gate`,
-    `Google Analytics E2E` and `Dispatch history e2e`. Required contexts 6 pass / 29 pending, none failed; Security DB Local in
-    progress — both `NOT_MEASURED` until they finish. The 35/35 PASS belongs to `2a2de17dc`.
+    `Google Analytics E2E` and `Dispatch history e2e`. Required contexts 11 pass / 24 pending at 20:50 UTC, none failed —
+    `NOT_MEASURED` until they finish. The 35/35 PASS belongs to `2a2de17dc`.
     Non-required reds: `Vercel` (account block), both Cloudflare `Workers Builds` (fail on every
     PR), and two lockfile-advisory audits — the root `Dependency & Security CI` and the
     `Cursor SDK local orchestration spike` job "Nested static proofs and production isolation"

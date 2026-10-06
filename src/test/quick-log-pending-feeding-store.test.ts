@@ -45,6 +45,8 @@ describe("durable Feed history-review refusal", () => {
     "idempotency_receipt_missing",
     "idempotency_key_retracted",
     "idempotency_key_conflict",
+    "rpc:invalid_typed_payload",
+    "volume_ml:invalid",
   ] as const)("marks only the original %s claim and retains its complete identity", (reason) => {
     const original = record();
     claimPendingQuickLogFeeding(original);

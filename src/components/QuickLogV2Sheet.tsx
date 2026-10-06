@@ -29,7 +29,11 @@ import {
 } from "@/lib/quickLogPendingStarterWaterStore";
 import { buildWateringRecoveryForm } from "@/lib/quickLogWateringRecoveryViewModel";
 import { mayCorrectRejectedWatering } from "@/lib/quickLogWateringRejectionRules";
-import { mayCorrectRejectedFeeding } from "@/lib/quickLogFeedingRejectionRules";
+import {
+  feedingHistoryCheckMessage,
+  feedingRejectionNeedsHistoryCheck,
+  mayCorrectRejectedFeeding,
+} from "@/lib/quickLogFeedingRejectionRules";
 import {
   readPendingQuickLogFeeding,
   claimPendingQuickLogFeeding,
@@ -509,7 +513,7 @@ function QuickLogV2SheetForOwner({
           : WATERING_RECOVERY_PENDING
         : initialFeeding
           ? initialFeeding.historyCheckReason
-            ? quickLogReasonToOperatorMessage(initialFeeding.historyCheckReason)
+            ? feedingHistoryCheckMessage(initialFeeding.historyCheckReason)
             : FEEDING_RECOVERY_PENDING
           : null,
   );
@@ -1425,7 +1429,7 @@ function QuickLogV2SheetForOwner({
     setSubmissionLocked(true);
     setLocalError(
       record.historyCheckReason
-        ? quickLogReasonToOperatorMessage(record.historyCheckReason)
+        ? feedingHistoryCheckMessage(record.historyCheckReason)
         : FEEDING_RECOVERY_PENDING,
     );
   }
@@ -1572,7 +1576,15 @@ function QuickLogV2SheetForOwner({
       if (!canContinueNote()) return;
       setFeedingSaving(false);
       if (result.ok !== true) {
-        if (quickLogSaveRequiresHistoryCheck(result.reason)) {
+        // A validation rejection after an earlier ambiguous attempt repeats on
+        // every same-key Retry; keep the key and route to Timeline review.
+        if (
+          quickLogSaveRequiresHistoryCheck(result.reason) ||
+          feedingRejectionNeedsHistoryCheck({
+            reason: result.reason,
+            priorClaim: pendingFeedingSubmission !== null,
+          })
+        ) {
           const marked = markPendingQuickLogFeedingHistoryCheck(
             exactFeedingSubmission.recovery,
             result.reason,
@@ -1588,7 +1600,7 @@ function QuickLogV2SheetForOwner({
           historyCheckRequiredRef.current = true;
           setHistoryCheckRequired(true);
           setExactRetryPending(true);
-          const message = quickLogReasonToOperatorMessage(result.reason);
+          const message = feedingHistoryCheckMessage(result.reason);
           setLocalError(message);
           toast.error(message);
           setSaveStatus("");

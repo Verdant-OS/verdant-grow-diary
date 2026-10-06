@@ -104,6 +104,21 @@ never be granted from any client trust surface:
 - A query string on a return URL
 - Local storage, session storage, or any client-trusted flag
 
+## Entitlement and checkout environment
+
+`PAYMENTS_ENVIRONMENT` must be set explicitly to `live` or `sandbox`. Nothing
+infers it from which Paddle keys are configured.
+
+- Entitlement gates (exports, live sensors, sensor ingest, bridge-token minting,
+  Pheno Tracker, credit-pack eligibility) read through
+  `resolveServerBillingEnvironment()`. When the selector is unset or invalid it
+  fails closed to `live`: verified live rows still entitle, and sandbox rows
+  never do. The edge runtime logs `billing_environment_unresolved` once with the
+  reason.
+- `get-paddle-price` picks the Paddle gateway with
+  `resolveRequiredServerBillingEnvironment()` and returns
+  `503 price_resolution_unavailable` when the selector is unset or invalid.
+
 ## AI credit environment boundary
 
 AI credit metering uses the same server-authoritative environment decision as

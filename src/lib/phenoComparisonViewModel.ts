@@ -66,6 +66,15 @@ export interface PhenoCandidateInput {
   readonly candidateLabel?: string | null;
   readonly growLabel?: string | null;
   readonly tentLabel?: string | null;
+  /**
+   * The plant's stored plants.grow_id / plants.tent_id as of the workspace
+   * load (#1005). Informational only: the evidence → Quick Log handoff does
+   * NOT use these; it resolves the plant's current grow/tent from Quick Log's
+   * live plant catalog (phenoEvidenceQuickLogTargetGate), so a plant moved
+   * after this page loaded can't open a dead handoff.
+   */
+  readonly growId?: string | null;
+  readonly tentId?: string | null;
   readonly plantLabel?: string | null;
   readonly strain?: string | null;
   readonly stage?: string | null;

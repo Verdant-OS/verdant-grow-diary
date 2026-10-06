@@ -249,8 +249,9 @@ show GREEN.
    the D1.1-A pins in §5.4 if chosen, and `AppShell.tsx` only under D1.2-B. No route,
    schema, RLS, auth, edge-function, migration, dependency or copy-constant change.
 6. Reviewers: Blue Dream (`Dashboard.tsx`), Critical Mass (tests/e2e). The owner does not
-   self-review. Chemdawg merges only after 35/35 required checks and an independent PASS on
-   the exact head (OWNERSHIP.md §2).
+   self-review. The merge-queue owner merges only after 35/35 required checks and an
+   independent PASS on the exact head. OWNERSHIP.md §2 names that role Chemdawg; per
+   `docs/agents/CURRENT_STATE.md` §Start here, Grok 91 holds it in current practice.
 
 ---
 
@@ -263,8 +264,9 @@ that was wrong (finding on #1844, comment 4158072653).
 - **DECIDED 2026-10-06 (Matthew Cheek): D1.1 = A, D1.2 = A.** D1.3 and D2 keep their defaults.
 - **D1 — which Log controls may stay visible.** After the header link is
   removed, a one-tent Dashboard still shows more than one Log control (`established fact`, §5.2
-  table). This slice only meets the brief's "one visible Log control" if GDP says which ones
-  stay. The tests then pin exactly that set.
+  table). Decided 2026-10-06 (D1.1-A, D1.2-A): the Dashboard's own `QuickLogV2Fab` is removed,
+  and AppShell's triggers (plus MobileNav's `Log` tab, §5.2) stay as named chrome exemptions.
+  E2 and E4 pin exactly that set. The options below are kept as the decision record.
   - **D1.1 — the page's own `QuickLogV2Fab` (desktop).** **A (recommended):** drop it from
     Dashboard; other pages keep theirs. **B:** keep it as a named exemption. See §5.4 for the
     counts and pins.
@@ -303,5 +305,6 @@ that was wrong (finding on #1844, comment 4158072653).
 - **Coordination:** #1849's owner (a Claude session, reassigned from Codex 2026-10-01). E1 is
   handled by this slice after #1849 lands; acknowledged in issuecomment-5936713821.
 - **Routing and product calls:** GDP (D1.1 and D1.2 blocking; D1.3 and D2 non-blocking).
-- **Merge:** Chemdawg, after 35/35 required checks and an independent PASS on the exact head; no
-  auto-merge.
+- **Merge:** the merge-queue owner (Chemdawg in OWNERSHIP.md; Grok 91 in current practice per
+  CURRENT_STATE.md §Start here), after 35/35 required checks and an independent PASS on the exact
+  head; no auto-merge.

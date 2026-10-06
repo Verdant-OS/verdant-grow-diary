@@ -367,7 +367,7 @@ describe("Timeline.tsx — fan-out collapse wire-up", () => {
     // this filter was tried and reviewed off in round 1 — deleted-parent
     // resolution now happens via the supplemental by-id lookup below instead.
     const growEventsQueryChain = TIMELINE_SRC.match(
-      /let growEventsQuery = supabase[\s\S]*?\.limit\(100\);/,
+      /let growEventsQuery = orderNewestFirstStable\([\s\S]*?\.limit\(100\);/,
     );
     expect(growEventsQueryChain).not.toBeNull();
     expect(growEventsQueryChain![0]).toMatch(/\.eq\(\s*"is_deleted",\s*false\s*\)/);

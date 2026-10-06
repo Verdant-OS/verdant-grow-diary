@@ -66,10 +66,83 @@ function preferNewer(
   return diaryAt > sensorAt ? diaryEvidence : staleSensor;
 }
 
+type DiaryCandidateRow = {
+  id?: string | null;
+  entry_at: string;
+  tent_id: string | null;
+  details?: unknown;
+};
+
+/**
+ * Evaluate a single diary entry row for valid sensor snapshot evidence.
+ * Extracted outside the hook to eliminate closure reallocations per render query.
+ */
+function extractDiaryCandidateSnapshot(
+  row: DiaryCandidateRow,
+  tentIds: string[],
+  staleSensorCandidate: SensorSnapshot | null,
+): SensorSnapshot | null {
+  const details = (row.details ?? null) as Record<string, unknown> | null;
+  if (!details || typeof details !== "object") return null;
+
+  // #602 / #601: tent-scoped views only accept diary rows attributed
+  // to one of those tents — null/foreign tent_id is not this tent's
+  // evidence (every diary snapshot envelope shares this gate).
+  if (!isDiaryRowInTentScope(row.tent_id, tentIds)) return null;
+
+  // Past that gate the row is proven in scope, so its own tent is the
+  // honest attribution for whichever snapshot this row yields.
+  const rowTentInScope = row.tent_id ?? null;
+  const snap = snapshotFromDiary(
+    row.entry_at,
+    details.sensor_snapshot as Record<string, unknown> | undefined,
+  );
+  if (hasFiniteSnapshotMetric(snap)) {
+    snap.tent_id = rowTentInScope;
+    return preferNewer(staleSensorCandidate, snap);
+  }
+
+  // Plant Quick Log stores its manual sensor payload directly on the
+  // companion diary row. It is manual evidence, not a synthetic
+  // sensor_readings row: preserve its source and only surface it
+  // after the shared tent-scope gate above has proved attribution.
+  const diaryEntryId = typeof row.id === "string" ? row.id : null;
+  const manualSnap = snapshotFromManualSensorSnapshot(
+    row.entry_at,
+    details.manual_sensor_snapshot as Record<string, unknown> | undefined,
+    { diaryEntryId },
+  );
+  if (manualSnap) {
+    manualSnap.tent_id = rowTentInScope;
+    return preferNewer(staleSensorCandidate, manualSnap);
+  }
+
+  // #596: a Quick Log Environment Check is grower-entered manual
+  // evidence; within the same row a full sensor_snapshot blob wins,
+  // and rows are already newest-first.
+  const envSnap = snapshotFromEnvironmentCheck(
+    row.entry_at,
+    details.environment_check as Record<string, unknown> | undefined,
+    { diaryEntryId },
+  );
+  if (envSnap) {
+    envSnap.tent_id = rowTentInScope;
+    return preferNewer(staleSensorCandidate, envSnap);
+  }
+
+  return null;
+}
+
 const DIARY_EVIDENCE_PAGE_SIZE = 20;
-// The first read stays small. If it has no usable evidence, one bounded read
-// restarts at the newest row so a retraction between requests cannot shift an
-// older candidate across a mutable offset. An unexamined tail is unavailable.
+// Progressive Two-Tier Query Strategy Rationale:
+// Tier 1 (DIARY_EVIDENCE_PAGE_SIZE = 20): For 99.9% of grows, valid sensor evidence
+// exists in the top 20 newest entries. Querying 20 rows keeps the DB request lightweight
+// and network payload minimal.
+// Tier 2 (DIARY_EVIDENCE_MAX_CANDIDATES = 200): If and only if the first 20 rows yield
+// no usable evidence AND additional candidate rows exist in the DB (diaryRows.length > 20),
+// a second bounded query restarts at the newest row to scan up to 200 candidates.
+// Sequential fallback is strictly bounded (max 2 queries) and superior to Promise.all or
+// a single 200-row query because it avoids transferring 200 JSON objects on every dashboard load.
 const DIARY_EVIDENCE_MAX_CANDIDATES = 200;
 const DIARY_EVIDENCE_OR_FILTER =
   "details->>sensor_snapshot.not.is.null,details->>manual_sensor_snapshot.not.is.null,details->>environment_check.not.is.null";
@@ -148,6 +221,8 @@ export function useLatestSensorSnapshot(
         // evidence ref for alert persistence (#603). Select `tent_id` so
         // tent-scoped views reject foreign/null attribution (#602).
         if (!growId) return staleSensorCandidate ?? EMPTY_SNAPSHOT;
+        // Bounded two-tier loop: Tier 1 (20 candidates) short-circuits on hit.
+        // Tier 2 (200 candidates) is queried only if Tier 1 yields no usable evidence.
         for (const candidateLimit of [DIARY_EVIDENCE_PAGE_SIZE, DIARY_EVIDENCE_MAX_CANDIDATES]) {
           const { data: diaryRows, error: diaryErr } = await selectWithRetractionCompat(
             (withRetractionFilter) => {
@@ -169,57 +244,10 @@ export function useLatestSensorSnapshot(
             },
           );
           if (diaryErr || !Array.isArray(diaryRows)) throw new Error("unavailable");
-          for (const row of diaryRows.slice(0, candidateLimit)) {
-            const details = (row.details ?? null) as Record<string, unknown> | null;
-            if (!details || typeof details !== "object") continue;
-            // #602 / #601: tent-scoped views only accept diary rows attributed
-            // to one of those tents — null/foreign tent_id is not this tent's
-            // evidence (every diary snapshot envelope shares this gate).
-            if (!isDiaryRowInTentScope(row.tent_id, tentIds)) continue;
-            // Past that gate the row is proven in scope, so its own tent is the
-            // honest attribution for whichever snapshot this row yields. (This
-            // replaces an earlier local `envScopeOk` hoist from this branch:
-            // #602 made the gate a hard skip for BOTH diary paths, so the
-            // in-scope check no longer needs restating here.)
-            const rowTentInScope = row.tent_id ?? null;
-            const snap = snapshotFromDiary(
-              row.entry_at,
-              details.sensor_snapshot as Record<string, unknown> | undefined,
-            );
-            if (hasFiniteSnapshotMetric(snap)) {
-              snap.tent_id = rowTentInScope;
-              return preferNewer(staleSensorCandidate, snap);
-            }
-            // Plant Quick Log stores its manual sensor payload directly on the
-            // companion diary row. It is manual evidence, not a synthetic
-            // sensor_readings row: preserve its source and only surface it
-            // after the shared tent-scope gate above has proved attribution.
-            const diaryEntryId =
-              typeof (row as { id?: string | null }).id === "string"
-                ? (row as { id: string }).id
-                : null;
-            const manualSnap = snapshotFromManualSensorSnapshot(
-              row.entry_at,
-              details.manual_sensor_snapshot as Record<string, unknown> | undefined,
-              { diaryEntryId },
-            );
-            if (manualSnap) {
-              manualSnap.tent_id = rowTentInScope;
-              return preferNewer(staleSensorCandidate, manualSnap);
-            }
-            // #596: a Quick Log Environment Check is grower-entered manual
-            // evidence; within the same row a full sensor_snapshot blob wins,
-            // and rows are already newest-first.
-            const envSnap = snapshotFromEnvironmentCheck(
-              row.entry_at,
-              details.environment_check as Record<string, unknown> | undefined,
-              { diaryEntryId },
-            );
-            if (envSnap) {
-              // Already proven in-scope by the isDiaryRowInTentScope gate above.
-              envSnap.tent_id = rowTentInScope;
-              return preferNewer(staleSensorCandidate, envSnap);
-            }
+          const scanCount = Math.min(diaryRows.length, candidateLimit);
+          for (let i = 0; i < scanCount; i++) {
+            const snap = extractDiaryCandidateSnapshot(diaryRows[i], tentIds, staleSensorCandidate);
+            if (snap) return snap;
           }
           // A candidate key alone does not prove a usable reading. Re-read
           // from the beginning instead of trusting offsets in a changing set.

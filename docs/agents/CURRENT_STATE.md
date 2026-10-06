@@ -31,11 +31,22 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-06T20:50 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-06T21:03 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
 
+- **Latest (`established fact`, GitHub API, 21:03 UTC):** head **`706707712`** (31 commits, 0
+  behind `verdant-grow-diary`) adds one CodeRabbit fix: the read model refuses cultivar
+  `thc_pct_*` / `cbd_pct_*` outside 0–100 (4 RED → GREEN; strain suites 134/134; offline strict
+  parity READY 10/10). It is a declared scorer change under `scripts/scorer-lock.mjs`, named in
+  the commit and in the PR body's "Changed checks" section.
+  - Exact head: `Published migration integrity` **`PASS`**; Security DB Local, the strain gate,
+    GA E2E, dispatch history and all 35 required contexts pending — `NOT_MEASURED`.
+  - Previous head `aa6306ab4`: the `CI` workflow (all 35 required contexts) completed
+    **success**, and Security DB Local passed 150/150.
+  - 46 review threads, all resolved; no approving or changes-requested review. Non-required
+    reds: `Vercel` and both Cloudflare `Workers Builds`.
 - **2026-10-06 update (`established fact`, GitHub API, 20:13–20:15 UTC):**
   - `#1827` head is still `2a2de17dc` (no commits since 2026-10-01): mergeable,
     `mergeStateStatus: UNSTABLE`; **35/35 required `PASS`**; 103 pass / 1 pending / 14 skipped /

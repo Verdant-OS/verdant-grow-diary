@@ -49,7 +49,7 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ```text
 TASK CLAUDE-CODE-ACTION-002  priority: other  status: OPEN
-goal: Lock auth-mutation and Action Queue I/O files for Claude slices by content, not only by filename (Codex's P1 on #1774: neutral-named files such as src/pages/ResetPassword.tsx passed). Owner decisions D1–D4 (Matthew, 2026-10-06). Workflow, doc and an empty exceptions file only; no app, schema, RLS, auth behavior, Edge, lockfile or device-control change.
+goal: Lock auth-mutation and Action Queue I/O files for Claude slices by content, not only by filename (Codex's P1 finding on #1774: neutral-named files such as src/pages/ResetPassword.tsx passed). The task's priority is other, not P1, by Matthew's explicit decision (2026-10-06): the finding was a P1 against #1774, and this follow-up slice is ranked other. Owner decisions D1–D4 (Matthew, 2026-10-06). Workflow, doc and an empty exceptions file only; no app, schema, RLS, auth behavior, Edge, lockfile or device-control change.
 branch: claude/vigilant-faraday-usy9mb
 base: verdant-grow-diary at cfe09322e3b6e5745c5e007dd064815542927580 (retargeted 2026-10-06 17:01 CT from codex/claude-code-action-slices-20260928 @ 343fe91b, #1774, which is not yet merged)
 checkout: git switch claude/vigilant-faraday-usy9mb && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
@@ -62,7 +62,7 @@ blockers: Merge order with #1774 (see next_action). The narrowed table-name rule
 artifacts: PR #1927 body (rebase record, P2 mapping, census, test and RED evidence, residual risk); docs/agents/claude-slices.md (Content locks, Residual risk); policy self-test inside .github/workflows/claude-slices.yml (run: extract the claude-slice-policy.cjs heredoc, then node <file> --self-test).
 reviewer_seat: Durban Poison (independent; Critical Mass fallback). Claude authored and cannot PASS.
 claimed_by: Claude, 2026-10-06 16:38 CT (owner reassignment 2026-10-06, #1774 comment 6025446068; round-2 assignment in session). No claimed_by PR comment, by Matthew's instruction.
-last_updated: 2026-10-06 17:34 CT, by Claude
+last_updated: 2026-10-06 17:36 CT, by Claude
 ```
 
 ### CLAUDE-LOOP-ENGINEERING-001

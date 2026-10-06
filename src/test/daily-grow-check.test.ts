@@ -318,10 +318,10 @@ describe("Daily Grow Check entry access — multi-surface", () => {
   it("Plant Detail entry preserves ?plantId= prefill", () => {
     expect(PLANT_DETAIL).toMatch(/\/daily-check\?plantId=/);
   });
-  it("Mobile nav 'More' sheet includes the Daily Grow Check flow entry", () => {
-    // Label renamed to grower-native "Quick Log"; the /daily-check route
-    // in the More sheet is the stable contract.
-    expect(MOBILE_NAV).toMatch(/to:\s*"\/daily-check",\s*label:\s*"Quick Log"/);
+  it("Mobile nav first row includes the Daily Grow Check flow entry", () => {
+    // One-Tent Home: the entry moved from the More sheet to the first-row
+    // "Log" tab; the /daily-check route is the stable contract.
+    expect(MOBILE_NAV).toMatch(/to:\s*"\/daily-check",\s*label:\s*"Log"/);
   });
   it("does not duplicate DailyCheck flow logic outside the page/rules", () => {
     for (const surface of [GROW_ROOM, MOBILE_NAV, DASHBOARD, PLANT_DETAIL]) {

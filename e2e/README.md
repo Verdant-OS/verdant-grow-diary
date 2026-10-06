@@ -30,9 +30,14 @@ Because of this:
   account must own the test plant and must not own real grower data you
   care about. Never use `matt@verdantgrowdiary.com`, the KEEP account or a
   customer account.
-- **Until a disposable test fixture exists, run the workflow manually
-  only.** There is intentionally no scheduled/nightly trigger — automated
-  scheduled smoke against a real grow is unsafe and is not enabled.
+- **Exactly one scheduled daily run, against the disposable test fixture
+  only.** The owner accepted the current fixture as disposable on
+  2026-10-01 (#1852), so the workflow runs once a day (09:17 UTC) on the
+  deploy branch tip, making two tagged saves. Every other run is manual,
+  push or pull request. Never point a scheduled run at a real grow. A
+  scheduled run has no person present: it never accepts an agreement
+  re-consent (it stops with BLOCKED; run an owner dispatch to accept) and
+  never runs the fixture bootstrap.
 - No automatic data cleanup, deletion, or mutation of existing grow data
   happens outside the intentional Quick Log save flow itself.
 
@@ -55,9 +60,10 @@ hunts with `buildE2eHuntName` (never append to the wizard prefill).
 - No localStorage token injection (unless produced by a real Playwright login).
 - No fake live sensor data; stale/non-usable snapshots are never attached.
 - No Action Queue / device-control writes.
-- No scheduled/nightly trigger in the CI workflow — the smoke runs only on
-  manual `workflow_dispatch` or on `push` / `pull_request` to
-  `verdant-grow-diary`, and skips cleanly when E2E config is unavailable.
+- Exactly one scheduled daily run in the CI workflow (09:17 UTC, #1852);
+  otherwise the smoke runs only on manual `workflow_dispatch` or on `push` /
+  `pull_request` to `verdant-grow-diary`, and skips cleanly when E2E config is
+  unavailable.
 - `e2e/.auth/user.json` is generated locally and is gitignored. Never commit it.
 - `e2e/results/` is gitignored. Never commit it.
 
@@ -139,7 +145,8 @@ The fixture validator:
 
 The smoke writes real diary entries into the E2E fixture, each tagged
 `[smoke <ISO timestamp>]`. No automatic cleanup is performed; periodically prune the E2E Test Plant's diary
-manually if desired. There is no scheduled or nightly smoke trigger.
+manually if desired. There is exactly one scheduled daily run (09:17 UTC),
+which adds two tagged saves a day.
 
 An **optional** UI-only bootstrap is available behind an explicit
 opt-in flag (`E2E_ALLOW_FIXTURE_BOOTSTRAP=true`). It is **off by
@@ -640,10 +647,11 @@ artifact and open `index.html` (HTML report) or the report files
 locally. For JSON/TXT report artifacts, download and open the file
 directly.
 
-There is no scheduled or nightly Quick Log smoke. Write-producing smoke
-must only run against a disposable test account/test plant, so the
-workflow stays manual-dispatch / PR / push only until such a fixture
-exists. See the real-write warning at the top of this file.
+There is exactly one scheduled daily Quick Log smoke (09:17 UTC, #1852),
+so a product-only push gets a save-timing receipt within a day.
+Write-producing smoke must only run against a disposable test account/test
+plant; the owner accepted the current fixture as disposable on 2026-10-01.
+See the real-write warning at the top of this file.
 
 ## Run from GitHub Actions manually
 

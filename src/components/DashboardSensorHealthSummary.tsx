@@ -25,6 +25,11 @@ interface Props {
   summary: SensorHealthSummary;
   /** Active alert count from useAlertsList. Used to render the calm empty state. */
   activeAlertCount: number;
+  /**
+   * False while the alerts read is pending or failed. The calm empty state
+   * only renders for a confirmed zero. Defaults to true for existing callers.
+   */
+  alertsKnown?: boolean;
   /** Optional grow id to wire timeline link. */
   growId: string | null;
   className?: string;
@@ -57,11 +62,12 @@ function StatusIcon({ status }: { status: SensorHealthSummary["status"] }) {
 export default function DashboardSensorHealthSummary({
   summary,
   activeAlertCount,
+  alertsKnown = true,
   growId,
   className,
 }: Props) {
   const toneClass = TONE_CLASSES[summary.tone];
-  const showEmptyAlerts = activeAlertCount === 0;
+  const showEmptyAlerts = alertsKnown && activeAlertCount === 0;
 
   return (
     <section

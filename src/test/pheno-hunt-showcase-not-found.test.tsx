@@ -31,6 +31,13 @@ vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: harness.user, session: null, loading: harness.authLoading }),
 }));
 
+// #1005: the evidence → Quick Log target gate reads the canonical tent
+// catalog; stub it so these suites keep their original axis without a
+// QueryClient (the gate has its own suites).
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({ data: [], isError: false, refetch: () => Promise.resolve() }),
+}));
+
 vi.mock("@/hooks/usePhenoHuntWorkspace", () => ({
   usePhenoHuntWorkspace: () => harness.ws,
 }));

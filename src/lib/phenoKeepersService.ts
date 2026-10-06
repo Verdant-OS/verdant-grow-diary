@@ -21,6 +21,7 @@ import {
 } from "@/lib/genetics/breedingReproductionRules";
 import { hasReversal } from "@/lib/phenoReversalsService";
 import { sanitizeStabilityRuns, type StabilityRun } from "@/lib/phenoStabilityRunRules";
+import { KEEPER_STABILITY_ROLLUP_LIMIT } from "@/lib/phenoHuntsIndexCardRules";
 
 export interface KeeperRow {
   readonly id: string;
@@ -144,16 +145,18 @@ export interface KeeperStabilityRow {
  * just the fields the cross-keeper stability dashboard needs. RLS scopes the
  * read to the owner (pheno_keepers_select_own: auth.uid() = user_id), so no
  * client-supplied user filter is trusted or needed; a bounded read (keepers
- * accumulate across seasons). Runs are re-sanitized on read. Best-effort:
- * returns [] on any error rather than throwing.
+ * accumulate across seasons). Runs are re-sanitized on read. A failed read
+ * REJECTS (#550): the hunts index catches it and flags the roll-up
+ * unavailable, so a failed read never renders as an empty ledger or as a hunt
+ * with zero keepers. `[]` means the read succeeded and found no keepers.
  */
 export async function listKeeperStabilityForOwner(): Promise<KeeperStabilityRow[]> {
   const { data, error } = await phenoDb
     .from("pheno_keepers")
     .select("id, hunt_id, keeper_name, stability_runs")
     .order("created_at", { ascending: true })
-    .limit(2000);
-  if (error || !data) return [];
+    .limit(KEEPER_STABILITY_ROLLUP_LIMIT);
+  if (error || !data) throw new Error("Could not load the keeper stability roll-up.");
   return data.map((r) => ({
     keeperId: r.id,
     huntId: r.hunt_id,
@@ -164,6 +167,20 @@ export async function listKeeperStabilityForOwner(): Promise<KeeperStabilityRow[
         : null,
     ),
   }));
+}
+
+/**
+ * Exact number of keepers the signed-in grower owns, from a head-only
+ * `count: "exact"` query (RLS-scoped like the roll-up). Independent of any
+ * response row cap, so the hunts index can prove its roll-up is complete
+ * before showing exact per-hunt keeper counts. Rejects rather than guessing.
+ */
+export async function countKeepersForOwner(): Promise<number> {
+  const { count, error } = await phenoDb
+    .from("pheno_keepers")
+    .select("id", { count: "exact", head: true });
+  if (error || typeof count !== "number") throw new Error("Could not count keepers.");
+  return count;
 }
 
 /**

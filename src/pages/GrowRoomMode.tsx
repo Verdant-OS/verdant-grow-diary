@@ -301,7 +301,7 @@ export default function GrowRoomMode() {
 
       <GrowRoomQuickActionsCard scopedGrowId={urlGrowId} />
 
-      {!showEmpty && <DailyGrowCheckStatusCard compact tentIds={tentIds} />}
+      {!showEmpty && <DailyGrowCheckStatusCard compact tentIds={tents ? tentIds : null} />}
 
       {showEmpty && (
         <EmptyState

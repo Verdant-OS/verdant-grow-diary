@@ -8,7 +8,7 @@
  * provenance fence before a snapshot is returned.
  */
 import { supabase } from "@/integrations/supabase/client";
-import type { QuickLogSensorSnapshot } from "./createQuickLogEvent";
+import type { QuickLogSensorSnapshot } from "./quickLogSensorSnapshotTypes";
 import { acquireQuickLogSensorSnapshot } from "./quickLogSensorSnapshotAcquisitionRules";
 import {
   effectiveSensorReadingsQuery,

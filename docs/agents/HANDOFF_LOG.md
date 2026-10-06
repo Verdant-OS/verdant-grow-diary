@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CLAUDE-CODE-ACTION-002
+
+```text
+TASK CLAUDE-CODE-ACTION-002  priority: other  status: OPEN
+goal: Lock auth-mutation and Action Queue I/O files for Claude slices by content, not only by filename (Codex's P1 on #1774: neutral-named files such as src/pages/ResetPassword.tsx passed). Owner decisions D1–D4 (Matthew, 2026-10-06). Workflow, doc and an empty exceptions file only; no app, schema, RLS, auth behavior, Edge, lockfile or device-control change.
+branch: claude/vigilant-faraday-usy9mb
+base: codex/claude-code-action-slices-20260928 at 343fe91b601ee631f1aa8c40fb4ba7006631697c (#1774, stacked; #1774 is in the merge queue)
+checkout: git switch claude/vigilant-faraday-usy9mb && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/codex/claude-code-action-slices-20260928
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1927 (draft)
+head_sha: 2c3609b1c84f7d5cbff10e9220bae307f4bffe53, observed on origin/claude/vigilant-faraday-usy9mb at 2026-10-06 21:38 UTC (16:38 CT). Earlier head: 5e4254d3dd3fc29ec550aedb580d4a4f4544bb77 (round 1). This block travels on a separate log-only branch, not on the task branch.
+state: pushed draft, round 2. Durban Poison gave PASS-with-P2 at 5e4254d3 (0 P1 / 4 P2); all four cleared at 2c3609b1: (P2-1) every content rule is evaluated and only excepted rules dropped, so an exception for one rule never clears the other; (P2-2) auth and Action Queue patterns widened to optional chaining, bracket access, ["auth"], destructuring, aliasing, ?.from, .from<Row>( and table-name declarations, with the forms still out of reach listed under Residual risk in docs/agents/claude-slices.md and the PR body; (P2-3) e2e-local/ added to the content roots; (P2-4) PR body corrected (Claude locked paths does not run at the stacked base; rebase, not retarget). Local only: extracted policy --self-test 204/204 PASS (was 163); RED shown on scratch copies for first-match logic, the round-1 regexes and the roots without e2e-local; census 92 files (auth-mutation 63, aq-io 31; 33 not already path-locked); --settings 21,040 bytes, strict superset of round 1 (+2 denies); trusted-base --diff output unchanged; YAML parse, Prettier, git diff --check and assert-docs-safety PASS; actionlint NOT_MEASURED this round. Hosted CI NOT_MEASURED at 2c3609b1.
+next_action: Durban Poison re-reviews the exact head 2c3609b1. After #1774 squash-merges, rebase this branch onto the verdant-grow-diary tip (not a retarget alone: the old merge-base would leave #1774's pre-squash commits in the diff); the rebased head needs a fresh exact-head review. Expect a red, non-required Claude locked paths check after that rebase, by design. Stay draft; no ready, merge or publish.
+files: .github/workflows/claude-slices.yml; docs/agents/claude-slices.md; config/claude-slice-lock-exceptions.json (new, { "exceptions": [] }).
+blockers: #1774 must land before the rebase and retarget. Rewriting the branch for that rebase needs the owner's go-ahead, because AGENTS.md forbids history rewrites and force-pushes without it. The narrowed table-name rule (declarations only; a bare-literal version locked 280 files, mostly source-scan tests) is a trade-off for the reviewer or Matthew to confirm. No PR claim/renewal comment posted: GitHub comments need Matthew's approval (CURRENT_STATE gates).
+artifacts: PR #1927 body (P2 mapping, census, test and RED evidence, residual risk); docs/agents/claude-slices.md (Content locks, Residual risk); policy self-test inside .github/workflows/claude-slices.yml (run: extract the claude-slice-policy.cjs heredoc, then node <file> --self-test).
+reviewer_seat: Durban Poison (independent; Critical Mass fallback). Claude authored and cannot PASS.
+claimed_by: Claude, 2026-10-06 16:38 CT (owner reassignment 2026-10-06, #1774 comment 6025446068; round-2 assignment in session). No claimed_by PR comment posted (see blockers).
+last_updated: 2026-10-06 16:38 CT, by Claude
+```
+
 ### CLAUDE-LOOP-ENGINEERING-001
 
 ```text

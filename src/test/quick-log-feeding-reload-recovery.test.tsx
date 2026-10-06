@@ -6,6 +6,8 @@ import type { QuickLogFeedingEventRpcArgs } from "@/lib/writeFeedingTypedEvent";
 import { claimPendingQuickLogNote } from "@/lib/quickLogPendingNoteStore";
 
 const owner = vi.hoisted(() => ({ id: "owner-a" }));
+// Lets a test move the read-back parent row, as another edit would have.
+const readbackOverride = vi.hoisted(() => ({ event: null as Record<string, unknown> | null }));
 const rpc = vi.fn();
 const toastSuccess = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
@@ -34,6 +36,7 @@ vi.mock("@/integrations/supabase/client", () => ({
                         grow_id: args.p_grow_id,
                         tent_id: args.p_tent_id,
                         plant_id: args.p_plant_id,
+                        ...readbackOverride.event,
                       }
                     : {
                         event_id: id,
@@ -124,12 +127,34 @@ function acceptedThenLost() {
   return ledger;
 }
 beforeEach(() => {
+  readbackOverride.event = null;
   owner.id = "owner-a";
   window.sessionStorage.clear();
   rpc.mockReset();
   toastSuccess.mockReset();
 });
 afterEach(() => vi.restoreAllMocks());
+
+describe("Feed reused receipt now on another plant", () => {
+  it("links history review to the verified destination, not the original plant", async () => {
+    acceptedThenLost();
+    sheet();
+    fill();
+    await uncertain();
+    readbackOverride.event = { grow_id: "grow-b", tent_id: "tent-b", plant_id: "plant-b" };
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+    await waitFor(() => expect(screen.getByTestId("qlv2-history-review-link")).toBeVisible());
+    const href = screen.getByTestId("qlv2-history-review-link").getAttribute("href")!;
+    expect(href).toContain("grow-b");
+    expect(href).toContain("plantId=plant-b");
+    expect(href).not.toContain("plant-a");
+    expect(screen.queryByTestId("qlv2-save-retry")).toBeNull();
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(window.sessionStorage.getItem(storageKey())!).historyCheckReason).toBe(
+      "receipt_target_moved",
+    );
+  });
+});
 
 describe("Feed permanent replay refusal recovery", () => {
   const permanentReasons = [

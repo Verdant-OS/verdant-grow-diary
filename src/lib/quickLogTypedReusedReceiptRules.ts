@@ -71,6 +71,27 @@ export function typedReusedEventRefusal(
   return "receipt_target_moved";
 }
 
+/** Where a moved parent row lives now, so history review links to the right Timeline. */
+export interface TypedReusedReviewTarget {
+  growId: string;
+  tentId: string | null;
+  plantId: string | null;
+}
+
+/** The verified current scope of a read-back parent row, or null when it is not well formed. */
+export function typedReusedMovedScope(value: unknown): TypedReusedReviewTarget | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const event = value as Record<string, unknown>;
+  const optional = (v: unknown) => v === null || (typeof v === "string" && v.length > 0);
+  if (typeof event.grow_id !== "string" || !event.grow_id) return null;
+  if (!optional(event.tent_id) || !optional(event.plant_id)) return null;
+  return {
+    growId: event.grow_id,
+    tentId: event.tent_id as string | null,
+    plantId: event.plant_id as string | null,
+  };
+}
+
 /** Why a readable typed child row does not confirm this receipt; null when it does. */
 export function typedReusedChildRefusal(
   expected: ExpectedTypedQuickLogEvent,

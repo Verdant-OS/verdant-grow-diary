@@ -386,7 +386,11 @@ describe("receipt identity", () => {
     const reusedChildReader = vi.fn();
     expect(
       await writeFeedingTypedEvent(baseInput(), { client, reusedEventReader, reusedChildReader }),
-    ).toEqual({ ok: false, reason: "receipt_target_moved" });
+    ).toEqual({
+      ok: false,
+      reason: "receipt_target_moved",
+      reviewTarget: { growId: "grow-1", tentId: "tent-1", plantId: "plant-2" },
+    });
     expect(reusedChildReader).not.toHaveBeenCalled();
   });
 

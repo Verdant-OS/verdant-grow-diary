@@ -18,6 +18,7 @@ import {
   type TypedQuickLogEventReader,
   type TypedQuickLogChildReader,
 } from "./quickLogTypedReusedReceipt";
+import type { TypedReusedReviewTarget } from "./quickLogTypedReusedReceiptRules";
 import { ROOT_ZONE_PRODUCT_CAP } from "./rootZoneObservationRules";
 import {
   quickLogSaveRequiresHistoryCheck,
@@ -83,7 +84,13 @@ export interface FeedingTypedEventInput {
 }
 
 export type WriteFeedingTypedEventResult =
-  { ok: true; eventId: string; reused: boolean } | { ok: false; reason: WriteFeedingFailureReason };
+  | { ok: true; eventId: string; reused: boolean }
+  | {
+      ok: false;
+      reason: WriteFeedingFailureReason;
+      /** Only with receipt_target_moved: where the reused entry lives now. */
+      reviewTarget?: TypedReusedReviewTarget;
+    };
 
 export type WriteFeedingFailureReason =
   | QuickLogHistoryCheckReason
@@ -300,7 +307,10 @@ export async function writeFeedingTypedEvent(
     // A read failure stays retryable with the same key; a confirmed mismatch is
     // returned again by every same-key Retry, so it goes to history review.
     if (receipt.status === "unavailable") return { ok: false, reason: "rpc:receipt_unverified" };
-    if (receipt.status === "refused") return { ok: false, reason: receipt.reason };
+    if (receipt.status === "refused")
+      return receipt.reviewTarget
+        ? { ok: false, reason: receipt.reason, reviewTarget: receipt.reviewTarget }
+        : { ok: false, reason: receipt.reason };
   }
 
   return {

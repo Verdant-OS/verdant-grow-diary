@@ -2,8 +2,10 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   typedReusedChildRefusal,
   typedReusedEventRefusal,
+  typedReusedMovedScope,
   type ExpectedTypedQuickLogEvent,
   type TypedReusedReceiptRefusal,
+  type TypedReusedReviewTarget,
 } from "./quickLogTypedReusedReceiptRules";
 
 export type TypedQuickLogEventReader = (
@@ -27,7 +29,12 @@ export type TypedReusedReceiptVerdict =
   /** Read failed, threw or timed out: same-key Retry may still confirm it. */
   | { status: "unavailable" }
   /** Read back and does not match: same-key Retry returns the same row. */
-  | { status: "refused"; reason: TypedReusedReceiptRefusal };
+  | {
+      status: "refused";
+      reason: TypedReusedReceiptRefusal;
+      /** Only for receipt_target_moved: where the original entry lives now. */
+      reviewTarget?: TypedReusedReviewTarget;
+    };
 
 export const readTypedQuickLogEvent: TypedQuickLogEventReader = async (id, signal) => {
   const query = supabase
@@ -66,7 +73,13 @@ export async function verifyActiveTypedQuickLogEvent(
     const { data, error } = await reader(expected.id, controller.signal);
     if (error) return { status: "unavailable" };
     const eventRefusal = typedReusedEventRefusal(expected, data);
-    if (eventRefusal) return { status: "refused", reason: eventRefusal };
+    if (eventRefusal) {
+      const reviewTarget =
+        eventRefusal === "receipt_target_moved" ? typedReusedMovedScope(data) : null;
+      return reviewTarget
+        ? { status: "refused", reason: eventRefusal, reviewTarget }
+        : { status: "refused", reason: eventRefusal };
+    }
     const child = await childReader(expected.eventType, expected.id, controller.signal);
     if (child.error) return { status: "unavailable" };
     const childRefusal = typedReusedChildRefusal(expected, child.data);

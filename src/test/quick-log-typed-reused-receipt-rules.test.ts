@@ -164,8 +164,24 @@ describe("typed Quick Log reused receipt", () => {
         vi.fn().mockResolvedValue({ data: row, error: null }),
         childReader,
       ),
-    ).toEqual({ status: "refused", reason });
+    ).toMatchObject({ status: "refused", reason });
     expect(childReader).not.toHaveBeenCalled();
+  });
+
+  it("carries the verified destination of a moved receipt for history review", async () => {
+    expect(
+      await verifyActiveTypedQuickLogEvent(
+        expected,
+        vi.fn().mockResolvedValue({
+          data: { ...active, grow_id: "grow-b", tent_id: null, plant_id: "plant-b" },
+          error: null,
+        }),
+      ),
+    ).toEqual({
+      status: "refused",
+      reason: "receipt_target_moved",
+      reviewTarget: { growId: "grow-b", tentId: null, plantId: "plant-b" },
+    });
   });
 
   it("gives up after the read deadline and aborts the outstanding read", async () => {

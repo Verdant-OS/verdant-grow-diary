@@ -1599,6 +1599,8 @@ function QuickLogV2SheetForOwner({
           // Explicit discard still requires clearing the unchanged exact journal.
           historyCheckRequiredRef.current = true;
           setHistoryCheckRequired(true);
+          // A moved receipt links Timeline to where the entry lives now.
+          setHistoryReviewScope(result.reviewTarget ?? null);
           setExactRetryPending(true);
           const message = feedingHistoryCheckMessage(result.reason);
           setLocalError(message);
@@ -1974,6 +1976,8 @@ function QuickLogV2SheetForOwner({
           // refused) still needs the unchanged journal cleared by discard.
           historyCheckRequiredRef.current = true;
           setHistoryCheckRequired(true);
+          // A moved receipt links Timeline to where the entry lives now.
+          setHistoryReviewScope(wateringResult.reviewTarget ?? null);
           setWateringRetryPending(false);
           setExactRetryPending(true);
           keepSubmissionLockedRef.current = true;

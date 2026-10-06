@@ -242,3 +242,76 @@ describe("re-review P2 fixes", () => {
     expect(checkMcp("mcp__supabasex__execute_sql", {})).toBe(null);
   });
 });
+
+describe("Codex review fixes", () => {
+  test("P1: a value-taking Playwright option is not counted as a spec filter", () => {
+    for (const cmd of [
+      "bunx playwright test --project=chromium-mocked --global-timeout 60000",
+      "bunx playwright test --project=chromium-mocked --tsconfig tsconfig.e2e.json",
+      "bunx playwright test --project=chromium-mocked --ui-port 9323",
+      "npx playwright test --project chromium-mocked --only-changed origin/main",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(
+      checkBash(
+        "bunx playwright test --project=chromium-mocked --global-timeout 60000 e2e/auth-loading.spec.ts",
+      ),
+    ).toBe(null);
+    expect(
+      checkBash(
+        "bunx playwright test --project=chromium-mocked --global-timeout=60000 auth-loading",
+      ),
+    ).toBe(null);
+  });
+  test("P2: bulk push modes that can include protected branches are denied", () => {
+    for (const cmd of [
+      "git push --all origin",
+      "git push origin --all",
+      "git push --mirror origin",
+      "git push --branches origin",
+      "git push origin :",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("git push --tags origin")).toBe(null);
+  });
+  test("P2: a wrapper's own options do not hide the command it runs", () => {
+    for (const cmd of [
+      "env -i git push --force origin claude/task",
+      "env --ignore-environment supabase db push",
+      "env -u HOME -C /tmp git push origin main",
+      "env -i PATH=/usr/bin git push -f",
+      'env -S "git push --force origin claude/task"',
+      "sudo -u runner -E git push --force",
+      "sudo --user=runner gh pr merge 1800",
+      "exec -a guard git push --force",
+      "time -p git push --force",
+      "time -f %e -o t.log supabase db push",
+      "env -- git push --force",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env -i HOME=/tmp git status")).toBe(null);
+    expect(checkBash("sudo -u runner git push origin claude/task")).toBe(null);
+  });
+  test("P2: clustered short flags do not hide a force-push or --no-verify", () => {
+    for (const cmd of [
+      "git push -uf origin claude/task",
+      "git push -fu origin claude/task",
+      "git push -qf",
+      "git commit -an -m wip",
+      "git commit -anm wip",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("git push -u origin claude/task")).toBe(null);
+    expect(checkBash("git commit -am 'fix: n-gram'")).toBe(null);
+    expect(checkBash("git commit -m 'fix: no-n here'")).toBe(null);
+  });
+  test("P2: gh pr ready --undo returns a PR to draft and is allowed", () => {
+    expect(checkBash("gh pr ready 1800 --undo")).toBe(null);
+    expect(checkBash("gh pr ready --undo 1800")).toBe(null);
+    expect(checkBash("gh pr ready 1800")).not.toBe(null);
+  });
+});

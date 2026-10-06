@@ -138,14 +138,87 @@ function naiveSegments(text: string): string[][] {
     .filter((t) => t.length > 0);
 }
 
-/** Drops leading `VAR=value` assignments and `sudo`/`env`/`exec` wrappers. */
+// Wrapper commands and their options that consume the next token. Any other option is taken to
+// stand alone; `--` ends the wrapper's options.
+const WRAPPER_VALUE_OPTIONS = new Map<string, ReadonlySet<string>>([
+  ["env", new Set(["-u", "--unset", "-C", "--chdir"])],
+  [
+    "sudo",
+    new Set([
+      "-u",
+      "--user",
+      "-g",
+      "--group",
+      "-C",
+      "--close-from",
+      "-D",
+      "--chdir",
+      "-h",
+      "--host",
+      "-p",
+      "--prompt",
+      "-r",
+      "--role",
+      "-t",
+      "--type",
+      "-T",
+      "--command-timeout",
+      "-U",
+      "--other-user",
+    ]),
+  ],
+  ["exec", new Set(["-a"])],
+  ["time", new Set(["-f", "--format", "-o", "--output"])],
+]);
+
+/**
+ * Drops leading `VAR=value` assignments and `sudo`/`env`/`exec`/`time` wrappers with their own
+ * options, so `env -i git push --force` is checked as `git push --force`. `env -S "<cmd>"`
+ * (`--split-string`) runs its argument as the command, so that argument is split and checked.
+ */
 function stripPrefix(tokens: string[]): string[] {
-  let i = 0;
-  for (const t of tokens) {
-    if (!/^[A-Za-z_][A-Za-z0-9_]*=/.test(t) && !["sudo", "env", "exec", "time"].includes(t)) break;
-    i += 1;
+  let rest = tokens;
+  for (;;) {
+    const head = rest[0];
+    if (head === undefined) return rest;
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(head)) {
+      rest = rest.slice(1);
+      continue;
+    }
+    const valueOptions = WRAPPER_VALUE_OPTIONS.get(head);
+    if (valueOptions === undefined) return rest;
+    let i = 1;
+    let split: string | null = null;
+    while (i < rest.length && rest[i]!.startsWith("-")) {
+      const option = rest[i]!;
+      if (option === "--") {
+        i += 1;
+        break;
+      }
+      if (head === "env" && (option === "-S" || option === "--split-string")) {
+        split = rest[i + 1] ?? "";
+        i += 2;
+        break;
+      }
+      if (head === "env" && option.startsWith("--split-string=")) {
+        split = option.slice("--split-string=".length);
+        i += 1;
+        break;
+      }
+      i += valueOptions.has(option) ? 2 : 1;
+    }
+    rest = [...(split === null ? [] : split.split(/\s+/).filter(Boolean)), ...rest.slice(i)];
   }
-  return tokens.slice(i);
+}
+
+/** True when a short-option cluster such as `-uf` sets `flag` before any value-taking letter. */
+function clusterHas(token: string, flag: string, valueLetters: string): boolean {
+  if (!/^-[A-Za-z0-9]{2,}$/.test(token)) return false;
+  for (const c of token.slice(1)) {
+    if (c === flag) return true;
+    if (valueLetters.includes(c)) return false;
+  }
+  return false;
 }
 
 /** For `git -C dir push ...` returns ["push", ...]. */
@@ -164,13 +237,24 @@ const FORCE_FLAGS = /^(--force|-f|--force-with-lease(=.*)?|--force-if-includes)$
 function checkGit(args: string[]): string | null {
   const [sub, ...rest] = args;
   if (sub === "push") {
-    if (rest.some((t) => FORCE_FLAGS.test(t) || (/^\+/.test(t) && !t.startsWith("+-")))) {
+    if (
+      rest.some(
+        (t) =>
+          FORCE_FLAGS.test(t) || clusterHas(t, "f", "o") || (/^\+/.test(t) && !t.startsWith("+-")),
+      )
+    ) {
       return "Force-push is forbidden (AGENTS.md › Git and merges: never force-push or rewrite history). Update the branch by merging from base.";
     }
     if (rest.includes("--no-verify")) {
       return "`--no-verify` skips the repo's pre-commit/pre-push safety gates. Run the hooks and fix what they report.";
     }
+    if (rest.some((t) => t === "--all" || t === "--mirror" || t === "--branches")) {
+      return "Bulk pushes (`--all`, `--mirror`, `--branches`) include `main` and `verdant-grow-diary` when they exist locally (AGENTS.md: never push directly to them). Push your own task branch by name.";
+    }
     const positional = rest.filter((t) => !t.startsWith("-"));
+    if (positional.slice(1).some((ref) => ref === ":" || ref === "+:")) {
+      return "The `:` refspec pushes every matching branch, including protected ones (AGENTS.md: never push directly to verdant-grow-diary or main). Push your own task branch by name.";
+    }
     for (const ref of positional.slice(1)) {
       const target = ref.includes(":") ? ref.split(":").pop()! : ref;
       const branch = target.replace(/^refs\/heads\//, "");
@@ -189,7 +273,10 @@ function checkGit(args: string[]): string | null {
   ) {
     return "`git pull --rebase` rewrites history. Use `git pull --no-rebase` or `git merge`.";
   }
-  if (sub === "commit" && rest.some((t) => t === "--no-verify" || t === "-n")) {
+  if (
+    sub === "commit" &&
+    rest.some((t) => t === "--no-verify" || t === "-n" || clusterHas(t, "n", "mFcCtS"))
+  ) {
     return "`git commit --no-verify` skips lint-staged, the full-project tsc and the docs-safety asserts. Commit without it and fix what fails.";
   }
   if (sub === "filter-branch" || sub === "filter-repo") {
@@ -226,23 +313,25 @@ function checkPackageManager(tokens: string[]): string | null {
   return null;
 }
 
-const PW_VALUE_FLAGS = new Set([
-  "--project",
-  "--grep",
-  "-g",
-  "--grep-invert",
-  "--reporter",
-  "--workers",
-  "-j",
-  "--config",
-  "-c",
-  "--retries",
-  "--timeout",
-  "--output",
-  "--shard",
-  "--repeat-each",
-  "--max-failures",
-  "--trace",
+// Playwright options that take no value. Every other option written without `=` is assumed to
+// consume the next token, so an unlisted value (`--global-timeout 60000`, `--only-changed main`)
+// is never mistaken for a spec filter. Unknown flags fail closed: pass `--flag=value` instead.
+const PW_BOOLEAN_FLAGS = new Set([
+  "--debug",
+  "--fail-on-flaky-tests",
+  "--forbid-only",
+  "--fully-parallel",
+  "--headed",
+  "--help",
+  "-h",
+  "--ignore-snapshots",
+  "--last-failed",
+  "--list",
+  "--no-deps",
+  "--pass-with-no-tests",
+  "--quiet",
+  "--ui",
+  "-x",
 ]);
 
 /** Drops a package-runner prefix: `bunx`, `npx`, `bun x`, `pnpm dlx|exec`, `yarn dlx|exec`. */
@@ -277,11 +366,13 @@ function checkPlaywright(tokens: string[]): string | null {
     const a = args[i] ?? "";
     if (a.startsWith("--project=")) project = a.slice("--project=".length);
     else if (a === "--project") project = args[i + 1] ?? null;
-    if (PW_VALUE_FLAGS.has(a)) {
-      i += 1;
+    if (a.startsWith("-")) {
+      if (!a.includes("=") && !PW_BOOLEAN_FLAGS.has(a) && !(args[i + 1] ?? "-").startsWith("-")) {
+        i += 1;
+      }
       continue;
     }
-    if (!a.startsWith("-")) specs += 1;
+    specs += 1;
   }
   if (project && project.includes("mocked") && specs === 0) {
     return `\`--project=${project}\` without a spec filter can reach real Supabase (that project installs no global route mocks). Pass an explicit spec path.`;
@@ -306,7 +397,12 @@ function checkProductionOps(rawTokens: string[], whole: string): string | null {
     if (tokens.includes("--prod") || ["promote", "rollback", "alias"].includes(a ?? ""))
       return PROD_MSG;
   }
-  if (cmd === "gh" && a === "pr" && (b === "merge" || b === "ready")) {
+  // `gh pr ready --undo` converts a PR back to draft, which the drafts-remain-draft rule wants.
+  if (
+    cmd === "gh" &&
+    a === "pr" &&
+    (b === "merge" || (b === "ready" && !tokens.includes("--undo")))
+  ) {
     return "Merging and marking PRs ready belong to Chemdawg after 35/35 required checks plus an independent exact-head PASS (AGENTS.md). Drafts remain draft.";
   }
   if (

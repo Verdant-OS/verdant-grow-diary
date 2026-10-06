@@ -9,6 +9,10 @@ import {
   quickLogSaveRequiresHistoryCheck,
   type QuickLogHistoryCheckReason,
 } from "./quickLogSaveErrorMessage";
+import {
+  isFeedingRejectionHistoryReason,
+  type FeedingRejectionHistoryReason,
+} from "./quickLogFeedingRejectionRules";
 
 export interface PendingQuickLogFeeding {
   version: 1;
@@ -17,7 +21,7 @@ export interface PendingQuickLogFeeding {
   payload: FeedingTypedEventInput;
   resolved: ResolvedQuickLogV2Target;
   /** Durable refusal of this same key; absent on older pending records. */
-  historyCheckReason?: QuickLogHistoryCheckReason;
+  historyCheckReason?: QuickLogHistoryCheckReason | FeedingRejectionHistoryReason;
 }
 
 export const FEEDING_RECOVERY_UNAVAILABLE =
@@ -105,7 +109,7 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogF
     return false;
   if (
     value.historyCheckReason !== undefined &&
-    !quickLogSaveRequiresHistoryCheck(value.historyCheckReason)
+    !feedingHistoryCheckReason(value.historyCheckReason)
   )
     return false;
   const p = value.payload;
@@ -217,17 +221,20 @@ export function claimPendingQuickLogFeeding(
   }
 }
 
+/** Replay refusals plus Feed validation rejections that same-key Retry can never clear. */
+function feedingHistoryCheckReason(
+  reason: unknown,
+): reason is QuickLogHistoryCheckReason | FeedingRejectionHistoryReason {
+  return quickLogSaveRequiresHistoryCheck(reason) || isFeedingRejectionHistoryReason(reason);
+}
+
 /** Preserve a refusal only on its exact claimed record, with verified storage readback. */
 export function markPendingQuickLogFeedingHistoryCheck(
   record: PendingQuickLogFeeding | null | undefined,
   reason: unknown,
 ): { status: "marked"; record: PendingQuickLogFeeding } | { status: "blocked" } {
   try {
-    if (
-      !record ||
-      !validRecord(record, record.ownerId) ||
-      !quickLogSaveRequiresHistoryCheck(reason)
-    )
+    if (!record || !validRecord(record, record.ownerId) || !feedingHistoryCheckReason(reason))
       return { status: "blocked" };
     const current = readPendingQuickLogFeeding(record.ownerId);
     if (current.status !== "pending" || !sameRecord(current.record, record))

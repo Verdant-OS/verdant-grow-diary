@@ -17,8 +17,18 @@ import { AlertCircle, ArrowUpRight, Loader2, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/PageHeader";
 import { listPhenoHuntsForOwner, type PhenoHuntListItem } from "@/lib/phenoHuntCandidatesService";
-import { listKeeperStabilityForOwner, type KeeperStabilityRow } from "@/lib/phenoKeepersService";
+import {
+  countKeepersForOwner,
+  listKeeperStabilityForOwner,
+  type KeeperStabilityRow,
+} from "@/lib/phenoKeepersService";
 import { buildStabilityDashboard } from "@/lib/phenoStabilityDashboardRules";
+import {
+  buildPhenoHuntCardSummary,
+  KEEPER_STABILITY_ROLLUP_LIMIT,
+  keeperCountsFromRollup,
+  keeperCountForHunt,
+} from "@/lib/phenoHuntsIndexCardRules";
 import PhenoStabilityDashboard from "@/components/PhenoStabilityDashboard";
 import { resolveNavigationGrowId } from "@/lib/navigationGrowIdRules";
 import { resolvePhenoHuntsEmptyCta } from "@/lib/phenoHuntsIndexEmptyCtaRules";
@@ -41,11 +51,28 @@ export default function PhenoHuntsIndex() {
   const [hunts, setHunts] = useState<PhenoHuntListItem[]>([]);
   const [keepers, setKeepers] = useState<KeeperStabilityRow[]>([]);
   const [rollupUnavailable, setRollupUnavailable] = useState(false);
+  // Server-side exact keeper count; null = unknown (counts are then omitted).
+  const [keeperTotal, setKeeperTotal] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setStatus("loading");
     setRollupUnavailable(false);
+    setKeeperTotal(null);
+    // Optional enrichment, decoupled from page readiness (Codex on #1825): a
+    // slow or pending exact count must never hold the hunts list or the
+    // roll-up failure notice on the spinner. Until it lands the total stays
+    // unknown, which only omits the per-hunt keeper clauses.
+    Promise.resolve()
+      .then(() => countKeepersForOwner())
+      .then(
+        (total) => {
+          if (!cancelled) setKeeperTotal(total);
+        },
+        () => {
+          /* best-effort: an unknown total only hides keeper counts */
+        },
+      );
     // Hunts drive the page's load status; the keeper roll-up is best-effort.
     // Hunt-list and candidate-count query failures reject so this page shows
     // an honest error state. A keeper-roll-up failure remains isolated because
@@ -86,6 +113,19 @@ export default function PhenoHuntsIndex() {
       huntNameById,
     );
   }, [hunts, keepers]);
+
+  // #550: keeper counts per hunt, so each card states its keepers beside its
+  // ACTIVE (non-archived) candidate count. Null when the roll-up failed, so a
+  // failed read never renders as "no keepers".
+  const keeperCounts = useMemo(
+    () =>
+      keeperCountsFromRollup(keepers, {
+        limit: KEEPER_STABILITY_ROLLUP_LIMIT,
+        unavailable: rollupUnavailable,
+        total: keeperTotal,
+      }),
+    [keepers, rollupUnavailable, keeperTotal],
+  );
 
   return (
     <div className="mx-auto min-w-0 max-w-4xl" data-testid="pheno-hunts-index">
@@ -162,9 +202,12 @@ export default function PhenoHuntsIndex() {
                 <div className="min-w-0">
                   <h2 className="truncate font-display font-semibold text-foreground">{h.name}</h2>
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    {h.candidateCount} {h.candidateCount === 1 ? "candidate" : "candidates"}
-                    {h.setupCompletedAt ? "" : " · setup in progress"}
-                    {formatCreated(h.createdAt) ? ` · started ${formatCreated(h.createdAt)}` : ""}
+                    {buildPhenoHuntCardSummary({
+                      activeCandidateCount: h.candidateCount,
+                      keeperCount: keeperCountForHunt(keeperCounts, h.id),
+                      setupCompleted: Boolean(h.setupCompletedAt),
+                      startedLabel: formatCreated(h.createdAt),
+                    })}
                   </p>
                 </div>
                 <ArrowUpRight

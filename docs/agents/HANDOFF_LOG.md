@@ -10,26 +10,6 @@ Owner locks remain binding even when a block is unclaimed or older than 24 hours
 Remote heads below are observations at their named times; confirm them before resuming.
 An unpushed candidate is not a remote head and must never be treated as hosted CI evidence.
 
-## CHEM-ACTIONS-READONLY-PROOF-001
-
-```text
-TASK CHEM-ACTIONS-READONLY-PROOF-001  priority: P2  status: OPEN
-goal: Measure the real fixture-owned Actions list, successful empty versus row readback, read-only refresh and grower-approval framing on production. No Action Queue mutation or device operation.
-branch: codex/chem-actions-readonly-proof-001
-base: codex/chem-signedin-performance-001 at 35e7def61992753d34fb04c10a99febfcce5e130
-checkout: git fetch origin codex/chem-signedin-performance-001 && git switch codex/chem-actions-readonly-proof-001 && git merge origin/codex/chem-signedin-performance-001
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1800
-head_sha: b25e8cfa93b2ba4fd8e1c3c0bf2194afcf00cbfd
-state: Four-file stay-draft (+810/-0) normal-pushed. Terminal production run36540923804/job109315857747 PASS: hosted3 files267 PASS / 0 FAIL / 0 SKIP; browser2 PASS / 0 FAIL / 0 SKIP / zero retries includes normal sign-in and owned Actions readback/refresh. Receipt proves four real rows before/after, all six checks and clean appSHA61821446ebd7e4fb30a36a5a95b7526a34515df5; elapsed1317.959747ms for whole sequence; zero blocked writes/runtime errors, two existing fixture operator reads. Artifact11020881186 downloaded, digest2b175b38203a523059f47ba888df09332c82bfd4be7eda5a7058f0fbd0b784e2 matches. Final local267 PASS includes97 new cases; initial86 PASS/11 FAIL from malformed UUID helper retained and corrected. Canonical/E2E types0, lint0/0, format/import/docs guards PASS. SeparateV026/26; static AQ/docs102 PASS/0 FAIL/16 SKIP, policy-detector skips are not runtime proof. Canonical build PASS; two generated build stamps restored to HEAD without changing the four-file diff. Fresh72 open heads, no other-owner/deploy drift.
-next_action: Obtain Critical Mass exact-head acceptance, integrate parent serially through GDP, then normal-retarget and run fresh standalone required checks. Continue the full goal's remaining live Timeline, auth/reset, credit-denial and core-loop acceptance.
-files: e2e/lib/actionsReadonlyProofRules.ts; e2e/actions-readonly-proof.spec.ts; src/test/actions-production-readonly-proof.test.ts; .github/workflows/actions-readonly-proof.yml
-blockers: Transition/device/security/full-core-loop acceptance excluded and remains NOT_MEASURED. Archived Quick Log write fixture remains separate; no fixture replacement or unarchive. All35 standalone Main contexts absent on this stack; two census jobs still pending at08:12 UTC, zero supplemental FAIL. Existing16 source-policy skips remain a coverage gap, not a hosted policy FAIL; locked AQ/RLS paths untouched. Parent stack requires independent review/integration and fresh standalone checks.
-artifacts: #1793 read-only identity/mutation barrier reused byte unchanged; run36540923804; Downloads CHEM-actions-production-receipt-2026-09-29.json and CHEM-actions-proof-* logs. Sanitized finite receipts only; no ids, action content, tokens or account responses exported. PR attachment UI hit100-identity limit; draft creation/head/body verified and no duplicate created.
-reviewer_seat: Critical Mass (new .ts test/proof and CI files; no own review)
-claimed_by: Codex, 2026-09-29 03:03 CT, before implementation
-last_updated: 2026-09-29 03:12 CT, by Codex
-```
-
 ## Template
 
 ```text
@@ -37,7 +17,7 @@ TASK <id>  priority: publish-gate | P1 | P2 | other  status: OPEN | CLOSED
 goal:
 branch: codex/<task-id>-<slug> for new Codex tasks; preserve existing names
 base: verdant-grow-diary or the recorded parent branch
-checkout: git fetch origin <branch> verdant-grow-diary && git switch <branch> && git merge origin/<base>
+checkout: git switch <branch> && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/<base>
 pr: URL or NOT_MEASURED
 head_sha: full exact remote SHA, with observation time
 state: implemented / local only / pushed draft / CI / review / merged / live measured
@@ -50,32 +30,39 @@ claimed_by: agent and date/time/zone, or empty
 last_updated: YYYY-MM-DD HH:MM CT, by agent
 ```
 
-Before the merge in the checkout command, confirm `git rev-parse origin/<branch>`
-matches head_sha. A mismatch invalidates the block's current-head CI/review claims:
-refresh the block and preserve the existing branch. Never rename, recreate or force-push.
+Before the checkout command, run `git fetch origin <branch> <base>`, then compare the
+freshly fetched `git rev-parse origin/<branch>` with head_sha as AGENTS.md (Agent Handoff /
+Coverage) describes: equal, continue; ahead (it equals the PR's current head and head_sha
+is its ancestor), adopt that head and name it in your claim; diverged or rewritten, stop
+and reconcile. Then set `VERIFIED_SHA` to the SHA that passed that check
+(`VERIFIED_SHA=<sha>`). `--ff-only` never moves past the verified head, and the `test` stops
+the command unless `HEAD` then equals it exactly, so neither a stale local copy nor a local
+branch with unpushed commits can stand in for the verified head. Any mismatch invalidates the block's
+current-head CI/review claims: refresh the block and preserve the existing branch. Never
+rename, recreate or force-push.
 Use the original base and declared closed scope. The example command assumes no other
 active checkout has the branch open; inspect worktree ownership before selecting a checkout.
 
 ## Open
 
-### CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001
+### CLAUDE-LOOP-ENGINEERING-001
 
 ```text
-TASK CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001  priority: P2  status: OPEN
-goal: Measure real Settings browser-preference save/reload, own-account readback and analytics refusal on production without backend mutations. Do not infer billing/credit/security acceptance from read-only UI.
-branch: codex/chem-settings-account-consent-proof-001
-base: codex/chem-signedin-performance-001 at 35e7def61992753d34fb04c10a99febfcce5e130
-checkout: git fetch origin codex/chem-signedin-performance-001 && git switch codex/chem-settings-account-consent-proof-001 && git merge origin/codex/chem-signedin-performance-001
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1799
-head_sha: 3b81addb65fbe17f206193e3cf4643861def3132, normal push and draft/base/body read back 2026-09-29 02:51 CT
-state: Pushed four-file stay-draft (+706/-0). Local 9 files / 369 PASS / 0 FAIL / 0 SKIP includes 66 new cases; separate V0 26/26 and docs-safety 67/67, not additive unique totals. Canonical and explicit E2E typechecks 0 diagnostics, final 3-file scoped lint 0 errors/0 warnings after one unsafe-finally correction. Format, whitespace, import and three strict docs scanners PASS. Existing parent read-only barrier reused unchanged; normal fixture auth bootstrap only. Fresh audit of 70 open heads and 15 recent closed PRs; no competing settings/account/consent paths. Archived QuickLog fixture cannot authorize writes. AI credit-limit hosted denial still needs genuine exhausted fixture credit state and usable review evidence; no model spend or fake denial planned.
-next_action: Critical Mass reviews the exact current head. Current proof run36538876591/job109309263434 terminal SUCCESS: hosted safety236/236; browser4 PASS / 0 FAIL / 0 SKIP / zero retries. Artifact11019502703 digest verified; all three receipts PASS at appSHA61821446. GDP serializes parent integration/normal retarget for fresh required CI. Account preferences and legal-acceptance writes are outside the grow-only smoke write scope; do not click those controls.
-files: e2e/lib/settingsAccountProofRules.ts; e2e/settings-account-consent-proof.spec.ts; src/test/settings-account-production-proof.test.ts; .github/workflows/settings-account-consent-proof.yml
-blockers: Full required CI does not run on the parent stack; independent Critical Mass review and fresh standalone CI after parent integration required. No merge, ready, auto-merge, Publish, production SQL, auth/Edge/Supabase changes, lockfile, customer or KEEP writes.
-artifacts: Existing #1793 proof source and terminal run 36536846789. Predecessor 1df2e35d run36538588974 had browser2 PASS/2 FAIL from premature teardown; all UI checks completed, transport correctly blocked PASS. +11-line current fix settles pending auth/role reads before reload/close, retaining final fence. Current run terminal PASS; no writes, application errors or analytics requests. Downloads CHEM-settings-proof-* validation logs. Task attachment failed because app attachment identity count exceeds 100; PR exists and URL/head read back, no duplicate PR created. Receipts supplement, not replace full feature/core-loop acceptance.
-reviewer_seat: Critical Mass (test/proof/CI .ts and .yml; Codex cannot review its own work)
-claimed_by: Codex, 2026-09-29 before the 02:41 CT first regression run (claim written before implementation)
-last_updated: 2026-09-29 02:51 CT, by Codex
+TASK CLAUDE-LOOP-ENGINEERING-001  priority: other  status: OPEN
+goal: Close the three gaps between Verdant's loop discipline and the Karpathy-loop workflow (AI LABS video qLfSDQ5NGh0): a scorer lock as a PreToolUse hook, a loop-habits skill with a check-safe amendment path, and docs/agents/loop-engineering.md with the four-condition eligibility gate and never-loop list. Docs plus tooling; no src/ product code, no supabase/, no workflow, no lockfile, no governance file.
+branch: claude/fervent-mccarthy-ga3vwv
+base: verdant-grow-diary at 80176bad5 (#1864)
+checkout: git switch claude/fervent-mccarthy-ga3vwv && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1866
+head_sha: a9bb2997f9747ea2fd8b8688fbd2dc7415fe28d2, observed on origin/claude/fervent-mccarthy-ga3vwv at 2026-10-03T01:52:55Z (20:52 CT). This log edit travels in that head's direct child on the task branch, so a successor will find origin ahead of this value: apply AGENTS.md › Eligible coverage, adopt the remote head when `git merge-base --is-ancestor a9bb2997f9747ea2fd8b8688fbd2dc7415fe28d2 origin/claude/fervent-mccarthy-ga3vwv` succeeds, and stop only if it fails. The PR integrates by squash: the merged commit's sole parent is the deploy tip, so this block closes with that squash SHA, not with any branch head. Earlier heads, oldest first: 639892d544bd0747183b5dd7cb503b41be925586, a665161a7e57be0086a6db3c4a1b535421009a56, 28ad3b0e958f961b84df46221a9d883331d7d705, 20cd4a97ceb3684e9ea856dc77e39f82c73e11aa, 3715dac6f1f68e0361d647c0afb6d94c6e822b4d, 4f9aff416044346e5fe6dc2eab84a91939f676d2, a715d25e16f0a0b0a0c5e6bf1695af83895bb8aa, 97455693e32f2fc92e82123607dab5a0161f7d49, 2a7ada309b2b820863595fc24348379ad21f9db1, d3f7fd4233e0ad3794500338046b13d204841806, 109aba953c25d0d2d26de4b26597d3688c4367cf, f1a165844d9ba22a7ff958dbfc1174f7f85b2427, 2a1e01f4f46ac818b5751a9ee0e4a6e4d051fca0
+state: ready for review (owner instruction 2026-10-02 18:46 CT). Head d3f7fd423 (round 7) was measured 35/35 required SUCCESS (ci.yml run 37084559423); every later head touches only scripts/scorer-lock.mjs, scripts/lib/scorerLockRules.mjs, the two tests and docs/agents/loop-engineering.md. Codex rounds 1 to 11 (twenty-one P2 findings) and CodeRabbit (one Major, four Minors, one security Low, one merge-risk note) are each fixed in the following push and named in the thread reply; the PR body carries the per-head test evidence. Scorer set now: tests and specs (src/test, e2e, e2e-local, *.test.*, *.spec.*, Deno *_test.ts, Python test_*.py, supabase/tests), scripts/ judges by verb token or run-/test- prefix, test-runner configs, the Vitest suite runners, the verb-less migration gates and their manifests, gate wiring (.github/workflows, .husky, package.json), the delegated gate library (scripts/lib), gate-owned configuration (config/, scripts/config/, scripts/fixtures/, eslint and tsconfig, the edge sync manifest, the workbook manifest), and the lock's own control files. Unlocks carry a full declaration contract (path, reason, at, branch, bounded expiry) and the hook judges worktree edits from the hook input's cwd. Non-blocking reds on every head, each stood down with one PR comment: Vercel (owner account block, #1842 notice), copilot-pull-request-reviewer (Copilot quota), the dependency-policy job (config/dependency-lockfile-transition.json reviewBy=2026-10-02 overdue; owner decision), and one native save/retrieve scenario timeout at d3f7fd423 (not this PR's; re-run on the current head pending).
+next_action: fresh CI at the new head, then Critical Mass independent review at that exact head; Claude answers review threads and keeps CI green. No auto-merge or merge; GDP owns integration.
+files: .claude/settings.json (new); .claude/skills/verdant-loop-habits/SKILL.md (new); .gitignore; docs/agents/loop-engineering.md (new); scripts/lib/scorerLockRules.mjs (new); scripts/scorer-lock.mjs (new); src/test/scorer-lock-rules.test.ts (new); src/test/loop-engineering-doc.test.ts (new); docs/agents/HANDOFF_LOG.md (this block).
+blockers: none for review. Deferred, recorded in the doc section 7: moving the scorer rule into verdant-guard waits for #1865; a link from docs/agents/claude-slices.md waits for #1774; a CI job running scorer-lock --report --strict is a Codex-routed CI slice. Dependency bootstrap in a cloud container needs xlsx re-pointed to the public registry for validation only (cdn.sheetjs.com is egress-denied); neither manifest is in the diff.
+artifacts: PR #1866 body (TDD evidence and validation table); src/test/scorer-lock-rules.test.ts; src/test/loop-engineering-doc.test.ts.
+reviewer_seat: Critical Mass (no .tsx outside src/test/, not P1, not a publish gate); Grok may add an independent review under the standing architecture assignment
+claimed_by: Claude, 2026-10-02 18:20 CT (owner instruction in session: "Build the three gaps as a draft PR")
+last_updated: 2026-10-02 20:58 CT, by Claude
 ```
 
 ### CHEM-MOVE-TENT-READ-HONESTY-001
@@ -96,26 +83,6 @@ artifacts: Downloads CHEM-move-tent-read-baseline-2026-09-29.log; CHEM-move-tent
 reviewer_seat: Blue Dream (.tsx presenter and mounted tests)
 claimed_by: Codex, 2026-09-29 01:29 CT
 last_updated: 2026-09-29 01:44 CT, by Codex
-```
-
-### CHEM-1672-1694-TENT-AGING-INTEGRATION
-
-```text
-TASK CHEM-1672-1694-TENT-AGING-INTEGRATION  priority: P2  status: OPEN
-goal: Bring the existing Tent Detail idle-aging implementation and its tests-only child onto current deploy without changing either owned feature diff.
-branch: codex/tent-detail-snapshot-aging-20260923; child cursor/missing-test-coverage-740e
-base: verdant-grow-diary at 61821446ebd7e4fb30a36a5a95b7526a34515df5; #1694 remains based on #1672
-checkout: git fetch origin codex/tent-detail-snapshot-aging-20260923 verdant-grow-diary && git merge --ff-only origin/codex/tent-detail-snapshot-aging-20260923 && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1672; https://github.com/Verdant-OS/verdant-grow-diary/pull/1694
-head_sha: #1672 9b0053e79e38b9c7585c6e7cf6bdeb48935a53f2; #1694 450d998ad5e6759f25964f9a144a9ebdb48767eb, normal pushes and draft/base/body read back 2026-09-29 01:20 CT
-state: Pushed stay-drafts. Parent merges old 89552fe7 and deploy 61821446; child merges old b94a4631 and new parent 9b0053e7. Zero conflicts. Parent remains two files (+137/-1), child two tests (+31/-0); all four predecessor feature/test blobs unchanged. Parent 7 files / 136 PASS / 0 FAIL / 0 SKIP; child 7 files / 139 PASS / 0 FAIL / 0 SKIP, overlapping sets not 275 unique cases. Both canonical typechecks 0 diagnostics; scoped lint 2 files each 0 errors/0 warnings, format/whitespace/three scanner categories/import guard PASS. Dependency command-shim setup failure and CRLF-only first format failures retained; existing shared dependencies reused, no install/lockfile edit. Automatic lint-staged pre-commit hooks skipped for pure base merges after explicit validation, preserving base files. Final source and parent checkouts clean.
-next_action: Blue Dream reviews the exact heads; GDP lands #1672 first. At 06:22:50 UTC parent all 35 required SUCCESS, zero required failure/missing/pending; Main CI 109282458900 terminal SUCCESS. Root 109282411050 FAIL high fast-uri and nested 109282410911 FAIL moderate undici; failed logs read, locked repair, no rerun/waiver. Earlier partial snapshot retained. Child has all 35 required contexts missing because Main CI excludes its stacked base; after parent landing retarget normally for fresh standalone CI. Do not inherit old checks, merge in parallel or claim live acceptance.
-files: Parent closed: src/pages/TentDetail.tsx; src/test/tent-detail-snapshot-aging.test.tsx. Child closed: src/test/tent-detail-real-sensor-readings.test.ts; src/test/tent-detail-snapshot-aging.test.tsx. Base-only changes are integration ancestry, not authored repairs.
-blockers: No locked-file repair authorized. Main CI's branch filter excludes stacked child; parent must land before child retarget/standalone required checks. Live Tent Detail acceptance NOT_MEASURED; existing production write fixture remains archived.
-artifacts: Existing PRs and Downloads CHEM-tent-aging-integration-2026-09-29.md, parent/child regression/typecheck/ESLint receipts and dated CI JSON. Full 69-open-PR path audit refreshed, parent-child overlap intentional; recent merge history checked. Old parent 95 records / 92 latest names zero FAIL; old child 33 records zero FAIL. Existing clean parent checkout fast-forwarded from ancestor fd7c3928 without local-only commits. Restricted fetch mapping required explicit remote refs; failed tracking setup recovered with a non-tracking local child branch, preserving the pushed Pricing branch.
-reviewer_seat: Blue Dream (product and test .tsx per OWNERSHIP); GDP owns landing
-claimed_by: Codex, 2026-09-29 01:14 CT
-last_updated: 2026-09-29 01:22 CT, by Codex
 ```
 
 ### CHEM-PRICING-PACK-RETRY-ELIGIBILITY-001
@@ -176,46 +143,6 @@ artifacts: PR #1794; GDP #1754 owner override comment 5882244703; Downloads GDP-
 reviewer_seat: Blue Dream (P1 / mounted .tsx proof)
 claimed_by: Codex, 2026-09-29 00:00 CT (implementation resumed after next-day boundary)
 last_updated: 2026-09-29 00:21 CT, by Codex
-```
-
-### CHEM-SIGNEDIN-PERFORMANCE-001
-
-```text
-TASK CHEM-SIGNEDIN-PERFORMANCE-001  priority: P2  status: OPEN
-goal: Add exact-live-SHA signed-in performance evidence for Dashboard, Timeline, Sensors and the existing Quick Log save confirmation without adding writes or inventing speed budgets.
-branch: codex/chem-signedin-performance-001
-base: codex/chem-production-quicklog-fixture-001 at 34f8beae3334cceb6f914df904a6842c90005eb4
-checkout: git fetch origin codex/chem-signedin-performance-001 codex/chem-production-quicklog-fixture-001 && git switch codex/chem-signedin-performance-001 && git merge origin/codex/chem-production-quicklog-fixture-001
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1793
-head_sha: 35e7def61992753d34fb04c10a99febfcce5e130, normal three-file photo correction from c98a5d9e463887c36bdc944434a0bab6c1bd593b; unchanged parent; draft/body/head read back 2026-09-29 02:29 CT
-state: Pushed draft eight files(+1728/-6). Final7 focused files293 PASS / 0 FAIL / 0 SKIP includes112 extension cases and V0/photo-parser coverage; previous totals overlap. Canonical/E2E typechecks zero diagnostics, changed-three-file lint zero errors/warnings, format/whitespace PASS; current synthetic Chromium5/5, receiver writes0. Source-contract photo display read limited to exact signing endpoint, fixed3600 expiry, unique1–100 positively proved fixture-owned paths and complete successful response. All uploads/deletes/unapproved POST/RPC/WebSockets blocked. Signed tokens and paths never enter receipts. Source auth/application/Supabase untouched, parent guard/Quick Log integration unchanged.
-next_action: Critical Mass reviews exact35e7def61992753d34fb04c10a99febfcce5e130; GDP integrates parent then normal-retargeted child. Codex continues separate core-loop and AI credit-limit proof. Do not equate three control-readiness measurements with full feature, saved-value or production infrastructure acceptance.
-files: Closed extension: e2e/lib/signedInPerformanceRules.ts; e2e/lib/signedInPerformanceProbe.ts; e2e/lib/signedInReadonlyProof.ts (new); e2e/signed-in-performance.spec.ts; src/test/signed-in-performance-proof.test.ts; src/test/signed-in-readonly-proof.test.ts (new); .github/workflows/signed-in-readonly-performance.yml (new). Existing e2e/quicklog-smoke.spec.ts change stays unchanged. Parent fixture guard, auth bootstrap, application code, CI variables/secrets and database paths are excluded.
-blockers: Current supplemental timing run36536846789/job109302743684 PASS:219 hosted safety tests and4 browser cases, zero failures/skips/retries. App61821446; Dashboard1447.4758849999998ms, Timeline1912.6403689999997ms, Sensors1355.4961920000005ms readiness PASS. All blocked counts0; Timeline completed one fixture-owned photo-sign read. All35 required Main contexts absent on stack, independent acceptance NOT_MEASURED; Quick Log save BLOCKED archived plant. Speed budget/full-data/core-loop/schema/Edge acceptance NOT_MEASURED. Predecessor failures retained.
-artifacts: Downloads CHEM-performance-readonly-2026-09-29.md and baseline/final regression/typecheck/E2E-typecheck/lint/discovery/browser-barrier logs; older CHEM-signedin-performance-2026-09-28-2330CT.md retained. Full 70 open head/base pairs refreshed before push with no drift; only this draft overlaps existing performance paths, parent Quick Log overlap unchanged. No held branch or competing implementation touched.
-reviewer_seat: Critical Mass (tests-only .ts performance evidence); Blue Dream retains #1792 P1 parent
-claimed_by: Codex, 2026-09-28 23:21 CT
-last_updated: 2026-09-29 02:31 CT, by Codex. Artifact11019051579 downloaded/digest5934f74e3b19d051867fcc94a6ce5c7c7f1fb0a39712d5eab833364416b3e496 verified. Full70-head check inventory:58 required35SUCCESS,43 any-latest-FAIL,1pending (overlapping counts). Assigned repair set12required-green/1orphan. No other-owner/deploy drift, no forbidden mutation or authority change. Full goal active.
-```
-
-### CHEM-PRODUCTION-QUICKLOG-FIXTURE-001
-
-```text
-TASK CHEM-PRODUCTION-QUICKLOG-FIXTURE-001  priority: P1  status: OPEN
-goal: Replace the Quick Log production-host dead end with positive fixture-account and record-ownership proof before either tagged smoke save; preserve other fixture guards.
-branch: codex/chem-production-quicklog-fixture-001
-base: verdant-grow-diary at 61821446ebd7e4fb30a36a5a95b7526a34515df5
-checkout: git fetch origin codex/chem-production-quicklog-fixture-001 verdant-grow-diary && git switch codex/chem-production-quicklog-fixture-001 && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1792
-head_sha: 34f8beae3334cceb6f914df904a6842c90005eb4, remote confirmed 2026-09-28 22:26 CT
-state: Pushed draft, 9 files (+1020/-46). Current related run: 7 files / 257 PASS / 0 FAIL / 0 SKIP, including 63 new cases, 67 existing docs-safety and 26 V0 cases. Project and targeted E2E typechecks: 0 diagnostics. Lint 9 files 0 errors/0 warnings; format 9 files, 3 docs-safety scanners, whitespace PASS. Playwright discovery lists 3 tests only; zero browser execution locally. Previous head 6ba962d2 hosted fixture check: 1 PASS / 1 FAIL / 0 SKIP, one automatic retry; checklist step skipped before notes could be written. Its guard rejected the existing legitimate tentId query and optional grow-name setting. New head binds query IDs to positively owned rows and derives an omitted grow name only from the verified owned grow; CI variables remain unchanged. Follow-up red proof: 2 FAIL / 0 PASS / 57 excluded; both regressions now PASS. Earlier baseline 2 FAIL / 0 PASS / 53 excluded and intermediate 223 PASS / 1 FAIL remain retained. No unique-test sum across repeats. Native 109241785670 terminal SUCCESS: 21 browser PASS / 0 FAIL / 0 SKIP and separate 22 static PASS. Disposable local-backend proof is not production acceptance.
-next_action: Matthew identifies an active fixture in the approved account's own grow; keep production CI variables unchanged here. Then remeasure the fixture through the sanctioned smoke lane and obtain Blue Dream acceptance at the exact head. Do not auto-unarchive or relax the ownership fence.
-files: e2e/lib/productionQuickLogFixtureRules.ts; e2e/lib/productionQuickLogFixtureProof.ts; e2e/lib/fixtureSafety.ts (Quick Log entry and opt-in QA marker only); e2e/fixture-safety.spec.ts; e2e/quicklog-smoke.spec.ts; e2e/scripts/print-fixture-config-checklist.ts; src/test/production-quicklog-fixture.test.ts; src/test/quicklog-e2e-fixture-safety.test.ts; src/test/quicklog-e2e-bootstrap-safety.test.ts
-blockers: Current head has all 35 required contexts SUCCESS at 03:33:31 UTC, but production fixture verification FAILS: 1 PASS / 1 FAIL / 0 SKIP / 0 flaky, one automatic retry, write-producing checklist skipped. Artifact 11010864748 shows the live page says Plant archived and preserves its history. This is a valid refusal of the configured archived fixture, not permission to bypass it. Blue Dream acceptance, active fixture ownership and production save/retrieve remain NOT_MEASURED. Root fast-uri (1239943/1239946) and nested undici (GHSA-3wwx-pv8p-q78v) audits also FAIL on this head and require locked dependency files. No auth, Pheno, workflow/variable/secret, bootstrap or production database changes.
-artifacts: PR #1792; Quick Log job 109241785410; Downloads CHEM-1792-fixture-failure-34f8beae.zip (artifact 11010864748, inspected) and CHEM-production-quicklog-context tests/red/eslint receipts. Observer issues no requests and reads no credentials. Previous failed job 109238860866 was read before correction; current root 109241785865 and nested 109241785446 logs also read.
-reviewer_seat: Blue Dream (P1 write-smoke fence); Codex is author, not independent acceptance reviewer
-claimed_by: Codex, 2026-09-28 22:02 CT
-last_updated: 2026-09-28 23:12 CT, by Codex
 ```
 
 ### CHEM-REQUIRED-AUDIT-PR-EVIDENCE-001
@@ -618,26 +545,6 @@ claimed_by: Codex, 2026-09-29 22:59 CT, existing authorized holder
 last_updated: 2026-09-29 22:59 CT, by Codex
 ```
 
-### SENTINEL-AMENDMENT-2026-09-28.3
-
-```text
-TASK SENTINEL-AMENDMENT-2026-09-28.3  priority: P2  status: OPEN
-goal: Separate exact twelve-file Sentinel 28.3 amendment, including pre-ACK coverage, eligible task claims and independent acceptance routing.
-branch: codex/sentinel-amendment-20260928-3
-base: codex/chem-production-only-docs-20260928 (#1777; amendment source checkpoint b7fa047de30c60a7e39ce67849835cdffdb0a115)
-checkout: git fetch origin codex/sentinel-amendment-20260928-3 codex/chem-production-only-docs-20260928 && git switch codex/sentinel-amendment-20260928-3 && git merge origin/codex/chem-production-only-docs-20260928
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1811
-head_sha: 5f106bfabe851791338badf68c6c5ab30fd73f35, normal-pushed and remote-confirmed 2026-09-30 03:53 UTC
-state: Draft restored; no auto-merge. Twelve governance files only. Corrected pre-ACK log reads in all bootstraps, four-file disconnected packets, unclaimed/older-than-24-hours eligibility without preempting explicit assignments, one current claim and contributor-independent acceptance. Local 31 Node PASS / 0 FAIL / 0 SKIP, separate 67 Vitest PASS / 0 FAIL / 0 SKIP, 12 supplemental consistency validation checks PASS, mirror/version parity and docs safety PASS. Main 36666466256 submitted once for this new head; earlier 44961a08 35/35 is historical and does not carry.
-next_action: Follow Main 36666466256 to terminal and obtain Critical Mass exact-head acceptance; retain independent chain #1779 then #1777 then this child. Read current PR metadata before any push.
-files: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/claude.md; docs/agents/roles/codex.md; docs/agents/roles/grok.md; docs/agents/roles/gemini.md; docs/agents/roles/security.md; docs/agents/roles/council-chair.md. No thirteenth file in this PR; this log is updated separately in parent #1777.
-blockers: Fresh required CI and independent acceptance NOT_MEASURED. #1807 has older 2026-09-25.1 governance in a broad stale branch; it is not a competing 28.3 amendment. Preserve all named holds and reconcile old governance before any later landing.
-artifacts: PR #1811; Downloads/CHEM-Sentinel-28.3-corrections-2026-09-30-5f106bfa.md; Temp/1811-governance-corrections-node.log; Temp/1811-governance-corrections-vitest.log; Temp/1811-governance-consistency-validation.cjs.
-reviewer_seat: Critical Mass, exact head; no author self-acceptance.
-claimed_by: Codex, 2026-09-29 22:59 CT, existing authorized holder
-last_updated: 2026-09-29 22:59 CT, by Codex
-```
-
 ### CHEM-1696-RECEIPT-RESTAMP
 
 ```text
@@ -770,6 +677,134 @@ last_updated: 2026-09-28 23:53 CT, by Codex
 ```
 
 ## Closed
+
+### CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001
+
+```text
+TASK CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001  priority: P2  status: CLOSED
+goal: Measure real Settings browser-preference save/reload, own-account readback and analytics refusal on production without backend mutations. Do not infer billing/credit/security acceptance from read-only UI.
+branch: claude/chem-settings-account-consent-proof-001 (re-land of codex/chem-settings-account-consent-proof-001, which stays unmerged)
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical: git switch codex/chem-settings-account-consent-proof-001 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1859 (re-land, merged); https://github.com/Verdant-OS/verdant-grow-diary/pull/1799 (closed as superseded)
+head_sha: 00af20804addb6e36fc80901a2b779ec4e56c664, the owner-accepted merged head of #1859. Earlier #1799 log head, historical: 3b81addb65fbe17f206193e3cf4643861def3132, normal push and draft/base/body read back 2026-09-29 02:51 CT
+state: Merged via #1859 as aca91a28f from owner-accepted head 00af20804. On that head: required checks 35/35 PASS; Codex code and security review PASS (no findings). Production browser proof NOT_MEASURED (first run waits for a deploy-branch push that touches its paths); independent Critical Mass review NOT_MEASURED (Codex review and owner acceptance gated the merge). Historical, pre-re-land state of #1799: Pushed four-file stay-draft (+706/-0). Local 9 files / 369 PASS / 0 FAIL / 0 SKIP includes 66 new cases; separate V0 26/26 and docs-safety 67/67, not additive unique totals. Canonical and explicit E2E typechecks 0 diagnostics, final 3-file scoped lint 0 errors/0 warnings after one unsafe-finally correction. Format, whitespace, import and three strict docs scanners PASS. Existing parent read-only barrier reused unchanged; normal fixture auth bootstrap only. Fresh audit of 70 open heads and 15 recent closed PRs; no competing settings/account/consent paths. Archived QuickLog fixture cannot authorize writes. AI credit-limit hosted denial still needs genuine exhausted fixture credit state and usable review evidence; no model spend or fake denial planned.
+next_action: None; closed. The first production browser run is NOT_MEASURED until a deploy-branch push touches its paths. Historical: Re-land onto verdant-grow-diary (see observation; the parent was superseded by #1849), then Critical Mass reviews the exact head on fresh standalone required checks. Historical: Current proof run36538876591/job109309263434 terminal SUCCESS: hosted safety236/236; browser4 PASS / 0 FAIL / 0 SKIP / zero retries. Artifact11019502703 digest verified; all three receipts PASS at appSHA61821446. GDP serializes parent integration/normal retarget for fresh required CI. Account preferences and legal-acceptance writes are outside the grow-only smoke write scope; do not click those controls.
+files: e2e/lib/settingsAccountProofRules.ts; e2e/settings-account-consent-proof.spec.ts; src/test/settings-account-production-proof.test.ts; .github/workflows/settings-account-consent-proof.yml
+blockers: None for this closed task. Open measurement only: the first production browser run is NOT_MEASURED. Historical, pre-re-land blockers of #1799: Full required CI does not run on the parent stack; independent Critical Mass review and fresh standalone CI after parent integration required. No merge, ready, auto-merge, Publish, production SQL, auth/Edge/Supabase changes, lockfile, customer or KEEP writes.
+artifacts: Existing #1793 proof source and terminal run 36536846789. Predecessor 1df2e35d run36538588974 had browser2 PASS/2 FAIL from premature teardown; all UI checks completed, transport correctly blocked PASS. +11-line current fix settles pending auth/role reads before reload/close, retaining final fence. Current run terminal PASS; no writes, application errors or analytics requests. Downloads CHEM-settings-proof-* validation logs. Task attachment failed because app attachment identity count exceeds 100; PR exists and URL/head read back, no duplicate PR created. Receipts supplement, not replace full feature/core-loop acceptance.
+reviewer_seat: Critical Mass (test/proof/CI .ts and .yml; Codex cannot review its own work)
+claimed_by: Claude, 2026-10-01 14:40 CT (owner: "take and fix so things keep moving"); previously Codex, 2026-09-29 before the 02:41 CT first regression run (claim written before implementation)
+last_updated: 2026-10-01 16:10 CT, by Claude. Earlier entry: 2026-09-29 02:51 CT, by Codex
+observation: 2026-10-01 13:47 CT, by Claude (log maintenance, #1847; not a claim, so last_updated and claimed_by are unchanged): the parent #1793 (codex/chem-signedin-performance-001) was superseded by its re-land #1849, merged as b5d064881b71d6cd04156d9a0b1a355f3ecc0cd2. #1849 also removed the matt@ owner QA fixture, dropped duplicate undici pins, added the deployed-SHA wait (scripts/wait-for-deployed-sha.mjs) and widened the read-only workflow's push paths. GitHub refuses base changes for PRs in a stack, so this child needs the same treatment: one normal merge of verdant-grow-diary, three-way against 35e7def6 for any shared files, keeping #1849's versions; then a re-land PR on verdant-grow-diary and fresh standalone CI.
+closure: Merged via #1859 as aca91a28fa5d1e650878a02c0c00e4cc85a119ab at 2026-10-01 16:05 CT from owner-accepted head 00af20804addb6e36fc80901a2b779ec4e56c664. #1799 is closed as superseded. The re-land carries the four files plus: a credential-free safety job for pull requests; the browser proof only on owner-gated push or dispatch on the deploy ref, with secrets scoped to two steps; GITHUB_SHA pinned and waited for; push paths covering product code, build inputs, e2e/**, playwright.config.ts and the SHA wait (Codex P1 and P2s). Earlier dated observations above remain historical.
+```
+
+### CHEM-ACTIONS-READONLY-PROOF-001
+
+```text
+TASK CHEM-ACTIONS-READONLY-PROOF-001  priority: P2  status: CLOSED
+goal: Measure the real fixture-owned Actions list, successful empty versus row readback, read-only refresh and grower-approval framing on production. No Action Queue mutation or device operation.
+branch: claude/chem-actions-readonly-proof-001 (re-land of codex/chem-actions-readonly-proof-001, which stays unmerged)
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical: git switch codex/chem-actions-readonly-proof-001 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1860 (re-land, merged); https://github.com/Verdant-OS/verdant-grow-diary/pull/1800 (closed as superseded)
+head_sha: 3ba38ad4d9365ee7e4deca7ab97fdab81a700299, the owner-accepted merged head of #1860. Earlier #1800 log head, historical: b25e8cfa93b2ba4fd8e1c3c0bf2194afcf00cbfd
+state: Merged via #1860 as 77336cd3f from owner-accepted head 3ba38ad4d. On that head: required checks 35/35 PASS; Codex code and security review PASS (no findings). Production browser proof NOT_MEASURED (first run waits for a deploy-branch push that touches its paths); independent Critical Mass review NOT_MEASURED (Codex review and owner acceptance gated the merge). Historical, pre-re-land state of #1800: Four-file stay-draft (+810/-0) normal-pushed. Terminal production run36540923804/job109315857747 PASS: hosted3 files267 PASS / 0 FAIL / 0 SKIP; browser2 PASS / 0 FAIL / 0 SKIP / zero retries includes normal sign-in and owned Actions readback/refresh. Receipt proves four real rows before/after, all six checks and clean appSHA61821446ebd7e4fb30a36a5a95b7526a34515df5; elapsed1317.959747ms for whole sequence; zero blocked writes/runtime errors, two existing fixture operator reads. Artifact11020881186 downloaded, digest2b175b38203a523059f47ba888df09332c82bfd4be7eda5a7058f0fbd0b784e2 matches. Final local267 PASS includes97 new cases; initial86 PASS/11 FAIL from malformed UUID helper retained and corrected. Canonical/E2E types0, lint0/0, format/import/docs guards PASS. SeparateV026/26; static AQ/docs102 PASS/0 FAIL/16 SKIP, policy-detector skips are not runtime proof. Canonical build PASS; two generated build stamps restored to HEAD without changing the four-file diff. Fresh72 open heads, no other-owner/deploy drift.
+next_action: None; closed. The first production browser run is NOT_MEASURED until a deploy-branch push touches its paths. Historical: Re-land onto verdant-grow-diary (see observation; the parent was superseded by #1849), then obtain Critical Mass exact-head acceptance on fresh standalone required checks. Continue the full goal's remaining live Timeline, auth/reset, credit-denial and core-loop acceptance.
+files: e2e/lib/actionsReadonlyProofRules.ts; e2e/actions-readonly-proof.spec.ts; src/test/actions-production-readonly-proof.test.ts; .github/workflows/actions-readonly-proof.yml
+blockers: None for this closed task. Open measurement only: the first production browser run is NOT_MEASURED. Historical, pre-re-land blockers of #1800: Transition/device/security/full-core-loop acceptance excluded and remains NOT_MEASURED. Archived Quick Log write fixture remains separate; no fixture replacement or unarchive. All35 standalone Main contexts absent on this stack; two census jobs still pending at08:12 UTC, zero supplemental FAIL. Existing16 source-policy skips remain a coverage gap, not a hosted policy FAIL; locked AQ/RLS paths untouched. Parent stack requires independent review/integration and fresh standalone checks.
+artifacts: #1793 read-only identity/mutation barrier reused byte unchanged; run36540923804; Downloads CHEM-actions-production-receipt-2026-09-29.json and CHEM-actions-proof-* logs. Sanitized finite receipts only; no ids, action content, tokens or account responses exported. PR attachment UI hit100-identity limit; draft creation/head/body verified and no duplicate created.
+reviewer_seat: Critical Mass (new .ts test/proof and CI files; no own review)
+claimed_by: Claude, 2026-10-01 14:40 CT (owner: "take and fix so things keep moving"); previously Codex, 2026-09-29 03:03 CT, before implementation
+last_updated: 2026-10-01 16:10 CT, by Claude. Earlier entry: 2026-09-29 03:12 CT, by Codex
+observation: 2026-10-01 13:47 CT, by Claude (log maintenance, #1847; not a claim, so last_updated and claimed_by are unchanged): the parent #1793 (codex/chem-signedin-performance-001) was superseded by its re-land #1849, merged as b5d064881b71d6cd04156d9a0b1a355f3ecc0cd2. #1849 also removed the matt@ owner QA fixture, dropped duplicate undici pins, added the deployed-SHA wait (scripts/wait-for-deployed-sha.mjs) and widened the read-only workflow's push paths. GitHub refuses base changes for PRs in a stack, so this child needs the same treatment: one normal merge of verdant-grow-diary, three-way against 35e7def6 for any shared files, keeping #1849's versions; then a re-land PR on verdant-grow-diary and fresh standalone CI.
+closure: Merged via #1860 as 77336cd3f3b35b5468d5a066e6f36d6cf6a1a6fe at 2026-10-01 16:05 CT from owner-accepted head 3ba38ad4d9365ee7e4deca7ab97fdab81a700299. #1800 is closed as superseded. The re-land carries the four files plus: a credential-free safety job for pull requests; the browser proof only on owner-gated push or dispatch on the deploy ref, with secrets scoped to two steps; GITHUB_SHA pinned and waited for; push paths covering product code, build inputs, e2e/**, playwright.config.ts and the SHA wait (Codex P1 and P2s). Earlier dated observations above remain historical.
+```
+
+### CHEM-SIGNEDIN-PERFORMANCE-001
+
+```text
+TASK CHEM-SIGNEDIN-PERFORMANCE-001  priority: P2  status: CLOSED
+goal: Add exact-live-SHA signed-in performance evidence for Dashboard, Timeline, Sensors and the existing Quick Log save confirmation without adding writes or inventing speed budgets.
+branch: claude/1793-signedin-performance-reland (re-land of codex/chem-signedin-performance-001, which stays unmerged)
+base: verdant-grow-diary
+checkout: git fetch origin claude/1793-signedin-performance-reland verdant-grow-diary && git switch claude/1793-signedin-performance-reland && git merge --ff-only origin/claude/1793-signedin-performance-reland && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1849 (re-land, merged); https://github.com/Verdant-OS/verdant-grow-diary/pull/1793 (closed as superseded)
+head_sha: c2d473e8e3acf03df521ed9f46b0ec6a2e479ffc, remote-confirmed 2026-10-01 13:35 CT. #1849 starts at #1793's head 074f434949de6dcc74970a9f9a563d652f55b642 plus one normal base merge. Earlier #1793 head 35e7def6 is historical
+state: Pushed draft eight files(+1728/-6). Final7 focused files293 PASS / 0 FAIL / 0 SKIP includes112 extension cases and V0/photo-parser coverage; previous totals overlap. Canonical/E2E typechecks zero diagnostics, changed-three-file lint zero errors/warnings, format/whitespace PASS; current synthetic Chromium5/5, receiver writes0. Source-contract photo display read limited to exact signing endpoint, fixed3600 expiry, unique1–100 positively proved fixture-owned paths and complete successful response. All uploads/deletes/unapproved POST/RPC/WebSockets blocked. Signed tokens and paths never enter receipts. Source auth/application/Supabase untouched, parent guard/Quick Log integration unchanged.
+next_action: None; closed. #1849 was owner-accepted at c2d473e8e (2026-10-01 13:05 CT) and merged. Earlier plan, now historical: Critical Mass reviews exact 35e7def6; GDP integrates the parent then the normal-retargeted child. Codex continues separate core-loop and AI credit-limit proof. Do not equate three control-readiness measurements with full feature, saved-value or production infrastructure acceptance.
+files: Closed extension: e2e/lib/signedInPerformanceRules.ts; e2e/lib/signedInPerformanceProbe.ts; e2e/lib/signedInReadonlyProof.ts (new); e2e/signed-in-performance.spec.ts; src/test/signed-in-performance-proof.test.ts; src/test/signed-in-readonly-proof.test.ts (new); .github/workflows/signed-in-readonly-performance.yml (new). Existing e2e/quicklog-smoke.spec.ts change stays unchanged. Parent fixture guard, auth bootstrap, application code, CI variables/secrets and database paths are excluded.
+blockers: Current supplemental timing run36536846789/job109302743684 PASS:219 hosted safety tests and4 browser cases, zero failures/skips/retries. App61821446; Dashboard1447.4758849999998ms, Timeline1912.6403689999997ms, Sensors1355.4961920000005ms readiness PASS. All blocked counts0; Timeline completed one fixture-owned photo-sign read. All35 required Main contexts absent on stack, independent acceptance NOT_MEASURED; Quick Log save BLOCKED archived plant. Speed budget/full-data/core-loop/schema/Edge acceptance NOT_MEASURED. Predecessor failures retained.
+artifacts: Downloads CHEM-performance-readonly-2026-09-29.md and baseline/final regression/typecheck/E2E-typecheck/lint/discovery/browser-barrier logs; older CHEM-signedin-performance-2026-09-28-2330CT.md retained. Full 70 open head/base pairs refreshed before push with no drift; only this draft overlaps existing performance paths, parent Quick Log overlap unchanged. No held branch or competing implementation touched.
+reviewer_seat: Critical Mass (tests-only .ts performance evidence); Blue Dream retains #1792 P1 parent
+claimed_by: Claude, 2026-10-01 11:53 CT (owner: "take over #1793"); previously Codex, 2026-09-28 23:21 CT
+last_updated: 2026-10-01 13:41 CT, by Claude. Earlier Claude entry (13:36 CT): #1849 changes against #1793 (all on the PR): it removed the unreachable matt@ owner QA fixture (owner option (a)); it dropped the duplicate undici pins the deploy branch already carries (TS1117); it added scripts/wait-for-deployed-sha.mjs so production probes wait for the pinned SHA (Codex P1); and it widened the read-only workflow's push paths to src/** and build inputs (Codex P2). The Quick Log smoke push cadence is kept by owner option (b) and tracked in #1852. Earlier Codex entry: 2026-09-29 02:31 CT, by Codex. Artifact11019051579 downloaded/digest5934f74e3b19d051867fcc94a6ce5c7c7f1fb0a39712d5eab833364416b3e496 verified. Full70-head check inventory:58 required35SUCCESS,43 any-latest-FAIL,1pending (overlapping counts). Assigned repair set12required-green/1orphan. No other-owner/deploy drift, no forbidden mutation or authority change. Full goal active.
+closure: Merged via #1849 as b5d064881b71d6cd04156d9a0b1a355f3ecc0cd2 at 2026-10-01 13:38 CT from owner-accepted head c2d473e8e3acf03df521ed9f46b0ec6a2e479ffc. #1793 is closed as superseded. Production timing receipts remain NOT_MEASURED until a qualifying deploy-branch run; save timing on product pushes waits on #1852. Earlier dated observations above remain historical.
+```
+
+### SENTINEL-AMENDMENT-2026-09-28.3
+
+```text
+TASK SENTINEL-AMENDMENT-2026-09-28.3  priority: P2  status: CLOSED
+goal: Separate exact twelve-file Sentinel 28.3 amendment, including pre-ACK coverage, eligible task claims and independent acceptance routing.
+branch: codex/sentinel-amendment-20260928-3
+base: codex/chem-production-only-docs-20260928 (#1777; amendment source checkpoint b7fa047de30c60a7e39ce67849835cdffdb0a115)
+checkout: git fetch origin codex/sentinel-amendment-20260928-3 codex/chem-production-only-docs-20260928 && git switch codex/sentinel-amendment-20260928-3 && git merge origin/codex/chem-production-only-docs-20260928
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1811
+head_sha: 5f106bfabe851791338badf68c6c5ab30fd73f35, normal-pushed and remote-confirmed 2026-09-30 03:53 UTC
+state: Draft restored; no auto-merge. Twelve governance files only. Corrected pre-ACK log reads in all bootstraps, four-file disconnected packets, unclaimed/older-than-24-hours eligibility without preempting explicit assignments, one current claim and contributor-independent acceptance. Local 31 Node PASS / 0 FAIL / 0 SKIP, separate 67 Vitest PASS / 0 FAIL / 0 SKIP, 12 supplemental consistency validation checks PASS, mirror/version parity and docs safety PASS. Main 36666466256 submitted once for this new head; earlier 44961a08 35/35 is historical and does not carry.
+next_action: Follow Main 36666466256 to terminal and obtain Critical Mass exact-head acceptance; retain independent chain #1779 then #1777 then this child. Read current PR metadata before any push.
+files: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/claude.md; docs/agents/roles/codex.md; docs/agents/roles/grok.md; docs/agents/roles/gemini.md; docs/agents/roles/security.md; docs/agents/roles/council-chair.md. No thirteenth file in this PR; this log is updated separately in parent #1777.
+blockers: Fresh required CI and independent acceptance NOT_MEASURED. #1807 has older 2026-09-25.1 governance in a broad stale branch; it is not a competing 28.3 amendment. Preserve all named holds and reconcile old governance before any later landing.
+artifacts: PR #1811; Downloads/CHEM-Sentinel-28.3-corrections-2026-09-30-5f106bfa.md; Temp/1811-governance-corrections-node.log; Temp/1811-governance-corrections-vitest.log; Temp/1811-governance-consistency-validation.cjs.
+reviewer_seat: Critical Mass, exact head; no author self-acceptance.
+claimed_by: Claude, 2026-10-01 10:14 CT (owner reassigned #1742/#1811/#1810 to Claude); previously Codex, 2026-09-29 22:59 CT
+last_updated: 2026-10-01 13:36 CT, by Claude
+closure: Merged via #1811 as b15cd0de01477fc3efdb2c51b42ffb55685a49a2 at 2026-10-01 13:27 CT from final head 76d6b8b35c61be5428355f231c7b37c4e016f86d (owner-accepted 11:44 CT under option (b): P2-only Codex findings no longer block). The PR was isolated onto verdant-grow-diary before landing, so the base above is historical. Fifteen Codex rounds were fixed; the remaining P2 log items are #1847 (this closure is part of it). Earlier dated observations above remain historical.
+```
+
+### CHEM-PRODUCTION-QUICKLOG-FIXTURE-001
+
+```text
+TASK CHEM-PRODUCTION-QUICKLOG-FIXTURE-001  priority: P1  status: CLOSED
+goal: Replace the Quick Log production-host dead end with positive fixture-account and record-ownership proof before either tagged smoke save; preserve other fixture guards.
+branch: codex/chem-production-quicklog-fixture-001
+base: verdant-grow-diary at 61821446ebd7e4fb30a36a5a95b7526a34515df5
+checkout: git fetch origin codex/chem-production-quicklog-fixture-001 verdant-grow-diary && git switch codex/chem-production-quicklog-fixture-001 && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1792
+head_sha: 34f8beae3334cceb6f914df904a6842c90005eb4, remote confirmed 2026-09-28 22:26 CT
+state: Pushed draft, 9 files (+1020/-46). Current related run: 7 files / 257 PASS / 0 FAIL / 0 SKIP, including 63 new cases, 67 existing docs-safety and 26 V0 cases. Project and targeted E2E typechecks: 0 diagnostics. Lint 9 files 0 errors/0 warnings; format 9 files, 3 docs-safety scanners, whitespace PASS. Playwright discovery lists 3 tests only; zero browser execution locally. Previous head 6ba962d2 hosted fixture check: 1 PASS / 1 FAIL / 0 SKIP, one automatic retry; checklist step skipped before notes could be written. Its guard rejected the existing legitimate tentId query and optional grow-name setting. New head binds query IDs to positively owned rows and derives an omitted grow name only from the verified owned grow; CI variables remain unchanged. Follow-up red proof: 2 FAIL / 0 PASS / 57 excluded; both regressions now PASS. Earlier baseline 2 FAIL / 0 PASS / 53 excluded and intermediate 223 PASS / 1 FAIL remain retained. No unique-test sum across repeats. Native 109241785670 terminal SUCCESS: 21 browser PASS / 0 FAIL / 0 SKIP and separate 22 static PASS. Disposable local-backend proof is not production acceptance.
+next_action: Matthew identifies an active fixture in the approved account's own grow; keep production CI variables unchanged here. Then remeasure the fixture through the sanctioned smoke lane and obtain Blue Dream acceptance at the exact head. Do not auto-unarchive or relax the ownership fence.
+files: e2e/lib/productionQuickLogFixtureRules.ts; e2e/lib/productionQuickLogFixtureProof.ts; e2e/lib/fixtureSafety.ts (Quick Log entry and opt-in QA marker only); e2e/fixture-safety.spec.ts; e2e/quicklog-smoke.spec.ts; e2e/scripts/print-fixture-config-checklist.ts; src/test/production-quicklog-fixture.test.ts; src/test/quicklog-e2e-fixture-safety.test.ts; src/test/quicklog-e2e-bootstrap-safety.test.ts
+blockers: Current head has all 35 required contexts SUCCESS at 03:33:31 UTC, but production fixture verification FAILS: 1 PASS / 1 FAIL / 0 SKIP / 0 flaky, one automatic retry, write-producing checklist skipped. Artifact 11010864748 shows the live page says Plant archived and preserves its history. This is a valid refusal of the configured archived fixture, not permission to bypass it. Blue Dream acceptance, active fixture ownership and production save/retrieve remain NOT_MEASURED. Root fast-uri (1239943/1239946) and nested undici (GHSA-3wwx-pv8p-q78v) audits also FAIL on this head and require locked dependency files. No auth, Pheno, workflow/variable/secret, bootstrap or production database changes.
+artifacts: PR #1792; Quick Log job 109241785410; Downloads CHEM-1792-fixture-failure-34f8beae.zip (artifact 11010864748, inspected) and CHEM-production-quicklog-context tests/red/eslint receipts. Observer issues no requests and reads no credentials. Previous failed job 109238860866 was read before correction; current root 109241785865 and nested 109241785446 logs also read.
+reviewer_seat: Blue Dream (P1 write-smoke fence); Codex is author, not independent acceptance reviewer
+claimed_by: Codex, 2026-09-28 22:02 CT
+last_updated: 2026-10-01 13:36 CT, by Claude
+closure: Superseded by re-land #1835 (branch claude/1792-production-fixture-reland), merged as 6ed854cee14747e419b2babde4f93823daa55771 at 2026-10-01 11:49 CT from owner-accepted head 15a4ba4e72407d0aa60a5b8c13dd54384d2ef970. #1835 carries this change plus the derived-grow visible check, the bootstrap restriction, the underscore marker and the Timeline readback, with production-only docs (owner option (a)). #1792 closed without merging; its branch is kept until #1849 lands. Production save/retrieve acceptance remains NOT_MEASURED. Earlier dated observations above remain historical.
+```
+
+### CHEM-1672-1694-TENT-AGING-INTEGRATION
+
+```text
+TASK CHEM-1672-1694-TENT-AGING-INTEGRATION  priority: P2  status: CLOSED
+goal: Bring the existing Tent Detail idle-aging implementation and its tests-only child onto current deploy without changing either owned feature diff.
+branch: codex/tent-detail-snapshot-aging-20260923; child cursor/missing-test-coverage-740e
+base: verdant-grow-diary at 61821446ebd7e4fb30a36a5a95b7526a34515df5; #1694 remains based on #1672
+checkout: git fetch origin codex/tent-detail-snapshot-aging-20260923 verdant-grow-diary && git merge --ff-only origin/codex/tent-detail-snapshot-aging-20260923 && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1672; https://github.com/Verdant-OS/verdant-grow-diary/pull/1694
+head_sha: #1672 9b0053e79e38b9c7585c6e7cf6bdeb48935a53f2; #1694 450d998ad5e6759f25964f9a144a9ebdb48767eb, normal pushes and draft/base/body read back 2026-09-29 01:20 CT
+state: Pushed stay-drafts. Parent merges old 89552fe7 and deploy 61821446; child merges old b94a4631 and new parent 9b0053e7. Zero conflicts. Parent remains two files (+137/-1), child two tests (+31/-0); all four predecessor feature/test blobs unchanged. Parent 7 files / 136 PASS / 0 FAIL / 0 SKIP; child 7 files / 139 PASS / 0 FAIL / 0 SKIP, overlapping sets not 275 unique cases. Both canonical typechecks 0 diagnostics; scoped lint 2 files each 0 errors/0 warnings, format/whitespace/three scanner categories/import guard PASS. Dependency command-shim setup failure and CRLF-only first format failures retained; existing shared dependencies reused, no install/lockfile edit. Automatic lint-staged pre-commit hooks skipped for pure base merges after explicit validation, preserving base files. Final source and parent checkouts clean.
+next_action: Blue Dream reviews the exact heads; GDP lands #1672 first. At 06:22:50 UTC parent all 35 required SUCCESS, zero required failure/missing/pending; Main CI 109282458900 terminal SUCCESS. Root 109282411050 FAIL high fast-uri and nested 109282410911 FAIL moderate undici; failed logs read, locked repair, no rerun/waiver. Earlier partial snapshot retained. Child has all 35 required contexts missing because Main CI excludes its stacked base; after parent landing retarget normally for fresh standalone CI. Do not inherit old checks, merge in parallel or claim live acceptance.
+files: Parent closed: src/pages/TentDetail.tsx; src/test/tent-detail-snapshot-aging.test.tsx. Child closed: src/test/tent-detail-real-sensor-readings.test.ts; src/test/tent-detail-snapshot-aging.test.tsx. Base-only changes are integration ancestry, not authored repairs.
+blockers: No locked-file repair authorized. Main CI's branch filter excludes stacked child; parent must land before child retarget/standalone required checks. Live Tent Detail acceptance NOT_MEASURED; existing production write fixture remains archived.
+artifacts: Existing PRs and Downloads CHEM-tent-aging-integration-2026-09-29.md, parent/child regression/typecheck/ESLint receipts and dated CI JSON. Full 69-open-PR path audit refreshed, parent-child overlap intentional; recent merge history checked. Old parent 95 records / 92 latest names zero FAIL; old child 33 records zero FAIL. Existing clean parent checkout fast-forwarded from ancestor fd7c3928 without local-only commits. Restricted fetch mapping required explicit remote refs; failed tracking setup recovered with a non-tracking local child branch, preserving the pushed Pricing branch.
+reviewer_seat: Blue Dream (product and test .tsx per OWNERSHIP); GDP owns landing
+claimed_by: Codex, 2026-09-29 01:14 CT
+last_updated: 2026-10-01 13:36 CT, by Claude
+closure: Both PRs merged, so the block closes rather than being split under the one-branch rule (#1847). #1672 merged as 089ccf65a56602b9213f3ecebaee0231a02fac1d at 2026-09-29 20:23 CT from head 0d2d935dfffacfe78a835eff930e43bb675663f7. #1694 merged as d28f8f3c827d3531014eede689492bd90e16fd6f at 2026-09-30 18:20 CT from head e658130269dc0b5b73799dae8dd01c3b88f5f03e. Live Tent Detail acceptance remains NOT_MEASURED. Earlier dated observations above remain historical.
+```
 
 ### SENTINEL-AMENDMENT-2026-09-28.2
 

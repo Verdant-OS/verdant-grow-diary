@@ -3,6 +3,8 @@ import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { runInNewContext } from "node:vm";
+import { load } from "js-yaml";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   ONE_TENT_PROOF_STAGES,
@@ -177,11 +179,38 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     expect(job).toContain("permissions:\n      contents: read");
     expect(job).not.toContain("environment:");
 
-    const ordinaryJob = workflow.slice(workflow.indexOf(nextJobMarker));
-    expect(ordinaryJob).toContain(
-      "github.event_name != 'workflow_dispatch' || inputs.run_mode == 'quicklog_smoke'",
-    );
-    expect(ordinaryJob).not.toContain(`github.ref != '${BRANCH_REF}'`);
+    const resolved = load(workflow) as { jobs: Record<string, { if: string }> };
+    const github = {
+      repository: "Verdant-OS/verdant-grow-diary",
+      ref: BRANCH_REF,
+      actor: "cheekhimself",
+      triggering_actor: "cheekhimself",
+      run_attempt: "1",
+      event_name: "workflow_dispatch",
+    };
+    // Evaluate the effective YAML conditions instead of pinning the old,
+    // broader expression that allowed arbitrary credential-bearing dispatches.
+    for (const mode of ["quicklog_smoke", "one_tent_proof", "unknown"]) {
+      const context = { github, inputs: { run_mode: mode } };
+      expect(runInNewContext(resolved.jobs["quicklog-smoke"].if, context, { timeout: 100 })).toBe(
+        mode === "quicklog_smoke",
+      );
+      expect(
+        runInNewContext(resolved.jobs["one-tent-authenticated-proof"].if, context, {
+          timeout: 100,
+        }),
+      ).toBe(mode === "one_tent_proof");
+    }
+    expect(
+      runInNewContext(
+        resolved.jobs["quicklog-smoke"].if,
+        {
+          github: { ...github, ref: "refs/heads/unreviewed" },
+          inputs: { run_mode: "quicklog_smoke" },
+        },
+        { timeout: 100 },
+      ),
+    ).toBe(false);
   });
 
   it("requires and verifies the exact immutable deployment SHA before any secret is available", () => {

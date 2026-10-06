@@ -49,8 +49,11 @@ describe("Timeline — action_queue_events fetch", () => {
   });
 
   it("orders newest-first at the DB layer", () => {
+    // #593: ordered through orderNewestFirstStable (created_at desc, then id
+    // desc as a tie-breaker — the helper's own ordering is unit-tested in
+    // timeline-stable-order.test.ts).
     expect(PAGE).toMatch(
-      /action_queue_events[\s\S]{0,400}\.order\(\s*["']created_at["']\s*,\s*\{\s*ascending:\s*false\s*\}\s*\)/,
+      /orderNewestFirstStable\(\s*supabase\s*\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,400}?["']created_at["'],?\s*\)\.limit\(50\)/,
     );
   });
 });

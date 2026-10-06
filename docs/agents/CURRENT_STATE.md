@@ -1,5 +1,34 @@
 > Ownership and the connector spec: see [docs/agents/OWNERSHIP.md](OWNERSHIP.md). It wins on conflicts.
 
+## Start here (agents)
+
+Read this section first. It doesn't replace the observation log below.
+
+- **This section supersedes stale OWNERSHIP.md rows.** Line 1 says OWNERSHIP.md wins on conflicts, but its GDP routing and product-call rows and its "Chemdawg only" merge rows are out of date. GDP retired on 2026-09-29. Grok 91 routes and merges in practice; older docs and other bots may still call this role Chemdawg or GDP. Where OWNERSHIP.md and this section disagree on roles or merging, this section describes current practice until OWNERSHIP.md is updated (pending).
+- **Roles:**
+  - Grok 91: merge-queue owner. Routes PRs to reviewers, sends findings back, and merges under the rule below.
+  - Blue Dream and Durban Poison: code reviewers (peers) for `.tsx`/UI, auth, RLS, DB and Edge.
+  - Critical Mass: reviewer for lib and logic, tests, docs-only, QA, accessibility, search and content (OWNERSHIP.md line 74). Until OWNERSHIP.md assigns it, Critical Mass also gives the independent verdict on CI, build and dependency PRs; line 75 gives Codex only _technical_ CI/build review.
+  - Claude, Codex and Grok 91: authors.
+  - Nobody reviews their own work.
+- **Review loop:** [`.agents/skills/verdant-exact-sha-review/SKILL.md`](../../.agents/skills/verdant-exact-sha-review/SKILL.md).
+  - Every verdict is tied to one exact SHA, or it is BLOCKED.
+  - PASS-with-P2 always goes back to the author for a full re-review at the new head. It is never merged as is.
+  - PRs stay draft until merge.
+  - **Merge rule:** **Matthew's decision (2026-10-03, 10:53 PM CT):** all merges go through the merge queue, and the `--admin` bypass is emergency-only, at his call. Matthew's standing merge-when-green rule covers non-migration PRs: a clean PASS at the exact head SHA plus 35/35 required checks green at that SHA means mark it ready and enqueue it at that SHA with `gh pr merge <N> --squash --auto --match-head-commit <SHA>`. On this branch a plain `gh pr merge <N>` also joins the queue rather than merging directly. The queue re-runs the required checks against the latest tip before the PR lands (see [`merge-queue.md`](merge-queue.md)). There is no extra wait for a go-ahead. Skipping the queue takes the repository-admin bypass. In gh that is `gh pr merge --admin`; because the bypass belongs to the admin role, any admin merge path (the UI bypass option, or a REST or MCP merge by an admin) likely skips the queue too (untested). merge-queue.md line 9 calls that emergency-only, and whether a bypass on green is ever allowed is Matthew's call. Migration PRs need Matthew's explicit decision. Dated note (2026-10-03): #1867, #1869, #1887, #1888 and #1890 merged 5–28 s after being marked ready; #1889 (ready since 2026-10-03 11:13 UTC) merged 53 s after #1890. None has a merge-queue event, so (an inference from the GitHub events, not measured directly) they used the admin bypass. All six merged before the 10:53 PM CT decision above.
+- **Before asking for review:** run [`recurring-review-findings.md`](recurring-review-findings.md).
+- **Gates (until Matthew lifts them):**
+  - No Publish.
+  - knk production database lock: no writes.
+  - HOLD #1250: PR #1250 merged on 2026-09-29 as `d2e8dbc3`. Its 4 files (`migration-drift-probe.yml`, `money-migration-drift-alert.yml` and their two tests) still must not be touched until Matthew clears it.
+  - Migration PRs held for Matthew.
+  - Never merge #1740.
+  - GitHub comments (PR, review or issue comments) need Matthew's approval.
+  - There's no staging site. Smoke tests run on production only, and only on the test fixture grow.
+  - The Vercel "Account is blocked." status isn't a required check.
+  - No agent changes to auth, RLS, migrations, Edge, `supabase/` or lockfiles unless Matthew names the action.
+  - The live list is on the agents' shared box at `/workspace/shared/context/fleet-locks.md`.
+
 # Verdant — Current Operating State
 
 ## Follow-up observation — 2026-10-06T22:33 UTC
@@ -69,6 +98,18 @@
 - **BLOCKED, production:** `https://verdantgrowdiary.com/` returns HTTP 402 (`X-Vercel-Error: DEPLOYMENT_DISABLED`) at 20:13 UTC. Live checks for #1857 remain NOT_MEASURED until a publish after the block clears.
 - **Unchanged:** #1857 stays draft with auto-merge off. The non-required Strain gate `validate` failure (`stamp_dirty`) still waits on #1827, which is open (not merged) at 20:13 UTC. No ready, merge or Publish.
 
+## Follow-up observation — 2026-10-02T15:39 UTC
+
+- **BLOCKED, decision D1 widened (GDP):** Codex automated review on #1844 (comment 4167087657, P2) found that a page-body count misses AppShell's chrome triggers. The thread was marked resolved by the shared `cheekhimself` account with no reply or change. Source classes predict (not measured in a browser) that, after the header link goes, a one-tent Dashboard has card `Log` + page `QuickLogV2Fab` + `header-quick-log-trigger` on desktop, and card `Log` + `mobile-quick-log-fab` ("Open Quick Log") on mobile. The spec defines browser-level visible-control checks in E2 (desktop) and E4 (390/320 px) to test actual visibility; they have not run, and splits D1 into two blocking parts plus one non-blocking: D1.1 page FAB (A drop, recommended / B exempt), D1.2 AppShell triggers on Dashboard (A named chrome exemption, recommended / B hide on Dashboard / C card `Log` opens the sheet, separate slice), and D1.3 `Start Check` (non-blocking, unchanged). This supersedes the 15:12 checkpoint's two-option D1. #1833 still blocks; no merge, auto-merge, Publish or production operation.
+- **#1844 head and review state:** #1844's exact head is not written here, because a commit cannot contain its own SHA; read it from the PR. Every push voids earlier CI and verdicts. Recorded: `bae8b6db` (the commit that added this entry, parent `ebc7fc3c`) reached 35/35 required SUCCESS at 2026-10-02 16:01 UTC with no review decision; the commit that adds this note moves the head again, so that result does not carry over. Independent review: Critical Mass (docs). Timestamp correction: this entry and the one below were first labelled 15:50 and 15:20 UTC; the commit times are 15:39 and 15:12 UTC.
+
+## Follow-up observation — 2026-10-02T15:12 UTC
+
+- **PASS, landed / BLOCKED, dashboard slice:** #1849 merged 2026-10-01 18:38 UTC as `b5d06488`; #1793 closed at 18:38 UTC as superseded. #1833 is still an open draft at `f296a953` (no activity since 2026-10-01 04:42 UTC), so the dashboard implementation stays BLOCKED. Deploy tip `80176bad`. `git grep` there shows exactly the 11 `dashboard-daily-grow-check-entry` references the spec plans for, including #1849's `e2e/signed-in-performance.spec.ts:35`. The overnight re-lands #1859/#1860 added none. #1837 (`881a64ba`) is still an open draft, with no `Dashboard.tsx` overlap on the deploy branch yet.
+- **Correction, routing:** the 2026-10-01 16:15 and 16:58 checkpoints sent decisions D1/D2 and #1793's reassignment to Cheek. Per OWNERSHIP.md, product calls and routing belong to GDP, and Matthew is never a blocker in the review path. Those receipts stay as written. From here: D1/D2 go to GDP, and merge goes to Chemdawg after 35/35 required checks and an independent PASS on the exact head. Raised by Codex automated review on #1844 (comments 4158072653, 4158139339).
+- **BLOCKED, decision D1 (GDP):** with a single-entry test that counts buttons as well as links, the page's own desktop `QuickLogV2Fab` ("Quick Log" button) is a second visible Log control next to the home card's `Log`. A link-only count would have missed it (review comment 4158072693). GDP must choose D1-A (drop `QuickLogV2Fab` from Dashboard; recommended, since AppShell's `header-quick-log-trigger` and its `open=quick-log` handling remain) or D1-B (keep it as a named exemption). D2 (no first-fold Log for no-tent or choose-a-tent states) is non-blocking.
+- **PASS, #1844 head refresh:** the 16:15 checkpoint's ready head `1139be80` is stale (comment 4158500366). #1844 was ready for review at `bca3bb67` with 35/35 required SUCCESS (2026-10-01 18:16 UTC); this commit moves the head again, so earlier CI and any verdict do not carry over. Independent review: Critical Mass (docs). No merge, auto-merge, Publish or production operation. HOLD #1250 and the named locks remain.
+
 ## Follow-up observation — 2026-10-01T18:57 UTC
 
 - **PASS, local validation / NOT_MEASURED, required CI:** #1857 is open as a stay-draft PR, with auto-merge off. Branch `claude/quicklog-sensor-snapshot-ai-allowlist`, head `7df4dfc63` (fix `27aecddf5` plus a normal merge of deploy `b5d064881`, no history rewrite). It closes the #1003 residual found during the #1855 audit, `established fact`: `resolveQuickLogSensorSnapshotForAi` returned its input verbatim when the snapshot had no `metrics` field (and for arrays and other non-objects), so `raw_payload`, `vbt_` tokens and hardware ids could reach the ai-coach prompt. Every path now builds a fresh object from an allowlist: canonical source (live/manual/csv/demo/stale/invalid), ISO `captured_at` or null, finite numbers under the annotator's reading keys. Unknown provenance resolves to `invalid`, not `unknown`. The edge `_shared` mirror was regenerated by `sync-edge-shared.mjs`. No schema, RLS, AI provider/model or UI change.
@@ -76,6 +117,20 @@
 - **NOT_MEASURED, CI at head:** at 18:57 UTC the required contexts are still pending (34 reported, none terminal); 4 pass, 60 pending, 14 skipped, 1 FAIL. The FAIL is Vercel ("Account is blocked"), the known owner-side account issue.
 - **FAIL, non-required gate / BLOCKED on #1827:** on the previous head `27aecddf5`, "Strain Reference Library V1 Gate / validate" failed with `[publish-verify] FAIL stamp_dirty`. Cause, `established fact`: the gate writes its build log to `.diagnostics/` inside the checkout, which is not gitignored, so the build stamps `-dirty`. The gate runs here only because `.sync-manifest.json` changed. #1827 (open, other session's PR) already moves the log to `$RUNNER_TEMP`; per Matthew, not duplicated here and not edited from this session. Expected to repeat on `7df4dfc63` until #1827 lands; the branch will be updated after that.
 - **BLOCKED, independent review:** owner Claude. No independent reviewer named yet; Chemdawg to assign by path once CI settles. No ready, merge or Publish.
+
+## Follow-up observation — 2026-10-01T16:58 UTC
+
+- **PASS, landed / BLOCKED, stacked successor:** #1792 is closed. Its fixture-proof change re-landed as #1835, which merged into `verdant-grow-diary` as `6ed854cee` at 16:49 UTC. #1793 (open draft, `074f4349`) still targets the closed #1792 branch `codex/chem-production-quicklog-fixture-001`. GitHub refused a retarget to `verdant-grow-diary` ("part of a stack"). A non-pushing `git merge-tree` trial against the deploy branch conflicts in 5 files: `e2e/lib/fixtureSafety.ts`, `e2e/lib/productionQuickLogFixtureProof.ts`, `e2e/lib/productionQuickLogFixtureRules.ts`, `e2e/quicklog-smoke.spec.ts` and `src/test/production-quicklog-fixture.test.ts`. The cause is #1835's review fixes, which #1792 never had. Source: status note on #1793 (issuecomment-5936177952, posted by another Claude session). This session has not reproduced the merge-tree trial. Proposed path: re-land #1793's signed-in performance and read-only proof work on a fresh branch from the deploy branch, keeping #1835's fixture files, with a normal merge and no force-push. It needs Codex as owner, or a reassignment from Cheek. #1799 and #1800 stack on #1793 and inherit the same block. No push to #1793 from either Claude session.
+- **NOT_MEASURED, Codex reply / PASS, coordination carried forward:** no Codex reply to the `dashboard-ready` handoff (issuecomment-5935387971) as of 16:53 UTC. If #1793 closes in favour of a re-land, our slice's "#1793 merged or closed" precondition is satisfied on paper. However, the successor will likely carry `e2e/signed-in-performance.spec.ts` with `control: "dashboard-daily-grow-check-entry"` (inference), so the handoff must move to the successor PR. Auto-fix for #1793 was unbound from the dashboard spec session at the user's request; #1793's own Copilot and Codex-connector findings, including a P1 workflow_dispatch credential-exposure finding, remain Codex's.
+- **PASS, base movement:** #1844 is now ready for review at `1139be80`. #1835 changes neither `CURRENT_STATE.md` nor `docs/specs/`, so #1844 was not updated with the new base. #1833 remains open (draft, `f296a953`); dashboard implementation stays BLOCKED. Same-file overlap, not a feature collision: #1837 (open draft, `claude/tonight-tent-home-demotion`, `881a64ba`) edits `src/pages/Dashboard.tsx` (+20/-17, KPI wall demotion) but not the header Quick Log button. Its PR body confirms it does not touch `dashboard-daily-grow-check-entry`. The implementation merges around whichever lands first. No merge, auto-merge, Publish or production operation. HOLD #1250 and the named locks remain.
+
+## Follow-up observation — 2026-10-01T16:15 UTC
+
+- **PASS, spec published / BLOCKED, implementation:** new stay-draft #1844 (`claude/dashboard-single-log-entry`) adds one file, `docs/specs/dashboard-single-log-entry-readiness-marker.md`, on deploy `0107d940`. No app or test code changed. After #1833, the Dashboard header `Quick Log` (`dashboard-daily-grow-check-entry`) duplicates the One-Tent Home `Log`. The spec removes the header button and moves every readiness consumer to `data-testid="dashboard-ready"` on the loaded-branch `PageHeader` actions wrapper. That wrapper renders whatever the tent selection, and never while loading or on error. Consumers covered: #1793's signed-in performance control, core-link census, ui-overhaul-responsive, and a fourth found by audit (`dashboard-mobile-overflow`). It also covers four unit-pin renegotiations and a RED-first test. Implementation stays BLOCKED until #1833 (`f296a953`, open draft) merges and #1793 (`074f4349`, open draft) merges or closes. Owner: Claude (user-assigned). Reviewers: Blue Dream for `.tsx`, Critical Mass for everything else.
+- **PASS, coordination / NOT_MEASURED, reply:** handoff to Codex posted on #1793 (issuecomment-5935387971). It asks for a one-line `control: "dashboard-ready"` change only if #1793 is still open when #1833 lands. #1793 was not edited, and #1799/#1800 do not use the header ID. No Codex reply yet.
+- **PASS, local docs evidence / NOT_MEASURED, CI:** `assert-docs-safety` PASS; two docs-safety test files 77 PASS / 0 FAIL / 0 SKIP; pre-commit hooks PASS. At 16:15 UTC #1844 checks: 1 SUCCESS, 52 queued, 1 pending, 12 skipped, 1 FAIL. Required contexts are not yet terminal.
+- **FAIL, external provider / NOT_MEASURED, production impact:** the Vercel status on #1844 and on deploy `0107d940` (15:12:36Z) reads "Account is blocked." The deploy commit later shows "Required and affected projects deploying" (15:35Z). Account cause and production publish impact are not measured; account owner action needed. Open decisions D1 (app-chrome Quick Log triggers and `Start Check`) and D2 (no first-fold Log for no-tent or choose-a-tent states) await Cheek. No merge, ready, auto-merge, Publish or production operation. HOLD #1250 and the named locks remain.
+
 
 ## Follow-up observation — 2026-09-29T08:38 UTC
 
@@ -379,7 +434,9 @@ OWNERSHIP.md controls ownership. HOLD #1250; #1369 REVIEW ONLY;
 #1741/#1745 retain protected database-approval holds. No Publish, production
 APPLY, device or Action Queue operation was performed in this docs change.
 Live acceptance remains NOT_MEASURED here.
+
 ### Historical operating receipts — unchanged below
+
 **Last updated:** 2026-09-24 UTC (~11:25 UTC; tip, live and board measured 11:14–11:17 UTC)
 **Updated by:** Claude (2026-09-24 late morning, restamp on **deploy tip
 `b0bfdb028600b63ec7b8bff914632a20b06020b7`**, the `#1685` squash. **Four commits** merged since the

@@ -36,6 +36,7 @@
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { timingSafeEqual } from "../_shared/lib/lib/timingSafeCompareRules.ts";
 
 const FN = "edge-metrics-alert-check";
 
@@ -524,7 +525,9 @@ if (import.meta.main) {
     // lets pg_net trigger the check without carrying a user session.
     const cronSecret = Deno.env.get("ALERT_CRON_SECRET");
     const providedCronSecret = req.headers.get("x-alert-cron-secret");
-    const isCron = Boolean(cronSecret && providedCronSecret && providedCronSecret === cronSecret);
+    const isCron = Boolean(
+      cronSecret && providedCronSecret && timingSafeEqual(providedCronSecret, cronSecret),
+    );
 
     if (!isCron) {
       const authHeader = req.headers.get("Authorization");

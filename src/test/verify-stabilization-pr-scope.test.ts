@@ -148,7 +148,7 @@ describe("classifyStabilizationPrFiles — staged-mode file lists", () => {
 });
 
 describe("classifyStabilizationPrFiles — lockfile allowlist", () => {
-  it.each(["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb"])(
+  it.each(["pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb"])(
     "allows lockfile %s on its own",
     (lock) => {
       const r = classifyStabilizationPrFiles([lock]);
@@ -157,10 +157,17 @@ describe("classifyStabilizationPrFiles — lockfile allowlist", () => {
     },
   );
 
+  it("rejects the retired npm lockfile", () => {
+    const result = classifyStabilizationPrFiles(["package-lock.json"]);
+    expect(result.verdict).toBe("stop-ship");
+    expect(result.allowed).toEqual([]);
+    expect(result.blocked).toEqual(["package-lock.json"]);
+  });
+
   it("blocks overall when a product file rides along with a lockfile", () => {
-    const r = classifyStabilizationPrFiles(["package-lock.json", "src/lib/harvestWatchRules.ts"]);
+    const r = classifyStabilizationPrFiles(["bun.lock", "src/lib/harvestWatchRules.ts"]);
     expect(r.verdict).toBe("stop-ship");
-    expect(r.allowed).toEqual(["package-lock.json"]);
+    expect(r.allowed).toEqual(["bun.lock"]);
     expect(r.blocked).toEqual(["src/lib/harvestWatchRules.ts"]);
   });
 });

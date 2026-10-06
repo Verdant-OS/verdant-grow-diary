@@ -31,7 +31,6 @@ const ALLOWED_EXACT = new Set([
   "package.json",
   "bun.lockb",
   "bun.lock",
-  "package-lock.json",
   "pnpm-lock.yaml",
   "yarn.lock",
 ]);

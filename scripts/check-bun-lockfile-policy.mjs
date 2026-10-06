@@ -5,8 +5,8 @@
  * Bun and bun.lock are canonical, and bun.lock is the only lockfile. The npm
  * compatibility lock (package-lock.json) was retired on 2026-10-03; it and every
  * other package manager's lockfile are forbidden. The remaining npm command
- * references (documentation and the local public-registry bootstrap) are an
- * exact allowlist in config/dependency-lockfile-transition.json.
+ * references in documentation are an exact allowlist in
+ * config/dependency-lockfile-transition.json.
  *
  * Safety posture:
  *  - Read-only. Never modifies package.json or bun.lock.
@@ -84,12 +84,12 @@ function normalizedRelative(root, absolutePath) {
 }
 
 function listPolicyFiles(root) {
-  // NPM_INSTALL_PATTERN cannot match a file that does not contain "npm".
-  // Ask Git for that lossless tracked-file candidate set first instead of
+  // Install commands/npm caches contain "npm"; retired-lock hashes contain
+  // "package-lock". Ask Git for that tracked-file candidate set first instead of
   // synchronously reading every tracked text file in the repository.
   const result = spawnSync(
     "git",
-    ["-C", root, "grep", "-l", "-z", "-i", "-F", "-e", "npm", "--", "."],
+    ["-C", root, "grep", "-l", "-z", "-i", "-F", "-e", "npm", "-e", "package-lock", "--", "."],
     {
       encoding: "utf8",
       timeout: 30_000,
@@ -399,6 +399,24 @@ export function evaluatePolicy({
     } catch (error) {
       errors.push(`Failed to scan ${relativePath}: ${String(error?.message ?? error)}`);
       continue;
+    }
+    if (/^\.github\/workflows\/.+\.ya?ml$/i.test(relativePath)) {
+      const activeLines = contents
+        .split(/\r?\n/)
+        .filter((line) => !/^\s*#/.test(line))
+        .join("\n");
+      if (
+        /(?:^|[\s{,])(?:cache|"cache"|'cache')\s*:\s*(?:npm|"npm"|'npm')(?=[\s,}#]|$)/im.test(
+          activeLines,
+        )
+      ) {
+        errors.push(`Forbidden npm cache found at ${relativePath}; use the Bun install cache.`);
+      }
+      if (/\bhashFiles\s*\([^)]*package-lock/i.test(activeLines)) {
+        errors.push(
+          `Workflow cache hashes the retired npm lock at ${relativePath}; hash bun.lock instead.`,
+        );
+      }
     }
     if (NPM_INSTALL_PATTERN.test(contents) && !declaredConsumers.has(relativePath)) {
       errors.push(

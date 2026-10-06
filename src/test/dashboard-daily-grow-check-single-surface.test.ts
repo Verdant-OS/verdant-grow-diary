@@ -33,21 +33,14 @@ describe("Dashboard · single daily grow-check surface", () => {
     expect(dashboardSrc).toMatch(/DailyGrowCheckStatusCard/);
   });
 
-  it("still exposes the Quick Log page entry button routing to /daily-check", () => {
-    // Slice 2 label cleanup: the PageHeader CTA was renamed
-    // "Daily Grow Check" → "Quick Log" so there is one grower-facing
-    // logging concept. Route target is unchanged.
-    expect(dashboardSrc).toMatch(/dashboard-daily-grow-check-entry/);
-    expect(dashboardSrc).toMatch(/>Quick Log</);
-    expect(dashboardSrc).toMatch(/withGrowId\("\/daily-check",\s*scopedGrowId\)/);
-    expect(dashboardSrc).not.toMatch(
-      /dashboard-daily-grow-check-entry[\s\S]{0,120}to=["']\/daily-check["']/,
-    );
-    // The PageHeader actions block must not present "Daily Grow Check" as
-    // a competing primary CTA label alongside Quick Log.
-    const headerActions =
-      dashboardSrc.match(/dashboard-daily-grow-check-entry[\s\S]{0,400}<\/Button>/)?.[0] ?? "";
-    expect(headerActions).not.toMatch(/>Daily Grow Check</);
+  it("the page header carries the readiness marker, not a second Log CTA", () => {
+    // docs/specs/dashboard-single-log-entry-readiness-marker.md: the header
+    // Quick Log link duplicated the One-Tent Home card's Log, so it was
+    // removed and its wrapper now carries the e2e readiness marker.
+    expect(dashboardSrc).not.toMatch(/dashboard-daily-grow-check-entry/);
+    expect(dashboardSrc).toMatch(/data-testid="dashboard-ready"/);
+    expect(dashboardSrc).not.toMatch(/>Quick Log</);
+    expect(dashboardSrc).not.toMatch(/>Daily Grow Check</);
   });
 
   it("has exactly one DailyGrowCheckStatusCard render on Dashboard", () => {

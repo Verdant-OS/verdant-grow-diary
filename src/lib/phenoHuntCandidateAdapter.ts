@@ -273,6 +273,8 @@ export function adaptPhenoHuntCandidates(
       plantType: cleanLabel(p.plant_type ?? null),
       growLabel: p.grow_id ? (growNames[p.grow_id] ?? null) : null,
       tentLabel: p.tent_id ? (tentNames[p.tent_id] ?? null) : null,
+      growId: p.grow_id ?? null,
+      tentId: p.tent_id ?? null,
       requireEcPh: requireFull,
       requirePpfd: requireFull,
       quickLogEntries: [...(quickLogs[p.id] ?? [])],

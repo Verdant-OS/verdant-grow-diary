@@ -310,6 +310,21 @@ export function usePhenoHuntWorkspace(
     editablePlantIdsRef.current = new Set();
     setDecisionHistoryByPlant({});
     (async () => {
+      // #571: the keeper chain (keepers → reversals + clones) depends only on
+      // the hunt id, so it runs alongside the summary/page reads instead of
+      // after them — two serial round trips on the critical path, not three.
+      // The no-op catch only marks the promise handled when an earlier error
+      // returns before it is awaited; awaiting it below still rejects.
+      const keeperChain = (async () => {
+        const keepers = await listKeepersForHunt(id);
+        const keeperIds = keepers.map((k) => k.id);
+        const [reversedKeeperIdList, cloneRows] = await Promise.all([
+          listReversedKeeperIdsForKeepers(keeperIds),
+          listClonesForKeepers(keeperIds),
+        ]);
+        return { keepers, reversedKeeperIdList, cloneRows };
+      })();
+      keeperChain.catch(() => undefined);
       const [summaryRes, comparison, pageRes] = await Promise.all([
         loadPhenoHuntSummary(id),
         loadPhenoHuntComparisonSummary(id),
@@ -327,16 +342,10 @@ export function usePhenoHuntWorkspace(
         return;
       }
       const pageIds = pageRes.candidates.map((c) => c.candidateId);
-      const [{ scores, decisions, sexes, smokes, labs }, keepers] = await Promise.all([
-        loadPageEvidence(id, pageIds),
-        listKeepersForHunt(id),
-      ]);
-      if (cancelled || reqId !== requestRef.current) return;
-      const keeperIds = keepers.map((k) => k.id);
-      const [reversedKeeperIdList, cloneRows] = await Promise.all([
-        listReversedKeeperIdsForKeepers(keeperIds),
-        listClonesForKeepers(keeperIds),
-      ]);
+      const [
+        { scores, decisions, sexes, smokes, labs },
+        { keepers, reversedKeeperIdList, cloneRows },
+      ] = await Promise.all([loadPageEvidence(id, pageIds), keeperChain]);
       const reversedKeeperIds = new Set(reversedKeeperIdList);
       if (cancelled || reqId !== requestRef.current) return;
       pageRef.current = 0;

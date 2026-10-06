@@ -45,6 +45,90 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CODEX-1730-TYPED-REUSED-RECEIPT
+
+```text
+TASK CODEX-1730-TYPED-REUSED-RECEIPT  priority: P2  status: OPEN
+goal: Verify a reused typed Water or Feed receipt against its active grow event and typed child before reporting the save as confirmed. Fail closed with rpc:receipt_unverified otherwise.
+branch: codex/typed-reused-receipt-active-check-20260926
+base: verdant-grow-diary
+checkout: git switch codex/typed-reused-receipt-active-check-20260926 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1730
+head_sha: 70ff2fe4861008bec3dafc902e7ede5d0e6b2c03, observed 2026-10-06T21:52Z. This is a normal revert of 9c752130 (owner decision "Split into separate PR"); git diff a3ed0541 70ff2fe4 is empty, so the content equals Blue Dream's reviewed a3ed0541.
+state: review. Required checks 35/35 at 70ff2fe4. CodeRabbit's two Minor threads were acknowledged and resolved; their fixes live in #1930.
+next_action: Blue Dream independent PASS at 70ff2fe4, then Matthew's Accept naming that SHA, then the Chemdawg merge. It lands before #1731 and #1930.
+files: src/lib/quickLogTypedReusedReceipt.ts; src/lib/quickLogTypedReusedReceiptRules.ts; src/lib/writeFeedingTypedEvent.ts; src/lib/writeQuickLogWateringTypedEvent.ts and their tests (own delta 94f4e3a1..565ba33a, 10 files)
+blockers: none caused by this PR. Non-required reds on every head: the dependency audit (new advisories; a lockfile fix needs Matthew), the nested dependency audit, Cloudflare Workers Builds (logs only in the dashboard; hosting migration on hold), and Vercel "Account is blocked".
+artifacts: handoff comment https://github.com/Verdant-OS/verdant-grow-diary/pull/1730#issuecomment-6026157552
+reviewer_seat: Blue Dream
+claimed_by:
+last_updated: 2026-10-06 16:55 CT, by Claude
+```
+
+### CODEX-1731-REUSED-NOTE-ACTIVITY-RECEIPT
+
+```text
+TASK CODEX-1731-REUSED-NOTE-ACTIVITY-RECEIPT  priority: P2  status: OPEN
+goal: Verify reused Note and Activity receipts against owner-visible active records before reporting them as saved. Stacked on #1730.
+branch: codex/quick-log-reused-note-activity-active-20260926
+base: codex/typed-reused-receipt-active-check-20260926 (#1730); retarget to verdant-grow-diary after #1730 merges
+checkout: git switch codex/quick-log-reused-note-activity-active-20260926 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/codex/typed-reused-receipt-active-check-20260926
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1731
+head_sha: 1686519b13c6f69ba4e0e89ef6003e074b7ecde0, observed 2026-10-06T21:52Z. This is a clean merge of #1730 70ff2fe4; its tree is byte-identical to a89033559, a tests-only empty-note pin pushed by another agent.
+state: review. Required checks 34/35 with 2 pending at 21:52Z. Blue Dream returned BLOCKED at a89033559 only because the head moved; its provisional findings clear both P2s. P2-1 owner decision: leave the code as is (?? null sent to the RPC, || null in verification, matching SQL NULLIF(p_note, '')). P2-2 is fixed in the PR body.
+next_action: 35/35 at 1686519b, a Blue Dream re-review at 1686519b, then Matthew's Accept. It lands after #1730.
+files: own delta 565ba33a..9f34cbce (15 files), plus the tests-only a89033559 (src/test/quick-log-activity-receipt-audit.test.tsx and src/test/quick-log-pending-activity-receipt.test.ts)
+blockers: depends on #1730. The same non-required reds as #1730. More than one agent has pushed to this branch, so check the PR's claim comments before pushing.
+artifacts: handoff comment https://github.com/Verdant-OS/verdant-grow-diary/pull/1731#issuecomment-6026169167
+reviewer_seat: Blue Dream
+claimed_by:
+last_updated: 2026-10-06 16:55 CT, by Claude
+```
+
+### CLAUDE-1921-HISTORY-MARKER-FALLBACK
+
+```text
+TASK CLAUDE-1921-HISTORY-MARKER-FALLBACK  priority: P2  status: OPEN
+goal: Keep Feed, Water and Note history review across a reload when the full marked record cannot be stored but a small write still lands. Each store adds a fallback marker scoped to the idempotency key. Full-storage capacity is explicitly out of scope; capacity tests pin the blocked result.
+branch: claude/new-session-07zuju
+base: verdant-grow-diary
+checkout: git switch claude/new-session-07zuju && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1921
+head_sha: fa0886730eed6b1716ab3389adaa7f0c9091784e, observed 2026-10-06T21:52Z
+state: review. Required checks 35/35 (the cancelled security-regression and PR-description runs are superseded duplicates; the latest run of each succeeded). CodeRabbit posted no findings. The Codex P2 is answered and resolved.
+next_action: Blue Dream independent PASS at fa088673, then Matthew's Accept. It is independent of the #1730 stack.
+files: src/lib/quickLogPendingFeedingStore.ts; src/lib/quickLogPendingNoteStore.ts; src/lib/quickLogPendingWateringStore.ts; src/lib/quickLogWaterRecoveryKeys.ts and their tests
+blockers: it will conflict with #1930 in the Feed and Water store files. Whichever lands second resolves the conflict, and #1921's fallback marker must then also carry historyReviewTarget. Same non-required reds as #1730.
+artifacts: handoff comment https://github.com/Verdant-OS/verdant-grow-diary/pull/1921#issuecomment-6026162929
+reviewer_seat: Blue Dream
+claimed_by:
+last_updated: 2026-10-06 16:55 CT, by Claude
+```
+
+### CLAUDE-1930-TYPED-RECEIPT-DEADLINE-MISMATCH
+
+```text
+TASK CLAUDE-1930-TYPED-RECEIPT-DEADLINE-MISMATCH  priority: P2  status: OPEN
+goal: The #1730 follow-ups, split out by owner decision:
+  - a 10 s AbortSignal deadline across both reused-receipt reads;
+  - a confirmed mismatch routes to history review;
+  - a moved receipt's verified destination is carried through and persisted as historyReviewTarget, so Open Timeline points where the entry lives now, including after a reload.
+  This changes the user-visible recovery flow.
+branch: claude/typed-receipt-deadline-mismatch-review
+base: codex/typed-reused-receipt-active-check-20260926 (#1730); retarget to verdant-grow-diary after #1730 merges
+checkout: git switch claude/typed-receipt-deadline-mismatch-review && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/codex/typed-reused-receipt-active-check-20260926
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1930
+head_sha: fbb5d1085f7cc088decc264df7414e9a9d2c9605, observed 2026-10-06T21:52Z
+state: review (ready, not draft). Required checks 0/35: ci.yml runs only for PRs into main or verdant-grow-diary, so it has not run on this stacked base. CodeRabbit skips it for the same reason. Two Codex P2s are fixed in c1dfd816 and fbb5d108.
+next_action: after #1730 merges, retarget to verdant-grow-diary, merge the base if needed (a normal merge), and confirm ci.yml starts. Then 35/35, a Blue Dream PASS at the then-current head, and Matthew's Accept.
+files: src/lib/quickLogTypedReusedReceipt.ts; src/lib/quickLogTypedReusedReceiptRules.ts; src/lib/quickLogHistoryReviewTargetRules.ts (new); src/lib/writeFeedingTypedEvent.ts; src/lib/writeQuickLogWateringTypedEvent.ts; src/lib/quickLogPendingFeedingStore.ts; src/lib/quickLogPendingWateringStore.ts; src/components/QuickLogV2Sheet.tsx and tests
+blockers: depends on #1730. It conflicts with #1921 in the Feed and Water store files (see that block).
+artifacts: handoff comment https://github.com/Verdant-OS/verdant-grow-diary/pull/1930#issuecomment-6026163158
+reviewer_seat: Blue Dream
+claimed_by:
+last_updated: 2026-10-06 16:55 CT, by Claude
+```
+
 ### CLAUDE-LOOP-ENGINEERING-001
 
 ```text

@@ -31,19 +31,21 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-06T21:06 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-06T21:15 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
 
-- **Latest (`established fact`, GitHub API, 21:06 UTC):** head **`706707712`** (31 commits, 0
+- **Latest (`established fact`, GitHub API, 21:15 UTC):** head **`706707712`** (31 commits, 0
   behind `verdant-grow-diary`) adds one CodeRabbit fix: the read model refuses cultivar
   `thc_pct_*` / `cbd_pct_*` outside 0–100 (4 RED → GREEN; strain suites 134/134; offline strict
   parity READY 10/10). It is a declared scorer change under `scripts/scorer-lock.mjs`, named in
   the commit and in the PR body's "Changed checks" section.
-  - Exact head: `Published migration integrity`, `Strain Reference Library V1 Gate` and
-    `Google Analytics E2E` **`PASS`**; Security DB Local, dispatch history and the required
-    contexts (1 pass, 34 pending; `CI` queued) pending — `NOT_MEASURED`.
+  - Exact head: **Security DB Local `PASS`**, 150 passed and 0 failed (run `37530749047`),
+    under the stricter percentage rule; `Published migration integrity`,
+    `Strain Reference Library V1 Gate`, `Google Analytics E2E` and `Dispatch history e2e`
+    **`PASS`**. Required contexts **33 pass / 2 pending** (`Full test suite (shard 19/32)`,
+    `Lint, typecheck, test, build`), none failed — 35/35 `NOT_MEASURED` until they finish.
   - Previous head `aa6306ab4`: the `CI` workflow (all 35 required contexts) completed
     **success**, and Security DB Local passed 150/150.
   - 46 review threads, all resolved; no approving or changes-requested review. Non-required

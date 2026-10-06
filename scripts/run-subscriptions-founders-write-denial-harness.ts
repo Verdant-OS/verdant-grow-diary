@@ -11,8 +11,10 @@
  *
  * Proves, for each table:
  *   - a user reads only their own row; another owner's row is invisible
- *   - INSERT for oneself or for another user is rejected (self-grant)
- *   - UPDATE and UPSERT of one's own or another user's row change nothing
+ *   - INSERT for oneself or for another user is rejected with SQLSTATE 42501
+ *     (self-grant); a constraint error such as 23505 does not count as denial
+ *   - UPDATE and UPSERT of one's own or another user's row change nothing,
+ *     including flipping an active sandbox subscription's environment to live
  *   - DELETE of one's own row changes nothing
  *   - anon can read nothing and write nothing
  *   - every seeded row is byte-for-byte unchanged afterwards (service_role
@@ -92,6 +94,38 @@ export function resolveHarnessTarget(
 
 type Row = Record<string, unknown>;
 
+export type WriteResult = { data: unknown; error: { code?: string; message: string } | null };
+
+/** SQLSTATE for a missing privilege or a row-level security violation. */
+export const PERMISSION_DENIED = "42501";
+
+/**
+ * A write is denied when it errors or returns no affected rows. Use this only where a
+ * constraint error is an acceptable outcome (UPDATE/UPSERT/DELETE); a 23505 here still
+ * means nothing changed, and the service_role read-back proves it.
+ */
+export function denied(result: WriteResult): boolean {
+  return !!result.error || (Array.isArray(result.data) && result.data.length === 0);
+}
+
+/**
+ * An INSERT is denied only by a permission error. Accepting any error would let a
+ * future authenticated INSERT grant pass as a unique violation (23505) whenever the
+ * target user already has a row, which is exactly the self-grant this harness exists
+ * to catch.
+ */
+export function permissionDenied(result: WriteResult): boolean {
+  return result.error?.code === PERMISSION_DENIED;
+}
+
+/**
+ * The environment flip is blocked when the UPDATE was denied and the active sandbox row
+ * still reads back as sandbox. A sandbox row turned live would grant production access.
+ */
+export function environmentFlipBlocked(update: WriteResult, rowAfter: Row | undefined): boolean {
+  return denied(update) && rowAfter?.environment === "sandbox" && rowAfter?.status === "active";
+}
+
 const SUBSCRIPTION_COLUMNS =
   "user_id,paddle_subscription_id,paddle_customer_id,product_id,price_id,status,current_period_end,cancel_at_period_end,environment";
 const FOUNDER_COLUMNS =
@@ -137,20 +171,17 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
   }
 
   async function readBack(table: string, columns: string, userIds: string[]): Promise<Row[]> {
-    const { data, error } = await admin
-      .from(table)
-      .select(columns)
-      .in("user_id", userIds)
-      .order("user_id");
+    // paddle_subscription_id is unique and user A holds two subscription rows, so it is
+    // the tie-breaker that keeps the before/after comparison order-stable.
+    const ordered = admin.from(table).select(columns).in("user_id", userIds).order("user_id");
+    const { data, error } = await (table === "subscriptions"
+      ? ordered.order("paddle_subscription_id")
+      : ordered);
     if (error) throw new Error(`read-back ${table}: ${error.message}`);
     return (data ?? []) as unknown as Row[];
   }
 
-  /** A write is denied when it errors or returns no affected rows. */
-  function denied(result: { data: unknown; error: { code?: string; message: string } | null }) {
-    return !!result.error || (Array.isArray(result.data) && result.data.length === 0);
-  }
-  function describe(result: { data: unknown; error: { code?: string; message: string } | null }) {
+  function describe(result: WriteResult) {
     return result.error
       ? `code=${result.error.code} msg=${result.error.message}`
       : `data=${JSON.stringify(result.data)}`;
@@ -172,7 +203,20 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
 
   try {
     // Canceled, non-entitling seed rows: the attack is turning them into paid access.
+    // A also holds an active sandbox row: sandbox rows never grant production access,
+    // so the attack there is flipping environment to live.
+    const sandboxSubscriptionId = `sub_write_denial_a_sandbox_${tag}`;
     const { error: subSeedError } = await admin.from("subscriptions").insert([
+      {
+        user_id: uidA,
+        paddle_subscription_id: sandboxSubscriptionId,
+        paddle_customer_id: `ctm_write_denial_a_${tag}`,
+        product_id: "pro_monthly",
+        price_id: "pro_monthly",
+        status: "active",
+        current_period_end: "2099-01-01T00:00:00Z",
+        environment: "sandbox",
+      },
       {
         user_id: uidA,
         paddle_subscription_id: `sub_write_denial_a_${tag}`,
@@ -212,8 +256,8 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
     {
       const own = await a.from("subscriptions").select("user_id");
       check(
-        "S1. A SELECT → only A's row",
-        !own.error && own.data?.length === 1 && own.data[0].user_id === uidA,
+        "S1. A SELECT → only A's two rows",
+        !own.error && own.data?.length === 2 && own.data.every((row) => row.user_id === uidA),
         describe(own),
       );
       const other = await a.from("subscriptions").select("user_id").eq("user_id", uidB);
@@ -239,8 +283,8 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
           })
           .select();
         check(
-          `S3. A INSERT active founder_lifetime for ${label} user_id → rejected`,
-          denied(insert),
+          `S3. A INSERT active founder_lifetime for ${label} user_id → permission denied (42501)`,
+          permissionDenied(insert),
           describe(insert),
         );
       }
@@ -257,6 +301,43 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
         "S4. A UPDATE own row to active → rejected or 0 rows",
         denied(update),
         describe(update),
+      );
+      const flip = await a
+        .from("subscriptions")
+        .update({ environment: "live" })
+        .eq("paddle_subscription_id", sandboxSubscriptionId)
+        .select();
+      const flipUpsert = await a
+        .from("subscriptions")
+        .upsert(
+          {
+            user_id: uidA,
+            paddle_subscription_id: sandboxSubscriptionId,
+            paddle_customer_id: `ctm_write_denial_a_${tag}`,
+            product_id: "pro_monthly",
+            price_id: "pro_monthly",
+            status: "active",
+            current_period_end: "2099-01-01T00:00:00Z",
+            environment: "live",
+          },
+          { onConflict: "paddle_subscription_id" },
+        )
+        .select();
+      const { data: flipped, error: flipReadError } = await admin
+        .from("subscriptions")
+        .select(SUBSCRIPTION_COLUMNS)
+        .eq("paddle_subscription_id", sandboxSubscriptionId)
+        .maybeSingle();
+      if (flipReadError) throw new Error(`read-back sandbox row: ${flipReadError.message}`);
+      check(
+        "S4b. A UPDATE own active sandbox row environment → live → rejected, row still sandbox",
+        environmentFlipBlocked(flip, (flipped ?? undefined) as Row | undefined),
+        `${describe(flip)} after=${JSON.stringify(flipped)}`,
+      );
+      check(
+        "S4c. A UPSERT own active sandbox row as environment=live → rejected, row still sandbox",
+        environmentFlipBlocked(flipUpsert, (flipped ?? undefined) as Row | undefined),
+        `${describe(flipUpsert)} after=${JSON.stringify(flipped)}`,
       );
       const updateOther = await a
         .from("subscriptions")
@@ -305,7 +386,11 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
           environment: "live",
         })
         .select();
-      check("S9. anon INSERT → rejected", denied(anonInsert), describe(anonInsert));
+      check(
+        "S9. anon INSERT → permission denied (42501)",
+        permissionDenied(anonInsert),
+        describe(anonInsert),
+      );
       const anonUpdate = await anon
         .from("subscriptions")
         .update({ status: "active" })
@@ -316,7 +401,7 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
       check("S11. anon DELETE → rejected or 0 rows", denied(anonDelete), describe(anonDelete));
       const after = await readBack("subscriptions", SUBSCRIPTION_COLUMNS, users);
       check(
-        "S12. both seeded rows unchanged (service_role read-back)",
+        "S12. all three seeded rows unchanged (service_role read-back)",
         JSON.stringify(after) === JSON.stringify(subsBefore),
         `before=${JSON.stringify(subsBefore)} after=${JSON.stringify(after)}`,
       );
@@ -324,7 +409,7 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
         .from("subscriptions")
         .select("*", { count: "exact", head: true })
         .in("user_id", users);
-      check("S13. no extra subscription rows were created", count === 2, `count=${count}`);
+      check("S13. no extra subscription rows were created", count === 3, `count=${count}`);
     }
 
     console.log("→ public.founders");
@@ -350,8 +435,8 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
           .insert({ user_id: userId, founder_number: numberSpare, status: "confirmed" })
           .select();
         check(
-          `F3. A INSERT confirmed founder for ${label} user_id → rejected`,
-          denied(insert),
+          `F3. A INSERT confirmed founder for ${label} user_id → permission denied (42501)`,
+          permissionDenied(insert),
           describe(insert),
         );
       }
@@ -415,7 +500,11 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
         .from("founders")
         .insert({ user_id: uidA, founder_number: numberSpare, status: "confirmed" })
         .select();
-      check("F11. anon INSERT → rejected", denied(anonInsert), describe(anonInsert));
+      check(
+        "F11. anon INSERT → permission denied (42501)",
+        permissionDenied(anonInsert),
+        describe(anonInsert),
+      );
       const anonUpdate = await anon
         .from("founders")
         .update({ status: "confirmed" })

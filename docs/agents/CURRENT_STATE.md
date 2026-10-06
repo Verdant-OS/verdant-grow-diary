@@ -2,6 +2,12 @@
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-06T21:30 UTC
+
+- **NOT_MEASURED, #1858 itself:** this status PR (stay-draft, auto-merge off, owner Claude, no reviewer routed) is at head `53a741dc7` with five dated blocks added since 2026-10-01 (`aa3a1ce4d`, `7d49705d2`, `79c6e679e`, `6c4556d87`, `53a741dc7`), all single-file `docs/agents/CURRENT_STATE.md` changes; every pre-commit docs-safety run passed. At 21:30 UTC all 34 required contexts on this head are pending; overall 1 pass / 53 pending / 12 skipped / 3 fail. The three failures are Vercel ("Account is blocked") and the two Cloudflare "Workers Builds" preview deploys (the `previews` block defect; this branch predates #1926's fix). The `test:security-db-local` flake re-run and the dependency audit job are pending again on this head, not failed.
+- **PASS, sibling repairs:** #1926 (Cloudflare `previews` block) now has **35/35 required contexts green** at head `54cf04d1e`; #1929 (dependency advisories, two commits, head `18e3109b6`) is at 29 pass / 6 pending. Neither has an independent reviewer routed yet; both stay draft. Once both merge, the Workers preview and dependency-audit failures stop appearing on every open PR, including this one.
+- **Unchanged:** production still HTTP 402 on Vercel; the hosting decision, the duplicate Workers project, the Access policy and the inert zone routes remain owner questions (block of 21:00 UTC).
+
 ## Follow-up observation — 2026-10-06T21:28 UTC
 
 - **FAIL, nested spike audit / PASS, repair on #1929:** the non-required job "Nested static proofs and production isolation" (workflow *Cursor SDK local orchestration spike*) runs `bun audit` inside `spikes/cursor-sdk-local-orchestration/`, whose own `bun.lock` still pinned source-map-js 1.2.1 (`vitest › @vitest/mocker › vite › postcss`), advisory 1241209 (high). `established fact`: that job failed on all ten most recent runs across branches, so it is a deploy-tip defect, not caused by #1929. #1929's second commit `18e3109b6` moves the nested copy to 1.2.2 (same integrity as the root fix, inside postcss's range); nested `bun audit` now reports no vulnerabilities and an isolated `bun install --frozen-lockfile --ignore-scripts` of the spike's `package.json` + `bun.lock` exits 0 with 1.2.2 installed. No nested `package-lock.json` exists. #1929 is now four files; head `18e3109b6`, still stay-draft, required contexts at 2026-10-06T21:28 UTC:  25 pass 10 pending ; independent review still unrouted.

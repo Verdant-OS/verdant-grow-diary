@@ -42,6 +42,7 @@ vi.mock("sonner", () => ({
 }));
 
 const storageKey = `verdant:quick-log:pending-feeding:v1:owner-a`;
+const historyStorageKey = `verdant:quick-log:pending-feeding-history:v1:owner-a`;
 
 function sheet() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -199,6 +200,45 @@ describe("Feed save rejected by server validation", () => {
     expect(JSON.parse(window.sessionStorage.getItem(storageKey)!).payload.idempotency_key).toBe(
       pendingKey,
     );
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores review after reload when only the full marked record could not be stored", async () => {
+    const pendingKey = await seedPendingFeedWithPh(15);
+    rpc.mockResolvedValueOnce({
+      data: { ok: false, reason: "invalid_typed_payload" },
+      error: null,
+    });
+    const setItem = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+      this: Storage,
+      name: string,
+      value: string,
+    ) {
+      if (name === storageKey && value.includes("historyCheckReason"))
+        throw new Error("QuotaExceededError");
+      setItem.call(this, name, value);
+    });
+    const second = sheet();
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+    await waitFor(() => expect(screen.getByTestId("qlv2-history-review-link")).toBeVisible());
+    second.unmount();
+    vi.restoreAllMocks();
+    expect(
+      JSON.parse(window.sessionStorage.getItem(storageKey)!).historyCheckReason,
+    ).toBeUndefined();
+
+    sheet();
+    expect(screen.getByTestId("qlv2-error")).toHaveTextContent(FEEDING_REJECTED_HISTORY_REVIEW);
+    expect(screen.getByTestId("qlv2-history-review-link")).toBeVisible();
+    expect(screen.queryByTestId("qlv2-save-retry")).toBeNull();
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(window.sessionStorage.getItem(storageKey)!).payload.idempotency_key).toBe(
+      pendingKey,
+    );
+    fireEvent.click(screen.getByRole("button", { name: QUICK_LOG_HISTORY_DISCARD_LABEL }));
+    await waitFor(() => expect(window.sessionStorage.getItem(storageKey)).toBeNull());
+    expect(window.sessionStorage.getItem(historyStorageKey)).toBeNull();
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 

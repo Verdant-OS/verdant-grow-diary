@@ -146,6 +146,110 @@ describe("durable Feed history-review refusal", () => {
   });
 });
 
+const historyKey = (owner = "owner-a") => `verdant:quick-log:pending-feeding-history:v1:${owner}`;
+
+/** A full marked-record rewrite fails (for example quota), while small writes still land. */
+function refuseMarkedRecordRewrite(mode: "throw" | "ignore") {
+  const original = Storage.prototype.setItem;
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+    this: Storage,
+    name: string,
+    value: string,
+  ) {
+    if (name === key() && value.includes("historyCheckReason")) {
+      if (mode === "throw") throw new Error("QuotaExceededError");
+      return;
+    }
+    original.call(this, name, value);
+  });
+}
+
+describe("Feed history-review marker fallback when the full record cannot be rewritten", () => {
+  it.each(["throw", "ignore"] as const)(
+    "persists a key-scoped marker when the marked record write %ss, so a reload restores review",
+    (mode) => {
+      const original = record();
+      claimPendingQuickLogFeeding(original);
+      const unmarkedRaw = window.sessionStorage.getItem(key());
+      refuseMarkedRecordRewrite(mode);
+      const marked = { ...record(), historyCheckReason: "rpc:invalid_typed_payload" as const };
+      expect(markPendingQuickLogFeedingHistoryCheck(original, "rpc:invalid_typed_payload")).toEqual(
+        { status: "marked", record: marked },
+      );
+      vi.restoreAllMocks();
+      // The exact journal is untouched; the refusal lives beside it.
+      expect(window.sessionStorage.getItem(key())).toBe(unmarkedRaw);
+      expect(JSON.parse(window.sessionStorage.getItem(historyKey())!)).toEqual({
+        version: 1,
+        idempotencyKey: "feeding-save-12345678",
+        historyCheckReason: "rpc:invalid_typed_payload",
+      });
+      expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "pending", record: marked });
+      expect(clearPendingQuickLogFeeding(marked)).toBe(true);
+      expect(window.sessionStorage.getItem(key())).toBeNull();
+      expect(window.sessionStorage.getItem(historyKey())).toBeNull();
+    },
+  );
+
+  it("ignores a fallback marker that names a different idempotency key", () => {
+    const original = record();
+    claimPendingQuickLogFeeding(original);
+    window.sessionStorage.setItem(
+      historyKey(),
+      JSON.stringify({
+        version: 1,
+        idempotencyKey: "another-feeding-save",
+        historyCheckReason: "rpc:invalid_typed_payload",
+      }),
+    );
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "pending", record: original });
+  });
+
+  it.each([
+    "not json",
+    JSON.stringify({ version: 1, idempotencyKey: "feeding-save-12345678" }),
+    JSON.stringify({
+      version: 1,
+      idempotencyKey: "feeding-save-12345678",
+      historyCheckReason: "rpc:error",
+    }),
+    JSON.stringify({
+      version: 2,
+      idempotencyKey: "feeding-save-12345678",
+      historyCheckReason: "rpc:invalid_typed_payload",
+    }),
+    JSON.stringify({
+      version: 1,
+      idempotencyKey: "feeding-save-12345678",
+      historyCheckReason: "rpc:invalid_typed_payload",
+      extra: true,
+    }),
+  ])("fails closed on a corrupt fallback marker beside a pending Feed: %s", (raw) => {
+    claimPendingQuickLogFeeding(record());
+    window.sessionStorage.setItem(historyKey(), raw);
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "blocked" });
+  });
+
+  it("ignores a fallback marker when no Feed is pending", () => {
+    window.sessionStorage.setItem(historyKey(), "not json");
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "empty" });
+  });
+
+  it("still reports blocked when neither the record nor the marker can be written", () => {
+    const original = record();
+    claimPendingQuickLogFeeding(original);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    expect(markPendingQuickLogFeedingHistoryCheck(original, "rpc:invalid_typed_payload")).toEqual({
+      status: "blocked",
+    });
+    vi.restoreAllMocks();
+    expect(window.sessionStorage.getItem(historyKey())).toBeNull();
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "pending", record: original });
+  });
+});
+
 describe("owner-scoped exact pending Feed", () => {
   it("returns empty only for a readable empty owner slot", () => {
     expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "empty" });

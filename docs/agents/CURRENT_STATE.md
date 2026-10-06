@@ -31,12 +31,12 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-06T21:35 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-06T21:38 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
 
-- **Latest (`established fact`, GitHub API, 21:35 UTC; unchanged since 21:27):** head **`706707712`** (31 commits, 0
+- **Latest (`established fact`, GitHub API, 21:38 UTC; unchanged since 21:27):** head **`706707712`** (31 commits, 0
   behind `verdant-grow-diary`) adds one CodeRabbit fix: the read model refuses cultivar
   `thc_pct_*` / `cbd_pct_*` outside 0–100 (4 RED → GREEN; strain suites 134/134; offline strict
   parity READY 10/10). It is a declared scorer change under `scripts/scorer-lock.mjs`, named in

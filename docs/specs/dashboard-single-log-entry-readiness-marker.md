@@ -1,7 +1,7 @@
 # Dashboard — one Log entry, stable readiness marker
 
-Status: **SPEC — implementation BLOCKED only on GDP decisions D1.1 and D1.2** (see §1, §7). #1833
-merged 2026-10-03 as `04a36937`.
+Status: **IMPLEMENTED on this branch (2026-10-06).** D1.1 = A and D1.2 = A, decided by Matthew
+Cheek 2026-10-06 (§7). #1833 merged 2026-10-03 as `04a36937`.
 Author: Claude, 2026-10-01. Audited at deploy tip `0107d9406` (`verdant-grow-diary`, #1836),
 #1833 head `f296a953`, #1793 head `074f4349`. Updated 2026-10-01 17:35 UTC for #1849 (re-land of #1793,
 head `c2d473e8`). Updated 2026-10-02 15:12 UTC: #1849 merged, #1793 closed, review findings on
@@ -21,7 +21,7 @@ Every claim carries a label: `established fact` (read from source at the SHAs ab
 | #1833 `feat(dashboard): One-Tent Home first fold` merged         | **MERGED** 2026-10-03 15:21 UTC as `04a36937`        | `established fact` |
 | #1849 `test(e2e): … (re-land of #1793)` merged                   | **MERGED** 2026-10-01 18:38 UTC as `b5d06488`        | `established fact` |
 | #1793 `test(e2e): measure signed-in readiness…` merged or closed | **CLOSED** 2026-10-01 18:38 UTC, superseded by #1849 | `established fact` |
-| D1 decided by GDP (§7)                                           | OPEN                                                 | `established fact` |
+| D1 decided (§7)                                                  | **DECIDED** 2026-10-06: D1.1-A, D1.2-A               | `established fact` |
 
 #1793's work landed through #1849. The deploy branch (`80176bad`) now carries
 `e2e/signed-in-performance.spec.ts:35` with `control: "dashboard-daily-grow-check-entry"`, as
@@ -152,6 +152,13 @@ duplicate fails:
 | Desktop (`chromium-mocked` uses `devices["Desktop Chrome"]`) | E2   | card `Log`, page `QuickLogV2Fab` (`Quick Log`), AppShell `header-quick-log-trigger` (`Quick Log`) | 2: card `Log` + `header-quick-log-trigger`, the second as a named chrome exemption |
 | Mobile 390 / 320 px                                          | E4   | card `Log`, AppShell `mobile-quick-log-fab` (`Open Quick Log`)                                    | 2: card `Log` + `mobile-quick-log-fab`, the second as a named chrome exemption     |
 
+**Implementation finding (2026-10-06, `established fact` from the E4 run):** on mobile a third
+visible Log control exists: `MobileNav`'s primary-bar `Log` tab (→ `/daily-check`, added by #1826
+after this spec was written; no test ID, inside `nav[aria-label="Primary navigation"]`). It is
+global app chrome, so D1.2-A covers it: it stays, named in E4's set as
+`Primary navigation > /daily-check`. The mobile whole-page set is therefore 3: card `Log`,
+`mobile-quick-log-fab`, and the MobileNav `Log` tab. `MobileNav` is not edited.
+
 In the mobile case, `QuickLogV2Fab` and `header-quick-log-trigger` are `hidden md:inline-flex`, and
 `mobile-quick-log-fab` is `md:hidden`. `established fact` (class names in source; actual
 visibility is proven by the e2e run). This check closes the gap raised on #1844 (comment
@@ -230,7 +237,8 @@ show GREEN.
 1. Signed-in Dashboard with one tent: the page-body Log controls (§5.4) and the whole-page
    visible Log controls at desktop and mobile widths (§5.2, E2 and E4) match GDP's D1 answer
    exactly. Under the recommended answer that is 1 in the page body (the home card's `Log`) and
-   2 on the whole page (card `Log` plus one named chrome trigger per viewport).
+   on the whole page the card `Log` plus the named chrome controls: `header-quick-log-trigger` on
+   desktop (2); `mobile-quick-log-fab` and the MobileNav `Log` tab on mobile (3; §5.2 finding).
 2. `dashboard-ready` is the only selector E1–E4 use; it renders exactly once in the loaded
    branch for `none`, `choose`, `tent`, and never while loading/error.
 3. U1–U4 renegotiated in the same commit; new test shown RED then GREEN with counts.
@@ -252,7 +260,8 @@ OWNERSHIP.md assigns product calls to GDP, and Matthew is never a blocker in the
 (OWNERSHIP.md §1, "GDP: routing and product calls"). Earlier revisions routed these to Cheek;
 that was wrong (finding on #1844, comment 4158072653).
 
-- **D1 — which Log controls may stay visible. BLOCKING, both parts.** After the header link is
+- **DECIDED 2026-10-06 (Matthew Cheek): D1.1 = A, D1.2 = A.** D1.3 and D2 keep their defaults.
+- **D1 — which Log controls may stay visible.** After the header link is
   removed, a one-tent Dashboard still shows more than one Log control (`established fact`, §5.2
   table). This slice only meets the brief's "one visible Log control" if GDP says which ones
   stay. The tests then pin exactly that set.

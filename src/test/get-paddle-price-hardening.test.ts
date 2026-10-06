@@ -80,6 +80,16 @@ describe("get-paddle-price — server-controlled environment", () => {
     expect(stripped).not.toMatch(/body\??\.environment/);
   });
 
+  it("picks the Paddle gateway only from an explicit PAYMENTS_ENVIRONMENT and refuses otherwise", () => {
+    // Grant-path audit, 2026-10-03: the gateway must never be inferred. The
+    // entitlement resolver fails closed to "live" for reads, which would be
+    // wrong for selling, so checkout uses the strict resolver and returns 503.
+    expect(stripped).toMatch(
+      /const environmentResolution = resolveRequiredServerBillingEnvironment\(\);\s*if \(!environmentResolution\.ok\) \{[\s\S]*?stage: "environment",[\s\S]*?return json\(503, \{ error: "price_resolution_unavailable" \}\);\s*\}\s*environment = environmentResolution\.environment;/,
+    );
+    expect(stripped).not.toMatch(/environment = resolveServerBillingEnvironment\(\)/);
+  });
+
   it("H1 (audit fix): the blanket live_billing_not_enabled 409 is removed so live checkout can settle", () => {
     // The Lovable webhook path (payments-webhook + allocate_lovable_founder_lifetime)
     // now handles both environments and enforces the founder cap atomically,

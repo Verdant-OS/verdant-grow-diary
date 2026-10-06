@@ -31,12 +31,12 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-06T21:18 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-06T21:27 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
 
-- **Latest (`established fact`, GitHub API, 21:18 UTC):** head **`706707712`** (31 commits, 0
+- **Latest (`established fact`, GitHub API, 21:27 UTC):** head **`706707712`** (31 commits, 0
   behind `verdant-grow-diary`) adds one CodeRabbit fix: the read model refuses cultivar
   `thc_pct_*` / `cbd_pct_*` outside 0–100 (4 RED → GREEN; strain suites 134/134; offline strict
   parity READY 10/10). It is a declared scorer change under `scripts/scorer-lock.mjs`, named in
@@ -44,8 +44,8 @@ this entry's earlier 2026-10-01 versions.
   - Exact head: **Security DB Local `PASS`**, 150 passed and 0 failed (run `37530749047`),
     under the stricter percentage rule; `Published migration integrity`,
     `Strain Reference Library V1 Gate`, `Google Analytics E2E` and `Dispatch history e2e`
-    **`PASS`**. Required contexts **34 pass / 1 pending** (`Lint, typecheck, test, build`; `CI` run
-    `37530749076` in progress), none failed — 35/35 `NOT_MEASURED` until it finishes.
+    **`PASS`**. **Required contexts 35/35 `PASS`** (`CI` run `37530749076` completed success);
+    `mergeStateStatus: UNSTABLE` (non-required reds only).
   - Previous head `aa6306ab4`: the `CI` workflow (all 35 required contexts) completed
     **success**, and Security DB Local passed 150/150.
   - 46 review threads, all resolved; no approving or changes-requested review. Non-required
@@ -99,8 +99,8 @@ this entry's earlier 2026-10-01 versions.
 
 The bullets below are the 2026-10-01 record and keep their own observation times.
 
-- **Open (not draft), required CI green at the exact head, awaiting Chemdawg pre-check — review
-  not routed:
+- **Open (not draft), 35/35 required CI green at the exact head, awaiting Chemdawg pre-check —
+  review not routed:
   [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
   (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `2a2de17dc`, 29 commits) implements
   issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 20:00

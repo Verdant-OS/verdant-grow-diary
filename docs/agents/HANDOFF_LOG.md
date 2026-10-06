@@ -74,15 +74,15 @@ branch: claude/strain-library-v1-1-db-parity-cutover
 base: verdant-grow-diary
 checkout: git switch claude/strain-library-v1-1-db-parity-cutover && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1827
-head_sha: aa6306ab4ce98f0d289dbecda14522abbeff06fa, observed 2026-10-06 20:50 UTC (base merge of verdant-grow-diary cfe09322e; exact-head CI not yet reported)
-state: CI — PR open, not draft. Head aa6306ab4 merges the base (0 behind); its CI is pending. At the previous head 2a2de17dc: 35/35 required PASS; GA E2E (webkit) re-run PASS; Security DB Local 150/150, Strain gate, migration integrity and dispatch history PASS (b4e569ea2 pins the parity receipt to production; d7a753f29 adds its guard to the strain gate; 2a2de17dc refuses non-sample verification and repeated terpenes). At a73dbfb40 (earlier head): 35/35 required PASS, Security DB Local 150/150, Strain gate PASS, migration integrity PASS. All automated review threads resolved; no independent acceptance yet.
+head_sha: aa6306ab4ce98f0d289dbecda14522abbeff06fa, observed 2026-10-06 20:47 UTC (base merge of verdant-grow-diary cfe09322e, committed 20:35:53 UTC; exact-head required CI pending)
+state: CI — PR open, not draft. Head aa6306ab4 merges the base (0 behind); migration integrity, strain gate, GA E2E and dispatch history PASS; required contexts and Security DB Local pending. At the previous head 2a2de17dc: 35/35 required PASS; GA E2E (webkit) re-run PASS; Security DB Local 150/150, Strain gate, migration integrity and dispatch history PASS (b4e569ea2 pins the parity receipt to production; d7a753f29 adds its guard to the strain gate; 2a2de17dc refuses non-sample verification and repeated terpenes). At a73dbfb40 (earlier head): 35/35 required PASS, Security DB Local 150/150, Strain gate PASS, migration integrity PASS. All automated review threads resolved; no independent acceptance yet.
 next_action: Let exact-head CI at aa6306ab4 settle, then route for independent acceptance; record results in docs/agents/CURRENT_STATE.md (PR #1830).
 files: supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql; src/lib/cultivarDatabase{ReadModel,ParityRules,SeedPayloadRules}.ts; src/lib/cultivarReference{Service,SourceRules}.ts; src/lib/supabasePublicReadKeyRules.ts; src/hooks/usePublishedCultivars.ts; src/constants/cultivarReferenceSourceCopy.ts; src/lib/featureFlags.ts; src/pages/Cultivar{Page,sIndex}.tsx; scripts/audit-cultivar-database-parity.ts; scripts/run-cultivar-reference-rls-harness.ts; .github/workflows/{strain-reference-library-v1-gate,security-db-local}.yml; package.json; docs/product/strain-reference-library-v1-1-db-cutover.md; six src/test/cultivar*/strain* tests
 blockers: HOLD-CHEEK — adds a migration, so merge waits for Matthew (OWNERSHIP.md §4.3); production apply is Matthew's only. Vercel check red = account block (owner, dashboard). Independent exact-head PASS from Blue Dream / Durban Poison / Critical Mass not yet recorded; owner named Grok as reviewer 2026-10-01.
 artifacts: PR #1827 checks; Security DB Local runs; docs/product/strain-reference-library-v1-1-db-cutover.md (production-only runbook); CURRENT_STATE entry via PR #1830
 reviewer_seat: Blue Dream (.tsx product files and migration); Claude cannot accept its own work
 claimed_by: Claude, 2026-10-06 20:34 UTC (renewal comments posted on PR #1827 and PR #1830)
-last_updated: 2026-10-06 15:58 CT, by Claude (state vocabulary and checkpoint refresh)
+last_updated: 2026-10-06 15:47 CT, by Claude (status refresh; corrects earlier estimated times)
 ```
 
 ### CLAUDE-CURRENT-STATE-1827-STATUS
@@ -94,15 +94,15 @@ branch: claude/current-state-1827-status
 base: verdant-grow-diary
 checkout: git switch claude/current-state-1827-status && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1830
-head_sha: 29fcfd40dae5261cfbe604d3c7dfd00ed3cbfcdc, verified source checkpoint 2026-10-06 20:58 UTC. Later merge-from-base and handoff-only commits sit on top of it, so the PR head is ahead of this SHA: per the template, confirm this SHA is an ancestor of the PR's current head, adopt that head and name it in your claim. Do not inherit this checkpoint's CI or review claims.
-state: CI — PR open, not draft. The CURRENT_STATE entry records #1827 at aa6306ab4 (base merge, 2026-10-06 20:50 UTC); both PRs are non-draft pending the owner's draft decision; for #1827's current head use only the head_sha of the block above; this block names no #1827 head of its own.
+head_sha: 50d4b612a52de495377fe995ae69d417af330039, verified source checkpoint 2026-10-06 20:47 UTC. Later merge-from-base and handoff-only commits sit on top of it, so the PR head is ahead of this SHA: per the template, confirm this SHA is an ancestor of the PR's current head, adopt that head and name it in your claim. Do not inherit this checkpoint's CI or review claims.
+state: CI — PR open, not draft. The CURRENT_STATE entry records #1827 at aa6306ab4 (base merge committed 2026-10-06 20:35:53 UTC); both PRs are non-draft pending the owner's draft decision; for #1827's current head use only the head_sha of the block above; this block names no #1827 head of its own.
 next_action: Refresh the #1827 entry once exact-head CI on #1827 reports; merge origin/verdant-grow-diary into the branch when it moves (normal push; never rebase or force-push).
 files: docs/agents/CURRENT_STATE.md; docs/agents/HANDOFF_LOG.md
 blockers: Vercel check red = account block (owner). Rebase conflicts possible with other CURRENT_STATE/HANDOFF_LOG edits; resolve by keeping every entry.
 artifacts: PR #1830
 reviewer_seat: Critical Mass (docs/state); Claude cannot accept its own work
 claimed_by: Claude, 2026-10-06 20:34 UTC (renewal comments posted on PR #1827 and PR #1830)
-last_updated: 2026-10-06 15:58 CT, by Claude (state vocabulary and checkpoint refresh)
+last_updated: 2026-10-06 15:47 CT, by Claude (status refresh; corrects earlier estimated times)
 ```
 
 ### CHEM-MOVE-TENT-READ-HONESTY-001

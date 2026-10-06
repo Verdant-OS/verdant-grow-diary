@@ -17,6 +17,10 @@ vi.mock("@/integrations/supabase/client", () => ({
       return {
         select: () => ({
           eq: (_column: string, id: string) => ({
+            // Mirrors the real builder: the receipt readback passes its deadline signal.
+            abortSignal() {
+              return this;
+            },
             maybeSingle: async () => {
               const args = rpc.mock.calls.at(-1)?.[1] as QuickLogFeedingEventRpcArgs | undefined;
               return {

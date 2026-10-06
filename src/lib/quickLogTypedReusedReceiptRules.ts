@@ -43,3 +43,39 @@ export function matchesActiveTypedQuickLogEvent(
     event.plant_id === expected.plantId
   );
 }
+
+/** A confirmed reused-receipt mismatch: same-key Retry returns it again, so only history review resolves it. */
+export type TypedReusedReceiptRefusal =
+  | "idempotency_receipt_missing"
+  | "idempotency_key_retracted"
+  | "receipt_target_moved"
+  | "idempotency_key_conflict";
+
+/** Why a readable parent row does not confirm this receipt; null when it does. */
+export function typedReusedEventRefusal(
+  expected: ExpectedTypedQuickLogEvent,
+  value: unknown,
+): TypedReusedReceiptRefusal | null {
+  if (value === null || value === undefined) return "idempotency_receipt_missing";
+  if (matchesActiveTypedQuickLogEvent(expected, value)) return null;
+  if (typeof value !== "object" || Array.isArray(value)) return "idempotency_key_conflict";
+  const event = value as Record<string, unknown>;
+  if (
+    event.id !== expected.id ||
+    event.event_type !== expected.eventType ||
+    event.source !== "manual"
+  )
+    return "idempotency_key_conflict";
+  if (event.is_deleted === true) return "idempotency_key_retracted";
+  if (event.is_deleted !== false) return "idempotency_key_conflict";
+  return "receipt_target_moved";
+}
+
+/** Why a readable typed child row does not confirm this receipt; null when it does. */
+export function typedReusedChildRefusal(
+  expected: ExpectedTypedQuickLogEvent,
+  value: unknown,
+): TypedReusedReceiptRefusal | null {
+  if (value === null || value === undefined) return "idempotency_receipt_missing";
+  return matchesTypedQuickLogChild(expected, value) ? null : "idempotency_key_conflict";
+}

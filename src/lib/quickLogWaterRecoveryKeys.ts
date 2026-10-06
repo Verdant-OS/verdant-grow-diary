@@ -7,3 +7,10 @@ export const starterWaterRecoveryKey = (ownerId: string) =>
 
 export const typedWaterRecoveryKey = (ownerId: string) =>
   `verdant:quick-log:pending-watering:v1:${ownerId}`;
+
+/**
+ * Key-scoped fallback for a typed Water history-review refusal whose full
+ * marked record could not be rewritten. It names exactly one idempotency key.
+ */
+export const typedWaterHistoryMarkerKey = (ownerId: string) =>
+  `verdant:quick-log:pending-watering-history:v1:${ownerId}`;

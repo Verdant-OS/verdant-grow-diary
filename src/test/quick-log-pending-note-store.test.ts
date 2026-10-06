@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   claimPendingQuickLogNote,
   clearPendingQuickLogNote,
@@ -293,7 +293,11 @@ describe("markPendingQuickLogNoteHistoryCheck", () => {
     const marked = markPendingQuickLogNoteHistoryCheck(record, "receipt_target_moved", target);
     expect(marked).toEqual({
       status: "marked",
-      record: { ...record, historyCheckReason: "receipt_target_moved", historyReviewTarget: target },
+      record: {
+        ...record,
+        historyCheckReason: "receipt_target_moved",
+        historyReviewTarget: target,
+      },
     });
     if (marked.status !== "marked") throw new Error("Expected the moved refusal to persist");
     expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "pending", record: marked.record });
@@ -365,5 +369,135 @@ describe("markPendingQuickLogNoteHistoryCheck", () => {
       JSON.stringify({ ...validRecord(), historyCheckReason: "network_error" }),
     );
     expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "blocked" });
+  });
+});
+
+const noteHistoryKey = (owner = ownerA) => `verdant:quick-log:pending-note-history:v1:${owner}`;
+
+/** The full marked-record rewrite fails (for example quota) while small writes still land. */
+function refuseMarkedNoteRewrite(mode: "throw" | "ignore") {
+  const original = Storage.prototype.setItem;
+  return vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+    this: Storage,
+    name: string,
+    value: string,
+  ) {
+    if (name === pendingKey() && value.includes("historyCheckReason")) {
+      if (mode === "throw") throw new Error("QuotaExceededError");
+      return;
+    }
+    original.call(this, name, value);
+  });
+}
+
+describe("Note history-review marker fallback when the full record cannot be rewritten", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each(["throw", "ignore"] as const)(
+    "persists a key-scoped marker when the marked record write %ss, so a reload restores review",
+    (mode) => {
+      const original = validRecord();
+      claimPendingQuickLogNote(original);
+      const unmarkedRaw = window.sessionStorage.getItem(pendingKey());
+      const spy = refuseMarkedNoteRewrite(mode);
+      const marked = { ...validRecord(), historyCheckReason: "idempotency_key_retracted" as const };
+      expect(markPendingQuickLogNoteHistoryCheck(original, "idempotency_key_retracted")).toEqual({
+        status: "marked",
+        record: marked,
+      });
+      spy.mockRestore();
+      expect(window.sessionStorage.getItem(pendingKey())).toBe(unmarkedRaw);
+      expect(JSON.parse(window.sessionStorage.getItem(noteHistoryKey())!)).toEqual({
+        version: 1,
+        idempotencyKey: "durable-note-key-12345678",
+        historyCheckReason: "idempotency_key_retracted",
+      });
+      expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "pending", record: marked });
+      expect(clearPendingQuickLogNote(marked)).toBe(true);
+      expect(window.sessionStorage.getItem(pendingKey())).toBeNull();
+      expect(window.sessionStorage.getItem(noteHistoryKey())).toBeNull();
+    },
+  );
+
+  it("keeps the moved-receipt review target in the fallback marker", () => {
+    const original = validRecord();
+    claimPendingQuickLogNote(original);
+    const spy = refuseMarkedNoteRewrite("throw");
+    const target = { growId, tentId: "77777777-7777-4777-8777-777777777777", plantId };
+    const marked = {
+      ...validRecord(),
+      historyCheckReason: "receipt_target_moved" as const,
+      historyReviewTarget: target,
+    };
+    expect(markPendingQuickLogNoteHistoryCheck(original, "receipt_target_moved", target)).toEqual({
+      status: "marked",
+      record: marked,
+    });
+    spy.mockRestore();
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "pending", record: marked });
+  });
+
+  it("ignores a fallback marker that names a different idempotency key", () => {
+    const original = validRecord();
+    claimPendingQuickLogNote(original);
+    window.sessionStorage.setItem(
+      noteHistoryKey(),
+      JSON.stringify({
+        version: 1,
+        idempotencyKey: "another-note-key-1234",
+        historyCheckReason: "idempotency_key_retracted",
+      }),
+    );
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "pending", record: original });
+  });
+
+  it.each([
+    "not json",
+    JSON.stringify({ version: 1, idempotencyKey: "durable-note-key-12345678" }),
+    JSON.stringify({
+      version: 1,
+      idempotencyKey: "durable-note-key-12345678",
+      historyCheckReason: "rpc:error",
+    }),
+    JSON.stringify({
+      version: 1,
+      idempotencyKey: "durable-note-key-12345678",
+      historyCheckReason: "idempotency_key_retracted",
+      historyReviewTarget: { growId, tentId, plantId },
+    }),
+    JSON.stringify({
+      version: 1,
+      idempotencyKey: "durable-note-key-12345678",
+      historyCheckReason: "receipt_target_moved",
+      historyReviewTarget: { growId: 42, tentId, plantId },
+    }),
+    JSON.stringify({
+      version: 2,
+      idempotencyKey: "durable-note-key-12345678",
+      historyCheckReason: "idempotency_key_retracted",
+    }),
+  ])("fails closed on a corrupt fallback marker beside a pending Note: %s", (raw) => {
+    claimPendingQuickLogNote(validRecord());
+    window.sessionStorage.setItem(noteHistoryKey(), raw);
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "blocked" });
+  });
+
+  it("ignores a fallback marker when no Note is pending", () => {
+    window.sessionStorage.setItem(noteHistoryKey(), "not json");
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "empty" });
+  });
+
+  it("still reports blocked when neither the record nor the marker can be written", () => {
+    const original = validRecord();
+    claimPendingQuickLogNote(original);
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    expect(markPendingQuickLogNoteHistoryCheck(original, "idempotency_key_retracted")).toEqual({
+      status: "blocked",
+    });
+    spy.mockRestore();
+    expect(window.sessionStorage.getItem(noteHistoryKey())).toBeNull();
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "pending", record: original });
   });
 });

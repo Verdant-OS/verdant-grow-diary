@@ -111,9 +111,10 @@ jobs:
             if (/(?:^|\/)(?:vitest|vite|playwright)\.(?:setup|workspace)[^/]*$/i.test(path)) return true;
             if (/(?:^|\/)(?:setup-?tests?|test-?setup|global[-_.]?(?:setup|teardown))[^/]*$/i.test(path)) return true;
             if (/^src\/test\/setup/i.test(path)) return true;
-            // Prettier and legacy ESLint configs can load plugins; scripts/e2e runs with E2E secrets.
+            // Prettier and legacy ESLint configs can load plugins. CI runs scripts/**
+            // (ci.yml and other workflows) in jobs that hold write tokens or secrets.
             if (/(?:^|\/)(?:\.prettierrc|\.eslintrc)[^/]*$/i.test(path)) return true;
-            if (/^scripts\/e2e(?:\/|$)/i.test(path)) return true;
+            if (/^scripts(?:\/|$)/i.test(path)) return true;
             const executable = /^(?:src|scripts|tests|e2e|packages)\//i.test(path) && !/\.md$/i.test(path);
             return executable && (
               /auth|oauth|rls|action[-_]?(?:queue|detail|outcome|follow[-_]?up|response[-_]?memory|completion|status)|linked[-_]?actions?|assigned[-_]?tent[-_]?actions?|live[-_]?proof[-_]?action[-_]?status|recent[-_]?action[-_]?response|device[-_]?(?:control|command)|actuator/i.test(path) ||
@@ -156,7 +157,7 @@ jobs:
               './**/*.config.*', './**/vitest.setup*', './**/vite.setup*', './**/playwright.setup*',
               './**/vitest.workspace*', './**/*setupTests*', './**/*setup-tests*', './**/*test-setup*',
               './**/*global-setup*', './**/*global-teardown*', './**/*globalSetup*', './**/*globalTeardown*',
-              './src/test/setup*', './**/.prettierrc*', './**/.eslintrc*', './scripts/e2e/**',
+              './src/test/setup*', './**/.prettierrc*', './**/.eslintrc*', './scripts/**',
             ];
             const codeGlobs = [
               '*auth*', '*Auth*', '*OAuth*', '*[rR][lL][sS]*',
@@ -223,7 +224,9 @@ jobs:
               '.npmrc', 'bunfig.toml', 'src/test/setup.ts', 'src/test/setupTests.ts',
               'vitest.setup.ts', 'vitest.workspace.ts', 'e2e/global-setup.ts', 'e2e/global-teardown.ts',
               '.prettierrc', '.prettierrc.json', 'nested/.prettierrc.cjs', '.eslintrc', '.eslintrc.json',
-              'scripts/e2e/materialize-managed-session.mjs',
+              'scripts/e2e/materialize-managed-session.mjs', 'scripts/check-no-src-lib-imports.mjs',
+              'scripts/verify-edge-shared-in-sync.mjs', 'scripts/notify-edge-shared-drift.mjs',
+              'scripts/sync-edge-shared-notes.md',
             ];
             const allowed = [
               'docs/library.md', 'docs/auth-guide.md', 'docs/agents/claude-slices.md',
@@ -231,8 +234,7 @@ jobs:
               'src/test/libraryRules.test.ts', 'src/test/component.test.tsx',
               'src/pages/Knowledge.tsx', 'docs/authorization-guide.md', 'docs/package-json.md',
               'src/lib/guidedActionChecklistRules.ts', 'src/lib/actionResponsePairingRules.ts',
-              'src/test/action-response-pairing-rules.test.ts', 'scripts/sync-edge-shared-notes.md',
-              'docs/prettierrc-notes.md',
+              'src/test/action-response-pairing-rules.test.ts', 'docs/prettierrc-notes.md',
             ];
             blocked.forEach(path => assert.equal(lockedPath(path), true, path));
             allowed.forEach(path => assert.equal(lockedPath(path), false, path));
@@ -245,11 +247,56 @@ jobs:
               'Bash(npx *)', 'Bash(*/scripts/git-push.sh*)', `Bash(${ACTION_PUSH_WRAPPER}:*)`,
               'Edit(./**/package.json)', 'Write(./**/package.json)', 'Edit(./**/*.config.*)',
               'Write(./**/*.config.*)', 'Edit(./**/tsconfig*.json)', 'Write(./src/test/setup*)',
-              'Edit(./**/.prettierrc*)', 'Edit(./**/.eslintrc*)', 'Write(./scripts/e2e/**)',
+              'Edit(./**/.prettierrc*)', 'Edit(./**/.eslintrc*)', 'Edit(./scripts/**)', 'Write(./scripts/**)',
               'Bash(*--pathspec-from-file*)', 'Bash(*--pathspec-file-nul*)',
             ];
             requiredDenies.forEach(rule => assert.ok(deny.includes(rule), rule));
-            console.log(`Claude policy regression tests: PASS (${blocked.length + allowed.length + 3 + requiredDenies.length} cases)`);
+            const leaks = tokenLeakProbe();
+            console.log(`Claude policy regression tests: PASS (${blocked.length + allowed.length + 3 + requiredDenies.length + leaks} cases)`);
+          }
+
+          // Behavioural check, not a string check. Builds a throwaway repo configured
+          // the way the pinned action configures the checkout, then tries to print
+          // .git/config through git's own error output, abbreviated options included.
+          // A token in the remote URL leaks (proves the probe can see a leak); the
+          // credential-helper layout the builder uses (allowed_non_write_users) does not.
+          function tokenLeakProbe() {
+            const { mkdtempSync } = require('node:fs');
+            const { tmpdir } = require('node:os');
+            const { join } = require('node:path');
+            const { spawnSync } = require('node:child_process');
+            const fake = 'ghs_policyProbeFakeToken0000';
+            const forms = [
+              ['commit', '-m', 'x', '--pathspec-from-file', '.git/config'],
+              ['commit', '-m', 'x', '--pathspec-fr', '.git/config'],
+              ['commit', '-m', 'x', '--pathspec-from=.git/config'],
+              ['add', '--pathspec-fr', '.git/config'],
+              ['add', '--dry-run', '--ignore-missing', '--pathspec-from', '.git/config'],
+            ];
+            const env = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GH_TOKEN: fake };
+            const git = (cwd, args) => spawnSync('git', ['-c', 'user.name=p', '-c', 'user.email=p@p', ...args], { cwd, env, encoding: 'utf8' });
+            function repo(helperLayout) {
+              const dir = mkdtempSync(join(tmpdir(), 'claude-probe-'));
+              git(dir, ['init', '-q']);
+              git(dir, ['commit', '-q', '--allow-empty', '-m', 'init']);
+              if (helperLayout) {
+                git(dir, ['remote', 'add', 'origin', 'https://github.com/o/r.git']);
+                git(dir, ['config', 'credential.helper', join(dir, '.git-credential-gh-token')]);
+              } else {
+                git(dir, ['remote', 'add', 'origin', `https://x-access-token:${fake}@github.com/o/r.git`]);
+              }
+              return dir;
+            }
+            const leaky = repo(false);
+            assert.ok(forms.some(args => { const r = git(leaky, args); return `${r.stdout}${r.stderr}`.includes(fake); }),
+              'probe must detect the token-in-URL leak, or it proves nothing');
+            const safe = repo(true);
+            for (const args of forms) {
+              const r = git(safe, args);
+              assert.ok(!`${r.stdout}${r.stderr}`.includes(fake), `token printed by git ${args.join(' ')}`);
+            }
+            assert.ok(!git(safe, ['config', '--list', '--local']).stdout.includes(fake), 'token stored in .git/config');
+            return forms.length + 2;
           }
 
           if (require.main === module) {
@@ -300,14 +347,16 @@ jobs:
       - name: Implement one Claude slice
         if: steps.billing.outputs.configured == 'true'
         uses: anthropics/claude-code-action@8ce9314fa9a404564fa7e954cd84f25bcba2b829 # v1, verified 2026-09-28
-        # Issue text is untrusted. The pinned action scrubs Anthropic, cloud and
-        # Actions secrets from Claude's subprocesses only when allowed_non_write_users
-        # is set, so enable the scrub explicitly. Subprocess PID isolation needs a
-        # working bubblewrap, which the previous step installs and verifies (the job
-        # fails if it doesn't work). The scrub itself is best-effort per the action's
-        # docs, so known file-reading command forms are denied (see the
-        # disallowedTools list); that list is a denylist, not a proof that no
-        # allowed command can read a file and echo it back to Claude.
+        # Issue text is untrusted. allowed_non_write_users (set below to the only
+        # actor the job `if` admits) makes the pinned action keep the job token out
+        # of .git/config: it sets a token-free origin URL and a credential helper that
+        # reads GH_TOKEN at push time, instead of writing the token into the remote
+        # URL. So no command that prints a repository file can print the token. The
+        # token still lives in the action's process environment; the subprocess scrub
+        # (best-effort per the action's docs) and the bubblewrap PID isolation verified
+        # in the previous step keep subprocesses from reading it. The disallowedTools
+        # list is defence in depth only: git accepts abbreviated long options, so no
+        # denylist can enumerate every file-reading form.
         env:
           CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
         with:
@@ -317,6 +366,10 @@ jobs:
           # The read-only job token replaces the Claude App token exchange, so the
           # token in Claude's environment and git remote cannot push or merge.
           github_token: ${{ github.token }}
+          # Not a widening: the job `if` already admits only cheekhimself, who has
+          # write access. Set for its side effect, the token-free git layout above.
+          # Never '*' and never another user.
+          allowed_non_write_users: cheekhimself
           base_branch: verdant-grow-diary
           branch_prefix: claude/
           label_trigger: claude-slice
@@ -382,6 +435,14 @@ jobs:
           BASE: ${{ steps.prep.outputs.base }}
         run: |
           set -euo pipefail
+          # The token-free git layout is what keeps the job token unreadable. If the
+          # pinned action ever writes a credential into .git/config again, publish
+          # nothing and fail, so the regression is visible.
+          local_config=$(git config --local --list)
+          if grep -qiE 'x-access-token|://[^/@[:space:]]+@' <<<"$local_config"; then
+            echo "A credential is present in .git/config; refusing to publish." >&2
+            exit 1
+          fi
           out="$RUNNER_TEMP/claude-slice-out"
           branch=$(git branch --show-current)
           if [[ ! "$branch" =~ ^claude/[A-Za-z0-9._-]+$ ]]; then
@@ -539,6 +600,11 @@ jobs:
           for (const rule of ['Bash(gh issue comment *)', 'Bash(*--no-index*)', 'Bash(*--output*)', 'Bash(*/proc/*)', 'Bash(git commit *-F*)', 'Bash(*--pathspec-from-file*)', 'Bash(*--pathspec-file-nul*)']) {
             assert.ok(denied.split(',').includes(rule), `${rule} must be denied`);
           }
+          const nonWrite = [...yml.matchAll(/^\s*allowed_non_write_users:\s*(\S+)\s*$/gm)].map(m => m[1]);
+          assert.deepEqual(nonWrite, ['cheekhimself'], 'allowed_non_write_users must be set exactly once, to cheekhimself only');
+          const jobIf = yml.match(/name: Claude slice builder\n\s*if: >-\n\s*github\.actor == 'cheekhimself' &&/);
+          assert.ok(jobIf, "the builder job must stay gated on github.actor == 'cheekhimself'");
+          assert.ok(yml.includes('A credential is present in .git/config; refusing to publish.'), 'the post-run .git/config credential check must remain');
           const gate = yml.indexOf('bwrap --unshare-pid');
           const claude = yml.indexOf('uses: anthropics/claude-code-action@');
           assert.ok(gate > 0 && gate < claude, 'the bubblewrap PID-isolation gate must run before the Claude step');

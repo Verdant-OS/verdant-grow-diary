@@ -110,8 +110,9 @@ when a maintainer starts CI on a draft: every `package.json` (its scripts), ever
 `tsconfig*.json`/`jsconfig*.json`, `.npmrc`, `.yarnrc*`, `bunfig.toml`, Node version
 files, Vitest/Playwright setup and workspace files, `src/test/setup*`, and
 Playwright global setup and teardown files, `.prettierrc*` and legacy
-`.eslintrc*` (both can load plugins), and `scripts/e2e/**` (run with E2E
-secrets). File-edit denials cover the common locked paths. Before any
+`.eslintrc*` (both can load plugins), and all of `scripts/**` (CI workflows run
+scripts there in jobs that hold write tokens or secrets, and `scripts/e2e/**`
+runs with E2E secrets). File-edit denials cover the common locked paths. Before any
 push or new PR, the publish job checks the committed diff using the same path
 policy as the Claude PR guard. SQL and lockfiles are blocked anywhere in the
 tree. Auth, RLS, Action Queue and device-control code are blocked in source,
@@ -140,10 +141,33 @@ keeps both credentials out of reach:
 
 - **GitHub token.** The builder job has Contents and Pull requests read and
   Issues write only, and passes that token to the action instead of the Claude
-  App token. The action writes it into the checkout's git remote, so Claude may
-  be able to see it, but it cannot push, merge or open a PR, and it expires with
-  the job. Pushing and draft creation happen only in the publish job, which runs
-  no Claude and no repository code and treats Claude's commits as a git bundle.
+  App token. It cannot push, merge or open a PR, and it expires with the job.
+  Pushing and draft creation happen only in the publish job, which runs no Claude
+  and no repository code and treats Claude's commits as a git bundle.
+  - **The token is kept out of `.git/config`.** The Claude step sets
+    `allowed_non_write_users: cheekhimself`. In the pinned action that input
+    switches git auth from a token embedded in the origin URL to a token-free URL
+    plus a credential helper that reads `GH_TOKEN` at push time. It widens no
+    trigger: the job `if` already admits only `cheekhimself`, who has write
+    access. The configuration job fails if the input is removed, set to `*` or
+    another user, or if the builder's actor gate is removed.
+  - An earlier revision relied on denying `--pathspec-from-file` and
+    `--pathspec-file-nul`. Durban Poison showed that git accepts abbreviated long
+    options (`--pathspec-fr .git/config`), which printed the token and matched no
+    denial. No denylist can enumerate every abbreviation, so the fix is to remove
+    the token from the file, not to deny more spellings.
+  - The policy self-test proves this behaviourally: it builds throwaway repos in
+    the action's two layouts and runs `git add`/`git commit` with full and
+    abbreviated `--pathspec-from-file` forms against `.git/config`. The
+    token-in-URL layout must leak (so the probe can see a leak) and the
+    credential-helper layout must not.
+  - After Claude finishes, the bundle step fails and publishes nothing if any
+    credential is present in `.git/config`, so a change in the pinned action's
+    behaviour shows up as a failed run.
+  - The token still lives in the action process's environment (`gh` and the
+    credential helper need it). The subprocess scrub and bubblewrap PID
+    isolation below are what keep commands from reading it; the scrub is
+    best-effort, so this is `NOT_MEASURED` until a real run.
 - **Max or API credential.** The Claude step sets
   `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` (the pinned action enables it only for
   `allowed_non_write_users` otherwise), which removes Anthropic credentials from
@@ -156,19 +180,18 @@ keeps both credentials out of reach:
     own PIDs. If it can't, the job fails and Claude never runs. That the Claude CLI
     then uses bubblewrap for its subprocesses rests on Anthropic's documentation
     (`NOT_MEASURED` until a real run).
-  - **Known file-reading command forms are denied.** This is a denylist, not a
-    guarantee: Claude can still post through the action's tracking comment, so
-    any allowed command that echoes a file's contents would be a leak path. A
-    review found one (`git add`/`git commit --pathspec-from-file=.git/config`
-    prints each line of the file, including the job token the action embeds in
-    the remote URL); `--pathspec-from-file` and `--pathspec-file-nul` are now
-    denied. `gh issue comment` is not allowed (Claude reports through the
+  - **Known file-reading command forms are denied, as defence in depth only.**
+    A denylist is not a guarantee: git accepts abbreviated long options, so
+    these denials cannot block every spelling, and Claude can still post through
+    the action's tracking comment. They are not what protects the job token (see
+    above). `gh issue comment` is not allowed (Claude reports through the
     action's own tracking comment).
     `git diff` is allowed only without arguments (plain, `--stat`, `--cached`),
     so it can't use `--no-index` or a path outside the repository. `git commit`
     is allowed only with `-m`, and `-F`/`--file`/`--template`/`-C`/`-c` are denied.
     Any command mentioning `--no-index`, `--output`, `--pathspec-from-file`,
-    `--pathspec-file-nul`, `/proc/` or `environ` is denied. The `Read(//proc/**)` denial covers only the Read tool.
+    `--pathspec-file-nul`, `/proc/` or `environ` is denied; abbreviated forms of
+    the long options are not matched. The `Read(//proc/**)` denial covers only the Read tool.
   - The configuration job fails if the gate is removed, moved after the Claude
     step, or stops failing the job, or if any of these commands is allowed again.
 - **No repository code runs.** Installs, tests, builds and other runners (`bun`,

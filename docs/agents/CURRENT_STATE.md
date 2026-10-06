@@ -31,7 +31,7 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-06T20:20 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-06T20:50 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
@@ -41,12 +41,16 @@ this entry's earlier 2026-10-01 versions.
     `mergeStateStatus: UNSTABLE`; **35/35 required `PASS`**; 103 pass / 1 pending / 14 skipped /
     **1 failed — `Vercel`** (account block, non-required). `GA E2E (webkit)` re-run (attempt 2)
     **`PASS`**. 45 review threads, all resolved; no approving or changes-requested review.
-  - **43 commits behind** `verdant-grow-diary` (`cfe09322e`); GitHub reports no textual conflict.
-    No new migration landed, so `20261001160000` still sorts last. Overlaps to re-check after a
-    base merge (`inference`: semantic, not textual): `#1889` (`ceda1318f`, noindex sample and
-    community cultivar profiles, `src/lib/cultivarDetailSeo.ts`), and `#1867` / `#1877` /
-    `#1848` (edits to `.github/workflows/security-db-local.yml` and the local replay lane).
-    Merging base restarts CI and awaits the owner's go-ahead.
+  - **Base merged (owner instruction, 2026-10-06):** `aa6306ab4` merges `verdant-grow-diary` at
+    `cfe09322e` (43 commits) with no conflicts; **0 behind** at 20:50 UTC. No new migration
+    landed, so `20261001160000` still sorts last; published-migration integrity verifier OK against
+    the base. Local checks at `aa6306ab4` (`established fact`, Windows clone): `tsc` 0 diagnostics;
+    14 strain, cultivar and security-lane test files 182/182, including `#1889`'s
+    `cultivar-sample-verification-noindex` and `#1867`'s grant-path lane test; offline strict
+    parity READY 10/10; harness `bun build` OK; `Sentinel-Version` `2026-09-28.3` OK. The merged
+    `test:security-db-local` chain keeps every base harness plus `test:cultivar-reference-db-security`.
+    Exact-head CI restarted: required contexts, Security DB Local and the strain gate are
+    `NOT_MEASURED` at `aa6306ab4`; the 35/35 PASS belongs to `2a2de17dc`.
   - **Claims renewed (owner instruction, 2026-10-06):** `claimed_by: Claude, 2026-10-06 20:34 UTC`
     posted on `#1827` and `#1830` (no competing claim or release on either PR); both
     `docs/agents/HANDOFF_LOG.md` blocks carry the same claim.

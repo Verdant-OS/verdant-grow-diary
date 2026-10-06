@@ -17,7 +17,6 @@ import {
   evaluateExceptionSourceImports,
   evaluateFindings,
   evaluateReviewedExceptions,
-  npmAuditInvocation,
   parseAuditOutput,
   parseReviewedExceptions,
   redactSecrets,
@@ -525,6 +524,33 @@ describe("check-dependency-security reviewed exceptions", () => {
     }
   });
 
+  it("checks the Bun graph alone when no npm lock is supplied", () => {
+    const exceptions = parseReviewedExceptions(exceptionDocument());
+    const bunLock = [
+      '"ajv": ["ajv@6.15.0", "", {}]',
+      '"eslint": ["eslint@9.0.0", "", { "dependencies": { "ajv": "^6.0.0" } }]',
+    ].join("\n");
+    const packageJson = { dependencies: {}, devDependencies: { eslint: "^9.0.0" } };
+    expect(
+      evaluateExceptionRootAncestors({ bunLockText: bunLock, packageJson, exceptions }),
+    ).toEqual({ ok: true, errors: [] });
+
+    const drifted = evaluateExceptionRootAncestors({
+      bunLockText: [
+        bunLock,
+        '"runtime-parent": ["runtime-parent@1.0.0", "", { "dependencies": { "eslint": "^9.0.0" } }]',
+      ].join("\n"),
+      packageJson: {
+        dependencies: { "runtime-parent": "1.0.0" },
+        devDependencies: { eslint: "^9.0.0" },
+      },
+      exceptions,
+    });
+    expect(drifted.ok).toBe(false);
+    expect(drifted.errors.join(" ")).toContain("Bun direct-root ancestors");
+    expect(drifted.errors.join(" ")).not.toContain("npm direct-root ancestors");
+  });
+
   it("fails closed when production code directly imports an excepted transitive", () => {
     const exceptions = parseReviewedExceptions(exceptionDocument());
     const root = resolve("virtual-repo");
@@ -573,15 +599,13 @@ describe("check-dependency-security reviewed exceptions", () => {
 });
 
 describe("check-dependency-security CLI", () => {
-  it("uses cmd.exe for npm audit on Windows without spawning npm.cmd directly", () => {
-    expect(npmAuditInvocation("win32", { ComSpec: "C:\\Windows\\System32\\cmd.exe" })).toEqual({
-      command: "C:\\Windows\\System32\\cmd.exe",
-      args: ["/d", "/s", "/c", "npm audit --package-lock-only --json"],
-    });
-    expect(npmAuditInvocation("linux", {})).toEqual({
-      command: "npm",
-      args: ["audit", "--package-lock-only", "--json"],
-    });
+  it("rejects the retired npm audit flags", () => {
+    const script = resolve(__dirname, "../../scripts/check-dependency-security.mjs");
+    for (const flag of ["--npm-input", "--npm-lockfile"]) {
+      const result = spawnSync(process.execPath, [script, flag, "x.json"], { encoding: "utf8" });
+      expect(result.status, flag).toBe(2);
+      expect(result.stderr, flag).toContain(`Unknown argument "${flag}"`);
+    }
   });
 
   it("executes on Windows and uses the explicit exception file", () => {

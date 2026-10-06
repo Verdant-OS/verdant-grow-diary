@@ -55,9 +55,10 @@ Green CI is not release acceptance, and a merge is not a deployment. Never write
 - **Generated files are never hand-resolved:** `src/routeTree.gen.ts`,
   `src/integrations/supabase/types.ts`, `supabase/functions/mcp/index.ts`,
   `supabase/functions/_shared/lib`. Regenerate with the repo's tooling.
-- **Lockfiles:** `bun.lock` is canonical; regenerate with bun. `package-lock.json` is the
-  synchronized compatibility lock governed by `config/dependency-lockfile-transition.json` and
-  checked by `node scripts/check-bun-lockfile-policy.mjs`.
+- **Lockfiles:** `bun.lock` is canonical and the only lockfile; regenerate with bun.
+  `package-lock.json` was retired on 2026-10-03 and is forbidden by
+  `node scripts/check-bun-lockfile-policy.mjs`, which also checks the npm-reference
+  allowlist in `config/dependency-lockfile-transition.json`.
 - **Migrations:** a file under `supabase/migrations/` that exists on the base is read-only. A
   conflict there means a new additive migration, never an edit. Check
   `config/local-supabase-replay-compatibility.json` before proposing any correction.

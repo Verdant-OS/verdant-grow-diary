@@ -37,7 +37,6 @@ export const DEFAULT_EXCEPTIONS_PATH = resolve(
   "../config/dependency-security-exceptions.json",
 );
 export const DEFAULT_LOCKFILE_PATH = resolve(SCRIPT_DIR, "../bun.lock");
-export const DEFAULT_NPM_LOCKFILE_PATH = resolve(SCRIPT_DIR, "../package-lock.json");
 export const DEFAULT_MANIFEST_PATH = resolve(SCRIPT_DIR, "../package.json");
 
 /**
@@ -938,14 +937,19 @@ export function evaluateExceptionRootAncestors({
     }
   }
 
-  let npmDocument;
-  try {
-    npmDocument = JSON.parse(npmLockText);
-  } catch {
-    throw new Error("package-lock.json is not valid JSON.");
-  }
-  if (!isObject(npmDocument) || !isObject(npmDocument.packages)) {
-    throw new Error("package-lock.json is missing a packages object.");
+  // The npm compatibility lock was retired on 2026-10-03. The npm graph is
+  // checked only when a caller supplies one explicitly.
+  const checkNpmGraph = npmLockText !== undefined && npmLockText !== null;
+  let npmDocument = { packages: {} };
+  if (checkNpmGraph) {
+    try {
+      npmDocument = JSON.parse(npmLockText);
+    } catch {
+      throw new Error("package-lock.json is not valid JSON.");
+    }
+    if (!isObject(npmDocument) || !isObject(npmDocument.packages)) {
+      throw new Error("package-lock.json is missing a packages object.");
+    }
   }
   const npmEntries = Object.entries(npmDocument.packages);
   const npmPaths = new Set(npmEntries.map(([path]) => path));
@@ -998,6 +1002,7 @@ export function evaluateExceptionRootAncestors({
       );
     }
 
+    if (!checkNpmGraph) continue;
     const npmClosure = reverseClosure(npmReverseEdges, exception.expectedNpmAffectedPaths);
     const actualNpmAncestors = declarations
       .filter(({ package: packageName }) => npmClosure.has(`node_modules/${packageName}`))
@@ -1215,10 +1220,8 @@ function parseCliArgs(argv) {
     stdin: false,
     exceptionsPath: DEFAULT_EXCEPTIONS_PATH,
     lockfilePath: DEFAULT_LOCKFILE_PATH,
-    npmLockfilePath: DEFAULT_NPM_LOCKFILE_PATH,
     manifestPath: DEFAULT_MANIFEST_PATH,
     repoRoot: DEFAULT_REPO_ROOT,
-    npmInputPath: null,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -1231,10 +1234,8 @@ function parseCliArgs(argv) {
       argument === "--input" ||
       argument === "--exceptions" ||
       argument === "--lockfile" ||
-      argument === "--npm-lockfile" ||
       argument === "--manifest" ||
-      argument === "--repo-root" ||
-      argument === "--npm-input"
+      argument === "--repo-root"
     ) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) {
@@ -1243,10 +1244,8 @@ function parseCliArgs(argv) {
       if (argument === "--input") parsed.inputPath = value;
       else if (argument === "--exceptions") parsed.exceptionsPath = value;
       else if (argument === "--lockfile") parsed.lockfilePath = value;
-      else if (argument === "--npm-lockfile") parsed.npmLockfilePath = value;
       else if (argument === "--manifest") parsed.manifestPath = value;
-      else if (argument === "--repo-root") parsed.repoRoot = value;
-      else parsed.npmInputPath = value;
+      else parsed.repoRoot = value;
       index += 1;
       continue;
     }
@@ -1255,12 +1254,6 @@ function parseCliArgs(argv) {
 
   if (parsed.stdin && parsed.inputPath) {
     throw new Error("Use only one of --stdin or --input.");
-  }
-  if (parsed.stdin && parsed.npmInputPath) {
-    throw new Error("--stdin cannot be combined with --npm-input.");
-  }
-  if (parsed.npmInputPath && !parsed.inputPath) {
-    throw new Error("--npm-input requires --input for the paired Bun audit fixture.");
   }
   return parsed;
 }
@@ -1287,46 +1280,20 @@ function runAuditCommand(command, commandArgs, label) {
   return result.stdout;
 }
 
-export function npmAuditInvocation(platform = process.platform, environment = process.env) {
-  if (platform === "win32") {
-    return {
-      command: environment.ComSpec || "cmd.exe",
-      args: ["/d", "/s", "/c", "npm audit --package-lock-only --json"],
-    };
-  }
-  return {
-    command: "npm",
-    args: ["audit", "--package-lock-only", "--json"],
-  };
-}
-
 function readAuditSources(args) {
   if (args.stdin) {
     return [{ name: "fixture", raw: readFileSync(0, "utf8") }];
   }
   if (args.inputPath) {
-    const sources = [
-      { name: args.npmInputPath ? "bun" : "fixture", raw: readFileSync(args.inputPath, "utf8") },
-    ];
-    if (args.npmInputPath) {
-      sources.push({ name: "npm", raw: readFileSync(args.npmInputPath, "utf8") });
-    }
-    return sources;
+    return [{ name: "fixture", raw: readFileSync(args.inputPath, "utf8") }];
   }
 
-  const npmInvocation = npmAuditInvocation();
+  // bun.lock is the only lockfile (package-lock.json retired 2026-10-03), so
+  // `bun audit` is the only live audit source.
   return [
     {
       name: "bun",
       raw: runAuditCommand("bun", ["audit", "--json"], "bun audit"),
-    },
-    {
-      name: "npm",
-      raw: runAuditCommand(
-        npmInvocation.command,
-        npmInvocation.args,
-        "npm audit --package-lock-only",
-      ),
     },
   ];
 }
@@ -1349,15 +1316,10 @@ function main() {
       readFileSync(args.lockfilePath, "utf8"),
       exceptions,
     );
-    const npmLockResult = evaluateExceptionNpmLockResolutions(
-      readFileSync(args.npmLockfilePath, "utf8"),
-      exceptions,
-    );
     const manifest = JSON.parse(readFileSync(args.manifestPath, "utf8"));
     const manifestResult = evaluateExceptionManifestReachability(manifest, exceptions);
     const rootAncestorResult = evaluateExceptionRootAncestors({
       bunLockText: readFileSync(args.lockfilePath, "utf8"),
-      npmLockText: readFileSync(args.npmLockfilePath, "utf8"),
       packageJson: manifest,
       exceptions,
     });
@@ -1373,7 +1335,6 @@ function main() {
     if (
       auditBlocked ||
       !lockResult.ok ||
-      !npmLockResult.ok ||
       !manifestResult.ok ||
       !rootAncestorResult.ok ||
       !sourceImportResult.ok
@@ -1384,7 +1345,6 @@ function main() {
           result.reasons.map((reason) => `${name}: ${reason}`),
         ),
         ...lockResult.errors,
-        ...npmLockResult.errors,
         ...manifestResult.errors,
         ...rootAncestorResult.errors,
         ...sourceImportResult.errors,

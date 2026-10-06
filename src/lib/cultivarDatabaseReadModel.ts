@@ -911,6 +911,18 @@ export function mapCultivarDatabaseSnapshot(
         read.fail(`${label}_min`, "range is inverted");
       }
     }
+    // Profile percentages render as "%" values, so each must sit within 0–100,
+    // matching the claim-level check (and the V1 table's CHECK constraints).
+    for (const [column, value] of [
+      ["thc_pct_min", thcMin],
+      ["thc_pct_max", thcMax],
+      ["cbd_pct_min", cbdMin],
+      ["cbd_pct_max", cbdMax],
+    ] as const) {
+      if (value !== undefined && !percentInRange(value)) {
+        read.fail(column, "percentage is outside 0–100");
+      }
+    }
 
     let breeder: string | null | undefined = null;
     const breederId = row.breeder_id;

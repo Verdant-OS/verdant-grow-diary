@@ -312,6 +312,24 @@ describe("cultivar database read model — fails closed", () => {
     },
   );
 
+  it.each([
+    ["thc_pct_max", 500],
+    ["thc_pct_min", -1],
+    ["cbd_pct_max", 100.5],
+    ["cbd_pct_min", -0.1],
+  ] as const)("refuses a cultivar %s of %s outside 0–100", (column, value) => {
+    const snapshot = freshSnapshot();
+    row(snapshot, "gg4")[column] = value;
+    // Keep the pair ordered so only the range check can catch it.
+    if (column.endsWith("_min")) row(snapshot, "gg4")[column.replace("_min", "_max")] = 100;
+    else row(snapshot, "gg4")[column.replace("_max", "_min")] = 0;
+    const result = map(snapshot);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ slug: "gg4", path: `cultivars.${column}` }),
+    );
+    expect(slugs(snapshot)).not.toContain("gg4");
+  });
+
   it("refuses a cannabinoid claim stored in a non-percent unit", () => {
     for (const unit of ["mg/g", null]) {
       const snapshot = freshSnapshot();

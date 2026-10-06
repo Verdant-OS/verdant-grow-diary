@@ -126,17 +126,24 @@ do not operate on the Action Queue.
 
 **Content locks.** Filenames don't always say what a file does, so the guard also
 locks files by their contents (Matthew, 2026-10-06). Under `src/`, `scripts/`,
-`tests/`, `e2e/` and `packages/`, Markdown aside, a file is locked when its text:
+`tests/`, `e2e/`, `e2e-local/` and `packages/`, Markdown aside, a file is locked
+when its text:
 
 - calls a Supabase auth mutation (`auth-mutation`): `signIn*`, `signOut`, `signUp`,
   `updateUser`, `resetPassword*`, `exchangeCode*`, `verifyOtp`, `setSession`,
-  `refreshSession`, `admin.*` or `onAuthStateChange`. A `getSession()` or
-  `getUser()` used only for the user ID doesn't lock, because RLS is the real
-  boundary;
+  `refreshSession`, `admin.*` or `onAuthStateChange`. Optional chaining
+  (`auth?.signOut()`), bracket access (`auth["signOut"]()`, `supabase["auth"]`),
+  destructuring (`const { signOut } = supabase.auth;`) and aliasing the namespace
+  (`const a = supabase.auth;`, `const { auth: a } = supabase;`) also lock. A
+  `getSession()` or `getUser()` used only for the user ID doesn't lock, because
+  RLS is the real boundary;
 - reads or writes the Action Queue (`aq-io`): `.from("action_queue…")` or
-  `.rpc("action_queue…")`. Mentioning an Action Queue row ID, type or comment
-  doesn't lock, so pure helpers such as `pendingOutcomeReviewRules.ts` stay
-  editable.
+  `.rpc("action_queue…")`, including `?.from(`, a type argument
+  (`.from<Row>("action_queue")`) and a variable declared with a table or RPC name
+  (`const TABLE = "action_queue";`). Mentioning an Action Queue row ID, type or
+  comment doesn't lock, and neither does a bare string literal elsewhere
+  (generated types, view models, source-scan tests), so pure helpers such as
+  `pendingOutcomeReviewRules.ts` stay editable.
 
 Test files follow the same rules. The publish job and `claude-locked-paths` check
 the text on both sides of every change: the merge-base version catches editing,
@@ -151,12 +158,23 @@ at publish.
 positives. It starts empty, is itself path-locked, and each entry needs `path`,
 `rule`, `reason` and `approved_by` (Matthew approves each one in the PR that adds
 it). Exceptions apply to content locks only, never to path locks; a malformed file
-fails the guard.
+fails the guard. Every rule is checked separately: a file that matches both rules
+needs an exception for each, and an exception for one rule never clears the other.
 
-**Residual risk.** The rules are regexes over file text. A file that reaches auth
-or the Action Queue only through a helper with a neutral name (for example a
-`requireUser()` wrapper) isn't locked. Following imports would close this, and is
-deferred.
+**Residual risk.** The rules are regexes over file text, so these forms are not
+locked:
+
+- a helper with a neutral name that wraps the calls (for example a `requireUser()`
+  wrapper), or a module that receives the client or `client.auth` as an argument
+  and calls it there;
+- a table or RPC name imported from another module, held in an object property
+  (`db.from(TABLES.queue)`), passed as a parameter, or built at runtime
+  (`"action_" + "queue"`);
+- reaching the namespace without naming it as `auth` or `["auth"]`, for example
+  `Reflect.get(supabase, "auth")` or a computed key held in a variable;
+- raw HTTP to Supabase (`fetch` to `/auth/v1/…` or `/rest/v1/action_queue`).
+
+Following imports and data flow would close these, and is deferred.
 
 `claude-locked-paths` has read-only permission and runs only on PR heads starting
 with `claude/`. It checks out the exact base, fetches the PR head, verifies that

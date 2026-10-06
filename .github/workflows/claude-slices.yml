@@ -128,10 +128,34 @@ jobs:
           // D1 auth mutations plus onAuthStateChange; D2 Action Queue reads and writes
           // only; D3 tests too; D4 reviewed exceptions). Regexes over text: a helper
           // with a neutral name that wraps these calls is not followed (deferred).
-          const CONTENT_ROOTS = /^(?:src|scripts|tests|e2e|packages)\//i;
+          const CONTENT_ROOT_DIRS = ['src', 'scripts', 'tests', 'e2e', 'e2e-local', 'packages'];
+          const CONTENT_ROOTS = new RegExp(`^(?:${CONTENT_ROOT_DIRS.join('|')})/`, 'i');
+          const AUTH_CALLS = '(?:signIn\\w*|signOut|signUp|updateUser|resetPassword\\w*|exchangeCode\\w*|verifyOtp|setSession|refreshSession|onAuthStateChange|admin)\\b';
+          // The auth namespace: auth as an identifier or property (not "/auth" or
+          // "oauth"), or ["auth"].
+          const AUTH = '(?:(?<![\\w$/\\\\-])auth\\b|\\[\\s*[\'"`]auth[\'"`]\\s*\\])';
+          const AQ_NAMES = '(?:action_queue|action_queue_events|action_queue_create|action_queue_transition|action_queue_guard_decision_fields)';
+          // Every pattern of a rule is tried; a file can match several rules.
           const CONTENT_RULES = [
-            ['auth-mutation', /\.auth\s*\.\s*(?:signIn\w*|signOut|signUp|updateUser|resetPassword\w*|exchangeCode\w*|verifyOtp|setSession|refreshSession|onAuthStateChange|admin\b)/],
-            ['aq-io', /\.(?:from|rpc)\(\s*['"`][a-z_]*action_queue[a-z_]*['"`]/],
+            ['auth-mutation', [
+              // supabase.auth.signOut(), auth?.signOut(), supabase["auth"].admin.createUser()
+              new RegExp(`${AUTH}\\s*\\??\\.\\s*${AUTH_CALLS}`),
+              // auth["signOut"](), auth?.[name](): any bracket access on the namespace
+              new RegExp(`${AUTH}\\s*(?:\\?\\.)?\\s*\\[`),
+              // const { signOut } = supabase.auth; const { data, signOut: out } = (await c()).auth;
+              new RegExp(`\\{(?:[^{}]*,)?\\s*${AUTH_CALLS}\\s*(?::\\s*[\\w$]+\\s*)?(?:,[^{}]*)?\\}\\s*=\\s*[^;=]*?${AUTH}\\s*;`),
+              // const a = supabase.auth; return client["auth"]; (the namespace escapes)
+              new RegExp(`(?:=|\\breturn\\b)\\s*[^;=\\n]*?(?:\\??\\.\\s*auth\\b|\\[\\s*['"\`]auth['"\`]\\s*\\])\\s*;`),
+              // const { auth: a } = supabase;
+              /\{[^{}]*\bauth\s*:\s*[\w$]+[^{}]*\}\s*=/,
+            ]],
+            ['aq-io', [
+              // .from("action_queue"), ?.rpc('action_queue_create'), .from<Row>(`action_queue_events`)
+              /\??\.\s*(?:from|rpc)\s*(?:<[^()]*?>)?\s*\(\s*['"`][a-z_]*action_queue[a-z_]*['"`]/,
+              // const TABLE = "action_queue"; db.from(TABLE). Only a declaration: a bare
+              // literal also sits in generated types, view models and source-scan tests.
+              new RegExp(`\\b(?:const|let|var)\\s+[\\w$]+\\s*(?::[^=]+)?=\\s*(['"\`])${AQ_NAMES}\\1`),
+            ]],
           ];
           const EXCEPTIONS_FILE = 'config/claude-slice-lock-exceptions.json';
 
@@ -139,12 +163,19 @@ jobs:
             return CONTENT_ROOTS.test(path) && !/\.md$/i.test(path);
           }
 
+          // Every content rule the text matches, not just the first: an exception
+          // for one rule must never hide another rule on the same file.
           function contentLocked(path, text) {
-            if (!contentScoped(path)) return { locked: false, rule: '' };
-            for (const [rule, pattern] of CONTENT_RULES) {
-              if (pattern.test(text)) return { locked: true, rule };
-            }
-            return { locked: false, rule: '' };
+            if (!contentScoped(path)) return { locked: false, rules: [] };
+            const rules = CONTENT_RULES
+              .filter(([, patterns]) => patterns.some(pattern => pattern.test(text)))
+              .map(([rule]) => rule);
+            return { locked: rules.length > 0, rules };
+          }
+
+          // The matched rules left once reviewed exceptions for this path are dropped.
+          function unexceptedRules(exceptions, path, text) {
+            return contentLocked(path, text).rules.filter(rule => !excepted(exceptions, path, rule));
           }
 
           // Read from the trusted checkout only. Missing means no exceptions; a
@@ -214,8 +245,7 @@ jobs:
                 reasons.push(`binary, ${side}`);
                 continue;
               }
-              const { locked, rule } = contentLocked(entry.path, text);
-              if (locked && !excepted(exceptions, entry.path, rule)) reasons.push(`${rule}, ${side}`);
+              for (const rule of unexceptedRules(exceptions, entry.path, text)) reasons.push(`${rule}, ${side}`);
             }
             return reasons;
           }
@@ -252,7 +282,7 @@ jobs:
           // Base-tree files under the content roots that a content rule locks and
           // the path policy doesn't already cover.
           function contentLockedTree(cwd = '.', exceptions = []) {
-            const files = git(['ls-files', '-z', '--', 'src', 'scripts', 'tests', 'e2e', 'packages'], cwd)
+            const files = git(['ls-files', '-z', '--', ...CONTENT_ROOT_DIRS], cwd)
               .toString('utf8').split('\0').filter(Boolean);
             const hits = [];
             for (const path of files) {
@@ -263,8 +293,8 @@ jobs:
               } catch {
                 continue;
               }
-              const { locked, rule } = contentLocked(path, text);
-              if (locked && !excepted(exceptions, path, rule)) hits.push({ path, rule });
+              const rules = unexceptedRules(exceptions, path, text);
+              if (rules.length) hits.push({ path, rules });
             }
             return hits;
           }
@@ -465,12 +495,38 @@ jobs:
             assert.deepEqual(entryLocks({ path: 'src/lib/logo.png', binary: true, base: null, head: null }), ['binary']);
             cases += 1;
             assert.deepEqual(entryLocks({ path: 'src/lib/fooRules.ts', binary: false, base: null, head: 'a\0b' }), ['binary, head']);
+            // Forms that slipped past the first patterns (Durban Poison probe, 2026-10-06).
+            for (const text of [
+              'auth?.signOut();', 'supabase.auth?.signOut();', 'auth["signOut"]();', "supabase.auth?.['signOut']();",
+              'auth[method]();', 'supabase["auth"].signOut();', 'const { signOut } = supabase.auth;',
+              'const { data, signOut: out } = (await getClient()).auth;', 'const a = supabase.auth;',
+              'return client["auth"];', 'const { auth: a } = supabase;', 'const { auth } = supabase; auth.admin.createUser(u);',
+              'supabase.auth\n  .signInWithOtp({ email });',
+            ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
+            for (const text of [
+              'db?.from("action_queue").select();', 'db.from<Row>("action_queue").select();',
+              'db.from<Database["public"]["Tables"]["action_queue"]["Row"]>("action_queue");',
+              "db.rpc ( 'action_queue_transition', p );", 'const TABLE = "action_queue"; db.from(TABLE);',
+              "export const EVENTS: string = 'action_queue_events';", 'let fn = `action_queue_create`;',
+            ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['aq-io, head'], text);
+            assert.deepEqual(locks('e2e-local/lib/fixtures.ts', 'await admin.auth.admin.deleteUser(uid);'), ['auth-mutation, head']);
+            assert.match(locks('e2e-local/lib/nativeLocalFixtures.ts', real('e2e-local/lib/nativeLocalFixtures.ts')).join(), /auth-mutation, head/);
+            // Both rules on one file are both reported.
+            assert.deepEqual(locks('src/lib/fooRules.ts', 'supabase.auth.signOut(); db.from("action_queue");'), ['auth-mutation, head', 'aq-io, head']);
             // Must stay allowed.
             assert.deepEqual(locks('docs/auth-guide.md', 'Call supabase.auth.signInWithPassword().'), []);
             assert.deepEqual(locks('src/lib/fooService.ts', 'const { data } = await supabase.auth.getUser();'), []);
             assert.deepEqual(locks('src/lib/fooRules.ts', 'type Row = { action_queue_id: string }; // action_queue'), []);
             assert.deepEqual(locks('src/lib/fooRules.ts', 'export function f(item: ActionQueueItem) { return item; }'), []);
             assert.deepEqual(locks('src/lib/fooRules.ts', 'if (d.kind === "action_queue_trace") return d;'), []);
+            for (const text of [
+              'const auth = defensivelyRedact(asString(p.auth) ?? "none");', 'vi.spyOn(fixture.client.auth, "getSession");',
+              'useAuth: () => mocks.auth }', 'simUrl(u, { allow: ["auth"] });', 'client: { auth?: SupabaseClient["auth"] }',
+              'expect(s).not.toMatch(/useRequireAuth\\(\\s*["\']\\/auth["\']\\s*\\)/);', 'navigate("/auth[0]");',
+              'const { error: signInErr } = await client.auth.getUser();', 'oauth.signInWithIdToken(t);',
+              'const status = client.auth\n  ? "anonymous"\n  : "unavailable";', 'const kind = "action_queue_trace";',
+              'expect(tables).toContain("action_queue");',
+            ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
             for (const path of [
               'src/lib/pendingOutcomeReviewRules.ts', 'src/lib/guidedActionChecklistRules.ts',
               'src/lib/actionResponsePairingRules.ts', 'src/lib/libraryRules.ts', 'src/lib/sensorDeviceLabels.ts',
@@ -484,6 +540,13 @@ jobs:
             assert.deepEqual(entryLocks({ path: 'src/lib/fooRules.ts', binary: false, base: null, head: 'db.from("action_queue")' }, exception), []);
             assert.deepEqual(entryLocks({ path: 'src/store/auth.tsx', binary: false, base: null, head: '' }, [{ ...exception[0], path: 'src/store/auth.tsx' }]), ['path']);
             assert.deepEqual(entryLocks({ path: 'src/lib/fooRules.ts', binary: false, base: null, head: 'supabase.auth.signOut()' }, exception), ['auth-mutation, head']);
+            // An exception for one rule never clears another rule on the same file.
+            const both = 'supabase.auth.signOut(); db.from("action_queue");';
+            const authException = [{ ...exception[0], rule: 'auth-mutation' }];
+            cases += 3;
+            assert.deepEqual(entryLocks({ path: 'src/lib/fooRules.ts', binary: false, base: null, head: both }, exception), ['auth-mutation, head']);
+            assert.deepEqual(entryLocks({ path: 'src/lib/fooRules.ts', binary: false, base: null, head: both }, authException), ['aq-io, head']);
+            assert.deepEqual(entryLocks({ path: 'src/lib/fooRules.ts', binary: false, base: both, head: both }, [...exception, ...authException]), []);
             cases += 2;
             assert.equal(lockedPath(EXCEPTIONS_FILE), true);
             assert.ok(settings().permissions.deny.includes(`Edit(./${EXCEPTIONS_FILE})`));
@@ -531,11 +594,24 @@ jobs:
               strip: commit('strip', () => write(join(repo, 'src/lib/queueReader.ts'), 'export const q = () => [];\n')),
               add: commit('add', () => write(join(repo, 'src/lib/plainRules.ts'), 'export const out = (s) => s.auth.signOut();\n')),
               clean: commit('clean', () => write(join(repo, 'src/lib/plainRules.ts'), 'export const one = 2;\n')),
+              both: commit('both', () => write(join(repo, 'src/lib/bothRules.ts'), 'export const f = (s) => { s.auth.signOut(); return s.from("action_queue"); };\n')),
+              e2eLocal: commit('e2e-local', () => {
+                mkdirSync(join(repo, 'e2e-local/lib'), { recursive: true });
+                write(join(repo, 'e2e-local/lib/fixtures.ts'), 'export const drop = (a, id) => a.auth.admin.deleteUser(id);\n');
+              }),
             };
+            // Written after the commits so it is never part of a diff: the trusted checkout's
+            // exceptions. Excepting auth-mutation must leave aq-io on the same file locked.
+            mkdirSync(join(repo, 'config'), { recursive: true });
+            write(join(repo, EXCEPTIONS_FILE), JSON.stringify({ exceptions: [
+              { path: 'src/lib/bothRules.ts', rule: 'auth-mutation', reason: 'fixture', approved_by: 'fixture' },
+            ] }));
             const expected = {
               rename: /^(?=[\s\S]*"src\/lib\/queueReader\.ts" \(aq-io, base\))(?=[\s\S]*"src\/lib\/neutralRules\.ts" \(aq-io, head\))/,
               strip: /HOLD-CHEEK: needs locked path "src\/lib\/queueReader\.ts" \(aq-io, base\)/,
               add: /HOLD-CHEEK: needs locked path "src\/lib\/plainRules\.ts" \(auth-mutation, head\)/,
+              both: /^(?![\s\S]*auth-mutation)[\s\S]*HOLD-CHEEK: needs locked path "src\/lib\/bothRules\.ts" \(aq-io, head\)/,
+              e2eLocal: /HOLD-CHEEK: needs locked path "e2e-local\/lib\/fixtures\.ts" \(auth-mutation, head\)/,
             };
             let cases = 0;
             for (const [label, head] of Object.entries(heads)) {
@@ -548,14 +624,22 @@ jobs:
                 assert.match(r.stderr, expected[label], label);
               }
             }
+            // The Edit/Write deny list drops only the excepted rule too.
+            run(repo, ['checkout', '-q', heads.both]);
+            cases += 1;
+            assert.deepEqual(
+              contentLockedTree(repo, loadExceptions(join(repo, EXCEPTIONS_FILE))).filter(({ path }) => path === 'src/lib/bothRules.ts'),
+              [{ path: 'src/lib/bothRules.ts', rules: ['aq-io'] }],
+            );
             rmSync(repo, { recursive: true, force: true });
             return cases;
           }
 
           function census() {
-            const files = git(['ls-files', '-z', '--', 'src', 'scripts', 'tests', 'e2e', 'packages'], '.')
+            const files = git(['ls-files', '-z', '--', ...CONTENT_ROOT_DIRS], '.')
               .toString('utf8').split('\0').filter(Boolean);
             const counts = Object.fromEntries(CONTENT_RULES.map(([rule]) => [rule, 0]));
+            let lockedFiles = 0;
             let alreadyPathLocked = 0;
             for (const path of files) {
               if (!contentScoped(path)) continue;
@@ -565,13 +649,14 @@ jobs:
               } catch {
                 continue;
               }
-              const { locked, rule } = contentLocked(path, text);
+              const { locked, rules } = contentLocked(path, text);
               if (!locked) continue;
-              counts[rule] += 1;
+              for (const rule of rules) counts[rule] += 1;
+              lockedFiles += 1;
               if (lockedPath(path)) alreadyPathLocked += 1;
             }
-            const total = Object.values(counts).reduce((a, b) => a + b, 0);
-            console.log(`Content-lock census: ${JSON.stringify(counts)}; ${total - alreadyPathLocked} not already path-locked`);
+            // A file can match both rules, so the per-rule counts can sum past the file count.
+            console.log(`Content-lock census: ${JSON.stringify(counts)}; ${lockedFiles} file(s), ${lockedFiles - alreadyPathLocked} not already path-locked`);
           }
 
           if (require.main === module) {

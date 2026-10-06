@@ -2,6 +2,10 @@
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-06T21:45 UTC
+
+- **PASS, nested audit in CI at #1929's head:** GitHub had recorded no run of the *Cursor SDK local orchestration spike* workflow for #1929's second commit, so it was dispatched manually on the branch (run 37535533924, `workflow_dispatch`, head `18e3109b6`). Result: **success** on every step: root `bun install --frozen-lockfile`, nested spike install, the production-isolation fence test, nested typecheck and tests, and "Nested dependency audit", whose `bun audit` output is "No vulnerabilities found". This closes the only non-required failure on #1929 that was within the PR's control; its remaining red checks are Vercel and the two Workers preview deploys (the `previews` defect, cleared by #1926). The earlier failed run (37532410970) belongs to the first commit `ca8bd9c9d`, before the nested lock fix. A dispatch run is not a pull-request check, so the PR's check list may still show the stale failure until a push or the next PR-triggered run replaces it.
+
 ## Follow-up observation — 2026-10-06T21:38 UTC
 
 - **PASS, #1926 ready for independent review:** the Cloudflare `previews`-block repair (`wrangler.jsonc`, one key) at exact head `54cf04d1e` has **35/35 required contexts SUCCESS**; overall 57 pass / 1 pending / 14 skipped / 2 fail. The two failures are non-required and not caused by the change: Vercel ("Account is blocked") and the dependency-audit job, which fails on the deploy tip's six advisories until #1929 lands. Both Cloudflare "Workers Builds" checks pass on this head with "Build: Success, Deployment: Success" (previews behind the account Access policy). No human review comment exists yet (the four PR comments are CodeRabbit, two Cloudflare status posts and the preview-pipeline bot). Stay-draft, auto-merge off, owner Claude, no `.tsx`; routing per OWNERSHIP §4.3 is Chemdawg's, Critical Mass default. Merge follows only an independent PASS at `54cf04d1e`; this note is readiness, not a verdict.

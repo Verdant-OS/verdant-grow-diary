@@ -65,6 +65,27 @@ claimed_by: Claude, 2026-10-06 15:40 CT (owner instruction in session)
 last_updated: 2026-10-06 15:40 CT, by Claude
 ```
 
+```text
+TASK DASHBOARD-SINGLE-LOG-ENTRY  priority: P2  status: OPEN
+goal: remove the Dashboard header Quick Log link and the page's own QuickLogV2Fab (GDP D1.1-A,
+  D1.2-A, decided 2026-10-06); add the dashboard-ready readiness marker; renegotiate E1-E4 and
+  U1-U4 per docs/specs/dashboard-single-log-entry-readiness-marker.md
+branch: claude/dashboard-single-log-entry
+base: verdant-grow-diary
+checkout: git switch claude/dashboard-single-log-entry && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1844
+head_sha: read from the PR (a commit cannot contain its own SHA); implementation commit follows 42d195f01
+state: pushed draft, CI pending
+next_action: drive 35/35 required checks green; request Blue Dream (Dashboard.tsx) and Critical Mass (tests, e2e)
+files: src/pages/Dashboard.tsx; src/test/dashboard-single-log-entry.test.tsx (new); U1-U4 and the
+  D1.1-A pins (first-plant-memory-cta, onboarding-checklist-view-model); e2e E1-E4; the spec
+blockers: none
+artifacts: PR #1844 body (RED/GREEN counts, e2e runs)
+reviewer_seat: Blue Dream (Dashboard.tsx), Critical Mass (tests, e2e)
+claimed_by: Claude, 2026-10-06 20:47 UTC (PR #1844 comment)
+last_updated: 2026-10-06 16:05 CT, by Claude
+```
+
 ### CLAUDE-LOOP-ENGINEERING-001
 
 ```text

@@ -136,11 +136,22 @@ describe.each(["note", "training"] as const)("%s receipt audit", (activityId) =>
     expect(h.event).not.toHaveBeenCalled();
   });
 
-  it("confirms an exact active reused event without a second write", async () => {
-    h.rpc.mockResolvedValue({
-      data: { ok: true, grow_event_id: validId, reused: true },
-      error: null,
-    });
+  it.each([
+    { name: "empty", note: "", storedNote: null },
+    { name: "null", note: null, storedNote: null },
+    { name: "missing", note: undefined, storedNote: null },
+    { name: "nonempty", note: "Synthetic receipt audit", storedNote: "Synthetic receipt audit" },
+    { name: "whitespace", note: "  ", storedNote: "  " },
+  ])("confirms an exact active reused event with a $name note", async ({ note, storedNote }) => {
+    h.rpc
+      .mockResolvedValueOnce({
+        data: { ok: true, grow_event_id: validId, reused: false },
+        error: null,
+      })
+      .mockResolvedValue({
+        data: { ok: true, grow_event_id: validId, reused: true },
+        error: null,
+      });
     h.readback.mockResolvedValue({
       data: {
         id: validId,
@@ -150,25 +161,33 @@ describe.each(["note", "training"] as const)("%s receipt audit", (activityId) =>
         grow_id: "11111111-1111-4111-8111-111111111111",
         tent_id: activityId === "note" ? "44444444-4444-4444-8444-444444444444" : null,
         plant_id: "33333333-3333-4333-8333-333333333333",
-        note: "Synthetic receipt audit",
+        note: storedNote,
+        occurred_at: "2026-09-26T00:00:00.000Z",
       },
       error: null,
     });
     const { result } = renderHook(() => useQuickLogActivitySave());
+    const saveInput = {
+      activityId,
+      growId: "11111111-1111-4111-8111-111111111111",
+      plantId: "33333333-3333-4333-8333-333333333333",
+      tentId: null,
+      idempotencyKey: "receipt-audit-logical-save",
+      occurredAt: "2026-09-26T00:00:00.000Z",
+      ...(note === undefined ? {} : { note }),
+    };
     let receipt;
     await act(async () => {
-      receipt = await result.current.save({
-        activityId,
-        growId: "11111111-1111-4111-8111-111111111111",
-        plantId: "33333333-3333-4333-8333-333333333333",
-        tentId: null,
-        idempotencyKey: "receipt-audit-logical-save",
-        note: "Synthetic receipt audit",
-      });
+      expect(await result.current.save(saveInput)).toMatchObject({ ok: true, reused: false });
+      receipt = await result.current.save(saveInput);
     });
     expect(receipt).toMatchObject({ ok: true, growEventId: validId, reused: true });
-    expect(h.rpc).toHaveBeenCalledTimes(1);
-    expect(h.event).toHaveBeenCalledTimes(1);
+    expect(h.rpc).toHaveBeenCalledTimes(2);
+    expect(h.rpc.mock.calls[1]).toEqual(h.rpc.mock.calls[0]);
+    // The replay hash binds the raw RPC note; SQL stores NULLIF(p_note, '').
+    expect(h.rpc.mock.calls[0][1].p_note).toBe(note ?? null);
+    expect(h.readback).toHaveBeenCalledTimes(1);
+    expect(h.event).toHaveBeenCalledTimes(2);
   });
 });
 

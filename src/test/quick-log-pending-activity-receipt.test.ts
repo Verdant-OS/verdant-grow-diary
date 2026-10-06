@@ -83,6 +83,35 @@ describe("Quick Log pending activity receipt", () => {
     ).toEqual({ status: "confirmed", growEventId: activeEvent.id });
   });
 
+  it.each(["note", "training"] as const)(
+    "confirms a %s receipt with an empty submitted note stored as SQL NULL",
+    async (activityId) => {
+      query.maybeSingle
+        .mockResolvedValueOnce({ data: { grow_event_id: activeEvent.id }, error: null })
+        .mockResolvedValueOnce({
+          data: {
+            ...activeEvent,
+            event_type: activityId === "note" ? "observation" : "training",
+            note: null,
+          },
+          error: null,
+        });
+      expect(
+        await readQuickLogPendingActivityReceipt("owner-a", "retry-key-a", {
+          ...input,
+          activityId,
+          note: "",
+        }),
+      ).toEqual({ status: "confirmed", growEventId: activeEvent.id });
+      expect(query.eq.mock.calls).toEqual([
+        ["user_id", "owner-a"],
+        ["idempotency_key", "retry-key-a"],
+        ["id", activeEvent.id],
+      ]);
+      expect(query.maybeSingle).toHaveBeenCalledTimes(2);
+    },
+  );
+
   it("does not ignore an event-route tent mismatch during pending recovery", async () => {
     query.maybeSingle
       .mockResolvedValueOnce({ data: { grow_event_id: activeEvent.id }, error: null })

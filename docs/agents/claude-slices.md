@@ -131,12 +131,16 @@ when its text:
 
 - calls a Supabase auth mutation (`auth-mutation`): `signIn*`, `signOut`, `signUp`,
   `updateUser`, `resetPassword*`, `exchangeCode*`, `verifyOtp`, `setSession`,
-  `refreshSession`, `admin.*` or `onAuthStateChange`. Optional chaining
+  `refreshSession`, `admin.*`, `mfa.*`, `resend`, `reauthenticate`,
+  `linkIdentity`, `unlinkIdentity` or `onAuthStateChange`. Optional chaining
   (`auth?.signOut()`), bracket access (`auth["signOut"]()`, `supabase["auth"]`),
   destructuring (`const { signOut } = supabase.auth;`) and aliasing the namespace
-  (`const a = supabase.auth;`, `const { auth: a } = supabase;`) also lock. A
-  `getSession()` or `getUser()` used only for the user ID doesn't lock, because
-  RLS is the real boundary;
+  (`const a = supabase.auth;`, `const { auth: a } = supabase;`) also lock, with or
+  without the trailing `;`, across a line break (`supabase\n  .auth`), and through
+  parentheses, `!`, `as T` or `satisfies T` (`(supabase.auth as any).signOut()`).
+  `mfa.*` locks reads such as `mfa.listFactors()` too. A `getSession()` or
+  `getUser()` used only for the user ID doesn't lock, because RLS is the real
+  boundary;
 - reads or writes the Action Queue (`aq-io`): `.from("action_queue…")` or
   `.rpc("action_queue…")`, including `?.from(`, a type argument
   (`.from<Row>("action_queue")`) and a variable declared with a table or RPC name
@@ -161,8 +165,8 @@ it). Exceptions apply to content locks only, never to path locks; a malformed fi
 fails the guard. Every rule is checked separately: a file that matches both rules
 needs an exception for each, and an exception for one rule never clears the other.
 
-**Residual risk.** The rules are regexes over file text, so these forms are not
-locked:
+**Residual risk.** The rules are regexes over file text. This list is not
+exhaustive; known forms that are not locked include:
 
 - a helper with a neutral name that wraps the calls (for example a `requireUser()`
   wrapper), or a module that receives the client or `client.auth` as an argument
@@ -172,6 +176,11 @@ locked:
   (`"action_" + "queue"`);
 - reaching the namespace without naming it as `auth` or `["auth"]`, for example
   `Reflect.get(supabase, "auth")` or a computed key held in a variable;
+- a second-hop alias of a bare `auth` identifier
+  (`const { auth } = supabase; const s = auth; s.signOut();`), an alias whose
+  statement continues on the next line (`const a = supabase.auth\n  ?? fallback;`),
+  the namespace passed with other arguments (`wrap(supabase.auth, "x").signOut()`),
+  or more than six wrappers between `auth` and the call;
 - raw HTTP to Supabase (`fetch` to `/auth/v1/…` or `/rest/v1/action_queue`).
 
 Following imports and data flow would close these, and is deferred.

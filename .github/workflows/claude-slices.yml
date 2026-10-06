@@ -130,24 +130,35 @@ jobs:
           // with a neutral name that wraps these calls is not followed (deferred).
           const CONTENT_ROOT_DIRS = ['src', 'scripts', 'tests', 'e2e', 'e2e-local', 'packages'];
           const CONTENT_ROOTS = new RegExp(`^(?:${CONTENT_ROOT_DIRS.join('|')})/`, 'i');
-          const AUTH_CALLS = '(?:signIn\\w*|signOut|signUp|updateUser|resetPassword\\w*|exchangeCode\\w*|verifyOtp|setSession|refreshSession|onAuthStateChange|admin)\\b';
+          // mfa.* and resend are covered too (Durban Poison P2-A, 2026-10-06).
+          const AUTH_CALLS = '(?:signIn\\w*|signOut|signUp|updateUser|resetPassword\\w*|exchangeCode\\w*|verifyOtp|setSession|refreshSession|onAuthStateChange|admin|mfa|resend|reauthenticate|linkIdentity|unlinkIdentity)\\b';
           // The auth namespace: auth as an identifier or property (not "/auth" or
           // "oauth"), or ["auth"].
           const AUTH = '(?:(?<![\\w$/\\\\-])auth\\b|\\[\\s*[\'"`]auth[\'"`]\\s*\\])';
+          // What may sit between the namespace and the call or terminator:
+          // (supabase.auth).x, (supabase.auth as any).x, supabase.auth!.x,
+          // supabase.auth as AuthClient, ... satisfies T. Bounded, so it can't stall.
+          const AUTH_TAIL = '(?:\\s*(?:\\)|!(?!=)|\\b(?:as|satisfies)\\s+[\\w$.]{1,200}(?:<[^<>()\\n]{0,200}>)?(?:\\[\\])?)){0,6}';
+          // End of an alias or destructure statement: ";", end of file, or a line
+          // break that ASI ends (the next line doesn't continue the expression).
+          const STMT_END = '[\\t ]*(?:;|$|\\r?\\n(?!\\s*[-?.:\\[(&|,+*/%<>=!^~]))';
           const AQ_NAMES = '(?:action_queue|action_queue_events|action_queue_create|action_queue_transition|action_queue_guard_decision_fields)';
           // Every pattern of a rule is tried; a file can match several rules.
           const CONTENT_RULES = [
             ['auth-mutation', [
               // supabase.auth.signOut(), auth?.signOut(), supabase["auth"].admin.createUser()
-              new RegExp(`${AUTH}\\s*\\??\\.\\s*${AUTH_CALLS}`),
+              // (supabase.auth).signOut(), (supabase.auth as any).signOut(), auth!.signOut()
+              new RegExp(`${AUTH}${AUTH_TAIL}\\s*\\??\\.\\s*${AUTH_CALLS}`),
               // auth["signOut"](), auth?.[name](): any bracket access on the namespace
-              new RegExp(`${AUTH}\\s*(?:\\?\\.)?\\s*\\[`),
+              new RegExp(`${AUTH}${AUTH_TAIL}\\s*(?:\\?\\.)?\\s*\\[`),
               // const { signOut } = supabase.auth; const { data, signOut: out } = (await c()).auth;
-              new RegExp(`\\{(?:[^{}]*,)?\\s*${AUTH_CALLS}\\s*(?::\\s*[\\w$]+\\s*)?(?:,[^{}]*)?\\}\\s*=\\s*[^;=]*?${AUTH}\\s*;`),
-              // const a = supabase.auth; return client["auth"]; (the namespace escapes)
-              new RegExp(`(?:=|\\breturn\\b)\\s*[^;=\\n]*?(?:\\??\\.\\s*auth\\b|\\[\\s*['"\`]auth['"\`]\\s*\\])\\s*;`),
+              // also without the trailing ";" (ASI) and with a cast.
+              new RegExp(`\\{(?:[^{}]{0,2000},)?\\s*${AUTH_CALLS}\\s*(?::\\s*[\\w$]+\\s*)?(?:,[^{}]{0,2000})?\\}\\s*=\\s*[^;=]{0,2000}?${AUTH}${AUTH_TAIL}${STMT_END}`),
+              // const a = supabase.auth; return client["auth"]; const a = supabase.auth as AuthClient
+              // and supabase\n  .auth; across lines (the namespace escapes).
+              new RegExp(`(?:=|\\breturn\\b)\\s*[^;=]{0,2000}?(?:\\??\\.\\s*auth\\b|\\[\\s*['"\`]auth['"\`]\\s*\\])${AUTH_TAIL}${STMT_END}`),
               // const { auth: a } = supabase;
-              /\{[^{}]*\bauth\s*:\s*[\w$]+[^{}]*\}\s*=/,
+              /\{[^{}]{0,2000}\bauth\s*:\s*[\w$]+[^{}]{0,2000}\}\s*=/,
             ]],
             ['aq-io', [
               // .from("action_queue"), ?.rpc('action_queue_create'), .from<Row>(`action_queue_events`)
@@ -502,7 +513,22 @@ jobs:
               'const { data, signOut: out } = (await getClient()).auth;', 'const a = supabase.auth;',
               'return client["auth"];', 'const { auth: a } = supabase;', 'const { auth } = supabase; auth.admin.createUser(u);',
               'supabase.auth\n  .signInWithOtp({ email });',
+              // Durban Poison P2-A probes at e425a3db: parentheses, casts, ASI, continuation lines.
+              '(supabase.auth).signOut();', '(supabase.auth as any).signOut();',
+              'const a = supabase.auth as AuthClient;\na.signOut();', 'const a = supabase.auth\na.signOut()',
+              'const { signOut } = supabase.auth\nawait signOut()', 'const a =\n  supabase\n    .auth;',
+              'const a = supabase.auth', 'supabase.auth!.signOut();', '(supabase.auth satisfies AuthClient).signOut();',
+              '((client as any).auth as GoTrueClient)["signOut"]();', 'await supabase.auth.mfa.enroll({ factorType: "totp" });',
+              'await supabase.auth.resend({ type: "signup", email });',
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
+            // Catastrophic-backtracking guard: a huge one-line file must finish quickly.
+            {
+              const big = '{' + 'a,'.repeat(150000) + ' x } = y';
+              const t0 = Date.now();
+              assert.deepEqual(locks('src/lib/fooRules.ts', big), [], 'synthetic 300 KB line');
+              assert.ok(Date.now() - t0 < 1500, `synthetic 300 KB line took ${Date.now() - t0} ms`);
+              cases += 1;
+            }
             for (const text of [
               'db?.from("action_queue").select();', 'db.from<Row>("action_queue").select();',
               'db.from<Database["public"]["Tables"]["action_queue"]["Row"]>("action_queue");',
@@ -526,6 +552,10 @@ jobs:
               'const { error: signInErr } = await client.auth.getUser();', 'oauth.signInWithIdToken(t);',
               'const status = client.auth\n  ? "anonymous"\n  : "unavailable";', 'const kind = "action_queue_trace";',
               'expect(tables).toContain("action_queue");',
+              // The ASI terminator must not lock a continued expression or a read.
+              'const status = client.auth\n  && client.auth.getUser;', 'const s = client.auth\n  .getSession();',
+              'expect(client.auth).toBeDefined();', 'const { data } = await supabase.auth.getUser()\nreturn data;',
+              'const user = (await supabase.auth.getUser()).data.user', 'if (a != b) x = y',
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
             for (const path of [
               'src/lib/pendingOutcomeReviewRules.ts', 'src/lib/guidedActionChecklistRules.ts',

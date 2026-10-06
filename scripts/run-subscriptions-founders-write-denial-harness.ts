@@ -11,8 +11,10 @@
  *
  * Proves, for each table:
  *   - a user reads only their own row; another owner's row is invisible
- *   - INSERT for oneself or for another user is rejected (self-grant)
+ *   - INSERT for oneself or for another user is rejected (self-grant); founders
+ *     INSERTs must fail with 42501, so a unique-constraint error can't pass
  *   - UPDATE and UPSERT of one's own or another user's row change nothing
+ *   - an active sandbox subscription cannot be switched to environment=live
  *   - DELETE of one's own row changes nothing
  *   - anon can read nothing and write nothing
  *   - every seeded row is byte-for-byte unchanged afterwards (service_role
@@ -91,6 +93,22 @@ export function resolveHarnessTarget(
 }
 
 type Row = Record<string, unknown>;
+type WriteResult = { data: unknown; error: { code?: string; message: string } | null };
+
+/** A write is denied when it errors or returns no affected rows. */
+export function denied(result: WriteResult): boolean {
+  return !!result.error || (Array.isArray(result.data) && result.data.length === 0);
+}
+
+/**
+ * A write is denied by access control: SQLSTATE 42501, which both a missing
+ * table privilege and an RLS WITH CHECK failure return. Use it where a
+ * constraint error (23505 unique, 23502 not-null, …) would otherwise read as a
+ * denial even though the caller was allowed to write.
+ */
+export function deniedByPrivilege(result: WriteResult): boolean {
+  return result.error?.code === "42501";
+}
 
 const SUBSCRIPTION_COLUMNS =
   "user_id,paddle_subscription_id,paddle_customer_id,product_id,price_id,status,current_period_end,cancel_at_period_end,environment";
@@ -106,6 +124,8 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
   const emailB = `write-denial-b-${tag}@verdant.test`;
   const passA = crypto.randomUUID();
   const passB = crypto.randomUUID();
+  const emailC = `write-denial-c-${tag}@verdant.test`;
+  const passC = crypto.randomUUID();
 
   let pass = 0;
   let fail = 0;
@@ -146,19 +166,17 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
     return (data ?? []) as unknown as Row[];
   }
 
-  /** A write is denied when it errors or returns no affected rows. */
-  function denied(result: { data: unknown; error: { code?: string; message: string } | null }) {
-    return !!result.error || (Array.isArray(result.data) && result.data.length === 0);
-  }
-  function describe(result: { data: unknown; error: { code?: string; message: string } | null }) {
+  function describe(result: WriteResult) {
     return result.error
       ? `code=${result.error.code} msg=${result.error.message}`
       : `data=${JSON.stringify(result.data)}`;
   }
 
-  console.log("→ seeding two auth.users via admin API (service_role)");
+  console.log("→ seeding three auth.users via admin API (service_role)");
   const uidA = await createUser(emailA, passA);
   const uidB = await createUser(emailB, passB);
+  // C holds an active SANDBOX subscription only; kept apart from A/B so their counts stay exact.
+  const uidC = await createUser(emailC, passC);
   const users = [uidA, uidB];
 
   // Three free founder numbers (A, B and a spare that must stay unclaimed), chosen from
@@ -325,6 +343,64 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
         .select("*", { count: "exact", head: true })
         .in("user_id", users);
       check("S13. no extra subscription rows were created", count === 2, `count=${count}`);
+
+      // Sandbox rows grant nothing in production; flipping one to live would. S4 never
+      // touches `environment`, so an UPDATE grant on that column alone would slip past it.
+      const sandboxSubId = `sub_write_denial_c_sandbox_${tag}`;
+      const { error: sandboxSeedError } = await admin.from("subscriptions").insert({
+        user_id: uidC,
+        paddle_subscription_id: sandboxSubId,
+        paddle_customer_id: `ctm_write_denial_c_${tag}`,
+        product_id: "pro_monthly",
+        price_id: "pro_monthly",
+        status: "active",
+        current_period_end: "2099-01-01T00:00:00Z",
+        environment: "sandbox",
+      });
+      if (sandboxSeedError)
+        throw new Error(`seed sandbox subscription: ${sandboxSeedError.message}`);
+      const sandboxBefore = await readBack("subscriptions", SUBSCRIPTION_COLUMNS, [uidC]);
+      const c = await signedIn(emailC, passC);
+      const flip = await c
+        .from("subscriptions")
+        .update({ environment: "live" })
+        .eq("user_id", uidC)
+        .select();
+      check(
+        "S14. C UPDATE own active sandbox row to environment=live → rejected or 0 rows",
+        denied(flip),
+        describe(flip),
+      );
+      const flipUpsert = await c
+        .from("subscriptions")
+        .upsert(
+          {
+            user_id: uidC,
+            paddle_subscription_id: sandboxSubId,
+            paddle_customer_id: `ctm_write_denial_c_${tag}`,
+            product_id: "pro_monthly",
+            price_id: "pro_monthly",
+            status: "active",
+            current_period_end: "2099-01-01T00:00:00Z",
+            environment: "live",
+          },
+          { onConflict: "paddle_subscription_id" },
+        )
+        .select();
+      check(
+        "S15. C UPSERT own sandbox row as environment=live → rejected",
+        denied(flipUpsert),
+        describe(flipUpsert),
+      );
+      const sandboxAfter = await readBack("subscriptions", SUBSCRIPTION_COLUMNS, [uidC]);
+      check(
+        "S16. C's sandbox row still sandbox and unchanged (service_role read-back)",
+        sandboxBefore.length === 1 &&
+          sandboxAfter.length === 1 &&
+          sandboxAfter[0].environment === "sandbox" &&
+          JSON.stringify(sandboxAfter) === JSON.stringify(sandboxBefore),
+        `before=${JSON.stringify(sandboxBefore)} after=${JSON.stringify(sandboxAfter)}`,
+      );
     }
 
     console.log("→ public.founders");
@@ -349,9 +425,11 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
           .from("founders")
           .insert({ user_id: userId, founder_number: numberSpare, status: "confirmed" })
           .select();
+        // Both users already hold a founder row, so a permitted INSERT would fail on
+        // founders_user_unique (23505). Only 42501 proves access control refused it.
         check(
-          `F3. A INSERT confirmed founder for ${label} user_id → rejected`,
-          denied(insert),
+          `F3. A INSERT confirmed founder for ${label} user_id → 42501`,
+          deniedByPrivilege(insert),
           describe(insert),
         );
       }
@@ -415,7 +493,7 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
         .from("founders")
         .insert({ user_id: uidA, founder_number: numberSpare, status: "confirmed" })
         .select();
-      check("F11. anon INSERT → rejected", denied(anonInsert), describe(anonInsert));
+      check("F11. anon INSERT → 42501", deniedByPrivilege(anonInsert), describe(anonInsert));
       const anonUpdate = await anon
         .from("founders")
         .update({ status: "confirmed" })
@@ -439,9 +517,13 @@ async function main(target: Extract<HarnessTarget, { ok: true }>) {
   } finally {
     console.log("→ teardown: deleting seeded rows and auth.users");
     await admin.from("founders").delete().in("user_id", users);
-    await admin.from("subscriptions").delete().in("user_id", users);
+    await admin
+      .from("subscriptions")
+      .delete()
+      .in("user_id", [...users, uidC]);
     await admin.auth.admin.deleteUser(uidA).catch(() => {});
     await admin.auth.admin.deleteUser(uidB).catch(() => {});
+    await admin.auth.admin.deleteUser(uidC).catch(() => {});
   }
 
   console.log(`\nresult: ${pass} passed, ${fail} failed`);

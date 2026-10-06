@@ -4,6 +4,8 @@ import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 import {
   LOCAL_LANE_FLAG,
+  denied,
+  deniedByPrivilege,
   isLoopbackHost,
   resolveHarnessTarget,
 } from "../../scripts/run-subscriptions-founders-write-denial-harness";
@@ -81,6 +83,28 @@ describe("write-denial harness refuses anything but the disposable loopback data
     expect(
       resolveHarnessTarget([LOCAL_LANE_FLAG], { ...LOCAL, SUPABASE_URL: "not a url" }),
     ).toMatchObject({ ok: false, exitCode: 2, message: "database API URL is invalid" });
+  });
+});
+
+describe("write-denial predicates", () => {
+  const privilege = { data: null, error: { code: "42501", message: "permission denied" } };
+  const unique = { data: null, error: { code: "23505", message: "duplicate key value" } };
+  const noRows = { data: [], error: null };
+  const wrote = { data: [{ user_id: "u" }], error: null };
+
+  it("deniedByPrivilege accepts only SQLSTATE 42501", () => {
+    expect(deniedByPrivilege(privilege)).toBe(true);
+    // A permitted INSERT hitting founders_user_unique must not read as denied.
+    expect(deniedByPrivilege(unique)).toBe(false);
+    expect(deniedByPrivilege(noRows)).toBe(false);
+    expect(deniedByPrivilege(wrote)).toBe(false);
+  });
+
+  it("denied still treats any error or zero affected rows as a denial", () => {
+    expect(denied(privilege)).toBe(true);
+    expect(denied(unique)).toBe(true);
+    expect(denied(noRows)).toBe(true);
+    expect(denied(wrote)).toBe(false);
   });
 });
 

@@ -31,7 +31,7 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-06T20:15 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-06T20:20 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
@@ -58,6 +58,14 @@ this entry's earlier 2026-10-01 versions.
     `proxy-addr`, `seroval`, `shell-quote`; high: `@modelcontextprotocol/sdk`, `seroval`,
     `source-map-js`), observed on other branches too — repository-wide, not this PR's diff;
     lockfile changes are off-limits without Matthew.
+  - **New integration, `established fact`:** a Cloudflare Workers Builds app
+    (`cloudflare-workers-and-pages`; projects `verdant-grow-diary1` and `verdant-grow-diary2`)
+    now posts checks. Both **pass** on `verdant-grow-diary` at `cfe09322e` (2026-10-06 19:39 UTC)
+    and **fail** on every open PR sampled (`#1830`, `#1901`, `#1904`, `#1919`, `#1920`), so the
+    PR-branch build configuration fails, not these diffs. Its PR comments call the builds
+    "Preview" deployments, which `AGENTS.md` says do not exist; whether Cloudflare now serves
+    `verdantgrowdiary.com` is operating state, `NOT_MEASURED` here. Build logs are only in the
+    Cloudflare dashboard (`BLOCKED` for agents). Neither check is a required context.
 
 The bullets below are the 2026-10-01 record and keep their own observation times.
 

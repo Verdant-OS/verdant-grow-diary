@@ -1,7 +1,7 @@
 /**
  * quickLogDiaryCompanionRules — pure helpers for the read path consuming
- * the companion `diary_entries` rows that `createQuickLogEvent` writes
- * alongside a primary `grow_events` row.
+ * the companion `diary_entries` rows written alongside a primary
+ * `grow_events` row by the Quick Log save path.
  *
  * The companion row carries:
  *   {

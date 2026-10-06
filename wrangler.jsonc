@@ -1,0 +1,11 @@
+{
+  // Cloudflare Workers Builds runs `npx wrangler preview` for non-production
+  // branches, and that command refuses to start unless the Wrangler config
+  // carries a `previews` block (an empty one is enough). Nitro's cloudflare
+  // preset merges this file into the generated `.output/server/wrangler.json`
+  // and keeps `main`, `assets`, `name` and compatibility settings generated.
+  // Production deploys (`npx wrangler deploy` on `verdant-grow-diary`) do not
+  // read this block. Which host serves verdantgrowdiary.com is operating
+  // state (docs/agents/CURRENT_STATE.md); this file does not change it.
+  "previews": {},
+}

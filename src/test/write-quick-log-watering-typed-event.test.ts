@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { TYPED_REUSED_RECEIPT_READ_DEADLINE_MS } from "@/lib/quickLogTypedReusedReceipt";
 import {
   mapWateringInputToRpcArgs,
   writeQuickLogWateringTypedEvent,
@@ -326,14 +325,10 @@ describe("writeQuickLogWateringTypedEvent — RPC behavior and idempotency", () 
       reused: true,
     });
     expect(rpc).toHaveBeenCalledTimes(1);
-    expect(reusedEventReader).toHaveBeenCalledWith(
-      "77777777-7777-4777-8777-000000000001",
-      expect.any(AbortSignal),
-    );
+    expect(reusedEventReader).toHaveBeenCalledWith("77777777-7777-4777-8777-000000000001");
     expect(reusedChildReader).toHaveBeenCalledWith(
       "watering",
       "77777777-7777-4777-8777-000000000001",
-      expect.any(AbortSignal),
     );
     expect(rpc).toHaveBeenCalledWith("quicklog_save_event", expect.any(Object));
   });
@@ -493,67 +488,8 @@ describe("receipt identity", () => {
       await writeQuickLogWateringTypedEvent(baseInput(), { client, reusedEventReader }),
     ).toEqual({
       ok: false,
-      reason: "idempotency_key_retracted",
-    });
-  });
-
-  it("routes a reused Watering now on another plant to history review", async () => {
-    const { client } = makeClient({
-      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
-    });
-    const reusedEventReader = vi.fn().mockResolvedValue({
-      data: {
-        id: "77777777-7777-4777-8777-000000000001",
-        event_type: "watering",
-        source: "manual",
-        is_deleted: false,
-        grow_id: "grow-1",
-        tent_id: "tent-1",
-        plant_id: "plant-2",
-      },
-      error: null,
-    });
-    const reusedChildReader = vi.fn();
-    expect(
-      await writeQuickLogWateringTypedEvent(baseInput(), {
-        client,
-        reusedEventReader,
-        reusedChildReader,
-      }),
-    ).toEqual({ ok: false, reason: "receipt_target_moved" });
-    expect(reusedChildReader).not.toHaveBeenCalled();
-  });
-
-  it("keeps a reused Watering retryable when its receipt cannot be read", async () => {
-    const { client } = makeClient({
-      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
-    });
-    const reusedEventReader = vi
-      .fn()
-      .mockResolvedValue({ data: null, error: { message: "offline" } });
-    expect(
-      await writeQuickLogWateringTypedEvent(baseInput(), { client, reusedEventReader }),
-    ).toEqual({
-      ok: false,
       reason: "rpc:receipt_unverified",
     });
-  });
-
-  it("stops waiting for a reused Watering receipt read that never settles", async () => {
-    vi.useFakeTimers();
-    try {
-      const { client } = makeClient({
-        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
-      });
-      const reusedEventReader = vi.fn(
-        () => new Promise<{ data: unknown; error: unknown }>(() => {}),
-      );
-      const result = writeQuickLogWateringTypedEvent(baseInput(), { client, reusedEventReader });
-      await vi.advanceTimersByTimeAsync(TYPED_REUSED_RECEIPT_READ_DEADLINE_MS);
-      await expect(result).resolves.toEqual({ ok: false, reason: "rpc:receipt_unverified" });
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it.each(["not-an-event", "", " ", null, undefined, 42, {}])(

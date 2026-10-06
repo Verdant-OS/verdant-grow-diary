@@ -283,8 +283,9 @@ export async function writeFeedingTypedEvent(
   const eventId = trimOrNull(envelope.grow_event_id);
   if (!isUuid(eventId)) return { ok: false, reason: "rpc:no_event_id" };
 
-  if (envelope.reused === true) {
-    const receipt = await verifyActiveTypedQuickLogEvent(
+  if (
+    envelope.reused === true &&
+    !(await verifyActiveTypedQuickLogEvent(
       {
         id: eventId,
         eventType: "feeding",
@@ -296,12 +297,9 @@ export async function writeFeedingTypedEvent(
       },
       options.reusedEventReader,
       options.reusedChildReader,
-    );
-    // A read failure stays retryable with the same key; a confirmed mismatch is
-    // returned again by every same-key Retry, so it goes to history review.
-    if (receipt.status === "unavailable") return { ok: false, reason: "rpc:receipt_unverified" };
-    if (receipt.status === "refused") return { ok: false, reason: receipt.reason };
-  }
+    ))
+  )
+    return { ok: false, reason: "rpc:receipt_unverified" };
 
   return {
     ok: true,

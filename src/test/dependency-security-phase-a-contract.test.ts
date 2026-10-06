@@ -166,39 +166,30 @@ describe("dependency security Phase A resolution floors", () => {
     ["nanoid", [3, 3, 18] as const],
     ["undici", [6, 28, 1] as const],
   ])("resolves every %s instance at or above %s in bun.lock", (packageName, minimum) => {
-    for (const [lockName, versions] of [["bun.lock", resolvedVersions(packageName)]] as const) {
-      expect(versions.length, `${packageName} must be present in ${lockName}`).toBeGreaterThan(0);
-      for (const version of versions) {
-        expect(
-          isAtLeast(version, minimum),
-          `${lockName}: ${packageName}@${version.join(".")}`,
-        ).toBe(true);
-      }
+    const versions = resolvedVersions(packageName);
+    expect(versions.length, `${packageName} must be present in bun.lock`).toBeGreaterThan(0);
+    for (const version of versions) {
+      expect(isAtLeast(version, minimum), `bun.lock: ${packageName}@${version.join(".")}`).toBe(
+        true,
+      );
     }
   });
 
   it("keeps any remaining Rollup resolutions patched without requiring its retired subtree", () => {
     // Vitest 4 can reuse root Vite/Rolldown, so the old Vite 7/Rollup graph may be absent.
-    for (const [lockName, versions] of [["bun.lock", resolvedVersions("rollup")]] as const) {
-      for (const version of versions) {
-        expect(isAtLeast(version, [4, 59, 0]), `${lockName}: rollup@${version.join(".")}`).toBe(
-          true,
-        );
-      }
+    for (const version of resolvedVersions("rollup")) {
+      expect(isAtLeast(version, [4, 59, 0]), `bun.lock: rollup@${version.join(".")}`).toBe(true);
     }
   });
 
   it("keeps every brace-expansion resolution outside the current vulnerable ranges", () => {
-    for (const [lockName, versions] of [
-      ["bun.lock", resolvedVersions("brace-expansion")],
-    ] as const) {
-      expect(versions.length, `brace-expansion must be present in ${lockName}`).toBeGreaterThan(0);
-      for (const version of versions) {
-        expect(
-          isSafeBraceExpansionVersion(version),
-          `${lockName}: brace-expansion@${version.join(".")}`,
-        ).toBe(true);
-      }
+    const versions = resolvedVersions("brace-expansion");
+    expect(versions.length, "brace-expansion must be present in bun.lock").toBeGreaterThan(0);
+    for (const version of versions) {
+      expect(
+        isSafeBraceExpansionVersion(version),
+        `bun.lock: brace-expansion@${version.join(".")}`,
+      ).toBe(true);
     }
   });
 

@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-03.1**
+**Sentinel-Version: 2026-10-06.1**
 
 _Amended 2026-09-28 (Matthew Cheek): added Release and Environment Rules and Agent
 Handoff / Coverage; open tasks are resumable by any agent from `docs/agents/HANDOFF_LOG.md`._
@@ -828,9 +828,8 @@ snapshots can differ.
   scripts run under **`bun`** in both observed snapshots. Per
   `.claude/skills/run-verdant-grow-diary/SKILL.md`: if `node_modules` already exists
   (managed environments pre-provision it), use it as-is — do not reinstall. If it's
-  absent, do **not** reach for `bun install --frozen-lockfile` first; go straight to the
-  SKILL's verified npm public-registry-override bootstrap. Install behavior has differed
-  across sessions, which is why the SKILL doesn't recommend trying bun first:
+  absent, use `bun install --frozen-lockfile` as the SKILL's supported setup path.
+  Historical install observations below do not authorize an unpinned npm fallback:
   - One session found `bun install --frozen-lockfile` worked fine against the public
     registry, and the VM startup script already ran it — no reinstall needed unless a
     run failed on a missing/updated package. `bun` was symlinked at `/usr/local/bin/bun`
@@ -842,9 +841,8 @@ snapshots can differ.
     override** instead, and `bun` itself was a pre-baked system dependency under
     `~/.bun` (`BUN_INSTALL` on `PATH` via `~/.bashrc`), not reinstalled by the update
     script.
-  - Don't assume either session's behavior carries over to a new one — check
-    `node_modules` first, and if an install is actually needed, prefer the SKILL's
-    verified bootstrap over guessing.
+  - Check `node_modules` first. If the frozen install fails, report the exact blocker
+    as `BLOCKED`; do not install an unpinned npm tree or regenerate the lockfile.
 - **Dev server.** `bun run dev -- --host 127.0.0.1 --port 8080`, then browse
   `http://127.0.0.1:8080`. Bind IPv4 (**`127.0.0.1`, not `localhost`**) and **port 8080,
   not 5173** explicitly — Vite's default host `::` is unreliable in this container.

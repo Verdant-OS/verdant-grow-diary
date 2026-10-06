@@ -26,12 +26,12 @@ the deploy tip above. They are not four verified lockfile consumers or deploymen
 `evaluatePolicy` found every configured marker and no undeclared npm reference in the
 paths it scans.
 
-| Contract                                         | Source evidence at the reviewed base                                | Status                                                                                               |
-| ------------------------------------------------ | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `.github/workflows/seo-monitoring.yml`           | Line 50 runs npm's `ci` subcommand, with `install` fallback.        | PASS: executable workflow source uses the committed lock for `ci`. Hosted execution is NOT_MEASURED. |
-| `README.md`                                      | Line 112 invokes `npm run build`.                                   | PASS: npm is documented; this command alone does not require a committed npm lock.                   |
-| `.claude/skills/run-verdant-grow-diary/SKILL.md` | Line 43 invokes npm's `install` subcommand, then restores the lock. | PASS: npm is documented; this procedure does not establish a lockfile dependency.                    |
-| `docs/preview-deployment-verification.md`        | Lines 21–23 list npm's install, build and dev commands.             | PASS: npm is documented. Actual dashboard configuration and execution are NOT_MEASURED.              |
+| Contract                                         | Source evidence at the reviewed base                                | Status                                                                                                                                          |
+| ------------------------------------------------ | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/seo-monitoring.yml`           | Line 50 runs npm's `ci` subcommand, with `install` fallback.        | PASS: executable workflow source uses the committed lock for `ci`. Hosted execution is NOT_MEASURED.                                            |
+| `README.md`                                      | Line 112 invokes `npm run build`.                                   | PASS: npm is documented; this command alone does not require a committed npm lock.                                                              |
+| `.claude/skills/run-verdant-grow-diary/SKILL.md` | Line 43 invokes npm's `install` subcommand, then restores the lock. | Historical npm bootstrap: without package-lock.json it resolves an unpinned tree, bypassing Bun’s minimum-age delay and locked security floors. |
+| `docs/preview-deployment-verification.md`        | Lines 21–23 list npm's install, build and dev commands.             | PASS: npm is documented. Actual dashboard configuration and execution are NOT_MEASURED.                                                         |
 
 `vercel.json` still pins `bun install --frozen-lockfile` and `bun run build`, and is
 correctly absent from this inventory. That source does not prove which commands an
@@ -80,13 +80,15 @@ Node 20 because the job runs its scripts with `node` and its own workflow test p
 version. Its `consumerContracts` entry is removed, because a declared consumer that no
 longer carries its marker fails the policy.
 
-That leaves three npm references, none of which installs from `package-lock.json`:
+At that stacked revision, three npm references remained. The bootstrap needed the npm
+lock to retain reproducible resolutions and security floors; removing the lock made
+that fallback unpinned:
 
-| Contract                                         | What it is                                                | Lock-dependent? |
-| ------------------------------------------------ | --------------------------------------------------------- | --------------- |
-| `README.md`                                      | Documented build command.                                 | No              |
-| `.claude/skills/run-verdant-grow-diary/SKILL.md` | Local public-registry bootstrap; restores the lock after. | No              |
-| `docs/preview-deployment-verification.md`        | Preview dashboard checklist.                              | No              |
+| Contract                                         | What it is                                                           | Lock-dependent?                           |
+| ------------------------------------------------ | -------------------------------------------------------------------- | ----------------------------------------- |
+| `README.md`                                      | Documented build command.                                            | No                                        |
+| `.claude/skills/run-verdant-grow-diary/SKILL.md` | Historical public-registry bootstrap; unpinned without the npm lock. | Yes for reproducible, floor-checked setup |
+| `docs/preview-deployment-verification.md`        | Preview dashboard checklist.                                         | No                                        |
 
 Every script the SEO job runs, and every test it spawns, imports only Node built-ins
 (measured over `scripts/seo/*.mjs` and the ten `scripts/test-seo-*.mjs` files the job
@@ -118,11 +120,12 @@ the transition ends. `bun.lock` is now the only lockfile.
 - `scripts/check-dependency-security.mjs` audits with `bun audit` only. The npm audit
   source, the `--npm-input` and `--npm-lockfile` flags, and the npm-lock reads are gone.
   The npm graph comparison runs only if a caller passes an npm lock explicitly.
-- `.gitignore` ignores `package-lock.json`. The run skill's bootstrap now deletes the
-  lock that npm writes, instead of restoring a tracked one.
+- `.gitignore` ignores `package-lock.json`. The original retirement revision deleted
+  the lock written by the npm bootstrap; that fallback was unpinned and bypassed
+  Bun’s minimum-age delay and locked security floors. It is replaced below.
 
-The bootstrap table row above, "restores the lock after", described that skill before
-this change.
+The historical bootstrap described above is superseded by the frozen local setup
+in the October 4 addendum below.
 
 Follow-ups not done here:
 
@@ -133,3 +136,29 @@ Follow-ups not done here:
   needs a §15 restamp.
 - The reviewed-exception schema still carries npm-specific fields. There are no
   exceptions today, so nothing exercises them.
+
+## Addendum — locked local setup and review corrections (2026-10-04)
+
+Matthew explicitly approved this lockfile change on October 4. PR #1870 remains
+open, draft and unmerged as checked on 2026-10-04; this branch already carries its
+SEO Bun install, but that does not establish that the deploy branch has it.
+
+The run skill now uses only `bun install --frozen-lockfile` when dependencies are
+absent. A frozen-install failure is BLOCKED, with its exact error reported; an
+unpinned npm bootstrap is not a supported recovery path. Its npm consumer entry is
+removed, leaving only the README build command and historical preview checklist.
+The historical preview install text is unpinned without an npm lock; it does not
+instruct current setup. The earlier sections describe their dated revisions.
+
+The lockfile policy also rejects workflow npm caches and cache keys that hash the
+retired npm lock. Stale package-lock entries in formatter/reviewer exclusions and
+the stabilization scope allowlist are removed. Security floors, audit thresholds
+and exact exception policy remain unchanged.
+
+The recorded 35/35 hosted check result at `b47799c00fb1102aafc1483002d1786142ff70d7`
+predates the October 4 GitHub billing lock; it is historical evidence, not current
+head CI. New-head hosted checks and full independent re-review remain required.
+After #1870 lands, a clean independent PASS and 35/35 required checks at the exact
+head route this PR through Grok 91’s merge queue, with #1879 immediately afterward.
+The author keeps this PR draft and does not merge or enable auto-merge. These status
+and routing statements are dated evidence, not test-pinned policy.

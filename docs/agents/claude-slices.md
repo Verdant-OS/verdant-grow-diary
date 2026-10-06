@@ -124,6 +124,40 @@ assigned-tent actions and live-proof action status. Diary-only Action Response
 Pairing and the guided diary checklist remain eligible; their source contracts
 do not operate on the Action Queue.
 
+**Content locks.** Filenames don't always say what a file does, so the guard also
+locks files by their contents (Matthew, 2026-10-06). Under `src/`, `scripts/`,
+`tests/`, `e2e/` and `packages/`, Markdown aside, a file is locked when its text:
+
+- calls a Supabase auth mutation (`auth-mutation`): `signIn*`, `signOut`, `signUp`,
+  `updateUser`, `resetPassword*`, `exchangeCode*`, `verifyOtp`, `setSession`,
+  `refreshSession`, `admin.*` or `onAuthStateChange`. A `getSession()` or
+  `getUser()` used only for the user ID doesn't lock, because RLS is the real
+  boundary;
+- reads or writes the Action Queue (`aq-io`): `.from("action_queue…")` or
+  `.rpc("action_queue…")`. Mentioning an Action Queue row ID, type or comment
+  doesn't lock, so pure helpers such as `pendingOutcomeReviewRules.ts` stay
+  editable.
+
+Test files follow the same rules. The publish job and `claude-locked-paths` check
+the text on both sides of every change: the merge-base version catches editing,
+deleting or renaming a locked file, and the head version catches adding these
+calls to a file with a neutral name. Head content is read as git blob data and
+never checked out or run. A binary file under those roots is locked. Claude's
+Edit/Write denials also list every content-locked file in the base tree, so it
+doesn't spend a run on a draft that can't publish; a new file can only be caught
+at publish.
+
+`config/claude-slice-lock-exceptions.json` lists reviewed exceptions for false
+positives. It starts empty, is itself path-locked, and each entry needs `path`,
+`rule`, `reason` and `approved_by` (Matthew approves each one in the PR that adds
+it). Exceptions apply to content locks only, never to path locks; a malformed file
+fails the guard.
+
+**Residual risk.** The rules are regexes over file text. A file that reaches auth
+or the Action Queue only through a helper with a neutral name (for example a
+`requireUser()` wrapper) isn't locked. Following imports would close this, and is
+deferred.
+
 `claude-locked-paths` has read-only permission and runs only on PR heads starting
 with `claude/`. It checks out the exact base, fetches the PR head, verifies that
 head SHA, and compares against the merge base without executing PR code. A

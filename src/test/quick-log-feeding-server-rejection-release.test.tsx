@@ -203,7 +203,7 @@ describe("Feed save rejected by server validation", () => {
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
-  it("restores review after reload when only the full marked record could not be stored", async () => {
+  it("restores review after reload when only the larger marked record write fails", async () => {
     const pendingKey = await seedPendingFeedWithPh(15);
     rpc.mockResolvedValueOnce({
       data: { ok: false, reason: "invalid_typed_payload" },
@@ -216,7 +216,7 @@ describe("Feed save rejected by server validation", () => {
       value: string,
     ) {
       if (name === storageKey && value.includes("historyCheckReason"))
-        throw new Error("QuotaExceededError");
+        throw new Error("SecurityError");
       setItem.call(this, name, value);
     });
     const second = sheet();

@@ -60,7 +60,10 @@ const PAYLOAD_KEYS = [
 const storageKey = (ownerId: string) => `verdant:quick-log:pending-feeding:v1:${ownerId}`;
 /**
  * Key-scoped fallback for a history-review refusal whose full marked record
- * could not be rewritten (for example a storage quota). It only ever adds the
+ * could not be rewritten while a small write still lands (a write that throws or
+ * is dropped for that one larger value). It does not help when storage is at
+ * capacity: the marker needs more room than the marked record, so marking then
+ * reports blocked. It only ever adds the
  * refusal to the exact pending Feed carrying the same idempotency key.
  */
 const historyMarkerKey = (ownerId: string) =>

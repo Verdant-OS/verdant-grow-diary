@@ -374,7 +374,25 @@ describe("markPendingQuickLogNoteHistoryCheck", () => {
 
 const noteHistoryKey = (owner = ownerA) => `verdant:quick-log:pending-note-history:v1:${owner}`;
 
-/** The full marked-record rewrite fails (for example quota) while small writes still land. */
+/** Models real capacity: any write that grows total stored characters past `limit` throws. */
+function capStorage(limit: number) {
+  const original = Storage.prototype.setItem;
+  return vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+    this: Storage,
+    name: string,
+    value: string,
+  ) {
+    let used = 0;
+    for (let i = 0; i < this.length; i += 1) {
+      const k = this.key(i)!;
+      if (k !== name) used += k.length + (this.getItem(k) ?? "").length;
+    }
+    if (used + name.length + value.length > limit) throw new Error("QuotaExceededError");
+    original.call(this, name, value);
+  });
+}
+
+/** The larger marked-record write alone fails (it throws or is dropped); small writes still land. */
 function refuseMarkedNoteRewrite(mode: "throw" | "ignore") {
   const original = Storage.prototype.setItem;
   return vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
@@ -383,7 +401,7 @@ function refuseMarkedNoteRewrite(mode: "throw" | "ignore") {
     value: string,
   ) {
     if (name === pendingKey() && value.includes("historyCheckReason")) {
-      if (mode === "throw") throw new Error("QuotaExceededError");
+      if (mode === "throw") throw new Error("SecurityError");
       return;
     }
     original.call(this, name, value);
@@ -435,6 +453,20 @@ describe("Note history-review marker fallback when the full record cannot be rew
     });
     spy.mockRestore();
     expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "pending", record: marked });
+  });
+
+  it("reports blocked at real storage capacity instead of claiming a durable marker", () => {
+    const original = validRecord();
+    claimPendingQuickLogNote(original);
+    const unmarkedRaw = window.sessionStorage.getItem(pendingKey())!;
+    // Room for the journal plus 10 characters: less than either the marked record or the marker.
+    const spy = capStorage(pendingKey().length + unmarkedRaw.length + 10);
+    expect(markPendingQuickLogNoteHistoryCheck(original, "idempotency_key_retracted")).toEqual({
+      status: "blocked",
+    });
+    spy.mockRestore();
+    expect(window.sessionStorage.getItem(pendingKey())).toBe(unmarkedRaw);
+    expect(window.sessionStorage.getItem(noteHistoryKey())).toBeNull();
   });
 
   it("ignores a fallback marker that names a different idempotency key", () => {

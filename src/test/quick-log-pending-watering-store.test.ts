@@ -712,7 +712,25 @@ describe("storage failures and exact completion", () => {
 const waterHistoryKey = (owner = ownerA) =>
   `verdant:quick-log:pending-watering-history:v1:${owner}`;
 
-/** The full marked-record rewrite fails (for example quota) while small writes still land. */
+/** Models real capacity: any write that grows total stored characters past `limit` throws. */
+function capStorage(limit: number) {
+  const original = Storage.prototype.setItem;
+  return vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+    this: Storage,
+    name: string,
+    value: string,
+  ) {
+    let used = 0;
+    for (let i = 0; i < this.length; i += 1) {
+      const k = this.key(i)!;
+      if (k !== name) used += k.length + (this.getItem(k) ?? "").length;
+    }
+    if (used + name.length + value.length > limit) throw new Error("QuotaExceededError");
+    original.call(this, name, value);
+  });
+}
+
+/** The larger marked-record write alone fails (it throws or is dropped); small writes still land. */
 function refuseMarkedWateringRewrite(mode: "throw" | "ignore") {
   const original = Storage.prototype.setItem;
   return vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
@@ -721,7 +739,7 @@ function refuseMarkedWateringRewrite(mode: "throw" | "ignore") {
     value: string,
   ) {
     if (name === key() && value.includes("historyCheckReason")) {
-      if (mode === "throw") throw new Error("QuotaExceededError");
+      if (mode === "throw") throw new Error("SecurityError");
       return;
     }
     original.call(this, name, value);
@@ -764,6 +782,20 @@ describe("Water history-review marker fallback when the full record cannot be re
       status: "cleared",
     });
     expect(window.sessionStorage.getItem(key())).toBeNull();
+    expect(window.sessionStorage.getItem(waterHistoryKey())).toBeNull();
+  });
+
+  it("reports blocked at real storage capacity instead of claiming a durable marker", async () => {
+    const original = record();
+    await claimPendingQuickLogWatering(original);
+    const unmarkedRaw = window.sessionStorage.getItem(key())!;
+    // Room for the journal plus 10 characters: less than either the marked record or the marker.
+    const spy = capStorage(key().length + unmarkedRaw.length + 10);
+    await expect(
+      markPendingQuickLogWateringHistoryCheck(original, "idempotency_key_retracted"),
+    ).resolves.toEqual({ status: "blocked" });
+    spy.mockRestore();
+    expect(window.sessionStorage.getItem(key())).toBe(unmarkedRaw);
     expect(window.sessionStorage.getItem(waterHistoryKey())).toBeNull();
   });
 

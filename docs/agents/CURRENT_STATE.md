@@ -31,10 +31,35 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
-## Follow-up observation — 2026-10-01T20:03 UTC — Strain Reference Library V1.1 (#1827)
+## Follow-up observation — 2026-10-06T20:15 UTC — Strain Reference Library V1.1 (#1827)
 
 Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
 this entry's earlier 2026-10-01 versions.
+
+- **2026-10-06 update (`established fact`, GitHub API, 20:13–20:15 UTC):**
+  - `#1827` head is still `2a2de17dc` (no commits since 2026-10-01): mergeable,
+    `mergeStateStatus: UNSTABLE`; **35/35 required `PASS`**; 103 pass / 1 pending / 14 skipped /
+    **1 failed — `Vercel`** (account block, non-required). `GA E2E (webkit)` re-run (attempt 2)
+    **`PASS`**. 45 review threads, all resolved; no approving or changes-requested review.
+  - **43 commits behind** `verdant-grow-diary` (`cfe09322e`); GitHub reports no textual conflict.
+    No new migration landed, so `20261001160000` still sorts last. Overlaps to re-check after a
+    base merge (`inference`: semantic, not textual): `#1889` (`ceda1318f`, noindex sample and
+    community cultivar profiles, `src/lib/cultivarDetailSeo.ts`), and `#1867` / `#1877` /
+    `#1848` (edits to `.github/workflows/security-db-local.yml` and the local replay lane).
+    Merging base restarts CI and awaits the owner's go-ahead.
+  - **Claims are stale:** both `docs/agents/HANDOFF_LOG.md` blocks carry
+    `claimed_by: Claude, 2026-10-01 13:41 CT` and no PR renewal comment has been posted, so under
+    `AGENTS.md` (Agent Handoff / Coverage) the blocks are open for coverage once this branch
+    merges. Posting renewals awaits the owner's decision.
+  - `#1830`'s own CI at `69ded12a4` was cancelled on 2026-10-05 because GitHub-hosted runners
+    were not acquired ("The job was not acquired by Runner of type hosted even after multiple
+    attempts"); failed runs were re-run 2026-10-06 ~20:12 UTC. The CodeQL run could not be
+    retried. `Dependency & Security CI` fails on newly published lockfile advisories (critical:
+    `proxy-addr`, `seroval`, `shell-quote`; high: `@modelcontextprotocol/sdk`, `seroval`,
+    `source-map-js`), observed on other branches too — repository-wide, not this PR's diff;
+    lockfile changes are off-limits without Matthew.
+
+The bullets below are the 2026-10-01 record and keep their own observation times.
 
 - **Open (not draft), required CI green at the exact head, awaiting Chemdawg pre-check — review
   not routed:

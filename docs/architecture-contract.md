@@ -569,18 +569,27 @@ vendor name does appear as the Source label there. What a rendered Dashboard sho
 ingest write paths, or alter trust-live membership. Collapsing a vendor name into Source would be
 the same AC-4.2 failure as collapsing it into stored trust state.
 
-**Known gap on the AI context path, recorded rather than fixed here.** `ai-coach` resolves a
-diary `sensor_snapshot` through `resolveQuickLogSensorSnapshotForAi`
+**Known gap on the AI context path, recorded rather than fixed here.** `ai-coach` resolves a diary
+`sensor_snapshot` through `resolveQuickLogSensorSnapshotForAi`
 (`supabase/functions/ai-coach/index.ts:481-484`). In that resolver, a nested `live` snapshot that
 provenance rows do not corroborate resolves to `source: "unknown"`
 (`src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts:215`), a token outside the six. A
 snapshot with no `metrics` object is returned unchanged (`:201`), and a non-`live` nested snapshot
-keeps its stored `source` (`:170`, `:204`). Whether the downstream annotator trusts the result is
-`src/lib/aiSensorSnapshotContextRules.ts`'s decision, not this resolver's, so this paragraph claims no trust
-widening. It records only that the resolver can emit a value outside the six. `#1857` would change
-this path. It is **not** on the deploy branch, and its latest independent verdict is **FAIL**
-(§15.2), so nothing in `#1857` is a property of the stamped tree. `established fact` at
-`2ffe78cc` and at `e0bb3930`; the two files are byte-identical between those trees.
+keeps its stored `source` (`:170`, `:204`). The unchanged return is a trust gap, not only a
+labelling one. `ai-coach` queries provenance rows only for a nested, declared-`live` snapshot
+(`supabase/functions/ai-coach/index.ts:458-461`), so a legacy flat snapshot (no `metrics` object)
+with `source: "live"`, a fresh `captured_at` and top-level readings is never corroborated. It
+reaches `buildAiSensorSnapshotContext` (`:505`) as stored, and the annotator gives a fresh `live`
+source `trust = "high"` and forwards its values to the model
+(`src/lib/aiSensorSnapshotContextRules.ts:415-418`; `valuesForModel` and `isTrustedForAi` at
+`:426-428`). Uncorroborated flat values can therefore reach the model as trusted live evidence. That
+conflicts with the Sensor Truth rule that unverified telemetry is never treated as healthy live
+data. This contract records the gap and does not correct it: the fix is in an edge function and a
+rules module, which a docs slice may not touch, and it belongs to the resolver's owner (`#1857` or a
+successor). `#1857` would change this path. It is **not** on the deploy branch, and its latest
+independent verdict is **FAIL** (§15.2), so nothing in `#1857` is a property of the stamped tree.
+`established fact` at `2ffe78cc` and at `e0bb3930`; the two files are byte-identical between those
+trees.
 
 **A second provenance envelope exists, and its tokens do not match the registry.** Manual rows now
 carry `raw_payload.manual_provenance = { source: "manual", source_identity: "manual_entry",
@@ -806,9 +815,12 @@ invariant is that they are server constants, and changing the model is a provide
 this contract.
 _Source:_ `supabase/functions/ai-doctor-review/index.ts:13` (the "decided SERVER-SIDE" comment),
 `:67-70` (constants), `:290-292` (`auth.getUser()`). `established fact`.
-Request-body model or tier fields are ignored, not rejected: the envelope parser reads only `packet`,
-`grow_id`, `idempotency_key`, `session_id` and `evidence_acceptance`, the packet is rebuilt with
-unknown keys dropped, and the credit weight is derived in the database from the server tier.
+Request-body model or tier fields are ignored, not rejected: the envelope parser reads only `packet`
+and four transport fields, each accepted under a snake-case or a camel-case name (`grow_id` /
+`growId`, `idempotency_key` / `idempotencyKey`, `session_id` / `sessionId`, `evidence_acceptance`
+/ `evidenceAcceptance`, through `readAliasedTransportValue` at `:229`); both forms are live inputs.
+The packet is rebuilt with unknown keys dropped, and the credit weight is derived in the database
+from the server tier.
 _Source (ignoring):_ `src/lib/aiDoctorReviewRequestTransportRules.ts:251-258`;
 `ai-doctor-review/index.ts:346-349`; `supabase/migrations/20260728090736_ai_credit_pack_portability.sql:90`.
 _Enforcement:_ structural — there is no code path from the request body to either constant.
@@ -876,7 +888,8 @@ finalizes results and evidence receipts (`ai_doctor_finalize_review`), and recor
 suggestion into an Action Queue row by clicking: `src/hooks/useAddAiDoctorSessionSuggestionToActionQueue.ts:97`
 and `src/pages/Coach.tsx:204-211` call `action_queue_create` with `source` `ai_doctor` and status
 `pending_approval`. That is grower-initiated and approval-required (AC-7.1), not automatic. The
-`/coach` page also persists `ai_doctor_sessions` (`src/pages/Coach.tsx:342`). The function's
+`/coach` page also persists `ai_doctor_sessions` (the `persistAiDoctorSession(...)` call at
+`src/pages/Coach.tsx:355-366`). The function's
 validator rejects device-command phrasing in model output (`ai-doctor-review/contract.ts:60-61`).
 _Source:_ `supabase/functions/ai-doctor-review/index.ts:8-9` for the prohibition;
 `:234,411,434,624` for the writes it does perform. `established fact`.
@@ -1512,15 +1525,15 @@ distinct file paths this document cites, ten changed. Each was re-read:
 
 **The seven stack claims.**
 
-| #   | Claim                                                                                                                                         | Verdict at `2ffe78cc`                                         | Status at `e0bb3930`                                                                                                                                                                                                                                                                                                       |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | TanStack Start SSR, TanStack Router, Vite, Nitro                                                                                              | PASS                                                          | `VERIFIED`: `package.json` declares `@tanstack/react-start ^1.168.32`, `@tanstack/react-router ^1.170.18`, `vite ^8.1.5`, `nitro 3.0.260603-beta`. `src/server.ts`, `src/start.ts`, `src/router.tsx` byte-identical. Clause cites into them: `INHERITED`                                                                   |
-| 2   | React 19, Tailwind 4, shadcn/Radix, TanStack Query                                                                                            | PASS                                                          | `VERIFIED` for the declared ranges (`react ^19.2.0`, `tailwindcss ^4.2.1`, `@radix-ui/*`, `@tanstack/react-query ^5.101.1`). `bun.lock` changed (`#1924`); resolved versions not re-read: `INHERITED`. Upstream-latest `NOT_MEASURED`                                                                                      |
-| 3   | Supabase Postgres/Auth/RLS/RPC/Edge Functions                                                                                                 | PASS in the repository                                        | `INHERITED`. No migration changed. `src/integrations/supabase/client.ts` byte-identical. Production `NOT_MEASURED`                                                                                                                                                                                                         |
-| 4   | Bun canonical; npm compatibility remains                                                                                                      | PASS                                                          | `VERIFIED`: `bun.lock`, `bunfig.toml` and `package-lock.json` present; checker header and `REQUIRED_LOCKFILES` unchanged (table above). The lockfile retirement (`#1873`) is still open, so AC-8.1 stands                                                                                                                  |
-| 5   | AI Doctor: Lovable gateway, server-pinned model, validated tool output, credit/idempotency, receipts, no direct Action Queue or device writes | PASS for `ai-doctor-review`; FAIL for every AI Doctor surface | `VERIFIED` for the gateway and model constants (`supabase/functions/ai-doctor-review/index.ts:66-67`). That file, `supabase/functions/ai-coach/index.ts` and `src/pages/Coach.tsx` are byte-identical, so the scope split is unchanged. Validator, credit, idempotency and receipt cites: `INHERITED`                      |
-| 6   | Canonical sources live/manual/csv/demo/stale/invalid; vendor and transport are provenance                                                     | PASS for set and storage; FAIL for display                    | `VERIFIED`: `SENSOR_SOURCES` at `src/lib/sensor/sensorSourceRules.ts:16` lists the six; the `Ecowitt` relabel at `src/lib/sensorSourceLabelRules.ts:80-81` holds. **Added:** the AI context path emits `unknown` (AC-4.2, new paragraph). `#1857` does not change this verdict; see below. Storage-path cites: `INHERITED` |
-| 7   | VPD EWMA exists; Modified Z-Score/MAD and Nelson Rules not implemented                                                                        | PASS                                                          | `VERIFIED`: `DEFAULT_VPD_DRIFT_ALPHA` and `evaluateVpdDriftEwma` at `src/lib/vpdDriftRules.ts:56`, `:59`; `git grep -i -E 'nelson rule\|modified.?z.?score\|median absolute deviation'` over `src`, `supabase` and `scripts` returns zero files. "No product caller": `INHERITED`                                          |
+| #   | Claim                                                                                                                                         | Verdict at `2ffe78cc`                                         | Status at `e0bb3930`                                                                                                                                                                                                                                                                                                                                                                                     |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | TanStack Start SSR, TanStack Router, Vite, Nitro                                                                                              | PASS                                                          | `VERIFIED`: `package.json` declares `@tanstack/react-start ^1.168.32`, `@tanstack/react-router ^1.170.18`, `vite ^8.1.5`, `nitro 3.0.260603-beta`. `src/server.ts`, `src/start.ts`, `src/router.tsx` byte-identical. Clause cites into them: `INHERITED`                                                                                                                                                 |
+| 2   | React 19, Tailwind 4, shadcn/Radix, TanStack Query                                                                                            | PASS                                                          | `VERIFIED` for the declared ranges (`react ^19.2.0`, `tailwindcss ^4.2.1`, `@radix-ui/*`, `@tanstack/react-query ^5.101.1`). `bun.lock` changed (`#1924`); resolved versions not re-read: `INHERITED`. Upstream-latest `NOT_MEASURED`                                                                                                                                                                    |
+| 3   | Supabase Postgres/Auth/RLS/RPC/Edge Functions                                                                                                 | PASS in the repository                                        | `INHERITED`. No migration changed. `src/integrations/supabase/client.ts` byte-identical. Production `NOT_MEASURED`                                                                                                                                                                                                                                                                                       |
+| 4   | Bun canonical; npm compatibility remains                                                                                                      | PASS                                                          | `VERIFIED`: `bun.lock`, `bunfig.toml` and `package-lock.json` present; checker header and `REQUIRED_LOCKFILES` unchanged (table above). The lockfile retirement (`#1873`) is still open, so AC-8.1 stands                                                                                                                                                                                                |
+| 5   | AI Doctor: Lovable gateway, server-pinned model, validated tool output, credit/idempotency, receipts, no direct Action Queue or device writes | PASS for `ai-doctor-review`; FAIL for every AI Doctor surface | `VERIFIED` for the gateway and model constants (`supabase/functions/ai-doctor-review/index.ts:66-67`). That file, `supabase/functions/ai-coach/index.ts` and `src/pages/Coach.tsx` are byte-identical, so the scope split is unchanged. Validator, credit, idempotency and receipt cites: `INHERITED`                                                                                                    |
+| 6   | Canonical sources live/manual/csv/demo/stale/invalid; vendor and transport are provenance                                                     | PASS for set and storage; FAIL for display                    | `VERIFIED`: `SENSOR_SOURCES` at `src/lib/sensor/sensorSourceRules.ts:16` lists the six; the `Ecowitt` relabel at `src/lib/sensorSourceLabelRules.ts:80-81` holds. **Added:** the AI context path emits `unknown`, and passes an uncorroborated flat `live` snapshot to the model at high trust (AC-4.2, new paragraph). `#1857` does not change this verdict; see below. Storage-path cites: `INHERITED` |
+| 7   | VPD EWMA exists; Modified Z-Score/MAD and Nelson Rules not implemented                                                                        | PASS                                                          | `VERIFIED`: `DEFAULT_VPD_DRIFT_ALPHA` and `evaluateVpdDriftEwma` at `src/lib/vpdDriftRules.ts:56`, `:59`; `git grep -i -E 'nelson rule\|modified.?z.?score\|median absolute deviation'` over `src`, `supabase` and `scripts` returns zero files. "No product caller": `INHERITED`                                                                                                                        |
 
 **`#1857` — exact-SHA review history, and what it means here.** `#1857`
 (`claude/quicklog-sensor-snapshot-ai-allowlist`, draft) rewrites the resolver in AC-4.2's new

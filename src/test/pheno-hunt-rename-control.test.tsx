@@ -4,21 +4,37 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import PhenoHuntRenameControl from "@/components/PhenoHuntRenameControl";
+import { usePhenoHuntRenameSession } from "@/hooks/usePhenoHuntRenameSession";
 import { PHENO_HUNT_RENAME_COPY } from "@/lib/phenoHuntRenameRules";
 
 afterEach(() => cleanup());
+
+function Harness(props: {
+  currentName: string;
+  canWrite: boolean;
+  onRename: (name: string) => Promise<boolean>;
+}) {
+  const session = usePhenoHuntRenameSession(props.onRename);
+  return (
+    <PhenoHuntRenameControl
+      currentName={props.currentName}
+      canWrite={props.canWrite}
+      session={session}
+    />
+  );
+}
 
 const MANGLED = "Starter Grow Pheno HuntClaude E2E Pheno Hunt";
 
 describe("PhenoHuntRenameControl", () => {
   it("is hidden when the grower cannot write", () => {
-    render(<PhenoHuntRenameControl currentName={MANGLED} canWrite={false} onRename={vi.fn()} />);
+    render(<Harness currentName={MANGLED} canWrite={false} onRename={vi.fn()} />);
     expect(screen.queryByTestId("pheno-hunt-rename-open")).toBeNull();
   });
 
   it("renames: opens prefilled, saves the trimmed name, closes on success", async () => {
     const onRename = vi.fn(async () => true);
-    render(<PhenoHuntRenameControl currentName={MANGLED} canWrite onRename={onRename} />);
+    render(<Harness currentName={MANGLED} canWrite onRename={onRename} />);
     fireEvent.click(screen.getByTestId("pheno-hunt-rename-open"));
     const input = screen.getByTestId("pheno-hunt-rename-input") as HTMLInputElement;
     expect(input.value).toBe(MANGLED);
@@ -29,7 +45,7 @@ describe("PhenoHuntRenameControl", () => {
   });
 
   it("save is disabled for an empty or unchanged name", () => {
-    render(<PhenoHuntRenameControl currentName={MANGLED} canWrite onRename={vi.fn()} />);
+    render(<Harness currentName={MANGLED} canWrite onRename={vi.fn()} />);
     fireEvent.click(screen.getByTestId("pheno-hunt-rename-open"));
     const save = screen.getByTestId("pheno-hunt-rename-save") as HTMLButtonElement;
     expect(save.disabled).toBe(true);
@@ -42,7 +58,7 @@ describe("PhenoHuntRenameControl", () => {
 
   it("a failed save stays open and says so", async () => {
     const onRename = vi.fn(async () => false);
-    render(<PhenoHuntRenameControl currentName={MANGLED} canWrite onRename={onRename} />);
+    render(<Harness currentName={MANGLED} canWrite onRename={onRename} />);
     fireEvent.click(screen.getByTestId("pheno-hunt-rename-open"));
     fireEvent.change(screen.getByTestId("pheno-hunt-rename-input"), {
       target: { value: "Claude E2E Pheno Hunt" },
@@ -58,7 +74,7 @@ describe("PhenoHuntRenameControl", () => {
   it("a pending save cannot be cancelled, reopened or edited (#551 Codex P2)", async () => {
     let resolve: (ok: boolean) => void = () => {};
     const onRename = vi.fn(() => new Promise<boolean>((r) => (resolve = r)));
-    render(<PhenoHuntRenameControl currentName={MANGLED} canWrite onRename={onRename} />);
+    render(<Harness currentName={MANGLED} canWrite onRename={onRename} />);
     fireEvent.click(screen.getByTestId("pheno-hunt-rename-open"));
     fireEvent.change(screen.getByTestId("pheno-hunt-rename-input"), {
       target: { value: "Claude E2E Pheno Hunt" },
@@ -79,7 +95,7 @@ describe("PhenoHuntRenameControl", () => {
     const onRename = vi.fn(async () => {
       throw new Error("network");
     });
-    render(<PhenoHuntRenameControl currentName={MANGLED} canWrite onRename={onRename} />);
+    render(<Harness currentName={MANGLED} canWrite onRename={onRename} />);
     fireEvent.click(screen.getByTestId("pheno-hunt-rename-open"));
     fireEvent.change(screen.getByTestId("pheno-hunt-rename-input"), {
       target: { value: "Claude E2E Pheno Hunt" },
@@ -95,7 +111,7 @@ describe("PhenoHuntRenameControl", () => {
 
   it("cancel discards the edit", () => {
     const onRename = vi.fn();
-    render(<PhenoHuntRenameControl currentName={MANGLED} canWrite onRename={onRename} />);
+    render(<Harness currentName={MANGLED} canWrite onRename={onRename} />);
     fireEvent.click(screen.getByTestId("pheno-hunt-rename-open"));
     fireEvent.change(screen.getByTestId("pheno-hunt-rename-input"), { target: { value: "X" } });
     fireEvent.click(screen.getByTestId("pheno-hunt-rename-cancel"));

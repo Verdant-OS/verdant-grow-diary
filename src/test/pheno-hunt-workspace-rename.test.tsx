@@ -145,7 +145,7 @@ describe("PhenoHuntWorkspace rename (#551)", () => {
     expect(within(card).queryByText("Blue Dream Hunt")).toBeNull();
   });
 
-  it("a pending rename keeps Rename locked across a reload remount", async () => {
+  it("a pending rename stays locked in its editor across a reload remount", async () => {
     let resolve: () => void = () => {};
     updatePhenoHuntSetup.mockImplementation(() => new Promise<void>((r) => (resolve = r)));
     const { rerenderState } = renderAt({});
@@ -153,16 +153,31 @@ describe("PhenoHuntWorkspace rename (#551)", () => {
     await waitFor(() => expect(updatePhenoHuntSetup).toHaveBeenCalledTimes(1));
     rerenderState({ status: "loading" });
     rerenderState({ status: "ok" });
-    const open = screen.getByTestId("pheno-hunt-rename-open") as HTMLButtonElement;
-    expect(open.disabled).toBe(true);
-    fireEvent.click(open);
-    expect(screen.queryByTestId("pheno-hunt-rename-input")).toBeNull();
+    // The editor survives the remount, still locked on the in-flight save.
+    const input = screen.getByTestId("pheno-hunt-rename-input") as HTMLInputElement;
+    expect(input.value).toBe("Repaired Hunt");
+    expect(input.disabled).toBe(true);
+    const cancel = screen.getByTestId("pheno-hunt-rename-cancel") as HTMLButtonElement;
+    expect(cancel.disabled).toBe(true);
+    fireEvent.click(cancel);
+    expect(screen.getByTestId("pheno-hunt-rename-input")).toBeDefined();
     resolve();
-    await waitFor(() =>
-      expect((screen.getByTestId("pheno-hunt-rename-open") as HTMLButtonElement).disabled).toBe(
-        false,
-      ),
-    );
+    await waitFor(() => expect(screen.queryByTestId("pheno-hunt-rename-input")).toBeNull());
     expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Repaired Hunt");
+  });
+  it("a rename that fails during a reload still shows the error and the draft", async () => {
+    let reject: (e: Error) => void = () => {};
+    updatePhenoHuntSetup.mockImplementation(() => new Promise<void>((_, r) => (reject = r)));
+    const { rerenderState } = renderAt({});
+    submitRename("Repaired Hunt");
+    await waitFor(() => expect(updatePhenoHuntSetup).toHaveBeenCalledTimes(1));
+    rerenderState({ status: "loading" });
+    reject(new Error("network"));
+    await Promise.resolve();
+    rerenderState({ status: "ok" });
+    expect(await screen.findByTestId("pheno-hunt-rename-error")).toBeDefined();
+    const input = screen.getByTestId("pheno-hunt-rename-input") as HTMLInputElement;
+    expect(input.value).toBe("Repaired Hunt");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Blue Dream Hunt");
   });
 });

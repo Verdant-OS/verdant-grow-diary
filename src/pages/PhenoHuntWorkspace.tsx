@@ -14,7 +14,7 @@
  * to compare side by side. Client gating is presentation-only; the database is
  * authoritative for numbering and Pro access.
  */
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "@/lib/react-router-compat";
 import { usePhenoHuntWorkspace, CANDIDATE_PAGE_SIZE } from "@/hooks/usePhenoHuntWorkspace";
 import { buildPhenoHuntCsv, phenoHuntCsvFilename } from "@/lib/phenoHuntCsvExport";
@@ -73,6 +73,7 @@ import PhenoCompareCandidatesAction from "@/components/PhenoCompareCandidatesAct
 import { buildPhenoComparisonActionState } from "@/lib/phenoComparisonActionState";
 import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
 import PhenoHuntRenameControl from "@/components/PhenoHuntRenameControl";
+import { usePhenoHuntRenameSession } from "@/hooks/usePhenoHuntRenameSession";
 import {
   huntNameOverrideValue,
   huntScopedOverrideValue,
@@ -1458,10 +1459,6 @@ export default function PhenoHuntWorkspace() {
   // #551: optimistic name after a confirmed rename; the hunt row stays
   // authoritative once a reload returns any other name.
   const [huntNameLocal, setHuntNameLocal] = useState<HuntNameOverride | null>(null);
-  // Held here, not in the control: a reload unmounts the control mid-save,
-  // and a remounted one must not open a second rename (#551 Codex P2).
-  const [renamePending, setRenamePending] = useState(false);
-  const renamePendingRef = useRef(false);
   const effectiveHuntName = huntNameOverrideValue(huntNameLocal, ws.hunt) ?? ws.hunt?.name ?? null;
   const effectiveBreedingObjective: BreedingObjectiveTarget[] =
     huntScopedOverrideValue(breedingObjectiveLocal, ws.hunt?.id) ??
@@ -1511,21 +1508,19 @@ export default function PhenoHuntWorkspace() {
   // #551: rename resolves true only after the row is read back (RLS + the
   // Pro entitlement policy filter blocked writes silently otherwise).
   const handleRenameHunt = async (name: string): Promise<boolean> => {
-    if (!canWrite || !ws.hunt?.id || renamePendingRef.current) return false;
+    if (!canWrite || !ws.hunt?.id) return false;
     const { id: huntId, name: baseName } = ws.hunt;
-    renamePendingRef.current = true;
-    setRenamePending(true);
     try {
       await updatePhenoHuntSetup({ huntId, name });
       setHuntNameLocal({ huntId, value: name, baseName });
       return true;
     } catch {
       return false;
-    } finally {
-      renamePendingRef.current = false;
-      setRenamePending(false);
     }
   };
+  // Held here, not in the control: a reload unmounts the control mid-save,
+  // and the save must still settle against the editor the grower used.
+  const renameSession = usePhenoHuntRenameSession(handleRenameHunt);
 
   // Debounce the free-text search into the server-side filter (resets paging).
   useEffect(() => {
@@ -1779,8 +1774,7 @@ export default function PhenoHuntWorkspace() {
               <PhenoHuntRenameControl
                 currentName={effectiveHuntName ?? ""}
                 canWrite={canWrite}
-                pending={renamePending}
-                onRename={handleRenameHunt}
+                session={renameSession}
               />
             ) : null}
           </div>

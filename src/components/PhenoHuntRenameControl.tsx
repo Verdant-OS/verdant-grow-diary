@@ -3,13 +3,13 @@
  * workspace header (e.g. rows mangled by the pre-#482 prefill concat bug).
  *
  * Presenter only: validation lives in phenoHuntRenameRules; the parent owns
- * the write (`onRename` resolves true on a confirmed save). Hidden when the
+ * the write and the editor state (`usePhenoHuntRenameSession`). Hidden when the
  * grower cannot write — RLS and the Pro entitlement policy remain the real
  * boundary.
  */
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { PhenoHuntRenameSession } from "@/hooks/usePhenoHuntRenameSession";
 import {
   PHENO_HUNT_NAME_MAX_LENGTH,
   PHENO_HUNT_RENAME_COPY,
@@ -20,22 +20,16 @@ import {
 export interface PhenoHuntRenameControlProps {
   currentName: string;
   canWrite: boolean;
-  /** A rename started by an earlier mount is still in flight. */
-  pending?: boolean;
-  onRename: (name: string) => Promise<boolean>;
+  /** Editor state, held by a parent that survives workspace reloads. */
+  session: PhenoHuntRenameSession;
 }
 
 export default function PhenoHuntRenameControl({
   currentName,
   canWrite,
-  pending = false,
-  onRename,
+  session,
 }: PhenoHuntRenameControlProps) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(currentName);
-  const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const busy = saving || pending;
+  const { editing, draft, saving, failed } = session;
 
   if (!canWrite) return null;
 
@@ -46,12 +40,8 @@ export default function PhenoHuntRenameControl({
         variant="ghost"
         size="sm"
         data-testid="pheno-hunt-rename-open"
-        disabled={pending}
-        onClick={() => {
-          setDraft(currentName);
-          setFailed(false);
-          setEditing(true);
-        }}
+        disabled={saving}
+        onClick={() => session.open(currentName)}
       >
         {PHENO_HUNT_RENAME_COPY.open}
       </Button>
@@ -61,29 +51,13 @@ export default function PhenoHuntRenameControl({
   const result = validatePhenoHuntRename(draft, currentName);
   const hint = phenoHuntRenameHint(result);
 
-  const save = async () => {
-    if (!result.ok || busy) return;
-    setSaving(true);
-    setFailed(false);
-    let ok = false;
-    try {
-      ok = await onRename(result.name);
-    } catch {
-      ok = false;
-    } finally {
-      setSaving(false);
-    }
-    if (ok) setEditing(false);
-    else setFailed(true);
-  };
-
   return (
     <form
       className="flex flex-wrap items-center gap-2"
       data-testid="pheno-hunt-rename-form"
       onSubmit={(e) => {
         e.preventDefault();
-        void save();
+        if (result.ok && !saving) void session.save(result.name);
       }}
     >
       <label className="sr-only" htmlFor="pheno-hunt-rename-input">
@@ -95,14 +69,14 @@ export default function PhenoHuntRenameControl({
         className="h-8 max-w-sm"
         value={draft}
         maxLength={PHENO_HUNT_NAME_MAX_LENGTH + 20}
-        onChange={(e) => setDraft(e.target.value)}
-        disabled={busy}
+        onChange={(e) => session.setDraft(e.target.value)}
+        disabled={saving}
         autoFocus
       />
       <Button
         type="submit"
         size="sm"
-        disabled={!result.ok || busy}
+        disabled={!result.ok || saving}
         data-testid="pheno-hunt-rename-save"
       >
         {saving ? PHENO_HUNT_RENAME_COPY.saving : PHENO_HUNT_RENAME_COPY.save}
@@ -112,8 +86,8 @@ export default function PhenoHuntRenameControl({
         size="sm"
         variant="ghost"
         data-testid="pheno-hunt-rename-cancel"
-        disabled={busy}
-        onClick={() => setEditing(false)}
+        disabled={saving}
+        onClick={session.cancel}
       >
         {PHENO_HUNT_RENAME_COPY.cancel}
       </Button>

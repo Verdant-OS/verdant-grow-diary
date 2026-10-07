@@ -88,11 +88,12 @@ That leaves three npm references, none of which installs from `package-lock.json
 | `.claude/skills/run-verdant-grow-diary/SKILL.md` | Local public-registry bootstrap; restores the lock after. | No              |
 | `docs/preview-deployment-verification.md`        | Preview dashboard checklist.                              | No              |
 
-Every script the SEO job runs, and every test it spawns, imports only Node built-ins
-(measured over `scripts/seo/*.mjs` and the ten `scripts/test-seo-*.mjs` files the job
-runs). The job therefore needs no installed packages. The install step is kept to match
-the requested Bun move and the repository pattern; removing it would be a separate
-change.
+The job needs its install step. Measured over `scripts/seo/*.mjs` and the ten
+`scripts/test-seo-*.mjs` files the job runs, every import is a Node built-in except one:
+`scripts/test-seo-monitoring-workflow.mjs` imports `js-yaml` to assert on the parsed
+workflow (#1870 review follow-up). The `bun install --frozen-lockfile` step provides it
+from `bun.lock`; removing that step would break the job's validation step on a clean
+runner.
 
 Removing `package-lock.json` itself is still the dependency security owner's decision,
 and lockfile changes stay owner-gated. This addendum does not remove it. Hosted

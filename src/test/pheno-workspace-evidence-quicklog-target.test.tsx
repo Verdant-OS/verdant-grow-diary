@@ -1,0 +1,430 @@
+/**
+ * #1005 — the workspace's "Record <goal> evidence" handoff targets the
+ * candidate plant's OWN stored grow/tent, never the hunt's, and never fires
+ * for an unresolved target.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
+import type { UsePhenoHuntWorkspaceState } from "@/hooks/usePhenoHuntWorkspace";
+import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
+import { buildPhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+
+const hookMock = vi.fn<() => UsePhenoHuntWorkspaceState>();
+vi.mock("@/hooks/usePhenoHuntWorkspace", () => ({
+  usePhenoHuntWorkspace: () => hookMock(),
+}));
+
+type TentsState = {
+  data: Array<{ id: string; grow_id: string | null }> | undefined;
+  isError: boolean;
+  refetch: () => Promise<unknown>;
+};
+const tentsState: { current: TentsState } = {
+  current: { data: [], isError: false, refetch: () => Promise.resolve() },
+};
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => tentsState.current,
+}));
+
+// Quick Log's live plant catalog (Codex on #1825). Null data → mirror the
+// rendered candidate (the plant has not moved since the page loaded).
+type PlantsState = {
+  data: Array<{ id: string; grow_id: string | null; tent_id: string | null }> | null | undefined;
+  isError: boolean;
+};
+const plantsState: { current: PlantsState } = { current: { data: null, isError: false } };
+const plantsRefetch = vi.fn(() => Promise.resolve());
+const mirroredPlant: { current: { id: string; grow_id: string | null; tent_id: string | null } } = {
+  current: { id: "plant-a", grow_id: null, tent_id: null },
+};
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({
+    data: plantsState.current.data === null ? [mirroredPlant.current] : plantsState.current.data,
+    isError: plantsState.current.isError,
+    refetch: plantsRefetch,
+  }),
+}));
+
+// Active (non-archived) grows, as GrowsProvider lists them (Codex on #1825).
+const growsState: {
+  current: { grows: Array<{ id: string }>; loading: boolean; error: string | null };
+} = { current: { grows: [{ id: "g-a" }, { id: "g-hunt" }], loading: false, error: null } };
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({
+    ...growsState.current,
+    activeGrowId: null,
+    activeGrow: null,
+    setActiveGrowId: () => {},
+    refresh: () => growsRefresh(),
+  }),
+}));
+const growsRefresh = vi.fn(() => Promise.resolve());
+
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    entitlement: {
+      effectivePlanId: "pro_monthly",
+      isActive: true,
+      source: "subscription",
+      hadProAccess: true,
+    },
+    refetch: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/usePhenoHermCullSuggestion", () => ({
+  usePhenoHermCullSuggestion: () => ({
+    queuing: null,
+    queuedPlantIds: new Set<string>(),
+    error: null,
+    queueRemoval: vi.fn().mockResolvedValue(true),
+  }),
+}));
+
+const PLANT = "plant-a";
+const GOALS = ["structure", "aroma"];
+
+vi.mock("@/hooks/usePhenoEvidencePackets", () => ({
+  usePhenoEvidencePackets: () => ({
+    status: "ready" as const,
+    packets: new Map([
+      [
+        "plant-a",
+        buildPhenoCandidateEvidencePacket({
+          huntId: "h1",
+          plantId: "plant-a",
+          configuredGoals: ["structure", "aroma"],
+          rows: [],
+        }),
+      ],
+    ]),
+    truncated: false,
+  }),
+}));
+
+import PhenoHuntWorkspace from "@/pages/PhenoHuntWorkspace";
+
+function candidate(growId: string | null, tentId: string | null): PhenoCandidateInput {
+  return {
+    candidateId: PLANT,
+    candidateLabel: "LP-01",
+    plantLabel: "Plant A",
+    growLabel: "Grow",
+    tentLabel: "Tent",
+    growId,
+    tentId,
+    strain: "GG4",
+    stage: "flower",
+    quickLogEntries: [],
+    timelineEvents: [],
+    photos: [],
+    sensorSnapshots: [],
+  };
+}
+
+function renderWorkspace(c: PhenoCandidateInput) {
+  mirroredPlant.current = {
+    id: c.candidateId,
+    grow_id: c.growId ?? null,
+    tent_id: c.tentId ?? null,
+  };
+  const state = {
+    status: "ok",
+    // The HUNT's grow/tent deliberately differ from the candidate's.
+    hunt: {
+      id: "h1",
+      name: "Hunt",
+      growId: "g-hunt",
+      tentId: "t-hunt",
+      evidenceGoals: GOALS,
+    },
+    candidates: [c],
+    totalCandidateCount: 1,
+    loadingMore: false,
+    loadMoreError: null,
+    hasMore: false,
+    loadNextPage: vi.fn(),
+    reload: vi.fn(),
+    filters: {},
+    setFilter: vi.fn(),
+    resetFilters: vi.fn(),
+    comparisonSummary: null,
+    scoresByPlant: {},
+    decisionsByPlant: {},
+    roundsByKey: {},
+    roundLoadStates: {},
+    decisionHistoryByPlant: {},
+    sexByPlant: {},
+    reversedPlantIds: new Set<string>(),
+    clonedPlantIds: new Set<string>(),
+    smokeByPlant: {},
+    labByKey: {},
+    error: null,
+    saving: null,
+    assignCandidateNumber: vi.fn(),
+    loadDecisionHistory: vi.fn().mockResolvedValue(undefined),
+    loadRound: vi.fn().mockResolvedValue(undefined),
+    saveScore: vi.fn(),
+    saveDecision: vi.fn(),
+    saveRound: vi.fn(),
+    saveSex: vi.fn(),
+    saveSmokeTest: vi.fn(),
+    saveLabResult: vi.fn(),
+    deleteLabResult: vi.fn(),
+  } as unknown as UsePhenoHuntWorkspaceState;
+  hookMock.mockImplementation(() => state);
+  return render(
+    <MemoryRouter initialEntries={["/pheno-hunts/h1/workspace"]}>
+      <Routes>
+        <Route path="/pheno-hunts/:id/workspace" element={<PhenoHuntWorkspace />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+const COVERAGE = `workspace-evidence-coverage-${PLANT}`;
+const listener = vi.fn();
+
+beforeEach(() => {
+  hookMock.mockReset();
+  listener.mockReset();
+  plantsState.current = { data: null, isError: false };
+  plantsRefetch.mockClear();
+  tentsState.current = {
+    data: [
+      { id: "t-a", grow_id: "g-a" },
+      { id: "t-hunt", grow_id: "g-hunt" },
+    ],
+    isError: false,
+    refetch: vi.fn().mockResolvedValue(undefined),
+  };
+  window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener as EventListener);
+});
+
+afterEach(() => {
+  window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener as EventListener);
+  cleanup();
+});
+
+describe("workspace evidence → Quick Log target (#1005)", () => {
+  it("prefills the plant's own stored grow and tent, never the hunt's", () => {
+    renderWorkspace(candidate("g-a", "t-a"));
+    fireEvent.click(screen.getByTestId(`${COVERAGE}-record-structure`));
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect((listener.mock.calls[0][0] as CustomEvent).detail).toMatchObject({
+      plantId: PLANT,
+      growId: "g-a",
+      tentId: "t-a",
+      phenoHuntId: "h1",
+      phenoEvidenceGoal: "structure",
+      source: "pheno-evidence-goal",
+    });
+  });
+
+  it("a tentless candidate gets Assign tent before any evidence prefill", () => {
+    renderWorkspace(candidate("g-a", null));
+    expect(screen.queryByRole("button", { name: /Record .* evidence/ })).toBeNull();
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "needs_tent_assignment",
+    );
+    const assign = screen.getByRole("link", { name: "Assign tent" });
+    expect(assign).toHaveAttribute("href", `/plants/${PLANT}`);
+    fireEvent.click(assign);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("a live tent removal blocks a stale tented candidate; assignment restores exact targeting", () => {
+    plantsState.current = {
+      data: [{ id: PLANT, grow_id: "g-a", tent_id: null }],
+      isError: false,
+    };
+    renderWorkspace(candidate("g-a", "t-a"));
+    expect(screen.getByRole("link", { name: "Assign tent" })).toHaveAttribute(
+      "href",
+      `/plants/${PLANT}`,
+    );
+    expect(screen.queryByRole("button", { name: /Record .* evidence/ })).toBeNull();
+    expect(listener).not.toHaveBeenCalled();
+    cleanup();
+
+    plantsState.current = {
+      data: [{ id: PLANT, grow_id: "g-hunt", tent_id: "t-hunt" }],
+      isError: false,
+    };
+    renderWorkspace(candidate("g-a", null));
+    expect(screen.queryByRole("link", { name: "Assign tent" })).toBeNull();
+    fireEvent.click(screen.getByTestId(`${COVERAGE}-record-aroma`));
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect((listener.mock.calls[0][0] as CustomEvent).detail).toMatchObject({
+      plantId: PLANT,
+      growId: "g-hunt",
+      tentId: "t-hunt",
+      phenoEvidenceGoal: "aroma",
+    });
+  });
+
+  it("a missing or archived tent blocks the handoff and offers Review plant", () => {
+    renderWorkspace(candidate("g-a", "t-archived-or-gone"));
+    expect(screen.queryByTestId(`${COVERAGE}-record-structure`)).toBeNull();
+    const status = screen.getByTestId(`${COVERAGE}-target`);
+    expect(status).toHaveAttribute("data-target-state", "tent_unavailable");
+    expect(status).toHaveTextContent("This plant's tent is archived or no longer available.");
+    expect(screen.getByTestId(`${COVERAGE}-target-review`)).toHaveAttribute(
+      "href",
+      `/plants/${PLANT}`,
+    );
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("a candidate in an archived grow is blocked and offers Review plant (Codex on #1825)", () => {
+    growsState.current = { ...growsState.current, grows: [{ id: "g-hunt" }] };
+    try {
+      renderWorkspace(candidate("g-a", "t-a"));
+      expect(screen.queryByTestId(`${COVERAGE}-record-structure`)).toBeNull();
+      const status = screen.getByTestId(`${COVERAGE}-target`);
+      expect(status).toHaveAttribute("data-target-state", "grow_unavailable");
+      expect(status).toHaveTextContent("This plant's grow is archived or no longer available.");
+      expect(screen.getByTestId(`${COVERAGE}-target-review`)).toHaveAttribute(
+        "href",
+        `/plants/${PLANT}`,
+      );
+      expect(listener).not.toHaveBeenCalled();
+    } finally {
+      growsState.current = { ...growsState.current, grows: [{ id: "g-a" }, { id: "g-hunt" }] };
+    }
+  });
+
+  it("a tent that belongs to another grow is blocked, never re-targeted", () => {
+    renderWorkspace(candidate("g-a", "t-hunt"));
+    expect(screen.queryByTestId(`${COVERAGE}-record-structure`)).toBeNull();
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "mismatch",
+    );
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("while the tent catalog loads, the handoff waits instead of guessing", () => {
+    tentsState.current = { ...tentsState.current, data: undefined, isError: false };
+    renderWorkspace(candidate("g-a", "t-a"));
+    expect(screen.queryByTestId(`${COVERAGE}-record-structure`)).toBeNull();
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "pending",
+    );
+    expect(screen.queryByTestId(`${COVERAGE}-target-review`)).toBeNull();
+  });
+
+  it("a failed tent catalog read offers Retry, not a configuration problem", () => {
+    const refetch = vi.fn().mockResolvedValue(undefined);
+    tentsState.current = { data: undefined, isError: true, refetch };
+    renderWorkspace(candidate("g-a", "t-a"));
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "catalog_error",
+    );
+    expect(screen.queryByTestId(`${COVERAGE}-target-review`)).toBeNull();
+    fireEvent.click(screen.getByTestId(`${COVERAGE}-target-retry`));
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("Retry also refreshes a failed grow catalog (Codex on #1825)", () => {
+    const refetch = vi.fn().mockResolvedValue(undefined);
+    tentsState.current = { data: [{ id: "t-a", grow_id: "g-a" }], isError: false, refetch };
+    growsState.current = { ...growsState.current, error: "boom" };
+    growsRefresh.mockClear();
+    try {
+      renderWorkspace(candidate("g-a", "t-a"));
+      expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+        "data-target-state",
+        "catalog_error",
+      );
+      fireEvent.click(screen.getByTestId(`${COVERAGE}-target-retry`));
+      expect(growsRefresh).toHaveBeenCalledTimes(1);
+    } finally {
+      growsState.current = { ...growsState.current, error: null };
+    }
+  });
+
+  it("a candidate moved after the page loaded targets its CURRENT grow/tent (Codex on #1825)", () => {
+    // Workspace snapshot says g-a/t-a; Quick Log's live plant row says g-hunt/t-hunt.
+    plantsState.current = {
+      data: [{ id: PLANT, grow_id: "g-hunt", tent_id: "t-hunt" }],
+      isError: false,
+    };
+    renderWorkspace(candidate("g-a", "t-a"));
+    fireEvent.click(screen.getByTestId(`${COVERAGE}-record-structure`));
+    expect((listener.mock.calls[0][0] as CustomEvent).detail).toMatchObject({
+      plantId: PLANT,
+      growId: "g-hunt",
+      tentId: "t-hunt",
+    });
+  });
+
+  it("a candidate missing from Quick Log's live plant catalog is blocked", () => {
+    plantsState.current = { data: [], isError: false };
+    renderWorkspace(candidate("g-a", "t-a"));
+    expect(screen.queryByTestId(`${COVERAGE}-record-structure`)).toBeNull();
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "plant_unavailable",
+    );
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("a failed plant catalog read offers Retry, which refetches plants", () => {
+    plantsState.current = { data: undefined, isError: true };
+    renderWorkspace(candidate("g-a", "t-a"));
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "catalog_error",
+    );
+    fireEvent.click(screen.getByTestId(`${COVERAGE}-target-retry`));
+    expect(plantsRefetch).toHaveBeenCalledTimes(1);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("a failed background refetch with cached tents blocks like Quick Log does (Codex on #1825)", () => {
+    // TanStack keeps `data` AND sets `isError`; Quick Log gives the error precedence.
+    tentsState.current = { ...tentsState.current, isError: true };
+    renderWorkspace(candidate("g-a", "t-a"));
+    expect(screen.queryByTestId(`${COVERAGE}-record-structure`)).toBeNull();
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "catalog_error",
+    );
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("a failed background refetch with cached plants blocks like Quick Log does (Codex on #1825)", () => {
+    plantsState.current = {
+      data: [{ id: PLANT, grow_id: "g-a", tent_id: "t-a" }],
+      isError: true,
+    };
+    renderWorkspace(candidate("g-a", "t-a"));
+    expect(screen.queryByTestId(`${COVERAGE}-record-structure`)).toBeNull();
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "catalog_error",
+    );
+    fireEvent.click(screen.getByTestId(`${COVERAGE}-target-retry`));
+    expect(plantsRefetch).toHaveBeenCalledTimes(1);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("a tentless candidate waits while the tent catalog loads (Codex on #1825)", () => {
+    tentsState.current = { ...tentsState.current, data: undefined, isError: false };
+    renderWorkspace(candidate("g-a", null));
+    expect(screen.queryByTestId(`${COVERAGE}-record-aroma`)).toBeNull();
+    expect(screen.getByTestId(`${COVERAGE}-target`)).toHaveAttribute(
+      "data-target-state",
+      "pending",
+    );
+    expect(listener).not.toHaveBeenCalled();
+  });
+});

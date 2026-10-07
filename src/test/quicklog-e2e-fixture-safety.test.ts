@@ -16,6 +16,10 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import {
+  QUICKLOG_SMOKE_DAILY_CRON,
+  loadQuickLogSmokeWorkflow,
+} from "./helpers/quicklogSmokeWorkflow";
+import {
   fixturePageRelationshipMatchesExpected,
   validateFixtureEnv,
   pageTextMatchesFixture,
@@ -384,9 +388,10 @@ describe("Workflow: fixture verification gates smoke", () => {
     expect(smoke).not.toMatch(/TARGET_NAME.*(?:RegExp| · )/);
   });
 
-  it("no schedule, no cron, no pull_request_target, no service_role, no checked-in storageState", () => {
-    expect(wf).not.toMatch(/^\s*schedule\s*:/m);
-    expect(wf).not.toMatch(/-\s*cron\s*:/);
+  it("only the one daily schedule, no pull_request_target, no service_role, no checked-in storageState", () => {
+    const workflow = loadQuickLogSmokeWorkflow(ROOT);
+    // Exactly one daily schedule (#1852); no other cron entry may be added.
+    expect(workflow.on.schedule).toEqual([{ cron: QUICKLOG_SMOKE_DAILY_CRON }]);
     expect(wf).not.toMatch(/pull_request_target/);
     expect(wf).not.toMatch(/service_role/i);
     expect(fs.existsSync(path.join(ROOT, "e2e/.auth/user.json"))).toBe(false);
@@ -498,8 +503,8 @@ describe("Package + docs wiring", () => {
     }
     // No automated bootstrap promise
     expect(readme.toLowerCase()).toContain("deferred");
-    // Reaffirm no scheduled smoke
-    expect(readme).toMatch(/no scheduled or nightly/i);
+    // Reaffirm the single daily schedule
+    expect(readme).toMatch(/exactly one scheduled daily run/i);
   });
 
   it("README says direct smoke invocation performs the same internal fixture validation", () => {

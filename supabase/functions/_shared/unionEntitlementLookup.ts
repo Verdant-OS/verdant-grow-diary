@@ -37,13 +37,22 @@ import type {
 } from "./lib/lib/entitlements/lovablePaddleAdapter.ts";
 import type { ResolvedEntitlement } from "./lib/lib/entitlements/types.ts";
 
+let unresolvedEnvironmentWarned = false;
+
 /**
- * Server-authoritative billing environment resolver.
+ * Server-authoritative billing environment for ENTITLEMENT reads.
  *
- * Trust order:
- *   1. Explicit `PAYMENTS_ENVIRONMENT` env var (`live` | `sandbox`).
- *   2. Presence of exactly one of PADDLE_LIVE_API_KEY / PADDLE_SANDBOX_API_KEY.
- *   3. Conservative default: `sandbox` (never overgrants live).
+ * Only an explicit `PAYMENTS_ENVIRONMENT` (`live` | `sandbox`) is trusted, via
+ * `resolveRequiredServerBillingEnvironment`. Anything else (unset, invalid, or
+ * only implied by which Paddle keys exist) fails closed to `live`: the
+ * entitlement loader then honours only live rows, which the webhook writes
+ * solely for signature-verified LIVE events, and sandbox rows never entitle.
+ * Sandbox rows grant access only when the server has explicitly resolved
+ * PAYMENTS_ENVIRONMENT=sandbox (AGENTS.md, Monetization / Entitlements).
+ *
+ * Never use this to choose a Paddle gateway: an unresolved configuration must
+ * refuse to sell, not sell live. Checkout uses
+ * `resolveRequiredServerBillingEnvironment` and refuses when it is not ok.
  *
  * IMPORTANT: never derived from request body / query. Any caller-provided
  * `billing_env` is ignored — a spoofed body cannot flip the server's
@@ -53,13 +62,20 @@ export function resolveServerBillingEnvironment(
   getEnv: (name: string) => string | undefined = (n) =>
     (globalThis as { Deno?: { env: { get(n: string): string | undefined } } }).Deno?.env.get(n),
 ): LovableBillingEnvironment {
-  const explicit = getEnv("PAYMENTS_ENVIRONMENT");
-  if (explicit === "live" || explicit === "sandbox") return explicit;
-  const hasLive = !!getEnv("PADDLE_LIVE_API_KEY");
-  const hasSandbox = !!getEnv("PADDLE_SANDBOX_API_KEY");
-  if (hasLive && !hasSandbox) return "live";
-  if (hasSandbox && !hasLive) return "sandbox";
-  return "sandbox";
+  const resolution = resolveRequiredServerBillingEnvironment(getEnv);
+  if (resolution.ok) return resolution.environment;
+  if (!unresolvedEnvironmentWarned) {
+    unresolvedEnvironmentWarned = true;
+    // Reason only: never log environment values or keys.
+    console.warn(
+      JSON.stringify({
+        event: "billing_environment_unresolved",
+        reason: resolution.reason,
+        entitlement_environment: "live",
+      }),
+    );
+  }
+  return "live";
 }
 
 export type RequiredServerBillingEnvironmentResolution =
@@ -73,10 +89,10 @@ export type RequiredServerBillingEnvironmentResolution =
     };
 
 /**
- * Strict environment resolver for cost-bearing AI calls.
+ * Strict environment resolver for cost-bearing AI calls and checkout.
  *
- * Unlike the compatibility resolver above, this helper never infers sandbox
- * from Paddle-key presence. AI provider spend is allowed only when
+ * This helper never infers an environment from Paddle-key presence. AI
+ * provider spend and Paddle price lookup are allowed only when
  * PAYMENTS_ENVIRONMENT is explicitly `live` or `sandbox`. If it is absent,
  * both/neither key configurations are reported as ambiguous instead of
  * silently becoming sandbox.

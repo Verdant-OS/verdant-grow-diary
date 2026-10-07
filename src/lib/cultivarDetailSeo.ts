@@ -8,7 +8,10 @@
  * stays authoritative. The visible FAQ rendered from these items is the single
  * source of truth for the FAQPage JSON-LD (no schema-only claims).
  */
-import type { VerdantCultivarProfile } from "../constants/verdantCultivars";
+import type {
+  CultivarVerificationStatus,
+  VerdantCultivarProfile,
+} from "../constants/verdantCultivars";
 
 export interface CultivarFaqItem {
   question: string;
@@ -18,6 +21,38 @@ export interface CultivarFaqItem {
 export interface CultivarBreadcrumbItem {
   name: string;
   url: string;
+}
+
+/**
+ * Search engines may index a cultivar profile only after human review.
+ * `sample` and `community` are weak records (`noindex, follow`). `reviewed`
+ * and `verified` stay indexable. The static head builder and the client
+ * `usePageSeo` call both use this gate, and the sitemap lists only the
+ * indexable side.
+ */
+export function cultivarVerificationIsSearchIndexable(status: CultivarVerificationStatus): boolean {
+  switch (status) {
+    case "reviewed":
+    case "verified":
+      return true;
+    case "sample":
+    case "community":
+      return false;
+    default: {
+      // Compile-time exhaustiveness check. At runtime an unknown status
+      // (for example a DB string) fails closed to noindex.
+      const unexpected: never = status;
+      void unexpected;
+      return false;
+    }
+  }
+}
+
+/** Robots directive paired with `cultivarVerificationIsSearchIndexable`. */
+export function cultivarDetailRobots(
+  status: CultivarVerificationStatus,
+): "index, follow" | "noindex, follow" {
+  return cultivarVerificationIsSearchIndexable(status) ? "index, follow" : "noindex, follow";
 }
 
 function difficultyPhrase(difficulty: VerdantCultivarProfile["difficulty"]): string {

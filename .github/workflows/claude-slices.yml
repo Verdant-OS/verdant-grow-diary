@@ -116,7 +116,8 @@ jobs:
             if (/(?:^|\/)(?:\.prettierrc|\.eslintrc)[^/]*$/i.test(path)) return true;
             if (/^scripts(?:\/|$)/i.test(path)) return true;
             if (/^config\/claude-slice-lock-exceptions\.json$/i.test(path)) return true;
-            const executable = /^(?:src|scripts|tests|e2e|packages)\//i.test(path) && !/\.md$/i.test(path);
+            // Same roots as the content rules, e2e-local/ included (Codex P1 at cbc0ab0f).
+            const executable = CONTENT_ROOTS.test(path) && !/\.md$/i.test(path);
             return executable && (
               /auth|oauth|rls|action[-_]?(?:queue|detail|outcome|follow[-_]?up|response[-_]?memory|completion|status)|linked[-_]?actions?|assigned[-_]?tent[-_]?actions?|live[-_]?proof[-_]?action[-_]?status|recent[-_]?action[-_]?response|device[-_]?(?:control|command)|actuator/i.test(path) ||
               /(?:^|\/)(?:actions|edge)(?:[/._]|$)/i.test(path)
@@ -138,7 +139,10 @@ jobs:
           // What may sit between the namespace and the call or terminator:
           // (supabase.auth).x, (supabase.auth as any).x, supabase.auth!.x,
           // supabase.auth as AuthClient, ... satisfies T. Bounded, so it can't stall.
-          const AUTH_TAIL = '(?:\\s*(?:\\)|!(?!=)|\\b(?:as|satisfies)\\s+[\\w$.]{1,200}(?:<[^<>()\\n]{0,200}>)?(?:\\[\\])?)){0,6}';
+          // After those, one cast of any type on the same line is allowed too:
+          // nested generics, function types, import("x").T (Codex P1 at cbc0ab0f).
+          const AUTH_TAIL = '(?:\\s*(?:\\)|!(?!=)|\\b(?:as|satisfies)\\s+[\\w$.]{1,200}(?:<[^<>()\\n]{0,200}>)?(?:\\[\\])?)){0,6}' +
+            '(?:\\s*\\b(?:as|satisfies)\\s+[^;\\n]{1,300}?(?:\\s*(?:\\)|!(?!=))){0,6})?';
           // End of an alias or destructure statement: ";", end of file, or a line
           // break that ASI ends (the next line doesn't continue the expression).
           const STMT_END = '[\\t ]*(?:;|$|\\r?\\n(?!\\s*[-?.:\\[(&|,+*/%<>=!^~]))';
@@ -194,6 +198,15 @@ jobs:
             const block = text[i + 1] === '*';
             const end = block ? text.indexOf('*/', i + 2) : text.indexOf('\n', i);
             return end === -1 ? text.length : block ? end + 2 : end;
+          }
+
+          // \uXXXX, \u{X…} and \xXX escapes decoded, in identifiers and strings alike.
+          function decodeEscapes(text) {
+            if (!text.includes('\\')) return text;
+            return text.replace(/\\u\{([0-9a-fA-F]{1,6})\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})/g, (match, braced, four, two) => {
+              const code = parseInt(braced || four || two, 16);
+              return code <= 0x10ffff ? String.fromCodePoint(code) : match;
+            });
           }
 
           // Every // and /* counts, even inside strings; this catches what the
@@ -300,9 +313,13 @@ jobs:
             if (!contentScoped(path)) return { locked: false, rules: [] };
             // Every pattern needs "auth" or "action_queue" in the text, so files
             // without either skip the (slower) stripped versions.
-            const variants = /auth|action_queue/.test(text)
-              ? [text, stripCommentsLexed(text), stripCommentsNaive(text)]
-              : [text];
+            // Unicode and hex escapes are decoded first, so supabase.\u0061uth and
+            // "action\x5fqueue" can't hide (Codex P1 at cbc0ab0f).
+            const decoded = decodeEscapes(text);
+            const bases = decoded === text ? [text] : [text, decoded];
+            const variants = /auth|action_queue/.test(decoded)
+              ? bases.flatMap(base => [base, stripCommentsLexed(base), stripCommentsNaive(base)])
+              : bases;
             const rules = CONTENT_RULES
               .filter(([, patterns]) => patterns.some(pattern => variants.some(variant => pattern.test(variant))))
               .map(([rule]) => rule);
@@ -474,7 +491,7 @@ jobs:
               '*deviceControl*', '*DeviceControl*', '*device-control*',
               '*deviceCommand*', '*DeviceCommand*', '*device-command*', '*actuator*', '*Actuator*',
             ];
-            for (const root of ['src', 'scripts', 'tests', 'e2e', 'packages']) {
+            for (const root of CONTENT_ROOT_DIRS) {
               lockedGlobs.push(...codeGlobs.map(glob => `./${root}/**/${glob}`));
             }
             // Best effort only: a new file can't be classified before it exists. The
@@ -518,6 +535,7 @@ jobs:
               'src/lib/plantAssignedTentActionRules.ts', 'src/hooks/usePlantAssignedTentActions.ts',
               'src/components/PlantAssignedTentActionsPanel.tsx', 'src/hooks/useOneTentLiveProofActionStatus.ts',
               'src/lib/deviceControl.ts', 'scripts/device-command.ts', 'src/lib/actuator.ts',
+              'e2e-local/device-control.ts', 'e2e-local/lib/authFixtures.ts',
               'bun.lock', 'bun.lockb', 'package-lock.json', 'nested/pnpm-lock.yaml',
               'yarn.lock', 'npm-shrinkwrap.json', 'nested/Cargo.lock',
               '.github/workflows/claude-slices.yml', '.claude/settings.json', '.grok/rules/rules.md',
@@ -652,6 +670,11 @@ jobs:
               "const r = /'/; supabase.auth /* c */ .signOut();", "x = `${'`'}`; supabase.auth /* c */ .signOut();",
               // Codex P1 at 43faeed5: the call inside a template expression next to a URL.
               'const x = `https://host/${supabase.auth /* c */ .signOut()}`;',
+              // Codex P1s at cbc0ab0f: complex cast types and escaped identifiers.
+              '(supabase.auth as Foo<Bar<Baz>>).signOut();', '(supabase.auth as (x: A) => B).signOut();',
+              '(supabase.auth as import("@supabase/supabase-js").AuthClient).signOut();',
+              'const a = supabase.auth as Map<string, Array<Foo>>;', 'supabase.\\u0061uth.signOut();',
+              'supabase.\\u{61}uth.\\u0073ignOut();',
               'const x = `a ${ { k: 1 }.k } https://h/${supabase.auth /* c */ .signOut()}`;',
               'const r = /`/; const u = "http://x"; supabase.auth /* c */ .signOut();',
               'return /"/.test(s) ? "http://x" : supabase.auth /* c */ .signOut();',
@@ -664,7 +687,7 @@ jobs:
               assert.ok(Date.now() - t0 < 1500, `synthetic 300 KB line took ${Date.now() - t0} ms`);
               cases += 1;
               // Comment stripping is linear: unterminated comments and strings can't stall it.
-              for (const huge of ['/*x'.repeat(100000), '`x\\'.repeat(100000), "'x".repeat(150000), '(/'.repeat(150000), '`${'.repeat(100000)]) {
+              for (const huge of ['/*x'.repeat(100000), '`x\\'.repeat(100000), "'x".repeat(150000), '(/'.repeat(150000), '`${'.repeat(100000), 'a.auth as b<c<d>> '.repeat(20000), '\\u0061'.repeat(100000)]) {
                 const t1 = Date.now();
                 locks('src/lib/fooRules.ts', huge);
                 assert.ok(Date.now() - t1 < 1500, `unterminated input took ${Date.now() - t1} ms`);
@@ -680,6 +703,7 @@ jobs:
               'db.from /* comment */ ("action_queue");', 'db.from(/* comment */ "action_queue");',
               'db.from( // comment\n  "action_queue")', 'db.rpc /* a */ ( /* b */ "action_queue_create", p);',
               'const x = `https://host/${db.from(/* c */ "action_queue")}`;',
+              'db.from("action\\u005fqueue");', 'db.from("action\\x5fqueue");',
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['aq-io, head'], text);
             assert.deepEqual(locks('e2e-local/lib/fixtures.ts', 'await admin.auth.admin.deleteUser(uid);'), ['auth-mutation, head']);
             assert.match(locks('e2e-local/lib/nativeLocalFixtures.ts', real('e2e-local/lib/nativeLocalFixtures.ts')).join(), /auth-mutation, head/);
@@ -921,7 +945,8 @@ jobs:
           prompt: |
             You are Claude, builder of one Verdant slice. Read AGENTS.md, CLAUDE.md
             and docs/agents/CURRENT_STATE.md first, and return SENTINEL_ACK.
-            The source of routing ownership is docs/agents/OWNERSHIP.md; GDP owns it.
+            Grok 91 routes and merges (docs/agents/CURRENT_STATE.md; GDP retired on
+            2026-09-29, and OWNERSHIP.md rows naming GDP are stale).
 
             Plant-memory-first priority, inherited from AGENTS.md. The product promise
             is "Plant memory. Sensor truth. Better decisions." Priority order is Grow,

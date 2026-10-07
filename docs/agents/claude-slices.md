@@ -3,8 +3,9 @@
 Slice: `CLAUDE-CODE-ACTION-001`. Infrastructure owner: Codex. Independent
 reviewer: Critical Mass. This is a draft-only builder integration; it does not
 authorize merging, publishing, production database access, or spend changes.
-The source of team ownership remains `docs/agents/OWNERSHIP.md`, maintained by
-GDP in its pending #1767. Repository [AGENTS.md](../../AGENTS.md), [CLAUDE.md](../../CLAUDE.md), and
+Routing follows `docs/agents/CURRENT_STATE.md`: GDP retired on 2026-09-29, and
+Grok 91 now routes and merges; `docs/agents/OWNERSHIP.md` rows that still name
+GDP are stale until it is updated. Repository [AGENTS.md](../../AGENTS.md), [CLAUDE.md](../../CLAUDE.md), and
 [CURRENT_STATE.md](CURRENT_STATE.md) govern every run.
 
 ## Routing
@@ -18,7 +19,7 @@ GDP in its pending #1767. Repository [AGENTS.md](../../AGENTS.md), [CLAUDE.md](.
   meaning not P1, not publish-gating and not data-integrity; and Copilot-sized
   slices when Copilot is backed up.
 - Claude stalls: 0 files about 10 minutes after starting counts as a stall. The
-  first gets a nudge from GDP, and the second sends the slice to Codex.
+  first gets a nudge from Grok 91, and the second sends the slice to Codex.
 - Claude never reviews its own work. Claude-built PRs go to Blue Dream for any
   `.tsx` outside `src/test/`, P1s or publish gates, and to Critical Mass for
   everything else. Claude may still be the independent reviewer on Codex-owned
@@ -31,11 +32,11 @@ Approval-Required Action Queue. Diary first, sensors second, AI third, automatio
 last. When unsure, protect the grower's plant memory (logs, timeline, photos,
 sensor truth) over any new surface.
 
-## GDP entry point
+## Routing entry point
 
-Claude slice: GDP opens the slice issue in the same block format it uses for Copilot, then comments `@claude Implement this slice as a draft PR. Stay draft. Owner Claude; reviewer per path routing.` (or applies the `claude-slice` label). No paste.
+Claude slice: Grok 91 opens the slice issue in the same block format it uses for Copilot, then comments `@claude Implement this slice as a draft PR. Stay draft. Owner Claude; reviewer per path routing.` (or applies the `claude-slice` label). No paste.
 
-Only events performed by `cheekhimself`, the account GDP posts through, can start
+Only events performed by `cheekhimself`, the account Grok 91 posts through, can start
 the builder. Accepted events are a newly created comment (on an issue or a PR)
 containing `@claude`, or an issue labeled `claude-slice`. Opening an issue whose
 body mentions `@claude` does not start it; comment `@claude` afterwards. A comment from any other account
@@ -43,7 +44,7 @@ skips at the job gate. Labels applied by another account also skip. PR events
 only run configuration tests and, for `claude/**` heads, the path guard; they
 cannot enter the Claude builder. There is no schedule or `pull_request_target`.
 
-GDP must provide a closed file plan and a slice ID in the issue. Claude checks
+Grok 91 must provide a closed file plan and a slice ID in the issue. Claude checks
 for collisions, branches from `verdant-grow-diary` as `claude/<slice-id>`, and
 commits locally. Nudges continue the existing Claude draft. Claude cannot push,
 merge, mark ready, review or open a PR: its job holds only a read-only token. A
@@ -76,7 +77,7 @@ which names its owner and independent reviewer.
    and each merge-queue entry uses its own group keyed on the queued head SHA,
    so neither waits behind or is cancelled by a builder run.
 5. After this workflow is independently reviewed and lands through the normal
-   release process, GDP can post one real authorized slice. Confirm the real run
+   release process, Grok 91 can post one real authorized slice. Confirm the real run
    opens a draft into `verdant-grow-diary` and that its locked-path check passes.
 
 The workflow also accepts `ANTHROPIC_API_KEY` as an alternative when no OAuth
@@ -139,7 +140,9 @@ when its text:
   without the trailing `;`, across a line break (`supabase\n  .auth`), and through
   parentheses, `!`, `as T` or `satisfies T` (`(supabase.auth as any).signOut()`),
   including with `//` or `/* */` comments inside the call chain
-  (`supabase.auth /* c */ .signOut()`).
+  (`supabase.auth /* c */ .signOut()`), a cast to any one-line type
+  (`as Foo<Bar<Baz>>`, `as (x: A) => B`, `as import("x").T`) and `\u`/`\x`
+  escapes (`supabase.\u0061uth`, `"action\x5fqueue"`).
   `mfa.*` locks reads such as `mfa.listFactors()` too. A `getSession()` or
   `getUser()` used only for the user ID doesn't lock, because RLS is the real
   boundary;
@@ -190,7 +193,9 @@ Comments are handled by also matching the text with comments blanked out, once
 through a small JavaScript lexer (strings, regex literals and template literals
 are skipped, and the code inside a template's `${…}` is lexed as code) and once
 treating every `//` and `/*` as a comment. A lock found in the raw text or either
-stripped version counts, so stripping can only add locks. The lexer guesses
+stripped version counts, so stripping can only add locks. The same checks also run on a copy with
+`\uXXXX`, `\u{…}` and `\xXX` escapes decoded; legacy octal escapes and names built
+at runtime (`String.fromCharCode`) are not decoded. The lexer guesses
 regex literals from the previous token and gives up on one longer than 200
 characters, so a construction that fools both stripped versions is still
 possible.
@@ -284,8 +289,8 @@ no-credential exit, locked-path policy and workflow syntax. A real Claude trigge
 Max model access, draft creation, and automatic review routing remain
 **NOT_MEASURED** until Matthew adds the secret and a real `@claude` run opens a
 draft (no GitHub App is needed). Whether the bubblewrap gate passes on
-`ubuntu-latest` is also measured only by that first real run. GDP owns its routing/stall handling and the #1767
-ownership follow-up; this slice provides the entry point and instructions.
+`ubuntu-latest` is also measured only by that first real run. Grok 91 owns its routing/stall handling (formerly GDP's, with the #1767
+ownership follow-up); this slice provides the entry point and instructions.
 
 The repository's existing `required-check-audit` workflow is a post-merge audit
 of deploy-branch commits. It requires an associated merged PR, so its merge audit

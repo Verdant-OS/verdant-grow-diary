@@ -250,7 +250,7 @@ const BROWSER_ROUTES: readonly BrowserRoute[] = [
     routePattern: "/dashboard",
     path: dashboardPath(),
     heading: "Dashboard",
-    readySelector: '[data-testid="dashboard-daily-grow-check-entry"]',
+    readySelector: '[data-testid="dashboard-ready"]',
     criticalOperatingLoop: true,
   },
   {

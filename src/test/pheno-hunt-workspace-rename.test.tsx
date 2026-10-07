@@ -264,4 +264,29 @@ describe("PhenoHuntWorkspace rename (#551)", () => {
       expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Blue Dream Hunt"),
     );
   });
+  it("renaming back to the loaded name before a reload leaves no stale override (#551 Codex P2)", async () => {
+    updatePhenoHuntSetup.mockResolvedValue(undefined);
+    const { rerenderState } = renderAt({});
+    submitRename("Renamed B");
+    await waitFor(() => expect(screen.queryByTestId("pheno-hunt-rename-input")).toBeNull());
+    submitRename("Blue Dream Hunt");
+    await waitFor(() => expect(screen.queryByTestId("pheno-hunt-rename-input")).toBeNull());
+    // Another session later renames the hunt to "Renamed B" again.
+    rerenderState({ hunt: { id: "h1", name: "Renamed B", growId: "g1", tentId: "t1" } });
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Renamed B"),
+    );
+  });
+
+  it("another session's different name retires the override (#551 Codex P2)", async () => {
+    updatePhenoHuntSetup.mockResolvedValue(undefined);
+    const { rerenderState } = renderAt({});
+    submitRename("Renamed B");
+    await waitFor(() => expect(screen.queryByTestId("pheno-hunt-rename-input")).toBeNull());
+    rerenderState({ hunt: { id: "h1", name: "Renamed C", growId: "g1", tentId: "t1" } });
+    rerenderState({ hunt: { id: "h1", name: "Blue Dream Hunt", growId: "g1", tentId: "t1" } });
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Blue Dream Hunt"),
+    );
+  });
 });

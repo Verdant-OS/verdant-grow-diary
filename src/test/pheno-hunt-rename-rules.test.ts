@@ -133,3 +133,20 @@ describe("retireConfirmedHuntNameOverride (#551 Codex P2: retire once confirmed)
     expect(retireConfirmedHuntNameOverride(map, null)).toBe(map);
   });
 });
+
+describe("retireConfirmedHuntNameOverride: any authoritative name retires (#551 Codex P2)", () => {
+  it("drops the override when the row shows a name outside its stale names", () => {
+    const b = nextHuntNameOverride(null, "hunt-a", "A", "B");
+    expect(retireConfirmedHuntNameOverride({ "hunt-a": b }, { id: "hunt-a", name: "C" })).toEqual(
+      {},
+    );
+  });
+
+  it("drops an override inserted while the row already shows its value", () => {
+    const b = nextHuntNameOverride(null, "hunt-a", "A", "B");
+    const backToA = nextHuntNameOverride(b, "hunt-a", "A", "A");
+    expect(
+      retireConfirmedHuntNameOverride({ "hunt-a": backToA }, { id: "hunt-a", name: "A" }),
+    ).toEqual({});
+  });
+});

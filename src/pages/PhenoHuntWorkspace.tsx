@@ -1550,7 +1550,9 @@ export default function PhenoHuntWorkspace() {
     setHuntNameLocal((prev) =>
       retireConfirmedHuntNameOverride(prev, { id: huntRowId, name: huntRowName }),
     );
-  }, [huntRowId, huntRowName]);
+    // huntNameLocal too: an override saved while the row already shows its
+    // value must retire without waiting for the row to change.
+  }, [huntRowId, huntRowName, huntNameLocal]);
   const effectiveHuntName =
     huntNameOverrideValue(ws.hunt ? (huntNameLocal[ws.hunt.id] ?? null) : null, ws.hunt) ??
     ws.hunt?.name ??

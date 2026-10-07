@@ -96,10 +96,11 @@ export function nextHuntNameOverride(
 }
 
 /**
- * Drop a hunt's override once its loaded row shows the override's value: the
- * row has confirmed it, so the accumulated stale names must not revive it if
- * another session later renames the hunt back (#551 Codex P2). Returns the
- * same map when nothing changes.
+ * Drop a hunt's override as soon as it no longer applies: the loaded row shows
+ * anything other than one of its stale names (the override's own value once
+ * the row confirms it, or another session's rename). A retired override can
+ * never be revived by a later rename back to one of its stale names (#551
+ * Codex P2s). Returns the same map when nothing changes.
  */
 export function retireConfirmedHuntNameOverride(
   overrides: Readonly<Record<string, HuntNameOverride>>,
@@ -107,7 +108,7 @@ export function retireConfirmedHuntNameOverride(
 ): Readonly<Record<string, HuntNameOverride>> {
   if (!hunt) return overrides;
   const override = overrides[hunt.id];
-  if (!override || override.value !== hunt.name) return overrides;
+  if (!override || huntNameOverrideValue(override, hunt) !== null) return overrides;
   const { [hunt.id]: _retired, ...rest } = overrides;
   return rest;
 }

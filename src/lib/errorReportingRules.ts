@@ -92,6 +92,10 @@ const BEARER_PATTERN = /\b(bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi;
 const SENSITIVE_PARAM_PATTERN =
   /\b(access_token|refresh_token|id_token|token|code|apikey|api_key|key|secret|password|authorization|session|sb-[a-z0-9-]+-auth-token)=([^&\s"'#]+)/gi;
 
+/** The same credential keys in JSON form (`"refresh_token":"…"`), as a serialised session would carry them. Keeps the key, drops the value. */
+const SENSITIVE_JSON_PATTERN =
+  /("(?:access_token|refresh_token|id_token|provider_token|provider_refresh_token|token|code|apikey|api_key|key|secret|password|authorization|session)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi;
+
 export const REDACTED = "[redacted]";
 
 /** Removes e-mail addresses, JWT/bearer tokens and credential-looking query values from free text. Idempotent. */
@@ -99,6 +103,7 @@ export function scrubText(value: unknown): string {
   if (value == null) return "";
   const text = typeof value === "string" ? value : safeString(value);
   return text
+    .replace(SENSITIVE_JSON_PATTERN, (_m, prefix: string) => `${prefix}"${REDACTED}"`)
     .replace(SENSITIVE_PARAM_PATTERN, (_m, key: string) => `${key}=${REDACTED}`)
     .replace(BEARER_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
     .replace(JWT_PATTERN, REDACTED)
@@ -138,7 +143,10 @@ export interface ReportableRequest {
 export interface ReportableException {
   type?: string;
   value?: string;
-  stacktrace?: { frames?: Array<{ filename?: string; abs_path?: string }> };
+  mechanism?: { data?: unknown };
+  stacktrace?: {
+    frames?: Array<{ filename?: string; abs_path?: string; vars?: unknown }>;
+  };
 }
 
 export interface ReportableBreadcrumb {
@@ -149,6 +157,9 @@ export interface ReportableBreadcrumb {
 
 export interface ReportableEvent {
   message?: string;
+  logentry?: { message?: string; formatted?: string; params?: unknown };
+  transaction?: string;
+  contexts?: Record<string, unknown>;
   request?: ReportableRequest;
   user?: unknown;
   server_name?: string;
@@ -161,6 +172,9 @@ export interface ReportableEvent {
 /** Breadcrumb categories that may carry page content or credentials; dropped outright. */
 export const DROPPED_BREADCRUMB_CATEGORIES: ReadonlyArray<string> = ["console", "ui.input"];
 
+/** Device/runtime contexts that carry no identity. Every other context (e.g. `response`, `state`, custom) is dropped. */
+export const ALLOWED_EVENT_CONTEXTS: ReadonlyArray<string> = ["browser", "os", "device", "runtime"];
+
 /**
  * Scrubs an outgoing event in place-safe fashion (returns a new object). Returns
  * null for null/undefined so it can be used directly as Sentry's `beforeSend`.
@@ -171,6 +185,22 @@ export function scrubEvent<T extends ReportableEvent | null | undefined>(event: 
   delete next.user;
   delete next.server_name;
   if (typeof next.message === "string") next.message = scrubText(next.message);
+  if (next.logentry) {
+    const logentry: NonNullable<ReportableEvent["logentry"]> = {};
+    if (typeof next.logentry.message === "string")
+      logentry.message = scrubText(next.logentry.message);
+    if (typeof next.logentry.formatted === "string")
+      logentry.formatted = scrubText(next.logentry.formatted);
+    next.logentry = logentry;
+  }
+  if (typeof next.transaction === "string") next.transaction = scrubUrl(next.transaction);
+  if (next.contexts) {
+    const contexts: Record<string, unknown> = {};
+    for (const name of ALLOWED_EVENT_CONTEXTS) {
+      if (next.contexts[name] !== undefined) contexts[name] = next.contexts[name];
+    }
+    next.contexts = contexts;
+  }
   if (next.request) {
     const request: ReportableRequest = {};
     if (typeof next.request.url === "string") request.url = scrubUrl(next.request.url);
@@ -181,12 +211,14 @@ export function scrubEvent<T extends ReportableEvent | null | undefined>(event: 
       ...next.exception,
       values: next.exception.values.map((ex) => ({
         ...ex,
+        ...(typeof ex.type === "string" && { type: scrubText(ex.type) }),
         ...(typeof ex.value === "string" && { value: scrubText(ex.value) }),
+        ...(ex.mechanism && { mechanism: withoutKey(ex.mechanism, "data") }),
         ...(ex.stacktrace?.frames && {
           stacktrace: {
             ...ex.stacktrace,
             frames: ex.stacktrace.frames.map((frame) => ({
-              ...frame,
+              ...withoutKey(frame, "vars"),
               ...(typeof frame.filename === "string" && { filename: scrubUrl(frame.filename) }),
               ...(typeof frame.abs_path === "string" && { abs_path: scrubUrl(frame.abs_path) }),
             })),
@@ -201,6 +233,7 @@ export function scrubEvent<T extends ReportableEvent | null | undefined>(event: 
       .filter((crumb): crumb is ReportableBreadcrumb => crumb !== null);
   }
   if (next.extra) next.extra = scrubRecord(next.extra);
+  if (next.tags) next.tags = scrubRecord(next.tags);
   return next as T;
 }
 
@@ -229,12 +262,21 @@ export function scrubBreadcrumb<T extends ReportableBreadcrumb | null | undefine
   return next as T;
 }
 
+/** Keeps strings (scrubbed), finite numbers and booleans. Objects and arrays are dropped: they can carry rows, bodies or session state. */
 function scrubRecord(record: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(record)) {
-    out[key] = typeof value === "string" ? scrubText(value) : value;
+    if (typeof value === "string") out[key] = scrubText(value);
+    else if (typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value)))
+      out[key] = value;
   }
   return out;
+}
+
+function withoutKey<T extends object>(value: T, key: string): T {
+  const copy = { ...value } as Record<string, unknown>;
+  delete copy[key];
+  return copy as T;
 }
 
 // ── Manual capture context ───────────────────────────────────────────────────

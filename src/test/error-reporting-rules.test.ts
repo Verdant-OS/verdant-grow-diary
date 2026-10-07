@@ -267,6 +267,7 @@ describe("errorReportingRules — manual capture", () => {
   });
 });
 
+// @source-scan-justified: "the SDK is never statically imported" and "no replay/tracing/console integration is named" are properties of source text, not of a resolved value; RootErrorComponent is not exported and only renders inside a full TanStack root route. Boundary runtime behaviour is covered in error-reporter-init-and-privacy.test.tsx.
 describe("errorReportingRules — wiring", () => {
   const repoRoot = join(__dirname, "..", "..");
 
@@ -288,12 +289,12 @@ describe("errorReportingRules — wiring", () => {
   it("both error surfaces report, and the root route initialises the reporter", () => {
     const root = readFileSync(join(repoRoot, "src", "routes", "__root.tsx"), "utf8");
     expect(root).toMatch(/initErrorReporter\(\)/);
-    expect(root).toMatch(/reportError\(error, \{ source: "route_error_component"/);
+    expect(root).toMatch(/reportErrorWhenReady\(error, \{\s*source: "route_error_component"/);
     const boundary = readFileSync(
       join(repoRoot, "src", "components", "RootErrorBoundary.tsx"),
       "utf8",
     );
-    expect(boundary).toMatch(/source: "react_error_boundary"/);
+    expect(boundary).toMatch(/reportErrorWhenReady\(error, \{\s*source: "react_error_boundary"/);
   });
 
   it("documents the ingest origins the report-only CSP must allow", () => {

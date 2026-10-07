@@ -7,9 +7,14 @@
  * this file and pays nothing at runtime.
  *
  * Contract:
- * - `initErrorReporter()` is idempotent and safe to call on every render.
+ * - `initErrorReporter()` is idempotent and safe to call on every render. It
+ *   returns a promise that settles once the reporter is ready, disabled or
+ *   failed; it never rejects.
  * - `reportError()` is a no-op until the SDK is ready; nothing is queued, so a
  *   burst of errors before init can never be replayed later out of context.
+ * - `reportErrorWhenReady()` is for the two error surfaces. They can fire before
+ *   (or instead of) the root effect that normally starts the reporter, so they
+ *   start it themselves and report the one error they caught once it settles.
  * - Reporting is independent of the analytics-consent banner on purpose: it
  *   carries no identity and exists to keep the product working, not to measure
  *   growers. See the privacy posture in `errorReportingRules.ts`.
@@ -54,15 +59,19 @@ function currentDecision(): ErrorReportingDecision {
   });
 }
 
-/** Idempotent. Loads and initialises the SDK once when the rules allow it. */
+/**
+ * Idempotent. Loads and initialises the SDK once when the rules allow it.
+ * Resolves when the reporter is ready, disabled or failed; never rejects.
+ */
 export function initErrorReporter(
   loadSdk: () => Promise<SentryModule> = () => import("@sentry/browser"),
-): void {
-  if (state.status !== "idle") return;
+): Promise<void> {
+  if (state.status === "loading") return state.promise;
+  if (state.status !== "idle") return Promise.resolve();
   const decision = currentDecision();
   if (!decision.enabled) {
     state = { status: "disabled", decision };
-    return;
+    return Promise.resolve();
   }
   const promise = loadSdk()
     .then((sentry) => {
@@ -91,6 +100,7 @@ export function initErrorReporter(
       state = { status: "failed" };
     });
   state = { status: "loading", decision, promise };
+  return promise;
 }
 
 /**
@@ -104,5 +114,23 @@ export function reportError(error: unknown, context?: ManualReportContext): void
     state.sentry.captureException(normalizeCaughtError(error), { tags, extra });
   } catch {
     // Swallow: reporting must not create a second failure.
+  }
+}
+
+/**
+ * Starts the reporter if needed, then reports this one error. Used by the root
+ * error boundary and the route error component, which can run before the root
+ * effect initialises the reporter (or, for a root-route error, without that
+ * effect ever running). Only the caught error waits; nothing else is queued.
+ */
+export function reportErrorWhenReady(
+  error: unknown,
+  context?: ManualReportContext,
+  loadSdk?: () => Promise<SentryModule>,
+): Promise<void> {
+  try {
+    return initErrorReporter(loadSdk).then(() => reportError(error, context));
+  } catch {
+    return Promise.resolve();
   }
 }

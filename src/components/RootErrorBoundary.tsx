@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { reportError } from "@/lib/errorReporter";
+import { reportErrorWhenReady } from "@/lib/errorReporter";
 
 /**
  * Top-level error boundary.
@@ -13,9 +13,11 @@ import { reportError } from "@/lib/errorReporter";
  * It never claims anything about data integrity it cannot guarantee; it only
  * reports that the page hit an unexpected error and offers a reload.
  *
- * The one import besides React is `reportError`, which is a no-op unless the
- * production reporter already initialised (the SDK itself is lazy-loaded
- * elsewhere), so this boundary still renders when a chunk or provider failed.
+ * The one import besides React is `reportErrorWhenReady`. It is inert unless
+ * the production reporter is enabled, and the SDK is only ever lazy-loaded, so
+ * this boundary still renders when a chunk or provider failed. A descendant can
+ * throw before the root effect has started the reporter, so it waits for
+ * initialisation instead of dropping the report.
  */
 interface Props {
   children: ReactNode;
@@ -41,7 +43,7 @@ export default class RootErrorBoundary extends Component<Props, State> {
     if (typeof g === "function") {
       g("event", "exception", { description: String(error?.message ?? error), fatal: false });
     }
-    reportError(error, {
+    void reportErrorWhenReady(error, {
       source: "react_error_boundary",
       route: typeof window === "undefined" ? undefined : window.location.pathname,
       handled: false,

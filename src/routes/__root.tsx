@@ -28,7 +28,7 @@ import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
 import FunnelEventDbSink from "@/components/FunnelEventDbSink";
 import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
-import { initErrorReporter, reportError } from "@/lib/errorReporter";
+import { initErrorReporter, reportErrorWhenReady } from "@/lib/errorReporter";
 import { renderErrorPage } from "@/lib/error-page";
 import appCss from "@/styles.css?url";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "@/lib/build/siteSoftwareApplicationJsonLd";
@@ -130,10 +130,21 @@ function RootErrorComponent({ error }: { error: Error }) {
   const pathname = useRouterState({
     select: (state) => state.resolvedLocation?.pathname ?? state.location.pathname,
   });
-  if (!isGrowHelpToolkitPath(pathname)) {
+  const isToolkit = isGrowHelpToolkitPath(pathname);
+  if (!isToolkit) {
     reportLovableError(error);
-    reportError(error, { source: "route_error_component", route: pathname, handled: false });
   }
+  // A root-route error renders this component instead of ApplicationRootComponent,
+  // so the root effect that starts the reporter may never run. Report from an
+  // effect (once per error, not on every re-render) after starting it here.
+  useEffect(() => {
+    if (isToolkit) return;
+    void reportErrorWhenReady(error, {
+      source: "route_error_component",
+      route: pathname,
+      handled: false,
+    });
+  }, [error, isToolkit, pathname]);
   return (
     <RootDocument>
       <div
@@ -233,7 +244,7 @@ function ApplicationRootComponent() {
   // Client-only. Inert unless VITE_SENTRY_DSN is set at build time and the
   // rules in errorReportingRules.ts allow this host.
   useEffect(() => {
-    initErrorReporter();
+    void initErrorReporter();
   }, []);
   return (
     <RootDocument>

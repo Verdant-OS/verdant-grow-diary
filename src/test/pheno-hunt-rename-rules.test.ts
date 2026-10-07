@@ -8,6 +8,7 @@ import {
   PHENO_HUNT_NAME_MAX_LENGTH,
   huntScopedOverrideValue,
   huntNameOverrideValue,
+  nextHuntNameOverride,
   validatePhenoHuntRename,
 } from "@/lib/phenoHuntRenameRules";
 
@@ -60,7 +61,7 @@ describe("huntScopedOverrideValue (#551 review P2)", () => {
 });
 
 describe("huntNameOverrideValue (#551 CodeRabbit: reconcile on reload)", () => {
-  const override = { huntId: "hunt-a", value: "Renamed A", baseName: "Old A" };
+  const override = { huntId: "hunt-a", value: "Renamed A", staleNames: ["Old A"] };
   it("wins while the loaded row still shows the pre-rename name", () => {
     expect(huntNameOverrideValue(override, { id: "hunt-a", name: "Old A" })).toBe("Renamed A");
   });
@@ -72,5 +73,42 @@ describe("huntNameOverrideValue (#551 CodeRabbit: reconcile on reload)", () => {
     expect(huntNameOverrideValue(override, { id: "hunt-b", name: "Old A" })).toBeNull();
     expect(huntNameOverrideValue(override, null)).toBeNull();
     expect(huntNameOverrideValue(null, { id: "hunt-a", name: "Old A" })).toBeNull();
+  });
+});
+
+describe("nextHuntNameOverride (#551 Codex P2: repeated renames)", () => {
+  it("a first rename treats the loaded row name as stale", () => {
+    const o = nextHuntNameOverride(null, "hunt-a", "Old A", "First");
+    expect(o).toEqual({ huntId: "hunt-a", value: "First", staleNames: ["Old A"] });
+  });
+
+  it("a second rename before any reload keeps every replaced name stale", () => {
+    const first = nextHuntNameOverride(null, "hunt-a", "Old A", "First");
+    const second = nextHuntNameOverride(first, "hunt-a", "Old A", "Second");
+    expect(second.value).toBe("Second");
+    // A reload that returns the first persisted name must not revert the second.
+    expect(huntNameOverrideValue(second, { id: "hunt-a", name: "First" })).toBe("Second");
+    expect(huntNameOverrideValue(second, { id: "hunt-a", name: "Old A" })).toBe("Second");
+    // The row catching up, or any other name, is authoritative again.
+    expect(huntNameOverrideValue(second, { id: "hunt-a", name: "Second" })).toBeNull();
+    expect(huntNameOverrideValue(second, { id: "hunt-a", name: "Elsewhere" })).toBeNull();
+  });
+
+  it("an override for another hunt is not carried over", () => {
+    const a = nextHuntNameOverride(null, "hunt-a", "Old A", "First");
+    expect(nextHuntNameOverride(a, "hunt-b", "Old B", "B")).toEqual({
+      huntId: "hunt-b",
+      value: "B",
+      staleNames: ["Old B"],
+    });
+  });
+
+  it("is deterministic and never lists the new value as stale", () => {
+    const first = nextHuntNameOverride(null, "hunt-a", "Old A", "First");
+    const back = nextHuntNameOverride(first, "hunt-a", "Old A", "Old A");
+    expect(back.staleNames).not.toContain("Old A");
+    expect(nextHuntNameOverride(first, "hunt-a", "Old A", "Second")).toEqual(
+      nextHuntNameOverride(first, "hunt-a", "Old A", "Second"),
+    );
   });
 });

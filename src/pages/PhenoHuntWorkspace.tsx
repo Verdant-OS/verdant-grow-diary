@@ -76,6 +76,7 @@ import PhenoHuntRenameControl from "@/components/PhenoHuntRenameControl";
 import { usePhenoHuntRenameSession } from "@/hooks/usePhenoHuntRenameSession";
 import {
   huntNameOverrideValue,
+  nextHuntNameOverride,
   huntScopedOverrideValue,
   type HuntNameOverride,
   type HuntScopedOverride,
@@ -1594,10 +1595,13 @@ export default function PhenoHuntWorkspace() {
   // Pro entitlement policy filter blocked writes silently otherwise).
   const handleRenameHunt = async (name: string): Promise<boolean> => {
     if (!canWrite || !ws.hunt?.id) return false;
-    const { id: huntId, name: baseName } = ws.hunt;
+    const { id: huntId, name: rowName } = ws.hunt;
     try {
       await updatePhenoHuntSetup({ huntId, name });
-      setHuntNameLocal((prev) => ({ ...prev, [huntId]: { huntId, value: name, baseName } }));
+      setHuntNameLocal((prev) => ({
+        ...prev,
+        [huntId]: nextHuntNameOverride(prev[huntId] ?? null, huntId, rowName, name),
+      }));
       return true;
     } catch {
       return false;

@@ -8,9 +8,10 @@
  * draft the grower submitted (#551 Codex P2s).
  *
  * The session is scoped to `huntId`: the workspace route isn't keyed by hunt,
- * so when the page moves to another hunt the editor starts idle there, and a
- * save still in flight for the previous hunt settles only into that hunt's
- * (now hidden) session.
+ * so when the page moves to another hunt the editor starts idle there. One
+ * save runs at a time across the page: while it is in flight no hunt can open
+ * or save an editor, so the session that started it is still there when it
+ * settles, even after the grower visits another hunt and comes back.
  */
 import { useCallback, useRef, useState } from "react";
 
@@ -40,23 +41,22 @@ export function usePhenoHuntRenameSession(
 ): PhenoHuntRenameSession {
   const scope = huntId ?? null;
   const [state, setState] = useState<SessionState>({ huntId: scope, ...IDLE });
-  // Hunts whose save is in flight (the ref guards double submits).
-  const [savingHuntIds, setSavingHuntIds] = useState<ReadonlySet<string>>(() => new Set());
-  const savingRef = useRef(new Set<string>());
+  // The one save in flight, page-wide (the ref guards double submits).
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const current = state.huntId === scope ? state : { huntId: scope, ...IDLE };
-  const saving = scope !== null && savingHuntIds.has(scope);
 
   const open = useCallback(
     (currentName: string) => {
-      if (scope !== null && savingRef.current.has(scope)) return;
+      if (savingRef.current) return;
       setState({ huntId: scope, editing: true, draft: currentName, failed: false });
     },
     [scope],
   );
 
   const cancel = useCallback(() => {
-    if (scope !== null && savingRef.current.has(scope)) return;
+    if (savingRef.current) return;
     setState({ huntId: scope, ...IDLE });
   }, [scope]);
 
@@ -71,10 +71,10 @@ export function usePhenoHuntRenameSession(
 
   const save = useCallback(
     async (name: string) => {
-      if (scope === null || savingRef.current.has(scope)) return;
+      if (scope === null || savingRef.current) return;
       const owner = scope;
-      savingRef.current.add(owner);
-      setSavingHuntIds(new Set(savingRef.current));
+      savingRef.current = true;
+      setSaving(true);
       setState((prev) => (prev.huntId === owner ? { ...prev, failed: false } : prev));
       let ok = false;
       try {
@@ -82,8 +82,8 @@ export function usePhenoHuntRenameSession(
       } catch {
         ok = false;
       } finally {
-        savingRef.current.delete(owner);
-        setSavingHuntIds(new Set(savingRef.current));
+        savingRef.current = false;
+        setSaving(false);
       }
       // Settle only into the session that started the save.
       setState((prev) => {

@@ -60,14 +60,15 @@ export function huntScopedOverrideValue<T>(
 }
 
 /**
- * An optimistic hunt name, plus the row's name when the rename was saved.
- * The override only stands in while the loaded row still shows `baseName`:
- * once a reload returns any other name (this rename, or a later one from
- * another session), the row is authoritative again. No clock involved, so a
- * stale in-flight load can't flash the old name back (#551 CodeRabbit).
+ * An optimistic hunt name, plus every name it replaced. The override stands
+ * in only while the loaded row still shows one of `staleNames`: the original
+ * row name, or an earlier rename a slow reload can still return. Once the row
+ * shows this value, or any other name (another session's rename), the row is
+ * authoritative again. No clock involved, so a stale in-flight load can't
+ * flash an old name back (#551 CodeRabbit, Codex P2).
  */
 export interface HuntNameOverride extends HuntScopedOverride<string> {
-  readonly baseName: string;
+  readonly staleNames: readonly string[];
 }
 
 export function huntNameOverrideValue(
@@ -75,7 +76,23 @@ export function huntNameOverrideValue(
   hunt: { readonly id: string; readonly name: string } | null | undefined,
 ): string | null {
   if (!override || !hunt || override.huntId !== hunt.id) return null;
-  return override.baseName === hunt.name ? override.value : null;
+  return override.staleNames.includes(hunt.name) ? override.value : null;
+}
+
+/** The override after a confirmed rename to `value` of the hunt whose loaded row shows `rowName`. */
+export function nextHuntNameOverride(
+  previous: HuntNameOverride | null,
+  huntId: string,
+  rowName: string,
+  value: string,
+): HuntNameOverride {
+  const carried =
+    previous && previous.huntId === huntId ? [...previous.staleNames, previous.value] : [];
+  const staleNames: string[] = [];
+  for (const name of [rowName, ...carried]) {
+    if (name !== value && !staleNames.includes(name)) staleNames.push(name);
+  }
+  return { huntId, value, staleNames };
 }
 
 export function phenoHuntRenameHint(result: PhenoHuntRenameResult): string {

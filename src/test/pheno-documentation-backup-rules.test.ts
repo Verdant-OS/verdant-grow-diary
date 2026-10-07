@@ -149,12 +149,39 @@ describe("parsePhenoDocumentationBackup — untrusted file", () => {
     expect(listed[0].values.phenotype.fields.unique_traits).toBe(long);
   });
 
+  it("restores an exported blank record and a diary-only section (#552 Codex re-review)", () => {
+    const exported = buildPhenoDocumentationBackup({
+      records: listPhenoDocRecordsInStorage(
+        store({ [phenoDocStorageKey("candidate", "p1", U)]: JSON.stringify(notes("")) }),
+        U,
+        "candidate",
+      ),
+      exportedAt: "x",
+    });
+    const blank = parsePhenoDocumentationBackup(JSON.stringify(exported));
+    expect(blank.ok && blank.records.map((r) => r.recordId)).toEqual(["p1"]);
+    const diaryOnly = parsePhenoDocumentationBackup(
+      valid([
+        { recordType: "candidate", recordId: "p2", values: { phenotype: { diaryEntryId: "d1" } } },
+      ]),
+    );
+    expect(diaryOnly.ok && diaryOnly.records[0].values.phenotype.diaryEntryId).toBe("d1");
+  });
+
   it("skips a record whose values are missing or malformed (#552 Codex P2)", () => {
     const bad = [
       { recordType: "candidate", recordId: "p1" },
       { recordType: "candidate", recordId: "p2", values: "x" },
       { recordType: "candidate", recordId: "p3", values: { evil: { fields: {} } } },
       { recordType: "candidate", recordId: "p4", values: [] },
+      { recordType: "candidate", recordId: "p6", values: { phenotype: {} } },
+      { recordType: "candidate", recordId: "p7", values: { phenotype: { fields: "bad" } } },
+      { recordType: "candidate", recordId: "p8", values: { phenotype: { fields: { nope: "x" } } } },
+      {
+        recordType: "candidate",
+        recordId: "p9",
+        values: { phenotype: { fields: { unique_traits: 5 } } },
+      },
     ];
     expect(parsePhenoDocumentationBackup(valid(bad))).toEqual({ ok: false, reason: "empty" });
     const mixed = parsePhenoDocumentationBackup(

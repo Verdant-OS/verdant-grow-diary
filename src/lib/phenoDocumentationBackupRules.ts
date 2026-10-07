@@ -166,13 +166,22 @@ function sanitizeValues(raw: unknown): PhenoDocumentationValues {
 }
 
 /**
- * A restorable record must carry at least one known section as an object.
- * A missing or malformed payload would otherwise sanitize to an all-blank
- * document and overwrite saved notes on restore (#552 Codex P2).
+ * A restorable record must carry at least one known section with real
+ * content: a `fields` object holding a known field as a string, or a valid
+ * diary reference. Anything less (a missing payload, `{ phenotype: {} }`,
+ * `fields: "bad"`) would sanitize to an all-blank document and overwrite
+ * saved notes on restore (#552 Codex P2 + re-review). Exported records always
+ * carry their known fields as strings, so a genuine blank export still passes.
  */
 function hasRestorableValues(raw: unknown): boolean {
   if (!isPlainObject(raw)) return false;
-  return PHENO_DOCUMENTATION_DEFAULTS.some((section) => isPlainObject(raw[section.key]));
+  return PHENO_DOCUMENTATION_DEFAULTS.some((section) => {
+    const s = raw[section.key];
+    if (!isPlainObject(s)) return false;
+    if (typeof s.diaryEntryId === "string" && RECORD_ID_RE.test(s.diaryEntryId)) return true;
+    const fields = s.fields;
+    return isPlainObject(fields) && section.fields.some((f) => typeof fields[f.key] === "string");
+  });
 }
 
 function compareRecords(a: PhenoDocRecord, b: PhenoDocRecord): number {

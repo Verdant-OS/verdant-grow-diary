@@ -26,7 +26,7 @@ const REQUIRED_LOCKFILES = Object.freeze(["bun.lock"]);
 // retiring that lock removes no security floor.
 export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   "@hono/node-server": "2.0.10",
-  "@modelcontextprotocol/sdk": "1.30.0",
+  "@modelcontextprotocol/sdk": "1.31.0",
   hono: "4.13.7",
   vite: "6.4.3",
   postcss: "8.5.18",
@@ -41,6 +41,10 @@ export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   esbuild: "0.28.1",
   "brace-expansion": "1.1.21",
   undici: "6.28.1",
+  "proxy-addr": "2.0.8",
+  seroval: "1.6.3",
+  "shell-quote": "1.11.0",
+  "source-map-js": "1.2.2",
 });
 // Vitest 4 uses the root Vite/Rolldown graph and no longer brings in Rollup.
 // Absence is safe; every copy must still be patched if it returns transitively.

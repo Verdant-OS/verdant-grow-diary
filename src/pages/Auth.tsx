@@ -160,6 +160,8 @@ export default function Auth() {
     try {
       // redirect_uri MUST be a same-origin public URL, not a protected route.
       // The one-shot destination is applied after Supabase reports a session.
+      // Signup analytics wait for that session: this click is also a returning
+      // Google sign-in, and the browser leaves the page before a user exists.
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
       });

@@ -10,7 +10,7 @@ known risks, and the safe path forward.
 tents, real sensors, real diary entries, real photos, real environmental
 intelligence and AI-assisted guidance for cultivators.
 
-**Leads is *not* part of Grow OS.** Leads is an internal **admin / operator
+**Leads is _not_ part of Grow OS.** Leads is an internal **admin / operator
 only** module for business development, partner tracking, and outreach
 pipeline visibility. It lives at `/admin/leads` (with `/leads` as a
 back-compat alias) and is intentionally **separate from Grow OS**. Leads
@@ -21,31 +21,35 @@ or public-companion data. See `docs/leads-command-center.md`.
 
 ### Real Supabase-backed (live data)
 
-| Area / Hook                                  | Backing table / bucket                                     |
-| -------------------------------------------- | ---------------------------------------------------------- |
-| `src/components/QuickLog.tsx`                | `public.diary_entries` (insert) + `grows` (stage update)   |
-| Diary photo uploads (`QuickLog`)             | Storage bucket **`diary-photos`** (real upload)            |
-| `src/hooks/use-diary-entries.ts`             | `public.diary_entries` (select)                            |
-| `src/hooks/use-plants.ts`                    | `public.plants` (select, non-archived)                     |
-| `src/hooks/use-tents.ts`                     | `public.tents` (select, non-archived)                      |
-| `src/hooks/use-sensor-readings.ts`           | `public.sensor_readings`                                   |
-| `src/hooks/useInsertSensorReading.ts`        | `public.sensor_readings` (insert)                          |
-| `src/hooks/useLatestSensorSnapshot.ts`       | `public.sensor_readings`                                   |
-| `src/hooks/useEnvironmentTrends.ts`          | `public.sensor_readings` / environment data                |
-| `src/hooks/useGrowTargets.ts`                | `public.grow_targets`                                      |
-| `src/hooks/useDashboardScopedData.ts`        | real grow-scoped queries                                   |
-| `src/hooks/useGrowDetailData.ts`             | real grow detail queries                                   |
-| `src/hooks/useAlertsList.ts` / `useAlertEvents.ts` | `public.alerts` / `public.alert_events`              |
-| `src/hooks/useScopedGrow.ts`                 | `public.grows` (via store)                                 |
-| `src/store/grows.tsx`                        | `public.grows`                                             |
-| `src/store/auth.tsx`                         | Supabase Auth                                              |
+| Area / Hook                                        | Backing table / bucket                                   |
+| -------------------------------------------------- | -------------------------------------------------------- |
+| `src/components/QuickLog.tsx`                      | `public.diary_entries` (insert) + `grows` (stage update) |
+| Diary photo uploads (`QuickLog`)                   | Storage bucket **`diary-photos`** (real upload)          |
+| `src/hooks/use-diary-entries.ts`                   | `public.diary_entries` (select)                          |
+| `src/hooks/use-plants.ts`                          | `public.plants` (select, non-archived)                   |
+| `src/hooks/use-tents.ts`                           | `public.tents` (select, non-archived)                    |
+| `src/hooks/use-sensor-readings.ts`                 | `public.sensor_readings`                                 |
+| `src/hooks/useInsertSensorReading.ts`              | `public.sensor_readings` (insert)                        |
+| `src/hooks/useLatestSensorSnapshot.ts`             | `public.sensor_readings`                                 |
+| `src/hooks/useEnvironmentTrends.ts`                | `public.sensor_readings` / environment data              |
+| `src/hooks/useGrowTargets.ts`                      | `public.grow_targets`                                    |
+| `src/hooks/useDashboardScopedData.ts`              | real grow-scoped queries                                 |
+| `src/hooks/useGrowDetailData.ts`                   | real grow detail queries                                 |
+| `src/hooks/useAlertsList.ts` / `useAlertEvents.ts` | `public.alerts` / `public.alert_events`                  |
+| `src/hooks/useScopedGrow.ts`                       | `public.grows` (via store)                               |
+| `src/store/grows.tsx`                              | `public.grows`                                           |
+| `src/store/auth.tsx`                               | Supabase Auth                                            |
 
-### Typed event schema present in Supabase (not yet wired to grower UI)
+### Typed event schema present in Supabase
 
 The following typed event tables exist in `public.*` with RLS, validation
-triggers, and (for watering) an RPC, but the grower UI does **not**
-currently write to them — `QuickLog` stores pH/EC/runoff/nutrients/training
-inside `diary_entries.details` jsonb instead:
+triggers, and (for watering) an RPC. _Corrected 2026-10-01 at `ccb38214`:_
+the earlier claim that the grower UI writes none of them is stale. The
+committed `quicklog_save_manual` RPC
+(`supabase/migrations/20260723000000_quicklog_manual_always_mirror_diary.sql`)
+inserts into `grow_events`, `watering_events` and `environment_events` and
+mirrors a `diary_entries` row. Whether the other typed tables are written,
+and which migrations production has applied, was not measured here:
 
 - `public.grow_events` (parent envelope)
 - `public.watering_events` (+ RPC `create_watering_event`)
@@ -57,21 +61,24 @@ inside `diary_entries.details` jsonb instead:
 
 ### Mock / demo surfaces (NOT live)
 
-| File / Surface                                | Source                                                     |
-| --------------------------------------------- | ---------------------------------------------------------- |
-| `src/mock/index.ts`                           | Static fake tents, plants, sensors, cameras, alerts        |
-| `src/hooks/useMockData.ts`                    | React Query wrappers over `src/mock`                       |
-| `src/hooks/useGrowData.ts`                    | Supabase-first but **silently falls back to mock** on empty/error (see §4) |
-| `src/pages/Dashboard.tsx`                     | Uses grow-, alert-, action-, and sensor-backed hooks; AI Insights remains an honest empty state |
-| `src/pages/Sensors.tsx`                       | `useGrowTents` + `useGrowSensorReadings` (mock-fallback); default tent id `"t1"` is a mock id |
-| `src/pages/Plants.tsx`                        | Real plants via `useGrowPlants` but **tent filter chips read mock tents** from `useMockData` |
-| `src/pages/Tents.tsx`                         | `useGrowTents` (mock-fallback) + mock `useSensorReadings`/`usePlants` |
-| `src/pages/TentDetail.tsx`                    | Mock `usePlants` / `useSensorReadings` / `useCameras`      |
-| `src/pages/PlantDetail.tsx`                   | Mock `useTent`                                             |
-| `src/pages/Cameras.tsx`                       | Mock `useCameras` / `useTents`                             |
-| `src/components/AppShell.tsx` (alerts badge)  | Mock `useAlerts` from `useMockData`                        |
-| `src/components/SensorChart.tsx`              | Renders whatever it is given — has no demo/live awareness  |
-| `src/lib/growRepo.ts` / `src/lib/growAdapters.ts` | Adapt between Supabase rows and mock shape (used by `useGrowData`) |
+Re-measured 2026-10-01 at deploy tip `ccb38214` from source. Earlier rows in
+this table described a silent mock fallback and mock-backed pages that no
+longer exist; see §4 for the history.
+
+| File / Surface                                     | Current state                                                                                                                                  |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/mock/index.ts`                                | Static fake tents, plants, sensors, cameras, alerts. Many modules import its **types** (`SensorReading`, `Stage`); those carry no fixture data |
+| `src/hooks/useMockData.ts`                         | React Query wrappers over `src/mock`. No production module imports it                                                                          |
+| `src/hooks/useGrowData.ts`                         | Supabase only, **no mock fallback**: empty reads stay empty, failed tent/plant reads stay React Query errors                                   |
+| `src/lib/growSensorEvidenceRules.ts`               | Labels rows whose source is `demo` as `isDemoData: true` (disclosure, not substitution)                                                        |
+| `src/pages/Dashboard.tsx`                          | Grow-, alert-, action- and sensor-backed hooks; AI Insights remains an honest empty state                                                      |
+| `src/pages/Sensors.tsx`, `Plants.tsx`, `Tents.tsx` | `useGrowTents` / `useGrowPlants` / `useGrowSensorReadings` from `useGrowData`; no mock reads                                                   |
+| `src/pages/TentDetail.tsx`, `PlantDetail.tsx`      | `useGrowTent` / `useGrowPlant(s)` from `useGrowData`; no mock reads                                                                            |
+| `src/components/AppShell.tsx` (alerts badge)       | `useAlertsList({ status: "open" })`, Supabase-backed                                                                                           |
+| `src/components/SensorChart.tsx`                   | Renders whatever it is given; imports only the `SensorReading` type from `src/mock`                                                            |
+| `src/lib/growRepo.ts` / `src/lib/growAdapters.ts`  | Adapt Supabase rows into the shared `src/mock` **types** used by `useGrowData`                                                                 |
+
+There is no `src/pages/Cameras.tsx` and no Cameras route.
 
 The retired `/tasks` URL is a context-preserving redirect to the
 approval-required `/actions` surface. There is no standalone Tasks page,
@@ -93,57 +100,74 @@ The following rules apply to every grower-facing surface:
    - **`Live`** — recent real reading from `public.sensor_readings`
      (source `pi_bridge` or `manual` within freshness window).
    - **`Manual`** — operator-entered real reading.
-   - **`Demo`** — value originated from `src/mock` or a `useGrowData`
-     fallback. Must never be shown without the `Demo` label.
+   - **`Demo`** — value originated from `src/mock` or a `demo` source row.
+     Must never be shown without the `Demo` label.
    - **`Stale`** — real reading older than the freshness window for that
      metric.
    - **`Unavailable`** — no reading exists, or the source is offline.
 5. AI Coach, AI Doctor, alerts, and recommendations must read the label
    and must **not** treat `Demo` or `Stale` as `Live`.
 
-## 4. Current Known Risk
+The canonical stored source vocabulary is the six values in
+`src/lib/sensor/sensorSourceRules.ts` (`live`, `manual`, `csv`, `demo`,
+`stale`, `invalid`); a blank or unknown source normalizes to `invalid`, never
+`live`. The five states above are a display grouping, not a second source
+vocabulary.
 
-**`src/hooks/useGrowData.ts` performs a silent mock fallback.** The helper
-`withFallback(...)` returns `tents`, `plants`, and `sensorReadings` from
-`src/mock/index.ts` whenever the Supabase query errors or returns an empty
-array. Consumers (`Dashboard`, `Plants`, `Tents`, `Sensors`) then render
-the mock rows with no `Demo` label, which means **a new account with no
-data sees fake tents, fake plants, and fake sensor charts that look fully
-live**.
+## 4. Resolved Risk — the `useGrowData` mock fallback
 
-This violates the Live vs Demo contract in §3 and is the **single highest
-risk in the Grow OS surface area today**. It is a known, temporary risk to
-be fixed in the next implementation pass — either by removing the fallback
-entirely or by wrapping results with an `isDemo` flag that every consumer
-must render as a `Demo Data` badge.
+_Corrected 2026-10-01 at deploy tip `ccb38214`._ This section used to say
+that `useGrowData` silently fell back to mock rows on an empty or failed
+read, so a new account would see fake tents, plants and sensor charts with
+no `Demo` label. **That is no longer true.** `src/hooks/useGrowData.ts` now
+states and implements the opposite: empty reads return an empty or null
+value, failed tent and plant reads remain React Query errors, and mock
+fixtures live only behind the separate `useMockData` surface, which no
+production module imports. There is no `withFallback` helper in `src/`.
 
-Until that pass lands, no new feature should depend on `useGrowData`
-returning live data.
+The rule the fallback broke still stands and is still fenced:
+`src/test/grower-sensor-ui-no-mock-data.test.ts` and
+`src/test/dashboard-no-mock-side-panels.test.ts` guard the grower surfaces.
+
+Residual items, measured from source, not from production:
+
+- Plant and alert counts are not telemetry. `deriveTentHealthChip`
+  (`src/lib/tentHealthChip.ts`) therefore never returns a healthy chip:
+  zero open alerts reads as a neutral "No open alerts", and an unknown
+  alert count reads as unknown.
 
 ## 5. Preferred Next Implementation Path
 
-Each step is independently shippable, testable, and reversible. Do them
-in order:
+Each step is independently shippable, testable, and reversible. Status
+notes were added 2026-10-01 at `ccb38214` from source only; none is a
+production measurement.
 
 1. **Add a shared sensor live/demo label helper** (`src/lib/sensorLiveLabel.ts`)
    that returns one of `Live | Manual | Demo | Stale | Unavailable` from a
    reading + source + age, and unit-test all branches.
+   _Status:_ `sensorLiveLabel.ts` was never created. The canonical helpers
+   are in `src/lib/sensor/sensorSourceRules.ts` (see §3).
 2. **Remove or flag the silent mock fallback in `useGrowData`** —
    either drop the fallback or wrap results with `{ data, isDemo }` and
    force every consumer to render a `Demo Data` badge when `isDemo` is
    true.
+   _Status:_ done; the fallback was dropped (§4).
 3. **Add real empty states** for: no grows, no tents, no plants, no diary
    entries, no sensor readings, no photos. Drive them from real Supabase
    results only.
+   _Status:_ not re-verified surface by surface here.
 4. **Prevent AI Coach / AI Doctor from relying on fake or demo context.**
    Add a pure `aiContextSufficiencyRules` helper that inspects the active
    grow's real data and caps AI confidence when context is missing or any
    input is `Demo` / `Stale`.
+   _Status:_ `src/lib/aiContextSufficiencyRules.ts` exists; its coverage
+   was not audited here.
 5. **Connect the typed watering / feeding / photo / observation /
    training / environment event tables to the grower UI.** Migrate
    `QuickLog` from `diary_entries.details` jsonb to typed event inserts
    (e.g. RPC `create_watering_event` for waterings) while keeping
    `diary_entries` as the human-readable timeline.
+   _Status:_ partly done; see §2, "Typed event schema present in Supabase".
 
 Out of scope for this path: schema changes, new tables, migrations,
 service_role usage, outbound messaging, exports, scheduled jobs, Leads

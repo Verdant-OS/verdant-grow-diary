@@ -217,21 +217,16 @@ function harnessExemptions(): Record<string, { class: string; reason: string }> 
     "Runtime harness needing a live database and a service-role key; no workflow invokes it. Deferred to P5, which cannot simply append all of them — src/test/genetics-propagation-rls-harness-static.test.ts pins that test:security-db-local must NOT list the genetics harness.";
   const out: Record<string, { class: string; reason: string }> = {};
   for (const file of [
-    "scripts/run-action-queue-rls-harness.ts",
     "scripts/run-ai-credit-grow-scope-integrity-harness.ts",
     "scripts/run-ai-credit-pack-portability-harness.ts",
-    "scripts/run-ai-credits-rls-harness.ts",
     "scripts/run-ai-doctor-review-completion-rls-harness.ts",
     "scripts/run-ai-doctor-review-evidence-receipt-rls-harness.ts",
-    "scripts/run-billing-rls-harness.ts",
     "scripts/run-free-creation-caps-rls-harness.ts",
     "scripts/run-genetics-propagation-rls-harness.ts",
     "scripts/run-paid-launch-proof-harness.ts",
     "scripts/run-pheno-candidate-number-rls-harness.ts",
     "scripts/run-quicklog-revisions-rls-harness.ts",
     "scripts/run-sensor-history-read-cap-rls-harness.ts",
-    "scripts/run-staff-grant-trigger-harness.ts",
-    "scripts/run-staff-role-rls-harness.ts",
     "scripts/run-verdant-storage-rls-harness.ts",
   ]) {
     out[file] = { class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE, reason };
@@ -310,7 +305,7 @@ describe("test execution manifest — every committed test runs, or says why not
       byClass[entry.class] = (byClass[entry.class] ?? 0) + 1;
     }
     expect(byClass).toEqual({
-      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 25,
+      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 20,
       [EXEMPTION_CLASS.NOT_HERMETIC]: 8,
       [EXEMPTION_CLASS.RED_WHEN_RUN]: 2,
       [EXEMPTION_CLASS.AWAITING_DECISION]: 1,

@@ -45,6 +45,21 @@ describe("errorReporter — initialisation race", () => {
     __resetErrorReporterForTests();
   });
 
+  it("removes the BrowserSession default integration, whose session envelopes bypass beforeSend", async () => {
+    enableProductionReporter();
+    await initErrorReporter(async () => sdk as never);
+    const options = sdk.init.mock.calls[0]?.[0] as {
+      integrations?: (defaults: Array<{ name: string }>) => Array<{ name: string }>;
+    };
+    expect(typeof options.integrations).toBe("function");
+    const kept = options.integrations!([
+      { name: "GlobalHandlers" },
+      { name: "BrowserSession" },
+      { name: "Dedupe" },
+    ]).map((integration) => integration.name);
+    expect(kept).toEqual(["GlobalHandlers", "Dedupe"]);
+  });
+
   it("initErrorReporter returns one shared promise that settles when the reporter is ready", async () => {
     enableProductionReporter();
     const loader = vi.fn(async () => sdk as never);

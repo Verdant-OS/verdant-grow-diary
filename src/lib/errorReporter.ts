@@ -26,6 +26,7 @@ import {
   resolveErrorReportingConfig,
   scrubBreadcrumb,
   scrubEvent,
+  withoutExcludedIntegrations,
   type ErrorReportingDecision,
   type ManualReportContext,
 } from "@/lib/errorReportingRules";
@@ -90,6 +91,8 @@ export function initErrorReporter(
         },
         tracesSampleRate: 0,
         maxBreadcrumbs: 20,
+        // No release-health sessions: they carry a session id and bypass beforeSend.
+        integrations: (defaults) => withoutExcludedIntegrations(defaults),
         beforeSend: (event) => scrubEvent(event),
         beforeBreadcrumb: (crumb) => scrubBreadcrumb(crumb),
       });

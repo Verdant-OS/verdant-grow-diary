@@ -235,6 +235,20 @@ export interface ReportableEvent {
   tags?: Record<string, unknown>;
 }
 
+/**
+ * Default SDK integrations removed at init. `BrowserSession` sends a release-health
+ * session envelope with a generated session id on every page load, even when no error
+ * occurs; session envelopes never pass through `beforeSend`, so they cannot be scrubbed.
+ */
+export const EXCLUDED_DEFAULT_INTEGRATIONS: ReadonlyArray<string> = ["BrowserSession"];
+
+/** Filters SDK default integrations by name; usable as Sentry's `integrations` callback. */
+export function withoutExcludedIntegrations<T extends { name: string }>(defaults: T[]): T[] {
+  return defaults.filter(
+    (integration) => !EXCLUDED_DEFAULT_INTEGRATIONS.includes(integration.name),
+  );
+}
+
 /** Breadcrumb categories that may carry page content, grower data or credentials; dropped outright. */
 export const DROPPED_BREADCRUMB_CATEGORIES: ReadonlyArray<string> = [
   "console",

@@ -398,3 +398,44 @@ describe("Codex re-review P1: env -S escapes and comments", () => {
     expect(checkBash(`env -S 'git push "origin" claude/task'`)).toBe(null);
   });
 });
+
+describe("Codex re-review P1s: abbreviations, --undo values, sudo --chroot", () => {
+  test("git accepts unambiguous long-option prefixes, so the guard matches them too", () => {
+    for (const cmd of [
+      "git push --al origin",
+      "git push --mirr origin",
+      "git push --bran origin",
+      "git push --force-w origin claude/task",
+      "git push --force-with origin claude/task",
+      "git push --no-veri origin claude/task",
+      "git pull --reb origin verdant-grow-diary",
+      "git pull --rebase=merges origin verdant-grow-diary",
+      "git commit --no-veri -m wip",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("git push --atomic origin claude/task")).toBe(null);
+    expect(checkBash("git push --no-thin origin claude/task")).toBe(null);
+    expect(checkBash("git pull --no-rebase origin verdant-grow-diary")).toBe(null);
+  });
+  test("gh pr ready is allowed only when --undo's effective value is true", () => {
+    for (const cmd of [
+      "gh pr ready 1800 --undo --undo=false",
+      "gh pr ready 1800 --undo=false",
+      "gh pr ready 1800 --undo=0",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("gh pr ready 1800 --undo")).toBe(null);
+    expect(checkBash("gh pr ready 1800 --undo=true")).toBe(null);
+    expect(checkBash("gh pr ready 1800 --undo=false --undo")).toBe(null);
+  });
+  test("sudo's -R/--chroot value is consumed before the command is checked", () => {
+    for (const cmd of [
+      "sudo -R /tmp git push --force origin claude/task",
+      "sudo --chroot /tmp git push --force origin claude/task",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+  });
+});

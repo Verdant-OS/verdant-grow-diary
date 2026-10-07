@@ -163,6 +163,8 @@ const WRAPPER_VALUE_OPTIONS = new Map<string, ReadonlySet<string>>([
       "--host",
       "-p",
       "--prompt",
+      "-R",
+      "--chroot",
       "-r",
       "--role",
       "-t",
@@ -265,7 +267,17 @@ function gitArgs(tokens: string[]): string[] | null {
   return tokens.slice(i);
 }
 
-const FORCE_FLAGS = /^(--force|-f|--force-with-lease(=.*)?|--force-if-includes)$/;
+/**
+ * True when `token` is `--<full>` or an abbreviation of it, with or without `=value`. Git's
+ * option parser accepts any unambiguous prefix (`--al` is `--all`, `--force-w` is
+ * `--force-with-lease`); an ambiguous one is an error, so matching every prefix fails closed.
+ */
+function longOpt(token: string, full: string): boolean {
+  const m = /^--([A-Za-z0-9-]+)(=.*)?$/.exec(token);
+  return m !== null && m[1] !== undefined && full.startsWith(m[1]);
+}
+
+const FORCE_LONG = ["force", "force-with-lease", "force-if-includes"] as const;
 
 function checkGit(args: string[]): string | null {
   const [sub, ...rest] = args;
@@ -273,15 +285,18 @@ function checkGit(args: string[]): string | null {
     if (
       rest.some(
         (t) =>
-          FORCE_FLAGS.test(t) || clusterHas(t, "f", "o") || (/^\+/.test(t) && !t.startsWith("+-")),
+          t === "-f" ||
+          FORCE_LONG.some((f) => longOpt(t, f)) ||
+          clusterHas(t, "f", "o") ||
+          (/^\+/.test(t) && !t.startsWith("+-")),
       )
     ) {
       return "Force-push is forbidden (AGENTS.md › Git and merges: never force-push or rewrite history). Update the branch by merging from base.";
     }
-    if (rest.includes("--no-verify")) {
+    if (rest.some((t) => longOpt(t, "no-verify"))) {
       return "`--no-verify` skips the repo's pre-commit/pre-push safety gates. Run the hooks and fix what they report.";
     }
-    if (rest.some((t) => t === "--all" || t === "--mirror" || t === "--branches")) {
+    if (rest.some((t) => longOpt(t, "all") || longOpt(t, "mirror") || longOpt(t, "branches"))) {
       return "Bulk pushes (`--all`, `--mirror`, `--branches`) include `main` and `verdant-grow-diary` when they exist locally (AGENTS.md: never push directly to them). Push your own task branch by name.";
     }
     const positional = rest.filter((t) => !t.startsWith("-"));
@@ -314,15 +329,12 @@ function checkGit(args: string[]): string | null {
   if (sub === "rebase" && !rest.some((t) => t === "--abort" || t === "--quit")) {
     return "`git rebase` rewrites history (AGENTS.md: update branches by merging from base). Use `git merge origin/<base>`.";
   }
-  if (
-    sub === "pull" &&
-    rest.some((t) => t === "--rebase" || t === "-r" || t.startsWith("--rebase="))
-  ) {
+  if (sub === "pull" && rest.some((t) => t === "-r" || longOpt(t, "rebase"))) {
     return "`git pull --rebase` rewrites history. Use `git pull --no-rebase` or `git merge`.";
   }
   if (
     sub === "commit" &&
-    rest.some((t) => t === "--no-verify" || t === "-n" || clusterHas(t, "n", "mFcCtS"))
+    rest.some((t) => longOpt(t, "no-verify") || t === "-n" || clusterHas(t, "n", "mFcCtS"))
   ) {
     return "`git commit --no-verify` skips lint-staged, the full-project tsc and the docs-safety asserts. Commit without it and fix what fails.";
   }
@@ -434,6 +446,18 @@ function checkPlaywright(tokens: string[]): string | null {
   return null;
 }
 
+const PFLAG_TRUE = /^(1|t|T|TRUE|true|True)$/;
+
+/** The effective value of a GitHub CLI `--undo` boolean flag across all its occurrences. */
+function undoIsSet(tokens: string[]): boolean {
+  let undo = false;
+  for (const t of tokens) {
+    if (t === "--undo") undo = true;
+    else if (t.startsWith("--undo=")) undo = PFLAG_TRUE.test(t.slice("--undo=".length));
+  }
+  return undo;
+}
+
 const PROD_MSG =
   "Production database changes, deploys, promotion and rollback are Matthew's decisions (AGENTS.md › Release and Environment Rules). Prepare a release packet or escalation instead.";
 
@@ -452,11 +476,8 @@ function checkProductionOps(rawTokens: string[], whole: string): string | null {
       return PROD_MSG;
   }
   // `gh pr ready --undo` converts a PR back to draft, which the drafts-remain-draft rule wants.
-  if (
-    cmd === "gh" &&
-    a === "pr" &&
-    (b === "merge" || (b === "ready" && !tokens.includes("--undo")))
-  ) {
+  // `--undo` is a pflag boolean: the last occurrence wins and `--undo=false` turns it off.
+  if (cmd === "gh" && a === "pr" && (b === "merge" || (b === "ready" && !undoIsSet(tokens)))) {
     return "Merging and marking PRs ready belong to Chemdawg after 35/35 required checks plus an independent exact-head PASS (AGENTS.md). Drafts remain draft.";
   }
   if (

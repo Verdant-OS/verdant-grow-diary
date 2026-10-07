@@ -170,6 +170,9 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ["privateKey: pk_abc", "pk_abc"],
       ["access_token%3D abc123", "abc123"],
       ["access_token %3Dabc123", "abc123"],
+      ["password=abc#123", "#123"],
+      ["password: it's secret", "s secret"],
+      ["password=#abc", "#abc"],
     ];
     for (const [input, secret] of cases) {
       const out = scrubText(input);

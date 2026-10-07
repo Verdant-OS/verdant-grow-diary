@@ -112,7 +112,8 @@ const BASIC_PATTERN = /\b(basic\s+)[A-Za-z0-9+/=]{4,}/gi;
  * `refresh_token`, `clientSecret`, `x-api-key`, `Set-Cookie`, `session_id`), bare
  * or quoted, followed by `:`, `=` or URL-encoded `%3D` with optional spaces. The
  * value may be double- or single-quoted (escapes included), already redacted, or
- * bare. A bare value runs to the next `, ; & } ] [ "` or line end, so a value
+ * bare. A bare value runs to the next `, ; & } ] [ "` or line end (`#` and `'`
+ * do not end it: `abc#123`, `it's secret`), so a value
  * with spaces (`password: hunter two`) is redacted whole; over-redacting the
  * rest of a clause is preferred to leaking part of a credential.
  * Keeps the key, separator and value quotes; drops the value.
@@ -122,7 +123,7 @@ const BASIC_PATTERN = /\b(basic\s+)[A-Za-z0-9+/=]{4,}/gi;
 /** Separator: `:`, `=` or URL-encoded `%3D`, with optional whitespace on either side. */
 const CREDENTIAL_SEPARATOR = String.raw`(\s*(?:[:=]|%3[Dd])\s*)`;
 /** Value: quoted (escapes included), already redacted, or bare up to the next delimiter. */
-const CREDENTIAL_VALUE = String.raw`("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[redacted\]|[^\s,;&}\][\]"'#][^,;&}\][\]"'#\n]*)`;
+const CREDENTIAL_VALUE = String.raw`("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[redacted\]|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
 /** Words that make an identifier a credential name, including `*_KEY` / `*-key` and named `…Key`s. */
 const CREDENTIAL_WORDS = String.raw`token|secret|passw(?:or)?d|pwd|pass|api[-_]?key|apikey|authorization|session|cookie|credential|[-_]key|(?:private|secret|service|access|signing|encryption|master|anon|role|client)key`;
 const CREDENTIAL_PATTERN = new RegExp(

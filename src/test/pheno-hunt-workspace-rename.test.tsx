@@ -201,4 +201,22 @@ describe("PhenoHuntWorkspace rename (#551)", () => {
     expect(screen.queryByTestId("pheno-hunt-rename-input")).toBeNull();
     expect(updatePhenoHuntSetup).toHaveBeenCalledTimes(1);
   });
+  it("another hunt's later save does not erase this hunt's new name (#551 Codex P2)", async () => {
+    let resolveA: () => void = () => {};
+    updatePhenoHuntSetup
+      .mockImplementationOnce(() => new Promise<void>((r) => (resolveA = r)))
+      .mockImplementationOnce(() => Promise.resolve());
+    const { rerenderState } = renderAt({});
+    submitRename("Repaired A");
+    await waitFor(() => expect(updatePhenoHuntSetup).toHaveBeenCalledTimes(1));
+    rerenderState({ hunt: { id: "h2", name: "Other Hunt", growId: "g1", tentId: "t1" } });
+    submitRename("Repaired B");
+    await waitFor(() => expect(screen.queryByTestId("pheno-hunt-rename-input")).toBeNull());
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Repaired B");
+    resolveA();
+    await waitFor(() => expect(updatePhenoHuntSetup).toHaveBeenCalledTimes(2));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Repaired B");
+  });
 });

@@ -1458,8 +1458,14 @@ export default function PhenoHuntWorkspace() {
   const [objectiveSaving, setObjectiveSaving] = useState(false);
   // #551: optimistic name after a confirmed rename; the hunt row stays
   // authoritative once a reload returns any other name.
-  const [huntNameLocal, setHuntNameLocal] = useState<HuntNameOverride | null>(null);
-  const effectiveHuntName = huntNameOverrideValue(huntNameLocal, ws.hunt) ?? ws.hunt?.name ?? null;
+  // Keyed by hunt id: saves for different hunts can settle in any order.
+  const [huntNameLocal, setHuntNameLocal] = useState<Readonly<Record<string, HuntNameOverride>>>(
+    {},
+  );
+  const effectiveHuntName =
+    huntNameOverrideValue(ws.hunt ? (huntNameLocal[ws.hunt.id] ?? null) : null, ws.hunt) ??
+    ws.hunt?.name ??
+    null;
   const effectiveBreedingObjective: BreedingObjectiveTarget[] =
     huntScopedOverrideValue(breedingObjectiveLocal, ws.hunt?.id) ??
     ws.hunt?.breedingObjective ??
@@ -1512,7 +1518,7 @@ export default function PhenoHuntWorkspace() {
     const { id: huntId, name: baseName } = ws.hunt;
     try {
       await updatePhenoHuntSetup({ huntId, name });
-      setHuntNameLocal({ huntId, value: name, baseName });
+      setHuntNameLocal((prev) => ({ ...prev, [huntId]: { huntId, value: name, baseName } }));
       return true;
     } catch {
       return false;

@@ -130,6 +130,7 @@ function baseState(overrides: Partial<UsePhenoHuntWorkspaceState>): UsePhenoHunt
     saveSmokeTest: vi.fn().mockResolvedValue(true),
     saveLabResult: vi.fn().mockResolvedValue(true),
     deleteLabResult: vi.fn().mockResolvedValue(true),
+    applyHuntName: vi.fn(),
     ...overrides,
   };
 }

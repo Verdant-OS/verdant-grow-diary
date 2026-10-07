@@ -28,6 +28,7 @@ import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
 import FunnelEventDbSink from "@/components/FunnelEventDbSink";
 import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
+import { initErrorReporter, reportError } from "@/lib/errorReporter";
 import { renderErrorPage } from "@/lib/error-page";
 import appCss from "@/styles.css?url";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "@/lib/build/siteSoftwareApplicationJsonLd";
@@ -131,6 +132,7 @@ function RootErrorComponent({ error }: { error: Error }) {
   });
   if (!isGrowHelpToolkitPath(pathname)) {
     reportLovableError(error);
+    reportError(error, { source: "route_error_component", route: pathname, handled: false });
   }
   return (
     <RootDocument>
@@ -228,6 +230,11 @@ function RootComponent() {
 function ApplicationRootComponent() {
   const { queryClient } = Route.useRouteContext();
   const onBeforeAuthIdentityChange = useClearQueryCacheBeforeAuthIdentityChange();
+  // Client-only. Inert unless VITE_SENTRY_DSN is set at build time and the
+  // rules in errorReportingRules.ts allow this host.
+  useEffect(() => {
+    initErrorReporter();
+  }, []);
   return (
     <RootDocument>
       <RootErrorBoundary>

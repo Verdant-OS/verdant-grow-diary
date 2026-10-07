@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { reportError } from "@/lib/errorReporter";
 
 /**
  * Top-level error boundary.
@@ -11,6 +12,10 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
  *
  * It never claims anything about data integrity it cannot guarantee; it only
  * reports that the page hit an unexpected error and offers a reload.
+ *
+ * The one import besides React is `reportError`, which is a no-op unless the
+ * production reporter already initialised (the SDK itself is lazy-loaded
+ * elsewhere), so this boundary still renders when a chunk or provider failed.
  */
 interface Props {
   children: ReactNode;
@@ -36,6 +41,11 @@ export default class RootErrorBoundary extends Component<Props, State> {
     if (typeof g === "function") {
       g("event", "exception", { description: String(error?.message ?? error), fatal: false });
     }
+    reportError(error, {
+      source: "react_error_boundary",
+      route: typeof window === "undefined" ? undefined : window.location.pathname,
+      handled: false,
+    });
   }
 
   private handleReload = (): void => {

@@ -346,19 +346,13 @@ export function evaluatePolicy({
       errors.push(`Required lockfile is missing: ${lockfile}.`);
     }
   }
-  for (const forbidden of FORBIDDEN_LOCKFILES) {
-    if (exists(resolve(root, forbidden))) {
-      errors.push(
-        `Forbidden lockfile present: ${forbidden}. Bun is canonical; bun.lock is the only lockfile.`,
-      );
-    }
-  }
-  // A workspace or spike can carry its own lockfile; reject a tracked forbidden
-  // basename at any depth. The root is covered above, tracked or not.
+  // Reject a tracked forbidden lockfile at any depth, the root included: a
+  // workspace or spike can carry its own lockfile. Only tracked paths count, so
+  // a gitignored local artifact (say, from a stray `npm install`) cannot fail
+  // the policy for something the repository does not contain.
   for (const tracked of listTracked(root)) {
     const path = tracked.replaceAll("\\", "/");
-    const slash = path.lastIndexOf("/");
-    if (slash === -1 || !FORBIDDEN_LOCKFILES.includes(path.slice(slash + 1))) continue;
+    if (!FORBIDDEN_LOCKFILES.includes(path.slice(path.lastIndexOf("/") + 1))) continue;
     errors.push(
       `Forbidden lockfile present: ${path}. Bun is canonical; bun.lock is the only lockfile.`,
     );

@@ -27,13 +27,9 @@ import { execSync } from "node:child_process";
  */
 const ALLOWED_PREFIXES = ["src/test/", "tests/", "scripts/"];
 
-const ALLOWED_EXACT = new Set([
-  "package.json",
-  "bun.lockb",
-  "bun.lock",
-  "pnpm-lock.yaml",
-  "yarn.lock",
-]);
+// bun.lock is the only lockfile; scripts/check-bun-lockfile-policy.mjs forbids
+// bun.lockb, package-lock.json, yarn.lock and pnpm-lock.yaml.
+const ALLOWED_EXACT = new Set(["package.json", "bun.lock"]);
 
 const ALLOWED_CONFIG_REGEXES = [/^vitest\.config\.[cm]?[jt]s$/, /^playwright\.config\.[cm]?[jt]s$/];
 

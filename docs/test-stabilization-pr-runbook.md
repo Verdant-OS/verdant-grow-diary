@@ -156,10 +156,11 @@ bun run verify:stabilization-pr-scope -- --base origin/main
 
 ### Lockfile handling
 
-Lockfiles (`bun.lockb`, `bun.lock`, `package-lock.json`, `pnpm-lock.yaml`,
-`yarn.lock`) are allowed **only** when the stabilization change genuinely
-required a test-tooling dependency update. If no dependency change was
-intended, revert the lockfile:
+Lockfiles (`bun.lockb`, `bun.lock`, `pnpm-lock.yaml`, `yarn.lock`) are allowed
+**only** when the stabilization change genuinely required a test-tooling
+dependency update. `package-lock.json` was retired on 2026-10-03 and the scope
+gate refuses it; `bun.lock` is the only lockfile the repository keeps. If no
+dependency change was intended, revert the lockfile:
 
 ```bash
 git restore --source=origin/main -- bun.lockb

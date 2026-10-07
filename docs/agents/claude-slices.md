@@ -199,10 +199,14 @@ stripped version counts, so stripping can only add locks. The same checks also r
 at runtime (`String.fromCharCode`) are not decoded. Every version is also matched
 with each `as T` / `satisfies T` cast and each `.from<T>` / `.rpc<T>` type argument
 blanked. A small scanner finds where the type ends by balancing `( [ { <`,
-skipping strings and the `>` of `=>`; a type that doesn't close within 2,000
-characters is left as it is. The scan has a per-file budget, and a file that uses
-it up locks under `auth-mutation` (if it contains `auth`) and `aq-io` (if it
-contains `action_queue`) instead of being skipped. The lexer guesses
+skipping strings and the `>` of `=>`, and continuing across a line break that a
+`|` or `&` joins. Types are found twice: in the code alone (comments, strings,
+regex bodies and template text blanked, so `as` in prose starts no type), where a
+type still open after 2,000 characters locks the file; and in each version as it
+is, where such a type is left alone. The scan also has a per-file budget. A file
+that hits the limit or uses up the budget locks under `auth-mutation` (if it
+contains `auth`) and `aq-io` (if it contains `action_queue`) instead of being
+skipped. The lexer guesses
 regex literals from the previous token and gives up on one longer than 200
 characters, so a construction that fools both stripped versions is still
 possible.

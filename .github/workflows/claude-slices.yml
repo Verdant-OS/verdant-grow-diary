@@ -209,20 +209,29 @@ jobs:
             });
           }
 
-          // End of the balanced TypeScript type starting at i, or -1 if it doesn't
-          // close within 2,000 characters. Brackets ( [ { < nest, strings are
+          // End of the balanced TypeScript type starting at i, or -1 if it is
+          // malformed or the text ends first. Brackets ( [ { < nest, strings are
           // skipped, the ">" of "=>" doesn't close. With stopAtTop, the type also ends
-          // at depth 0 before ) ] } ; , = or a line break; otherwise it ends after the
-          // first bracket closes.
+          // at depth 0 before ) ] } ; , = or a line break, unless a | or & on either
+          // side of the break continues it (Codex P1 at dac72d14); otherwise it ends
+          // after the first bracket closes. In strict mode (code-only text), a type
+          // still open after 2,000 characters throws, so the file locks rather than
+          // slipping through (Codex P1 at dac72d14).
           const TYPE_OPEN = { '(': ')', '[': ']', '{': '}', '<': '>' };
-          function typeEnd(text, i, stopAtTop, budget) {
+          function typeEnd(text, i, stopAtTop, budget, strict) {
             const stack = [];
             const limit = Math.min(text.length, i + 2000);
             let j = i;
+            let last = '';
             while (j < limit) {
               if (--budget.left < 0) throw new Error('type-scan budget');
               const c = text[j];
-              if (!stack.length && stopAtTop && (c === ')' || c === ']' || c === '}' || c === ';' || c === ',' || c === '\n' || (c === '=' && text[j + 1] !== '>'))) return j;
+              if (!stack.length && stopAtTop && c === '\n') {
+                let k = j + 1;
+                while (k < limit && /\s/.test(text[k])) k += 1;
+                if (last !== '|' && last !== '&' && text[k] !== '|' && text[k] !== '&') return j;
+              } else if (!stack.length && stopAtTop && (c === ')' || c === ']' || c === '}' || c === ';' || c === ',' || (c === '=' && text[j + 1] !== '>'))) return j;
+              if (!/\s/.test(c)) last = c;
               if (c === "'" || c === '"' || c === '`') {
                 let k = j + 1;
                 while (k < limit && text[k] !== c && text[k] !== '\n') k += text[k] === '\\' ? 2 : 1;
@@ -236,6 +245,7 @@ jobs:
               }
               j += 1;
             }
+            if (strict && j >= limit && limit < text.length) throw new Error('type-scan budget');
             return stopAtTop && !stack.length ? j : -1;
           }
 
@@ -246,20 +256,20 @@ jobs:
           // P1s at cb216998). A type that doesn't close is left alone. The scan
           // shares a budget across a file's versions; contentLocked locks a file
           // that runs out of it instead of skipping it.
-          function eraseTypes(text, budget) {
+          function typeRanges(text, budget, strict) {
             const ranges = [];
             const re = /(?<![\w$.])(?:as|satisfies)\s+(?=[^\s=;,)\]}])|\.\s*(?:from|rpc)\s*(?=<)/g;
             let m;
             while ((m = re.exec(text))) {
               const isCast = m[0][0] !== '.';
               const start = isCast ? m.index : m.index + m[0].length;
-              const end = typeEnd(text, m.index + m[0].length, isCast, budget);
+              const end = typeEnd(text, m.index + m[0].length, isCast, budget, strict);
               if (end > start) {
                 ranges.push([start, end]);
                 re.lastIndex = end;
               }
             }
-            return blankRanges(text, ranges);
+            return ranges;
           }
 
           // Every // and /* counts, even inside strings; this catches what the
@@ -287,8 +297,11 @@ jobs:
           function isWordChar(code) {
             return (code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || code === 95 || code === 36;
           }
-          function stripCommentsLexed(text) {
+          // Returns the comment ranges, and the literal ranges: string and regex
+          // bodies and template text outside ${...}.
+          function lexRanges(text) {
             const ranges = [];
+            const literals = [];
             const n = text.length;
             let i = 0;
             let prev = '';
@@ -299,8 +312,8 @@ jobs:
               const c = text[i];
               if (top && top.kind === 'template') {
                 if (c === '\\') i += 2;
-                else if (c === '`') { i += 1; stack.pop(); prev = 'x'; }
-                else if (c === '$' && text[i + 1] === '{') { i += 2; stack.push({ kind: 'expr', depth: 0 }); prev = ''; }
+                else if (c === '`') { literals.push([top.start, i]); i += 1; stack.pop(); prev = 'x'; }
+                else if (c === '$' && text[i + 1] === '{') { literals.push([top.start, i]); i += 2; stack.push({ kind: 'expr', depth: 0 }); prev = ''; }
                 else i += 1;
                 continue;
               }
@@ -319,6 +332,7 @@ jobs:
                   j += 1;
                 }
                 if (text[j] === '/') {
+                  literals.push([i + 1, j]);
                   j += 1;
                   while (j < n && text.charCodeAt(j) >= 97 && text.charCodeAt(j) <= 122) j += 1;
                   i = j;
@@ -330,18 +344,22 @@ jobs:
               } else if (c === "'" || c === '"') {
                 let j = i + 1;
                 while (j < n && text[j] !== c && text[j] !== '\n') j += text[j] === '\\' ? 2 : 1;
+                literals.push([i + 1, Math.min(j, n)]);
                 i = j + 1;
                 prev = 'x';
               } else if (c === '`') {
                 i += 1;
-                stack.push({ kind: 'template' });
+                stack.push({ kind: 'template', start: i });
               } else if (c === '{') {
                 if (top) top.depth += 1;
                 i += 1;
                 prev = c;
               } else if (c === '}') {
-                if (top && top.depth === 0) stack.pop();
-                else if (top) top.depth -= 1;
+                if (top && top.depth === 0) {
+                  stack.pop();
+                  const outer = stack[stack.length - 1];
+                  if (outer && outer.kind === 'template') outer.start = i + 1;
+                } else if (top) top.depth -= 1;
                 i += 1;
                 prev = '}';
               } else if (isWordChar(text.charCodeAt(i))) {
@@ -354,7 +372,25 @@ jobs:
                 i += 1;
               }
             }
-            return blankRanges(text, ranges);
+            // An unterminated template's text runs to the end.
+            for (const ctx of stack) if (ctx.kind === 'template' && ctx.start < n) literals.push([ctx.start, n]);
+            return { comments: ranges, literals };
+          }
+          function stripCommentsLexed(text) {
+            return blankRanges(text, lexRanges(text).comments);
+          }
+          // The code alone: comments and literal bodies blanked, offsets kept.
+          function codeOnly(text, lexed) {
+            const ranges = [...lexed.comments, ...lexed.literals]
+              .filter(([from, to]) => to > from)
+              .sort((a, b) => a[0] - b[0]);
+            const merged = [];
+            for (const [from, to] of ranges) {
+              const last = merged[merged.length - 1];
+              if (last && from <= last[1]) last[1] = Math.max(last[1], to);
+              else merged.push([from, to]);
+            }
+            return blankRanges(text, merged);
           }
 
           // Every content rule the text matches, not just the first: an exception
@@ -371,16 +407,25 @@ jobs:
             const decoded = decodeEscapes(text);
             const bases = decoded === text ? [text] : [text, decoded];
             // Each version is also checked with its casts and type arguments blanked
-            // (Codex P1s at cb216998).
-            // A file whose types exhaust the scan budget locks under the rules its
-            // words point to (fail closed): auth-mutation for "auth", aq-io for
-            // "action_queue".
+            // (Codex P1s at cb216998): once with the types found in the code alone
+            // (comments, strings, regex bodies and template text blanked, so "as" in
+            // prose starts no type), where a type that doesn't close in time locks
+            // the file; and once with the types found in that version itself, which
+            // never locks on its own.
+            // A file whose types exhaust the scan budget or the strict limit locks
+            // under the rules its words point to (fail closed): auth-mutation for
+            // "auth", aq-io for "action_queue".
             const budget = { left: 2000000 };
             let variants;
             try {
               // Identical versions are tried once.
               variants = /auth|action_queue/.test(decoded)
-                ? [...new Set(bases.flatMap(base => [base, stripCommentsLexed(base), stripCommentsNaive(base)]).flatMap(v => [v, eraseTypes(v, budget)]))]
+                ? [...new Set(bases.flatMap(base => {
+                  const lexed = lexRanges(base);
+                  const strict = typeRanges(codeOnly(base, lexed), budget, true);
+                  return [base, blankRanges(base, lexed.comments), stripCommentsNaive(base)]
+                    .flatMap(v => [v, blankRanges(v, strict), blankRanges(v, typeRanges(v, budget, false))]);
+                }))]
                 : bases;
             } catch (error) {
               if (error.message !== 'type-scan budget') throw error;
@@ -752,6 +797,10 @@ jobs:
               'const a = supabase.auth as { signOut(): void; };\na.signOut();',
               '(supabase.auth satisfies Record<"k", { a: 1; }>)["signOut"]();',
               '(supabase.auth as Array<{ a: ")"; }>[0]).signOut();',
+              // Codex P1s at dac72d14: unions and intersections across lines, types past the scan limit.
+              '(supabase.auth as Foo\n  & Bar).signOut();', '(supabase.auth as Foo |\n  Bar).signOut();',
+              'const a = supabase.auth as\n  | A\n  | B;\na.signOut();',
+              '(supabase.auth as { ' + 'p: string; '.repeat(300) + '}).signOut();',
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
             // Catastrophic-backtracking guard: a huge one-line file must finish quickly.
             {
@@ -781,6 +830,7 @@ jobs:
               // Codex P1 at cb216998: parenthesized, function and multi-line type arguments.
               'db.from<("action_queue")>("action_queue");', 'db.from<(r: Row) => void>("action_queue");',
               'db?.rpc<{\n  id: string;\n}>("action_queue_create", p);', 'db.from<Array<(A)>>( "action_queue")',
+              'db.from<({ ' + 'p: string; '.repeat(300) + '})>("action_queue");',
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['aq-io, head'], text);
             // A file that exhausts the type-scan budget locks (fail closed).
             assert.deepEqual(locks('src/lib/fooRules.ts', 'x as { auth '.repeat(200000)), ['auth-mutation, head']);
@@ -810,6 +860,9 @@ jobs:
               'const user = (await supabase.auth.getUser()).data.user', 'if (a != b) x = y',
               'const u = (await supabase.auth.getUser()) as { data: { user: U; } };', 'import { x as auth } from "y";',
               'const s = client.auth as AuthClient\n  .getSession();', 'db.from<Row>("plants");',
+              'const x = y as A\nconst z = supabase.auth.getUser();',
+              // "as" in prose starts no type, so a long block after it doesn't lock (dac72d14 census).
+              'it("treats history as grow evidence", async () => {\n' + '  expect(x).toBe(1);\n'.repeat(150) + '  await supabase.auth.getUser();\n});',
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
             for (const path of [
               'src/lib/pendingOutcomeReviewRules.ts', 'src/lib/guidedActionChecklistRules.ts',

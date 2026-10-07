@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   classifyStabilizationPrFiles,
@@ -156,6 +158,15 @@ describe("classifyStabilizationPrFiles — lockfile allowlist", () => {
       expect(r.allowed).toEqual([lock]);
     },
   );
+
+  it("keeps the runbook's lockfile allowlist in step with the retired npm lockfile", () => {
+    // Absence scan over documentation prose, not resolved config.
+    const runbook = readFileSync(resolve("docs/test-stabilization-pr-runbook.md"), "utf8");
+    const section = runbook.slice(runbook.indexOf("### Lockfile handling"));
+    const allowlist = section.slice(0, section.indexOf("are allowed"));
+    expect(allowlist).not.toContain("package-lock.json");
+    expect(section).toMatch(/`package-lock\.json` was retired on 2026-10-03/);
+  });
 
   it("rejects the retired npm lockfile", () => {
     const result = classifyStabilizationPrFiles(["package-lock.json"]);

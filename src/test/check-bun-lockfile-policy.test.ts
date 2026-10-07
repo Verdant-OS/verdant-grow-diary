@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import {
   BUN_LOCK_SECURITY_FLOORS,
   FORBIDDEN_LOCKFILES,
@@ -98,6 +98,7 @@ function makeFs(files: Record<string, string>) {
       return files[path];
     },
     listFiles: () => [...paths],
+    listTracked: () => [...paths].map((path) => relative(CWD, path).replaceAll("\\", "/")),
   };
 }
 
@@ -191,6 +192,26 @@ describe("evaluatePolicy", () => {
       expect(evaluate(files).errors.join(" ")).toContain(`Forbidden lockfile present: ${name}`);
     },
   );
+
+  it.each(
+    FORBIDDEN_LOCKFILES.flatMap((name: string) => [
+      { path: `spikes/example/${name}` },
+      { path: `packages/a/b/${name}` },
+    ]) as Array<{ path: string }>,
+  )("fails when a tracked $path is nested below the root", ({ path }) => {
+    const files = policyFiles({ extra: { [at(path)]: "x" } });
+    expect(evaluate(files).errors.join(" ")).toContain(`Forbidden lockfile present: ${path}`);
+  });
+
+  it("allows a nested bun.lock and files that only end in a forbidden name", () => {
+    const files = policyFiles({
+      extra: {
+        [at("spikes/example/bun.lock")]: "{}",
+        [at("docs/old-package-lock.json.md")]: "notes",
+      },
+    });
+    expect(evaluate(files).errors.join(" ")).not.toContain("Forbidden lockfile present");
+  });
 
   it.each(["^0.24.0", "~0.24.0", "latest", "*"])(
     "fails when @lovable.dev/mcp-js uses %s",

@@ -83,6 +83,20 @@ function normalizedRelative(root, absolutePath) {
   return relative(root, absolutePath).replaceAll("\\", "/");
 }
 
+function listTrackedPaths(root) {
+  const result = spawnSync("git", ["-C", root, "ls-files", "-z"], {
+    encoding: "utf8",
+    timeout: 30_000,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.error || result.status !== 0) {
+    throw new Error(
+      `git ls-files failed: ${result.error?.message ?? `exit ${result.status ?? "unknown"}`}`,
+    );
+  }
+  return result.stdout.split("\0").filter(Boolean);
+}
+
 function listPolicyFiles(root) {
   // Install commands/npm caches contain "npm"; retired-lock hashes contain
   // "package-lock". Ask Git for that tracked-file candidate set first instead of
@@ -322,6 +336,7 @@ export function evaluatePolicy({
   readFile = readFileSync,
   exists = existsSync,
   listFiles = listPolicyFiles,
+  listTracked = listTrackedPaths,
 } = {}) {
   const root = cwd ?? process.cwd();
   const errors = [];
@@ -337,6 +352,16 @@ export function evaluatePolicy({
         `Forbidden lockfile present: ${forbidden}. Bun is canonical; bun.lock is the only lockfile.`,
       );
     }
+  }
+  // A workspace or spike can carry its own lockfile; reject a tracked forbidden
+  // basename at any depth. The root is covered above, tracked or not.
+  for (const tracked of listTracked(root)) {
+    const path = tracked.replaceAll("\\", "/");
+    const slash = path.lastIndexOf("/");
+    if (slash === -1 || !FORBIDDEN_LOCKFILES.includes(path.slice(slash + 1))) continue;
+    errors.push(
+      `Forbidden lockfile present: ${path}. Bun is canonical; bun.lock is the only lockfile.`,
+    );
   }
 
   const packageJson = parseJson(readFile, resolve(root, "package.json"), "package.json");

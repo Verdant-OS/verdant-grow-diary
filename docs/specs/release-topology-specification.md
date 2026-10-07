@@ -8,7 +8,7 @@ files) — Cheek, 2026-09-25. Which seat satisfies peer review is Cheek's decisi
 (`docs/agents/CURRENT_STATE.md`, "Start here"); no Claude session can fill it
 **Date:** 2026-09-25 (founding measurement); amended 2026-09-25 late evening (§2.4); amended
 2026-09-26 for Vercel Rolling Releases (§2.5); amended 2026-10-06 for the blocked publisher account
-and a third build integration (§2.6)
+and a third build integration (§2.6); evidence-status and hosting-timeline note 2026-10-07 (§2.7, Appendix E)
 **Slice:** Authoritative Release Topology Specification — docs-only, the second slice of the
 architecture-contract work, sequenced after `#1221` merged (`cb6c3288`, 2026-09-25 00:12 UTC).
 First opened as `#1699`; carried forward on `claude/clever-davinci-hk7o03` after its owning session
@@ -355,6 +355,40 @@ or reconfigured.
   `unavailable` fallback is on `:56`, and was already there at `c9bc1df3`: the `:55` cite was one line
   off. Every other cite in §§3–5, §7 and §8 holds at `cfe09322`. Cites in §2, §6.1, §6.2, §15.1 and
   the appendices stay dated to the trees their headings name.
+
+### 2.7 The evidence-status and hosting-timeline note — 2026-10-07
+
+`practical observation`, one session, every call a read: GitHub check runs and commit statuses on
+four first-parent tips, Vercel project, domain and deployment reads, and one attempted live read.
+Times are UTC. Appendix E holds the readings and a consolidated hosting timeline.
+
+- **Why.** The owner asked for this PR's evidence and hosting timeline to be brought up to date in
+  place, with inherited claims labelled, and for `#1857`'s failed review to be accounted for. This
+  note re-reads nothing in §§3–8. Their cites stay at `cfe09322` (§2.6) and are **inherited** here.
+  The base branch was merged in (`e0bb3930`) with a normal merge. Between `cfe09322` and `e0bb3930`,
+  three cited files changed, and every changed line falls outside the cited lines. `package.json`
+  changed only in `overrides`, below `:455`, and every cite into it is above `:400`.
+  `scripts/check-bun-lockfile-policy.mjs` gained security floors below `:22`, and `:5` holds.
+  `package-lock.json` is cited by name only. (`git diff`, `VERIFIED`)
+- **Labels in Appendix E.** `VERIFIED` means read by this session on 2026-10-07. `INHERITED` means
+  recorded by an earlier session in Appendices A–D and not re-read; for this session that is a
+  `source claim`. `SOURCE CLAIM` means text in a PR, a bot comment or a review, not a measurement.
+- **What changed since Appendix D, from the readings.** Apex and `www` no longer resolve to any
+  Vercel deployment (`404 not_found`). Appendix D bound both to `dpl_2Mog…` (`ebc8f82e`), and that
+  deployment no longer appears in the production list. The Vercel project's `updatedAt` moved to
+  2026-10-07 01:08:19, after D.4's reads. Every first-parent tip since D's read still carries
+  `Vercel: Account is blocked.`, two passing Workers Builds runs and a failing `Supabase Preview`.
+  What any production hostname serves is still `BLOCKED` from this session (egress `403`).
+- **`#1857`.** It touches no file this document cites, so it is not a topology change. Its review
+  history is recorded in the architecture contract (`#1899`, §15.2): a clean Blue Dream PASS at
+  `4ee43c6e`, then a Codex **FAIL** (one P1) at the same SHA. One line of that FAIL review is
+  topology evidence and is carried into E.4 as a `SOURCE CLAIM`. It says that one of three Workers
+  checks on that head reported "This Worker does not exist on your account".
+- **Board.** The open PRs bearing on hosting since §2.6 are `#1904` (the Cloudflare Workers
+  migration plan, unchanged at `5ddcd1ce`), `#1937` (response headers "on the Worker and static
+  assets", which edits `src/server.ts`), `#1938` (client error reporting) and `#1939` (a real 404
+  status). None touches this document. Their titles are `SOURCE CLAIM`s about intent, not evidence
+  of which host serves production.
 
 ---
 
@@ -1895,6 +1929,98 @@ correction to this amendment, not a new state. What the integration is connected
 it can apply migrations or deploy edge functions, is `missing evidence` from GitHub's side; under
 M5 its capability is `BLOCKED` until a §15 amendment adds a Supabase read, and the owner's
 production database lock (`docs/agents/CURRENT_STATE.md`) is the authority on what may change it.
+
+---
+
+## Appendix E. Evidence status and hosting timeline — 2026-10-07, dated
+
+Labels: `VERIFIED`, `INHERITED` and `SOURCE CLAIM` as defined in §2.7. One attempt each. Times UTC.
+Superseded by every later stamp that re-runs the procedures (D-RT-11).
+
+### E.1 Reads that could not run
+
+| Procedure  | Read                                                                         | Result                                                  | Status    |
+| ---------- | ---------------------------------------------------------------------------- | ------------------------------------------------------- | --------- |
+| M1         | `GET https://verdantgrowdiary.com/version.json` and the `www` host, 21:26:42 | Session proxy refused the tunnel (`403`), both hosts    | `BLOCKED` |
+| M2 (DNS)   | Not attempted                                                                | Same egress as M1 (D.1)                                 | `BLOCKED` |
+| M6, M9     | Not attempted                                                                | No production access; standing `No production SQL` lock | `BLOCKED` |
+| M11        | Not attempted                                                                | Event log deliberately not read                         | `SKIPPED` |
+| Cloudflare | Not attempted                                                                | No Cloudflare tool or access in this session            | `BLOCKED` |
+
+### E.2 First-parent tips since Appendix D — GitHub check runs and statuses, `VERIFIED`
+
+Read with `commits/{sha}/check-runs` and `commits/{sha}/status` around 21:25. GitHub Actions
+runs are omitted.
+
+| Tip        | `Vercel` status                             | `Vercel Deployments – …` | Workers Builds `…1` / `…2` | `Supabase Preview` |
+| ---------- | ------------------------------------------- | ------------------------ | -------------------------- | ------------------ |
+| `c5b1d1c3` | `failure`, "Account is blocked." (23:10:56) | `pending`                | success / success (23:18)  | `failure`          |
+| `1aa310d2` | `failure`, "Account is blocked." (03:06:12) | `pending`                | success / success (03:30)  | `failure`          |
+| `9958e7cf` | `failure`, "Account is blocked." (03:07:37) | `pending`                | success / success (03:38)  | `failure`          |
+| `e0bb3930` | `failure`, "Account is blocked." (05:35:28) | `pending`                | success / success (05:41)  | `failure`          |
+
+A check run proves that a build ran. It says nothing about a deploy, its route or its account
+(§4.1, D.3).
+
+### E.3 Vercel — M3, M4, M10, read 21:27–21:33, `VERIFIED`
+
+| Read                                                                        | Result                                                                                                                                                                                                                                         |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_teams`                                                                | One team                                                                                                                                                                                                                                       |
+| `get_project verdant-grow-diary` (team-scoped)                              | `live: false`; `updatedAt` **2026-10-07 01:08:19** (D.4 read 2026-10-04 05:06:25); `latestDeployment` `dpl_2F61…`, a **preview** (`target: null`) from a PR branch, created 2026-10-01 03:08:53; `domains: []`; `ssoProtection.enabled: false` |
+| `list_project_domains`                                                      | Apex (created 2026-09-01 19:06:11, updated 2026-09-18 00:19:07) and `www` (updated **2026-10-03 09:51:48**), both `verified: true`, no redirect                                                                                                |
+| `get_deployment verdantgrowdiary.com`, `www.…` (unscoped, then team-scoped) | **`404 not_found`** for both, in both scopes                                                                                                                                                                                                   |
+| `list_deployments` (production, newest three)                               | `dpl_5jjJ…` (`3005ff3f`, 2026-10-01 02:36:08), `dpl_6sKn…` (`cf6de0e9`), `dpl_3UsP…` (`18730daf`), all `READY`                                                                                                                                 |
+| `list_deployments` (project, since 2026-10-01 00:00, 20 rows)               | No deployment named `dpl_2Mog…`. The only `ebc8f82e` row is `dpl_3qRU…`, a merge-queue preview, `CANCELED`                                                                                                                                     |
+| `list_deployments sha=ebc8f82e`                                             | No rows                                                                                                                                                                                                                                        |
+
+What changed between D.4 and E.3 is **not** established here, and in particular not why `dpl_2Mog…`
+no longer lists or why the hostnames resolve to no deployment. `domains: []` and
+`ssoProtection.enabled: false` may be a different field shape from D.4's alias and SSO reads. That
+comparison is `uncertainty`, not a recorded change.
+
+**M10: `FAIL`.** No binding names the tip, and neither production hostname resolves to a Vercel
+deployment. Under D-RT-15 a binding never establishes what a hostname serves, and its absence
+does not either. What apex and `www` return is `BLOCKED` (E.1). Nothing here says another host
+serves them.
+**M4: `FAIL`** for the owner. The tip `e0bb3930` has no Vercel build, and the `Vercel` status reports
+the account block. The cause stays `inference` (D.4).
+
+### E.4 Hosting timeline — consolidated
+
+| When (UTC)                     | Event                                                                                                         | Label                                                      | Where                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------- |
+| 2026-09-01 19:06:11            | Apex and `www` added to the Vercel project                                                                    | `VERIFIED`                                                 | E.3                    |
+| 2026-09-25                     | Founding measurement; promotion incident                                                                      | `INHERITED`                                                | Appendices A, B        |
+| 2026-09-26                     | Promotion moves to Vercel Rolling Releases                                                                    | `INHERITED`                                                | Appendix C             |
+| 2026-10-01 02:36:08            | Production deployment `dpl_5jjJ…` (`3005ff3f`)                                                                | `VERIFIED`                                                 | E.3                    |
+| 2026-10-01 03:12:18            | Production deployment `dpl_2Mog…` (`ebc8f82e`, `#1790`)                                                       | `INHERITED`                                                | D.4                    |
+| 2026-10-01 03:35–03:40         | Rolling release takes `dpl_2Mog…` to 100 %                                                                    | `INHERITED`                                                | D.4                    |
+| 2026-10-01 03:42:34 →          | `Vercel: Account is blocked.` on every first-parent tip                                                       | `INHERITED` to `cfe09322`; `VERIFIED` on the four E.2 tips | D.2, E.2               |
+| 2026-10-03 09:51:48            | `www` domain record updated (what changed `NOT_MEASURED`)                                                     | `VERIFIED`                                                 | E.3                    |
+| 2026-10-05 18:01               | First Cloudflare Workers Builds check run on a first-parent tip                                               | `INHERITED`                                                | D.3                    |
+| 2026-10-05 →                   | Draft `#1904` plans moving apex and `www` to Cloudflare Workers; Critical Mass FAIL, 1 P1, at `5ddcd1ce`      | `SOURCE CLAIM` / `INHERITED`                               | §2.6                   |
+| 2026-10-06 21:02–21:04         | Apex, `www` and the project alias bound to `dpl_2Mog…`; M10 `FAIL` (bindings 55 commits behind)               | `INHERITED`                                                | D.4                    |
+| 2026-10-06 23:18 → 10-07 05:41 | Workers Builds `…1` and `…2` succeed on each new tip; `Supabase Preview` fails on each                        | `VERIFIED`                                                 | E.2                    |
+| 2026-10-07 01:08:19            | Vercel project record updated (what changed `NOT_MEASURED`)                                                   | `VERIFIED`                                                 | E.3                    |
+| 2026-10-07 16:37               | A Codex review on `#1857` reports one of three Workers checks as "This Worker does not exist on your account" | `SOURCE CLAIM`                                             | `#1857` review comment |
+| 2026-10-07                     | `#1937`, `#1938`, `#1939` open; `#1937`'s title targets "the Worker"                                          | `SOURCE CLAIM`                                             | §2.7                   |
+| 2026-10-07 21:26:42            | M1 against apex and `www`: egress `403`                                                                       | `VERIFIED` (`BLOCKED`)                                     | E.1                    |
+| 2026-10-07 21:27–21:33         | Apex and `www` resolve to no Vercel deployment; `dpl_2Mog…` not listed                                        | `VERIFIED`                                                 | E.3                    |
+
+### E.5 What Appendix E does not establish
+
+- What any production hostname returns, or which platform answers it (M1, M2 `BLOCKED`).
+- That the Vercel account block is real, or its cause or date. The status reports it (D-RT-15).
+- What Workers Builds deploys, where, or from which account. The `SOURCE CLAIM` in E.4 is one
+  reviewer's report of one check, not a read.
+- Whether `dpl_2Mog…` was deleted, retained elsewhere or hidden by the block.
+- Anything about `#1857`'s code. It does not touch this axis.
+- Production database or edge-function state (§5.3, §5.4 `BLOCKED`).
+
+**Owner actions carried from §12, unchanged:** inventory and fence every Cloudflare Worker
+connected to the repository; decide which build serves first when the Vercel account is restored;
+and record which host serves the apex once DNS can be read.
 
 ---
 

@@ -34,6 +34,12 @@ export const KNOWN_THIRD_PARTY_ORIGINS = {
     "https://analytics.google.com",
   ],
   lovableAuth: ["https://api.lovable.dev"],
+  /** Error-report ingest (PR #1938 reporter). Report-only CSP; nothing is blocked either way. */
+  sentryIngest: [
+    "https://*.ingest.sentry.io",
+    "https://*.ingest.us.sentry.io",
+    "https://*.ingest.de.sentry.io",
+  ],
 } as const;
 
 function joinSources(...groups: ReadonlyArray<ReadonlyArray<string>>): string {
@@ -46,7 +52,8 @@ function joinSources(...groups: ReadonlyArray<ReadonlyArray<string>>): string {
  * the follow-up once violation reports are collected.
  */
 export function buildContentSecurityPolicyReportOnly(): string {
-  const { supabase, paddle, googleFonts, googleAnalytics, lovableAuth } = KNOWN_THIRD_PARTY_ORIGINS;
+  const { supabase, paddle, googleFonts, googleAnalytics, lovableAuth, sentryIngest } =
+    KNOWN_THIRD_PARTY_ORIGINS;
   const directives: ReadonlyArray<[string, string]> = [
     ["default-src", "'self'"],
     ["base-uri", "'self'"],
@@ -58,7 +65,10 @@ export function buildContentSecurityPolicyReportOnly(): string {
     ["font-src", joinSources(["'self'", "data:"], [googleFonts[1]])],
     ["img-src", "'self' data: blob: https:"],
     ["media-src", "'self' blob: https:"],
-    ["connect-src", joinSources(["'self'"], supabase, paddle, googleAnalytics, lovableAuth)],
+    [
+      "connect-src",
+      joinSources(["'self'"], supabase, paddle, googleAnalytics, lovableAuth, sentryIngest),
+    ],
     ["frame-src", joinSources(["'self'"], paddle)],
     ["worker-src", "'self' blob:"],
     ["manifest-src", "'self'"],

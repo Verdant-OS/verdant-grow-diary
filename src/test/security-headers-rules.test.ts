@@ -56,6 +56,10 @@ describe("securityHeadersRules — baseline set", () => {
     expect(directive("connect-src")).toContain("wss://*.supabase.co");
     expect(directive("connect-src")).toContain("https://*.paddle.com");
     expect(directive("connect-src")).toContain("https://api.lovable.dev");
+    expect(directive("connect-src")).toContain("https://*.ingest.us.sentry.io");
+    // Ingest only — never script-src/frame-src for the error reporter.
+    expect(directive("script-src")).not.toContain("sentry");
+    expect(directive("frame-src")).not.toContain("sentry");
     expect(directive("frame-src")).toContain("https://*.paddle.com");
     expect(directive("script-src")).toContain("https://*.paddle.com");
     expect(directive("style-src")).toContain("https://fonts.googleapis.com");

@@ -146,9 +146,9 @@ const CREDENTIAL_PATTERN = new RegExp(
  * `key:` is not matched, so diagnostics such as Postgres `Key (plant_id)=…` stay readable.
  */
 const QUOTED_KEY_PATTERN = new RegExp(String.raw`(["'])(key)\1(\s*:\s*)` + CREDENTIAL_VALUE, "gi");
-/** OAuth `code=` / `key=` query parameters (auth callbacks carry them), `=` literal or URL-encoded `%3D`. */
+/** OAuth `code=` / `key=` query parameters (auth callbacks carry them), `=` or `%3D` with optional spaces. */
 const OAUTH_PARAM_PATTERN =
-  /\b(code|key)(=|\s*%3[Dd]\s*)("[^"]*"|'[^']*'|\[redacted\]|[^&\s"'#]+)/gi;
+  /\b(code|key)(\s*(?:=|%3[Dd])\s*)("[^"]*"|'[^']*'|\[redacted\]|[^&\s"'#]+)/gi;
 
 export const REDACTED = "[redacted]";
 
@@ -158,10 +158,35 @@ function redactedLike(value: string): string {
   return `${quote}${REDACTED}${quote}`;
 }
 
+/** Most nested URL-encoding layers decoded before scrubbing (`%253D` is two). */
+const MAX_DECODE_PASSES = 3;
+const PERCENT_RUN_PATTERN = /(?:%[0-9A-Fa-f]{2})+/g;
+
+/**
+ * Decodes `%XX` escapes so encoded credentials (`Bearer%20…`, `%22password%22%3A…`,
+ * `%2540`) meet the same patterns as plain text. Runs that are not valid UTF-8 stay
+ * as they are; stops once a pass changes nothing.
+ */
+function decodePercentEscapes(text: string): string {
+  let current = text;
+  for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
+    const next = current.replace(PERCENT_RUN_PATTERN, (run) => {
+      try {
+        return decodeURIComponent(run);
+      } catch {
+        return run;
+      }
+    });
+    if (next === current) break;
+    current = next;
+  }
+  return current;
+}
+
 /** Removes e-mail addresses, UUID row ids, bridge/JWT/bearer tokens and credential-looking query values from free text. Idempotent. */
 export function scrubText(value: unknown): string {
   if (value == null) return "";
-  const text = typeof value === "string" ? value : safeString(value);
+  const text = decodePercentEscapes(typeof value === "string" ? value : safeString(value));
   return text
     .replace(BRIDGE_TOKEN_PATTERN, `vbt_${REDACTED}`)
     .replace(BEARER_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)

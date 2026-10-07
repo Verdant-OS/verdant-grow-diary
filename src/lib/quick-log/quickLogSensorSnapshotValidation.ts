@@ -21,7 +21,7 @@
  *     and unparseable strings → reject.
  */
 
-import type { QuickLogSensorSnapshot } from "./createQuickLogEvent";
+import type { QuickLogSensorSnapshot } from "./quickLogSensorSnapshotTypes";
 
 export type QuickLogSnapshotValidation =
   { ok: true; snapshot: QuickLogSensorSnapshot | null } | { ok: false; error: string };

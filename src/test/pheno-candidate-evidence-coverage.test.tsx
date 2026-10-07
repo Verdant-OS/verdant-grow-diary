@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { buildPhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
@@ -45,6 +46,65 @@ function packet(
 afterEach(() => cleanup());
 
 describe("PhenoCandidateEvidenceCoverage", () => {
+  it("Assign tent links to plant setup without dispatching evidence, then a ready target records", () => {
+    const listener = vi.fn();
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener as EventListener);
+    try {
+      const { rerender } = render(
+        <MemoryRouter>
+          <PhenoCandidateEvidenceCoverage
+            packet={packet()}
+            status="ready"
+            allowRecordActions
+            quickLogTarget={{ kind: "needs_tent_assignment" }}
+          />
+        </MemoryRouter>,
+      );
+      expect(screen.queryByRole("button", { name: /Record .* evidence/ })).toBeNull();
+      const assign = screen.getByRole("link", { name: "Assign tent" });
+      expect(assign).toHaveAttribute("href", "/plants/plant-a");
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Assign this plant to a tent before recording evidence.",
+      );
+      fireEvent.click(assign);
+      expect(listener).not.toHaveBeenCalled();
+
+      rerender(
+        <MemoryRouter>
+          <PhenoCandidateEvidenceCoverage
+            packet={packet()}
+            status="ready"
+            allowRecordActions
+            quickLogTarget={{ kind: "ready", plantId: "plant-a", growId: "g1", tentId: "t1" }}
+          />
+        </MemoryRouter>,
+      );
+      expect(screen.queryByRole("link", { name: "Assign tent" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Record Structure evidence" }));
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect((listener.mock.calls[0][0] as CustomEvent).detail).toMatchObject({
+        plantId: "plant-a",
+        growId: "g1",
+        tentId: "t1",
+        phenoEvidenceGoal: "structure",
+      });
+    } finally {
+      window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener as EventListener);
+    }
+  });
+
+  it("read-only coverage offers neither Assign tent nor recording", () => {
+    render(
+      <PhenoCandidateEvidenceCoverage
+        packet={packet()}
+        status="ready"
+        quickLogTarget={{ kind: "needs_tent_assignment" }}
+      />,
+    );
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
   it("shows X of Y with recorded and missing chips", () => {
     render(
       <PhenoCandidateEvidenceCoverage packet={packet({ rows: [row("aroma")] })} status="ready" />,
@@ -68,8 +128,7 @@ describe("PhenoCandidateEvidenceCoverage", () => {
         packet={packet({ rows: [row("aroma")] })}
         status="ready"
         allowRecordActions
-        growId="g1"
-        tentId={null}
+        quickLogTarget={{ kind: "ready", plantId: "plant-a", growId: "g1", tentId: "t1" }}
       />,
     );
     const btn = screen.getByRole("button", { name: "Record Structure evidence" });
@@ -81,10 +140,59 @@ describe("PhenoCandidateEvidenceCoverage", () => {
     const detail = (listener.mock.calls[0][0] as CustomEvent).detail;
     expect(detail).toMatchObject({
       plantId: "plant-a",
+      growId: "g1",
+      tentId: "t1",
       phenoHuntId: "hunt-1",
       phenoEvidenceGoal: "structure",
       source: "pheno-evidence-goal",
     });
+  });
+
+  it("#1005: no resolved target means no record action — absent is pending, never a guess", () => {
+    const listener = vi.fn();
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener as EventListener);
+    render(
+      <PhenoCandidateEvidenceCoverage
+        packet={packet({ rows: [row("aroma")] })}
+        status="ready"
+        allowRecordActions
+      />,
+    );
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener as EventListener);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByTestId("pheno-candidate-evidence-coverage-target")).toHaveAttribute(
+      "data-target-state",
+      "pending",
+    );
+    expect(screen.getByTestId("pheno-candidate-evidence-coverage-goal-structure")).toHaveAttribute(
+      "data-recorded",
+      "false",
+    );
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("#1005: a target resolved for a different plant never fires for this one", () => {
+    render(
+      <PhenoCandidateEvidenceCoverage
+        packet={packet({ rows: [row("aroma")] })}
+        status="ready"
+        allowRecordActions
+        quickLogTarget={{ kind: "ready", plantId: "plant-b", growId: "g1", tentId: "t1" }}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /Record .* evidence/ })).toBeNull();
+  });
+
+  it("#1005: a fully recorded candidate shows no target status line", () => {
+    render(
+      <PhenoCandidateEvidenceCoverage
+        packet={packet({ rows: [row("aroma"), row("structure")] })}
+        status="ready"
+        allowRecordActions
+        quickLogTarget={{ kind: "mismatch" }}
+      />,
+    );
+    expect(screen.queryByTestId("pheno-candidate-evidence-coverage-target")).toBeNull();
   });
 
   it("recorded goals never render a record button; read-only mode renders none", () => {

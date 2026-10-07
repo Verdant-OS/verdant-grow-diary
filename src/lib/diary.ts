@@ -177,28 +177,3 @@ export function getEventType(value?: string | null): EventTypeDef {
   if (value && EVENT_TYPE_MAP[value]) return EVENT_TYPE_MAP[value];
   return EVENT_TYPE_MAP.observation;
 }
-
-export interface SensorSnapshot {
-  temp?: number;
-  rh?: number;
-  vpd?: number;
-  co2?: number;
-  soil?: number;
-  ts?: string;
-}
-
-import { sensorReadings } from "@/mock";
-
-export function snapshotForTent(tentId: string): SensorSnapshot | null {
-  const rows = sensorReadings.filter((r) => r.tentId === tentId);
-  if (!rows.length) return null;
-  const last = rows[rows.length - 1];
-  return {
-    temp: last.temp,
-    rh: last.rh,
-    vpd: last.vpd,
-    co2: last.co2,
-    soil: last.soil,
-    ts: last.ts,
-  };
-}

@@ -32,7 +32,7 @@ test.describe("signed-in route performance evidence", () => {
     {
       operation: "dashboard-ready",
       route: "/dashboard",
-      control: "dashboard-daily-grow-check-entry",
+      control: "dashboard-ready",
     },
     { operation: "timeline-ready", route: "/timeline", control: "timeline-search-input" },
     { operation: "sensors-ready", route: "/sensors", control: "sensors-manual-reading-anchor" },

@@ -1991,10 +1991,17 @@ test.describe("core link and form census", () => {
 
     await expect(page.getByTestId("onboarding-checklist-card")).toHaveCount(0);
     await expect(page.getByTestId("onboarding-step-first_log")).toHaveCount(0);
-    await expect(page.getByTestId("dashboard-daily-grow-check-entry")).toHaveAttribute(
+    await expect(page.getByTestId("dashboard-ready")).toBeVisible();
+    await expect(page.getByTestId("dashboard-daily-grow-check-entry")).toHaveCount(0);
+    await expect(page.getByTestId("tonight-tent-home-log")).toHaveAttribute(
       "href",
-      "/daily-check",
+      `/daily-check?growId=${GROW_ID}`,
     );
+    // Desktop chrome exemption (GDP D1.2-A): AppShell's header Quick Log trigger.
+    expect(await visibleLogControls(page)).toEqual([
+      "header-quick-log-trigger",
+      "tonight-tent-home-log",
+    ]);
 
     const pendingHrefs = (await visibleLinkAudits(page, dashboardRoute.path)).map(
       (link) => link.href,
@@ -2226,3 +2233,33 @@ test.describe("core link and form census", () => {
     }
   });
 });
+
+/**
+ * Identity of every visible Log control (links and buttons named Log, Quick
+ * Log or Open Quick Log; not Log out or Start Check), sorted: its test ID,
+ * or for an untagged control its landmark label and href. GDP D1.1-A/D1.2-A
+ * (docs/specs/dashboard-single-log-entry-readiness-marker.md): the page body
+ * shows only the home card's Log; AppShell's chrome triggers are named
+ * exemptions. A new duplicate fails the exact set.
+ */
+async function visibleLogControls(page: Page): Promise<string[]> {
+  const name = /^(open )?(quick )?log$/i;
+  const ids: string[] = [];
+  for (const role of ["link", "button"] as const) {
+    // One atomic read per role: a re-render between per-index reads could
+    // otherwise count a control twice or skip it.
+    const roleIds = await page
+      .getByRole(role, { name })
+      .filter({ visible: true })
+      .evaluateAll((elements) =>
+        elements.map((element) => {
+          const testId = element.getAttribute("data-testid");
+          if (testId) return testId;
+          const landmark = element.closest("nav, header, main, aside")?.getAttribute("aria-label");
+          return `${landmark ?? "unlabelled region"} > ${element.getAttribute("href") ?? element.tagName}`;
+        }),
+      );
+    ids.push(...roleIds);
+  }
+  return ids.sort();
+}

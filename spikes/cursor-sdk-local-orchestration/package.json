@@ -21,6 +21,7 @@
     "vitest": "4.1.11"
   },
   "overrides": {
+    "source-map-js": "1.2.2",
     "undici": "6.28.1"
   }
 }

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { formatSnapshotCapturedAt } from "@/lib/alertReasonDisplayRules";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import {
@@ -124,6 +124,26 @@ async function submitSnapshot() {
   await waitFor(() => expect(backend.posts).toHaveLength(1));
   await waitFor(() => expect(screen.getByTestId("manual-sensor-review-confirm")).toBeEnabled());
 }
+
+// The first pass through render -> label queries -> save -> retry runs cold
+// (module JIT, first React/Radix/Testing Library paths), measured locally at
+// ~3-7x the warm cost in every phase. Under a loaded CI shard that one-time
+// cost was charged to whichever case ran first (5842 ms on #1870, shard 16).
+// Pay it once here with the same flow so every case measures only its own work.
+// The hook timeout covers that one-time cost; per-case timeouts stay default.
+beforeAll(async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(CAPTURED);
+  const view = renderCard();
+  try {
+    await submitSnapshot();
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+    await screen.findByTestId("manual-reading-saved-confirmation");
+  } finally {
+    view.unmount();
+    vi.useRealTimers();
+  }
+}, 30_000);
 
 beforeEach(() => {
   vi.clearAllMocks();

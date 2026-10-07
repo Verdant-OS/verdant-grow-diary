@@ -238,6 +238,11 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ['{"code":"abc123"}', "abc123"],
       ["{'code':'ab12'}", "ab12"],
       ["password%3A%ED%A0%80%20hunter2", "hunter2"],
+      ["sign-in failed, auth code: 123456", "123456"],
+      ["Verification code: 482913 expired", "482913"],
+      ["code verifier: dBjftJeZ4CVPmB92K27uhbUJU1p1r", "dBjftJeZ4CVPmB92K27uhbUJU1p1r"],
+      ["one-time code = 771204", "771204"],
+      ["Authorization code: q8w7e6r5t4", "q8w7e6r5t4"],
       ['{"auth_code":"q8w7e6r5t4y3"}', "q8w7e6r5t4y3"],
       ["verification_code=482913", "482913"],
       ['{"otp":"482913"}', "482913"],
@@ -268,6 +273,8 @@ describe("errorReportingRules — privacy of outgoing events", () => {
     expect(scrubText('{"code":"42P01"}')).toBe('{"code":"42P01"}');
     expect(scrubText('{"error_code":"23505"}')).toBe('{"error_code":"23505"}');
     expect(scrubText("status_code: 500")).toBe("status_code: 500");
+    expect(scrubText("error code: 23505")).toBe("error code: 23505");
+    expect(scrubText("HTTP status code: 500")).toBe("HTTP status code: 500");
   });
 
   it("drops DOM click breadcrumbs, which can carry grower data in element attributes", () => {

@@ -142,6 +142,16 @@ const CREDENTIAL_PATTERN = new RegExp(
   "gi",
 );
 /**
+ * Human-readable one-time-code labels with a space (`auth code: 123456`,
+ * `Verification code: …`, `code verifier: …`). `error code:` / `status code:` are not matched.
+ */
+const SPACED_CODE_LABEL_PATTERN = new RegExp(
+  String.raw`\b((?:auth(?:orization)?|verification|one[- ]time|otp|security|confirmation)\s+code|code\s+verifier)` +
+    CREDENTIAL_SEPARATOR +
+    CREDENTIAL_VALUE,
+  "gi",
+);
+/**
  * An exactly quoted `"key"` / `'key'` in object form (`{"key":"sk_live_…"}`). A bare
  * `key:` is not matched, so diagnostics such as Postgres `Key (plant_id)=…` stay readable.
  */
@@ -211,6 +221,11 @@ export function scrubText(value: unknown): string {
       CREDENTIAL_PATTERN,
       (_m, quote: string, key: string, separator: string, value: string) =>
         `${quote}${key}${quote}${separator}${redactedLike(value)}`,
+    )
+    .replace(
+      SPACED_CODE_LABEL_PATTERN,
+      (_m, label: string, separator: string, value: string) =>
+        `${label}${separator}${redactedLike(value)}`,
     )
     .replace(
       QUOTED_KEY_PATTERN,

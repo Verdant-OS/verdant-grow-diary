@@ -119,7 +119,7 @@ code is written in this slice.
   first-parent commits behind the tip `cfe09322`. Binding is not serving: what the apex returns
   while the account is blocked is **`BLOCKED`** from this session (egress), and the "402" that
   `docs/release/go-live-checklist-after-402.md` and `docs/release/hosting-failover-plan.md` describe
-  is a `source claim` here. A blocked account is a topology state in its own right (D-RT-15): it stopped path 1 of §5.7 (no Git build since 2026-10-01), by `inference` every other promotion path too, and a rollback to that publisher restores nothing.
+  is a `source claim` here. A blocked account is a topology state in its own right (D-RT-15): path 1 of §5.7 has produced no Git build since 2026-10-01 (observed), and that the block is why, like its effect on every other promotion path, is `inference`; a rollback to that publisher restores nothing.
 - **A third build integration watches the branch.** Since 2026-10-05 the Cloudflare Workers and
   Pages GitHub App has posted `Workers Builds` check runs for deploy-branch tips. Every tip since
   `851a02a2` carries two (`verdant-grow-diary1` and `verdant-grow-diary2`), and both succeeded at
@@ -874,7 +874,7 @@ Durable. Each is a rule a future slice can be held to; none carries a date.
   publisher. Which sessions and agents hold one is a topology fact. The owner records it and scopes
   or revokes it; this document cannot measure it (§10). Until it is recorded, D-RT-13 is held by
   convention only.
-- **D-RT-15 — The publisher's account state is part of the topology.** A blocked, suspended or unpaid publisher account can stop every path of §5.7 at once: no Git build, no promote, no rollout, no rollback. For Git builds that is observed (no Vercel build since 2026-10-01, D.2); for the other paths it is an `inference`. The platform's domain bindings and rolling-release record keep their last values, so
+- **D-RT-15 — The publisher's account state is part of the topology.** A blocked, suspended or unpaid publisher account can stop every path of §5.7 at once: no Git build, no promote, no rollout, no rollback. What is observed is the correlation: no Vercel build since 2026-10-01 while every tip carries the block status (D.2). That the block caused it, and its effect on the other paths, are `inference`. The platform's domain bindings and rolling-release record keep their last values, so
   M10's reads still answer and are recorded, but they describe the binding, not what the hostname
   returns. While the account state is not `active` (or the platform's equivalent), what the
   hostnames serve is answered only by M1 and the per-hostname `/version.json` and status reads, and
@@ -1018,7 +1018,7 @@ publisher regresses; (c) keep parked. This slice does not push to, review, or en
 `verify-publish-provenance.mjs` is now the sixth `prebuild` step at `cfe09322` (`package.json:9`,
 §5.2). It runs inside every publisher that runs `bun run build`, the third build integration's
 builds included if they do (`NOT_MEASURED`). Whether it has ever failed a production build is
-`NOT_MEASURED`: no Vercel build has run since the account block (D.2).
+`NOT_MEASURED`: no Vercel build has run since 2026-10-01 (D.2).
 
 ---
 
@@ -1100,21 +1100,21 @@ Verdict: **safe to merge as documentation.** It changes what readers believe, no
 
 **Deferred — sequenced, not rejected**
 
-| Item                                                                                                                             | Gate                                                                                                                                                                                |
-| -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CLAUDE.md` publisher and `vercel.json` corrections                                                                              | **Done** by `#1717` (`ea361665`)                                                                                                                                                    |
-| `stamp-version.mjs`, `deployment-preview.yml`, `Makefile` comment corrections                                                    | **Done** by `#1728` (`376ea7c6`) and `#1732` (`66ea7bd3`); no test pin needed renegotiating                                                                                         |
-| `docs/preview-deployment-verification.md` retirement                                                                             | Docs slice; the project is absent from the team (C.6), and the owner confirms no other account holds it                                                                             |
-| Edge-function deployer measurement (M6) and applied-migration measurement (M9)                                                   | Need production read access this session does not hold; `No APPLY` stands regardless                                                                                                |
-| The Lovable publisher decision (D-RT-4)                                                                                          | Cheek                                                                                                                                                                               |
-| `#1175`                                                                                                                          | **Done**: merged as `0a6210c1`, 2026-09-30 (§11)                                                                                                                                    |
-| A runner for AT-4                                                                                                                | Test slice, alongside the contract's T1                                                                                                                                             |
-| Closing the release-state `FAIL` (superseded as "roll out the tip build": no tip deployment exists while the account is blocked) | **BLOCKED** (D-RT-15): owner picks the first build to serve, then restores the account, then M4 confirms that target's deployment exists, then the owner's promotion step (D-RT-13) |
-| Credential inventory and scoping (D-RT-14)                                                                                       | Owner                                                                                                                                                                               |
-| A scheduled M10 promotion-drift probe                                                                                            | Workflow slice after this merges; signal only (D-RT-10)                                                                                                                             |
-| Rollback-procedure gaps found by `#1892`'s doubt check (list below)                                                              | Owner decides each design question; then a spec slice and a runbook PR                                                                                                              |
-| Cloudflare reads for M2–M4, M10, M11 (§12)                                                                                       | A §15 amendment, sequenced with `#1904`; not written here because no Cloudflare read was possible                                                                                   |
-| M11 for the window since Appendix C                                                                                              | `SKIPPED` in the 2026-10-06 amendment (no event log read); the next stamp's window starts at Appendix C                                                                             |
+| Item                                                                                                                             | Gate                                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CLAUDE.md` publisher and `vercel.json` corrections                                                                              | **Done** by `#1717` (`ea361665`)                                                                                                                                                              |
+| `stamp-version.mjs`, `deployment-preview.yml`, `Makefile` comment corrections                                                    | **Done** by `#1728` (`376ea7c6`) and `#1732` (`66ea7bd3`); no test pin needed renegotiating                                                                                                   |
+| `docs/preview-deployment-verification.md` retirement                                                                             | Docs slice; the project is absent from the team (C.6), and the owner confirms no other account holds it                                                                                       |
+| Edge-function deployer measurement (M6) and applied-migration measurement (M9)                                                   | Need production read access this session does not hold; `No APPLY` stands regardless                                                                                                          |
+| The Lovable publisher decision (D-RT-4)                                                                                          | Cheek                                                                                                                                                                                         |
+| `#1175`                                                                                                                          | **Done**: merged as `0a6210c1`, 2026-09-30 (§11)                                                                                                                                              |
+| A runner for AT-4                                                                                                                | Test slice, alongside the contract's T1                                                                                                                                                       |
+| Closing the release-state `FAIL` (superseded as "roll out the tip build": no tip deployment exists while the account is blocked) | **BLOCKED** (D-RT-15): owner picks the first build to serve, then restores the account, then M4 confirms that target's deployment exists, then the owner's promotion step (D-RT-13), then M10 |
+| Credential inventory and scoping (D-RT-14)                                                                                       | Owner                                                                                                                                                                                         |
+| A scheduled M10 promotion-drift probe                                                                                            | Workflow slice after this merges; signal only (D-RT-10)                                                                                                                                       |
+| Rollback-procedure gaps found by `#1892`'s doubt check (list below)                                                              | Owner decides each design question; then a spec slice and a runbook PR                                                                                                                        |
+| Cloudflare reads for M2–M4, M10, M11 (§12)                                                                                       | A §15 amendment, sequenced with `#1904`; not written here because no Cloudflare read was possible                                                                                             |
+| M11 for the window since Appendix C                                                                                              | `SKIPPED` in the 2026-10-06 amendment (no event log read); the next stamp's window starts at Appendix C                                                                                       |
 
 The rollback-procedure gaps are open design questions for the `Rollback — Matthew only`
 section of `docs/agents/RUNBOOK_VERCEL_PROMOTE.md`. They are `NOT_MEASURED` against a
@@ -1844,8 +1844,10 @@ release state is **`FAIL`** under D-RT-12, and under D-RT-15 the bindings do not
 hostnames return (D.1). The custom hostnames' DNS step is `BLOCKED` (D.1), so their reads are
 recorded but not passed. **M4.** The tip has a `ci.yml` `merge_group` run on
 `gh-readonly-queue/verdant-grow-diary/pr-1839-0c09a89c…`, whose parent is the previous first-parent
-tip, concluded `success`: normal provenance. It has no Vercel build, a missing build whose cause is
-the account block (D.2): **`FAIL`** for the owner. **M8.** `v2026.10.06-cfe09322e3b6` points at the
+tip, concluded `success`: normal provenance. It has no Vercel build: **`FAIL`** for the owner. The cause is
+`inference`, not measured: Vercel's status reports an account block at every tip since `5fbaa96b`
+(D.2), but that status neither proves the block nor dates its cause; an authoritative account-state
+read would close it. **M8.** `v2026.10.06-cfe09322e3b6` points at the
 tip; its message was not read, so the fast path is `NOT_MEASURED`.
 
 ---

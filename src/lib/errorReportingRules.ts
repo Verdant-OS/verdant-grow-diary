@@ -133,8 +133,8 @@ const BASIC_PATTERN = /\b(basic\s+)[A-Za-z0-9+/=]{4,}/gi;
 const CREDENTIAL_SEPARATOR = String.raw`(\s*(?:[:=]|%3[Dd])\s*)`;
 /** Value: quoted (escapes included), already redacted, or bare up to the next delimiter. */
 const CREDENTIAL_VALUE = String.raw`("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[redacted\]|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
-/** Words that make an identifier a credential name, including `*_KEY` / `*-key` and named `…Key`s. */
-const CREDENTIAL_WORDS = String.raw`token|secret|passw(?:or)?d|pwd|pass|api[-_]?key|apikey|authorization|session|cookie|credential|[-_]key|(?:private|secret|service|access|signing|encryption|master|anon|role|client)key`;
+/** Words that make an identifier a credential name, including `*_KEY` / `*-key`, named `…Key`s and one-time codes (`auth_code`, `verification_code`, PKCE `code_verifier`, `otp`). */
+const CREDENTIAL_WORDS = String.raw`token|secret|passw(?:or)?d|pwd|pass|api[-_]?key|apikey|authorization|session|cookie|credential|[-_]key|(?:private|secret|service|access|signing|encryption|master|anon|role|client)key|auth[-_]?code|verification[-_]?code|code[-_]?verifier|otp`;
 const CREDENTIAL_PATTERN = new RegExp(
   String.raw`(["']?)(?<![A-Za-z0-9_-])([A-Za-z0-9_-]*(?:${CREDENTIAL_WORDS})[A-Za-z0-9_-]*)\1` +
     CREDENTIAL_SEPARATOR +

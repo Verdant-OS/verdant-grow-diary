@@ -234,6 +234,11 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ["callback failed code = abc123", "abc123"],
       ['oauth exchange failed {"code":"4/0AbCdEfGhIjKlMnOp"}', "4/0AbCdEfGhIjKlMnOp"],
       ["oauth exchange failed {'code': 'q8w7e6r5t4y3u2i1'}", "q8w7e6r5t4y3u2i1"],
+      ["auth_code=q8w7e6r5t4y3", "q8w7e6r5t4y3"],
+      ['{"auth_code":"q8w7e6r5t4y3"}', "q8w7e6r5t4y3"],
+      ["verification_code=482913", "482913"],
+      ['{"otp":"482913"}', "482913"],
+      ["code_verifier=dBjftJeZ4CVPmB92K27uhbUJU1p1r", "dBjftJeZ4CVPmB92K27uhbUJU1p1r"],
       ["request rejected vbt_0123456789abcdefABCDEF0123456789abcdefAB", "vbt_0123456789"],
       ["bridge said (vbt_short-tok_123) was revoked", "short-tok_123"],
     ];
@@ -257,6 +262,8 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       '{"code":"23505","message":"duplicate"}',
     );
     expect(scrubText('{"code":"PGRST116"}')).toBe('{"code":"PGRST116"}');
+    expect(scrubText('{"error_code":"23505"}')).toBe('{"error_code":"23505"}');
+    expect(scrubText("status_code: 500")).toBe("status_code: 500");
   });
 
   it("drops DOM click breadcrumbs, which can carry grower data in element attributes", () => {

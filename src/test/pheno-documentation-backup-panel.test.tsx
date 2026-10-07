@@ -8,6 +8,7 @@ import PhenoDocumentationSections from "@/components/PhenoDocumentationSections"
 import {
   PHENO_DOC_BACKUP_COPY,
   PHENO_DOC_BACKUP_FORMAT,
+  PHENO_DOC_BACKUP_MAX_TEXT_LENGTH,
   phenoDocStorageKey,
 } from "@/lib/phenoDocumentationBackupRules";
 
@@ -154,6 +155,30 @@ describe("PhenoDocumentationBackupPanel", () => {
         PHENO_DOC_BACKUP_COPY.invalid.not_json,
       ),
     );
+    expect(storage.length).toBe(0);
+  });
+
+  it("rejects an oversized file before reading it (#552 Codex P2)", async () => {
+    const storage = memoryStorage();
+    const text = vi.fn(async () => "{}");
+    const huge = { name: "big.json", size: PHENO_DOC_BACKUP_MAX_TEXT_LENGTH + 1, text };
+    render(
+      <PhenoDocumentationBackupPanel
+        storage={storage}
+        download={vi.fn()}
+        now={() => "x"}
+        confirm={() => true}
+      />,
+    );
+    fireEvent.change(screen.getByTestId("pheno-doc-backup-restore-input"), {
+      target: { files: [huge] },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("pheno-doc-backup-status").textContent).toBe(
+        PHENO_DOC_BACKUP_COPY.invalid.too_large,
+      ),
+    );
+    expect(text).not.toHaveBeenCalled();
     expect(storage.length).toBe(0);
   });
 

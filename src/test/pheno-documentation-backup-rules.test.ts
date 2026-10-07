@@ -135,11 +135,32 @@ describe("parsePhenoDocumentationBackup — untrusted file", () => {
     expect(v).not.toHaveProperty("evil");
   });
 
-  it("caps very long field values", () => {
+  it("keeps long field values whole instead of truncating them (#552 Codex P2)", () => {
+    const long = "x".repeat(20000);
     const parsed = parsePhenoDocumentationBackup(
-      valid([{ recordType: "candidate", recordId: "p1", values: notes("x".repeat(20000)) }]),
+      valid([{ recordType: "candidate", recordId: "p1", values: notes(long) }]),
     );
-    expect(parsed.ok && parsed.records[0].values.phenotype.fields.unique_traits.length).toBe(10000);
+    expect(parsed.ok && parsed.records[0].values.phenotype.fields.unique_traits).toBe(long);
+    const listed = listPhenoDocRecordsInStorage(
+      store({ [phenoDocStorageKey("candidate", "p1", U)]: JSON.stringify(notes(long)) }),
+      U,
+      "candidate",
+    );
+    expect(listed[0].values.phenotype.fields.unique_traits).toBe(long);
+  });
+
+  it("skips a record whose values are missing or malformed (#552 Codex P2)", () => {
+    const bad = [
+      { recordType: "candidate", recordId: "p1" },
+      { recordType: "candidate", recordId: "p2", values: "x" },
+      { recordType: "candidate", recordId: "p3", values: { evil: { fields: {} } } },
+      { recordType: "candidate", recordId: "p4", values: [] },
+    ];
+    expect(parsePhenoDocumentationBackup(valid(bad))).toEqual({ ok: false, reason: "empty" });
+    const mixed = parsePhenoDocumentationBackup(
+      valid([...bad, { recordType: "candidate", recordId: "p5", values: notes("keep") }]),
+    );
+    expect(mixed.ok && mixed.records.map((r) => r.recordId)).toEqual(["p5"]);
   });
 });
 

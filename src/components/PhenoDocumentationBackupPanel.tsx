@@ -12,6 +12,7 @@ import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import {
   PHENO_DOC_BACKUP_COPY,
+  PHENO_DOC_BACKUP_MAX_TEXT_LENGTH,
   PHENO_DOCS_RESTORED_EVENT,
   buildPhenoDocumentationBackup,
   listExistingPhenoDocKeys,
@@ -100,6 +101,11 @@ export default function PhenoDocumentationBackupPanel({
     if (!file) return;
     if (!userId) return setStatus(PHENO_DOC_BACKUP_COPY.signedOut);
     if (!store) return setStatus(PHENO_DOC_BACKUP_COPY.storageUnavailable);
+    // Check the size before reading: a huge file must not be pulled into
+    // memory just to be rejected by the parser (#552 Codex P2).
+    if (file.size > PHENO_DOC_BACKUP_MAX_TEXT_LENGTH) {
+      return setStatus(PHENO_DOC_BACKUP_COPY.invalid.too_large);
+    }
     let text: string;
     try {
       text = await readFileText(file);

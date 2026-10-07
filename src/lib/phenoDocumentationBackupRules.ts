@@ -68,7 +68,6 @@ export function canSavePhenoDocOverStored(
 export const PHENO_DOC_BACKUP_FORMAT = "verdant.pheno-documentation-backup";
 export const PHENO_DOC_BACKUP_VERSION = 1;
 export const PHENO_DOC_BACKUP_MAX_RECORDS = 5000;
-export const PHENO_DOC_BACKUP_MAX_FIELD_LENGTH = 10000;
 /** Reject absurdly large files before parsing (bytes of text). */
 export const PHENO_DOC_BACKUP_MAX_TEXT_LENGTH = 20_000_000;
 
@@ -140,7 +139,11 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-/** Keep only known sections/fields with string values (capped). */
+/**
+ * Keep only known sections/fields with string values. Values are kept whole:
+ * entry has no length limit, so capping here silently truncated backups
+ * (#552 Codex P2). The file-size and record caps bound untrusted input.
+ */
 function sanitizeValues(raw: unknown): PhenoDocumentationValues {
   const clean: PhenoDocumentationValues = {};
   if (!isPlainObject(raw)) return mergeDocumentationValues(null);
@@ -151,7 +154,7 @@ function sanitizeValues(raw: unknown): PhenoDocumentationValues {
     const rawFields = isPlainObject(s.fields) ? s.fields : {};
     for (const f of section.fields) {
       const v = rawFields[f.key];
-      if (typeof v === "string") fields[f.key] = v.slice(0, PHENO_DOC_BACKUP_MAX_FIELD_LENGTH);
+      if (typeof v === "string") fields[f.key] = v;
     }
     const diary =
       typeof s.diaryEntryId === "string" && RECORD_ID_RE.test(s.diaryEntryId)
@@ -160,6 +163,16 @@ function sanitizeValues(raw: unknown): PhenoDocumentationValues {
     clean[section.key] = { fields, diaryEntryId: diary };
   }
   return mergeDocumentationValues(clean);
+}
+
+/**
+ * A restorable record must carry at least one known section as an object.
+ * A missing or malformed payload would otherwise sanitize to an all-blank
+ * document and overwrite saved notes on restore (#552 Codex P2).
+ */
+function hasRestorableValues(raw: unknown): boolean {
+  if (!isPlainObject(raw)) return false;
+  return PHENO_DOCUMENTATION_DEFAULTS.some((section) => isPlainObject(raw[section.key]));
 }
 
 function compareRecords(a: PhenoDocRecord, b: PhenoDocRecord): number {
@@ -243,6 +256,7 @@ export function parsePhenoDocumentationBackup(text: string): PhenoDocBackupParse
     if (!isPlainObject(r)) continue;
     if (typeof r.recordType !== "string" || !RESTORABLE_RECORD_TYPES.has(r.recordType)) continue;
     if (typeof r.recordId !== "string" || !RECORD_ID_RE.test(r.recordId)) continue;
+    if (!hasRestorableValues(r.values)) continue;
     const rec: PhenoDocRecord = {
       recordType: r.recordType as PhenoDocRecordType,
       recordId: r.recordId,

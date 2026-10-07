@@ -113,6 +113,18 @@ const SENSITIVE_PARAM_PATTERN =
 const SENSITIVE_JSON_PATTERN =
   /("(?:access_token|refresh_token|id_token|provider_token|provider_refresh_token|token|code|apikey|api_key|key|secret|password|authorization|session)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi;
 
+/** `Basic <base64>` credentials (HTTP Basic auth). Keeps the scheme, drops the value. */
+const BASIC_PATTERN = /\b(basic\s+)[A-Za-z0-9+/=]{6,}/gi;
+/**
+ * `key: value` credentials in log or object form, with the key bare, single- or
+ * double-quoted, and the value bare or quoted (`password: hunter2`,
+ * `{'client_secret': 'x'}`, `Authorization: Basic …`). Narrower than the `=`
+ * list on purpose: `code` and `key` are left out so diagnostics such as a
+ * Postgres `code: 23505` stay readable.
+ */
+const SENSITIVE_COLON_PATTERN =
+  /(["']?)\b(access_token|refresh_token|id_token|provider_token|provider_refresh_token|token|apikey|api_key|api-key|x-api-key|secret|client_secret|password|passwd|pwd|authorization|session|cookie)\1(\s*:\s*)("[^"]*"|'[^']*'|\[redacted\]|[^\s,;&}\]]+)/gi;
+
 export const REDACTED = "[redacted]";
 
 /** Removes e-mail addresses, JWT/bearer tokens and credential-looking query values from free text. Idempotent. */
@@ -123,6 +135,14 @@ export function scrubText(value: unknown): string {
     .replace(SENSITIVE_JSON_PATTERN, (_m, prefix: string) => `${prefix}"${REDACTED}"`)
     .replace(SENSITIVE_PARAM_PATTERN, (_m, key: string) => `${key}=${REDACTED}`)
     .replace(BEARER_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
+    .replace(BASIC_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
+    .replace(
+      SENSITIVE_COLON_PATTERN,
+      (_m, quote: string, key: string, separator: string, value: string) => {
+        const valueQuote = value.startsWith('"') || value.startsWith("'") ? value[0] : "";
+        return `${quote}${key}${quote}${separator}${valueQuote}${REDACTED}${valueQuote}`;
+      },
+    )
     .replace(JWT_PATTERN, REDACTED)
     .replace(EMAIL_PATTERN, REDACTED);
 }

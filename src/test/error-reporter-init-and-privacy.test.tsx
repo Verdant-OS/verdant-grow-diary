@@ -139,6 +139,30 @@ describe("errorReportingRules — privacy of outgoing events", () => {
     expect(scrubText(scrubbed)).toBe(scrubbed);
   });
 
+  it("redacts colon-delimited, Basic-auth and object-style credentials", () => {
+    const cases: Array<[string, string]> = [
+      ["login failed password: hunter2", "hunter2"],
+      ["api_key: sk_live_abc123 rejected", "sk_live_abc123"],
+      ["Authorization: Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"],
+      ["{password: 'hunter two', user: 'x'}", "hunter two"],
+      ["{'client_secret': 'cs_abc'}", "cs_abc"],
+      ["Cookie: sb-access=xyz123", "xyz123"],
+      ['{"apikey" : "anon-key-value"}', "anon-key-value"],
+    ];
+    for (const [input, secret] of cases) {
+      const out = scrubText(input);
+      expect(out, input).not.toContain(secret);
+      expect(out, input).toContain(REDACTED);
+      expect(scrubText(out), input).toBe(out);
+    }
+  });
+
+  it("keeps non-credential diagnostics such as Postgres error codes readable", () => {
+    expect(scrubText('duplicate key value, code: 23505, details: "plant_id"')).toBe(
+      'duplicate key value, code: 23505, details: "plant_id"',
+    );
+  });
+
   it("drops non-allowlisted contexts and keeps device/runtime ones", () => {
     const out = scrubEvent({
       contexts: {

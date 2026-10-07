@@ -253,6 +253,16 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ["mfa_code=123456", "123456"],
       ['recovery_codes: ["a1b2", "c3d4"]', "a1b2"],
       ["pin: 4821", "4821"],
+      ["https://verdantgrowdiary.com/auth?code=abc&state=csrfSecret123456", "csrfSecret123456"],
+      ["openid callback nonce=n0nc3Value99", "n0nc3Value99"],
+      ['{"code":"12345"}', "12345"],
+      ['{"code":"ABCDE"}', "ABCDE"],
+      ["gateway rejected sk_live_ABCDEFGH123456", "ABCDEFGH123456"],
+      ["supabase said sb_secret_abcdefgh12345678", "abcdefgh12345678"],
+      ["paddle webhook pdl_ntfset_ABCDEF123456", "ABCDEF123456"],
+      ["whsec_9f8e7d6c5b4a3210 rejected", "9f8e7d6c5b4a3210"],
+      ["token ghp_AbCdEfGhIjKlMnOpQrSt1234 revoked", "AbCdEfGhIjKlMnOpQrSt1234"],
+      ["key AKIAABCDEFGHIJKLMNOP leaked", "ABCDEFGHIJKLMNOP"],
       ['{"auth_code":"q8w7e6r5t4y3"}', "q8w7e6r5t4y3"],
       ["verification_code=482913", "482913"],
       ['{"otp":"482913"}', "482913"],
@@ -279,8 +289,12 @@ describe("errorReportingRules — privacy of outgoing events", () => {
     expect(scrubText('{"code":"23505","message":"duplicate"}')).toBe(
       '{"code":"23505","message":"duplicate"}',
     );
-    expect(scrubText('{"code":"PGRST116"}')).toBe('{"code":"PGRST116"}');
-    expect(scrubText('{"code":"42P01"}')).toBe('{"code":"42P01"}');
+    expect(scrubText('{"code":"PGRST116","details":null,"hint":null,"message":"no rows"}')).toBe(
+      '{"code":"PGRST116","details":null,"hint":null,"message":"no rows"}',
+    );
+    expect(scrubText('{"code":"42P01","message":"relation missing"}')).toBe(
+      '{"code":"42P01","message":"relation missing"}',
+    );
     expect(scrubText('{"error_code":"23505"}')).toBe('{"error_code":"23505"}');
     expect(scrubText("status_code: 500")).toBe("status_code: 500");
     expect(scrubText("error code: 23505")).toBe("error code: 23505");

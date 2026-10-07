@@ -114,6 +114,13 @@ const JWT_PATTERN = /\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,
 const BEARER_PATTERN = /\b(bearer\s+)[A-Za-z0-9._~+/=-]{4,}/gi;
 /** Verdant bridge tokens (`vbt_…`), which can appear bare with no key or scheme in front. */
 const BRIDGE_TOKEN_PATTERN = /\bvbt_[A-Za-z0-9_-]{6,}/g;
+/**
+ * Secrets recognisable by prefix alone, with no key label in front (`gateway rejected
+ * sk_live_…`). Prefixes follow `SECRET_LIKE_PATTERNS` in `src/lib/mcp/manifestView.ts`
+ * plus standard provider formats. The prefix is kept for diagnosis; the rest is dropped.
+ */
+const KNOWN_SECRET_PATTERN =
+  /\b((?:sk|rk)_(?:live|test)_|sk-|sb_secret_|sbp_|pdl_[a-z]+_|whsec_|gh[pousr]_|github_pat_|xox[abprs]-|AKIA)[A-Za-z0-9_-]{6,}/g;
 /** `Basic <base64>` credentials (HTTP Basic auth). Keeps the scheme, drops the value. */
 const BASIC_PATTERN = /\b(basic\s+)[A-Za-z0-9+/=]{4,}/gi;
 /**
@@ -167,12 +174,18 @@ const QUOTED_CODE_PATTERN = new RegExp(
   String.raw`(["'])(code)\1(\s*:\s*)` + CREDENTIAL_VALUE,
   "gi",
 );
-/** SQLSTATE (`23505`, `42P01`) or PostgREST (`PGRST116`) codes only, optionally quoted. */
+/** SQLSTATE (`23505`, `42P01`) or PostgREST (`PGRST116`) code shape, optionally quoted. */
 const DIAGNOSTIC_CODE_VALUE = /^(["']?)(?:[0-9A-Z]{5}|PGRST\d{3})\1$/;
+/**
+ * A PostgREST/Postgres error object carries `message`, `details` or `hint` beside its
+ * `code`. Only with that context is a code-shaped value kept; a lone `{"code":"12345"}`
+ * could be a verification or OAuth code and is redacted.
+ */
+const POSTGREST_ERROR_CONTEXT = /["'](?:message|details|hint)["']\s*:/i;
 
-/** OAuth `code=` / `key=` query parameters (auth callbacks carry them), `=` or `%3D` with optional spaces. */
+/** OAuth `code=` / `key=` / `state=` / `nonce=` parameters (auth callbacks carry them), `=` or `%3D` with optional spaces. */
 const OAUTH_PARAM_PATTERN =
-  /\b(code|key)(\s*(?:=|%3[Dd])\s*)("[^"]*"|'[^']*'|\[redacted\]|[^&\s"'#]+)/gi;
+  /\b(code|key|state|nonce)(\s*(?:=|%3[Dd])\s*)("[^"]*"|'[^']*'|\[redacted\]|[^&\s"'#]+)/gi;
 
 export const REDACTED = "[redacted]";
 
@@ -216,8 +229,10 @@ function decodePercentEscapes(text: string): string {
 export function scrubText(value: unknown): string {
   if (value == null) return "";
   const text = decodePercentEscapes(typeof value === "string" ? value : safeString(value));
+  const hasPostgrestContext = POSTGREST_ERROR_CONTEXT.test(text);
   return text
     .replace(BRIDGE_TOKEN_PATTERN, `vbt_${REDACTED}`)
+    .replace(KNOWN_SECRET_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
     .replace(BEARER_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
     .replace(BASIC_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
     .replace(
@@ -238,7 +253,7 @@ export function scrubText(value: unknown): string {
     .replace(
       QUOTED_CODE_PATTERN,
       (match, quote: string, key: string, separator: string, value: string) =>
-        DIAGNOSTIC_CODE_VALUE.test(value)
+        DIAGNOSTIC_CODE_VALUE.test(value) && hasPostgrestContext
           ? match
           : `${quote}${key}${quote}${separator}${redactedLike(value)}`,
     )

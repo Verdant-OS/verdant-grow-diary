@@ -90,8 +90,14 @@ export function segments(command: string): string[][] {
         }
       }
       if (c === quote) quote = null;
-      else if (c === "\\" && quote === '"' && i + 1 < text.length) token += text[++i];
-      else token += c;
+      else if (c === "\\" && quote === '"' && i + 1 < text.length) {
+        // As in bash: inside double quotes a backslash escapes only $ ` " \ and newline;
+        // before anything else it stays, so `"git\_push"` keeps its backslash for env -S.
+        const next = text[i + 1]!;
+        if (next === "\n") i += 1;
+        else if ('$`"\\'.includes(next)) token += text[++i];
+        else token += c;
+      } else token += c;
       continue;
     }
     if (c === "'" || c === '"') {
@@ -467,12 +473,13 @@ export function checkBash(command: string): string | null {
   for (const raw of segments(command)) {
     let expands = false;
     const tokens = stripPrefix(raw, (split) => {
-      // GNU `env -S` expands `${NAME}` while splitting; the value is unknown here, so the
-      // wrapped command cannot be checked.
-      if (split.includes("${")) expands = true;
+      // GNU `env -S` has its own grammar beyond quotes: `${NAME}` expansion, backslash
+      // escapes (`\_` separates arguments, `\c` ends the string) and `#` comments. This
+      // guard models quotes only, so any of those makes the wrapped command uncheckable.
+      if (/[\\$#]/.test(split)) expands = true;
     });
     if (expands) {
-      return "`env -S` with `${…}` expands variables this guard cannot see, so the command it runs cannot be checked. Write the command out without `env -S`.";
+      return "`env -S` with `$`, `\\` or `#` uses env's own expansion, escapes or comments, so the command it runs cannot be checked here. Write the command out without `env -S`.";
     }
     if (tokens.length === 0) continue;
     const git = gitArgs(tokens);

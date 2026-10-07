@@ -383,3 +383,18 @@ describe("Codex re-review P1: env -S variable expansion", () => {
     expect(checkBash('git commit -m "${not} an env split"')).toBe(null);
   });
 });
+
+describe("Codex re-review P1: env -S escapes and comments", () => {
+  test("an env -S string using env's own escapes or comments is refused", () => {
+    for (const cmd of [
+      String.raw`env -S 'git\_push\_-f\_origin\_claude/task'`,
+      String.raw`env -S 'git push origin claude/task\c -f'`,
+      "env -S 'gh pr ready 1800 #--undo'",
+      String.raw`env --split-string='git\tpush\t-f'`,
+      String.raw`env -S "git\_push\_-f\_origin\_claude/task"`,
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash(`env -S 'git push "origin" claude/task'`)).toBe(null);
+  });
+});

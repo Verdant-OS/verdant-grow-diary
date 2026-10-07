@@ -227,4 +227,41 @@ describe("PhenoHuntWorkspace rename (#551)", () => {
     expect(input.value).toBe("Repaired A");
     expect(updatePhenoHuntSetup).toHaveBeenCalledTimes(1);
   });
+  it("a failed draft survives renaming another hunt (#551 Codex P2)", async () => {
+    let reject: (e: Error) => void = () => {};
+    updatePhenoHuntSetup
+      .mockImplementationOnce(() => new Promise<void>((_, r) => (reject = r)))
+      .mockImplementationOnce(() => Promise.resolve());
+    const { rerenderState } = renderAt({});
+    const huntA = { id: "h1", name: "Blue Dream Hunt", growId: "g1", tentId: "t1" };
+    submitRename("Repaired A");
+    await waitFor(() => expect(updatePhenoHuntSetup).toHaveBeenCalledTimes(1));
+    rerenderState({ hunt: { id: "h2", name: "Other Hunt", growId: "g1", tentId: "t1" } });
+    reject(new Error("network"));
+    await waitFor(() =>
+      expect((screen.getByTestId("pheno-hunt-rename-open") as HTMLButtonElement).disabled).toBe(
+        false,
+      ),
+    );
+    // Rename hunt B after A's save failed.
+    submitRename("Repaired B");
+    await waitFor(() => expect(screen.queryByTestId("pheno-hunt-rename-input")).toBeNull());
+    rerenderState({ hunt: huntA });
+    expect(await screen.findByTestId("pheno-hunt-rename-error")).toBeDefined();
+    const input = screen.getByTestId("pheno-hunt-rename-input") as HTMLInputElement;
+    expect(input.value).toBe("Repaired A");
+  });
+
+  it("a confirmed name is not revived when another session renames back (#551 Codex P2)", async () => {
+    updatePhenoHuntSetup.mockResolvedValue(undefined);
+    const { rerenderState } = renderAt({});
+    submitRename("Repaired Hunt");
+    await waitFor(() => expect(screen.queryByTestId("pheno-hunt-rename-input")).toBeNull());
+    // The row catches up, then another session renames the hunt back.
+    rerenderState({ hunt: { id: "h1", name: "Repaired Hunt", growId: "g1", tentId: "t1" } });
+    rerenderState({ hunt: { id: "h1", name: "Blue Dream Hunt", growId: "g1", tentId: "t1" } });
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Blue Dream Hunt"),
+    );
+  });
 });

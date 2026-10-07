@@ -7,11 +7,10 @@
  * that window must still close the editor or show its failure against the
  * draft the grower submitted (#551 Codex P2s).
  *
- * The session is scoped to `huntId`: the workspace route isn't keyed by hunt,
- * so when the page moves to another hunt the editor starts idle there. One
- * save runs at a time across the page: while it is in flight no hunt can open
- * or save an editor, so the session that started it is still there when it
- * settles, even after the grower visits another hunt and comes back.
+ * Editor state is kept per hunt: the workspace route isn't keyed by hunt, so
+ * the page can move between hunts, and each hunt keeps its own draft and
+ * failure until the grower resolves it there. One save runs at a time across
+ * the page; it settles into the session of the hunt that started it.
  */
 import { useCallback, useRef, useState } from "react";
 
@@ -27,46 +26,50 @@ export interface PhenoHuntRenameSession {
 }
 
 interface SessionState {
-  readonly huntId: string | null;
   readonly editing: boolean;
   readonly draft: string;
   readonly failed: boolean;
 }
 
-const IDLE = { editing: false, draft: "", failed: false } as const;
+const IDLE: SessionState = { editing: false, draft: "", failed: false };
 
 export function usePhenoHuntRenameSession(
   huntId: string | null | undefined,
   onRename: (name: string) => Promise<boolean>,
 ): PhenoHuntRenameSession {
   const scope = huntId ?? null;
-  const [state, setState] = useState<SessionState>({ huntId: scope, ...IDLE });
+  const [sessions, setSessions] = useState<Readonly<Record<string, SessionState>>>({});
   // The one save in flight, page-wide (the ref guards double submits).
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
 
-  const current = state.huntId === scope ? state : { huntId: scope, ...IDLE };
+  const current = (scope !== null && sessions[scope]) || IDLE;
+
+  const update = useCallback(
+    (key: string, change: (prev: SessionState) => SessionState) =>
+      setSessions((prev) => ({ ...prev, [key]: change(prev[key] ?? IDLE) })),
+    [],
+  );
 
   const open = useCallback(
     (currentName: string) => {
-      if (savingRef.current) return;
-      setState({ huntId: scope, editing: true, draft: currentName, failed: false });
+      if (scope === null || savingRef.current) return;
+      update(scope, () => ({ editing: true, draft: currentName, failed: false }));
     },
-    [scope],
+    [scope, update],
   );
 
   const cancel = useCallback(() => {
-    if (savingRef.current) return;
-    setState({ huntId: scope, ...IDLE });
-  }, [scope]);
+    if (scope === null || savingRef.current) return;
+    update(scope, () => IDLE);
+  }, [scope, update]);
 
   const setDraft = useCallback(
     (draft: string) => {
-      setState((prev) =>
-        prev.huntId === scope ? { ...prev, draft } : { huntId: scope, ...IDLE, draft },
-      );
+      if (scope === null) return;
+      update(scope, (prev) => ({ ...prev, draft }));
     },
-    [scope],
+    [scope, update],
   );
 
   const save = useCallback(
@@ -75,7 +78,7 @@ export function usePhenoHuntRenameSession(
       const owner = scope;
       savingRef.current = true;
       setSaving(true);
-      setState((prev) => (prev.huntId === owner ? { ...prev, failed: false } : prev));
+      update(owner, (prev) => ({ ...prev, failed: false }));
       let ok = false;
       try {
         ok = await onRename(name);
@@ -85,13 +88,10 @@ export function usePhenoHuntRenameSession(
         savingRef.current = false;
         setSaving(false);
       }
-      // Settle only into the session that started the save.
-      setState((prev) => {
-        if (prev.huntId !== owner) return prev;
-        return ok ? { huntId: owner, ...IDLE } : { ...prev, failed: true };
-      });
+      // Settle into the session of the hunt that started the save.
+      update(owner, (prev) => (ok ? IDLE : { ...prev, failed: true }));
     },
-    [scope, onRename],
+    [scope, onRename, update],
   );
 
   return {

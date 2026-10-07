@@ -95,6 +95,23 @@ export function nextHuntNameOverride(
   return { huntId, value, staleNames };
 }
 
+/**
+ * Drop a hunt's override once its loaded row shows the override's value: the
+ * row has confirmed it, so the accumulated stale names must not revive it if
+ * another session later renames the hunt back (#551 Codex P2). Returns the
+ * same map when nothing changes.
+ */
+export function retireConfirmedHuntNameOverride(
+  overrides: Readonly<Record<string, HuntNameOverride>>,
+  hunt: { readonly id: string; readonly name: string } | null | undefined,
+): Readonly<Record<string, HuntNameOverride>> {
+  if (!hunt) return overrides;
+  const override = overrides[hunt.id];
+  if (!override || override.value !== hunt.name) return overrides;
+  const { [hunt.id]: _retired, ...rest } = overrides;
+  return rest;
+}
+
 export function phenoHuntRenameHint(result: PhenoHuntRenameResult): string {
   if (result.ok) return "";
   if (result.reason === "empty") return PHENO_HUNT_RENAME_COPY.empty;

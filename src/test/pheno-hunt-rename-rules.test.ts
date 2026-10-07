@@ -9,6 +9,7 @@ import {
   huntScopedOverrideValue,
   huntNameOverrideValue,
   nextHuntNameOverride,
+  retireConfirmedHuntNameOverride,
   validatePhenoHuntRename,
 } from "@/lib/phenoHuntRenameRules";
 
@@ -110,5 +111,25 @@ describe("nextHuntNameOverride (#551 Codex P2: repeated renames)", () => {
     expect(nextHuntNameOverride(first, "hunt-a", "Old A", "Second")).toEqual(
       nextHuntNameOverride(first, "hunt-a", "Old A", "Second"),
     );
+  });
+});
+
+describe("retireConfirmedHuntNameOverride (#551 Codex P2: retire once confirmed)", () => {
+  const a = nextHuntNameOverride(null, "hunt-a", "Old A", "First");
+  const b = nextHuntNameOverride(null, "hunt-b", "Old B", "B");
+  const map = { "hunt-a": a, "hunt-b": b };
+
+  it("drops the override once the row shows its value", () => {
+    const next = retireConfirmedHuntNameOverride(map, { id: "hunt-a", name: "First" });
+    expect(next).toEqual({ "hunt-b": b });
+  });
+
+  it("keeps the override while the row still shows a stale name", () => {
+    expect(retireConfirmedHuntNameOverride(map, { id: "hunt-a", name: "Old A" })).toBe(map);
+  });
+
+  it("returns the same map when there is nothing to retire", () => {
+    expect(retireConfirmedHuntNameOverride(map, { id: "hunt-c", name: "C" })).toBe(map);
+    expect(retireConfirmedHuntNameOverride(map, null)).toBe(map);
   });
 });

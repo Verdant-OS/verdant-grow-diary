@@ -77,6 +77,7 @@ import { usePhenoHuntRenameSession } from "@/hooks/usePhenoHuntRenameSession";
 import {
   huntNameOverrideValue,
   nextHuntNameOverride,
+  retireConfirmedHuntNameOverride,
   huntScopedOverrideValue,
   type HuntNameOverride,
   type HuntScopedOverride,
@@ -1542,6 +1543,14 @@ export default function PhenoHuntWorkspace() {
   const [huntNameLocal, setHuntNameLocal] = useState<Readonly<Record<string, HuntNameOverride>>>(
     {},
   );
+  const huntRowId = ws.hunt?.id;
+  const huntRowName = ws.hunt?.name;
+  useEffect(() => {
+    if (!huntRowId || huntRowName === undefined) return;
+    setHuntNameLocal((prev) =>
+      retireConfirmedHuntNameOverride(prev, { id: huntRowId, name: huntRowName }),
+    );
+  }, [huntRowId, huntRowName]);
   const effectiveHuntName =
     huntNameOverrideValue(ws.hunt ? (huntNameLocal[ws.hunt.id] ?? null) : null, ws.hunt) ??
     ws.hunt?.name ??

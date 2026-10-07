@@ -271,6 +271,30 @@ describe("errorReportingRules — privacy of outgoing events", () => {
     expect(event.request.url).toBe("https://verdantgrowdiary.com/plants/:id");
   });
 
+  it("replaces percent-encoded UUID path segments with :id", () => {
+    const encoded = "3f2c9a1e%2D8b7d%2d4c6e%2D9f00%2D1a2b3c4d5e6f";
+    expect(scrubUrl(`https://verdantgrowdiary.com/plants/${encoded}`)).toBe(
+      "https://verdantgrowdiary.com/plants/:id",
+    );
+    expect(scrubUrl(`/plants/${encoded}`)).toBe("/plants/:id");
+  });
+
+  it("redacts UUIDs in free text: exception values, messages and breadcrumb messages", () => {
+    const id = "3f2c9a1e-8b7d-4c6e-9f00-1a2b3c4d5e6f";
+    const text = scrubText(`hunt ${id} failed; plant ${id.toUpperCase()} missing`);
+    expect(text).toBe("hunt [id] failed; plant [id] missing");
+    expect(scrubText(text)).toBe(text);
+    const event = scrubEvent({
+      message: `load ${id}`,
+      exception: { values: [{ type: "Error", value: `hunt ${id} failed` }] },
+    }) as { message: string; exception: { values: Array<{ value: string }> } };
+    expect(event.message).toBe("load [id]");
+    expect(event.exception.values[0]?.value).toBe("hunt [id] failed");
+    expect(scrubBreadcrumb({ category: "fetch", message: `GET row ${id}` })?.message).toBe(
+      "GET row [id]",
+    );
+  });
+
   it("keeps only http(s) origin+path from URLs and redacts payload-bearing schemes", () => {
     expect(scrubUrl("https://verdantgrowdiary.com/grows/1?token=abc#x")).toBe(
       "https://verdantgrowdiary.com/grows/1",

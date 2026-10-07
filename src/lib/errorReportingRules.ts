@@ -15,7 +15,7 @@
  *   replaced by `:id`. Query strings and fragments are
  *   dropped because auth flows carry tokens there.
  * - Free text (messages, stacks, breadcrumbs) is scrubbed for token-like
- *   values and e-mail addresses before it leaves the browser.
+ *   values, e-mail addresses and UUID row ids before it leaves the browser.
  * - No session replay, no performance tracing, no console capture.
  */
 
@@ -102,6 +102,11 @@ export function resolveErrorReportingConfig(
 
 // ── Scrubbing ────────────────────────────────────────────────────────────────
 
+/** UUID with literal or percent-encoded (`%2D`) hyphens. */
+const UUID_BODY = String.raw`[0-9a-f]{8}(?:-|%2[Dd])[0-9a-f]{4}(?:-|%2[Dd])[0-9a-f]{4}(?:-|%2[Dd])[0-9a-f]{4}(?:-|%2[Dd])[0-9a-f]{12}`;
+/** A UUID anywhere in free text (row ids in error messages). */
+const UUID_TEXT_PATTERN = new RegExp(String.raw`(?<![0-9a-z])${UUID_BODY}(?![0-9a-z])`, "gi");
+export const REDACTED_ID = "[id]";
 const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 /** Bearer / JWT / API-key shaped values. JWTs are three base64url segments. */
 const JWT_PATTERN = /\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g;
@@ -151,7 +156,7 @@ function redactedLike(value: string): string {
   return `${quote}${REDACTED}${quote}`;
 }
 
-/** Removes e-mail addresses, bridge/JWT/bearer tokens and credential-looking query values from free text. Idempotent. */
+/** Removes e-mail addresses, UUID row ids, bridge/JWT/bearer tokens and credential-looking query values from free text. Idempotent. */
 export function scrubText(value: unknown): string {
   if (value == null) return "";
   const text = typeof value === "string" ? value : safeString(value);
@@ -174,12 +179,12 @@ export function scrubText(value: unknown): string {
       (_m, key: string, value: string) => `${key}=${redactedLike(value)}`,
     )
     .replace(JWT_PATTERN, REDACTED)
-    .replace(EMAIL_PATTERN, REDACTED);
+    .replace(EMAIL_PATTERN, REDACTED)
+    .replace(UUID_TEXT_PATTERN, REDACTED_ID);
 }
 
-/** A whole path segment shaped like a UUID (grow, tent, plant and other row ids). */
-const UUID_SEGMENT_PATTERN =
-  /(?<=\/)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=\/|$)/gi;
+/** A whole path segment shaped like a UUID (grow, tent, plant and other row ids), hyphens literal or `%2D`. */
+const UUID_SEGMENT_PATTERN = new RegExp(String.raw`(?<=\/)${UUID_BODY}(?=\/|$)`, "gi");
 
 function redactPathIds(path: string): string {
   return path.replace(UUID_SEGMENT_PATTERN, ":id");

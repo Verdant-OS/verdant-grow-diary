@@ -16,8 +16,13 @@
  *   never weaker"). Owner decision 2026-10-07 on PR #1937.
  * - Route-specific headers (today only `/unsubscribe`, mirroring `vercel.json`)
  *   override the baseline for that path, because the more specific rule must win.
- * - Existing headers are never overwritten, so a route can tighten or loosen a
- *   header for itself and this layer stays out of the way.
+ * - Baseline headers never overwrite a header the response already carries, so
+ *   a route can tighten or loosen one for itself. Only ROUTE_SECURITY_HEADERS
+ *   override existing values, because the more specific rule must win.
+ * - The non-CSP baseline is identical to `vercel.json`'s `/(.*)` rule, including
+ *   `camera=()` and `payment=()`: photo capture uses `<input capture>`, which
+ *   Permissions-Policy does not gate, and the app calls neither getUserMedia
+ *   nor the Payment Request API.
  */
 
 export const STRICT_TRANSPORT_SECURITY_VALUE = "max-age=63072000; includeSubDomains; preload";
@@ -88,7 +93,7 @@ export function buildSecurityHeaders(): ReadonlyArray<[string, string]> {
     ["X-Content-Type-Options", "nosniff"],
     ["X-Frame-Options", "SAMEORIGIN"],
     ["Referrer-Policy", "strict-origin-when-cross-origin"],
-    ["Permissions-Policy", "geolocation=(), microphone=()"],
+    ["Permissions-Policy", "geolocation=(), camera=(), microphone=(), payment=()"],
     ["Content-Security-Policy-Report-Only", buildContentSecurityPolicyReportOnly()],
   ];
 }

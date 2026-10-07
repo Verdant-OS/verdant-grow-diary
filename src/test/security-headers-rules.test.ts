@@ -54,6 +54,13 @@ describe("securityHeadersRules — baseline set", () => {
     expect(STRICT_TRANSPORT_SECURITY_VALUE).toBe(published);
   });
 
+  it("every non-CSP baseline header is identical to vercel.json's /(.*) rule (hosting parity)", () => {
+    const published = VERCEL_RULES.find((rule) => rule.source === "/(.*)")?.headers ?? [];
+    expect(published.length).toBeGreaterThan(0);
+    const ours = new Map(buildSecurityHeaders().map(([k, v]) => [k.toLowerCase(), v] as const));
+    for (const { key, value } of published) expect(ours.get(key.toLowerCase()), key).toBe(value);
+  });
+
   it("route headers match the vercel.json /unsubscribe rule exactly", () => {
     const published = VERCEL_RULES.find((rule) => rule.source === "/unsubscribe")?.headers ?? [];
     expect(published.length).toBeGreaterThan(0);

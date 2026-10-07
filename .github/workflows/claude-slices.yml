@@ -174,12 +174,52 @@ jobs:
             return CONTENT_ROOTS.test(path) && !/\.md$/i.test(path);
           }
 
+          // The text with // and /* */ comments blanked (a block comment keeps its
+          // line breaks), so supabase.auth /* c */ .signOut() and
+          // db.from(/* c */ "action_queue") match (Codex P1s, 2026-10-07). One
+          // linear pass; strings are skipped so a "//" inside a URL is not taken
+          // for a comment. An unterminated comment runs to the end of the file.
+          // With skipStrings false every // and /* counts, which also catches a
+          // comment after a quote in a regex literal (/'/) or a nested template.
+          function stripComments(text, skipStrings = true) {
+            let out = '';
+            let i = 0;
+            while (i < text.length) {
+              const c = text[i];
+              if (c === '/' && text[i + 1] === '/') {
+                const end = text.indexOf('\n', i);
+                const stop = end === -1 ? text.length : end;
+                out += ' '.repeat(stop - i);
+                i = stop;
+              } else if (c === '/' && text[i + 1] === '*') {
+                const end = text.indexOf('*/', i + 2);
+                const stop = end === -1 ? text.length : end + 2;
+                out += text.slice(i, stop).replace(/[^\n]/g, ' ');
+                i = stop;
+              } else if (skipStrings && (c === "'" || c === '"' || c === '`')) {
+                let j = i + 1;
+                while (j < text.length && text[j] !== c && !(c !== '`' && text[j] === '\n')) j += text[j] === '\\' ? 2 : 1;
+                const stop = Math.min(j + 1, text.length);
+                out += text.slice(i, stop);
+                i = stop;
+              } else {
+                out += c;
+                i += 1;
+              }
+            }
+            return out;
+          }
+
           // Every content rule the text matches, not just the first: an exception
-          // for one rule must never hide another rule on the same file.
+          // for one rule must never hide another rule on the same file. The raw
+          // text and both comment-stripped versions are checked, so stripping (which
+          // can misread a regex literal or a string) can only add a lock, never
+          // remove one.
           function contentLocked(path, text) {
             if (!contentScoped(path)) return { locked: false, rules: [] };
+            const variants = [text, stripComments(text), stripComments(text, false)];
             const rules = CONTENT_RULES
-              .filter(([, patterns]) => patterns.some(pattern => pattern.test(text)))
+              .filter(([, patterns]) => patterns.some(pattern => variants.some(variant => pattern.test(variant))))
               .map(([rule]) => rule);
             return { locked: rules.length > 0, rules };
           }
@@ -520,6 +560,11 @@ jobs:
               'const a = supabase.auth', 'supabase.auth!.signOut();', '(supabase.auth satisfies AuthClient).signOut();',
               '((client as any).auth as GoTrueClient)["signOut"]();', 'await supabase.auth.mfa.enroll({ factorType: "totp" });',
               'await supabase.auth.resend({ type: "signup", email });',
+              // Codex P1 at ad1a6177: comments inside the call chain.
+              'supabase.auth // comment\n  .signOut();', 'supabase.auth /* comment */ .signOut();',
+              'supabase /* c */ .auth /* c */ ?. /* c */ signOut();', 'const a = supabase.auth // keep\na.signOut()',
+              'const u = "https://x"; supabase.auth /* c */ .signOut();',
+              "const r = /'/; supabase.auth /* c */ .signOut();", "x = `${'`'}`; supabase.auth /* c */ .signOut();",
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
             // Catastrophic-backtracking guard: a huge one-line file must finish quickly.
             {
@@ -528,12 +573,22 @@ jobs:
               assert.deepEqual(locks('src/lib/fooRules.ts', big), [], 'synthetic 300 KB line');
               assert.ok(Date.now() - t0 < 1500, `synthetic 300 KB line took ${Date.now() - t0} ms`);
               cases += 1;
+              // Comment stripping is linear: unterminated comments and strings can't stall it.
+              for (const huge of ['/*x'.repeat(100000), '`x\\'.repeat(100000), "'x".repeat(150000)]) {
+                const t1 = Date.now();
+                locks('src/lib/fooRules.ts', huge);
+                assert.ok(Date.now() - t1 < 1500, `unterminated input took ${Date.now() - t1} ms`);
+                cases += 1;
+              }
             }
             for (const text of [
               'db?.from("action_queue").select();', 'db.from<Row>("action_queue").select();',
               'db.from<Database["public"]["Tables"]["action_queue"]["Row"]>("action_queue");',
               "db.rpc ( 'action_queue_transition', p );", 'const TABLE = "action_queue"; db.from(TABLE);',
               "export const EVENTS: string = 'action_queue_events';", 'let fn = `action_queue_create`;',
+              // Codex P1 at ad1a6177: comments inside the call.
+              'db.from /* comment */ ("action_queue");', 'db.from(/* comment */ "action_queue");',
+              'db.from( // comment\n  "action_queue")', 'db.rpc /* a */ ( /* b */ "action_queue_create", p);',
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['aq-io, head'], text);
             assert.deepEqual(locks('e2e-local/lib/fixtures.ts', 'await admin.auth.admin.deleteUser(uid);'), ['auth-mutation, head']);
             assert.match(locks('e2e-local/lib/nativeLocalFixtures.ts', real('e2e-local/lib/nativeLocalFixtures.ts')).join(), /auth-mutation, head/);

@@ -137,14 +137,17 @@ when its text:
   destructuring (`const { signOut } = supabase.auth;`) and aliasing the namespace
   (`const a = supabase.auth;`, `const { auth: a } = supabase;`) also lock, with or
   without the trailing `;`, across a line break (`supabase\n  .auth`), and through
-  parentheses, `!`, `as T` or `satisfies T` (`(supabase.auth as any).signOut()`).
+  parentheses, `!`, `as T` or `satisfies T` (`(supabase.auth as any).signOut()`),
+  including with `//` or `/* */` comments inside the call chain
+  (`supabase.auth /* c */ .signOut()`).
   `mfa.*` locks reads such as `mfa.listFactors()` too. A `getSession()` or
   `getUser()` used only for the user ID doesn't lock, because RLS is the real
   boundary;
 - reads or writes the Action Queue (`aq-io`): `.from("action_queue…")` or
   `.rpc("action_queue…")`, including `?.from(`, a type argument
   (`.from<Row>("action_queue")`) and a variable declared with a table or RPC name
-  (`const TABLE = "action_queue";`). Mentioning an Action Queue row ID, type or
+  (`const TABLE = "action_queue";`), also with comments inside the call
+  (`db.from(/* c */ "action_queue")`). Mentioning an Action Queue row ID, type or
   comment doesn't lock, and neither does a bare string literal elsewhere
   (generated types, view models, source-scan tests), so pure helpers such as
   `pendingOutcomeReviewRules.ts` stay editable.
@@ -182,6 +185,10 @@ exhaustive; known forms that are not locked include:
   the namespace passed with other arguments (`wrap(supabase.auth, "x").signOut()`),
   or more than six wrappers between `auth` and the call;
 - raw HTTP to Supabase (`fetch` to `/auth/v1/…` or `/rest/v1/action_queue`).
+
+Comments are handled by also matching the text with comments blanked out, once
+skipping strings and once not; a lock found in any version counts, so stripping
+can only add locks.
 
 Following imports and data flow would close these, and is deferred.
 

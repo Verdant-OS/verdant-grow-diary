@@ -1520,7 +1520,7 @@ export default function PhenoHuntWorkspace() {
   };
   // Held here, not in the control: a reload unmounts the control mid-save,
   // and the save must still settle against the editor the grower used.
-  const renameSession = usePhenoHuntRenameSession(handleRenameHunt);
+  const renameSession = usePhenoHuntRenameSession(ws.hunt?.id, handleRenameHunt);
 
   // Debounce the free-text search into the server-side filter (resets paging).
   useEffect(() => {

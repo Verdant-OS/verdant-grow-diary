@@ -14,7 +14,7 @@ function Harness(props: {
   canWrite: boolean;
   onRename: (name: string) => Promise<boolean>;
 }) {
-  const session = usePhenoHuntRenameSession(props.onRename);
+  const session = usePhenoHuntRenameSession("h1", props.onRename);
   return (
     <PhenoHuntRenameControl
       currentName={props.currentName}

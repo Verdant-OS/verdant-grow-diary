@@ -161,6 +161,7 @@ describe("PhenoHuntWorkspace rename (#551)", () => {
     expect(cancel.disabled).toBe(true);
     fireEvent.click(cancel);
     expect(screen.getByTestId("pheno-hunt-rename-input")).toBeDefined();
+    expect(updatePhenoHuntSetup).toHaveBeenCalledTimes(1);
     resolve();
     await waitFor(() => expect(screen.queryByTestId("pheno-hunt-rename-input")).toBeNull());
     expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Repaired Hunt");
@@ -179,5 +180,25 @@ describe("PhenoHuntWorkspace rename (#551)", () => {
     const input = screen.getByTestId("pheno-hunt-rename-input") as HTMLInputElement;
     expect(input.value).toBe("Repaired Hunt");
     expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Blue Dream Hunt");
+  });
+  it("a rename session does not follow the page to another hunt (#551 Codex P2)", async () => {
+    let reject: (e: Error) => void = () => {};
+    updatePhenoHuntSetup.mockImplementation(() => new Promise<void>((_, r) => (reject = r)));
+    const { rerenderState } = renderAt({});
+    submitRename("Repaired Hunt");
+    await waitFor(() => expect(updatePhenoHuntSetup).toHaveBeenCalledTimes(1));
+    const other = { id: "h2", name: "Other Hunt", growId: "g1", tentId: "t1" };
+    rerenderState({ hunt: other });
+    // Hunt B starts idle: no A draft, no lock from A's in-flight save.
+    expect(screen.queryByTestId("pheno-hunt-rename-input")).toBeNull();
+    const open = screen.getByTestId("pheno-hunt-rename-open") as HTMLButtonElement;
+    expect(open.disabled).toBe(false);
+    reject(new Error("network"));
+    await Promise.resolve();
+    await Promise.resolve();
+    // A's failure must not surface on B.
+    expect(screen.queryByTestId("pheno-hunt-rename-error")).toBeNull();
+    expect(screen.queryByTestId("pheno-hunt-rename-input")).toBeNull();
+    expect(updatePhenoHuntSetup).toHaveBeenCalledTimes(1);
   });
 });

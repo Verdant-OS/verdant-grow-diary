@@ -151,6 +151,18 @@ describe("classifyStabilizationPrFiles — staged-mode file lists", () => {
 });
 
 describe("classifyStabilizationPrFiles — lockfile allowlist", () => {
+  it.each(
+    FORBIDDEN_LOCKFILES.flatMap((name: string) => [
+      [`scripts/${name}`],
+      [`tests/${name}`],
+      [`src/test/fixtures/${name}`],
+    ]) as Array<[string]>,
+  )("refuses %s below an allowed directory", (path) => {
+    expect(isAllowedStabilizationPath(path)).toBe(false);
+    expect(isBlockedStabilizationPath(path)).toBe(true);
+    expect(classifyStabilizationPrFiles([path]).verdict).toBe("stop-ship");
+  });
+
   it("allows bun.lock, the only lockfile the repository keeps, on its own", () => {
     const r = classifyStabilizationPrFiles(["bun.lock"]);
     expect(r.verdict).toBe("pass");

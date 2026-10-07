@@ -24,6 +24,17 @@ export const SENTRY_INGEST_ORIGINS: ReadonlyArray<string> = [
   "https://*.ingest.de.sentry.io",
 ];
 
+/**
+ * The only hosts that may report. Verdant has no staging or preview environment
+ * (AGENTS.md › Release and Environment Rules), so a production-mode bundle served
+ * anywhere else (a workers.dev or vercel.app deployment, a copied build) stays off
+ * rather than sending events to the real project.
+ */
+export const PRODUCTION_HOSTNAMES: ReadonlyArray<string> = [
+  "verdantgrowdiary.com",
+  "www.verdantgrowdiary.com",
+];
+
 /** Hosts where the reporter must stay off: local dev, Lovable preview, tests. */
 export const LOCAL_HOSTNAMES: ReadonlyArray<string> = ["localhost", "127.0.0.1", "[::1]"];
 
@@ -43,12 +54,18 @@ export type ErrorReportingDecision =
   | {
       readonly enabled: true;
       readonly dsn: string;
-      readonly environment: "production" | "preview";
+      readonly environment: "production";
       readonly release: string | undefined;
     };
 
 export type ErrorReportingDisabledReason =
-  "no_dsn" | "invalid_dsn" | "server" | "local_host" | "lovable_preview" | "not_production_build";
+  | "no_dsn"
+  | "invalid_dsn"
+  | "server"
+  | "local_host"
+  | "lovable_preview"
+  | "non_production_host"
+  | "not_production_build";
 
 const DSN_PATTERN = /^https:\/\/[0-9a-f]{8,}@[a-z0-9.-]+\.sentry\.io\/\d+$/i;
 
@@ -74,10 +91,10 @@ export function resolveErrorReportingConfig(
   if ((env?.mode ?? "production") !== "production") {
     return { enabled: false, reason: "not_production_build" };
   }
-  const environment =
-    hostname === "verdantgrowdiary.com" || hostname === "www.verdantgrowdiary.com"
-      ? "production"
-      : "preview";
+  if (!PRODUCTION_HOSTNAMES.includes(hostname)) {
+    return { enabled: false, reason: "non_production_host" };
+  }
+  const environment = "production";
   const release = env?.release?.trim() || undefined;
   return { enabled: true, dsn, environment, release };
 }

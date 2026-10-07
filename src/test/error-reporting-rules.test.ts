@@ -82,7 +82,22 @@ describe("errorReportingRules — resolveErrorReportingConfig", () => {
     }
   });
 
-  it("enables on the production apex/www with environment=production, elsewhere preview", () => {
+  it("stays off on every host outside the production apex/www allowlist", () => {
+    for (const hostname of [
+      "diary2.example.workers.dev",
+      "verdant-grow-diary.vercel.app",
+      "verdantgrowdiary.com.evil.example",
+      "notify.verdantgrowdiary.com",
+      "verdantgrowdiary.app",
+    ]) {
+      expect(
+        resolveErrorReportingConfig({ dsn: TEST_DSN, hostname, mode: "production" }),
+        hostname,
+      ).toEqual({ enabled: false, reason: "non_production_host" });
+    }
+  });
+
+  it("enables only on the production apex/www, with environment=production", () => {
     const prod = resolveErrorReportingConfig({
       dsn: ` ${TEST_DSN} `,
       hostname: "verdantgrowdiary.com",
@@ -99,12 +114,8 @@ describe("errorReportingRules — resolveErrorReportingConfig", () => {
       resolveErrorReportingConfig({ dsn: TEST_DSN, hostname: "www.verdantgrowdiary.com" }),
     ).toMatchObject({ enabled: true, environment: "production", release: undefined });
     expect(
-      resolveErrorReportingConfig({
-        dsn: TEST_DSN,
-        hostname: "diary2.example.workers.dev",
-        release: "",
-      }),
-    ).toMatchObject({ enabled: true, environment: "preview", release: undefined });
+      resolveErrorReportingConfig({ dsn: TEST_DSN, hostname: "VerdantGrowDiary.com", release: "" }),
+    ).toMatchObject({ enabled: true, environment: "production", release: undefined });
   });
 
   it("is deterministic", () => {

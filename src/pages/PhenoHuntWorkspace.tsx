@@ -14,7 +14,7 @@
  * to compare side by side. Client gating is presentation-only; the database is
  * authoritative for numbering and Pro access.
  */
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "@/lib/react-router-compat";
 import { usePhenoHuntWorkspace, CANDIDATE_PAGE_SIZE } from "@/hooks/usePhenoHuntWorkspace";
 import { buildPhenoHuntCsv, phenoHuntCsvFilename } from "@/lib/phenoHuntCsvExport";
@@ -1458,6 +1458,10 @@ export default function PhenoHuntWorkspace() {
   // #551: optimistic name after a confirmed rename; the hunt row stays
   // authoritative once a reload returns any other name.
   const [huntNameLocal, setHuntNameLocal] = useState<HuntNameOverride | null>(null);
+  // Held here, not in the control: a reload unmounts the control mid-save,
+  // and a remounted one must not open a second rename (#551 Codex P2).
+  const [renamePending, setRenamePending] = useState(false);
+  const renamePendingRef = useRef(false);
   const effectiveHuntName = huntNameOverrideValue(huntNameLocal, ws.hunt) ?? ws.hunt?.name ?? null;
   const effectiveBreedingObjective: BreedingObjectiveTarget[] =
     huntScopedOverrideValue(breedingObjectiveLocal, ws.hunt?.id) ??
@@ -1507,13 +1511,19 @@ export default function PhenoHuntWorkspace() {
   // #551: rename resolves true only after the row is read back (RLS + the
   // Pro entitlement policy filter blocked writes silently otherwise).
   const handleRenameHunt = async (name: string): Promise<boolean> => {
-    if (!canWrite || !ws.hunt?.id) return false;
+    if (!canWrite || !ws.hunt?.id || renamePendingRef.current) return false;
+    const { id: huntId, name: baseName } = ws.hunt;
+    renamePendingRef.current = true;
+    setRenamePending(true);
     try {
-      await updatePhenoHuntSetup({ huntId: ws.hunt.id, name });
-      setHuntNameLocal({ huntId: ws.hunt.id, value: name, baseName: ws.hunt.name });
+      await updatePhenoHuntSetup({ huntId, name });
+      setHuntNameLocal({ huntId, value: name, baseName });
       return true;
     } catch {
       return false;
+    } finally {
+      renamePendingRef.current = false;
+      setRenamePending(false);
     }
   };
 
@@ -1769,6 +1779,7 @@ export default function PhenoHuntWorkspace() {
               <PhenoHuntRenameControl
                 currentName={effectiveHuntName ?? ""}
                 canWrite={canWrite}
+                pending={renamePending}
                 onRename={handleRenameHunt}
               />
             ) : null}
@@ -1848,6 +1859,7 @@ export default function PhenoHuntWorkspace() {
                 <PhenoHuntSetupProgressCard
                   hunt={{
                     ...ws.hunt,
+                    name: effectiveHuntName ?? ws.hunt.name,
                     setupCompletedAt: setupCompletedLocal ?? ws.hunt.setupCompletedAt ?? null,
                   }}
                   candidateCount={ws.totalCandidateCount ?? candidates.length}

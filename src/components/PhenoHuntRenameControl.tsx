@@ -20,18 +20,22 @@ import {
 export interface PhenoHuntRenameControlProps {
   currentName: string;
   canWrite: boolean;
+  /** A rename started by an earlier mount is still in flight. */
+  pending?: boolean;
   onRename: (name: string) => Promise<boolean>;
 }
 
 export default function PhenoHuntRenameControl({
   currentName,
   canWrite,
+  pending = false,
   onRename,
 }: PhenoHuntRenameControlProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(currentName);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
+  const busy = saving || pending;
 
   if (!canWrite) return null;
 
@@ -42,6 +46,7 @@ export default function PhenoHuntRenameControl({
         variant="ghost"
         size="sm"
         data-testid="pheno-hunt-rename-open"
+        disabled={pending}
         onClick={() => {
           setDraft(currentName);
           setFailed(false);
@@ -57,7 +62,7 @@ export default function PhenoHuntRenameControl({
   const hint = phenoHuntRenameHint(result);
 
   const save = async () => {
-    if (!result.ok || saving) return;
+    if (!result.ok || busy) return;
     setSaving(true);
     setFailed(false);
     let ok = false;
@@ -91,13 +96,13 @@ export default function PhenoHuntRenameControl({
         value={draft}
         maxLength={PHENO_HUNT_NAME_MAX_LENGTH + 20}
         onChange={(e) => setDraft(e.target.value)}
-        disabled={saving}
+        disabled={busy}
         autoFocus
       />
       <Button
         type="submit"
         size="sm"
-        disabled={!result.ok || saving}
+        disabled={!result.ok || busy}
         data-testid="pheno-hunt-rename-save"
       >
         {saving ? PHENO_HUNT_RENAME_COPY.saving : PHENO_HUNT_RENAME_COPY.save}
@@ -107,7 +112,7 @@ export default function PhenoHuntRenameControl({
         size="sm"
         variant="ghost"
         data-testid="pheno-hunt-rename-cancel"
-        disabled={saving}
+        disabled={busy}
         onClick={() => setEditing(false)}
       >
         {PHENO_HUNT_RENAME_COPY.cancel}

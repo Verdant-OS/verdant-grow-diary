@@ -144,11 +144,20 @@ const CREDENTIAL_SEPARATOR = String.raw`(\s*(?:[:=]|%3[Dd])\s*)`;
  */
 const QUOTE = String.raw`\\*["']`;
 /**
+ * A value quoted with `\\` × `level` before each quote (`\"…\"` is level 1, `\\\"…\\\"` level 3).
+ * It closes only on a quote escaped at the same level, so an inner quote escaped one level
+ * deeper (`\"abc\\\"def\"`) stays inside the value; unterminated, it runs to the end.
+ */
+function escapedQuoted(level: number, quote: '"' | "'"): string {
+  const open = `${"\\\\".repeat(level)}${quote}`;
+  return String.raw`${open}[\s\S]*?(?:(?<!\\)${open}|$)`;
+}
+/**
  * Value: escaped-quoted, quoted (escapes included), bracketed (an array, across lines too,
  * or already `[redacted]`), or bare up to the next delimiter. A quoted or bracketed value
  * with no closing quote or bracket (a truncated payload) runs to the end of the text.
  */
-const CREDENTIAL_VALUE = String.raw`(\\+"[^"]*?(?:\\+"|$)|\\+'[^']*?(?:\\+'|$)|"(?:[^"\\]|\\.)*(?:"|$)|'(?:[^'\\]|\\.)*(?:'|$)|\[[^\]]*(?:\]|$)|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
+const CREDENTIAL_VALUE = String.raw`(${escapedQuoted(3, '"')}|${escapedQuoted(1, '"')}|${escapedQuoted(1, "'")}|"(?:[^"\\]|\\.)*(?:"|$)|'(?:[^'\\]|\\.)*(?:'|$)|\[[^\]]*(?:\]|$)|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
 /** What a one-time or recovery code is called (`MFA code`, `recovery_codes`, `pin`). Not `error` or `status`. */
 const ONE_TIME_CODE_QUALIFIERS = String.raw`auth|authorization|verification|otp|security|confirmation|mfa|2fa|sms|totp|recovery|backup|reset|invite|login|pin`;
 /** Words that make an identifier a credential name, including `*_KEY` / `*-key`, named `…Key`s and one-time codes (`auth_code`, `mfa_code`, `recovery_codes`, PKCE `code_verifier`, `otp`). */
@@ -192,36 +201,92 @@ const QUOTED_CODE_PATTERN = new RegExp(
 /** SQLSTATE (`23505`, `42P01`) or PostgREST (`PGRST116`) code shape, optionally (escape-)quoted. */
 const DIAGNOSTIC_CODE_VALUE = /^(\\*["']?)(?:[0-9A-Z]{5}|PGRST\d{3})\1$/;
 /** The fields a PostgREST error object carries beside `code`. */
-const POSTGREST_ERROR_FIELDS = ["details", "hint", "message"].map(
-  (field) => new RegExp(String.raw`${QUOTE}${field}${QUOTE}\s*:`, "i"),
-);
+const POSTGREST_ERROR_FIELDS = ["details", "hint", "message"];
 
 /**
- * True when the code at `offset` sits in a flat object that also has `details`, `hint`
- * and `message`: the full PostgREST error shape. A code beside only some of them
- * (`{"code":"12345","message":"OAuth exchange failed"}`), or in another object, could be
- * a verification or OAuth code and is redacted.
+ * The text of the object enclosing `offset` at its own depth: nested objects are left
+ * out. Null when the braces do not balance.
  */
-function isInPostgrestErrorObject(text: string, offset: number): boolean {
-  const start = text.lastIndexOf("{", offset);
-  const end = text.indexOf("}", offset);
-  if (start < 0 || end < 0) return false;
-  const object = text.slice(start, end + 1);
-  return POSTGREST_ERROR_FIELDS.every((field) => field.test(object));
+function enclosingObjectTopLevel(text: string, offset: number): string | null {
+  let depth = 0;
+  let start = -1;
+  for (let i = offset - 1; i >= 0; i -= 1) {
+    if (text[i] === "}") depth += 1;
+    else if (text[i] === "{") {
+      if (depth === 0) {
+        start = i;
+        break;
+      }
+      depth -= 1;
+    }
+  }
+  if (start < 0) return null;
+  let topLevel = "";
+  depth = 0;
+  for (let i = start + 1; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === "{") depth += 1;
+    else if (char === "}") {
+      if (depth === 0) return topLevel;
+      depth -= 1;
+    } else if (depth === 0) topLevel += char;
+  }
+  return null;
+}
+
+/**
+ * True when the code at `offset` sits in an object whose own top-level keys, quoted
+ * exactly like `code`, include `details`, `hint` and `message`: the full PostgREST error
+ * shape. A code beside only some of them (`{"code":"12345","message":"OAuth exchange
+ * failed"}`), with them only in a nested object or inside a string value, or in another
+ * object, could be a verification or OAuth code and is redacted.
+ */
+function isInPostgrestErrorObject(text: string, offset: number, quote: string): boolean {
+  const topLevel = enclosingObjectTopLevel(text, offset);
+  if (topLevel == null) return false;
+  const q = quote.replace(/[\\"']/g, (char) => `\\${char}`);
+  return POSTGREST_ERROR_FIELDS.every((field) =>
+    new RegExp(String.raw`(?:^|,)\s*${q}${field}${q}\s*:`, "i").test(topLevel),
+  );
 }
 
 /**
  * `state` / `nonce` in object or colon form (`{"state":"…"}`, `nonce: …`). A nonce is
- * always redacted; a state only when token-shaped, so `state: pending` stays readable.
+ * always redacted. An OAuth state is an opaque string of any shape, so a state is
+ * redacted too unless it is one of READABLE_STATES (`state: pending`).
  */
 const STATE_NONCE_PATTERN = new RegExp(
   String.raw`(${QUOTE}|)\b(state|nonce)\1(\s*:\s*)` + CREDENTIAL_VALUE,
   "gi",
 );
-/** Eight or more token characters including a digit (`csrfSecret123456`), quotes stripped. */
-function isTokenShaped(value: string): boolean {
-  const bare = value.replace(/^\\*["']|\\*["']$/g, "");
-  return /^[A-Za-z0-9._~+/=-]{8,}$/.test(bare) && /\d/.test(bare);
+/** Lifecycle words a diagnostic `state` may carry; any other state value is redacted. */
+const READABLE_STATES = new Set([
+  "active",
+  "inactive",
+  "pending",
+  "idle",
+  "loading",
+  "ready",
+  "open",
+  "closed",
+  "running",
+  "stopped",
+  "complete",
+  "completed",
+  "failed",
+  "error",
+  "success",
+  "unknown",
+  "draft",
+  "archived",
+  "null",
+  "undefined",
+  "true",
+  "false",
+]);
+
+function isReadableState(value: string): boolean {
+  return READABLE_STATES.has(value.replace(/^\\*["']|\\*["']$/g, "").toLowerCase());
 }
 
 /** OAuth `code=` / `key=` / `state=` / `nonce=` parameters (auth callbacks carry them), `=` or `%3D` with optional spaces. */
@@ -301,14 +366,14 @@ export function scrubText(value: unknown): string {
         offset: number,
         whole: string,
       ) =>
-        DIAGNOSTIC_CODE_VALUE.test(value) && isInPostgrestErrorObject(whole, offset)
+        DIAGNOSTIC_CODE_VALUE.test(value) && isInPostgrestErrorObject(whole, offset, quote)
           ? match
           : `${quote}${key}${quote}${separator}${redactedLike(value)}`,
     )
     .replace(
       STATE_NONCE_PATTERN,
       (match, quote: string, key: string, separator: string, value: string) =>
-        key.toLowerCase() === "state" && !isTokenShaped(value)
+        key.toLowerCase() === "state" && isReadableState(value)
           ? match
           : `${quote}${key}${quote}${separator}${redactedLike(value)}`,
     )

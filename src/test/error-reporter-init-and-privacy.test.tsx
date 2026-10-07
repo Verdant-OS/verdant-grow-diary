@@ -289,6 +289,12 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ['{"backup_codes": ["e5f6", "g7h8"', "g7h8"],
       ['login failed password: "hunter2', "hunter2"],
       ['payload=\\"access_token\\":\\"AbCdEf1234567890', "AbCdEf1234567890"],
+      [String.raw`{\"password\":\"abc\\\"def\"}`, "def"],
+      [String.raw`{\\\"password\\\":\\\"abc\\\\\\\"def\\\"}`, "def"],
+      ['{"code":"12345","metadata":{"details":null,"hint":null,"message":"oauth"}}', "12345"],
+      ['{"code":"12345","message":"\\"details\\":null,\\"hint\\":null"}', "12345"],
+      ['{"state":"abcdefghijklmno"}', "abcdefghijklmno"],
+      ["state: abcdefghijklmno", "abcdefghijklmno"],
     ];
     for (const [input, secret] of cases) {
       const out = scrubText(input);

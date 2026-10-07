@@ -54,6 +54,23 @@ describe("adaptPhenoHuntCandidates", () => {
     expect(c.photos).toEqual([{ id: "plant-a-plant-photo", url: "https://example.invalid/a.jpg" }]);
   });
 
+  it("#1005: carries the plant's own stored grow and tent ids, unnamed ones included", () => {
+    const [named, unnamed, tentless] = adaptPhenoHuntCandidates({
+      plants: [
+        plant({ id: "a", grow_id: "grow-1", tent_id: "tent-1" }),
+        plant({ id: "b", grow_id: "grow-2", tent_id: "tent-2" }),
+        plant({ id: "c", grow_id: "grow-1", tent_id: null }),
+      ],
+      growNameById: { "grow-1": "Summer Grow" },
+      tentNameById: { "tent-1": "Flower Tent" },
+      preserveOrder: true,
+    });
+    expect(named).toMatchObject({ growId: "grow-1", tentId: "tent-1" });
+    // Ids survive even when no display name resolved for them.
+    expect(unnamed).toMatchObject({ growId: "grow-2", tentId: "tent-2", tentLabel: null });
+    expect(tentless).toMatchObject({ growId: "grow-1", tentId: null });
+  });
+
   it("falls back to plant name when candidate_label is missing/blank", () => {
     const [c] = adaptPhenoHuntCandidates({
       plants: [plant({ name: "Bravo", candidate_label: "  " })],

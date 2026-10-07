@@ -20,10 +20,12 @@ Three read-only audits from the agent prompt deck (prompts 30, 31 and 32), run a
 
 - **Branch and tip:** verdant-grow-diary at `80176ba` (#1864)
 - **Method:** Source and documentation reads, byte counts, route and sitemap greps. No Search Console, GA4 or live site access.
-- **Status vocabulary:** PASS · FAIL · HOLD · NO_BASELINE · NOT_MEASURED · OBSERVATION
+- **Status vocabulary:** PASS · FAIL · HOLD · NOT_MEASURED · OBSERVATION
+- **Legend:** In Audit 30, the Mark column holds document-currency marks, not status words. The marks are CURRENT, CURRENT HEADER, CURRENT DATED, SUPERSEDED IN PART, DESIGN ONLY, SANDBOX PREMISE and SANDBOX-ONLY, which answer prompt 30's "current, superseded or sandbox-only". REJECT is the third verdict that prompt 32 allows (PASS, HOLD or REJECT), and it means do not proceed.
+- **Legend (NO_BASELINE):** `docs/seo/route-indexation-matrix.md` uses NO_BASELINE to mean no Search Console baseline exists. This page quotes the word but reports the status as NOT_MEASURED.
 - **Locks in force:** HOLD #1250, production database lock, publishing stop. Unchanged.
 
-> **Calibrated verdict.** The billing documentation set is one current page scattered across ten files, four of which still carry a sandbox-only premise the 2026-08-25 standing directive retired. The indexation matrix is stale by three public routes and an unresolvable tip stamp, a documentation defect with no production effect. Both pillar drafts are HOLD for the same reason: they wait on independent evidence review an author cannot supply, not on more writing. REJECT applies to neither.
+> **Calibrated verdict.** The billing documentation set is one current page scattered across ten files, four of which still carry a sandbox-only premise the 2026-08-25 standing directive retired. The indexation matrix is stale by three public routes and an unresolvable tip stamp, a documentation defect with no production effect. _Superseded in part, see index §4 errata: the tip stamp resolves (#558) and is about two months stale._ Both pillar drafts are HOLD for the same reason: they wait on independent evidence review an author cannot supply, not on more writing. REJECT applies to neither.
 
 ## Audit 30 · Billing documentation truth table
 
@@ -60,13 +62,13 @@ Consolidation proposal, docs only: one current `docs/billing.md` rewritten from 
 
 | Check | Status | Evidence |
 | --- | --- | --- |
-| Matrix pinned to the current manifest | **FAIL** | Header cites manifest tip `1c40c21f2`, which is not an object in this clone, and counts 134 routes: 39 public, 42 auth, 29 operator, 6 internal, 18 redirects. The manifest today has 144 routes: 42 public, 46 auth, 32 operator, 6 internal, 18 redirects. Both files were last touched in the same commit (`a695f5d`, 2026-09-30), so the header was not refreshed when the rows changed. |
-| Public routes missing from the matrix | **FAIL** | `/tools/blueprint-targets` and `/tools/grow-help-toolkit` are public in the manifest and present in `public/sitemap.xml`, but appear in no matrix row. `/customer/guide/oreoz-vs-gelonade-comparison` is public, described in the manifest as noindex, and also absent. Three routes with no recorded index policy. |
+| Matrix pinned to the current manifest | **FAIL** | Header cites manifest tip `1c40c21f2`, which is not an object in this clone, and counts 134 routes: 39 public, 42 auth, 29 operator, 6 internal, 18 redirects. The manifest today (`src/lib/appRouteManifest.ts`) has 144 routes: 42 public, 46 auth, 32 operator, 6 internal, 18 redirects. Corrected on re-verification: the matrix was last changed in `16a575129` (#685, 2026-08-02) and the manifest in `816894ba9` (#1141, 2026-08-26), so the manifest gained rows after the matrix was last refreshed. The earlier `a695f5d` attribution was a shallow-clone artifact. _Superseded, see index §4 errata: `1c40c21f2` exists (#558, 2026-07-29); the stamp is about two months stale._ |
+| Public routes missing from the matrix | **FAIL** | `/tools/blueprint-targets` and `/tools/grow-help-toolkit` are public in the manifest (`src/lib/appRouteManifest.ts:512, 517`) and present in `public/sitemap.xml`, but appear in no matrix row. `/customer/guide/oreoz-vs-gelonade-comparison` is public, described in the manifest as noindex (`src/lib/appRouteManifest.ts:124-127`), and also absent. It is also listed in `public/sitemap.xml`. Three routes with no recorded index policy. |
 | Mounted tree versus manifest | **PASS** | Every public file under `src/routes/` has a manifest row. The alias files (`strains.*`, `login`, `register`, `signup`, `features`, `demo`, the legal aliases, `upgrade`, `billing.$plan`) are marked `redirect`. `strains.index.tsx` renders a static noindex head plus `RouteAliasRedirect`, matching the matrix's redirect row. |
 | Canonical and JSON-LD emission | **PASS** by source | Static heads from `src/lib/build/staticRouteHead` at build time; client heads from `usePageSeo`; sitewide Organization and WebSite schema from `src/routes/__root.tsx`. Matches the matrix's “static plus client head, self-canonical” description. |
 | Manifest-versus-tree test exists | **PASS** | `src/test/helpers/routeManifestSyncHarness.ts`, consumed by three tests including `verdant-seo-guides-public-links.test.tsx`. |
 | Sitemap and robots parity | **NOT_MEASURED** | `scripts/check-sitemap-robots-parity.mjs` exists; not run in this pass. |
-| Live index status | **NO_BASELINE** | The matrix says so for every row. No Search Console read was attempted. |
+| Live index status | **NOT_MEASURED** | No baseline exists; the matrix records NO_BASELINE for every row. No Search Console read was attempted. |
 
 Fix is docs-only: refresh the header stamp to the current tip, add three rows with their intended index state, and recount the coverage line. No code.
 

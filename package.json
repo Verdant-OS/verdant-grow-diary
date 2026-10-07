@@ -137,6 +137,7 @@
     "test:customer-mode-db-security": "node scripts/security/run-customer-mode-db-security.mjs",
     "test:subscriber-interest-db-security": "bun run scripts/run-subscriber-interest-rls-harness.ts",
     "test:public-support-forms-db-security": "bun run scripts/run-support-forms-rls-harness.ts --confirm-local-security-lane",
+    "test:subscriptions-founders-write-denial": "bun run scripts/run-subscriptions-founders-write-denial-harness.ts --confirm-local-security-lane",
     "test:security-advisor-hardening-followup-db-security": "bun run scripts/run-security-advisor-hardening-followup-db-security.ts --confirm-local-security-lane",
     "test:pgmq-email-wrapper-grants-db-security": "bun run scripts/run-pgmq-email-wrapper-grants-db-security.ts --confirm-local-security-lane",
     "test:quicklog-private-helper-grants-db-security": "bun run scripts/run-quicklog-private-helper-grants-db-security.ts --confirm-local-security-lane",
@@ -150,6 +151,11 @@
     "test:genetics-propagation-rls:local-lane": "bun run scripts/run-genetics-propagation-rls-harness.ts --confirm-local-security-lane",
     "test:irrigation-evidence-rls": "bun run scripts/run-irrigation-evidence-rls-harness.ts",
     "test:irrigation-evidence-rls:local-lane": "bun run scripts/run-irrigation-evidence-rls-harness.ts --confirm-local-security-lane",
+    "test:billing-rls:local-lane": "node scripts/security/run-local-lane-harness.mjs billing --confirm-local-security-lane",
+    "test:ai-credits-rls:local-lane": "node scripts/security/run-local-lane-harness.mjs ai-credits --confirm-local-security-lane",
+    "test:action-queue-rls:local-lane": "node scripts/security/run-local-lane-harness.mjs action-queue --confirm-local-security-lane",
+    "test:staff-role-rls:local-lane": "node scripts/security/run-local-lane-harness.mjs staff-role --confirm-local-security-lane",
+    "test:staff-grant-trigger:local-lane": "node scripts/security/run-local-lane-harness.mjs staff-grant-trigger --confirm-local-security-lane",
     "test:irrigation-integrity-suite": "node scripts/run-irrigation-integrity-suite.mjs",
     "test:summarize-timeouts": "node scripts/summarize-vitest-timeouts.mjs",
     "verify:contract-test-resolution": "node scripts/check-contract-test-resolution.mjs",
@@ -449,7 +455,7 @@
   },
   "overrides": {
     "@hono/node-server": "2.0.10",
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/sdk": "1.31.0",
     "esbuild": "0.28.1",
     "fast-uri": "3.1.8",
     "form-data": "4.0.6",
@@ -459,7 +465,11 @@
     "glob": "10.5.0",
     "hono": "4.13.7",
     "nanoid": "3.3.18",
+    "proxy-addr": "2.0.8",
     "qs": "6.16.0",
+    "seroval": "1.6.8",
+    "shell-quote": "1.12.0",
+    "source-map-js": "1.2.2",
     "undici": "6.28.1"
   }
 }

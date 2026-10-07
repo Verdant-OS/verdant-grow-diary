@@ -30,6 +30,11 @@ import {
 import { buildWateringRecoveryForm } from "@/lib/quickLogWateringRecoveryViewModel";
 import { mayCorrectRejectedWatering } from "@/lib/quickLogWateringRejectionRules";
 import {
+  feedingHistoryCheckMessage,
+  feedingRejectionNeedsHistoryCheck,
+  mayCorrectRejectedFeeding,
+} from "@/lib/quickLogFeedingRejectionRules";
+import {
   readPendingQuickLogFeeding,
   claimPendingQuickLogFeeding,
   clearPendingQuickLogFeeding,
@@ -508,7 +513,7 @@ function QuickLogV2SheetForOwner({
           : WATERING_RECOVERY_PENDING
         : initialFeeding
           ? initialFeeding.historyCheckReason
-            ? quickLogReasonToOperatorMessage(initialFeeding.historyCheckReason)
+            ? feedingHistoryCheckMessage(initialFeeding.historyCheckReason)
             : FEEDING_RECOVERY_PENDING
           : null,
   );
@@ -1424,7 +1429,7 @@ function QuickLogV2SheetForOwner({
     setSubmissionLocked(true);
     setLocalError(
       record.historyCheckReason
-        ? quickLogReasonToOperatorMessage(record.historyCheckReason)
+        ? feedingHistoryCheckMessage(record.historyCheckReason)
         : FEEDING_RECOVERY_PENDING,
     );
   }
@@ -1571,7 +1576,15 @@ function QuickLogV2SheetForOwner({
       if (!canContinueNote()) return;
       setFeedingSaving(false);
       if (result.ok !== true) {
-        if (quickLogSaveRequiresHistoryCheck(result.reason)) {
+        // A validation rejection after an earlier ambiguous attempt repeats on
+        // every same-key Retry; keep the key and route to Timeline review.
+        if (
+          quickLogSaveRequiresHistoryCheck(result.reason) ||
+          feedingRejectionNeedsHistoryCheck({
+            reason: result.reason,
+            priorClaim: pendingFeedingSubmission !== null,
+          })
+        ) {
           const marked = markPendingQuickLogFeedingHistoryCheck(
             exactFeedingSubmission.recovery,
             result.reason,
@@ -1587,28 +1600,24 @@ function QuickLogV2SheetForOwner({
           historyCheckRequiredRef.current = true;
           setHistoryCheckRequired(true);
           setExactRetryPending(true);
-          const message = quickLogReasonToOperatorMessage(result.reason);
+          const message = feedingHistoryCheckMessage(result.reason);
           setLocalError(message);
           toast.error(message);
           setSaveStatus("");
           return;
         }
-        // Writer validation can reject before issuing an RPC. That draft is
-        // safe to correct. So is an explicit server validation rejection:
-        // the server answered that nothing was saved, even for a restored
-        // pending entry. Only an ambiguous server/transport outcome needs
-        // an exact retry.
         const definitiveServerRejection = result.reason === "rpc:invalid_typed_payload";
         const released =
-          (definitiveServerRejection || !pendingFeedingSubmission) &&
-          (definitiveServerRejection || !result.reason.startsWith("rpc:")) &&
-          clearPendingQuickLogFeeding(exactFeedingSubmission.recovery);
+          mayCorrectRejectedFeeding({
+            reason: result.reason,
+            priorClaim: pendingFeedingSubmission !== null,
+          }) && clearPendingQuickLogFeeding(exactFeedingSubmission.recovery);
         const unresolved = !released;
         setExactRetryPending(unresolved);
         keepSubmissionLockedRef.current = unresolved;
         if (!unresolved) feedingRetrySubmissionRef.current = null;
-        // A rejected key never reached a committed save; the corrected entry
-        // is a new logical submission and gets a fresh server key.
+        // Only a fresh claim can be cleared. An older ambiguous attempt may
+        // have committed before a later validation rejection arrived.
         if (released && definitiveServerRejection) {
           saveIdempotencyKeyRef.current = newQuickLogSaveKey();
         }

@@ -28,7 +28,11 @@ import {
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
 import { buildCultivarSummaryRows } from "@/lib/cultivarReferenceViewModel";
-import { buildCultivarBreadcrumbItems, buildCultivarFaqItems } from "@/lib/cultivarDetailSeo";
+import {
+  buildCultivarBreadcrumbItems,
+  buildCultivarFaqItems,
+  cultivarVerificationIsSearchIndexable,
+} from "@/lib/cultivarDetailSeo";
 
 function sectionId(key: CultivarGuideSectionKey): string {
   return `guide-${key.replace(/_/g, "-")}`;
@@ -59,6 +63,7 @@ export default function CultivarPage() {
       ? `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`
       : "Source-backed cultivar references with reported tendencies, confidence, and missing information.",
     path: cultivar ? `/cultivars/${cultivar.slug}` : "/cultivars",
+    noindex: cultivar ? !cultivarVerificationIsSearchIndexable(cultivar.verificationStatus) : false,
   });
 
   useEffect(() => {

@@ -1,0 +1,68 @@
+/**
+ * timingSafeCompareRules — the one shared comparison helper for secrets,
+ * bearer tokens and HMAC signatures (#1002).
+ *
+ * Mirrored into supabase/functions/_shared/lib/** by `bun run sync-edge-shared`
+ * so Edge functions and src/lib use the same code. Never hand-copy it.
+ *
+ * Timing hygiene, NOT a constant-time proof: JavaScript engines give no
+ * constant-time guarantee (JIT, string representation, GC). These helpers
+ * remove the obvious oracles — no early exit on the first mismatched code
+ * unit, length differences folded into the result instead of returning
+ * early, and every accepted value compared — and nothing more.
+ *
+ * Pure, deterministic, no I/O. Callers keep their own parsing, timestamp,
+ * replay and scope checks; these helpers only answer "equal?".
+ */
+
+/**
+ * Equality of two strings by UTF-16 code unit, without exiting early.
+ * `("", "")` is equal: callers must reject an empty configured secret
+ * themselves (fail closed) before comparing. Non-string input never matches.
+ */
+export function timingSafeEqual(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const length = Math.max(a.length, b.length);
+  let mismatch = a.length ^ b.length;
+  for (let i = 0; i < length; i += 1) {
+    // charCodeAt past the end is NaN; `| 0` folds it to 0, and the length
+    // difference above already records the mismatch.
+    mismatch |= (a.charCodeAt(i) | 0) ^ (b.charCodeAt(i) | 0);
+  }
+  return mismatch === 0;
+}
+
+const HEX_RE = /^[0-9a-f]+$/;
+
+/**
+ * Equality of two hex digests, case-insensitive (lowercase is canonical).
+ * Empty or non-hex input never matches; validity is folded into the result
+ * so the comparison itself still runs.
+ */
+export function timingSafeEqualHex(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const left = a.toLowerCase();
+  const right = b.toLowerCase();
+  const valid = HEX_RE.test(left) && HEX_RE.test(right);
+  const equal = timingSafeEqual(left, right);
+  return valid && equal;
+}
+
+/**
+ * True when `candidate` equals ANY accepted value. Every accepted value is
+ * compared (no early return on a match), and an empty candidate or empty
+ * accepted value still goes through the loop and simply cannot match.
+ */
+export function timingSafeMatchesAny(
+  candidate: string | null | undefined,
+  accepted: ReadonlyArray<string>,
+): boolean {
+  const value = typeof candidate === "string" ? candidate : "";
+  let matched = 0;
+  for (let i = 0; i < accepted.length; i += 1) {
+    const option = accepted[i];
+    const usable = typeof option === "string" && option.length > 0 ? 1 : 0;
+    matched |= usable & Number(timingSafeEqual(value, usable ? option : ""));
+  }
+  return matched === 1 && value.length > 0;
+}

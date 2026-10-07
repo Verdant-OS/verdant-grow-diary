@@ -138,25 +138,33 @@ const BASIC_PATTERN = /\b(basic\s+)[A-Za-z0-9+/=]{4,}/gi;
  */
 /** Separator: `:`, `=` or URL-encoded `%3D`, with optional whitespace on either side. */
 const CREDENTIAL_SEPARATOR = String.raw`(\s*(?:[:=]|%3[Dd])\s*)`;
-/** Value: quoted (escapes included), bracketed (an array, across lines too, or already `[redacted]`), or bare up to the next delimiter. */
-const CREDENTIAL_VALUE = String.raw`("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[[^\]]*\]|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
+/**
+ * A quote, or a backslash-escaped one (`\"`) when JSON was serialised inside another
+ * string (`payload=\"access_token\":\"…\"`).
+ */
+const QUOTE = String.raw`\\*["']`;
+/** Value: escaped-quoted, quoted (escapes included), bracketed (an array, across lines too, or already `[redacted]`), or bare up to the next delimiter. */
+const CREDENTIAL_VALUE = String.raw`(\\+"[^"]*?\\+"|\\+'[^']*?\\+'|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[[^\]]*\]|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
 /** What a one-time or recovery code is called (`MFA code`, `recovery_codes`, `pin`). Not `error` or `status`. */
 const ONE_TIME_CODE_QUALIFIERS = String.raw`auth|authorization|verification|otp|security|confirmation|mfa|2fa|sms|totp|recovery|backup|reset|invite|login|pin`;
 /** Words that make an identifier a credential name, including `*_KEY` / `*-key`, named `…Key`s and one-time codes (`auth_code`, `mfa_code`, `recovery_codes`, PKCE `code_verifier`, `otp`). */
 const CREDENTIAL_WORDS = String.raw`token|secret|passw(?:or)?d|pwd|pass|api[-_]?key|apikey|authorization|session|cookie|credential|[-_]key|(?:private|secret|service|access|signing|encryption|master|anon|role|client)key|(?:${ONE_TIME_CODE_QUALIFIERS}|one[-_]?time)[-_]?codes?|code[-_]?verifier|otp`;
 const CREDENTIAL_PATTERN = new RegExp(
-  String.raw`(["']?)(?<![A-Za-z0-9_-])([A-Za-z0-9_-]*(?:${CREDENTIAL_WORDS})[A-Za-z0-9_-]*)\1` +
+  String.raw`(${QUOTE}|)(?<![A-Za-z0-9_-])([A-Za-z0-9_-]*(?:${CREDENTIAL_WORDS})[A-Za-z0-9_-]*)\1` +
     CREDENTIAL_SEPARATOR +
     CREDENTIAL_VALUE,
   "gi",
 );
+/** What a key is called when its label has a space (`API key`, `service role key`). Not `primary` or `foreign`. */
+const SPACED_KEY_QUALIFIERS = String.raw`api|secret|signing|private|access|encryption|master|anon|client|service(?:\s+role)?`;
 /**
- * Human-readable one-time-code labels with a space (`auth code: 123456`, `MFA code: …`,
- * `recovery codes: …`, `code verifier: …`) and an exact `pin:`. `error code:` / `status code:`
- * are not matched, nor are `spin:` / `pinned:`.
+ * Human-readable credential labels with a space: one-time codes (`auth code: 123456`,
+ * `MFA code: …`, `recovery codes: …`, `code verifier: …`), named keys (`API key: …`,
+ * `service role key: …`) and an exact `pin:`. `error code:` / `status code:` /
+ * `primary key:` are not matched, nor are `spin:` / `pinned:`.
  */
-const SPACED_CODE_LABEL_PATTERN = new RegExp(
-  String.raw`\b((?:${ONE_TIME_CODE_QUALIFIERS}|one[- ]time)\s+codes?|code\s+verifier|pin)` +
+const SPACED_CREDENTIAL_LABEL_PATTERN = new RegExp(
+  String.raw`\b((?:${ONE_TIME_CODE_QUALIFIERS}|one[- ]time)\s+codes?|code\s+verifier|(?:${SPACED_KEY_QUALIFIERS})\s+key|pin)` +
     CREDENTIAL_SEPARATOR +
     CREDENTIAL_VALUE,
   "gi",
@@ -165,23 +173,52 @@ const SPACED_CODE_LABEL_PATTERN = new RegExp(
  * An exactly quoted `"key"` / `'key'` in object form (`{"key":"sk_live_…"}`). A bare
  * `key:` is not matched, so diagnostics such as Postgres `Key (plant_id)=…` stay readable.
  */
-const QUOTED_KEY_PATTERN = new RegExp(String.raw`(["'])(key)\1(\s*:\s*)` + CREDENTIAL_VALUE, "gi");
+const QUOTED_KEY_PATTERN = new RegExp(
+  String.raw`(${QUOTE})(key)\1(\s*:\s*)` + CREDENTIAL_VALUE,
+  "gi",
+);
 /**
  * An exactly quoted `"code"` / `'code'` in object form (`{"code":"4/0Ab…"}`, an OAuth
  * exchange). Only SQLSTATE and PostgREST diagnostic codes (`"23505"`, `"42P01"`, `"PGRST116"`) are kept.
  */
 const QUOTED_CODE_PATTERN = new RegExp(
-  String.raw`(["'])(code)\1(\s*:\s*)` + CREDENTIAL_VALUE,
+  String.raw`(${QUOTE})(code)\1(\s*:\s*)` + CREDENTIAL_VALUE,
   "gi",
 );
-/** SQLSTATE (`23505`, `42P01`) or PostgREST (`PGRST116`) code shape, optionally quoted. */
-const DIAGNOSTIC_CODE_VALUE = /^(["']?)(?:[0-9A-Z]{5}|PGRST\d{3})\1$/;
+/** SQLSTATE (`23505`, `42P01`) or PostgREST (`PGRST116`) code shape, optionally (escape-)quoted. */
+const DIAGNOSTIC_CODE_VALUE = /^(\\*["']?)(?:[0-9A-Z]{5}|PGRST\d{3})\1$/;
+/** The fields a PostgREST error object carries beside `code`. */
+const POSTGREST_ERROR_FIELDS = ["details", "hint", "message"].map(
+  (field) => new RegExp(String.raw`${QUOTE}${field}${QUOTE}\s*:`, "i"),
+);
+
 /**
- * A PostgREST/Postgres error object carries `message`, `details` or `hint` beside its
- * `code`. Only with that context is a code-shaped value kept; a lone `{"code":"12345"}`
- * could be a verification or OAuth code and is redacted.
+ * True when the code at `offset` sits in a flat object that also has `details`, `hint`
+ * and `message`: the full PostgREST error shape. A code beside only some of them
+ * (`{"code":"12345","message":"OAuth exchange failed"}`), or in another object, could be
+ * a verification or OAuth code and is redacted.
  */
-const POSTGREST_ERROR_CONTEXT = /["'](?:message|details|hint)["']\s*:/i;
+function isInPostgrestErrorObject(text: string, offset: number): boolean {
+  const start = text.lastIndexOf("{", offset);
+  const end = text.indexOf("}", offset);
+  if (start < 0 || end < 0) return false;
+  const object = text.slice(start, end + 1);
+  return POSTGREST_ERROR_FIELDS.every((field) => field.test(object));
+}
+
+/**
+ * `state` / `nonce` in object or colon form (`{"state":"…"}`, `nonce: …`). A nonce is
+ * always redacted; a state only when token-shaped, so `state: pending` stays readable.
+ */
+const STATE_NONCE_PATTERN = new RegExp(
+  String.raw`(${QUOTE}|)\b(state|nonce)\1(\s*:\s*)` + CREDENTIAL_VALUE,
+  "gi",
+);
+/** Eight or more token characters including a digit (`csrfSecret123456`), quotes stripped. */
+function isTokenShaped(value: string): boolean {
+  const bare = value.replace(/^\\*["']|\\*["']$/g, "");
+  return /^[A-Za-z0-9._~+/=-]{8,}$/.test(bare) && /\d/.test(bare);
+}
 
 /** OAuth `code=` / `key=` / `state=` / `nonce=` parameters (auth callbacks carry them), `=` or `%3D` with optional spaces. */
 const OAUTH_PARAM_PATTERN =
@@ -191,7 +228,7 @@ export const REDACTED = "[redacted]";
 
 /** REDACTED, keeping the quotes of a quoted value so serialised text stays well-formed. */
 function redactedLike(value: string): string {
-  const quote = value.startsWith('"') || value.startsWith("'") ? value[0] : "";
+  const quote = /^\\*["']/.exec(value)?.[0] ?? "";
   return `${quote}${REDACTED}${quote}`;
 }
 
@@ -229,7 +266,6 @@ function decodePercentEscapes(text: string): string {
 export function scrubText(value: unknown): string {
   if (value == null) return "";
   const text = decodePercentEscapes(typeof value === "string" ? value : safeString(value));
-  const hasPostgrestContext = POSTGREST_ERROR_CONTEXT.test(text);
   return text
     .replace(BRIDGE_TOKEN_PATTERN, `vbt_${REDACTED}`)
     .replace(KNOWN_SECRET_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
@@ -241,7 +277,7 @@ export function scrubText(value: unknown): string {
         `${quote}${key}${quote}${separator}${redactedLike(value)}`,
     )
     .replace(
-      SPACED_CODE_LABEL_PATTERN,
+      SPACED_CREDENTIAL_LABEL_PATTERN,
       (_m, label: string, separator: string, value: string) =>
         `${label}${separator}${redactedLike(value)}`,
     )
@@ -252,8 +288,23 @@ export function scrubText(value: unknown): string {
     )
     .replace(
       QUOTED_CODE_PATTERN,
+      (
+        match,
+        quote: string,
+        key: string,
+        separator: string,
+        value: string,
+        offset: number,
+        whole: string,
+      ) =>
+        DIAGNOSTIC_CODE_VALUE.test(value) && isInPostgrestErrorObject(whole, offset)
+          ? match
+          : `${quote}${key}${quote}${separator}${redactedLike(value)}`,
+    )
+    .replace(
+      STATE_NONCE_PATTERN,
       (match, quote: string, key: string, separator: string, value: string) =>
-        DIAGNOSTIC_CODE_VALUE.test(value) && hasPostgrestContext
+        key.toLowerCase() === "state" && !isTokenShaped(value)
           ? match
           : `${quote}${key}${quote}${separator}${redactedLike(value)}`,
     )

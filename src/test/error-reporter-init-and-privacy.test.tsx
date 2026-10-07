@@ -271,6 +271,20 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ["code_verifier=dBjftJeZ4CVPmB92K27uhbUJU1p1r", "dBjftJeZ4CVPmB92K27uhbUJU1p1r"],
       ["request rejected vbt_0123456789abcdefABCDEF0123456789abcdefAB", "vbt_0123456789"],
       ["bridge said (vbt_short-tok_123) was revoked", "short-tok_123"],
+      ['{"code":"12345","message":"OAuth exchange failed"}', "12345"],
+      ['oauth={"code":"12345"}; error={"message":"request failed"}', "12345"],
+      ['{"code":"42P01","message":"relation missing"}', "42P01"],
+      ['payload=\\"access_token\\":\\"AbCdEf1234567890\\"', "AbCdEf1234567890"],
+      ['{\\"refresh_token\\":\\"rt_9x8y7z6w\\"}', "rt_9x8y7z6w"],
+      ['{\\"key\\":\\"AbCdEf1234567890\\"}', "AbCdEf1234567890"],
+      ["API key: AbCdEf1234567890", "AbCdEf1234567890"],
+      ["secret key: AbCdEf1234567890", "AbCdEf1234567890"],
+      ["signing key: AbCdEf1234567890", "AbCdEf1234567890"],
+      ["service role key: AbCdEf1234567890", "AbCdEf1234567890"],
+      ['{"state":"csrfSecret123456"}', "csrfSecret123456"],
+      ['{"nonce":"n0nc3Value99"}', "n0nc3Value99"],
+      ["state: csrfSecret123456", "csrfSecret123456"],
+      ["nonce: n0nc3Value99", "n0nc3Value99"],
     ];
     for (const [input, secret] of cases) {
       const out = scrubText(input);
@@ -287,16 +301,17 @@ describe("errorReportingRules — privacy of outgoing events", () => {
     expect(scrubText("Key (plant_id)=(42) already exists.")).toBe(
       "Key (plant_id)=(42) already exists.",
     );
-    // PostgREST error JSON keeps its short diagnostic code.
-    expect(scrubText('{"code":"23505","message":"duplicate"}')).toBe(
-      '{"code":"23505","message":"duplicate"}',
-    );
-    expect(scrubText('{"code":"PGRST116","details":null,"hint":null,"message":"no rows"}')).toBe(
+    // A complete PostgREST error object (code, details, hint, message) keeps its diagnostic code.
+    const postgrestErrors = [
+      '{"code":"23505","details":"Key (plant_id)=(42) already exists.","hint":null,"message":"duplicate"}',
       '{"code":"PGRST116","details":null,"hint":null,"message":"no rows"}',
-    );
-    expect(scrubText('{"code":"42P01","message":"relation missing"}')).toBe(
-      '{"code":"42P01","message":"relation missing"}',
-    );
+      '{"message":"relation missing","code":"42P01","hint":null,"details":null}',
+      '{\\"code\\":\\"23505\\",\\"details\\":null,\\"hint\\":null,\\"message\\":\\"duplicate\\"}',
+    ];
+    for (const payload of postgrestErrors) expect(scrubText(payload)).toBe(payload);
+    expect(scrubText("state: pending")).toBe("state: pending");
+    expect(scrubText('{"state":"active"}')).toBe('{"state":"active"}');
+    expect(scrubText("primary key: plant_id")).toBe("primary key: plant_id");
     expect(scrubText('{"error_code":"23505"}')).toBe('{"error_code":"23505"}');
     expect(scrubText("status_code: 500")).toBe("status_code: 500");
     expect(scrubText("error code: 23505")).toBe("error code: 23505");

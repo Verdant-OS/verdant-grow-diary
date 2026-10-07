@@ -285,6 +285,10 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ['{"nonce":"n0nc3Value99"}', "n0nc3Value99"],
       ["state: csrfSecret123456", "csrfSecret123456"],
       ["nonce: n0nc3Value99", "n0nc3Value99"],
+      ['recovery_codes: [\n  "a1b2",\n  "c3d4"', "c3d4"],
+      ['{"backup_codes": ["e5f6", "g7h8"', "g7h8"],
+      ['login failed password: "hunter2', "hunter2"],
+      ['payload=\\"access_token\\":\\"AbCdEf1234567890', "AbCdEf1234567890"],
     ];
     for (const [input, secret] of cases) {
       const out = scrubText(input);

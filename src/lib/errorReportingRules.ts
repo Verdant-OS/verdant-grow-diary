@@ -143,8 +143,12 @@ const CREDENTIAL_SEPARATOR = String.raw`(\s*(?:[:=]|%3[Dd])\s*)`;
  * string (`payload=\"access_token\":\"…\"`).
  */
 const QUOTE = String.raw`\\*["']`;
-/** Value: escaped-quoted, quoted (escapes included), bracketed (an array, across lines too, or already `[redacted]`), or bare up to the next delimiter. */
-const CREDENTIAL_VALUE = String.raw`(\\+"[^"]*?\\+"|\\+'[^']*?\\+'|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[[^\]]*\]|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
+/**
+ * Value: escaped-quoted, quoted (escapes included), bracketed (an array, across lines too,
+ * or already `[redacted]`), or bare up to the next delimiter. A quoted or bracketed value
+ * with no closing quote or bracket (a truncated payload) runs to the end of the text.
+ */
+const CREDENTIAL_VALUE = String.raw`(\\+"[^"]*?(?:\\+"|$)|\\+'[^']*?(?:\\+'|$)|"(?:[^"\\]|\\.)*(?:"|$)|'(?:[^'\\]|\\.)*(?:'|$)|\[[^\]]*(?:\]|$)|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
 /** What a one-time or recovery code is called (`MFA code`, `recovery_codes`, `pin`). Not `error` or `status`. */
 const ONE_TIME_CODE_QUALIFIERS = String.raw`auth|authorization|verification|otp|security|confirmation|mfa|2fa|sms|totp|recovery|backup|reset|invite|login|pin`;
 /** Words that make an identifier a credential name, including `*_KEY` / `*-key`, named `…Key`s and one-time codes (`auth_code`, `mfa_code`, `recovery_codes`, PKCE `code_verifier`, `otp`). */

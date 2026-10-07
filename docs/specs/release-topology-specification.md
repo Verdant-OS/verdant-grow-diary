@@ -358,9 +358,10 @@ or reconfigured.
 
 ### 2.7 The evidence-status and hosting-timeline note — 2026-10-07
 
-`practical observation`, one session, every call a read: GitHub check runs and commit statuses on
-four first-parent tips, Vercel project, domain and deployment reads, and one attempted live read.
-Times are UTC. Appendix E holds the readings and a consolidated hosting timeline.
+`practical observation`, every call a read: GitHub check runs and commit statuses on the six
+first-parent tips since Appendix D, Vercel project, domain and deployment reads, and one attempted
+live read. One session took them, except two tip reads a second session added (E.2). Times are
+UTC. Appendix E holds the readings and a consolidated hosting timeline.
 
 - **Why.** The owner asked for this PR's evidence and hosting timeline to be brought up to date in
   place, with inherited claims labelled, and for `#1857`'s failed review to be accounted for. This
@@ -1949,11 +1950,15 @@ Superseded by every later stamp that re-runs the procedures (D-RT-11).
 
 ### E.2 First-parent tips since Appendix D — GitHub check runs and statuses, `VERIFIED`
 
-Read with `commits/{sha}/check-runs` and `commits/{sha}/status` around 21:25. GitHub Actions
-runs are omitted.
+Read with `commits/{sha}/check-runs` and `commits/{sha}/status`: the last four tips around 21:25,
+and `1209caab` and `03347101` at 22:18:27–22:18:31 by a second session, after the Codex review at
+`c0603fee` found them missing. `git log --first-parent cfe09322..e0bb3930` lists exactly these
+six. GitHub Actions runs are omitted.
 
 | Tip        | `Vercel` status                             | `Vercel Deployments – …` | Workers Builds `…1` / `…2` | `Supabase Preview` |
 | ---------- | ------------------------------------------- | ------------------------ | -------------------------- | ------------------ |
+| `1209caab` | `failure`, "Account is blocked." (22:21:27) | `pending`                | success / success (22:35)  | `failure`          |
+| `03347101` | `failure`, "Account is blocked." (22:36:35) | `pending`                | success / success (22:57)  | `failure`          |
 | `c5b1d1c3` | `failure`, "Account is blocked." (23:10:56) | `pending`                | success / success (23:18)  | `failure`          |
 | `1aa310d2` | `failure`, "Account is blocked." (03:06:12) | `pending`                | success / success (03:30)  | `failure`          |
 | `9958e7cf` | `failure`, "Account is blocked." (03:07:37) | `pending`                | success / success (03:38)  | `failure`          |
@@ -1968,7 +1973,7 @@ A check run proves that a build ran. It says nothing about a deploy, its route o
 | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list_teams`                                                                | One team                                                                                                                                                                                                                                       |
 | `get_project verdant-grow-diary` (team-scoped)                              | `live: false`; `updatedAt` **2026-10-07 01:08:19** (D.4 read 2026-10-04 05:06:25); `latestDeployment` `dpl_2F61…`, a **preview** (`target: null`) from a PR branch, created 2026-10-01 03:08:53; `domains: []`; `ssoProtection.enabled: false` |
-| `list_project_domains`                                                      | Apex (created 2026-09-01 19:06:11, updated 2026-09-18 00:19:07) and `www` (updated **2026-10-03 09:51:48**), both `verified: true`, no redirect                                                                                                |
+| `list_project_domains`                                                      | Apex (created 2026-09-01 19:06:11, updated 2026-09-18 00:19:07) and `www` (updated **2026-10-03 09:51:48**; no creation time recorded), both `verified: true`, no redirect                                                                     |
 | `get_deployment verdantgrowdiary.com`, `www.…` (unscoped, then team-scoped) | **`404 not_found`** for both, in both scopes                                                                                                                                                                                                   |
 | `list_deployments` (production, newest three)                               | `dpl_5jjJ…` (`3005ff3f`, 2026-10-01 02:36:08), `dpl_6sKn…` (`cf6de0e9`), `dpl_3UsP…` (`18730daf`), all `READY`                                                                                                                                 |
 | `list_deployments` (project, since 2026-10-01 00:00, 20 rows)               | No deployment named `dpl_2Mog…`. The only `ebc8f82e` row is `dpl_3qRU…`, a merge-queue preview, `CANCELED`                                                                                                                                     |
@@ -1979,34 +1984,40 @@ no longer lists or why the hostnames resolve to no deployment. `domains: []` and
 `ssoProtection.enabled: false` may be a different field shape from D.4's alias and SSO reads. That
 comparison is `uncertainty`, not a recorded change.
 
-**M10: `FAIL`.** No binding names the tip, and neither production hostname resolves to a Vercel
-deployment. Under D-RT-15 a binding never establishes what a hostname serves, and its absence
-does not either. What apex and `www` return is `BLOCKED` (E.1). Nothing here says another host
-serves them.
+**M10: `BLOCKED`, a partial run.** These reads are two of M10's inputs, not the procedure. With M2
+blocked, M10's inventory is the baseline four, and this session read only apex and `www`. It did
+not read the rollout record or configuration, `verdant-grow-diary.vercel.app`,
+`verdant-grow-diary-verdantgrowdiary.vercel.app`, `list_promote_aliases`, either custom
+hostname's DNS, or the opening and closing tip. What the two reads show is that neither custom
+hostname resolves to a Vercel deployment. Whether any production binding names the tip is
+`NOT_MEASURED`. Without the DNS step, a `404` cannot tell a hostname bound to nothing from one
+served by another platform, so it is not a `FAIL` either. Under D-RT-15 a binding never
+establishes what a hostname serves, and its absence does not either. What apex and `www` return
+is `BLOCKED` (E.1). Nothing here says another host serves them.
 **M4: `FAIL`** for the owner. The tip `e0bb3930` has no Vercel build, and the `Vercel` status reports
 the account block. The cause stays `inference` (D.4).
 
 ### E.4 Hosting timeline — consolidated
 
-| When (UTC)                     | Event                                                                                                         | Label                                                      | Where                  |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------- |
-| 2026-09-01 19:06:11            | Apex and `www` added to the Vercel project                                                                    | `VERIFIED`                                                 | E.3                    |
-| 2026-09-25                     | Founding measurement; promotion incident                                                                      | `INHERITED`                                                | Appendices A, B        |
-| 2026-09-26                     | Promotion moves to Vercel Rolling Releases                                                                    | `INHERITED`                                                | Appendix C             |
-| 2026-10-01 02:36:08            | Production deployment `dpl_5jjJ…` (`3005ff3f`)                                                                | `VERIFIED`                                                 | E.3                    |
-| 2026-10-01 03:12:18            | Production deployment `dpl_2Mog…` (`ebc8f82e`, `#1790`)                                                       | `INHERITED`                                                | D.4                    |
-| 2026-10-01 03:35–03:40         | Rolling release takes `dpl_2Mog…` to 100 %                                                                    | `INHERITED`                                                | D.4                    |
-| 2026-10-01 03:42:34 →          | `Vercel: Account is blocked.` on every first-parent tip                                                       | `INHERITED` to `cfe09322`; `VERIFIED` on the four E.2 tips | D.2, E.2               |
-| 2026-10-03 09:51:48            | `www` domain record updated (what changed `NOT_MEASURED`)                                                     | `VERIFIED`                                                 | E.3                    |
-| 2026-10-05 18:01               | First Cloudflare Workers Builds check run on a first-parent tip                                               | `INHERITED`                                                | D.3                    |
-| 2026-10-05 →                   | Draft `#1904` plans moving apex and `www` to Cloudflare Workers; Critical Mass FAIL, 1 P1, at `5ddcd1ce`      | `SOURCE CLAIM` / `INHERITED`                               | §2.6                   |
-| 2026-10-06 21:02–21:04         | Apex, `www` and the project alias bound to `dpl_2Mog…`; M10 `FAIL` (bindings 55 commits behind)               | `INHERITED`                                                | D.4                    |
-| 2026-10-06 23:18 → 10-07 05:41 | Workers Builds `…1` and `…2` succeed on each new tip; `Supabase Preview` fails on each                        | `VERIFIED`                                                 | E.2                    |
-| 2026-10-07 01:08:19            | Vercel project record updated (what changed `NOT_MEASURED`)                                                   | `VERIFIED`                                                 | E.3                    |
-| 2026-10-07 16:37               | A Codex review on `#1857` reports one of three Workers checks as "This Worker does not exist on your account" | `SOURCE CLAIM`                                             | `#1857` review comment |
-| 2026-10-07                     | `#1937`, `#1938`, `#1939` open; `#1937`'s title targets "the Worker"                                          | `SOURCE CLAIM`                                             | §2.7                   |
-| 2026-10-07 21:26:42            | M1 against apex and `www`: egress `403`                                                                       | `VERIFIED` (`BLOCKED`)                                     | E.1                    |
-| 2026-10-07 21:27–21:33         | Apex and `www` resolve to no Vercel deployment; `dpl_2Mog…` not listed                                        | `VERIFIED`                                                 | E.3                    |
+| When (UTC)                     | Event                                                                                                         | Label                                                     | Where                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ---------------------- |
+| 2026-09-01 19:06:11            | Apex added to the Vercel project (when `www` was added: `NOT_MEASURED`, E.3 recorded no creation time)        | `VERIFIED`                                                | E.3                    |
+| 2026-09-25                     | Founding measurement; promotion incident                                                                      | `INHERITED`                                               | Appendices A, B        |
+| 2026-09-26                     | Promotion moves to Vercel Rolling Releases                                                                    | `INHERITED`                                               | Appendix C             |
+| 2026-10-01 02:36:08            | Production deployment `dpl_5jjJ…` (`3005ff3f`)                                                                | `VERIFIED`                                                | E.3                    |
+| 2026-10-01 03:12:18            | Production deployment `dpl_2Mog…` (`ebc8f82e`, `#1790`)                                                       | `INHERITED`                                               | D.4                    |
+| 2026-10-01 03:35–03:40         | Rolling release takes `dpl_2Mog…` to 100 %                                                                    | `INHERITED`                                               | D.4                    |
+| 2026-10-01 03:42:34 →          | `Vercel: Account is blocked.` on every first-parent tip                                                       | `INHERITED` to `cfe09322`; `VERIFIED` on the six E.2 tips | D.2, E.2               |
+| 2026-10-03 09:51:48            | `www` domain record updated (what changed `NOT_MEASURED`)                                                     | `VERIFIED`                                                | E.3                    |
+| 2026-10-05 18:01               | First Cloudflare Workers Builds check run on a first-parent tip                                               | `INHERITED`                                               | D.3                    |
+| 2026-10-05 →                   | Draft `#1904` plans moving apex and `www` to Cloudflare Workers; Critical Mass FAIL, 1 P1, at `5ddcd1ce`      | `SOURCE CLAIM` / `INHERITED`                              | §2.6                   |
+| 2026-10-06 21:02–21:04         | Apex, `www` and the project alias bound to `dpl_2Mog…`; M10 `FAIL` (bindings 55 commits behind)               | `INHERITED`                                               | D.4                    |
+| 2026-10-06 22:35 → 10-07 05:41 | Workers Builds `…1` and `…2` succeed on each new tip; `Supabase Preview` fails on each                        | `VERIFIED`                                                | E.2                    |
+| 2026-10-07 01:08:19            | Vercel project record updated (what changed `NOT_MEASURED`)                                                   | `VERIFIED`                                                | E.3                    |
+| 2026-10-07 16:37               | A Codex review on `#1857` reports one of three Workers checks as "This Worker does not exist on your account" | `SOURCE CLAIM`                                            | `#1857` review comment |
+| 2026-10-07                     | `#1937`, `#1938`, `#1939` open; `#1937`'s title targets "the Worker"                                          | `SOURCE CLAIM`                                            | §2.7                   |
+| 2026-10-07 21:26:42            | M1 against apex and `www`: egress `403`                                                                       | `VERIFIED` (`BLOCKED`)                                    | E.1                    |
+| 2026-10-07 21:27–21:33         | Apex and `www` resolve to no Vercel deployment; `dpl_2Mog…` not listed                                        | `VERIFIED`                                                | E.3                    |
 
 ### E.5 What Appendix E does not establish
 

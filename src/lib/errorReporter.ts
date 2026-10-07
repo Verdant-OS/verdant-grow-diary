@@ -88,6 +88,13 @@ export function initErrorReporter(
           httpHeaders: false,
           httpBodies: [],
           urlQueryParams: false,
+          // Omitted fields resolve ON in v11, so the rest are set explicitly.
+          graphQL: { document: false, variables: false },
+          genAI: { inputs: false, outputs: false },
+          databaseQueryData: false,
+          queues: false,
+          stackFrameVariables: false,
+          frameContextLines: 0,
         },
         tracesSampleRate: 0,
         maxBreadcrumbs: 20,

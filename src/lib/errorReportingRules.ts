@@ -11,7 +11,8 @@
  * Privacy posture (deliberate, do not loosen without an owner decision):
  * - No user id, email, IP, or session identifiers are attached. Sentry's
  *   `dataCollection` has every category off.
- * - URLs are reduced to origin + pathname. Query strings and fragments are
+ * - URLs are reduced to origin + pathname, with UUID path segments (row ids)
+ *   replaced by `:id`. Query strings and fragments are
  *   dropped because auth flows carry tokens there.
  * - Free text (messages, stacks, breadcrumbs) is scrubbed for token-like
  *   values and e-mail addresses before it leaves the browser.
@@ -105,6 +106,8 @@ const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 /** Bearer / JWT / API-key shaped values. JWTs are three base64url segments. */
 const JWT_PATTERN = /\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g;
 const BEARER_PATTERN = /\b(bearer\s+)[A-Za-z0-9._~+/=-]{4,}/gi;
+/** Verdant bridge tokens (`vbt_…`), which can appear bare with no key or scheme in front. */
+const BRIDGE_TOKEN_PATTERN = /\bvbt_[A-Za-z0-9_-]{6,}/g;
 /** `Basic <base64>` credentials (HTTP Basic auth). Keeps the scheme, drops the value. */
 const BASIC_PATTERN = /\b(basic\s+)[A-Za-z0-9+/=]{4,}/gi;
 /**
@@ -148,11 +151,12 @@ function redactedLike(value: string): string {
   return `${quote}${REDACTED}${quote}`;
 }
 
-/** Removes e-mail addresses, JWT/bearer tokens and credential-looking query values from free text. Idempotent. */
+/** Removes e-mail addresses, bridge/JWT/bearer tokens and credential-looking query values from free text. Idempotent. */
 export function scrubText(value: unknown): string {
   if (value == null) return "";
   const text = typeof value === "string" ? value : safeString(value);
   return text
+    .replace(BRIDGE_TOKEN_PATTERN, `vbt_${REDACTED}`)
     .replace(BEARER_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
     .replace(BASIC_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
     .replace(
@@ -173,7 +177,15 @@ export function scrubText(value: unknown): string {
     .replace(EMAIL_PATTERN, REDACTED);
 }
 
-/** Reduces an http(s) URL to origin + pathname; any other scheme becomes `scheme:[redacted]`. Relative or unparsable input keeps only the part before `?`/`#`. */
+/** A whole path segment shaped like a UUID (grow, tent, plant and other row ids). */
+const UUID_SEGMENT_PATTERN =
+  /(?<=\/)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=\/|$)/gi;
+
+function redactPathIds(path: string): string {
+  return path.replace(UUID_SEGMENT_PATTERN, ":id");
+}
+
+/** Reduces an http(s) URL to origin + pathname, with UUID segments as `:id`; any other scheme becomes `scheme:[redacted]`. Relative or unparsable input keeps only the part before `?`/`#`. */
 export function scrubUrl(value: unknown): string {
   if (typeof value !== "string" || value.length === 0) return "";
   try {
@@ -181,9 +193,9 @@ export function scrubUrl(value: unknown): string {
     // Only http(s) has an origin + path worth keeping. data:, javascript:, blob:,
     // extension and other schemes can carry a payload in what follows the scheme.
     if (url.protocol !== "http:" && url.protocol !== "https:") return `${url.protocol}${REDACTED}`;
-    return `${url.origin}${url.pathname}`;
+    return `${url.origin}${redactPathIds(url.pathname)}`;
   } catch {
-    return value.split(/[?#]/, 1)[0] ?? "";
+    return redactPathIds(value.split(/[?#]/, 1)[0] ?? "");
   }
 }
 

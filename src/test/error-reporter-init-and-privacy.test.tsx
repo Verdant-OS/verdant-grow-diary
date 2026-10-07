@@ -60,6 +60,30 @@ describe("errorReporter — initialisation race", () => {
     expect(kept).toEqual(["GlobalHandlers", "Dedupe"]);
   });
 
+  it("turns every Sentry data-collection category off once the SDK resolves its defaults", async () => {
+    enableProductionReporter();
+    await initErrorReporter(async () => sdk as never);
+    const options = sdk.init.mock.calls[0]?.[0] as { dataCollection?: unknown };
+    // Resolve with the installed SDK's own resolver, so an omitted field shows its real default.
+    const { resolveDataCollectionOptions } = (await import(
+      // Deep import of an unexported SDK helper (no type declaration at this path).
+      "../../node_modules/@sentry/core/build/esm/utils/data-collection/resolveDataCollectionOptions.js"
+    )) as { resolveDataCollectionOptions: (o: unknown) => Record<string, unknown> };
+    expect(resolveDataCollectionOptions(options)).toEqual({
+      userInfo: false,
+      cookies: false,
+      httpHeaders: { request: false, response: false },
+      httpBodies: [],
+      urlQueryParams: false,
+      graphQL: { document: false, variables: false },
+      genAI: { inputs: false, outputs: false },
+      databaseQueryData: false,
+      queues: false,
+      stackFrameVariables: false,
+      frameContextLines: 0,
+    });
+  });
+
   it("initErrorReporter returns one shared promise that settles when the reporter is ready", async () => {
     enableProductionReporter();
     const loader = vi.fn(async () => sdk as never);
@@ -194,6 +218,8 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ["password=abc#123", "#123"],
       ["password: it's secret", "s secret"],
       ["password=#abc", "#abc"],
+      ["request rejected vbt_0123456789abcdefABCDEF0123456789abcdefAB", "vbt_0123456789"],
+      ["bridge said (vbt_short-tok_123) was revoked", "short-tok_123"],
     ];
     for (const [input, secret] of cases) {
       const out = scrubText(input);
@@ -223,6 +249,26 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ],
     });
     expect(out?.breadcrumbs).toEqual([{ category: "navigation", data: { from: "/a", to: "/b" } }]);
+  });
+
+  it("replaces UUID path segments (grow, tent and plant ids) with :id", () => {
+    const id = "3f2c9a1e-8b7d-4c6e-9f00-1a2b3c4d5e6f";
+    expect(scrubUrl(`https://verdantgrowdiary.com/plants/${id}?tab=log`)).toBe(
+      "https://verdantgrowdiary.com/plants/:id",
+    );
+    expect(scrubUrl(`/grows/${id.toUpperCase()}/tents/${id}`)).toBe("/grows/:id/tents/:id");
+    expect(scrubUrl("/assets/index-3f2c9a1e.js")).toBe("/assets/index-3f2c9a1e.js");
+    const crumb = scrubBreadcrumb({
+      category: "navigation",
+      data: { from: `/plants/${id}`, to: `/grows/${id}` },
+    });
+    expect(crumb?.data).toEqual({ from: "/plants/:id", to: "/grows/:id" });
+    const event = scrubEvent({
+      transaction: `/plants/${id}`,
+      request: { url: `https://verdantgrowdiary.com/plants/${id}` },
+    }) as { transaction: string; request: { url: string } };
+    expect(event.transaction).toBe("/plants/:id");
+    expect(event.request.url).toBe("https://verdantgrowdiary.com/plants/:id");
   });
 
   it("keeps only http(s) origin+path from URLs and redacts payload-bearing schemes", () => {

@@ -7,7 +7,7 @@ import {
 import {
   TYPED_REUSED_RECEIPT_READ_DEADLINE_MS,
   verifyActiveTypedQuickLogEvent,
-} from "@/lib/quickLogTypedReusedReceipt";
+} from "@/lib/quickLogTypedReusedReceiptService";
 
 const expected: ExpectedTypedQuickLogEvent = {
   id: "77777777-7777-4777-8777-000000000001",

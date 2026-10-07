@@ -14,10 +14,12 @@
 import { isUuid } from "@/lib/isUuid";
 import { supabase as defaultSupabase } from "@/integrations/supabase/client";
 import {
+  resolveTypedReceiptReaders,
   verifyActiveTypedQuickLogEvent,
   type TypedQuickLogEventReader,
   type TypedQuickLogChildReader,
-} from "./quickLogTypedReusedReceipt";
+  type TypedReceiptReadClient,
+} from "./quickLogTypedReusedReceiptService";
 import type { TypedReusedReviewTarget } from "./quickLogTypedReusedReceiptRules";
 import {
   quickLogSaveRequiresHistoryCheck,
@@ -60,6 +62,8 @@ export interface WateringRpcClient {
     fn: "quicklog_save_event",
     args: QuickLogWateringEventRpcArgs,
   ) => Promise<{ data: unknown; error: unknown }>;
+  /** Reads a reused receipt back; without an injected client the singleton reads. */
+  from?: TypedReceiptReadClient["from"];
 }
 
 export interface WateringTypedEventInput {
@@ -303,6 +307,8 @@ export async function writeQuickLogWateringTypedEvent(
   const eventId = trimOrNull(envelope.grow_event_id);
   if (!isUuid(eventId)) return { ok: false, reason: "rpc:no_event_id" };
 
+  // Read the receipt back through the same client the RPC used.
+  const readers = resolveTypedReceiptReaders(options);
   if (envelope.reused === true) {
     const receipt = await verifyActiveTypedQuickLogEvent(
       {
@@ -313,8 +319,8 @@ export async function writeQuickLogWateringTypedEvent(
         plantId: mapped.args.p_plant_id,
         volumeMl: mapped.args.p_water.volume_ml,
       },
-      options.reusedEventReader,
-      options.reusedChildReader,
+      readers.eventReader,
+      readers.childReader,
     );
     // A read failure stays retryable with the same key; a confirmed mismatch is
     // returned again by every same-key Retry, so it goes to history review.

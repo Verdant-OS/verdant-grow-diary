@@ -32,7 +32,8 @@ repository `path:line` cite. **Amended a third time** at deploy tip
 `cfe09322e3b6e5745c5e007dd064815542927580` (the `#1839` squash, committed 2026-10-06 19:28:11 UTC):
 every repository cite in §§3–5, §7 and §8 re-read at that SHA, and the publisher, promotion and
 build-integration axes re-measured by Vercel, Lovable and GitHub reads from 21:02:08 to 21:04:26 UTC, plus a follow-up read
-of the PR branches' GitHub check runs from 21:12 to 21:20 UTC (Appendix D, D.3).
+of the PR branches' GitHub check runs from 21:12 to 21:20 UTC (Appendix D, D.3), and a 2026-10-07
+03:37:39–03:39:56 UTC read of the 104 first-parent tips between C.6 and 2026-10-02 (D.5).
 
 Every claim carries a Sentinel label: `established fact`, `source claim`, `practical observation`,
 `inference`, `uncertainty`, `missing evidence`. Every topology check carries one status from the
@@ -111,7 +112,7 @@ code is written in this slice.
   as a fifth promotion path (§5.7), makes an `ACTIVE` rollout a non-`PASS` state (D-RT-12), makes
   every rollout action and configuration change a publish action (D-RT-13), and reads the rollout
   before the hostnames (M10, M11).
-- **The Vercel account is blocked.** GitHub first reported it at 2026-10-01 03:42 UTC; when the
+- **Vercel reports that the account is blocked** (`practical observation`). GitHub first reported it at 2026-10-01 03:42 UTC; when the
   block began, and why, is `NOT_MEASURED` (§10, Appendix D). Every
   deploy-branch tip from `5fbaa96b` on carries the commit status `Vercel: Account is blocked.`, and
   the newest production deployment is still the 2026-10-01 03:12 UTC build of `ebc8f82e` (`#1790`).
@@ -313,7 +314,8 @@ and nothing changed (C.7).
 ### 2.6 The blocked-account and build-integration amendment — 2026-10-06
 
 `established fact`, GitHub API, `git`, Vercel and Lovable reads, 2026-10-06 from 21:02:08 to 21:04:26
-UTC, plus the PR-branch check-run follow-up from 21:12 to 21:20 UTC (D.3), one attempt each (Appendix D). Every call was a read; nothing was promoted, rolled out, redeployed
+UTC, plus the PR-branch check-run follow-up from 21:12 to 21:20 UTC (D.3) and the 2026-10-07
+03:37:39–03:39:56 UTC first-parent tip scan (D.5), one attempt each (Appendix D). Every call was a read; nothing was promoted, rolled out, redeployed
 or reconfigured.
 
 - **Why.** The owner asked for a restamp once `#1892`, `#1895` and `#1896` had resolved. All three are

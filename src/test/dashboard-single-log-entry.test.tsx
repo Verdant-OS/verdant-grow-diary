@@ -1,11 +1,17 @@
 /**
- * GDP-GROW-SCOPED-CTA-GROWID-001 — Dashboard presenter render pins.
+ * Dashboard — one Log entry and a stable readiness marker.
  *
- * Source scans can pass while rendered hrefs regress to bare /sensors or
- * /daily-check. These tests assert resolved Link targets in the DOM for the
- * Dashboard surfaces #1595 fixed alongside DailyGrowCheckStatusCard.
+ * Spec: docs/specs/dashboard-single-log-entry-readiness-marker.md (§5.4).
+ * GDP decision D1.1-A (2026-10-06): the Dashboard does not render its own
+ * QuickLogV2Fab; the One-Tent Home card's `Log` is the page body's single
+ * Log control. AppShell's chrome triggers sit outside `dashboard-root` and
+ * are counted by the browser-level e2e checks instead (D1.2-A).
+ *
+ * `dashboard-ready` is the e2e readiness marker. It renders exactly once in
+ * the loaded branch whatever the tent selection, and never while the grow
+ * data is loading or failed.
  */
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,9 +20,8 @@ const GROW = "4cad3cae-1111-4000-8000-000000000001";
 const TENT = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f";
 
 const H = vi.hoisted(() => ({
-  scoped: false,
+  tentCount: 1,
   growStatus: "success" as "loading" | "error" | "success",
-  perTentRows: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("@/hooks/use-diary-entries", () => ({
@@ -40,18 +45,16 @@ vi.mock("@/hooks/useGrowData", () => ({
   useGrowTents: () => ({
     data:
       H.growStatus === "success"
-        ? [
-            {
-              id: TENT,
-              name: "Render Tent",
-              brand: "",
-              size: "",
-              stage: "veg",
-              light: { on: false, schedule: "", wattage: 0 },
-              alertCount: 0,
-              growId: GROW,
-            },
-          ]
+        ? Array.from({ length: H.tentCount }, (_, i) => ({
+            id: i === 0 ? TENT : `${TENT}-${i}`,
+            name: `Render Tent ${i + 1}`,
+            brand: "",
+            size: "",
+            stage: "veg",
+            light: { on: false, schedule: "", wattage: 0 },
+            alertCount: 0,
+            growId: GROW,
+          }))
         : [],
     isLoading: H.growStatus === "loading",
     isError: H.growStatus === "error",
@@ -68,13 +71,13 @@ vi.mock("@/hooks/useGrowData", () => ({
 
 vi.mock("@/hooks/use-sensor-readings", () => ({
   useSensorReadings: () => ({
-    data: H.perTentRows,
+    data: [],
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
   }),
   useSensorReadingsByTents: () => ({
-    byTent: { [TENT]: H.perTentRows },
+    byTent: { [TENT]: [] },
     statusByTent: { [TENT]: "success" },
     isLoading: false,
     isError: false,
@@ -83,10 +86,10 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
 
 vi.mock("@/hooks/useScopedGrow", () => ({
   useScopedGrow: () => ({
-    urlGrowId: H.scoped ? GROW : null,
-    scopedGrow: H.scoped ? { id: GROW, name: "Render Grow", stage: "veg" } : null,
-    scopedGrowName: H.scoped ? "Render Grow" : null,
-    isValidScopedGrow: H.scoped,
+    urlGrowId: null,
+    scopedGrow: null,
+    scopedGrowName: null,
+    isValidScopedGrow: false,
     backHref: null,
   }),
 }));
@@ -153,7 +156,15 @@ vi.mock("@/store/grows", () => ({ useGrows: () => ({ grows: [] }) }));
 vi.mock("@/components/VpdStageMissingBadge", () => ({ default: () => null }));
 vi.mock("@/components/EcowittLatestSnapshotCard", () => ({ default: () => null }));
 vi.mock("@/components/StabilityChipDrilldown", () => ({ default: () => null }));
-vi.mock("@/components/QuickLogV2Fab", () => ({ default: () => null }));
+// Stand-in with the real FAB's accessible name, so a Dashboard render of
+// QuickLogV2Fab is counted as a Log control (jsdom applies no md: CSS).
+vi.mock("@/components/QuickLogV2Fab", () => ({
+  default: () => (
+    <button type="button" aria-label="Quick Log">
+      Quick Log
+    </button>
+  ),
+}));
 vi.mock("@/components/MetricChip", () => ({ default: () => null }));
 vi.mock("@/components/SeverityBadge", () => ({ default: () => null }));
 vi.mock("@/components/StageBadge", () => ({ default: () => null }));
@@ -188,11 +199,7 @@ vi.mock("@/components/DashboardZeroTentEmptyState", () => ({
 
 import Dashboard from "@/pages/Dashboard";
 
-function hrefForTestId(testId: string): string | null {
-  const node = screen.getByTestId(testId);
-  const anchor = node.tagName === "A" ? node : node.querySelector("a");
-  return anchor?.getAttribute("href") ?? null;
-}
+const LOG_NAME = /^(Quick )?Log$/;
 
 function renderDashboard() {
   const queryClient = new QueryClient({
@@ -205,146 +212,71 @@ function renderDashboard() {
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return screen.getByTestId("dashboard-root");
 }
 
-describe("Dashboard grow-scoped CTA render", () => {
+/** Visible-by-role Log controls (links and buttons) inside the page body. */
+function logControls(root: HTMLElement): HTMLElement[] {
+  const body = within(root);
+  return [
+    ...body.queryAllByRole("link", { name: LOG_NAME }),
+    ...body.queryAllByRole("button", { name: LOG_NAME }),
+  ];
+}
+
+describe("Dashboard single Log entry and readiness marker", () => {
   beforeEach(() => {
-    H.scoped = false;
+    H.tentCount = 1;
     H.growStatus = "success";
-    H.perTentRows = [];
   });
 
-  const populatedReading = () => {
-    const ts = new Date().toISOString();
-    H.perTentRows = [
-      {
-        id: "reading-render-a",
-        tent_id: TENT,
-        metric: "temperature_c",
-        value: 24,
-        source: "manual",
-        quality: "ok",
-        ts,
-        captured_at: ts,
-        created_at: ts,
-      },
-      {
-        id: "reading-render-b",
-        tent_id: TENT,
-        metric: "humidity_pct",
-        value: 55,
-        source: "manual",
-        quality: "ok",
-        ts,
-        captured_at: ts,
-        created_at: ts,
-      },
-      {
-        id: "reading-render-c",
-        tent_id: TENT,
-        metric: "vpd_kpa",
-        value: 1.1,
-        source: "manual",
-        quality: "ok",
-        ts,
-        captured_at: ts,
-        created_at: ts,
-      },
-    ];
-  };
+  it("one tent: the home card's Log is the only Log control in the page body", () => {
+    const root = renderDashboard();
 
-  it("carries growId on the home card Log, with no header Quick Log, when grow scope is active", () => {
-    H.scoped = true;
-    renderDashboard();
-
+    const controls = logControls(root);
+    expect(controls).toHaveLength(1);
+    expect(controls[0]).toBe(screen.getByTestId("tonight-tent-home-log"));
+    expect(screen.getByTestId("tonight-tent-home-log").getAttribute("href")).toBe(
+      `/daily-check?growId=${GROW}`,
+    );
     expect(screen.queryByTestId("dashboard-daily-grow-check-entry")).toBeNull();
-    expect(hrefForTestId("tonight-tent-home-log")).toBe(`/daily-check?growId=${GROW}`);
     expect(screen.getAllByTestId("dashboard-ready")).toHaveLength(1);
   });
 
-  it("uses the tent's grow on the home card Log, with no header Quick Log, without grow scope", () => {
-    // #1833 prefers homeTent.growId; the harness tent carries growId: GROW.
-    renderDashboard();
+  it("no tent: readiness marker renders, with no home card and no header Log", () => {
+    H.tentCount = 0;
+    const root = renderDashboard();
 
-    expect(screen.queryByTestId("dashboard-daily-grow-check-entry")).toBeNull();
-    expect(hrefForTestId("tonight-tent-home-log")).toBe(`/daily-check?growId=${GROW}`);
     expect(screen.getAllByTestId("dashboard-ready")).toHaveLength(1);
+    expect(root.querySelector('[data-testid^="tonight-tent-home"]')).toBeNull();
+    expect(screen.queryByTestId("dashboard-daily-grow-check-entry")).toBeNull();
+    expect(logControls(root)).toHaveLength(0);
   });
 
-  it("carries growId on inline Daily Grow Check Start Check when grow scope is active", () => {
-    H.scoped = true;
-    renderDashboard();
+  it("choose a tent: readiness marker renders, the card offers tents and no Log", () => {
+    H.tentCount = 2;
+    const root = renderDashboard();
 
-    expect(hrefForTestId("daily-grow-check-status-cta")).toBe(`/daily-check?growId=${GROW}`);
+    expect(screen.getAllByTestId("dashboard-ready")).toHaveLength(1);
+    expect(screen.getByTestId("tonight-tent-home-choose")).toBeInTheDocument();
+    expect(screen.queryByTestId("tonight-tent-home-log")).toBeNull();
+    expect(screen.queryByTestId("dashboard-daily-grow-check-entry")).toBeNull();
+    expect(logControls(root)).toHaveLength(0);
   });
 
-  it("keeps global /daily-check on inline Start Check without grow scope", () => {
+  it("loading: no readiness marker", () => {
+    H.growStatus = "loading";
     renderDashboard();
 
-    expect(hrefForTestId("daily-grow-check-status-cta")).toBe("/daily-check");
+    expect(screen.getByTestId("dashboard-grow-data-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-ready")).toBeNull();
   });
 
-  it("carries growId on Environment Snapshot sensor CTAs when grow scope is active", () => {
-    H.scoped = true;
+  it("error: no readiness marker", () => {
+    H.growStatus = "error";
     renderDashboard();
 
-    expect(screen.getByTestId("dashboard-environment-snapshot-empty")).toBeInTheDocument();
-    expect(hrefForTestId("dashboard-environment-snapshot-go-to-sensors")).toBe(
-      `/sensors?growId=${GROW}`,
-    );
-    expect(hrefForTestId("dashboard-environment-snapshot-add-manual-reading")).toBe(
-      `/sensors?growId=${GROW}#manual-reading`,
-    );
-    expect(hrefForTestId("dashboard-environment-snapshot-import-sensor-data")).toBe(
-      `/sensors?growId=${GROW}#csv-import`,
-    );
-    expect(hrefForTestId("dashboard-environment-snapshot-empty-sensors-link")).toBe(
-      `/sensors?growId=${GROW}`,
-    );
-  });
-
-  it("keeps bare /sensors paths on Environment Snapshot CTAs without grow scope", () => {
-    renderDashboard();
-
-    expect(hrefForTestId("dashboard-environment-snapshot-go-to-sensors")).toBe("/sensors");
-    expect(hrefForTestId("dashboard-environment-snapshot-add-manual-reading")).toBe(
-      "/sensors#manual-reading",
-    );
-    expect(hrefForTestId("dashboard-environment-snapshot-import-sensor-data")).toBe(
-      "/sensors#csv-import",
-    );
-    expect(hrefForTestId("dashboard-environment-snapshot-empty-sensors-link")).toBe("/sensors");
-    expect(hrefForTestId("dashboard-environment-snapshot-open-sensors")).toBe("/sensors");
-  });
-
-  it("carries growId on Environment Snapshot header Open sensors when grow scope is active", () => {
-    H.scoped = true;
-    renderDashboard();
-
-    expect(hrefForTestId("dashboard-environment-snapshot-open-sensors")).toBe(
-      `/sensors?growId=${GROW}`,
-    );
-  });
-
-  it("carries growId on populated chart Sensor data link when grow scope is active", () => {
-    H.scoped = true;
-    populatedReading();
-    renderDashboard();
-
-    expect(screen.queryByTestId("dashboard-environment-snapshot-empty")).toBeNull();
-    expect(hrefForTestId("dashboard-environment-snapshot-sensor-data")).toBe(
-      `/sensors?growId=${GROW}`,
-    );
-    expect(hrefForTestId("dashboard-environment-snapshot-open-sensors")).toBe(
-      `/sensors?growId=${GROW}`,
-    );
-  });
-
-  it("keeps bare /sensors on populated chart Sensor data link without grow scope", () => {
-    populatedReading();
-    renderDashboard();
-
-    expect(hrefForTestId("dashboard-environment-snapshot-sensor-data")).toBe("/sensors");
-    expect(hrefForTestId("dashboard-environment-snapshot-open-sensors")).toBe("/sensors");
+    expect(screen.getByTestId("dashboard-grow-data-error")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-ready")).toBeNull();
   });
 });

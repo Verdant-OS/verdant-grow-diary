@@ -1,0 +1,10 @@
+# Baseline security headers for responses served directly by the Workers Assets
+# binding (JS/CSS/images/fonts/PDF), which never reach src/server.ts.
+# Keep in sync with src/lib/securityHeadersRules.ts. Nitro appends its own
+# /assets/* cache-control rule after this block at build time.
+/*
+  Strict-Transport-Security: max-age=31536000
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=()

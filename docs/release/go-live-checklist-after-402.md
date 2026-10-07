@@ -133,7 +133,11 @@ Restated from #1894:
      refuses it as out of order or, with `--include-all`, runs it after #1836. There its
      preflight fails and the push stops. The owner records the skip, e.g.
      `supabase migration repair --status applied 20260927012000`. Agents never run this.
-   - #1836 `20261001140000` last (it accepts either predecessor).
+   - #1836 `20261001140000` (it accepts either predecessor).
+   - #1841 `20261001180000` last. It only replaces the manual wrapper, and its preflight
+     requires the `20260928183000` wrapper, so it fails closed if that file was not applied.
+     Deliver it as step 4 of the guarded manual chain in
+     `docs/quicklog-manual-delivery-order-contract.md`, not as a bare file.
 2. Before any edge deploy that includes #1869: confirm `PAYMENTS_ENVIRONMENT=live` in the
    Supabase function secrets. If it's unset, checkout returns 503 by design.
 3. Redeploy the edge functions listed there: `mcp` (#1651, #1655), `ai-doctor-review`

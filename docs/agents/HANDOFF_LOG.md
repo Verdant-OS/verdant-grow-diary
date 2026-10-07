@@ -120,14 +120,14 @@ base: codex/typed-reused-receipt-active-check-20260926 (#1730); retarget to verd
 checkout: git switch claude/typed-receipt-deadline-mismatch-review && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/codex/typed-reused-receipt-active-check-20260926
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1930
 head_sha: 3a94982d282e9e7b72bfd3bce5d37aff34afbb94, observed 2026-10-07T03:10Z. It merges #1730 67cd417a: the deadline and verdict moved into the renamed service module, and #1730's missing-child pins follow this PR's refusal rule (merge note https://github.com/Verdant-OS/verdant-grow-diary/pull/1930#issuecomment-6029452168).
-state: review. Ready, not draft, on the owner's explicit instruction to mark it ready. Required checks 0/35: ci.yml runs only for PRs into main or verdant-grow-diary, so it has not run on this stacked base. CodeRabbit skips it for the same reason. Two Codex P2s are fixed in c1dfd816 and fbb5d108.
+state: review, draft. The owner returned it to draft on 2026-10-07 because repo rules keep PRs as drafts until merge; it stays draft through review. Required checks 0/35: ci.yml runs only for PRs into main or verdant-grow-diary, so it has not run on this stacked base. CodeRabbit skips it for the same reason. Two Codex P2s are fixed in c1dfd816 and fbb5d108.
 next_action: after #1730 merges, retarget to verdant-grow-diary, merge the base (a normal merge; it brings in #1921's markers, see blockers), and confirm ci.yml starts. Then 35/35 and a Blue Dream PASS at the then-current head, then the Chemdawg merge.
 files: src/lib/quickLogTypedReusedReceiptService.ts; src/lib/quickLogTypedReusedReceiptRules.ts; src/lib/quickLogHistoryReviewTargetRules.ts (new); src/lib/writeFeedingTypedEvent.ts; src/lib/writeQuickLogWateringTypedEvent.ts; src/lib/quickLogPendingFeedingStore.ts; src/lib/quickLogPendingWateringStore.ts; src/components/QuickLogV2Sheet.tsx and tests
 blockers: depends on #1730. #1921 merged as 03347101 and changes the same Feed and Water store files, so the base merge after retargeting will conflict there; #1921's fallback marker must then also carry historyReviewTarget.
 artifacts: handoff comment https://github.com/Verdant-OS/verdant-grow-diary/pull/1930#issuecomment-6026163158
 reviewer_seat: Blue Dream (the delta includes src/components/QuickLogV2Sheet.tsx)
 claimed_by:
-last_updated: 2026-10-06 22:15 CT, by Claude
+last_updated: 2026-10-06 22:20 CT, by Claude
 ```
 
 ### CLAUDE-LOOP-ENGINEERING-001

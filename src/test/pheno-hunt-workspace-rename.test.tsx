@@ -113,6 +113,14 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     saveSmokeTest: state.saveSmokeTest ?? vi.fn().mockResolvedValue(true),
     saveLabResult: state.saveLabResult ?? vi.fn().mockResolvedValue(true),
     deleteLabResult: state.deleteLabResult ?? vi.fn().mockResolvedValue(true),
+    // Mirrors the hook: a confirmed rename patches the loaded hunt.
+    applyHuntName:
+      state.applyHuntName ??
+      ((huntId: string, name: string) => {
+        if (currentState.hunt?.id === huntId) {
+          rerenderState({ hunt: { ...currentState.hunt, name } });
+        }
+      }),
     ...state,
   };
   hookMock.mockImplementation(() => currentState);

@@ -59,60 +59,6 @@ export function huntScopedOverrideValue<T>(
   return override.value;
 }
 
-/**
- * An optimistic hunt name, plus every name it replaced. The override stands
- * in only while the loaded row still shows one of `staleNames`: the original
- * row name, or an earlier rename a slow reload can still return. Once the row
- * shows this value, or any other name (another session's rename), the row is
- * authoritative again. No clock involved, so a stale in-flight load can't
- * flash an old name back (#551 CodeRabbit, Codex P2).
- */
-export interface HuntNameOverride extends HuntScopedOverride<string> {
-  readonly staleNames: readonly string[];
-}
-
-export function huntNameOverrideValue(
-  override: HuntNameOverride | null,
-  hunt: { readonly id: string; readonly name: string } | null | undefined,
-): string | null {
-  if (!override || !hunt || override.huntId !== hunt.id) return null;
-  return override.staleNames.includes(hunt.name) ? override.value : null;
-}
-
-/** The override after a confirmed rename to `value` of the hunt whose loaded row shows `rowName`. */
-export function nextHuntNameOverride(
-  previous: HuntNameOverride | null,
-  huntId: string,
-  rowName: string,
-  value: string,
-): HuntNameOverride {
-  const carried =
-    previous && previous.huntId === huntId ? [...previous.staleNames, previous.value] : [];
-  const staleNames: string[] = [];
-  for (const name of [rowName, ...carried]) {
-    if (name !== value && !staleNames.includes(name)) staleNames.push(name);
-  }
-  return { huntId, value, staleNames };
-}
-
-/**
- * Drop a hunt's override as soon as it no longer applies: the loaded row shows
- * anything other than one of its stale names (the override's own value once
- * the row confirms it, or another session's rename). A retired override can
- * never be revived by a later rename back to one of its stale names (#551
- * Codex P2s). Returns the same map when nothing changes.
- */
-export function retireConfirmedHuntNameOverride(
-  overrides: Readonly<Record<string, HuntNameOverride>>,
-  hunt: { readonly id: string; readonly name: string } | null | undefined,
-): Readonly<Record<string, HuntNameOverride>> {
-  if (!hunt) return overrides;
-  const override = overrides[hunt.id];
-  if (!override || huntNameOverrideValue(override, hunt) !== null) return overrides;
-  const { [hunt.id]: _retired, ...rest } = overrides;
-  return rest;
-}
-
 export function phenoHuntRenameHint(result: PhenoHuntRenameResult): string {
   if (result.ok) return "";
   if (result.reason === "empty") return PHENO_HUNT_RENAME_COPY.empty;

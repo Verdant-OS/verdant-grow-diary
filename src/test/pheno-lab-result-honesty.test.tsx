@@ -93,6 +93,7 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     hasMore: false,
     loadNextPage: vi.fn(),
     reload: vi.fn(),
+    applyHuntName: vi.fn(),
     filters: {},
     setFilter: vi.fn(),
     resetFilters: vi.fn(),

@@ -74,14 +74,7 @@ import { buildPhenoComparisonActionState } from "@/lib/phenoComparisonActionStat
 import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
 import PhenoHuntRenameControl from "@/components/PhenoHuntRenameControl";
 import { usePhenoHuntRenameSession } from "@/hooks/usePhenoHuntRenameSession";
-import {
-  huntNameOverrideValue,
-  nextHuntNameOverride,
-  retireConfirmedHuntNameOverride,
-  huntScopedOverrideValue,
-  type HuntNameOverride,
-  type HuntScopedOverride,
-} from "@/lib/phenoHuntRenameRules";
+import { huntScopedOverrideValue, type HuntScopedOverride } from "@/lib/phenoHuntRenameRules";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
@@ -1537,26 +1530,9 @@ export default function PhenoHuntWorkspace() {
     BreedingObjectiveTarget[]
   > | null>(null);
   const [objectiveSaving, setObjectiveSaving] = useState(false);
-  // #551: optimistic name after a confirmed rename; the hunt row stays
-  // authoritative once a reload returns any other name.
-  // Keyed by hunt id: saves for different hunts can settle in any order.
-  const [huntNameLocal, setHuntNameLocal] = useState<Readonly<Record<string, HuntNameOverride>>>(
-    {},
-  );
-  const huntRowId = ws.hunt?.id;
-  const huntRowName = ws.hunt?.name;
-  useEffect(() => {
-    if (!huntRowId || huntRowName === undefined) return;
-    setHuntNameLocal((prev) =>
-      retireConfirmedHuntNameOverride(prev, { id: huntRowId, name: huntRowName }),
-    );
-    // huntNameLocal too: an override saved while the row already shows its
-    // value must retire without waiting for the row to change.
-  }, [huntRowId, huntRowName, huntNameLocal]);
-  const effectiveHuntName =
-    huntNameOverrideValue(ws.hunt ? (huntNameLocal[ws.hunt.id] ?? null) : null, ws.hunt) ??
-    ws.hunt?.name ??
-    null;
+  // #551: a confirmed rename is applied to the hook's hunt (applyHuntName),
+  // which also supersedes any load that read the row before the save.
+  const effectiveHuntName = ws.hunt?.name ?? null;
   const effectiveBreedingObjective: BreedingObjectiveTarget[] =
     huntScopedOverrideValue(breedingObjectiveLocal, ws.hunt?.id) ??
     ws.hunt?.breedingObjective ??
@@ -1566,7 +1542,7 @@ export default function PhenoHuntWorkspace() {
       ? null
       : (ws.roundLoadStates?.[round] ?? { status: "idle" as const, error: null });
 
-  const { setFilter } = ws;
+  const { setFilter, applyHuntName } = ws;
 
   const handleMarkSetupComplete = async () => {
     if (!canWrite || !ws.hunt?.id || setupSaving) return;
@@ -1606,13 +1582,10 @@ export default function PhenoHuntWorkspace() {
   // Pro entitlement policy filter blocked writes silently otherwise).
   const handleRenameHunt = async (name: string): Promise<boolean> => {
     if (!canWrite || !ws.hunt?.id) return false;
-    const { id: huntId, name: rowName } = ws.hunt;
+    const huntId = ws.hunt.id;
     try {
       await updatePhenoHuntSetup({ huntId, name });
-      setHuntNameLocal((prev) => ({
-        ...prev,
-        [huntId]: nextHuntNameOverride(prev[huntId] ?? null, huntId, rowName, name),
-      }));
+      applyHuntName(huntId, name);
       return true;
     } catch {
       return false;
@@ -1953,7 +1926,6 @@ export default function PhenoHuntWorkspace() {
                 <PhenoHuntSetupProgressCard
                   hunt={{
                     ...ws.hunt,
-                    name: effectiveHuntName ?? ws.hunt.name,
                     setupCompletedAt: setupCompletedLocal ?? ws.hunt.setupCompletedAt ?? null,
                   }}
                   candidateCount={ws.totalCandidateCount ?? candidates.length}

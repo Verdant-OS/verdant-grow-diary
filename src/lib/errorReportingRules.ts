@@ -138,8 +138,8 @@ const BASIC_PATTERN = /\b(basic\s+)[A-Za-z0-9+/=]{4,}/gi;
  */
 /** Separator: `:`, `=` or URL-encoded `%3D`, with optional whitespace on either side. */
 const CREDENTIAL_SEPARATOR = String.raw`(\s*(?:[:=]|%3[Dd])\s*)`;
-/** Value: quoted (escapes included), bracketed (an array, or already `[redacted]`), or bare up to the next delimiter. */
-const CREDENTIAL_VALUE = String.raw`("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[[^\]\n]*\]|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
+/** Value: quoted (escapes included), bracketed (an array, across lines too, or already `[redacted]`), or bare up to the next delimiter. */
+const CREDENTIAL_VALUE = String.raw`("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[[^\]]*\]|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
 /** What a one-time or recovery code is called (`MFA code`, `recovery_codes`, `pin`). Not `error` or `status`. */
 const ONE_TIME_CODE_QUALIFIERS = String.raw`auth|authorization|verification|otp|security|confirmation|mfa|2fa|sms|totp|recovery|backup|reset|invite|login|pin`;
 /** Words that make an identifier a credential name, including `*_KEY` / `*-key`, named `…Key`s and one-time codes (`auth_code`, `mfa_code`, `recovery_codes`, PKCE `code_verifier`, `otp`). */

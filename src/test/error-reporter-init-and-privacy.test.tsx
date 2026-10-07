@@ -252,6 +252,8 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ["invite code: XYZ123", "XYZ123"],
       ["mfa_code=123456", "123456"],
       ['recovery_codes: ["a1b2", "c3d4"]', "a1b2"],
+      ['recovery_codes: [\n  "a1b2",\n  "c3d4"\n]', "c3d4"],
+      ['{"backup_codes": [\n  "e5f6"\n]}', "e5f6"],
       ["pin: 4821", "4821"],
       ["https://verdantgrowdiary.com/auth?code=abc&state=csrfSecret123456", "csrfSecret123456"],
       ["openid callback nonce=n0nc3Value99", "n0nc3Value99"],

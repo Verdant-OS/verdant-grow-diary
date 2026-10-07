@@ -95,7 +95,10 @@ export function isAllowlistException(filePath) {
  * below an allowed prefix such as scripts/ or tests/.
  */
 function isForbiddenLockfile(filePath) {
-  const name = filePath.slice(filePath.lastIndexOf("/") + 1);
+  // Normalize Windows separators and drop trailing ones first, so neither
+  // `scripts\\package-lock.json` nor `scripts/package-lock.json/` hides the name.
+  const path = String(filePath).replaceAll("\\", "/").replace(/\/+$/, "");
+  const name = path.slice(path.lastIndexOf("/") + 1);
   return FORBIDDEN_LOCKFILES.includes(name);
 }
 

@@ -146,6 +146,16 @@ const CREDENTIAL_PATTERN = new RegExp(
  * `key:` is not matched, so diagnostics such as Postgres `Key (plant_id)=…` stay readable.
  */
 const QUOTED_KEY_PATTERN = new RegExp(String.raw`(["'])(key)\1(\s*:\s*)` + CREDENTIAL_VALUE, "gi");
+/**
+ * An exactly quoted `"code"` / `'code'` in object form (`{"code":"4/0Ab…"}`, an OAuth
+ * exchange). Short diagnostic codes (`"23505"`, `"PGRST116"`, `"42P01"`) are kept.
+ */
+const QUOTED_CODE_PATTERN = new RegExp(
+  String.raw`(["'])(code)\1(\s*:\s*)` + CREDENTIAL_VALUE,
+  "gi",
+);
+const DIAGNOSTIC_CODE_VALUE = /^(["']?)[A-Z0-9]{1,8}\1$/i;
+
 /** OAuth `code=` / `key=` query parameters (auth callbacks carry them), `=` or `%3D` with optional spaces. */
 const OAUTH_PARAM_PATTERN =
   /\b(code|key)(\s*(?:=|%3[Dd])\s*)("[^"]*"|'[^']*'|\[redacted\]|[^&\s"'#]+)/gi;
@@ -200,6 +210,13 @@ export function scrubText(value: unknown): string {
       QUOTED_KEY_PATTERN,
       (_m, quote: string, key: string, separator: string, value: string) =>
         `${quote}${key}${quote}${separator}${redactedLike(value)}`,
+    )
+    .replace(
+      QUOTED_CODE_PATTERN,
+      (match, quote: string, key: string, separator: string, value: string) =>
+        DIAGNOSTIC_CODE_VALUE.test(value)
+          ? match
+          : `${quote}${key}${quote}${separator}${redactedLike(value)}`,
     )
     .replace(
       OAUTH_PARAM_PATTERN,

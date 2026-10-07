@@ -231,6 +231,9 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ["token%3A%20abc123", "abc123"],
       ["access_token%253Dabc123", "abc123"],
       ["grower%2540example.com", "example.com"],
+      ["callback failed code = abc123", "abc123"],
+      ['oauth exchange failed {"code":"4/0AbCdEfGhIjKlMnOp"}', "4/0AbCdEfGhIjKlMnOp"],
+      ["oauth exchange failed {'code': 'q8w7e6r5t4y3u2i1'}", "q8w7e6r5t4y3u2i1"],
       ["request rejected vbt_0123456789abcdefABCDEF0123456789abcdefAB", "vbt_0123456789"],
       ["bridge said (vbt_short-tok_123) was revoked", "short-tok_123"],
     ];
@@ -249,6 +252,11 @@ describe("errorReportingRules — privacy of outgoing events", () => {
     expect(scrubText("Key (plant_id)=(42) already exists.")).toBe(
       "Key (plant_id)=(42) already exists.",
     );
+    // PostgREST error JSON keeps its short diagnostic code.
+    expect(scrubText('{"code":"23505","message":"duplicate"}')).toBe(
+      '{"code":"23505","message":"duplicate"}',
+    );
+    expect(scrubText('{"code":"PGRST116"}')).toBe('{"code":"PGRST116"}');
   });
 
   it("drops DOM click breadcrumbs, which can carry grower data in element attributes", () => {

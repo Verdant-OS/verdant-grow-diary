@@ -243,6 +243,16 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ["code verifier: dBjftJeZ4CVPmB92K27uhbUJU1p1r", "dBjftJeZ4CVPmB92K27uhbUJU1p1r"],
       ["one-time code = 771204", "771204"],
       ["Authorization code: q8w7e6r5t4", "q8w7e6r5t4"],
+      ["MFA code: 123456", "123456"],
+      ["2FA code: 123456", "123456"],
+      ["SMS code: 123456", "123456"],
+      ["recovery code: abcd-efgh", "abcd-efgh"],
+      ["backup code: 1234-5678", "1234-5678"],
+      ["reset code: 998877", "998877"],
+      ["invite code: XYZ123", "XYZ123"],
+      ["mfa_code=123456", "123456"],
+      ['recovery_codes: ["a1b2", "c3d4"]', "a1b2"],
+      ["pin: 4821", "4821"],
       ['{"auth_code":"q8w7e6r5t4y3"}', "q8w7e6r5t4y3"],
       ["verification_code=482913", "482913"],
       ['{"otp":"482913"}', "482913"],
@@ -275,6 +285,7 @@ describe("errorReportingRules — privacy of outgoing events", () => {
     expect(scrubText("status_code: 500")).toBe("status_code: 500");
     expect(scrubText("error code: 23505")).toBe("error code: 23505");
     expect(scrubText("HTTP status code: 500")).toBe("HTTP status code: 500");
+    expect(scrubText("pinned: true, spin: 3")).toBe("pinned: true, spin: 3");
   });
 
   it("drops DOM click breadcrumbs, which can carry grower data in element attributes", () => {

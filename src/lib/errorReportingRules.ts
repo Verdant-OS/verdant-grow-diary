@@ -131,10 +131,12 @@ const BASIC_PATTERN = /\b(basic\s+)[A-Za-z0-9+/=]{4,}/gi;
  */
 /** Separator: `:`, `=` or URL-encoded `%3D`, with optional whitespace on either side. */
 const CREDENTIAL_SEPARATOR = String.raw`(\s*(?:[:=]|%3[Dd])\s*)`;
-/** Value: quoted (escapes included), already redacted, or bare up to the next delimiter. */
-const CREDENTIAL_VALUE = String.raw`("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[redacted\]|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
-/** Words that make an identifier a credential name, including `*_KEY` / `*-key`, named `…Key`s and one-time codes (`auth_code`, `verification_code`, PKCE `code_verifier`, `otp`). */
-const CREDENTIAL_WORDS = String.raw`token|secret|passw(?:or)?d|pwd|pass|api[-_]?key|apikey|authorization|session|cookie|credential|[-_]key|(?:private|secret|service|access|signing|encryption|master|anon|role|client)key|auth[-_]?code|verification[-_]?code|code[-_]?verifier|otp`;
+/** Value: quoted (escapes included), bracketed (an array, or already `[redacted]`), or bare up to the next delimiter. */
+const CREDENTIAL_VALUE = String.raw`("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[[^\]\n]*\]|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
+/** What a one-time or recovery code is called (`MFA code`, `recovery_codes`, `pin`). Not `error` or `status`. */
+const ONE_TIME_CODE_QUALIFIERS = String.raw`auth|authorization|verification|otp|security|confirmation|mfa|2fa|sms|totp|recovery|backup|reset|invite|login|pin`;
+/** Words that make an identifier a credential name, including `*_KEY` / `*-key`, named `…Key`s and one-time codes (`auth_code`, `mfa_code`, `recovery_codes`, PKCE `code_verifier`, `otp`). */
+const CREDENTIAL_WORDS = String.raw`token|secret|passw(?:or)?d|pwd|pass|api[-_]?key|apikey|authorization|session|cookie|credential|[-_]key|(?:private|secret|service|access|signing|encryption|master|anon|role|client)key|(?:${ONE_TIME_CODE_QUALIFIERS}|one[-_]?time)[-_]?codes?|code[-_]?verifier|otp`;
 const CREDENTIAL_PATTERN = new RegExp(
   String.raw`(["']?)(?<![A-Za-z0-9_-])([A-Za-z0-9_-]*(?:${CREDENTIAL_WORDS})[A-Za-z0-9_-]*)\1` +
     CREDENTIAL_SEPARATOR +
@@ -142,11 +144,12 @@ const CREDENTIAL_PATTERN = new RegExp(
   "gi",
 );
 /**
- * Human-readable one-time-code labels with a space (`auth code: 123456`,
- * `Verification code: …`, `code verifier: …`). `error code:` / `status code:` are not matched.
+ * Human-readable one-time-code labels with a space (`auth code: 123456`, `MFA code: …`,
+ * `recovery codes: …`, `code verifier: …`) and an exact `pin:`. `error code:` / `status code:`
+ * are not matched, nor are `spin:` / `pinned:`.
  */
 const SPACED_CODE_LABEL_PATTERN = new RegExp(
-  String.raw`\b((?:auth(?:orization)?|verification|one[- ]time|otp|security|confirmation)\s+code|code\s+verifier)` +
+  String.raw`\b((?:${ONE_TIME_CODE_QUALIFIERS}|one[- ]time)\s+codes?|code\s+verifier|pin)` +
     CREDENTIAL_SEPARATOR +
     CREDENTIAL_VALUE,
   "gi",

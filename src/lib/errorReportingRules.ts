@@ -148,13 +148,14 @@ const CREDENTIAL_PATTERN = new RegExp(
 const QUOTED_KEY_PATTERN = new RegExp(String.raw`(["'])(key)\1(\s*:\s*)` + CREDENTIAL_VALUE, "gi");
 /**
  * An exactly quoted `"code"` / `'code'` in object form (`{"code":"4/0Ab…"}`, an OAuth
- * exchange). Short diagnostic codes (`"23505"`, `"PGRST116"`, `"42P01"`) are kept.
+ * exchange). Only SQLSTATE and PostgREST diagnostic codes (`"23505"`, `"42P01"`, `"PGRST116"`) are kept.
  */
 const QUOTED_CODE_PATTERN = new RegExp(
   String.raw`(["'])(code)\1(\s*:\s*)` + CREDENTIAL_VALUE,
   "gi",
 );
-const DIAGNOSTIC_CODE_VALUE = /^(["']?)[A-Z0-9]{1,8}\1$/i;
+/** SQLSTATE (`23505`, `42P01`) or PostgREST (`PGRST116`) codes only, optionally quoted. */
+const DIAGNOSTIC_CODE_VALUE = /^(["']?)(?:[0-9A-Z]{5}|PGRST\d{3})\1$/;
 
 /** OAuth `code=` / `key=` query parameters (auth callbacks carry them), `=` or `%3D` with optional spaces. */
 const OAUTH_PARAM_PATTERN =
@@ -171,11 +172,12 @@ function redactedLike(value: string): string {
 /** Most nested URL-encoding layers decoded before scrubbing (`%253D` is two). */
 const MAX_DECODE_PASSES = 3;
 const PERCENT_RUN_PATTERN = /(?:%[0-9A-Fa-f]{2})+/g;
+const ASCII_ESCAPE_PATTERN = /%[0-7][0-9A-Fa-f]/g;
 
 /**
  * Decodes `%XX` escapes so encoded credentials (`Bearer%20…`, `%22password%22%3A…`,
- * `%2540`) meet the same patterns as plain text. Runs that are not valid UTF-8 stay
- * as they are; stops once a pass changes nothing.
+ * `%2540`) meet the same patterns as plain text. In a run that is not valid UTF-8 only
+ * the ASCII escapes are decoded; stops once a pass changes nothing.
  */
 function decodePercentEscapes(text: string): string {
   let current = text;
@@ -184,7 +186,11 @@ function decodePercentEscapes(text: string): string {
       try {
         return decodeURIComponent(run);
       } catch {
-        return run;
+        // Malformed UTF-8 in the run: still decode its ASCII escapes (`%3A`, `%20`)
+        // so one bad sequence cannot hide the separator next to a credential.
+        return run.replace(ASCII_ESCAPE_PATTERN, (escape) =>
+          String.fromCharCode(parseInt(escape.slice(1), 16)),
+        );
       }
     });
     if (next === current) break;

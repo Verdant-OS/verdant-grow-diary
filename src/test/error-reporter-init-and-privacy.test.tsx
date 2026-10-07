@@ -235,6 +235,9 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ['oauth exchange failed {"code":"4/0AbCdEfGhIjKlMnOp"}', "4/0AbCdEfGhIjKlMnOp"],
       ["oauth exchange failed {'code': 'q8w7e6r5t4y3u2i1'}", "q8w7e6r5t4y3u2i1"],
       ["auth_code=q8w7e6r5t4y3", "q8w7e6r5t4y3"],
+      ['{"code":"abc123"}', "abc123"],
+      ["{'code':'ab12'}", "ab12"],
+      ["password%3A%ED%A0%80%20hunter2", "hunter2"],
       ['{"auth_code":"q8w7e6r5t4y3"}', "q8w7e6r5t4y3"],
       ["verification_code=482913", "482913"],
       ['{"otp":"482913"}', "482913"],
@@ -262,6 +265,7 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       '{"code":"23505","message":"duplicate"}',
     );
     expect(scrubText('{"code":"PGRST116"}')).toBe('{"code":"PGRST116"}');
+    expect(scrubText('{"code":"42P01"}')).toBe('{"code":"42P01"}');
     expect(scrubText('{"error_code":"23505"}')).toBe('{"error_code":"23505"}');
     expect(scrubText("status_code: 500")).toBe("status_code: 500");
   });

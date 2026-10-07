@@ -107,11 +107,12 @@ describe("Dashboard no longer renders FirstPlantMemoryCta (single Quick Log entr
   it("does not contain the duplicated 'Log your first plant memory' copy", () => {
     expect(DASH).not.toMatch(/Log your first plant memory/i);
   });
-  it("retains the single Quick Log FAB entry point", () => {
-    expect(DASH).toMatch(/<QuickLogV2Fab\b/);
-    // Only one Quick Log primary entry point on the page.
-    const fabMatches = DASH.match(/<QuickLogV2Fab\b/g) ?? [];
-    expect(fabMatches.length).toBe(1);
+  it("leaves the Quick Log sheet triggers to AppShell (GDP D1.1-A)", () => {
+    // The One-Tent Home card's Log is the page's single primary Log entry;
+    // AppShell's header trigger and mobile FAB open the Quick Log sheet.
+    expect(DASH).not.toMatch(/<QuickLogV2Fab\b/);
+    expect(DASH).not.toMatch(/from\s+["']@\/components\/QuickLogV2Fab["']/);
+    expect(DASH).toMatch(/<TonightTentHomeCard\b/);
   });
   it("does not introduce a new Quick Log launch mechanism or write path", () => {
     expect(DASH).not.toMatch(/service_role/);

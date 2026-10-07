@@ -9,6 +9,10 @@ import {
   quickLogSaveRequiresHistoryCheck,
   type QuickLogHistoryCheckReason,
 } from "./quickLogSaveErrorMessage";
+import {
+  isFeedingRejectionHistoryReason,
+  type FeedingRejectionHistoryReason,
+} from "./quickLogFeedingRejectionRules";
 
 export interface PendingQuickLogFeeding {
   version: 1;
@@ -17,7 +21,7 @@ export interface PendingQuickLogFeeding {
   payload: FeedingTypedEventInput;
   resolved: ResolvedQuickLogV2Target;
   /** Durable refusal of this same key; absent on older pending records. */
-  historyCheckReason?: QuickLogHistoryCheckReason;
+  historyCheckReason?: QuickLogHistoryCheckReason | FeedingRejectionHistoryReason;
 }
 
 export const FEEDING_RECOVERY_UNAVAILABLE =
@@ -54,6 +58,16 @@ const PAYLOAD_KEYS = [
   ...NUMERIC_KEYS,
 ];
 const storageKey = (ownerId: string) => `verdant:quick-log:pending-feeding:v1:${ownerId}`;
+/**
+ * Key-scoped fallback for a history-review refusal whose full marked record
+ * could not be rewritten while a small write still lands (a write that throws or
+ * is dropped for that one larger value). It does not help when storage is at
+ * capacity: the marker needs more room than the marked record, so marking then
+ * reports blocked. It only ever adds the
+ * refusal to the exact pending Feed carrying the same idempotency key.
+ */
+const historyMarkerKey = (ownerId: string) =>
+  `verdant:quick-log:pending-feeding-history:v1:${ownerId}`;
 function object(value: unknown): value is Record<string, unknown> {
   return (
     value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype
@@ -105,7 +119,7 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogF
     return false;
   if (
     value.historyCheckReason !== undefined &&
-    !quickLogSaveRequiresHistoryCheck(value.historyCheckReason)
+    !feedingHistoryCheckReason(value.historyCheckReason)
   )
     return false;
   const p = value.payload;
@@ -187,10 +201,43 @@ export function readPendingQuickLogFeeding(ownerId: string | null | undefined): 
     const raw = window.sessionStorage.getItem(storageKey(ownerId));
     if (raw === null) return { status: "empty" };
     const record: unknown = JSON.parse(raw);
-    return validRecord(record, ownerId) ? { status: "pending", record } : { status: "blocked" };
+    if (!validRecord(record, ownerId)) return { status: "blocked" };
+    if (record.historyCheckReason !== undefined) return { status: "pending", record };
+    const fallback = readHistoryMarker(ownerId, record.payload.idempotency_key);
+    if (fallback.status === "blocked") return fallback;
+    return fallback.status === "marked"
+      ? { status: "pending", record: { ...record, historyCheckReason: fallback.reason } }
+      : { status: "pending", record };
   } catch {
     return { status: "blocked" };
   }
+}
+
+/** A marker for another key is stale and ignored; an unreadable one fails closed. */
+function readHistoryMarker(
+  ownerId: string,
+  idempotencyKey: string,
+):
+  | { status: "none" }
+  | {
+      status: "marked";
+      reason: QuickLogHistoryCheckReason | FeedingRejectionHistoryReason;
+    }
+  | { status: "blocked" } {
+  const raw = window.sessionStorage.getItem(historyMarkerKey(ownerId));
+  if (raw === null) return { status: "none" };
+  const marker: unknown = JSON.parse(raw);
+  if (
+    !object(marker) ||
+    !onlyKeys(marker, ["version", "idempotencyKey", "historyCheckReason"]) ||
+    marker.version !== 1 ||
+    !id(marker.idempotencyKey) ||
+    !feedingHistoryCheckReason(marker.historyCheckReason)
+  )
+    return { status: "blocked" };
+  return marker.idempotencyKey === idempotencyKey
+    ? { status: "marked", reason: marker.historyCheckReason }
+    : { status: "none" };
 }
 
 /** Claim synchronously before dispatch; an existing unresolved Feed always wins. */
@@ -217,26 +264,48 @@ export function claimPendingQuickLogFeeding(
   }
 }
 
+/** Replay refusals plus Feed validation rejections that same-key Retry can never clear. */
+function feedingHistoryCheckReason(
+  reason: unknown,
+): reason is QuickLogHistoryCheckReason | FeedingRejectionHistoryReason {
+  return quickLogSaveRequiresHistoryCheck(reason) || isFeedingRejectionHistoryReason(reason);
+}
+
 /** Preserve a refusal only on its exact claimed record, with verified storage readback. */
 export function markPendingQuickLogFeedingHistoryCheck(
   record: PendingQuickLogFeeding | null | undefined,
   reason: unknown,
 ): { status: "marked"; record: PendingQuickLogFeeding } | { status: "blocked" } {
   try {
-    if (
-      !record ||
-      !validRecord(record, record.ownerId) ||
-      !quickLogSaveRequiresHistoryCheck(reason)
-    )
+    if (!record || !validRecord(record, record.ownerId) || !feedingHistoryCheckReason(reason))
       return { status: "blocked" };
     const current = readPendingQuickLogFeeding(record.ownerId);
     if (current.status !== "pending" || !sameRecord(current.record, record))
       return { status: "blocked" };
     const marked: PendingQuickLogFeeding = { ...current.record, historyCheckReason: reason };
-    window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
+    try {
+      window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
+    } catch {
+      // Verified below; the unchanged journal falls back to the small marker.
+    }
     const verified = readPendingQuickLogFeeding(record.ownerId);
-    return verified.status === "pending" && sameRecord(verified.record, marked)
-      ? { status: "marked", record: verified.record }
+    if (verified.status === "pending" && sameRecord(verified.record, marked))
+      return { status: "marked", record: verified.record };
+    // Only the exact unchanged journal may take the fallback; anything else is
+    // unknown storage state, and a reload must not reopen same-key Retry from it.
+    if (verified.status !== "pending" || !sameRecord(verified.record, current.record))
+      return { status: "blocked" };
+    window.sessionStorage.setItem(
+      historyMarkerKey(record.ownerId),
+      JSON.stringify({
+        version: 1,
+        idempotencyKey: marked.payload.idempotency_key,
+        historyCheckReason: reason,
+      }),
+    );
+    const fallback = readPendingQuickLogFeeding(record.ownerId);
+    return fallback.status === "pending" && sameRecord(fallback.record, marked)
+      ? { status: "marked", record: fallback.record }
       : { status: "blocked" };
   } catch {
     return { status: "blocked" };
@@ -252,7 +321,14 @@ export function clearPendingQuickLogFeeding(
     const current = readPendingQuickLogFeeding(record.ownerId);
     if (current.status !== "pending" || !sameRecord(current.record, record)) return false;
     window.sessionStorage.removeItem(storageKey(record.ownerId));
-    return window.sessionStorage.getItem(storageKey(record.ownerId)) === null;
+    if (window.sessionStorage.getItem(storageKey(record.ownerId)) !== null) return false;
+    try {
+      // A leftover marker names this retired key, so it can never attach to a new Feed.
+      window.sessionStorage.removeItem(historyMarkerKey(record.ownerId));
+    } catch {
+      // The journal is cleared; a stale key-scoped marker is inert.
+    }
+    return true;
   } catch {
     return false;
   }

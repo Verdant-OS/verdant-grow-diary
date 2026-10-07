@@ -1358,7 +1358,8 @@ merged or mergeable is operating state, and it lives in `docs/agents/CURRENT_STA
     and `src/hooks/useSaveAiDoctorPhase1TimelineEvidence.ts`;
   - `quicklog_save_event`: `src/hooks/useQuickLogActivitySave.ts`,
     `src/lib/writeQuickLogWateringTypedEvent.ts`, `src/lib/writeFeedingTypedEvent.ts` and
-    `src/lib/quick-log/createQuickLogEvent.ts`.
+    `src/lib/quick-log/createQuickLogEvent.ts`. (Update, #593: `createQuickLogEvent.ts` had no
+    reachable caller and was removed; the live `quicklog_save_event` callers are the other three.)
 
   Photo and video entries insert into `diary_entries` directly from
   `src/lib/quickLogPhotoDiaryEntry.ts` and `src/lib/quickLogVideoDiaryEntry.ts`, and

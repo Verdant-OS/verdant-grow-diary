@@ -32,7 +32,8 @@ jobs:
     name: test:security-db-local
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # Not a required check, so a red run never blocks the merge queue.
+    # Not one of the ruleset's required contexts, but config/required-status-checks.json
+    # lists it under mustBeGreen: when this lane runs, a red result fails the audit.
     # Deliberately NOT continue-on-error: that flag rewrote a failing job
     # into a run-level "success" and masked a real base red for a full day
     # (run 30940375065, deploy head ef1173798). Failures must stay visible.
@@ -177,6 +178,16 @@ jobs:
           set -o pipefail
           bun run test:public-support-forms-db-security 2>&1 | tee public-support-forms-db.log
 
+      # Grant-path audit (2026-10-03): browser clients must not write the two
+      # tables that decide paid access and Founder status. The harness refuses
+      # a non-loopback SUPABASE_URL.
+      - name: Subscriptions + founders write denial
+        if: env.ENABLED == 'true'
+        id: subscriptions-founders-write-denial
+        run: |
+          set -o pipefail
+          bun run test:subscriptions-founders-write-denial 2>&1 | tee subscriptions-founders-write-denial.log
+
       - name: AI Doctor sessions RLS
         if: env.ENABLED == 'true'
         id: ai-doctor-sessions-rls
@@ -266,6 +277,7 @@ jobs:
             customer-mode-db.log
             subscriber-interest-db.log
             public-support-forms-db.log
+            subscriptions-founders-write-denial.log
             ai-doctor-sessions-rls.log
             bridge-tokens-db.log
             billing-rls.log
@@ -309,6 +321,7 @@ jobs:
               echo "- customer mode isolation (\`test:customer-mode-db-security\`)"
               echo "- subscriber interest RLS (\`test:subscriber-interest-db-security\`)"
               echo "- public support forms RLS (\`test:public-support-forms-db-security\`)"
+              echo "- subscriptions + founders write denial (\`test:subscriptions-founders-write-denial\`)"
               echo "- grant paths: billing, AI credits, Action Queue, staff role, staff grant trigger (\`test:*:local-lane\`)"
               echo "- AI Doctor sessions RLS (\`test:ai-doctor-sessions-rls\`)"
               echo "- bridge tokens RLS + revocation integrity, strict zero-skip mode (\`test:bridge-tokens-db-security\`)"
@@ -319,7 +332,7 @@ jobs:
               echo ""
               echo "Artifact paths (when uploaded):"
               echo "- \`migration-replay-compatibility.json\`, \`local-supabase-replay-report.json\`"
-              echo "- \`profiles-db.log\`, \`customer-mode-db.log\`, \`subscriber-interest-db.log\`, \`public-support-forms-db.log\`, \`ai-doctor-sessions-rls.log\`, \`security-db-local.log\`"
+              echo "- \`profiles-db.log\`, \`customer-mode-db.log\`, \`subscriber-interest-db.log\`, \`public-support-forms-db.log\`, \`subscriptions-founders-write-denial.log\`, \`ai-doctor-sessions-rls.log\`, \`security-db-local.log\`"
               echo "- \`billing-rls.log\`, \`ai-credits-rls.log\`, \`action-queue-rls.log\`, \`staff-role-rls.log\`, \`staff-grant-trigger.log\`"
               echo "- \`supabase-start.log\`, \`supabase-db-reset.log\` (sanitized)"
               echo "- \`test-results/\`, \`artifacts/security-db/\` (if produced)"

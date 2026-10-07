@@ -45,12 +45,23 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+function pathOf(request: Request): string | undefined {
+  try {
+    return new URL(request.url).pathname;
+  } catch {
+    return undefined;
+  }
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return applySecurityHeaders(await normalizeCatastrophicSsrResponse(response));
+      return applySecurityHeaders(
+        await normalizeCatastrophicSsrResponse(response),
+        pathOf(request),
+      );
     } catch (error) {
       console.error(error);
       return applySecurityHeaders(
@@ -58,6 +69,7 @@ export default {
           status: 500,
           headers: { "content-type": "text/html; charset=utf-8" },
         }),
+        pathOf(request),
       );
     }
   },

@@ -54,6 +54,36 @@ describe("src/server.ts — security headers on real Worker responses", () => {
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
+  it("gives /unsubscribe its own no-store, no-referrer and noindex headers even when the route sets none", async () => {
+    for (const path of ["/unsubscribe?token=secret-token", "/unsubscribe/?token=secret-token"]) {
+      entry.fetch.mockResolvedValue(
+        new Response("<html>unsubscribe</html>", {
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
+      const response = await server.fetch(
+        new Request(`https://verdantgrowdiary.com${path}`),
+        {},
+        {},
+      );
+      expect(response.headers.get("referrer-policy"), path).toBe("no-referrer");
+      expect(response.headers.get("cache-control"), path).toBe("no-store");
+      expect(response.headers.get("x-robots-tag"), path).toBe("noindex, nofollow, noarchive");
+      expect(response.headers.get("x-content-type-options"), path).toBe("nosniff");
+    }
+  });
+
+  it("does not apply the /unsubscribe headers to other paths", async () => {
+    entry.fetch.mockResolvedValue(new Response(""));
+    const response = await server.fetch(
+      new Request("https://verdantgrowdiary.com/unsubscribe-help"),
+      {},
+      {},
+    );
+    expect(response.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+    expect(response.headers.has("x-robots-tag")).toBe(false);
+  });
+
   it("adds the baseline to the branded 500 when the handler throws", async () => {
     entry.fetch.mockRejectedValue(new Error("render exploded"));
     const response = await server.fetch(new Request("https://verdantgrowdiary.com/x"), {}, {});

@@ -3,7 +3,7 @@
 # Keep in sync with src/lib/securityHeadersRules.ts. Nitro appends its own
 # /assets/* cache-control rule after this block at build time.
 /*
-  Strict-Transport-Security: max-age=31536000
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
   X-Content-Type-Options: nosniff
   X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin

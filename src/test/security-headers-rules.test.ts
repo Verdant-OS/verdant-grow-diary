@@ -2,13 +2,21 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import vercelConfig from "../../vercel.json";
 import {
   FORBIDDEN_ENFORCING_HEADERS,
   STRICT_TRANSPORT_SECURITY_VALUE,
   applySecurityHeaders,
   buildContentSecurityPolicyReportOnly,
+  buildRouteSecurityHeaders,
   buildSecurityHeaders,
 } from "@/lib/securityHeadersRules";
+
+const VERCEL_RULES = (
+  vercelConfig as {
+    headers: Array<{ source: string; headers: Array<{ key: string; value: string }> }>;
+  }
+).headers;
 
 const REQUIRED_BASELINE = [
   "strict-transport-security",
@@ -37,9 +45,28 @@ describe("securityHeadersRules — baseline set", () => {
     expect(names).toContain("content-security-policy-report-only");
   });
 
-  it("keeps HSTS conservative: one year, no includeSubDomains, no preload", () => {
-    expect(STRICT_TRANSPORT_SECURITY_VALUE).toBe("max-age=31536000");
-    expect(STRICT_TRANSPORT_SECURITY_VALUE).not.toMatch(/includeSubDomains|preload/i);
+  it("keeps HSTS identical to the apex's published policy (never weaker)", () => {
+    expect(STRICT_TRANSPORT_SECURITY_VALUE).toBe("max-age=63072000; includeSubDomains; preload");
+    const published = VERCEL_RULES.find((rule) => rule.source === "/(.*)")?.headers.find(
+      (h) => h.key.toLowerCase() === "strict-transport-security",
+    )?.value;
+    expect(published).toBeDefined();
+    expect(STRICT_TRANSPORT_SECURITY_VALUE).toBe(published);
+  });
+
+  it("route headers match the vercel.json /unsubscribe rule exactly", () => {
+    const published = VERCEL_RULES.find((rule) => rule.source === "/unsubscribe")?.headers ?? [];
+    expect(published.length).toBeGreaterThan(0);
+    const ours = new Map(
+      buildRouteSecurityHeaders("/unsubscribe").map(([k, v]) => [k.toLowerCase(), v] as const),
+    );
+    expect(ours.size).toBe(published.length);
+    for (const { key, value } of published) expect(ours.get(key.toLowerCase()), key).toBe(value);
+    expect(buildRouteSecurityHeaders("/unsubscribe/")).toEqual(
+      buildRouteSecurityHeaders("/unsubscribe"),
+    );
+    expect(buildRouteSecurityHeaders("/")).toEqual([]);
+    expect(buildRouteSecurityHeaders(null)).toEqual([]);
   });
 
   it("report-only CSP covers the origins the client is known to use", () => {

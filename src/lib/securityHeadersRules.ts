@@ -11,14 +11,16 @@
  *   pass first. The report-only header never blocks anything; browsers log
  *   violations to the devtools console (there is no report endpoint yet — that
  *   lands with production error reporting).
- * - HSTS is deliberately conservative: no `includeSubDomains`, no `preload`.
- *   `notify.` is NS-delegated for email only and `verdantgrowdiary.app` is a
- *   separate zone; widening HSTS is an owner decision, not a default.
+ * - HSTS is identical to the policy the apex already publishes (`vercel.json`;
+ *   `docs/release/hosting-failover-plan.md` § Header rules: "keep it identical,
+ *   never weaker"). Owner decision 2026-10-07 on PR #1937.
+ * - Route-specific headers (today only `/unsubscribe`, mirroring `vercel.json`)
+ *   override the baseline for that path, because the more specific rule must win.
  * - Existing headers are never overwritten, so a route can tighten or loosen a
  *   header for itself and this layer stays out of the way.
  */
 
-export const STRICT_TRANSPORT_SECURITY_VALUE = "max-age=31536000";
+export const STRICT_TRANSPORT_SECURITY_VALUE = "max-age=63072000; includeSubDomains; preload";
 
 /**
  * Third-party origins the client is known to talk to. Keep this list the single
@@ -91,19 +93,50 @@ export function buildSecurityHeaders(): ReadonlyArray<[string, string]> {
   ];
 }
 
+/**
+ * Path-specific headers, mirroring the `vercel.json` route rules. `/unsubscribe`
+ * carries a token in its query string: no referrer may leak it, and the page must
+ * be neither cached nor indexed.
+ */
+export const ROUTE_SECURITY_HEADERS: Readonly<Record<string, ReadonlyArray<[string, string]>>> = {
+  "/unsubscribe": [
+    ["Cache-Control", "no-store"],
+    ["Referrer-Policy", "no-referrer"],
+    ["X-Robots-Tag", "noindex, nofollow, noarchive"],
+  ],
+};
+
+/** Route headers for a pathname (trailing slash ignored), or an empty list. */
+export function buildRouteSecurityHeaders(
+  pathname: string | null | undefined,
+): ReadonlyArray<[string, string]> {
+  if (typeof pathname !== "string" || pathname.length === 0) return [];
+  const normalized = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  return ROUTE_SECURITY_HEADERS[normalized] ?? [];
+}
+
 /** Header names this layer must never emit as enforcing. */
 export const FORBIDDEN_ENFORCING_HEADERS: ReadonlyArray<string> = ["content-security-policy"];
 
 /**
  * Returns a Response carrying the baseline security headers. Headers already
- * present on the input are preserved untouched. Null/undefined input yields
- * null so callers can pass through unexpected values safely. The input
+ * present on the input are preserved untouched, except that the route headers
+ * for `pathname` (see ROUTE_SECURITY_HEADERS) always win. Null/undefined input
+ * yields null so callers can pass through unexpected values safely. The input
  * Response is never mutated (its headers may be immutable on Workers).
  */
-export function applySecurityHeaders<T extends Response | null | undefined>(response: T): T {
+export function applySecurityHeaders<T extends Response | null | undefined>(
+  response: T,
+  pathname?: string | null,
+): T {
   if (!response) return response;
   const headers = new Headers(response.headers);
   let changed = false;
+  for (const [name, value] of buildRouteSecurityHeaders(pathname)) {
+    if (headers.get(name) === value) continue;
+    headers.set(name, value);
+    changed = true;
+  }
   for (const [name, value] of buildSecurityHeaders()) {
     if (headers.has(name)) continue;
     headers.set(name, value);

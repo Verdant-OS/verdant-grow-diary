@@ -376,6 +376,8 @@ or reconfigured.
   (D) Edge functions:  supabase functions deploy — deployer NOT_MEASURED; no Actions path
   (E) Database:  supabase/migrations/** (append-only) → operator-dispatched apply workflows;
                  applied state NOT_MEASURED here (CURRENT_STATE axis)
+                 `supabase` GitHub App → Supabase Preview check on every tip against a remote
+                 project (D.5); can it apply or deploy? BLOCKED — a D-RT-4 candidate
   (F) Promotion:  which READY deployment each production hostname resolves to.
                   Git auto-assignment ─┐
                   promote / redeploy ──┤

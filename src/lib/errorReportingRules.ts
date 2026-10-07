@@ -107,7 +107,8 @@ const UUID_BODY = String.raw`[0-9a-f]{8}(?:-|%2[Dd])[0-9a-f]{4}(?:-|%2[Dd])[0-9a
 /** A UUID anywhere in free text (row ids in error messages). */
 const UUID_TEXT_PATTERN = new RegExp(String.raw`(?<![0-9a-z])${UUID_BODY}(?![0-9a-z])`, "gi");
 export const REDACTED_ID = "[id]";
-const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+/** E-mail addresses, with a literal or URL-encoded (`%40`) at sign. */
+const EMAIL_PATTERN = /[A-Z0-9._%+-]+(?:@|%40)[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 /** Bearer / JWT / API-key shaped values. JWTs are three base64url segments. */
 const JWT_PATTERN = /\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g;
 const BEARER_PATTERN = /\b(bearer\s+)[A-Za-z0-9._~+/=-]{4,}/gi;
@@ -145,8 +146,9 @@ const CREDENTIAL_PATTERN = new RegExp(
  * `key:` is not matched, so diagnostics such as Postgres `Key (plant_id)=…` stay readable.
  */
 const QUOTED_KEY_PATTERN = new RegExp(String.raw`(["'])(key)\1(\s*:\s*)` + CREDENTIAL_VALUE, "gi");
-/** OAuth `code=` / `key=` query parameters (auth callbacks carry them). */
-const OAUTH_PARAM_PATTERN = /\b(code|key)=("[^"]*"|'[^']*'|\[redacted\]|[^&\s"'#]+)/gi;
+/** OAuth `code=` / `key=` query parameters (auth callbacks carry them), `=` literal or URL-encoded `%3D`. */
+const OAUTH_PARAM_PATTERN =
+  /\b(code|key)(=|\s*%3[Dd]\s*)("[^"]*"|'[^']*'|\[redacted\]|[^&\s"'#]+)/gi;
 
 export const REDACTED = "[redacted]";
 
@@ -176,7 +178,8 @@ export function scrubText(value: unknown): string {
     )
     .replace(
       OAUTH_PARAM_PATTERN,
-      (_m, key: string, value: string) => `${key}=${redactedLike(value)}`,
+      (_m, key: string, separator: string, value: string) =>
+        `${key}${separator}${redactedLike(value)}`,
     )
     .replace(JWT_PATTERN, REDACTED)
     .replace(EMAIL_PATTERN, REDACTED)

@@ -218,6 +218,11 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ["password=abc#123", "#123"],
       ["password: it's secret", "s secret"],
       ["password=#abc", "#abc"],
+      ["callback failed code%3Dabc123", "abc123"],
+      ["callback failed key%3Dsecret", "secret"],
+      ["callback failed code %3D abc123", "abc123"],
+      ["lookup failed email=grower%40example.com", "grower%40example.com"],
+      ["lookup failed for grower%40example.com", "example.com"],
       ["request rejected vbt_0123456789abcdefABCDEF0123456789abcdefAB", "vbt_0123456789"],
       ["bridge said (vbt_short-tok_123) was revoked", "short-tok_123"],
     ];

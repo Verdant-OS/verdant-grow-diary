@@ -6,16 +6,28 @@
  * so saved values survive across sessions without touching schema or RLS.
  * Defaults populate empty fields but never overwrite anything already saved.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/store/auth";
 import {
   PHENO_DOCUMENTATION_DEFAULTS,
   mergeDocumentationValues,
   type PhenoDocumentationValues,
 } from "@/constants/phenoDocumentationDefaults";
+import {
+  PHENO_DOCS_RESTORED_EVENT,
+  canSavePhenoDocOverStored,
+  phenoDocChangeAffectsRecord,
+  phenoDocStorageKey,
+  type PhenoDocRecordType,
+  type PhenoDocsRestoredDetail,
+} from "@/lib/phenoDocumentationBackupRules";
 
-export type PhenoDocRecordType = "candidate" | "breeding_program";
-type DeviceSaveStatus = "idle" | "saved" | "failed";
+// Storage keys are USER-scoped when signed in (see phenoDocStorageKey): the
+// old device-scoped key let another signed-in account on the same device see
+// the previous grower's values; legacy device-scoped data is never read under
+// a user id.
+export type { PhenoDocRecordType };
+type DeviceSaveStatus = "idle" | "saved" | "failed" | "stale" | "conflict";
 
 export interface PhenoDocDiaryOption {
   readonly id: string;
@@ -41,18 +53,23 @@ interface Props {
   defaultOpen?: boolean;
 }
 
-function storageKey(
-  recordType: PhenoDocRecordType,
-  recordId: string,
-  userId: string | null,
-): string {
-  // USER-scoped when signed in: the old device-scoped key let another
-  // signed-in account on the same device see and edit the previous grower's
-  // values for the same record. Legacy device-scoped data is deliberately
-  // NOT read under a user id — it cannot be attributed to this user safely.
-  return userId
-    ? `phenoDocs:${userId}:${recordType}:${recordId}`
-    : `phenoDocs:${recordType}:${recordId}`;
+/** The stored JSON string for one record, or null (missing / unreadable). */
+function readRaw(storage: Pick<Storage, "getItem" | "setItem"> | null, key: string): string | null {
+  if (storage === null) return null;
+  try {
+    return storage.getItem(key) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function parseSaved(raw: string | null): PhenoDocumentationValues | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as PhenoDocumentationValues;
+  } catch {
+    return null;
+  }
 }
 
 function loadSaved(
@@ -61,14 +78,7 @@ function loadSaved(
   recordId: string,
   userId: string | null,
 ): PhenoDocumentationValues | null {
-  if (storage === null) return null;
-  try {
-    const raw = storage.getItem(storageKey(recordType, recordId, userId));
-    if (!raw) return null;
-    return JSON.parse(raw) as PhenoDocumentationValues;
-  } catch {
-    return null;
-  }
+  return parseSaved(readRaw(storage, phenoDocStorageKey(recordType, recordId, userId)));
 }
 
 function resolveDeviceStorage(
@@ -94,6 +104,14 @@ export default function PhenoDocumentationSections({
   const store = useMemo(() => resolveDeviceStorage(storage), [storage]);
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const recordKey = phenoDocStorageKey(recordType, recordId, userId);
+
+  // The stored string the open form hydrated from (undefined = not hydrated).
+  // Save refuses to write when storage no longer holds it: a restore or
+  // another tab replaced the record, and writing would silently revert it.
+  const [hydratedRaw, setHydratedRaw] = useState<string | null | undefined>(() =>
+    defaultOpen ? readRaw(store, recordKey) : undefined,
+  );
 
   // Lazy hydration: null = storage not read yet (collapsed mode only). The
   // eager path preserves the original mount-time read for defaultOpen users.
@@ -101,23 +119,81 @@ export default function PhenoDocumentationSections({
     defaultOpen ? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId)) : null,
   );
   const [saveStatus, setSaveStatus] = useState<DeviceSaveStatus>("idle");
+  // True while the form holds typing that has not been saved. A record change
+  // from a restore or another tab must not replace that typing silently.
+  const dirtyRef = useRef(false);
   const [openSections, setOpenSections] = useState<ReadonlySet<string>>(new Set());
 
   // Re-hydrate if the record identity changes (e.g. switching candidates).
   useEffect(() => {
-    setValues(
-      defaultOpen ? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId)) : null,
-    );
+    const raw = defaultOpen ? readRaw(store, recordKey) : undefined;
+    setHydratedRaw(raw);
+    setValues(defaultOpen ? mergeDocumentationValues(parseSaved(raw ?? null)) : null);
     setOpenSections(new Set());
     setSaveStatus("idle");
-  }, [store, recordType, recordId, defaultOpen, userId]);
+    dirtyRef.current = false;
+  }, [store, recordKey, defaultOpen]);
+
+  // A restore (same tab) or a write from another tab replaced this record:
+  // show the stored values instead of keeping pre-restore ones on screen. If
+  // the form has unsaved typing, keep it, warn, and block Save until the
+  // grower discards it and loads the stored record.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const refresh = (changedKeys: ReadonlyArray<string> | null) => {
+      if (!phenoDocChangeAffectsRecord(changedKeys, recordKey)) return;
+      if (dirtyRef.current) {
+        setSaveStatus("conflict");
+        return;
+      }
+      const raw = readRaw(store, recordKey);
+      setValues((prev) =>
+        prev === null && !defaultOpen ? null : mergeDocumentationValues(parseSaved(raw)),
+      );
+      setHydratedRaw((prev) => (prev === undefined && !defaultOpen ? undefined : raw));
+      setSaveStatus("idle");
+    };
+    const onRestored = (e: Event) =>
+      refresh((e as CustomEvent<PhenoDocsRestoredDetail | undefined>).detail?.keys ?? null);
+    const onStorage = (e: StorageEvent) => refresh(e.key === null ? null : [e.key]);
+    window.addEventListener(PHENO_DOCS_RESTORED_EVENT, onRestored);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(PHENO_DOCS_RESTORED_EVENT, onRestored);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [store, recordKey, defaultOpen]);
+
+  /** Hydrate from storage before the first edit (collapsed mode). */
+  function hydrateForEdit() {
+    if (values !== null) return;
+    const raw = readRaw(store, recordKey);
+    setHydratedRaw(raw);
+    setValues(mergeDocumentationValues(parseSaved(raw)));
+  }
 
   function hydrated(): PhenoDocumentationValues {
     return values ?? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId));
   }
 
-  function setField(sectionKey: string, fieldKey: string, value: string) {
+  /** Edits keep a conflict notice up: Save stays blocked until discard. */
+  function markEdited() {
+    dirtyRef.current = true;
+    setSaveStatus((prev) => (prev === "conflict" ? "conflict" : "idle"));
+  }
+
+  /** Drop unsaved typing and show the record as stored now. */
+  function discardAndReload() {
+    const raw = readRaw(store, recordKey);
+    dirtyRef.current = false;
+    setHydratedRaw(raw);
+    setValues(mergeDocumentationValues(parseSaved(raw)));
     setSaveStatus("idle");
+  }
+
+  function setField(sectionKey: string, fieldKey: string, value: string) {
+    markEdited();
+    hydrateForEdit();
     setValues((prev) => {
       const base = prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId));
       return {
@@ -131,7 +207,8 @@ export default function PhenoDocumentationSections({
   }
 
   function setDiary(sectionKey: string, diaryEntryId: string | null) {
-    setSaveStatus("idle");
+    markEdited();
+    hydrateForEdit();
     setValues((prev) => {
       const base = prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId));
       return {
@@ -142,12 +219,29 @@ export default function PhenoDocumentationSections({
   }
 
   function onSave() {
+    if (saveStatus === "conflict") return;
     if (store === null) {
       setSaveStatus("failed");
       return;
     }
+    const currentRaw = readRaw(store, recordKey);
+    if (values !== null && !canSavePhenoDocOverStored(hydratedRaw ?? null, currentRaw)) {
+      if (dirtyRef.current) {
+        // Unsaved typing over a newer stored record: keep it, never write.
+        setSaveStatus("conflict");
+        return;
+      }
+      // Stale form: never write over the newer stored record. Show it instead.
+      setValues(mergeDocumentationValues(parseSaved(currentRaw)));
+      setHydratedRaw(currentRaw);
+      setSaveStatus("stale");
+      return;
+    }
     try {
-      store.setItem(storageKey(recordType, recordId, userId), JSON.stringify(hydrated()));
+      const next = JSON.stringify(hydrated());
+      store.setItem(recordKey, next);
+      setHydratedRaw(next);
+      dirtyRef.current = false;
       setSaveStatus("saved");
     } catch {
       // storage may be unavailable; keep values in-memory
@@ -165,6 +259,9 @@ export default function PhenoDocumentationSections({
         <p className="text-xs text-muted-foreground">
           Saved on this device only. This documentation is not saved to your Verdant account or
           synced to another browser. Defaults never overwrite what you have already entered.
+          {recordType === "candidate"
+            ? " Use “Download backup” on the hunt page to keep a copy."
+            : ""}
         </p>
       </header>
 
@@ -183,11 +280,7 @@ export default function PhenoDocumentationSections({
                 ? undefined
                 : (e) => {
                     const isOpen = (e.target as HTMLDetailsElement).open;
-                    setValues(
-                      (prev) =>
-                        prev ??
-                        mergeDocumentationValues(loadSaved(store, recordType, recordId, userId)),
-                    );
+                    hydrateForEdit();
                     setOpenSections((prev) => {
                       const next = new Set(prev);
                       if (isOpen) next.add(section.key);
@@ -259,6 +352,7 @@ export default function PhenoDocumentationSections({
           type="button"
           data-testid={`pheno-doc-save-${recordType}-${recordId}`}
           onClick={onSave}
+          disabled={saveStatus === "conflict"}
           className="rounded-md border border-border bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
         >
           Save on this device
@@ -281,7 +375,38 @@ export default function PhenoDocumentationSections({
             Could not save on this device. Your edits remain open in this tab; try again.
           </span>
         )}
+        {saveStatus === "stale" && (
+          <span
+            role="alert"
+            data-testid={`pheno-doc-save-stale-${recordType}-${recordId}`}
+            className="text-xs text-amber-700 dark:text-amber-300"
+          >
+            Not saved: this record changed on this device after you opened it (a restore or another
+            tab). The latest saved values are shown now; re-enter your changes and save again.
+          </span>
+        )}
       </div>
+      {saveStatus === "conflict" && (
+        <div
+          role="alert"
+          data-testid={`pheno-doc-conflict-${recordType}-${recordId}`}
+          className="space-y-2 rounded border border-amber-500/50 p-2 text-xs text-amber-700 dark:text-amber-300"
+        >
+          <p>
+            This record changed on this device after you started typing (a restore or another tab).
+            Your unsaved changes are still shown, but saving is blocked so they can&apos;t overwrite
+            the newer record. Copy anything you want to keep, then load the saved record.
+          </p>
+          <button
+            type="button"
+            data-testid={`pheno-doc-conflict-reload-${recordType}-${recordId}`}
+            onClick={discardAndReload}
+            className="rounded-md border border-border px-2 py-1 font-medium"
+          >
+            Discard my changes and load the saved record
+          </button>
+        </div>
+      )}
     </section>
   );
 }

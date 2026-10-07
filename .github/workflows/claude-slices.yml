@@ -176,38 +176,119 @@ jobs:
 
           // The text with // and /* */ comments blanked (a block comment keeps its
           // line breaks), so supabase.auth /* c */ .signOut() and
-          // db.from(/* c */ "action_queue") match (Codex P1s, 2026-10-07). One
-          // linear pass; strings are skipped so a "//" inside a URL is not taken
-          // for a comment. An unterminated comment runs to the end of the file.
-          // With skipStrings false every // and /* counts, which also catches a
-          // comment after a quote in a regex literal (/'/) or a nested template.
-          function stripComments(text, skipStrings = true) {
+          // db.from(/* c */ "action_queue") match (Codex P1s, 2026-10-07).
+          // The text with the given [start, end) comment ranges blanked.
+          function blankRanges(text, ranges) {
+            if (!ranges.length) return text;
             let out = '';
-            let i = 0;
-            while (i < text.length) {
-              const c = text[i];
-              if (c === '/' && text[i + 1] === '/') {
-                const end = text.indexOf('\n', i);
-                const stop = end === -1 ? text.length : end;
-                out += ' '.repeat(stop - i);
-                i = stop;
-              } else if (c === '/' && text[i + 1] === '*') {
-                const end = text.indexOf('*/', i + 2);
-                const stop = end === -1 ? text.length : end + 2;
-                out += text.slice(i, stop).replace(/[^\n]/g, ' ');
-                i = stop;
-              } else if (skipStrings && (c === "'" || c === '"' || c === '`')) {
-                let j = i + 1;
-                while (j < text.length && text[j] !== c && !(c !== '`' && text[j] === '\n')) j += text[j] === '\\' ? 2 : 1;
-                const stop = Math.min(j + 1, text.length);
-                out += text.slice(i, stop);
-                i = stop;
+            let last = 0;
+            for (const [from, to] of ranges) {
+              out += text.slice(last, from) + text.slice(from, to).replace(/[^\n]/g, ' ');
+              last = to;
+            }
+            return out + text.slice(last);
+          }
+
+          // End of the comment starting at i (after its "*/", or at its line break).
+          function commentEnd(text, i) {
+            const block = text[i + 1] === '*';
+            const end = block ? text.indexOf('*/', i + 2) : text.indexOf('\n', i);
+            return end === -1 ? text.length : block ? end + 2 : end;
+          }
+
+          // Every // and /* counts, even inside strings; this catches what the
+          // lexer below misreads. One linear pass.
+          function stripCommentsNaive(text) {
+            const ranges = [];
+            let i = text.indexOf('/');
+            while (i !== -1 && i < text.length) {
+              if (text[i + 1] === '/' || text[i + 1] === '*') {
+                const stop = commentEnd(text, i);
+                ranges.push([i, stop]);
+                i = text.indexOf('/', stop);
               } else {
-                out += c;
+                i = text.indexOf('/', i + 1);
+              }
+            }
+            return blankRanges(text, ranges);
+          }
+
+          // A small JS lexer, one linear pass: strings, regex literals and template
+          // literals are kept as they are, the code inside a template's ${...} is
+          // lexed as code (Codex P1 at 43faeed5), and comments are blanked.
+          const REGEX_BEFORE = new Set(['', '(', ',', '=', ':', '[', '!', '&', '|', '?', '{', ';', '+', '-', '*', '%', '<', '>', '~', '^']);
+          const REGEX_KEYWORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else', 'yield', 'await']);
+          function isWordChar(code) {
+            return (code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || code === 95 || code === 36;
+          }
+          function stripCommentsLexed(text) {
+            const ranges = [];
+            const n = text.length;
+            let i = 0;
+            let prev = '';
+            // Contexts above top-level code: 'template', or a ${...} expression with its brace depth.
+            const stack = [];
+            while (i < n) {
+              const top = stack[stack.length - 1];
+              const c = text[i];
+              if (top && top.kind === 'template') {
+                if (c === '\\') i += 2;
+                else if (c === '`') { i += 1; stack.pop(); prev = 'x'; }
+                else if (c === '$' && text[i + 1] === '{') { i += 2; stack.push({ kind: 'expr', depth: 0 }); prev = ''; }
+                else i += 1;
+                continue;
+              }
+              if (c === '/' && (text[i + 1] === '/' || text[i + 1] === '*')) {
+                const stop = commentEnd(text, i);
+                ranges.push([i, stop]);
+                i = stop;
+              } else if (c === '/' && REGEX_BEFORE.has(prev)) {
+                // A regex literal: up to 200 characters on one line, else division.
+                let j = i + 1;
+                let inClass = false;
+                while (j < n && j - i < 200 && text[j] !== '\n' && (inClass || text[j] !== '/')) {
+                  if (text[j] === '\\') j += 1;
+                  else if (text[j] === '[') inClass = true;
+                  else if (text[j] === ']') inClass = false;
+                  j += 1;
+                }
+                if (text[j] === '/') {
+                  j += 1;
+                  while (j < n && text.charCodeAt(j) >= 97 && text.charCodeAt(j) <= 122) j += 1;
+                  i = j;
+                  prev = 'x';
+                } else {
+                  i += 1;
+                  prev = c;
+                }
+              } else if (c === "'" || c === '"') {
+                let j = i + 1;
+                while (j < n && text[j] !== c && text[j] !== '\n') j += text[j] === '\\' ? 2 : 1;
+                i = j + 1;
+                prev = 'x';
+              } else if (c === '`') {
+                i += 1;
+                stack.push({ kind: 'template' });
+              } else if (c === '{') {
+                if (top) top.depth += 1;
+                i += 1;
+                prev = c;
+              } else if (c === '}') {
+                if (top && top.depth === 0) stack.pop();
+                else if (top) top.depth -= 1;
+                i += 1;
+                prev = '}';
+              } else if (isWordChar(text.charCodeAt(i))) {
+                let j = i + 1;
+                while (j < n && isWordChar(text.charCodeAt(j))) j += 1;
+                prev = REGEX_KEYWORDS.has(text.slice(i, j)) ? '(' : 'x';
+                i = j;
+              } else {
+                if (c !== ' ' && c !== '\t' && c !== '\n' && c !== '\r') prev = c;
                 i += 1;
               }
             }
-            return out;
+            return blankRanges(text, ranges);
           }
 
           // Every content rule the text matches, not just the first: an exception
@@ -217,7 +298,11 @@ jobs:
           // remove one.
           function contentLocked(path, text) {
             if (!contentScoped(path)) return { locked: false, rules: [] };
-            const variants = [text, stripComments(text), stripComments(text, false)];
+            // Every pattern needs "auth" or "action_queue" in the text, so files
+            // without either skip the (slower) stripped versions.
+            const variants = /auth|action_queue/.test(text)
+              ? [text, stripCommentsLexed(text), stripCommentsNaive(text)]
+              : [text];
             const rules = CONTENT_RULES
               .filter(([, patterns]) => patterns.some(pattern => variants.some(variant => pattern.test(variant))))
               .map(([rule]) => rule);
@@ -565,6 +650,11 @@ jobs:
               'supabase /* c */ .auth /* c */ ?. /* c */ signOut();', 'const a = supabase.auth // keep\na.signOut()',
               'const u = "https://x"; supabase.auth /* c */ .signOut();',
               "const r = /'/; supabase.auth /* c */ .signOut();", "x = `${'`'}`; supabase.auth /* c */ .signOut();",
+              // Codex P1 at 43faeed5: the call inside a template expression next to a URL.
+              'const x = `https://host/${supabase.auth /* c */ .signOut()}`;',
+              'const x = `a ${ { k: 1 }.k } https://h/${supabase.auth /* c */ .signOut()}`;',
+              'const r = /`/; const u = "http://x"; supabase.auth /* c */ .signOut();',
+              'return /"/.test(s) ? "http://x" : supabase.auth /* c */ .signOut();',
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
             // Catastrophic-backtracking guard: a huge one-line file must finish quickly.
             {
@@ -574,7 +664,7 @@ jobs:
               assert.ok(Date.now() - t0 < 1500, `synthetic 300 KB line took ${Date.now() - t0} ms`);
               cases += 1;
               // Comment stripping is linear: unterminated comments and strings can't stall it.
-              for (const huge of ['/*x'.repeat(100000), '`x\\'.repeat(100000), "'x".repeat(150000)]) {
+              for (const huge of ['/*x'.repeat(100000), '`x\\'.repeat(100000), "'x".repeat(150000), '(/'.repeat(150000), '`${'.repeat(100000)]) {
                 const t1 = Date.now();
                 locks('src/lib/fooRules.ts', huge);
                 assert.ok(Date.now() - t1 < 1500, `unterminated input took ${Date.now() - t1} ms`);
@@ -589,6 +679,7 @@ jobs:
               // Codex P1 at ad1a6177: comments inside the call.
               'db.from /* comment */ ("action_queue");', 'db.from(/* comment */ "action_queue");',
               'db.from( // comment\n  "action_queue")', 'db.rpc /* a */ ( /* b */ "action_queue_create", p);',
+              'const x = `https://host/${db.from(/* c */ "action_queue")}`;',
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['aq-io, head'], text);
             assert.deepEqual(locks('e2e-local/lib/fixtures.ts', 'await admin.auth.admin.deleteUser(uid);'), ['auth-mutation, head']);
             assert.match(locks('e2e-local/lib/nativeLocalFixtures.ts', real('e2e-local/lib/nativeLocalFixtures.ts')).join(), /auth-mutation, head/);

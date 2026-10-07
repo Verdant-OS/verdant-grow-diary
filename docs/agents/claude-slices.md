@@ -187,8 +187,13 @@ exhaustive; known forms that are not locked include:
 - raw HTTP to Supabase (`fetch` to `/auth/v1/…` or `/rest/v1/action_queue`).
 
 Comments are handled by also matching the text with comments blanked out, once
-skipping strings and once not; a lock found in any version counts, so stripping
-can only add locks.
+through a small JavaScript lexer (strings, regex literals and template literals
+are skipped, and the code inside a template's `${…}` is lexed as code) and once
+treating every `//` and `/*` as a comment. A lock found in the raw text or either
+stripped version counts, so stripping can only add locks. The lexer guesses
+regex literals from the previous token and gives up on one longer than 200
+characters, so a construction that fools both stripped versions is still
+possible.
 
 Following imports and data flow would close these, and is deferred.
 

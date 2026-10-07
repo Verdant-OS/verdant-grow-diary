@@ -45,6 +45,31 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### DASHBOARD-SINGLE-LOG-ENTRY-CODERABBIT-FIXES
+
+```text
+TASK DASHBOARD-SINGLE-LOG-ENTRY-CODERABBIT-FIXES  priority: other  status: OPEN
+goal: land CodeRabbit's findings on #1844's merged head 2df60a64 (#1844 was in the merge queue and
+  could not take the push): spec §7 records the D1.1-A/D1.2-A outcome; spec §6/§9 name the
+  merge-queue owner role; visibleLogControls moves to e2e/lib with no behavior change. Docs and
+  e2e helper only; no product code, supabase/, lockfile or governance file.
+branch: claude/dashboard-single-log-entry-coderabbit-fixes
+base: verdant-grow-diary
+checkout: git switch claude/dashboard-single-log-entry-coderabbit-fixes && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1934 (draft)
+head_sha: read from the PR (a commit cannot contain its own SHA). Last measured head e2f73961 had
+  35/35 required checks SUCCESS at 2026-10-06 23:32 UTC; this block's commit moves the head.
+state: pushed draft; required CI green on the prior head; Codex review P2 (this block) addressed
+next_action: Critical Mass independent review at the exact current head; merge base after #1924 lands
+files: docs/specs/dashboard-single-log-entry-readiness-marker.md; e2e/lib/visibleLogControls.ts (new);
+  e2e/core-link-form-census.spec.ts; e2e/dashboard-mobile-overflow.spec.ts; docs/agents/HANDOFF_LOG.md
+blockers: independent PASS (Critical Mass). Non-required dependency-audit checks stay red until #1924 merges.
+artifacts: PR #1934 body and comments
+reviewer_seat: Critical Mass (docs and e2e)
+claimed_by: Claude, 2026-10-06 22:39 UTC (PR #1934 opened by this session)
+last_updated: 2026-10-07 02:10 UTC, by Claude
+```
+
 ### CLAUDE-LOOP-ENGINEERING-001
 
 ```text

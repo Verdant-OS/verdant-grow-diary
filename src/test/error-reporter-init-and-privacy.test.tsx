@@ -148,6 +148,21 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ["{'client_secret': 'cs_abc'}", "cs_abc"],
       ["Cookie: sb-access=xyz123", "xyz123"],
       ['{"apikey" : "anon-key-value"}', "anon-key-value"],
+      ['config error password="hunter2"', "hunter2"],
+      ["api_key='sk_live_abc' rejected", "sk_live_abc"],
+      ['secret="two words"', "two words"],
+      ["Authorization: Basic YTpi", "YTpi"],
+      ["Authorization: Bearer abcd", "abcd"],
+      ["password = hunter2", "hunter2"],
+      ['token: "a\\"b secret"', "secret"],
+      ["Authorization=Basic YTpi", "YTpi"],
+      ["access_token%3Dabc123", "abc123"],
+      ["clientSecret=cs_1", "cs_1"],
+      ["refreshToken: rt_abc", "rt_abc"],
+      ["pass: hunter2", "hunter2"],
+      ["session_id: abc123", "abc123"],
+      ["login failed password: hunter two, retrying", "two"],
+      ["secret=open sesame; next", "sesame"],
     ];
     for (const [input, secret] of cases) {
       const out = scrubText(input);

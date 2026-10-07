@@ -104,44 +104,49 @@ export function resolveErrorReportingConfig(
 const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 /** Bearer / JWT / API-key shaped values. JWTs are three base64url segments. */
 const JWT_PATTERN = /\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g;
-const BEARER_PATTERN = /\b(bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi;
-/** `key=value` pairs whose key looks like a credential. Keeps the key, drops the value. */
-const SENSITIVE_PARAM_PATTERN =
-  /\b(access_token|refresh_token|id_token|token|code|apikey|api_key|key|secret|password|authorization|session|sb-[a-z0-9-]+-auth-token)=([^&\s"'#]+)/gi;
-
-/** The same credential keys in JSON form (`"refresh_token":"…"`), as a serialised session would carry them. Keeps the key, drops the value. */
-const SENSITIVE_JSON_PATTERN =
-  /("(?:access_token|refresh_token|id_token|provider_token|provider_refresh_token|token|code|apikey|api_key|key|secret|password|authorization|session)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi;
-
+const BEARER_PATTERN = /\b(bearer\s+)[A-Za-z0-9._~+/=-]{4,}/gi;
 /** `Basic <base64>` credentials (HTTP Basic auth). Keeps the scheme, drops the value. */
-const BASIC_PATTERN = /\b(basic\s+)[A-Za-z0-9+/=]{6,}/gi;
+const BASIC_PATTERN = /\b(basic\s+)[A-Za-z0-9+/=]{4,}/gi;
 /**
- * `key: value` credentials in log or object form, with the key bare, single- or
- * double-quoted, and the value bare or quoted (`password: hunter2`,
- * `{'client_secret': 'x'}`, `Authorization: Basic …`). Narrower than the `=`
- * list on purpose: `code` and `key` are left out so diagnostics such as a
- * Postgres `code: 23505` stay readable.
+ * Any key whose name contains a credential word (snake, kebab or camel case:
+ * `refresh_token`, `clientSecret`, `x-api-key`, `Set-Cookie`, `session_id`), bare
+ * or quoted, followed by `:`, `=` or URL-encoded `%3D` with optional spaces. The
+ * value may be double- or single-quoted (escapes included), already redacted, or
+ * bare. A bare value runs to the next `, ; & } ] [ "` or line end, so a value
+ * with spaces (`password: hunter two`) is redacted whole; over-redacting the
+ * rest of a clause is preferred to leaking part of a credential.
+ * Keeps the key, separator and value quotes; drops the value.
+ * `code` and bare `key` are not credential words here, so diagnostics such as a
+ * Postgres `code: 23505` stay readable; see OAUTH_PARAM_PATTERN for `code=`.
  */
-const SENSITIVE_COLON_PATTERN =
-  /(["']?)\b(access_token|refresh_token|id_token|provider_token|provider_refresh_token|token|apikey|api_key|api-key|x-api-key|secret|client_secret|password|passwd|pwd|authorization|session|cookie)\1(\s*:\s*)("[^"]*"|'[^']*'|\[redacted\]|[^\s,;&}\]]+)/gi;
+const CREDENTIAL_PATTERN =
+  /(["']?)(?<![A-Za-z0-9_-])([A-Za-z0-9_-]*(?:token|secret|passw(?:or)?d|pwd|pass|api[-_]?key|apikey|authorization|session|cookie|credential)[A-Za-z0-9_-]*)\1(\s*[:=]\s*|%3[Dd])("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[redacted\]|[^\s,;&}\][\]"'#][^,;&}\][\]"'#\n]*)/gi;
+/** OAuth `code=` / `key=` query parameters (auth callbacks carry them). */
+const OAUTH_PARAM_PATTERN = /\b(code|key)=("[^"]*"|'[^']*'|\[redacted\]|[^&\s"'#]+)/gi;
 
 export const REDACTED = "[redacted]";
+
+/** REDACTED, keeping the quotes of a quoted value so serialised text stays well-formed. */
+function redactedLike(value: string): string {
+  const quote = value.startsWith('"') || value.startsWith("'") ? value[0] : "";
+  return `${quote}${REDACTED}${quote}`;
+}
 
 /** Removes e-mail addresses, JWT/bearer tokens and credential-looking query values from free text. Idempotent. */
 export function scrubText(value: unknown): string {
   if (value == null) return "";
   const text = typeof value === "string" ? value : safeString(value);
   return text
-    .replace(SENSITIVE_JSON_PATTERN, (_m, prefix: string) => `${prefix}"${REDACTED}"`)
-    .replace(SENSITIVE_PARAM_PATTERN, (_m, key: string) => `${key}=${REDACTED}`)
     .replace(BEARER_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
     .replace(BASIC_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
     .replace(
-      SENSITIVE_COLON_PATTERN,
-      (_m, quote: string, key: string, separator: string, value: string) => {
-        const valueQuote = value.startsWith('"') || value.startsWith("'") ? value[0] : "";
-        return `${quote}${key}${quote}${separator}${valueQuote}${REDACTED}${valueQuote}`;
-      },
+      CREDENTIAL_PATTERN,
+      (_m, quote: string, key: string, separator: string, value: string) =>
+        `${quote}${key}${quote}${separator}${redactedLike(value)}`,
+    )
+    .replace(
+      OAUTH_PARAM_PATTERN,
+      (_m, key: string, value: string) => `${key}=${redactedLike(value)}`,
     )
     .replace(JWT_PATTERN, REDACTED)
     .replace(EMAIL_PATTERN, REDACTED);

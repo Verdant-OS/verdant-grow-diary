@@ -297,6 +297,35 @@ export type Database = {
           },
         ]
       }
+      ai_doctor_review_completions: {
+        Row: {
+          completed_at: string
+          recorded_by: string
+          spend_id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string
+          recorded_by?: string
+          spend_id: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          recorded_by?: string
+          spend_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_doctor_review_completions_spend_id_fkey"
+            columns: ["spend_id"]
+            isOneToOne: true
+            referencedRelation: "ai_credit_spends"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_doctor_review_evidence_receipts: {
         Row: {
           evidence: Json
@@ -974,6 +1003,7 @@ export type Database = {
           entry_at: string
           grow_id: string
           id: string
+          logged_at: string | null
           note: string
           photo_url: string | null
           plant_id: string | null
@@ -988,6 +1018,7 @@ export type Database = {
           entry_at?: string
           grow_id: string
           id?: string
+          logged_at?: string | null
           note: string
           photo_url?: string | null
           plant_id?: string | null
@@ -1002,6 +1033,7 @@ export type Database = {
           entry_at?: string
           grow_id?: string
           id?: string
+          logged_at?: string | null
           note?: string
           photo_url?: string | null
           plant_id?: string | null
@@ -1639,6 +1671,7 @@ export type Database = {
           grow_id: string
           id: string
           is_deleted: boolean
+          logged_at: string | null
           note: string | null
           occurred_at: string
           plant_id: string | null
@@ -1655,6 +1688,7 @@ export type Database = {
           grow_id: string
           id?: string
           is_deleted?: boolean
+          logged_at?: string | null
           note?: string | null
           occurred_at?: string
           plant_id?: string | null
@@ -1671,6 +1705,7 @@ export type Database = {
           grow_id?: string
           id?: string
           is_deleted?: boolean
+          logged_at?: string | null
           note?: string | null
           occurred_at?: string
           plant_id?: string | null
@@ -1980,6 +2015,67 @@ export type Database = {
         }
         Relationships: []
       }
+      manual_sensor_correction_operations: {
+        Row: {
+          anchor_reading_id: string
+          changed_at: string
+          id: string
+          legacy_evidence: Json
+          observed_at: string
+          request: Json
+          resolved_changes: Json
+          revision: number
+          tent_id: string
+          user_id: string
+        }
+        Insert: {
+          anchor_reading_id: string
+          changed_at: string
+          id: string
+          legacy_evidence: Json
+          observed_at: string
+          request: Json
+          resolved_changes: Json
+          revision?: number
+          tent_id: string
+          user_id: string
+        }
+        Update: {
+          anchor_reading_id?: string
+          changed_at?: string
+          id?: string
+          legacy_evidence?: Json
+          observed_at?: string
+          request?: Json
+          resolved_changes?: Json
+          revision?: number
+          tent_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manual_sensor_correction_operations_anchor_reading_id_fkey"
+            columns: ["anchor_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_sensor_correction_operations_anchor_reading_id_fkey"
+            columns: ["anchor_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings_effective"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_sensor_correction_operations_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       manual_sensor_snapshot_edits: {
         Row: {
           change_reason: string | null
@@ -2035,6 +2131,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "manual_sensor_snapshot_edits_original_reading_id_fkey"
+            columns: ["original_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings_effective"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "manual_sensor_snapshot_edits_plant_id_fkey"
             columns: ["plant_id"]
             isOneToOne: false
@@ -2046,6 +2149,13 @@ export type Database = {
             columns: ["replacement_reading_id"]
             isOneToOne: false
             referencedRelation: "sensor_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_sensor_snapshot_edits_replacement_reading_id_fkey"
+            columns: ["replacement_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings_effective"
             referencedColumns: ["id"]
           },
           {
@@ -2182,6 +2292,99 @@ export type Database = {
           payload?: Json
           received_at?: string
           signature_verified?: boolean
+        }
+        Relationships: []
+      }
+      paid_return_cohort_memberships: {
+        Row: {
+          captured_from: string
+          first_paid_at: string
+          user_id: string
+        }
+        Insert: {
+          captured_from?: string
+          first_paid_at?: string
+          user_id: string
+        }
+        Update: {
+          captured_from?: string
+          first_paid_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payments_confirmation_resend_retries: {
+        Row: {
+          attempts: number
+          created_at: string
+          dedupe_key: string
+          environment: string
+          last_attempt_at: string | null
+          last_detail: string | null
+          last_reason: string | null
+          max_attempts: number
+          next_attempt_at: string
+          paddle_event_id: string
+          paddle_transaction_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          dedupe_key: string
+          environment: string
+          last_attempt_at?: string | null
+          last_detail?: string | null
+          last_reason?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          paddle_event_id: string
+          paddle_transaction_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          dedupe_key?: string
+          environment?: string
+          last_attempt_at?: string | null
+          last_detail?: string | null
+          last_reason?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          paddle_event_id?: string
+          paddle_transaction_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      payments_email_dispatches: {
+        Row: {
+          dedupe_key: string
+          dispatched_at: string
+          environment: string
+          paddle_event_id: string
+          paddle_transaction_id: string | null
+          template_name: string
+        }
+        Insert: {
+          dedupe_key: string
+          dispatched_at?: string
+          environment: string
+          paddle_event_id: string
+          paddle_transaction_id?: string | null
+          template_name: string
+        }
+        Update: {
+          dedupe_key?: string
+          dispatched_at?: string
+          environment?: string
+          paddle_event_id?: string
+          paddle_transaction_id?: string | null
+          template_name?: string
         }
         Relationships: []
       }
@@ -3256,6 +3459,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pi_ingest_idempotency_keys_sensor_reading_id_fkey"
+            columns: ["sensor_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings_effective"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "pi_ingest_idempotency_keys_tent_id_fkey"
             columns: ["tent_id"]
             isOneToOne: false
@@ -3813,7 +4023,22 @@ export type Database = {
           root_id?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "quicklog_entry_revisions_diary_entry_id_fkey"
+            columns: ["diary_entry_id"]
+            isOneToOne: false
+            referencedRelation: "diary_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quicklog_entry_revisions_grow_event_id_fkey"
+            columns: ["grow_event_id"]
+            isOneToOne: false
+            referencedRelation: "grow_events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quicklog_idempotency: {
         Row: {
@@ -3962,6 +4187,24 @@ export type Database = {
           ts?: string
           user_id?: string
           value?: number
+        }
+        Relationships: []
+      }
+      signup_acquisition_attributions: {
+        Row: {
+          created_at: string
+          source: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          source: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          source?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -4368,6 +4611,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vpd_measurement_provenance_air_temperature_reading_id_fkey"
+            columns: ["air_temperature_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings_effective"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "vpd_measurement_provenance_calibration_record_id_fkey"
             columns: ["calibration_record_id"]
             isOneToOne: false
@@ -4382,6 +4632,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vpd_measurement_provenance_humidity_reading_id_fkey"
+            columns: ["humidity_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings_effective"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "vpd_measurement_provenance_tent_id_fkey"
             columns: ["tent_id"]
             isOneToOne: false
@@ -4393,6 +4650,13 @@ export type Database = {
             columns: ["vpd_reading_id"]
             isOneToOne: true
             referencedRelation: "sensor_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vpd_measurement_provenance_vpd_reading_id_fkey"
+            columns: ["vpd_reading_id"]
+            isOneToOne: true
+            referencedRelation: "sensor_readings_effective"
             referencedColumns: ["id"]
           },
         ]
@@ -4521,6 +4785,27 @@ export type Database = {
           },
         ]
       }
+      sensor_readings_effective: {
+        Row: {
+          captured_at: string | null
+          corrected_at: string | null
+          correction_operation_id: string | null
+          correction_valid: boolean | null
+          created_at: string | null
+          device_id: string | null
+          id: string | null
+          legacy_evidence: Json | null
+          metric: string | null
+          quality: string | null
+          raw_payload: Json | null
+          source: string | null
+          tent_id: string | null
+          ts: string | null
+          user_id: string | null
+          value: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       action_queue_create: {
@@ -4537,6 +4822,15 @@ export type Database = {
           p_suggested_change: string
           p_target_metric?: string
           p_tent_id?: string
+        }
+        Returns: Json
+      }
+      action_queue_transition: {
+        Args: {
+          p_action_queue_id: string
+          p_expected_status: string
+          p_note?: string
+          p_transition: string
         }
         Returns: Json
       }
@@ -4854,6 +5148,7 @@ export type Database = {
         }
         Returns: number
       }
+      paid_return_operator_snapshot: { Args: never; Returns: Json }
       pheno_ingest: {
         Args: { p_idempotency_key: string; p_payload: Json }
         Returns: Json
@@ -4895,6 +5190,22 @@ export type Database = {
         }
         Returns: Json
       }
+      quicklog_event_request_hash_pre_logged_at: {
+        Args: {
+          p_details: Json
+          p_event_type: string
+          p_feed: Json
+          p_grow_id: string
+          p_note: string
+          p_occurred_at: string
+          p_photo_url: string
+          p_plant_id: string
+          p_sensor_snapshot: Json
+          p_tent_id: string
+          p_water: Json
+        }
+        Returns: string
+      }
       quicklog_retract_entry: {
         Args: {
           p_diary_entry_id?: string
@@ -4904,7 +5215,39 @@ export type Database = {
         }
         Returns: Json
       }
+      quicklog_revision_rebase_captured_at: {
+        Args: { p_details: Json; p_new: string; p_old: string }
+        Returns: Json
+      }
+      quicklog_revision_resolve_root: {
+        Args: { p_diary_entry_id: string; p_grow_event_id: string; uid: string }
+        Returns: Record<string, unknown>
+      }
+      quicklog_revision_sibling_env_ids: {
+        Args: {
+          p_parent: Database["public"]["Tables"]["grow_events"]["Row"]
+          uid: string
+        }
+        Returns: string[]
+      }
       quicklog_save_event: {
+        Args: {
+          p_details?: Json
+          p_event_type: string
+          p_feed?: Json
+          p_grow_id: string
+          p_idempotency_key: string
+          p_note?: string
+          p_occurred_at?: string
+          p_photo_url?: string
+          p_plant_id?: string
+          p_sensor_snapshot?: Json
+          p_tent_id?: string
+          p_water?: Json
+        }
+        Returns: Json
+      }
+      quicklog_save_event_pre_logged_at: {
         Args: {
           p_details?: Json
           p_event_type: string
@@ -4938,12 +5281,59 @@ export type Database = {
         }
         Returns: Json
       }
+      quicklog_save_manual_pre_logged_at: {
+        Args: {
+          p_action: string
+          p_details?: Json
+          p_humidity_pct?: number
+          p_idempotency_key?: string
+          p_note?: string
+          p_occurred_at?: string
+          p_stage?: string
+          p_target_id: string
+          p_target_type: string
+          p_temperature_c?: number
+          p_volume_ml?: number
+          p_vpd_kpa?: number
+        }
+        Returns: Json
+      }
+      quicklog_try_parse_logged_at: {
+        Args: { p_value: string }
+        Returns: string
+      }
+      quicklog_try_parse_uuid: { Args: { p_value: string }; Returns: string }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
           message: Json
           msg_id: number
           read_ct: number
+        }[]
+      }
+      read_manual_sensor_correction_evidence: {
+        Args: { p_reading_ids: string[] }
+        Returns: Json
+      }
+      record_ai_doctor_review_completion: {
+        Args: { p_expected_user_id: string; p_spend_id: string }
+        Returns: Json
+      }
+      record_own_agreement_acceptances: {
+        Args: { p_acceptances: Json }
+        Returns: number
+      }
+      record_signup_acquisition_first_touch: {
+        Args: { p_source: string }
+        Returns: boolean
+      }
+      resolve_legacy_manual_sensor_reading: {
+        Args: { p_id: string }
+        Returns: {
+          evidence: Json
+          root_id: string
+          valid: boolean
+          value: number
         }[]
       }
       revoke_lovable_founder_lifetime_by_transaction: {
@@ -4954,8 +5344,18 @@ export type Database = {
         }
         Returns: Json
       }
+      save_manual_sensor_correction: {
+        Args: { p_request: Json }
+        Returns: Json
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      signup_acquisition_operator_snapshot: { Args: never; Returns: Json }
+      signup_acquisition_readiness_operator_snapshot: {
+        Args: never
+        Returns: Json
+      }
+      signup_to_paid_operator_snapshot: { Args: never; Returns: Json }
       verdant_normalize_search_text: {
         Args: { p_text: string }
         Returns: string
@@ -4998,12 +5398,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5027,11 +5427,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5052,11 +5452,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5077,11 +5477,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5094,11 +5494,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

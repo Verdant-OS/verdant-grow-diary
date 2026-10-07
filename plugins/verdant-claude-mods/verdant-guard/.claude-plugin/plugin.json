@@ -1,0 +1,5 @@
+{
+  "name": "verdant-guard",
+  "version": "0.1.0",
+  "description": "Refuses tool calls that break Verdant's AGENTS.md fences: force-push, pushes to verdant-grow-diary/main, rebase, --no-verify, dependency/lockfile changes, published-migration and generated-file edits, production SQL/deploy/promote, PR merge/ready."
+}

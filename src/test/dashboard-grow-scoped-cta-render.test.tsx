@@ -253,17 +253,22 @@ describe("Dashboard grow-scoped CTA render", () => {
     ];
   };
 
-  it("carries growId on PageHeader Quick Log when grow scope is active", () => {
+  it("carries growId on the home card Log, with no header Quick Log, when grow scope is active", () => {
     H.scoped = true;
     renderDashboard();
 
-    expect(hrefForTestId("dashboard-daily-grow-check-entry")).toBe(`/daily-check?growId=${GROW}`);
+    expect(screen.queryByTestId("dashboard-daily-grow-check-entry")).toBeNull();
+    expect(hrefForTestId("tonight-tent-home-log")).toBe(`/daily-check?growId=${GROW}`);
+    expect(screen.getAllByTestId("dashboard-ready")).toHaveLength(1);
   });
 
-  it("keeps global /daily-check on PageHeader Quick Log without grow scope", () => {
+  it("uses the tent's grow on the home card Log, with no header Quick Log, without grow scope", () => {
+    // #1833 prefers homeTent.growId; the harness tent carries growId: GROW.
     renderDashboard();
 
-    expect(hrefForTestId("dashboard-daily-grow-check-entry")).toBe("/daily-check");
+    expect(screen.queryByTestId("dashboard-daily-grow-check-entry")).toBeNull();
+    expect(hrefForTestId("tonight-tent-home-log")).toBe(`/daily-check?growId=${GROW}`);
+    expect(screen.getAllByTestId("dashboard-ready")).toHaveLength(1);
   });
 
   it("carries growId on inline Daily Grow Check Start Check when grow scope is active", () => {

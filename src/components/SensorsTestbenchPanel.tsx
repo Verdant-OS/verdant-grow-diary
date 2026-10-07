@@ -150,6 +150,17 @@ function indicatorBadge(c: SensorTestbenchClassification) {
       </Badge>
     );
   }
+  if (c.indicator === "no_bridge_ingest") {
+    return (
+      <Badge
+        variant="outline"
+        data-testid="sensors-testbench-indicator"
+        data-state="no_bridge_ingest"
+      >
+        No bridge ingest — latest reading is {c.source ?? "unlabeled"}
+      </Badge>
+    );
+  }
   if (c.indicator === "stale") {
     return (
       <Badge variant="outline" data-testid="sensors-testbench-indicator" data-state="stale">

@@ -103,6 +103,11 @@ export interface UsePhenoHuntWorkspaceState {
   loadNextPage: () => void;
   /** Retry the initial bounded hunt read without changing hunt or filters. */
   reload: () => void;
+  /**
+   * #551: apply a confirmed rename to the loaded hunt. A load already in
+   * flight read the row before the save, so it is superseded by a fresh one.
+   */
+  applyHuntName: (huntId: string, name: string) => void;
   /** Active server-side filters. */
   filters: PhenoWorkspaceFilters;
   /** Patch the filters; resets pagination to page 0 with stale-response guard. */
@@ -267,6 +272,8 @@ export function usePhenoHuntWorkspace(
   // (mount / filter change); a page response tagged with an old id is dropped.
   const pageRef = useRef<number>(0);
   const requestRef = useRef<number>(0);
+  // True while the initial hunt read is in flight (#551 applyHuntName).
+  const loadInFlightRef = useRef(false);
   const loadingMoreRef = useRef(false);
   // Round cards are hunt-wide, not candidate-filter-specific. This generation
   // changes only with the hunt so filtering a loaded page cannot invalidate a
@@ -301,6 +308,7 @@ export function usePhenoHuntWorkspace(
     }
     let cancelled = false;
     const reqId = ++requestRef.current;
+    loadInFlightRef.current = true;
     loadingMoreRef.current = false;
     setLoadingMore(false);
     setLoadMoreError(null);
@@ -310,6 +318,21 @@ export function usePhenoHuntWorkspace(
     editablePlantIdsRef.current = new Set();
     setDecisionHistoryByPlant({});
     (async () => {
+      // #571: the keeper chain (keepers → reversals + clones) depends only on
+      // the hunt id, so it runs alongside the summary/page reads instead of
+      // after them — two serial round trips on the critical path, not three.
+      // The no-op catch only marks the promise handled when an earlier error
+      // returns before it is awaited; awaiting it below still rejects.
+      const keeperChain = (async () => {
+        const keepers = await listKeepersForHunt(id);
+        const keeperIds = keepers.map((k) => k.id);
+        const [reversedKeeperIdList, cloneRows] = await Promise.all([
+          listReversedKeeperIdsForKeepers(keeperIds),
+          listClonesForKeepers(keeperIds),
+        ]);
+        return { keepers, reversedKeeperIdList, cloneRows };
+      })();
+      keeperChain.catch(() => undefined);
       const [summaryRes, comparison, pageRes] = await Promise.all([
         loadPhenoHuntSummary(id),
         loadPhenoHuntComparisonSummary(id),
@@ -327,16 +350,10 @@ export function usePhenoHuntWorkspace(
         return;
       }
       const pageIds = pageRes.candidates.map((c) => c.candidateId);
-      const [{ scores, decisions, sexes, smokes, labs }, keepers] = await Promise.all([
-        loadPageEvidence(id, pageIds),
-        listKeepersForHunt(id),
-      ]);
-      if (cancelled || reqId !== requestRef.current) return;
-      const keeperIds = keepers.map((k) => k.id);
-      const [reversedKeeperIdList, cloneRows] = await Promise.all([
-        listReversedKeeperIdsForKeepers(keeperIds),
-        listClonesForKeepers(keeperIds),
-      ]);
+      const [
+        { scores, decisions, sexes, smokes, labs },
+        { keepers, reversedKeeperIdList, cloneRows },
+      ] = await Promise.all([loadPageEvidence(id, pageIds), keeperChain]);
       const reversedKeeperIds = new Set(reversedKeeperIdList);
       if (cancelled || reqId !== requestRef.current) return;
       pageRef.current = 0;
@@ -359,17 +376,26 @@ export function usePhenoHuntWorkspace(
       );
       editablePlantIdsRef.current = new Set(pageIds);
       setStatus("ok");
-    })().catch((readError: unknown) => {
-      if (cancelled || reqId !== requestRef.current) return;
-      setError(evidenceReadMessage(readError, "Could not load this hunt."));
-      setStatus("error");
-    });
+    })()
+      .catch((readError: unknown) => {
+        if (cancelled || reqId !== requestRef.current) return;
+        setError(evidenceReadMessage(readError, "Could not load this hunt."));
+        setStatus("error");
+      })
+      .finally(() => {
+        if (reqId === requestRef.current) loadInFlightRef.current = false;
+      });
     return () => {
       cancelled = true;
     };
   }, [id, filters, reloadTick]);
 
   const reload = useCallback(() => setReloadTick((tick) => tick + 1), []);
+
+  const applyHuntName = useCallback((targetId: string, name: string) => {
+    setHunt((prev) => (prev && prev.id === targetId ? { ...prev, name } : prev));
+    if (loadInFlightRef.current) setReloadTick((tick) => tick + 1);
+  }, []);
 
   const hasMore =
     status === "ok" && totalCandidateCount != null && candidates.length < totalCandidateCount;
@@ -796,6 +822,7 @@ export function usePhenoHuntWorkspace(
     hasMore,
     loadNextPage,
     reload,
+    applyHuntName,
     filters,
     setFilter,
     resetFilters,

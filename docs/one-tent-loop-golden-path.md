@@ -121,7 +121,10 @@ The loop is green only when **all** of the following hold in one run:
 - One Quick Log persisted, one timeline event visible, no duplicates
   on remount or retry.
 - One manual sensor snapshot with `source`, `captured_at`, `tent_id`,
-  `plant_id`, `confidence`, and `raw_payload` preserved.
+  `plant_id` when the entry targets a plant, and `confidence` preserved.
+  `raw_payload` is deliberately **not** carried in the saved Quick Log
+  snapshot envelope: it is redacted by `buildSensorSnapshotSavePayload`
+  (see `SensorAttachPayload` in `src/lib/legacyQuickLogUnifiedSave.ts`).
 - One cautious AI Doctor result with all 12 required fields, evidence
   citing the actual snapshot, and no aggressive prescription.
 - One alert derived from a real threshold breach.

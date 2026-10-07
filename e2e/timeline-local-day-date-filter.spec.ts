@@ -111,17 +111,21 @@ interface Captured {
   blockedExternalRequests: string[];
 }
 
-/** Identify the core Timeline reads independently of the date bounds under test. */
+/**
+ * Identify the core Timeline reads independently of the date bounds under test.
+ * Core reads order newest-first with an `id` tiebreaker (`orderNewestFirstStable`),
+ * which postgrest-js serializes as `order=<column>.desc,id.desc`.
+ */
 function isCoreTimelineRead(url: string, table: "diary_entries" | "grow_events"): boolean {
   const query = new URL(url).searchParams;
   if (query.get("grow_id") !== `eq.${GROW_ID}` || query.get("limit") !== "100") return false;
   if (table === "diary_entries") {
     return (
       query.get("select") === "id,note,photo_url,stage,details,entry_at,plant_id,tent_id" &&
-      query.get("order") === "entry_at.desc"
+      query.get("order") === "entry_at.desc,id.desc"
     );
   }
-  return query.get("order") === "occurred_at.desc";
+  return query.get("order") === "occurred_at.desc,id.desc";
 }
 
 function isReadOnlyRoleFixture(req: Request): boolean {

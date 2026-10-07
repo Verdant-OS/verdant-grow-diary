@@ -226,6 +226,43 @@ describe("classifySensorTestbench", () => {
       ],
       now: NOW,
     });
+    expect(r.indicator).not.toBe("receiving");
+  });
+
+  // #593: a fresh manual reading used to render "Stale — no recent ingest".
+  // It is not stale; it simply did not come through the bridge.
+  it.each(["manual", "csv", "demo"])(
+    "labels a fresh %s reading as no bridge ingest, never stale or receiving",
+    (source) => {
+      const r = classifySensorTestbench({
+        rows: [
+          {
+            source,
+            captured_at: new Date(NOW.getTime() - 60_000).toISOString(),
+            raw_payload: {},
+          },
+        ],
+        now: NOW,
+      });
+      expect(r.indicator).toBe("no_bridge_ingest");
+      expect(r.source).toBe(source);
+      expect(r.isTestbench).toBe(false);
+    },
+  );
+
+  it("still renders an aged manual reading as stale", () => {
+    const r = classifySensorTestbench({
+      rows: [
+        {
+          source: "manual",
+          captured_at: new Date(
+            NOW.getTime() - SENSOR_TESTBENCH_LIVE_WINDOW_MS - 60_000,
+          ).toISOString(),
+          raw_payload: {},
+        },
+      ],
+      now: NOW,
+    });
     expect(r.indicator).toBe("stale");
   });
 

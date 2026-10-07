@@ -14,10 +14,12 @@
 import { isUuid } from "@/lib/isUuid";
 import { supabase as defaultSupabase } from "@/integrations/supabase/client";
 import {
+  resolveTypedReceiptReaders,
   verifyActiveTypedQuickLogEvent,
   type TypedQuickLogEventReader,
   type TypedQuickLogChildReader,
-} from "./quickLogTypedReusedReceipt";
+  type TypedReceiptReadClient,
+} from "./quickLogTypedReusedReceiptService";
 import { ROOT_ZONE_PRODUCT_CAP } from "./rootZoneObservationRules";
 import {
   quickLogSaveRequiresHistoryCheck,
@@ -58,6 +60,8 @@ export interface FeedingRpcClient {
     fn: "quicklog_save_event",
     args: QuickLogFeedingEventRpcArgs,
   ) => Promise<{ data: unknown; error: unknown }>;
+  /** Reads a reused receipt back; without an injected client the singleton reads. */
+  from?: TypedReceiptReadClient["from"];
 }
 
 export interface FeedingTypedEventInput {
@@ -283,6 +287,8 @@ export async function writeFeedingTypedEvent(
   const eventId = trimOrNull(envelope.grow_event_id);
   if (!isUuid(eventId)) return { ok: false, reason: "rpc:no_event_id" };
 
+  // Read the receipt back through the same client the RPC used.
+  const readers = resolveTypedReceiptReaders(options);
   if (
     envelope.reused === true &&
     !(await verifyActiveTypedQuickLogEvent(
@@ -295,8 +301,8 @@ export async function writeFeedingTypedEvent(
         volumeMl: mapped.args.p_feed.volume_ml,
         lineId: mapped.args.p_feed.line_id,
       },
-      options.reusedEventReader,
-      options.reusedChildReader,
+      readers.eventReader,
+      readers.childReader,
     ))
   )
     return { ok: false, reason: "rpc:receipt_unverified" };

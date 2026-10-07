@@ -12,6 +12,8 @@
  *  - Secret is server-only; never logged, never returned in errors.
  */
 
+import { timingSafeEqual } from "../_shared/lib/lib/timingSafeCompareRules.ts";
+
 export type PaddleSignatureParts = {
   ts: string;
   /** Last h1 value (back-compat with earlier callers/tests). */
@@ -38,13 +40,12 @@ export function parsePaddleSignature(header: string): PaddleSignatureParts | nul
   return { ts, h1: h1s[h1s.length - 1], h1s };
 }
 
+/**
+ * Exact string equality via the shared helper (#1002): no early exit, no
+ * case folding (Paddle h1 is compared exactly as before). Timing hygiene only.
+ */
 export function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
+  return timingSafeEqual(a, b);
 }
 
 export async function hmacSha256Hex(secret: string, message: string): Promise<string> {

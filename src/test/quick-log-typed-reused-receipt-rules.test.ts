@@ -4,7 +4,7 @@ import {
   matchesTypedQuickLogChild,
   type ExpectedTypedQuickLogEvent,
 } from "@/lib/quickLogTypedReusedReceiptRules";
-import { verifyActiveTypedQuickLogEvent } from "@/lib/quickLogTypedReusedReceipt";
+import { verifyActiveTypedQuickLogEvent } from "@/lib/quickLogTypedReusedReceiptService";
 
 const expected: ExpectedTypedQuickLogEvent = {
   id: "77777777-7777-4777-8777-000000000001",

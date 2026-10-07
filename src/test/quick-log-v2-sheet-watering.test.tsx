@@ -826,6 +826,26 @@ describe("QuickLogV2Sheet — structured watering", () => {
     expect(wateringWriterMock.mock.calls[1][0].idempotency_key).not.toBe(rejectedKey);
   });
 
+  it("keeps the Water key and claim when a reused receipt cannot be verified", async () => {
+    wateringWriterMock
+      .mockResolvedValueOnce({ ok: false, reason: "rpc:receipt_unverified" })
+      .mockResolvedValueOnce({ ok: true, eventId: "water-event-verified", reused: true });
+    renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
+    enterVolume("500");
+    clickSave();
+    await waitFor(() => expect(screen.getByTestId("qlv2-watering-retry-lock")).toBeVisible());
+    const firstKey = wateringWriterMock.mock.calls[0][0].idempotency_key;
+    const pending = readPendingQuickLogWatering(authState.ownerId);
+    expect(pending.status).toBe("pending");
+    if (pending.status !== "pending") throw new Error("claim was released");
+    expect(pending.record.payload.idempotency_key).toBe(firstKey);
+    expect(screen.queryByTestId("qlv2-post-save")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+    await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(2));
+    expect(wateringWriterMock.mock.calls[1][0].idempotency_key).toBe(firstKey);
+  });
+
   it("retains an earlier ambiguous Water attempt when a later retry is rejected", async () => {
     wateringWriterMock
       .mockResolvedValueOnce({ ok: false, reason: "rpc:error" })

@@ -315,3 +315,56 @@ describe("Codex review fixes", () => {
     expect(checkBash("gh pr ready 1800")).not.toBe(null);
   });
 });
+
+describe("Codex re-review P1 fixes", () => {
+  test("P1: a value-taking sudo option inside a flag cluster consumes the next token", () => {
+    for (const cmd of [
+      "sudo -Eu runner git push --force",
+      "sudo -nu runner git push origin main",
+      "sudo -Eg wheel supabase db push",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("sudo -Eu runner git push origin claude/task")).toBe(null);
+    expect(checkBash("sudo -urunner git push --force")).not.toBe(null);
+  });
+  test("P1: env -S splits its argument the way a shell would, removing quotes", () => {
+    for (const cmd of [
+      `env -S 'git push "-f" origin claude/task'`,
+      `env -S "git push 'origin' 'main'"`,
+      `env --split-string='git push "--force"'`,
+      `env -iS 'git push -f'`,
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash(`env -S 'git push "origin" "claude/task"'`)).toBe(null);
+  });
+  test("P1: Playwright's optional --debug mode is not counted as a spec filter", () => {
+    for (const cmd of [
+      "bunx playwright test --project=chromium-mocked --debug inspector",
+      "bunx playwright test --project=chromium-mocked --debug cli",
+      "bunx playwright test --project=chromium-mocked --debug",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(
+      checkBash("bunx playwright test --project=chromium-mocked --debug e2e/auth-loading.spec.ts"),
+    ).toBe(null);
+    expect(
+      checkBash("bunx playwright test --project=chromium-mocked --debug inspector auth-loading"),
+    ).toBe(null);
+  });
+  test("P1: a wildcard refspec that can expand to a protected branch is denied", () => {
+    for (const cmd of [
+      "git push origin 'refs/heads/*:refs/heads/*'",
+      "git push origin 'refs/heads/*'",
+      "git push origin '*:*'",
+      "git push origin 'refs/*:refs/*'",
+      "git push origin 'refs/heads/m*:refs/heads/m*'",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("git push origin 'refs/heads/claude/*:refs/heads/claude/*'")).toBe(null);
+    expect(checkBash("git push origin 'refs/tags/*:refs/tags/*'")).toBe(null);
+  });
+});

@@ -171,10 +171,17 @@ const WRAPPER_VALUE_OPTIONS = new Map<string, ReadonlySet<string>>([
   ["time", new Set(["-f", "--format", "-o", "--output"])],
 ]);
 
+/** Splits a string into words the way a shell would, removing quotes (`env -S`, `npx -c`). */
+function shellWords(text: string): string[] {
+  return segments(text).flat();
+}
+
 /**
  * Drops leading `VAR=value` assignments and `sudo`/`env`/`exec`/`time` wrappers with their own
  * options, so `env -i git push --force` is checked as `git push --force`. `env -S "<cmd>"`
  * (`--split-string`) runs its argument as the command, so that argument is split and checked.
+ * A short-option cluster (`sudo -Eu runner`) is read letter by letter: the first value-taking
+ * letter takes the rest of the cluster as its value, or the next token when it is last.
  */
 function stripPrefix(tokens: string[]): string[] {
   let rest = tokens;
@@ -205,9 +212,28 @@ function stripPrefix(tokens: string[]): string[] {
         i += 1;
         break;
       }
+      if (/^-[A-Za-z]{2,}$/.test(option)) {
+        let consumed = 1;
+        for (let k = 1; k < option.length; k += 1) {
+          const letter = `-${option[k]}`;
+          const attached = option.slice(k + 1);
+          if (head === "env" && letter === "-S") {
+            split = attached !== "" ? attached : (rest[i + 1] ?? "");
+            consumed = attached !== "" ? 1 : 2;
+            break;
+          }
+          if (valueOptions.has(letter)) {
+            if (attached === "") consumed = 2;
+            break;
+          }
+        }
+        i += consumed;
+        if (split !== null) break;
+        continue;
+      }
       i += valueOptions.has(option) ? 2 : 1;
     }
-    rest = [...(split === null ? [] : split.split(/\s+/).filter(Boolean)), ...rest.slice(i)];
+    rest = [...(split === null ? [] : shellWords(split)), ...rest.slice(i)];
   }
 }
 
@@ -258,6 +284,20 @@ function checkGit(args: string[]): string | null {
     for (const ref of positional.slice(1)) {
       const target = ref.includes(":") ? ref.split(":").pop()! : ref;
       const branch = target.replace(/^refs\/heads\//, "");
+      if (target.includes("*")) {
+        // A wildcard refspec pushes every local branch it matches (`refs/heads/*:refs/heads/*`).
+        const glob = new RegExp(
+          `^${target
+            .split("*")
+            .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
+            .join(".*")}$`,
+        );
+        const hit = PROTECTED_BRANCHES.find((b) => glob.test(b) || glob.test(`refs/heads/${b}`));
+        if (hit) {
+          return `The wildcard refspec \`${ref}\` can push \`${hit}\` (AGENTS.md: never push directly to verdant-grow-diary or main). Push your own task branch by name.`;
+        }
+        continue;
+      }
       if ((PROTECTED_BRANCHES as readonly string[]).includes(branch)) {
         return `Pushing to \`${branch}\` is forbidden (AGENTS.md: never push directly to verdant-grow-diary or main). Push your own task branch and open a draft PR.`;
       }
@@ -334,6 +374,8 @@ const PW_BOOLEAN_FLAGS = new Set([
   "-x",
 ]);
 
+const PW_DEBUG_MODES = new Set(["inspector", "cli"]);
+
 /** Drops a package-runner prefix: `bunx`, `npx`, `bun x`, `pnpm dlx|exec`, `yarn dlx|exec`. */
 function stripRunner(tokens: string[]): string[] {
   const [a, b] = tokens;
@@ -367,6 +409,11 @@ function checkPlaywright(tokens: string[]): string | null {
     if (a.startsWith("--project=")) project = a.slice("--project=".length);
     else if (a === "--project") project = args[i + 1] ?? null;
     if (a.startsWith("-")) {
+      // `--debug [mode]` takes an optional mode (Playwright 1.62: `inspector` or `cli`).
+      if (a === "--debug" && PW_DEBUG_MODES.has(args[i + 1] ?? "")) {
+        i += 1;
+        continue;
+      }
       if (!a.includes("=") && !PW_BOOLEAN_FLAGS.has(a) && !(args[i + 1] ?? "-").startsWith("-")) {
         i += 1;
       }

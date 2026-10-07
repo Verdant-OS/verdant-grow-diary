@@ -140,9 +140,10 @@ when its text:
   without the trailing `;`, across a line break (`supabase\n  .auth`), and through
   parentheses, `!`, `as T` or `satisfies T` (`(supabase.auth as any).signOut()`),
   including with `//` or `/* */` comments inside the call chain
-  (`supabase.auth /* c */ .signOut()`), a cast to any one-line type
-  (`as Foo<Bar<Baz>>`, `as (x: A) => B`, `as import("x").T`) and `\u`/`\x`
-  escapes (`supabase.\u0061uth`, `"action\x5fqueue"`).
+  (`supabase.auth /* c */ .signOut()`), a cast to any balanced type, on one
+  line or several (`as Foo<Bar<Baz>>`, `as (x: A) => B`, `as import("x").T`,
+  `as { signOut(): Promise<void>; }`) and `\u`/`\x` escapes
+  (`supabase.\u0061uth`, `"action\x5fqueue"`).
   `mfa.*` locks reads such as `mfa.listFactors()` too. A `getSession()` or
   `getUser()` used only for the user ID doesn't lock, because RLS is the real
   boundary;
@@ -195,7 +196,13 @@ are skipped, and the code inside a template's `${…}` is lexed as code) and onc
 treating every `//` and `/*` as a comment. A lock found in the raw text or either
 stripped version counts, so stripping can only add locks. The same checks also run on a copy with
 `\uXXXX`, `\u{…}` and `\xXX` escapes decoded; legacy octal escapes and names built
-at runtime (`String.fromCharCode`) are not decoded. The lexer guesses
+at runtime (`String.fromCharCode`) are not decoded. Every version is also matched
+with each `as T` / `satisfies T` cast and each `.from<T>` / `.rpc<T>` type argument
+blanked. A small scanner finds where the type ends by balancing `( [ { <`,
+skipping strings and the `>` of `=>`; a type that doesn't close within 2,000
+characters is left as it is. The scan has a per-file budget, and a file that uses
+it up locks under `auth-mutation` (if it contains `auth`) and `aq-io` (if it
+contains `action_queue`) instead of being skipped. The lexer guesses
 regex literals from the previous token and gives up on one longer than 200
 characters, so a construction that fools both stripped versions is still
 possible.

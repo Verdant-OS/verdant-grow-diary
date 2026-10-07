@@ -209,6 +209,59 @@ jobs:
             });
           }
 
+          // End of the balanced TypeScript type starting at i, or -1 if it doesn't
+          // close within 2,000 characters. Brackets ( [ { < nest, strings are
+          // skipped, the ">" of "=>" doesn't close. With stopAtTop, the type also ends
+          // at depth 0 before ) ] } ; , = or a line break; otherwise it ends after the
+          // first bracket closes.
+          const TYPE_OPEN = { '(': ')', '[': ']', '{': '}', '<': '>' };
+          function typeEnd(text, i, stopAtTop, budget) {
+            const stack = [];
+            const limit = Math.min(text.length, i + 2000);
+            let j = i;
+            while (j < limit) {
+              if (--budget.left < 0) throw new Error('type-scan budget');
+              const c = text[j];
+              if (!stack.length && stopAtTop && (c === ')' || c === ']' || c === '}' || c === ';' || c === ',' || c === '\n' || (c === '=' && text[j + 1] !== '>'))) return j;
+              if (c === "'" || c === '"' || c === '`') {
+                let k = j + 1;
+                while (k < limit && text[k] !== c && text[k] !== '\n') k += text[k] === '\\' ? 2 : 1;
+                j = k + 1;
+                continue;
+              }
+              if (TYPE_OPEN[c]) stack.push(TYPE_OPEN[c]);
+              else if (c === ')' || c === ']' || c === '}' || (c === '>' && text[j - 1] !== '=')) {
+                if (stack.pop() !== c) return -1;
+                if (!stack.length && !stopAtTop) return j + 1;
+              }
+              j += 1;
+            }
+            return stopAtTop && !stack.length ? j : -1;
+          }
+
+          // The text with each "as T" / "satisfies T" cast and each .from<T> / .rpc<T>
+          // type argument blanked (line breaks kept), so object, multi-line and
+          // parenthesized types can't hide a call: (supabase.auth as { signOut():
+          // void; }).signOut() and db.from<("action_queue")>("action_queue") (Codex
+          // P1s at cb216998). A type that doesn't close is left alone. The scan
+          // shares a budget across a file's versions; contentLocked locks a file
+          // that runs out of it instead of skipping it.
+          function eraseTypes(text, budget) {
+            const ranges = [];
+            const re = /(?<![\w$.])(?:as|satisfies)\s+(?=[^\s=;,)\]}])|\.\s*(?:from|rpc)\s*(?=<)/g;
+            let m;
+            while ((m = re.exec(text))) {
+              const isCast = m[0][0] !== '.';
+              const start = isCast ? m.index : m.index + m[0].length;
+              const end = typeEnd(text, m.index + m[0].length, isCast, budget);
+              if (end > start) {
+                ranges.push([start, end]);
+                re.lastIndex = end;
+              }
+            }
+            return blankRanges(text, ranges);
+          }
+
           // Every // and /* counts, even inside strings; this catches what the
           // lexer below misreads. One linear pass.
           function stripCommentsNaive(text) {
@@ -317,9 +370,24 @@ jobs:
             // "action\x5fqueue" can't hide (Codex P1 at cbc0ab0f).
             const decoded = decodeEscapes(text);
             const bases = decoded === text ? [text] : [text, decoded];
-            const variants = /auth|action_queue/.test(decoded)
-              ? bases.flatMap(base => [base, stripCommentsLexed(base), stripCommentsNaive(base)])
-              : bases;
+            // Each version is also checked with its casts and type arguments blanked
+            // (Codex P1s at cb216998).
+            // A file whose types exhaust the scan budget locks under the rules its
+            // words point to (fail closed): auth-mutation for "auth", aq-io for
+            // "action_queue".
+            const budget = { left: 2000000 };
+            let variants;
+            try {
+              // Identical versions are tried once.
+              variants = /auth|action_queue/.test(decoded)
+                ? [...new Set(bases.flatMap(base => [base, stripCommentsLexed(base), stripCommentsNaive(base)]).flatMap(v => [v, eraseTypes(v, budget)]))]
+                : bases;
+            } catch (error) {
+              if (error.message !== 'type-scan budget') throw error;
+              const rules = [['auth-mutation', /auth/], ['aq-io', /action_queue/]]
+                .filter(([, word]) => word.test(decoded)).map(([rule]) => rule);
+              return { locked: true, rules };
+            }
             const rules = CONTENT_RULES
               .filter(([, patterns]) => patterns.some(pattern => variants.some(variant => pattern.test(variant))))
               .map(([rule]) => rule);
@@ -678,6 +746,12 @@ jobs:
               'const x = `a ${ { k: 1 }.k } https://h/${supabase.auth /* c */ .signOut()}`;',
               'const r = /`/; const u = "http://x"; supabase.auth /* c */ .signOut();',
               'return /"/.test(s) ? "http://x" : supabase.auth /* c */ .signOut();',
+              // Codex P1 at cb216998: object, multi-line and member-separator cast types.
+              '(supabase.auth as { signOut(): Promise<void>; }).signOut();',
+              '(supabase.auth as {\n  signOut(): Promise<void>;\n  x: (a: A) => B;\n}).signOut();',
+              'const a = supabase.auth as { signOut(): void; };\na.signOut();',
+              '(supabase.auth satisfies Record<"k", { a: 1; }>)["signOut"]();',
+              '(supabase.auth as Array<{ a: ")"; }>[0]).signOut();',
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
             // Catastrophic-backtracking guard: a huge one-line file must finish quickly.
             {
@@ -687,7 +761,7 @@ jobs:
               assert.ok(Date.now() - t0 < 1500, `synthetic 300 KB line took ${Date.now() - t0} ms`);
               cases += 1;
               // Comment stripping is linear: unterminated comments and strings can't stall it.
-              for (const huge of ['/*x'.repeat(100000), '`x\\'.repeat(100000), "'x".repeat(150000), '(/'.repeat(150000), '`${'.repeat(100000), 'a.auth as b<c<d>> '.repeat(20000), '\\u0061'.repeat(100000)]) {
+              for (const huge of ['/*x'.repeat(100000), '`x\\'.repeat(100000), "'x".repeat(150000), '(/'.repeat(150000), '`${'.repeat(100000), 'a.auth as b<c<d>> '.repeat(20000), '\\u0061'.repeat(100000), 'auth x as { '.repeat(50000), 'action_queue db.from<( '.repeat(30000), 'auth a as (b) => '.repeat(30000), 'auth as <'.repeat(60000)]) {
                 const t1 = Date.now();
                 locks('src/lib/fooRules.ts', huge);
                 assert.ok(Date.now() - t1 < 1500, `unterminated input took ${Date.now() - t1} ms`);
@@ -704,7 +778,15 @@ jobs:
               'db.from( // comment\n  "action_queue")', 'db.rpc /* a */ ( /* b */ "action_queue_create", p);',
               'const x = `https://host/${db.from(/* c */ "action_queue")}`;',
               'db.from("action\\u005fqueue");', 'db.from("action\\x5fqueue");',
+              // Codex P1 at cb216998: parenthesized, function and multi-line type arguments.
+              'db.from<("action_queue")>("action_queue");', 'db.from<(r: Row) => void>("action_queue");',
+              'db?.rpc<{\n  id: string;\n}>("action_queue_create", p);', 'db.from<Array<(A)>>( "action_queue")',
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['aq-io, head'], text);
+            // A file that exhausts the type-scan budget locks (fail closed).
+            assert.deepEqual(locks('src/lib/fooRules.ts', 'x as { auth '.repeat(200000)), ['auth-mutation, head']);
+            cases += 1;
+            assert.deepEqual(locks('src/lib/fooRules.ts', 'const s = "x as {"; db.from<{ a: 1; }>("action_queue");'), ['aq-io, head']);
+            cases += 1;
             assert.deepEqual(locks('e2e-local/lib/fixtures.ts', 'await admin.auth.admin.deleteUser(uid);'), ['auth-mutation, head']);
             assert.match(locks('e2e-local/lib/nativeLocalFixtures.ts', real('e2e-local/lib/nativeLocalFixtures.ts')).join(), /auth-mutation, head/);
             // Both rules on one file are both reported.
@@ -726,6 +808,8 @@ jobs:
               'const status = client.auth\n  && client.auth.getUser;', 'const s = client.auth\n  .getSession();',
               'expect(client.auth).toBeDefined();', 'const { data } = await supabase.auth.getUser()\nreturn data;',
               'const user = (await supabase.auth.getUser()).data.user', 'if (a != b) x = y',
+              'const u = (await supabase.auth.getUser()) as { data: { user: U; } };', 'import { x as auth } from "y";',
+              'const s = client.auth as AuthClient\n  .getSession();', 'db.from<Row>("plants");',
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
             for (const path of [
               'src/lib/pendingOutcomeReviewRules.ts', 'src/lib/guidedActionChecklistRules.ts',

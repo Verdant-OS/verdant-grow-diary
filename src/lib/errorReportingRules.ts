@@ -173,11 +173,14 @@ export function scrubText(value: unknown): string {
     .replace(EMAIL_PATTERN, REDACTED);
 }
 
-/** Reduces a URL to origin + pathname. Relative or unparsable input keeps only the part before `?`/`#`. */
+/** Reduces an http(s) URL to origin + pathname; any other scheme becomes `scheme:[redacted]`. Relative or unparsable input keeps only the part before `?`/`#`. */
 export function scrubUrl(value: unknown): string {
   if (typeof value !== "string" || value.length === 0) return "";
   try {
     const url = new URL(value);
+    // Only http(s) has an origin + path worth keeping. data:, javascript:, blob:,
+    // extension and other schemes can carry a payload in what follows the scheme.
+    if (url.protocol !== "http:" && url.protocol !== "https:") return `${url.protocol}${REDACTED}`;
     return `${url.origin}${url.pathname}`;
   } catch {
     return value.split(/[?#]/, 1)[0] ?? "";
@@ -232,8 +235,13 @@ export interface ReportableEvent {
   tags?: Record<string, unknown>;
 }
 
-/** Breadcrumb categories that may carry page content or credentials; dropped outright. */
-export const DROPPED_BREADCRUMB_CATEGORIES: ReadonlyArray<string> = ["console", "ui.input"];
+/** Breadcrumb categories that may carry page content, grower data or credentials; dropped outright. */
+export const DROPPED_BREADCRUMB_CATEGORIES: ReadonlyArray<string> = [
+  "console",
+  "ui.input",
+  // DOM click descriptors include element attributes (e.g. a cultivar name in `title`).
+  "ui.click",
+];
 
 /** Device/runtime contexts that carry no identity. Every other context (e.g. `response`, `state`, custom) is dropped. */
 export const ALLOWED_EVENT_CONTEXTS: ReadonlyArray<string> = ["browser", "os", "device", "runtime"];

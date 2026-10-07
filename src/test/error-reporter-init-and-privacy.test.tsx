@@ -11,7 +11,13 @@ import {
   initErrorReporter,
   reportErrorWhenReady,
 } from "@/lib/errorReporter";
-import { REDACTED, scrubEvent, scrubText } from "@/lib/errorReportingRules";
+import {
+  REDACTED,
+  scrubBreadcrumb,
+  scrubEvent,
+  scrubText,
+  scrubUrl,
+} from "@/lib/errorReportingRules";
 
 const TEST_DSN = "https://0123456789abcdef0123456789abcdef@o000000.ingest.us.sentry.io/1";
 
@@ -188,6 +194,47 @@ describe("errorReportingRules — privacy of outgoing events", () => {
     );
     expect(scrubText("Key (plant_id)=(42) already exists.")).toBe(
       "Key (plant_id)=(42) already exists.",
+    );
+  });
+
+  it("drops DOM click breadcrumbs, which can carry grower data in element attributes", () => {
+    expect(
+      scrubBreadcrumb({ category: "ui.click", message: 'button[title="Blue Dream #3"]' }),
+    ).toBeNull();
+    const out = scrubEvent({
+      breadcrumbs: [
+        { category: "ui.click", message: 'div[title="My private cultivar"]' },
+        { category: "navigation", data: { from: "/a", to: "/b" } },
+      ],
+    });
+    expect(out?.breadcrumbs).toEqual([{ category: "navigation", data: { from: "/a", to: "/b" } }]);
+  });
+
+  it("keeps only http(s) origin+path from URLs and redacts payload-bearing schemes", () => {
+    expect(scrubUrl("https://verdantgrowdiary.com/grows/1?token=abc#x")).toBe(
+      "https://verdantgrowdiary.com/grows/1",
+    );
+    for (const url of [
+      "data:text/plain,grower@example.com?token=abc",
+      "javascript:alert('grower@example.com')",
+      "blob:https://verdantgrowdiary.com/1f2e",
+      "chrome-extension://abcdef/content.js",
+    ]) {
+      const out = scrubUrl(url);
+      expect(out, url).not.toContain("grower@example.com");
+      expect(out, url).not.toContain("token");
+      expect(out, url).toMatch(/^[a-z][a-z0-9+.-]*:\[redacted\]$/);
+      expect(scrubUrl(out), url).toBe(out);
+    }
+    const event = scrubEvent({
+      transaction: "data:text/plain,grower@example.com",
+      request: { url: "javascript:void(document.cookie)" },
+      exception: { values: [{ stacktrace: { frames: [{ filename: "data:x,secret" }] } }] },
+    });
+    expect(event?.transaction).toBe("data:[redacted]");
+    expect(event?.request?.url).toBe("javascript:[redacted]");
+    expect(event?.exception?.values?.[0]?.stacktrace?.frames?.[0]?.filename).toBe(
+      "data:[redacted]",
     );
   });
 

@@ -183,7 +183,7 @@ function shellWords(text: string): string[] {
  * A short-option cluster (`sudo -Eu runner`) is read letter by letter: the first value-taking
  * letter takes the rest of the cluster as its value, or the next token when it is last.
  */
-function stripPrefix(tokens: string[]): string[] {
+function stripPrefix(tokens: string[], onSplit?: (split: string) => void): string[] {
   let rest = tokens;
   for (;;) {
     const head = rest[0];
@@ -233,6 +233,7 @@ function stripPrefix(tokens: string[]): string[] {
       }
       i += valueOptions.has(option) ? 2 : 1;
     }
+    if (split !== null) onSplit?.(split);
     rest = [...(split === null ? [] : shellWords(split)), ...rest.slice(i)];
   }
 }
@@ -464,7 +465,15 @@ function checkProductionOps(rawTokens: string[], whole: string): string | null {
 /** The whole Bash rule set. */
 export function checkBash(command: string): string | null {
   for (const raw of segments(command)) {
-    const tokens = stripPrefix(raw);
+    let expands = false;
+    const tokens = stripPrefix(raw, (split) => {
+      // GNU `env -S` expands `${NAME}` while splitting; the value is unknown here, so the
+      // wrapped command cannot be checked.
+      if (split.includes("${")) expands = true;
+    });
+    if (expands) {
+      return "`env -S` with `${…}` expands variables this guard cannot see, so the command it runs cannot be checked. Write the command out without `env -S`.";
+    }
     if (tokens.length === 0) continue;
     const git = gitArgs(tokens);
     const reason =

@@ -368,3 +368,18 @@ describe("Codex re-review P1 fixes", () => {
     expect(checkBash("git push origin 'refs/tags/*:refs/tags/*'")).toBe(null);
   });
 });
+
+describe("Codex re-review P1: env -S variable expansion", () => {
+  test("an env -S string that expands ${VAR} is refused, since its value is unknown here", () => {
+    for (const cmd of [
+      "F=-f env -S 'git push ${F} origin claude/task'",
+      "env -S 'git push ${FLAGS}'",
+      "env --split-string='${CMD} origin main'",
+      "env -iS '${X}'",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env -S 'git push origin claude/task'")).toBe(null);
+    expect(checkBash('git commit -m "${not} an env split"')).toBe(null);
+  });
+});

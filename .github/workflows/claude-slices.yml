@@ -218,20 +218,40 @@ jobs:
           // still open after 2,000 characters throws, so the file locks rather than
           // slipping through (Codex P1 at dac72d14).
           const TYPE_OPEN = { '(': ')', '[': ']', '{': '}', '<': '>' };
+          // Whether a top-level line break inside a type continues it, following
+          // TypeScript's parser: a qualified name (.), union (|), intersection (&),
+          // function type (=>), a keyword that needs an operand, and a conditional
+          // type's ? and : carry across a break; type arguments (<), array types
+          // ([) and extends don't (Codex P1 at 2dc5d761).
+          const TYPE_PREFIX_WORDS = /(?<![\w$])(?:keyof|typeof|infer|readonly|unique|extends)$/;
+          function typeContinues(text, last, lastAt, k, conditional) {
+            const next = text[k];
+            if (next === '.' || next === '|' || next === '&' || (next === '=' && text[k + 1] === '>')) return true;
+            if (conditional && (next === '?' || next === ':')) return true;
+            if (last === '.' || last === '|' || last === '&' || (last === '>' && text[lastAt - 1] === '=')) return true;
+            if (conditional && (last === '?' || last === ':')) return true;
+            return lastAt >= 0 && TYPE_PREFIX_WORDS.test(text.slice(Math.max(0, lastAt - 8), lastAt + 1));
+          }
           function typeEnd(text, i, stopAtTop, budget, strict) {
             const stack = [];
             const limit = Math.min(text.length, i + 2000);
             let j = i;
             let last = '';
+            let lastAt = -1;
+            let conditional = false;
             while (j < limit) {
               if (--budget.left < 0) throw new Error('type-scan budget');
               const c = text[j];
               if (!stack.length && stopAtTop && c === '\n') {
                 let k = j + 1;
                 while (k < limit && /\s/.test(text[k])) k += 1;
-                if (last !== '|' && last !== '&' && text[k] !== '|' && text[k] !== '&') return j;
+                if (!typeContinues(text, last, lastAt, k, conditional)) return j;
               } else if (!stack.length && stopAtTop && (c === ')' || c === ']' || c === '}' || c === ';' || c === ',' || (c === '=' && text[j + 1] !== '>'))) return j;
-              if (!/\s/.test(c)) last = c;
+              if (!/\s/.test(c)) {
+                last = c;
+                lastAt = j;
+                if (!stack.length && c === 's' && /(?<![\w$])extends$/.test(text.slice(Math.max(i, j - 7), j + 1))) conditional = true;
+              }
               if (c === "'" || c === '"' || c === '`') {
                 let k = j + 1;
                 while (k < limit && text[k] !== c && text[k] !== '\n') k += text[k] === '\\' ? 2 : 1;
@@ -799,6 +819,10 @@ jobs:
               '(supabase.auth as Array<{ a: ")"; }>[0]).signOut();',
               // Codex P1s at dac72d14: unions and intersections across lines, types past the scan limit.
               '(supabase.auth as Foo\n  & Bar).signOut();', '(supabase.auth as Foo |\n  Bar).signOut();',
+              // Codex P1 at 2dc5d761: qualified names, function types and conditional types across lines.
+              '(supabase.auth as Namespace\n .AuthClient).signOut();', '(supabase.auth as Namespace.\n  AuthClient).signOut();',
+              '(supabase.auth as (a: A)\n  => B).signOut();', '(supabase.auth as keyof\n  T).signOut();',
+              '(supabase.auth as A extends B\n  ? C\n  : D).signOut();', 'const s = client.auth as AuthClient\n  .getSession();',
               'const a = supabase.auth as\n  | A\n  | B;\na.signOut();',
               '(supabase.auth as { ' + 'p: string; '.repeat(300) + '}).signOut();',
             ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
@@ -810,7 +834,7 @@ jobs:
               assert.ok(Date.now() - t0 < 1500, `synthetic 300 KB line took ${Date.now() - t0} ms`);
               cases += 1;
               // Comment stripping is linear: unterminated comments and strings can't stall it.
-              for (const huge of ['/*x'.repeat(100000), '`x\\'.repeat(100000), "'x".repeat(150000), '(/'.repeat(150000), '`${'.repeat(100000), 'a.auth as b<c<d>> '.repeat(20000), '\\u0061'.repeat(100000), 'auth x as { '.repeat(50000), 'action_queue db.from<( '.repeat(30000), 'auth a as (b) => '.repeat(30000), 'auth as <'.repeat(60000)]) {
+              for (const huge of ['/*x'.repeat(100000), '`x\\'.repeat(100000), "'x".repeat(150000), '(/'.repeat(150000), '`${'.repeat(100000), 'a.auth as b<c<d>> '.repeat(20000), '\\u0061'.repeat(100000), 'auth x as { '.repeat(50000), 'action_queue db.from<( '.repeat(30000), 'auth a as (b) => '.repeat(30000), 'auth as <'.repeat(60000), 'auth x as A |\n'.repeat(50000), 'auth x as A\n  .\n'.repeat(40000)]) {
                 const t1 = Date.now();
                 locks('src/lib/fooRules.ts', huge);
                 assert.ok(Date.now() - t1 < 1500, `unterminated input took ${Date.now() - t1} ms`);
@@ -859,7 +883,8 @@ jobs:
               'expect(client.auth).toBeDefined();', 'const { data } = await supabase.auth.getUser()\nreturn data;',
               'const user = (await supabase.auth.getUser()).data.user', 'if (a != b) x = y',
               'const u = (await supabase.auth.getUser()) as { data: { user: U; } };', 'import { x as auth } from "y";',
-              'const s = client.auth as AuthClient\n  .getSession();', 'db.from<Row>("plants");',
+              'const s = (client.auth as AuthClient)\n  .getSession();', 'db.from<Row>("plants");',
+              'const x = y as A\n[1, 2].forEach(f); supabase.auth.getUser();', 'const x = y as A\n<div />; supabase.auth.getUser();',
               'const x = y as A\nconst z = supabase.auth.getUser();',
               // "as" in prose starts no type, so a long block after it doesn't lock (dac72d14 census).
               'it("treats history as grow evidence", async () => {\n' + '  expect(x).toBe(1);\n'.repeat(150) + '  await supabase.auth.getUser();\n});',

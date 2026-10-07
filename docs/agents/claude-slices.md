@@ -199,8 +199,11 @@ stripped version counts, so stripping can only add locks. The same checks also r
 at runtime (`String.fromCharCode`) are not decoded. Every version is also matched
 with each `as T` / `satisfies T` cast and each `.from<T>` / `.rpc<T>` type argument
 blanked. A small scanner finds where the type ends by balancing `( [ { <`,
-skipping strings and the `>` of `=>`, and continuing across a line break that a
-`|` or `&` joins. Types are found twice: in the code alone (comments, strings,
+skipping strings and the `>` of `=>`. Like TypeScript's parser, it continues a
+type across a line break after or before `.`, `|`, `&` or `=>`, after `keyof`,
+`typeof`, `infer`, `readonly`, `unique` or `extends`, and around a conditional
+type's `?` and `:`; type arguments (`<`), array types (`[`) and `extends` itself
+never follow a line break. Types are found twice: in the code alone (comments, strings,
 regex bodies and template text blanked, so `as` in prose starts no type), where a
 type still open after 2,000 characters locks the file; and in each version as it
 is, where such a type is left alone. The scan also has a per-file budget. A file

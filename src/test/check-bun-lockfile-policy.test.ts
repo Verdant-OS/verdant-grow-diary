@@ -203,6 +203,17 @@ describe("evaluatePolicy", () => {
     expect(evaluate(files).errors.join(" ")).toContain(`Forbidden lockfile present: ${path}`);
   });
 
+  it.each(FORBIDDEN_LOCKFILES.map((name: string) => ({ name })) as Array<{ name: string }>)(
+    "ignores an untracked $name on disk, at the root or nested",
+    ({ name }) => {
+      const files = policyFiles({ extra: { [at(name)]: "x", [at(`spikes/a/${name}`)]: "x" } });
+      const fs = makeFs(files);
+      const tracked = fs.listTracked().filter((path) => !path.endsWith(name));
+      const result = evaluatePolicy({ cwd: CWD, ...fs, listTracked: () => tracked });
+      expect(result.errors.join(" ")).not.toContain("Forbidden lockfile present");
+    },
+  );
+
   it("allows a nested bun.lock and files that only end in a forbidden name", () => {
     const files = policyFiles({
       extra: {
@@ -618,7 +629,14 @@ describe("evaluatePolicy", () => {
         expect(cacheRejected.stderr).toContain(diagnostic);
       }
 
+      // An untracked (for example gitignored) lock on disk is not repository content.
       writeFileSync(join(root, "package-lock.json"), "{}", "utf8");
+      const untracked = spawnSync(process.execPath, [script], { cwd: root, encoding: "utf8" });
+      expect(untracked.stderr).not.toContain("Forbidden lockfile present");
+      expect(
+        spawnSync("git", ["add", "-f", "package-lock.json"], { cwd: root, encoding: "utf8" })
+          .status,
+      ).toBe(0);
       const relocked = spawnSync(process.execPath, [script], { cwd: root, encoding: "utf8" });
       expect(relocked.status).toBe(1);
       expect(relocked.stderr).toContain("Forbidden lockfile present: package-lock.json");

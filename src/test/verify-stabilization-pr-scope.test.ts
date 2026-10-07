@@ -156,6 +156,10 @@ describe("classifyStabilizationPrFiles — lockfile allowlist", () => {
       [`scripts/${name}`],
       [`tests/${name}`],
       [`src/test/fixtures/${name}`],
+      // Windows separators and a trailing separator must not hide the basename.
+      [`scripts\\${name}`],
+      [`scripts/${name}/`],
+      [`tests\\nested\\${name}\\`],
     ]) as Array<[string]>,
   )("refuses %s below an allowed directory", (path) => {
     expect(isAllowedStabilizationPath(path)).toBe(false);

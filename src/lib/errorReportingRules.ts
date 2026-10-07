@@ -119,8 +119,23 @@ const BASIC_PATTERN = /\b(basic\s+)[A-Za-z0-9+/=]{4,}/gi;
  * `code` and bare `key` are not credential words here, so diagnostics such as a
  * Postgres `code: 23505` stay readable; see OAUTH_PARAM_PATTERN for `code=`.
  */
-const CREDENTIAL_PATTERN =
-  /(["']?)(?<![A-Za-z0-9_-])([A-Za-z0-9_-]*(?:token|secret|passw(?:or)?d|pwd|pass|api[-_]?key|apikey|authorization|session|cookie|credential)[A-Za-z0-9_-]*)\1(\s*[:=]\s*|%3[Dd])("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[redacted\]|[^\s,;&}\][\]"'#][^,;&}\][\]"'#\n]*)/gi;
+/** Separator: `:`, `=` or URL-encoded `%3D`, with optional whitespace on either side. */
+const CREDENTIAL_SEPARATOR = String.raw`(\s*(?:[:=]|%3[Dd])\s*)`;
+/** Value: quoted (escapes included), already redacted, or bare up to the next delimiter. */
+const CREDENTIAL_VALUE = String.raw`("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[redacted\]|[^\s,;&}\][\]"'#][^,;&}\][\]"'#\n]*)`;
+/** Words that make an identifier a credential name, including `*_KEY` / `*-key` and named `…Key`s. */
+const CREDENTIAL_WORDS = String.raw`token|secret|passw(?:or)?d|pwd|pass|api[-_]?key|apikey|authorization|session|cookie|credential|[-_]key|(?:private|secret|service|access|signing|encryption|master|anon|role|client)key`;
+const CREDENTIAL_PATTERN = new RegExp(
+  String.raw`(["']?)(?<![A-Za-z0-9_-])([A-Za-z0-9_-]*(?:${CREDENTIAL_WORDS})[A-Za-z0-9_-]*)\1` +
+    CREDENTIAL_SEPARATOR +
+    CREDENTIAL_VALUE,
+  "gi",
+);
+/**
+ * An exactly quoted `"key"` / `'key'` in object form (`{"key":"sk_live_…"}`). A bare
+ * `key:` is not matched, so diagnostics such as Postgres `Key (plant_id)=…` stay readable.
+ */
+const QUOTED_KEY_PATTERN = new RegExp(String.raw`(["'])(key)\1(\s*:\s*)` + CREDENTIAL_VALUE, "gi");
 /** OAuth `code=` / `key=` query parameters (auth callbacks carry them). */
 const OAUTH_PARAM_PATTERN = /\b(code|key)=("[^"]*"|'[^']*'|\[redacted\]|[^&\s"'#]+)/gi;
 
@@ -141,6 +156,11 @@ export function scrubText(value: unknown): string {
     .replace(BASIC_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
     .replace(
       CREDENTIAL_PATTERN,
+      (_m, quote: string, key: string, separator: string, value: string) =>
+        `${quote}${key}${quote}${separator}${redactedLike(value)}`,
+    )
+    .replace(
+      QUOTED_KEY_PATTERN,
       (_m, quote: string, key: string, separator: string, value: string) =>
         `${quote}${key}${quote}${separator}${redactedLike(value)}`,
     )

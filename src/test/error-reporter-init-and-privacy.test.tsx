@@ -163,6 +163,13 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ["session_id: abc123", "abc123"],
       ["login failed password: hunter two, retrying", "two"],
       ["secret=open sesame; next", "sesame"],
+      ["SUPABASE_SERVICE_ROLE_KEY=service-secret-123", "service-secret-123"],
+      ["service_role_key: service-secret-123", "service-secret-123"],
+      ['{"key":"sk_live_abc"}', "sk_live_abc"],
+      ["{'key': 'sk_live_abc'}", "sk_live_abc"],
+      ["privateKey: pk_abc", "pk_abc"],
+      ["access_token%3D abc123", "abc123"],
+      ["access_token %3Dabc123", "abc123"],
     ];
     for (const [input, secret] of cases) {
       const out = scrubText(input);
@@ -175,6 +182,9 @@ describe("errorReportingRules — privacy of outgoing events", () => {
   it("keeps non-credential diagnostics such as Postgres error codes readable", () => {
     expect(scrubText('duplicate key value, code: 23505, details: "plant_id"')).toBe(
       'duplicate key value, code: 23505, details: "plant_id"',
+    );
+    expect(scrubText("Key (plant_id)=(42) already exists.")).toBe(
+      "Key (plant_id)=(42) already exists.",
     );
   });
 

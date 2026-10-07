@@ -530,6 +530,32 @@ describe("check-dependency-security CLI", () => {
     }
   });
 
+  it.each([
+    ["package-lock.json"],
+    ["package.json"],
+    ["nested/package-lock.json"],
+    ["nested\\yarn.lock"],
+    ["bun.lockb"],
+  ])("refuses --lockfile %s, which is not a bun.lock", (lockfile) => {
+    const script = resolve(__dirname, "../../scripts/check-dependency-security.mjs");
+    const result = spawnSync(process.execPath, [script, "--stdin", "--lockfile", lockfile], {
+      input: CLEAN_JSON,
+      encoding: "utf8",
+    });
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("--lockfile must name a bun.lock file");
+  });
+
+  it("accepts an explicit --lockfile that names bun.lock", () => {
+    const script = resolve(__dirname, "../../scripts/check-dependency-security.mjs");
+    const result = spawnSync(
+      process.execPath,
+      [script, "--stdin", "--lockfile", resolve(__dirname, "../../bun.lock")],
+      { input: CLEAN_JSON, encoding: "utf8" },
+    );
+    expect(result.status).toBe(0);
+  });
+
   it("executes on Windows and uses the explicit exception file", () => {
     const root = mkdtempSync(join(tmpdir(), "verdant-dependency-audit-"));
     const auditPath = join(root, "audit.json");

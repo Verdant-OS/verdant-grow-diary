@@ -1005,6 +1005,19 @@ function parseCliArgs(argv) {
   if (parsed.stdin && parsed.inputPath) {
     throw new Error("Use only one of --stdin or --input.");
   }
+  // bun.lock is the only lockfile (package-lock.json retired 2026-10-03). With
+  // no exceptions the lock evaluators have nothing to bind, so an override that
+  // names another file would be accepted silently; refuse it up front.
+  const lockfileName = String(parsed.lockfilePath)
+    .replaceAll("\\", "/")
+    .replace(/\/+$/, "")
+    .split("/")
+    .pop();
+  if (lockfileName !== "bun.lock") {
+    throw new Error(
+      `--lockfile must name a bun.lock file, not "${lockfileName}"; package-lock.json is retired.`,
+    );
+  }
   return parsed;
 }
 

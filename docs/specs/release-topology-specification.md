@@ -111,7 +111,8 @@ code is written in this slice.
   as a fifth promotion path (§5.7), makes an `ACTIVE` rollout a non-`PASS` state (D-RT-12), makes
   every rollout action and configuration change a publish action (D-RT-13), and reads the rollout
   before the hostnames (M10, M11).
-- **Since 2026-10-01 03:42 UTC the Vercel account has been blocked** (Appendix D). Every
+- **The Vercel account is blocked.** GitHub first reported it at 2026-10-01 03:42 UTC; when the
+  block began, and why, is `NOT_MEASURED` (§10, Appendix D). Every
   deploy-branch tip from `5fbaa96b` on carries the commit status `Vercel: Account is blocked.`, and
   the newest production deployment is still the 2026-10-01 03:12 UTC build of `ebc8f82e` (`#1790`).
   At 21:02 UTC on 2026-10-06 the apex, `www` and the project alias were bound to that build, 55

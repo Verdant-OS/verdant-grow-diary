@@ -172,8 +172,21 @@ it). Exceptions apply to content locks only, never to path locks; a malformed fi
 fails the guard. Every rule is checked separately: a file that matches both rules
 needs an exception for each, and an exception for one rule never clears the other.
 
-**Residual risk.** The rules are regexes over file text. This list is not
-exhaustive; known forms that are not locked include:
+**AST rules.** The same D1 and D2 rules are also matched on a TypeScript parse of
+every `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts` and `.cts` file
+(Matthew's Option 1, 2026-10-07). Casts, `satisfies`, `!`, parentheses and comma
+operators are unwrapped to any depth, `\u`/`\x` escapes are decoded by the
+parser, type arguments are separate nodes, and aliases are followed through any
+number of hops, so no type syntax, comment or line break can hide a call. The
+policy step downloads exactly `typescript-5.9.3.tgz` from the npm registry and
+checks it against a pinned sha512 (the one `bun.lock` records); a mismatch stops
+the job. Only `ts.createSourceFile` runs, on PR text read as data. The AST rules
+are OR-ed with the text rules below, so they only add locks. A file the parser
+can't be loaded for, a parse that throws, and a file over 512 KiB lock under the
+rules their words point to.
+
+**Residual risk.** This list is not exhaustive; known forms that are not locked
+include:
 
 - a helper with a neutral name that wraps the calls (for example a `requireUser()`
   wrapper), or a module that receives the client or `client.auth` as an argument
@@ -183,11 +196,10 @@ exhaustive; known forms that are not locked include:
   (`"action_" + "queue"`);
 - reaching the namespace without naming it as `auth` or `["auth"]`, for example
   `Reflect.get(supabase, "auth")` or a computed key held in a variable;
-- a second-hop alias of a bare `auth` identifier
-  (`const { auth } = supabase; const s = auth; s.signOut();`), an alias whose
-  statement continues on the next line (`const a = supabase.auth\n  ?? fallback;`),
-  the namespace passed with other arguments (`wrap(supabase.auth, "x").signOut()`),
-  or more than six wrappers between `auth` and the call;
+- an alias held in an expression other than a plain binding or assignment
+  (`const a = supabase.auth ?? fallback;`), the namespace passed with other
+  arguments (`wrap(supabase.auth, "x").signOut()`), or an alias that crosses a
+  module boundary;
 - raw HTTP to Supabase (`fetch` to `/auth/v1/…` or `/rest/v1/action_queue`).
 
 Comments are handled by also matching the text with comments blanked out, once

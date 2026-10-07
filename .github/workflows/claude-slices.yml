@@ -413,6 +413,132 @@ jobs:
             return blankRanges(text, merged);
           }
 
+          // AST content rules (Matthew, 2026-10-07, Option 1): the same D1/D2 rules
+          // matched on a TypeScript parse of the file, so casts, comments, escapes and
+          // line breaks in any form TypeScript accepts can't hide a call. Only
+          // ts.createSourceFile runs; PR code is never executed. The parser is the
+          // exact typescript tarball the policy step verifies against a pinned sha512.
+          // These rules are OR-ed with the text versions, so they only add locks. If
+          // the parser can't be loaded or throws, the file locks (fail closed).
+          const AUTH_METHODS = new Set(['signOut', 'signUp', 'updateUser', 'verifyOtp', 'setSession', 'refreshSession', 'onAuthStateChange', 'admin', 'mfa', 'resend', 'reauthenticate', 'linkIdentity', 'unlinkIdentity']);
+          const AUTH_METHOD_PREFIXES = ['signIn', 'resetPassword', 'exchangeCode'];
+          const AQ_LITERAL = /^[a-z_]*action_queue[a-z_]*$/;
+          const AQ_NAME_SET = new Set(['action_queue', 'action_queue_events', 'action_queue_create', 'action_queue_transition', 'action_queue_guard_decision_fields']);
+          const AST_MAX_CHARS = 512 * 1024;
+          const TS_SCRIPT_KINDS = { ts: 'TS', mts: 'TS', cts: 'TS', tsx: 'TSX', js: 'JS', mjs: 'JS', cjs: 'JS', jsx: 'JSX' };
+          let tsModule;
+          function loadTypeScript() {
+            if (tsModule === undefined) {
+              try {
+                tsModule = require(`${process.env.RUNNER_TEMP}/claude-slice-ts/package/lib/typescript.js`);
+              } catch {
+                tsModule = null;
+              }
+            }
+            return tsModule;
+          }
+          function isAuthMethod(name) {
+            return AUTH_METHODS.has(name) || AUTH_METHOD_PREFIXES.some(prefix => name.startsWith(prefix));
+          }
+          // The rules the AST shows, or null when the file isn't JS/TS. Throws when the
+          // parser is missing, so the caller fails closed.
+          function astRules(path, text) {
+            const ext = (path.match(/\.([a-z]+)$/i) || [])[1]?.toLowerCase();
+            if (!TS_SCRIPT_KINDS[ext]) return null;
+            const ts = loadTypeScript();
+            if (!ts) throw new Error('TypeScript parser unavailable');
+            const K = ts.SyntaxKind;
+            const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, ts.ScriptKind[TS_SCRIPT_KINDS[ext]]);
+            // Casts, parentheses, non-null assertions and comma operators never change
+            // which object an expression names.
+            const unwrap = node => {
+              for (;;) {
+                if (!node) return node;
+                if (node.kind === K.ParenthesizedExpression || node.kind === K.AsExpression || node.kind === K.SatisfiesExpression ||
+                    node.kind === K.TypeAssertionExpression || node.kind === K.NonNullExpression || node.kind === K.PartiallyEmittedExpression) node = node.expression;
+                else if (node.kind === K.BinaryExpression && node.operatorToken.kind === K.CommaToken) node = node.right;
+                else return node;
+              }
+            };
+            const literalText = node => {
+              const inner = unwrap(node);
+              if (!inner) return null;
+              if (inner.kind === K.StringLiteral || inner.kind === K.NoSubstitutionTemplateLiteral) return inner.text;
+              if (inner.kind === K.TemplateExpression) return inner.head.text;
+              return null;
+            };
+            // The member a property or element access names: its text, '*' for a key
+            // that isn't a literal, or null when the node isn't a member access.
+            const memberName = node => {
+              if (node.kind === K.PropertyAccessExpression) return ts.isIdentifier(node.name) ? node.name.text : null;
+              if (node.kind === K.ElementAccessExpression) return literalText(node.argumentExpression) ?? '*';
+              return null;
+            };
+            // Identifiers bound to the auth namespace: auth itself, `const a = x.auth`,
+            // `const { auth: a } = x`, and assignments of x.auth.
+            const aliases = new Set(['auth']);
+            const isAuthMember = node => {
+              const inner = unwrap(node);
+              return !!inner && memberName(inner) === 'auth';
+            };
+            const isAuthRef = node => {
+              const inner = unwrap(node);
+              if (!inner) return false;
+              if (ts.isIdentifier(inner)) return aliases.has(inner.text);
+              return memberName(inner) === 'auth';
+            };
+            const bindingNames = pattern => pattern.elements.filter(element => element.kind === K.BindingElement);
+            // Repeated until nothing new is found, so an alias of an alias counts:
+            // const { auth } = x; const s = auth; s.signOut().
+            const collect = node => {
+              if (node.kind === K.VariableDeclaration && ts.isIdentifier(node.name) && isAuthRef(node.initializer)) aliases.add(node.name.text);
+              if (node.kind === K.BinaryExpression && node.operatorToken.kind === K.EqualsToken && ts.isIdentifier(unwrap(node.left)) && isAuthRef(node.right)) aliases.add(unwrap(node.left).text);
+              if (node.kind === K.BindingElement && ts.isIdentifier(node.name)) {
+                const key = node.propertyName ? (ts.isIdentifier(node.propertyName) || ts.isStringLiteral(node.propertyName) ? node.propertyName.text : null) : node.name.text;
+                if (key === 'auth') aliases.add(node.name.text);
+              }
+              ts.forEachChild(node, collect);
+            };
+            for (let size = -1; size !== aliases.size && aliases.size < 1000;) {
+              size = aliases.size;
+              collect(source);
+            }
+            const rules = new Set();
+            const visit = node => {
+              // x.auth.signOut, auth?.["signIn"], a.admin, auth[key]: a D1 member, or a
+              // computed one, of the namespace.
+              const name = memberName(node);
+              if (name !== null && (name === '*' || isAuthMethod(name)) && isAuthRef(node.expression)) rules.add('auth-mutation');
+              // const { signOut } = x.auth; ({ signOut } = x.auth)
+              if (node.kind === K.VariableDeclaration && node.name.kind === K.ObjectBindingPattern && isAuthRef(node.initializer)) {
+                for (const element of bindingNames(node.name)) {
+                  const key = element.propertyName ?? element.name;
+                  if (!ts.isIdentifier(key) && !ts.isStringLiteral(key)) rules.add('auth-mutation');
+                  else if (isAuthMethod(key.text)) rules.add('auth-mutation');
+                }
+              }
+              // The namespace escaping into a binding, an assignment or a return:
+              // const a = x.auth; a = x.auth; return x["auth"]; const { auth: a } = x.
+              if ((node.kind === K.VariableDeclaration && isAuthMember(node.initializer)) ||
+                  (node.kind === K.BinaryExpression && node.operatorToken.kind === K.EqualsToken && isAuthMember(node.right)) ||
+                  (node.kind === K.ReturnStatement && isAuthMember(node.expression)) ||
+                  (node.kind === K.BindingElement && aliases.has(ts.isIdentifier(node.name) ? node.name.text : '') && node.name.text !== 'auth')) rules.add('auth-mutation');
+              // .from("action_queue…") / .rpc("action_queue…"), whatever the type
+              // arguments, casts or escapes.
+              if (node.kind === K.CallExpression) {
+                const callee = unwrap(node.expression);
+                const calleeName = callee ? memberName(callee) : null;
+                const first = node.arguments[0] && literalText(node.arguments[0]);
+                if ((calleeName === 'from' || calleeName === 'rpc') && typeof first === 'string' && AQ_LITERAL.test(first)) rules.add('aq-io');
+              }
+              // const TABLE = "action_queue"
+              if (node.kind === K.VariableDeclaration && node.initializer && AQ_NAME_SET.has(literalText(node.initializer))) rules.add('aq-io');
+              ts.forEachChild(node, visit);
+            };
+            visit(source);
+            return [...rules];
+          }
+
           // Every content rule the text matches, not just the first: an exception
           // for one rule must never hide another rule on the same file. The raw
           // text and both comment-stripped versions are checked, so stripping (which
@@ -449,13 +575,31 @@ jobs:
                 : bases;
             } catch (error) {
               if (error.message !== 'type-scan budget') throw error;
-              const rules = [['auth-mutation', /auth/], ['aq-io', /action_queue/]]
-                .filter(([, word]) => word.test(decoded)).map(([rule]) => rule);
-              return { locked: true, rules };
+              variants = null;
             }
-            const rules = CONTENT_RULES
-              .filter(([, patterns]) => patterns.some(pattern => variants.some(variant => pattern.test(variant))))
-              .map(([rule]) => rule);
+            // The rules the file's words point to, for every fail-closed path.
+            const wordRules = () => [['auth-mutation', /auth/], ['aq-io', /action_queue/]]
+              .filter(([, word]) => word.test(decoded)).map(([rule]) => rule);
+            const found = new Set(variants
+              ? CONTENT_RULES
+                .filter(([, patterns]) => patterns.some(pattern => variants.some(variant => pattern.test(variant))))
+                .map(([rule]) => rule)
+              : wordRules());
+            // The AST rules (Option 1), OR-ed in. A missing parser, a parse that
+            // throws, or a file over AST_MAX_CHARS (about three times the largest
+            // file under the content roots, and slow to parse when crafted) locks
+            // the file. A file the text versions already failed closed on is not
+            // parsed again.
+            if (variants && /auth|action_queue/.test(decoded)) {
+              let fromAst;
+              try {
+                fromAst = text.length > AST_MAX_CHARS ? wordRules() : (astRules(path, text) ?? []);
+              } catch {
+                fromAst = wordRules();
+              }
+              for (const rule of fromAst) found.add(rule);
+            }
+            const rules = CONTENT_RULES.map(([rule]) => rule).filter(rule => found.has(rule));
             return { locked: rules.length > 0, rules };
           }
 
@@ -823,9 +967,19 @@ jobs:
               '(supabase.auth as Namespace\n .AuthClient).signOut();', '(supabase.auth as Namespace.\n  AuthClient).signOut();',
               '(supabase.auth as (a: A)\n  => B).signOut();', '(supabase.auth as keyof\n  T).signOut();',
               '(supabase.auth as A extends B\n  ? C\n  : D).signOut();', 'const s = client.auth as AuthClient\n  .getSession();',
+              // Codex P1 at 8f8a1838: an import type across a line break. Locked by the AST rules.
+              '(supabase.auth as import\n("./auth-types").AuthClient).signOut();',
+              '(supabase.auth as typeof import\n  ("x")).signOut();',
+              // Second-hop aliases and unlimited wrappers, which the AST follows.
+              'const { auth } = supabase; const s = auth; s.signOut();', 'const a = supabase.auth; const b = a; const c = b; c.mfa.enroll(f);',
+              '(((((((supabase.auth as A)!) as B) satisfies C)!)) as D).signOut();',
               'const a = supabase.auth as\n  | A\n  | B;\na.signOut();',
               '(supabase.auth as { ' + 'p: string; '.repeat(300) + '}).signOut();',
-            ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
+            ]) {
+              assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
+              // Each form also locks on the AST alone (Option 1).
+              assert.deepEqual(astRules('src/lib/fooRules.ts', text), ['auth-mutation'], `AST: ${text}`);
+            }
             // Catastrophic-backtracking guard: a huge one-line file must finish quickly.
             {
               const big = '{' + 'a,'.repeat(150000) + ' x } = y';
@@ -855,7 +1009,11 @@ jobs:
               'db.from<("action_queue")>("action_queue");', 'db.from<(r: Row) => void>("action_queue");',
               'db?.rpc<{\n  id: string;\n}>("action_queue_create", p);', 'db.from<Array<(A)>>( "action_queue")',
               'db.from<({ ' + 'p: string; '.repeat(300) + '})>("action_queue");',
-            ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), ['aq-io, head'], text);
+              'db.from<import\n("x").Row>("action_queue");', 'db["from"]("action_queue");',
+            ]) {
+              assert.deepEqual(locks('src/lib/fooRules.ts', text), ['aq-io, head'], text);
+              assert.deepEqual(astRules('src/lib/fooRules.ts', text), ['aq-io'], `AST: ${text}`);
+            }
             // A file that exhausts the type-scan budget locks (fail closed).
             assert.deepEqual(locks('src/lib/fooRules.ts', 'x as { auth '.repeat(200000)), ['auth-mutation, head']);
             cases += 1;
@@ -888,7 +1046,30 @@ jobs:
               'const x = y as A\nconst z = supabase.auth.getUser();',
               // "as" in prose starts no type, so a long block after it doesn't lock (dac72d14 census).
               'it("treats history as grow evidence", async () => {\n' + '  expect(x).toBe(1);\n'.repeat(150) + '  await supabase.auth.getUser();\n});',
-            ]) assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
+            ]) {
+              assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
+              assert.deepEqual(astRules('src/lib/fooRules.ts', text), [], `AST: ${text}`);
+            }
+            // The parser is the pinned TypeScript, and a file the AST can't be
+            // built for locks under the rules its words point to (fail closed).
+            assert.equal(loadTypeScript()?.version, '5.9.3', 'the pinned TypeScript parser must load');
+            cases += 1;
+            assert.equal(astRules('src/lib/fooRules.md', 'supabase.auth.signOut()'), null);
+            cases += 1;
+            {
+              const saved = tsModule;
+              tsModule = null;
+              try {
+                assert.deepEqual(locks('src/lib/fooRules.ts', 'const { data } = await supabase.auth.getUser();'), ['auth-mutation, head']);
+                assert.deepEqual(locks('src/lib/fooRules.ts', 'const k = "action_queue_trace"; supabase.auth.getUser();'), ['auth-mutation, head', 'aq-io, head']);
+                assert.deepEqual(locks('src/lib/fooRules.ts', 'const x = 1;'), []);
+              } finally {
+                tsModule = saved;
+              }
+              cases += 1;
+            }
+            assert.deepEqual(locks('src/lib/fooRules.ts', '// auth\n' + 'const x = 1;\n'.repeat(45000)), ['auth-mutation, head'], 'a file over AST_MAX_CHARS locks');
+            cases += 1;
             for (const path of [
               'src/lib/pendingOutcomeReviewRules.ts', 'src/lib/guidedActionChecklistRules.ts',
               'src/lib/actionResponsePairingRules.ts', 'src/lib/libraryRules.ts', 'src/lib/sensorDeviceLabels.ts',
@@ -1030,6 +1211,22 @@ jobs:
           }
           module.exports = { lockedPath, contentLocked, changedPaths, changedEntries, entryLocks, assertAllowed };
           NODE
+          # The TypeScript parser for the AST content rules (Option 1): only this exact
+          # registry tarball, checked against a pinned sha512 (the integrity bun.lock and
+          # the npm registry both record for typescript@5.9.3). No package manager or
+          # lockfile is involved, nothing in the package is run except
+          # ts.createSourceFile on PR text, and a mismatch stops the job.
+          ts_archive="$RUNNER_TEMP/typescript-5.9.3.tgz"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz --output "$ts_archive"
+          ts_integrity="sha512-$(openssl dgst -sha512 -binary "$ts_archive" | base64 -w0)"
+          if [ "$ts_integrity" != 'sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==' ]; then
+            echo 'typescript-5.9.3.tgz does not match the pinned sha512; refusing to continue.' >&2
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/claude-slice-ts"
+          tar -xzf "$ts_archive" -C "$RUNNER_TEMP/claude-slice-ts" package/lib/typescript.js package/package.json
+          chmod -R a-w "$RUNNER_TEMP/claude-slice-ts"
 
       - name: Prepare Claude settings and disable repository git hooks
         id: prep

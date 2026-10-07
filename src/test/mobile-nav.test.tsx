@@ -24,12 +24,11 @@ describe("MobileNav primary tabs", () => {
 
   it("renders the canonical primary tabs", () => {
     render(wrap(<MobileNav />));
-    expect(screen.getByText("Home")).toBeInTheDocument();
-    expect(screen.getByText("Tents")).toBeInTheDocument();
-    expect(screen.getByText("Plants")).toBeInTheDocument();
+    expect(screen.getByText("Tent")).toBeInTheDocument();
+    expect(screen.getByText("Log")).toBeInTheDocument();
     expect(screen.getByText("Timeline")).toBeInTheDocument();
-    expect(screen.getByText("Alerts")).toBeInTheDocument();
     expect(screen.getByText("More")).toBeInTheDocument();
+    expect(screen.queryByText("Home")).toBeNull();
     expect(screen.queryByText("Logs")).toBeNull();
   });
 });
@@ -74,7 +73,7 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Quick Log")).toBeInTheDocument();
+      expect(screen.getByText("Action Queue")).toBeInTheDocument();
     });
 
     // Group order
@@ -83,16 +82,18 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
 
     // Each group contains the expected labels + route targets
     const expectations: Record<string, Array<[string, string]>> = {
-      Daily: [
-        ["Quick Log", "/daily-check"],
-        ["Action Queue", "/actions"],
-      ],
+      Daily: [["Action Queue", "/actions"]],
       Insight: [
+        ["Alerts", "/alerts"],
         ["Sensors", "/sensors"],
         ["AI Doctor", "/doctor"],
         ["Reports", "/reports"],
       ],
-      Cultivation: [["My Grows", "/grows"]],
+      Cultivation: [
+        ["My Grows", "/grows"],
+        ["Tents", "/tents"],
+        ["Plants", "/plants"],
+      ],
       Labs: [
         ["Pheno Hunt", "/pheno-hunts"],
         ["Breeding Programs", "/breeding"],
@@ -134,7 +135,7 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
     await act(async () => {
       screen.getByText("More").click();
     });
-    await waitFor(() => expect(screen.getByText("Quick Log")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Action Queue")).toBeInTheDocument());
 
     for (const banned of [
       "Logs",

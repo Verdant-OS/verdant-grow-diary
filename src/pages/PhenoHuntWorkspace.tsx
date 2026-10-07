@@ -73,7 +73,12 @@ import PhenoCompareCandidatesAction from "@/components/PhenoCompareCandidatesAct
 import { buildPhenoComparisonActionState } from "@/lib/phenoComparisonActionState";
 import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
 import PhenoHuntRenameControl from "@/components/PhenoHuntRenameControl";
-import { huntScopedOverrideValue, type HuntScopedOverride } from "@/lib/phenoHuntRenameRules";
+import {
+  huntNameOverrideValue,
+  huntScopedOverrideValue,
+  type HuntNameOverride,
+  type HuntScopedOverride,
+} from "@/lib/phenoHuntRenameRules";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
@@ -1451,10 +1456,9 @@ export default function PhenoHuntWorkspace() {
   > | null>(null);
   const [objectiveSaving, setObjectiveSaving] = useState(false);
   // #551: optimistic name after a confirmed rename; the hunt row stays
-  // authoritative on the next load.
-  const [huntNameLocal, setHuntNameLocal] = useState<HuntScopedOverride<string> | null>(null);
-  const effectiveHuntName =
-    huntScopedOverrideValue(huntNameLocal, ws.hunt?.id) ?? ws.hunt?.name ?? null;
+  // authoritative once a reload returns any other name.
+  const [huntNameLocal, setHuntNameLocal] = useState<HuntNameOverride | null>(null);
+  const effectiveHuntName = huntNameOverrideValue(huntNameLocal, ws.hunt) ?? ws.hunt?.name ?? null;
   const effectiveBreedingObjective: BreedingObjectiveTarget[] =
     huntScopedOverrideValue(breedingObjectiveLocal, ws.hunt?.id) ??
     ws.hunt?.breedingObjective ??
@@ -1506,7 +1510,7 @@ export default function PhenoHuntWorkspace() {
     if (!canWrite || !ws.hunt?.id) return false;
     try {
       await updatePhenoHuntSetup({ huntId: ws.hunt.id, name });
-      setHuntNameLocal({ huntId: ws.hunt.id, value: name });
+      setHuntNameLocal({ huntId: ws.hunt.id, value: name, baseName: ws.hunt.name });
       return true;
     } catch {
       return false;

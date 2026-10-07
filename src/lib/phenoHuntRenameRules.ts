@@ -59,6 +59,25 @@ export function huntScopedOverrideValue<T>(
   return override.value;
 }
 
+/**
+ * An optimistic hunt name, plus the row's name when the rename was saved.
+ * The override only stands in while the loaded row still shows `baseName`:
+ * once a reload returns any other name (this rename, or a later one from
+ * another session), the row is authoritative again. No clock involved, so a
+ * stale in-flight load can't flash the old name back (#551 CodeRabbit).
+ */
+export interface HuntNameOverride extends HuntScopedOverride<string> {
+  readonly baseName: string;
+}
+
+export function huntNameOverrideValue(
+  override: HuntNameOverride | null,
+  hunt: { readonly id: string; readonly name: string } | null | undefined,
+): string | null {
+  if (!override || !hunt || override.huntId !== hunt.id) return null;
+  return override.baseName === hunt.name ? override.value : null;
+}
+
 export function phenoHuntRenameHint(result: PhenoHuntRenameResult): string {
   if (result.ok) return "";
   if (result.reason === "empty") return PHENO_HUNT_RENAME_COPY.empty;

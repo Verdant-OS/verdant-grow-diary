@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import {
   PHENO_HUNT_NAME_MAX_LENGTH,
   huntScopedOverrideValue,
+  huntNameOverrideValue,
   validatePhenoHuntRename,
 } from "@/lib/phenoHuntRenameRules";
 
@@ -55,5 +56,21 @@ describe("huntScopedOverrideValue (#551 review P2)", () => {
     expect(huntScopedOverrideValue(override, "hunt-b")).toBeNull();
     expect(huntScopedOverrideValue(override, null)).toBeNull();
     expect(huntScopedOverrideValue(null, "hunt-a")).toBeNull();
+  });
+});
+
+describe("huntNameOverrideValue (#551 CodeRabbit: reconcile on reload)", () => {
+  const override = { huntId: "hunt-a", value: "Renamed A", baseName: "Old A" };
+  it("wins while the loaded row still shows the pre-rename name", () => {
+    expect(huntNameOverrideValue(override, { id: "hunt-a", name: "Old A" })).toBe("Renamed A");
+  });
+  it("yields to a reloaded row whose name changed (ours or another session's)", () => {
+    expect(huntNameOverrideValue(override, { id: "hunt-a", name: "Renamed A" })).toBeNull();
+    expect(huntNameOverrideValue(override, { id: "hunt-a", name: "Elsewhere" })).toBeNull();
+  });
+  it("never applies to a different hunt, a missing hunt, or no override", () => {
+    expect(huntNameOverrideValue(override, { id: "hunt-b", name: "Old A" })).toBeNull();
+    expect(huntNameOverrideValue(override, null)).toBeNull();
+    expect(huntNameOverrideValue(null, { id: "hunt-a", name: "Old A" })).toBeNull();
   });
 });

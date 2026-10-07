@@ -60,8 +60,14 @@ export default function PhenoHuntRenameControl({
     if (!result.ok || saving) return;
     setSaving(true);
     setFailed(false);
-    const ok = await onRename(result.name);
-    setSaving(false);
+    let ok = false;
+    try {
+      ok = await onRename(result.name);
+    } catch {
+      ok = false;
+    } finally {
+      setSaving(false);
+    }
     if (ok) setEditing(false);
     else setFailed(true);
   };
@@ -85,6 +91,7 @@ export default function PhenoHuntRenameControl({
         value={draft}
         maxLength={PHENO_HUNT_NAME_MAX_LENGTH + 20}
         onChange={(e) => setDraft(e.target.value)}
+        disabled={saving}
         autoFocus
       />
       <Button
@@ -100,6 +107,7 @@ export default function PhenoHuntRenameControl({
         size="sm"
         variant="ghost"
         data-testid="pheno-hunt-rename-cancel"
+        disabled={saving}
         onClick={() => setEditing(false)}
       >
         {PHENO_HUNT_RENAME_COPY.cancel}

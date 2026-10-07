@@ -55,6 +55,44 @@ describe("PhenoHuntRenameControl", () => {
     expect(screen.getByTestId("pheno-hunt-rename-input")).toBeDefined();
   });
 
+  it("a pending save cannot be cancelled, reopened or edited (#551 Codex P2)", async () => {
+    let resolve: (ok: boolean) => void = () => {};
+    const onRename = vi.fn(() => new Promise<boolean>((r) => (resolve = r)));
+    render(<PhenoHuntRenameControl currentName={MANGLED} canWrite onRename={onRename} />);
+    fireEvent.click(screen.getByTestId("pheno-hunt-rename-open"));
+    fireEvent.change(screen.getByTestId("pheno-hunt-rename-input"), {
+      target: { value: "Claude E2E Pheno Hunt" },
+    });
+    fireEvent.click(screen.getByTestId("pheno-hunt-rename-save"));
+    await waitFor(() => expect(onRename).toHaveBeenCalledTimes(1));
+    const cancel = screen.getByTestId("pheno-hunt-rename-cancel") as HTMLButtonElement;
+    const input = screen.getByTestId("pheno-hunt-rename-input") as HTMLInputElement;
+    expect(cancel.disabled).toBe(true);
+    expect(input.disabled).toBe(true);
+    fireEvent.click(cancel);
+    expect(screen.getByTestId("pheno-hunt-rename-input")).toBeDefined();
+    resolve(true);
+    await waitFor(() => expect(screen.queryByTestId("pheno-hunt-rename-input")).toBeNull());
+  });
+
+  it("a rejected rename is a failed save, not a stuck one (#551 CodeRabbit)", async () => {
+    const onRename = vi.fn(async () => {
+      throw new Error("network");
+    });
+    render(<PhenoHuntRenameControl currentName={MANGLED} canWrite onRename={onRename} />);
+    fireEvent.click(screen.getByTestId("pheno-hunt-rename-open"));
+    fireEvent.change(screen.getByTestId("pheno-hunt-rename-input"), {
+      target: { value: "Claude E2E Pheno Hunt" },
+    });
+    fireEvent.click(screen.getByTestId("pheno-hunt-rename-save"));
+    expect(await screen.findByTestId("pheno-hunt-rename-error")).toBeDefined();
+    const save = screen.getByTestId("pheno-hunt-rename-save") as HTMLButtonElement;
+    expect(save.disabled).toBe(false);
+    expect((screen.getByTestId("pheno-hunt-rename-cancel") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+
   it("cancel discards the edit", () => {
     const onRename = vi.fn();
     render(<PhenoHuntRenameControl currentName={MANGLED} canWrite onRename={onRename} />);

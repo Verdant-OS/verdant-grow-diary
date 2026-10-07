@@ -1,4 +1,4 @@
-import { breedingProgramsPath, phenoHuntsPath } from "@/lib/routes";
+import { breedingProgramsPath, phenoHuntsPath, withGrowId } from "@/lib/routes";
 
 export interface GrowerNavigationDestination {
   id:
@@ -52,4 +52,15 @@ export function resolveLabsNavigationDestinations(
     }
     return { ...item };
   });
+}
+
+/**
+ * Mobile first-row href. Only the Log tab (`/daily-check`) carries an explicit
+ * grow from the current URL, so a grower logging from a grow keeps its scope.
+ * Every other tab keeps its static route. Never invents a growId.
+ */
+export function resolveMobilePrimaryHref(to: string, growId?: string | null): string {
+  const trimmed = typeof growId === "string" ? growId.trim() : "";
+  if (to !== "/daily-check" || !trimmed) return to;
+  return withGrowId(to, trimmed);
 }

@@ -19,7 +19,10 @@
  *     unless another relevant read already proved a paid entitlement.
  */
 import { describe, it, expect } from "vitest";
-import { loadUnionEntitlement } from "../../supabase/functions/_shared/unionEntitlementLookup.ts";
+import {
+  loadUnionEntitlement,
+  resolveServerBillingEnvironment,
+} from "../../supabase/functions/_shared/unionEntitlementLookup.ts";
 import type { BillingSubscriptionRow, LovableSubscriptionRow } from "@/lib/entitlements";
 
 const NOW = new Date("2026-07-16T12:00:00.000Z");
@@ -466,6 +469,35 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
 
     expect(lookupFailed).toBe(false);
     expect(entitlement.displayPlanId).toBe("pro_monthly");
+    expect(entitlement.capabilities.advancedExports).toBe(true);
+  });
+});
+
+describe("unresolved billing environment fails closed end to end (grant-path audit, 2026-10-03)", () => {
+  // No explicit PAYMENTS_ENVIRONMENT and no Paddle keys. Before the fix this
+  // resolved to sandbox, so a sandbox test-card subscription unlocked paid
+  // capabilities. The key-presence variants are covered in
+  // server-billing-env-trust.test.ts (key names stay out of other src files).
+  const ambiguous = (_name: string): string | undefined => undefined;
+
+  it("a sandbox Pro row does not unlock paid capabilities", async () => {
+    const { entitlement, lookupFailed } = await loadUnionEntitlement(
+      fakeClient({ subsByEnv: { sandbox: [proRow({ environment: "sandbox" })] } }),
+      resolveServerBillingEnvironment(ambiguous),
+      NOW,
+    );
+    expect(lookupFailed).toBe(false);
+    expect(entitlement.effectivePlanId).toBe("free");
+    expect(entitlement.capabilities.advancedExports).toBe(false);
+  });
+
+  it("a verified live Founder Lifetime row still unlocks", async () => {
+    const { entitlement } = await loadUnionEntitlement(
+      fakeClient({ subsByEnv: { live: [liveFounderRow()] } }),
+      resolveServerBillingEnvironment(ambiguous),
+      NOW,
+    );
+    expect(entitlement.displayPlanId).toBe("founder_lifetime");
     expect(entitlement.capabilities.advancedExports).toBe(true);
   });
 });

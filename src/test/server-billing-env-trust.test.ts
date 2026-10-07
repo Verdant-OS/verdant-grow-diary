@@ -29,29 +29,50 @@ describe("resolveServerBillingEnvironment (server-authoritative)", () => {
     );
   });
 
-  it("derives live from PADDLE_LIVE_API_KEY alone", () => {
-    expect(resolveServerBillingEnvironment(envFrom({ PADDLE_LIVE_API_KEY: "k" }))).toBe("live");
+  // Fail closed (grant-path audit, 2026-10-03): only an explicit selector is
+  // trusted. Everything else resolves to "live", so the entitlement loader
+  // honours only live rows and sandbox rows never entitle (AGENTS.md:
+  // sandbox rows grant only when PAYMENTS_ENVIRONMENT=sandbox is explicit).
+  it.each([
+    ["unset, no keys", {}],
+    ["unset, both keys", { PADDLE_LIVE_API_KEY: "k", PADDLE_SANDBOX_API_KEY: "k" }],
+    ["unset, sandbox key only", { PADDLE_SANDBOX_API_KEY: "k" }],
+    ["unset, live key only", { PADDLE_LIVE_API_KEY: "k" }],
+    ["invalid selector", { PAYMENTS_ENVIRONMENT: "prod", PADDLE_SANDBOX_API_KEY: "k" }],
+    ["selector differing only in case", { PAYMENTS_ENVIRONMENT: "Sandbox" }],
+    ["empty selector", { PAYMENTS_ENVIRONMENT: "", PADDLE_SANDBOX_API_KEY: "k" }],
+  ])("never resolves sandbox from an inferred setting (%s)", (_label, env) => {
+    expect(resolveServerBillingEnvironment(envFrom(env))).toBe("live");
   });
 
-  it("derives sandbox from PADDLE_SANDBOX_API_KEY alone", () => {
-    expect(resolveServerBillingEnvironment(envFrom({ PADDLE_SANDBOX_API_KEY: "k" }))).toBe(
-      "sandbox",
-    );
-  });
-
-  it("defaults conservatively to sandbox when ambiguous / unset", () => {
-    expect(resolveServerBillingEnvironment(envFrom({}))).toBe("sandbox");
+  it("keeps an explicit selector even when the opposite key is the only one present", () => {
     expect(
       resolveServerBillingEnvironment(
-        envFrom({ PADDLE_LIVE_API_KEY: "k", PADDLE_SANDBOX_API_KEY: "k" }),
+        envFrom({ PAYMENTS_ENVIRONMENT: "sandbox", PADDLE_LIVE_API_KEY: "k" }),
       ),
     ).toBe("sandbox");
+    expect(
+      resolveServerBillingEnvironment(
+        envFrom({ PAYMENTS_ENVIRONMENT: "live", PADDLE_SANDBOX_API_KEY: "k" }),
+      ),
+    ).toBe("live");
   });
 
-  it("ignores invalid PAYMENTS_ENVIRONMENT values", () => {
-    expect(resolveServerBillingEnvironment(envFrom({ PAYMENTS_ENVIRONMENT: "prod" }))).toBe(
-      "sandbox",
-    );
+  it("agrees with the strict resolver whenever the strict resolver resolves", () => {
+    for (const env of [
+      { PAYMENTS_ENVIRONMENT: "live" },
+      { PAYMENTS_ENVIRONMENT: "sandbox" },
+      { PAYMENTS_ENVIRONMENT: "sandbox", PADDLE_LIVE_API_KEY: "k", PADDLE_SANDBOX_API_KEY: "k" },
+    ]) {
+      const strict = resolveRequiredServerBillingEnvironment(envFrom(env));
+      expect(strict.ok).toBe(true);
+      if (strict.ok) expect(resolveServerBillingEnvironment(envFrom(env))).toBe(strict.environment);
+    }
+  });
+
+  it("is deterministic for the same configuration", () => {
+    const env = envFrom({ PADDLE_SANDBOX_API_KEY: "k" });
+    expect(resolveServerBillingEnvironment(env)).toBe(resolveServerBillingEnvironment(env));
   });
 
   // Spoofing surface: the resolver takes NO request-derived input, so a

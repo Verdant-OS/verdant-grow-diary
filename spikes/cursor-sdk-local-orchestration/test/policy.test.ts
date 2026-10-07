@@ -13,7 +13,7 @@ import {
 } from "../src/constants.ts";
 import { OrchestrationError } from "../src/errors.ts";
 import { createSyntheticWorkspace, removeSyntheticWorkspace } from "../src/fixtureBuilder.ts";
-import { validatePolicy } from "../src/policy.ts";
+import { isProductionPath, validatePolicy } from "../src/policy.ts";
 import { resolvedVitestEnvironment } from "./resolvedConfig.ts";
 
 const SPIKE_ROOT = join(fileURLToPath(new URL("..", import.meta.url)));
@@ -55,6 +55,16 @@ describe("SDK tool catalog inspection", () => {
 });
 
 describe("fail-closed policy validator", () => {
+  it("recognizes a protected subtree with the platform path separator", () => {
+    expect(isProductionPath(join(REPO_ROOT, "src", "private", "missing.ts"), REPO_ROOT)).toBe(true);
+  });
+
+  it("does not mistake a sibling prefix for a protected subtree", () => {
+    expect(isProductionPath(join(`${REPO_ROOT}-sibling`, "src", "missing.ts"), REPO_ROOT)).toBe(
+      false,
+    );
+    expect(isProductionPath(join(REPO_ROOT, "src-sibling", "missing.ts"), REPO_ROOT)).toBe(false);
+  });
   it("rejects cloud configuration before create", () => {
     const workspace = createSyntheticWorkspace();
     try {

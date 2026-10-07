@@ -1097,9 +1097,19 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Use trusted base workflow file for validation
+      - name: Extract only the workflow from the verified PR head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          cp .github/workflows/claude-slices.yml "$RUNNER_TEMP/claude-slices.yml"
+          git fetch --no-tags origin "refs/pull/$PR_NUMBER/head"
+          test "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA"
+          if git cat-file -e "$HEAD_SHA:.github/workflows/claude-slices.yml" 2>/dev/null; then
+            git show "$HEAD_SHA:.github/workflows/claude-slices.yml" > "$RUNNER_TEMP/claude-slices.yml"
+          else
+            # The PR head predates this workflow; validate the base checkout's copy instead.
+            cp .github/workflows/claude-slices.yml "$RUNNER_TEMP/claude-slices.yml"
+          fi
       - name: Check workflow syntax with checksum-verified actionlint
         run: |
           archive="$RUNNER_TEMP/actionlint.tar.gz"

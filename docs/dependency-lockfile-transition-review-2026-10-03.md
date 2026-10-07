@@ -119,7 +119,9 @@ the transition ends. `bun.lock` is now the only lockfile.
   removed, with nothing left to check.
 - `scripts/check-dependency-security.mjs` audits with `bun audit` only. The npm audit
   source, the `--npm-input` and `--npm-lockfile` flags, and the npm-lock reads are gone.
-  The npm graph comparison runs only if a caller passes an npm lock explicitly.
+  The npm graph comparison is removed as well: exceptions bind to `bun.lock` only, the
+  retired `expectedNpm*` exception fields are rejected, and `--lockfile` must name a
+  `bun.lock` file, so no caller can trigger a second dependency-graph check (#1879).
 - `.gitignore` ignores `package-lock.json`. The original retirement revision deleted
   the lock written by the npm bootstrap; that fallback was unpinned and bypassed
   Bun’s minimum-age delay and locked security floors. It is replaced below.

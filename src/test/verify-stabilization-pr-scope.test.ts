@@ -6,6 +6,7 @@ import {
   isAllowedStabilizationPath,
   isBlockedStabilizationPath,
 } from "../../scripts/verify-stabilization-pr-scope.mjs";
+import { FORBIDDEN_LOCKFILES } from "../../scripts/check-bun-lockfile-policy.mjs";
 
 describe("isAllowedStabilizationPath", () => {
   it("allows harness files", () => {
@@ -14,7 +15,7 @@ describe("isAllowedStabilizationPath", () => {
     expect(isAllowedStabilizationPath("scripts/sensor-safety-check.mjs")).toBe(true);
     expect(isAllowedStabilizationPath("tests/foo.spec.ts")).toBe(true);
     expect(isAllowedStabilizationPath("package.json")).toBe(true);
-    expect(isAllowedStabilizationPath("bun.lockb")).toBe(true);
+    expect(isAllowedStabilizationPath("bun.lock")).toBe(true);
     expect(isAllowedStabilizationPath("playwright.config.ts")).toBe(true);
   });
 
@@ -150,21 +151,30 @@ describe("classifyStabilizationPrFiles — staged-mode file lists", () => {
 });
 
 describe("classifyStabilizationPrFiles — lockfile allowlist", () => {
-  it.each(["pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb"])(
-    "allows lockfile %s on its own",
+  it("allows bun.lock, the only lockfile the repository keeps, on its own", () => {
+    const r = classifyStabilizationPrFiles(["bun.lock"]);
+    expect(r.verdict).toBe("pass");
+    expect(r.allowed).toEqual(["bun.lock"]);
+  });
+
+  it.each(FORBIDDEN_LOCKFILES.map((name: string) => [name]) as Array<[string]>)(
+    "refuses %s, which the lockfile policy forbids",
     (lock) => {
       const r = classifyStabilizationPrFiles([lock]);
-      expect(r.verdict).toBe("pass");
-      expect(r.allowed).toEqual([lock]);
+      expect(r.verdict).toBe("stop-ship");
+      expect(r.blocked).toEqual([lock]);
     },
   );
 
-  it("keeps the runbook's lockfile allowlist in step with the retired npm lockfile", () => {
+  it("keeps the runbook's lockfile allowlist to bun.lock", () => {
     // Absence scan over documentation prose, not resolved config.
     const runbook = readFileSync(resolve("docs/test-stabilization-pr-runbook.md"), "utf8");
     const section = runbook.slice(runbook.indexOf("### Lockfile handling"));
-    const allowlist = section.slice(0, section.indexOf("are allowed"));
-    expect(allowlist).not.toContain("package-lock.json");
+    const end = section.indexOf("allowed **only**");
+    expect(end).toBeGreaterThan(0);
+    const allowlist = section.slice(0, end);
+    expect(allowlist).toContain("`bun.lock`");
+    for (const forbidden of FORBIDDEN_LOCKFILES) expect(allowlist).not.toContain(forbidden);
     expect(section).toMatch(/`package-lock\.json` was retired on 2026-10-03/);
   });
 

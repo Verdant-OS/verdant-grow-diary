@@ -136,7 +136,8 @@ when its text:
   `linkIdentity`, `unlinkIdentity` or `onAuthStateChange`. Optional chaining
   (`auth?.signOut()`), bracket access (`auth["signOut"]()`, `auth[key]()`,
   `supabase["auth"]`; a plain literal read-only key such as `auth["getUser"]()` does
-  not lock), destructuring (`const { signOut } = supabase.auth;`) and aliasing the
+  not lock), destructuring (`const { signOut } = supabase.auth;`, including a rest element such as
+  `const { auth: { ...a } } = supabase;`) and aliasing the
   namespace (`const a = supabase.auth;`, `const { auth: a } = supabase;`, a literal
   computed key such as `const { ["auth"]: a } = supabase;` or ``({ [`auth`]: a } = x)``,
   a destructuring assignment, a parameter or destructuring default such as
@@ -169,7 +170,8 @@ when its text:
   (`const TABLE = "action_queue";`), also with comments inside the call
   (`db.from(/* c */ "action_queue")`), and through `call`, `apply` or `bind`
   (`db.from.call(db, "action_queue")`, `db.from.apply(db, ["action_queue"])`,
-  `db.from.bind(db)("action_queue")`). Mentioning an Action Queue row ID, type or
+  `db.from.bind(db)("action_queue")`), also with the arguments spread from a literal
+  array (`db.from(...["action_queue"])`). Mentioning an Action Queue row ID, type or
   comment doesn't lock, and neither does a bare string literal elsewhere
   (generated types, view models, source-scan tests), so pure helpers such as
   `pendingOutcomeReviewRules.ts` stay editable.

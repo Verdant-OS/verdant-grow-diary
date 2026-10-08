@@ -688,7 +688,8 @@ jobs:
                 (isAuthRef(node.initializer) || (node.kind === K.BindingElement && propKey(node.propertyName) === 'auth'));
               if (authPattern) {
                 for (const element of bindingNames(node.name)) {
-                  const key = propKey(element.propertyName ?? element.name);
+                  // A rest element copies every member (Codex P1 at aaa48540).
+                  const key = element.dotDotDotToken ? '*' : propKey(element.propertyName ?? element.name);
                   if (key === '*' || isAuthMethod(key)) rules.add('auth-mutation');
                 }
               }
@@ -722,19 +723,31 @@ jobs:
                 const callee = unwrap(node.expression);
                 const calleeName = callee ? memberName(callee) : null;
                 const isAq = arg => { const text = arg && literalText(arg); return typeof text === 'string' && AQ_LITERAL.test(text); };
+                // Arguments with literal array spreads expanded (Codex P1 at aaa48540):
+                // db.from(...["action_queue"]), db.from.call(...[db, "action_queue"]).
+                const flatArgs = list => {
+                  const out = [];
+                  for (const arg of list) {
+                    const inner = arg.kind === K.SpreadElement ? unwrap(arg.expression) : null;
+                    if (inner && inner.kind === K.ArrayLiteralExpression) out.push(...flatArgs(inner.elements));
+                    else out.push(arg);
+                  }
+                  return out;
+                };
+                const args = flatArgs(node.arguments);
                 const isQuery = expr => { const inner = unwrap(expr); const name = inner ? memberName(inner) : null; return name === 'from' || name === 'rpc'; };
-                if ((calleeName === 'from' || calleeName === 'rpc') && isAq(node.arguments[0])) rules.add('aq-io');
+                if ((calleeName === 'from' || calleeName === 'rpc') && isAq(args[0])) rules.add('aq-io');
                 // Through Function methods (Codex P1 at de2a31e4): db.from.call(db, "action_queue"),
                 // db.from.apply(db, ["action_queue"]), db.from.bind(db, "action_queue"),
                 // db.from.bind(db)("action_queue").
-                if ((calleeName === 'call' || calleeName === 'bind') && isQuery(callee.expression) && isAq(node.arguments[1])) rules.add('aq-io');
+                if ((calleeName === 'call' || calleeName === 'bind') && isQuery(callee.expression) && isAq(args[1])) rules.add('aq-io');
                 if (calleeName === 'apply' && isQuery(callee.expression)) {
-                  const list = unwrap(node.arguments[1]);
-                  if (list && list.kind === K.ArrayLiteralExpression && isAq(list.elements[0])) rules.add('aq-io');
+                  const list = unwrap(args[1]);
+                  if (list && list.kind === K.ArrayLiteralExpression && isAq(flatArgs(list.elements)[0])) rules.add('aq-io');
                 }
                 if (callee && callee.kind === K.CallExpression) {
                   const inner = unwrap(callee.expression);
-                  if (inner && memberName(inner) === 'bind' && isQuery(inner.expression) && isAq(node.arguments[0])) rules.add('aq-io');
+                  if (inner && memberName(inner) === 'bind' && isQuery(inner.expression) && isAq(args[0])) rules.add('aq-io');
                 }
               }
               // const TABLE = "action_queue"
@@ -1213,6 +1226,8 @@ jobs:
               'const { ["auth"]: { signOut } } = supabase; signOut();', 'function f({ ["auth"]: a }) { a.signOut(); }',
               'let a; ({ ["auth"]: a } = supabase); a.signOut();', 'let a; ({ [`auth`]: a = d } = supabase); a.signOut();',
               'let a; ({ auth: a } = supabase); a.signOut();', '({ auth: { signOut } } = supabase);',
+              // Codex P1 at aaa48540: a rest element of a nested auth pattern.
+              'const { auth: { ...a } } = supabase; a.signOut();', 'const { ["auth"]: { ...a } } = supabase; a.signOut();',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
               // Each form also locks on the AST alone (Option 1).
@@ -1254,6 +1269,11 @@ jobs:
               'db.from.bind(db, "action_queue")().select();', 'db.from.bind(db)("action_queue").select();',
               'db.rpc.call(db, "action_queue_create", p);', '(db.from as any).call(db, `action_queue`);',
               'db?.from?.call(db, "action_queue");', 'db["from"].call(db, "action_queue");',
+              // Codex P1 at aaa48540: literal array spreads in the arguments.
+              'db.from.call(db, ...["action_queue"]).select();', 'db.from.call(...[db, "action_queue"]);',
+              'db.from(...["action_queue"]).select();', 'db.from.apply(db, [...["action_queue"]]);',
+              'db.from.bind(db)(...["action_queue"]);', 'db.from.bind(db, ...["action_queue"])();',
+              'db.rpc(...[`action_queue_create`], p);',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), ['aq-io, head'], text);
               assert.deepEqual(astRules('src/lib/fooRules.ts', text), ['aq-io'], `AST: ${text}`);
@@ -1321,7 +1341,7 @@ jobs:
               'function f(auth) { const alias = auth; return alias; }',
               'function f(auth) { const alias = auth; const o = { alias }; return o; }',
               'const auth = useRoute(); const r = auth; export default r;',
-              'db.from.call(db, "plants").select();', 'fn.call(db, "action_queue_note");', 'const { ["data"]: d } = supabase;',
+              'db.from.call(db, "plants").select();', 'db.from(...["plants"]).select();', 'const { auth: { user } } = state;', 'fn.call(db, "action_queue_note");', 'const { ["data"]: d } = supabase;',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
               assert.deepEqual(astRules('src/lib/fooRules.ts', text), [], `AST: ${text}`);

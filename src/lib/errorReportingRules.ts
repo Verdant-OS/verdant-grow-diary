@@ -352,14 +352,42 @@ function restoreDelimiters(text: string): string {
   );
 }
 
+/** HTML entities an HTML-safe diagnostic uses for quotes and separators (`&quot;`, `&#58;`, `&#x22;`). */
+const HTML_ENTITY_PATTERN =
+  /&(?:#(\d{1,7})|#[xX]([0-9A-Fa-f]{1,6})|(quot|apos|amp|colon|comma|semi|equals|lt|gt));/g;
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+  quot: '"',
+  apos: "'",
+  amp: "&",
+  colon: ":",
+  comma: ",",
+  semi: ";",
+  equals: "=",
+  lt: "<",
+  gt: ">",
+};
+
+function decodeHtmlEntities(text: string): string {
+  return text.replace(
+    HTML_ENTITY_PATTERN,
+    (entity, decimal?: string, hex?: string, name?: string) => {
+      const code = decimal ? Number(decimal) : hex ? parseInt(hex, 16) : null;
+      if (code !== null) {
+        return code > 0 && code <= 0x10ffff ? holdDelimiters(String.fromCodePoint(code)) : entity;
+      }
+      return holdDelimiters(NAMED_HTML_ENTITIES[(name ?? "").toLowerCase()] ?? entity);
+    },
+  );
+}
+
 /**
- * Decodes one layer of `%XX` escapes so encoded credentials (`Bearer%20…`,
- * `%22password%22%3A…`, `%2540`) meet the same patterns as plain text. Decoded value
- * delimiters are held (see VALUE_DELIMITERS). In a run that is not valid UTF-8 only the
- * ASCII escapes are decoded.
+ * Decodes one layer of `%XX` escapes and HTML entities so encoded credentials
+ * (`Bearer%20…`, `%22password%22%3A…`, `%2540`, `&quot;access_token&quot;:…`) meet the
+ * same patterns as plain text. Decoded value delimiters are held (see VALUE_DELIMITERS).
+ * In a percent run that is not valid UTF-8 only the ASCII escapes are decoded.
  */
 function decodeOneLayer(text: string): string {
-  return text.replace(PERCENT_RUN_PATTERN, (run) => {
+  return decodeHtmlEntities(text).replace(PERCENT_RUN_PATTERN, (run) => {
     try {
       return holdDelimiters(decodeURIComponent(run));
     } catch {
@@ -378,7 +406,11 @@ export function scrubText(value: unknown): string {
   // Redact before decoding, while an encoded `%22` inside a credential cannot yet end its
   // value, then again after each decoded layer, for credentials that only decoding
   // reveals (`%22password%22%3A…`). Decoded delimiters stay held until the end.
-  let text = redactPatterns(typeof value === "string" ? value : safeString(value));
+  // HTML entities decode to held characters, so decoding them first keeps `&amp;` inside a
+  // credential from ending it at the raw pass.
+  let text = redactPatterns(
+    decodeHtmlEntities(typeof value === "string" ? value : safeString(value)),
+  );
   for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
     const next = decodeOneLayer(text);
     if (next === text) return restoreDelimiters(text);

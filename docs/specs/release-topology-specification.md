@@ -2061,14 +2061,16 @@ out" form. The served commit itself was merged outside the queue, which M4 recor
 publish. The application code at the two commits is identical (no `src/` change). Closing it takes a
 rollout of the tip build, and this document does not start one.
 
-**At the 2026-10-06 amendment (Appendix D)**, the axis that moved is the publisher's account, not
-its promotion settings. Vercel has built nothing since 2026-10-01, the bindings then named
+**At the 2026-10-06 amendment (Appendix D)**, Vercel reports the publisher's account as blocked
+(`practical observation`); that the account, not its promotion settings, is the axis that moved is
+`inference`, since no authoritative account-state read was obtained and when the block began, and
+why, is `NOT_MEASURED`. Vercel has built nothing since 2026-10-01, the bindings then named
 `ebc8f82e`, 55 commits behind the tip, and what the hostnames return is `BLOCKED` from here. A
 third build integration, Cloudflare Workers Builds, now builds every tip; what it deploys is
 `BLOCKED`. A fourth, the `supabase` GitHub App's `Supabase Preview` check, compares every tip with a
 remote project (D.5); whether it can apply migrations or deploy functions is `BLOCKED`. The release
-state stays **`FAIL`**, and closing it now starts with the account (D-RT-15) and the Workers and
-Supabase connections (D-RT-4), all the owner's.
+state stays **`FAIL`**, and closing it now starts with an authoritative read of the account's state
+(D-RT-15) and the Workers and Supabase connections (D-RT-4), all the owner's.
 
 **At the 2026-10-07 note (Appendix E)**, the Appendix D bindings are gone from the reads:
 `dpl_2Mog…` is not in the production list, and apex and `www` resolve to no Vercel deployment. E.3's

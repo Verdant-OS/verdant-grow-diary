@@ -175,9 +175,15 @@ when its text:
   array (`db.from(...["action_queue"])`). A file that also uses `.from` or `.rpc` as a
   value (anything but a direct call: `.bind`, `.call`, `.apply`, `Reflect.apply(db.from, …)`,
   `const f = db.from`) and has an Action Queue table or RPC name anywhere locks as well, so
-  no Function-method composition can hide the call; reading another member
-  (`x.from.mock.calls`), an `expect(...)` argument, a same-name mock property
-  (`{ from: mock.from }`) and a write to a member named `from` don't count. Mentioning an Action Queue row ID, type or
+  no Function-method composition can hide the call. Any member read counts too
+  (`db.from.valueOf()`), except the `vi.fn` mock members (`x.from.mock.calls`,
+  `x.from.mockImplementation(…)`) and `length`. An `expect(...)` argument doesn't count only
+  when it goes straight into a built-in matcher that doesn't run the value
+  (`expect(db.from).not.toHaveBeenCalled()`, `.toHaveBeenCalledWith(…)`), and only in a file
+  that defines no `expect` of its own (other than importing it from `vitest`,
+  `@playwright/test`, `@jest/globals` or `bun:test`) and never calls `expect.extend`.
+  A same-name mock property (`{ from: mock.from }`) and a write to a member named `from`
+  don't count either. Mentioning an Action Queue row ID, type or
   comment doesn't lock, and neither does a bare string literal elsewhere
   (generated types, view models, source-scan tests), so pure helpers such as
   `pendingOutcomeReviewRules.ts` stay editable.

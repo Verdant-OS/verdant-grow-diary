@@ -685,20 +685,66 @@ jobs:
             let queryEscapes = false;
             let aqName = false;
             const isQueryKey = key => key === 'from' || key === 'rpc';
-            const FUNCTION_METHODS = new Set(['bind', 'call', 'apply']);
-            // Where x.from or x.rpc appears other than as the callee of a call. Reading
-            // another member (x.from.mock.calls), an expect(...) argument, and an object
+            // Members of x.from or x.rpc that never run it: the vi.fn mock metadata and
+            // mock setters, and length. Any other member escapes (Codex P1 at 363713e5:
+            // db.from.valueOf().call(db, "action_queue") runs from).
+            const MOCK_MEMBERS = new Set(['mock', 'length', 'getMockName', 'mockName', 'mockClear', 'mockReset',
+              'mockRestore', 'mockReturnThis', 'mockImplementation', 'mockImplementationOnce', 'mockReturnValue',
+              'mockReturnValueOnce', 'mockResolvedValue', 'mockResolvedValueOnce', 'mockRejectedValue',
+              'mockRejectedValueOnce']);
+            // expect is the test framework's only when the file declares no expect of its
+            // own, other than importing it under that name from a test runner, and never
+            // calls expect.extend (Codex P1 at 363713e5: const expect = x => x;
+            // expect(db.from).call(db, "action_queue")). The call is then exempt only when
+            // it is read straight into a built-in matcher that does not run the value:
+            // expect(x).not.toHaveBeenCalled(), expect(x).toBe(y).
+            const TEST_RUNNERS = new Set(['vitest', '@playwright/test', '@jest/globals', 'bun:test']);
+            const EXPECT_MODIFIERS = new Set(['not', 'resolves', 'rejects']);
+            const MATCHERS = new Set(['toBe', 'toEqual', 'toStrictEqual', 'toBeDefined', 'toBeUndefined', 'toBeNull',
+              'toBeTruthy', 'toBeFalsy', 'toBeTypeOf', 'toBeInstanceOf', 'toContain', 'toContainEqual', 'toHaveLength',
+              'toHaveProperty', 'toMatchObject', 'toBeCalled', 'toBeCalledTimes', 'toBeCalledWith', 'toHaveBeenCalled',
+              'toHaveBeenCalledOnce', 'toHaveBeenCalledTimes', 'toHaveBeenCalledWith', 'toHaveBeenLastCalledWith',
+              'toHaveBeenNthCalledWith', 'toHaveBeenCalledExactlyOnceWith']);
+            const EXPECT_DECLARATIONS = new Set([K.VariableDeclaration, K.Parameter, K.BindingElement, K.FunctionDeclaration,
+              K.FunctionExpression, K.ClassDeclaration, K.ClassExpression, K.EnumDeclaration, K.ImportSpecifier,
+              K.ImportClause, K.NamespaceImport, K.ImportEqualsDeclaration]);
+            let expectShadowed = false;
+            walk(source, node => {
+              if (EXPECT_DECLARATIONS.has(node.kind) && node.name && ts.isIdentifier(node.name) && node.name.text === 'expect') {
+                const declaration = node.kind === K.ImportSpecifier ? node.parent.parent.parent : null;
+                const runnerImport = declaration && !node.propertyName && ts.isStringLiteral(declaration.moduleSpecifier) &&
+                  TEST_RUNNERS.has(declaration.moduleSpecifier.text);
+                if (!runnerImport) expectShadowed = true;
+              }
+              // expect = f; globalThis.expect = f; expect.extend({ … })
+              if (node.kind === K.Identifier && node.text === 'expect' && isWriteTarget(node)) expectShadowed = true;
+              if ((node.kind === K.PropertyAccessExpression || node.kind === K.ElementAccessExpression) &&
+                  memberName(node) === 'expect' && isWriteTarget(node)) expectShadowed = true;
+              if ((node.kind === K.PropertyAccessExpression || node.kind === K.ElementAccessExpression) &&
+                  memberName(node) === 'extend' && ts.isIdentifier(unwrap(node.expression)) && unwrap(node.expression).text === 'expect') expectShadowed = true;
+            });
+            const isMatcherRead = call => {
+              let node = call;
+              for (;;) {
+                const parent = node.parent;
+                if (!parent || parent.kind !== K.PropertyAccessExpression || parent.expression !== node) return false;
+                const name = parent.name.text;
+                if (EXPECT_MODIFIERS.has(name)) { node = parent; continue; }
+                return MATCHERS.has(name) && parent.parent && parent.parent.kind === K.CallExpression && parent.parent.expression === parent;
+              }
+            };
+            // Where x.from or x.rpc appears other than as the callee of a call. A mock
+            // member (x.from.mock.calls), a verified expect(...) argument, and an object
             // property of the same name ({ from: mock.from }, whose later c.from("…")
             // call the direct rule sees) are test-mock usage, not an escape.
             const queryValueEscapes = (child, parent) => {
               if (parent.kind === K.CallExpression) {
                 if (parent.expression === child) return false;
-                const fn = unwrap(parent.expression);
-                return !(fn && ts.isIdentifier(fn) && fn.text === 'expect');
+                const fn = parent.expression;
+                return !(!expectShadowed && ts.isIdentifier(fn) && fn.text === 'expect' && isMatcherRead(parent));
               }
               if ((parent.kind === K.PropertyAccessExpression || parent.kind === K.ElementAccessExpression) && parent.expression === child) {
-                const name = memberName(parent);
-                return name === '*' || FUNCTION_METHODS.has(name);
+                return !MOCK_MEMBERS.has(memberName(parent));
               }
               if (parent.kind === K.PropertyAssignment && parent.initializer === child && isQueryKey(propKey(parent.name))) return false;
               // A write to the member (config.replacements[0].from = "x") is not a read
@@ -1345,6 +1391,12 @@ jobs:
               // name anywhere in the file.
               'db.from.bind.call(db.from, db)("action_queue").select();', 'db.from.bind.apply(db.from, [db])("action_queue");',
               'Reflect.apply(db.from, db, ["action_queue"]);', 'const f = db.from.bind(db); f("action_queue");',
+              // Codex P1s at 363713e5: an expect the file defines, and other Function members.
+              'const expect = x => x; expect(db.from).call(db, "action_queue");',
+              'import { expect } from "./mine"; expect(db.from).toBe(1); log("action_queue");',
+              'expect.extend({ toRun(f) { f("action_queue"); } }); expect(db.from).toRun();',
+              'expect(db.from).toSatisfy(f => f("action_queue"));', 'expect(db.from).not.call(db, "action_queue");',
+              'db.from.valueOf().call(db, "action_queue");', 'db.from["valueOf"]().call(db, "action_queue");',
               'const f = db.from; f.call(db, "action_queue");', 'const { from } = db; from.call(db, "action_queue");',
               'Function.prototype.call.call(db.from, db, "action_queue");', 'db.rpc.bind.call(db.rpc, db)("action_queue_create", p);',
             ]) {
@@ -1419,6 +1471,8 @@ jobs:
               'expect(forbidden.rpc).not.toHaveBeenCalled(); log("action_queue");',
               'for (const c of client.from.mock.calls) expect(c[0]).not.toBe("action_queue");',
               'vi.mock("x", () => ({ supabase: { from: mock.from } })); log("action_queue");',
+              'import { expect } from "vitest"; expect(client.from).toHaveBeenCalledWith("action_queue");',
+              'client.from.mockImplementation(() => q); expect(state.calls.from.length).toBe(1); log("action_queue");',
               'cfg.replacements[0].from = "x"; log("action_queue");', 'const { auth: { user } } = state;', 'fn.call(db, "action_queue_note");', 'const { ["data"]: d } = supabase;',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);

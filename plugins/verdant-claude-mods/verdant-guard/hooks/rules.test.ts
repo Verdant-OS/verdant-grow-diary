@@ -483,3 +483,37 @@ describe("Codex re-review P1s: wrapper long-option prefixes, variadic --project"
     ).toBe(null);
   });
 });
+
+describe("Codex re-review P1s: env -S option re-parse, Playwright project wildcards", () => {
+  test("words split by env -S are parsed again as env options", () => {
+    for (const cmd of [
+      "env -S '-- git push -f origin claude/task'",
+      "env -S '-i git push -f origin claude/task'",
+      "env -S '-u HOME git push --force'",
+      "env --split-string='-C /tmp git push --force'",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env -S '-- git push origin claude/task'")).toBe(null);
+  });
+  test("project selectors match the way Playwright filters projects", () => {
+    for (const cmd of [
+      "bunx playwright test --project='chromium-*'",
+      "bunx playwright test --project '*'",
+      "bunx playwright test --project=*-MOCKED",
+      "bunx playwright test --project=Chromium-Mocked",
+      "bunx playwright test",
+      "bunx playwright test --headed",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    for (const cmd of [
+      "bunx playwright test --project='chromium-*' e2e/auth-loading.spec.ts",
+      "bunx playwright test --project=chromium-authed",
+      "bunx playwright test --project='*-authed'",
+      "bunx playwright test e2e/auth-loading.spec.ts",
+    ]) {
+      expect(checkBash(cmd)).toBe(null);
+    }
+  });
+});

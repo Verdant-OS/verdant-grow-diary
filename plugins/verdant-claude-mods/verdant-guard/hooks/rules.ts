@@ -247,8 +247,14 @@ function stripPrefix(tokens: string[], onSplit?: (split: string) => void): strin
       }
       i += valueOptions.has(option) ? 2 : 1;
     }
-    if (split !== null) onSplit?.(split);
-    rest = [...(split === null ? [] : shellWords(split)), ...rest.slice(i)];
+    if (split === null) {
+      rest = rest.slice(i);
+      continue;
+    }
+    onSplit?.(split);
+    // GNU env puts the split words back in place of `-S` and keeps parsing them as its own
+    // options, so `env -S '-- git push -f'` runs the push: parse them as env options again.
+    rest = [head, ...shellWords(split), ...rest.slice(i)];
   }
 }
 
@@ -423,6 +429,21 @@ function stripRunner(tokens: string[]): string[] {
   return [];
 }
 
+/** The credential-free projects in `playwright.config.ts`, which install no global route mocks. */
+const PW_MOCKED_PROJECTS = ["chromium-mocked", "webkit-mocked"] as const;
+
+/**
+ * True when a `--project` selector picks a mocked project. Playwright 1.62 compares names
+ * case-insensitively and reads `*` as a wildcard (`filterProjects` in `lib/runner/index.js`).
+ */
+function selectsMockedProject(selector: string): boolean {
+  const lower = selector.toLocaleLowerCase();
+  if (!lower.includes("*")) return lower.includes("mocked");
+  const escaped = lower.split("*").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(`^${escaped.join(".*")}$`);
+  return PW_MOCKED_PROJECTS.some((name) => pattern.test(name));
+}
+
 function checkPlaywright(tokens: string[]): string | null {
   const t = stripRunner(tokens);
   if (t[0] !== "playwright" || t[1] !== "test") return null;
@@ -455,9 +476,13 @@ function checkPlaywright(tokens: string[]): string | null {
     }
     specs += 1;
   }
-  const project = projects.find((p) => p.includes("mocked"));
-  if (project && specs === 0) {
-    return `\`--project=${project}\` without a spec filter can reach real Supabase (that project installs no global route mocks). Pass an explicit spec path.`;
+  if (specs > 0) return null;
+  if (projects.length === 0) {
+    return "`playwright test` with no `--project` runs every project, `chromium-mocked` included, and without a spec filter that can reach real Supabase (the mocked projects install no global route mocks). Pass an explicit spec path.";
+  }
+  const project = projects.find(selectsMockedProject);
+  if (project !== undefined) {
+    return `\`--project=${project}\` without a spec filter can reach real Supabase (the mocked projects install no global route mocks). Pass an explicit spec path.`;
   }
   return null;
 }

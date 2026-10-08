@@ -138,7 +138,10 @@ when its text:
   `supabase["auth"]`; a plain literal read-only key such as `auth["getUser"]()` does
   not lock), destructuring (`const { signOut } = supabase.auth;`) and aliasing the
   namespace (`const a = supabase.auth;`, `const { auth: a } = supabase;`, a parameter
-  or destructuring default such as `function f(a = supabase.auth)`) also lock, with or
+  or destructuring default such as `function f(a = supabase.auth)`) also lock. On the
+  AST, the namespace locks wherever it escapes into a value: any binding, default or
+  assignment, an object or array literal, a spread, a return or a yield, including
+  through `??`, `||`, `&&` and `? :` (`const a = flag ? supabase.auth : b`). They lock with or
   without the trailing `;`, across a line break (`supabase\n  .auth`), and through
   parentheses, `!`, `as T` or `satisfies T` (`(supabase.auth as any).signOut()`),
   including with `//` or `/* */` comments inside the call chain
@@ -202,10 +205,10 @@ include:
   (`"action_" + "queue"`);
 - reaching the namespace without naming it as `auth` or `["auth"]`, for example
   `Reflect.get(supabase, "auth")` or a computed key held in a variable;
-- an alias held in an expression other than a plain binding or assignment
-  (`const a = supabase.auth ?? fallback;`), the namespace passed with other
-  arguments (`wrap(supabase.auth, "x").signOut()`), or an alias that crosses a
-  module boundary;
+- the namespace passed as a call argument (`wrap(supabase.auth, "x").signOut()`;
+  `vi.spyOn(client.auth, "getSession")` and `expect(client.auth)` must stay allowed)
+  or returned from an arrow's concise body (`() => mocks.auth`), or an alias that
+  crosses a module boundary;
 - raw HTTP to Supabase (`fetch` to `/auth/v1/…` or `/rest/v1/action_queue`).
 
 Comments are handled by also matching the text with comments blanked out, once

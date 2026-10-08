@@ -493,6 +493,10 @@ jobs:
             // Identifiers bound to the auth namespace: auth itself, `const a = x.auth`,
             // `const { auth: a } = x`, and assignments of x.auth.
             const aliases = new Set(['auth']);
+            // Names actually bound to the namespace. The seed 'auth' above is only a
+            // guess, so an unrelated local named auth never escapes on its own.
+            const bound = new Set();
+            const addAlias = name => { aliases.add(name); bound.add(name); };
             const isAuthMember = node => {
               const inner = unwrap(node);
               return !!inner && memberName(inner) === 'auth';
@@ -520,11 +524,11 @@ jobs:
             const collect = node => {
               // A variable, a parameter default or a destructuring default (Codex P1 at
               // 805b256c): const a = x.auth; function f(a = x.auth); ({ a = x.auth }).
-              if (DECLARATIONS.has(node.kind) && ts.isIdentifier(node.name) && isAuthRef(node.initializer)) aliases.add(node.name.text);
-              if (node.kind === K.BinaryExpression && node.operatorToken.kind === K.EqualsToken && ts.isIdentifier(unwrap(node.left)) && isAuthRef(node.right)) aliases.add(unwrap(node.left).text);
+              if (DECLARATIONS.has(node.kind) && ts.isIdentifier(node.name) && isAuthRef(node.initializer)) addAlias(node.name.text);
+              if (node.kind === K.BinaryExpression && node.operatorToken.kind === K.EqualsToken && ts.isIdentifier(unwrap(node.left)) && isAuthRef(node.right)) addAlias(unwrap(node.left).text);
               if (node.kind === K.BindingElement && ts.isIdentifier(node.name)) {
                 const key = node.propertyName ? (ts.isIdentifier(node.propertyName) || ts.isStringLiteral(node.propertyName) ? node.propertyName.text : null) : node.name.text;
-                if (key === 'auth') aliases.add(node.name.text);
+                if (key === 'auth') addAlias(node.name.text);
               }
             };
             for (let size = -1; size !== aliases.size && aliases.size < 1000;) {
@@ -532,6 +536,31 @@ jobs:
               walk(source, collect);
             }
             const rules = new Set();
+            const WRAPPERS = new Set([K.ParenthesizedExpression, K.AsExpression, K.SatisfiesExpression, K.TypeAssertionExpression,
+              K.NonNullExpression, K.PartiallyEmittedExpression, K.AwaitExpression]);
+            const ASSIGNMENTS = new Set([K.EqualsToken, K.BarBarEqualsToken, K.QuestionQuestionEqualsToken, K.AmpersandAmpersandEqualsToken]);
+            const escapes = start => {
+              let child = start;
+              let parent = start.parent;
+              // Climb while the parent's value can be the namespace itself.
+              for (;;) {
+                if (!parent) return false;
+                const op = parent.kind === K.BinaryExpression ? parent.operatorToken.kind : null;
+                if (WRAPPERS.has(parent.kind) ||
+                    (parent.kind === K.ConditionalExpression && parent.condition !== child) ||
+                    op === K.BarBarToken || op === K.QuestionQuestionToken ||
+                    ((op === K.AmpersandAmpersandToken || op === K.CommaToken) && parent.right === child)) {
+                  child = parent;
+                  parent = parent.parent;
+                } else break;
+              }
+              if (DECLARATIONS.has(parent.kind) || parent.kind === K.PropertyDeclaration) return parent.initializer === child;
+              if (parent.kind === K.BinaryExpression) return ASSIGNMENTS.has(parent.operatorToken.kind) && parent.right === child;
+              if (parent.kind === K.ShorthandPropertyAssignment) return parent.objectAssignmentInitializer === child;
+              if (parent.kind === K.PropertyAssignment) return parent.initializer === child;
+              return parent.kind === K.ArrayLiteralExpression || parent.kind === K.SpreadElement || parent.kind === K.SpreadAssignment ||
+                parent.kind === K.ReturnStatement || parent.kind === K.YieldExpression || parent.kind === K.ExportAssignment;
+            };
             const visit = node => {
               // x.auth.signOut, auth?.["signIn"], a.admin, auth[key]: a D1 member, or a
               // computed one, of the namespace.
@@ -552,6 +581,14 @@ jobs:
                   (node.kind === K.BinaryExpression && node.operatorToken.kind === K.EqualsToken && isAuthMember(node.right)) ||
                   (node.kind === K.ReturnStatement && isAuthMember(node.expression)) ||
                   (node.kind === K.BindingElement && aliases.has(ts.isIdentifier(node.name) ? node.name.text : '') && node.name.text !== 'auth')) rules.add('auth-mutation');
+              // Any other place the namespace escapes into a value, found by where it sits
+              // rather than by node kind (Codex P1 at b26fc2ce; three escape kinds in a row):
+              // a binding or default of any form, an assignment, an object or array
+              // literal, a spread, a return or a yield. The walk climbs through wrappers,
+              // conditional branches and ?? / || / && results first. A call argument
+              // (vi.spyOn(x.auth, "getSession"), expect(x.auth)) and an arrow's concise
+              // body stay allowed, as pinned below.
+              if ((isAuthMember(node) || (ts.isIdentifier(node) && bound.has(node.text))) && !ts.isBindingElement(node.parent) && escapes(node)) rules.add('auth-mutation');
               // .from("action_queue…") / .rpc("action_queue…"), whatever the type
               // arguments, casts or escapes.
               if (node.kind === K.CallExpression) {
@@ -1016,6 +1053,13 @@ jobs:
               // A bracket key that is a D1 member, not a plain literal, or escaped.
               'supabase.auth["signOut"]();', 'supabase.auth?.["admin"].deleteUser(id);', 'supabase.auth["sign\\u004Fut"]();',
               'supabase.auth[`${m}`]();',
+              // Codex P1 at b26fc2ce: the namespace escaping by position, whatever the node kind.
+              'let a; ({ a = supabase.auth } = options); a.signOut();', 'let b; ({ a: b = supabase.auth } = o); b.signOut();',
+              'let a; [a = supabase.auth] = arr; a.signOut();', 'const o = { x: supabase.auth }; o.x.signOut();',
+              'const o = { ...supabase.auth };', 'const arr = [supabase.auth]; arr[0].signOut();',
+              'const a = flag ? supabase.auth : other; a.signOut();', 'const a = c ?? supabase.auth; a.signOut();',
+              'let a; a ??= supabase.auth; a.signOut();', 'function* g() { yield supabase.auth; }',
+              'const { auth } = supabase; let x; ({ x = auth } = o); x.signOut();', '(c ?? supabase).auth.signOut();',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
               // Each form also locks on the AST alone (Option 1).
@@ -1103,6 +1147,9 @@ jobs:
               // Codex P2 at 805b256c: a literal bracket key for a read-only method.
               'supabase.auth["getUser"]();', 'supabase.auth?.["getSession"]();', "const { data } = await client.auth['getUser']();",
               'function run(a = defaults.timeout) { return a; }',
+              // A local that is only named auth doesn't escape (auth-sign-out-navigation-race census).
+              'const auth = createRoute({ path: "/auth" }); const tree = root.addChildren([apex, auth]);',
+              'const u = { useAuth: () => mocks.auth };',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
               assert.deepEqual(astRules('src/lib/fooRules.ts', text), [], `AST: ${text}`);

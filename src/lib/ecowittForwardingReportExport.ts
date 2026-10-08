@@ -119,7 +119,7 @@ const VENDOR_LABEL_ALLOWLIST: ReadonlySet<string> = new Set([
   "ecowitt_windows_testbench",
 ]);
 
-function safeCapturedAt(v: unknown): string | null {
+export function safeCapturedAt(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const trimmed = v.trim();
   return TIMESTAMP_SHAPE_RE.test(trimmed) ? trimmed : null;
@@ -130,17 +130,23 @@ function safeCapturedAt(v: unknown): string | null {
  * unknown provenance claim and exports as "invalid" — never echoed,
  * never allowed to read as live (issue #1003).
  */
-function safeSourceLabel(v: unknown): string | null {
+export function safeSourceLabel(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const lower = v.trim().toLowerCase();
   if (lower.length === 0) return null;
   return CANONICAL_SOURCE_LABELS.has(lower) ? lower : "invalid";
 }
 
-function safeVendorLabel(v: unknown): string | null {
+export function safeVendorLabel(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const lower = v.trim().toLowerCase();
   return VENDOR_LABEL_ALLOWLIST.has(lower) ? lower : null;
+}
+
+/** Allowlisted metric keys only, in allowlist order (issue #1003). */
+export function pickAllowedMetricKeys(keys: readonly unknown[]): AllowedMetricKey[] {
+  const present = new Set(keys);
+  return ALLOWED_METRIC_KEYS.filter((k) => present.has(k));
 }
 
 function pickAllowedMetrics(raw: unknown): Partial<Record<AllowedMetricKey, number>> {

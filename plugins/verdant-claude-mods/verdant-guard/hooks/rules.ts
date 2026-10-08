@@ -218,6 +218,16 @@ function shellWords(text: string): string[] {
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=/;
 
 /**
+ * True when `word` is an assignment the wrapper `head` consumes itself, so it does not end the
+ * wrapper: sudo takes `VAR=value` among its options (`sudo VAR=x -u root cmd`), and GNU env reads
+ * any operand holding `=` as NAME=VALUE (`env 1=x cmd`), not only a shell identifier.
+ */
+function isWrapperAssignment(head: string, word: string): boolean {
+  if (head === "sudo") return ASSIGNMENT.test(word);
+  return head === "env" && !word.startsWith("-") && word.includes("=");
+}
+
+/**
  * Drops leading `VAR=value` assignments and `sudo`/`env`/`exec`/`time` wrappers with their own
  * options, so `env -i git push --force` is checked as `git push --force`. `env -S "<cmd>"`
  * (`--split-string`) runs its argument as the command, so that argument is split and checked.
@@ -239,19 +249,15 @@ function stripPrefix(tokens: string[], onSplit?: (split: string) => void): strin
     let split: string | null = null;
     while (i < rest.length) {
       const option = rest[i]!;
-      // sudo takes `VAR=value` among its own options (`sudo VAR=x -u root cmd`), and GNU env reads
-      // any operand holding `=` as NAME=VALUE (`env 1=x cmd`), not only a shell identifier. So for
-      // both, such a word does not end the wrapper.
-      if (
-        (head === "sudo" && ASSIGNMENT.test(option)) ||
-        (head === "env" && !option.startsWith("-") && option.includes("="))
-      ) {
+      if (isWrapperAssignment(head, option)) {
         i += 1;
         continue;
       }
       if (!option.startsWith("-")) break;
       if (option === "--") {
+        // `--` ends the wrapper's options, not its assignments: `env -- 1=x cmd` still sets `1=x`.
         i += 1;
+        while (i < rest.length && isWrapperAssignment(head, rest[i]!)) i += 1;
         break;
       }
       if (option.startsWith("--")) {

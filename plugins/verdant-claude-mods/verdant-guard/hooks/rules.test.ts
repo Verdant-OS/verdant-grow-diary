@@ -718,3 +718,17 @@ describe("Codex re-review: Playwright `--`, env's NAME=VALUE grammar", () => {
     expect(checkBash("env 1=x git push origin claude/task")).toBe(null);
   });
 });
+
+describe("Codex re-review: wrapper assignments after `--`", () => {
+  test("P1: env and sudo still skip NAME=VALUE operands after `--`", () => {
+    for (const cmd of [
+      "env -- 1=x git push -f origin claude/task",
+      "env -S '-- 1=x git push -f origin claude/task'",
+      "env -i -- A=1 B=2 git commit --no-verify -m wip",
+      "sudo -- VAR=x git push --force origin claude/task",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env -- 1=x git push origin claude/task")).toBe(null);
+  });
+});

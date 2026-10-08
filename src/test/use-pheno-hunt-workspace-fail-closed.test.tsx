@@ -453,3 +453,52 @@ describe("bounded pagination failures", () => {
     for (const writer of WRITERS) expect(writer).not.toHaveBeenCalled();
   });
 });
+
+describe("initial load critical path (#571)", () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  }
+
+  it("reads keepers, reversals and clones while the candidate page is still loading", async () => {
+    // Before #571 the keeper chain waited for the candidate page, adding two
+    // serial round trips to every workspace open. It depends only on the hunt id.
+    const page = deferred<ReturnType<typeof successfulPage>>();
+    loadCandidatePage.mockReturnValueOnce(page.promise);
+    listKeepers.mockResolvedValue([{ id: "keeper-1", sourcePlantId: "plant-1" }]);
+    const { result } = renderHook(() => usePhenoHuntWorkspace("hunt-1"));
+
+    await waitFor(() => expect(listReversedKeeperIds).toHaveBeenCalledWith(["keeper-1"]));
+    expect(listKeepers).toHaveBeenCalledWith("hunt-1");
+    expect(listClones).toHaveBeenCalledWith(["keeper-1"]);
+    expect(result.current.status).toBe("loading");
+
+    await act(async () => {
+      page.resolve(successfulPage());
+    });
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+  });
+
+  it("still fails closed when the keeper read rejects", async () => {
+    listKeepers.mockRejectedValueOnce(new Error("Could not load keepers."));
+    const { result } = renderHook(() => usePhenoHuntWorkspace("hunt-1"));
+
+    await waitFor(() => expect(result.current.status).toBe("error"));
+    await act(async () => {
+      expect(await result.current.saveScore("plant-1", { vigor: 1 })).toBe(false);
+    });
+    for (const writer of WRITERS) expect(writer).not.toHaveBeenCalled();
+  });
+
+  it("keeps the summary error when the concurrent keeper chain also rejects", async () => {
+    loadSummary.mockResolvedValueOnce({ ok: false, error: "Pheno hunt not found." });
+    listKeepers.mockRejectedValueOnce(new Error("Could not load keepers."));
+    const { result } = renderHook(() => usePhenoHuntWorkspace("hunt-1"));
+
+    await waitFor(() => expect(result.current.status).toBe("error"));
+    expect(result.current.error).toBe("Pheno hunt not found.");
+  });
+});

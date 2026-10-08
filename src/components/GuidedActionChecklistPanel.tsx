@@ -41,6 +41,7 @@ import {
   type GuidedActionItemKind,
 } from "@/lib/guidedActionChecklistRules";
 import { dismissItem, readActiveDismissals } from "@/lib/guidedActionChecklistDismissals";
+import { resolveSensorReadingTentScope } from "@/lib/tentScopedSensorReadingsRules";
 
 interface Props {
   scopedGrowId: string | null;
@@ -78,7 +79,22 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
   const plantsQuery = useGrowPlants(undefined, scopedGrowId ?? undefined);
   const tentsQuery = useGrowTents(scopedGrowId ?? undefined);
   const diaryQuery = useDiaryEntries();
-  const readingsQuery = useSensorReadings(undefined, 500);
+  // Per-tent windows over this grow's tents; never the unscoped all-tents
+  // read, which hit the Postgres statement timeout (BUG-003). With no grow in
+  // scope the panel renders nothing, so it reads nothing. Unresolved or
+  // failed tents keep the read pending/error, never an empty success.
+  const tentScope = resolveSensorReadingTentScope({
+    enabled: Boolean(scopedGrowId),
+    tents: tentsQuery,
+  });
+  const readingsQuery = useSensorReadings(
+    {
+      tentIds: tentScope.tentIds,
+      scopeError: tentScope.scopeError,
+      retryScope: tentsQuery.refetch,
+    },
+    500,
+  );
   const alertsQuery = useAlertsList(
     { growId: scopedGrowId ?? undefined, status: "open" },
     { enabled: Boolean(scopedGrowId) },

@@ -11,13 +11,14 @@ import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
 
 const NOW = new Date("2026-05-20T12:00:00Z").getTime();
 
-function renderSummary(state: SnapshotState, activeAlertCount = 0) {
+function renderSummary(state: SnapshotState, activeAlertCount = 0, alertsKnown?: boolean) {
   const summary = buildDashboardSensorHealthSummary(state, NOW);
   return render(
     <MemoryRouter>
       <DashboardSensorHealthSummary
         summary={summary}
         activeAlertCount={activeAlertCount}
+        alertsKnown={alertsKnown}
         growId="grow-1"
       />
     </MemoryRouter>,
@@ -189,5 +190,11 @@ describe("DashboardSensorHealthSummary", () => {
   it("hides empty-alerts block when there are active alerts", () => {
     renderSummary(fresh(), 3);
     expect(screen.queryByTestId("sensor-health-empty-alerts")).not.toBeInTheDocument();
+  });
+
+  it("hides empty-alerts copy when the alerts read is not confirmed", () => {
+    renderSummary(fresh(), 0, false);
+    expect(screen.queryByTestId("sensor-health-empty-alerts")).not.toBeInTheDocument();
+    expect(screen.queryByText("No active alerts right now.")).not.toBeInTheDocument();
   });
 });

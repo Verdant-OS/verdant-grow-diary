@@ -22,6 +22,14 @@ const H = vi.hoisted(() => ({
   secondTentId: "6b2d7f10-3c4e-4d6f-9a01-2b3c4d5e6f70",
   targetsStatus: "idle" as "idle" | "ok",
   targets: null as Record<string, { min: number | null; max: number | null }> | null,
+  alertsStatus: "ok" as "idle" | "loading" | "ok" | "unavailable",
+  kpiRenders: [] as string[],
+  alertsCommits: [] as {
+    kpi: string;
+    latestEnvCount: string | null | undefined;
+    alertRows: number;
+  }[],
+  alertRows: [] as unknown[],
   // The per-tent hook has not reported a status for the first tent yet.
   omitTentStatus: false,
 }));
@@ -157,7 +165,12 @@ vi.mock("@/hooks/usePersistEnvironmentAlerts", () => ({
   usePersistEnvironmentAlerts: (input: unknown) => H.persist(input),
 }));
 vi.mock("@/hooks/useAlertsList", () => ({
-  useAlertsList: () => ({ status: "ok", alerts: [], error: null, reload: vi.fn() }),
+  useAlertsList: () => ({
+    status: H.alertsStatus,
+    alerts: H.alertRows,
+    error: null,
+    reload: vi.fn(),
+  }),
 }));
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => undefined }));
 vi.mock("@/hooks/useNowTick", () => ({ useNowTick: () => Date.now() }));
@@ -191,13 +204,31 @@ vi.mock("@/components/DailyGrowCheckStatusCard", () => ({ default: () => null })
 vi.mock("@/components/DashboardDailyGrowCheckPanel", () => ({ default: () => null }));
 vi.mock("@/components/SensorSourceBadge", () => ({ default: () => null }));
 
-vi.mock("@/components/KpiCard", () => ({
-  default: ({ label, value }: { label: string; value: number }) => (
-    <div data-testid="dashboard-kpi-card">
-      {label}: {value}
-    </div>
-  ),
-}));
+vi.mock("@/components/KpiCard", async () => {
+  const { useLayoutEffect } = await import("react");
+  return {
+    default: function KpiCardMock({ label, value }: { label: string; value: number }) {
+      H.kpiRenders.push(`${label}: ${value}`);
+      // Layout effects run after this commit's DOM is written and before passive
+      // effects, so this sees exactly what that commit painted.
+      useLayoutEffect(() => {
+        if (!label.startsWith("Open alerts")) return;
+        H.alertsCommits.push({
+          kpi: String(value),
+          latestEnvCount: document.querySelector('[data-testid="latest-env-persisted-count"]')
+            ?.textContent,
+          alertRows: document.querySelectorAll('[data-testid="dashboard-active-alert-item"]')
+            .length,
+        });
+      });
+      return (
+        <div data-testid="dashboard-kpi-card">
+          {label}: {value}
+        </div>
+      );
+    },
+  };
+});
 vi.mock("@/components/DashboardZeroTentEmptyState", () => ({
   default: () => <div data-testid="dashboard-zero-tent-empty-state">No tents</div>,
 }));
@@ -235,6 +266,8 @@ function pendingFirstRead(fetchStatus: "paused" | "idle") {
 
 describe("Dashboard private-read honesty boundary", () => {
   beforeEach(() => {
+    H.alertsStatus = "ok";
+    H.alertRows = [];
     H.snapshotState = null;
     H.scoped = false;
     H.persist.mockClear();
@@ -697,5 +730,101 @@ describe("Dashboard private-read honesty boundary", () => {
     const empty = screen.getByTestId("dashboard-zero-tent-empty-state");
     const firstKpi = screen.getAllByTestId("dashboard-kpi-card")[0];
     expect(empty.compareDocumentPosition(firstKpi) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  // Open alerts honesty: a pending or failed alerts read is not zero alerts.
+  it.each([
+    ["loading", "Checking…", "pending"],
+    ["unavailable", "Unavailable", "unavailable"],
+  ] as const)(
+    "does not report zero open alerts while the alerts read is %s",
+    (status, kpiText, kind) => {
+      H.growStatus = "success";
+      H.alertsStatus = status;
+      renderDashboard();
+
+      const alertsKpi = screen
+        .getAllByTestId("dashboard-kpi-card")
+        .find((el) => el.textContent?.startsWith("Open alerts"));
+      expect(alertsKpi).toHaveTextContent(`Open alerts: ${kpiText}`);
+      expect(screen.queryByTestId("dashboard-active-alerts-empty")).toBeNull();
+      expect(screen.getByTestId("dashboard-active-alerts-unknown")).toHaveAttribute(
+        "data-kind",
+        kind,
+      );
+      expect(screen.queryByText("No active alerts right now.")).toBeNull();
+    },
+  );
+
+  it("does not confirm the previous grow's alerts read for a new grow scope", () => {
+    const openAlert = (id: string) => ({
+      id,
+      status: "open",
+      severity: "warning",
+      metric: "rh",
+      source: "derived",
+      title: `Old scope alert ${id}`,
+      reason: "Belongs to the previous scope",
+      created_at: "2026-10-01T00:00:00Z",
+    });
+    H.growStatus = "success";
+    H.alertsStatus = "ok";
+    // The previous scope has two open alerts, so a leak would be visible.
+    H.alertRows = [openAlert("old-1"), openAlert("old-2")];
+    const view = renderDashboard();
+    expect(H.kpiRenders).toContain("Open alerts: 2");
+    expect(screen.getAllByTestId("dashboard-active-alert-item")).toHaveLength(2);
+
+    // useAlertsList keeps reporting the old scope's 'ok' and rows until its
+    // effect runs.
+    H.scoped = true;
+    H.kpiRenders = [];
+    H.alertsCommits = [];
+    view.rerenderDashboard();
+
+    const alertsRenders = H.kpiRenders.filter((r) => r.startsWith("Open alerts"));
+    expect(alertsRenders[0]).toBe("Open alerts: Checking…");
+    // The first commit for the new grow paints neither the old count, the
+    // Latest Environment persisted-alerts line, nor the old alert rows.
+    expect(H.alertsCommits[0]).toEqual({
+      kpi: "Checking…",
+      latestEnvCount: undefined,
+      alertRows: 0,
+    });
+
+    // The hook's effect then starts the new grow's read: still pending. Like
+    // the real useAlertsList, loading keeps the previous rows until it settles.
+    H.alertsStatus = "loading";
+    H.alertsCommits = [];
+    view.rerenderDashboard();
+    expect(H.alertsCommits.at(-1)).toEqual({
+      kpi: "Checking…",
+      latestEnvCount: undefined,
+      alertRows: 0,
+    });
+
+    // Only the new grow's own successful read replaces the rows and confirms zero.
+    H.alertsStatus = "ok";
+    H.alertRows = [];
+    H.alertsCommits = [];
+    view.rerenderDashboard();
+    expect(H.alertsCommits.at(-1)).toEqual({
+      kpi: "0",
+      latestEnvCount: "No persisted open alerts for this grow.",
+      alertRows: 0,
+    });
+  });
+
+  it("reports zero open alerts only after the alerts read succeeds", () => {
+    H.growStatus = "success";
+    H.alertsStatus = "ok";
+    renderDashboard();
+
+    const alertsKpi = screen
+      .getAllByTestId("dashboard-kpi-card")
+      .find((el) => el.textContent?.startsWith("Open alerts"));
+    expect(alertsKpi).toHaveTextContent("Open alerts: 0");
+    expect(screen.getByTestId("dashboard-active-alerts-empty")).toBeVisible();
+    expect(screen.queryByTestId("dashboard-active-alerts-unknown")).toBeNull();
   });
 });

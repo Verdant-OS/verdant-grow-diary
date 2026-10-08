@@ -14,7 +14,7 @@ import {
   computeStabilityRollup,
   STABILITY_ROLLUP_TONE_CLASS,
 } from "@/lib/dashboardStabilityRollupRules";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@/lib/react-router-compat";
 
@@ -22,7 +22,6 @@ import { AlertTriangle, Box, Sprout, Sparkles, ArrowRight } from "lucide-react";
 import type { Stage, SensorReading } from "@/mock";
 import PageHeader from "@/components/PageHeader";
 import KpiCard from "@/components/KpiCard";
-import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
 import StageBadge from "@/components/StageBadge";
@@ -97,6 +96,7 @@ import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnv
 import { saveAlert, logAlertEvent } from "@/lib/alerts";
 import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 import { useAlertsList } from "@/hooks/useAlertsList";
+import { buildDashboardOpenAlertsView } from "@/lib/dashboardOpenAlertsViewModel";
 import { resolveSelectedTentIds, type TentSelection } from "@/lib/dashboardLatestEnvironmentRules";
 import {
   Select,
@@ -147,6 +147,7 @@ import {
 } from "@/lib/dashboardSensorEvidenceRules";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
 import TonightTentHomeCard from "@/components/TonightTentHomeCard";
+import { resolveSensorReadingTentScope } from "@/lib/tentScopedSensorReadingsRules";
 import {
   buildTonightLastLog,
   buildTonightTentMetrics,
@@ -177,9 +178,10 @@ export default function Dashboard() {
   const { data: plants = [] } = plantsQuery;
   // Per-tent windows over this scope's tents; never the unscoped all-tents
   // read, which hit the Postgres statement timeout (QA 2026-09-24).
+  const dashboardTentScope = resolveSensorReadingTentScope({ tents: tentsQuery });
   const dashboardReadingsQuery = useSensorReadings({
-    tentIds: tentsQuery.data ? tentsQuery.data.map((tent) => tent.id) : null,
-    scopeError: tentsQuery.isError,
+    tentIds: dashboardTentScope.tentIds,
+    scopeError: dashboardTentScope.scopeError,
     retryScope: tentsQuery.refetch,
   });
   const { data: rawReadings = [] } = dashboardReadingsQuery;
@@ -343,6 +345,15 @@ export default function Dashboard() {
     scopedGrowId ? { growId: scopedGrowId, status: "open" } : { status: "open" },
   );
   const persistedOpenCount = scopedGrowId ? persistedAlertsState.alerts.length : 0;
+  // useAlertsList starts each read in a passive effect, so right after a grow
+  // scope change it still reports the previous scope's 'ok'. This effect
+  // follows that hook's effect, so the new scope and its loading state land
+  // together (same guard as usePlantAssignedTentAlerts).
+  const alertsScopeKey = scopedGrowId ?? null;
+  const [alertsReadScope, setAlertsReadScope] = useState(alertsScopeKey);
+  useEffect(() => {
+    setAlertsReadScope(alertsScopeKey);
+  }, [alertsScopeKey]);
 
   // Persist derived Environment Alerts into public.alerts when (and only
   // when) they are backed by real, valid sensor readings. Idempotent and
@@ -365,6 +376,12 @@ export default function Dashboard() {
 
   // Open alert count and recent alerts come from real persisted alerts (RLS).
   const openAlerts = persistedAlertsState.alerts.filter((a) => a.status === "open").length;
+  // A pending or failed read is not "zero alerts"; see dashboardOpenAlertsViewModel.
+  const openAlertsView = buildDashboardOpenAlertsView({
+    status: persistedAlertsState.status,
+    openCount: openAlerts,
+    readScopeCurrent: alertsReadScope === alertsScopeKey,
+  });
 
   // Latest reading per tent for the strip + a read-only stability summary
   // computed from the same tent-scoped readings (no extra fetches, no writes).
@@ -399,7 +416,9 @@ export default function Dashboard() {
     };
   });
 
-  const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
+  // Another scope's rows are not this grow's alerts.
+  const recentAlerts =
+    openAlertsView.kind === "known" ? persistedAlertsState.alerts.slice(0, 3) : [];
 
   if (tentsQuery.isError || plantsQuery.isError) {
     return (
@@ -474,7 +493,6 @@ export default function Dashboard() {
   // the route Outlet, so the page root must not nest another.
   return (
     <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
-      <QuickLogV2Fab />
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}
@@ -486,15 +504,10 @@ export default function Dashboard() {
         description="Track your tents, plants, sensors, and grow activity in one place."
         icon={<Sparkles className="h-5 w-5" />}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          // data-testid="dashboard-ready" is the e2e readiness marker (census, responsive,
+          // signed-in performance). Loaded branch only; keep it unconditional.
+          <div className="flex items-center gap-2 flex-wrap" data-testid="dashboard-ready">
             <OnboardingProgressPill vm={onboardingVm} />
-            <Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">
-              {/* Route still targets /daily-check (the underlying Quick Log
-                  surface). Label unified to "Quick Log" so the Dashboard
-                  presents a single grower-facing logging concept. Carry
-                  scopedGrowId when present so Daily Check stays on this grow. */}
-              <Link to={withGrowId("/daily-check", scopedGrowId)}>Quick Log</Link>
-            </Button>
             <Button asChild className="gradient-leaf text-primary-foreground">
               <Link to={tentsPath()}>Open tents</Link>
             </Button>
@@ -537,7 +550,8 @@ export default function Dashboard() {
           First-run guidance now has one canonical relationship-aware card
           above, so two checklists cannot disagree or compete on mobile. */}
 
-      {/* Dashboard intentionally has a single Quick Log entry point (QuickLogV2Fab).
+      {/* The One-Tent Home card's Log is the page's single primary Log entry;
+          AppShell owns the Quick Log sheet triggers (header button, mobile FAB).
           The "Log your first plant memory" CTA was a duplicate entry point and was removed.
           The same CTA remains on TentDetail where it is contextually unique. */}
 
@@ -552,7 +566,9 @@ export default function Dashboard() {
       <DailyGrowCheckStatusCard
         className="mb-6"
         growId={scopedGrowId ?? null}
-        tentIds={tents.map((t) => t.id)}
+        // null while this scope's tents load (card stays loading); [] for a
+        // grow with no tents (empty scope), never "every active tent".
+        tentIds={dashboardTentScope.tentIds}
       />
 
       <DashboardDailyGrowCheckPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
@@ -1057,7 +1073,17 @@ export default function Dashboard() {
               </Link>
             </Button>
           </div>
-          {recentAlerts.length === 0 && (
+          {openAlertsView.kind !== "known" && (
+            <p
+              className="text-sm text-muted-foreground"
+              role="status"
+              data-testid="dashboard-active-alerts-unknown"
+              data-kind={openAlertsView.kind}
+            >
+              {openAlertsView.detail}
+            </p>
+          )}
+          {openAlertsView.kind === "known" && recentAlerts.length === 0 && (
             <div
               className="rounded-xl border border-dashed border-border/50 p-3"
               role="status"
@@ -1136,9 +1162,9 @@ export default function Dashboard() {
         />
         <KpiCard
           label="Open alerts"
-          value={openAlerts}
+          value={openAlertsView.kpiValue}
           icon={<AlertTriangle className="h-3.5 w-3.5" />}
-          accent={openAlerts > 0 ? "destructive" : "success"}
+          accent={openAlertsView.accent}
         />
       </div>
       {scopedGrowId ? (
@@ -1146,6 +1172,7 @@ export default function Dashboard() {
           <DashboardSensorHealthSummary
             summary={buildDashboardSensorHealthSummary(sensorState)}
             activeAlertCount={openAlerts}
+            alertsKnown={openAlertsView.kind === "known"}
             growId={scopedGrowId}
             className="mt-4"
           />
@@ -1195,7 +1222,8 @@ export default function Dashboard() {
                 </Link>
               </div>
             </div>
-            {persistedAlertsState.status === "ok" && (
+            {/* Known means this grow's read succeeded, not a previous scope's. */}
+            {openAlertsView.kind === "known" && (
               <div
                 className="mb-3 text-xs text-muted-foreground"
                 data-testid="latest-env-persisted-count"

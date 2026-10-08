@@ -18,6 +18,10 @@ import {
   withHostHeaders,
   workerRoutingEnv,
 } from "@/lib/cloudflareHostRoutingRules";
+import {
+  CONTENT_SECURITY_POLICY_REPORT_ONLY_HEADER,
+  buildContentSecurityPolicyReportOnly,
+} from "@/lib/securityHeadersRules";
 import worker from "../server";
 
 const ROOT = resolve(__dirname, "../..");
@@ -223,12 +227,18 @@ describe("legacy permanent redirects", () => {
 describe("response headers", () => {
   it("applies the global security headers on a normal page", () => {
     const headers = hostHeadersForPathname("/");
-    expect(headers).toEqual(GLOBAL_SECURITY_HEADERS);
+    expect(headers).toEqual([
+      ...GLOBAL_SECURITY_HEADERS,
+      [CONTENT_SECURITY_POLICY_REPORT_ONLY_HEADER, buildContentSecurityPolicyReportOnly()],
+    ]);
     expect(headers).toContainEqual(["X-Content-Type-Options", "nosniff"]);
     expect(headers).toContainEqual([
       "Strict-Transport-Security",
       "max-age=63072000; includeSubDomains; preload",
     ]);
+    const names = headers.map(([name]) => name.toLowerCase());
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).not.toContain("content-security-policy");
   });
 
   it("gives /unsubscribe no-store, no-referrer, and noindex over the global referrer policy", () => {
@@ -240,6 +250,10 @@ describe("response headers", () => {
     expect(headerValue(headers, "Strict-Transport-Security")).toBe(
       "max-age=63072000; includeSubDomains; preload",
     );
+    expect(headerValue(headers, CONTENT_SECURITY_POLICY_REPORT_ONLY_HEADER)).toBe(
+      buildContentSecurityPolicyReportOnly(),
+    );
+    expect(headerValue(headers, "Content-Security-Policy")).toBeNull();
   });
 
   it("marks hashed assets immutable without dropping the security headers", () => {
@@ -403,6 +417,7 @@ describe("static asset header file", () => {
       "Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=()",
     );
     expect(text).toContain("X-Frame-Options: SAMEORIGIN");
+    expect(text.toLowerCase()).not.toContain("content-security-policy");
 
     const unsubscribe = text.slice(text.indexOf("/unsubscribe"));
     expect(unsubscribe).toContain("Cache-Control: no-store");

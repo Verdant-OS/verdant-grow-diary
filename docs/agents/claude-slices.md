@@ -172,7 +172,12 @@ when its text:
   (`db.from.call(db, "action_queue")`, `db.from.apply(db, ["action_queue"])`,
   `db.from.bind(db)("action_queue")`, any chain of `bind` followed by `call` or `apply`
   such as `db.from.bind(db).call(null, "action_queue")`), also with the arguments spread from a literal
-  array (`db.from(...["action_queue"])`). Mentioning an Action Queue row ID, type or
+  array (`db.from(...["action_queue"])`). A file that also uses `.from` or `.rpc` as a
+  value (anything but a direct call: `.bind`, `.call`, `.apply`, `Reflect.apply(db.from, …)`,
+  `const f = db.from`) and has an Action Queue table or RPC name anywhere locks as well, so
+  no Function-method composition can hide the call; reading another member
+  (`x.from.mock.calls`), an `expect(...)` argument, a same-name mock property
+  (`{ from: mock.from }`) and a write to a member named `from` don't count. Mentioning an Action Queue row ID, type or
   comment doesn't lock, and neither does a bare string literal elsewhere
   (generated types, view models, source-scan tests), so pure helpers such as
   `pendingOutcomeReviewRules.ts` stay editable.
@@ -218,8 +223,7 @@ include:
   and calls it there;
 - a table or RPC name imported from another module, held in an object property
   (`db.from(TABLES.queue)`), passed as a parameter, or built at runtime
-  (`"action_" + "queue"`), or a query method reached through `Reflect.apply`
-  (`Reflect.apply(db.from, db, ["action_queue"])`);
+  (`"action_" + "queue"`);
 - reaching the namespace without naming it as `auth` or `["auth"]`, for example
   `Reflect.get(supabase, "auth")` or a computed key held in a variable;
 - the namespace passed as a call argument (`wrap(supabase.auth, "x").signOut()`;

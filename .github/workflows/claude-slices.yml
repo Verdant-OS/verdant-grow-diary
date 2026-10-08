@@ -677,7 +677,51 @@ jobs:
               if (ts.isTypeNode(p) || p.kind === K.QualifiedName || p.kind === K.ExpressionWithTypeArguments) return false;
               return true;
             };
+            // A query function used as a value, and any Action Queue name anywhere in
+            // the file, lock together (Codex P1 at a8ef4552, the fourth Function-method
+            // form in a row): db.from.bind.call(db.from, db)("action_queue"),
+            // Reflect.apply(db.from, ...), const f = db.from. Only a direct call such as
+            // db.from("x") or db?.rpc<T>("x") uses the function without letting it escape.
+            let queryEscapes = false;
+            let aqName = false;
+            const isQueryKey = key => key === 'from' || key === 'rpc';
+            const FUNCTION_METHODS = new Set(['bind', 'call', 'apply']);
+            // Where x.from or x.rpc appears other than as the callee of a call. Reading
+            // another member (x.from.mock.calls), an expect(...) argument, and an object
+            // property of the same name ({ from: mock.from }, whose later c.from("…")
+            // call the direct rule sees) are test-mock usage, not an escape.
+            const queryValueEscapes = (child, parent) => {
+              if (parent.kind === K.CallExpression) {
+                if (parent.expression === child) return false;
+                const fn = unwrap(parent.expression);
+                return !(fn && ts.isIdentifier(fn) && fn.text === 'expect');
+              }
+              if ((parent.kind === K.PropertyAccessExpression || parent.kind === K.ElementAccessExpression) && parent.expression === child) {
+                const name = memberName(parent);
+                return name === '*' || FUNCTION_METHODS.has(name);
+              }
+              if (parent.kind === K.PropertyAssignment && parent.initializer === child && isQueryKey(propKey(parent.name))) return false;
+              // A write to the member (config.replacements[0].from = "x") is not a read
+              // of the function.
+              if (parent.kind === K.BinaryExpression && parent.left === child &&
+                  parent.operatorToken.kind >= FIRST_ASSIGNMENT && parent.operatorToken.kind <= LAST_ASSIGNMENT) return false;
+              return true;
+            };
             const visit = node => {
+              const queryMember = (node.kind === K.PropertyAccessExpression || node.kind === K.ElementAccessExpression) && isQueryKey(memberName(node));
+              if (queryMember) {
+                let child = node;
+                let parent = node.parent;
+                while (parent && WRAPPERS.has(parent.kind)) { child = parent; parent = parent.parent; }
+                if (parent && queryValueEscapes(child, parent)) queryEscapes = true;
+              }
+              if ((node.kind === K.BindingElement && isQueryKey(propKey(node.propertyName ?? node.name))) ||
+                  ((node.kind === K.PropertyAssignment || node.kind === K.ShorthandPropertyAssignment) &&
+                   isQueryKey(propKey(node.name)) && isAssignmentPattern(node.parent))) queryEscapes = true;
+              if (node.kind === K.StringLiteral || node.kind === K.NoSubstitutionTemplateLiteral || node.kind === K.TemplateExpression) {
+                const text = node.kind === K.TemplateExpression ? node.head.text : node.text;
+                if (AQ_LITERAL.test(text) || AQ_NAME_SET.has(text)) aqName = true;
+              }
               // x.auth.signOut, auth?.["signIn"], a.admin, auth[key]: a D1 member, or a
               // computed one, of the namespace.
               const name = memberName(node);
@@ -772,6 +816,7 @@ jobs:
               if (node.kind === K.VariableDeclaration && node.initializer && AQ_NAME_SET.has(literalText(node.initializer))) rules.add('aq-io');
             };
             walk(source, visit);
+            if (queryEscapes && aqName) rules.add('aq-io');
             return [...rules];
           }
 
@@ -1296,6 +1341,12 @@ jobs:
               'db.from.bind(db).call(null, ...["action_queue"]).select();', 'db.from.bind(db).apply(null, ["action_queue"]);',
               'db.from.bind(db).call(null, "action_queue");', 'db.from.bind(db).bind(null)("action_queue");',
               'db.rpc.bind(db).call(db, "action_queue_create", p);', '(db.from.bind(db) as any).call(null, `action_queue`);',
+              // Codex P1 at a8ef4552: a query function used as a value, with an Action Queue
+              // name anywhere in the file.
+              'db.from.bind.call(db.from, db)("action_queue").select();', 'db.from.bind.apply(db.from, [db])("action_queue");',
+              'Reflect.apply(db.from, db, ["action_queue"]);', 'const f = db.from.bind(db); f("action_queue");',
+              'const f = db.from; f.call(db, "action_queue");', 'const { from } = db; from.call(db, "action_queue");',
+              'Function.prototype.call.call(db.from, db, "action_queue");', 'db.rpc.bind.call(db.rpc, db)("action_queue_create", p);',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), ['aq-io, head'], text);
               assert.deepEqual(astRules('src/lib/fooRules.ts', text), ['aq-io'], `AST: ${text}`);
@@ -1363,7 +1414,12 @@ jobs:
               'function f(auth) { const alias = auth; return alias; }',
               'function f(auth) { const alias = auth; const o = { alias }; return o; }',
               'const auth = useRoute(); const r = auth; export default r;',
-              'db.from.call(db, "plants").select();', 'db.from(...["plants"]).select();', 'db.from.bind(db).call(null, "plants");', 'const { auth: { user } } = state;', 'fn.call(db, "action_queue_note");', 'const { ["data"]: d } = supabase;',
+              'db.from.call(db, "plants").select();', 'db.from(...["plants"]).select();', 'db.from.bind(db).call(null, "plants");',
+              // Test-mock uses of a query member next to an Action Queue name (census).
+              'expect(forbidden.rpc).not.toHaveBeenCalled(); log("action_queue");',
+              'for (const c of client.from.mock.calls) expect(c[0]).not.toBe("action_queue");',
+              'vi.mock("x", () => ({ supabase: { from: mock.from } })); log("action_queue");',
+              'cfg.replacements[0].from = "x"; log("action_queue");', 'const { auth: { user } } = state;', 'fn.call(db, "action_queue_note");', 'const { ["data"]: d } = supabase;',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
               assert.deepEqual(astRules('src/lib/fooRules.ts', text), [], `AST: ${text}`);

@@ -79,15 +79,26 @@ anything.
    `docs/specs/release-topology-specification.md`). Restoring the account can let the
    platform build and promote the current tip on its own, so the order is fixed:
    - **(a)** The owner picks the build that first serves and records its SHA in the receipt.
+     For this sequence it must be the frozen tip of `verdant-grow-diary`. Every later
+     workflow here is dispatched at `--ref verdant-grow-diary` and pins `E2E_EXPECTED_SHA`
+     to that tip, so with an older build `wait-for-deployed-sha` times out without
+     measuring anything. **Stop** if the owner picks a different SHA: this checklist
+     doesn't apply as written.
    - **(b)** **Before the account is restored**, the owner sets a no-auto-promotion fence
      (automatic production promotion and automatic rollout turned off for the Vercel
      project), or arranges a restoration pinned to that SHA, and reads the setting back. The
      read-back goes in the receipt. **Stop** if it can't be read back: a recorded choice
      without a fence is not a control.
    - **(c)** Only then the owner restores the account (the 402 clears).
-   - **(d)** M4 confirms a READY production build of the chosen SHA exists, and no other
-     build has been promoted since the restore.
-   - **(e)** The owner publishes (promotes) that build. See
+   - **(d)** M4 confirms a READY production build of the chosen SHA exists. M4 answers what
+     was built, not what is served, so it can't show that nothing was promoted since.
+   - **(e)** Immediately before promoting, the owner re-reads the serving state: the
+     production-host inventory and each hostname's current serving deployment, as the
+     runbook's "Manual promotion — Matthew only" pre-promotion reads require (M10's
+     hostname reads). **Stop** if any of it differs from the runbook's owner promotion
+     packet: an intervening promote, rollback or alias move would otherwise be overwritten
+     unseen.
+   - **(f)** The owner publishes (promotes) that build. See
      `docs/agents/RUNBOOK_VERCEL_PROMOTE.md`. Promotion is Matthew only. When to lift the
      fence afterwards is Matthew's call, and goes in the receipt.
 2. `https://verdantgrowdiary.com/version.json` reports the chosen SHA from 1(a) and

@@ -54,15 +54,15 @@ branch: cursor/cloudflare-worker-routing-54eb
 base: verdant-grow-diary
 checkout: git fetch origin cursor/cloudflare-worker-routing-54eb verdant-grow-diary && git switch cursor/cloudflare-worker-routing-54eb && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1943 (draft)
-head_sha: recorded in the next log update after this commit is pushed
-state: Worker entry applies redirects before SSR and headers on the response. public/_headers carries the same header rules for the assets binding. The SPA catch-all rewrite is not applied as an internal rewrite to /, because that would replace every SSR route with the homepage; oauth and assets stay excluded. Permanent 308s hid the legacy alias SSR documents from postbuild head capture, so the capture retries once with VERDANT_SEO_SNAPSHOT=1 and x-verdant-seo-snapshot: 1. A request header alone still redirects. The oauth 307 is never skipped.
-next_action: bun run build, curl the local Worker, paste the output into PR #1943, then address CodeRabbit and watch CI. Stay draft. Do not deploy or merge.
+head_sha: 64f28c485e013b4bf4d0db83fa7e1cd05cc4a316 (build and local wrangler curl verified here; a log-only commit may follow)
+state: Worker entry applies redirects before SSR and headers on the response. public/_headers carries the same header rules for the assets binding. The SPA catch-all rewrite is not applied as an internal rewrite to /. bun run build exited 0 at this SHA (77/77 SSR snapshots). Local wrangler on 127.0.0.1:8787: /~oauth/initiate 307 to the Lovable host, /strains and /refund-policy 308, /unsubscribe 200 with no-store / no-referrer / noindex, / and /welcome 200. The capture retry uses VERDANT_SEO_SNAPSHOT on Nitro's globalThis.__env__. A request header alone still redirects. The oauth 307 is never skipped.
+next_action: address CodeRabbit if it comments, and watch the 35 required checks. Stay draft. Do not deploy or merge.
 files: src/lib/cloudflareHostRoutingRules.ts; src/server.ts; public/_headers; src/test/cloudflare-host-routing-rules.test.ts; scripts/capture-ssr-head-snapshots-with-server.mjs; docs/agents/HANDOFF_LOG.md
 blockers: none for the repository change. Do not deploy, merge, or write the Lovable production Supabase project. #1937 also edits src/server.ts and public/_headers; keep the two PRs separate and merge the header application if that PR lands first.
 artifacts: src/test/cloudflare-host-routing-rules.test.ts
 reviewer_seat: Critical Mass (no product .tsx; lib, Worker entry, tests)
 claimed_by: Grok, 2026-10-08 11:49 CT
-last_updated: 2026-10-08 11:59 CT, by Grok
+last_updated: 2026-10-08 12:08 CT, by Grok
 ```
 
 ### CLAUDE-CODE-ACTION-002

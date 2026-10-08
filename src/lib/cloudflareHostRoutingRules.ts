@@ -1,4 +1,8 @@
 import { buildLegacyStrainSlugAliasTarget, buildRouteAliasTarget } from "@/lib/routeAliasRules";
+import {
+  CONTENT_SECURITY_POLICY_REPORT_ONLY_HEADER,
+  buildContentSecurityPolicyReportOnly,
+} from "@/lib/securityHeadersRules";
 
 /**
  * Host routing that `vercel.json` applied on Vercel and that the Cloudflare
@@ -20,6 +24,11 @@ export const SPA_CATCH_ALL_REWRITE = {
   destination: "/",
 } as const;
 
+/**
+ * `vercel.json` `/(.*)` headers, unchanged. Report-only CSP is not in this
+ * list: `vercel.json` does not publish it, and `public/_headers` does not
+ * either. `hostHeadersForPathname` appends it for Worker responses.
+ */
 export const GLOBAL_SECURITY_HEADERS = [
   ["X-Content-Type-Options", "nosniff"],
   ["X-Frame-Options", "SAMEORIGIN"],
@@ -97,6 +106,7 @@ export function isSpaCatchAllExcluded(pathname: string): boolean {
 export function hostHeadersForPathname(pathname: string | null | undefined): HostHeader[] {
   const headers = new Map<string, string>();
   for (const [name, value] of GLOBAL_SECURITY_HEADERS) headers.set(name, value);
+  headers.set(CONTENT_SECURITY_POLICY_REPORT_ONLY_HEADER, buildContentSecurityPolicyReportOnly());
 
   const path = normalizePathname(pathname);
   if (!path) return [...headers.entries()];

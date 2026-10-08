@@ -453,3 +453,33 @@ describe("Codex re-review P1: attached env -S argument", () => {
     expect(checkBash("env -S'git push origin claude/task'")).toBe(null);
   });
 });
+
+describe("Codex re-review P1s: wrapper long-option prefixes, variadic --project", () => {
+  test("env and sudo long options are matched by unambiguous prefix", () => {
+    for (const cmd of [
+      "env --spli='git push -f origin claude/task'",
+      "env --spl 'git push -f origin claude/task'",
+      "sudo --us runner git push --force",
+      "env --chd /tmp git push --force",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env --spli='git push origin claude/task'")).toBe(null);
+  });
+  test("--project without = takes every following word as a project name", () => {
+    for (const cmd of [
+      "bunx playwright test --project chromium-mocked chromium-authed",
+      "bunx playwright test --project chromium-authed chromium-mocked",
+      "bunx playwright test --project chromium-mocked e2e/auth-loading.spec.ts",
+      "bunx playwright test --project=chromium-authed --project chromium-mocked",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(
+      checkBash("bunx playwright test --project=chromium-mocked e2e/auth-loading.spec.ts"),
+    ).toBe(null);
+    expect(
+      checkBash("bunx playwright test e2e/auth-loading.spec.ts --project chromium-mocked"),
+    ).toBe(null);
+  });
+});

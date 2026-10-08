@@ -210,15 +210,19 @@ function stripPrefix(tokens: string[], onSplit?: (split: string) => void): strin
         i += 1;
         break;
       }
-      if (head === "env" && (option === "-S" || option === "--split-string")) {
-        split = rest[i + 1] ?? "";
-        i += 2;
-        break;
-      }
-      if (head === "env" && option.startsWith("--split-string=")) {
-        split = option.slice("--split-string=".length);
-        i += 1;
-        break;
+      if (option.startsWith("--")) {
+        // Long options match by unambiguous prefix, as getopt_long does (`--spli`, `--us`).
+        const eq = option.indexOf("=");
+        if (head === "env" && longOpt(option, "split-string")) {
+          split = eq >= 0 ? option.slice(eq + 1) : (rest[i + 1] ?? "");
+          i += eq >= 0 ? 1 : 2;
+          break;
+        }
+        const takesValue =
+          eq < 0 &&
+          [...valueOptions].some((v) => v.startsWith("--") && longOpt(option, v.slice(2)));
+        i += takesValue ? 2 : 1;
+        continue;
       }
       // A single-dash option is read letter by letter, whatever follows the first letter: an
       // attached value can hold any character (`env -S'git push -f'`, `sudo -urunner`).
@@ -423,12 +427,21 @@ function checkPlaywright(tokens: string[]): string | null {
   const t = stripRunner(tokens);
   if (t[0] !== "playwright" || t[1] !== "test") return null;
   const args = t.slice(2);
-  let project: string | null = null;
+  const projects: string[] = [];
   let specs = 0;
   for (let i = 0; i < args.length; i += 1) {
     const a = args[i] ?? "";
-    if (a.startsWith("--project=")) project = a.slice("--project=".length);
-    else if (a === "--project") project = args[i + 1] ?? null;
+    if (a.startsWith("--project=")) {
+      projects.push(a.slice("--project=".length));
+      continue;
+    }
+    if (a === "--project") {
+      // `--project <project-name...>` is variadic: every word up to the next option is a project
+      // name, a spec path included (Playwright then reports that "project" as not found).
+      while (i + 1 < args.length && !(args[i + 1] ?? "-").startsWith("-"))
+        projects.push(args[++i]!);
+      continue;
+    }
     if (a.startsWith("-")) {
       // `--debug [mode]` takes an optional mode (Playwright 1.62: `inspector` or `cli`).
       if (a === "--debug" && PW_DEBUG_MODES.has(args[i + 1] ?? "")) {
@@ -442,7 +455,8 @@ function checkPlaywright(tokens: string[]): string | null {
     }
     specs += 1;
   }
-  if (project && project.includes("mocked") && specs === 0) {
+  const project = projects.find((p) => p.includes("mocked"));
+  if (project && specs === 0) {
     return `\`--project=${project}\` without a spec filter can reach real Supabase (that project installs no global route mocks). Pass an explicit spec path.`;
   }
   return null;

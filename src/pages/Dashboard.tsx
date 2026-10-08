@@ -14,7 +14,7 @@ import {
   computeStabilityRollup,
   STABILITY_ROLLUP_TONE_CLASS,
 } from "@/lib/dashboardStabilityRollupRules";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@/lib/react-router-compat";
 
@@ -197,7 +197,12 @@ export default function Dashboard() {
   // Mock-fallback tent ids ("t1"…) would 400 against the uuid tent_id
   // column — only query real UUIDs; a non-UUID id cannot have rows, so its
   // absence is established (same guard as the Tents list).
-  const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
+  // Performance optimization: Memoize tentIds so useSensorReadingsByTents and
+  // useEnvironmentTrends receive a stable array reference across re-renders.
+  const tentIds = useMemo(
+    () => tents.map((t) => t.id).filter((id) => isUuid(id)),
+    [tents],
+  );
   const { byTent: readingsByTent, statusByTent: sensorStatusByTent } =
     useSensorReadingsByTents(tentIds);
   // Freshness is time-relative: re-evaluate the snapshot strip's clock every
@@ -242,7 +247,7 @@ export default function Dashboard() {
   const stageSaveBlock = stageReadsCurrentForWrite ? null : ALERT_SAVE_STAGE_UNCONFIRMED_MESSAGE;
   const trendsState = useEnvironmentTrends(
     scopedGrowId ?? null,
-    tents.map((t) => t.id),
+    tentIds,
   );
   const targetsState = useGrowTargets(scopedGrowId ?? null);
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);

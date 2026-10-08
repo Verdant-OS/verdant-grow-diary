@@ -1,23 +1,24 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { QueryClient } from "@tanstack/react-query";
 import {
   createMemoryHistory,
-  createRootRoute,
+  createRootRouteWithContext,
   createRoute,
   createRouter,
-  notFound,
 } from "@tanstack/react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Route as SplatRoute } from "@/routes/$";
+import type { RootRouteContext } from "@/routes/__root";
 
 vi.mock("@/pages/NotFound", () => ({ default: () => null }));
 
 // The file route is already bound to src/routes/__root.tsx by the router
-// plugin, so mount the same loader behaviour plus its real notFoundComponent on a
-// stand-in splat under a minimal root. The router mechanism under test is the
-// same one the production tree uses.
-const rootRoute = createRootRoute({ component: () => null });
+// plugin, so mount its production loader and components on a splat under a
+// minimal root. Status assertions must exercise the real loader so removing its
+// notFound() throw fails this regression.
+const rootRoute = createRootRouteWithContext<RootRouteContext>()({
+  component: () => null,
+});
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
@@ -26,9 +27,7 @@ const indexRoute = createRoute({
 const splatRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "$",
-  loader: () => {
-    throw notFound();
-  },
+  loader: SplatRoute.options.loader,
   notFoundComponent: SplatRoute.options.notFoundComponent,
   component: SplatRoute.options.component,
 });
@@ -37,6 +36,7 @@ const routeTree = rootRoute.addChildren([indexRoute, splatRoute]);
 function buildRouter(path: string) {
   return createRouter({
     routeTree,
+    context: { queryClient: new QueryClient() },
     history: createMemoryHistory({ initialEntries: [path] }),
     isServer: true,
   });
@@ -67,11 +67,5 @@ describe("catch-all route reports HTTP 404 (no soft 404)", () => {
   it("the catch-all declares a route-level notFoundComponent so the branded page still renders", () => {
     expect(SplatRoute.options.notFoundComponent).toBeTypeOf("function");
     expect(SplatRoute.options.loader).toBeTypeOf("function");
-  });
-
-  it("source pin: $.tsx throws notFound() from its loader", () => {
-    const source = readFileSync(join(__dirname, "..", "routes", "$.tsx"), "utf8");
-    expect(source).toMatch(/throw notFound\(\)/);
-    expect(source).toMatch(/notFoundComponent: NotFound/);
   });
 });

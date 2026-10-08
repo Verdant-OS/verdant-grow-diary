@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PR-1939-NOT-FOUND-COVERAGE
+
+```text
+TASK PR-1939-NOT-FOUND-COVERAGE  priority: P2  status: OPEN
+goal: exercise the production catch-all loader in HTTP-status regressions; remove source-text pin
+branch: fix/not-found-404-status
+base: verdant-grow-diary
+checkout: git switch fix/not-found-404-status && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1939
+head_sha: read current PR head; this coverage correction is a direct child of verified 399919de242681a2a96a81f98282da3a47f5a0da
+state: regression coverage implemented; draft, unmerged; no production-code changes
+next_action: independent exact-head review; verify current-head CI, no merge or publish in this task
+files: src/test/not-found-route-status.test.tsx; docs/agents/HANDOFF_LOG.md (this record)
+blockers: standard tsc exhausted the local 2 GiB heap; native alternative receipt is on the PR
+artifacts: PR validation receipt and inline thread replies; local mutation restored production route byte-for-byte
+reviewer_seat: Critical Mass for test correction; Blue Dream for existing product .tsx change
+claimed_by: Codex, 2026-10-08 05:56 UTC (PR claim comment)
+last_updated: 2026-10-08 06:02 UTC, by Codex
+```
+
 ```text
 TASK DASHBOARD-SINGLE-LOG-ENTRY  priority: P2  status: OPEN
 goal: remove the Dashboard header Quick Log link and the page's own QuickLogV2Fab (GDP D1.1-A,

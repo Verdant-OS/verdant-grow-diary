@@ -200,6 +200,14 @@ function searchFromRequest(request: Request): string {
 
 export const SEO_SNAPSHOT_ENV = "VERDANT_SEO_SNAPSHOT";
 
+/** workerd sets this. A production or `wrangler dev` isolate must not skip redirects. */
+export const CLOUDFLARE_WORKERS_RUNTIME = "Cloudflare-Workers";
+
+export function seoSnapshotRuntimeAllowed(): boolean {
+  if (typeof navigator === "undefined") return true;
+  return navigator.userAgent !== CLOUDFLARE_WORKERS_RUNTIME;
+}
+
 function snapshotEnvValue(env: unknown): unknown {
   if (!env || typeof env !== "object") return undefined;
   return (env as Record<string, unknown>)[SEO_SNAPSHOT_ENV];
@@ -219,6 +227,7 @@ export function workerRoutingEnv(explicit: unknown): unknown {
 
 /** Build-only. A request header alone must not skip a public redirect. */
 export function seoSnapshotBypassRequested(request: Request, env: unknown): boolean {
+  if (!seoSnapshotRuntimeAllowed()) return false;
   return (
     snapshotEnvValue(env) === SEO_SNAPSHOT_HEADER_VALUE &&
     request.headers.get(SEO_SNAPSHOT_HEADER) === SEO_SNAPSHOT_HEADER_VALUE

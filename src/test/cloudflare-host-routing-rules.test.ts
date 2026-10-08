@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   ASSET_CACHE_CONTROL,
+  CLOUDFLARE_WORKERS_RUNTIME,
   GLOBAL_SECURITY_HEADERS,
   LOVABLE_OAUTH_ORIGIN,
   SEO_SNAPSHOT_ENV,
@@ -302,6 +303,27 @@ describe("response headers", () => {
     );
     expect(envAlone?.status).toBe(308);
 
+    const previousUserAgent = navigator.userAgent;
+    Object.defineProperty(navigator, "userAgent", {
+      configurable: true,
+      get: () => CLOUDFLARE_WORKERS_RUNTIME,
+    });
+    try {
+      const refused = redirectResponseFor(
+        new Request("https://verdantgrowdiary.com/strains/blue-dream", {
+          headers: { [SEO_SNAPSHOT_HEADER]: SEO_SNAPSHOT_HEADER_VALUE },
+        }),
+        snapshotEnv,
+      );
+      expect(refused?.status).toBe(308);
+      expect(refused?.headers.get("location")).toBe("/cultivars/blue-dream");
+    } finally {
+      Object.defineProperty(navigator, "userAgent", {
+        configurable: true,
+        get: () => previousUserAgent,
+      });
+    }
+
     const oauth = redirectResponseFor(
       new Request("https://verdantgrowdiary.com/~oauth/initiate?provider=google", {
         headers: { [SEO_SNAPSHOT_HEADER]: SEO_SNAPSHOT_HEADER_VALUE },
@@ -345,6 +367,8 @@ describe("response headers", () => {
     expect(response.headers.get("location")).toBe("/refund");
   });
 
+  // @source-scan-justified: the capture script is a bun process over the built
+  // bundle, so this pins the retry call; the Worker behavior is asserted above.
   it("pins the SEO capture retry so a 308 alias document is re-requested once", () => {
     const capture = readFileSync(
       resolve(ROOT, "scripts/capture-ssr-head-snapshots-with-server.mjs"),

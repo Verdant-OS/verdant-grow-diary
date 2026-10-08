@@ -356,9 +356,10 @@ function restoreDelimiters(text: string): string {
 /**
  * An entity starts with `&`, or with the held stand-in a decoded `&amp;` became (`&amp;quot;`),
  * and ends with `;` or its held stand-in, so a percent-encoded entity (`%26quot%3B`) decodes too.
+ * Names are case-sensitive: the uppercase forms are only the four the HTML spec defines.
  */
 const HTML_ENTITY_PATTERN =
-  /[&\uE026](?:#(\d{1,7})|#[xX]([0-9A-Fa-f]{1,6})|(quot|apos|amp|colon|comma|semi|equals|lt|gt))[;\uE03B]/g;
+  /[&\uE026](?:#(\d{1,7})|#[xX]([0-9A-Fa-f]{1,6})|(quot|apos|amp|colon|comma|semi|equals|lt|gt|QUOT|AMP|LT|GT))[;\uE03B]/g;
 const NAMED_HTML_ENTITIES: Record<string, string> = {
   quot: '"',
   apos: "'",

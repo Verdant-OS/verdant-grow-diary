@@ -342,6 +342,12 @@ describe("errorReportingRules — privacy of outgoing events", () => {
         "AbCdEf1234567890",
       ],
       ["%26%2334%3Bpassword%26%2334%3B%3A%26%2334%3Bhunter2%26%2334%3B", "hunter2"],
+      ["&QUOT;access_token&QUOT;:&QUOT;AbCdEf1234567890&QUOT;", "AbCdEf1234567890"],
+      [
+        "%26QUOT%3Baccess_token%26QUOT%3B%3A%26QUOT%3BAbCdEf1234567890%26QUOT%3B",
+        "AbCdEf1234567890",
+      ],
+      ["access_token=abc&AMP;defSECRET", "SECRET"],
       [`{'details':null,'hint':null,'message':'db','metadata':{"x":"}",'code':'12345'}}`, "12345"],
     ];
     for (const [input, secret] of cases) {

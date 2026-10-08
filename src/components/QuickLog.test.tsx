@@ -11,7 +11,7 @@
  * (including photo) stay off the ordinary selector and fail closed
  * if supplied through a crafted prefill.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
@@ -65,20 +65,35 @@ vi.mock("@/store/auth", () => ({
 
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
-    grows: [{ id: "grow-1", name: "Test Grow", stage: "veg" }],
-    activeGrow: { id: "grow-1", name: "Test Grow", stage: "veg" },
-    activeGrowId: "grow-1",
+    grows: [{ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Test Grow", stage: "veg" }],
+    activeGrow: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Test Grow", stage: "veg" },
+    activeGrowId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     setActiveGrowId: vi.fn(),
   }),
 }));
 
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [{ id: "plant-1", name: "Test Plant", tent_id: "tent-1", grow_id: "grow-1" }],
+    data: [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        name: "Test Plant",
+        tent_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        grow_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
-  useTents: () => ({ data: [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }] }),
+  useTents: () => ({
+    data: [
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        name: "Tent 1",
+        grow_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
+  }),
 }));
 
 const toastError = vi.fn();
@@ -92,7 +107,22 @@ vi.mock("sonner", () => ({
   },
 }));
 
+const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 beforeEach(() => {
+  let tail: Promise<unknown> = Promise.resolve();
+  Object.defineProperty(window.navigator, "locks", {
+    configurable: true,
+    value: {
+      request: (_name: string, _options: unknown, callback: () => unknown) => {
+        const turn = tail.then(callback);
+        tail = turn.then(
+          () => undefined,
+          () => undefined,
+        );
+        return turn;
+      },
+    },
+  });
   saveMock.mockReset();
   saveMock.mockResolvedValue({ ok: true });
   insertMock.mockReset();
@@ -101,6 +131,10 @@ beforeEach(() => {
   toastSuccess.mockReset();
   toastMessage.mockReset();
   window.localStorage.clear();
+});
+afterEach(() => {
+  if (originalLocks) Object.defineProperty(window.navigator, "locks", originalLocks);
+  else Reflect.deleteProperty(window.navigator, "locks");
 });
 
 describe("QuickLog photo attach — disabled (no upload path)", () => {
@@ -119,7 +153,10 @@ describe("QuickLog photo attach — disabled (no upload path)", () => {
       <QuickLog
         open={true}
         onOpenChange={vi.fn()}
-        prefill={{ plantId: "plant-1", growId: "grow-1" }}
+        prefill={{
+          plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        }}
       />,
     );
     const dialog = screen.getByRole("dialog");
@@ -154,9 +191,9 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
         open={true}
         onOpenChange={vi.fn()}
         prefill={{
-          plantId: "plant-1",
-          growId: "grow-1",
-          tentId: "tent-1",
+          plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
           eventType: "watering",
           wateringVolumeMl: 500,
         }}
@@ -232,9 +269,9 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
           open={true}
           onOpenChange={vi.fn()}
           prefill={{
-            plantId: "plant-1",
-            growId: "grow-1",
-            tentId: "tent-1",
+            plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             eventType: "watering",
             wateringVolumeMl: handoffVolumeMl,
             source: "public-starter",
@@ -280,9 +317,9 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
         open={true}
         onOpenChange={vi.fn()}
         prefill={{
-          plantId: "plant-1",
-          growId: "grow-1",
-          tentId: "tent-1",
+          plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
           eventType: "watering",
           wateringVolumeMl: 500,
           source: "public-starter",
@@ -298,7 +335,7 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
     expect(saveMock.mock.calls[0][0]).toMatchObject({
       p_action: "water",
       p_volume_ml: 500,
-      p_target_id: "plant-1",
+      p_target_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     });
     await waitFor(() =>
       expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBeNull(),
@@ -328,9 +365,9 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
         open={true}
         onOpenChange={vi.fn()}
         prefill={{
-          plantId: "plant-1",
-          growId: "grow-1",
-          tentId: "tent-1",
+          plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
           eventType: "watering",
           wateringVolumeMl: 500,
           source: "public-starter",
@@ -356,7 +393,7 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
     expect(saveMock.mock.calls[1][0]).toMatchObject({
       p_action: "note",
-      p_target_id: "plant-1",
+      p_target_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       p_note: "Observed healthy new growth",
     });
     expect(saveMock.mock.calls[1][1]).toEqual({ telemetryIntent: "observation" });
@@ -401,9 +438,9 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
           open={true}
           onOpenChange={vi.fn()}
           prefill={{
-            plantId: "plant-1",
-            growId: "grow-1",
-            tentId: "tent-1",
+            plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             eventType: "watering",
             wateringVolumeMl: 500,
             source: "public-starter",
@@ -427,7 +464,7 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
       await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
       expect(saveMock.mock.calls[0][0]).toMatchObject({
         p_action: "note",
-        p_target_id: "plant-1",
+        p_target_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         p_note: "Normal observation after abandoning Water",
       });
       expect(saveMock.mock.calls[0][1]).toEqual({ telemetryIntent: "observation" });
@@ -444,7 +481,10 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
         open={true}
         onOpenChange={onOpenChange}
         onCreated={onCreated}
-        prefill={{ plantId: "plant-1", growId: "grow-1" }}
+        prefill={{
+          plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        }}
       />,
     );
 
@@ -459,7 +499,7 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
     expect(payload).toMatchObject({
       p_action: "note",
       p_target_type: "plant",
-      p_target_id: "plant-1",
+      p_target_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       p_note: "Topped plant",
     });
     expect(saveMock.mock.calls[0][1]).toEqual({
@@ -488,7 +528,10 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
         open={true}
         onOpenChange={onOpenChange}
         onCreated={onCreated}
-        prefill={{ plantId: "plant-1", growId: "grow-1" }}
+        prefill={{
+          plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        }}
       />,
     );
 
@@ -513,7 +556,10 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
         open={true}
         onOpenChange={onOpenChange}
         onCreated={onCreated}
-        prefill={{ plantId: "plant-1", growId: "grow-1" }}
+        prefill={{
+          plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        }}
       />,
     );
 

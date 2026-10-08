@@ -1,0 +1,118 @@
+name: Signed-in read-only performance
+
+# Production only. This is readiness timing, not a speed budget or core-loop PASS.
+# Login uses the existing UI bootstrap. No fixture save or database dispatch.
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "e2e/lib/signedInPerformance*.ts"
+      - "e2e/lib/signedInReadonlyProof.ts"
+      - "e2e/signed-in-performance.spec.ts"
+      - "src/test/signed-in-performance-proof.test.ts"
+      - "src/test/signed-in-readonly-proof.test.ts"
+      - ".github/workflows/signed-in-readonly-performance.yml"
+  push:
+    branches: [verdant-grow-diary]
+    # The measured routes (Dashboard, Timeline, Sensors) and their build inputs,
+    # plus the probe itself: product changes are what can regress readiness.
+    paths:
+      - "src/**"
+      - "public/**"
+      - "vite.config.ts"
+      - "package.json"
+      - "bun.lock"
+      - "e2e/lib/signedInPerformance*.ts"
+      - "e2e/lib/signedInReadonlyProof.ts"
+      - "e2e/signed-in-performance.spec.ts"
+      - ".github/workflows/signed-in-readonly-performance.yml"
+
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  performance-safety-regressions:
+    # PR code is tested without login credentials or authenticated browser work.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout safety tests
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.3.14"
+      - name: Install pinned dependencies
+        run: bun install --frozen-lockfile
+      - name: Verify performance safety regressions
+        run: bun run test --run src/test/signed-in-performance-proof.test.ts src/test/signed-in-readonly-proof.test.ts src/test/production-quicklog-fixture.test.ts
+  signed-in-readonly-performance:
+    # Login is restricted before runner allocation; a branch name is not trust.
+    if: github.repository == 'Verdant-OS/verdant-grow-diary' && github.ref == 'refs/heads/verdant-grow-diary' && github.actor == 'cheekhimself' && github.triggering_actor == 'cheekhimself' && github.run_attempt == '1' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    # Includes up to 20 minutes waiting for publishing to serve the pinned SHA.
+    timeout-minutes: 40
+    env:
+      E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
+      E2E_MEASURE_SIGNED_IN_PERFORMANCE: "true"
+      PLAYWRIGHT_RETRIES: "0"
+    steps:
+      - name: Verify production fixture configuration
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$E2E_BASE_URL" != "https://verdantgrowdiary.com" ] ||
+             [ "$E2E_TEST_EMAIL" != "cheekhimself@gmail.com" ] ||
+             [ -z "$E2E_TEST_PASSWORD" ]; then
+            echo "BLOCKED: exact production host and approved fixture-account credentials required."
+            exit 1
+          fi
+      - name: Checkout proof source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Pin current deploy SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_sha="$(git rev-parse HEAD)"
+          [ "$expected_sha" = "$GITHUB_SHA" ]
+          [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "E2E_EXPECTED_SHA=$expected_sha" >> "$GITHUB_ENV"
+      # A merge is not a deployment: measure only once production serves this SHA.
+      - name: Wait for the pinned SHA to be live
+        run: node scripts/wait-for-deployed-sha.mjs
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.3.14"
+      - name: Install pinned dependencies
+        run: bun install --frozen-lockfile
+      - name: Verify performance safety regressions
+        run: bun run test --run src/test/signed-in-performance-proof.test.ts src/test/signed-in-readonly-proof.test.ts src/test/production-quicklog-fixture.test.ts
+      - name: Install Chromium
+        run: bun run e2e:install:ci
+      - name: Measure three signed-in read-only routes
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+        run: bunx playwright test e2e/signed-in-performance.spec.ts --project=chromium-authed --workers=1 --retries=0 --reporter=list
+      - name: Upload sanitized timing receipts only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: signed-in-readonly-performance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/**/*-performance.json
+          if-no-files-found: warn
+          retention-days: 7

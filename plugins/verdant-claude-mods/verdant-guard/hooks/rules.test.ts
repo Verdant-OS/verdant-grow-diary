@@ -665,3 +665,16 @@ describe("Codex re-review: --undo after the option terminator", () => {
     expect(checkBash("gh pr ready --undo -- 1800")).toBe(null);
   });
 });
+
+describe("Codex re-review: sudo assignments between sudo options", () => {
+  test("P1: sudo keeps parsing its options after a VAR=value", () => {
+    for (const cmd of [
+      "sudo VAR=x -u root git push --force origin claude/task",
+      "sudo -n VAR=x -u root git push -f origin claude/task",
+      "sudo A=1 B=2 -E git commit --no-verify -m wip",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("sudo VAR=x -u root git push origin claude/task")).toBe(null);
+  });
+});

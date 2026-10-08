@@ -211,6 +211,9 @@ function shellWords(text: string): string[] {
   return segments(text, false).flat();
 }
 
+/** A shell `VAR=value` assignment word. */
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
 /**
  * Drops leading `VAR=value` assignments and `sudo`/`env`/`exec`/`time` wrappers with their own
  * options, so `env -i git push --force` is checked as `git push --force`. `env -S "<cmd>"`
@@ -223,7 +226,7 @@ function stripPrefix(tokens: string[], onSplit?: (split: string) => void): strin
   for (;;) {
     const head = rest[0];
     if (head === undefined) return rest;
-    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(head)) {
+    if (ASSIGNMENT.test(head)) {
       rest = rest.slice(1);
       continue;
     }
@@ -231,8 +234,15 @@ function stripPrefix(tokens: string[], onSplit?: (split: string) => void): strin
     if (valueOptions === undefined) return rest;
     let i = 1;
     let split: string | null = null;
-    while (i < rest.length && rest[i]!.startsWith("-")) {
+    while (i < rest.length) {
       const option = rest[i]!;
+      // sudo takes `VAR=value` among its own options (`sudo VAR=x -u root cmd`), so an
+      // assignment there does not end the wrapper.
+      if (head === "sudo" && ASSIGNMENT.test(option)) {
+        i += 1;
+        continue;
+      }
+      if (!option.startsWith("-")) break;
       if (option === "--") {
         i += 1;
         break;

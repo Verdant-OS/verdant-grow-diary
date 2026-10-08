@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  EMPTY_SNAPSHOT,
   hasFiniteSnapshotMetric,
   type SensorSnapshot,
   snapshotFromDiary,

@@ -170,7 +170,8 @@ when its text:
   (`const TABLE = "action_queue";`), also with comments inside the call
   (`db.from(/* c */ "action_queue")`), and through `call`, `apply` or `bind`
   (`db.from.call(db, "action_queue")`, `db.from.apply(db, ["action_queue"])`,
-  `db.from.bind(db)("action_queue")`), also with the arguments spread from a literal
+  `db.from.bind(db)("action_queue")`, any chain of `bind` followed by `call` or `apply`
+  such as `db.from.bind(db).call(null, "action_queue")`), also with the arguments spread from a literal
   array (`db.from(...["action_queue"])`). Mentioning an Action Queue row ID, type or
   comment doesn't lock, and neither does a bare string literal elsewhere
   (generated types, view models, source-scan tests), so pure helpers such as

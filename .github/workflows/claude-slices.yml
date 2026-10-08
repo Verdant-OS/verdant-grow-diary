@@ -735,20 +735,38 @@ jobs:
                   return out;
                 };
                 const args = flatArgs(node.arguments);
-                const isQuery = expr => { const inner = unwrap(expr); const name = inner ? memberName(inner) : null; return name === 'from' || name === 'rpc'; };
-                if ((calleeName === 'from' || calleeName === 'rpc') && isAq(args[0])) rules.add('aq-io');
-                // Through Function methods (Codex P1 at de2a31e4): db.from.call(db, "action_queue"),
-                // db.from.apply(db, ["action_queue"]), db.from.bind(db, "action_queue"),
-                // db.from.bind(db)("action_queue").
-                if ((calleeName === 'call' || calleeName === 'bind') && isQuery(callee.expression) && isAq(args[1])) rules.add('aq-io');
-                if (calleeName === 'apply' && isQuery(callee.expression)) {
-                  const list = unwrap(args[1]);
-                  if (list && list.kind === K.ArrayLiteralExpression && isAq(flatArgs(list.elements)[0])) rules.add('aq-io');
+                // A query function: x.from or x.rpc, or one bound from it with any
+                // number of .bind(thisArg, ...args) calls. Returns the arguments bound
+                // so far, or null (Codex P1s at de2a31e4 and f043e9cb).
+                const queryRef = expr => {
+                  const inner = unwrap(expr);
+                  if (!inner) return null;
+                  const name = memberName(inner);
+                  if (name === 'from' || name === 'rpc') return [];
+                  if (inner.kind === K.CallExpression) {
+                    const method = unwrap(inner.expression);
+                    if (method && memberName(method) === 'bind') {
+                      const bound = queryRef(method.expression);
+                      if (bound) return bound.concat(flatArgs(inner.arguments).slice(1));
+                    }
+                  }
+                  return null;
+                };
+                // The arguments a query receives: called directly, through .call or
+                // .apply, or bound and not yet called (which fails closed).
+                let queryArgs = null;
+                const direct = queryRef(callee);
+                if (direct) queryArgs = direct.concat(args);
+                else if (calleeName === 'bind') queryArgs = queryRef(node);
+                else if (calleeName === 'call' || calleeName === 'apply') {
+                  const bound = queryRef(callee.expression);
+                  if (bound && calleeName === 'call') queryArgs = bound.concat(args.slice(1));
+                  if (bound && calleeName === 'apply') {
+                    const list = unwrap(args[1]);
+                    if (list && list.kind === K.ArrayLiteralExpression) queryArgs = bound.concat(flatArgs(list.elements));
+                  }
                 }
-                if (callee && callee.kind === K.CallExpression) {
-                  const inner = unwrap(callee.expression);
-                  if (inner && memberName(inner) === 'bind' && isQuery(inner.expression) && isAq(args[0])) rules.add('aq-io');
-                }
+                if (queryArgs && isAq(queryArgs[0])) rules.add('aq-io');
               }
               // const TABLE = "action_queue"
               if (node.kind === K.VariableDeclaration && node.initializer && AQ_NAME_SET.has(literalText(node.initializer))) rules.add('aq-io');
@@ -1274,6 +1292,10 @@ jobs:
               'db.from(...["action_queue"]).select();', 'db.from.apply(db, [...["action_queue"]]);',
               'db.from.bind(db)(...["action_queue"]);', 'db.from.bind(db, ...["action_queue"])();',
               'db.rpc(...[`action_queue_create`], p);',
+              // Codex P1 at f043e9cb: a bound query invoked through another Function method.
+              'db.from.bind(db).call(null, ...["action_queue"]).select();', 'db.from.bind(db).apply(null, ["action_queue"]);',
+              'db.from.bind(db).call(null, "action_queue");', 'db.from.bind(db).bind(null)("action_queue");',
+              'db.rpc.bind(db).call(db, "action_queue_create", p);', '(db.from.bind(db) as any).call(null, `action_queue`);',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), ['aq-io, head'], text);
               assert.deepEqual(astRules('src/lib/fooRules.ts', text), ['aq-io'], `AST: ${text}`);
@@ -1341,7 +1363,7 @@ jobs:
               'function f(auth) { const alias = auth; return alias; }',
               'function f(auth) { const alias = auth; const o = { alias }; return o; }',
               'const auth = useRoute(); const r = auth; export default r;',
-              'db.from.call(db, "plants").select();', 'db.from(...["plants"]).select();', 'const { auth: { user } } = state;', 'fn.call(db, "action_queue_note");', 'const { ["data"]: d } = supabase;',
+              'db.from.call(db, "plants").select();', 'db.from(...["plants"]).select();', 'db.from.bind(db).call(null, "plants");', 'const { auth: { user } } = state;', 'fn.call(db, "action_queue_note");', 'const { ["data"]: d } = supabase;',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
               assert.deepEqual(astRules('src/lib/fooRules.ts', text), [], `AST: ${text}`);

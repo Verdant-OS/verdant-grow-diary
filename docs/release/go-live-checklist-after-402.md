@@ -75,9 +75,22 @@ anything.
    `verify-fixture`. Two such runs trip step 6's "two consecutive red" stop condition. That
    red means BLOCKED (archived fixture), not a product regression.
 
-1. The Vercel 402 has cleared and the owner has published (promoted) a production build of
-   the deploy tip. See `docs/agents/RUNBOOK_VERCEL_PROMOTE.md`. Promotion is Matthew only.
-2. `https://verdantgrowdiary.com/version.json` reports the intended tip SHA and
+1. **Fence first, then restore, then promote** (D-RT-15 in
+   `docs/specs/release-topology-specification.md`). Restoring the account can let the
+   platform build and promote the current tip on its own, so the order is fixed:
+   - **(a)** The owner picks the build that first serves and records its SHA in the receipt.
+   - **(b)** **Before the account is restored**, the owner sets a no-auto-promotion fence
+     (automatic production promotion and automatic rollout turned off for the Vercel
+     project), or arranges a restoration pinned to that SHA, and reads the setting back. The
+     read-back goes in the receipt. **Stop** if it can't be read back: a recorded choice
+     without a fence is not a control.
+   - **(c)** Only then the owner restores the account (the 402 clears).
+   - **(d)** M4 confirms a READY production build of the chosen SHA exists, and no other
+     build has been promoted since the restore.
+   - **(e)** The owner publishes (promotes) that build. See
+     `docs/agents/RUNBOOK_VERCEL_PROMOTE.md`. Promotion is Matthew only. When to lift the
+     fence afterwards is Matthew's call, and goes in the receipt.
+2. `https://verdantgrowdiary.com/version.json` reports the chosen SHA from 1(a) and
    `dirty:false` on the apex. Check `www` too, per the runbook's "Verify every production
    hostname" section.
    **Stop** if any hostname serves a different SHA.

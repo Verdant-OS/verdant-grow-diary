@@ -134,9 +134,11 @@ when its text:
   `updateUser`, `resetPassword*`, `exchangeCode*`, `verifyOtp`, `setSession`,
   `refreshSession`, `admin.*`, `mfa.*`, `resend`, `reauthenticate`,
   `linkIdentity`, `unlinkIdentity` or `onAuthStateChange`. Optional chaining
-  (`auth?.signOut()`), bracket access (`auth["signOut"]()`, `supabase["auth"]`),
-  destructuring (`const { signOut } = supabase.auth;`) and aliasing the namespace
-  (`const a = supabase.auth;`, `const { auth: a } = supabase;`) also lock, with or
+  (`auth?.signOut()`), bracket access (`auth["signOut"]()`, `auth[key]()`,
+  `supabase["auth"]`; a plain literal read-only key such as `auth["getUser"]()` does
+  not lock), destructuring (`const { signOut } = supabase.auth;`) and aliasing the
+  namespace (`const a = supabase.auth;`, `const { auth: a } = supabase;`, a parameter
+  or destructuring default such as `function f(a = supabase.auth)`) also lock, with or
   without the trailing `;`, across a line break (`supabase\n  .auth`), and through
   parentheses, `!`, `as T` or `satisfies T` (`(supabase.auth as any).signOut()`),
   including with `//` or `/* */` comments inside the call chain

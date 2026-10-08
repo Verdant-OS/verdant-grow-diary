@@ -153,8 +153,10 @@ jobs:
               // supabase.auth.signOut(), auth?.signOut(), supabase["auth"].admin.createUser()
               // (supabase.auth).signOut(), (supabase.auth as any).signOut(), auth!.signOut()
               new RegExp(`${AUTH}${AUTH_TAIL}\\s*\\??\\.\\s*${AUTH_CALLS}`),
-              // auth["signOut"](), auth?.[name](): any bracket access on the namespace
-              new RegExp(`${AUTH}${AUTH_TAIL}\\s*(?:\\?\\.)?\\s*\\[`),
+              // auth["signOut"](), auth?.[name](): bracket access on the namespace, unless
+              // the key is a plain literal that isn't a D1 member (auth["getUser"] is the
+              // read-only getUser(); Codex P2 at 805b256c).
+              new RegExp(`${AUTH}${AUTH_TAIL}\\s*(?:\\?\\.)?\\s*\\[(?!\\s*(['"\`])(?!${AUTH_CALLS})[\\w$]+\\1\\s*\\])`),
               // const { signOut } = supabase.auth; const { data, signOut: out } = (await c()).auth;
               // also without the trailing ";" (ASI) and with a cast.
               new RegExp(`\\{(?:[^{}]{0,2000},)?\\s*${AUTH_CALLS}\\s*(?::\\s*[\\w$]+\\s*)?(?:,[^{}]{0,2000})?\\}\\s*=\\s*[^;=]{0,2000}?${AUTH}${AUTH_TAIL}${STMT_END}`),
@@ -481,7 +483,11 @@ jobs:
             // that isn't a literal, or null when the node isn't a member access.
             const memberName = node => {
               if (node.kind === K.PropertyAccessExpression) return ts.isIdentifier(node.name) ? node.name.text : null;
-              if (node.kind === K.ElementAccessExpression) return literalText(node.argumentExpression) ?? '*';
+              // A template with substitutions is a computed key, whatever its head says.
+              if (node.kind === K.ElementAccessExpression) {
+                const key = unwrap(node.argumentExpression);
+                return key && key.kind === K.TemplateExpression ? '*' : literalText(key) ?? '*';
+              }
               return null;
             };
             // Identifiers bound to the auth namespace: auth itself, `const a = x.auth`,
@@ -498,6 +504,7 @@ jobs:
               return memberName(inner) === 'auth';
             };
             const bindingNames = pattern => pattern.elements.filter(element => element.kind === K.BindingElement);
+            const DECLARATIONS = new Set([K.VariableDeclaration, K.Parameter, K.BindingElement]);
             // An explicit stack, not recursion: a deep expression (a long comma or +
             // chain) can't overflow the call stack.
             const walk = (root, fn) => {
@@ -511,7 +518,9 @@ jobs:
             // Repeated until nothing new is found, so an alias of an alias counts:
             // const { auth } = x; const s = auth; s.signOut().
             const collect = node => {
-              if (node.kind === K.VariableDeclaration && ts.isIdentifier(node.name) && isAuthRef(node.initializer)) aliases.add(node.name.text);
+              // A variable, a parameter default or a destructuring default (Codex P1 at
+              // 805b256c): const a = x.auth; function f(a = x.auth); ({ a = x.auth }).
+              if (DECLARATIONS.has(node.kind) && ts.isIdentifier(node.name) && isAuthRef(node.initializer)) aliases.add(node.name.text);
               if (node.kind === K.BinaryExpression && node.operatorToken.kind === K.EqualsToken && ts.isIdentifier(unwrap(node.left)) && isAuthRef(node.right)) aliases.add(unwrap(node.left).text);
               if (node.kind === K.BindingElement && ts.isIdentifier(node.name)) {
                 const key = node.propertyName ? (ts.isIdentifier(node.propertyName) || ts.isStringLiteral(node.propertyName) ? node.propertyName.text : null) : node.name.text;
@@ -528,8 +537,8 @@ jobs:
               // computed one, of the namespace.
               const name = memberName(node);
               if (name !== null && (name === '*' || isAuthMethod(name)) && isAuthRef(node.expression)) rules.add('auth-mutation');
-              // const { signOut } = x.auth; ({ signOut } = x.auth)
-              if (node.kind === K.VariableDeclaration && node.name.kind === K.ObjectBindingPattern && isAuthRef(node.initializer)) {
+              // const { signOut } = x.auth; function f({ signOut } = x.auth)
+              if (DECLARATIONS.has(node.kind) && node.name.kind === K.ObjectBindingPattern && isAuthRef(node.initializer)) {
                 for (const element of bindingNames(node.name)) {
                   const key = element.propertyName ?? element.name;
                   if (!ts.isIdentifier(key) && !ts.isStringLiteral(key)) rules.add('auth-mutation');
@@ -537,8 +546,9 @@ jobs:
                 }
               }
               // The namespace escaping into a binding, an assignment or a return:
-              // const a = x.auth; a = x.auth; return x["auth"]; const { auth: a } = x.
-              if ((node.kind === K.VariableDeclaration && isAuthMember(node.initializer)) ||
+              // const a = x.auth; function f(a = x.auth); a = x.auth; return x["auth"];
+              // const { auth: a } = x.
+              if ((DECLARATIONS.has(node.kind) && isAuthMember(node.initializer)) ||
                   (node.kind === K.BinaryExpression && node.operatorToken.kind === K.EqualsToken && isAuthMember(node.right)) ||
                   (node.kind === K.ReturnStatement && isAuthMember(node.expression)) ||
                   (node.kind === K.BindingElement && aliases.has(ts.isIdentifier(node.name) ? node.name.text : '') && node.name.text !== 'auth')) rules.add('auth-mutation');
@@ -999,6 +1009,13 @@ jobs:
               'supabase["au\\\nth"].signOut();', 'supabase["\\141uth"].signOut();',
               'const a = supabase.auth as\n  | A\n  | B;\na.signOut();',
               '(supabase.auth as { ' + 'p: string; '.repeat(300) + '}).signOut();',
+              // Codex P1 at 805b256c: parameter and destructuring defaults.
+              'function run(a = supabase.auth) { return a.signOut(); }', 'const run = (a = supabase.auth) => a.signOut();',
+              'function run({ signOut } = supabase.auth) { signOut(); }', 'function run({ a = supabase.auth }) { a.signOut(); }',
+              'const { a = supabase.auth } = opts; a.signOut();',
+              // A bracket key that is a D1 member, not a plain literal, or escaped.
+              'supabase.auth["signOut"]();', 'supabase.auth?.["admin"].deleteUser(id);', 'supabase.auth["sign\\u004Fut"]();',
+              'supabase.auth[`${m}`]();',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
               // Each form also locks on the AST alone (Option 1).
@@ -1083,6 +1100,9 @@ jobs:
               'const x = y as A\nconst z = supabase.auth.getUser();',
               // "as" in prose starts no type, so a long block after it doesn't lock (dac72d14 census).
               'it("treats history as grow evidence", async () => {\n' + '  expect(x).toBe(1);\n'.repeat(150) + '  await supabase.auth.getUser();\n});',
+              // Codex P2 at 805b256c: a literal bracket key for a read-only method.
+              'supabase.auth["getUser"]();', 'supabase.auth?.["getSession"]();', "const { data } = await client.auth['getUser']();",
+              'function run(a = defaults.timeout) { return a; }',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
               assert.deepEqual(astRules('src/lib/fooRules.ts', text), [], `AST: ${text}`);

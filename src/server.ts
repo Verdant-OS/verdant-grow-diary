@@ -47,7 +47,7 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
-    const redirect = redirectResponseFor(request);
+    const redirect = redirectResponseFor(request, env);
     if (redirect) return redirect;
 
     try {

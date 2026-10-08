@@ -1,8 +1,7 @@
 # Header rules ported from vercel.json for files the Workers assets binding
 # serves directly. SSR responses get the same rules from
-# src/lib/cloudflareHostRoutingRules.ts. This file includes a /* block, so
-# Nitro will not append its own fallback; the asset cache rule is declared
-# here on purpose.
+# src/lib/cloudflareHostRoutingRules.ts. The /* line has no trailing space, so
+# Nitro still appends its own /assets/* cache-control rule after this file.
 
 /*
   X-Content-Type-Options: nosniff

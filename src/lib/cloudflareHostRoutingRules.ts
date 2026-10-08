@@ -36,6 +36,13 @@ export const UNSUBSCRIBE_HEADERS = [
 
 export const ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
 
+/**
+ * Build-time only. The SEO snapshot capture sends this so a permanent alias
+ * can still render its noindex head. The temporary /~oauth hop ignores it.
+ */
+export const SEO_SNAPSHOT_HEADER = "x-verdant-seo-snapshot";
+export const SEO_SNAPSHOT_HEADER_VALUE = "1";
+
 const EXACT_PERMANENT_REDIRECTS: Readonly<Record<string, string>> = {
   "/strains": "/cultivars",
   "/features": "/welcome",
@@ -191,12 +198,30 @@ function searchFromRequest(request: Request): string {
   }
 }
 
-export function redirectResponseFor(request: Request): Response | null {
+export const SEO_SNAPSHOT_ENV = "VERDANT_SEO_SNAPSHOT";
+
+/** Build-only. A request header alone must not skip a public redirect. */
+export function seoSnapshotBypassRequested(request: Request, env: unknown): boolean {
+  if (!env || typeof env !== "object") return false;
+  const flag = (env as Record<string, unknown>)[SEO_SNAPSHOT_ENV];
+  return (
+    flag === SEO_SNAPSHOT_HEADER_VALUE &&
+    request.headers.get(SEO_SNAPSHOT_HEADER) === SEO_SNAPSHOT_HEADER_VALUE
+  );
+}
+
+export function redirectResponseFor(request: Request, env?: unknown): Response | null {
   const decision = resolveHostRouting({
     pathname: pathnameFromRequest(request),
     search: searchFromRequest(request),
   });
   if (decision.kind !== "redirect") return null;
+  // Permanent legacy aliases still have an SSR document. The snapshot capture
+  // re-requests those with the build env flag and header so the head-fidelity
+  // gate can read it. The oauth hop is temporary and is never skipped.
+  if (decision.status === 308 && seoSnapshotBypassRequested(request, env)) {
+    return null;
+  }
 
   const headers = new Headers();
   for (const [name, value] of decision.headers) headers.set(name, value);

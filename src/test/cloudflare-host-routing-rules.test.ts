@@ -5,6 +5,9 @@ import {
   ASSET_CACHE_CONTROL,
   GLOBAL_SECURITY_HEADERS,
   LOVABLE_OAUTH_ORIGIN,
+  SEO_SNAPSHOT_ENV,
+  SEO_SNAPSHOT_HEADER,
+  SEO_SNAPSHOT_HEADER_VALUE,
   SPA_CATCH_ALL_REWRITE,
   UNSUBSCRIBE_HEADERS,
   hostHeadersForPathname,
@@ -264,6 +267,72 @@ describe("response headers", () => {
     expect(redirect?.status).toBe(308);
     expect(redirect?.headers.get("location")).toBe("/refund?from=footer");
     expect(redirect?.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
+  it("skips a permanent alias redirect only for the build snapshot env and header", () => {
+    const snapshotEnv = { [SEO_SNAPSHOT_ENV]: SEO_SNAPSHOT_HEADER_VALUE };
+    const strains = redirectResponseFor(
+      new Request("https://verdantgrowdiary.com/strains/blue-dream", {
+        headers: { [SEO_SNAPSHOT_HEADER]: SEO_SNAPSHOT_HEADER_VALUE },
+      }),
+      snapshotEnv,
+    );
+    expect(strains).toBeNull();
+
+    const refund = redirectResponseFor(
+      new Request("https://verdantgrowdiary.com/refund-policy", {
+        headers: { [SEO_SNAPSHOT_HEADER]: SEO_SNAPSHOT_HEADER_VALUE },
+      }),
+      snapshotEnv,
+    );
+    expect(refund).toBeNull();
+
+    const headerAlone = redirectResponseFor(
+      new Request("https://verdantgrowdiary.com/strains/blue-dream", {
+        headers: { [SEO_SNAPSHOT_HEADER]: SEO_SNAPSHOT_HEADER_VALUE },
+      }),
+    );
+    expect(headerAlone?.status).toBe(308);
+    expect(headerAlone?.headers.get("location")).toBe("/cultivars/blue-dream");
+
+    const envAlone = redirectResponseFor(
+      new Request("https://verdantgrowdiary.com/refund-policy"),
+      snapshotEnv,
+    );
+    expect(envAlone?.status).toBe(308);
+
+    const oauth = redirectResponseFor(
+      new Request("https://verdantgrowdiary.com/~oauth/initiate?provider=google", {
+        headers: { [SEO_SNAPSHOT_HEADER]: SEO_SNAPSHOT_HEADER_VALUE },
+      }),
+      snapshotEnv,
+    );
+    expect(oauth?.status).toBe(307);
+    expect(oauth?.headers.get("location")).toBe(
+      `${LOVABLE_OAUTH_ORIGIN}/~oauth/initiate?provider=google`,
+    );
+  });
+
+  it("worker fetch keeps the permanent redirect when only the snapshot header is sent", async () => {
+    const response = await worker.fetch(
+      new Request("https://verdantgrowdiary.com/refund-policy", {
+        headers: { [SEO_SNAPSHOT_HEADER]: SEO_SNAPSHOT_HEADER_VALUE },
+      }),
+      {},
+      {},
+    );
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe("/refund");
+  });
+
+  it("pins the SEO capture retry so a 308 alias document is re-requested once", () => {
+    const capture = readFileSync(
+      resolve(ROOT, "scripts/capture-ssr-head-snapshots-with-server.mjs"),
+      "utf8",
+    );
+    expect(capture).toContain(SEO_SNAPSHOT_HEADER);
+    expect(capture).toContain(SEO_SNAPSHOT_ENV);
+    expect(capture).toContain("response.status !== 308");
   });
 
   it("leaves an unrelated response unchanged when the headers already match", () => {

@@ -45,6 +45,47 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CLAUDE-CODE-ACTION-002
+
+```text
+TASK CLAUDE-CODE-ACTION-002  priority: P1  status: OPEN
+goal: Lock auth-mutation and Action Queue I/O files for Claude slices by content, not only by filename (Codex's P1 finding on #1774: neutral-named files such as src/pages/ResetPassword.tsx passed). Priority is P1: Matthew raised it from other on 2026-10-07, matching the P1 finding it repairs. Workflow, doc and an empty exceptions file only; no app, schema, RLS, auth behavior, Edge, lockfile or device-control change.
+branch: claude/vigilant-faraday-usy9mb
+base: verdant-grow-diary at 1209caaba (#1844), as the branch was last rebuilt; the deploy tip has since moved (c5b1d1c32 at 2026-10-06 18:28 CT)
+checkout: git switch claude/vigilant-faraday-usy9mb && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1927 (draft)
+head_sha: ad1a617778ea67c775fa9098e3f9532e23927d3f, observed on origin/claude/vigilant-faraday-usy9mb at 2026-10-06 23:30 UTC (18:30 CT). Commits on the tip: 36f9f521 (carries #1774's net change, byte-identical to 343fe91b), 707874ab (round 1), 6209b316 (round 2), ad1a6177 (round 3). The three slice files at 6209b316 are byte-identical to e425a3db. History was rewritten twice: once to e425a3db with Matthew's go-ahead, once by session_019Kztxw onto 1209caaba. Earlier heads, none an ancestor: e425a3db, 2c3609b1, 5e4254d3. This block travels on a separate log-only branch (PR #1932), not on the task branch.
+state: pushed draft, round 3 by session_019Kztxw. Durban Poison gave PASS-with-P2 at e425a3db (0 P1 / 1 P2, P2-A: auth-mutation bypasses through parentheses, casts and ASI); it was recorded in ad1a6177's commit message, not posted on GitHub. ad1a6177 closes P2-A. Self-test 224/224 PASS, re-run locally at ad1a6177 by session_01VsMEJU (the log-block maintainer). Per that commit: census auth-mutation 65, aq-io 31 (94 files, 34 not already path-locked); actionlint 0 diagnostics; RED shown against the e425a3db matcher. Round 2 (2c3609b1, four Durban Poison P2s at 5e4254d3) was peer-verified in issuecomment-6026225154 by another Claude session; that is not acceptance. No review covers ad1a6177 yet. Durban Poison's exact-head re-review was requested in issuecomment-6027452325, but Durban Poison is unavailable: on 2026-10-07 Matthew named Codex the independent reviewer instead (issuecomment-6042253781). That overrides AGENTS.md's Blue Dream / Durban Poison / Critical Mass routing and its rule that Codex can't PASS its own work (36f9f521 carries Codex's #1774 change); the override applies to #1927 only. Codex's review at ad1a6177 was requested in issuecomment-6042223102 and is running. Hosted required checks at ad1a6177: 35/35 SUCCESS, verified by the log-block maintainer on 2026-10-07. #1927 merges cleanly into verdant-grow-diary at e0bb3930 and has not been updated. Expected red and not required: Claude locked paths (by design), Workers Builds (Cloudflare), and Vercel "Account is blocked.". The dependency audit fix (#1924) is on the deploy branch, so check:deps should go green at #1927's next base update.
+next_action: Codex reviews the exact head ad1a6177 (running; no verdict yet). #1774 is still open at 343fe91b. After #1774 squash-merges, merge origin/verdant-grow-diary into this branch. No rebuild and no force-push: the carried commit 36f9f521 is byte-identical to #1774's change, so the normal base merge drops it from the PR diff. That merge is a new head and needs a fresh exact-head review. Don't merge #1774 and #1927 in a way that lands #1774's change twice. Stay draft; no ready, merge or publish.
+files: .github/workflows/claude-slices.yml; docs/agents/claude-slices.md; config/claude-slice-lock-exceptions.json (new, { "exceptions": [] }). The first two also carry #1774's change while 36f9f521 is in the PR diff.
+blockers: Codex's review at ad1a6177. The narrowed table-name rule (declarations only; a bare-literal version locked 280 files, mostly source-scan tests) is a trade-off for the reviewer or Matthew to confirm. No claimed_by PR comment: Matthew said not to post one (2026-10-06).
+artifacts: PR #1927 body and the commit messages of 6209b316 and ad1a6177 (P2 mappings, census, test and RED evidence, residual risk); docs/agents/claude-slices.md (Content locks, Residual risk); policy self-test inside .github/workflows/claude-slices.yml (extract the claude-slice-policy.cjs heredoc, then run node <file> --self-test).
+reviewer_seat: Codex, by Matthew's override for #1927 (2026-10-07, issuecomment-6042253781); Durban Poison unavailable. Claude authored and cannot PASS.
+claimed_by: Claude, session_019KztxwgLfeEaNDYyGfkbfS, holds #1927 and its branch (Matthew, 2026-10-06 18:36 CT). Claude session_01VsMEJU3e1qoicFgNKiJL3y maintains this log block in PR #1932 and does not push to #1927. No claimed_by PR comment, by Matthew's instruction.
+last_updated: 2026-10-07 11:32 CT, by Claude (session_01VsMEJU, log-block maintainer)
+```
+
+```text
+TASK DASHBOARD-SINGLE-LOG-ENTRY  priority: P2  status: OPEN
+goal: remove the Dashboard header Quick Log link and the page's own QuickLogV2Fab (GDP D1.1-A,
+  D1.2-A, decided 2026-10-06); add the dashboard-ready readiness marker; renegotiate E1-E4 and
+  U1-U4 per docs/specs/dashboard-single-log-entry-readiness-marker.md
+branch: claude/dashboard-single-log-entry
+base: verdant-grow-diary
+checkout: git switch claude/dashboard-single-log-entry && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1844
+head_sha: read from the PR (a commit cannot contain its own SHA); implementation commit follows 42d195f01
+state: pushed draft, CI pending
+next_action: drive 35/35 required checks green; request Blue Dream (Dashboard.tsx) and Critical Mass (tests, e2e)
+files: src/pages/Dashboard.tsx; src/test/dashboard-single-log-entry.test.tsx (new); U1-U4 and the
+  D1.1-A pins (first-plant-memory-cta, onboarding-checklist-view-model); e2e E1-E4; the spec
+blockers: none
+artifacts: PR #1844 body (RED/GREEN counts, e2e runs)
+reviewer_seat: Blue Dream (Dashboard.tsx), Critical Mass (tests, e2e)
+claimed_by: Claude, 2026-10-06 20:47 UTC (PR #1844 comment)
+last_updated: 2026-10-06 16:05 CT, by Claude
+```
+
 ### CLAUDE-LOOP-ENGINEERING-001
 
 ```text

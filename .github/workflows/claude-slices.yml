@@ -1667,6 +1667,41 @@ jobs:
           chmod 555 "$RUNNER_TEMP/claude-no-hooks"
           git config core.hooksPath "$RUNNER_TEMP/claude-no-hooks"
           chmod 444 "$RUNNER_TEMP/claude-slice-policy.cjs" "$RUNNER_TEMP/claude-slice-settings.json"
+          # The scorer-unlock wrapper (owner decision 2026-10-08, Codex P2 at f799fbf9).
+          # The project scorer-lock hook still runs in this job and blocks edits to
+          # tracked checks until an unlock is declared, but Bash(node *) is denied, so
+          # without this a slice that must update an existing test could never proceed.
+          # The wrapper runs only `scorer-lock.mjs --unlock <path>... --reason <why>`,
+          # from a read-only copy of the base branch's script taken now, before Claude
+          # starts, so editing scripts/ in the slice cannot change what it runs. Every
+          # other form exits 2.
+          lock_dir="$RUNNER_TEMP/claude-scorer-lock"
+          mkdir -p "$lock_dir/scripts/lib" "$RUNNER_TEMP/claude-bin"
+          cp scripts/scorer-lock.mjs "$lock_dir/scripts/scorer-lock.mjs"
+          cp scripts/lib/scorerLockRules.mjs "$lock_dir/scripts/lib/scorerLockRules.mjs"
+          chmod -R a-w "$lock_dir"
+          cat > "$RUNNER_TEMP/claude-bin/scorer-unlock" <<'SH'
+          #!/bin/sh
+          # scorer-unlock <path>... --reason "<why>"; the only form accepted.
+          set -eu
+          usage() { echo 'usage: scorer-unlock <path>... --reason "<why>"' >&2; exit 2; }
+          [ "$#" -ge 3 ] || usage
+          count=$#
+          i=0
+          for arg in "$@"; do
+            i=$((i + 1))
+            if [ "$i" -eq $((count - 1)) ]; then
+              [ "$arg" = "--reason" ] || usage
+            else
+              case "$arg" in ''|-*) usage ;; esac
+            fi
+          done
+          exec @NODE@ @LOCK@ --unlock "$@"
+          SH
+          node_bin=$(command -v node)
+          sed -i -e "s|@NODE@|$node_bin|" -e "s|@LOCK@|$lock_dir/scripts/scorer-lock.mjs|" \
+            "$RUNNER_TEMP/claude-bin/scorer-unlock"
+          chmod 555 "$RUNNER_TEMP/claude-bin/scorer-unlock" "$RUNNER_TEMP/claude-bin"
           echo "base=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Require bubblewrap PID isolation before Claude runs
@@ -1728,7 +1763,7 @@ jobs:
             --model claude-sonnet-5-5
             --max-turns 40
             --permission-mode acceptEdits
-            --allowedTools "Read,Glob,Grep,Bash(git status *),Bash(git diff),Bash(git diff --stat),Bash(git diff --cached),Bash(git diff --cached --stat),Bash(git log *),Bash(git switch -c claude/*),Bash(git add *),Bash(git commit -m *),Bash(gh issue view *),Bash(gh pr view *),Bash(gh pr list *)"
+            --allowedTools "Read,Glob,Grep,Bash(git status *),Bash(git diff),Bash(git diff --stat),Bash(git diff --cached),Bash(git diff --cached --stat),Bash(git log *),Bash(git switch -c claude/*),Bash(git add *),Bash(git commit -m *),Bash(gh issue view *),Bash(gh pr view *),Bash(gh pr list *),Bash(${{ runner.temp }}/claude-bin/scorer-unlock *)"
             --disallowedTools "Bash(gh issue comment),Bash(gh issue comment *),Bash(*--no-index*),Bash(*--output*),Bash(*/proc/*),Bash(*environ*),Bash(git commit *-F*),Bash(git commit *--file*),Bash(git commit *-t *),Bash(git commit *--template*),Bash(git commit *-C *),Bash(git commit *-c *),Bash(git commit *--reuse-message*),Bash(git commit *--reedit-message*),Bash(*--pathspec-from-file*),Bash(*--pathspec-file-nul*),Bash(gh pr merge),Bash(gh pr merge *),Bash(gh pr ready),Bash(gh pr ready *),Bash(gh pr review),Bash(gh pr review *),Bash(gh pr create *),Bash(git push *),Bash(git *push*),Bash(gh api *),Bash(gh workflow *),Bash(bun *),Bash(bunx *),Bash(npm *),Bash(npx *),Bash(node *),WebFetch,WebSearch"
           prompt: |
             You are Claude, builder of one Verdant slice. Read AGENTS.md, CLAUDE.md
@@ -1775,7 +1810,11 @@ jobs:
             Do not touch PRs #1625, #1727, #1737, #1735, #1369 or #1767.
             Never read, print or commit credentials, private environment values or tokens.
             Repository code (tests, builds, installs, scripts) cannot run in this job;
-            CI tests the draft. Mark every unrun check NOT_MEASURED in the PR body.
+            CI tests the draft. If the scorer lock blocks an edit to an existing test or
+            check the slice must change, declare it with
+            ${{ runner.temp }}/claude-bin/scorer-unlock <path>... --reason "<why the check changes>"
+            and record the reason in the PR body; never weaken a check to make it pass.
+            Mark every unrun check NOT_MEASURED in the PR body.
             Consult docs/agents/claude-slices.md for routing.
             The PR body names Owner: Claude and reviewer by path: Blue Dream for any
             .tsx outside src/test/, P1s or publish gates; Critical Mass for everything
@@ -1962,5 +2001,42 @@ jobs:
           const claude = yml.indexOf('uses: anthropics/claude-code-action@');
           assert.ok(gate > 0 && gate < claude, 'the bubblewrap PID-isolation gate must run before the Claude step');
           assert.ok(/refusing to run Claude[\s\S]{0,40}exit 1/.test(yml), 'the gate must fail the job');
+          // The scorer-unlock wrapper: the one allowlisted entry that reaches node.
+          assert.ok(denied.split(',').includes('Bash(node *)'), 'Bash(node *) must stay denied');
+          const reachesNode = allow.filter(rule => /node|scorer/.test(rule));
+          // Built in pieces: Actions would expand the expression inside this run script.
+          assert.deepEqual(reachesNode, ['Bash($' + '{{ runner.temp }}/claude-bin/scorer-unlock *)'],
+            'only the scorer-unlock wrapper may be allowed');
+          const wrapper = yml.match(/<<'SH'\n([\s\S]*?)\n\s*SH\n/)?.[1];
+          assert.ok(wrapper, 'the scorer-unlock wrapper must be present');
+          const copy = yml.indexOf('cp scripts/scorer-lock.mjs "$lock_dir/');
+          assert.ok(copy > 0 && copy < claude, 'the trusted scorer-lock copy must be taken before Claude runs');
+          assert.ok(/chmod -R a-w "\$lock_dir"/.test(yml) && /chmod 555 "\$RUNNER_TEMP\/claude-bin\/scorer-unlock"/.test(yml),
+            'the copy and the wrapper must be read-only');
+          // Run the wrapper with a stub in place of node and the lock script: only
+          // `<path>... --reason <why>` reaches it, and exactly as given.
+          const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+          const { spawnSync } = require('node:child_process');
+          const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'scorer-unlock-'));
+          const stub = path.join(dir, 'stub');
+          fs.writeFileSync(stub, '#!/bin/sh\nprintf "%s\\n" "$@"\n', { mode: 0o755 });
+          const script = path.join(dir, 'scorer-unlock');
+          const body = wrapper.split('\n').map(line => line.replace(/^ {10}/, '')).join('\n')
+            .replace('@NODE@', stub).replace('@LOCK@', '/trusted/scorer-lock.mjs');
+          fs.writeFileSync(script, body + '\n', { mode: 0o755 });
+          const run = args => spawnSync(script, args, { encoding: 'utf8' });
+          const ok = run(['src/test/a.test.ts', 'src/test/b.test.ts', '--reason', 'the copy changed; the pin moves with it']);
+          assert.equal(ok.status, 0, ok.stderr);
+          assert.deepEqual(ok.stdout.trim().split('\n'), ['/trusted/scorer-lock.mjs', '--unlock', 'src/test/a.test.ts',
+            'src/test/b.test.ts', '--reason', 'the copy changed; the pin moves with it']);
+          for (const args of [[], ['a.test.ts'], ['a.test.ts', '--reason'], ['--reason', 'why'], ['--lock'], ['--hook'],
+            ['--report', '--reason', 'why'], ['--lock', 'a.test.ts', '--reason', 'why'], ['a.test.ts', '--status', '--reason', 'why'],
+            ['-x', '--reason', 'why'], ['', '--reason', 'why'], ['a.test.ts', '--reason', '--strict'],
+            ['a.test.ts', 'why', '--reason'], ['a.test.ts', '--base', 'HEAD', '--reason', 'why']]) {
+            const r = run(args);
+            assert.equal(r.status, 2, `scorer-unlock must refuse ${JSON.stringify(args)}`);
+            assert.equal(r.stdout, '', `scorer-unlock must not run anything for ${JSON.stringify(args)}`);
+          }
+          fs.rmSync(dir, { recursive: true, force: true });
           console.log('Claude credential guards: PASS');
           NODE

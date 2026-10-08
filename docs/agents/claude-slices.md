@@ -344,6 +344,16 @@ keeps both credentials out of reach:
   `bunx`, `npm`, `npx`, `node` and similar) are denied, and git hooks point at an
   empty read-only directory, so code planted in the checkout never executes while
   a credential is present. CI tests the draft instead.
+- **One exception: `scorer-unlock`** (Matthew, 2026-10-08). The repository's scorer-lock
+  hook still runs in the job and blocks edits to existing tests and checks until an unlock
+  is declared, which needs `node`. So the job allows exactly one extra command,
+  `<runner temp>/claude-bin/scorer-unlock <path>... --reason "<why>"`. It runs
+  `scorer-lock.mjs --unlock` from a read-only copy of the base branch's script, taken
+  before Claude starts, so a slice that edits `scripts/` cannot change what it runs. Any
+  other form (`--lock`, `--hook`, `--report`, a path starting with `-`, a missing reason)
+  exits 2 without running anything. The slice records each reason in its PR body. The
+  configuration job runs the wrapper against a stub and fails if it accepts any other
+  form, or if any other allowed command can reach `node`.
 - The pinned action grants its own `scripts/git-push.sh` wrapper; it is denied
   explicitly, and a push would fail with the read-only token in any case.
 

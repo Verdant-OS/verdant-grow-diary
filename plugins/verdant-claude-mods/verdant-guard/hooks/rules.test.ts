@@ -596,3 +596,24 @@ describe("Codex re-review P1: redirections attached to a preceding word", () => 
     expect(checkBash("npm i --no-audit>/tmp/install.log")).toBe(null);
   });
 });
+
+describe("Codex re-review P1: shell expansions as Playwright filters", () => {
+  test("only a plain literal word counts as a spec filter", () => {
+    for (const cmd of [
+      "bunx playwright test --project=chromium-mocked {,}",
+      "bunx playwright test --project=chromium-mocked {a,}",
+      "bunx playwright test --project=chromium-mocked e2e/*.nomatch",
+      "bunx playwright test --project=chromium-mocked e2e/?",
+      "bunx playwright test --project=chromium-mocked [x]",
+      "bunx playwright test --project=chromium-mocked ~nobody",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    for (const cmd of [
+      "bunx playwright test --project=chromium-mocked e2e/auth-loading.spec.ts:12",
+      "bunx playwright test --project=chromium-mocked auth-loading",
+    ]) {
+      expect(checkBash(cmd)).toBe(null);
+    }
+  });
+});

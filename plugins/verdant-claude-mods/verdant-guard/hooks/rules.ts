@@ -436,6 +436,9 @@ const PW_BOOLEAN_FLAGS = new Set([
   "-x",
 ]);
 
+/** A spec filter the shell passes through unchanged: no expansion can make it disappear. */
+const PW_LITERAL_FILTER = /^[A-Za-z0-9._/:@+=-]+$/;
+
 const PW_DEBUG_MODES = new Set(["inspector", "cli"]);
 
 /** Drops a package-runner prefix: `bunx`, `npx`, `bun x`, `pnpm dlx|exec`, `yarn dlx|exec`. */
@@ -505,9 +508,9 @@ function checkPlaywright(tokens: string[]): string | null {
       }
       continue;
     }
-    // An empty filter matches every test, and `$VAR` or a backtick substitution may expand to
-    // nothing, so only a non-empty literal word counts as a spec filter.
-    if (a.trim() !== "" && !/[$`]/.test(a)) specs += 1;
+    // An empty filter matches every test, and the shell can expand a word to nothing (`$VAR`,
+    // a substitution, `{,}`, a glob under nullglob), so only a plain literal word counts.
+    if (PW_LITERAL_FILTER.test(a)) specs += 1;
   }
   if (specs > 0) return null;
   if (projects.length === 0) {

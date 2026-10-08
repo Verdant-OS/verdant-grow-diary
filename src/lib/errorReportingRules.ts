@@ -530,7 +530,8 @@ const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]{0,63}$/;
 
 /**
  * FNV-1a (32-bit) over the UTF-16 code units. Deterministic and one-way: it lets
- * identical messages group without sending them, and reveals only equality.
+ * identical messages group without sending them. It is not a secret: anyone who can
+ * guess a whole message can confirm the guess, so it never stands in for redaction.
  */
 function fingerprint(text: string): string {
   let hash = 0x811c9dc5;

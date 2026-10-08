@@ -1,6 +1,10 @@
 import "./lib/error-capture";
 
-import { redirectResponseFor, withHostHeaders } from "./lib/cloudflareHostRoutingRules";
+import {
+  redirectResponseFor,
+  withHostHeaders,
+  workerRoutingEnv,
+} from "./lib/cloudflareHostRoutingRules";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
@@ -47,7 +51,7 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
-    const redirect = redirectResponseFor(request, env);
+    const redirect = redirectResponseFor(request, workerRoutingEnv(env));
     if (redirect) return redirect;
 
     try {

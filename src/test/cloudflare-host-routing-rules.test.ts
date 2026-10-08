@@ -15,6 +15,7 @@ import {
   redirectResponseFor,
   resolveHostRouting,
   withHostHeaders,
+  workerRoutingEnv,
 } from "@/lib/cloudflareHostRoutingRules";
 import worker from "../server";
 
@@ -313,6 +314,25 @@ describe("response headers", () => {
     );
   });
 
+  it("reads the snapshot env from globalThis.__env__ when Nitro omits the fetch argument", () => {
+    const holder = globalThis as { __env__?: unknown };
+    const previous = holder.__env__;
+    holder.__env__ = { [SEO_SNAPSHOT_ENV]: SEO_SNAPSHOT_HEADER_VALUE };
+    try {
+      const skipped = redirectResponseFor(
+        new Request("https://verdantgrowdiary.com/strains", {
+          headers: { [SEO_SNAPSHOT_HEADER]: SEO_SNAPSHOT_HEADER_VALUE },
+        }),
+        workerRoutingEnv(undefined),
+      );
+      expect(skipped).toBeNull();
+      expect(workerRoutingEnv({})).toEqual({ [SEO_SNAPSHOT_ENV]: SEO_SNAPSHOT_HEADER_VALUE });
+    } finally {
+      if (previous === undefined) delete holder.__env__;
+      else holder.__env__ = previous;
+    }
+  });
+
   it("worker fetch keeps the permanent redirect when only the snapshot header is sent", async () => {
     const response = await worker.fetch(
       new Request("https://verdantgrowdiary.com/refund-policy", {
@@ -333,6 +353,8 @@ describe("response headers", () => {
     expect(capture).toContain(SEO_SNAPSHOT_HEADER);
     expect(capture).toContain(SEO_SNAPSHOT_ENV);
     expect(capture).toContain("response.status !== 308");
+    const server = readFileSync(resolve(ROOT, "src/server.ts"), "utf8");
+    expect(server).toContain("workerRoutingEnv(env)");
   });
 
   it("leaves an unrelated response unchanged when the headers already match", () => {

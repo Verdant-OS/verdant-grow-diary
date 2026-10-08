@@ -200,12 +200,27 @@ function searchFromRequest(request: Request): string {
 
 export const SEO_SNAPSHOT_ENV = "VERDANT_SEO_SNAPSHOT";
 
+function snapshotEnvValue(env: unknown): unknown {
+  if (!env || typeof env !== "object") return undefined;
+  return (env as Record<string, unknown>)[SEO_SNAPSHOT_ENV];
+}
+
+/**
+ * Nitro's Cloudflare module stores the Worker env on `globalThis.__env__` and
+ * then calls the SSR fetch with the request only. The capture script sets the
+ * snapshot flag on that outer env.
+ */
+export function workerRoutingEnv(explicit: unknown): unknown {
+  if (snapshotEnvValue(explicit) === SEO_SNAPSHOT_HEADER_VALUE) return explicit;
+  const stored = (globalThis as { __env__?: unknown }).__env__;
+  if (snapshotEnvValue(stored) === SEO_SNAPSHOT_HEADER_VALUE) return stored;
+  return explicit;
+}
+
 /** Build-only. A request header alone must not skip a public redirect. */
 export function seoSnapshotBypassRequested(request: Request, env: unknown): boolean {
-  if (!env || typeof env !== "object") return false;
-  const flag = (env as Record<string, unknown>)[SEO_SNAPSHOT_ENV];
   return (
-    flag === SEO_SNAPSHOT_HEADER_VALUE &&
+    snapshotEnvValue(env) === SEO_SNAPSHOT_HEADER_VALUE &&
     request.headers.get(SEO_SNAPSHOT_HEADER) === SEO_SNAPSHOT_HEADER_VALUE
   );
 }

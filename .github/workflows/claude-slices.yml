@@ -538,11 +538,16 @@ jobs:
             const rules = new Set();
             const WRAPPERS = new Set([K.ParenthesizedExpression, K.AsExpression, K.SatisfiesExpression, K.TypeAssertionExpression,
               K.NonNullExpression, K.PartiallyEmittedExpression, K.AwaitExpression]);
-            const ASSIGNMENTS = new Set([K.EqualsToken, K.BarBarEqualsToken, K.QuestionQuestionEqualsToken, K.AmpersandAmpersandEqualsToken]);
+            const COMPARISONS = new Set([K.EqualsEqualsToken, K.EqualsEqualsEqualsToken, K.ExclamationEqualsToken,
+              K.ExclamationEqualsEqualsToken, K.LessThanToken, K.LessThanEqualsToken, K.GreaterThanToken,
+              K.GreaterThanEqualsToken, K.InstanceOfKeyword, K.InKeyword]);
+            // Whether the namespace escapes into a value. Inverted (Codex P1 at becd033c,
+            // the fourth escape form in a row): after climbing through casts, await,
+            // ? :, ??, || and the right of && or a comma, only the positions below are
+            // safe, and every other parent locks, including syntax not yet thought of.
             const escapes = start => {
               let child = start;
               let parent = start.parent;
-              // Climb while the parent's value can be the namespace itself.
               for (;;) {
                 if (!parent) return false;
                 const op = parent.kind === K.BinaryExpression ? parent.operatorToken.kind : null;
@@ -554,12 +559,41 @@ jobs:
                   parent = parent.parent;
                 } else break;
               }
-              if (DECLARATIONS.has(parent.kind) || parent.kind === K.PropertyDeclaration) return parent.initializer === child;
-              if (parent.kind === K.BinaryExpression) return ASSIGNMENTS.has(parent.operatorToken.kind) && parent.right === child;
-              if (parent.kind === K.ShorthandPropertyAssignment) return parent.objectAssignmentInitializer === child;
-              if (parent.kind === K.PropertyAssignment) return parent.initializer === child;
-              return parent.kind === K.ArrayLiteralExpression || parent.kind === K.SpreadElement || parent.kind === K.SpreadAssignment ||
-                parent.kind === K.ReturnStatement || parent.kind === K.YieldExpression || parent.kind === K.ExportAssignment;
+              const op = parent.kind === K.BinaryExpression ? parent.operatorToken.kind : null;
+              // A member read: x.auth.getUser, x.auth?.["getSession"]. D1 and computed
+              // members lock in visit.
+              if ((parent.kind === K.PropertyAccessExpression || parent.kind === K.ElementAccessExpression) && parent.expression === child) return false;
+              // A call: x.auth() itself, or the namespace as an argument. Arguments stay
+              // allowed (residual risk): vi.spyOn(x.auth, "getSession"), expect(x.auth)
+              // and asString(p.auth) are pinned, and locking them is the owner's call.
+              // new C(x.auth) and tag`${x.auth}` still lock.
+              if (parent.kind === K.CallExpression) return false;
+              // A truth test or comparison: if (x.auth), !x.auth, x.auth && x.auth.getUser,
+              // typeof x.auth, x.auth === y, a discarded comma operand.
+              if (op !== null && ((op === K.AmpersandAmpersandToken || op === K.CommaToken) && parent.left === child)) return false;
+              if (op !== null && COMPARISONS.has(op)) return false;
+              if (parent.kind === K.PrefixUnaryExpression || parent.kind === K.TypeOfExpression ||
+                  parent.kind === K.VoidExpression || parent.kind === K.DeleteExpression) return false;
+              if (parent.kind === K.ConditionalExpression && parent.condition === child) return false;
+              if ((parent.kind === K.IfStatement || parent.kind === K.WhileStatement || parent.kind === K.DoStatement ||
+                   parent.kind === K.SwitchStatement || parent.kind === K.CaseClause) && parent.expression === child) return false;
+              if (parent.kind === K.ForStatement && parent.condition === child) return false;
+              if (parent.kind === K.ExpressionStatement) return false;
+              // String interpolation, unless a tag function receives the value.
+              if (parent.kind === K.TemplateSpan && parent.expression === child && parent.parent.parent.kind !== K.TaggedTemplateExpression) return false;
+              // An arrow's concise body: vi.mock factories (() => mocks.auth), pinned.
+              if (parent.kind === K.ArrowFunction && parent.body === child) return false;
+              return true;
+            };
+            // An identifier that reads a variable, not a declaration, property, label
+            // or type name. A shorthand property's name is its value.
+            const isValueReference = node => {
+              const p = node.parent;
+              if (!p) return false;
+              if (p.kind === K.ShorthandPropertyAssignment) return p.name === node || p.objectAssignmentInitializer === node;
+              if (p.name === node || p.propertyName === node || p.label === node) return false;
+              if (ts.isTypeNode(p) || p.kind === K.QualifiedName || p.kind === K.ExpressionWithTypeArguments) return false;
+              return true;
             };
             const visit = node => {
               // x.auth.signOut, auth?.["signIn"], a.admin, auth[key]: a D1 member, or a
@@ -588,7 +622,7 @@ jobs:
               // conditional branches and ?? / || / && results first. A call argument
               // (vi.spyOn(x.auth, "getSession"), expect(x.auth)) and an arrow's concise
               // body stay allowed, as pinned below.
-              if ((isAuthMember(node) || (ts.isIdentifier(node) && bound.has(node.text))) && !ts.isBindingElement(node.parent) && escapes(node)) rules.add('auth-mutation');
+              if ((isAuthMember(node) || (ts.isIdentifier(node) && bound.has(node.text) && isValueReference(node))) && !ts.isBindingElement(node.parent) && escapes(node)) rules.add('auth-mutation');
               // .from("action_queue…") / .rpc("action_queue…"), whatever the type
               // arguments, casts or escapes.
               if (node.kind === K.CallExpression) {
@@ -1060,6 +1094,10 @@ jobs:
               'const a = flag ? supabase.auth : other; a.signOut();', 'const a = c ?? supabase.auth; a.signOut();',
               'let a; a ??= supabase.auth; a.signOut();', 'function* g() { yield supabase.auth; }',
               'const { auth } = supabase; let x; ({ x = auth } = o); x.signOut();', '(c ?? supabase).auth.signOut();',
+              // Codex P1 at becd033c: any position not on the safe list locks.
+              'try { throw supabase.auth; } catch (a) { a.signOut(); }', 'tag`${supabase.auth}`;',
+              'new Wrapper(supabase.auth);', 'class X { a = supabase.auth; }', 'export default supabase.auth;',
+              'const o = { [k]: supabase.auth };', 'const { auth } = supabase; const o = { auth };', 'obj[supabase.auth] = 1;',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
               // Each form also locks on the AST alone (Option 1).
@@ -1150,6 +1188,10 @@ jobs:
               // A local that is only named auth doesn't escape (auth-sign-out-navigation-race census).
               'const auth = createRoute({ path: "/auth" }); const tree = root.addChildren([apex, auth]);',
               'const u = { useAuth: () => mocks.auth };',
+              // Safe positions: a truth test, interpolation, a bare statement, a call.
+              'if (!supabase.auth) throw new Error("x");', 'log(`auth: ${client.auth}`);', 'client.auth;',
+              'mocks.auth.mockReturnValue({ user: null }); useAuth: () => mocks.auth();',
+              'getAuthSignOutOperation(supabase.auth).clearFailedCleanup();',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
               assert.deepEqual(astRules('src/lib/fooRules.ts', text), [], `AST: ${text}`);

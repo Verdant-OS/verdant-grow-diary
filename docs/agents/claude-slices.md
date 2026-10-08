@@ -139,9 +139,14 @@ when its text:
   not lock), destructuring (`const { signOut } = supabase.auth;`) and aliasing the
   namespace (`const a = supabase.auth;`, `const { auth: a } = supabase;`, a parameter
   or destructuring default such as `function f(a = supabase.auth)`) also lock. On the
-  AST, the namespace locks wherever it escapes into a value: any binding, default or
-  assignment, an object or array literal, a spread, a return or a yield, including
-  through `??`, `||`, `&&` and `? :` (`const a = flag ? supabase.auth : b`). They lock with or
+  AST, the namespace locks in every position except a short safe list, so a syntax
+  form nobody listed fails closed: after climbing through casts, `await`, `??`, `||`,
+  `&&` and `? :`, it may only be read as a member (`x.auth.getUser()`), called or
+  passed to a call, tested (`if (x.auth)`, `!x.auth`, `typeof`, a comparison, the left
+  of `&&`), interpolated into an untagged template, used as a bare statement, or
+  returned from an arrow's concise body. `throw`, `new`, tagged templates, class
+  fields, `export default`, JSX attributes, computed keys and every binding, literal,
+  spread, return or yield lock. They lock with or
   without the trailing `;`, across a line break (`supabase\n  .auth`), and through
   parentheses, `!`, `as T` or `satisfies T` (`(supabase.auth as any).signOut()`),
   including with `//` or `/* */` comments inside the call chain
@@ -206,7 +211,9 @@ include:
 - reaching the namespace without naming it as `auth` or `["auth"]`, for example
   `Reflect.get(supabase, "auth")` or a computed key held in a variable;
 - the namespace passed as a call argument (`wrap(supabase.auth, "x").signOut()`;
-  `vi.spyOn(client.auth, "getSession")` and `expect(client.auth)` must stay allowed)
+  `vi.spyOn(client.auth, "getSession")`, `expect(client.auth)` and
+  `asString(p.auth)` must stay allowed; locking every argument would newly lock three
+  tree files, so it is left to the owner)
   or returned from an arrow's concise body (`() => mocks.auth`), or an alias that
   crosses a module boundary;
 - raw HTTP to Supabase (`fetch` to `/auth/v1/…` or `/rest/v1/action_queue`).

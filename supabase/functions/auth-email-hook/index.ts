@@ -9,6 +9,7 @@ import { MagicLinkEmail } from "../_shared/email-templates/magic-link.tsx";
 import { RecoveryEmail } from "../_shared/email-templates/recovery.tsx";
 import { EmailChangeEmail } from "../_shared/email-templates/email-change.tsx";
 import { ReauthenticationEmail } from "../_shared/email-templates/reauthentication.tsx";
+import { timingSafeEqual } from "../_shared/lib/lib/timingSafeCompareRules.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -94,7 +95,7 @@ async function handlePreview(req: Request): Promise<Response> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
   const authHeader = req.headers.get("Authorization");
 
-  if (!apiKey || authHeader !== `Bearer ${apiKey}`) {
+  if (!apiKey || !timingSafeEqual(authHeader ?? "", `Bearer ${apiKey}`)) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...previewCorsHeaders, "Content-Type": "application/json" },

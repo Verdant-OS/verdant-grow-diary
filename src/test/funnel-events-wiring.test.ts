@@ -5,6 +5,7 @@
  * emission seam, and fences the module against privacy regressions:
  *
  *   signup                  → Auth.tsx (after supabase.auth.signUp succeeds)
+ *                             and AuthProvider (first Google OAuth session)
  *   grow_created            → Grows.tsx (after insert succeeds)
  *   tent_created            → CreateTentDialog.tsx (after insert succeeds)
  *   plant_created           → CreatePlantDialog.tsx (after insert succeeds)
@@ -78,6 +79,11 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
     event: "signup",
     file: "src/pages/Auth.tsx",
     extra: [/trackFunnelEvent\("signup",\s*\{\s*method:\s*"email"\s*\}\)/],
+  },
+  {
+    event: "signup",
+    file: "src/store/auth.tsx",
+    extra: [/trackFunnelEvent\("signup",\s*\{\s*method:\s*"google"\s*\}\)/],
   },
   { event: "grow_created", file: "src/pages/Grows.tsx" },
   { event: "tent_created", file: "src/components/CreateTentDialog.tsx" },

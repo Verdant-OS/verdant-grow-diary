@@ -27,6 +27,7 @@ vi.mock("@/lib/phenoHuntCandidatesService", () => ({
 
 vi.mock("@/lib/phenoKeepersService", () => ({
   listKeeperStabilityForOwner: () => Promise.resolve([]),
+  countKeepersForOwner: () => Promise.resolve(0),
 }));
 
 const growsStore = vi.hoisted(() => ({

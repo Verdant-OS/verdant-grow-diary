@@ -53,6 +53,18 @@ function storageKey(ownerId: string): string {
   return `verdant:quick-log:pending-note:v1:${ownerId}`;
 }
 
+/**
+ * Key-scoped fallback for a history-review refusal whose full marked record
+ * could not be rewritten while a small write still lands (a write that throws or
+ * is dropped for that one larger value). It does not help when storage is at
+ * capacity: the marker needs more room than the marked record, so marking then
+ * reports blocked. It only ever adds the
+ * refusal to the exact pending Note carrying the same idempotency key.
+ */
+function historyMarkerKey(ownerId: string): string {
+  return `verdant:quick-log:pending-note-history:v1:${ownerId}`;
+}
+
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -175,10 +187,54 @@ export function readPendingQuickLogNote(ownerId: string | null): PendingNoteRead
     const raw = window.sessionStorage.getItem(storageKey(ownerId));
     if (raw === null) return { status: "empty" };
     const record: unknown = JSON.parse(raw);
-    return validRecord(record, ownerId) ? { status: "pending", record } : { status: "blocked" };
+    if (!validRecord(record, ownerId)) return { status: "blocked" };
+    if (record.historyCheckReason !== undefined) return { status: "pending", record };
+    const fallback = readHistoryMarker(ownerId, record.payload.p_idempotency_key);
+    if (fallback.status === "blocked") return fallback;
+    return fallback.status === "marked"
+      ? { status: "pending", record: { ...record, ...fallback.fields } }
+      : { status: "pending", record };
   } catch {
     return { status: "blocked" };
   }
+}
+
+/** A marker for another key is stale and ignored; an unreadable one fails closed. */
+function readHistoryMarker(
+  ownerId: string,
+  idempotencyKey: string,
+):
+  | { status: "none" }
+  | {
+      status: "marked";
+      fields: Pick<PendingQuickLogNote, "historyCheckReason" | "historyReviewTarget">;
+    }
+  | { status: "blocked" } {
+  const raw = window.sessionStorage.getItem(historyMarkerKey(ownerId));
+  if (raw === null) return { status: "none" };
+  const marker: unknown = JSON.parse(raw);
+  if (
+    !object(marker) ||
+    !onlyKeys(marker, ["version", "idempotencyKey", "historyCheckReason", "historyReviewTarget"]) ||
+    marker.version !== 1 ||
+    typeof marker.idempotencyKey !== "string" ||
+    !marker.idempotencyKey ||
+    !quickLogSaveRequiresHistoryCheck(marker.historyCheckReason) ||
+    (marker.historyReviewTarget !== undefined &&
+      (marker.historyCheckReason !== "receipt_target_moved" ||
+        !validReviewTarget(marker.historyReviewTarget)))
+  )
+    return { status: "blocked" };
+  if (marker.idempotencyKey !== idempotencyKey) return { status: "none" };
+  return {
+    status: "marked",
+    fields: {
+      historyCheckReason: marker.historyCheckReason,
+      ...(marker.historyReviewTarget !== undefined
+        ? { historyReviewTarget: marker.historyReviewTarget }
+        : {}),
+    },
+  };
 }
 
 function sameRecord(a: PendingQuickLogNote, b: PendingQuickLogNote): boolean {
@@ -248,10 +304,30 @@ export function markPendingQuickLogNoteHistoryCheck(
           }
         : {}),
     };
-    window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
+    try {
+      window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
+    } catch {
+      // Verified below; the unchanged journal falls back to the small marker.
+    }
     const verified = readPendingQuickLogNote(record.ownerId);
-    return verified.status === "pending" && sameRecord(verified.record, marked)
-      ? { status: "marked", record: verified.record }
+    if (verified.status === "pending" && sameRecord(verified.record, marked))
+      return { status: "marked", record: verified.record };
+    // Only the exact unchanged journal may take the fallback; anything else is
+    // unknown storage state, and a reload must not reopen same-key Retry from it.
+    if (verified.status !== "pending" || !sameRecord(verified.record, current.record))
+      return { status: "blocked" };
+    window.sessionStorage.setItem(
+      historyMarkerKey(record.ownerId),
+      JSON.stringify({
+        version: 1,
+        idempotencyKey: marked.payload.p_idempotency_key,
+        historyCheckReason: marked.historyCheckReason,
+        ...(marked.historyReviewTarget ? { historyReviewTarget: marked.historyReviewTarget } : {}),
+      }),
+    );
+    const fallback = readPendingQuickLogNote(record.ownerId);
+    return fallback.status === "pending" && sameRecord(fallback.record, marked)
+      ? { status: "marked", record: fallback.record }
       : { status: "blocked" };
   } catch {
     return { status: "blocked" };
@@ -264,8 +340,19 @@ export function clearPendingQuickLogNote(record: PendingQuickLogNote): boolean {
     const current = readPendingQuickLogNote(record.ownerId);
     if (current.status !== "pending" || !sameRecord(current.record, record)) return false;
     window.sessionStorage.removeItem(storageKey(record.ownerId));
-    return window.sessionStorage.getItem(storageKey(record.ownerId)) === null;
+    if (window.sessionStorage.getItem(storageKey(record.ownerId)) !== null) return false;
+    removeHistoryMarker(record.ownerId);
+    return true;
   } catch {
     return false;
+  }
+}
+
+/** A leftover marker names a retired key, so it can never attach to a new Note. */
+function removeHistoryMarker(ownerId: string): void {
+  try {
+    window.sessionStorage.removeItem(historyMarkerKey(ownerId));
+  } catch {
+    // The journal is cleared; a stale key-scoped marker is inert.
   }
 }

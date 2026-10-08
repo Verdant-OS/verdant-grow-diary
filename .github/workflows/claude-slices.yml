@@ -1463,7 +1463,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          git fetch --no-tags origin "refs/pull/$PR_NUMBER/head"
+          git fetch --no-tags origin "$HEAD_SHA"
           test "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA"
           node "$RUNNER_TEMP/claude-slice-policy.cjs" --diff "$BASE_SHA" "$HEAD_SHA"
 

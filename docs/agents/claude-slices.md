@@ -137,8 +137,13 @@ when its text:
   (`auth?.signOut()`), bracket access (`auth["signOut"]()`, `auth[key]()`,
   `supabase["auth"]`; a plain literal read-only key such as `auth["getUser"]()` does
   not lock), destructuring (`const { signOut } = supabase.auth;`) and aliasing the
-  namespace (`const a = supabase.auth;`, `const { auth: a } = supabase;`, a parameter
-  or destructuring default such as `function f(a = supabase.auth)`) also lock. On the
+  namespace (`const a = supabase.auth;`, `const { auth: a } = supabase;`, a literal
+  computed key such as `const { ["auth"]: a } = supabase;` or ``({ [`auth`]: a } = x)``,
+  a destructuring assignment, a parameter or destructuring default such as
+  `function f(a = supabase.auth)`) also lock. An alias spreads only from a proven
+  reference (`x.auth`, a name destructured from an `auth` key, `import { auth }`, or
+  another proven alias), so an unrelated local or parameter named `auth` that is
+  copied or returned doesn't lock. On the
   AST, the namespace locks in every position except a short safe list, so a syntax
   form nobody listed fails closed: after climbing through casts, `await`, `??`, `||`,
   `&&` and `? :`, it may only be read as a member (`x.auth.getUser()`, unless the member
@@ -162,7 +167,9 @@ when its text:
   `.rpc("action_queue…")`, including `?.from(`, a type argument
   (`.from<Row>("action_queue")`) and a variable declared with a table or RPC name
   (`const TABLE = "action_queue";`), also with comments inside the call
-  (`db.from(/* c */ "action_queue")`). Mentioning an Action Queue row ID, type or
+  (`db.from(/* c */ "action_queue")`), and through `call`, `apply` or `bind`
+  (`db.from.call(db, "action_queue")`, `db.from.apply(db, ["action_queue"])`,
+  `db.from.bind(db)("action_queue")`). Mentioning an Action Queue row ID, type or
   comment doesn't lock, and neither does a bare string literal elsewhere
   (generated types, view models, source-scan tests), so pure helpers such as
   `pendingOutcomeReviewRules.ts` stay editable.
@@ -208,7 +215,8 @@ include:
   and calls it there;
 - a table or RPC name imported from another module, held in an object property
   (`db.from(TABLES.queue)`), passed as a parameter, or built at runtime
-  (`"action_" + "queue"`);
+  (`"action_" + "queue"`), or a query method reached through `Reflect.apply`
+  (`Reflect.apply(db.from, db, ["action_queue"])`);
 - reaching the namespace without naming it as `auth` or `["auth"]`, for example
   `Reflect.get(supabase, "auth")` or a computed key held in a variable;
 - the namespace passed as a call argument (`wrap(supabase.auth, "x").signOut()`;

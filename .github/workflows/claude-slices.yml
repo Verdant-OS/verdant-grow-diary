@@ -490,6 +490,19 @@ jobs:
               }
               return null;
             };
+            // A destructuring or object-literal key: its text, or '*' when computed from
+            // something other than a literal. ["auth"] and [`auth`] are the literal auth
+            // (Codex P1 at de2a31e4).
+            const propKey = name => {
+              if (!name) return null;
+              if (ts.isIdentifier(name) || name.kind === K.StringLiteral || name.kind === K.NumericLiteral ||
+                  name.kind === K.NoSubstitutionTemplateLiteral) return name.text;
+              if (name.kind === K.ComputedPropertyName) {
+                const key = unwrap(name.expression);
+                return key && key.kind === K.TemplateExpression ? '*' : literalText(key) ?? '*';
+              }
+              return '*';
+            };
             // Identifiers bound to the auth namespace: auth itself, `const a = x.auth`,
             // `const { auth: a } = x`, and assignments of x.auth.
             const aliases = new Set(['auth']);
@@ -506,6 +519,33 @@ jobs:
               if (!inner) return false;
               if (ts.isIdentifier(inner)) return aliases.has(inner.text);
               return memberName(inner) === 'auth';
+            };
+            // An alias spreads only from a proven reference: x.auth or a bound name,
+            // never the guessed seed (Codex P2 at de2a31e4: function f(auth) { const
+            // a = auth; return a; } has no Supabase namespace in it).
+            const isProvenAuthRef = node => {
+              const inner = unwrap(node);
+              if (!inner) return false;
+              if (ts.isIdentifier(inner)) return bound.has(inner.text);
+              return memberName(inner) === 'auth';
+            };
+            // Whether an object or array literal is a destructuring-assignment target.
+            const isAssignmentPattern = literal => {
+              let node = literal;
+              while (node.parent && (node.parent.kind === K.PropertyAssignment || node.parent.kind === K.ShorthandPropertyAssignment ||
+                     node.parent.kind === K.SpreadAssignment || node.parent.kind === K.SpreadElement ||
+                     node.parent.kind === K.ArrayLiteralExpression || node.parent.kind === K.ObjectLiteralExpression ||
+                     (node.parent.kind === K.BinaryExpression && node.parent.operatorToken.kind === K.EqualsToken && node.parent.left === node &&
+                      node.parent.parent && (node.parent.parent.kind === K.PropertyAssignment || node.parent.parent.kind === K.ArrayLiteralExpression))))
+                node = node.parent;
+              return !!node.parent && node.parent.kind === K.BinaryExpression && node.parent.operatorToken.kind === K.EqualsToken && node.parent.left === node;
+            };
+            // The target of an assignment-pattern property, without its default: a in
+            // { auth: a } and { auth: a = d }.
+            const patternTarget = node => {
+              const inner = unwrap(node);
+              if (inner && inner.kind === K.BinaryExpression && inner.operatorToken.kind === K.EqualsToken) return unwrap(inner.left);
+              return inner;
             };
             const bindingNames = pattern => pattern.elements.filter(element => element.kind === K.BindingElement);
             const DECLARATIONS = new Set([K.VariableDeclaration, K.Parameter, K.BindingElement]);
@@ -524,12 +564,17 @@ jobs:
             const collect = node => {
               // A variable, a parameter default or a destructuring default (Codex P1 at
               // 805b256c): const a = x.auth; function f(a = x.auth); ({ a = x.auth }).
-              if (DECLARATIONS.has(node.kind) && ts.isIdentifier(node.name) && isAuthRef(node.initializer)) addAlias(node.name.text);
-              if (node.kind === K.BinaryExpression && node.operatorToken.kind === K.EqualsToken && ts.isIdentifier(unwrap(node.left)) && isAuthRef(node.right)) addAlias(unwrap(node.left).text);
-              if (node.kind === K.BindingElement && ts.isIdentifier(node.name)) {
-                const key = node.propertyName ? (ts.isIdentifier(node.propertyName) || ts.isStringLiteral(node.propertyName) ? node.propertyName.text : null) : node.name.text;
-                if (key === 'auth') addAlias(node.name.text);
+              if (DECLARATIONS.has(node.kind) && ts.isIdentifier(node.name) && isProvenAuthRef(node.initializer)) addAlias(node.name.text);
+              if (node.kind === K.BinaryExpression && node.operatorToken.kind === K.EqualsToken && ts.isIdentifier(unwrap(node.left)) && isProvenAuthRef(node.right)) addAlias(unwrap(node.left).text);
+              // const { auth: a } = x; const { ["auth"]: a } = x; ({ [`auth`]: a = d } = x);
+              // ({ auth } = x); import { auth as a } from "…".
+              if (node.kind === K.BindingElement && ts.isIdentifier(node.name) && propKey(node.propertyName ?? node.name) === 'auth') addAlias(node.name.text);
+              if (node.kind === K.PropertyAssignment && propKey(node.name) === 'auth' && isAssignmentPattern(node.parent)) {
+                const target = patternTarget(node.initializer);
+                if (target && ts.isIdentifier(target)) addAlias(target.text);
               }
+              if (node.kind === K.ShorthandPropertyAssignment && node.name.text === 'auth' && isAssignmentPattern(node.parent)) addAlias('auth');
+              if (node.kind === K.ImportSpecifier && (node.propertyName ?? node.name).text === 'auth') addAlias(node.name.text);
             };
             for (let size = -1; size !== aliases.size && aliases.size < 1000;) {
               size = aliases.size;
@@ -638,11 +683,22 @@ jobs:
               const name = memberName(node);
               if (name !== null && (name === '*' || isAuthMethod(name)) && isAuthRef(node.expression)) rules.add('auth-mutation');
               // const { signOut } = x.auth; function f({ signOut } = x.auth)
-              if (DECLARATIONS.has(node.kind) && node.name.kind === K.ObjectBindingPattern && isAuthRef(node.initializer)) {
+              // const { auth: { signOut } } = x; const { ["auth"]: { signOut } } = x
+              const authPattern = DECLARATIONS.has(node.kind) && node.name.kind === K.ObjectBindingPattern &&
+                (isAuthRef(node.initializer) || (node.kind === K.BindingElement && propKey(node.propertyName) === 'auth'));
+              if (authPattern) {
                 for (const element of bindingNames(node.name)) {
-                  const key = element.propertyName ?? element.name;
-                  if (!ts.isIdentifier(key) && !ts.isStringLiteral(key)) rules.add('auth-mutation');
-                  else if (isAuthMethod(key.text)) rules.add('auth-mutation');
+                  const key = propKey(element.propertyName ?? element.name);
+                  if (key === '*' || isAuthMethod(key)) rules.add('auth-mutation');
+                }
+              }
+              // ({ auth: { signOut } } = x); ({ signOut } = x.auth)
+              if (node.kind === K.ObjectLiteralExpression && isAssignmentPattern(node) &&
+                  ((node.parent.kind === K.PropertyAssignment && propKey(node.parent.name) === 'auth') ||
+                   (node.parent.kind === K.BinaryExpression && node.parent.left === node && isAuthRef(node.parent.right)))) {
+                for (const property of node.properties) {
+                  const key = property.kind === K.SpreadAssignment ? '*' : propKey(property.name);
+                  if (key === '*' || isAuthMethod(key)) rules.add('auth-mutation');
                 }
               }
               // The namespace escaping into a binding, an assignment or a return:
@@ -665,8 +721,21 @@ jobs:
               if (node.kind === K.CallExpression) {
                 const callee = unwrap(node.expression);
                 const calleeName = callee ? memberName(callee) : null;
-                const first = node.arguments[0] && literalText(node.arguments[0]);
-                if ((calleeName === 'from' || calleeName === 'rpc') && typeof first === 'string' && AQ_LITERAL.test(first)) rules.add('aq-io');
+                const isAq = arg => { const text = arg && literalText(arg); return typeof text === 'string' && AQ_LITERAL.test(text); };
+                const isQuery = expr => { const inner = unwrap(expr); const name = inner ? memberName(inner) : null; return name === 'from' || name === 'rpc'; };
+                if ((calleeName === 'from' || calleeName === 'rpc') && isAq(node.arguments[0])) rules.add('aq-io');
+                // Through Function methods (Codex P1 at de2a31e4): db.from.call(db, "action_queue"),
+                // db.from.apply(db, ["action_queue"]), db.from.bind(db, "action_queue"),
+                // db.from.bind(db)("action_queue").
+                if ((calleeName === 'call' || calleeName === 'bind') && isQuery(callee.expression) && isAq(node.arguments[1])) rules.add('aq-io');
+                if (calleeName === 'apply' && isQuery(callee.expression)) {
+                  const list = unwrap(node.arguments[1]);
+                  if (list && list.kind === K.ArrayLiteralExpression && isAq(list.elements[0])) rules.add('aq-io');
+                }
+                if (callee && callee.kind === K.CallExpression) {
+                  const inner = unwrap(callee.expression);
+                  if (inner && memberName(inner) === 'bind' && isQuery(inner.expression) && isAq(node.arguments[0])) rules.add('aq-io');
+                }
               }
               // const TABLE = "action_queue"
               if (node.kind === K.VariableDeclaration && node.initializer && AQ_NAME_SET.has(literalText(node.initializer))) rules.add('aq-io');
@@ -1139,6 +1208,11 @@ jobs:
               'delete supabase.auth;', '++supabase.auth;', 'supabase.auth = other;', 'supabase.auth.signOut = noop;',
               'supabase.auth.x++;', 'delete supabase.auth.getUser;', '({ x: supabase.auth.y } = o);', '[supabase.auth.y] = arr;',
               'for (supabase.auth.x of xs) {}',
+              // Codex P1 at de2a31e4: literal computed keys, in declarations and assignments.
+              'const { ["auth"]: a } = supabase; a.signOut();', 'const { [`auth`]: a } = supabase; a.signOut();',
+              'const { ["auth"]: { signOut } } = supabase; signOut();', 'function f({ ["auth"]: a }) { a.signOut(); }',
+              'let a; ({ ["auth"]: a } = supabase); a.signOut();', 'let a; ({ [`auth`]: a = d } = supabase); a.signOut();',
+              'let a; ({ auth: a } = supabase); a.signOut();', '({ auth: { signOut } } = supabase);',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
               // Each form also locks on the AST alone (Option 1).
@@ -1175,6 +1249,11 @@ jobs:
               'db.from<({ ' + 'p: string; '.repeat(300) + '})>("action_queue");',
               'db.from<import\n("x").Row>("action_queue");', 'db["from"]("action_queue");',
               'db.from("action_\\\nqueue");', 'db.from("action\\137queue");',
+              // Codex P1 at de2a31e4: through Function methods.
+              'db.from.call(db, "action_queue").select();', 'db.from.apply(db, ["action_queue"]).select();',
+              'db.from.bind(db, "action_queue")().select();', 'db.from.bind(db)("action_queue").select();',
+              'db.rpc.call(db, "action_queue_create", p);', '(db.from as any).call(db, `action_queue`);',
+              'db?.from?.call(db, "action_queue");', 'db["from"].call(db, "action_queue");',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), ['aq-io, head'], text);
               assert.deepEqual(astRules('src/lib/fooRules.ts', text), ['aq-io'], `AST: ${text}`);
@@ -1238,6 +1317,11 @@ jobs:
               'for (const k of Object.keys(client.auth)) log(k);',
               // A plain assignment to a non-D1 member: auth-store mocks (pricing-credit-pack census).
               'mocks.auth.user = { id: "u" }; mocks.auth.loading = false;',
+              // Codex P2 at de2a31e4: an unrelated identifier named auth seeds no alias.
+              'function f(auth) { const alias = auth; return alias; }',
+              'function f(auth) { const alias = auth; const o = { alias }; return o; }',
+              'const auth = useRoute(); const r = auth; export default r;',
+              'db.from.call(db, "plants").select();', 'fn.call(db, "action_queue_note");', 'const { ["data"]: d } = supabase;',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
               assert.deepEqual(astRules('src/lib/fooRules.ts', text), [], `AST: ${text}`);

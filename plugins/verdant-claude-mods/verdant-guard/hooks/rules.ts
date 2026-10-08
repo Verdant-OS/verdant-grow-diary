@@ -123,9 +123,9 @@ export function segments(command: string, redirections = true): string[][] {
       (c === ">" || c === "<" || (c === "&" && text[i + 1] === ">"))
     ) {
       // An unquoted `>`, `<` or `&>` opens a redirection: read the whole operator, then any
-      // attached target. A file-descriptor number right before it (`2>`) belongs to it; any
+      // attached target. A descriptor right before it (`2>`, `{fd}>`) belongs to it; any
       // other word before it (`main>log`, `-f>log`) is a word of its own and stays.
-      if (inToken && (quoted || !/^\d+$/.test(token))) endToken();
+      if (inToken && (quoted || !/^(\d+|\{[A-Za-z_][A-Za-z0-9_]*\})$/.test(token))) endToken();
       while (i + 1 < text.length && "<>&|".includes(text[i + 1]!)) i += 1;
       redirect = true;
       inToken = true;
@@ -377,7 +377,7 @@ function checkGit(args: string[]): string | null {
   }
   if (
     sub === "commit" &&
-    rest.some((t) => longOpt(t, "no-verify") || t === "-n" || clusterHas(t, "n", "mFcCtS"))
+    rest.some((t) => longOpt(t, "no-verify") || t === "-n" || clusterHas(t, "n", "mFcCtSu"))
   ) {
     return "`git commit --no-verify` skips lint-staged, the full-project tsc and the docs-safety asserts. Commit without it and fix what fails.";
   }

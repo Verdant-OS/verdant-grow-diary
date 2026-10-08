@@ -617,3 +617,22 @@ describe("Codex re-review P1: shell expansions as Playwright filters", () => {
     }
   });
 });
+
+describe("Codex re-review: allocated-FD redirections, commit -u mode", () => {
+  test("P1: a {name}> redirection is dropped like a numeric one", () => {
+    for (const cmd of [
+      "env {guardfd}>/tmp/log git push --force origin claude/task",
+      "{fd}>/tmp/log git push -f origin claude/task",
+      "git push origin main {fd}>&2",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("{fd}>/tmp/log git push origin claude/task")).toBe(null);
+  });
+  test("P2: the value attached to commit -u is not scanned for -n", () => {
+    for (const cmd of ["git commit -unormal -m wip", "git commit -uno -m wip"]) {
+      expect(checkBash(cmd)).toBe(null);
+    }
+    expect(checkBash("git commit -nu -m wip")).not.toBe(null);
+  });
+});

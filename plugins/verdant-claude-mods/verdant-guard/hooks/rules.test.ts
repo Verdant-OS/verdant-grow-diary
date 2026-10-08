@@ -678,3 +678,17 @@ describe("Codex re-review: sudo assignments between sudo options", () => {
     expect(checkBash("sudo VAR=x -u root git push origin claude/task")).toBe(null);
   });
 });
+
+describe("Codex re-review: append and subscripted assignment prefixes", () => {
+  test("P1: `+=` and `a[i]=` prefixes do not hide the command", () => {
+    for (const cmd of [
+      "F+=x git push --force origin claude/task",
+      "a[1]=y git push -f origin claude/task",
+      "b[k]+=z git commit --no-verify -m wip",
+      "sudo F+=x git push --force origin claude/task",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("F+=x git push origin claude/task")).toBe(null);
+  });
+});

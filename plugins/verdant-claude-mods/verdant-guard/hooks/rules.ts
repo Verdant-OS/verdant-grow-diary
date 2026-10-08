@@ -211,8 +211,11 @@ function shellWords(text: string): string[] {
   return segments(text, false).flat();
 }
 
-/** A shell `VAR=value` assignment word. */
-const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+/**
+ * A shell assignment word: `VAR=value`, `VAR+=value`, and the subscripted `a[i]=` / `a[i]+=`
+ * forms (Bash rejects a subscript in a command prefix but still runs the command after it).
+ */
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=/;
 
 /**
  * Drops leading `VAR=value` assignments and `sudo`/`env`/`exec`/`time` wrappers with their own

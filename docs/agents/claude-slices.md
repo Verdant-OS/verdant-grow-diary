@@ -225,7 +225,8 @@ type still open after 2,000 characters locks the file; and in each version as it
 is, where such a type is left alone. The scan also has a per-file budget. A file
 that hits the limit or uses up the budget locks under `auth-mutation` (if it
 contains `auth`) and `aq-io` (if it contains `action_queue`) instead of being
-skipped. The lexer guesses
+skipped, and a JS/TS file is still parsed for the AST rules, so an escaped name
+behind the exhausted scan still locks. The lexer guesses
 regex literals from the previous token and gives up on one longer than 200
 characters, so a construction that fools both stripped versions is still
 possible.

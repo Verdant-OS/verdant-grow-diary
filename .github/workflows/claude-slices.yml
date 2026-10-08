@@ -605,13 +605,14 @@ jobs:
               : wordRules());
             // The AST rules (Option 1), OR-ed in. AST_MAX_CHARS is about three times
             // the largest file under the content roots; a crafted file that large is
-            // slow to parse. A file the text versions already failed closed on is not
-            // parsed again.
+            // slow to parse. A file the text versions failed closed on is still parsed:
+            // its word rules can miss an escaped name, and an exception for one rule must
+            // never clear the other (Codex and CodeRabbit at 2ecba527).
             // Every JS/TS file is parsed, with no word pre-check: a line
             // continuation or a legacy octal escape can hide the words from the text
             // versions but not from the parser (CodeRabbit at 6deb747b). An oversized
             // file, a missing parser or a parse that throws locks under both rules.
-            if (variants && astParsable(path)) {
+            if (astParsable(path)) {
               let fromAst;
               try {
                 fromAst = text.length > AST_MAX_CHARS ? ALL_RULES : astRules(path, text);
@@ -1038,9 +1039,21 @@ jobs:
               assert.deepEqual(locks('src/lib/fooRules.ts', text), ['aq-io, head'], text);
               assert.deepEqual(astRules('src/lib/fooRules.ts', text), ['aq-io'], `AST: ${text}`);
             }
-            // A file that exhausts the type-scan budget locks (fail closed).
-            assert.deepEqual(locks('src/lib/fooRules.ts', 'x as { auth '.repeat(200000)), ['auth-mutation, head']);
+            // A file that exhausts the type-scan budget locks (fail closed). This one is
+            // also over AST_MAX_CHARS, so it locks under both rules.
+            assert.deepEqual(locks('src/lib/fooRules.ts', 'x as { auth '.repeat(200000)), ['auth-mutation, head', 'aq-io, head']);
             cases += 1;
+            // Under AST_MAX_CHARS, a file that exhausts the strict or the per-version
+            // budget is still parsed, so an escaped table name behind it locks
+            // (Codex and CodeRabbit at 2ecba527).
+            for (const text of [
+              'const x = y as {' + ' auth: string;'.repeat(200) + '\ndb.from("action\\137queue").select();\n',
+              'x as { auth '.repeat(30000) + '\ndb.from("action\\137queue");\n',
+            ]) {
+              assert.ok(text.length < AST_MAX_CHARS);
+              assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head', 'aq-io, head']);
+              cases += 1;
+            }
             assert.deepEqual(locks('src/lib/fooRules.ts', 'const s = "x as {"; db.from<{ a: 1; }>("action_queue");'), ['aq-io, head']);
             cases += 1;
             assert.deepEqual(locks('e2e-local/lib/fixtures.ts', 'await admin.auth.admin.deleteUser(uid);'), ['auth-mutation, head']);

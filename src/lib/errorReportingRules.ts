@@ -144,20 +144,18 @@ const CREDENTIAL_SEPARATOR = String.raw`(\s*(?:[:=]|%3[Dd])\s*)`;
  */
 const QUOTE = String.raw`\\*["']`;
 /**
- * A value quoted with `\\` × `level` before each quote (`\"…\"` is level 1, `\\\"…\\\"` level 3).
- * It closes only on a quote escaped at the same level, so an inner quote escaped one level
- * deeper (`\"abc\\\"def\"`) stays inside the value; unterminated, it runs to the end.
+ * A value whose quote is escaped at any serialisation depth (`\"…\"`, `\\\"…\\\"`,
+ * seven or more backslashes). It closes only on the same quote behind exactly the same
+ * backslash run, so an inner quote escaped one level deeper (`\"abc\\\"def\"`) stays
+ * inside the value; unterminated, it runs to the end.
  */
-function escapedQuoted(level: number, quote: '"' | "'"): string {
-  const open = `${"\\\\".repeat(level)}${quote}`;
-  return String.raw`${open}[\s\S]*?(?:(?<!\\)${open}|$)`;
-}
+const ESCAPED_QUOTED_VALUE = String.raw`(?<esc>\\+)(?<q>["'])[\s\S]*?(?:(?<!\\)\k<esc>\k<q>|$)`;
 /**
  * Value: escaped-quoted, quoted (escapes included), bracketed (an array, across lines too,
  * or already `[redacted]`), or bare up to the next delimiter. A quoted or bracketed value
  * with no closing quote or bracket (a truncated payload) runs to the end of the text.
  */
-const CREDENTIAL_VALUE = String.raw`(${escapedQuoted(3, '"')}|${escapedQuoted(1, '"')}|${escapedQuoted(1, "'")}|"(?:[^"\\]|\\.)*(?:"|$)|'(?:[^'\\]|\\.)*(?:'|$)|\[[^\]]*(?:\]|$)|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
+const CREDENTIAL_VALUE = String.raw`(${ESCAPED_QUOTED_VALUE}|"(?:[^"\\]|\\.)*(?:"|$)|'(?:[^'\\]|\\.)*(?:'|$)|\[[^\]]*(?:\]|$)|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
 /** What a one-time or recovery code is called (`MFA code`, `recovery_codes`, `pin`). Not `error` or `status`. */
 const ONE_TIME_CODE_QUALIFIERS = String.raw`auth|authorization|verification|otp|security|confirmation|mfa|2fa|sms|totp|recovery|backup|reset|invite|login|pin`;
 /** Words that make an identifier a credential name, including `*_KEY` / `*-key`, named `…Key`s and one-time codes (`auth_code`, `mfa_code`, `recovery_codes`, PKCE `code_verifier`, `otp`). */
@@ -177,7 +175,7 @@ const SPACED_KEY_QUALIFIERS = String.raw`api|secret|signing|private|access|encry
  * `primary key:` are not matched, nor are `spin:` / `pinned:`.
  */
 const SPACED_CREDENTIAL_LABEL_PATTERN = new RegExp(
-  String.raw`\b((?:${ONE_TIME_CODE_QUALIFIERS}|one[- ]time)\s+codes?|code\s+verifier|(?:${SPACED_KEY_QUALIFIERS})\s+key|pin)` +
+  String.raw`(${QUOTE}|)\b((?:${ONE_TIME_CODE_QUALIFIERS}|one[- ]time)\s+codes?|code\s+verifier|(?:${SPACED_KEY_QUALIFIERS})\s+key|pin)\1` +
     CREDENTIAL_SEPARATOR +
     CREDENTIAL_VALUE,
   "gi",
@@ -204,32 +202,30 @@ const DIAGNOSTIC_CODE_VALUE = /^(\\*["']?)(?:[0-9A-Z]{5}|PGRST\d{3})\1$/;
 const POSTGREST_ERROR_FIELDS = ["details", "hint", "message"];
 
 /**
- * The text of the object enclosing `offset` at its own depth: nested objects are left
- * out. Null when the braces do not balance.
+ * The text of the innermost object enclosing `offset` at its own depth: nested objects are
+ * left out. Scans from the start of the text and treats `quote` (the code key's own quote,
+ * not preceded by a backslash) as a string delimiter, so braces inside string values are
+ * not structure. Null when no balanced object encloses `offset`.
  */
-function enclosingObjectTopLevel(text: string, offset: number): string | null {
-  let depth = 0;
-  let start = -1;
-  for (let i = offset - 1; i >= 0; i -= 1) {
-    if (text[i] === "}") depth += 1;
-    else if (text[i] === "{") {
-      if (depth === 0) {
-        start = i;
-        break;
-      }
-      depth -= 1;
+function enclosingObjectTopLevel(text: string, offset: number, quote: string): string | null {
+  const open: Array<{ start: number; topLevel: string }> = [];
+  let inString = false;
+  for (let i = 0; i < text.length; i += 1) {
+    if (text.startsWith(quote, i) && text[i - 1] !== "\\") {
+      inString = !inString;
+      if (open.length > 0) open[open.length - 1].topLevel += quote;
+      i += quote.length - 1;
+      continue;
     }
-  }
-  if (start < 0) return null;
-  let topLevel = "";
-  depth = 0;
-  for (let i = start + 1; i < text.length; i += 1) {
     const char = text[i];
-    if (char === "{") depth += 1;
-    else if (char === "}") {
-      if (depth === 0) return topLevel;
-      depth -= 1;
-    } else if (depth === 0) topLevel += char;
+    if (!inString && char === "{") {
+      open.push({ start: i, topLevel: "" });
+    } else if (!inString && char === "}") {
+      const object = open.pop();
+      if (object && object.start < offset && i > offset) return object.topLevel;
+    } else if (open.length > 0) {
+      open[open.length - 1].topLevel += char;
+    }
   }
   return null;
 }
@@ -242,7 +238,7 @@ function enclosingObjectTopLevel(text: string, offset: number): string | null {
  * object, could be a verification or OAuth code and is redacted.
  */
 function isInPostgrestErrorObject(text: string, offset: number, quote: string): boolean {
-  const topLevel = enclosingObjectTopLevel(text, offset);
+  const topLevel = enclosingObjectTopLevel(text, offset, quote);
   if (topLevel == null) return false;
   const q = quote.replace(/[\\"']/g, (char) => `\\${char}`);
   return POSTGREST_ERROR_FIELDS.every((field) =>
@@ -334,7 +330,14 @@ function decodePercentEscapes(text: string): string {
 /** Removes e-mail addresses, UUID row ids, bridge/JWT/bearer tokens and credential-looking query values from free text. Idempotent. */
 export function scrubText(value: unknown): string {
   if (value == null) return "";
-  const text = decodePercentEscapes(typeof value === "string" ? value : safeString(value));
+  // Redact once before decoding, while an encoded `%26` / `%3B` / `%2C` / `%22` inside a
+  // credential cannot yet end its value, then again after, for credentials that only
+  // decoding reveals (`%22password%22%3A…`).
+  const raw = typeof value === "string" ? value : safeString(value);
+  return redactPatterns(decodePercentEscapes(redactPatterns(raw)));
+}
+
+function redactPatterns(text: string): string {
   return text
     .replace(BRIDGE_TOKEN_PATTERN, `vbt_${REDACTED}`)
     .replace(KNOWN_SECRET_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
@@ -347,8 +350,8 @@ export function scrubText(value: unknown): string {
     )
     .replace(
       SPACED_CREDENTIAL_LABEL_PATTERN,
-      (_m, label: string, separator: string, value: string) =>
-        `${label}${separator}${redactedLike(value)}`,
+      (_m, quote: string, label: string, separator: string, value: string) =>
+        `${quote}${label}${quote}${separator}${redactedLike(value)}`,
     )
     .replace(
       QUOTED_KEY_PATTERN,
@@ -357,18 +360,14 @@ export function scrubText(value: unknown): string {
     )
     .replace(
       QUOTED_CODE_PATTERN,
-      (
-        match,
-        quote: string,
-        key: string,
-        separator: string,
-        value: string,
-        offset: number,
-        whole: string,
-      ) =>
-        DIAGNOSTIC_CODE_VALUE.test(value) && isInPostgrestErrorObject(whole, offset, quote)
+      (match, quote: string, key: string, separator: string, value: string, ...rest: unknown[]) => {
+        // CREDENTIAL_VALUE has named groups, so the arguments end with offset, text, groups.
+        const offset = rest[rest.length - 3] as number;
+        const whole = rest[rest.length - 2] as string;
+        return DIAGNOSTIC_CODE_VALUE.test(value) && isInPostgrestErrorObject(whole, offset, quote)
           ? match
-          : `${quote}${key}${quote}${separator}${redactedLike(value)}`,
+          : `${quote}${key}${quote}${separator}${redactedLike(value)}`;
+      },
     )
     .replace(
       STATE_NONCE_PATTERN,

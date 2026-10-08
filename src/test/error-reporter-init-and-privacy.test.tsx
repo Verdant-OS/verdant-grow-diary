@@ -295,6 +295,20 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ['{"code":"12345","message":"\\"details\\":null,\\"hint\\":null"}', "12345"],
       ['{"state":"abcdefghijklmno"}', "abcdefghijklmno"],
       ["state: abcdefghijklmno", "abcdefghijklmno"],
+      ['{"API key":"AbCdEf1234567890"}', "AbCdEf1234567890"],
+      ['{"service role key":"AbCdEf1234567890"}', "AbCdEf1234567890"],
+      [String.raw`{\"API key\":\"AbCdEf1234567890\"}`, "AbCdEf1234567890"],
+      ["access_token=abc%26defSECRET", "SECRET"],
+      ["password=abc%3BdefSECRET", "SECRET"],
+      ["client_secret=abc%2CdefSECRET", "SECRET"],
+      ["token: abc%22defSECRET", "SECRET"],
+      [String.raw`{\\\\\\\"password\\\\\\\":\\\\\\\"AbCdEf1234567890\\\\\\\"}`, "AbCdEf1234567890"],
+      [
+        String.raw`{\\\\\\\\\\\\\\\"token\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"AbCdEf1234567890\\\\\\\\\\\\\\\"}`,
+        "AbCdEf1234567890",
+      ],
+      ['{"details":null,"hint":null,"message":"db","metadata":{"x":"}","code":"12345"}}', "12345"],
+      ['{"details":null,"hint":null,"message":"db","metadata":{"x":"{","code":"12345"}}', "12345"],
     ];
     for (const [input, secret] of cases) {
       const out = scrubText(input);

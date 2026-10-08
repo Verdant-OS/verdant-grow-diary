@@ -708,3 +708,147 @@ describe("storage failures and exact completion", () => {
     expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: input });
   });
 });
+
+const waterHistoryKey = (owner = ownerA) =>
+  `verdant:quick-log:pending-watering-history:v1:${owner}`;
+
+/** Models real capacity: any write that grows total stored characters past `limit` throws. */
+function capStorage(limit: number) {
+  const original = Storage.prototype.setItem;
+  return vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+    this: Storage,
+    name: string,
+    value: string,
+  ) {
+    let used = 0;
+    for (let i = 0; i < this.length; i += 1) {
+      const k = this.key(i)!;
+      if (k !== name) used += k.length + (this.getItem(k) ?? "").length;
+    }
+    if (used + name.length + value.length > limit) throw new Error("QuotaExceededError");
+    original.call(this, name, value);
+  });
+}
+
+/** The larger marked-record write alone fails (it throws or is dropped); small writes still land. */
+function refuseMarkedWateringRewrite(mode: "throw" | "ignore") {
+  const original = Storage.prototype.setItem;
+  return vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+    this: Storage,
+    name: string,
+    value: string,
+  ) {
+    if (name === key() && value.includes("historyCheckReason")) {
+      if (mode === "throw") throw new Error("SecurityError");
+      return;
+    }
+    original.call(this, name, value);
+  });
+}
+
+describe("Water history-review marker fallback when the full record cannot be rewritten", () => {
+  it.each(["throw", "ignore"] as const)(
+    "persists a key-scoped marker when the marked record write %ss, so a reload restores review",
+    async (mode) => {
+      const original = record();
+      await claimPendingQuickLogWatering(original);
+      const unmarkedRaw = window.sessionStorage.getItem(key());
+      const spy = refuseMarkedWateringRewrite(mode);
+      const marked = { ...record(), historyCheckReason: "idempotency_key_retracted" as const };
+      await expect(
+        markPendingQuickLogWateringHistoryCheck(original, "idempotency_key_retracted"),
+      ).resolves.toEqual({ status: "marked", record: marked });
+      spy.mockRestore();
+      expect(window.sessionStorage.getItem(key())).toBe(unmarkedRaw);
+      expect(JSON.parse(window.sessionStorage.getItem(waterHistoryKey())!)).toEqual({
+        version: 1,
+        idempotencyKey: "watering-save-12345678",
+        historyCheckReason: "idempotency_key_retracted",
+      });
+      expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: marked });
+      await expect(clearPendingQuickLogWatering(marked)).resolves.toBe(true);
+      expect(window.sessionStorage.getItem(key())).toBeNull();
+      expect(window.sessionStorage.getItem(waterHistoryKey())).toBeNull();
+    },
+  );
+
+  it("history discard of a fallback-marked claim removes the journal and the marker", async () => {
+    const original = record();
+    await claimPendingQuickLogWatering(original);
+    const spy = refuseMarkedWateringRewrite("throw");
+    await markPendingQuickLogWateringHistoryCheck(original, "idempotency_key_retracted");
+    spy.mockRestore();
+    await expect(reconcilePendingQuickLogWateringHistoryDiscard(original)).resolves.toEqual({
+      status: "cleared",
+    });
+    expect(window.sessionStorage.getItem(key())).toBeNull();
+    expect(window.sessionStorage.getItem(waterHistoryKey())).toBeNull();
+  });
+
+  it("reports blocked at real storage capacity instead of claiming a durable marker", async () => {
+    const original = record();
+    await claimPendingQuickLogWatering(original);
+    const unmarkedRaw = window.sessionStorage.getItem(key())!;
+    // Room for the journal plus 10 characters: less than either the marked record or the marker.
+    const spy = capStorage(key().length + unmarkedRaw.length + 10);
+    await expect(
+      markPendingQuickLogWateringHistoryCheck(original, "idempotency_key_retracted"),
+    ).resolves.toEqual({ status: "blocked" });
+    spy.mockRestore();
+    expect(window.sessionStorage.getItem(key())).toBe(unmarkedRaw);
+    expect(window.sessionStorage.getItem(waterHistoryKey())).toBeNull();
+  });
+
+  it("ignores a fallback marker that names a different idempotency key", async () => {
+    const original = record();
+    await claimPendingQuickLogWatering(original);
+    window.sessionStorage.setItem(
+      waterHistoryKey(),
+      JSON.stringify({
+        version: 1,
+        idempotencyKey: "another-watering-save",
+        historyCheckReason: "idempotency_key_retracted",
+      }),
+    );
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
+  });
+
+  it.each([
+    "not json",
+    JSON.stringify({ version: 1, idempotencyKey: "watering-save-12345678" }),
+    JSON.stringify({
+      version: 1,
+      idempotencyKey: "watering-save-12345678",
+      historyCheckReason: "rpc:error",
+    }),
+    JSON.stringify({
+      version: 1,
+      idempotencyKey: "watering-save-12345678",
+      historyCheckReason: "idempotency_key_retracted",
+      extra: true,
+    }),
+  ])("fails closed on a corrupt fallback marker beside a pending Water: %s", async (raw) => {
+    await claimPendingQuickLogWatering(record());
+    window.sessionStorage.setItem(waterHistoryKey(), raw);
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "blocked" });
+  });
+
+  it("ignores a fallback marker when no Water is pending", () => {
+    window.sessionStorage.setItem(waterHistoryKey(), "not json");
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "empty" });
+  });
+
+  it("still reports blocked when neither the record nor the marker can be written", async () => {
+    const original = record();
+    await claimPendingQuickLogWatering(original);
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    await expect(
+      markPendingQuickLogWateringHistoryCheck(original, "idempotency_key_retracted"),
+    ).resolves.toEqual({ status: "blocked" });
+    spy.mockRestore();
+    expect(window.sessionStorage.getItem(waterHistoryKey())).toBeNull();
+    expect(readPendingQuickLogWatering(ownerA)).toEqual({ status: "pending", record: original });
+  });
+});

@@ -19,6 +19,8 @@ import {
 // Shape-valid, non-functional DSN for tests only.
 const TEST_DSN = "https://0123456789abcdef0123456789abcdef@o000000.ingest.us.sentry.io/1";
 
+const SUPABASE_URL_ORIGIN = new URL(import.meta.env.VITE_SUPABASE_URL as string).origin;
+
 describe("errorReportingRules — resolveErrorReportingConfig", () => {
   it("is disabled without a DSN (the default for every build until the owner sets one)", () => {
     expect(resolveErrorReportingConfig({ hostname: "verdantgrowdiary.com" })).toEqual({
@@ -197,7 +199,7 @@ describe("errorReportingRules — scrubbing", () => {
         {
           category: "fetch",
           data: {
-            url: "https://x.supabase.co/auth/v1/token?grant_type=refresh_token",
+            url: `${SUPABASE_URL_ORIGIN}/auth/v1/token?grant_type=refresh_token`,
             method: "POST",
             status_code: 400,
             response: { body: "secret" },
@@ -223,7 +225,7 @@ describe("errorReportingRules — scrubbing", () => {
     expect(out.breadcrumbs).toEqual([
       {
         category: "fetch",
-        data: { url: "https://x.supabase.co/auth/v1/token", method: "POST", status_code: 400 },
+        data: { url: `${SUPABASE_URL_ORIGIN}/auth/v1/token`, method: "POST", status_code: 400 },
       },
     ]);
     expect(out.extra).toEqual({ note: `mail me ${REDACTED}` });

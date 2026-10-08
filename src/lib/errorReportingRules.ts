@@ -496,10 +496,40 @@ function redactPatterns(text: string): string {
 /** A whole path segment shaped like a UUID (grow, tent, plant and other row ids), hyphens literal or `%2D`. */
 const UUID_SEGMENT_PATTERN = new RegExp(String.raw`^${UUID_BODY}$`, "i");
 
-/** A Vite build asset, `<name>-<8-character content hash>.<ext>`: a grower-named file has no hash. */
-const FINGERPRINTED_ASSET_PATTERN =
-  /^[A-Za-z0-9_.-]{1,96}-[A-Za-z0-9_-]{8}\.(?:m?js|css|map|wasm|woff2?|ttf|png|svg|jpe?g|webp|avif|gif|ico)$/;
-const SUPABASE_HOST_PATTERN = /^[a-z0-9-]+\.supabase\.co$/;
+/**
+ * A built script, `<name>-<8-character content hash>.js`. Its name is kept only in a stack
+ * frame: a frame names a script the browser executed from our origin, which only the
+ * build's own output can be. Anywhere else an asset name is redacted.
+ */
+const BUILT_SCRIPT_PATTERN = /^[A-Za-z0-9_.-]{1,96}-[A-Za-z0-9_-]{8}\.m?js$/;
+
+function hostOf(value: unknown): string | null {
+  if (typeof value !== "string" || value === "") return null;
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return null;
+  }
+}
+
+/** The app's own Supabase host, from the same build variable the client is created with. */
+const CONFIGURED_SUPABASE_HOST = hostOf(import.meta.env?.VITE_SUPABASE_URL);
+export const REDACTED_HOST = "[redacted-host]";
+
+/** Hosts whose names are code-owned: the production hosts and the configured Supabase host. */
+function isTrustedHost(host: string): boolean {
+  return PRODUCTION_HOSTNAMES.includes(host) || host === CONFIGURED_SUPABASE_HOST;
+}
+
+/** An http(s) origin, or the same scheme with `[redacted-host]` when the host is not trusted. */
+function scrubOrigin(url: URL): string {
+  return isTrustedHost(url.hostname) ? url.origin : `${url.protocol}//${REDACTED_HOST}`;
+}
+
+export interface ScrubUrlOptions {
+  /** The URL is a stack frame's script: a built script name on our origin may be kept. */
+  readonly scriptFrame?: boolean;
+}
 
 /** Every edge function under `supabase/functions` (a test keeps this equal to the directory). */
 export const KNOWN_EDGE_FUNCTIONS: ReadonlySet<string> = new Set([
@@ -578,13 +608,17 @@ const STORAGE_ACCESS_SEGMENTS: ReadonlySet<string> = new Set([
  * names. Table, RPC and bucket names are not listed, so they are not kept; nor is
  * anything on another host.
  */
-function keptSegmentMask(parts: ReadonlyArray<string>, host: string | null): boolean[] {
+function keptSegmentMask(
+  parts: ReadonlyArray<string>,
+  host: string | null,
+  scriptFrame: boolean,
+): boolean[] {
   const keep = parts.map(() => false);
   const ownOrigin = host === null || PRODUCTION_HOSTNAMES.includes(host);
   if (ownOrigin && parts.length === 2 && parts[0] === "assets") {
-    return [true, FINGERPRINTED_ASSET_PATTERN.test(parts[1] ?? "")];
+    return [true, scriptFrame && BUILT_SCRIPT_PATTERN.test(parts[1] ?? "")];
   }
-  if (host === null || !SUPABASE_HOST_PATTERN.test(host)) return keep;
+  if (host === null || host !== CONFIGURED_SUPABASE_HOST) return keep;
   const [service = "", version = "", name = "", access = ""] = parts;
   if (!SUPABASE_SERVICES.has(service) || version !== "v1") return keep;
   keep[0] = true;
@@ -606,9 +640,9 @@ function keptSegmentMask(parts: ReadonlyArray<string>, host: string | null): boo
  * data — a grower label, a file name, a token, possibly percent-encoded any number of
  * times — so UUIDs become `:id` and the rest `:redacted`, without decoding.
  */
-function redactPathSegments(path: string, host: string | null): string {
+function redactPathSegments(path: string, host: string | null, scriptFrame: boolean): string {
   const parts = path.split("/").slice(1);
-  const keep = keptSegmentMask(parts, host);
+  const keep = keptSegmentMask(parts, host, scriptFrame);
   const kept = parts.map((segment, index) => {
     if (keep[index] || segment === "") return segment;
     return UUID_SEGMENT_PATTERN.test(segment) ? ":id" : ":redacted";
@@ -617,17 +651,31 @@ function redactPathSegments(path: string, host: string | null): string {
 }
 
 /** Reduces an http(s) URL to origin + its code-owned path segments, the rest replaced (see `redactPathSegments`); any other scheme becomes `scheme:[redacted]`. Relative or unparsable input keeps only the part before `?`/`#`. */
-export function scrubUrl(value: unknown): string {
+export function scrubUrl(value: unknown, options: ScrubUrlOptions = {}): string {
   if (typeof value !== "string" || value.length === 0) return "";
+  const scriptFrame = options.scriptFrame === true;
   try {
     const url = new URL(value);
     // Only http(s) has an origin + path worth keeping. data:, javascript:, blob:,
     // extension and other schemes can carry a payload in what follows the scheme.
     if (url.protocol !== "http:" && url.protocol !== "https:") return `${url.protocol}${REDACTED}`;
-    return `${url.origin}${redactPathSegments(url.pathname, url.hostname)}`;
+    const host = isTrustedHost(url.hostname) ? url.hostname : null;
+    const path =
+      host === null ? redactAll(url.pathname) : redactPathSegments(url.pathname, host, scriptFrame);
+    return `${scrubOrigin(url)}${path}`;
   } catch {
-    return redactPathSegments(value.split(/[?#]/, 1)[0] ?? "", null);
+    return redactPathSegments(value.split(/[?#]/, 1)[0] ?? "", null, scriptFrame);
   }
+}
+
+/** Every segment of a path on an untrusted host is data. */
+function redactAll(path: string): string {
+  return path
+    .split("/")
+    .map((segment) =>
+      segment === "" ? segment : UUID_SEGMENT_PATTERN.test(segment) ? ":id" : ":redacted",
+    )
+    .join("/");
 }
 
 // ── Page routes ──────────────────────────────────────────────────────────────
@@ -670,7 +718,7 @@ export function scrubRouteUrl(value: unknown): string {
     try {
       const url = new URL(value);
       if (url.protocol !== "http:" && url.protocol !== "https:") return scrubUrl(value);
-      return `${url.origin}${routeTemplateFor(url.pathname)}`;
+      return `${scrubOrigin(url)}${routeTemplateFor(url.pathname)}`;
     } catch {
       return scrubUrl(value);
     }
@@ -886,8 +934,12 @@ export function scrubEvent<T extends ReportableEvent | null | undefined>(event: 
             ...ex.stacktrace,
             frames: ex.stacktrace.frames.map((frame) => ({
               ...withoutKey(frame, "vars"),
-              ...(typeof frame.filename === "string" && { filename: scrubUrl(frame.filename) }),
-              ...(typeof frame.abs_path === "string" && { abs_path: scrubUrl(frame.abs_path) }),
+              ...(typeof frame.filename === "string" && {
+                filename: scrubUrl(frame.filename, { scriptFrame: true }),
+              }),
+              ...(typeof frame.abs_path === "string" && {
+                abs_path: scrubUrl(frame.abs_path, { scriptFrame: true }),
+              }),
             })),
           },
         }),

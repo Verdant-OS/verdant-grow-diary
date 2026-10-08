@@ -31,6 +31,9 @@ function enableProductionReporter(hostname = "verdantgrowdiary.com") {
   });
 }
 
+// Supabase segments are kept only on the configured project host (VITE_SUPABASE_URL).
+const SUPABASE_URL_ORIGIN = new URL(import.meta.env.VITE_SUPABASE_URL as string).origin;
+
 describe("errorReporter — initialisation race", () => {
   const originalLocation = window.location;
 
@@ -408,7 +411,8 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       "https://verdantgrowdiary.com/:redacted/:id",
     );
     expect(scrubUrl(`/grows/${id.toUpperCase()}/tents/${id}`)).toBe("/:redacted/:id/:redacted/:id");
-    expect(scrubUrl("/assets/index-3f2c9a1e.js")).toBe("/assets/index-3f2c9a1e.js");
+    // An asset name keeps only inside an executed stack frame; anywhere else it is redacted.
+    expect(scrubUrl("/assets/index-3f2c9a1e.js")).toBe("/assets/:redacted");
     const crumb = scrubBreadcrumb({
       category: "navigation",
       data: { from: `/plants/${id}`, to: `/grows/${id}` },
@@ -519,8 +523,8 @@ describe("errorReportingRules — privacy of outgoing events", () => {
     const ex = out?.exception?.values?.[0];
     expect(ex?.type).toBe("Error");
     expect(ex?.mechanism).toEqual({ type: "generic", handled: false });
-    // A script outside /assets/ is not a code-defined shape, so only its origin is kept.
-    expect(ex?.stacktrace?.frames?.[0]).toEqual({ filename: "https://x.test/:redacted" });
+    // A script on a host outside the closed list loses its host as well as its path.
+    expect(ex?.stacktrace?.frames?.[0]).toEqual({ filename: "https://[redacted-host]/:redacted" });
   });
 });
 
@@ -622,7 +626,8 @@ describe("errorReportingRules — summary fields come only from code-defined pro
       "/:redacted/:redacted",
     );
     expect(scrubUrl("/x/grower%40example.com/y")).toBe("/:redacted/:redacted/:redacted");
-    expect(scrubUrl("/assets/index-3f2c9a1e.js")).toBe("/assets/index-3f2c9a1e.js");
+    // An asset name keeps only inside an executed stack frame; anywhere else it is redacted.
+    expect(scrubUrl("/assets/index-3f2c9a1e.js")).toBe("/assets/:redacted");
   });
 
   it("reduces page URLs to their route template and fails closed for unknown paths", () => {
@@ -668,9 +673,9 @@ describe("errorReportingRules — only code-defined shapes leave; nothing else i
     });
     expect(
       scrubUrl(
-        "https://x.supabase.co/storage/v1/object/public/plant-photos/3f2c9a1e-8b7d-4c6e-9f00-1a2b3c4d5e6f/My%20private%20plant.jpg",
+        `${SUPABASE_URL_ORIGIN}/storage/v1/object/public/plant-photos/3f2c9a1e-8b7d-4c6e-9f00-1a2b3c4d5e6f/My%20private%20plant.jpg`,
       ),
-    ).toBe("https://x.supabase.co/storage/v1/object/public/:redacted/:id/:redacted");
+    ).toBe(`${SUPABASE_URL_ORIGIN}/storage/v1/object/public/:redacted/:id/:redacted`);
   });
 
   it("redacts nested-encoded segments instead of trusting one decoding pass", () => {
@@ -679,27 +684,27 @@ describe("errorReportingRules — only code-defined shapes leave; nothing else i
     );
   });
 
-  it("keeps fingerprinted assets, Supabase vocabulary and known function/auth names readable", () => {
+  it("keeps Supabase vocabulary and known function/auth names readable; redacts non-frame asset names", () => {
     for (const [input, expected] of [
       [
         "https://verdantgrowdiary.com/assets/index-BvX3k9aQ.js",
-        "https://verdantgrowdiary.com/assets/index-BvX3k9aQ.js",
+        "https://verdantgrowdiary.com/assets/:redacted",
       ],
       [
-        "https://x.supabase.co/rest/v1/sensor_readings?select=*",
-        "https://x.supabase.co/rest/v1/:redacted",
+        `${SUPABASE_URL_ORIGIN}/rest/v1/sensor_readings?select=*`,
+        `${SUPABASE_URL_ORIGIN}/rest/v1/:redacted`,
       ],
       [
-        "https://x.supabase.co/rest/v1/rpc/quicklog_save_manual",
-        "https://x.supabase.co/rest/v1/rpc/:redacted",
+        `${SUPABASE_URL_ORIGIN}/rest/v1/rpc/quicklog_save_manual`,
+        `${SUPABASE_URL_ORIGIN}/rest/v1/rpc/:redacted`,
       ],
       [
-        "https://x.supabase.co/functions/v1/ai-doctor-review",
-        "https://x.supabase.co/functions/v1/ai-doctor-review",
+        `${SUPABASE_URL_ORIGIN}/functions/v1/ai-doctor-review`,
+        `${SUPABASE_URL_ORIGIN}/functions/v1/ai-doctor-review`,
       ],
       [
-        "https://x.supabase.co/auth/v1/token?grant_type=refresh_token",
-        "https://x.supabase.co/auth/v1/token",
+        `${SUPABASE_URL_ORIGIN}/auth/v1/token?grant_type=refresh_token`,
+        `${SUPABASE_URL_ORIGIN}/auth/v1/token`,
       ],
     ]) {
       expect(scrubUrl(input), input).toBe(expected);
@@ -710,45 +715,45 @@ describe("errorReportingRules — only code-defined shapes leave; nothing else i
 describe("errorReportingRules — URL segments are kept only from closed lists of code-owned names", () => {
   it("does not trust an API shape on a foreign host, or an unfingerprinted asset name", () => {
     expect(scrubUrl("https://evil.test/rest/v1/blue-dream")).toBe(
-      "https://evil.test/:redacted/:redacted/:redacted",
+      "https://[redacted-host]/:redacted/:redacted/:redacted",
     );
     expect(scrubUrl("/assets/grower_private_note.svg")).toBe("/assets/:redacted");
     expect(scrubUrl("https://evil.test/assets/index-BvX3k9aQ.js")).toBe(
-      "https://evil.test/:redacted/:redacted",
+      "https://[redacted-host]/:redacted/:redacted",
     );
   });
 
   it("keeps Supabase vocabulary and known function/auth names, and redacts table, RPC and bucket names", () => {
     for (const [input, expected] of [
-      ["https://x.supabase.co/rest/v1/blue-dream", "https://x.supabase.co/rest/v1/:redacted"],
+      [`${SUPABASE_URL_ORIGIN}/rest/v1/blue-dream`, `${SUPABASE_URL_ORIGIN}/rest/v1/:redacted`],
       [
-        "https://x.supabase.co/rest/v1/sensor_readings?select=*",
-        "https://x.supabase.co/rest/v1/:redacted",
+        `${SUPABASE_URL_ORIGIN}/rest/v1/sensor_readings?select=*`,
+        `${SUPABASE_URL_ORIGIN}/rest/v1/:redacted`,
       ],
       [
-        "https://x.supabase.co/rest/v1/rpc/quicklog_save_manual",
-        "https://x.supabase.co/rest/v1/rpc/:redacted",
+        `${SUPABASE_URL_ORIGIN}/rest/v1/rpc/quicklog_save_manual`,
+        `${SUPABASE_URL_ORIGIN}/rest/v1/rpc/:redacted`,
       ],
       [
-        "https://x.supabase.co/functions/v1/blue-dream",
-        "https://x.supabase.co/functions/v1/:redacted",
+        `${SUPABASE_URL_ORIGIN}/functions/v1/blue-dream`,
+        `${SUPABASE_URL_ORIGIN}/functions/v1/:redacted`,
       ],
       [
-        "https://x.supabase.co/functions/v1/ai-doctor-review",
-        "https://x.supabase.co/functions/v1/ai-doctor-review",
+        `${SUPABASE_URL_ORIGIN}/functions/v1/ai-doctor-review`,
+        `${SUPABASE_URL_ORIGIN}/functions/v1/ai-doctor-review`,
       ],
       [
-        "https://x.supabase.co/auth/v1/token?grant_type=refresh_token",
-        "https://x.supabase.co/auth/v1/token",
+        `${SUPABASE_URL_ORIGIN}/auth/v1/token?grant_type=refresh_token`,
+        `${SUPABASE_URL_ORIGIN}/auth/v1/token`,
       ],
-      ["https://x.supabase.co/auth/v1/blue-dream", "https://x.supabase.co/auth/v1/:redacted"],
+      [`${SUPABASE_URL_ORIGIN}/auth/v1/blue-dream`, `${SUPABASE_URL_ORIGIN}/auth/v1/:redacted`],
       [
-        "https://x.supabase.co/storage/v1/object/public/plant-photos/a.jpg",
-        "https://x.supabase.co/storage/v1/object/public/:redacted/:redacted",
+        `${SUPABASE_URL_ORIGIN}/storage/v1/object/public/plant-photos/a.jpg`,
+        `${SUPABASE_URL_ORIGIN}/storage/v1/object/public/:redacted/:redacted`,
       ],
       [
         "https://verdantgrowdiary.com/assets/index-BvX3k9aQ.js",
-        "https://verdantgrowdiary.com/assets/index-BvX3k9aQ.js",
+        "https://verdantgrowdiary.com/assets/:redacted",
       ],
     ]) {
       expect(scrubUrl(input), input).toBe(expected);
@@ -763,5 +768,52 @@ describe("errorReportingRules — URL segments are kept only from closed lists o
       .map((entry) => entry.name)
       .sort();
     expect([...KNOWN_EDGE_FUNCTIONS].sort()).toEqual(onDisk);
+  });
+});
+
+describe("errorReportingRules — only closed-list hosts, and only executed scripts keep asset names", () => {
+  const SUPABASE_ORIGIN = new URL(import.meta.env.VITE_SUPABASE_URL as string).origin;
+
+  it("redacts every host that is not a production or the configured Supabase host", () => {
+    expect(scrubUrl("https://blue-dream.evil.test/rest/v1/x")).toBe(
+      "https://[redacted-host]/:redacted/:redacted/:redacted",
+    );
+    expect(scrubUrl("https://other-project.supabase.co/functions/v1/ai-doctor-review")).toBe(
+      "https://[redacted-host]/:redacted/:redacted/:redacted",
+    );
+    expect(scrubUrl(`${SUPABASE_ORIGIN}/functions/v1/ai-doctor-review`)).toBe(
+      `${SUPABASE_ORIGIN}/functions/v1/ai-doctor-review`,
+    );
+    expect(
+      scrubBreadcrumb({ category: "fetch", data: { url: "https://blue-dream.evil.test/a" } })?.data,
+    ).toEqual({ url: "https://[redacted-host]/:redacted" });
+  });
+
+  it("redacts asset file names outside stack frames, and non-script names inside them", () => {
+    expect(scrubUrl("/assets/Blue-Dream-12345678.svg")).toBe("/assets/:redacted");
+    expect(
+      scrubBreadcrumb({
+        category: "fetch",
+        data: { url: "https://verdantgrowdiary.com/assets/Blue-Dream-12345678.js" },
+      })?.data,
+    ).toEqual({ url: "https://verdantgrowdiary.com/assets/:redacted" });
+    const frames = scrubEvent({
+      exception: {
+        values: [
+          {
+            stacktrace: {
+              frames: [
+                { filename: "https://verdantgrowdiary.com/assets/index-BvX3k9aQ.js" },
+                { filename: "https://verdantgrowdiary.com/assets/Blue-Dream-12345678.svg" },
+              ],
+            },
+          },
+        ],
+      },
+    })?.exception?.values?.[0]?.stacktrace?.frames;
+    expect(frames?.map((frame) => frame.filename)).toEqual([
+      "https://verdantgrowdiary.com/assets/index-BvX3k9aQ.js",
+      "https://verdantgrowdiary.com/assets/:redacted",
+    ]);
   });
 });

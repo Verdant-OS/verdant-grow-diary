@@ -581,3 +581,18 @@ describe("Codex re-review P1: empty or unexpanded Playwright filters", () => {
     ).toBe(null);
   });
 });
+
+describe("Codex re-review P1: redirections attached to a preceding word", () => {
+  test("the word before an attached redirection is still checked", () => {
+    for (const cmd of [
+      "git push origin main>/tmp/push.log",
+      "git push -f>/tmp/push.log origin claude/task",
+      "git push origin main&>/tmp/push.log",
+      "git push origin main 2>/dev/null",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("git push origin claude/task>/tmp/push.log")).toBe(null);
+    expect(checkBash("npm i --no-audit>/tmp/install.log")).toBe(null);
+  });
+});

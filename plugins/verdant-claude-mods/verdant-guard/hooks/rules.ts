@@ -120,12 +120,12 @@ export function segments(command: string, redirections = true): string[][] {
     } else if (
       redirections &&
       !redirect &&
-      !quoted &&
-      /^\d*$/.test(token) &&
-      (c === ">" || c === "<" || (c === "&" && text[i + 1] === ">" && token === ""))
+      (c === ">" || c === "<" || (c === "&" && text[i + 1] === ">"))
     ) {
-      // An unquoted `>`, `<` or `&>` at the start of a word, or after a file-descriptor number,
-      // opens a redirection: read the whole operator, then any attached target.
+      // An unquoted `>`, `<` or `&>` opens a redirection: read the whole operator, then any
+      // attached target. A file-descriptor number right before it (`2>`) belongs to it; any
+      // other word before it (`main>log`, `-f>log`) is a word of its own and stays.
+      if (inToken && (quoted || !/^\d+$/.test(token))) endToken();
       while (i + 1 < text.length && "<>&|".includes(text[i + 1]!)) i += 1;
       redirect = true;
       inToken = true;

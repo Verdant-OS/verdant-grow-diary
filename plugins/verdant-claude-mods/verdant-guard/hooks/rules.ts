@@ -466,11 +466,17 @@ function stripRunner(tokens: string[]): string[] {
 /** The credential-free projects in `playwright.config.ts`, which install no global route mocks. */
 const PW_MOCKED_PROJECTS = ["chromium-mocked", "webkit-mocked"] as const;
 
+/** A `--project` value with nothing left for the shell to expand. */
+const PW_PROJECT_LITERAL = /^[A-Za-z0-9._/:@+=*-]+$/;
+
 /**
  * True when a `--project` selector picks a mocked project. Playwright 1.62 compares names
  * case-insensitively and reads `*` as a wildcard (`filterProjects` in `lib/runner/index.js`).
  */
 function selectsMockedProject(selector: string): boolean {
+  // A selector the shell can still expand (`$P`, a substitution, `{a,b}`, `?`/`[…]` globs) is
+  // unknown here, so it fails closed. `*` stays: Playwright reads it as its own wildcard.
+  if (!PW_PROJECT_LITERAL.test(selector)) return true;
   const lower = selector.toLocaleLowerCase();
   if (!lower.includes("*")) return lower.includes("mocked");
   const escaped = lower.split("*").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));

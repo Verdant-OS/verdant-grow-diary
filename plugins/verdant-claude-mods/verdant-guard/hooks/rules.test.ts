@@ -636,3 +636,23 @@ describe("Codex re-review: allocated-FD redirections, commit -u mode", () => {
     expect(checkBash("git commit -nu -m wip")).not.toBe(null);
   });
 });
+
+describe("Codex re-review: expandable Playwright project selectors", () => {
+  test("P1: a --project the shell can expand counts as a mocked selection", () => {
+    for (const cmd of [
+      "P=chromium-mocked; bunx playwright test --project=$P",
+      'bunx playwright test --project "$P"',
+      "bunx playwright test --project=$(echo chromium-mocked)",
+      "bunx playwright test --project=chromium-{mocked,authed}",
+      "bunx playwright test --project=chromium-m?cked",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    for (const cmd of [
+      "bunx playwright test --project=$P e2e/auth-loading.spec.ts",
+      "bunx playwright test --project=chromium-authed",
+    ]) {
+      expect(checkBash(cmd)).toBe(null);
+    }
+  });
+});

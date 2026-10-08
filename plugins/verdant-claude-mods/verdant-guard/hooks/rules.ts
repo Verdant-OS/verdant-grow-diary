@@ -535,6 +535,8 @@ const PFLAG_TRUE = /^(1|t|T|TRUE|true|True)$/;
 function undoIsSet(tokens: string[]): boolean {
   let undo = false;
   for (const t of tokens) {
+    // After `--` every word is positional: `gh pr ready -- --undo` selects a branch named `--undo`.
+    if (t === "--") break;
     if (t === "--undo") undo = true;
     else if (t.startsWith("--undo=")) undo = PFLAG_TRUE.test(t.slice("--undo=".length));
   }

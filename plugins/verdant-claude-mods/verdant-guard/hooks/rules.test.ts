@@ -656,3 +656,12 @@ describe("Codex re-review: expandable Playwright project selectors", () => {
     }
   });
 });
+
+describe("Codex re-review: --undo after the option terminator", () => {
+  test("P1: `--undo` after `--` is a branch name, not the flag", () => {
+    for (const cmd of ["gh pr ready -- --undo", "gh pr ready -- --undo=true"]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("gh pr ready --undo -- 1800")).toBe(null);
+  });
+});

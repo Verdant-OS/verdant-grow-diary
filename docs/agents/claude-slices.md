@@ -181,9 +181,13 @@ number of hops, so no type syntax, comment or line break can hide a call. The
 policy step downloads exactly `typescript-5.9.3.tgz` from the npm registry and
 checks it against a pinned sha512 (the one `bun.lock` records); a mismatch stops
 the job. Only `ts.createSourceFile` runs, on PR text read as data. The AST rules
-are OR-ed with the text rules below, so they only add locks. A file the parser
-can't be loaded for, a parse that throws, and a file over 512 KiB lock under the
-rules their words point to.
+are OR-ed with the text rules below, so they only add locks. Every JS/TS file is
+parsed, with no word pre-check, because a line continuation or a legacy octal
+escape inside a string can hide `auth` or `action_queue` from the text rules but
+not from the parser. A JS/TS file over 512 KiB, a parser that can't be loaded and
+a parse that throws lock the file under both rules. The tree walk uses an explicit
+stack, so a deeply nested expression can't overflow it. The text rules also decode
+line continuations.
 
 **Residual risk.** This list is not exhaustive; known forms that are not locked
 include:
@@ -207,8 +211,8 @@ through a small JavaScript lexer (strings, regex literals and template literals
 are skipped, and the code inside a template's `${…}` is lexed as code) and once
 treating every `//` and `/*` as a comment. A lock found in the raw text or either
 stripped version counts, so stripping can only add locks. The same checks also run on a copy with
-`\uXXXX`, `\u{…}` and `\xXX` escapes decoded; legacy octal escapes and names built
-at runtime (`String.fromCharCode`) are not decoded. Every version is also matched
+`\uXXXX`, `\u{…}` and `\xXX` escapes decoded; legacy octal escapes (the AST rules
+cover them) and names built at runtime (`String.fromCharCode`) are not decoded. Every version is also matched
 with each `as T` / `satisfies T` cast and each `.from<T>` / `.rpc<T>` type argument
 blanked. A small scanner finds where the type ends by balancing `( [ { <`,
 skipping strings and the `>` of `=>`. Like TypeScript's parser, it continues a

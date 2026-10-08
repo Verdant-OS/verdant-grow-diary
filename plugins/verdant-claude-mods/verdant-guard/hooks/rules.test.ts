@@ -517,3 +517,35 @@ describe("Codex re-review P1s: env -S option re-parse, Playwright project wildca
     }
   });
 });
+
+describe("shell redirections are not arguments", () => {
+  test("a redirection is neither a package name nor a spec filter", () => {
+    for (const cmd of [
+      "npm install --no-audit 2>&1 | tail -5",
+      "npm install --no-audit > /tmp/install.log",
+      "npm install --no-audit >/tmp/install.log 2>/dev/null",
+    ]) {
+      expect(checkBash(cmd)).toBe(null);
+    }
+    for (const cmd of [
+      "bunx playwright test --project=chromium-mocked 2>&1 | tail -20",
+      "bunx playwright test --project=chromium-mocked > /tmp/pw.log",
+      "bunx playwright test --project=chromium-mocked >/tmp/pw.log",
+      "npm install left-pad 2>&1",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+  });
+});
+
+describe("quoted redirection characters stay arguments", () => {
+  test("a quoted `>` is a word, so the option after it is still checked", () => {
+    for (const cmd of [
+      "git push origin '>' -f",
+      'git push origin ">" --force',
+      "env -S 'git push origin > -f'",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+  });
+});

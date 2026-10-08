@@ -39,6 +39,8 @@ export function stripHeredocs(command: string): string {
  * `;`, `|` and newlines split only outside quotes, so `grep "a|git push --force"` stays one
  * command. Quotes are removed from tokens; a backslash escapes the next character outside
  * single quotes. It does not expand `$(…)`, backticks or `bash -c` strings (see README).
+ * Unquoted redirections (`2>&1`, `> log`, `<in`) and their targets are dropped, since they are
+ * not arguments; pass `redirections: false` for text no shell parses, such as an `env -S` string.
  */
 /** Index of the `)` closing the `(` at `open`, respecting nested parens and quotes; -1 if none. */
 function matchingParen(text: string, open: number): number {
@@ -59,20 +61,31 @@ function matchingParen(text: string, open: number): number {
   return -1;
 }
 
-export function segments(command: string): string[][] {
+export function segments(command: string, redirections = true): string[][] {
   const text = stripHeredocs(command);
   const out: string[][] = [];
   let tokens: string[] = [];
   let token = "";
   let inToken = false;
+  let quoted = false;
   let quote: "'" | '"' | null = null;
+  // `redirect`: the current word is a redirection; `dropNext`: the next word is its target.
+  let redirect = false;
+  let dropNext = false;
   const endToken = () => {
-    if (inToken) tokens.push(token);
+    if (inToken) {
+      if (redirect) dropNext = token === "";
+      else if (dropNext) dropNext = false;
+      else tokens.push(token);
+    }
     token = "";
     inToken = false;
+    quoted = false;
+    redirect = false;
   };
   const endSegment = () => {
     endToken();
+    dropNext = false;
     if (tokens.length > 0) out.push(tokens);
     tokens = [];
   };
@@ -103,6 +116,20 @@ export function segments(command: string): string[][] {
     if (c === "'" || c === '"') {
       quote = c;
       inToken = true;
+      quoted = true;
+    } else if (
+      redirections &&
+      !redirect &&
+      !quoted &&
+      /^\d*$/.test(token) &&
+      (c === ">" || c === "<" || (c === "&" && text[i + 1] === ">" && token === ""))
+    ) {
+      // An unquoted `>`, `<` or `&>` at the start of a word, or after a file-descriptor number,
+      // opens a redirection: read the whole operator, then any attached target.
+      while (i + 1 < text.length && "<>&|".includes(text[i + 1]!)) i += 1;
+      redirect = true;
+      inToken = true;
+      token = "";
     } else if (c === "\\" && i + 1 < text.length) {
       // A backslash-newline is a line continuation, not a character.
       if (text[i + 1] !== "\n") {
@@ -181,7 +208,7 @@ const WRAPPER_VALUE_OPTIONS = new Map<string, ReadonlySet<string>>([
 
 /** Splits a string into words the way a shell would, removing quotes (`env -S`, `npx -c`). */
 function shellWords(text: string): string[] {
-  return segments(text).flat();
+  return segments(text, false).flat();
 }
 
 /**

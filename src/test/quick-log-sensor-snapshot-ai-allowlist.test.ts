@@ -1,8 +1,7 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildAiSensorSnapshotContext } from "@/lib/aiSensorSnapshotContextRules";
+import { buildAiSensorSnapshotContext, READING_KEYS } from "@/lib/aiSensorSnapshotContextRules";
 import {
+  AI_READING_KEYS,
   resolveQuickLogSensorSnapshotForAi,
   type QuickLogSensorAcquisitionRow,
 } from "@/lib/quick-log/quickLogSensorSnapshotAcquisitionRules";
@@ -291,28 +290,50 @@ describe("resolveQuickLogSensorSnapshotForAi — allowlisted output", () => {
   });
 });
 
-/** Quoted string keys inside the first `<marker> ... ]` block of a source file. */
-function quotedKeysAfter(file: string, marker: string): string[] {
-  const src = readFileSync(resolve(process.cwd(), file), "utf8");
-  const start = src.indexOf(marker);
-  expect(start, `${marker} not found in ${file}`).toBeGreaterThanOrEqual(0);
-  const end = src.indexOf("]", start);
-  const block = src.slice(start, end).replace(/\/\/.*$/gm, "");
-  return [...block.matchAll(/"([a-z0-9_]+)"/g)].map((m) => m[1]).sort();
-}
+/**
+ * Every reading key the annotator understands, pinned independently of both
+ * modules so that a key dropped from either list fails here.
+ */
+const EXPECTED_READING_KEYS = [
+  "air_temp_c",
+  "co2",
+  "co2_ppm",
+  "humidity",
+  "humidity_pct",
+  "ph",
+  "ppfd",
+  "reservoir_ec_mscm",
+  "reservoir_ph",
+  "soil_ec",
+  "soil_ec_mscm",
+  "soil_moisture",
+  "soil_moisture_pct",
+  "soil_temp_c",
+  "soil_temp_f",
+  "soil_water_content",
+  "temp_c",
+  "temp_f",
+  "temperature_c",
+  "temperature_f",
+  "vpd",
+  "vpd_kpa",
+] as const;
 
 describe("AI reading-key allowlist stays in step with the annotator", () => {
-  it("AI_READING_KEYS equals READING_KEYS in aiSensorSnapshotContextRules.ts", () => {
-    const allowlist = quotedKeysAfter(
-      "src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts",
-      "const AI_READING_KEYS",
-    );
-    const annotator = quotedKeysAfter(
-      "src/lib/aiSensorSnapshotContextRules.ts",
-      "const READING_KEYS",
-    );
-    expect(allowlist.length).toBeGreaterThan(0);
-    expect(allowlist).toEqual(annotator);
+  it("the resolver allowlist and the annotator READING_KEYS resolve to the same keys", () => {
+    expect([...(AI_READING_KEYS ?? [])].sort()).toEqual([...EXPECTED_READING_KEYS]);
+    expect([...(READING_KEYS ?? [])].sort()).toEqual([...EXPECTED_READING_KEYS]);
+  });
+
+  it.each(EXPECTED_READING_KEYS)("forwards %s from the resolver to the model values", (key) => {
+    const resolved = resolveQuickLogSensorSnapshotForAi({
+      source: "manual",
+      captured_at: NOW.toISOString(),
+      [key]: 7,
+    });
+    expect(resolved?.[key]).toBe(7);
+    const context = buildAiSensorSnapshotContext(resolved, { now: NOW });
+    expect(context.valuesForModel?.[key]).toBe(7);
   });
 });
 
@@ -326,5 +347,106 @@ describe("flat (no-metrics) live snapshot needs provenance like a nested one", (
     });
     expect(resolved).toEqual({ source: "invalid", captured_at: capturedAt });
     expect(JSON.stringify(buildAiSensorSnapshotContext(resolved))).not.toMatch(/trust=high/);
+  });
+});
+
+const NOW = new Date("2026-06-09T12:05:00Z");
+const MALFORMED_PROVENANCE: ReadonlyArray<[string, unknown]> = [
+  ["number", 42],
+  ["boolean", true],
+  ["object", { label: "live" }],
+  ["array", ["manual"]],
+];
+
+function expectUntrusted(resolved: ReturnType<typeof resolveQuickLogSensorSnapshotForAi>) {
+  expect(resolved?.source).toBe("invalid");
+  const context = buildAiSensorSnapshotContext(resolved, { now: NOW });
+  expect(context.isTrustedForAi).toBe(false);
+  expect(context.valuesForModel).toBeNull();
+}
+
+describe("a present but malformed provenance field is invalid, not skipped", () => {
+  it.each(MALFORMED_PROVENANCE)(
+    "flat: non-string source (%s) does not fall through to data_source",
+    (_label, source) => {
+      const resolved = resolveQuickLogSensorSnapshotForAi({
+        source,
+        data_source: "manual",
+        captured_at: "2026-06-09T12:00:00Z",
+        temperature_c: 24,
+      });
+      expectUntrusted(resolved);
+    },
+  );
+
+  it.each(MALFORMED_PROVENANCE)(
+    "nested: non-string source (%s) does not fall through to data_source",
+    (_label, source) => {
+      const resolved = resolveQuickLogSensorSnapshotForAi({
+        source,
+        data_source: "manual",
+        captured_at: "2026-06-09T12:00:00Z",
+        metrics: { temperature: 24 },
+      });
+      expectUntrusted(resolved);
+    },
+  );
+
+  it("a non-string data_source does not fall through to sensor_source", () => {
+    const resolved = resolveQuickLogSensorSnapshotForAi({
+      data_source: 42,
+      sensor_source: "manual",
+      captured_at: "2026-06-09T12:00:00Z",
+      temperature_c: 24,
+    });
+    expectUntrusted(resolved);
+  });
+
+  it("an absent or null source still falls through to a legacy label", () => {
+    for (const source of [undefined, null]) {
+      const resolved = resolveQuickLogSensorSnapshotForAi({
+        source,
+        data_source: "manual",
+        captured_at: "2026-06-09T12:00:00Z",
+        temperature_c: 24,
+      });
+      expect(resolved).toEqual({
+        source: "manual",
+        captured_at: "2026-06-09T12:00:00.000Z",
+        temperature_c: 24,
+      });
+    }
+  });
+});
+
+describe("inherited Object properties are not source aliases", () => {
+  it.each(["__proto__", "constructor", "toString", "hasOwnProperty"])(
+    "source %s resolves to the scalar invalid, flat and nested",
+    (source) => {
+      for (const extra of [{ temperature_c: 24 }, { metrics: { temperature: 24 } }]) {
+        const resolved = resolveQuickLogSensorSnapshotForAi({
+          source,
+          captured_at: "2026-06-09T12:00:00Z",
+          ...extra,
+        });
+        expect(resolved?.source).toBe("invalid");
+        expect(JSON.parse(JSON.stringify(resolved)).source).toBe("invalid");
+        expectUntrusted(resolved);
+      }
+    },
+  );
+});
+
+describe("an unreadable timestamp is invalid even when live rows corroborate", () => {
+  it.each([
+    ["flat", { temperature_c: 24 }],
+    ["nested", { metrics: { temperature: 24 } }],
+  ])("%s live snapshot with a garbage captured_at and live rows", (_label, extra) => {
+    const resolved = resolveQuickLogSensorSnapshotForAi(
+      { source: "live", captured_at: "garbage-timestamp", ...extra },
+      [liveRow("temperature_c", 24)],
+    );
+    expect(resolved).toEqual({ source: "invalid", captured_at: null });
+    expectUntrusted(resolved);
   });
 });

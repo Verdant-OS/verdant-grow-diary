@@ -186,19 +186,20 @@ const AI_CANONICAL_SOURCES: ReadonlySet<string> = new Set([
   "invalid",
 ]);
 
-const AI_SOURCE_ALIASES: Readonly<Record<string, QuickLogAiSensorSource>> = {
-  imported: "csv",
-  import: "csv",
-  mock: "demo",
-  fixture: "demo",
-};
+/** A Map, so inherited Object properties (`__proto__`, `constructor`) are never aliases. */
+const AI_SOURCE_ALIASES: ReadonlyMap<string, QuickLogAiSensorSource> = new Map([
+  ["imported", "csv"],
+  ["import", "csv"],
+  ["mock", "demo"],
+  ["fixture", "demo"],
+]);
 
 /**
  * Flat reading keys the AI snapshot annotator understands. Kept in step with
  * `READING_KEYS` in `aiSensorSnapshotContextRules.ts`; a key missing here is
  * dropped, never forwarded.
  */
-const AI_READING_KEYS: ReadonlySet<string> = new Set([
+export const AI_READING_KEYS: ReadonlySet<string> = new Set([
   "temperature_c",
   "temperature_f",
   "humidity",
@@ -223,12 +224,21 @@ const AI_READING_KEYS: ReadonlySet<string> = new Set([
   "reservoir_ec_mscm",
 ]);
 
+/**
+ * The first provenance label present decides the source. An absent, null or
+ * blank label falls through to the next legacy key; a present label that is
+ * not a string is malformed provenance and resolves to `invalid` without
+ * consulting the remaining keys.
+ */
 function canonicalAiSource(object: Record<string, unknown>): QuickLogAiSensorSource {
   for (const key of ["source", "data_source", "sensor_source"]) {
-    const source = normalizedSource(object[key]);
+    const raw = object[key];
+    if (raw === undefined || raw === null) continue;
+    if (typeof raw !== "string") return "invalid";
+    const source = normalizedSource(raw);
     if (source === "") continue;
     if (AI_CANONICAL_SOURCES.has(source)) return source as QuickLogAiSensorSource;
-    return AI_SOURCE_ALIASES[source] ?? "invalid";
+    return AI_SOURCE_ALIASES.get(source) ?? "invalid";
   }
   return "invalid";
 }
@@ -323,11 +333,13 @@ export function resolveQuickLogSensorSnapshotForAi(
     return aiSnapshotHeader("demo", object);
   }
 
+  // An unreadable timestamp: invalid on every path, live included, and no
+  // values are forwarded. Corroborating rows cannot rescue it.
+  if (capturedAtState(object).kind === "invalid") return { source: "invalid", captured_at: null };
+
   const source = canonicalAiSource(object);
   const metrics = asObject(object.metrics);
   if (source !== "live") {
-    // An unreadable timestamp: invalid, and no values are forwarded.
-    if (capturedAtState(object).kind === "invalid") return { source: "invalid", captured_at: null };
     const header = aiSnapshotHeader(source, object);
     return metrics
       ? withAllowlistedReadings(header, metrics, AI_METRIC_MAP)

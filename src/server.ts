@@ -1,8 +1,12 @@
 import "./lib/error-capture";
 
+import {
+  redirectResponseFor,
+  withHostHeaders,
+  workerRoutingEnv,
+} from "./lib/cloudflareHostRoutingRules";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
-import { applySecurityHeaders } from "./lib/securityHeadersRules";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -45,31 +49,23 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
-function pathOf(request: Request): string | undefined {
-  try {
-    return new URL(request.url).pathname;
-  } catch {
-    return undefined;
-  }
-}
-
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const redirect = redirectResponseFor(request, workerRoutingEnv(env));
+    if (redirect) return redirect;
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return applySecurityHeaders(
-        await normalizeCatastrophicSsrResponse(response),
-        pathOf(request),
-      );
+      return withHostHeaders(request, await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
-      return applySecurityHeaders(
+      return withHostHeaders(
+        request,
         new Response(renderErrorPage(), {
           status: 500,
           headers: { "content-type": "text/html; charset=utf-8" },
         }),
-        pathOf(request),
       );
     }
   },

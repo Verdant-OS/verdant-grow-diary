@@ -1,10 +1,28 @@
-# Baseline security headers for responses served directly by the Workers Assets
-# binding (JS/CSS/images/fonts/PDF), which never reach src/server.ts.
-# Keep in sync with src/lib/securityHeadersRules.ts. Nitro appends its own
-# /assets/* cache-control rule after this block at build time.
+# Header rules ported from vercel.json for files the Workers assets binding
+# serves directly. SSR responses get the same rules from
+# src/lib/cloudflareHostRoutingRules.ts. The /* line has no trailing space, so
+# Nitro still appends its own /assets/* cache-control rule after this file.
+
 /*
-  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
   X-Content-Type-Options: nosniff
   X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=()
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=()
+
+/unsubscribe
+  Cache-Control: no-store
+  Referrer-Policy: no-referrer
+  X-Robots-Tag: noindex, nofollow, noarchive
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
   Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=()

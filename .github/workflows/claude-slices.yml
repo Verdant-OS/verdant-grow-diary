@@ -545,6 +545,34 @@ jobs:
             // the fourth escape form in a row): after climbing through casts, await,
             // ? :, ??, || and the right of && or a comma, only the positions below are
             // safe, and every other parent locks, including syntax not yet thought of.
+            const SAFE_PREFIX = new Set([K.ExclamationToken, K.PlusToken, K.MinusToken, K.TildeToken]);
+            const FIRST_ASSIGNMENT = K.FirstAssignment;
+            const LAST_ASSIGNMENT = K.LastAssignment;
+            // Whether an expression is written to: the left of any assignment, the
+            // operand of ++, -- or delete, a for-in/of initializer, or an element of a
+            // destructuring-assignment target.
+            const isWriteTarget = (node, assignments = true) => {
+              let child = node;
+              let parent = node.parent;
+              while (parent && WRAPPERS.has(parent.kind)) { child = parent; parent = parent.parent; }
+              if (!parent) return false;
+              if (assignments && parent.kind === K.BinaryExpression && parent.left === child &&
+                  parent.operatorToken.kind >= FIRST_ASSIGNMENT && parent.operatorToken.kind <= LAST_ASSIGNMENT) return true;
+              if ((parent.kind === K.PrefixUnaryExpression || parent.kind === K.PostfixUnaryExpression) &&
+                  (parent.operator === K.PlusPlusToken || parent.operator === K.MinusMinusToken)) return true;
+              if (parent.kind === K.DeleteExpression) return true;
+              if ((parent.kind === K.ForInStatement || parent.kind === K.ForOfStatement) && parent.initializer === child) return true;
+              // Inside an object or array literal: a write when the literal is itself a
+              // destructuring-assignment target.
+              if (parent.kind === K.PropertyAssignment || parent.kind === K.ShorthandPropertyAssignment ||
+                  parent.kind === K.SpreadElement || parent.kind === K.SpreadAssignment ||
+                  parent.kind === K.ArrayLiteralExpression) {
+                let literal = parent;
+                while (literal && literal.kind !== K.ObjectLiteralExpression && literal.kind !== K.ArrayLiteralExpression) literal = literal.parent;
+                return !!literal && isWriteTarget(literal, true);
+              }
+              return false;
+            };
             const escapes = start => {
               let child = start;
               let parent = start.parent;
@@ -561,8 +589,16 @@ jobs:
               }
               const op = parent.kind === K.BinaryExpression ? parent.operatorToken.kind : null;
               // A member read: x.auth.getUser, x.auth?.["getSession"]. D1 and computed
-              // members lock in visit.
-              if ((parent.kind === K.PropertyAccessExpression || parent.kind === K.ElementAccessExpression) && parent.expression === child) return false;
+              // members lock in visit. A member chain written through does not count:
+              // x.auth.x = y, x.auth.x++, delete x.auth.y (Codex P1 at 2f20671a).
+              if ((parent.kind === K.PropertyAccessExpression || parent.kind === K.ElementAccessExpression) && parent.expression === child) {
+                let top = parent;
+                while (top.parent && (WRAPPERS.has(top.parent.kind) ||
+                       ((top.parent.kind === K.PropertyAccessExpression || top.parent.kind === K.ElementAccessExpression) && top.parent.expression === top))) top = top.parent;
+                // A plain or compound assignment to a non-D1 member stays allowed
+                // (test mocks: mocks.auth.user = u); a D1 member already locks in visit.
+                return isWriteTarget(top, false);
+              }
               // A call: x.auth() itself, or the namespace as an argument. Arguments stay
               // allowed (residual risk): vi.spyOn(x.auth, "getSession"), expect(x.auth)
               // and asString(p.auth) are pinned, and locking them is the owner's call.
@@ -572,8 +608,9 @@ jobs:
               // typeof x.auth, x.auth === y, a discarded comma operand.
               if (op !== null && ((op === K.AmpersandAmpersandToken || op === K.CommaToken) && parent.left === child)) return false;
               if (op !== null && COMPARISONS.has(op)) return false;
-              if (parent.kind === K.PrefixUnaryExpression || parent.kind === K.TypeOfExpression ||
-                  parent.kind === K.VoidExpression || parent.kind === K.DeleteExpression) return false;
+              // !, +, - and ~ read the value; ++ and -- write it, and delete removes it.
+              if (parent.kind === K.PrefixUnaryExpression && SAFE_PREFIX.has(parent.operator)) return false;
+              if (parent.kind === K.TypeOfExpression || parent.kind === K.VoidExpression) return false;
               if (parent.kind === K.ConditionalExpression && parent.condition === child) return false;
               if ((parent.kind === K.IfStatement || parent.kind === K.WhileStatement || parent.kind === K.DoStatement ||
                    parent.kind === K.SwitchStatement || parent.kind === K.CaseClause) && parent.expression === child) return false;
@@ -1098,6 +1135,10 @@ jobs:
               'try { throw supabase.auth; } catch (a) { a.signOut(); }', 'tag`${supabase.auth}`;',
               'new Wrapper(supabase.auth);', 'class X { a = supabase.auth; }', 'export default supabase.auth;',
               'const o = { [k]: supabase.auth };', 'const { auth } = supabase; const o = { auth };', 'obj[supabase.auth] = 1;',
+              // Codex P1 at 2f20671a: delete, ++, -- and writes through a member chain.
+              'delete supabase.auth;', '++supabase.auth;', 'supabase.auth = other;', 'supabase.auth.signOut = noop;',
+              'supabase.auth.x++;', 'delete supabase.auth.getUser;', '({ x: supabase.auth.y } = o);', '[supabase.auth.y] = arr;',
+              'for (supabase.auth.x of xs) {}',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), ['auth-mutation, head'], text);
               // Each form also locks on the AST alone (Option 1).
@@ -1192,6 +1233,11 @@ jobs:
               'if (!supabase.auth) throw new Error("x");', 'log(`auth: ${client.auth}`);', 'client.auth;',
               'mocks.auth.mockReturnValue({ user: null }); useAuth: () => mocks.auth();',
               'getAuthSignOutOperation(supabase.auth).clearFailedCleanup();',
+              // Reads through a member chain stay allowed.
+              'const o = { x: supabase.auth.getUser };', 'const n = -client.auth.count;',
+              'for (const k of Object.keys(client.auth)) log(k);',
+              // A plain assignment to a non-D1 member: auth-store mocks (pricing-credit-pack census).
+              'mocks.auth.user = { id: "u" }; mocks.auth.loading = false;',
             ]) {
               assert.deepEqual(locks('src/lib/fooRules.ts', text), [], text);
               assert.deepEqual(astRules('src/lib/fooRules.ts', text), [], `AST: ${text}`);

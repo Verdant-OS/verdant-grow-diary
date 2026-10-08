@@ -141,10 +141,11 @@ when its text:
   or destructuring default such as `function f(a = supabase.auth)`) also lock. On the
   AST, the namespace locks in every position except a short safe list, so a syntax
   form nobody listed fails closed: after climbing through casts, `await`, `??`, `||`,
-  `&&` and `? :`, it may only be read as a member (`x.auth.getUser()`), called or
-  passed to a call, tested (`if (x.auth)`, `!x.auth`, `typeof`, a comparison, the left
+  `&&` and `? :`, it may only be read as a member (`x.auth.getUser()`, unless the member
+  chain is deleted, incremented, destructured into or iterated into), called or passed
+  to a call, tested (`if (x.auth)`, `!`, `+`, `-`, `~`, `typeof`, a comparison, the left
   of `&&`), interpolated into an untagged template, used as a bare statement, or
-  returned from an arrow's concise body. `throw`, `new`, tagged templates, class
+  returned from an arrow's concise body. `delete`, `++` and `--` on the namespace lock. `throw`, `new`, tagged templates, class
   fields, `export default`, JSX attributes, computed keys and every binding, literal,
   spread, return or yield lock. They lock with or
   without the trailing `;`, across a line break (`supabase\n  .auth`), and through
@@ -213,7 +214,10 @@ include:
 - the namespace passed as a call argument (`wrap(supabase.auth, "x").signOut()`;
   `vi.spyOn(client.auth, "getSession")`, `expect(client.auth)` and
   `asString(p.auth)` must stay allowed; locking every argument would newly lock three
-  tree files, so it is left to the owner)
+  tree files, so it is left to the owner), or a plain assignment to a non-D1 member
+  (`supabase.auth.x = y`; auth-store mocks such as `mocks.auth.user = u` would
+  otherwise lock two tree files, and a D1 member such as `supabase.auth.signOut = f`
+  already locks)
   or returned from an arrow's concise body (`() => mocks.auth`), or an alias that
   crosses a module boundary;
 - raw HTTP to Supabase (`fetch` to `/auth/v1/…` or `/rest/v1/action_queue`).

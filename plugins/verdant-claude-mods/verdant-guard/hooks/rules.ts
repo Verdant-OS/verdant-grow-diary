@@ -606,12 +606,15 @@ export function checkBash(command: string): string | null {
     let expands = false;
     const tokens = stripPrefix(raw, (split) => {
       // GNU `env -S` has its own grammar beyond quotes: `${NAME}` expansion, backslash
-      // escapes (`\_` separates arguments, `\c` ends the string) and `#` comments. This
-      // guard models quotes only, so any of those makes the wrapped command uncheckable.
-      if (/[\\$#]/.test(split)) expands = true;
+      // escapes (`\_` separates arguments, `\c` ends the string) and `#` comments. And the
+      // operand reaches this point with its quotes already removed, so a brace, glob,
+      // backtick or `~` here may be one Bash expands before env sees it
+      // (`env -S {git,push,-f}`). This guard models neither, so any of those makes the
+      // wrapped command uncheckable.
+      if (/[\\$#{}*?[\]`~]/.test(split)) expands = true;
     });
     if (expands) {
-      return "`env -S` with `$`, `\\` or `#` uses env's own expansion, escapes or comments, so the command it runs cannot be checked here. Write the command out without `env -S`.";
+      return "`env -S` with `$`, `\\`, `#`, braces, globs, backticks or `~` uses expansion, escapes or comments this guard cannot follow, so the command it runs cannot be checked here. Write the command out without `env -S`.";
     }
     if (tokens.length === 0) continue;
     const git = gitArgs(tokens);

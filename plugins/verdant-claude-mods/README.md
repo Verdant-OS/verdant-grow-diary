@@ -12,7 +12,7 @@ They add no new policy: every refusal names the existing rule it enforces.
 ## Status
 
 `practical observation`: both mods pass `claude plugin validate` and `claude plugin test`
-(`verdant-guard` 104/104, `verdant-cache-clock` 6/6) on Claude Code 2.1.293. Removing the
+(`verdant-guard` 105/105, `verdant-cache-clock` 6/6) on Claude Code 2.1.293. Removing the
 guard's Bash and file checks turns two engine tests red. Behaviour inside a live agent
 session is `NOT_MEASURED`.
 

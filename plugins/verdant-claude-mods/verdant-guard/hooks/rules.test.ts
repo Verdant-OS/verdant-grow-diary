@@ -732,3 +732,19 @@ describe("Codex re-review: wrapper assignments after `--`", () => {
     expect(checkBash("env -- 1=x git push origin claude/task")).toBe(null);
   });
 });
+
+describe("Codex re-review: shell-expandable env -S operands", () => {
+  test("P1: braces, globs, backticks and ~ in an env -S operand fail closed", () => {
+    for (const cmd of [
+      "env -S {git,push,-f} origin claude/task",
+      "env -S git* push -f origin claude/task",
+      "env -S gi? push -f origin claude/task",
+      "env -S [g]it push -f origin claude/task",
+      "env -S `echo git` push -f origin claude/task",
+      "env -S ~/bin/git push -f origin claude/task",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env -S 'git status'")).toBe(null);
+  });
+});

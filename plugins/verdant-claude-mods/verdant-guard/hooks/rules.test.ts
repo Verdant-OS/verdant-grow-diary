@@ -692,3 +692,29 @@ describe("Codex re-review: append and subscripted assignment prefixes", () => {
     expect(checkBash("F+=x git push origin claude/task")).toBe(null);
   });
 });
+
+describe("Codex re-review: Playwright `--`, env's NAME=VALUE grammar", () => {
+  test("P1: nothing after Playwright's `--` narrows the run", () => {
+    for (const cmd of [
+      "bunx playwright test -- --project=chromium-authed",
+      "bunx playwright test -- e2e/auth-loading.spec.ts",
+      "bunx playwright test --project=chromium-mocked -- e2e/auth-loading.spec.ts",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(
+      checkBash("bunx playwright test --project=chromium-mocked e2e/auth-loading.spec.ts --"),
+    ).toBe(null);
+  });
+  test("P1: env skips every NAME=VALUE operand, not only shell identifiers", () => {
+    for (const cmd of [
+      "env -S '1=x git push -f origin claude/task'",
+      "env 1=x git push --force origin claude/task",
+      "env A-B=x git commit --no-verify -m wip",
+      "env -i 1=x 2=y git push -f origin claude/task",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env 1=x git push origin claude/task")).toBe(null);
+  });
+});

@@ -239,9 +239,13 @@ function stripPrefix(tokens: string[], onSplit?: (split: string) => void): strin
     let split: string | null = null;
     while (i < rest.length) {
       const option = rest[i]!;
-      // sudo takes `VAR=value` among its own options (`sudo VAR=x -u root cmd`), so an
-      // assignment there does not end the wrapper.
-      if (head === "sudo" && ASSIGNMENT.test(option)) {
+      // sudo takes `VAR=value` among its own options (`sudo VAR=x -u root cmd`), and GNU env reads
+      // any operand holding `=` as NAME=VALUE (`env 1=x cmd`), not only a shell identifier. So for
+      // both, such a word does not end the wrapper.
+      if (
+        (head === "sudo" && ASSIGNMENT.test(option)) ||
+        (head === "env" && !option.startsWith("-") && option.includes("="))
+      ) {
         i += 1;
         continue;
       }
@@ -505,6 +509,9 @@ function checkPlaywright(tokens: string[]): string | null {
   let specs = 0;
   for (let i = 0; i < args.length; i += 1) {
     const a = args[i] ?? "";
+    // Words after `--` do not narrow the run (Playwright 1.62.1 `--list -- --project=x` lists every
+    // project's tests), so neither they nor anything later counts as a project or a spec.
+    if (a === "--") break;
     if (a.startsWith("--project=")) {
       projects.push(a.slice("--project=".length));
       continue;

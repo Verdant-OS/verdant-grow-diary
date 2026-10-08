@@ -156,9 +156,9 @@ describe("errorReportingRules — scrubbing", () => {
 
   it("reduces URLs to origin + path; drops query and fragment; tolerates relative/invalid input", () => {
     expect(scrubUrl("https://verdantgrowdiary.com/auth?code=secret#access_token=tok")).toBe(
-      "https://verdantgrowdiary.com/auth",
+      "https://verdantgrowdiary.com/:redacted",
     );
-    expect(scrubUrl("/plants/1?x=1#frag")).toBe("/plants/1");
+    expect(scrubUrl("/plants/1?x=1#frag")).toBe("/:redacted/:redacted");
     expect(scrubUrl("")).toBe("");
     expect(scrubUrl(undefined)).toBe("");
     expect(scrubUrl(7)).toBe("");
@@ -212,12 +212,12 @@ describe("errorReportingRules — scrubbing", () => {
     expect(out.user).toBeUndefined();
     expect(out.server_name).toBeUndefined();
     expect(out.request).toEqual({ url: "https://verdantgrowdiary.com/plants" });
-    expect(out.message).toMatch(/^#[0-9a-f]{8}$/);
-    expect(out.exception?.values?.[0]?.value).toMatch(/^#[0-9a-f]{8}$/);
+    expect(out.message).toBe(REDACTED);
+    expect(out.exception?.values?.[0]?.value).toBe(REDACTED);
     expect(JSON.stringify(out)).not.toMatch(/a@b\.co|refresh_token=rt|x@y\.io/);
     expect(out.exception?.values?.[0]?.stacktrace?.frames?.[0]).toEqual({
       filename: "https://verdantgrowdiary.com/assets/a.js",
-      abs_path: "/a.js",
+      abs_path: "/:redacted",
       lineno: 1,
     });
     expect(out.breadcrumbs).toEqual([

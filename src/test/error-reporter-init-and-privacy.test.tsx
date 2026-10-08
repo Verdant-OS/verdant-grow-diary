@@ -164,7 +164,7 @@ describe("errorReporter — initialisation race", () => {
     const sent = options.beforeSend({
       exception: { values: [{ type: "Error", value: error.message }] },
     }) as { exception: { values: Array<{ value: string }> } };
-    expect(sent.exception.values[0]?.value).toMatch(/^#[0-9a-f]{8}$/);
+    expect(sent.exception.values[0]?.value).toBe(REDACTED);
     expect(JSON.stringify(sent)).not.toContain("grower@example.com");
   });
 });
@@ -402,10 +402,12 @@ describe("errorReportingRules — privacy of outgoing events", () => {
 
   it("replaces UUID path segments (grow, tent and plant ids) with :id", () => {
     const id = "3f2c9a1e-8b7d-4c6e-9f00-1a2b3c4d5e6f";
+    // Direct scrubUrl calls keep only code-defined segments; page URLs in events go
+    // through scrubRouteUrl and keep their route template instead.
     expect(scrubUrl(`https://verdantgrowdiary.com/plants/${id}?tab=log`)).toBe(
-      "https://verdantgrowdiary.com/plants/:id",
+      "https://verdantgrowdiary.com/:redacted/:id",
     );
-    expect(scrubUrl(`/grows/${id.toUpperCase()}/tents/${id}`)).toBe("/grows/:id/tents/:id");
+    expect(scrubUrl(`/grows/${id.toUpperCase()}/tents/${id}`)).toBe("/:redacted/:id/:redacted/:id");
     expect(scrubUrl("/assets/index-3f2c9a1e.js")).toBe("/assets/index-3f2c9a1e.js");
     const crumb = scrubBreadcrumb({
       category: "navigation",
@@ -424,9 +426,9 @@ describe("errorReportingRules — privacy of outgoing events", () => {
   it("replaces percent-encoded UUID path segments with :id", () => {
     const encoded = "3f2c9a1e%2D8b7d%2d4c6e%2D9f00%2D1a2b3c4d5e6f";
     expect(scrubUrl(`https://verdantgrowdiary.com/plants/${encoded}`)).toBe(
-      "https://verdantgrowdiary.com/plants/:id",
+      "https://verdantgrowdiary.com/:redacted/:id",
     );
-    expect(scrubUrl(`/plants/${encoded}`)).toBe("/plants/:id");
+    expect(scrubUrl(`/plants/${encoded}`)).toBe("/:redacted/:id");
   });
 
   it("redacts UUIDs in free text: exception values, messages and breadcrumb messages", () => {
@@ -439,16 +441,16 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       exception: { values: [{ type: "Error", value: `hunt ${id} failed` }] },
     }) as { message: string; exception: { values: Array<{ value: string }> } };
     // Event and breadcrumb messages leave only as a summary, so no id survives there either.
-    expect(event.message).toMatch(/^#[0-9a-f]{8}$/);
-    expect(event.exception.values[0]?.value).toMatch(/^#[0-9a-f]{8}$/);
-    expect(scrubBreadcrumb({ category: "fetch", message: `GET row ${id}` })?.message).toMatch(
-      /^#[0-9a-f]{8}$/,
+    expect(event.message).toBe(REDACTED);
+    expect(event.exception.values[0]?.value).toBe(REDACTED);
+    expect(scrubBreadcrumb({ category: "fetch", message: `GET row ${id}` })?.message).toBe(
+      REDACTED,
     );
   });
 
   it("keeps only http(s) origin+path from URLs and redacts payload-bearing schemes", () => {
     expect(scrubUrl("https://verdantgrowdiary.com/grows/1?token=abc#x")).toBe(
-      "https://verdantgrowdiary.com/grows/1",
+      "https://verdantgrowdiary.com/:redacted/:redacted",
     );
     for (const url of [
       "data:text/plain,grower@example.com?token=abc",
@@ -512,40 +514,37 @@ describe("errorReportingRules — privacy of outgoing events", () => {
         ],
       },
     });
-    expect(out?.logentry).toEqual({ message: expect.stringMatching(/^#[0-9a-f]{8}$/) });
+    expect(out?.logentry).toEqual({ message: REDACTED });
     expect(out?.transaction).toBe("/auth");
     const ex = out?.exception?.values?.[0];
     expect(ex?.type).toBe("Error");
     expect(ex?.mechanism).toEqual({ type: "generic", handled: false });
-    expect(ex?.stacktrace?.frames?.[0]).toEqual({ filename: "https://x.test/a.js" });
+    // A script outside /assets/ is not a code-defined shape, so only its origin is kept.
+    expect(ex?.stacktrace?.frames?.[0]).toEqual({ filename: "https://x.test/:redacted" });
   });
 });
 
 describe("errorReportingRules — free-text messages leave only an allowlisted diagnostic summary", () => {
-  const FINGERPRINT = /#[0-9a-f]{8}$/;
-
-  it("replaces grower-authored text in event messages with a fingerprint", () => {
+  it("replaces grower-authored text in event messages with a constant", () => {
     const out = scrubEvent({ message: "plant Blue Dream note: leaves curled" });
-    expect(out?.message).toMatch(/^#[0-9a-f]{8}$/);
+    expect(out?.message).toBe(REDACTED);
     expect(out?.message).not.toContain("Blue Dream");
     expect(out?.message).not.toContain("leaves");
   });
 
-  it("keeps the repo scope, SQLSTATE code and fingerprint from a forwarded provider message", () => {
+  it("keeps the repo scope and SQLSTATE code from a forwarded provider message", () => {
     const value =
       'growRepo.fetchTents: duplicate key value violates unique constraint "plants_name_key" ' +
       "Key (name)=(Blue Dream #3) already exists. SQLSTATE 23505";
     const out = scrubEvent({ exception: { values: [{ type: "Error", value }] } });
     const sent = out?.exception?.values?.[0]?.value ?? "";
-    expect(sent).toMatch(/^growRepo\.fetchTents code=23505 #[0-9a-f]{8}$/);
+    expect(sent).toBe("growRepo.fetchTents code=23505");
     expect(sent).not.toContain("Blue Dream");
-    // Deterministic, and distinct messages stay distinct for grouping.
-    const again = scrubEvent({ exception: { values: [{ type: "Error", value }] } });
-    expect(again?.exception?.values?.[0]?.value).toBe(sent);
+    // Nothing derived from the grower value survives, so a different value sends the same summary.
     const other = scrubEvent({
       exception: { values: [{ type: "Error", value: value.replace("#3", "#4") }] },
     });
-    expect(other?.exception?.values?.[0]?.value).not.toBe(sent);
+    expect(other?.exception?.values?.[0]?.value).toBe(sent);
   });
 
   it("keeps PostgREST codes and HTTP statuses, and drops everything else", () => {
@@ -556,14 +555,14 @@ describe("errorReportingRules — free-text messages leave only an allowlisted d
         formatted: "My Gelato tent is too warm",
       },
     });
-    expect(out?.message).toMatch(/^db\.fetchGrowRow code=PGRST116 #[0-9a-f]{8}$/);
-    expect(out?.logentry?.message).toMatch(/^status=503 #[0-9a-f]{8}$/);
-    expect(out?.logentry?.formatted).toMatch(/^#[0-9a-f]{8}$/);
+    expect(out?.message).toBe("db.fetchGrowRow code=PGRST116");
+    expect(out?.logentry?.message).toBe("status=503");
+    expect(out?.logentry?.formatted).toBe(REDACTED);
   });
 
   it("summarises breadcrumb messages the same way", () => {
     const crumb = scrubBreadcrumb({ category: "fetch", message: "GET Blue Dream diary failed" });
-    expect(crumb?.message).toMatch(/^#[0-9a-f]{8}$/);
+    expect(crumb?.message).toBe(REDACTED);
   });
 
   it("keeps identifier-shaped exception types and replaces any other type with Error", () => {
@@ -576,13 +575,13 @@ describe("errorReportingRules — free-text messages leave only an allowlisted d
       },
     });
     expect(out?.exception?.values?.map((ex) => ex.type)).toEqual(["TypeError", "Error"]);
-    for (const ex of out?.exception?.values ?? []) expect(ex.value).toMatch(FINGERPRINT);
+    for (const ex of out?.exception?.values ?? []) expect(ex.value).toBe(REDACTED);
   });
 
   it("reports a code only when it is a real SQLSTATE class, so a grower's number never passes", () => {
-    expect(scrubEvent({ message: "ship to zip code 90210" })?.message).toMatch(/^#[0-9a-f]{8}$/);
-    expect(scrubEvent({ message: "growRepo.fetchTents: SQLSTATE 42P01" })?.message).toMatch(
-      /^growRepo\.fetchTents code=42P01 #[0-9a-f]{8}$/,
+    expect(scrubEvent({ message: "ship to zip code 90210" })?.message).toBe(REDACTED);
+    expect(scrubEvent({ message: "growRepo.fetchTents: SQLSTATE 42P01" })?.message).toBe(
+      "growRepo.fetchTents code=42P01",
     );
   });
 
@@ -594,47 +593,35 @@ describe("errorReportingRules — free-text messages leave only an allowlisted d
 });
 
 describe("errorReportingRules — summary fields come only from code-defined provenance", () => {
-  const ONLY_FINGERPRINT = /^#[0-9a-f]{8}$/;
-
   it("keeps a scope only from the closed list of repository-defined scopes", () => {
-    expect(scrubEvent({ message: "plant.BlueDream: leaves curled" })?.message).toMatch(
-      ONLY_FINGERPRINT,
-    );
-    expect(scrubEvent({ message: "db.fetchGrowRow: boom" })?.message).toMatch(
-      /^db\.fetchGrowRow #[0-9a-f]{8}$/,
-    );
+    expect(scrubEvent({ message: "plant.BlueDream: leaves curled" })?.message).toBe(REDACTED);
+    expect(scrubEvent({ message: "db.fetchGrowRow: boom" })?.message).toBe("db.fetchGrowRow");
   });
 
   it("keeps a code only under a known scope and with explicit PostgREST or SQLSTATE context", () => {
-    expect(scrubEvent({ message: "oauth.exchange: code=42P01" })?.message).toMatch(
-      ONLY_FINGERPRINT,
+    expect(scrubEvent({ message: "oauth.exchange: code=42P01" })?.message).toBe(REDACTED);
+    expect(scrubEvent({ message: "growRepo.fetchTents: code=42P01" })?.message).toBe(
+      "growRepo.fetchTents",
     );
-    expect(scrubEvent({ message: "growRepo.fetchTents: code=42P01" })?.message).toMatch(
-      /^growRepo\.fetchTents #[0-9a-f]{8}$/,
+    expect(scrubEvent({ message: "growRepo.fetchTents: SQLSTATE 42P01" })?.message).toBe(
+      "growRepo.fetchTents code=42P01",
     );
-    expect(scrubEvent({ message: "growRepo.fetchTents: SQLSTATE 42P01" })?.message).toMatch(
-      /^growRepo\.fetchTents code=42P01 #[0-9a-f]{8}$/,
-    );
-    expect(scrubEvent({ message: "PGRST116 from an unknown caller" })?.message).toMatch(
-      ONLY_FINGERPRINT,
-    );
+    expect(scrubEvent({ message: "PGRST116 from an unknown caller" })?.message).toBe(REDACTED);
   });
 
   it("keeps an HTTP status only from the caught-Response shape or under a known scope", () => {
-    expect(scrubEvent({ message: "Response 503 at https://x.test/a" })?.message).toMatch(
-      /^status=503 #[0-9a-f]{8}$/,
-    );
-    expect(scrubEvent({ message: "my tent status 404 is odd" })?.message).toMatch(ONLY_FINGERPRINT);
+    expect(scrubEvent({ message: "Response 503 at https://x.test/a" })?.message).toBe("status=503");
+    expect(scrubEvent({ message: "my tent status 404 is odd" })?.message).toBe(REDACTED);
   });
 
   it("redacts e-mail and token-shaped path segments from asset and API URLs", () => {
     expect(scrubUrl("https://verdantgrowdiary.com/oops/grower@example.com")).toBe(
-      "https://verdantgrowdiary.com/oops/:redacted",
+      "https://verdantgrowdiary.com/:redacted/:redacted",
     );
     expect(scrubUrl("/bridge/vbt_0123456789abcdefABCDEF0123456789abcdefAB")).toBe(
-      "/bridge/:redacted",
+      "/:redacted/:redacted",
     );
-    expect(scrubUrl("/x/grower%40example.com/y")).toBe("/x/:redacted/y");
+    expect(scrubUrl("/x/grower%40example.com/y")).toBe("/:redacted/:redacted/:redacted");
     expect(scrubUrl("/assets/index-3f2c9a1e.js")).toBe("/assets/index-3f2c9a1e.js");
   });
 
@@ -661,5 +648,61 @@ describe("errorReportingRules — summary fields come only from code-defined pro
     expect(buildManualReportContext({ source: "manual", route: "/oops/a@b.co" }).extra).toEqual({
       route: "/:unmatched",
     });
+  });
+});
+
+describe("errorReportingRules — only code-defined shapes leave; nothing else is fingerprinted", () => {
+  it("sends a constant instead of fingerprinting grower text", () => {
+    expect(scrubEvent({ message: "plant Blue Dream note: leaves curled" })?.message).toBe(REDACTED);
+    expect(scrubEvent({ message: "growRepo.fetchTents: SQLSTATE 42P01" })?.message).toBe(
+      "growRepo.fetchTents code=42P01",
+    );
+    expect(scrubEvent({ message: "Response 503 at https://x.test/a" })?.message).toBe("status=503");
+  });
+
+  it("redacts URL segments that are not a recognised asset or API shape", () => {
+    expect(
+      scrubBreadcrumb({ category: "fetch", data: { url: "/api/Blue%20Dream" } })?.data,
+    ).toEqual({
+      url: "/:redacted/:redacted",
+    });
+    expect(
+      scrubUrl(
+        "https://x.supabase.co/storage/v1/object/public/plant-photos/3f2c9a1e-8b7d-4c6e-9f00-1a2b3c4d5e6f/My%20private%20plant.jpg",
+      ),
+    ).toBe("https://x.supabase.co/storage/v1/object/public/plant-photos/:id/:redacted");
+  });
+
+  it("redacts nested-encoded segments instead of trusting one decoding pass", () => {
+    expect(scrubUrl("/bridge/vbt%255F0123456789abcdefABCDEF0123456789abcdefAB")).toBe(
+      "/:redacted/:redacted",
+    );
+  });
+
+  it("keeps code-defined asset and Supabase API paths readable", () => {
+    for (const [input, expected] of [
+      [
+        "https://verdantgrowdiary.com/assets/index-BvX3k9aQ.js",
+        "https://verdantgrowdiary.com/assets/index-BvX3k9aQ.js",
+      ],
+      [
+        "https://x.supabase.co/rest/v1/sensor_readings?select=*",
+        "https://x.supabase.co/rest/v1/sensor_readings",
+      ],
+      [
+        "https://x.supabase.co/rest/v1/rpc/quicklog_save_manual",
+        "https://x.supabase.co/rest/v1/rpc/quicklog_save_manual",
+      ],
+      [
+        "https://x.supabase.co/functions/v1/ai-doctor-review",
+        "https://x.supabase.co/functions/v1/ai-doctor-review",
+      ],
+      [
+        "https://x.supabase.co/auth/v1/token?grant_type=refresh_token",
+        "https://x.supabase.co/auth/v1/token",
+      ],
+    ]) {
+      expect(scrubUrl(input), input).toBe(expected);
+    }
   });
 });

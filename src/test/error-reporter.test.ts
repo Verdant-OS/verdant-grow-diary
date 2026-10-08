@@ -6,6 +6,7 @@ import {
   initErrorReporter,
   reportError,
 } from "@/lib/errorReporter";
+import { REDACTED } from "@/lib/errorReportingRules";
 
 const TEST_DSN = "https://0123456789abcdef0123456789abcdef@o000000.ingest.us.sentry.io/1";
 
@@ -116,7 +117,7 @@ describe("errorReporter", () => {
       beforeBreadcrumb: (b: Record<string, unknown>) => Record<string, unknown> | null;
     };
     const sent = options.beforeSend({ user: { id: "u" }, message: "a@b.co" });
-    expect(sent).toEqual({ message: expect.stringMatching(/^#[0-9a-f]{8}$/) });
+    expect(sent).toEqual({ message: REDACTED });
     expect(JSON.stringify(sent)).not.toContain("a@b.co");
     expect(options.beforeBreadcrumb({ category: "console", message: "x" })).toBeNull();
   });

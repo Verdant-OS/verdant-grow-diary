@@ -12,8 +12,9 @@
  * - No user id, email, IP, or session identifiers are attached. Sentry's
  *   `dataCollection` has every category off.
  * - Page URLs are reduced to origin + route template (`/plants/:id`); a path only the
- *   catch-all renders becomes `/:unmatched`. Asset and API URLs keep origin + path with
- *   UUID segments as `:id` and e-mail/credential/opaque-token segments as `:redacted`.
+ *   catch-all renders becomes `/:unmatched`. Other URLs keep origin plus only the
+ *   code-defined path segments (`/assets/<built file>`, Supabase `/<service>/v1/<name>`);
+ *   every other segment becomes `:id` (UUID) or `:redacted`.
  *   Query strings and fragments are always dropped: auth flows carry tokens there.
  * - Messages, exception values and breadcrumb messages leave only as an allowlisted
  *   summary (`summarizeErrorText`). Other strings (tags, extra, breadcrumb data) are
@@ -493,37 +494,67 @@ function redactPatterns(text: string): string {
 }
 
 /** A whole path segment shaped like a UUID (grow, tent, plant and other row ids), hyphens literal or `%2D`. */
-const UUID_SEGMENT_PATTERN = new RegExp(String.raw`(?<=\/)${UUID_BODY}(?=\/|$)`, "gi");
+const UUID_SEGMENT_PATTERN = new RegExp(String.raw`^${UUID_BODY}$`, "i");
 
-/** A long opaque run of letters and digits: a token or key in a path, never a route word or asset hash. */
-const OPAQUE_SEGMENT_PATTERN = /^(?=[^\d]*\d)(?=[^A-Za-z]*[A-Za-z])[A-Za-z0-9_-]{24,}$/;
+/** A built asset file name (`index-BvX3k9aQ.js`): written by the bundler, never by a grower. */
+const ASSET_FILE_PATTERN =
+  /^[\w.-]{1,128}\.(?:m?js|css|map|wasm|woff2?|ttf|png|svg|jpe?g|webp|avif|gif|ico)$/;
+/** A lowercase code identifier: a table, RPC, edge-function or endpoint name. No `%`, so no encoding to undo. */
+const CODE_SEGMENT_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
+const SUPABASE_SERVICES: ReadonlySet<string> = new Set([
+  "rest",
+  "auth",
+  "functions",
+  "realtime",
+  "storage",
+]);
+const STORAGE_ACCESS_SEGMENTS: ReadonlySet<string> = new Set([
+  "public",
+  "sign",
+  "authenticated",
+  "info",
+]);
 
-function decodeSegment(segment: string): string {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return segment;
+/** A segment that matches a code shape but still carries a credential (`sk-live-…`) is not kept. */
+function isCodeSegment(segment: string): boolean {
+  return CODE_SEGMENT_PATTERN.test(segment) && redactPatterns(segment) === segment;
+}
+
+/**
+ * How many leading segments of a path are code-defined, by shape: `/assets/<built file>`,
+ * and Supabase `/<service>/v1/<name>` (`/rest/v1/rpc/<fn>`, and storage up to the bucket).
+ * Everything after that count is data and is not kept.
+ */
+function codeDefinedPrefixLength(parts: ReadonlyArray<string>): number {
+  if (parts[0] === "assets" && parts.length === 2 && ASSET_FILE_PATTERN.test(parts[1] ?? ""))
+    return 2;
+  if (!SUPABASE_SERVICES.has(parts[0] ?? "") || !/^v\d+$/.test(parts[1] ?? "")) return 0;
+  if (parts[0] === "storage") {
+    if (parts[2] !== "object") return 2;
+    const accessOffset = STORAGE_ACCESS_SEGMENTS.has(parts[3] ?? "") ? 4 : 3;
+    return isCodeSegment(parts[accessOffset] ?? "") ? accessOffset + 1 : accessOffset;
   }
+  if (!isCodeSegment(parts[2] ?? "")) return 2;
+  if (parts[0] === "rest" && parts[2] === "rpc") return isCodeSegment(parts[3] ?? "") ? 4 : 3;
+  return 3;
 }
 
-/** UUID segments become `:id`; segments carrying an e-mail, a credential or an opaque token become `:redacted`. */
+/**
+ * Keeps only code-defined path segments (see `codeDefinedPrefixLength`). Every other
+ * segment is data — a grower label, a file name, a token, possibly percent-encoded any
+ * number of times — so UUIDs become `:id` and the rest `:redacted`, without decoding.
+ */
 function redactPathSegments(path: string): string {
-  return path
-    .replace(UUID_SEGMENT_PATTERN, ":id")
-    .split("/")
-    .map((segment) => {
-      if (segment === "" || segment === ":id") return segment;
-      const decoded = decodeSegment(segment);
-      const sensitive =
-        decoded.includes("@") ||
-        OPAQUE_SEGMENT_PATTERN.test(decoded) ||
-        redactPatterns(decoded) !== decoded;
-      return sensitive ? ":redacted" : segment;
-    })
-    .join("/");
+  const parts = path.split("/").slice(1);
+  const keep = codeDefinedPrefixLength(parts);
+  const kept = parts.map((segment, index) => {
+    if (index < keep || segment === "") return segment;
+    return UUID_SEGMENT_PATTERN.test(segment) ? ":id" : ":redacted";
+  });
+  return path.startsWith("/") ? `/${kept.join("/")}` : kept.join("/");
 }
 
-/** Reduces an http(s) URL to origin + pathname with sensitive segments replaced (see `redactPathSegments`); any other scheme becomes `scheme:[redacted]`. Relative or unparsable input keeps only the part before `?`/`#`. */
+/** Reduces an http(s) URL to origin + its code-defined path segments, the rest replaced (see `redactPathSegments`); any other scheme becomes `scheme:[redacted]`. Relative or unparsable input keeps only the part before `?`/`#`. */
 export function scrubUrl(value: unknown): string {
   if (typeof value !== "string" || value.length === 0) return "";
   try {
@@ -591,14 +622,16 @@ export function scrubRouteUrl(value: unknown): string {
 // note) inside an error message, and provider messages forwarded verbatim can carry
 // row values. So event messages, exception values and breadcrumb messages never
 // leave as text: only an allowlisted summary does — the code-defined scope prefix,
-// a SQLSTATE/PostgREST code, an HTTP status, and a fingerprint of the full text.
+// a SQLSTATE/PostgREST code and an HTTP status. Nothing derived from the rest of the
+// text is sent, not even a hash: grower text is low-entropy, so any digest of it could
+// be confirmed by guessing. Grouping relies on the summary and the scrubbed stack.
 
 const SCOPE_PREFIX_PATTERN = /^\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*:/;
 /**
  * Every scope the repository's own throw sites put in front of a forwarded provider
  * message (`fail()` in `growRepo.ts` and `db.ts`, plus three direct throws). A scope not
  * listed here is grower text that happens to look like one, so it is not reported;
- * a new throw site reports only a fingerprint until it is added.
+ * a new throw site reports only `[redacted]` until it is added.
  */
 export const KNOWN_ERROR_SCOPES: ReadonlySet<string> = new Set([
   ...[
@@ -644,21 +677,8 @@ const CAUGHT_RESPONSE_PATTERN = /^Response ([1-5]\d{2})(?: at |$)/;
 const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]{0,63}$/;
 
 /**
- * FNV-1a (32-bit) over the UTF-16 code units. Deterministic and one-way: it lets
- * identical messages group without sending them. It is not a secret: anyone who can
- * guess a whole message can confirm the guess, so it never stands in for redaction.
- */
-function fingerprint(text: string): string {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < text.length; index++) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return `#${(hash >>> 0).toString(16).padStart(8, "0")}`;
-}
-
-/**
- * Reduces a free-text message to `scope code=… status=… #fingerprint`; empty stays empty.
+ * Reduces a free-text message to `scope code=… status=…`, or `[redacted]` when code wrote
+ * none of those fields; empty stays empty.
  * A field is kept only when code put it there: the scope must be in `KNOWN_ERROR_SCOPES`,
  * a code or status is read only after such a scope (where the rest is a provider message,
  * and a code needs an explicit `PGRST###` or `SQLSTATE` label), and the only other status
@@ -679,8 +699,7 @@ export function summarizeErrorText(value: unknown): string {
     const status = CAUGHT_RESPONSE_PATTERN.exec(value)?.[1];
     if (status) parts.push(`status=${status}`);
   }
-  parts.push(fingerprint(value));
-  return parts.join(" ");
+  return parts.length > 0 ? parts.join(" ") : REDACTED;
 }
 
 /** Exception types are class names; anything else is free text and becomes `Error`. */

@@ -350,10 +350,17 @@ keeps both credentials out of reach:
   `<runner temp>/claude-bin/scorer-unlock <path>... --reason "<why>"`. It runs
   `scorer-lock.mjs --unlock` from a read-only copy of the base branch's script, taken
   before Claude starts, so a slice that edits `scripts/` cannot change what it runs. Any
-  other form (`--lock`, `--hook`, `--report`, a path starting with `-`, a missing reason)
-  exits 2 without running anything. The slice records each reason in its PR body. The
-  configuration job runs the wrapper against a stub and fails if it accepts any other
-  form, or if any other allowed command can reach `node`.
+  other form (`--lock`, `--hook`, `--report`, a path starting with `-`, a missing reason,
+  or a reason shorter than the scorer's 8-character minimum after trimming) exits 2
+  without running anything. The scorer's git-ignored `.claude/scorer-unlock.json` record
+  leaves the builder as data alongside the bundle, and the publish job posts every
+  declared path and reason: in the body of a new draft, or as a comment on the existing
+  PR for a nudge, whose body the job never rewrites. Each field is flattened to one line,
+  capped and shown in a code span, so a reason cannot add mentions, links or HTML. The
+  configuration job runs the wrapper against a stub, checks the reason minimum against
+  the base branch's `UNLOCK_MIN_REASON_LENGTH`, and fails if the wrapper accepts any
+  other form, if any other allowed command can reach `node`, or if the nudge path stops
+  posting the reasons.
 - The pinned action grants its own `scripts/git-push.sh` wrapper; it is denied
   explicitly, and a push would fail with the read-only token in any case.
 

@@ -1123,6 +1123,47 @@ jobs:
             };
           }
 
+          // The scorer unlocks a slice declared, as Markdown for its PR (Codex P2 at
+          // 49539f84). The record is the slice's own data: each field is flattened to
+          // one line, capped, and shown in a code span, so it cannot add mentions,
+          // links or HTML. An unreadable record says so instead of vanishing.
+          function unlockReceipt(text) {
+            const head = '### Scorer unlocks declared by this slice\n\nThe reasons are the slice\'s own words; review each changed check.\n';
+            let entries;
+            try {
+              entries = JSON.parse(text).unlocked;
+            } catch {
+              entries = null;
+            }
+            if (!Array.isArray(entries)) return `${head}\n- The scorer-unlock record could not be read.`;
+            const span = (value, max) => '`' + String(value ?? '?').replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]+/g, ' ')
+              .replace(/`/g, "'").trim().slice(0, max) + '`';
+            const rows = entries.filter(e => e && typeof e === 'object')
+              .map(e => `- ${span(e.path, 200)}: ${span(e.reason, 500)} (declared ${span(e.at, 40)} on ${span(e.branch, 120)})`)
+              .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+            if (rows.length === 0) return '';
+            return `${head}\n${rows.join('\n')}`;
+          }
+
+          function receiptSelfTest() {
+            let cases = 0;
+            const check = (text, expected) => { assert.equal(unlockReceipt(text), expected); cases += 1; };
+            const head = '### Scorer unlocks declared by this slice\n\nThe reasons are the slice\'s own words; review each changed check.\n';
+            check('{"unlocked":[]}', '');
+            check('not json', `${head}\n- The scorer-unlock record could not be read.`);
+            check('{"unlocked":{}}', `${head}\n- The scorer-unlock record could not be read.`);
+            check(JSON.stringify({ unlocked: [
+              { path: 'src/test/b.test.ts', reason: 'copy moved', at: '2026-10-08T17:00:00Z', branch: 'claude/x' },
+              { path: 'src/test/a.test.ts', reason: 'ping @someone `x` <img src=y>\nnext', at: '2026-10-08T17:01:00Z', branch: 'claude/x' },
+              null,
+            ] }), `${head}\n- \`src/test/a.test.ts\`: \`ping @someone 'x' <img src=y> next\` (declared \`2026-10-08T17:01:00Z\` on \`claude/x\`)\n`
+              + '- `src/test/b.test.ts`: `copy moved` (declared `2026-10-08T17:00:00Z` on `claude/x`)');
+            const long = unlockReceipt(JSON.stringify({ unlocked: [{ path: 'p', reason: 'r'.repeat(900) }] }));
+            assert.ok(long.includes('`' + 'r'.repeat(500) + '`') && !long.includes('r'.repeat(501)));
+            cases += 1;
+            return cases;
+          }
+
           function selfTest() {
             const blocked = [
               'supabase/functions/test/index.ts', 'supabase/config.toml',
@@ -1185,8 +1226,9 @@ jobs:
             requiredDenies.forEach(rule => assert.ok(deny.includes(rule), rule));
             const leaks = tokenLeakProbe();
             const content = contentSelfTest();
+            const receipts = receiptSelfTest();
             census();
-            console.log(`Claude policy regression tests: PASS (${blocked.length + allowed.length + 3 + requiredDenies.length + leaks + content} cases)`);
+            console.log(`Claude policy regression tests: PASS (${blocked.length + allowed.length + 3 + requiredDenies.length + leaks + content + receipts} cases)`);
           }
 
           // Behavioural check, not a string check. Builds a throwaway repo configured
@@ -1636,6 +1678,7 @@ jobs:
             if (mode === '--self-test') selfTest();
             else if (mode === '--settings') writeFileSync(first, JSON.stringify(settings()));
             else if (mode === '--diff') assertAllowed(changedEntries(first, second, '.'), loadExceptions());
+            else if (mode === '--unlock-receipt') process.stdout.write(unlockReceipt(readFileSync(first, 'utf8')));
             else throw new Error('Unknown Claude policy command');
           }
           module.exports = { lockedPath, contentLocked, changedPaths, changedEntries, entryLocks, assertAllowed };
@@ -1688,6 +1731,7 @@ jobs:
           [ "$#" -ge 3 ] || usage
           count=$#
           i=0
+          reason=
           for arg in "$@"; do
             i=$((i + 1))
             if [ "$i" -eq $((count - 1)) ]; then
@@ -1695,7 +1739,13 @@ jobs:
             else
               case "$arg" in ''|-*) usage ;; esac
             fi
+            reason=$arg
           done
+          # The scorer's own minimum (UNLOCK_MIN_REASON_LENGTH, 8) after trimming, so a
+          # reason it would refuse exits 2 here and nothing runs. Perl trims at least the
+          # whitespace JavaScript trims and counts code points, never more than JS, so
+          # this is never looser than the scorer.
+          perl -CSA -e '$_ = shift; s/^[\s\x{FEFF}]+|[\s\x{FEFF}]+\z//g; exit(length() >= 8 ? 0 : 2)' -- "$reason" || usage
           exec @NODE@ @LOCK@ --unlock "$@"
           SH
           node_bin=$(command -v node)
@@ -1813,7 +1863,8 @@ jobs:
             CI tests the draft. If the scorer lock blocks an edit to an existing test or
             check the slice must change, declare it with
             ${{ runner.temp }}/claude-bin/scorer-unlock <path>... --reason "<why the check changes>"
-            and record the reason in the PR body; never weaken a check to make it pass.
+            (a reason of at least 8 characters) and record the reason in the PR body. The
+            publish job also posts each declared reason. Never weaken a check to make it pass.
             Mark every unrun check NOT_MEASURED in the PR body.
             Consult docs/agents/claude-slices.md for routing.
             The PR body names Owner: Claude and reviewer by path: Blue Dream for any
@@ -1850,6 +1901,12 @@ jobs:
           mkdir -p "$out"
           git bundle create "$out/slice.bundle" "^$BASE" "refs/heads/$branch"
           printf '%s\n' "$branch" > "$out/branch"
+          # The scorer-unlock record (git-ignored, so not in the bundle) goes along as
+          # data, so the publish job can post each declared reason, on a nudge too.
+          unlocks=.claude/scorer-unlock.json
+          if [[ -f "$unlocks" && ! -L "$unlocks" ]]; then
+            head -c 262144 "$unlocks" > "$out/scorer-unlock.json"
+          fi
           echo "publish=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload the slice bundle
@@ -1899,14 +1956,26 @@ jobs:
           base=$(git rev-parse origin/verdant-grow-diary)
           node "$RUNNER_TEMP/claude-slice-policy.cjs" --diff "$base" "$head"
           # A normal push: a non-fast-forward update of an existing branch is rejected.
+          # Each scorer unlock the slice declared, rendered from the record as data.
+          receipt=
+          if [[ -f "$in/scorer-unlock.json" ]]; then
+            receipt=$(node "$RUNNER_TEMP/claude-slice-policy.cjs" --unlock-receipt "$in/scorer-unlock.json")
+          fi
           git -c core.hooksPath=/dev/null push origin "$head:refs/heads/$branch"
-          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state all --json number --jq 'length')
-          if [[ "$existing" != 0 ]]; then
+          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state all --json number --jq '.[0].number // empty')
+          if [[ -n "$existing" ]]; then
+            # A nudge: the body stays as it is, so the reasons go on the PR as a comment.
+            if [[ -n "$receipt" ]]; then
+              gh pr comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$receipt"
+            fi
             echo "A PR already exists for $branch; pushed the new commits only."
             exit 0
           fi
           title=$(git log -1 --format=%s "$head")
           body="$(git log -1 --format=%b "$head")"$'\n\n'"CI note: this draft was opened with the workflow token, so GitHub does not start CI for it automatically. A maintainer starts CI by pushing to the branch or by closing and reopening the draft."
+          if [[ -n "$receipt" ]]; then
+            body+=$'\n\n'"$receipt"
+          fi
           gh pr create --repo "$GITHUB_REPOSITORY" --draft --base verdant-grow-diary --head "$branch" --title "$title" --body "$body"
 
   claude-locked-paths:
@@ -2037,6 +2106,30 @@ jobs:
             assert.equal(r.status, 2, `scorer-unlock must refuse ${JSON.stringify(args)}`);
             assert.equal(r.stdout, '', `scorer-unlock must not run anything for ${JSON.stringify(args)}`);
           }
+          // A reason the scorer would refuse (Codex P2 at 49539f84) exits 2 here too,
+          // measured against the scorer's own minimum in the base checkout.
+          const min = Number(spawnSync(process.execPath, ['--input-type=module', '-e',
+            "import { UNLOCK_MIN_REASON_LENGTH as m } from './scripts/lib/scorerLockRules.mjs'; console.log(m);"],
+            { encoding: 'utf8' }).stdout);
+          assert.ok(Number.isInteger(min) && min > 1, 'UNLOCK_MIN_REASON_LENGTH must be readable');
+          const short = 'x'.repeat(min - 1);
+          for (const reason of ['why', short, `  ${short}\t`, `\u00a0${short}\u3000`, `\ufeff${short}\n`]) {
+            const r = run(['src/test/a.test.ts', '--reason', reason]);
+            assert.equal(r.status, 2, `scorer-unlock must refuse the reason ${JSON.stringify(reason)}`);
+            assert.equal(r.stdout, '', `scorer-unlock must not run anything for the reason ${JSON.stringify(reason)}`);
+          }
+          for (const reason of ['x'.repeat(min), ` ${'x'.repeat(min)} `, '\u00e9'.repeat(min)]) {
+            assert.equal(run(['src/test/a.test.ts', '--reason', reason]).status, 0, `scorer-unlock must accept ${JSON.stringify(reason)}`);
+          }
           fs.rmSync(dir, { recursive: true, force: true });
+          // A nudge keeps its reasons (Codex P2 at 49539f84): the record leaves the
+          // builder as data, and the publish job posts it before the existing-PR exit.
+          assert.ok(yml.includes('head -c 262144 "$unlocks" > "$out/scorer-unlock.json"'), 'the bundle step must carry the unlock record');
+          const publish = yml.slice(yml.indexOf('- name: Check the slice and push one draft'), yml.indexOf('claude-locked-paths:'));
+          const render = publish.indexOf('--unlock-receipt "$in/scorer-unlock.json"');
+          const comment = publish.indexOf('gh pr comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$receipt"');
+          const nudgeExit = publish.indexOf('pushed the new commits only.');
+          assert.ok(render > 0 && render < comment && comment < nudgeExit, 'a nudge must post the unlock reasons before it exits');
+          assert.ok(publish.includes('body+=$\'\\n\\n\'"$receipt"'), 'a new draft must carry the unlock reasons in its body');
           console.log('Claude credential guards: PASS');
           NODE

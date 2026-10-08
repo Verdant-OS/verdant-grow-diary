@@ -670,7 +670,7 @@ describe("errorReportingRules — only code-defined shapes leave; nothing else i
       scrubUrl(
         "https://x.supabase.co/storage/v1/object/public/plant-photos/3f2c9a1e-8b7d-4c6e-9f00-1a2b3c4d5e6f/My%20private%20plant.jpg",
       ),
-    ).toBe("https://x.supabase.co/storage/v1/object/public/plant-photos/:id/:redacted");
+    ).toBe("https://x.supabase.co/storage/v1/object/public/:redacted/:id/:redacted");
   });
 
   it("redacts nested-encoded segments instead of trusting one decoding pass", () => {
@@ -679,7 +679,7 @@ describe("errorReportingRules — only code-defined shapes leave; nothing else i
     );
   });
 
-  it("keeps code-defined asset and Supabase API paths readable", () => {
+  it("keeps fingerprinted assets, Supabase vocabulary and known function/auth names readable", () => {
     for (const [input, expected] of [
       [
         "https://verdantgrowdiary.com/assets/index-BvX3k9aQ.js",
@@ -687,11 +687,11 @@ describe("errorReportingRules — only code-defined shapes leave; nothing else i
       ],
       [
         "https://x.supabase.co/rest/v1/sensor_readings?select=*",
-        "https://x.supabase.co/rest/v1/sensor_readings",
+        "https://x.supabase.co/rest/v1/:redacted",
       ],
       [
         "https://x.supabase.co/rest/v1/rpc/quicklog_save_manual",
-        "https://x.supabase.co/rest/v1/rpc/quicklog_save_manual",
+        "https://x.supabase.co/rest/v1/rpc/:redacted",
       ],
       [
         "https://x.supabase.co/functions/v1/ai-doctor-review",
@@ -704,5 +704,64 @@ describe("errorReportingRules — only code-defined shapes leave; nothing else i
     ]) {
       expect(scrubUrl(input), input).toBe(expected);
     }
+  });
+});
+
+describe("errorReportingRules — URL segments are kept only from closed lists of code-owned names", () => {
+  it("does not trust an API shape on a foreign host, or an unfingerprinted asset name", () => {
+    expect(scrubUrl("https://evil.test/rest/v1/blue-dream")).toBe(
+      "https://evil.test/:redacted/:redacted/:redacted",
+    );
+    expect(scrubUrl("/assets/grower_private_note.svg")).toBe("/assets/:redacted");
+    expect(scrubUrl("https://evil.test/assets/index-BvX3k9aQ.js")).toBe(
+      "https://evil.test/:redacted/:redacted",
+    );
+  });
+
+  it("keeps Supabase vocabulary and known function/auth names, and redacts table, RPC and bucket names", () => {
+    for (const [input, expected] of [
+      ["https://x.supabase.co/rest/v1/blue-dream", "https://x.supabase.co/rest/v1/:redacted"],
+      [
+        "https://x.supabase.co/rest/v1/sensor_readings?select=*",
+        "https://x.supabase.co/rest/v1/:redacted",
+      ],
+      [
+        "https://x.supabase.co/rest/v1/rpc/quicklog_save_manual",
+        "https://x.supabase.co/rest/v1/rpc/:redacted",
+      ],
+      [
+        "https://x.supabase.co/functions/v1/blue-dream",
+        "https://x.supabase.co/functions/v1/:redacted",
+      ],
+      [
+        "https://x.supabase.co/functions/v1/ai-doctor-review",
+        "https://x.supabase.co/functions/v1/ai-doctor-review",
+      ],
+      [
+        "https://x.supabase.co/auth/v1/token?grant_type=refresh_token",
+        "https://x.supabase.co/auth/v1/token",
+      ],
+      ["https://x.supabase.co/auth/v1/blue-dream", "https://x.supabase.co/auth/v1/:redacted"],
+      [
+        "https://x.supabase.co/storage/v1/object/public/plant-photos/a.jpg",
+        "https://x.supabase.co/storage/v1/object/public/:redacted/:redacted",
+      ],
+      [
+        "https://verdantgrowdiary.com/assets/index-BvX3k9aQ.js",
+        "https://verdantgrowdiary.com/assets/index-BvX3k9aQ.js",
+      ],
+    ]) {
+      expect(scrubUrl(input), input).toBe(expected);
+    }
+  });
+
+  it("lists exactly the edge functions that exist in supabase/functions", async () => {
+    const { readdirSync } = await import("node:fs");
+    const { KNOWN_EDGE_FUNCTIONS } = await import("@/lib/errorReportingRules");
+    const onDisk = readdirSync("supabase/functions", { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"))
+      .map((entry) => entry.name)
+      .sort();
+    expect([...KNOWN_EDGE_FUNCTIONS].sort()).toEqual(onDisk);
   });
 });

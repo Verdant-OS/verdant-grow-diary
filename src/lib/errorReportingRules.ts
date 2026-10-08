@@ -496,11 +496,67 @@ function redactPatterns(text: string): string {
 /** A whole path segment shaped like a UUID (grow, tent, plant and other row ids), hyphens literal or `%2D`. */
 const UUID_SEGMENT_PATTERN = new RegExp(String.raw`^${UUID_BODY}$`, "i");
 
-/** A built asset file name (`index-BvX3k9aQ.js`): written by the bundler, never by a grower. */
-const ASSET_FILE_PATTERN =
-  /^[\w.-]{1,128}\.(?:m?js|css|map|wasm|woff2?|ttf|png|svg|jpe?g|webp|avif|gif|ico)$/;
-/** A lowercase code identifier: a table, RPC, edge-function or endpoint name. No `%`, so no encoding to undo. */
-const CODE_SEGMENT_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
+/** A Vite build asset, `<name>-<8-character content hash>.<ext>`: a grower-named file has no hash. */
+const FINGERPRINTED_ASSET_PATTERN =
+  /^[A-Za-z0-9_.-]{1,96}-[A-Za-z0-9_-]{8}\.(?:m?js|css|map|wasm|woff2?|ttf|png|svg|jpe?g|webp|avif|gif|ico)$/;
+const SUPABASE_HOST_PATTERN = /^[a-z0-9-]+\.supabase\.co$/;
+
+/** Every edge function under `supabase/functions` (a test keeps this equal to the directory). */
+export const KNOWN_EDGE_FUNCTIONS: ReadonlySet<string> = new Set([
+  "ai-coach",
+  "ai-cultivar-qa",
+  "ai-doctor-review",
+  "auth-email-hook",
+  "checkout-status",
+  "create-breeding-suggestions",
+  "delete-account",
+  "ecowitt-ingest",
+  "ecowitt-real-ingest",
+  "edge-metrics-alert-check",
+  "edge-metrics-latest",
+  "environment-summary-report-entitlement",
+  "founder-slots-remaining",
+  "get-paddle-price",
+  "handle-email-suppression",
+  "handle-email-unsubscribe",
+  "live-sensor-entitlement",
+  "mcp",
+  "mint-bridge-token",
+  "operator-credits-audit",
+  "operator-ggs-real-payload-commit",
+  "paddle-portal-session",
+  "paddle-webhook",
+  "payments-webhook",
+  "pi-ingest-readings",
+  "premium-export-entitlement",
+  "preview-transactional-email",
+  "process-email-queue",
+  "redeem-referral",
+  "revoke-bridge-token",
+  "rls-selftest",
+  "save-founder-prefs",
+  "send-transactional-email",
+  "sensor-ingest-webhook",
+]);
+/** Supabase Auth endpoint names the client calls. */
+const KNOWN_AUTH_ENDPOINTS: ReadonlySet<string> = new Set([
+  "authorize",
+  "callback",
+  "factors",
+  "health",
+  "logout",
+  "magiclink",
+  "otp",
+  "reauthenticate",
+  "recover",
+  "resend",
+  "settings",
+  "signup",
+  "sso",
+  "token",
+  "user",
+  "verify",
+]);
 const SUPABASE_SERVICES: ReadonlySet<string> = new Set([
   "rest",
   "auth",
@@ -515,46 +571,52 @@ const STORAGE_ACCESS_SEGMENTS: ReadonlySet<string> = new Set([
   "info",
 ]);
 
-/** A segment that matches a code shape but still carries a credential (`sk-live-…`) is not kept. */
-function isCodeSegment(segment: string): boolean {
-  return CODE_SEGMENT_PATTERN.test(segment) && redactPatterns(segment) === segment;
-}
-
 /**
- * How many leading segments of a path are code-defined, by shape: `/assets/<built file>`,
- * and Supabase `/<service>/v1/<name>` (`/rest/v1/rpc/<fn>`, and storage up to the bucket).
- * Everything after that count is data and is not kept.
+ * Which path segments are known to be written by code, by closed list and never by
+ * shape: a fingerprinted build asset on our own origin (or a relative path), and on a
+ * Supabase host the fixed service vocabulary plus known edge-function and auth-endpoint
+ * names. Table, RPC and bucket names are not listed, so they are not kept; nor is
+ * anything on another host.
  */
-function codeDefinedPrefixLength(parts: ReadonlyArray<string>): number {
-  if (parts[0] === "assets" && parts.length === 2 && ASSET_FILE_PATTERN.test(parts[1] ?? ""))
-    return 2;
-  if (!SUPABASE_SERVICES.has(parts[0] ?? "") || !/^v\d+$/.test(parts[1] ?? "")) return 0;
-  if (parts[0] === "storage") {
-    if (parts[2] !== "object") return 2;
-    const accessOffset = STORAGE_ACCESS_SEGMENTS.has(parts[3] ?? "") ? 4 : 3;
-    return isCodeSegment(parts[accessOffset] ?? "") ? accessOffset + 1 : accessOffset;
+function keptSegmentMask(parts: ReadonlyArray<string>, host: string | null): boolean[] {
+  const keep = parts.map(() => false);
+  const ownOrigin = host === null || PRODUCTION_HOSTNAMES.includes(host);
+  if (ownOrigin && parts.length === 2 && parts[0] === "assets") {
+    return [true, FINGERPRINTED_ASSET_PATTERN.test(parts[1] ?? "")];
   }
-  if (!isCodeSegment(parts[2] ?? "")) return 2;
-  if (parts[0] === "rest" && parts[2] === "rpc") return isCodeSegment(parts[3] ?? "") ? 4 : 3;
-  return 3;
+  if (host === null || !SUPABASE_HOST_PATTERN.test(host)) return keep;
+  const [service = "", version = "", name = "", access = ""] = parts;
+  if (!SUPABASE_SERVICES.has(service) || version !== "v1") return keep;
+  keep[0] = true;
+  keep[1] = true;
+  if (parts.length < 3) return keep;
+  if (service === "functions") keep[2] = KNOWN_EDGE_FUNCTIONS.has(name);
+  else if (service === "auth") keep[2] = KNOWN_AUTH_ENDPOINTS.has(name);
+  else if (service === "rest") keep[2] = name === "rpc";
+  else if (service === "realtime") keep[2] = name === "websocket";
+  else if (service === "storage" && name === "object") {
+    keep[2] = true;
+    if (parts.length > 3) keep[3] = STORAGE_ACCESS_SEGMENTS.has(access);
+  }
+  return keep;
 }
 
 /**
- * Keeps only code-defined path segments (see `codeDefinedPrefixLength`). Every other
- * segment is data — a grower label, a file name, a token, possibly percent-encoded any
- * number of times — so UUIDs become `:id` and the rest `:redacted`, without decoding.
+ * Keeps only code-owned path segments (see `keptSegmentMask`). Every other segment is
+ * data — a grower label, a file name, a token, possibly percent-encoded any number of
+ * times — so UUIDs become `:id` and the rest `:redacted`, without decoding.
  */
-function redactPathSegments(path: string): string {
+function redactPathSegments(path: string, host: string | null): string {
   const parts = path.split("/").slice(1);
-  const keep = codeDefinedPrefixLength(parts);
+  const keep = keptSegmentMask(parts, host);
   const kept = parts.map((segment, index) => {
-    if (index < keep || segment === "") return segment;
+    if (keep[index] || segment === "") return segment;
     return UUID_SEGMENT_PATTERN.test(segment) ? ":id" : ":redacted";
   });
   return path.startsWith("/") ? `/${kept.join("/")}` : kept.join("/");
 }
 
-/** Reduces an http(s) URL to origin + its code-defined path segments, the rest replaced (see `redactPathSegments`); any other scheme becomes `scheme:[redacted]`. Relative or unparsable input keeps only the part before `?`/`#`. */
+/** Reduces an http(s) URL to origin + its code-owned path segments, the rest replaced (see `redactPathSegments`); any other scheme becomes `scheme:[redacted]`. Relative or unparsable input keeps only the part before `?`/`#`. */
 export function scrubUrl(value: unknown): string {
   if (typeof value !== "string" || value.length === 0) return "";
   try {
@@ -562,9 +624,9 @@ export function scrubUrl(value: unknown): string {
     // Only http(s) has an origin + path worth keeping. data:, javascript:, blob:,
     // extension and other schemes can carry a payload in what follows the scheme.
     if (url.protocol !== "http:" && url.protocol !== "https:") return `${url.protocol}${REDACTED}`;
-    return `${url.origin}${redactPathSegments(url.pathname)}`;
+    return `${url.origin}${redactPathSegments(url.pathname, url.hostname)}`;
   } catch {
-    return redactPathSegments(value.split(/[?#]/, 1)[0] ?? "");
+    return redactPathSegments(value.split(/[?#]/, 1)[0] ?? "", null);
   }
 }
 

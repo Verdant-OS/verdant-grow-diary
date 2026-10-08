@@ -216,7 +216,7 @@ describe("errorReportingRules — scrubbing", () => {
     expect(out.exception?.values?.[0]?.value).toBe(REDACTED);
     expect(JSON.stringify(out)).not.toMatch(/a@b\.co|refresh_token=rt|x@y\.io/);
     expect(out.exception?.values?.[0]?.stacktrace?.frames?.[0]).toEqual({
-      filename: "https://verdantgrowdiary.com/assets/a.js",
+      filename: "https://verdantgrowdiary.com/assets/:redacted",
       abs_path: "/:redacted",
       lineno: 1,
     });

@@ -353,8 +353,9 @@ function restoreDelimiters(text: string): string {
 }
 
 /** HTML entities an HTML-safe diagnostic uses for quotes and separators (`&quot;`, `&#58;`, `&#x22;`). */
+/** An entity starts with `&`, or with the held stand-in a decoded `&amp;` became (`&amp;quot;`). */
 const HTML_ENTITY_PATTERN =
-  /&(?:#(\d{1,7})|#[xX]([0-9A-Fa-f]{1,6})|(quot|apos|amp|colon|comma|semi|equals|lt|gt));/g;
+  /[&\uE026](?:#(\d{1,7})|#[xX]([0-9A-Fa-f]{1,6})|(quot|apos|amp|colon|comma|semi|equals|lt|gt));/g;
 const NAMED_HTML_ENTITIES: Record<string, string> = {
   quot: '"',
   apos: "'",
@@ -367,7 +368,22 @@ const NAMED_HTML_ENTITIES: Record<string, string> = {
   gt: ">",
 };
 
+/**
+ * Decodes HTML entities until none remain, so nested escaping (`&amp;quot;`, `&#38;quot;`)
+ * is undone too. Text still holding entities after MAX_DECODE_PASSES layers is redacted
+ * whole rather than sent with a recoverable layer left.
+ */
 function decodeHtmlEntities(text: string): string {
+  let current = text;
+  for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
+    const next = decodeHtmlEntityLayer(current);
+    if (next === current) return current;
+    current = next;
+  }
+  return decodeHtmlEntityLayer(current) === current ? current : REDACTED;
+}
+
+function decodeHtmlEntityLayer(text: string): string {
   return text.replace(
     HTML_ENTITY_PATTERN,
     (entity, decimal?: string, hex?: string, name?: string) => {

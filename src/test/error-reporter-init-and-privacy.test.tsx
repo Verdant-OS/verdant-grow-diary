@@ -328,6 +328,15 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ["&#34;password&#34;&#58;&#34;hunter2&#34;", "hunter2"],
       ["{&#x22;refresh_token&#x22;:&#x22;rt_9x8y7z&#x22;}", "rt_9x8y7z"],
       ["access_token=abc&amp;defSECRET", "SECRET"],
+      [
+        "&amp;quot;access_token&amp;quot;&colon;&amp;quot;AbCdEf1234567890&amp;quot;",
+        "AbCdEf1234567890",
+      ],
+      ["&#38;quot;password&#38;quot;:&#38;quot;hunter2&#38;quot;", "hunter2"],
+      [
+        "&amp;amp;quot;token&amp;amp;quot;:&amp;amp;quot;AbCdEf1234567890&amp;amp;quot;",
+        "AbCdEf1234567890",
+      ],
       [`{'details':null,'hint':null,'message':'db','metadata':{"x":"}",'code':'12345'}}`, "12345"],
     ];
     for (const [input, secret] of cases) {

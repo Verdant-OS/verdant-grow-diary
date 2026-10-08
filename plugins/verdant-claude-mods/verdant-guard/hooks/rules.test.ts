@@ -564,3 +564,20 @@ describe("Codex re-review P1: clustered git pull rebase", () => {
     }
   });
 });
+
+describe("Codex re-review P1: empty or unexpanded Playwright filters", () => {
+  test("a filter that may be empty is not a spec filter", () => {
+    for (const cmd of [
+      'bunx playwright test --project=chromium-mocked ""',
+      "bunx playwright test --project=chromium-mocked ' '",
+      "bunx playwright test --project=chromium-mocked $SPEC",
+      'bunx playwright test --project=chromium-mocked "${SPEC}"',
+      "bunx playwright test --project=chromium-mocked `cat specs.txt`",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(
+      checkBash("bunx playwright test --project=chromium-mocked e2e/auth-loading.spec.ts"),
+    ).toBe(null);
+  });
+});

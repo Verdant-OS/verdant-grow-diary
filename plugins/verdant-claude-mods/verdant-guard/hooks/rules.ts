@@ -505,7 +505,9 @@ function checkPlaywright(tokens: string[]): string | null {
       }
       continue;
     }
-    specs += 1;
+    // An empty filter matches every test, and `$VAR` or a backtick substitution may expand to
+    // nothing, so only a non-empty literal word counts as a spec filter.
+    if (a.trim() !== "" && !/[$`]/.test(a)) specs += 1;
   }
   if (specs > 0) return null;
   if (projects.length === 0) {

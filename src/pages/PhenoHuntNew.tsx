@@ -290,6 +290,11 @@ export default function PhenoHuntNew() {
     [name, growId, tentId, notes, candidateIds, evidenceGoals, setupConfirmed, goalsReviewed],
   );
 
+  const goalSelection = useMemo(
+    () => describePhenoEvidenceGoalSelection(evidenceGoals),
+    [evidenceGoals],
+  );
+
   const canSave = vm.canCreate && !saving && !!user;
 
   const toggleCandidate = (id: string) => {

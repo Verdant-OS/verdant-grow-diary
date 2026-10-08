@@ -204,30 +204,41 @@ const POSTGREST_ERROR_FIELDS = ["details", "hint", "message"];
 /**
  * The text of the innermost object enclosing `offset` at its own depth: nested objects are
  * left out. Scans from the start of the text and treats `quote` (the code key's own quote,
- * not preceded by a backslash) as a string delimiter, so braces inside string values are
+ * judged by backslash parity, see isDelimitingQuote) as a string delimiter, so braces inside string values are
  * not structure. Null when no balanced object encloses `offset`.
  */
 function enclosingObjectTopLevel(text: string, offset: number, quote: string): string | null {
+  const quoteChar = quote[quote.length - 1];
+  const level = quote.length - 1;
   const open: Array<{ start: number; topLevel: string }> = [];
   let inString = false;
   for (let i = 0; i < text.length; i += 1) {
-    if (text.startsWith(quote, i) && text[i - 1] !== "\\") {
-      inString = !inString;
-      if (open.length > 0) open[open.length - 1].topLevel += quote;
-      i += quote.length - 1;
-      continue;
-    }
     const char = text[i];
-    if (!inString && char === "{") {
+    if (char === quoteChar && isDelimitingQuote(text, i, level)) {
+      inString = !inString;
+    } else if (!inString && char === "{") {
       open.push({ start: i, topLevel: "" });
+      continue;
     } else if (!inString && char === "}") {
       const object = open.pop();
       if (object && object.start < offset && i > offset) return object.topLevel;
-    } else if (open.length > 0) {
-      open[open.length - 1].topLevel += char;
+      continue;
     }
+    if (open.length > 0) open[open.length - 1].topLevel += char;
   }
   return null;
+}
+
+/**
+ * Whether the quote at `index` delimits a string serialised `level` times over (0 for
+ * plain JSON, 1 for `\"…\"`, 3, 7, …), judged by the parity of the backslash run before
+ * it: plain JSON closes on an even run (`"…\\"` ends after an escaped backslash), level 1
+ * on 1, 5, 9 … backslashes, and so on. A quote escaped inside the string fails the test.
+ */
+function isDelimitingQuote(text: string, index: number, level: number): boolean {
+  let run = 0;
+  while (index - run - 1 >= 0 && text[index - run - 1] === "\\") run += 1;
+  return run % (2 * (level + 1)) === level;
 }
 
 /**
@@ -303,38 +314,64 @@ const PERCENT_RUN_PATTERN = /(?:%[0-9A-Fa-f]{2})+/g;
 const ASCII_ESCAPE_PATTERN = /%[0-7][0-9A-Fa-f]/g;
 
 /**
- * Decodes `%XX` escapes so encoded credentials (`Bearer%20…`, `%22password%22%3A…`,
- * `%2540`) meet the same patterns as plain text. In a run that is not valid UTF-8 only
- * the ASCII escapes are decoded; stops once a pass changes nothing.
+ * Characters that end a bare credential value. When decoding produces one, it is held as
+ * a private-use stand-in until redaction is done, so an encoded `%26` / `%3B` / `%2C`
+ * inside a credential cannot end its value early (`access_token%3Aabc%26def…`).
  */
-function decodePercentEscapes(text: string): string {
-  let current = text;
-  for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
-    const next = current.replace(PERCENT_RUN_PATTERN, (run) => {
-      try {
-        return decodeURIComponent(run);
-      } catch {
-        // Malformed UTF-8 in the run: still decode its ASCII escapes (`%3A`, `%20`)
-        // so one bad sequence cannot hide the separator next to a credential.
-        return run.replace(ASCII_ESCAPE_PATTERN, (escape) =>
-          String.fromCharCode(parseInt(escape.slice(1), 16)),
-        );
-      }
-    });
-    if (next === current) break;
-    current = next;
-  }
-  return current;
+const VALUE_DELIMITERS = "&;,}][\n";
+const DELIMITER_STAND_IN_BASE = 0xe000;
+const DELIMITER_STAND_IN_PATTERN = new RegExp(
+  `[${[...VALUE_DELIMITERS]
+    .map((char) => `\\u${(DELIMITER_STAND_IN_BASE + char.charCodeAt(0)).toString(16)}`)
+    .join("")}]`,
+  "g",
+);
+
+function holdDelimiters(decoded: string): string {
+  return decoded.replace(/[&;,}\][\n]/g, (char) =>
+    String.fromCharCode(DELIMITER_STAND_IN_BASE + char.charCodeAt(0)),
+  );
+}
+
+function restoreDelimiters(text: string): string {
+  return text.replace(DELIMITER_STAND_IN_PATTERN, (char) =>
+    String.fromCharCode(char.charCodeAt(0) - DELIMITER_STAND_IN_BASE),
+  );
+}
+
+/**
+ * Decodes one layer of `%XX` escapes so encoded credentials (`Bearer%20…`,
+ * `%22password%22%3A…`, `%2540`) meet the same patterns as plain text. Decoded value
+ * delimiters are held (see VALUE_DELIMITERS). In a run that is not valid UTF-8 only the
+ * ASCII escapes are decoded.
+ */
+function decodeOneLayer(text: string): string {
+  return text.replace(PERCENT_RUN_PATTERN, (run) => {
+    try {
+      return holdDelimiters(decodeURIComponent(run));
+    } catch {
+      // Malformed UTF-8 in the run: still decode its ASCII escapes (`%3A`, `%20`)
+      // so one bad sequence cannot hide the separator next to a credential.
+      return run.replace(ASCII_ESCAPE_PATTERN, (escape) =>
+        holdDelimiters(String.fromCharCode(parseInt(escape.slice(1), 16))),
+      );
+    }
+  });
 }
 
 /** Removes e-mail addresses, UUID row ids, bridge/JWT/bearer tokens and credential-looking query values from free text. Idempotent. */
 export function scrubText(value: unknown): string {
   if (value == null) return "";
-  // Redact once before decoding, while an encoded `%26` / `%3B` / `%2C` / `%22` inside a
-  // credential cannot yet end its value, then again after, for credentials that only
-  // decoding reveals (`%22password%22%3A…`).
-  const raw = typeof value === "string" ? value : safeString(value);
-  return redactPatterns(decodePercentEscapes(redactPatterns(raw)));
+  // Redact before decoding, while an encoded `%22` inside a credential cannot yet end its
+  // value, then again after each decoded layer, for credentials that only decoding
+  // reveals (`%22password%22%3A…`). Decoded delimiters stay held until the end.
+  let text = redactPatterns(typeof value === "string" ? value : safeString(value));
+  for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
+    const next = decodeOneLayer(text);
+    if (next === text) break;
+    text = redactPatterns(next);
+  }
+  return restoreDelimiters(text);
 }
 
 function redactPatterns(text: string): string {

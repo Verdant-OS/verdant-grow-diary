@@ -100,7 +100,8 @@ export function initErrorReporter(
         maxBreadcrumbs: 20,
         // No release-health sessions: they carry a session id and bypass beforeSend.
         integrations: (defaults) => withoutExcludedIntegrations(defaults),
-        beforeSend: (event) => scrubEvent(event),
+        beforeSend: (event, hint) =>
+          scrubEvent(event, { eventId: hint?.event_id, release: decision.release }),
         beforeBreadcrumb: (crumb) => scrubBreadcrumb(crumb),
       });
       state = { status: "ready", sentry };

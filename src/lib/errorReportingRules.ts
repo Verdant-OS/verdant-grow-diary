@@ -17,8 +17,8 @@
  *   every other segment becomes `:id` (UUID) or `:redacted`.
  *   Query strings and fragments are always dropped: auth flows carry tokens there.
  * - Messages, exception values and breadcrumb messages leave only as an allowlisted
- *   summary (`summarizeErrorText`). Other strings (tags, extra, breadcrumb data) are
- *   scrubbed for token-like values, e-mail addresses and UUID row ids.
+ *   summary (`summarizeErrorText`). Other metadata uses closed keys and bounded values.
+ *   Stack frames retain scrubbed URLs and numeric positions, never function/source text.
  * - No session replay, no performance tracing, no console capture.
  */
 
@@ -496,13 +496,6 @@ function redactPatterns(text: string): string {
 /** A whole path segment shaped like a UUID (grow, tent, plant and other row ids), hyphens literal or `%2D`. */
 const UUID_SEGMENT_PATTERN = new RegExp(String.raw`^${UUID_BODY}$`, "i");
 
-/**
- * A built script, `<name>-<8-character content hash>.js`. Its name is kept only in a stack
- * frame: a frame names a script the browser executed from our origin, which only the
- * build's own output can be. Anywhere else an asset name is redacted.
- */
-const BUILT_SCRIPT_PATTERN = /^[A-Za-z0-9_.-]{1,96}-[A-Za-z0-9_-]{8}\.m?js$/;
-
 function hostOf(value: unknown): string | null {
   if (typeof value !== "string" || value === "") return null;
   try {
@@ -523,12 +516,11 @@ function isTrustedHost(host: string): boolean {
 
 /** An http(s) origin, or the same scheme with `[redacted-host]` when the host is not trusted. */
 function scrubOrigin(url: URL): string {
-  return isTrustedHost(url.hostname) ? url.origin : `${url.protocol}//${REDACTED_HOST}`;
+  return isTrustedOrigin(url) ? url.origin : `${url.protocol}//${REDACTED_HOST}`;
 }
 
-export interface ScrubUrlOptions {
-  /** The URL is a stack frame's script: a built script name on our origin may be kept. */
-  readonly scriptFrame?: boolean;
+function isTrustedOrigin(url: URL): boolean {
+  return url.protocol === "https:" && url.port === "" && isTrustedHost(url.hostname);
 }
 
 /** Every edge function under `supabase/functions` (a test keeps this equal to the directory). */
@@ -603,20 +595,17 @@ const STORAGE_ACCESS_SEGMENTS: ReadonlySet<string> = new Set([
 
 /**
  * Which path segments are known to be written by code, by closed list and never by
- * shape: a fingerprinted build asset on our own origin (or a relative path), and on a
+ * shape: the assets directory on our own origin (or a relative path), and on a
  * Supabase host the fixed service vocabulary plus known edge-function and auth-endpoint
  * names. Table, RPC and bucket names are not listed, so they are not kept; nor is
  * anything on another host.
  */
-function keptSegmentMask(
-  parts: ReadonlyArray<string>,
-  host: string | null,
-  scriptFrame: boolean,
-): boolean[] {
+function keptSegmentMask(parts: ReadonlyArray<string>, host: string | null): boolean[] {
   const keep = parts.map(() => false);
   const ownOrigin = host === null || PRODUCTION_HOSTNAMES.includes(host);
   if (ownOrigin && parts.length === 2 && parts[0] === "assets") {
-    return [true, scriptFrame && BUILT_SCRIPT_PATTERN.test(parts[1] ?? "")];
+    // Neither a filename shape nor a caller-supplied Error.stack proves build membership.
+    return [true, false];
   }
   if (host === null || host !== CONFIGURED_SUPABASE_HOST) return keep;
   const [service = "", version = "", name = "", access = ""] = parts;
@@ -640,9 +629,9 @@ function keptSegmentMask(
  * data — a grower label, a file name, a token, possibly percent-encoded any number of
  * times — so UUIDs become `:id` and the rest `:redacted`, without decoding.
  */
-function redactPathSegments(path: string, host: string | null, scriptFrame: boolean): string {
+function redactPathSegments(path: string, host: string | null): string {
   const parts = path.split("/").slice(1);
-  const keep = keptSegmentMask(parts, host, scriptFrame);
+  const keep = keptSegmentMask(parts, host);
   const kept = parts.map((segment, index) => {
     if (keep[index] || segment === "") return segment;
     return UUID_SEGMENT_PATTERN.test(segment) ? ":id" : ":redacted";
@@ -651,20 +640,32 @@ function redactPathSegments(path: string, host: string | null, scriptFrame: bool
 }
 
 /** Reduces an http(s) URL to origin + its code-owned path segments, the rest replaced (see `redactPathSegments`); any other scheme becomes `scheme:[redacted]`. Relative or unparsable input keeps only the part before `?`/`#`. */
-export function scrubUrl(value: unknown, options: ScrubUrlOptions = {}): string {
+export function scrubUrl(value: unknown): string {
   if (typeof value !== "string" || value.length === 0) return "";
-  const scriptFrame = options.scriptFrame === true;
+  if (value === REDACTED) return REDACTED;
+  if (/^https?:\/\/\[redacted-host\](?:\/(?::redacted|:id)?)*$/.test(value)) return value;
   try {
     const url = new URL(value);
     // Only http(s) has an origin + path worth keeping. data:, javascript:, blob:,
     // extension and other schemes can carry a payload in what follows the scheme.
-    if (url.protocol !== "http:" && url.protocol !== "https:") return `${url.protocol}${REDACTED}`;
-    const host = isTrustedHost(url.hostname) ? url.hostname : null;
-    const path =
-      host === null ? redactAll(url.pathname) : redactPathSegments(url.pathname, host, scriptFrame);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return [
+        "data:",
+        "javascript:",
+        "blob:",
+        "chrome-extension:",
+        "moz-extension:",
+        "file:",
+        "about:",
+      ].includes(url.protocol)
+        ? `${url.protocol}${REDACTED}`
+        : REDACTED;
+    }
+    const host = isTrustedOrigin(url) ? url.hostname : null;
+    const path = host === null ? redactAll(url.pathname) : redactPathSegments(url.pathname, host);
     return `${scrubOrigin(url)}${path}`;
   } catch {
-    return redactPathSegments(value.split(/[?#]/, 1)[0] ?? "", null, scriptFrame);
+    return redactPathSegments(value.split(/[?#]/, 1)[0] ?? "", null);
   }
 }
 
@@ -784,7 +785,18 @@ const SQLSTATE_PATTERN = new RegExp(
 const HTTP_STATUS_PATTERN = /\b(?:status(?:[\s_-]?code)?|HTTP)\b["'\s:=]*([1-5]\d{2})\b/i;
 /** The message `normalizeCaughtError` builds for a thrown `Response`. */
 const CAUGHT_RESPONSE_PATTERN = /^Response ([1-5]\d{2})(?: at |$)/;
-const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]{0,63}$/;
+const KNOWN_EXCEPTION_TYPES: ReadonlySet<string> = new Set([
+  "Error",
+  "TypeError",
+  "RangeError",
+  "ReferenceError",
+  "SyntaxError",
+  "URIError",
+  "EvalError",
+  "AggregateError",
+  "InternalError",
+  "DOMException",
+]);
 
 /**
  * Reduces a free-text message to `scope code=… status=…`, or `[redacted]` when code wrote
@@ -796,6 +808,18 @@ const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]{0,63}$/;
  */
 export function summarizeErrorText(value: unknown): string {
   if (typeof value !== "string" || value === "") return "";
+  // beforeBreadcrumb and beforeSend both run, and a retry may re-use an event.
+  // Accept only the exact bounded summary grammar, never arbitrary trailing text.
+  const summary = /^(\S+)(?: code=(PGRST\d{3}|[0-9A-Z]{5}))?(?: status=([1-5]\d{2}))?$/.exec(value);
+  if (
+    summary &&
+    KNOWN_ERROR_SCOPES.has(summary[1]) &&
+    (!summary[2] ||
+      POSTGREST_CODE_PATTERN.test(summary[2]) ||
+      SQLSTATE_PATTERN.test(`SQLSTATE ${summary[2]}`))
+  )
+    return value;
+  if (/^status=[1-5]\d{2}$/.test(value)) return value;
   const parts: string[] = [];
   const scope = SCOPE_PREFIX_PATTERN.exec(value)?.[1];
   if (scope && KNOWN_ERROR_SCOPES.has(scope)) {
@@ -812,9 +836,9 @@ export function summarizeErrorText(value: unknown): string {
   return parts.length > 0 ? parts.join(" ") : REDACTED;
 }
 
-/** Exception types are class names; anything else is free text and becomes `Error`. */
+/** Only standard exception names are diagnostic metadata; identifier shape is not provenance. */
 function safeExceptionType(type: string): string {
-  return IDENTIFIER_PATTERN.test(type) ? type : "Error";
+  return KNOWN_EXCEPTION_TYPES.has(type) ? type : "Error";
 }
 
 function safeString(value: unknown): string {
@@ -839,9 +863,16 @@ export interface ReportableRequest {
 export interface ReportableException {
   type?: string;
   value?: string;
-  mechanism?: { data?: unknown };
+  mechanism?: { type?: string; handled?: boolean; data?: unknown };
   stacktrace?: {
-    frames?: Array<{ filename?: string; abs_path?: string; vars?: unknown }>;
+    frames?: Array<{
+      filename?: string;
+      abs_path?: string;
+      vars?: unknown;
+      lineno?: number;
+      colno?: number;
+      in_app?: boolean;
+    }>;
   };
 }
 
@@ -852,6 +883,12 @@ export interface ReportableBreadcrumb {
 }
 
 export interface ReportableEvent {
+  event_id?: string;
+  timestamp?: number;
+  level?: string;
+  platform?: string;
+  environment?: string;
+  release?: string;
   message?: string;
   logentry?: { message?: string; formatted?: string; params?: unknown };
   transaction?: string;
@@ -894,66 +931,172 @@ export const ALLOWED_EVENT_CONTEXTS: ReadonlyArray<string> = ["browser", "os", "
  * Scrubs an outgoing event in place-safe fashion (returns a new object). Returns
  * null for null/undefined so it can be used directly as Sentry's `beforeSend`.
  */
-export function scrubEvent<T extends ReportableEvent | null | undefined>(event: T): T {
+export function scrubEvent<T extends ReportableEvent | null | undefined>(
+  event: T,
+  metadata: { readonly eventId?: string; readonly release?: string } = {},
+): T {
   if (!event) return event;
-  const next: ReportableEvent = { ...event };
-  delete next.user;
-  delete next.server_name;
-  if (typeof next.message === "string") next.message = summarizeErrorText(next.message);
-  if (next.logentry) {
+  // Never spread an SDK event or a nested payload: unknown properties may contain rows.
+  const next: ReportableEvent = {};
+  if (typeof metadata.eventId === "string" && /^[0-9a-f]{32}$/.test(metadata.eventId))
+    next.event_id = metadata.eventId;
+  if (metadata.release) next.release = metadata.release;
+  if (event.environment === "production") next.environment = "production";
+  if (event.platform === "javascript") next.platform = "javascript";
+  if (
+    typeof event.timestamp === "number" &&
+    Number.isFinite(event.timestamp) &&
+    event.timestamp >= 0 &&
+    event.timestamp < 100_000_000_000
+  )
+    next.timestamp = event.timestamp;
+  if (typeof event.level === "string" && KNOWN_LEVELS.has(event.level)) next.level = event.level;
+  if (typeof event.message === "string") next.message = summarizeErrorText(event.message);
+  if (event.logentry) {
     const logentry: NonNullable<ReportableEvent["logentry"]> = {};
-    if (typeof next.logentry.message === "string")
-      logentry.message = summarizeErrorText(next.logentry.message);
-    if (typeof next.logentry.formatted === "string")
-      logentry.formatted = summarizeErrorText(next.logentry.formatted);
+    if (typeof event.logentry.message === "string")
+      logentry.message = summarizeErrorText(event.logentry.message);
+    if (typeof event.logentry.formatted === "string")
+      logentry.formatted = summarizeErrorText(event.logentry.formatted);
     next.logentry = logentry;
   }
-  if (typeof next.transaction === "string") next.transaction = scrubRouteUrl(next.transaction);
-  if (next.contexts) {
+  if (typeof event.transaction === "string") next.transaction = scrubRouteUrl(event.transaction);
+  if (event.contexts) {
     const contexts: Record<string, unknown> = {};
     for (const name of ALLOWED_EVENT_CONTEXTS) {
-      if (next.contexts[name] !== undefined) contexts[name] = next.contexts[name];
+      const context = event.contexts[name];
+      if (
+        isRecord(context) &&
+        typeof context.name === "string" &&
+        KNOWN_CONTEXT_NAMES[name]?.has(context.name)
+      )
+        contexts[name] = { name: context.name };
     }
     next.contexts = contexts;
   }
-  if (next.request) {
+  if (event.request) {
     const request: ReportableRequest = {};
-    if (typeof next.request.url === "string") request.url = scrubRouteUrl(next.request.url);
+    if (typeof event.request.url === "string") request.url = scrubRouteUrl(event.request.url);
     next.request = request;
   }
-  if (next.exception?.values) {
+  if (Array.isArray(event.exception?.values)) {
     next.exception = {
-      ...next.exception,
-      values: next.exception.values.map((ex) => ({
-        ...ex,
-        ...(typeof ex.type === "string" && { type: safeExceptionType(ex.type) }),
-        ...(typeof ex.value === "string" && { value: summarizeErrorText(ex.value) }),
-        ...(ex.mechanism && { mechanism: withoutKey(ex.mechanism, "data") }),
-        ...(ex.stacktrace?.frames && {
-          stacktrace: {
-            ...ex.stacktrace,
-            frames: ex.stacktrace.frames.map((frame) => ({
-              ...withoutKey(frame, "vars"),
-              ...(typeof frame.filename === "string" && {
-                filename: scrubUrl(frame.filename, { scriptFrame: true }),
+      values: event.exception.values
+        .filter((ex): boolean => isRecord(ex))
+        .slice(0, 10)
+        .map((ex) => ({
+          ...(typeof ex.type === "string" && { type: safeExceptionType(ex.type) }),
+          ...(typeof ex.value === "string" && { value: summarizeErrorText(ex.value) }),
+          ...(ex.mechanism && {
+            mechanism: {
+              type: "generic",
+              ...(typeof ex.mechanism.handled === "boolean" && {
+                handled: ex.mechanism.handled,
               }),
-              ...(typeof frame.abs_path === "string" && {
-                abs_path: scrubUrl(frame.abs_path, { scriptFrame: true }),
-              }),
-            })),
-          },
-        }),
-      })),
+            },
+          }),
+          ...(Array.isArray(ex.stacktrace?.frames) && {
+            stacktrace: {
+              frames: ex.stacktrace.frames.slice(0, 100).map(scrubFrame),
+            },
+          }),
+        })),
     };
   }
-  if (Array.isArray(next.breadcrumbs)) {
-    next.breadcrumbs = next.breadcrumbs
+  if (Array.isArray(event.breadcrumbs)) {
+    next.breadcrumbs = event.breadcrumbs
+      .slice(-20)
       .map((crumb) => scrubBreadcrumb(crumb))
       .filter((crumb): crumb is ReportableBreadcrumb => crumb !== null);
   }
-  if (next.extra) next.extra = scrubRecord(next.extra);
-  if (next.tags) next.tags = scrubRecord(next.tags);
+  if (event.extra) {
+    next.extra = {};
+    if (typeof event.extra.route === "string") next.extra.route = scrubRouteUrl(event.extra.route);
+  }
+  if (event.tags) {
+    next.tags = {};
+    if (typeof event.tags.source === "string" && KNOWN_REPORT_SOURCES.has(event.tags.source))
+      next.tags.source = event.tags.source;
+    if (event.tags.handled === "true" || event.tags.handled === "false")
+      next.tags.handled = event.tags.handled;
+  }
   return next as T;
+}
+
+const KNOWN_LEVELS: ReadonlySet<string> = new Set([
+  "fatal",
+  "error",
+  "warning",
+  "log",
+  "info",
+  "debug",
+]);
+const KNOWN_REPORT_SOURCES: ReadonlySet<string> = new Set([
+  "manual",
+  "react_error_boundary",
+  "route_error_component",
+]);
+const KNOWN_CONTEXT_NAMES: Readonly<Record<string, ReadonlySet<string>>> = {
+  browser: new Set([
+    "Chrome",
+    "Chrome Mobile",
+    "Chromium",
+    "Firefox",
+    "Firefox Mobile",
+    "Safari",
+    "Mobile Safari",
+    "Edge",
+    "Opera",
+    "Samsung Internet",
+  ]),
+  os: new Set(["Windows", "macOS", "Mac OS X", "Linux", "Android", "iOS", "Chrome OS"]),
+  runtime: new Set(["browser", "Browser", "JavaScript"]),
+};
+const KNOWN_BREADCRUMB_CATEGORIES: ReadonlySet<string> = new Set([
+  "fetch",
+  "xhr",
+  "navigation",
+  "sentry.event",
+  "sentry.transaction",
+  "error",
+]);
+const KNOWN_HTTP_METHODS: ReadonlySet<string> = new Set([
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "HEAD",
+  "OPTIONS",
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Only finite, nonnegative positions survive; source and symbol text is never forwarded. */
+type ReportableFrame = NonNullable<
+  NonNullable<ReportableException["stacktrace"]>["frames"]
+>[number];
+
+function scrubFrame(frame: unknown): ReportableFrame {
+  if (!isRecord(frame)) return {};
+  const out: ReportableFrame = {};
+  for (const key of ["filename", "abs_path"] as const) {
+    if (typeof frame[key] === "string") out[key] = scrubUrl(frame[key]);
+  }
+  for (const key of ["lineno", "colno"] as const) {
+    const value = frame[key];
+    if (
+      typeof value === "number" &&
+      Number.isInteger(value) &&
+      value >= 0 &&
+      value <= 2_147_483_647
+    )
+      out[key] = value;
+  }
+  if (typeof frame.in_app === "boolean") out.in_app = frame.in_app;
+  return out;
 }
 
 /** Returns null to drop the breadcrumb; otherwise a scrubbed copy. Usable as `beforeBreadcrumb`. */
@@ -961,20 +1104,26 @@ export function scrubBreadcrumb<T extends ReportableBreadcrumb | null | undefine
   crumb: T,
 ): T | null {
   if (!crumb) return null;
-  if (crumb.category && DROPPED_BREADCRUMB_CATEGORIES.includes(crumb.category)) return null;
-  const next: ReportableBreadcrumb = { ...crumb };
-  if (typeof next.message === "string") next.message = summarizeErrorText(next.message);
-  if (next.data) {
+  if (!crumb.category || !KNOWN_BREADCRUMB_CATEGORIES.has(crumb.category)) return null;
+  const next: ReportableBreadcrumb = { category: crumb.category };
+  if (typeof crumb.message === "string") next.message = summarizeErrorText(crumb.message);
+  if (crumb.data) {
     const data: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(next.data)) {
+    for (const [key, value] of Object.entries(crumb.data)) {
       if (key === "from" || key === "to") {
         // Navigation breadcrumbs: in-app page paths.
         data[key] = scrubRouteUrl(value);
       } else if (key === "url") {
         data[key] = scrubUrl(value);
-      } else if (typeof value === "string") {
-        data[key] = scrubText(value);
-      } else if (typeof value === "number" || typeof value === "boolean") {
+      } else if (key === "method" && typeof value === "string" && KNOWN_HTTP_METHODS.has(value)) {
+        data[key] = value;
+      } else if (
+        key === "status_code" &&
+        typeof value === "number" &&
+        Number.isInteger(value) &&
+        value >= 100 &&
+        value <= 599
+      ) {
         data[key] = value;
       }
       // Objects (request/response bodies, headers) are dropped.
@@ -982,23 +1131,6 @@ export function scrubBreadcrumb<T extends ReportableBreadcrumb | null | undefine
     next.data = data;
   }
   return next as T;
-}
-
-/** Keeps strings (scrubbed), finite numbers and booleans. Objects and arrays are dropped: they can carry rows, bodies or session state. */
-function scrubRecord(record: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(record)) {
-    if (typeof value === "string") out[key] = scrubText(value);
-    else if (typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value)))
-      out[key] = value;
-  }
-  return out;
-}
-
-function withoutKey<T extends object>(value: T, key: string): T {
-  const copy = { ...value } as Record<string, unknown>;
-  delete copy[key];
-  return copy as T;
 }
 
 // ── Manual capture context ───────────────────────────────────────────────────

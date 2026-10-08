@@ -492,13 +492,13 @@ describe("errorReportingRules — privacy of outgoing events", () => {
     expect(out?.contexts).toEqual({ browser: { name: "Chrome" }, os: { name: "macOS" } });
   });
 
-  it("scrubs tags and extra, and drops structured values from both", () => {
+  it("keeps only bounded manual tags and the route template", () => {
     const out = scrubEvent({
       tags: { source: "manual", who: "grower@example.com", nested: { id: "u1" } as never },
       extra: { route: "/x", row: { plant: "Blue Dream #3", owner: "u1" }, count: 2 },
     });
-    expect(out?.tags).toEqual({ source: "manual", who: REDACTED });
-    expect(out?.extra).toEqual({ route: "/x", count: 2 });
+    expect(out?.tags).toEqual({ source: "manual" });
+    expect(out?.extra).toEqual({ route: "/:unmatched" });
   });
 
   it("scrubs logentry, transaction, exception type, mechanism data and frame vars", () => {
@@ -771,7 +771,7 @@ describe("errorReportingRules — URL segments are kept only from closed lists o
   });
 });
 
-describe("errorReportingRules — only closed-list hosts, and only executed scripts keep asset names", () => {
+describe("errorReportingRules — closed-list origins and no unverified asset names", () => {
   const SUPABASE_ORIGIN = new URL(import.meta.env.VITE_SUPABASE_URL as string).origin;
 
   it("redacts every host that is not a production or the configured Supabase host", () => {
@@ -789,7 +789,7 @@ describe("errorReportingRules — only closed-list hosts, and only executed scri
     ).toEqual({ url: "https://[redacted-host]/:redacted" });
   });
 
-  it("redacts asset file names outside stack frames, and non-script names inside them", () => {
+  it("redacts asset file names both in breadcrumbs and in stack frames", () => {
     expect(scrubUrl("/assets/Blue-Dream-12345678.svg")).toBe("/assets/:redacted");
     expect(
       scrubBreadcrumb({
@@ -812,7 +812,7 @@ describe("errorReportingRules — only closed-list hosts, and only executed scri
       },
     })?.exception?.values?.[0]?.stacktrace?.frames;
     expect(frames?.map((frame) => frame.filename)).toEqual([
-      "https://verdantgrowdiary.com/assets/index-BvX3k9aQ.js",
+      "https://verdantgrowdiary.com/assets/:redacted",
       "https://verdantgrowdiary.com/assets/:redacted",
     ]);
   });

@@ -21,6 +21,178 @@ const TEST_DSN = "https://0123456789abcdef0123456789abcdef@o000000.ingest.us.sen
 
 const SUPABASE_URL_ORIGIN = new URL(import.meta.env.VITE_SUPABASE_URL as string).origin;
 
+describe("telemetry retains only bounded diagnostic metadata", () => {
+  it("omits stack function, module and source context while retaining safe positions", () => {
+    const frame = {
+      filename: "/assets/Blue-Dream-12345678.js",
+      abs_path: "https://verdantgrowdiary.com/assets/private-note-ABCDEFGH.js",
+      function: "Blue Dream",
+      module: "grower@example.com",
+      context_line: "private diary note",
+      pre_context: ["access_token=secret"],
+      post_context: ["private plant"],
+      vars: { plant: "Blue Dream" },
+      lineno: 12,
+      colno: 34,
+      in_app: true,
+    };
+    const out = scrubEvent({ exception: { values: [{ stacktrace: { frames: [frame] } }] } });
+    expect(out.exception.values[0].stacktrace.frames[0]).toEqual({
+      filename: "/assets/:redacted",
+      abs_path: "https://verdantgrowdiary.com/assets/:redacted",
+      lineno: 12,
+      colno: 34,
+      in_app: true,
+    });
+    expect(frame.function).toBe("Blue Dream");
+  });
+
+  it("drops invalid frame positions and arbitrary exception and mechanism fields", () => {
+    const out = scrubEvent({
+      exception: {
+        note: "private",
+        values: [
+          {
+            type: "BlueDream",
+            value: "private",
+            module: "Blue Dream",
+            mechanism: {
+              type: "Blue Dream",
+              handled: false,
+              help_link: "https://private.test",
+              data: { note: "private" },
+            },
+            stacktrace: {
+              registers: { note: "private" },
+              frames: [{ lineno: -1, colno: Infinity, in_app: "private", function: "private" }],
+            },
+          },
+        ],
+      },
+    } as never) as unknown;
+    expect(out).toEqual({
+      exception: {
+        values: [
+          {
+            type: "Error",
+            value: REDACTED,
+            mechanism: { type: "generic", handled: false },
+            stacktrace: { frames: [{}] },
+          },
+        ],
+      },
+    });
+  });
+
+  it("keeps only source, handled and a manifest route in manual metadata", () => {
+    const out = scrubEvent({
+      tags: { source: "manual", handled: "false", BlueDream: true, note: "private" },
+      extra: { route: "/plants/Blue%20Dream?secret=1", count: 2, note: "private diary note" },
+    });
+    expect(out.tags).toEqual({ source: "manual", handled: "false" });
+    expect(out.extra).toEqual({ route: "/plants/:id" });
+    expect(scrubEvent({ tags: { source: "BlueDream", handled: "private" } }).tags).toEqual({});
+  });
+
+  it("bounds breadcrumb category, method, status and data keys", () => {
+    expect(scrubBreadcrumb({ category: "private plant", message: "private" })).toBeNull();
+    const out = scrubBreadcrumb({
+      category: "fetch",
+      data: {
+        url: "/assets/Blue-Dream-12345678.js",
+        method: "GET",
+        status_code: 503,
+        note: "private diary note",
+        BlueDream: true,
+        response: { text: "private" },
+      },
+    });
+    expect(out?.data).toEqual({ url: "/assets/:redacted", method: "GET", status_code: 503 });
+    expect(
+      scrubBreadcrumb({ category: "xhr", data: { method: "BlueDream", status_code: 999 } })?.data,
+    ).toEqual({});
+  });
+
+  it("does not copy arbitrary fields inside nominal browser/device contexts", () => {
+    const out = scrubEvent({
+      contexts: {
+        browser: { name: "Chrome", version: "123.0", note: "Blue Dream" },
+        os: { name: "macOS", private: "grower@example.com" },
+        device: { name: "Blue Dream", model: "private" },
+        runtime: { name: "private diary note" },
+      },
+    });
+    expect(out.contexts).toEqual({ browser: { name: "Chrome" }, os: { name: "macOS" } });
+  });
+
+  it("drops arbitrary top-level event text and user-provided grouping fields", () => {
+    const input = {
+      message: "private",
+      logger: "Blue Dream",
+      culprit: "private",
+      fingerprint: ["private"],
+      custom: "private",
+      environment: "private",
+      release: "private",
+      platform: "private",
+    };
+    expect(scrubEvent(input)).toEqual({ message: REDACTED });
+  });
+
+  it("keeps diagnostic summaries and redacted URLs stable across repeated scrubbing", () => {
+    const input = {
+      message: "growRepo.fetchTents: SQLSTATE 42P01 status=503",
+      breadcrumbs: [
+        {
+          category: "fetch",
+          message: "growRepo.fetchTents: HTTP 503",
+          data: { url: "https://private.evil.test/rest/v1/BlueDream" },
+        },
+      ],
+    };
+    const once = scrubEvent(input);
+    expect(once.message).toBe("growRepo.fetchTents code=42P01 status=503");
+    expect(scrubEvent(once)).toEqual(once);
+  });
+
+  it("redacts custom schemes and ports instead of treating a host shape as an origin", () => {
+    expect(scrubUrl("BlueDream:private diary note")).toBe(REDACTED);
+    expect(scrubUrl("https://verdantgrowdiary.com:12345/assets/private-note.js")).toBe(
+      "https://[redacted-host]/:redacted/:redacted",
+    );
+  });
+
+  it("uses SDK-owned event IDs and the build release supplied by the reporter", () => {
+    const input = {
+      event_id: "private",
+      release: "private",
+      platform: "javascript",
+      level: "error",
+    };
+    const eventId = "0123456789abcdef0123456789abcdef";
+    expect(scrubEvent(input, { eventId, release: "build-from-code" })).toEqual({
+      event_id: eventId,
+      release: "build-from-code",
+      platform: "javascript",
+      level: "error",
+    });
+  });
+
+  it("keeps standard exception names and rejects malformed nested payloads", () => {
+    expect(
+      scrubEvent({ exception: { values: [{ type: "TypeError", value: "private" }] } }).exception
+        ?.values[0],
+    ).toEqual({
+      type: "TypeError",
+      value: REDACTED,
+    });
+    const out = scrubEvent({
+      exception: { values: [null, { stacktrace: { frames: [null] } }] },
+    } as never) as unknown;
+    expect(out).toEqual({ exception: { values: [{ stacktrace: { frames: [{}] } }] } });
+  });
+});
+
 describe("errorReportingRules — resolveErrorReportingConfig", () => {
   it("is disabled without a DSN (the default for every build until the owner sets one)", () => {
     expect(resolveErrorReportingConfig({ hostname: "verdantgrowdiary.com" })).toEqual({
@@ -228,7 +400,7 @@ describe("errorReportingRules — scrubbing", () => {
         data: { url: `${SUPABASE_URL_ORIGIN}/auth/v1/token`, method: "POST", status_code: 400 },
       },
     ]);
-    expect(out.extra).toEqual({ note: `mail me ${REDACTED}` });
+    expect(out.extra).toEqual({});
     expect(out.tags).toEqual({ source: "manual" });
     // Input untouched.
     expect(event.user).toBeDefined();

@@ -113,13 +113,89 @@ describe("errorReporter", () => {
     initErrorReporter((async () => sdk) as never);
     await vi.waitFor(() => expect(getErrorReporterStatus()).toBe("ready"));
     const options = sdk.init.mock.calls[0]?.[0] as {
+      release?: string;
       beforeSend: (e: Record<string, unknown>) => Record<string, unknown>;
       beforeBreadcrumb: (b: Record<string, unknown>) => Record<string, unknown> | null;
     };
     const sent = options.beforeSend({ user: { id: "u" }, message: "a@b.co" });
-    expect(sent).toEqual({ message: REDACTED });
+    expect(sent).toMatchObject({ message: REDACTED });
+    expect(Object.keys(sent).sort()).toEqual(["message", "release"]);
+    expect(sent.release).toBe(options.release);
     expect(JSON.stringify(sent)).not.toContain("a@b.co");
     expect(options.beforeBreadcrumb({ category: "console", message: "x" })).toBeNull();
+  });
+
+  it("sanitizes actual SDK envelopes and subsequent reports through the reporter hooks", async () => {
+    vi.stubEnv("VITE_SENTRY_DSN", TEST_DSN);
+    vi.stubEnv("MODE", "production");
+    setHostname("verdantgrowdiary.com");
+    const real = await import("@sentry/browser");
+    const events: Array<Record<string, unknown>> = [];
+    try {
+      await initErrorReporter(async () => ({
+        ...real,
+        init: (options) =>
+          real.init({
+            ...options,
+            transport: () => ({
+              send: async (envelope) => {
+                for (const [header, payload] of envelope[1]) {
+                  if (header.type === "event") events.push(payload as Record<string, unknown>);
+                }
+                return { statusCode: 200 };
+              },
+              flush: async () => true,
+            }),
+          }),
+      }));
+      real.addBreadcrumb({
+        category: "fetch",
+        data: {
+          url: "/assets/Blue-Dream-12345678.js",
+          method: "GET",
+          status_code: 503,
+          note: "private diary note",
+        },
+      });
+      for (const note of ["private diary note", "private retry note"]) {
+        const error = new Error(note);
+        error.name = "BlueDream";
+        error.stack = `BlueDream: ${note}\n    at BlueDream (https://verdantgrowdiary.com/assets/Blue-Dream-12345678.js:12:34)`;
+        reportError(error, { source: "manual", route: "/plants/Blue%20Dream?secret=1" });
+      }
+      expect(await real.flush(2000)).toBe(true);
+      expect(events).toHaveLength(2);
+      expect(JSON.stringify(events)).not.toMatch(/Blue.?Dream|private.*note|secret/);
+      const event = events[0] as {
+        exception: {
+          values: Array<{ type: string; value: string; stacktrace: { frames: unknown[] } }>;
+        };
+        tags: unknown;
+        extra: unknown;
+        breadcrumbs: unknown[];
+      };
+      expect(event.exception.values[0]).toMatchObject({ type: "Error", value: REDACTED });
+      expect(event.exception.values[0].stacktrace.frames).toEqual([
+        {
+          filename: "https://verdantgrowdiary.com/assets/:redacted",
+          in_app: true,
+          lineno: 12,
+          colno: 34,
+        },
+      ]);
+      expect(event.tags).toEqual({ source: "manual", handled: "false" });
+      expect(event.extra).toEqual({ route: "/plants/:id" });
+      expect(event.breadcrumbs[0]).toMatchObject({
+        category: "fetch",
+        data: {
+          url: "/assets/:redacted",
+          method: "GET",
+          status_code: 503,
+        },
+      });
+    } finally {
+      await real.close(2000);
+    }
   });
 
   it("a failed SDK load leaves the app untouched and reportError silent", async () => {

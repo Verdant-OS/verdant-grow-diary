@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CODEX-1938-TELEMETRY-PRIVACY
+
+```text
+TASK CODEX-1938-TELEMETRY-PRIVACY  priority: P1  status: OPEN
+goal: Prevent grower text and identifiers from leaving in SDK stack frames, URLs or arbitrary metadata; preserve bounded diagnostics.
+branch: fix/production-error-reporting
+base: verdant-grow-diary at eaf0b092257af57acb724dfe9f817d6c8881943b (normally merged before repair)
+checkout: git fetch origin fix/production-error-reporting verdant-grow-diary && git switch fix/production-error-reporting && git merge --ff-only origin/fix/production-error-reporting && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1938 (draft)
+head_sha: 643470e8ab09bcf87e6af06b8c6011a15d1b669e (released predecessor, verified 2026-10-08 22:58 UTC; repair push follows this log commit, so read the PR for its exact current head)
+state: Ownership release issuecomment-6070096139 independently verified; Codex claim issuecomment-6070715914 reread with no competitor. Eleven new behavioral cases fail on the released source (11 FAIL / 0 PASS / 23 name-filtered), including a real Sentry 11.4.0 SDK memory-transport envelope through application hooks. Repair uses closed metadata fields, standard exception names, safe frame positions, known routes/services and redacted asset filenames; no filename regex or stack provenance substitutes for an emitted build manifest. Current local affected run: five files / 84 PASS / 0 FAIL / 0 SKIP, including header tests; the three reporter suites account for 73 cases. Canonical typecheck zero diagnostics; scoped ESLint zero errors/warnings; full lint zero errors / 853 warnings outside repaired files. Dependency policy and three docs safety categories succeed. Build attempted before commit is BLOCKED by the expected stamp_dirty gate; retry on a clean committed tree. No independent acceptance or production claim.
+next_action: Commit with hooks, build on the clean tree, normally push only after validation, then record exact remote head, terminal CI and evidence on this PR; Blue Dream independently reviews the P1 repair.
+files: src/lib/errorReportingRules.ts; src/lib/errorReporter.ts; src/test/error-reporting-rules.test.ts; src/test/error-reporter.test.ts; src/test/error-reporter-init-and-privacy.test.tsx; docs/agents/HANDOFF_LOG.md (this block only)
+blockers: CI and independent acceptance at the repair head NOT_MEASURED until pushed; live shared fleet-locks.md unavailable in this environment (no named repair-path lock in available governance, and user explicitly instructed this ownership-cleared resumption). No auth, SQL, Edge, Supabase, Action Queue, device, credential, configuration or dependency/lockfile edits. Older review threads stay unresolved pending independent assessment.
+artifacts: Existing reproducible regressions in the three test files; /workspace/scratch/pr1938-diagnosis (earlier read-only evidence); /tmp/pr1938-all-new-red.log; /tmp/pr1938-final-tests.log; /tmp/pr1938-typecheck.log; /tmp/pr1938-lint.log; /tmp/pr1938-scoped-lint.log; /tmp/pr1938-build.log; final PR technical evidence comment.
+reviewer_seat: Blue Dream (P1 privacy; Codex is the repair author and cannot give acceptance)
+claimed_by: Codex, 2026-10-08 22:58 UTC (effective PR claim after Claude release)
+last_updated: 2026-10-08 23:12 UTC, by Codex
+```
+
 ### CLOUDFLARE-VERCEL-ROUTING-PORT
 
 ```text

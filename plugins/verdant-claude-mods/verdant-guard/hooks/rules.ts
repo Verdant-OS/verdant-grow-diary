@@ -220,7 +220,9 @@ function stripPrefix(tokens: string[], onSplit?: (split: string) => void): strin
         i += 1;
         break;
       }
-      if (/^-[A-Za-z]{2,}$/.test(option)) {
+      // A single-dash option is read letter by letter, whatever follows the first letter: an
+      // attached value can hold any character (`env -S'git push -f'`, `sudo -urunner`).
+      if (/^-[A-Za-z]/.test(option)) {
         let consumed = 1;
         for (let k = 1; k < option.length; k += 1) {
           const letter = `-${option[k]}`;

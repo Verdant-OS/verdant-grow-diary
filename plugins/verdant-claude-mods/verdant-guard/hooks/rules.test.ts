@@ -439,3 +439,17 @@ describe("Codex re-review P1s: abbreviations, --undo values, sudo --chroot", () 
     }
   });
 });
+
+describe("Codex re-review P1: attached env -S argument", () => {
+  test("an -S argument attached to the option is split and checked", () => {
+    for (const cmd of [
+      "env -S'git push -f origin claude/task'",
+      'env -S"git push origin main"',
+      "env -iS'git push --force'",
+      "sudo -urunner git push --force",
+    ]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    expect(checkBash("env -S'git push origin claude/task'")).toBe(null);
+  });
+});

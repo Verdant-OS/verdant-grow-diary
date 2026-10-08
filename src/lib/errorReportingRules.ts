@@ -353,9 +353,12 @@ function restoreDelimiters(text: string): string {
 }
 
 /** HTML entities an HTML-safe diagnostic uses for quotes and separators (`&quot;`, `&#58;`, `&#x22;`). */
-/** An entity starts with `&`, or with the held stand-in a decoded `&amp;` became (`&amp;quot;`). */
+/**
+ * An entity starts with `&`, or with the held stand-in a decoded `&amp;` became (`&amp;quot;`),
+ * and ends with `;` or its held stand-in, so a percent-encoded entity (`%26quot%3B`) decodes too.
+ */
 const HTML_ENTITY_PATTERN =
-  /[&\uE026](?:#(\d{1,7})|#[xX]([0-9A-Fa-f]{1,6})|(quot|apos|amp|colon|comma|semi|equals|lt|gt));/g;
+  /[&\uE026](?:#(\d{1,7})|#[xX]([0-9A-Fa-f]{1,6})|(quot|apos|amp|colon|comma|semi|equals|lt|gt))[;\uE03B]/g;
 const NAMED_HTML_ENTITIES: Record<string, string> = {
   quot: '"',
   apos: "'",

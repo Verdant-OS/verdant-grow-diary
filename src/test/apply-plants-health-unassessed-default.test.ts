@@ -113,6 +113,7 @@ const WRITERS = Object.freeze([
   "apply-agreement-acceptance-insert-forward-repair.yml",
   "apply-quicklog-revision-idempotent-replay.yml",
   "apply-plants-health-unassessed-default.yml",
+  "apply-linked-quicklog-diary-client-write-fence.yml",
 ]);
 
 /** Writers that snapshot every other writer before APPLY. */
@@ -122,6 +123,7 @@ const GUARDED_WRITERS = Object.freeze([
   "apply-agreement-acceptance-insert-forward-repair.yml",
   "apply-quicklog-revision-idempotent-replay.yml",
   "apply-plants-health-unassessed-default.yml",
+  "apply-linked-quicklog-diary-client-write-fence.yml",
 ]);
 
 function stdout(state: object) {

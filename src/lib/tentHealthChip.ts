@@ -1,36 +1,39 @@
 /**
- * Pure derivation of the per-tent health chip on the Tents page.
+ * Pure derivation of a per-tent status chip from plant and alert counts.
+ *
+ * Counts are not telemetry, so this chip never claims health. Zero open
+ * alerts can mean the tent was never assessed, and an unknown alert count is
+ * not zero.
  *
  * Rules:
- *  - plantCount === 0           → "empty"  (neutral, copy: "No plants")
- *  - alertCount > 0             → "alerts" (destructive)
- *  - plantCount > 0, no alerts  → "healthy"
- *  - any unknown input          → "unknown" (neutral, never healthy)
+ *  - plantCount unknown or negative → "unknown"   (copy: "Status unknown")
+ *  - plantCount === 0               → "empty"     (copy: "No plants")
+ *  - alertCount unknown or negative → "unknown"   (copy: "Alert status unknown")
+ *  - alertCount > 0                 → "alerts"    (destructive)
+ *  - alertCount === 0               → "no_alerts" (neutral, copy: "No open alerts")
  *
  * Presenter-only. No I/O. No React.
  */
 
-export type TentHealthChipVariant = "healthy" | "alerts" | "empty" | "unknown";
+export type TentHealthChipVariant = "alerts" | "no_alerts" | "empty" | "unknown";
 
 export interface TentHealthChip {
   variant: TentHealthChipVariant;
   copy: string;
-  /** True only when the chip should render in the green/success style. */
-  isHealthy: boolean;
+  /** Always false: plant and alert counts cannot establish tent health. */
+  isHealthy: false;
+}
+
+function knownCount(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 export function deriveTentHealthChip(args: {
   plantCount: number | null | undefined;
   alertCount: number | null | undefined;
 }): TentHealthChip {
-  const plants =
-    typeof args.plantCount === "number" && Number.isFinite(args.plantCount)
-      ? args.plantCount
-      : null;
-  const alerts =
-    typeof args.alertCount === "number" && Number.isFinite(args.alertCount)
-      ? args.alertCount
-      : null;
+  const plants = knownCount(args.plantCount);
+  const alerts = knownCount(args.alertCount);
 
   if (plants === null) {
     return { variant: "unknown", copy: "Status unknown", isHealthy: false };
@@ -38,12 +41,15 @@ export function deriveTentHealthChip(args: {
   if (plants === 0) {
     return { variant: "empty", copy: "No plants", isHealthy: false };
   }
-  if (alerts !== null && alerts > 0) {
+  if (alerts === null) {
+    return { variant: "unknown", copy: "Alert status unknown", isHealthy: false };
+  }
+  if (alerts > 0) {
     return {
       variant: "alerts",
       copy: `● ${alerts} alert${alerts > 1 ? "s" : ""}`,
       isHealthy: false,
     };
   }
-  return { variant: "healthy", copy: "● healthy", isHealthy: true };
+  return { variant: "no_alerts", copy: "No open alerts", isHealthy: false };
 }

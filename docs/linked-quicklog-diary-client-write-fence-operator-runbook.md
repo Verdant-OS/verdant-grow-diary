@@ -1,0 +1,159 @@
+# Linked Quick Log diary client-write fence operator runbook
+
+This lane delivers exactly one reviewed, already-merged production migration:
+
+- Version: `20260927094000`
+- File: `20260927094000_linked_quicklog_diary_client_write_fence.sql` (#1741)
+- SHA-256: `DB09A0C9CDA6C1A1933E9C1DA919B45E1288030DD866C51529A02B9C434C8F7F`
+- Project: `knkwiiywfkbqznbxwqfh`
+- Branch: `verdant-grow-diary`
+- Environment: `verdant-production-solo-founder`
+- Workflow: `.github/workflows/apply-linked-quicklog-diary-client-write-fence.yml`
+
+This workflow is not a generic SQL runner. It refuses another migration file,
+byte hash, commit, branch, project, repository, catalog shape or actor. Its
+disposable PostgreSQL 15 proof is
+`.github/workflows/linked-diary-delivery-pg15.yml`. Passing that proof does
+not establish production applied state.
+
+## Effect and blast radius
+
+The migration is self-transactional and adds two **restrictive** authenticated
+policies on `public.diary_entries`, one invoker trigger function, and one
+`BEFORE UPDATE` trigger. Client inserts with linked Quick Log keys, direct
+updates of linked rows, and direct deletes of linked rows are rejected.
+Ordinary owner diary rows retain their existing path. The canonical Quick Log
+revision RPC can continue to update both histories as the server principal.
+No existing row is rewritten, deleted, or backfilled. No Action Queue, device,
+payment, or Edge object is touched.
+
+The runner checks existing diary owner policies, `details`/`photo_url`
+types, RLS, client roles, the measured production migration-ledger shape, and
+absence or exact canonical presence of the four target objects. A partial
+state blocks. The read-only PREFLIGHT receipt binds the catalog result to the
+exact deploy SHA and migration hash. APPLY rechecks it, runs the migration
+byte-for-byte through plain `psql --file`, verifies the canonical objects,
+then inserts only this migration's ledger row in a separate short transaction.
+If the schema committed but the ledger step failed, a fresh PREFLIGHT can
+classify `schema_live_ledger_absent` for ledger-only recovery.
+
+## Protected environment
+
+Require the solo founder `cheekhimself` (GitHub user ID `72639960`) as
+the sole environment reviewer, self-review allowed, admin bypass off, and
+the single deployment branch rule `verdant-grow-diary`. Environment secrets
+`SUPABASE_DB_URL` and `SUPABASE_DB_CA_CERT_B64` must refer to the pinned
+production project. The workflow checks the actual approval and environment
+configuration, then uses the pinned PostgreSQL client and `sslmode=verify-full`.
+Do not copy a sandbox URL or certificate into this environment.
+
+All production migration writers use the
+`verdant-production-migration-writer` concurrency group. Before either
+dispatch, verify no other writer is queued, in progress, waiting, pending,
+or requested. The workflow repeats that check before database access. The
+registered writers are:
+
+- `apply-candidate-number-maintenance-migrations.yml`
+- `apply-pinned-breeding-reconciliation.yml`
+- `apply-pinned-production-migrations.yml`
+- `apply-quicklog-corrections-retractions.yml`
+- `apply-signup-acquisition-forward-repair.yml`
+- `apply-quicklog-manual-delegate-forward-repair.yml`
+- `apply-action-queue-transition-forward-repair.yml`
+- `apply-agreement-acceptance-insert-forward-repair.yml`
+- `apply-quicklog-revision-idempotent-replay.yml`
+- `apply-plants-health-unassessed-default.yml`
+- `apply-linked-quicklog-diary-client-write-fence.yml`
+
+## Mandatory compatible-client delivery gate
+
+Missing or unverified client delivery is **BLOCKED** for APPLY. The founder
+must record a compatible-client receipt before authorizing the SQL fence.
+The receipt must identify the actual live client bundle, its exact SHA,
+measurement time, and reviewed #1741 frontend ancestry or equivalent reviewed
+fix. A merged PR, green CI, or a `version.json` SHA alone is not client
+acceptance. Publishing requires its own founder authorization.
+
+Include SHA-locked disposable browser/regression evidence that the delivered
+client handles rejected linked-row writes and zero affected rows honestly:
+delete must not report "Log removed" when nothing was deleted, edit must
+offer the canonical correction path, and a refused photo attachment must
+retain its pending checkpoint for safe recovery. Keep this fixture evidence
+separate from the measured live bundle identity; do not label a mocked
+failure as a production result. An old client that checks only the DELETE
+error can report false success after this migration silently affects zero
+rows, so deploying SQL first is unsafe.
+
+The workflow does not verify frontend deployment or browser behavior itself,
+but it binds the founder's measurement to APPLY and fails closed without it
+(owner decision 2026-10-01). APPLY requires two dispatch inputs:
+
+- `compatible_client_sha`: the 40-character commit of the measured live client
+  bundle.
+- `compatible_client_measured_at`: the UTC time of that measurement, as
+  `YYYY-MM-DDTHH:MM:SSZ`.
+
+Before any database access, the workflow uses the GitHub compare API to require
+that this commit contains #1741's merge `07f258ff6d8e348d99ec8131ae95b7eaeed98326`
+(status `ahead` or `identical`) and is on `verdant-grow-diary`. The runner then
+refuses APPLY, with outcome `client_receipt_rejected`, when either input is
+missing or malformed, when the measurement is more than 60 minutes old or more
+than 5 minutes in the future, or when the ancestry check did not verify the
+same commit. Both values are recorded in the audit. PREFLIGHT must leave them
+empty. The protected approval must still reference the founder-reviewed
+compatible-client receipt as well as the exact PREFLIGHT receipt. Missing,
+stale, or contradicted evidence stops APPLY. Recheck the client identity
+immediately before dispatch. Read-only PREFLIGHT can precede client delivery;
+SQL APPLY cannot. After APPLY, separately verify live save/correct/retract
+and checkpoint recovery on an explicitly authorized disposable fixture.
+
+## Dispatch sequence — founder only, after merge and independent review
+
+1. Confirm #1741 and this delivery lane have independent PASS reviews on
+   their **current** heads and have landed on `verdant-grow-diary`. Recheck
+   the deploy SHA, migration hash and current production incident state.
+   Do not dispatch from a draft PR branch.
+2. Dispatch **PREFLIGHT** from `verdant-grow-diary` with the exact 40-character
+   `expected_head_sha`, `confirm_project_ref=knkwiiywfkbqznbxwqfh`,
+   empty APPLY-only fields, and acknowledgement
+   `I AM THE SOLE FOUNDER AND AUTHORIZE THIS PRODUCTION RUN`. Approve the
+   protected environment as the founder. Do not rerun an old workflow attempt.
+3. Review the sanitized PREFLIGHT report. Only `SAFE_TO_APPLY` or the
+   canonical `schema_live_ledger_absent` recovery state may produce an APPLY
+   receipt. `already_applied_verified` needs no APPLY. Drift, missing
+   prerequisites, an unrecognized ledger, or an unverified receipt is a stop.
+4. Record the successful PREFLIGHT run ID, attempt `1`, and lowercase
+   artifact SHA-256. Wait at least **15 minutes** and no more than **24 hours**,
+   recheck the deploy SHA and active writers, and obtain the founder's explicit
+   go/no-go for this exact target and receipt.
+5. Recheck and record the mandatory compatible-client receipt above alongside
+   the PREFLIGHT receipt. Only after that authorization, dispatch **APPLY** from the same deploy SHA
+   with `confirm_apply=APPLY LINKED QUICKLOG DIARY CLIENT WRITE FENCE`,
+   the recorded `preflight_run_id`,
+   `expected_preflight_run_attempt=1`,
+   `expected_preflight_artifact_sha256`, `compatible_client_sha` and
+   `compatible_client_measured_at` (measured within the last 60 minutes),
+   and the same founder acknowledgement. Approve the protected environment
+   again; an approval wait longer than the 60-minute window refuses APPLY,
+   so measure again and dispatch fresh.
+6. Retain the sanitized APPLY artifact and run URLs. Require
+   `applied_verified` or `already_applied_verified` and an exact ledger
+   receipt before calling the migration applied. Then verify the live client
+   save/correct/retract/reopen path separately. CI and the frontend
+   `version.json` cannot prove applied SQL.
+
+## Failure and rollback
+
+If the migration fails, its own transaction rolls back and no ledger row is
+inserted. If a later step fails, dispatch a **new PREFLIGHT**; never rerun an
+attempt or delete/edit a migration-ledger row. An exact canonical schema with
+absent ledger is recoverable through a new authorized ledger-only APPLY.
+
+There is no automatic destructive rollback. To withdraw the fence after
+release, author and independently review a **new forward migration** that
+drops only the two added restrictive policies, the added trigger, and its
+function, with its own protected delivery lane. Do not edit the historical
+migration or execute ad-hoc SQL in production.
+
+HOLD #1250. This runbook itself authorizes no production PREFLIGHT, APPLY,
+Publish, device, or Action Queue operation.

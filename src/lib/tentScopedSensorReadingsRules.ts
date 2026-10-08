@@ -115,3 +115,45 @@ export function combineTentScopedSensorWindows<T extends TentScopedSensorRowLike
   }
   return { status: "success", data };
 }
+
+export interface SensorReadingTentScopeSource {
+  data: readonly { id: string }[] | null | undefined;
+  isError: boolean;
+}
+
+export interface ResolvedSensorReadingTentScope {
+  /** `null` = unresolved (pending); `[]` = resolved empty scope (no reads). */
+  tentIds: string[] | null;
+  /** The read that resolves the scope failed: an error, never "no readings". */
+  scopeError: boolean;
+}
+
+/**
+ * One rule for the sensor-reading tent scope of aggregate surfaces
+ * (DailyGrowCheckStatusCard, GuidedActionChecklistPanel, Dashboard):
+ *
+ *  - `enabled: false` (for example no grow in scope) → empty scope, no reads.
+ *  - `explicitTentIds` given by the caller wins: `null` means the caller's
+ *    tents are still loading (pending, never a fallback to every tent), and
+ *    `[]` is a resolved empty scope (no readings, no activity).
+ *  - Otherwise the loaded tents decide: loading → unresolved, failed → error
+ *    (even when stale cached tents remain), loaded → their ids.
+ */
+export function resolveSensorReadingTentScope(input: {
+  enabled?: boolean;
+  explicitTentIds?: readonly string[] | null;
+  tents: SensorReadingTentScopeSource;
+}): ResolvedSensorReadingTentScope {
+  if (input.enabled === false) return { tentIds: [], scopeError: false };
+  if (input.explicitTentIds !== undefined) {
+    return {
+      tentIds: input.explicitTentIds === null ? null : [...input.explicitTentIds],
+      scopeError: false,
+    };
+  }
+  if (input.tents.isError) return { tentIds: null, scopeError: true };
+  if (Array.isArray(input.tents.data)) {
+    return { tentIds: input.tents.data.map((tent) => tent.id), scopeError: false };
+  }
+  return { tentIds: null, scopeError: false };
+}

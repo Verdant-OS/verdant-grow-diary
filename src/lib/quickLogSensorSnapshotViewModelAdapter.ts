@@ -29,6 +29,7 @@ import type {
   SensorSnapshotMetricInput,
   SensorSnapshotSource,
 } from "@/lib/sensorSnapshotFreshnessRules";
+import { sanitizeSensorSourceDetail } from "@/lib/sensorSnapshotFreshnessRules";
 import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 
 /**
@@ -92,7 +93,9 @@ export function adaptQuickLogSensorContextInput(
 
   const input: SensorSnapshotInput = {
     source: mappedSource,
-    sourceDetail: typeof snap.source === "string" && snap.source.length > 0 ? snap.source : null,
+    // Provenance metadata only, and only when the raw label is a safe slug —
+    // a MAC, UUID, passkey or station id in `source` is dropped (#1003).
+    sourceDetail: sanitizeSensorSourceDetail(snap.source),
     capturedAt: snap.captured_at,
     confidence: snap.confidence ?? null,
     invalid: snap.freshness === "invalid",

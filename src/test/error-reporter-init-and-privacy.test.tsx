@@ -322,6 +322,9 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       ["%22access_token%22%3Aabc%26defSECRET", "SECRET"],
       ["%2522access_token%2522%253Aabc%2526defSECRET", "SECRET"],
       ["%22password%22%3A%20abc%3BdefSECRET", "SECRET"],
+      ["%25252522access_token%25252522%2525253AabcSECRET", "SECRET"],
+      ["%22access_token%22%3Aabc%22defSECRET", "SECRET"],
+      [`{'details':null,'hint':null,'message':'db','metadata':{"x":"}",'code':'12345'}}`, "12345"],
     ];
     for (const [input, secret] of cases) {
       const out = scrubText(input);

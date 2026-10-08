@@ -142,7 +142,7 @@ const CREDENTIAL_SEPARATOR = String.raw`(\s*(?:[:=]|%3[Dd])\s*)`;
  * A quote, or a backslash-escaped one (`\"`) when JSON was serialised inside another
  * string (`payload=\"access_token\":\"…\"`).
  */
-const QUOTE = String.raw`\\*["']`;
+const QUOTE = String.raw`(?:\\*["']|[\uE022\uE027])`;
 /**
  * A value whose quote is escaped at any serialisation depth (`\"…\"`, `\\\"…\\\"`,
  * seven or more backslashes). It closes only on the same quote behind exactly the same
@@ -204,18 +204,21 @@ const POSTGREST_ERROR_FIELDS = ["details", "hint", "message"];
 /**
  * The text of the innermost object enclosing `offset` at its own depth: nested objects are
  * left out. Scans from the start of the text and treats `quote` (the code key's own quote,
- * judged by backslash parity, see isDelimitingQuote) as a string delimiter, so braces inside string values are
+ * judged by backslash parity, see isDelimitingQuote), double or single, as a string delimiter, so braces inside string values are
  * not structure. Null when no balanced object encloses `offset`.
  */
 function enclosingObjectTopLevel(text: string, offset: number, quote: string): string | null {
-  const quoteChar = quote[quote.length - 1];
   const level = quote.length - 1;
   const open: Array<{ start: number; topLevel: string }> = [];
-  let inString = false;
+  // The quote character of the string being scanned, or null outside strings. Both
+  // styles are tracked: a `"…}…"` value inside a single-quoted object is still a string.
+  let openQuote: string | null = null;
   for (let i = 0; i < text.length; i += 1) {
     const char = text[i];
-    if (char === quoteChar && isDelimitingQuote(text, i, level)) {
-      inString = !inString;
+    const inString = openQuote !== null;
+    if ((char === '"' || char === "'") && isDelimitingQuote(text, i, level)) {
+      if (openQuote === null) openQuote = char;
+      else if (openQuote === char) openQuote = null;
     } else if (!inString && char === "{") {
       open.push({ start: i, topLevel: "" });
       continue;
@@ -308,17 +311,22 @@ function redactedLike(value: string): string {
   return `${quote}${REDACTED}${quote}`;
 }
 
-/** Most nested URL-encoding layers decoded before scrubbing (`%253D` is two). */
-const MAX_DECODE_PASSES = 3;
+/**
+ * Most URL-encoding layers decoded (`%253D` is two). Text still encoded after this many
+ * layers is redacted whole rather than sent with a recoverable layer left.
+ */
+const MAX_DECODE_PASSES = 8;
 const PERCENT_RUN_PATTERN = /(?:%[0-9A-Fa-f]{2})+/g;
 const ASCII_ESCAPE_PATTERN = /%[0-7][0-9A-Fa-f]/g;
 
 /**
- * Characters that end a bare credential value. When decoding produces one, it is held as
- * a private-use stand-in until redaction is done, so an encoded `%26` / `%3B` / `%2C`
- * inside a credential cannot end its value early (`access_token%3Aabc%26def…`).
+ * Characters that end a credential value. When decoding produces one, it is held as a
+ * private-use stand-in until redaction is done, so an encoded `%26` / `%3B` / `%2C` /
+ * `%22` inside a credential cannot end its value early (`access_token%3Aabc%26def…`).
+ * A held quote still counts as a key quote (see QUOTE), so `%22access_token%22%3A…` is
+ * recognised.
  */
-const VALUE_DELIMITERS = "&;,}][\n";
+const VALUE_DELIMITERS = "&;,}][\n\"'";
 const DELIMITER_STAND_IN_BASE = 0xe000;
 const DELIMITER_STAND_IN_PATTERN = new RegExp(
   `[${[...VALUE_DELIMITERS]
@@ -327,8 +335,13 @@ const DELIMITER_STAND_IN_PATTERN = new RegExp(
   "g",
 );
 
+const HELD_DELIMITER_PATTERN = new RegExp(
+  `[${[...VALUE_DELIMITERS].map((char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`).join("")}]`,
+  "g",
+);
+
 function holdDelimiters(decoded: string): string {
-  return decoded.replace(/[&;,}\][\n]/g, (char) =>
+  return decoded.replace(HELD_DELIMITER_PATTERN, (char) =>
     String.fromCharCode(DELIMITER_STAND_IN_BASE + char.charCodeAt(0)),
   );
 }
@@ -368,10 +381,10 @@ export function scrubText(value: unknown): string {
   let text = redactPatterns(typeof value === "string" ? value : safeString(value));
   for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
     const next = decodeOneLayer(text);
-    if (next === text) break;
+    if (next === text) return restoreDelimiters(text);
     text = redactPatterns(next);
   }
-  return restoreDelimiters(text);
+  return decodeOneLayer(text) === text ? restoreDelimiters(text) : REDACTED;
 }
 
 function redactPatterns(text: string): string {

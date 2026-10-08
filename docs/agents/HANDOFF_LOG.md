@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CLOUDFLARE-VERCEL-ROUTING-PORT
+
+```text
+TASK CLOUDFLARE-VERCEL-ROUTING-PORT  priority: P1  status: OPEN
+goal: Make the Cloudflare Worker reproduce every vercel.json redirect, the SPA-rewrite exclusion, and every header rule. /~oauth/* must hop to the Lovable project host, /strains and /refund-policy (and the other legacy aliases) must redirect, and /unsubscribe must send no-store / no-referrer / noindex.
+branch: cursor/cloudflare-worker-routing-54eb
+base: verdant-grow-diary
+checkout: git fetch origin cursor/cloudflare-worker-routing-54eb verdant-grow-diary && git switch cursor/cloudflare-worker-routing-54eb && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED until the draft PR is opened
+head_sha: NOT_MEASURED until the branch is pushed
+state: local implementation. Worker entry applies redirects before SSR and headers on the response. public/_headers carries the same header rules for the assets binding. The SPA catch-all rewrite is not applied as an internal rewrite to /, because that would replace every SSR route with the homepage; oauth and assets stay excluded.
+next_action: commit, push, open the draft PR, then bun run build and curl the local Worker.
+files: src/lib/cloudflareHostRoutingRules.ts (new); src/server.ts; public/_headers (new); src/test/cloudflare-host-routing-rules.test.ts (new); docs/agents/HANDOFF_LOG.md
+blockers: none for the repository change. Do not deploy, merge, or write the Lovable production Supabase project. #1937 also edits src/server.ts and public/_headers; keep the two PRs separate and merge the header application if that PR lands first.
+artifacts: src/test/cloudflare-host-routing-rules.test.ts
+reviewer_seat: Critical Mass (no product .tsx; lib, Worker entry, tests)
+claimed_by: Grok, 2026-10-08 11:49 CT
+last_updated: 2026-10-08 11:49 CT, by Grok
+```
+
 ### CLAUDE-CODE-ACTION-002
 
 ```text

@@ -12,6 +12,7 @@ import {
   reportErrorWhenReady,
 } from "@/lib/errorReporter";
 import {
+  buildManualReportContext,
   REDACTED,
   scrubBreadcrumb,
   scrubEvent,
@@ -123,7 +124,7 @@ describe("errorReporter — initialisation race", () => {
     expect(error.message).toBe("first paint crash");
     expect(hint).toEqual({
       tags: { source: "route_error_component", handled: "false" },
-      extra: { route: "/grows/1" },
+      extra: { route: "/grows/:growId" },
     });
   });
 
@@ -154,7 +155,7 @@ describe("errorReporter — initialisation race", () => {
     expect(error.message).toBe("child render failed for grower@example.com");
     expect(hint).toEqual({
       tags: { source: "react_error_boundary", handled: "false" },
-      extra: { route: "/plants/1" },
+      extra: { route: "/plants/:id" },
     });
     // The message text is replaced by beforeSend before anything leaves the browser.
     const options = sdk.init.mock.calls[0]?.[0] as {
@@ -391,10 +392,12 @@ describe("errorReportingRules — privacy of outgoing events", () => {
     const out = scrubEvent({
       breadcrumbs: [
         { category: "ui.click", message: 'div[title="My private cultivar"]' },
-        { category: "navigation", data: { from: "/a", to: "/b" } },
+        { category: "navigation", data: { from: "/grows", to: "/plants" } },
       ],
     });
-    expect(out?.breadcrumbs).toEqual([{ category: "navigation", data: { from: "/a", to: "/b" } }]);
+    expect(out?.breadcrumbs).toEqual([
+      { category: "navigation", data: { from: "/grows", to: "/plants" } },
+    ]);
   });
 
   it("replaces UUID path segments (grow, tent and plant ids) with :id", () => {
@@ -408,7 +411,8 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       category: "navigation",
       data: { from: `/plants/${id}`, to: `/grows/${id}` },
     });
-    expect(crumb?.data).toEqual({ from: "/plants/:id", to: "/grows/:id" });
+    // Navigation breadcrumbs carry page paths, so they leave as route templates.
+    expect(crumb?.data).toEqual({ from: "/plants/:id", to: "/grows/:growId" });
     const event = scrubEvent({
       transaction: `/plants/${id}`,
       request: { url: `https://verdantgrowdiary.com/plants/${id}` },
@@ -494,7 +498,7 @@ describe("errorReportingRules — privacy of outgoing events", () => {
   it("scrubs logentry, transaction, exception type, mechanism data and frame vars", () => {
     const out = scrubEvent({
       logentry: { message: "login a@b.co", params: ["secret-param"] },
-      transaction: "/auth/callback?code=abc",
+      transaction: "/auth?code=abc",
       exception: {
         values: [
           {
@@ -509,7 +513,7 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       },
     });
     expect(out?.logentry).toEqual({ message: expect.stringMatching(/^#[0-9a-f]{8}$/) });
-    expect(out?.transaction).toBe("/auth/callback");
+    expect(out?.transaction).toBe("/auth");
     const ex = out?.exception?.values?.[0];
     expect(ex?.type).toBe("Error");
     expect(ex?.mechanism).toEqual({ type: "generic", handled: false });
@@ -530,7 +534,7 @@ describe("errorReportingRules — free-text messages leave only an allowlisted d
   it("keeps the repo scope, SQLSTATE code and fingerprint from a forwarded provider message", () => {
     const value =
       'growRepo.fetchTents: duplicate key value violates unique constraint "plants_name_key" ' +
-      "Key (name)=(Blue Dream #3) already exists. code 23505";
+      "Key (name)=(Blue Dream #3) already exists. SQLSTATE 23505";
     const out = scrubEvent({ exception: { values: [{ type: "Error", value }] } });
     const sent = out?.exception?.values?.[0]?.value ?? "";
     expect(sent).toMatch(/^growRepo\.fetchTents code=23505 #[0-9a-f]{8}$/);
@@ -546,13 +550,13 @@ describe("errorReportingRules — free-text messages leave only an allowlisted d
 
   it("keeps PostgREST codes and HTTP statuses, and drops everything else", () => {
     const out = scrubEvent({
-      message: "plantRepo.load: PGRST116 JSON object requested, multiple (or no) rows returned",
+      message: "db.fetchGrowRow: PGRST116 JSON object requested, multiple (or no) rows returned",
       logentry: {
         message: "Response 503 at https://verdantgrowdiary.com/plants/:id",
         formatted: "My Gelato tent is too warm",
       },
     });
-    expect(out?.message).toMatch(/^plantRepo\.load code=PGRST116 #[0-9a-f]{8}$/);
+    expect(out?.message).toMatch(/^db\.fetchGrowRow code=PGRST116 #[0-9a-f]{8}$/);
     expect(out?.logentry?.message).toMatch(/^status=503 #[0-9a-f]{8}$/);
     expect(out?.logentry?.formatted).toMatch(/^#[0-9a-f]{8}$/);
   });
@@ -577,8 +581,8 @@ describe("errorReportingRules — free-text messages leave only an allowlisted d
 
   it("reports a code only when it is a real SQLSTATE class, so a grower's number never passes", () => {
     expect(scrubEvent({ message: "ship to zip code 90210" })?.message).toMatch(/^#[0-9a-f]{8}$/);
-    expect(scrubEvent({ message: "x.y: SQLSTATE 42P01" })?.message).toMatch(
-      /^x\.y code=42P01 #[0-9a-f]{8}$/,
+    expect(scrubEvent({ message: "growRepo.fetchTents: SQLSTATE 42P01" })?.message).toMatch(
+      /^growRepo\.fetchTents code=42P01 #[0-9a-f]{8}$/,
     );
   });
 
@@ -586,5 +590,76 @@ describe("errorReportingRules — free-text messages leave only an allowlisted d
     const out = scrubEvent({ message: "", exception: { values: [{ type: "Error", value: "" }] } });
     expect(out?.message).toBe("");
     expect(out?.exception?.values?.[0]?.value).toBe("");
+  });
+});
+
+describe("errorReportingRules — summary fields come only from code-defined provenance", () => {
+  const ONLY_FINGERPRINT = /^#[0-9a-f]{8}$/;
+
+  it("keeps a scope only from the closed list of repository-defined scopes", () => {
+    expect(scrubEvent({ message: "plant.BlueDream: leaves curled" })?.message).toMatch(
+      ONLY_FINGERPRINT,
+    );
+    expect(scrubEvent({ message: "db.fetchGrowRow: boom" })?.message).toMatch(
+      /^db\.fetchGrowRow #[0-9a-f]{8}$/,
+    );
+  });
+
+  it("keeps a code only under a known scope and with explicit PostgREST or SQLSTATE context", () => {
+    expect(scrubEvent({ message: "oauth.exchange: code=42P01" })?.message).toMatch(
+      ONLY_FINGERPRINT,
+    );
+    expect(scrubEvent({ message: "growRepo.fetchTents: code=42P01" })?.message).toMatch(
+      /^growRepo\.fetchTents #[0-9a-f]{8}$/,
+    );
+    expect(scrubEvent({ message: "growRepo.fetchTents: SQLSTATE 42P01" })?.message).toMatch(
+      /^growRepo\.fetchTents code=42P01 #[0-9a-f]{8}$/,
+    );
+    expect(scrubEvent({ message: "PGRST116 from an unknown caller" })?.message).toMatch(
+      ONLY_FINGERPRINT,
+    );
+  });
+
+  it("keeps an HTTP status only from the caught-Response shape or under a known scope", () => {
+    expect(scrubEvent({ message: "Response 503 at https://x.test/a" })?.message).toMatch(
+      /^status=503 #[0-9a-f]{8}$/,
+    );
+    expect(scrubEvent({ message: "my tent status 404 is odd" })?.message).toMatch(ONLY_FINGERPRINT);
+  });
+
+  it("redacts e-mail and token-shaped path segments from asset and API URLs", () => {
+    expect(scrubUrl("https://verdantgrowdiary.com/oops/grower@example.com")).toBe(
+      "https://verdantgrowdiary.com/oops/:redacted",
+    );
+    expect(scrubUrl("/bridge/vbt_0123456789abcdefABCDEF0123456789abcdefAB")).toBe(
+      "/bridge/:redacted",
+    );
+    expect(scrubUrl("/x/grower%40example.com/y")).toBe("/x/:redacted/y");
+    expect(scrubUrl("/assets/index-3f2c9a1e.js")).toBe("/assets/index-3f2c9a1e.js");
+  });
+
+  it("reduces page URLs to their route template and fails closed for unknown paths", () => {
+    const event = scrubEvent({
+      transaction: "/oops/grower@example.com",
+      request: { url: "https://verdantgrowdiary.com/oops/Blue%20Dream" },
+      breadcrumbs: [
+        { category: "navigation", data: { from: "/oops/x@y.co", to: "/pheno-hunts/abc/keepers" } },
+      ],
+    });
+    expect(event?.transaction).toBe("/:unmatched");
+    expect(event?.request?.url).toBe("https://verdantgrowdiary.com/:unmatched");
+    expect(event?.breadcrumbs?.[0]?.data).toEqual({
+      from: "/:unmatched",
+      to: "/pheno-hunts/:id/keepers",
+    });
+    expect(buildManualReportContext({ source: "manual", route: "/plants/1" }).extra).toEqual({
+      route: "/plants/:id",
+    });
+    expect(buildManualReportContext({ source: "manual", route: "/pheno-hunts/new" }).extra).toEqual(
+      { route: "/pheno-hunts/new" },
+    );
+    expect(buildManualReportContext({ source: "manual", route: "/oops/a@b.co" }).extra).toEqual({
+      route: "/:unmatched",
+    });
   });
 });

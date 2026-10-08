@@ -11,13 +11,17 @@
  * Privacy posture (deliberate, do not loosen without an owner decision):
  * - No user id, email, IP, or session identifiers are attached. Sentry's
  *   `dataCollection` has every category off.
- * - URLs are reduced to origin + pathname, with UUID path segments (row ids)
- *   replaced by `:id`. Query strings and fragments are
- *   dropped because auth flows carry tokens there.
- * - Free text (messages, stacks, breadcrumbs) is scrubbed for token-like
- *   values, e-mail addresses and UUID row ids before it leaves the browser.
+ * - Page URLs are reduced to origin + route template (`/plants/:id`); a path only the
+ *   catch-all renders becomes `/:unmatched`. Asset and API URLs keep origin + path with
+ *   UUID segments as `:id` and e-mail/credential/opaque-token segments as `:redacted`.
+ *   Query strings and fragments are always dropped: auth flows carry tokens there.
+ * - Messages, exception values and breadcrumb messages leave only as an allowlisted
+ *   summary (`summarizeErrorText`). Other strings (tags, extra, breadcrumb data) are
+ *   scrubbed for token-like values, e-mail addresses and UUID row ids.
  * - No session replay, no performance tracing, no console capture.
  */
+
+import { APP_ROUTES } from "@/lib/appRouteManifest";
 
 export const SENTRY_INGEST_ORIGINS: ReadonlyArray<string> = [
   "https://*.ingest.sentry.io",
@@ -491,11 +495,35 @@ function redactPatterns(text: string): string {
 /** A whole path segment shaped like a UUID (grow, tent, plant and other row ids), hyphens literal or `%2D`. */
 const UUID_SEGMENT_PATTERN = new RegExp(String.raw`(?<=\/)${UUID_BODY}(?=\/|$)`, "gi");
 
-function redactPathIds(path: string): string {
-  return path.replace(UUID_SEGMENT_PATTERN, ":id");
+/** A long opaque run of letters and digits: a token or key in a path, never a route word or asset hash. */
+const OPAQUE_SEGMENT_PATTERN = /^(?=[^\d]*\d)(?=[^A-Za-z]*[A-Za-z])[A-Za-z0-9_-]{24,}$/;
+
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
 }
 
-/** Reduces an http(s) URL to origin + pathname, with UUID segments as `:id`; any other scheme becomes `scheme:[redacted]`. Relative or unparsable input keeps only the part before `?`/`#`. */
+/** UUID segments become `:id`; segments carrying an e-mail, a credential or an opaque token become `:redacted`. */
+function redactPathSegments(path: string): string {
+  return path
+    .replace(UUID_SEGMENT_PATTERN, ":id")
+    .split("/")
+    .map((segment) => {
+      if (segment === "" || segment === ":id") return segment;
+      const decoded = decodeSegment(segment);
+      const sensitive =
+        decoded.includes("@") ||
+        OPAQUE_SEGMENT_PATTERN.test(decoded) ||
+        redactPatterns(decoded) !== decoded;
+      return sensitive ? ":redacted" : segment;
+    })
+    .join("/");
+}
+
+/** Reduces an http(s) URL to origin + pathname with sensitive segments replaced (see `redactPathSegments`); any other scheme becomes `scheme:[redacted]`. Relative or unparsable input keeps only the part before `?`/`#`. */
 export function scrubUrl(value: unknown): string {
   if (typeof value !== "string" || value.length === 0) return "";
   try {
@@ -503,10 +531,58 @@ export function scrubUrl(value: unknown): string {
     // Only http(s) has an origin + path worth keeping. data:, javascript:, blob:,
     // extension and other schemes can carry a payload in what follows the scheme.
     if (url.protocol !== "http:" && url.protocol !== "https:") return `${url.protocol}${REDACTED}`;
-    return `${url.origin}${redactPathIds(url.pathname)}`;
+    return `${url.origin}${redactPathSegments(url.pathname)}`;
   } catch {
-    return redactPathIds(value.split(/[?#]/, 1)[0] ?? "");
+    return redactPathSegments(value.split(/[?#]/, 1)[0] ?? "");
   }
+}
+
+// ── Page routes ──────────────────────────────────────────────────────────────
+
+export const UNMATCHED_ROUTE = "/:unmatched";
+
+const ROUTE_TEMPLATES: ReadonlyArray<ReadonlyArray<string>> = APP_ROUTES.map((route) => route.path)
+  .filter((path) => path.startsWith("/"))
+  .map((path) => path.split("/").filter(Boolean));
+
+/**
+ * The manifest route a pathname renders, as its template (`/plants/:id`); the most
+ * specific match wins, so `/pheno-hunts/new` beats `/pheno-hunts/:id`. A path that only
+ * the catch-all would render returns `/:unmatched`: its segments came from a link, not code.
+ */
+export function routeTemplateFor(pathname: string): string {
+  const segments = pathname.split("/").filter(Boolean);
+  let best: ReadonlyArray<string> | null = null;
+  let bestStatic = -1;
+  for (const template of ROUTE_TEMPLATES) {
+    if (template.length !== segments.length) continue;
+    let staticCount = 0;
+    const matches = template.every((part, index) => {
+      if (part.startsWith(":")) return true;
+      staticCount++;
+      return part === segments[index];
+    });
+    if (matches && staticCount > bestStatic) {
+      best = template;
+      bestStatic = staticCount;
+    }
+  }
+  return best ? `/${best.join("/")}` : UNMATCHED_ROUTE;
+}
+
+/** Like `scrubUrl`, for an in-app page URL: the pathname is replaced by its route template. */
+export function scrubRouteUrl(value: unknown): string {
+  if (typeof value !== "string" || value.length === 0) return "";
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "http:" && url.protocol !== "https:") return scrubUrl(value);
+      return `${url.origin}${routeTemplateFor(url.pathname)}`;
+    } catch {
+      return scrubUrl(value);
+    }
+  }
+  return routeTemplateFor(value.split(/[?#]/, 1)[0] ?? "");
 }
 
 // ── Free-text summary ────────────────────────────────────────────────────────
@@ -518,14 +594,53 @@ export function scrubUrl(value: unknown): string {
 // a SQLSTATE/PostgREST code, an HTTP status, and a fingerprint of the full text.
 
 const SCOPE_PREFIX_PATTERN = /^\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*:/;
+/**
+ * Every scope the repository's own throw sites put in front of a forwarded provider
+ * message (`fail()` in `growRepo.ts` and `db.ts`, plus three direct throws). A scope not
+ * listed here is grower text that happens to look like one, so it is not reported;
+ * a new throw site reports only a fingerprint until it is added.
+ */
+export const KNOWN_ERROR_SCOPES: ReadonlySet<string> = new Set([
+  ...[
+    "fetchTents",
+    "fetchTent",
+    "fetchPlants",
+    "fetchPlant",
+    "fetchSensorReadings",
+    "insertSensorReading",
+    "insertSensorReadingsBatch",
+  ].map((name) => `growRepo.${name}`),
+  ...[
+    "fetchGrowRows",
+    "fetchGrowRow",
+    "insertGrowRow",
+    "updateGrowRow",
+    "archiveGrow",
+    "fetchDiaryEntryRows",
+    "insertDiaryEntryRow",
+    "updateDiaryEntryRow",
+    "deleteDiaryEntry",
+    "fetchHarvestRows",
+    "insertHarvestRow",
+    "fetchProfileRow",
+    "fetchUserRoles",
+    "assignRole",
+    "fetchUnlockRows",
+    "fetchUserQuestRows",
+  ].map((name) => `db.${name}`),
+  "piIngestIdempotencyRepo.insertPiIngestIdempotencyKeys",
+  "permissions.moderatePlantAsOperator",
+]);
 const POSTGREST_CODE_PATTERN = /\bPGRST\d{3}\b/;
 /** PostgreSQL's SQLSTATE classes (Appendix A); a five-character value outside them is not reported. */
 const SQLSTATE_CLASSES = String.raw`0[0-389ABFLPZ]|10|2[0-8BDF]|3[489BDF]|4[024]|5[3-578]|72|F0|HV|P0|XX`;
 const SQLSTATE_PATTERN = new RegExp(
-  String.raw`\b(?:sqlstate|code)\b["'\s:=]*((?:${SQLSTATE_CLASSES})[0-9A-Z]{3})\b`,
+  String.raw`\bsqlstate\b["'\s:=]*((?:${SQLSTATE_CLASSES})[0-9A-Z]{3})\b`,
   "i",
 );
-const HTTP_STATUS_PATTERN = /\b(?:status(?:[\s_-]?code)?|HTTP|Response)\b["'\s:=]*([1-5]\d{2})\b/i;
+const HTTP_STATUS_PATTERN = /\b(?:status(?:[\s_-]?code)?|HTTP)\b["'\s:=]*([1-5]\d{2})\b/i;
+/** The message `normalizeCaughtError` builds for a thrown `Response`. */
+const CAUGHT_RESPONSE_PATTERN = /^Response ([1-5]\d{2})(?: at |$)/;
 const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]{0,63}$/;
 
 /**
@@ -542,17 +657,28 @@ function fingerprint(text: string): string {
   return `#${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
-/** Reduces a free-text message to `scope code=… status=… #fingerprint`; empty stays empty. */
+/**
+ * Reduces a free-text message to `scope code=… status=… #fingerprint`; empty stays empty.
+ * A field is kept only when code put it there: the scope must be in `KNOWN_ERROR_SCOPES`,
+ * a code or status is read only after such a scope (where the rest is a provider message,
+ * and a code needs an explicit `PGRST###` or `SQLSTATE` label), and the only other status
+ * kept is the one `normalizeCaughtError` writes for a thrown `Response`.
+ */
 export function summarizeErrorText(value: unknown): string {
   if (typeof value !== "string" || value === "") return "";
   const parts: string[] = [];
   const scope = SCOPE_PREFIX_PATTERN.exec(value)?.[1];
-  if (scope && scope.length <= 80) parts.push(scope);
-  const code =
-    POSTGREST_CODE_PATTERN.exec(value)?.[0] ?? SQLSTATE_PATTERN.exec(value)?.[1]?.toUpperCase();
-  if (code) parts.push(`code=${code}`);
-  const status = HTTP_STATUS_PATTERN.exec(value)?.[1];
-  if (status) parts.push(`status=${status}`);
+  if (scope && KNOWN_ERROR_SCOPES.has(scope)) {
+    parts.push(scope);
+    const code =
+      POSTGREST_CODE_PATTERN.exec(value)?.[0] ?? SQLSTATE_PATTERN.exec(value)?.[1]?.toUpperCase();
+    if (code) parts.push(`code=${code}`);
+    const status = HTTP_STATUS_PATTERN.exec(value)?.[1];
+    if (status) parts.push(`status=${status}`);
+  } else {
+    const status = CAUGHT_RESPONSE_PATTERN.exec(value)?.[1];
+    if (status) parts.push(`status=${status}`);
+  }
   parts.push(fingerprint(value));
   return parts.join(" ");
 }
@@ -653,7 +779,7 @@ export function scrubEvent<T extends ReportableEvent | null | undefined>(event: 
       logentry.formatted = summarizeErrorText(next.logentry.formatted);
     next.logentry = logentry;
   }
-  if (typeof next.transaction === "string") next.transaction = scrubUrl(next.transaction);
+  if (typeof next.transaction === "string") next.transaction = scrubRouteUrl(next.transaction);
   if (next.contexts) {
     const contexts: Record<string, unknown> = {};
     for (const name of ALLOWED_EVENT_CONTEXTS) {
@@ -663,7 +789,7 @@ export function scrubEvent<T extends ReportableEvent | null | undefined>(event: 
   }
   if (next.request) {
     const request: ReportableRequest = {};
-    if (typeof next.request.url === "string") request.url = scrubUrl(next.request.url);
+    if (typeof next.request.url === "string") request.url = scrubRouteUrl(next.request.url);
     next.request = request;
   }
   if (next.exception?.values) {
@@ -708,7 +834,10 @@ export function scrubBreadcrumb<T extends ReportableBreadcrumb | null | undefine
   if (next.data) {
     const data: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(next.data)) {
-      if (key === "url" || key === "from" || key === "to") {
+      if (key === "from" || key === "to") {
+        // Navigation breadcrumbs: in-app page paths.
+        data[key] = scrubRouteUrl(value);
+      } else if (key === "url") {
         data[key] = scrubUrl(value);
       } else if (typeof value === "string") {
         data[key] = scrubText(value);
@@ -768,7 +897,7 @@ export function buildManualReportContext(context: ManualReportContext | null | u
 } {
   const source = context?.source ?? "manual";
   const handled = context?.handled === true ? "true" : "false";
-  const route = typeof context?.route === "string" ? scrubUrl(context.route) : "";
+  const route = typeof context?.route === "string" ? scrubRouteUrl(context.route) : "";
   return {
     tags: { source, handled },
     extra: route ? { route } : {},

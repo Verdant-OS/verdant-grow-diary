@@ -170,7 +170,7 @@ describe("errorReportingRules — scrubbing", () => {
       user: { id: "u1", email: "a@b.co", ip_address: "1.2.3.4" },
       server_name: "host",
       request: {
-        url: "https://verdantgrowdiary.com/x?access_token=t",
+        url: "https://verdantgrowdiary.com/plants?access_token=t",
         headers: { cookie: "sb-auth=abc" },
         cookies: "sb=1",
         data: "body",
@@ -211,7 +211,7 @@ describe("errorReportingRules — scrubbing", () => {
     expect(out).not.toBe(event);
     expect(out.user).toBeUndefined();
     expect(out.server_name).toBeUndefined();
-    expect(out.request).toEqual({ url: "https://verdantgrowdiary.com/x" });
+    expect(out.request).toEqual({ url: "https://verdantgrowdiary.com/plants" });
     expect(out.message).toMatch(/^#[0-9a-f]{8}$/);
     expect(out.exception?.values?.[0]?.value).toMatch(/^#[0-9a-f]{8}$/);
     expect(JSON.stringify(out)).not.toMatch(/a@b\.co|refresh_token=rt|x@y\.io/);
@@ -242,10 +242,10 @@ describe("errorReportingRules — scrubbing", () => {
       expect(scrubBreadcrumb({ category, message: "x" })).toBeNull();
     }
     expect(
-      scrubBreadcrumb({ category: "navigation", data: { from: "/a?x=1", to: "/b#y" } }),
+      scrubBreadcrumb({ category: "navigation", data: { from: "/grows?x=1", to: "/plants#y" } }),
     ).toEqual({
       category: "navigation",
-      data: { from: "/a", to: "/b" },
+      data: { from: "/grows", to: "/plants" },
     });
   });
 });

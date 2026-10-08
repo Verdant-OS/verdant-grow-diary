@@ -92,7 +92,7 @@ describe("errorReporter", () => {
 
     reportError("string failure for a@b.co", {
       source: "react_error_boundary",
-      route: "/x?code=1",
+      route: "/plants?code=1",
     });
     expect(sdk.captureException).toHaveBeenCalledTimes(1);
     const [error, hint] = sdk.captureException.mock.calls[0] as [Error, Record<string, unknown>];
@@ -100,7 +100,7 @@ describe("errorReporter", () => {
     expect(error.message).toBe("string failure for [redacted]");
     expect(hint).toEqual({
       tags: { source: "react_error_boundary", handled: "false" },
-      extra: { route: "/x" },
+      extra: { route: "/plants" },
     });
   });
 

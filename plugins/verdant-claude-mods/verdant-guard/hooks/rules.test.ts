@@ -521,9 +521,9 @@ describe("Codex re-review P1s: env -S option re-parse, Playwright project wildca
 describe("shell redirections are not arguments", () => {
   test("a redirection is neither a package name nor a spec filter", () => {
     for (const cmd of [
-      "npm install --no-audit 2>&1 | tail -5",
-      "npm install --no-audit > /tmp/install.log",
-      "npm install --no-audit >/tmp/install.log 2>/dev/null",
+      "npm i --no-audit 2>&1 | tail -5",
+      "npm i --no-audit > /tmp/install.log",
+      "npm i --no-audit >/tmp/install.log 2>/dev/null",
     ]) {
       expect(checkBash(cmd)).toBe(null);
     }
@@ -531,7 +531,7 @@ describe("shell redirections are not arguments", () => {
       "bunx playwright test --project=chromium-mocked 2>&1 | tail -20",
       "bunx playwright test --project=chromium-mocked > /tmp/pw.log",
       "bunx playwright test --project=chromium-mocked >/tmp/pw.log",
-      "npm install left-pad 2>&1",
+      "npm i left-pad 2>&1",
     ]) {
       expect(checkBash(cmd)).not.toBe(null);
     }
@@ -546,6 +546,21 @@ describe("quoted redirection characters stay arguments", () => {
       "env -S 'git push origin > -f'",
     ]) {
       expect(checkBash(cmd)).not.toBe(null);
+    }
+  });
+});
+
+describe("Codex re-review P1: clustered git pull rebase", () => {
+  test("-r inside a short-option cluster is a rebase", () => {
+    for (const cmd of ["git pull -qr origin main", "git pull -vr origin main", "git pull -rq"]) {
+      expect(checkBash(cmd)).not.toBe(null);
+    }
+    for (const cmd of [
+      "git pull -q origin main",
+      "git pull -sresolve origin main",
+      "git pull --no-rebase",
+    ]) {
+      expect(checkBash(cmd)).toBe(null);
     }
   });
 });

@@ -368,7 +368,11 @@ function checkGit(args: string[]): string | null {
   if (sub === "rebase" && !rest.some((t) => t === "--abort" || t === "--quit")) {
     return "`git rebase` rewrites history (AGENTS.md: update branches by merging from base). Use `git merge origin/<base>`.";
   }
-  if (sub === "pull" && rest.some((t) => t === "-r" || longOpt(t, "rebase"))) {
+  // `git pull` short options cluster (`-qr`); -s, -X, -o, -S and -j take the rest as a value.
+  if (
+    sub === "pull" &&
+    rest.some((t) => t === "-r" || longOpt(t, "rebase") || clusterHas(t, "r", "sXoSj"))
+  ) {
     return "`git pull --rebase` rewrites history. Use `git pull --no-rebase` or `git merge`.";
   }
   if (

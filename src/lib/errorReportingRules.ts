@@ -509,6 +509,58 @@ export function scrubUrl(value: unknown): string {
   }
 }
 
+// ── Free-text summary ────────────────────────────────────────────────────────
+//
+// Pattern scrubbing cannot recognise grower-authored text (a plant name, a diary
+// note) inside an error message, and provider messages forwarded verbatim can carry
+// row values. So event messages, exception values and breadcrumb messages never
+// leave as text: only an allowlisted summary does — the code-defined scope prefix,
+// a SQLSTATE/PostgREST code, an HTTP status, and a fingerprint of the full text.
+
+const SCOPE_PREFIX_PATTERN = /^\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*:/;
+const POSTGREST_CODE_PATTERN = /\bPGRST\d{3}\b/;
+/** PostgreSQL's SQLSTATE classes (Appendix A); a five-character value outside them is not reported. */
+const SQLSTATE_CLASSES = String.raw`0[0-389ABFLPZ]|10|2[0-8BDF]|3[489BDF]|4[024]|5[3-578]|72|F0|HV|P0|XX`;
+const SQLSTATE_PATTERN = new RegExp(
+  String.raw`\b(?:sqlstate|code)\b["'\s:=]*((?:${SQLSTATE_CLASSES})[0-9A-Z]{3})\b`,
+  "i",
+);
+const HTTP_STATUS_PATTERN = /\b(?:status(?:[\s_-]?code)?|HTTP|Response)\b["'\s:=]*([1-5]\d{2})\b/i;
+const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]{0,63}$/;
+
+/**
+ * FNV-1a (32-bit) over the UTF-16 code units. Deterministic and one-way: it lets
+ * identical messages group without sending them, and reveals only equality.
+ */
+function fingerprint(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index++) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `#${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+/** Reduces a free-text message to `scope code=… status=… #fingerprint`; empty stays empty. */
+export function summarizeErrorText(value: unknown): string {
+  if (typeof value !== "string" || value === "") return "";
+  const parts: string[] = [];
+  const scope = SCOPE_PREFIX_PATTERN.exec(value)?.[1];
+  if (scope && scope.length <= 80) parts.push(scope);
+  const code =
+    POSTGREST_CODE_PATTERN.exec(value)?.[0] ?? SQLSTATE_PATTERN.exec(value)?.[1]?.toUpperCase();
+  if (code) parts.push(`code=${code}`);
+  const status = HTTP_STATUS_PATTERN.exec(value)?.[1];
+  if (status) parts.push(`status=${status}`);
+  parts.push(fingerprint(value));
+  return parts.join(" ");
+}
+
+/** Exception types are class names; anything else is free text and becomes `Error`. */
+function safeExceptionType(type: string): string {
+  return IDENTIFIER_PATTERN.test(type) ? type : "Error";
+}
+
 function safeString(value: unknown): string {
   try {
     return typeof value === "object" ? (JSON.stringify(value) ?? String(value)) : String(value);
@@ -591,13 +643,13 @@ export function scrubEvent<T extends ReportableEvent | null | undefined>(event: 
   const next: ReportableEvent = { ...event };
   delete next.user;
   delete next.server_name;
-  if (typeof next.message === "string") next.message = scrubText(next.message);
+  if (typeof next.message === "string") next.message = summarizeErrorText(next.message);
   if (next.logentry) {
     const logentry: NonNullable<ReportableEvent["logentry"]> = {};
     if (typeof next.logentry.message === "string")
-      logentry.message = scrubText(next.logentry.message);
+      logentry.message = summarizeErrorText(next.logentry.message);
     if (typeof next.logentry.formatted === "string")
-      logentry.formatted = scrubText(next.logentry.formatted);
+      logentry.formatted = summarizeErrorText(next.logentry.formatted);
     next.logentry = logentry;
   }
   if (typeof next.transaction === "string") next.transaction = scrubUrl(next.transaction);
@@ -618,8 +670,8 @@ export function scrubEvent<T extends ReportableEvent | null | undefined>(event: 
       ...next.exception,
       values: next.exception.values.map((ex) => ({
         ...ex,
-        ...(typeof ex.type === "string" && { type: scrubText(ex.type) }),
-        ...(typeof ex.value === "string" && { value: scrubText(ex.value) }),
+        ...(typeof ex.type === "string" && { type: safeExceptionType(ex.type) }),
+        ...(typeof ex.value === "string" && { value: summarizeErrorText(ex.value) }),
         ...(ex.mechanism && { mechanism: withoutKey(ex.mechanism, "data") }),
         ...(ex.stacktrace?.frames && {
           stacktrace: {
@@ -651,7 +703,7 @@ export function scrubBreadcrumb<T extends ReportableBreadcrumb | null | undefine
   if (!crumb) return null;
   if (crumb.category && DROPPED_BREADCRUMB_CATEGORIES.includes(crumb.category)) return null;
   const next: ReportableBreadcrumb = { ...crumb };
-  if (typeof next.message === "string") next.message = scrubText(next.message);
+  if (typeof next.message === "string") next.message = summarizeErrorText(next.message);
   if (next.data) {
     const data: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(next.data)) {

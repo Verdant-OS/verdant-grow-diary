@@ -115,9 +115,9 @@ describe("errorReporter", () => {
       beforeSend: (e: Record<string, unknown>) => Record<string, unknown>;
       beforeBreadcrumb: (b: Record<string, unknown>) => Record<string, unknown> | null;
     };
-    expect(options.beforeSend({ user: { id: "u" }, message: "a@b.co" })).toEqual({
-      message: "[redacted]",
-    });
+    const sent = options.beforeSend({ user: { id: "u" }, message: "a@b.co" });
+    expect(sent).toEqual({ message: expect.stringMatching(/^#[0-9a-f]{8}$/) });
+    expect(JSON.stringify(sent)).not.toContain("a@b.co");
     expect(options.beforeBreadcrumb({ category: "console", message: "x" })).toBeNull();
   });
 

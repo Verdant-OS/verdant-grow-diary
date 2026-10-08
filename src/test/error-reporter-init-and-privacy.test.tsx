@@ -156,14 +156,15 @@ describe("errorReporter — initialisation race", () => {
       tags: { source: "react_error_boundary", handled: "false" },
       extra: { route: "/plants/1" },
     });
-    // The e-mail is removed by beforeSend before anything leaves the browser.
+    // The message text is replaced by beforeSend before anything leaves the browser.
     const options = sdk.init.mock.calls[0]?.[0] as {
       beforeSend: (e: Record<string, unknown>) => Record<string, unknown>;
     };
     const sent = options.beforeSend({
       exception: { values: [{ type: "Error", value: error.message }] },
     }) as { exception: { values: Array<{ value: string }> } };
-    expect(sent.exception.values[0]?.value).toBe(`child render failed for ${REDACTED}`);
+    expect(sent.exception.values[0]?.value).toMatch(/^#[0-9a-f]{8}$/);
+    expect(JSON.stringify(sent)).not.toContain("grower@example.com");
   });
 });
 
@@ -433,10 +434,11 @@ describe("errorReportingRules — privacy of outgoing events", () => {
       message: `load ${id}`,
       exception: { values: [{ type: "Error", value: `hunt ${id} failed` }] },
     }) as { message: string; exception: { values: Array<{ value: string }> } };
-    expect(event.message).toBe("load [id]");
-    expect(event.exception.values[0]?.value).toBe("hunt [id] failed");
-    expect(scrubBreadcrumb({ category: "fetch", message: `GET row ${id}` })?.message).toBe(
-      "GET row [id]",
+    // Event and breadcrumb messages leave only as a summary, so no id survives there either.
+    expect(event.message).toMatch(/^#[0-9a-f]{8}$/);
+    expect(event.exception.values[0]?.value).toMatch(/^#[0-9a-f]{8}$/);
+    expect(scrubBreadcrumb({ category: "fetch", message: `GET row ${id}` })?.message).toMatch(
+      /^#[0-9a-f]{8}$/,
     );
   });
 
@@ -506,11 +508,83 @@ describe("errorReportingRules — privacy of outgoing events", () => {
         ],
       },
     });
-    expect(out?.logentry).toEqual({ message: `login ${REDACTED}` });
+    expect(out?.logentry).toEqual({ message: expect.stringMatching(/^#[0-9a-f]{8}$/) });
     expect(out?.transaction).toBe("/auth/callback");
     const ex = out?.exception?.values?.[0];
-    expect(ex?.type).toBe(`Error for ${REDACTED}`);
+    expect(ex?.type).toBe("Error");
     expect(ex?.mechanism).toEqual({ type: "generic", handled: false });
     expect(ex?.stacktrace?.frames?.[0]).toEqual({ filename: "https://x.test/a.js" });
+  });
+});
+
+describe("errorReportingRules — free-text messages leave only an allowlisted diagnostic summary", () => {
+  const FINGERPRINT = /#[0-9a-f]{8}$/;
+
+  it("replaces grower-authored text in event messages with a fingerprint", () => {
+    const out = scrubEvent({ message: "plant Blue Dream note: leaves curled" });
+    expect(out?.message).toMatch(/^#[0-9a-f]{8}$/);
+    expect(out?.message).not.toContain("Blue Dream");
+    expect(out?.message).not.toContain("leaves");
+  });
+
+  it("keeps the repo scope, SQLSTATE code and fingerprint from a forwarded provider message", () => {
+    const value =
+      'growRepo.fetchTents: duplicate key value violates unique constraint "plants_name_key" ' +
+      "Key (name)=(Blue Dream #3) already exists. code 23505";
+    const out = scrubEvent({ exception: { values: [{ type: "Error", value }] } });
+    const sent = out?.exception?.values?.[0]?.value ?? "";
+    expect(sent).toMatch(/^growRepo\.fetchTents code=23505 #[0-9a-f]{8}$/);
+    expect(sent).not.toContain("Blue Dream");
+    // Deterministic, and distinct messages stay distinct for grouping.
+    const again = scrubEvent({ exception: { values: [{ type: "Error", value }] } });
+    expect(again?.exception?.values?.[0]?.value).toBe(sent);
+    const other = scrubEvent({
+      exception: { values: [{ type: "Error", value: value.replace("#3", "#4") }] },
+    });
+    expect(other?.exception?.values?.[0]?.value).not.toBe(sent);
+  });
+
+  it("keeps PostgREST codes and HTTP statuses, and drops everything else", () => {
+    const out = scrubEvent({
+      message: "plantRepo.load: PGRST116 JSON object requested, multiple (or no) rows returned",
+      logentry: {
+        message: "Response 503 at https://verdantgrowdiary.com/plants/:id",
+        formatted: "My Gelato tent is too warm",
+      },
+    });
+    expect(out?.message).toMatch(/^plantRepo\.load code=PGRST116 #[0-9a-f]{8}$/);
+    expect(out?.logentry?.message).toMatch(/^status=503 #[0-9a-f]{8}$/);
+    expect(out?.logentry?.formatted).toMatch(/^#[0-9a-f]{8}$/);
+  });
+
+  it("summarises breadcrumb messages the same way", () => {
+    const crumb = scrubBreadcrumb({ category: "fetch", message: "GET Blue Dream diary failed" });
+    expect(crumb?.message).toMatch(/^#[0-9a-f]{8}$/);
+  });
+
+  it("keeps identifier-shaped exception types and replaces any other type with Error", () => {
+    const out = scrubEvent({
+      exception: {
+        values: [
+          { type: "TypeError", value: "x" },
+          { type: "Blue Dream note", value: "y" },
+        ],
+      },
+    });
+    expect(out?.exception?.values?.map((ex) => ex.type)).toEqual(["TypeError", "Error"]);
+    for (const ex of out?.exception?.values ?? []) expect(ex.value).toMatch(FINGERPRINT);
+  });
+
+  it("reports a code only when it is a real SQLSTATE class, so a grower's number never passes", () => {
+    expect(scrubEvent({ message: "ship to zip code 90210" })?.message).toMatch(/^#[0-9a-f]{8}$/);
+    expect(scrubEvent({ message: "x.y: SQLSTATE 42P01" })?.message).toMatch(
+      /^x\.y code=42P01 #[0-9a-f]{8}$/,
+    );
+  });
+
+  it("leaves empty messages empty", () => {
+    const out = scrubEvent({ message: "", exception: { values: [{ type: "Error", value: "" }] } });
+    expect(out?.message).toBe("");
+    expect(out?.exception?.values?.[0]?.value).toBe("");
   });
 });

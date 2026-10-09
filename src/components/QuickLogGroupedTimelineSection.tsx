@@ -35,6 +35,7 @@ import {
   QUICK_LOG_SAMPLE_SOURCE_LABEL,
   quickLogActionLabel,
   formatQuickLogOccurredAt,
+  groupByQuickLogLocalDay,
   quickLogSourceAccessibleLabel,
   quickLogOccurredAtAccessibleLabel,
   filterQuickLogGroupedTimelineEntries,
@@ -366,7 +367,7 @@ function EntryItem({ entry, demoVariant, correctionCount }: EntryItemProps) {
                   className="text-xs text-muted-foreground"
                   data-testid="quick-log-grouped-review-action-occurred-at"
                 >
-                  {reviewActionSection.occurredAt}
+                  {formatQuickLogOccurredAt(reviewActionSection.occurredAt)}
                 </p>
                 {reviewActionSection.volumeMl != null && (
                   <p className="text-xs" data-testid="quick-log-grouped-review-action-volume">
@@ -658,28 +659,42 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
               </p>
             ) : null}
             <ul className="space-y-3" data-testid="quick-log-grouped-timeline-list">
-              {filteredWrapped.map((w, i) => {
-                const entry = w.entry;
-                const key =
-                  entry.kind === "environment"
-                    ? `env:${entry.environment.id}:${i}`
-                    : `act:${entry.action.id}:${i}`;
-                const actionId =
-                  entry.kind === "action" || entry.kind === "grouped" ? entry.action.id : null;
-                const correctionCount =
-                  revisionBadgesReady && actionId
-                    ? (revisionBadges.get(actionId)?.correctionCount ?? 0)
-                    : 0;
-                return (
-                  <li key={key}>
-                    <EntryItem
-                      entry={entry}
-                      demoVariant={w.demoVariant}
-                      correctionCount={correctionCount}
-                    />
-                  </li>
-                );
-              })}
+              {groupByQuickLogLocalDay(
+                filteredWrapped,
+                (wrapped) => wrapped.entry.occurredAt,
+              ).flatMap((day) =>
+                day.items.map((w, i) => {
+                  const entry = w.entry;
+                  const key =
+                    entry.kind === "environment"
+                      ? `env:${entry.environment.id}:${day.dayKey}:${i}`
+                      : `act:${entry.action.id}:${day.dayKey}:${i}`;
+                  const actionId =
+                    entry.kind === "action" || entry.kind === "grouped" ? entry.action.id : null;
+                  const correctionCount =
+                    revisionBadgesReady && actionId
+                      ? (revisionBadges.get(actionId)?.correctionCount ?? 0)
+                      : 0;
+                  return (
+                    <li key={key} data-local-day={day.dayKey}>
+                      {i === 0 ? (
+                        <p
+                          className="text-xs font-semibold text-muted-foreground"
+                          data-testid="quick-log-grouped-timeline-day-label"
+                          data-local-day={day.dayKey}
+                        >
+                          {day.label}
+                        </p>
+                      ) : null}
+                      <EntryItem
+                        entry={entry}
+                        demoVariant={w.demoVariant}
+                        correctionCount={correctionCount}
+                      />
+                    </li>
+                  );
+                }),
+              )}
             </ul>
           </>
         )}

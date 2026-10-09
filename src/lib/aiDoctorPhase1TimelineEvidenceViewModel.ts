@@ -3,6 +3,10 @@ import {
   AI_DOCTOR_PHASE1_EVIDENCE_LABEL,
   AI_DOCTOR_PHASE1_TIMELINE_KIND,
 } from "@/lib/aiDoctorPhase1TimelineDraft";
+import {
+  formatQuickLogOccurredAt,
+  quickLogLocalClockParts,
+} from "@/lib/quickLogGroupedTimelineFilterViewModel";
 
 export const AI_DOCTOR_PHASE1_TIMELINE_BADGE_PRIMARY = "AI Doctor Phase 1" as const;
 export const AI_DOCTOR_PHASE1_TIMELINE_BADGE_EVIDENCE_ONLY = "Evidence only" as const;
@@ -72,24 +76,9 @@ function asStringArray(value: unknown): string[] {
 }
 
 export function formatAiDoctorPhase1TimelineSavedAt(iso: string | null | undefined): string | null {
-  if (typeof iso !== "string" || iso.length === 0) return null;
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return null;
-  try {
-    return (
-      new Intl.DateTimeFormat("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-        timeZone: "UTC",
-      }).format(new Date(ms)) + " UTC"
-    );
-  } catch {
-    return iso;
-  }
+  if (!quickLogLocalClockParts(iso)) return null;
+  const formatted = formatQuickLogOccurredAt(iso);
+  return formatted.length > 0 ? formatted : null;
 }
 
 export function isAiDoctorPhase1EvidenceEvent(

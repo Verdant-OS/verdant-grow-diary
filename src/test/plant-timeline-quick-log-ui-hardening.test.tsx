@@ -111,8 +111,9 @@ describe("Plant Timeline — Quick Log UI hardening", () => {
       const title = screen.getByTestId("quick-log-grouped-action-title");
       expect(title.textContent).toBe("Note");
       const ts = screen.getByTestId("quick-log-grouped-action-occurred-at");
-      // Formatted via shared helper, anchored in UTC for stability.
-      expect(ts.textContent).toMatch(/2026.*UTC/);
+      // Formatted via the shared local-clock helper. The stored ISO stays on the row.
+      expect(ts.textContent).toMatch(/2026/);
+      expect(ts.textContent).not.toMatch(/\bUTC\b/);
       const source = screen.getByTestId("quick-log-grouped-action-source");
       expect(source.textContent).toBe(QUICK_LOG_MANUAL_SOURCE_LABEL);
       expect(source.textContent).not.toMatch(/live|synced|connected|imported/i);

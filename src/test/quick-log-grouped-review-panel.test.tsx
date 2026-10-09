@@ -6,6 +6,7 @@ import { render, screen, waitFor, within, fireEvent } from "@testing-library/rea
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
+import { formatQuickLogOccurredAt } from "@/lib/quickLogGroupedTimelineFilterViewModel";
 
 type Row = {
   id: string;
@@ -205,7 +206,7 @@ describe("Grouped Timeline Review Panel — open / close", () => {
     );
     expect(
       within(panel).getByTestId("quick-log-grouped-review-action-occurred-at").textContent,
-    ).toBe("2026-05-06T10:00:00.000Z");
+    ).toBe(formatQuickLogOccurredAt("2026-05-06T10:00:00.000Z"));
     expect(
       within(panel).getByTestId("quick-log-grouped-review-action-volume").textContent,
     ).toContain("500");

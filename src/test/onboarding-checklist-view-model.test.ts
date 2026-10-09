@@ -224,7 +224,7 @@ describe("checklist links point to safe existing routes", () => {
     expect(ONBOARDING_ROUTES[key]).toBe(expected);
   });
 
-  it("first log step routes to Dashboard where QuickLogV2Fab opens the sheet", () => {
+  it("first log step routes to Dashboard where AppShell's open=quick-log intent opens the sheet", () => {
     const firstLog = vm.steps.find((s) => s.key === "first_log");
 
     expect(firstLog?.href).toBe("/dashboard?open=quick-log");

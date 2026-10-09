@@ -11,6 +11,10 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  QUICKLOG_SMOKE_DAILY_CRON,
+  loadQuickLogSmokeWorkflow,
+} from "./helpers/quicklogSmokeWorkflow";
 import { evaluateBootstrapGate } from "../../e2e/lib/fixtureBootstrap";
 import { readWorkflowYamlScalar } from "./helpers/yamlScalarText";
 
@@ -222,9 +226,10 @@ describe("Workflow: bootstrap step + media expansion + summary", () => {
     expect(block).not.toMatch(/\/artifacts\/\d+/);
   });
 
-  it("workflow still has no schedule/cron/pull_request_target/service_role and no checked-in storageState", () => {
-    expect(wf).not.toMatch(/^\s*schedule\s*:/m);
-    expect(wf).not.toMatch(/-\s*cron\s*:/);
+  it("workflow has only the one daily schedule and no pull_request_target/service_role or checked-in storageState", () => {
+    const workflow = loadQuickLogSmokeWorkflow(ROOT);
+    // Exactly one daily schedule (#1852); no other cron entry may be added.
+    expect(workflow.on.schedule).toEqual([{ cron: QUICKLOG_SMOKE_DAILY_CRON }]);
     expect(wf).not.toMatch(/pull_request_target/);
     expect(wf).not.toMatch(/service_role/i);
     expect(wf).not.toMatch(/password\s*:\s*["'][^"'$]+["']/i);

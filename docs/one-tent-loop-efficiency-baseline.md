@@ -129,7 +129,8 @@ divergences, by surface:
    protect Tranche A5 anchors).
 4. Direct `diary_entries` UPDATE photo patch (`PlantQuickLog.tsx:325-328`).
 5. Direct `grows` UPDATE stage side-write (`QuickLog.tsx:1205`).
-6. Dead-but-compiled `createQuickLogEvent` (`quick-log/createQuickLogEvent.ts:95`).
+6. Dead-but-compiled `createQuickLogEvent` (`quick-log/createQuickLogEvent.ts:95`). Removed under
+   #593.
 
 **Idempotency ranking** (drives the Dup column): legacy `QuickLog` strongest
 (signature-aware key reuse, `QuickLog.tsx:1162-1170`) > `QuickLogV2Sheet`

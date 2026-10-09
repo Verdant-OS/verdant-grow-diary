@@ -33,7 +33,12 @@ import {
   OREOZ_GELONADE_CUSTOMER_SEO,
   OREOZ_GELONADE_GUIDE_SLUG,
 } from "../../constants/oreozGelonadeExperience";
-import { buildCultivarBreadcrumbItems, buildCultivarFaqItems } from "../cultivarDetailSeo";
+import {
+  buildCultivarBreadcrumbItems,
+  buildCultivarFaqItems,
+  cultivarDetailRobots,
+  cultivarVerificationIsSearchIndexable,
+} from "../cultivarDetailSeo";
 import {
   buildArticleJsonLd,
   buildBreadcrumbListJsonLd,
@@ -706,14 +711,36 @@ const GUIDE_DOCUMENTS = VERDANT_SEO_GUIDES.map((guide) =>
   }),
 );
 
-const CULTIVAR_DOCUMENTS = VERDANT_CULTIVARS.map((cultivar) =>
-  publicDocument(`/cultivars/${cultivar.slug}`, {
+export function buildStaticCultivarDocument(cultivar: (typeof VERDANT_CULTIVARS)[number]) {
+  return publicDocument(`/cultivars/${cultivar.slug}`, {
     title: `${cultivar.name} Cultivar Grow Guide | Verdant`,
     description: `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`,
     imageAlt: `${cultivar.name} cultivar guide`,
     jsonLd: buildStaticCultivarJsonLd(cultivar),
-  }),
+    robots: cultivarDetailRobots(cultivar.verificationStatus),
+  });
+}
+
+const CULTIVAR_SEO_ENTRIES = VERDANT_CULTIVARS.map((cultivar) => ({
+  indexable: cultivarVerificationIsSearchIndexable(cultivar.verificationStatus),
+  document: buildStaticCultivarDocument(cultivar),
+}));
+
+const INDEXABLE_CULTIVAR_DOCUMENTS = CULTIVAR_SEO_ENTRIES.filter((entry) => entry.indexable).map(
+  (entry) => entry.document,
 );
+
+/**
+ * Sample and community profiles stay reachable and self-canonical, but they
+ * are not acquisition documents. Reviewed and verified profiles stay in
+ * `STATIC_PUBLIC_SEO_DOCUMENTS` and the sitemap.
+ */
+export const STATIC_CULTIVAR_NOINDEX_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> =
+  Object.freeze(
+    CULTIVAR_SEO_ENTRIES.filter((entry) => !entry.indexable).map((entry) => entry.document),
+  );
+
+const CULTIVAR_DOCUMENTS = CULTIVAR_SEO_ENTRIES.map((entry) => entry.document);
 
 /**
  * Transactional checkout return routes are reachable without JavaScript, but
@@ -773,7 +800,7 @@ export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument>
   GUIDE_HUB,
   ...GUIDE_DOCUMENTS,
   CULTIVAR_HUB,
-  ...CULTIVAR_DOCUMENTS,
+  ...INDEXABLE_CULTIVAR_DOCUMENTS,
 ]);
 
 /**
@@ -795,6 +822,7 @@ export const STATIC_PUBLIC_OUTPUT_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocume
   Object.freeze([
     ...STATIC_PUBLIC_SEO_DOCUMENTS,
     ...STATIC_PUBLIC_NOINDEX_DOCUMENTS,
+    ...STATIC_CULTIVAR_NOINDEX_DOCUMENTS,
     ...STATIC_TRANSACTIONAL_NOINDEX_DOCUMENTS,
     ...STATIC_PUBLIC_ALIAS_DOCUMENTS,
   ]);

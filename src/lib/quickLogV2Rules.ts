@@ -14,6 +14,8 @@ export interface QuickLogV2TargetOption {
   label: string;
   tentId: string | null;
   growId: string | null;
+  /** True when the option's grow is archived and was admitted for notes. */
+  growArchived?: boolean;
 }
 
 export interface PlantLike {
@@ -62,22 +64,34 @@ export function buildQuickLogV2TargetOptions(
   tents: TentLike[],
   plants: PlantLike[],
   visibleGrowIds: ReadonlySet<string> | readonly string[],
+  archivedGrowIds?: ReadonlySet<string> | readonly string[] | null,
 ): QuickLogV2TargetOption[] {
   const visible = toVisibleGrowIdSet(visibleGrowIds);
+  const archived = toVisibleGrowIdSet(archivedGrowIds ?? []);
   const out: QuickLogV2TargetOption[] = [];
+  const admitGrow = (growId: string | null | undefined): { ok: boolean; growArchived: boolean } => {
+    const inVisible = isResolvableQuickLogGrowId(growId, visible);
+    if (inVisible) return { ok: true, growArchived: false };
+    const id = typeof growId === "string" ? growId.trim() : "";
+    if (id.length > 0 && archived.has(id)) return { ok: true, growArchived: true };
+    return { ok: false, growArchived: false };
+  };
   for (const t of tents) {
     if (t?.is_archived) continue;
     if (!t?.id) continue;
-    // Fail closed: null/blank grow_id OR dangling grow_id (not in visible
-    // roster) cannot be selected (live FAIL: "Tent · Flower" with Grow
-    // "No grow linked" while McDonald's Flower Tent was the real target).
-    if (!isResolvableQuickLogGrowId(t.grow_id, visible)) continue;
+    // Fail closed: null/blank grow_id OR dangling grow_id (not in the active
+    // roster and not a known archived grow) cannot be selected (live FAIL:
+    // "Tent · Flower" with Grow "No grow linked" while McDonald's Flower Tent
+    // was the real target).
+    const admission = admitGrow(t.grow_id);
+    if (!admission.ok) continue;
     out.push({
       type: "tent",
       id: t.id,
       label: t.name || "Tent",
       tentId: t.id,
       growId: t.grow_id ?? null,
+      ...(admission.growArchived ? { growArchived: true } : {}),
     });
   }
   for (const p of plants) {
@@ -86,14 +100,17 @@ export function buildQuickLogV2TargetOptions(
     if (!p?.id) continue;
     if (isInactiveQuickLogPlant(p)) continue;
     // Same resolvable-grow fence as tents — unlinked or dangling grow_id
-    // rows are not selectable write targets.
-    if (!isResolvableQuickLogGrowId(p.grow_id, visible)) continue;
+    // rows are not selectable write targets. Known archived grows stay
+    // selectable so a backdated note can name them.
+    const admission = admitGrow(p.grow_id);
+    if (!admission.ok) continue;
     out.push({
       type: "plant",
       id: p.id,
       label: p.name || "Plant",
       tentId: p.tent_id ?? null,
       growId: p.grow_id ?? null,
+      ...(admission.growArchived ? { growArchived: true } : {}),
     });
   }
   return out;

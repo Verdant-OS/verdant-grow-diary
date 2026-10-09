@@ -139,3 +139,37 @@ describe("updatePhenoHuntSetup persistence honesty", () => {
     );
   });
 });
+
+describe("updatePhenoHuntSetup rename (#551)", () => {
+  it("writes the trimmed name and requires the row back", async () => {
+    const { client, calls } = makeFakeClient(() => ({ data: { id: "h1" }, error: null }));
+    await updatePhenoHuntSetup({ huntId: "h1", name: "  Claude E2E Pheno Hunt " }, client);
+    const upd = calls.find((c) => c.op === "update");
+    expect(upd?.payload).toEqual({ name: "Claude E2E Pheno Hunt" });
+  });
+
+  it("an empty name is rejected before any write", async () => {
+    const { client, calls } = makeFakeClient(() => ({ data: { id: "h1" }, error: null }));
+    await expect(
+      updatePhenoHuntSetup({ huntId: "h1", name: "   " }, client),
+    ).rejects.toBeInstanceOf(PhenoHuntError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("a name over the 120-character limit is rejected before any write", async () => {
+    const { client, calls } = makeFakeClient(() => ({ data: { id: "h1" }, error: null }));
+    await expect(
+      updatePhenoHuntSetup({ huntId: "h1", name: "x".repeat(121) }, client),
+    ).rejects.toBeInstanceOf(PhenoHuntError);
+    expect(calls).toHaveLength(0);
+    await updatePhenoHuntSetup({ huntId: "h1", name: "y".repeat(120) }, client);
+    expect(calls.find((c) => c.op === "update")?.payload).toEqual({ name: "y".repeat(120) });
+  });
+
+  it("a silently-filtered rename (lapsed plan / other user's hunt) is not a success", async () => {
+    const { client } = makeFakeClient(() => ({ data: null, error: null }));
+    await expect(
+      updatePhenoHuntSetup({ huntId: "someone-elses-hunt", name: "New" }, client),
+    ).rejects.toBeInstanceOf(PhenoHuntError);
+  });
+});

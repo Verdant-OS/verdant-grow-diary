@@ -22,6 +22,7 @@ export type QuickLogTargetBlockReason =
   | "prefill_tent_mismatch"
   | "prefill_target_pending"
   | "active_grow_mismatch"
+  | "grow_archived"
   | "tent_not_found"
   | "tent_inactive"
   | "selected_tent_mismatch"
@@ -43,6 +44,7 @@ export const QUICK_LOG_TARGET_BLOCKED_COPY: Readonly<Record<QuickLogTargetBlockR
   prefill_tent_mismatch: "The Quick Log tent context changed. Reopen it from the plant.",
   prefill_target_pending: "Confirming this Quick Log target. Please wait.",
   active_grow_mismatch: "This plant belongs to another grow. Review the target before saving.",
+  grow_archived: "This plant's grow is archived. Restore the grow to log to it.",
   tent_not_found: "The assigned tent is unavailable. Review the plant assignment before saving.",
   tent_inactive: "The assigned tent is archived. Choose an active tent before saving.",
   selected_tent_mismatch:
@@ -87,6 +89,14 @@ export interface ResolveQuickLogEditorTargetInput {
   prefillResolution: QuickLogTargetResolution;
   writeResolution: QuickLogTargetResolution;
   dismissedBlockedPrefillKey?: string | null;
+  /**
+   * True when the named prefill's grow is archived. A named archived grow
+   * finalizes in this call: notes stay ready, every other kind is blocked.
+   * Callers omit it for ordinary active-grow launches.
+   */
+  namedGrowArchived?: boolean;
+  /** Notes may target an archived grow. Other log kinds may not. */
+  allowArchivedGrowNote?: boolean;
 }
 
 const blocked = (reason: QuickLogTargetBlockReason): QuickLogTargetResolution => ({
@@ -159,6 +169,9 @@ export function resolveQuickLogEditorTarget(
   }
   if (input.prefillResolution.status === "blocked") {
     return input.prefillResolution;
+  }
+  if (input.namedGrowArchived) {
+    return input.allowArchivedGrowNote ? input.prefillResolution : blocked("grow_archived");
   }
   if (input.writeResolution.status === "blocked") {
     return blocked("prefill_target_pending");

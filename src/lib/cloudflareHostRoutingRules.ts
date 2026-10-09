@@ -244,6 +244,23 @@ export function seoSnapshotBypassRequested(request: Request, env: unknown): bool
   );
 }
 
+/** Exact path only. No version, env, or app data. */
+export const HEALTHZ_PATH = "/healthz";
+export const HEALTHZ_BODY = '{"ok":true}';
+
+export function healthResponseFor(request: Request): Response | null {
+  const pathname = pathnameFromRequest(request);
+  if (!pathname || stripOneTrailingSlash(pathname) !== HEALTHZ_PATH) return null;
+  return new Response(HEALTHZ_BODY, {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "x-robots-tag": "noindex",
+    },
+  });
+}
+
 export function redirectResponseFor(request: Request, env?: unknown): Response | null {
   const decision = resolveHostRouting({
     pathname: pathnameFromRequest(request),

@@ -45,24 +45,24 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### CLOUDFLARE-VERCEL-ROUTING-PORT
+### PR-1939-NOT-FOUND-COVERAGE
 
 ```text
-TASK CLOUDFLARE-VERCEL-ROUTING-PORT  priority: P1  status: OPEN
-goal: Make the Cloudflare Worker reproduce every vercel.json redirect, the SPA-rewrite exclusion, and every header rule. /~oauth/* must hop to the Lovable project host, /strains and /refund-policy (and the other legacy aliases) must redirect, and /unsubscribe must send no-store / no-referrer / noindex.
-branch: cursor/cloudflare-worker-routing-54eb
+TASK PR-1939-NOT-FOUND-COVERAGE  priority: P2  status: OPEN
+goal: Unknown paths return HTTP 404 with the branded not-found page. /healthz stays HTTP 200 with a body of {"ok":true}, cache-control no-store, and x-robots-tag noindex, and no app data. Preserve Cloudflare Worker redirects, host headers, and report-only CSP from #1943 and #1937.
+branch: fix/not-found-404-status
 base: verdant-grow-diary
-checkout: git fetch origin cursor/cloudflare-worker-routing-54eb verdant-grow-diary && git switch cursor/cloudflare-worker-routing-54eb && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1943 (draft)
-head_sha: 64f28c485e013b4bf4d0db83fa7e1cd05cc4a316 (build and local wrangler curl verified here; a log-only commit may follow)
-state: Worker entry applies redirects before SSR and headers on the response. public/_headers carries the same header rules for the assets binding. The SPA catch-all rewrite is not applied as an internal rewrite to /. bun run build exited 0 at 64f28c485 (77/77 SSR snapshots). Local wrangler on 127.0.0.1:8787: /~oauth/initiate 307 to the Lovable host, /strains and /refund-policy 308, /unsubscribe 200 with no-store / no-referrer / noindex, / and /welcome 200. The capture retry uses VERDANT_SEO_SNAPSHOT on Nitro's globalThis.__env__, and only outside the Cloudflare Workers runtime (navigator.userAgent is Cloudflare-Workers in production and wrangler dev). A request header alone still redirects. The oauth 307 is never skipped. CodeRabbit comments on #1943 are addressed in the follow-up commit.
-next_action: address CodeRabbit if it comments, and watch the 35 required checks. Stay draft. Do not deploy or merge.
-files: src/lib/cloudflareHostRoutingRules.ts; src/server.ts; public/_headers; src/test/cloudflare-host-routing-rules.test.ts; scripts/capture-ssr-head-snapshots-with-server.mjs; docs/agents/HANDOFF_LOG.md
-blockers: none for the repository change. Do not deploy, merge, or write the Lovable production Supabase project. #1937 also edits src/server.ts and public/_headers; keep the two PRs separate and merge the header application if that PR lands first.
-artifacts: src/test/cloudflare-host-routing-rules.test.ts
-reviewer_seat: Critical Mass (no product .tsx; lib, Worker entry, tests)
-claimed_by: Grok, 2026-10-08 11:49 CT
-last_updated: 2026-10-08 12:21 CT, by Grok
+checkout: git fetch origin fix/not-found-404-status verdant-grow-diary && git switch fix/not-found-404-status && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1939
+head_sha: c35baaddeb5b3407060a401a411831a3ce460413 before the healthz commits. Those commits cannot name themselves; read the PR head after push.
+state: draft. Unknown paths still throw notFound(). /healthz is answered in the Worker before SSR. withHostHeaders still copies a 404 status and sets the security headers. /manifest.webmanifest stays a 404; the app links /site.webmanifest.
+next_action: required checks at the new head and local Worker curl evidence. Stay draft. No ready, merge, or deploy.
+files: src/routes/$.tsx; src/server.ts; src/lib/cloudflareHostRoutingRules.ts; src/test/not-found-route-status.test.tsx; src/test/host-headers-404-status.test.ts; docs/agents/HANDOFF_LOG.md (this record)
+blockers: none for the repository change. Do not deploy or write production Supabase.
+artifacts: PR #1939 claim comment 6074014428; local Worker curl receipt on the PR
+reviewer_seat: Blue Dream (src/routes/$.tsx); Critical Mass (test)
+claimed_by: Canopy (Cursor cloud agent), 2026-10-09 04:02 UTC — reassigned by Matthew, overriding Codex claim 2026-10-08 05:56 UTC
+last_updated: 2026-10-08 23:46 CT, by Canopy
 ```
 
 ### CLAUDE-CODE-ACTION-002
@@ -738,6 +738,27 @@ last_updated: 2026-09-28 23:53 CT, by Codex
 ```
 
 ## Closed
+
+### CLOUDFLARE-VERCEL-ROUTING-PORT
+
+```text
+TASK CLOUDFLARE-VERCEL-ROUTING-PORT  priority: P1  status: CLOSED
+goal: Make the Cloudflare Worker reproduce every vercel.json redirect, the SPA-rewrite exclusion, and every header rule. /~oauth/* must hop to the Lovable project host, /strains and /refund-policy (and the other legacy aliases) must redirect, and /unsubscribe must send no-store / no-referrer / noindex.
+branch: cursor/cloudflare-worker-routing-54eb
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical: git fetch origin cursor/cloudflare-worker-routing-54eb verdant-grow-diary && git switch cursor/cloudflare-worker-routing-54eb && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1943 (merged)
+head_sha: 3412513bf3f9a9094e1966275bfb32ffc6a6f9b7
+state: CLOSED. Merged to verdant-grow-diary as 3412513bf on 2026-10-08 12:55 PM CT (GitHub merged_at 2026-10-08T17:55:16Z). #1937 (report-only CSP) then merged as eaf0b092257af57acb724dfe9f817d6c8881943b on 2026-10-08T19:23:18Z. The deploy-tip copy of this block still said OPEN; that line was stale.
+next_action: None; closed.
+files: src/lib/cloudflareHostRoutingRules.ts; src/server.ts; public/_headers; src/test/cloudflare-host-routing-rules.test.ts; scripts/capture-ssr-head-snapshots-with-server.mjs; docs/agents/HANDOFF_LOG.md
+blockers: none. Do not deploy from this closed record, and do not write the production Supabase project.
+artifacts: src/test/cloudflare-host-routing-rules.test.ts
+reviewer_seat: Critical Mass (no product .tsx; lib, Worker entry, tests)
+claimed_by: Grok, 2026-10-08 11:49 CT
+last_updated: 2026-10-08 23:02 CT, by Canopy (log maintenance on #1939; not a new claim on #1943)
+closure: Merged via #1943 as 3412513bf3f9a9094e1966275bfb32ffc6a6f9b7 at 2026-10-08 12:55 PM CT. #1937 merged afterward as eaf0b092257af57acb724dfe9f817d6c8881943b, so the header application this block was waiting on has landed. Historical last_updated before this closure note: 2026-10-08 12:21 CT, by Grok.
+```
 
 ### CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001
 

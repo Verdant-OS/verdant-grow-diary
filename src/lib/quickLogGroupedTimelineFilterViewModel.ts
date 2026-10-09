@@ -192,6 +192,67 @@ export function formatQuickLogLocalDayLabel(dayKey: string, now: Date): string {
 }
 
 /**
+ * Put each demo row in the local-day run that matches its instant.
+ * Real rows keep their relative order. Demo rows follow the real rows of
+ * that day, in the order the demos were given. A day that has only demo
+ * rows is inserted by descending local day key. An unreadable instant
+ * stays after the dated rows.
+ */
+export function orderQuickLogTimelineDemosIntoLocalDays<T>(
+  items: readonly T[],
+  occurredAtOf: (item: T) => string | null | undefined,
+  isDemo: (item: T) => boolean,
+): T[] {
+  const reals: T[] = [];
+  const demos: T[] = [];
+  for (const item of items) {
+    if (isDemo(item)) demos.push(item);
+    else reals.push(item);
+  }
+  if (demos.length === 0) return reals.slice();
+
+  const buckets: { dayKey: string; items: T[] }[] = [];
+  for (const item of reals) {
+    const dayKey = quickLogLocalDayKey(occurredAtOf(item)) ?? "";
+    const last = buckets[buckets.length - 1];
+    if (last && last.dayKey === dayKey) last.items.push(item);
+    else buckets.push({ dayKey, items: [item] });
+  }
+
+  const firstIndexByDay = new Map<string, number>();
+  const reindex = () => {
+    firstIndexByDay.clear();
+    buckets.forEach((bucket, index) => {
+      if (!firstIndexByDay.has(bucket.dayKey)) firstIndexByDay.set(bucket.dayKey, index);
+    });
+  };
+  reindex();
+
+  for (const demo of demos) {
+    const dayKey = quickLogLocalDayKey(occurredAtOf(demo)) ?? "";
+    const existing = firstIndexByDay.get(dayKey);
+    if (existing !== undefined) {
+      buckets[existing]?.items.push(demo);
+      continue;
+    }
+    const index = indexForNewLocalDay(buckets, dayKey);
+    buckets.splice(index, 0, { dayKey, items: [demo] });
+    reindex();
+  }
+
+  return buckets.flatMap((bucket) => bucket.items);
+}
+
+function indexForNewLocalDay(buckets: readonly { dayKey: string }[], dayKey: string): number {
+  if (dayKey.length === 0) return buckets.length;
+  for (let i = 0; i < buckets.length; i++) {
+    const key = buckets[i]?.dayKey ?? "";
+    if (key.length === 0 || dayKey > key) return i;
+  }
+  return buckets.length;
+}
+
+/**
  * Bucket already-ordered timeline rows by the viewer's local calendar day.
  * Order inside a day, and the order days are first encountered, are preserved.
  */

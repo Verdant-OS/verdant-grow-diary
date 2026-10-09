@@ -36,6 +36,7 @@ import {
   quickLogActionLabel,
   formatQuickLogOccurredAt,
   groupByQuickLogLocalDay,
+  orderQuickLogTimelineDemosIntoLocalDays,
   quickLogSourceAccessibleLabel,
   quickLogOccurredAtAccessibleLabel,
   filterQuickLogGroupedTimelineEntries,
@@ -515,9 +516,18 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
   const revisionLedgerUnread = revisionBadgesStatus === "unavailable";
 
   const hasAnyEntries = wrapped.length > 0;
+  const orderedWrapped = useMemo(
+    () =>
+      orderQuickLogTimelineDemosIntoLocalDays(
+        filteredWrapped,
+        (item) => item.entry.occurredAt,
+        (item) => item.demoVariant !== undefined,
+      ),
+    [filteredWrapped],
+  );
   const timelineDays = useMemo(() => {
     const seenDayHeadings = new Map<string, string>();
-    return groupByQuickLogLocalDay(filteredWrapped, (item) => item.entry.occurredAt).map((day) => {
+    return groupByQuickLogLocalDay(orderedWrapped, (item) => item.entry.occurredAt).map((day) => {
       const dayToken = day.dayKey.length > 0 ? day.dayKey : "unknown";
       const existingHeadingId = seenDayHeadings.get(dayToken);
       const showHeading = existingHeadingId === undefined;
@@ -525,7 +535,7 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
       if (showHeading) seenDayHeadings.set(dayToken, headingId);
       return { day, showHeading, headingId };
     });
-  }, [filteredWrapped, dayHeadingPrefix]);
+  }, [orderedWrapped, dayHeadingPrefix]);
   const aiDoctorResultsHref = aiDoctorResultsHrefFor(props);
   const isAiDoctorEvidenceFilter = filter === "ai-doctor-evidence";
 

@@ -1,4 +1,7 @@
 /**
+ * @source-scan-justified: readFileSync plus toMatch on
+ * scripts/run-quicklog-dual-timestamp-rls-harness.ts. That bun harness has no
+ * Vitest import surface, so these pins cannot assert a resolved module.
  * Regression: the Quick Log dual-timestamp harness reported RPC failures as a
  * bare "null" (JSON.stringify(result.data)), hiding the HTTP status and the
  * PostgREST/transport error. Two CI failures (#1867 @ 4108949a, #1877 @

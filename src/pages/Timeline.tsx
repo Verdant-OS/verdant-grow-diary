@@ -2,6 +2,7 @@ import { SENSOR_TRUTH_FUTURE_SKEW_MS } from "@/constants/sensorTruthRanges";
 import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
 import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
+import { orderNewestFirstStable } from "@/lib/timelineQueryOrderRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
@@ -682,14 +683,15 @@ export default function Timeline() {
       // Page-critical read: falls back to unfiltered pre-migration (the
       // retracted_at column ships in 20260811090000) instead of failing.
       const entriesResult = await selectWithRetractionCompat((withRetractionFilter) => {
-        let entriesQuery = supabase
-          .from("diary_entries")
-          .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", {
-            count: "exact",
-          })
-          .eq("grow_id", activeGrowId)
-          .order("entry_at", { ascending: false })
-          .limit(100);
+        let entriesQuery = orderNewestFirstStable(
+          supabase
+            .from("diary_entries")
+            .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", {
+              count: "exact",
+            })
+            .eq("grow_id", activeGrowId),
+          "entry_at",
+        ).limit(100);
         if (withRetractionFilter) entriesQuery = entriesQuery.is("retracted_at", null);
         if (timelineDateRangeBounds.startIso)
           entriesQuery = entriesQuery.gte("entry_at", timelineDateRangeBounds.startIso);
@@ -713,13 +715,14 @@ export default function Timeline() {
       // a deleted (or merely out-of-window) parent that this bounded page
       // doesn't include; that gap is closed by the small supplemental
       // by-id lookup below, not by widening this query.
-      let growEventsQuery = supabase
-        .from("grow_events")
-        .select(ROOT_ZONE_GROW_EVENT_SELECT, { count: "exact" })
-        .eq("grow_id", activeGrowId)
-        .eq("is_deleted", false)
-        .order("occurred_at", { ascending: false })
-        .limit(100);
+      let growEventsQuery = orderNewestFirstStable(
+        supabase
+          .from("grow_events")
+          .select(ROOT_ZONE_GROW_EVENT_SELECT, { count: "exact" })
+          .eq("grow_id", activeGrowId)
+          .eq("is_deleted", false),
+        "occurred_at",
+      ).limit(100);
       if (timelineDateRangeBounds.startIso)
         growEventsQuery = growEventsQuery.gte("occurred_at", timelineDateRangeBounds.startIso);
       if (timelineDateRangeBounds.endIso)
@@ -820,14 +823,15 @@ export default function Timeline() {
       supplementalTasks.push(
         (async () => {
           try {
-            const actionResult = await supabase
-              .from("action_queue_events")
-              .select(
-                "id,action_queue_id,event_type,previous_status,new_status,note,created_at,action:action_queue(suggested_change,reason)",
-              )
-              .eq("grow_id", activeGrowId)
-              .order("created_at", { ascending: false })
-              .limit(50);
+            const actionResult = await orderNewestFirstStable(
+              supabase
+                .from("action_queue_events")
+                .select(
+                  "id,action_queue_id,event_type,previous_status,new_status,note,created_at,action:action_queue(suggested_change,reason)",
+                )
+                .eq("grow_id", activeGrowId),
+              "created_at",
+            ).limit(50);
             if (!isCurrentRequest()) return;
             if (actionResult.error || !Array.isArray(actionResult.data)) {
               markPartial("action_queue_events");
@@ -840,14 +844,15 @@ export default function Timeline() {
         })(),
         (async () => {
           try {
-            const alertResult = await supabase
-              .from("alert_events")
-              .select(
-                "id,alert_id,event_type,previous_status,new_status,note,created_at,alert:alerts(title,severity,metric,status)",
-              )
-              .eq("grow_id", activeGrowId)
-              .order("created_at", { ascending: false })
-              .limit(50);
+            const alertResult = await orderNewestFirstStable(
+              supabase
+                .from("alert_events")
+                .select(
+                  "id,alert_id,event_type,previous_status,new_status,note,created_at,alert:alerts(title,severity,metric,status)",
+                )
+                .eq("grow_id", activeGrowId),
+              "created_at",
+            ).limit(50);
             if (!isCurrentRequest()) return;
             if (alertResult.error || !Array.isArray(alertResult.data)) {
               markPartial("alert_events");
@@ -992,13 +997,14 @@ export default function Timeline() {
       // Keyset page stays inside the applied date bounds so pagination
       // never walks out of the filtered range.
       const olderResult = await selectWithRetractionCompat((withRetractionFilter) => {
-        let olderQuery = supabase
-          .from("diary_entries")
-          .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
-          .eq("grow_id", requestedGrowId)
-          .lt("entry_at", cursor)
-          .order("entry_at", { ascending: false })
-          .limit(100);
+        let olderQuery = orderNewestFirstStable(
+          supabase
+            .from("diary_entries")
+            .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+            .eq("grow_id", requestedGrowId)
+            .lt("entry_at", cursor),
+          "entry_at",
+        ).limit(100);
         if (withRetractionFilter) olderQuery = olderQuery.is("retracted_at", null);
         if (timelineDateRangeBounds.startIso)
           olderQuery = olderQuery.gte("entry_at", timelineDateRangeBounds.startIso);

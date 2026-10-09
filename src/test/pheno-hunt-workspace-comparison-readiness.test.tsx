@@ -37,6 +37,16 @@ vi.mock("@/hooks/usePhenoStressObservations", () => ({
   }),
 }));
 
+// #1005: the evidence → Quick Log target gate reads the canonical tent
+// catalog; stub it so these suites keep their original axis without a
+// QueryClient (the gate has its own suites).
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({ data: [], isError: false, refetch: () => Promise.resolve() }),
+}));
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({ data: [], isError: false, refetch: () => Promise.resolve() }),
+}));
+
 import PhenoHuntWorkspace from "@/pages/PhenoHuntWorkspace";
 
 // Packet coverage is exercised by its own suites; here it stays disabled so
@@ -127,6 +137,7 @@ function mountAt(input: ScenarioInput) {
     saveSmokeTest: vi.fn().mockResolvedValue(true),
     saveLabResult: vi.fn().mockResolvedValue(true),
     deleteLabResult: vi.fn().mockResolvedValue(true),
+    applyHuntName: vi.fn(),
   });
   return render(
     <MemoryRouter initialEntries={[`/pheno-hunts/${HUNT_ID}/workspace`]}>

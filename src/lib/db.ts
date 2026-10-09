@@ -186,12 +186,6 @@ export async function fetchProfileRow(userId: string): Promise<ProfileRow | null
   return (data as ProfileRow | null) ?? null;
 }
 
-export async function upsertProfileRow(row: ProfileInsert): Promise<ProfileRow> {
-  const { data, error } = await supabase.from("profiles").upsert(row).select().single();
-  if (error) fail("upsertProfileRow", error);
-  return data as ProfileRow;
-}
-
 /* ------------------------------------------------------------------ */
 //  Typed CRUD helpers — User Roles
 /* ------------------------------------------------------------------ */

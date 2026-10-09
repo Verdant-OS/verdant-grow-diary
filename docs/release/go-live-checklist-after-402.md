@@ -115,7 +115,12 @@ database lock knk, HOLD #1250).
 `20260928183000` or `20261001140000` is recorded in production migration history, a single
 version-ordered apply runs `20260927012000` in place, with no skip. Otherwise use the order
 below. Both paths are safe: `20260927160000`/`20260928183000` need only `20260927002000`,
-and `20261001140000` accepts either predecessor.
+and `20261001140000` accepts either predecessor. **In either path, `20261001180000` (#1841)
+is excluded:** a version-ordered apply would run it as a bare file and skip the guarded
+chain's ACL and runner-role checks. It is delivered only as step 4 of the guarded manual
+chain (last bullet of step 1). Whether the owner's apply tool can leave that one file out of
+a version-ordered push is NOT_MEASURED; if it cannot, do not run a version-ordered push while
+`20261001180000` is pending.
 
 Restated from #1894:
 
@@ -136,8 +141,13 @@ Restated from #1894:
    - #1836 `20261001140000` (it accepts either predecessor).
    - #1841 `20261001180000` last. It only replaces the manual wrapper, and its preflight
      requires the `20260928183000` wrapper, so it fails closed if that file was not applied.
-     Deliver it as step 4 of the guarded manual chain in
-     `docs/quicklog-manual-delivery-order-contract.md`, not as a bare file.
+     Deliver it only as step 4 of the guarded manual chain in
+     `docs/quicklog-manual-delivery-order-contract.md`, never as a bare file or in a
+     version-ordered push (see the pre-step-2 check). **The guarded delivery must be
+     recorded.** Otherwise the file stays pending, and a later `db push` runs it bare; its
+     preflight then fails on the already-replaced wrapper and the push stops. The owner
+     records it, e.g. `supabase migration repair --status applied 20261001180000`. Agents
+     never run this.
 2. Before any edge deploy that includes #1869: confirm `PAYMENTS_ENVIRONMENT=live` in the
    Supabase function secrets. If it's unset, checkout returns 503 by design.
 3. Redeploy the edge functions listed there: `mcp` (#1651, #1655), `ai-doctor-review`

@@ -1,4 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -149,7 +153,7 @@ beforeEach(() => {
     error: null,
   });
   harness.setActiveGrowId.mockReset();
-  localStorage.setItem("verdant.activeGrow.u1", "g-active");
+  setLocalStorageItemForTest("verdant.activeGrow.u1", "g-active");
 });
 
 afterEach(() => cleanup());
@@ -174,7 +178,7 @@ describe("Quick Log launcher for a plant in an archived grow", () => {
     expect(screen.getByTestId("quick-log-save")).toBeEnabled();
     expect(harness.setActiveGrowId).not.toHaveBeenCalled();
     expect(harness.activeGrowId).toBe("g-active");
-    expect(localStorage.getItem("verdant.activeGrow.u1")).toBe("g-active");
+    expect(getLocalStorageItemForTest("verdant.activeGrow.u1")).toBe("g-active");
     fireEvent.pointerDown(screen.getByTestId("quick-log-plant-select"), {
       button: 0,
       ctrlKey: false,
@@ -197,7 +201,7 @@ describe("Quick Log launcher for a plant in an archived grow", () => {
       }),
     );
     expect(harness.setActiveGrowId).not.toHaveBeenCalled();
-    expect(localStorage.getItem("verdant.activeGrow.u1")).toBe("g-active");
+    expect(getLocalStorageItemForTest("verdant.activeGrow.u1")).toBe("g-active");
   });
 
   it("shows a final archived-grow message for a non-note instead of confirming", () => {

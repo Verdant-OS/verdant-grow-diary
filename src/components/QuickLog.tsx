@@ -82,6 +82,7 @@ import {
   QUICK_LOG_WATERING_VOLUME_PRESET_OPTIONS,
 } from "@/lib/quickLogWateringVolumePresetRules";
 import {
+  buildQuickLogPlantSelectOptions,
   filterQuickLogPlantOptions,
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
@@ -865,11 +866,10 @@ export default function QuickLog({
     if (!editorPlantId || !namedGrowArchived) return null;
     return plants.find((plant) => plant.id === editorPlantId) ?? null;
   }, [editorPlantId, namedGrowArchived, plants]);
-  const plantSelectOptions = useMemo(() => {
-    if (!archivedNamedPlant) return scopedPlants;
-    if (scopedPlants.some((plant) => plant.id === archivedNamedPlant.id)) return scopedPlants;
-    return [archivedNamedPlant, ...scopedPlants];
-  }, [archivedNamedPlant, scopedPlants]);
+  const plantSelectOptions = useMemo(
+    () => buildQuickLogPlantSelectOptions(scopedPlants, archivedNamedPlant),
+    [archivedNamedPlant, scopedPlants],
+  );
 
   const selectedPlant = useMemo(
     () =>

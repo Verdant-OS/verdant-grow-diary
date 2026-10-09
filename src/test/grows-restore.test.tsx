@@ -3,14 +3,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 
 import { FREE_GROW_LIMIT_BLOCKED_COPY } from "@/lib/entitlements/freeTierGates";
+import { GROW_RESTORE_FAILED_COPY } from "@/lib/archivedGrowQuickLogRules";
 
 const harness = vi.hoisted(() => ({
   grows: [] as Array<Record<string, unknown>>,
   archivedGrows: [] as Array<Record<string, unknown>>,
   refresh: vi.fn(),
   maxActiveGrows: 1 as number | null,
-  updateResult: { error: null as { message: string; details?: string } | null },
+  updateResult: {
+    data: [{ id: "g-old" }] as Array<Record<string, unknown>> | null,
+    error: null as { message: string; details?: string } | null,
+  },
   updates: [] as Array<Record<string, unknown>>,
+  eqs: [] as Array<[string, unknown]>,
+  holdSelect: false,
+  pendingSelect: null as null | ((value: unknown) => void),
 }));
 
 vi.mock("sonner", () => ({
@@ -45,10 +52,18 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
       update: (payload: Record<string, unknown>) => ({
-        eq: async () => {
-          harness.updates.push(payload);
-          return harness.updateResult;
-        },
+        eq: (column: string, value: unknown) => ({
+          select: () => {
+            harness.updates.push(payload);
+            harness.eqs.push([column, value]);
+            if (harness.holdSelect) {
+              return new Promise((resolve) => {
+                harness.pendingSelect = resolve;
+              });
+            }
+            return Promise.resolve(harness.updateResult);
+          },
+        }),
       }),
     }),
   },
@@ -79,6 +94,12 @@ const active = {
   notes: null,
 };
 
+const archivedLater = {
+  ...archived,
+  id: "g-older",
+  name: "Autumn run",
+};
+
 function renderGrows() {
   return render(
     <MemoryRouter>
@@ -91,8 +112,11 @@ beforeEach(() => {
   harness.grows = [];
   harness.archivedGrows = [archived];
   harness.maxActiveGrows = null;
-  harness.updateResult = { error: null };
+  harness.updateResult = { data: [{ id: "g-old" }], error: null };
   harness.updates = [];
+  harness.eqs = [];
+  harness.holdSelect = false;
+  harness.pendingSelect = null;
   harness.refresh.mockReset();
   harness.refresh.mockResolvedValue(undefined);
   vi.mocked(toast.success).mockReset();
@@ -109,6 +133,7 @@ describe("Grows page restore", () => {
     fireEvent.click(screen.getByTestId("restore-grow"));
 
     await waitFor(() => expect(harness.updates).toEqual([{ is_archived: false }]));
+    expect(harness.eqs).toEqual([["id", "g-old"]]);
     expect(harness.refresh).toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalledWith("Grow restored");
     expect(screen.queryByTestId("grow-restore-error")).not.toBeInTheDocument();
@@ -132,6 +157,7 @@ describe("Grows page restore", () => {
   it("surfaces the server cap error when the write is rejected", async () => {
     harness.maxActiveGrows = null;
     harness.updateResult = {
+      data: null,
       error: {
         message: "free_active_grow_limit_reached",
         details: "Free accounts may have one active grow.",
@@ -146,5 +172,40 @@ describe("Grows page restore", () => {
     );
     expect(harness.refresh).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("shows an error when the update matches no row", async () => {
+    harness.updateResult = { data: [], error: null };
+    renderGrows();
+
+    fireEvent.click(screen.getByTestId("restore-grow"));
+
+    expect(await screen.findByTestId("grow-restore-error")).toHaveTextContent(
+      GROW_RESTORE_FAILED_COPY,
+    );
+    expect(harness.eqs).toEqual([["id", "g-old"]]);
+    expect(harness.refresh).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(GROW_RESTORE_FAILED_COPY);
+  });
+
+  it("marks the chosen Restore button busy and disables the others", async () => {
+    harness.archivedGrows = [archived, archivedLater];
+    harness.holdSelect = true;
+    renderGrows();
+
+    const [first, second] = screen.getAllByTestId("restore-grow");
+    fireEvent.click(first);
+
+    expect(first).toHaveAttribute("aria-busy", "true");
+    expect(first).toHaveTextContent("Restoring grow");
+    expect(first).toBeDisabled();
+    expect(second).toBeDisabled();
+    expect(second).toHaveTextContent("Restore grow");
+
+    harness.pendingSelect?.({ data: [{ id: "g-old" }], error: null });
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Grow restored"));
+    expect(harness.eqs).toEqual([["id", "g-old"]]);
   });
 });

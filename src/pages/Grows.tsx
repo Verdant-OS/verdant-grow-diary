@@ -171,19 +171,24 @@ export default function Grows() {
     }
     setRestoringId(id);
     setRestoreError(null);
-    const { error: restoreWriteError } = await supabase
-      .from("grows")
-      .update({ is_archived: false })
-      .eq("id", id);
-    setRestoringId(null);
-    if (restoreWriteError) {
-      const copy = growRestoreFailureCopy(restoreWriteError);
-      setRestoreError(copy);
-      toast.error(copy);
-      return;
+    try {
+      const { data: restoredRows, error: restoreWriteError } = await supabase
+        .from("grows")
+        .update({ is_archived: false })
+        .eq("id", id)
+        .select();
+      const restoredCount = Array.isArray(restoredRows) ? restoredRows.length : 0;
+      if (restoreWriteError || restoredCount === 0) {
+        const copy = growRestoreFailureCopy(restoreWriteError);
+        setRestoreError(copy);
+        toast.error(copy);
+        return;
+      }
+      await refresh();
+      toast.success("Grow restored");
+    } finally {
+      setRestoringId(null);
     }
-    await refresh();
-    toast.success("Grow restored");
   }
 
   return (
@@ -347,10 +352,11 @@ export default function Grows() {
                   size="sm"
                   variant="outline"
                   data-testid="restore-grow"
-                  disabled={restoringId === g.id}
+                  disabled={restoringId !== null}
+                  aria-busy={restoringId === g.id}
                   onClick={() => restore(g.id)}
                 >
-                  Restore grow
+                  {restoringId === g.id ? "Restoring grow" : "Restore grow"}
                 </Button>
               </li>
             ))}

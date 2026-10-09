@@ -287,7 +287,7 @@ export default function DiaryCalendarSection({
     );
     setOpenDay(nextGroups[0]?.dateKey ?? null);
   };
-  // Today: jump to the current UTC month, keep active filter, and expand
+  // Today: jump to the viewer's local month, keep active filter, and expand
   // the newest matching day in that month. If no matches exist, close the
   // expanded day so we don't leak stale details.
   const goToToday = () => {

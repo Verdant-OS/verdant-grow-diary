@@ -25,6 +25,7 @@ import {
 } from "@/lib/environmentCheckTimelineViewModel";
 import { TRAINING_INTENSITIES, TRAINING_TECHNIQUES } from "@/lib/quickLogTypedEventPayloadRules";
 import { repairDiaryNoteSentenceSpacing } from "@/lib/diaryNoteFormatting";
+import { calendarInstantDayKey } from "@/lib/calendarLocalDayRules";
 import {
   celsiusToFahrenheit,
   loadTemperatureUnitPreference,
@@ -186,7 +187,10 @@ export interface DiaryCalendarEvent {
   label: string;
   /** ISO timestamp of the event (entry_at preferred). */
   occurredAt: string;
-  /** YYYY-MM-DD bucket key in UTC. */
+  /**
+   * YYYY-MM-DD bucket in the viewer's local calendar day. A bare
+   * YYYY-MM-DD stays that civil date. Stored `occurredAt` remains UTC.
+   */
   dateKey: string;
   /** Optional safe plant name pulled from a vetted field. */
   plantName: string | null;
@@ -524,15 +528,12 @@ function toIso(value: string | null | undefined): string | null {
   return new Date(t).toISOString();
 }
 
-function dateKeyUtc(iso: string): string {
-  return iso.slice(0, 10);
-}
-
 /**
  * Build the read-only calendar view-model. Pure & deterministic.
  *
  * - Filters to watering / feeding / training / diagnosis / environment only.
- * - Groups by UTC calendar date (YYYY-MM-DD).
+ * - Groups timestamped events by the viewer's local calendar day. A bare
+ *   YYYY-MM-DD stays that civil date. The stored instant stays UTC.
  * - Sorts groups newest-first, events within a day newest-first,
  *   stable-tiebreaks by id.
  *
@@ -551,8 +552,10 @@ export function buildDiaryCalendarViewModel(
     if (!raw || typeof raw.id !== "string" || !raw.id) continue;
     const kind = extractKind(raw);
     if (!kind) continue;
-    const iso = toIso(raw.entry_at ?? raw.occurred_at ?? null);
-    if (!iso) continue;
+    const rawAt = raw.entry_at ?? raw.occurred_at ?? null;
+    const iso = toIso(rawAt);
+    const dateKey = calendarInstantDayKey(rawAt);
+    if (!iso || !dateKey) continue;
 
     const noteSnippet = safeNote(raw.note);
     events.push({
@@ -560,7 +563,7 @@ export function buildDiaryCalendarViewModel(
       kind,
       label: DIARY_CALENDAR_KIND_LABEL[kind],
       occurredAt: iso,
-      dateKey: dateKeyUtc(iso),
+      dateKey,
       plantName: safePlantName(raw.details),
       stage: safeCalendarStage(raw.stage),
       noteSnippet,
@@ -704,10 +707,10 @@ export function diaryCalendarMonthEmptyTitle(
   return `No ${filter} events logged for ${label}.`;
 }
 
-/** Current UTC month key (YYYY-MM) for the given date. Pure & deterministic. */
+/** Current local month key (YYYY-MM) for the given date. Pure & deterministic. */
 export function currentMonthKey(now: Date): string {
-  const y = now.getUTCFullYear();
-  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
   return `${y}-${m}`;
 }
 

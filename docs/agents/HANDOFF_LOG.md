@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CALENDAR-LOCAL-DAY
+
+```text
+TASK CALENDAR-LOCAL-DAY  priority: P2  status: OPEN
+goal: Diary calendar and cultivation calendar group timestamped events (occurred_at, entry_at, scheduled review instants) by the viewer's local day. Bare YYYY-MM-DD and UTC-midnight plant/grow/flower-flip start dates stay on that civil date. Stored instants stay UTC. References #1949 (Quick Log timeline local timezone — do not edit that draft) and #1946.
+branch: cursor/calendar-local-day-fc13
+base: verdant-grow-diary
+checkout: git fetch origin cursor/calendar-local-day-fc13 verdant-grow-diary && git switch cursor/calendar-local-day-fc13 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED until the draft is open
+head_sha: local only until the first push
+state: local implementation. New Chicago-pinned tests were red (3 failed, 2 passed) before the calendar call sites changed, then green on the targeted calendar files.
+next_action: push the branch, open a draft PR, and record the head SHA here. Stay draft. No ready, merge, or deploy.
+files: src/lib/calendarLocalDayRules.ts; src/lib/diaryCalendarViewModel.ts; src/lib/cultivationCalendarMonthGridRules.ts; src/lib/flowerWindowCalendarRules.ts; src/components/DiaryCalendarSection.tsx; src/test/calendar-local-day-grouping.test.ts; docs/agents/HANDOFF_LOG.md
+blockers: none for the repository change. No production data, schema, auth, or lockfile edits.
+artifacts: src/test/calendar-local-day-grouping.test.ts
+reviewer_seat: Blue Dream (DiaryCalendarSection.tsx); Critical Mass (rules and tests)
+claimed_by: Grok, 2026-10-09 14:45 CT
+last_updated: 2026-10-09 14:45 CT, by Grok
+```
+
 ### PR-1939-NOT-FOUND-COVERAGE
 
 ```text

@@ -124,6 +124,11 @@ import {
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
 import {
+  ARCHIVED_GROW_QUICK_LOG_BLOCKED_COPY,
+  isArchivedGrowId,
+  isArchivedGrowQuickLogNote,
+} from "@/lib/archivedGrowQuickLogRules";
+import {
   QUICK_LOG_TARGET_BLOCKED_COPY,
   quickLogPrefillTargetKey,
   resolveQuickLogEditorTarget,
@@ -411,7 +416,8 @@ export default function QuickLog({
   successMessage = "Logged 🌱",
 }: Props) {
   const { user } = useAuth();
-  const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
+  const { grows, archivedGrows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
+  const archivedGrowList = useMemo(() => archivedGrows ?? [], [archivedGrows]);
   const plantsQuery = usePlants();
   const tentsQuery = useTents();
   const plants = useMemo(() => plantsQuery.data ?? [], [plantsQuery.data]);
@@ -614,6 +620,18 @@ export default function QuickLog({
   );
   const prefillPlantId = prefillTarget.status === "ready" ? prefillTarget.target.plantId : null;
   const prefillGrowId = prefillTarget.status === "ready" ? prefillTarget.target.growId : null;
+  const archivedGrowIds = useMemo(
+    () =>
+      archivedGrowList
+        .map((grow) => grow.id)
+        .filter((id): id is string => typeof id === "string" && id.trim().length > 0),
+    [archivedGrowList],
+  );
+  const namedGrowArchived = isArchivedGrowId(prefillGrowId, archivedGrowIds);
+  const allowArchivedGrowNote = isArchivedGrowQuickLogNote({
+    eventType: eventTypeUserTouchedRef.current ? eventType : (prefill?.eventType ?? eventType),
+    activityId: prefill?.activityId ?? null,
+  });
   // Legacy adapter boundary: AppShell currently supplies one already-collapsed
   // named prefill, so this first consumer maps it to the highest named tier.
   // The shared resolver still owns the complete explicit → route → selection
@@ -765,7 +783,14 @@ export default function QuickLog({
   useEffect(() => {
     if (!open || saveLocked) return;
     if (targetPlan.step === "apply-named") {
-      if (targetPlan.target.growId && targetPlan.target.growId !== activeGrowId) {
+      // Only an id already in the active roster may become the stored setup.
+      // Archived grows are absent from that roster, so this launch cannot
+      // write one and then have the store snap back to another grow.
+      if (
+        targetPlan.target.growId &&
+        targetPlan.target.growId !== activeGrowId &&
+        grows.some((grow) => grow.id === targetPlan.target.growId)
+      ) {
         setActiveGrowId(targetPlan.target.growId);
       }
       setPlantId(targetPlan.target.type === "plant" ? targetPlan.target.plantId : "");
@@ -780,7 +805,9 @@ export default function QuickLog({
     if (!prefill?.plantId && prefill?.growId && prefill.growId !== activeGrowId) {
       // Grow/tent launchers without a plant remain explicit manual-selection
       // flows. Preserve their known grow scope, but never invent a plant.
-      setActiveGrowId(prefill.growId);
+      if (grows.some((grow) => grow.id === prefill.growId)) {
+        setActiveGrowId(prefill.growId);
+      }
     }
     if (prefill?.eventType) {
       eventTypeUserTouchedRef.current = false;
@@ -825,10 +852,21 @@ export default function QuickLog({
     () => filterQuickLogPlantOptions(plants, activeGrowId),
     [plants, activeGrowId],
   );
+  const archivedNamedPlant = useMemo(() => {
+    if (!editorPlantId || !namedGrowArchived) return null;
+    return plants.find((plant) => plant.id === editorPlantId) ?? null;
+  }, [editorPlantId, namedGrowArchived, plants]);
+  const plantSelectOptions = useMemo(() => {
+    if (!archivedNamedPlant) return scopedPlants;
+    if (scopedPlants.some((plant) => plant.id === archivedNamedPlant.id)) return scopedPlants;
+    return [archivedNamedPlant, ...scopedPlants];
+  }, [archivedNamedPlant, scopedPlants]);
 
   const selectedPlant = useMemo(
-    () => scopedPlants.find((p) => p.id === editorPlantId) ?? null,
-    [editorPlantId, scopedPlants],
+    () =>
+      scopedPlants.find((p) => p.id === editorPlantId) ??
+      (archivedNamedPlant?.id === editorPlantId ? archivedNamedPlant : null),
+    [archivedNamedPlant, editorPlantId, scopedPlants],
   );
 
   const selectedPhenoHuntId = useMemo(() => {
@@ -876,8 +914,17 @@ export default function QuickLog({
         prefillResolution: strictPrefillTarget,
         writeResolution: strictWriteTarget,
         dismissedBlockedPrefillKey,
+        namedGrowArchived,
+        allowArchivedGrowNote,
       }),
-    [prefill, strictPrefillTarget, strictWriteTarget, dismissedBlockedPrefillKey],
+    [
+      prefill,
+      strictPrefillTarget,
+      strictWriteTarget,
+      dismissedBlockedPrefillKey,
+      namedGrowArchived,
+      allowArchivedGrowNote,
+    ],
   );
   const editorTarget = useMemo(
     () =>
@@ -886,8 +933,17 @@ export default function QuickLog({
         prefillResolution: prefillTarget,
         writeResolution: writeTarget,
         dismissedBlockedPrefillKey,
+        namedGrowArchived,
+        allowArchivedGrowNote,
       }),
-    [prefill, prefillTarget, writeTarget, dismissedBlockedPrefillKey],
+    [
+      prefill,
+      prefillTarget,
+      writeTarget,
+      dismissedBlockedPrefillKey,
+      namedGrowArchived,
+      allowArchivedGrowNote,
+    ],
   );
   const editorResolvedTarget = editorTarget.status === "ready" ? editorTarget.target : null;
   const resolvedTarget = inFlightSaveContext?.target ?? editorResolvedTarget;
@@ -895,8 +951,12 @@ export default function QuickLog({
     !!resolvedTarget && activityRecoveryLockKey === buildQuickLogTargetKey(resolvedTarget);
   const resolvedTargetGrow = useMemo(
     () =>
-      resolvedTarget ? (grows.find((grow) => grow.id === resolvedTarget.growId) ?? null) : null,
-    [grows, resolvedTarget],
+      resolvedTarget
+        ? (grows.find((grow) => grow.id === resolvedTarget.growId) ??
+          archivedGrowList.find((grow) => grow.id === resolvedTarget.growId) ??
+          null)
+        : null,
+    [archivedGrowList, grows, resolvedTarget],
   );
   const resolvedTargetPlant = useMemo(
     () =>
@@ -2192,18 +2252,28 @@ export default function QuickLog({
             verdant:entry-created only on confirmed success. Kept reachable
             below Field Edition; must not own first paint. */}
         <QuickLogAllActivitiesSection
-          growId={resolvedTarget?.growId ?? activeGrow?.id ?? null}
-          tentId={resolvedTarget?.tentId ?? null}
-          plantId={resolvedTarget?.plantId ?? null}
+          growId={
+            resolvedTarget?.growId ?? (namedGrowArchived ? prefillGrowId : (activeGrow?.id ?? null))
+          }
+          tentId={
+            resolvedTarget?.tentId ??
+            (namedGrowArchived && prefillTarget.status === "ready"
+              ? prefillTarget.target.tentId
+              : null)
+          }
+          plantId={resolvedTarget?.plantId ?? (namedGrowArchived ? prefillPlantId : null)}
           tentRequiredBlockReason={allActivitiesTentRequiredBlockReason}
           externalPersistenceBlockReason={
             targetQueryPending
               ? QUICK_LOG_TARGET_BLOCKED_COPY.prefill_target_pending
               : targetQueryError
                 ? `We couldn't load the ${targetQueryErrorSubject} needed to confirm this Quick Log target.`
-                : editorTarget.status === "blocked"
+                : editorTarget.status === "blocked" && editorTarget.reason !== "grow_archived"
                   ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
                   : null
+          }
+          nonNoteArchivedGrowBlockReason={
+            namedGrowArchived ? ARCHIVED_GROW_QUICK_LOG_BLOCKED_COPY : null
           }
           plantStage={(resolvedTargetPlant as { stage?: unknown } | null)?.stage ?? null}
           heading="All activity types"
@@ -2575,7 +2645,7 @@ export default function QuickLog({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none">Choose a plant…</SelectItem>
-                      {scopedPlants.map((p) => (
+                      {plantSelectOptions.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           <span data-testid="quick-log-plant-option-name">{p.name}</span>
                           {p.strain ? ` · ${p.strain}` : ""}

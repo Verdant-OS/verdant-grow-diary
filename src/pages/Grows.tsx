@@ -24,6 +24,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { evaluateGrowCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlements/freeTierGates";
+import { growRestoreFailureCopy, planGrowRestore } from "@/lib/archivedGrowQuickLogRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import {
   buildConnectedActivationRoutes,
@@ -40,10 +41,14 @@ export default function Grows() {
   const [searchParams] = useSearchParams();
   const activationIntent = isOneTentActivationIntent(searchParams.get("intent"));
   const { user } = useAuth();
-  const { grows, activeGrowId, setActiveGrowId, refresh, loading, error } = useGrows();
+  const { grows, archivedGrows, activeGrowId, setActiveGrowId, refresh, loading, error } =
+    useGrows();
+  const archivedGrowList = archivedGrows ?? [];
   const [open, setOpen] = useState(activationIntent);
   const [form, setForm] = useState({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
   const [busy, setBusy] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
   const createInFlightRef = useRef(false);
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
     ownerId: user?.id,
@@ -152,6 +157,33 @@ export default function Grows() {
     }
     await refresh();
     toast.success("Archived");
+  }
+
+  async function restore(id: string) {
+    const plan = planGrowRestore({
+      allowed: growGate.allowed,
+      blockedCopy: growGate.blockedCopy,
+    });
+    if (!plan.proceed) {
+      setRestoreError(plan.errorCopy);
+      if (plan.errorCopy) toast.error(plan.errorCopy);
+      return;
+    }
+    setRestoringId(id);
+    setRestoreError(null);
+    const { error: restoreWriteError } = await supabase
+      .from("grows")
+      .update({ is_archived: false })
+      .eq("id", id);
+    setRestoringId(null);
+    if (restoreWriteError) {
+      const copy = growRestoreFailureCopy(restoreWriteError);
+      setRestoreError(copy);
+      toast.error(copy);
+      return;
+    }
+    await refresh();
+    toast.success("Grow restored");
   }
 
   return (
@@ -283,6 +315,47 @@ export default function Grows() {
             </li>
           ))}
         </ul>
+      )}
+
+      {!loading && !error && archivedGrowList.length > 0 && (
+        <section className="mt-8" data-testid="archived-grows">
+          <h2 className="font-display text-lg font-semibold mb-3">Archived grows</h2>
+          {restoreError && (
+            <p
+              role="alert"
+              data-testid="grow-restore-error"
+              className="mb-3 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+            >
+              {restoreError}
+            </p>
+          )}
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {archivedGrowList.map((g) => (
+              <li
+                key={g.id}
+                className="rounded-3xl border border-border/60 bg-card/65 p-5 shadow-card"
+                data-testid="archived-grow-row"
+              >
+                <div className="flex items-center gap-2 flex-wrap mb-3">
+                  <span className="font-semibold">{g.name}</span>
+                  <Badge variant="outline" className="text-[10px]">
+                    archived
+                  </Badge>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  data-testid="restore-grow"
+                  disabled={restoringId === g.id}
+                  onClick={() => restore(g.id)}
+                >
+                  Restore grow
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <Dialog open={open} onOpenChange={handleOpenChange}>

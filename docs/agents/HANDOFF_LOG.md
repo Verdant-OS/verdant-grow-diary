@@ -53,10 +53,10 @@ goal: Show saved manual PPFD on the tent page Recent manual snapshots list, with
 branch: cursor/manual-snapshot-ppfd-ec88
 base: verdant-grow-diary
 checkout: git fetch origin cursor/manual-snapshot-ppfd-ec88 verdant-grow-diary && git switch cursor/manual-snapshot-ppfd-ec88 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED until the draft PR exists; this commit cannot name its own SHA — read the PR head after push
-head_sha: the commit that carries this block; read origin/cursor/manual-snapshot-ppfd-ec88 after push
-state: local implementation, tests green, draft PR next. Stay draft. No ready, merge, or deploy.
-next_action: open the draft PR referencing #1953 and leave it draft for independent review
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1956 (draft)
+head_sha: 93c5bfc97cb342c412bd6df4615ba2c931814052 is the implementation commit. This log update cannot name itself; read origin/cursor/manual-snapshot-ppfd-ec88 after push.
+state: pushed draft. Stay draft. No ready, merge, or deploy.
+next_action: independent review at the PR head (Blue Dream for the history list, Critical Mass for rules and tests). Required checks are not a merge signal until 35/35 and an independent PASS at the exact head.
 files: src/lib/sensorTruthRules.ts; src/lib/manualSensorSnapshotChangeContextRules.ts; src/lib/manualSensorSnapshotHistoryListRules.ts; src/lib/sensorReadingManualEntryRules.ts; src/components/TentManualSnapshotHistoryList.tsx; src/test/manual-snapshot-ppfd-history-rules.test.ts; src/test/tent-manual-snapshot-device-note.test.tsx; docs/agents/HANDOFF_LOG.md
 blockers: none for the repository change. Locked scorer tests were not edited and passed. No GitHub claim comment (comments need Matthew's approval). Signed-in tent page is NOT_MEASURED.
 artifacts: new tests in src/test/; issue https://github.com/Verdant-OS/verdant-grow-diary/issues/1953

@@ -288,66 +288,11 @@
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
-  <url>
-    <loc>https://verdantgrowdiary.com/cultivars/oreoz</loc>
-    <lastmod>2026-07-16</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://verdantgrowdiary.com/cultivars/do-si-dos</loc>
-    <lastmod>2026-07-16</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://verdantgrowdiary.com/cultivars/blue-cookies</loc>
-    <lastmod>2026-07-16</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://verdantgrowdiary.com/cultivars/sour-diesel</loc>
-    <lastmod>2026-07-16</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://verdantgrowdiary.com/cultivars/og-kush</loc>
-    <lastmod>2026-07-16</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://verdantgrowdiary.com/cultivars/blue-dream</loc>
-    <lastmod>2026-07-16</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://verdantgrowdiary.com/cultivars/gg4</loc>
-    <lastmod>2026-07-16</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://verdantgrowdiary.com/cultivars/lemon-cherry-gelato</loc>
-    <lastmod>2026-07-16</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://verdantgrowdiary.com/cultivars/jack-herer</loc>
-    <lastmod>2026-07-16</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://verdantgrowdiary.com/cultivars/sour-stomper</loc>
-    <lastmod>2026-07-16</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
+  <!--
+    Cultivar detail URLs are omitted while verificationStatus is sample or
+    community. Reviewed and verified profiles are the only slugs that belong
+    here. The hub above stays advertised.
+  -->
   <!--
     Added 2026-08-20. These routes were already live, HTTP 200, self-canonical
     and "index, follow", but absent from this sitemap — the long-standing

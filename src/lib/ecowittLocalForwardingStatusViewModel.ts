@@ -10,6 +10,12 @@ import type {
 } from "@/lib/ecowittLocalForwardingStatus";
 import { recommendForStatus } from "@/lib/ecowittForwardingRecommendedNextStepRules";
 import {
+  pickAllowedMetricKeys,
+  safeCapturedAt,
+  safeSourceLabel,
+  safeVendorLabel,
+} from "@/lib/ecowittForwardingReportExport";
+import {
   classifyLiveIngestVerifiedMarker,
   type LiveIngestVerifiedMarker,
 } from "@/lib/ecowittLiveIngestVerifiedRules";
@@ -156,12 +162,18 @@ export function buildForwardingStatusViewModel(
   });
 
   if (s.latest_metrics) {
+    // Same output allowlists as the copied report (issue #1003): the row
+    // must never render a value the export would refuse.
     const m = s.latest_metrics;
+    const source = safeSourceLabel(m.source);
+    const vendor = safeVendorLabel(m.vendor);
+    const capturedAt = safeCapturedAt(m.captured_at);
+    const metricKeys = pickAllowedMetricKeys(m.metric_keys);
     const summary = [
-      m.source ? `source=${m.source}` : null,
-      m.vendor ? `vendor=${m.vendor}` : null,
-      m.captured_at ? `captured_at=${m.captured_at}` : null,
-      m.metric_keys.length > 0 ? `metrics=${m.metric_keys.join(",")}` : null,
+      source ? `source=${source}` : null,
+      vendor ? `vendor=${vendor}` : null,
+      capturedAt ? `captured_at=${capturedAt}` : null,
+      metricKeys.length > 0 ? `metrics=${metricKeys.join(",")}` : null,
     ]
       .filter((v): v is string => v != null)
       .join(" • ");

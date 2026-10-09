@@ -22,7 +22,7 @@ const reading = (source = "live", age = 300_000) => ({
   tent_id: "t1",
   source,
   quality: "ok",
-  metric: "temperature",
+  metric: "temperature_c",
   value: 25,
   captured_at: new Date(NOW - age).toISOString(),
 });
@@ -47,6 +47,137 @@ afterEach(() => {
 });
 
 describe("guided checklist evidence honesty", () => {
+  it.each(["soil_ec_mscm", "reservoir_ec_mscm"])(
+    "persisted EC regression: recognizes a valid %s reading",
+    (metric) => {
+      state.readings.data = [{ ...reading(), metric, value: 1.2 }];
+      show();
+      expect(gap()).toBeNull();
+    },
+  );
+  it.each(
+    (
+      [
+        ["soil_ec_mscm", 8],
+        ["reservoir_ec_mscm", 5],
+      ] as const
+    ).flatMap(([metric, max]) => [
+      { metric, value: 0, valid: true },
+      { metric, value: max, valid: true },
+      { metric, value: "1.2", valid: true },
+      { metric, value: -0.001, valid: false },
+      { metric, value: max + 0.001, valid: false },
+      { metric, value: 1200, valid: false },
+    ]),
+  )("uses the evidence bound for persisted $metric=$value", ({ metric, value, valid }) => {
+    state.readings.data = [{ ...reading(), metric, value }];
+    show();
+    if (valid) expect(gap()).toBeNull();
+    else expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+  });
+  it.each(
+    ["humidity_pct", "soil_moisture_pct"].flatMap((metric) =>
+      [0, 100, "0", "100"].map((value) => ({ metric, value })),
+    ),
+  )("review regression: keeps capture guidance for stuck $metric=$value", (change) => {
+    state.readings.data = [{ ...reading(), ...change }];
+    show();
+    expect(gap()).not.toBeNull();
+    expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+    expect(screen.queryByTestId("guided-action-checklist-empty")).toBeNull();
+  });
+  it.each([0, 1.2, 8, "1.2"])("review regression: recognizes canonical ec=%s", (value) => {
+    state.readings.data = [{ ...reading(), metric: "ec", value }];
+    show();
+    expect(gap()).toBeNull();
+  });
+  it.each([-0.001, 8.001, 1200, "1200"])(
+    "review regression: keeps capture guidance for invalid ec=%s",
+    (value) => {
+      state.readings.data = [{ ...reading(), metric: "ec", value }];
+      show();
+      expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+    },
+  );
+  it("keeps capture guidance for recent live humidity 999 despite quality ok", () => {
+    state.readings.data = [{ ...reading(), metric: "humidity_pct", value: 999 }];
+    show();
+    expect(gap()).not.toBeNull();
+    expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+    expect(screen.queryByTestId("guided-action-checklist-empty")).toBeNull();
+  });
+  it.each([
+    { metric: "humidity_pct", value: "999" },
+    { metric: "unknown_metric", value: 25 },
+    { metric: "constructor", value: 25 },
+    { metric: "temperature_c", value: 999 },
+    { metric: "ppfd", value: -1 },
+  ])("keeps capture guidance when telemetry is invalid: %j", (invalidMetric) => {
+    state.readings.data = [{ ...reading(), ...invalidMetric }];
+    show();
+    expect(gap()).not.toBeNull();
+    expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+    expect(screen.queryByTestId("guided-action-checklist-empty")).toBeNull();
+  });
+  it.each([
+    { metric: "humidity_pct", value: 999 },
+    { metric: "humidity_pct", value: 0 },
+    { metric: "humidity_pct", value: 100 },
+    { metric: "soil_moisture_pct", value: 0 },
+    { metric: "soil_moisture_pct", value: 100 },
+    { metric: "ec", value: 8.001 },
+  ])(
+    "keeps a valid survivor and its expiry despite newer invalid telemetry: %j",
+    (invalidMetric) => {
+      state.readings.data = [
+        { ...reading("live", 60_000), ...invalidMetric },
+        reading("live", 14 * 60_000),
+      ];
+      show();
+      expect(gap()).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(120_000);
+      });
+      expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+    },
+  );
+  it.each([
+    { metric: "humidity_pct", value: 999 },
+    { metric: "humidity_pct", value: 0 },
+    { metric: "humidity_pct", value: 100 },
+    { metric: "soil_moisture_pct", value: 0 },
+    { metric: "soil_moisture_pct", value: 100 },
+    { metric: "ec", value: 8.001 },
+  ])("keeps valid manual diary evidence despite newer invalid telemetry: %j", (invalidMetric) => {
+    state.readings.data = [{ ...reading(), ...invalidMetric }];
+    state.diary.data = [
+      {
+        id: "d1",
+        grow_id: "g1",
+        tent_id: "t1",
+        entry_at: new Date(NOW - 3_600_000).toISOString(),
+        details: { manual_sensor_snapshot: { source: "manual", ph: 6.2 } },
+      },
+    ];
+    show();
+    expect(gap()).toBeNull();
+  });
+  it.each(["ec", "soil_ec_mscm", "reservoir_ec_mscm"])(
+    "keeps valid %s as the survivor of newer stuck percentage readings",
+    (metric) => {
+      state.readings.data = [
+        { ...reading("live", 60_000), metric: "humidity_pct", value: 100 },
+        { ...reading("live", 60_000), metric: "soil_moisture_pct", value: 0 },
+        { ...reading("live", 14 * 60_000), metric, value: 1.2 },
+      ];
+      show();
+      expect(gap()).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(120_000);
+      });
+      expect(screen.getByText("Capture a fresh reading for Tent A")).toBeTruthy();
+    },
+  );
   it.each([
     { manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 55 } },
     { manual_sensor_snapshot: { source: "manual", ph: 6.2 } },

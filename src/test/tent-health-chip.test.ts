@@ -22,9 +22,10 @@ describe("deriveTentHealthChip", () => {
     expect(chip.isHealthy).toBe(false);
   });
 
-  it("returns healthy when plants > 0 and no alerts", () => {
+  it("returns neutral no_alerts (never healthy) when plants > 0 and no alerts", () => {
     const chip = deriveTentHealthChip({ plantCount: 3, alertCount: 0 });
-    expect(chip.variant).toBe("healthy");
-    expect(chip.isHealthy).toBe(true);
+    expect(chip.variant).toBe("no_alerts");
+    expect(chip.copy).toBe("No open alerts");
+    expect(chip.isHealthy).toBe(false);
   });
 });

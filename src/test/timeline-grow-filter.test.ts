@@ -45,8 +45,10 @@ describe("Timeline — grow filter", () => {
   });
 
   it("preserves newest-first ordering", () => {
-    expect(TIMELINE).toMatch(/entry_at["']\s*,\s*\{\s*ascending:\s*false/);
-    expect(TIMELINE).toMatch(/created_at["']\s*,\s*\{\s*ascending:\s*false/);
+    // #593: bounded reads order through orderNewestFirstStable (column desc,
+    // then id desc); its ordering is unit-tested in timeline-stable-order.test.ts.
+    expect(TIMELINE).toMatch(/orderNewestFirstStable\([\s\S]{0,400}?["']entry_at["'],?\s*\)/);
+    expect(TIMELINE).toMatch(/orderNewestFirstStable\([\s\S]{0,400}?["']created_at["'],?\s*\)/);
   });
 
   it("introduces no device-control or service_role surface", () => {

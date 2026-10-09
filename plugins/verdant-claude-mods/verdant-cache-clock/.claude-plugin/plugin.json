@@ -1,0 +1,5 @@
+{
+  "name": "verdant-cache-clock",
+  "version": "0.1.0",
+  "description": "Status-line countdown to the 60-minute prompt-cache expiry (CLAUDE.md check-in cadence), with a toast at 50 minutes idle."
+}

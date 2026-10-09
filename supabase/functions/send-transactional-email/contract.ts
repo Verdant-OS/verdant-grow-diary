@@ -1,3 +1,5 @@
+import { timingSafeMatchesAny } from "../_shared/lib/lib/timingSafeCompareRules.ts";
+
 export const MAX_TRANSACTIONAL_EMAIL_BODY_BYTES = 64 * 1024;
 export const MAX_TRANSACTIONAL_EMAIL_SUBJECT_LENGTH = 200;
 
@@ -31,17 +33,6 @@ export type TransactionalEmailRequestResult =
         | "invalid_idempotency_key"
         | "invalid_template_data";
     };
-
-function constantTimeEqual(left: string, right: string): boolean {
-  const maxLength = Math.max(left.length, right.length);
-  let mismatch = left.length ^ right.length;
-
-  for (let index = 0; index < maxLength; index += 1) {
-    mismatch |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
-  }
-
-  return mismatch === 0;
-}
 
 function normalizeSecret(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
@@ -147,12 +138,8 @@ export function authorizeTransactionalEmailCaller(
   }
 
   const candidate = apiKeyHeader || bearer;
-  let matched = 0;
-  for (const acceptedKey of acceptedKeys) {
-    matched |= candidate ? Number(constantTimeEqual(candidate, acceptedKey)) : 0;
-  }
-
-  if (matched !== 1) {
+  // Shared helper (#1002): compares every accepted key, no early exit.
+  if (!timingSafeMatchesAny(candidate, acceptedKeys)) {
     return { ok: false, reason: "server_secret_mismatch" };
   }
 

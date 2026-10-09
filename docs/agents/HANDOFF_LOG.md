@@ -53,16 +53,16 @@ goal: Diary calendar and cultivation calendar group timestamped events (occurred
 branch: cursor/calendar-local-day-fc13
 base: verdant-grow-diary
 checkout: git fetch origin cursor/calendar-local-day-fc13 verdant-grow-diary && git switch cursor/calendar-local-day-fc13 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED until the draft is open
-head_sha: local only until the first push
-state: local implementation. New Chicago-pinned tests were red (3 failed, 2 passed) before the calendar call sites changed, then green on the targeted calendar files.
-next_action: push the branch, open a draft PR, and record the head SHA here. Stay draft. No ready, merge, or deploy.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1952 (draft)
+head_sha: implementation a1c66ccb43b1c7b9efb60ee4f450bd164a17264d. This log line cannot name its own commit; read origin/cursor/calendar-local-day-fc13 after the log push.
+state: pushed draft. Chicago-pinned tests were red (3 failed, 2 passed) before the calendar call sites changed. Targeted calendar tests 52/52 and the full Vitest suite passed aside from 4 pre-existing PostgreSQL-tool BLOCKED files. Lint 0 errors. Typecheck passed. Production build passed. Stay draft.
+next_action: independent review at the exact head. Stay draft. No ready, merge, or deploy.
 files: src/lib/calendarLocalDayRules.ts; src/lib/diaryCalendarViewModel.ts; src/lib/cultivationCalendarMonthGridRules.ts; src/lib/flowerWindowCalendarRules.ts; src/components/DiaryCalendarSection.tsx; src/test/calendar-local-day-grouping.test.ts; docs/agents/HANDOFF_LOG.md
 blockers: none for the repository change. No production data, schema, auth, or lockfile edits.
 artifacts: src/test/calendar-local-day-grouping.test.ts
 reviewer_seat: Blue Dream (DiaryCalendarSection.tsx); Critical Mass (rules and tests)
 claimed_by: Grok, 2026-10-09 14:45 CT
-last_updated: 2026-10-09 14:45 CT, by Grok
+last_updated: 2026-10-09 15:05 CT, by Grok
 ```
 
 ### PR-1939-NOT-FOUND-COVERAGE

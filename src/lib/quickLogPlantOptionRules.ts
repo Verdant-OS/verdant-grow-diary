@@ -100,3 +100,19 @@ export function pickDefaultQuickLogPlant<T extends MinimalQuickLogPlant>(
   }
   return "";
 }
+
+/**
+ * Options rendered in the Quick Log plant select.
+ *
+ * The scoped list is the only roster. A named plant from an archived grow
+ * is prepended when the launcher asked for it and the scoped list does not
+ * already contain it. The raw workspace plant list is never the source.
+ */
+export function buildQuickLogPlantSelectOptions<T extends { id: string }>(
+  scopedPlants: readonly T[],
+  namedPlant: T | null | undefined,
+): readonly T[] {
+  if (!namedPlant) return scopedPlants;
+  if (scopedPlants.some((plant) => plant.id === namedPlant.id)) return scopedPlants;
+  return [namedPlant, ...scopedPlants];
+}

@@ -53,9 +53,9 @@ goal: Quick Log timeline clocks and the days they group under use the viewer's l
 branch: cursor/quicklog-local-timezone-ec09
 base: verdant-grow-diary
 checkout: git fetch origin cursor/quicklog-local-timezone-ec09 verdant-grow-diary && git switch cursor/quicklog-local-timezone-ec09 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: draft, URL after push
-head_sha: 68da34dbfd51b2e87426b6500d9027c45685f0c9 local commit before push. Confirm origin after push.
-state: local commit, gates run, draft PR next. Stay draft. No ready, merge, or Publish.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1949 (draft)
+head_sha: implementation 68da34dbfd51b2e87426b6500d9027c45685f0c9. Branch tip is this log commit; confirm origin/cursor/quicklog-local-timezone-ec09 after push.
+state: pushed draft. Gates recorded on the PR. Stay draft. No ready, merge, or Publish.
 next_action: independent review at the exact pushed head. Three renegotiated scorer pins are pending owner approval.
 files: src/lib/quickLogGroupedTimelineFilterViewModel.ts; src/components/QuickLogGroupedTimelineSection.tsx; src/lib/aiDoctorPhase1TimelineEvidenceViewModel.ts; src/test/quick-log-timeline-local-timezone.test.ts; src/test/plant-timeline-quick-log-ui-accessibility.test.tsx; src/test/plant-timeline-quick-log-ui-hardening.test.tsx; src/test/quick-log-grouped-review-panel.test.tsx
 blockers: owner scorer approval for the three renegotiated pins. No production data, schema, auth, or RLS change.

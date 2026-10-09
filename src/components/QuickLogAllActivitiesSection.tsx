@@ -33,6 +33,7 @@ import QuickLogActivityPicker from "@/components/QuickLogActivityPicker";
 import QuickLogSymptomCheckFields from "@/components/QuickLogSymptomCheckFields";
 import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import { useAuth } from "@/store/auth";
+import { isArchivedGrowNoteActivity } from "@/lib/archivedGrowQuickLogRules";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createQuickLogPhotoDiaryEntry,
@@ -148,6 +149,12 @@ export interface QuickLogAllActivitiesSectionProps {
   /** Activity-specific tent requirement block shown only for tent-scoped saves. */
   tentRequiredBlockReason?: string | null;
   /**
+   * Shown for watering, feeding, and other non-note activities when the
+   * named plant's grow is archived. Notes, photos, and issue observations
+   * stay available.
+   */
+  nonNoteArchivedGrowBlockReason?: string | null;
+  /**
    * Optional grower-visible activity handoff. The editor is selected only;
    * it never writes or bypasses availability checks.
    */
@@ -240,6 +247,7 @@ export default function QuickLogAllActivitiesSection({
   onBeforeStructuredWaterOpen,
   externalPersistenceBlockReason = null,
   tentRequiredBlockReason = null,
+  nonNoteArchivedGrowBlockReason = null,
   requestedActivityId = null,
   requestedNote = null,
   reviewedStarterHandoffKey = null,
@@ -445,13 +453,21 @@ export default function QuickLogAllActivitiesSection({
   const activityPersistenceBlockReason = useCallback(
     (activityId: QuickLogActivityId | null | undefined) => {
       if (externalPersistenceBlockReason) return externalPersistenceBlockReason;
+      if (nonNoteArchivedGrowBlockReason && activityId && !isArchivedGrowNoteActivity(activityId)) {
+        return nonNoteArchivedGrowBlockReason;
+      }
       if (!quickLogActivityRequiresTent(activityId)) return null;
       return (
         tentRequiredBlockReason ??
         (!tentId ? QUICK_LOG_TARGET_BLOCKED_COPY.plant_tent_unassigned : null)
       );
     },
-    [externalPersistenceBlockReason, tentId, tentRequiredBlockReason],
+    [
+      externalPersistenceBlockReason,
+      nonNoteArchivedGrowBlockReason,
+      tentId,
+      tentRequiredBlockReason,
+    ],
   );
   const requestedActivityBlockReason = activityPersistenceBlockReason(requestedActivity);
   const selectedActivityBlockReason = activityPersistenceBlockReason(selected?.id);

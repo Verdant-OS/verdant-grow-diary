@@ -73,6 +73,9 @@ import PhenoHuntSetupProgressCard from "@/components/PhenoHuntSetupProgressCard"
 import PhenoCompareCandidatesAction from "@/components/PhenoCompareCandidatesAction";
 import { buildPhenoComparisonActionState } from "@/lib/phenoComparisonActionState";
 import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
+import PhenoHuntRenameControl from "@/components/PhenoHuntRenameControl";
+import { usePhenoHuntRenameSession } from "@/hooks/usePhenoHuntRenameSession";
+import { huntScopedOverrideValue, type HuntScopedOverride } from "@/lib/phenoHuntRenameRules";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
@@ -1523,18 +1526,24 @@ export default function PhenoHuntWorkspace() {
   const [setupCompletedLocal, setSetupCompletedLocal] = useState<string | null>(null);
   // Same optimistic-override pattern for the breeding objective: the grower's
   // save should reflect instantly without waiting on a full hunt refetch.
-  const [breedingObjectiveLocal, setBreedingObjectiveLocal] = useState<
-    BreedingObjectiveTarget[] | null
-  >(null);
+  // Scoped to the hunt it was saved on: the route isn't keyed by hunt id.
+  const [breedingObjectiveLocal, setBreedingObjectiveLocal] = useState<HuntScopedOverride<
+    BreedingObjectiveTarget[]
+  > | null>(null);
   const [objectiveSaving, setObjectiveSaving] = useState(false);
+  // #551: a confirmed rename is applied to the hook's hunt (applyHuntName),
+  // which also supersedes any load that read the row before the save.
+  const effectiveHuntName = ws.hunt?.name ?? null;
   const effectiveBreedingObjective: BreedingObjectiveTarget[] =
-    breedingObjectiveLocal ?? ws.hunt?.breedingObjective ?? [];
+    huntScopedOverrideValue(breedingObjectiveLocal, ws.hunt?.id) ??
+    ws.hunt?.breedingObjective ??
+    [];
   const selectedRoundLoadState =
     round === "overall"
       ? null
       : (ws.roundLoadStates?.[round] ?? { status: "idle" as const, error: null });
 
-  const { setFilter } = ws;
+  const { setFilter, applyHuntName } = ws;
 
   const handleMarkSetupComplete = async () => {
     if (!canWrite || !ws.hunt?.id || setupSaving) return;
@@ -1561,7 +1570,7 @@ export default function PhenoHuntWorkspace() {
     setObjectiveSaving(true);
     try {
       await updatePhenoHuntSetup({ huntId: ws.hunt.id, breedingObjective: targets });
-      setBreedingObjectiveLocal([...targets]);
+      setBreedingObjectiveLocal({ huntId: ws.hunt.id, value: [...targets] });
       return true;
     } catch {
       return false;
@@ -1569,6 +1578,23 @@ export default function PhenoHuntWorkspace() {
       setObjectiveSaving(false);
     }
   };
+
+  // #551: rename resolves true only after the row is read back (RLS + the
+  // Pro entitlement policy filter blocked writes silently otherwise).
+  const handleRenameHunt = async (name: string): Promise<boolean> => {
+    if (!canWrite || !ws.hunt?.id) return false;
+    const huntId = ws.hunt.id;
+    try {
+      await updatePhenoHuntSetup({ huntId, name });
+      applyHuntName(huntId, name);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  // Held here, not in the control: a reload unmounts the control mid-save,
+  // and the save must still settle against the editor the grower used.
+  const renameSession = usePhenoHuntRenameSession(ws.hunt?.id, handleRenameHunt);
 
   // Debounce the free-text search into the server-side filter (resets paging).
   useEffect(() => {
@@ -1736,7 +1762,7 @@ export default function PhenoHuntWorkspace() {
       };
     }
     const csv = buildPhenoHuntCsv({
-      huntName: ws.hunt?.name ?? "hunt",
+      huntName: effectiveHuntName ?? "hunt",
       huntId: ws.hunt?.id ?? null,
       candidates,
       scoresByPlant: ws.scoresByPlant,
@@ -1763,7 +1789,7 @@ export default function PhenoHuntWorkspace() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = phenoHuntCsvFilename(ws.hunt?.name ?? "hunt");
+    a.download = phenoHuntCsvFilename(effectiveHuntName ?? "hunt");
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1814,7 +1840,18 @@ export default function PhenoHuntWorkspace() {
         className="container mx-auto max-w-5xl space-y-4 px-4 py-6"
       >
         <header className="space-y-1">
-          <h1 className="text-2xl font-semibold">Hunt workspace: {ws.hunt?.name ?? "this hunt"}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold">
+              Hunt workspace: {effectiveHuntName ?? "this hunt"}
+            </h1>
+            {ws.hunt?.id ? (
+              <PhenoHuntRenameControl
+                currentName={effectiveHuntName ?? ""}
+                canWrite={canWrite}
+                session={renameSession}
+              />
+            ) : null}
+          </div>
           <p className="text-xs text-muted-foreground">{PHENO_KEEPER_DECISION_CAVEAT}</p>
           {id ? (
             <nav

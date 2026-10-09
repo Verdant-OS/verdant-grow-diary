@@ -4,6 +4,11 @@
  * Reads back the stored sensor rows behind an action's evidence refs and
  * returns per-ref verification. Until the read settles every sensor ref is
  * "not checked" (unverified), so nothing renders as Live early.
+ *
+ * `revision` identifies one load of the action (ActionDetail passes the row
+ * object, which is new on every load). A new revision re-reads the rows even
+ * when the ids are unchanged, so a reading superseded since the last load
+ * cannot keep a verified badge; the badge is "not checked" until it settles.
  */
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -19,6 +24,7 @@ export function useActionEvidenceVerification(
   refs: ReadonlyArray<OriginatingTimelineEventRef>,
   actionTentId: string | null | undefined,
   actionTargetMetric: string | null | undefined,
+  revision: unknown,
 ): Map<string, EvidenceRefVerification> {
   const ids = useMemo(() => sensorEvidenceRefIdsToRead(refs), [refs]);
   const idsKey = ids.join(",");
@@ -42,7 +48,7 @@ export function useActionEvidenceVerification(
     return () => {
       cancelled = true;
     };
-  }, [idsKey]);
+  }, [idsKey, revision]);
 
   return useMemo(
     () => verifyActionEvidenceRefs({ refs, actionTentId, actionTargetMetric, read }),

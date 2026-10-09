@@ -255,9 +255,10 @@ export function verifyActionEvidenceRefs(input: {
     }
     const stored = storedEvidenceSource(row);
     const claimed = ref.source ?? "unknown";
-    // A ref records the row's source when it was captured; quality applied
-    // since (stale, invalid) changes the label shown, not the claim (#1845).
-    if (claimed !== "unknown" && claimed !== storedRawEvidenceSource(row) && claimed !== stored) {
+    // A ref records the row's source when it was captured, so the claim is
+    // checked against the raw source only; quality (stale, invalid) changes
+    // the label shown, never what a claim may match (#1845).
+    if (claimed !== "unknown" && claimed !== storedRawEvidenceSource(row)) {
       out.set(ref.id, unverified("source_mismatch"));
       continue;
     }

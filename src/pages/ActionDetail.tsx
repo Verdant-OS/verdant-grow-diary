@@ -240,6 +240,7 @@ export default function ActionDetail() {
     evidenceRefs,
     row?.tent_id ?? null,
     row?.target_metric ?? null,
+    row,
   );
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);

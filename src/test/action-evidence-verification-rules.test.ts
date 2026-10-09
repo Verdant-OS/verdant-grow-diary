@@ -254,6 +254,15 @@ describe("verifyActionEvidenceRefs — metric, effective row, observation time (
     );
   });
 
+  it("a quality label is never accepted as a source claim", () => {
+    expect(
+      verifyOne(ref({ source: "stale" }), [row({ source: "manual", quality: "stale" })])?.reason,
+    ).toBe("source_mismatch");
+    expect(
+      verifyOne(ref({ source: "invalid" }), [row({ source: "live", quality: "invalid" })])?.reason,
+    ).toBe("source_mismatch");
+  });
+
   it("the raw-source allowance does not let a live claim pass over a manual row", () => {
     expect(
       verifyOne(ref({ source: "live" }), [row({ source: "manual", quality: "stale" })])?.reason,

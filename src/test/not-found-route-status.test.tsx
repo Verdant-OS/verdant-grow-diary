@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { healthResponseFor, withHostHeaders } from "@/lib/cloudflareHostRoutingRules";
 import { Route as SplatRoute } from "@/routes/$";
 import type { RootRouteContext } from "@/routes/__root";
 
@@ -47,7 +48,7 @@ afterEach(() => {
 });
 
 describe("catch-all route reports HTTP 404 (no soft 404)", () => {
-  it.each(["/definitely-missing", "/plants/does/not/exist", "/healthz", "/manifest.webmanifest"])(
+  it.each(["/definitely-missing", "/plants/does/not/exist", "/manifest.webmanifest"])(
     "unmatched path %s loads with router statusCode 404",
     async (path) => {
       const router = buildRouter(path);
@@ -56,6 +57,25 @@ describe("catch-all route reports HTTP 404 (no soft 404)", () => {
       expect(router.hasNotFoundMatch()).toBe(true);
     },
   );
+
+  it("answers /healthz with 200 and no app data", async () => {
+    const request = new Request("https://verdantgrowdiary.com/healthz?unused=1");
+    const health = healthResponseFor(request);
+    expect(health).not.toBeNull();
+    const response = withHostHeaders(request, health!);
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toBe('{"ok":true}');
+    expect(JSON.parse(body)).toEqual({ ok: true });
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("x-robots-tag")).toBe("noindex");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("content-security-policy")).toBeNull();
+    expect(healthResponseFor(new Request("https://verdantgrowdiary.com/healthz/extra"))).toBeNull();
+    expect(
+      healthResponseFor(new Request("https://verdantgrowdiary.com/manifest.webmanifest")),
+    ).toBeNull();
+  });
 
   it("a matched route still loads with statusCode 200", async () => {
     const router = buildRouter("/");

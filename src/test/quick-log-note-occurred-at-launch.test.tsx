@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -177,7 +178,7 @@ beforeEach(() => {
     data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000009" },
     error: null,
   });
-  localStorage.setItem("verdant.activeGrow.u1", "g-active");
+  setLocalStorageItemForTest("verdant.activeGrow.u1", "g-active");
 });
 
 afterEach(() => cleanup());

@@ -575,8 +575,9 @@ export default function QuickLog({
   // submission, and a dedupe hit would hand back the OLD entry while the
   // edits silently never saved.
   const saveIdempotencyKeyRef = useRef<string>(newQuickLogSaveKey());
-  // Signature (key + timestamp excluded) of the last FAILED attempt's
-  // payload, so an edited retry is distinguished from a pure retry.
+  // Signature (idempotency key excluded) of the last FAILED attempt's
+  // payload, so an edited retry — including a changed occurrence time —
+  // is distinguished from a pure retry.
   const lastFailedSaveSigRef = useRef<string | null>(null);
 
   useEffect(() => {

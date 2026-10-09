@@ -18,6 +18,7 @@ import type { OriginatingTimelineEventRef } from "@/lib/originatingTimelineEvent
 export function useActionEvidenceVerification(
   refs: ReadonlyArray<OriginatingTimelineEventRef>,
   actionTentId: string | null | undefined,
+  actionTargetMetric: string | null | undefined,
 ): Map<string, EvidenceRefVerification> {
   const ids = useMemo(() => sensorEvidenceRefIdsToRead(refs), [refs]);
   const idsKey = ids.join(",");
@@ -44,7 +45,7 @@ export function useActionEvidenceVerification(
   }, [idsKey]);
 
   return useMemo(
-    () => verifyActionEvidenceRefs({ refs, actionTentId, read }),
-    [refs, actionTentId, read],
+    () => verifyActionEvidenceRefs({ refs, actionTentId, actionTargetMetric, read }),
+    [refs, actionTentId, actionTargetMetric, read],
   );
 }

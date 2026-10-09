@@ -236,7 +236,11 @@ export default function ActionDetail() {
     () => (row ? adaptOriginatingTimelineEventsFromRow(row) : []),
     [row],
   );
-  const evidenceVerification = useActionEvidenceVerification(evidenceRefs, row?.tent_id ?? null);
+  const evidenceVerification = useActionEvidenceVerification(
+    evidenceRefs,
+    row?.tent_id ?? null,
+    row?.target_metric ?? null,
+  );
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);

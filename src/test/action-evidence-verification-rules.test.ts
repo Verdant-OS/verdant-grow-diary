@@ -1,7 +1,7 @@
 /**
  * #1001 — Action Queue evidence is trustworthy only when it matches a stored
- * sensor row the grower can read (RLS), for the action's tent, with the same
- * source and captured timestamp. Anything else is unverified context and
+ * effective sensor row the grower can read (RLS), for the action's tent and
+ * metric, with the same source and observation timestamp. Anything else is unverified context and
  * never renders as healthy/live.
  */
 import { describe, it, expect } from "vitest";
@@ -24,12 +24,28 @@ function ref(over: Partial<OriginatingTimelineEventRef> = {}): OriginatingTimeli
   return { id: ROW_ID, type: "sensor_snapshot", occurred_at: AT, source: "live", ...over };
 }
 function row(over: Partial<EvidenceSensorRow> = {}): EvidenceSensorRow {
-  return { id: ROW_ID, tent_id: TENT, source: "live", quality: "ok", captured_at: AT, ...over };
+  return {
+    id: ROW_ID,
+    tent_id: TENT,
+    metric: "humidity_pct",
+    source: "live",
+    quality: "ok",
+    captured_at: AT,
+    ts: AT,
+    correction_valid: true,
+    ...over,
+  };
 }
-function verifyOne(r: OriginatingTimelineEventRef, rows: EvidenceSensorRow[], tent = TENT) {
+function verifyOne(
+  r: OriginatingTimelineEventRef,
+  rows: EvidenceSensorRow[],
+  tent = TENT,
+  metric: string | null = "humidity",
+) {
   return verifyActionEvidenceRefs({
     refs: [r],
     actionTentId: tent,
+    actionTargetMetric: metric,
     read: { status: "ok", rows },
   }).get(r.id);
 }
@@ -79,7 +95,12 @@ describe("verifyActionEvidenceRefs — fail closed", () => {
 
   it("pending and failed reads are unverified, never live", () => {
     for (const read of [{ status: "pending" as const }, { status: "error" as const }]) {
-      const v = verifyActionEvidenceRefs({ refs: [ref()], actionTentId: TENT, read }).get(ROW_ID);
+      const v = verifyActionEvidenceRefs({
+        refs: [ref()],
+        actionTentId: TENT,
+        actionTargetMetric: "humidity",
+        read,
+      }).get(ROW_ID);
       expect(v?.status).toBe("unverified");
       expect(v?.displaySource).toBe("unknown");
       expect(v?.reason).toBe(read.status === "pending" ? "not_checked" : "read_failed");
@@ -99,6 +120,7 @@ describe("verifyActionEvidenceRefs — fail closed", () => {
     const map = verifyActionEvidenceRefs({
       refs: [ref({ id: "diary-1", type: "diary_entry", source: "manual" })],
       actionTentId: TENT,
+      actionTargetMetric: "humidity",
       read: { status: "ok", rows: [] },
     });
     expect(map.has("diary-1")).toBe(false);
@@ -167,6 +189,7 @@ describe("verifyActionEvidenceRefs — persisted provenance wins", () => {
     const map = verifyActionEvidenceRefs({
       refs: [ref(), ref({ id: ROW_ID_2, source: "manual" })],
       actionTentId: TENT,
+      actionTargetMetric: "humidity",
       read: { status: "ok", rows: [row(), row({ id: ROW_ID_2, source: "manual" })] },
     });
     expect(map.get(ROW_ID)?.displaySource).toBe("live");
@@ -177,9 +200,64 @@ describe("verifyActionEvidenceRefs — persisted provenance wins", () => {
     const input = {
       refs: [ref()],
       actionTentId: TENT,
+      actionTargetMetric: "humidity",
       read: { status: "ok" as const, rows: [row()] },
     };
     expect([...verifyActionEvidenceRefs(input)]).toEqual([...verifyActionEvidenceRefs(input)]);
+  });
+});
+
+describe("verifyActionEvidenceRefs — metric, effective row, observation time (#1845 review)", () => {
+  it("a reading of another metric in the same tent does not verify the action", () => {
+    expect(verifyOne(ref(), [row({ metric: "temperature_c" })])?.reason).toBe("metric_mismatch");
+  });
+
+  it("the action metric resolves through the alert alias table", () => {
+    for (const [target, metric] of [
+      ["rh", "humidity_pct"],
+      ["temperature", "temperature_c"],
+      ["vpd", "vpd_kpa"],
+      ["soil_moisture", "soil_moisture_pct"],
+    ] as const) {
+      expect(verifyOne(ref(), [row({ metric })], TENT, target)?.status).toBe("verified");
+    }
+  });
+
+  it("an action with no recognised metric cannot verify sensor evidence", () => {
+    expect(verifyOne(ref(), [row()], TENT, null)?.reason).toBe("no_metric_scope");
+    expect(verifyOne(ref(), [row()], TENT, "co2")?.reason).toBe("no_metric_scope");
+  });
+
+  it("an invalid or unknown correction lineage never verifies", () => {
+    expect(verifyOne(ref(), [row({ correction_valid: false })])?.reason).toBe("correction_invalid");
+    expect(verifyOne(ref(), [row({ correction_valid: null })])?.reason).toBe("correction_invalid");
+  });
+
+  it("a row with no captured_at matches on ts, as the snapshot resolved it", () => {
+    expect(verifyOne(ref(), [row({ captured_at: null, ts: AT })])?.status).toBe("verified");
+    expect(
+      verifyOne(ref(), [row({ captured_at: null, ts: "2026-09-30T11:00:00.000Z" })])?.reason,
+    ).toBe("timestamp_mismatch");
+  });
+
+  it("a live ref over a live row that has since gone stale verifies and shows Stale", () => {
+    expect(verifyOne(ref({ source: "live" }), [row({ quality: "stale" })])).toEqual({
+      status: "verified",
+      reason: "verified",
+      displaySource: "stale",
+    });
+    expect(verifyOne(ref({ source: "live" }), [row({ quality: "invalid" })])?.displaySource).toBe(
+      "invalid",
+    );
+    expect(verifyOne(ref({ source: "live" }), [row({ quality: "degraded" })])?.displaySource).toBe(
+      "unknown",
+    );
+  });
+
+  it("the raw-source allowance does not let a live claim pass over a manual row", () => {
+    expect(
+      verifyOne(ref({ source: "live" }), [row({ source: "manual", quality: "stale" })])?.reason,
+    ).toBe("source_mismatch");
   });
 });
 

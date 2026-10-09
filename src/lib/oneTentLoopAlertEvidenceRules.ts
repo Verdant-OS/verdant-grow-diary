@@ -56,7 +56,10 @@ const METRIC_KEY_BY_ALERT_METRIC: Readonly<Record<string, SensorSnapshotMetricRe
   ppfd: "ppfd",
 };
 
-function normalizeMetricKey(raw: string | null | undefined): SensorSnapshotMetricRefKey | null {
+/** Snapshot metric key for a persisted alert / action metric, or null. */
+export function normalizeMetricKey(
+  raw: string | null | undefined,
+): SensorSnapshotMetricRefKey | null {
   if (typeof raw !== "string") return null;
   return METRIC_KEY_BY_ALERT_METRIC[raw.trim().toLowerCase()] ?? null;
 }

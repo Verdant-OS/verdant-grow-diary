@@ -1,8 +1,9 @@
 /**
  * #1001 — ActionDetail must not render client-carried sensor refs as trusted
- * Live evidence. Each sensor_snapshot ref is read back from sensor_readings
- * under RLS and checked against the action's tent, stored source and
- * captured_at. Unmatched refs render as Unverified with a caution line.
+ * Live evidence. Each sensor_snapshot ref is read back from the
+ * sensor_readings_effective view under RLS and checked against the action's
+ * tent and metric, the row's correction validity, stored source and
+ * observation time. Unmatched refs render as Unverified with a caution line.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -41,15 +42,33 @@ const ROW = {
 type SensorRow = {
   id: string;
   tent_id: string | null;
+  metric: string;
   source: string;
   quality: string;
-  captured_at: string;
+  captured_at: string | null;
+  ts: string;
+  correction_valid: boolean;
 };
+
+function sensorRow(over: Partial<SensorRow> = {}): SensorRow {
+  return {
+    id: READING_ID,
+    tent_id: TENT,
+    metric: "humidity_pct",
+    source: "live",
+    quality: "ok",
+    captured_at: AT,
+    ts: AT,
+    correction_valid: true,
+    ...over,
+  };
+}
 
 let detailRow: unknown = ROW;
 let sensorRows: SensorRow[] = [];
 let sensorReadError = false;
 const sensorQueries: string[][] = [];
+const sensorTables: string[] = [];
 
 vi.mock("@/integrations/supabase/client", () => {
   const makeActionQueueChain = () => {
@@ -104,8 +123,8 @@ vi.mock("@/integrations/supabase/client", () => {
       from: (table: string) =>
         table === "action_queue"
           ? makeActionQueueChain()
-          : table === "sensor_readings"
-            ? makeSensorReadingsChain()
+          : table === "sensor_readings_effective"
+            ? (sensorTables.push(table), makeSensorReadingsChain())
             : makeGeneric(),
     },
   };
@@ -133,6 +152,7 @@ beforeEach(() => {
   sensorRows = [];
   sensorReadError = false;
   sensorQueries.length = 0;
+  sensorTables.length = 0;
 });
 
 function renderDetail() {
@@ -173,9 +193,7 @@ describe("ActionDetail — sensor evidence verified against stored rows (#1001)"
   });
 
   it("a stored row from another tent stays Unverified", async () => {
-    sensorRows = [
-      { id: READING_ID, tent_id: "other", source: "live", quality: "ok", captured_at: AT },
-    ];
+    sensorRows = [sensorRow({ tent_id: "other" })];
     renderDetail();
     const item = await evidenceItem();
     expect(item.getAttribute("data-verification")).toBe("unverified:wrong_tent");
@@ -190,11 +208,10 @@ describe("ActionDetail — sensor evidence verified against stored rows (#1001)"
   });
 
   it("a matching stored live row renders Live with the stored provenance", async () => {
-    sensorRows = [
-      { id: READING_ID, tent_id: TENT, source: "live", quality: "ok", captured_at: AT },
-    ];
+    sensorRows = [sensorRow()];
     renderDetail();
     const item = await evidenceItem();
+    expect(sensorTables).toEqual(["sensor_readings_effective"]);
     expect(item.getAttribute("data-verification")).toBe("verified");
     expect(item.getAttribute("data-trusted")).toBe("true");
     expect(item.querySelector('[data-testid="evidence-linkage-badges-source"]')?.textContent).toBe(
@@ -203,9 +220,7 @@ describe("ActionDetail — sensor evidence verified against stored rows (#1001)"
   });
 
   it("a matching stored row with stale quality renders Stale with caution", async () => {
-    sensorRows = [
-      { id: READING_ID, tent_id: TENT, source: "live", quality: "stale", captured_at: AT },
-    ];
+    sensorRows = [sensorRow({ quality: "stale" })];
     detailRow = {
       ...ROW,
       originating_timeline_events: [
@@ -219,5 +234,31 @@ describe("ActionDetail — sensor evidence verified against stored rows (#1001)"
     expect(item.querySelector('[data-testid="evidence-linkage-badges-source"]')?.textContent).toBe(
       "Stale",
     );
+  });
+
+  it("a live ref over a row that has since gone stale renders Stale, not Unverified", async () => {
+    sensorRows = [sensorRow({ quality: "stale" })];
+    renderDetail();
+    const item = await evidenceItem();
+    expect(item.getAttribute("data-verification")).toBe("verified");
+    expect(item.getAttribute("data-trusted")).toBe("false");
+    expect(item.querySelector('[data-testid="evidence-linkage-badges-source"]')?.textContent).toBe(
+      "Stale",
+    );
+  });
+
+  it("a reading of another metric in the tent stays Unverified", async () => {
+    sensorRows = [sensorRow({ metric: "temperature_c" })];
+    renderDetail();
+    const item = await evidenceItem();
+    expect(item.getAttribute("data-verification")).toBe("unverified:metric_mismatch");
+    expect(item.getAttribute("data-trusted")).toBe("false");
+  });
+
+  it("an invalid correction lineage stays Unverified", async () => {
+    sensorRows = [sensorRow({ correction_valid: false })];
+    renderDetail();
+    const item = await evidenceItem();
+    expect(item.getAttribute("data-verification")).toBe("unverified:correction_invalid");
   });
 });

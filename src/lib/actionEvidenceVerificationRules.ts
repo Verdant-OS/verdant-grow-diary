@@ -10,8 +10,16 @@
  *     action's TENT only: readings carry no plant_id, and action_queue_create
  *     accepts a tentless plant against any tent, so plant binding is NOT
  *     checked here,
- *   - has the same captured instant as the ref,
- *   - and does not contradict the ref's claimed source.
+ *   - measures the action's metric (`target_metric`, through the same alias
+ *     table the alert-evidence proof uses); an action with no recognised
+ *     metric cannot be verified,
+ *   - is the effective reading: it is read from `sensor_readings_effective`,
+ *     so a superseded manual reading is absent and an invalid correction
+ *     lineage (`correction_valid` not true) never verifies,
+ *   - has the same observation instant as the ref (`captured_at`, else `ts`,
+ *     exactly as the snapshot builder resolved it),
+ *   - and does not contradict the ref's claimed source. The claim is compared
+ *     with the row's raw source; stored quality only changes what is shown.
  * The displayed provenance then comes from the STORED row (canonical
  * normalization + stored quality), never from the ref.
  *
@@ -24,6 +32,9 @@
  */
 
 import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
+import { normalizeMetricKey } from "@/lib/oneTentLoopAlertEvidenceRules";
+import { snapshotFromReadings, type SensorSnapshotMetricRefKey } from "@/lib/sensorSnapshot";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 import type {
   OriginatingTimelineEventRef,
   OriginatingTimelineEventSource,
@@ -33,9 +44,13 @@ import type {
 export interface EvidenceSensorRow {
   readonly id: string;
   readonly tent_id: string | null;
+  readonly metric: string | null;
   readonly source: string | null;
   readonly quality: string | null;
   readonly captured_at: string | null;
+  readonly ts: string | null;
+  /** From `sensor_readings_effective`; only `true` may verify. */
+  readonly correction_valid: boolean | null;
 }
 
 export type EvidenceRowsRead =
@@ -51,6 +66,9 @@ export type EvidenceVerificationReason =
   | "not_found"
   | "no_tent_scope"
   | "wrong_tent"
+  | "correction_invalid"
+  | "no_metric_scope"
+  | "metric_mismatch"
   | "timestamp_mismatch"
   | "source_mismatch"
   | "live_not_verifiable";
@@ -113,17 +131,47 @@ export function sensorEvidenceRefIdsToRead(
  * quality wins: stale/invalid map to themselves, any other non-"ok" quality
  * is "unknown"; unrecognized tokens are "unknown".
  */
-export function storedEvidenceSource(row: EvidenceSensorRow): OriginatingTimelineEventSource {
+export function storedEvidenceSource(
+  row: Pick<EvidenceSensorRow, "source" | "quality">,
+): OriginatingTimelineEventSource {
   const quality = (row.quality ?? "").trim().toLowerCase();
   if (quality === "invalid") return "invalid";
   if (quality === "stale") return "stale";
   // Any quality other than "ok" (degraded, missing, unknown) is never shown
   // as trusted evidence, whatever the source (#1845 review).
   if (quality !== "ok") return "unknown";
+  return storedRawEvidenceSource(row);
+}
+
+/** The row's canonical source before quality is applied; the claim is checked against this. */
+function storedRawEvidenceSource(
+  row: Pick<EvidenceSensorRow, "source">,
+): OriginatingTimelineEventSource {
   const raw = (row.source ?? "").trim().toLowerCase();
   const canonical = normalizeSensorSource(raw);
   if (canonical === "invalid" && raw !== "invalid") return "unknown";
   return canonical;
+}
+
+/** Snapshot metric key an action's `target_metric` refers to, or null. */
+export function evidenceMetricKeyForAction(
+  targetMetric: string | null | undefined,
+): SensorSnapshotMetricRefKey | null {
+  return normalizeMetricKey(targetMetric);
+}
+
+/**
+ * True when the snapshot builder that produced the refs would file this row
+ * under `key`. Asking the builder keeps its metric table the only mapping
+ * site between snapshot keys and `sensor_readings.metric`.
+ */
+function rowMeasuresMetricKey(row: EvidenceSensorRow, key: SensorSnapshotMetricRefKey): boolean {
+  const metric = (row.metric ?? "").trim();
+  if (!metric) return false;
+  const snapshot = snapshotFromReadings([
+    { id: row.id, metric, value: null, ts: "1970-01-01T00:00:00.000Z" },
+  ]);
+  return snapshot?.metric_refs?.[key]?.id === row.id;
 }
 
 function sameInstant(a: string | null | undefined, b: string | null | undefined): boolean {
@@ -147,8 +195,10 @@ const unverified = (reason: EvidenceVerificationReason): EvidenceRefVerification
 export function verifyActionEvidenceRefs(input: {
   readonly refs: ReadonlyArray<OriginatingTimelineEventRef> | null | undefined;
   readonly actionTentId: string | null | undefined;
+  readonly actionTargetMetric: string | null | undefined;
   readonly read: EvidenceRowsRead;
 }): Map<string, EvidenceRefVerification> {
+  const expectedMetricKey = evidenceMetricKeyForAction(input.actionTargetMetric);
   const out = new Map<string, EvidenceRefVerification>();
   const rowsById = new Map<string, EvidenceSensorRow>();
   if (input.read.status === "ok") {
@@ -187,13 +237,27 @@ export function verifyActionEvidenceRefs(input: {
       out.set(ref.id, unverified("wrong_tent"));
       continue;
     }
-    if (!sameInstant(ref.occurred_at, row.captured_at)) {
+    if (row.correction_valid !== true) {
+      out.set(ref.id, unverified("correction_invalid"));
+      continue;
+    }
+    if (!expectedMetricKey) {
+      out.set(ref.id, unverified("no_metric_scope"));
+      continue;
+    }
+    if (!rowMeasuresMetricKey(row, expectedMetricKey)) {
+      out.set(ref.id, unverified("metric_mismatch"));
+      continue;
+    }
+    if (!sameInstant(ref.occurred_at, resolveSensorObservationTime(row))) {
       out.set(ref.id, unverified("timestamp_mismatch"));
       continue;
     }
     const stored = storedEvidenceSource(row);
     const claimed = ref.source ?? "unknown";
-    if (claimed !== "unknown" && claimed !== stored) {
+    // A ref records the row's source when it was captured; quality applied
+    // since (stale, invalid) changes the label shown, not the claim (#1845).
+    if (claimed !== "unknown" && claimed !== storedRawEvidenceSource(row) && claimed !== stored) {
       out.set(ref.id, unverified("source_mismatch"));
       continue;
     }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { Droplets, NotebookPen, History, PlusCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -479,6 +479,7 @@ function aiDoctorResultsHrefFor(props: Props): string {
 export const QUICK_LOG_GROUPED_TIMELINE_UPDATING_LABEL = "Updating QuickLog timeline…";
 
 export default function QuickLogGroupedTimelineSection(props: Props) {
+  const dayHeadingPrefix = useId();
   const scope = toScope(props);
   const { entries, isLoading, isFetching, isError } = useQuickLogGroupedTimeline(scope);
   const [filter, setFilter] = useState<QuickLogGroupedTimelineFilter>("all");
@@ -514,6 +515,17 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
   const revisionLedgerUnread = revisionBadgesStatus === "unavailable";
 
   const hasAnyEntries = wrapped.length > 0;
+  const timelineDays = useMemo(() => {
+    const seenDayHeadings = new Map<string, string>();
+    return groupByQuickLogLocalDay(filteredWrapped, (item) => item.entry.occurredAt).map((day) => {
+      const dayToken = day.dayKey.length > 0 ? day.dayKey : "unknown";
+      const existingHeadingId = seenDayHeadings.get(dayToken);
+      const showHeading = existingHeadingId === undefined;
+      const headingId = existingHeadingId ?? `${dayHeadingPrefix}-day-${dayToken}`;
+      if (showHeading) seenDayHeadings.set(dayToken, headingId);
+      return { day, showHeading, headingId };
+    });
+  }, [filteredWrapped, dayHeadingPrefix]);
   const aiDoctorResultsHref = aiDoctorResultsHrefFor(props);
   const isAiDoctorEvidenceFilter = filter === "ai-doctor-evidence";
 
@@ -659,10 +671,7 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
               </p>
             ) : null}
             <ul className="space-y-3" data-testid="quick-log-grouped-timeline-list">
-              {groupByQuickLogLocalDay(
-                filteredWrapped,
-                (wrapped) => wrapped.entry.occurredAt,
-              ).flatMap((day) =>
+              {timelineDays.flatMap(({ day, showHeading, headingId }) =>
                 day.items.map((w, i) => {
                   const entry = w.entry;
                   const key =
@@ -677,14 +686,15 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
                       : 0;
                   return (
                     <li key={key} data-local-day={day.dayKey}>
-                      {i === 0 ? (
-                        <p
+                      {showHeading && i === 0 ? (
+                        <h4
+                          id={headingId}
                           className="text-xs font-semibold text-muted-foreground"
                           data-testid="quick-log-grouped-timeline-day-label"
                           data-local-day={day.dayKey}
                         >
                           {day.label}
-                        </p>
+                        </h4>
                       ) : null}
                       <EntryItem
                         entry={entry}

@@ -6,7 +6,6 @@ import { render, screen, waitFor, within, fireEvent } from "@testing-library/rea
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
-import { formatQuickLogOccurredAt } from "@/lib/quickLogGroupedTimelineFilterViewModel";
 
 type Row = {
   id: string;
@@ -190,26 +189,35 @@ describe("Grouped Timeline Review Panel — open / close", () => {
   });
 
   it("Water panel shows action kind, occurred_at, Manual source, volume", async () => {
-    nextRows = [
-      water("w1", "2026-05-06T10:00:00.000Z"),
-      env("e1", "2026-05-06T10:00:01.000Z", { humidity_pct: 55 }),
-    ];
-    renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
-    await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
-    fireEvent.click(screen.getByTestId("quick-log-grouped-review-trigger"));
-    const panel = screen.getByTestId("quick-log-grouped-review-panel");
-    expect(within(panel).getByTestId("quick-log-grouped-review-action-kind").textContent).toBe(
-      "Water",
-    );
-    expect(within(panel).getByTestId("quick-log-grouped-review-action-source").textContent).toBe(
-      "Manual",
-    );
-    expect(
-      within(panel).getByTestId("quick-log-grouped-review-action-occurred-at").textContent,
-    ).toBe(formatQuickLogOccurredAt("2026-05-06T10:00:00.000Z"));
-    expect(
-      within(panel).getByTestId("quick-log-grouped-review-action-volume").textContent,
-    ).toContain("500");
+    const originalTz = process.env.TZ;
+    process.env.TZ = "UTC";
+    try {
+      // Proves the assignment took effect: local 10:00 AM is the stored UTC instant.
+      expect(new Date(2026, 4, 6, 10, 0, 0, 0).toISOString()).toBe("2026-05-06T10:00:00.000Z");
+      nextRows = [
+        water("w1", "2026-05-06T10:00:00.000Z"),
+        env("e1", "2026-05-06T10:00:01.000Z", { humidity_pct: 55 }),
+      ];
+      renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
+      await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
+      fireEvent.click(screen.getByTestId("quick-log-grouped-review-trigger"));
+      const panel = screen.getByTestId("quick-log-grouped-review-panel");
+      expect(within(panel).getByTestId("quick-log-grouped-review-action-kind").textContent).toBe(
+        "Water",
+      );
+      expect(within(panel).getByTestId("quick-log-grouped-review-action-source").textContent).toBe(
+        "Manual",
+      );
+      expect(
+        within(panel).getByTestId("quick-log-grouped-review-action-occurred-at").textContent,
+      ).toBe("May 6, 2026, 10:00 AM");
+      expect(
+        within(panel).getByTestId("quick-log-grouped-review-action-volume").textContent,
+      ).toContain("500");
+    } finally {
+      if (originalTz === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTz;
+    }
   });
 
   it("Note panel shows action kind, occurred_at, Manual source, note text", async () => {

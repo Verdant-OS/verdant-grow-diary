@@ -56,6 +56,7 @@ export default function TentManualSnapshotHistoryList({
         value: r.value as number | null | undefined,
         source: r.source as string | null | undefined,
         tent_id: r.tent_id as string | null | undefined,
+        device_id: r.device_id,
       }))
     : [];
 
@@ -71,11 +72,7 @@ export default function TentManualSnapshotHistoryList({
       </div>
 
       {readStatus === "error" ? (
-        <div
-          role="alert"
-          aria-busy={isFetching}
-          data-testid="tent-manual-snapshot-history-error"
-        >
+        <div role="alert" aria-busy={isFetching} data-testid="tent-manual-snapshot-history-error">
           <p className="text-sm text-muted-foreground">Manual snapshot history is unavailable.</p>
           <Button
             type="button"
@@ -121,11 +118,21 @@ export default function TentManualSnapshotHistoryList({
                 >
                   {formatTs(e.ts)}
                 </span>
-                <span
-                  className="rounded-md border border-border/50 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground"
-                  data-testid="tent-manual-snapshot-history-source"
-                >
-                  Manual
+                <span className="inline-flex items-center gap-1.5">
+                  {e.deviceNote ? (
+                    <span
+                      className="text-[11px] text-muted-foreground"
+                      data-testid="tent-manual-snapshot-history-device-note"
+                    >
+                      {e.deviceNote}
+                    </span>
+                  ) : null}
+                  <span
+                    className="rounded-md border border-border/50 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground"
+                    data-testid="tent-manual-snapshot-history-source"
+                  >
+                    Manual
+                  </span>
                 </span>
               </div>
 

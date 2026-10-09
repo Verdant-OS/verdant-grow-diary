@@ -4,12 +4,11 @@
  * No I/O, no React, no Supabase. Read-only derivations only.
  *
  * Scope notes:
- *  - `sensor_readings` only accepts the metrics enforced by the DB trigger
- *    `validate_sensor_reading`:
- *      temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct
- *    PPFD / soil_ec / soil_temp / reservoir EC+pH are NOT in the schema and
- *    are intentionally not part of this form. Adding them would require a
- *    migration to extend the trigger; out of scope here.
+ *  - `validate_sensor_reading` allows temperature_c, humidity_pct, vpd_kpa,
+ *    co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, and ppfd. This form
+ *    persists the air metrics, soil moisture, and optional PPFD. PPFD is
+ *    a real meter reading validated by `classifyPpfd`. soil_temp_c, ph,
+ *    and ec are allowed by the trigger and are not fields on this form.
  *  - Source is always `manual`. Never fakes live data.
  *  - Air temp is entered in °F by default (grow-room friendly) and is
  *    converted to °C before save. Growers who prefer Celsius enter °C

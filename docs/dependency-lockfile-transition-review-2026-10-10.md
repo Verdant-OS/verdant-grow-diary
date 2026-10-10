@@ -64,6 +64,7 @@ Keeping two locks keeps the synchronization work; the existing semantic and
 version-floor gates continue to enforce it. Reverting this change restores the
 2026-10-10 deadline and its fail-closed result on 2026-10-11 UTC. No data rollback is
 needed. No merge, Publish, production APPLY, device or Action Queue operation,
-credential, or production acceptance is authorized by this review. Merging this draft
-needs an outside reviewer (Codex, Blue Dream, Critical Mass, or Durban Poison) and
-Matthew's yes.
+credential, or production acceptance is authorized by this review. Acceptance review
+for this dependency and config change goes to Critical Mass, or to Durban Poison
+when independently assigned. A Codex review is supplemental and is not an acceptance
+verdict. Merging this draft still needs Matthew's yes.

@@ -61,6 +61,7 @@ import {
 import { toDateTimeLocalInputValue } from "@/lib/dateTimeLocalRules";
 import {
   MANUAL_READING_OBSERVED_AT_HINT,
+  MANUAL_READING_OBSERVED_AT_LOOKBACK_MS,
   decideManualReadingObservedAt,
 } from "@/lib/manualSensorObservedAtRules";
 import {
@@ -232,7 +233,22 @@ export default function ManualSensorReadingCard({
   const [observedAtLocal, setObservedAtLocal] = useState(() =>
     toDateTimeLocalInputValue(new Date()),
   );
+  const [observedAtNow, setObservedAtNow] = useState(() => new Date());
   const [observedAtError, setObservedAtError] = useState<string | null>(null);
+  useEffect(() => {
+    if (isCorrection) return;
+    const timer = window.setInterval(() => {
+      setObservedAtNow(new Date());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isCorrection]);
+  const observedAtShown = observedAtTouched
+    ? observedAtLocal
+    : toDateTimeLocalInputValue(observedAtNow);
+  const observedAtMin = toDateTimeLocalInputValue(
+    new Date(observedAtNow.getTime() - MANUAL_READING_OBSERVED_AT_LOOKBACK_MS),
+  );
+  const observedAtMax = toDateTimeLocalInputValue(observedAtNow);
   const chosenObservedIso = (() => {
     if (isCorrection || !observedAtTouched) return undefined;
     const decision = decideManualReadingObservedAt({
@@ -423,7 +439,7 @@ export default function ManualSensorReadingCard({
     }
     const snap: ManualSensorSnapshotInput = {
       source: "manual",
-      captured_at: draftCapturedAt ?? chosenObservedIso ?? new Date().toISOString(),
+      captured_at: draftCapturedAt ?? chosenObservedIso ?? observedAtNow.toISOString(),
       ...fields,
     };
     // Any other blocking error (VPD -1, CO₂ -5, PPFD 5000, a malformed
@@ -433,24 +449,42 @@ export default function ManualSensorReadingCard({
       evaluateManualSensorSnapshotQuality(snap),
       manualEntryValueErrors(validation),
     );
-  }, [validation, draftCapturedAt, chosenObservedIso, form.humidityPct, form.soilMoisturePct]);
+  }, [
+    validation,
+    draftCapturedAt,
+    chosenObservedIso,
+    observedAtNow,
+    form.humidityPct,
+    form.soilMoisturePct,
+  ]);
 
   // Structured pre-save review (source: "manual", never live). Renders inside
   // the review prompt so the grower sees findings + normalized preview before
   // confirming. Blockers here also disable the Confirm button.
   const snapshotReview = useMemo(() => {
-    const review = isCorrection ? reviewManualSensorCorrection : reviewManualSensorSnapshot;
-    return review({
+    const input = {
       tempF: airTempFBridge,
       humidity: form.humidityPct,
       vpdKpa: form.vpdKpa,
       soilWaterContent: form.soilMoisturePct,
       co2Ppm: form.co2Ppm,
       ppfd: form.ppfd,
-      capturedAt: draftCapturedAt ?? chosenObservedIso ?? new Date().toISOString(),
+      capturedAt: draftCapturedAt ?? chosenObservedIso ?? observedAtNow.toISOString(),
       tentId: tentId || null,
+    };
+    if (isCorrection) return reviewManualSensorCorrection(input);
+    return reviewManualSensorSnapshot(input, {
+      staleBlockMs: MANUAL_READING_OBSERVED_AT_LOOKBACK_MS,
     });
-  }, [form, airTempFBridge, tentId, draftCapturedAt, chosenObservedIso, isCorrection]);
+  }, [
+    form,
+    airTempFBridge,
+    tentId,
+    draftCapturedAt,
+    chosenObservedIso,
+    observedAtNow,
+    isCorrection,
+  ]);
 
   // Entered VPD vs air-VPD estimate. Uses only sanitized numeric metrics —
   // never relabels source. If the grower entered a VPD that disagrees with
@@ -478,10 +512,10 @@ export default function ManualSensorReadingCard({
     }
     return validateManualSensorSnapshotFields({
       source: "manual",
-      capturedAt: draftCapturedAt ?? chosenObservedIso ?? new Date().toISOString(),
+      capturedAt: draftCapturedAt ?? chosenObservedIso ?? observedAtNow.toISOString(),
       ...fields,
     });
-  }, [validation.metrics, form.vpdKpa, draftCapturedAt, chosenObservedIso]);
+  }, [validation.metrics, form.vpdKpa, draftCapturedAt, chosenObservedIso, observedAtNow]);
   const enteredVpd =
     fieldValidation.derivedVpd.kind === "entered" ? fieldValidation.derivedVpd.vpdKpa : null;
   const derivedVpdFromTempRh = useMemo(() => {
@@ -555,6 +589,9 @@ export default function ManualSensorReadingCard({
     const capturedMetrics = validation.metrics;
     const pendingSnapshot = values.pendingStandardSnapshot;
     let observedIso: string | undefined;
+    if (!submissionCorrection && !observedAtTouched) {
+      setObservedAtNow(new Date());
+    }
     if (!submissionCorrection && observedAtTouched) {
       const decision = decideManualReadingObservedAt({
         touched: true,
@@ -664,8 +701,10 @@ export default function ManualSensorReadingCard({
       if (stillOwnsDraft) {
         setReviewOpen(false);
         if (!submissionCorrection) {
+          const savedAt = new Date();
           setObservedAtTouched(false);
-          setObservedAtLocal(toDateTimeLocalInputValue(new Date()));
+          setObservedAtNow(savedAt);
+          setObservedAtLocal(toDateTimeLocalInputValue(savedAt));
           setObservedAtError(null);
         }
       }
@@ -899,7 +938,9 @@ export default function ManualSensorReadingCard({
                   id="manual-reading-observed-at"
                   data-testid="manual-reading-observed-at"
                   type="datetime-local"
-                  value={observedAtLocal}
+                  value={observedAtShown}
+                  min={observedAtMin}
+                  max={observedAtMax}
                   onChange={(event) => updateObservedAt(event.target.value)}
                   disabled={isSaving || !draft}
                 />

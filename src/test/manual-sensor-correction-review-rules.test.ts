@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { reviewManualSensorCorrection } from "@/lib/manualSensorCorrectionReviewRules";
-import { MANUAL_READING_OBSERVED_AT_LOOKBACK_MS } from "@/lib/manualSensorObservedAtRules";
 import { reviewManualSensorSnapshot } from "@/lib/sensorSnapshotReviewRules";
 const options = { now: new Date("2026-09-17T12:00:00Z") };
 const input = {
-  capturedAt: new Date(
-    options.now.getTime() - MANUAL_READING_OBSERVED_AT_LOOKBACK_MS - 1,
-  ).toISOString(),
+  capturedAt: "2026-09-16T08:00:00.123456+00:00",
   humidity: 60,
   tentId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
 };

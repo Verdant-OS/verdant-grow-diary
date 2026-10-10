@@ -2,7 +2,7 @@ import { toDateTimeLocalInputValue } from "@/lib/dateTimeLocalRules";
 
 /**
  * How far back a grower may set the observed time on a new manual reading.
- * Cheeko chose 7 days on 2026-10-09, relayed by Verdo.
+ * Lookback 7 days: Cheeko chose this himself in Verdo's chat at 7:24 PM CT, Oct 9, 2026.
  *
  * This lookback is not a freshness window. A time inside it can still be
  * stale. Freshness, latest-snapshot selection, and any live or now indicator

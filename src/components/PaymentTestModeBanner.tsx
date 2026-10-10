@@ -1,18 +1,29 @@
+import { useHasRole } from "@/hooks/useHasRole";
+import { shouldShowPaddleSandboxTestModeBanner } from "@/lib/paymentTestModeBannerVisibilityRules";
 import { getCheckoutUnavailableMessage, resolvePaddleCheckout } from "@/lib/paddle";
 
 /**
  * Payments banner.
  *
  * Renders one of:
- *   - sandbox → visible test-only banner on every host
+ *   - sandbox → visible test-only banner when the caller asks for it
  *   - anything else → visible fail-closed availability banner
  *
- * Never renders or logs the token value.
+ * The site mount is `SitePaymentTestModeBanner`, which shows the sandbox
+ * banner only to operators. This presenter defaults to showing it so existing
+ * callers and the accessibility contract keep the same copy.
+ *
+ * Never renders or logs the token value. Does not choose sandbox vs live.
  */
-export function PaymentTestModeBanner() {
+export function PaymentTestModeBanner({
+  showSandboxTestMode = true,
+}: {
+  showSandboxTestMode?: boolean;
+} = {}) {
   const env = resolvePaddleCheckout();
 
   if (env === "sandbox") {
+    if (!showSandboxTestMode) return null;
     return (
       <aside
         aria-label="Payment environment"
@@ -46,6 +57,20 @@ export function PaymentTestModeBanner() {
     >
       {message}
     </aside>
+  );
+}
+
+/**
+ * Sitewide mount. Operators still see the sandbox test-mode banner.
+ * Everyone else, including signed-out visitors, does not. Checkout
+ * availability copy is unchanged.
+ */
+export function SitePaymentTestModeBanner() {
+  const operator = useHasRole("operator");
+  return (
+    <PaymentTestModeBanner
+      showSandboxTestMode={shouldShowPaddleSandboxTestModeBanner(operator.granted)}
+    />
   );
 }
 

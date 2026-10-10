@@ -19,7 +19,7 @@ import { AuthProvider } from "@/store/auth";
 import { GrowsProvider } from "@/store/grows";
 import RootErrorBoundary from "@/components/RootErrorBoundary";
 import OAuthPostAuthRedirect from "@/components/OAuthPostAuthRedirect";
-import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
+import { SitePaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
 import { useAnalyticsConsent } from "@/hooks/useAnalyticsConsent";
@@ -238,7 +238,7 @@ function ApplicationRootComponent() {
             <AuthProvider onBeforeAuthIdentityChange={onBeforeAuthIdentityChange}>
               <OAuthPostAuthRedirect />
               <GrowsProvider>
-                <PaymentTestModeBanner />
+                <SitePaymentTestModeBanner />
                 <AgreementReconsentGate />
                 <Suspense fallback={<PageLoader />}>
                   {/*

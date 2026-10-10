@@ -5,12 +5,14 @@ import {
   getErrorReporterStatus,
   initErrorReporter,
 } from "@/lib/errorReporter";
+import { KNOWN_THIRD_PARTY_ORIGINS } from "@/lib/securityHeadersRules";
 import {
   ERROR_REPORTING_DATA_COLLECTION,
   LABELED_NON_HTTP_SCHEMES,
   REDACTED,
   SEND_DEFAULT_PII,
   TRACES_SAMPLE_RATE,
+  isValidSentryDsn,
   resolveErrorReportingConfig,
   scrubEvent,
   scrubUrl,
@@ -65,6 +67,51 @@ describe("resolveErrorReportingConfig", () => {
         mode: "production",
       }),
     ).toEqual({ enabled: false, reason: "invalid_dsn" });
+    expect(
+      resolveErrorReportingConfig({
+        dsn: "https://0123456789abcdef0123456789abcdef@o000000.sentry.io/1",
+        hostname: "verdantgrowdiary.com",
+        mode: "production",
+      }),
+    ).toEqual({ enabled: false, reason: "invalid_dsn" });
+  });
+
+  it("does not enable when build mode is missing or unknown", () => {
+    expect(
+      resolveErrorReportingConfig({
+        dsn: TEST_DSN,
+        hostname: "verdantgrowdiary.com",
+      }),
+    ).toEqual({ enabled: false, reason: "not_production_build" });
+    expect(
+      resolveErrorReportingConfig({
+        dsn: TEST_DSN,
+        hostname: "verdantgrowdiary.com",
+        mode: "",
+      }),
+    ).toEqual({ enabled: false, reason: "not_production_build" });
+    expect(
+      resolveErrorReportingConfig({
+        dsn: TEST_DSN,
+        hostname: "verdantgrowdiary.com",
+        mode: "staging",
+      }),
+    ).toEqual({ enabled: false, reason: "not_production_build" });
+  });
+
+  it("accepts only DSN hosts from the CSP sentry ingest list", () => {
+    for (const origin of KNOWN_THIRD_PARTY_ORIGINS.sentryIngest) {
+      const host = origin.replace("https://*.", "o000000.");
+      expect(isValidSentryDsn(`https://0123456789abcdef0123456789abcdef@${host}/1`)).toBe(true);
+    }
+    expect(isValidSentryDsn(TEST_DSN)).toBe(true);
+    expect(isValidSentryDsn("https://0123456789abcdef0123456789abcdef@o000000.sentry.io/1")).toBe(
+      false,
+    );
+    expect(isValidSentryDsn("https://0123456789abcdef0123456789abcdef@ingest.sentry.io/1")).toBe(
+      false,
+    );
+    expect(isValidSentryDsn("https://evil.example/1")).toBe(false);
   });
 
   it("enables only on a production hostname with a hosted DSN and a release", () => {
@@ -95,6 +142,20 @@ describe("scrubUrl", () => {
       "https://verdantgrowdiary.com/plants/a",
     );
     expect(scrubUrl("/grows/1?note=secret#x")).toBe("/grows/1");
+  });
+
+  it("replaces UUID and long path segments with :id", () => {
+    const uuid = "01234567-89ab-4cde-8fab-0123456789ab";
+    const longToken = "abcdefghijklmnopqrstuvwx";
+    expect(longToken.length).toBe(24);
+    expect(scrubUrl(`https://verdantgrowdiary.com/plants/${uuid}/notes?token=secret`)).toBe(
+      "https://verdantgrowdiary.com/plants/:id/notes",
+    );
+    expect(scrubUrl(`https://verdantgrowdiary.com/assets/${longToken}.js`)).toBe(
+      "https://verdantgrowdiary.com/assets/:id",
+    );
+    expect(scrubUrl(`/grows/${uuid}/plants/${longToken}`)).toBe("/grows/:id/plants/:id");
+    expect(scrubUrl("/grows/abcdefghijklmnopqrstuvw")).toBe("/grows/abcdefghijklmnopqrstuvw");
   });
 });
 
@@ -157,6 +218,77 @@ describe("scrubEvent", () => {
     expect(scrubbed.breadcrumbs).toEqual([{ category: "navigation" }]);
     expect(scrubEvent(null)).toBeNull();
   });
+
+  it("drops Blue Dream from every non-allowlisted event field", async () => {
+    const probe = "Blue Dream";
+    const event = {
+      message: probe,
+      logentry: { message: probe, params: [probe] },
+      transaction: probe,
+      contexts: { grow: { cultivar: probe } },
+      tags: {
+        cultivar: probe,
+        source: probe,
+        route: probe,
+        handled: probe,
+      },
+      exception: {
+        values: [
+          {
+            type: probe,
+            value: probe,
+            mechanism: { type: probe, handled: false, data: { cultivar: probe, note: probe } },
+            stacktrace: {
+              frames: [
+                {
+                  function: probe,
+                  module: probe,
+                  filename: "https://verdantgrowdiary.com/assets/app.js?q=1",
+                  abs_path: "https://verdantgrowdiary.com/assets/app.js",
+                  vars: { name: probe },
+                  context_line: probe,
+                  pre_context: [probe],
+                  post_context: [probe],
+                  lineno: 12,
+                  colno: 3,
+                  in_app: true,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    };
+    const scrubbed = scrubEvent(event);
+
+    expect(JSON.stringify(scrubbed)).not.toContain(probe);
+    expect(scrubbed.contexts).toBeUndefined();
+    expect(scrubbed.transaction).toBeUndefined();
+    expect(scrubbed.tags).toBeUndefined();
+    expect(scrubbed.exception?.values?.[0]?.type).toBeUndefined();
+    expect(scrubbed.exception?.values?.[0]?.mechanism).toEqual({ handled: false });
+    expect(scrubbed.exception?.values?.[0]?.stacktrace?.frames?.[0]).toEqual({
+      filename: "https://verdantgrowdiary.com/assets/app.js",
+      abs_path: "https://verdantgrowdiary.com/assets/app.js",
+      lineno: 12,
+      colno: 3,
+      in_app: true,
+    });
+
+    vi.stubEnv("VITE_SENTRY_DSN", TEST_DSN);
+    vi.stubEnv("MODE", "production");
+    setHostname("verdantgrowdiary.com");
+    __resetErrorReporterForTests();
+    const sdk = { init: vi.fn(), captureException: vi.fn() };
+    void initErrorReporter((async () => sdk) as never);
+    await vi.waitFor(() => expect(getErrorReporterStatus()).toBe("ready"));
+    const beforeSend = sdk.init.mock.calls[0]?.[0].beforeSend as (
+      value: typeof event,
+    ) => typeof event;
+    expect(JSON.stringify(beforeSend(event))).not.toContain(probe);
+    __resetErrorReporterForTests();
+    vi.unstubAllEnvs();
+  });
 });
 
 describe("initErrorReporter", () => {
@@ -190,6 +322,24 @@ describe("initErrorReporter", () => {
     const loader = vi.fn();
     void initErrorReporter(loader as never);
     expect(loader).not.toHaveBeenCalled();
+    expect(getErrorReporterStatus()).toBe("disabled");
+  });
+
+  it("does not load the SDK when build mode is missing or unknown", () => {
+    vi.stubEnv("VITE_SENTRY_DSN", TEST_DSN);
+    vi.stubEnv("MODE", "");
+    setHostname("verdantgrowdiary.com");
+    const missing = vi.fn();
+    void initErrorReporter(missing as never);
+    expect(missing).not.toHaveBeenCalled();
+    expect(getErrorReporterStatus()).toBe("disabled");
+
+    __resetErrorReporterForTests();
+    vi.stubEnv("VITE_SENTRY_DSN", TEST_DSN);
+    vi.stubEnv("MODE", "staging");
+    const unknown = vi.fn();
+    void initErrorReporter(unknown as never);
+    expect(unknown).not.toHaveBeenCalled();
     expect(getErrorReporterStatus()).toBe("disabled");
   });
 

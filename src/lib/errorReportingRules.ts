@@ -2,13 +2,19 @@
  * Production error-reporting rules. Pure, deterministic, null-safe — no I/O,
  * no SDK import. The side-effecting wiring lives in `errorReporter.ts`.
  *
- * The reporter may run only with a hosted-Sentry DSN, a production build, and
- * one of the production hostnames. Outgoing events drop user fields, IP,
- * request bodies, and breadcrumbs that carry content. Free-text messages are
- * replaced so grower text does not leave. Query strings never leave.
- * `vbscript:` and the other labeled non-http schemes keep the scheme and drop
- * the payload (`vbscript:[redacted]`).
+ * The reporter may run only with a DSN whose host is one of the Sentry ingest
+ * origins in the report-only CSP, an exact production build mode, and one of
+ * the production hostnames. A missing or unknown mode stays off. Outgoing
+ * events drop user fields, IP, request bodies, contexts, transaction, and
+ * breadcrumbs that carry content. Stack frames keep only filename, abs_path,
+ * lineno, colno, and in_app. Tags are rebuilt from `manualReportTags`.
+ * Free-text messages are replaced so grower text does not leave. Query strings
+ * never leave. A UUID path segment, or a path segment of 24 or more
+ * characters, becomes `:id`. `vbscript:` and the other labeled non-http
+ * schemes keep the scheme and drop the payload (`vbscript:[redacted]`).
  */
+
+import { KNOWN_THIRD_PARTY_ORIGINS } from "@/lib/securityHeadersRules";
 
 export const PRODUCTION_HOSTNAMES: ReadonlyArray<string> = [
   "verdantgrowdiary.com",
@@ -75,7 +81,24 @@ export const LABELED_NON_HTTP_SCHEMES: ReadonlyArray<string> = [
   "about:",
 ];
 
-const DSN_PATTERN = /^https:\/\/[0-9a-f]{8,}@[a-z0-9.-]+\.sentry\.io\/\d+$/i;
+const DSN_SHAPE = /^https:\/\/[0-9a-f]{8,}@([a-z0-9.-]+)\/\d+$/i;
+
+const UUID_SEGMENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** ECMAScript error classes. Any other exception type is omitted. */
+const STANDARD_JS_ERROR_TYPES: ReadonlySet<string> = new Set([
+  "AggregateError",
+  "Error",
+  "EvalError",
+  "RangeError",
+  "ReferenceError",
+  "SyntaxError",
+  "TypeError",
+  "URIError",
+]);
+
+/** SDK mechanism labels. Free-text mechanism types are omitted. `data` never leaves. */
+const SAFE_MECHANISM_TYPE = /^[a-z0-9._-]{1,64}$/i;
 
 export interface ErrorReportingEnvironment {
   readonly dsn?: string | null;
@@ -108,8 +131,26 @@ export interface ManualReportContext {
   readonly handled?: boolean;
 }
 
+/**
+ * A CSP ingest origin is `https://*.<suffix>`. The DSN host must be exactly
+ * one label plus that suffix, so the allowlist cannot drift from connect-src.
+ */
+function isCspSentryIngestHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return KNOWN_THIRD_PARTY_ORIGINS.sentryIngest.some((origin) => {
+    if (!origin.startsWith("https://*.")) return false;
+    const suffix = origin.slice("https://*.".length).toLowerCase();
+    if (!host.endsWith(`.${suffix}`)) return false;
+    const label = host.slice(0, host.length - suffix.length - 1);
+    return /^[a-z0-9-]+$/.test(label);
+  });
+}
+
 export function isValidSentryDsn(value: unknown): value is string {
-  return typeof value === "string" && DSN_PATTERN.test(value.trim());
+  if (typeof value !== "string") return false;
+  const match = DSN_SHAPE.exec(value.trim());
+  const host = match?.[1];
+  return typeof host === "string" && isCspSentryIngestHost(host);
 }
 
 export function resolveErrorReportingConfig(
@@ -126,7 +167,7 @@ export function resolveErrorReportingConfig(
   if (hostname.endsWith(".lovable.app") || hostname.endsWith(".lovableproject.com")) {
     return { enabled: false, reason: "lovable_preview" };
   }
-  if ((env?.mode ?? "production") !== "production") {
+  if (env?.mode !== "production") {
     return { enabled: false, reason: "not_production_build" };
   }
   if (!PRODUCTION_HOSTNAMES.includes(hostname)) {
@@ -144,6 +185,25 @@ export function withoutExcludedIntegrations<T extends { name: string }>(
   );
 }
 
+function redactPathSegment(segment: string): string {
+  if (segment.length === 0) return segment;
+  let token = segment;
+  try {
+    token = decodeURIComponent(segment);
+  } catch {
+    token = segment;
+  }
+  if (UUID_SEGMENT.test(token) || token.length >= 24 || segment.length >= 24) return ":id";
+  return segment;
+}
+
+function redactPath(pathname: string): string {
+  return pathname
+    .split("/")
+    .map((segment) => redactPathSegment(segment))
+    .join("/");
+}
+
 /** http(s) keeps origin + path. Labeled non-http schemes keep `scheme:[redacted]`. */
 export function scrubUrl(value: unknown): string {
   if (typeof value !== "string") return "";
@@ -156,9 +216,9 @@ export function scrubUrl(value: unknown): string {
         ? `${url.protocol}${REDACTED}`
         : REDACTED;
     }
-    return `${url.origin}${url.pathname}`;
+    return `${url.origin}${redactPath(url.pathname)}`;
   } catch {
-    return raw.split(/[?#]/, 1)[0] ?? "";
+    return redactPath(raw.split(/[?#]/, 1)[0] ?? "");
   }
 }
 
@@ -189,35 +249,63 @@ function scrubRequest(request: Record<string, unknown>): Record<string, unknown>
   return next;
 }
 
-function scrubFrame(frame: unknown): unknown {
-  if (!frame || typeof frame !== "object") return frame;
-  const next: Record<string, unknown> = { ...(frame as Record<string, unknown>) };
-  delete next.vars;
-  if (typeof next.filename === "string") next.filename = scrubUrl(next.filename);
-  if (typeof next.abs_path === "string") next.abs_path = scrubUrl(next.abs_path);
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function scrubFrame(frame: unknown): Record<string, unknown> | null {
+  if (!frame || typeof frame !== "object") return null;
+  const source = frame as Record<string, unknown>;
+  const next: Record<string, unknown> = {};
+  if (typeof source.filename === "string") next.filename = scrubUrl(source.filename);
+  if (typeof source.abs_path === "string") next.abs_path = scrubUrl(source.abs_path);
+  const lineno = finiteNumber(source.lineno);
+  const colno = finiteNumber(source.colno);
+  if (lineno !== undefined) next.lineno = lineno;
+  if (colno !== undefined) next.colno = colno;
+  if (typeof source.in_app === "boolean") next.in_app = source.in_app;
+  return next;
+}
+
+function scrubMechanism(mechanism: unknown): Record<string, unknown> | undefined {
+  if (!mechanism || typeof mechanism !== "object") return undefined;
+  const source = mechanism as Record<string, unknown>;
+  const next: Record<string, unknown> = {};
+  if (typeof source.type === "string" && SAFE_MECHANISM_TYPE.test(source.type)) {
+    next.type = source.type;
+  }
+  if (typeof source.handled === "boolean") next.handled = source.handled;
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function scrubExceptionValue(entry: unknown): Record<string, unknown> {
+  if (!entry || typeof entry !== "object") return {};
+  const source = entry as Record<string, unknown>;
+  const next: Record<string, unknown> = {};
+  if (typeof source.type === "string" && STANDARD_JS_ERROR_TYPES.has(source.type)) {
+    next.type = source.type;
+  }
+  if ("value" in source) next.value = REDACTED;
+  const mechanism = scrubMechanism(source.mechanism);
+  if (mechanism) next.mechanism = mechanism;
+  const stacktrace = source.stacktrace;
+  if (stacktrace && typeof stacktrace === "object") {
+    const frames = (stacktrace as { frames?: unknown }).frames;
+    next.stacktrace = {
+      frames: Array.isArray(frames)
+        ? frames
+            .map((frame) => scrubFrame(frame))
+            .filter((frame): frame is Record<string, unknown> => frame != null)
+        : [],
+    };
+  }
   return next;
 }
 
 function scrubException(exception: Record<string, unknown>): Record<string, unknown> {
   const values = exception.values;
-  if (!Array.isArray(values)) return { ...exception };
-  return {
-    ...exception,
-    values: values.map((entry) => {
-      if (!entry || typeof entry !== "object") return entry;
-      const next: Record<string, unknown> = { ...(entry as Record<string, unknown>) };
-      if ("value" in next) next.value = REDACTED;
-      const stacktrace = next.stacktrace;
-      if (stacktrace && typeof stacktrace === "object") {
-        const frames = (stacktrace as { frames?: unknown }).frames;
-        next.stacktrace = {
-          ...(stacktrace as Record<string, unknown>),
-          frames: Array.isArray(frames) ? frames.map(scrubFrame) : frames,
-        };
-      }
-      return next;
-    }),
-  };
+  if (!Array.isArray(values)) return {};
+  return { values: values.map((entry) => scrubExceptionValue(entry)) };
 }
 
 function scrubBreadcrumbsField(breadcrumbs: unknown): unknown {
@@ -242,10 +330,17 @@ function scrubBreadcrumbsField(breadcrumbs: unknown): unknown {
   return breadcrumbs;
 }
 
+function eventHandled(value: unknown): boolean | undefined {
+  if (value === true || value === "true") return true;
+  if (value === false || value === "false") return false;
+  return undefined;
+}
+
 /**
  * Small `beforeSend` floor. Returns null only when the event itself is null.
- * Drops user (including IP), request bodies, and content breadcrumbs. Redacts
- * free text. Strips query strings and rejects non-http schemes, including
+ * Drops user (including IP), contexts, transaction, request bodies, and
+ * content breadcrumbs. Rebuilds tags from `manualReportTags`. Redacts free
+ * text. Strips query strings and rejects non-http schemes, including
  * `vbscript:`.
  */
 export function scrubEvent<T>(event: T): T {
@@ -253,10 +348,15 @@ export function scrubEvent<T>(event: T): T {
   const next: Record<string, unknown> = { ...(event as Record<string, unknown>) };
   delete next.user;
   delete next.extra;
+  delete next.contexts;
+  delete next.transaction;
   if (typeof next.message === "string") next.message = REDACTED;
   if (next.logentry && typeof next.logentry === "object") {
-    next.logentry = { ...(next.logentry as Record<string, unknown>), message: REDACTED };
+    next.logentry = { message: REDACTED };
   }
+  const tags = scrubTags(next.tags);
+  if (tags) next.tags = tags;
+  else delete next.tags;
   if (next.request && typeof next.request === "object") {
     next.request = scrubRequest(next.request as Record<string, unknown>);
   }
@@ -265,6 +365,17 @@ export function scrubEvent<T>(event: T): T {
   }
   if ("breadcrumbs" in next) next.breadcrumbs = scrubBreadcrumbsField(next.breadcrumbs);
   return next as T;
+}
+
+function scrubTags(tags: unknown): Record<string, string> | undefined {
+  if (!tags || typeof tags !== "object" || Array.isArray(tags)) return undefined;
+  const record = tags as Record<string, unknown>;
+  const rebuilt = manualReportTags({
+    source: typeof record.source === "string" ? record.source : undefined,
+    route: typeof record.route === "string" ? record.route : undefined,
+    handled: eventHandled(record.handled),
+  });
+  return Object.keys(rebuilt).length > 0 ? rebuilt : undefined;
 }
 
 export function normalizeCaughtError(error: unknown): Error {
@@ -282,8 +393,10 @@ export function manualReportTags(
   }
   if (typeof context.handled === "boolean") tags.handled = context.handled ? "true" : "false";
   if (typeof context.route === "string" && context.route.length > 0) {
-    const route = scrubUrl(context.route);
-    if (route) tags.route = route.slice(0, 300);
+    const route = scrubUrl(context.route).slice(0, 300);
+    const pathShaped =
+      route.startsWith("/") || route.startsWith("http://") || route.startsWith("https://");
+    if (route && pathShaped && !/\s/.test(route)) tags.route = route;
   }
   return tags;
 }

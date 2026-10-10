@@ -35,6 +35,7 @@ import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityC
 type Kind = "correction" | "retraction";
 
 const UNAVAILABLE_COPY = quickLogRevisionFailureCopy("rpc_unavailable");
+const AMBIGUOUS_COPY = quickLogRevisionFailureCopy("rpc_error");
 
 const receipt = {
   data: {
@@ -50,6 +51,11 @@ const receipt = {
 const unavailable = {
   data: null,
   error: { code: "PGRST202", message: "Could not find the function public.quicklog_correct_entry" },
+};
+
+const ambiguous = {
+  data: null,
+  error: { code: "08006", message: "connection failure" },
 };
 
 function mount() {
@@ -237,6 +243,22 @@ describe("inline revision failure copy", () => {
       UNAVAILABLE_COPY,
     );
   });
+
+  it.each<Kind>(["correction", "retraction"])(
+    "shows the rpc_error status line inside the open %s dialog and no alert",
+    async (kind) => {
+      mocks.rpc.mockResolvedValueOnce(ambiguous);
+      mount();
+      openAndSubmit(kind);
+
+      const dialog = dialogFor(kind);
+      const status = await within(dialog).findByRole("status");
+      expect(status).toHaveTextContent(AMBIGUOUS_COPY);
+      expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+      expect(mocks.error).toHaveBeenCalledWith(AMBIGUOUS_COPY);
+      expect(dialog).toBeInTheDocument();
+    },
+  );
 
   it.each<Kind>(["correction", "retraction"])(
     "clears the %s alert when the dialog closes",

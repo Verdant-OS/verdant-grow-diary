@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CLAUDE-WRITE-DENIAL-HARNESS-42501-001
+
+```text
+TASK CLAUDE-WRITE-DENIAL-HARNESS-42501-001  priority: other  status: OPEN
+goal: Close the two post-merge bot findings on #1877: every write-denial INSERT check (S3, S9, F3, F11) requires SQLSTATE 42501, and an active sandbox subscription cannot be flipped to live by UPDATE or UPSERT (service_role read-back). Harness and spec only.
+branch: claude/founders-harness-env-flip-42501
+base: verdant-grow-diary at cfe09322e (#1839)
+checkout: git switch claude/founders-harness-env-flip-42501 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1925
+head_sha: c0866c4bc0d6cfb2f8d80b4f2c6f08a1b3973022 observed 2026-10-06 15:40 CT; this log edit travels in its direct child, so adopt the remote head when c0866c4bc is its ancestor.
+state: pushed draft. Supersedes #1922 (closed at owner's request). Spec 18 PASS / 0 FAIL; four mutations (loose predicate, F3 rewired, flip verdict ignoring read-back, S4c rewired) each go RED and were restored byte-identical. tsc 0, eslint 0/0, prettier PASS. Database-level RED in a disposable replay NOT_MEASURED (no Docker locally).
+next_action: CI at the exact head (watch security-db-local harness step: two more checks, S4b/S4c), then Critical Mass independent review. No ready/merge by Claude.
+files: scripts/run-subscriptions-founders-write-denial-harness.ts; src/test/subscriptions-founders-write-denial-harness.test.ts; docs/agents/HANDOFF_LOG.md (this block)
+blockers: none. Known security-db-local Quick Log null-RPC flake is unrelated.
+artifacts: PR #1925 body (mutation table and validation)
+reviewer_seat: Critical Mass
+claimed_by: Claude, 2026-10-06 15:40 CT (owner instruction in session)
+last_updated: 2026-10-06 15:40 CT, by Claude
+```
+
 ### PR-1939-NOT-FOUND-COVERAGE
 
 ```text

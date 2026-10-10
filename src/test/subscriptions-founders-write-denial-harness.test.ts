@@ -4,7 +4,11 @@ import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 import {
   LOCAL_LANE_FLAG,
+  PERMISSION_DENIED,
+  denied,
+  environmentFlipBlocked,
   isLoopbackHost,
+  permissionDenied,
   resolveHarnessTarget,
 } from "../../scripts/run-subscriptions-founders-write-denial-harness";
 
@@ -81,6 +85,94 @@ describe("write-denial harness refuses anything but the disposable loopback data
     expect(
       resolveHarnessTarget([LOCAL_LANE_FLAG], { ...LOCAL, SUPABASE_URL: "not a url" }),
     ).toMatchObject({ ok: false, exitCode: 2, message: "database API URL is invalid" });
+  });
+});
+
+const PERMISSION_ERROR = {
+  data: null,
+  error: { code: "42501", message: 'permission denied for table "founders"' },
+};
+const RLS_ERROR = {
+  data: null,
+  error: { code: "42501", message: 'new row violates row-level security policy for table "x"' },
+};
+const UNIQUE_VIOLATION = {
+  data: null,
+  error: { code: "23505", message: 'duplicate key value violates unique constraint "x"' },
+};
+const NO_ROWS = { data: [], error: null };
+const ONE_ROW = { data: [{ user_id: "a" }], error: null };
+
+describe("INSERT denial requires a permission error, not any error", () => {
+  it("pins the SQLSTATE", () => {
+    expect(PERMISSION_DENIED).toBe("42501");
+  });
+
+  it("accepts a missing privilege and a row-level security violation", () => {
+    expect(permissionDenied(PERMISSION_ERROR)).toBe(true);
+    expect(permissionDenied(RLS_ERROR)).toBe(true);
+  });
+
+  it("rejects a unique violation, which is what a future INSERT grant would produce", () => {
+    // The loose predicate passes this result; the INSERT checks must not.
+    expect(denied(UNIQUE_VIOLATION)).toBe(true);
+    expect(permissionDenied(UNIQUE_VIOLATION)).toBe(false);
+  });
+
+  it("rejects success, an empty result and an error without a code", () => {
+    expect(permissionDenied(ONE_ROW)).toBe(false);
+    expect(permissionDenied(NO_ROWS)).toBe(false);
+    expect(permissionDenied({ data: null, error: { message: "network" } })).toBe(false);
+  });
+
+  it("leaves the loose predicate for UPDATE/UPSERT/DELETE unchanged", () => {
+    expect(denied(NO_ROWS)).toBe(true);
+    expect(denied(PERMISSION_ERROR)).toBe(true);
+    expect(denied(ONE_ROW)).toBe(false);
+  });
+});
+
+describe("environment flip on an active sandbox subscription", () => {
+  const sandbox = { status: "active", environment: "sandbox" };
+
+  it("passes when the update is denied and the row still reads back as sandbox", () => {
+    expect(environmentFlipBlocked(NO_ROWS, sandbox)).toBe(true);
+    expect(environmentFlipBlocked(PERMISSION_ERROR, sandbox)).toBe(true);
+  });
+
+  it("fails when an environment-only grant lets the row turn live", () => {
+    const live = { status: "active", environment: "live" };
+    expect(environmentFlipBlocked(ONE_ROW, live)).toBe(false);
+    // Even if the response hides the write, the service_role read-back catches it.
+    expect(environmentFlipBlocked(NO_ROWS, live)).toBe(false);
+  });
+
+  it("fails when the update reports an affected row, or the row is missing", () => {
+    expect(environmentFlipBlocked(ONE_ROW, sandbox)).toBe(false);
+    expect(environmentFlipBlocked(NO_ROWS, undefined)).toBe(false);
+    expect(environmentFlipBlocked(NO_ROWS, { status: "canceled", environment: "sandbox" })).toBe(
+      false,
+    );
+  });
+});
+
+describe("harness wires the strict predicates into the checks", () => {
+  const source = readFileSync(resolve(ROOT, HARNESS), "utf8");
+  // @source-scan-justified: main() needs a live loopback database, so which predicate
+  // each check calls can only be read from the source in a unit test.
+  it("uses permissionDenied for every INSERT check and nowhere looser", () => {
+    for (const id of ["S3", "S9", "F3", "F11"]) {
+      const check = new RegExp(`["\`]${id}\\. [^"\`]*\\(42501\\)["\`],\\s*permissionDenied\\(`);
+      expect(source, id).toMatch(check);
+    }
+    expect(source.match(/INSERT[^"`]*["`],\s*denied\(/g)).toBeNull();
+  });
+
+  it("checks the sandbox environment flip with a service_role read-back", () => {
+    expect(source).toContain('.update({ environment: "live" })');
+    expect(source).toMatch(/environmentFlipBlocked\(flip,/);
+    expect(source).toMatch(/environmentFlipBlocked\(flipUpsert,/);
+    expect(source).toContain('environment: "sandbox"');
   });
 });
 

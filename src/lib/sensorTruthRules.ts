@@ -35,6 +35,7 @@ import {
   SOIL_TEMP_F_REALISTIC,
   VPD_KPA_REALISTIC,
 } from "@/constants/sensorTruthRanges";
+import { classifyPpfd } from "@/lib/ppfdRules";
 import { EMPTY_SNAPSHOT, isSnapshotStale, type SensorSnapshot } from "@/lib/sensorSnapshot";
 import { tempFFromC } from "@/lib/temperatureUnits";
 
@@ -376,6 +377,10 @@ const VALID_TRUTH: ManualMetricTruth = { valid: true };
  *
  * Does NOT enforce the VPD ↔ temp/RH dependency — callers that have access
  * to the sibling metrics must apply that rule themselves.
+ *
+ * PPFD uses `classifyPpfd` (`PPFD_MAX`, negatives rejected). A missing
+ * case would fall through to the default and present an implausible
+ * PPFD value as healthy.
  */
 export function classifyManualMetric(
   metric: string,
@@ -436,6 +441,11 @@ export function classifyManualMetric(
       return isPhRealistic(value)
         ? VALID_TRUTH
         : { valid: false, chip: TRUTH_REASON_CHIP.invalid_ph, reasonCode: "invalid_ph" };
+    case "ppfd": {
+      const classified = classifyPpfd(value);
+      if (classified.kind === "valid") return VALID_TRUTH;
+      return { valid: false, chip: "Invalid PPFD" };
+    }
     default:
       return VALID_TRUTH;
   }

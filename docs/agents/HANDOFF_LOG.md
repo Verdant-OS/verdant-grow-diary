@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### GH-1953-MANUAL-SNAPSHOT-PPFD
+
+```text
+TASK GH-1953-MANUAL-SNAPSHOT-PPFD  priority: other  status: OPEN
+goal: Show saved manual PPFD on the tent page Recent manual snapshots list, with classifyPpfd realism (negatives and values above PPFD_MAX are not healthy), and show the optional device note (device_id with the manual: prefix stripped). Client-only. No schema, migration, observation-notes field (#1954), billing, auth, or server change.
+branch: cursor/manual-snapshot-ppfd-ec88
+base: verdant-grow-diary
+checkout: git fetch origin cursor/manual-snapshot-ppfd-ec88 verdant-grow-diary && git switch cursor/manual-snapshot-ppfd-ec88 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1956 (draft)
+head_sha: 93c5bfc97cb342c412bd6df4615ba2c931814052 is the implementation commit. This log update cannot name itself; read origin/cursor/manual-snapshot-ppfd-ec88 after push.
+state: pushed draft. Stay draft. No ready, merge, or deploy. Head 06031db3 failed required preflight because the generated mirror of sensorTruthRules.ts was stale. The sync script regenerated that mirror and its manifest hash. This log edit cannot name the sync commit; read origin/cursor/manual-snapshot-ppfd-ec88 after push.
+next_action: required checks at the new head. Independent review stays Blue Dream for the history list and Critical Mass for rules and tests, only after 35/35 at that exact head. Stay draft.
+files: src/lib/sensorTruthRules.ts; src/lib/manualSensorSnapshotChangeContextRules.ts; src/lib/manualSensorSnapshotHistoryListRules.ts; src/lib/sensorReadingManualEntryRules.ts; src/components/TentManualSnapshotHistoryList.tsx; src/test/manual-snapshot-ppfd-history-rules.test.ts; src/test/tent-manual-snapshot-device-note.test.tsx; supabase/functions/_shared/lib/lib/sensorTruthRules.ts; supabase/functions/_shared/lib/.sync-manifest.json; docs/agents/HANDOFF_LOG.md
+blockers: none for the repository change. Locked scorer tests were not edited. No GitHub claim comment (comments need Matthew's approval). Signed-in tent page is NOT_MEASURED.
+artifacts: new tests in src/test/; issue https://github.com/Verdant-OS/verdant-grow-diary/issues/1953
+reviewer_seat: Blue Dream (TentManualSnapshotHistoryList.tsx); Critical Mass (rules and tests)
+claimed_by: Grok, 2026-10-09 21:50 UTC (log only; no GitHub comment)
+last_updated: 2026-10-09 19:29 CT, by Grok
+```
+
 ### PR-1939-NOT-FOUND-COVERAGE
 
 ```text

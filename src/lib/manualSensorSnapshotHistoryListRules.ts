@@ -26,6 +26,7 @@ import {
   type ChangeContextSnapshot,
   type ChangeContextSuppressedDelta,
 } from "@/lib/manualSensorSnapshotChangeContextRules";
+import { formatPpfd, PPFD_LABEL } from "@/lib/ppfdRules";
 import { classifyManualMetric } from "@/lib/sensorTruthRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 
@@ -36,6 +37,7 @@ export const HISTORY_METRIC_DISPLAY_ORDER: ChangeContextMetric[] = [
   "vpd_kpa",
   "co2_ppm",
   "soil_moisture_pct",
+  "ppfd",
   "soil_ec_ms_cm",
   "reservoir_ph",
 ];
@@ -69,6 +71,11 @@ export interface ManualSnapshotHistoryEntry {
   deltas: ChangeContextDelta[];
   /** Deltas suppressed because either side failed realism guards. */
   suppressedDeltas: ChangeContextSuppressedDelta[];
+  /**
+   * Device label from `device_id` with the `manual:` prefix removed.
+   * Null when the snapshot has no manual device note.
+   */
+  deviceNote: string | null;
 }
 
 function clampLimit(n: number | undefined): number {
@@ -84,6 +91,7 @@ const METRIC_LABEL: Record<ChangeContextMetric, string> = {
   vpd_kpa: "VPD",
   co2_ppm: "CO₂",
   soil_moisture_pct: "Soil",
+  ppfd: PPFD_LABEL,
   soil_ec_ms_cm: "Soil EC",
   reservoir_ph: "pH",
 };
@@ -104,6 +112,8 @@ function formatMetricChip(key: ChangeContextMetric, value: number): HistoryMetri
       return { key, label: "CO₂", formatted: `${Math.round(value)} ppm` };
     case "soil_moisture_pct":
       return { key, label: "Soil", formatted: `${Math.round(value)}%` };
+    case "ppfd":
+      return { key, label: PPFD_LABEL, formatted: formatPpfd(value, { unit: "long" }) };
     case "soil_ec_ms_cm":
       return { key, label: "Soil EC", formatted: `${value.toFixed(2)} mS/cm` };
     case "reservoir_ph":
@@ -178,6 +188,7 @@ export function buildManualSnapshotHistoryList(
       firstSnapshot: ctx.firstSnapshot,
       deltas: ctx.deltas,
       suppressedDeltas: ctx.suppressedDeltas,
+      deviceNote: snap.deviceNote ?? null,
     });
   }
   return out;

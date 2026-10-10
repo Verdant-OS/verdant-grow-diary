@@ -97,7 +97,7 @@
     "src/lib/sensorSourceDisplayLabel.ts": "2c18d0b286841d6b39dd06d2c09a4d8750bba8bd518c539859c53f1fb8713ebc",
     "src/lib/sensorTestbenchIndicatorRules.ts": "4763491cab2f2c017fff85f5ffa8fcc5f60494057bb618cb530b8516d67844f2",
     "src/lib/sensorTruthCanon.ts": "a076c5544f77aa66056854482dafc533db5d6897febc3efa68a2eb70b318aca9",
-    "src/lib/sensorTruthRules.ts": "20c5e681d016727e1133836875861cb88c405f8740dcf3a38e2ca8439e27fc3b",
+    "src/lib/sensorTruthRules.ts": "7f63a937deb00364df2ff9ac6e4e881bddf49d0f255fb593926b1df0bda3c94a",
     "src/lib/spiderFarmerGgsMappingRules.ts": "dca4a2e6cca9af03cbb8f3af0c89547c7f587d5bb102b49ca76baa1dcb626a60",
     "src/lib/temperatureUnitPreference.ts": "1272533f8aaf3eff41a8ee16073535a09f1cda9d505dfe12e8c6c71d4b6479c9",
     "src/lib/temperatureUnits.ts": "1f8aeb96ffcc869601a0ffd11f85836d60aa9496b67ca817c5aac4810424ef7f",

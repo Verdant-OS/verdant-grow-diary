@@ -1,5 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { isUuid } from "@/lib/isUuid";
+import { planQuickLogPersistence } from "@/lib/quickLogActivityRules";
+import type { PendingQuickLogActivityInput } from "@/lib/quickLogPendingActivityStore";
+import { verifyReusedQuickLogActivityEvent } from "@/lib/quickLogReusedActivityReceipt";
+import { resolveManualNoteReceiptTentId } from "@/lib/quickLogReusedActivityReceiptRules";
 
 export const MOVED_ACTIVITY_RECOVERY_GUIDANCE =
   "This activity belongs to the plant's previous tent or grow. Check its saved receipt before logging another activity.";
@@ -19,6 +23,7 @@ export type QuickLogPendingActivityReceipt =
 export async function readQuickLogPendingActivityReceipt(
   ownerId: string | null | undefined,
   idempotencyKey: string | null | undefined,
+  input: PendingQuickLogActivityInput,
 ): Promise<QuickLogPendingActivityReceipt> {
   if (!ownerId?.trim() || !idempotencyKey?.trim()) return { status: "unavailable" };
   try {
@@ -31,6 +36,27 @@ export async function readQuickLogPendingActivityReceipt(
     if (error) return { status: "unavailable" };
     if (data === null) return { status: "not_found" };
     if (!isUuid(data?.grow_event_id)) return { status: "unavailable" };
+    const plan = planQuickLogPersistence(input.activityId);
+    const eventType =
+      plan?.saveRoute === "manual_note"
+        ? "observation"
+        : plan?.saveRoute === "event"
+          ? plan.eventType
+          : null;
+    if (
+      !eventType ||
+      !(await verifyReusedQuickLogActivityEvent({
+        id: data.grow_event_id,
+        eventType,
+        growId: input.growId,
+        tentId:
+          plan?.saveRoute === "manual_note" ? resolveManualNoteReceiptTentId(input) : input.tentId,
+        plantId: input.plantId,
+        note: input.note || null,
+        occurredAt: input.occurredAt,
+      }))
+    )
+      return { status: "unavailable" };
     return { status: "confirmed", growEventId: data.grow_event_id };
   } catch {
     return { status: "unavailable" };

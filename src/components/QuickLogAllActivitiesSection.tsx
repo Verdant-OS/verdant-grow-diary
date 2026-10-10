@@ -857,6 +857,7 @@ export default function QuickLogAllActivitiesSection({
         const receipt = await readQuickLogPendingActivityReceipt(
           record.ownerId,
           record.input.idempotencyKey,
+          record.input,
         );
         if (
           liveOwnerIdRef.current !== record.ownerId ||

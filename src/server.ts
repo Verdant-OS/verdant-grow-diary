@@ -1,5 +1,11 @@
 import "./lib/error-capture";
 
+import {
+  healthResponseFor,
+  redirectResponseFor,
+  withHostHeaders,
+  workerRoutingEnv,
+} from "./lib/cloudflareHostRoutingRules";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
@@ -46,16 +52,25 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const redirect = redirectResponseFor(request, workerRoutingEnv(env));
+    if (redirect) return redirect;
+
+    const health = healthResponseFor(request);
+    if (health) return withHostHeaders(request, health);
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return withHostHeaders(request, await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return withHostHeaders(
+        request,
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
     }
   },
 };

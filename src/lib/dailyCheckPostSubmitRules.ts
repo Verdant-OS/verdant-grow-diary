@@ -389,6 +389,33 @@ const SAVED_LABELS: Record<DailyCheckSavedSource, { key: DailyCheckSavedItemKey;
     harvest: { key: "harvest", label: "Harvest" },
   };
 
+const ENTRY_ACTIVITY_SAVED_SOURCES: Record<string, DailyCheckSavedSource> = {
+  note: "note",
+  photo: "photo",
+  watering: "watering",
+  feeding: "feeding",
+  environment_check: "environment_check",
+  training: "training",
+  defoliation: "defoliation",
+  issue_observation: "issue_observation",
+  harvest: "harvest",
+  manual_sensor_snapshot: "sensor",
+};
+
+/**
+ * Map a confirmed `verdant:entry-created` detail onto the saved-item source.
+ * A missing or unrecognized activity id stays `"note"`, which is what the
+ * Daily Check listener did before activity ids were carried on the event.
+ * A photo save must not be labeled as a plant note.
+ */
+export function resolveDailyCheckEntrySavedSource(
+  detail: { activityId?: string | null } | null | undefined,
+): DailyCheckSavedSource {
+  const id = detail?.activityId;
+  if (typeof id !== "string" || id.trim() === "") return "note";
+  return ENTRY_ACTIVITY_SAVED_SOURCES[id] ?? "note";
+}
+
 export function buildDailyCheckSavedItems(input: DailyCheckSavedItemsInput): DailyCheckSavedItem[] {
   if (!input) return [];
   const ts = input.submittedAt;

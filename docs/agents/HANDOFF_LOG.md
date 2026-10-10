@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PR-1959-MANUAL-READING-OBSERVED-AT
+
+```text
+TASK PR-1959-MANUAL-READING-OBSERVED-AT  priority: P2  status: OPEN
+goal: Optional observed-at on a new manual sensor reading. An untouched field stays current while the form is open and saves the device instant at save time. A chosen time is stored on ts and captured_at, rejected when future or older than 7 days. Lookback 7 days: Cheeko chose this himself in Verdo's chat at 7:24 PM CT, Oct 9, 2026. SensorSnapshotReviewOptions.staleBlockMs defaults to 24h; ManualSensorReadingCard passes the 7-day lookback for new readings only, never for corrections. Backdated readings use the observed instant for freshness and must not look live. No schema change. Draft only.
+branch: cursor/manual-reading-observed-at-4bcf
+base: verdant-grow-diary
+checkout: git fetch origin cursor/manual-reading-observed-at-4bcf verdant-grow-diary && git switch cursor/manual-reading-observed-at-4bcf && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1962 (draft)
+head_sha: Graft FAIL at 257867e5cc33bacce99c6ea6b414c727b123ae15. This rework commit cannot name itself. Read the PR head after push.
+state: rework on the same draft. The two locked scorers are restored byte-for-byte to merge-base 2574b187b9c72d3a1dc3b7fe0e590b6da84d7285. No unlock file. Stay draft. No ready, merge, or publish.
+next_action: required checks at the new head. Blue Dream reviews the card. Critical Mass reviews the rules and tests. Do not mark ready.
+files: src/lib/manualSensorObservedAtRules.ts; src/components/ManualSensorReadingCard.tsx; src/lib/manualSensorSnapshotQualityRules.ts; src/lib/sensorSnapshotReviewRules.ts; src/test/manual-sensor-observed-at-rules.test.ts; src/test/manual-sensor-observed-at-chicago.test.ts; src/test/manual-sensor-observed-at-freshness.test.ts; src/test/manual-sensor-observed-at-card.test.tsx; src/test/manual-sensor-observed-at-card-save-instant.test.tsx; src/test/manual-sensor-observed-at-review-window.test.ts; docs/agents/HANDOFF_LOG.md
+blockers: none for the repository change. Do not edit #1948 or #1956 product files. Do not edit locked scorers. No schema, publish, or production write.
+artifacts: Collision Guard CLEAR 2026-10-10 against deploy tip 2574b187b9c72d3a1dc3b7fe0e590b6da84d7285. #1956 overlaps HANDOFF_LOG and sensorTruthRules only; this rework does not edit sensorTruthRules. #1948 and #1961 merge-tree clean. No open PR claims ManualSensorReadingCard.tsx.
+reviewer_seat: Blue Dream (.tsx); Critical Mass (rules and tests)
+claimed_by:
+last_updated: 2026-10-09 21:00 CT, by Grok
+```
+
 ### PR-1939-NOT-FOUND-COVERAGE
 
 ```text

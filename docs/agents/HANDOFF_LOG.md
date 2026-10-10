@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CODEX-1938-TELEMETRY-PRIVACY
+
+```text
+TASK CODEX-1938-TELEMETRY-PRIVACY  priority: P1  status: OPEN
+goal: Prevent grower text and identifiers from leaving in SDK stack frames, URLs or arbitrary metadata; preserve bounded diagnostics.
+branch: fix/production-error-reporting
+base: verdant-grow-diary at eaf0b092257af57acb724dfe9f817d6c8881943b (normally merged before repair)
+checkout: git fetch origin fix/production-error-reporting verdant-grow-diary && git switch fix/production-error-reporting && git merge --ff-only origin/fix/production-error-reporting && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1938 (ready)
+head_sha: adabea667ffde15ab9b01b00eb918a2b0e870fe9 at the Canopy claim (2026-10-10 01:16 UTC). The slim commit cannot name itself; read the PR head after push.
+state: Graft PASS at 5d94472555c4b03a7f1b2e2767d5ba57a655ebf8. Cleanup removes the dead token initializer in redactPathSegment (github-code-quality thread r4236186800) and redacts any path segment that contains @ or %. The cleanup commit cannot name itself; read the PR head after push. Awaiting Matthew's merge yes. Canopy touched the slice and cannot give acceptance. Stay ready. No merge from this session.
+next_action: Await Matthew's merge yes at the cleanup head. Blue Dream reviews that exact head after its own CI receipt, including test:security-regression. Do not inherit CI from 5d944725, bc2d493, ae50b54, or adabea667.
+files: .env.example (privacy wording only); src/lib/errorReportingRules.ts; src/lib/errorReporter.ts; src/test/error-reporting-minimal.test.ts; docs/agents/HANDOFF_LOG.md (this block only). The three elaborate suites (error-reporting-rules, error-reporter, error-reporter-init-and-privacy) are removed with the scrubber they pinned.
+blockers: A later head requires its own CI receipt. No auth, SQL, Edge, Supabase, Action Queue, device, credential, Cloudflare or DSN edits. Lockfiles stay as they were for @sentry/browser 11.4.0. Older review threads stay available pending independent assessment; no author acceptance.
+artifacts: PR #1938; claim issuecomment-6092080728; historical receipts issuecomment-6071121823 and issuecomment-6071320327 describe ae50b54, not the slimmed head.
+reviewer_seat: Blue Dream (P1 privacy; Canopy and Codex touched the slice and cannot give acceptance)
+claimed_by: Canopy (Cursor cloud agent), 2026-10-10 01:16 UTC (issuecomment-6092080728)
+last_updated: 2026-10-09 23:50 CT, by Canopy
+```
+
 ### PR-1939-NOT-FOUND-COVERAGE
 
 ```text

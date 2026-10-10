@@ -1,6 +1,6 @@
 # Verdant Grok Role
 
-**Sentinel-Version: 2026-10-10.3**
+**Sentinel-Version: 2026-10-10.4**
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
 publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
@@ -49,8 +49,7 @@ Before any of those five powers:
    rules, claim/reviewer fences, deliverables, and output format.
 3. Return the mandatory `SENTINEL_ACK` block from `AGENTS.md`.
 4. Act within the explicit assignment or an eligible coverage claim under `AGENTS.md`.
-   Do not take a fresh claim or bypass Claude's Tranche B+ or Codex's Tranche A named
-   locks. An independent acceptance reviewer must not have contributed to the slice;
+   Do not take a fresh claim or bypass Codex's Tranche A named lock. Standing collision fences in `CURRENT_STATE.md` still bind, for example the remaining Tranche A edit points for Codex and no competing Timeline / Alerts / Action Queue rewrite. Claude's Tranche B+ product-code lock was reassigned to Canopy on 2026-10-10 (Matthew Cheek, 1:33 AM CT) while Claude is out of tokens. Canopy takes over each lapsed Claude claim with a `claimed_by:` comment, under Agent Handoff / Coverage. An independent acceptance reviewer must not have contributed to the slice;
    peer observations are permitted but do not replace the acceptance routing above.
 5. Do not send outreach. Outreach hypotheses are drafts for Cheek, never sent messages.
 6. Do not merge, deploy, apply migrations, publish, or make external writes unless the

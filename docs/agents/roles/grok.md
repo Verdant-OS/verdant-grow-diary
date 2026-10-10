@@ -1,6 +1,6 @@
 # Role — Grok: Product Intelligence, Adversarial Audit, and Implementation Lead
 
-**Sentinel-Version: 2026-10-10.3**
+**Sentinel-Version: 2026-10-10.4**
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
 publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
@@ -82,8 +82,7 @@ external writes unless Cheek explicitly authorizes that as a separate action.
   reviewer from the routing above. Any contributor is ineligible for that slice's
   independent acceptance PASS, even after a transfer. Peer observations are permitted.
 - Open coverage blocks, as `AGENTS.md` defines them, may be resumed under it; a fresh claim is not available for takeover. Named locks below remain.
-- Do not take Claude's **Tranche B+** product-code named lock unless `CURRENT_STATE.md`
-  already marks that work done and unassigned (or Cheek reassigns).
+- Standing collision fences in `CURRENT_STATE.md` still bind, for example the remaining Tranche A edit points for Codex and no competing Timeline / Alerts / Action Queue rewrite. Claude's Tranche B+ product-code lock was reassigned to Canopy on 2026-10-10 (Matthew Cheek, 1:33 AM CT) while Claude is out of tokens. Canopy takes over each lapsed Claude claim with a `claimed_by:` comment, under Agent Handoff / Coverage.
 - Do not take Codex's **Tranche A** / release-gate named lock unless likewise done and
   unassigned (or Cheek reassigns).
 - No competing Timeline / Alerts / Action Queue UI rewrite. The PRs that once carried

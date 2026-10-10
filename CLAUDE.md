@@ -3,7 +3,7 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-10-10.3**
+**Sentinel-Version: 2026-10-10.4**
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
 publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
@@ -163,7 +163,7 @@ prefer what the code shows:
 | UI         | React, Tailwind v4 (`@tailwindcss/vite`), shadcn/ui over Radix primitives, `lucide-react`, `sonner`          |
 | Data       | `@tanstack/react-query`; hosted Supabase via `@supabase/supabase-js` + `@supabase/ssr`                       |
 | Validation | `zod`                                                                                                        |
-| Platform   | Lovable (`@lovable.dev/*` preset, project sync). **The production publisher is operating state** — see below |
+| Platform   | Production runs on Cloudflare Workers. Lovable (`@lovable.dev/*` preset, project sync) is no longer the production publisher. |
 
 There is **no `App.tsx` and no react-router** — but see the compat shim below, which is
 what almost all component code imports.
@@ -171,12 +171,9 @@ what almost all component code imports.
 `vite.config.ts` is a thin wrapper over the Lovable preset. The preset already supplies
 tanstackStart, viteReact, tailwindcss, tsconfigPaths and the `@` alias; do not re-add them.
 
-**Never assume the production publisher, and never reason about `vercel.json` without it.**
-Which platform serves `verdantgrowdiary.com` is operating state. This repository has recorded it
-both ways (Lovable earlier, Vercel's git integration in later measurements), so it lives in
-`docs/agents/CURRENT_STATE.md`, not here. A host configuration file governs production only while
+**Production runs on Cloudflare Workers.** Lovable is no longer the production publisher. Vercel statuses on PRs and commits are not evidence of a production release, and a Vercel failure is not a production failure. Release evidence is live `/version.json` reporting the target SHA. A host configuration file governs production only while
 the measured publisher applies it: `vercel.json`'s redirects and headers fire when Vercel serves the
-apex and are inert under any other host (`docs/seo/lighting-launch-verification.md`,
+apex and are inert under Cloudflare Workers (`docs/seo/lighting-launch-verification.md`,
 §Non-blocking host mismatch, records a period when its redirects returned HTTP 200 with no
 `Location`). Measure the publish trigger, and the deployment behind each production hostname,
 before asserting either (`docs/architecture-contract.md` §14). A merge, or a built production

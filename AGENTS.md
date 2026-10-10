@@ -1,12 +1,13 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-10-10.3**
+Owner: Matthew Cheek ("Cheeko"; "Cheek" in older entries).
+
+**Sentinel-Version: 2026-10-10.4**
 
 _Amended 2026-09-28 (Matthew Cheek): added Release and Environment Rules and Agent
 Handoff / Coverage; open tasks are resumable by any agent from `docs/agents/HANDOFF_LOG.md`._
 
-Ownership and review routing: see `docs/agents/OWNERSHIP.md`. It wins on those
-points; Matthew Cheek's explicit current instructions control any conflicting permission.
+Ownership and review routing: see `docs/agents/OWNERSHIP.md`. It wins over this file on those points. Matthew Cheek's current decisions win over both. Where OWNERSHIP.md has not yet caught up with a dated decision from Matthew, follow the decision and report the gap.
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -71,8 +72,7 @@ Use small, scoped changes. Avoid broad rewrites.
 
 - **Production only.** Verdant has no sandbox, staging, preview, or non-production smoke
   environment. Build, verify, and smoke against production
-  (`https://verdantgrowdiary.com`). Smoke writes by `cheekhimself@gmail.com` go only to its own
-  grow, tagged `[smoke <timestamp>]`. Never touch customer data or use the KEEP account.
+  (`https://verdantgrowdiary.com`). Smoke and QA writes use a disposable test account only, never Matthew Cheek's own accounts (`cheekhimself@gmail.com`, `matt@verdantgrowdiary.com`) and never the KEEP account. Writes go only to that test account's own fixture grow, tagged `[smoke <timestamp>]`. Never touch customer data. Backdated notes are allowed on archived grows.
   Verify the fixture identity and ownership before a write. A task that asks for a
   non-production target is out of date; report it instead of building one.
 - **CI probes production or nothing.** No push-triggered job may probe a non-production
@@ -83,11 +83,8 @@ Use small, scoped changes. Avoid broad rewrites.
   deployment checks before asserting delivery. Agents never publish, promote, or roll back. They prepare a
   release packet (live SHA, target SHA, commits, checks at the target, the deployment URL,
   the rollback target) and hand over one promotion step. A merge is not a release until
-  `/version.json` on live reports the SHA.
-- **Ship before test.** Once CI is green and the reviewer has passed a fix, getting it live
-  comes before more testing. Public-page probes against a live build that doesn't contain
-  the fix measure nothing; report them `NOT_MEASURED`. Signed-in verification starts after
-  the fix is live.
+  `/version.json` on live reports the SHA. Production runs on Cloudflare Workers. Vercel statuses on PRs and commits are not evidence of a production release, and a Vercel failure is not a production failure. Release evidence is live `/version.json` reporting the target SHA.
+- **Ship before test.** Once CI is green, the reviewer has passed a fix, and Matthew has approved the merge, the next step is to get it live. More testing comes after that. Public-page probes against a live build that doesn't contain the fix measure nothing, so report them `NOT_MEASURED`. Signed-in verification starts after the fix is live. Canopy owns post-deploy production checks.
 - **Git and merges.** Never push directly to `verdant-grow-diary` or `main`, force-push,
   or rewrite history. Update branches by merging from base. Open PRs as drafts.
   Codex uses normal PR-branch pushes only: no force-push, merge, Publish, SQL apply,
@@ -99,13 +96,11 @@ Use small, scoped changes. Avoid broad rewrites.
   or repair (OWNERSHIP.md allowlist). Migrations, payments or billing, `.github`
   workflows, security or auth, and dependency or lockfile changes still need Codex
   (not on a PR Codex authored or repaired), or Blue Dream, Critical Mass, or Durban
-  Poison. A skipped, missing, pending
+  Poison. Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. A skipped, missing, pending
   or failed required check is not green. There is no author-integration exception.
   Off-limits paths and named holds still require explicit reassignment before editing.
-  Production database changes, spend, publish gates and the publish decision remain
-  with Matthew; repository work does not authorize those operations.
-- **One task, one branch, one holder.** New Codex branches use
-  `codex/<task-id>-<slug>` in lowercase. There is no shared working branch.
+  Merges, production database changes, production and config changes, spend, deletes, outbound messages, installs, publish gates and the publish decision all need Matthew's per-item yes (see Standing approval). Repository work does not authorize them.
+- **One task, one branch, one holder.** New branches use `<agent>/<task-id>-<slug>` in lowercase, for example `codex/...` or `canopy/...`. There is no shared working branch.
   Only the agent currently holding a
   branch, per the effective claim (see Agent Handoff / Coverage) in `docs/agents/HANDOFF_LOG.md` or on the task's PR, pushes to it, and no agent edits files on
   another holder's branch. The task goes with the branch: whoever holds the branch holds
@@ -114,15 +109,9 @@ Use small, scoped changes. Avoid broad rewrites.
   block per branch. A block that still lists several branches counts as one block per
   branch: a claim on one of its PRs covers only that PR's branch, and the holder splits
   the block at the next log update.
-- **Repair ownership and intake.** Codex fixes every discovered defect in its assigned
-  repository scope itself. New work arrives as `@codex` PR comments. A coverage record
-  preserves resumable evidence; it does not delegate implementation or grant new authority.
-- **Matthew Cheek keeps four decisions:** production database changes, the spend ceiling,
-  anything that gates a publish, and the publish decision itself. Everything else runs
-  without waiting on him.
-- **Off-limits without Matthew's approval:** migrations and SQL, `supabase/`, RLS, auth,
-  Edge functions, the Action Queue, lockfiles, and device control. If a fix needs one,
-  stop that item, write it up as an escalation, and move on.
+- **Repair ownership and intake.** Root Cause triages discovered bugs and files them as issues or in Linear team VER, which Trellis runs. The agent assigned to a fix repairs it inside its own scope. Codex still takes work requested in `@codex` PR comments on its own PRs. A coverage record keeps resumable evidence. It does not hand off implementation or grant new authority.
+- **Standing approval (Matthew Cheek, 2026-10-09).** Bots may do low-risk work without asking: open draft PRs, sync a branch with its base without force-push, edit PR bodies and docs, file issues, run read-only checks, and lower a routine's frequency. Everything below needs Matthew's per-item yes first: merges, migrations and SQL, production or config changes, deletes, anything that costs money, outbound messages, and installs. The production database stays untouched. Verdante sends one numbered approvals batch at 9:12 AM CT on weekdays. Put pending items there, not in separate pings.
+- **Off-limits without Matthew's per-item yes:** migrations and SQL, `supabase/`, RLS, auth, Edge functions, the Action Queue, lockfiles and dependency installs, production and config changes (Cloudflare, Supabase, Paddle, repo settings, secrets), deletes of branches, files, or data outside your own scratch space, money, outbound messages, and device control. If a fix needs one, stop that item, add it to Verdante's approvals batch, and move on.
 - **Standing locks** (the production database lock, named PR holds such as HOLD #1250)
   are listed in `docs/agents/CURRENT_STATE.md` and bind every agent until removed there.
 
@@ -131,7 +120,7 @@ Local/CI fixtures validate code, not production. See
 
 ## Multi-Agent Coordination
 
-This repo is worked on by more than one AI agent (Codex, Claude Code, Grok, Lovable) at once, sometimes on the same feature independently, without either side knowing.
+This repo is worked on by several AI agents at once: Codex, Claude Code (currently out of tokens), Lovable, Cursor cloud agents, GitHub Copilot, and Matthew Cheek's Grok Bot team (Canopy, Graft, Root Cause, Trellis, Verdante and others). Sometimes two of them work on the same feature without knowing.
 
 - Before starting substantial new work, check recent merged PRs and open PRs (`gh pr list --state all`, `git log`) for the same or an overlapping feature area. Do not build a second implementation of something that already shipped or is already in review elsewhere.
 - If you discover another agent already has open, unmerged work in your target area, stop and report the collision rather than silently building a competing version.
@@ -159,9 +148,7 @@ agent from one written block.
   by the current holder): a log edit made on a task branch is invisible to a successor
   until it merges, so the PR comment is what keeps the task's activity visible. Push the branch and have its
   draft PR open before implementation begins, not only before a planned stop: an agent
-  can be cut off at any time, and a successor can only claim on a PR. Under
-  `docs/agents/OWNERSHIP.md` Codex opens PRs, as drafts; a holder without that right asks
-  Codex first. A block without a pushed branch and a PR is not eligible for coverage until
+  can be cut off at any time, and a successor can only claim on a PR. Any agent with repository access may open its own PR, as a draft (Matthew Cheek's standing approval, 2026-10-09). An agent without repository access asks the agent that holds the task. A block without a pushed branch and a PR is not eligible for coverage until
   both exist.
 - **Last activity.** A block's last activity is the newer of its `last_updated` as
   recorded on the deploy branch (`verdant-grow-diary`) and its effective claim (below),
@@ -208,9 +195,7 @@ agent from one written block.
   eligible open block: a pushed branch and a PR, and either no effective claim or a last
   activity (the newer of `last_updated` and the effective claim) older than 24 hours, with
   no conflicting assignment or named lock. Priority order: publish gate, then P1, then P2, then everything else.
-  Ties go to the oldest `last_updated`. Agents without repository access (Security,
-  Council Chair) cannot set `claimed_by` or touch a branch, so they never select or
-  resume a block: they read the log for context and act only on an explicit assignment.
+  Ties go to the oldest `last_updated`. Graft owns the open-PR backlog. Before resuming a stale block, check Graft's latest backlog note. If you resume one, say so in your claim comment so Graft can track it. Agents without repository access (for example Security, Council Chair, Verdante, Trellis, and Petal) cannot set `claimed_by` or touch a branch, so they never select or resume a block. They read the log for context and act only on an explicit assignment.
 - **Role seats still hold.** Resuming a task does not change who merges, who reviews, or
   who owns CI; those stay as `docs/agents/OWNERSHIP.md` lists them. An agent that touched
   a task can never give its independent acceptance PASS. Peer observations do not
@@ -247,6 +232,7 @@ Never violate these:
 - Do not recommend aggressive nutrient, irrigation, or equipment changes from weak evidence.
 - Do not expose service role keys, bridge tokens, API keys, webhook secrets, private env values, or internal secrets.
 - Treat user data, sensor data, CSVs, bridge payloads, and AI outputs as untrusted.
+- Never show one user's photo or record to anyone else unless its location and EXIF metadata have been stripped, and only through a surface Matthew has approved.
 
 ---
 
@@ -614,7 +600,7 @@ Use the repo's actual package manager and scripts.
 
 Prefer existing conventions.
 
-Common commands (verified on the deploy branch, 2026-08-19):
+Common commands (verified on the deploy branch, 2026-10-10):
 
 ```bash
 bun run typecheck
@@ -722,6 +708,14 @@ assigned role and read its file.
 - Security reviewer must read `docs/agents/roles/security.md`.
 - Council Chair must read `docs/agents/roles/council-chair.md`.
 
+Named Grok Bot roles (Matthew Cheek, 2026-10-09). Until each has its own role file, these agents read `docs/agents/roles/grok.md` for the shared rules only, not for its job title, and follow the job below:
+
+- **Canopy**: engineering lead. Owns post-deploy production checks. Holds Claude's reassigned code work.
+- **Graft**: exact-head PR reviews and the open-PR backlog.
+- **Root Cause**: bug triage.
+- **Trellis**: product manager, Linear team VER.
+- **Verdante**: chief of staff. Collects approvals and sends the 9:12 AM CT weekday approvals batch.
+
 Any agent may resume an open task from its block in `docs/agents/HANDOFF_LOG.md` under
 Agent Handoff / Coverage. Claim it first with a `claimed_by:` comment on the task's PR, as
 that section describes. Do not start a second implementation of a task someone else has
@@ -731,9 +725,7 @@ Codex, Claude, and Grok are **peers**: none outranks the others (Cheek, 2026-08-
 refined). Explicit assignments, named locks and the current coverage claim control
 who researches, architects, implements,
 audits, tests, or independently reviews. Default strengths differ; they are preference,
-not exclusivity. Standing collision fences in `CURRENT_STATE.md` still bind (for
-example remaining Tranche A edit points for Codex, Tranche B+ product code for Claude,
-and no competing Timeline / Alerts / Action Queue rewrite).
+not exclusivity. Standing collision fences in `CURRENT_STATE.md` still bind, for example the remaining Tranche A edit points for Codex and no competing Timeline / Alerts / Action Queue rewrite. Claude's Tranche B+ product-code lock was reassigned to Canopy on 2026-10-10 (Matthew Cheek, 1:33 AM CT) while Claude is out of tokens. Canopy takes over each lapsed Claude claim with a `claimed_by:` comment, under Agent Handoff / Coverage.
 
 Every slice names its independent review route, and at any moment one agent holds the
 claim to build it. An agent that touched a slice cannot give it an independent PASS.
@@ -754,6 +746,7 @@ tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments 
 billing, `.github` workflows, security or auth, and dependency or lockfile changes
 still need Codex (not on a PR Codex authored or repaired), or Blue Dream, Critical
 Mass, or Durban Poison.
+Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge.
 Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
 Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
 

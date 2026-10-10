@@ -1,6 +1,6 @@
 # Role — Codex: Implementation and Integration Lead
 
-**Sentinel-Version: 2026-10-10.3**
+**Sentinel-Version: 2026-10-10.4**
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
 publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**

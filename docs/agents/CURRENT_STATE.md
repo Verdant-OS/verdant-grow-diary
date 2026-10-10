@@ -31,6 +31,10 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-10
+
+- **established fact, collision fence (Matthew Cheek, 2026-10-10, 1:33 AM CT):** Claude's Tranche B+ product-code lock was reassigned to Canopy while Claude is out of tokens. Standing collision fences still bind, for example the remaining Tranche A edit points for Codex and no competing Timeline / Alerts / Action Queue rewrite. Canopy takes over each lapsed Claude claim with a `claimed_by:` comment, under Agent Handoff / Coverage. This entry records that reassignment. It does not change who Chemdawg, Grand Daddy Grok, Golden Toad, Lovable, or Council Chair are.
+
 ## Follow-up observation — 2026-10-02T15:39 UTC
 
 - **BLOCKED, decision D1 widened (GDP):** Codex automated review on #1844 (comment 4167087657, P2) found that a page-body count misses AppShell's chrome triggers. The thread was marked resolved by the shared `cheekhimself` account with no reply or change. Source classes predict (not measured in a browser) that, after the header link goes, a one-tent Dashboard has card `Log` + page `QuickLogV2Fab` + `header-quick-log-trigger` on desktop, and card `Log` + `mobile-quick-log-fab` ("Open Quick Log") on mobile. The spec defines browser-level visible-control checks in E2 (desktop) and E4 (390/320 px) to test actual visibility; they have not run, and splits D1 into two blocking parts plus one non-blocking: D1.1 page FAB (A drop, recommended / B exempt), D1.2 AppShell triggers on Dashboard (A named chrome exemption, recommended / B hide on Dashboard / C card `Log` opens the sheet, separate slice), and D1.3 `Start Check` (non-blocking, unchanged). This supersedes the 15:12 checkpoint's two-option D1. #1833 still blocks; no merge, auto-merge, Publish or production operation.
@@ -315,8 +319,7 @@ Read this section first. It doesn't replace the observation log below.
   #1777 amendment; #1767 still lands first. Critical Mass reviews #1779.
 - **NOT_MEASURED, production acceptance:** no repaired draft has been declared
   deployed. Signed-in save/readback, hosted schema and Edge acceptance remain
-  unmeasured. Fixture-only smoke uses `cheekhimself@gmail.com`, never matt@/KEEP;
-  tag records `[smoke <timestamp>]`. The proposed plus-alias signup is unconfirmed
+  unmeasured. Smoke and QA writes use a disposable test account only, never Matthew Cheek's own accounts (`cheekhimself@gmail.com`, `matt@verdantgrowdiary.com`) and never the KEEP account. Writes go only to that test account's own fixture grow, tagged `[smoke <timestamp>]`. Never touch customer data. Backdated notes are allowed on archived grows. The proposed plus-alias signup is unconfirmed
   and no fixture user has been created.
 - **Locks:** production database (knk), HOLD #1250; do not edit #1625, #1727,
   #1735, #1737 or #1369 (REVIEW ONLY). #1740 NEVER MERGE; #1742/#1658 locked;

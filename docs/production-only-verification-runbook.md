@@ -41,14 +41,18 @@ and CI cannot establish applied schema, Edge deployment or live save/retrieve.
 Independent acceptance routing: **Blue Dream** reviews `.tsx` files outside
 `src/test/`, P1s and publish gates; **Critical Mass** is the default for other
 acceptance. Independently assigned **Durban Poison** is also a valid acceptance
-seat. **Graft** is valid only for the OWNERSHIP.md low-risk lane (ordinary docs, new
-tests, HANDOFF_LOG). Another author's CI/build infrastructure additionally receives **Codex**
-technical review; that does not replace independent acceptance, and Codex cannot
-review its own work. Claude may add peer observations but is not the acceptance
-reviewer. Codex opens repairs as drafts and uses normal pushes only. **Chemdawg**
-alone owns merge after all 35 required checks are SUCCESS and an independent PASS
-covers the exact head. Earlier self-integration phases grant no current authority.
-Publish gates remain with Matthew. Historical receipts keep their original reviewer.
+seat. **Codex** is an equal independent exact-head reviewer, except on a PR Codex
+authored or repaired (for example #1938). **Graft**'s exact-head PASS counts as the
+outside review on docs-only and low-risk PRs Graft did not author or repair (the
+OWNERSHIP.md allowlist: ordinary docs, new tests, HANDOFF_LOG). The PASS is void
+once the head moves. Migrations, payments or billing, `.github` workflows, security
+or auth, and dependency or lockfile changes still need Codex (not on a PR Codex
+authored or repaired), or Blue Dream, Critical Mass, or Durban Poison. Claude may
+add peer observations but is not the acceptance reviewer. Codex opens repairs as
+drafts and uses normal pushes only. **Chemdawg** alone owns merge after all 35
+required checks are SUCCESS and an independent PASS covers the exact head. Earlier
+self-integration phases grant no current authority. Publish gates remain with
+Matthew. Historical receipts keep their original reviewer.
 
 ## Existing non-production dependencies — separate CI slices
 

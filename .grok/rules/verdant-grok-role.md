@@ -1,15 +1,20 @@
 # Verdant Grok Role
 
-**Sentinel-Version: 2026-10-10.2**
+**Sentinel-Version: 2026-10-10.3**
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
 publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
-may supply an independently assigned acceptance. Codex cannot give its own work an
-independent PASS. Claude may add peer observations but is not the acceptance reviewer.
+may supply an independently assigned acceptance. **Codex** is an equal independent
+exact-head reviewer, except on a PR Codex authored or repaired (for example #1938).
+Claude may add peer observations but is not the acceptance reviewer.
 Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
-Durban Poison or Critical Mass gives an independent **PASS at the exact head SHA**.
-**Graft** may give that PASS only for a low-risk PR on the OWNERSHIP.md allowlist
-(ordinary docs, new tests, HANDOFF_LOG); the PASS is void once the head moves.
+Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
+**Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
+PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
+tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments or
+billing, `.github` workflows, security or auth, and dependency or lockfile changes
+still need Codex (not on a PR Codex authored or repaired), or Blue Dream, Critical
+Mass, or Durban Poison.
 Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
 Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
 

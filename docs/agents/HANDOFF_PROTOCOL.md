@@ -1,6 +1,6 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-10-10.2**
+**Sentinel-Version: 2026-10-10.3**
 
 Operating order is sequential for a given slice. Parallel implementation of the **same**
 slice by multiple agents is the failure this protocol exists to prevent.
@@ -39,12 +39,17 @@ confirm its remote head, and merge from base; never rename, recreate or force-pu
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
 publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
-may supply an independently assigned acceptance. Codex cannot give its own work an
-independent PASS. Claude may add peer observations but is not the acceptance reviewer.
+may supply an independently assigned acceptance. **Codex** is an equal independent
+exact-head reviewer, except on a PR Codex authored or repaired (for example #1938).
+Claude may add peer observations but is not the acceptance reviewer.
 Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
-Durban Poison or Critical Mass gives an independent **PASS at the exact head SHA**.
-**Graft** may give that PASS only for a low-risk PR on the OWNERSHIP.md allowlist
-(ordinary docs, new tests, HANDOFF_LOG); the PASS is void once the head moves.
+Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
+**Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
+PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
+tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments or
+billing, `.github` workflows, security or auth, and dependency or lockfile changes
+still need Codex (not on a PR Codex authored or repaired), or Blue Dream, Critical
+Mass, or Durban Poison.
 Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
 Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
 
@@ -84,7 +89,7 @@ sentinel_version:
 date:
 
 task_id:
-independent_reviewer: the seat assigned under OWNERSHIP.md §4.3 (Blue Dream or Critical Mass); Durban Poison if independently assigned; Graft for the OWNERSHIP.md low-risk lane only
+independent_reviewer: the seat assigned under OWNERSHIP.md §4.3 (Blue Dream, Critical Mass, Durban Poison, or Codex — not on a PR Codex authored or repaired, for example #1938); Graft's exact-head PASS counts as the outside review on a docs-only or low-risk PR Graft did not author or repair
 claimed_by:
 last_updated:
 
@@ -119,8 +124,13 @@ does not erase earlier contributions. Record the reviewer actually assigned unde
 `docs/agents/OWNERSHIP.md` §4.3 (Chemdawg's pre-check until the bot is live). Its
 defaults: Blue Dream for .tsx outside src/test/, any P1 or a publish gate; Critical
 Mass otherwise, unless load balancing moves that work to Blue Dream. Durban Poison may
-provide acceptance when independently assigned. Graft may provide it only for a PR whose
-every file is on the OWNERSHIP.md low-risk allowlist, at that exact head.
+provide acceptance when independently assigned. Codex is an equal independent exact-head
+reviewer, except on a PR Codex authored or repaired (for example #1938). Graft's
+exact-head PASS counts as the outside review on a docs-only or low-risk PR Graft did
+not author or repair, when every file is on the OWNERSHIP.md allowlist, at that exact
+head. Migrations, payments or billing, `.github` workflows, security or auth, and
+dependency or lockfile changes still need Codex (not on a PR Codex authored or
+repaired), or Blue Dream, Critical Mass, or Durban Poison.
 Security/Gemini/Claude observations do not replace that acceptance. Name the
 exact head SHA; routing is not a completed PASS. State NOT_MEASURED if unassigned.
 

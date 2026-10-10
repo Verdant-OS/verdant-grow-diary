@@ -45,44 +45,24 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### CODEX-1938-TELEMETRY-PRIVACY
+### PR-1939-NOT-FOUND-COVERAGE
 
 ```text
-TASK CODEX-1938-TELEMETRY-PRIVACY  priority: P1  status: OPEN
-goal: Prevent grower text and identifiers from leaving in SDK stack frames, URLs or arbitrary metadata; preserve bounded diagnostics.
-branch: fix/production-error-reporting
-base: verdant-grow-diary at eaf0b092257af57acb724dfe9f817d6c8881943b (normally merged before repair)
-checkout: git fetch origin fix/production-error-reporting verdant-grow-diary && git switch fix/production-error-reporting && git merge --ff-only origin/fix/production-error-reporting && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1938 (draft)
-head_sha: ae50b54f9f6904f99712f3d4a24e6da9e4cffa58 (exact remote observed 2026-10-08 23:50 UTC; required CI 35/35 succeeded. This receipt describes the measured head, not a future head. Resolve the current PR head and latest terminal evidence comment before independent review; a documentation follow-up cannot embed its own Git hash.)
-state: Ownership release issuecomment-6070096139 independently verified; Codex claim issuecomment-6070715914 reread with no competitor. Eleven new behavioral cases fail on the released source (11 FAIL / 0 PASS / 23 name-filtered), including a real Sentry 11.4.0 SDK memory-transport envelope through application hooks. Repair uses closed metadata fields, standard exception names, safe frame positions, known routes/services and redacted asset filenames; no filename regex or stack provenance substitutes for an emitted build manifest. Current local affected run: five files / 84 PASS / 0 FAIL / 0 SKIP, including header tests; the three reporter suites account for 73 cases. Canonical typecheck zero diagnostics; scoped ESLint zero errors/warnings; full lint zero errors / 853 warnings outside repaired files. Dependency policy and three docs safety categories succeed. Clean committed build at 6f7a3128b4be5d4269ca4d76db54253e6b14cb21 succeeds: 77/77 head snapshots, 383 JSON-LD blocks. The earlier uncommitted build stopped at stamp_dirty; generated version/buildInfo changes from both builds were restored. Saved diagnostic packet also passes 15/15 at the repaired source (separate, overlapping evidence, not added to 84). Hooks execute the additional 67-case automated-phenotyping docs guard. Fresh P2 r4225129618 corrects .env.example: payload IP omission does not prevent source-IP exposure over direct browser transport; provider IP retention controls remain NOT_MEASURED. CodeQL r4225134067 was behaviorally probed with vbscript, uppercase VBSCRIPT, javascript and a custom scheme in URL/breadcrumb/frame paths plus repeated scrubbing; all four drop private payloads. No runtime fix was needed for that alert. P2 handoff r4225212840 is corrected here: normal push is complete and the next action is independent review, with explicit receipt SHA and no CI inheritance. Full paginated check census at ae50b54f9f6904f99712f3d4a24e6da9e4cffa58: 103 terminal records, 89 success / 12 skipped / 2 cancelled earlier runs with successful replacements, 0 failed / 0 pending. No independent acceptance or production claim.
-next_action: Blue Dream independently reviews the full exact current PR head after verifying its terminal CI receipt. Preserve draft and auto-merge off; Codex cannot issue acceptance. Do not repeat the completed repair push or inherit CI from a previous SHA.
-files: .env.example (privacy wording only); src/lib/errorReportingRules.ts; src/lib/errorReporter.ts; src/test/error-reporting-rules.test.ts; src/test/error-reporter.test.ts; src/test/error-reporter-init-and-privacy.test.tsx; docs/agents/HANDOFF_LOG.md (this block only)
-blockers: Repair push and 35/35 required checks are complete at ae50b54f9f6904f99712f3d4a24e6da9e4cffa58. All four supplemental checks succeeded at that same head (public census 6 cases, authenticated census 6 cases, native browser proof 23 PASS / 0 FAIL / 0 SKIP, CodeQL analysis success); independent acceptance is pending. A later head requires its own CI receipt; live shared fleet-locks.md unavailable in this environment (no named repair-path lock in available governance, and user explicitly instructed this ownership-cleared resumption). No auth, SQL, Edge, Supabase, Action Queue, device, credential, configuration or dependency/lockfile edits. Older review threads stay available pending independent assessment; no author acceptance or resolution.
-artifacts: Existing reproducible regressions in the three test files; /workspace/scratch/pr1938-diagnosis (earlier read-only evidence); /tmp/pr1938-all-new-red.log; /tmp/pr1938-final-tests.log; /tmp/pr1938-typecheck.log; /tmp/pr1938-lint.log; /tmp/pr1938-scoped-lint.log; /tmp/pr1938-build.log; PR required-check receipt issuecomment-6071121823; supplemental terminal receipt issuecomment-6071320327; /workspace/scratch/pr1938-repair/README.md (terminal supplemental census recorded separately).
-reviewer_seat: Blue Dream (P1 privacy; Codex is the repair author and cannot give acceptance)
-claimed_by: Codex, 2026-10-08 23:49 UTC (renewal issuecomment-6071320327 after effective 22:58 claim)
-last_updated: 2026-10-08 23:50 UTC, by Codex
-```
-
-### CLOUDFLARE-VERCEL-ROUTING-PORT
-
-```text
-TASK CLOUDFLARE-VERCEL-ROUTING-PORT  priority: P1  status: OPEN
-goal: Make the Cloudflare Worker reproduce every vercel.json redirect, the SPA-rewrite exclusion, and every header rule. /~oauth/* must hop to the Lovable project host, /strains and /refund-policy (and the other legacy aliases) must redirect, and /unsubscribe must send no-store / no-referrer / noindex.
-branch: cursor/cloudflare-worker-routing-54eb
+TASK PR-1939-NOT-FOUND-COVERAGE  priority: P2  status: OPEN
+goal: Unknown paths return HTTP 404 with the branded not-found page. /healthz stays HTTP 200 with a body of {"ok":true}, cache-control no-store, and x-robots-tag noindex, and no app data. Preserve Cloudflare Worker redirects, host headers, and report-only CSP from #1943 and #1937.
+branch: fix/not-found-404-status
 base: verdant-grow-diary
-checkout: git fetch origin cursor/cloudflare-worker-routing-54eb verdant-grow-diary && git switch cursor/cloudflare-worker-routing-54eb && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1943 (draft)
-head_sha: 64f28c485e013b4bf4d0db83fa7e1cd05cc4a316 (build and local wrangler curl verified here; a log-only commit may follow)
-state: Worker entry applies redirects before SSR and headers on the response. public/_headers carries the same header rules for the assets binding. The SPA catch-all rewrite is not applied as an internal rewrite to /. bun run build exited 0 at 64f28c485 (77/77 SSR snapshots). Local wrangler on 127.0.0.1:8787: /~oauth/initiate 307 to the Lovable host, /strains and /refund-policy 308, /unsubscribe 200 with no-store / no-referrer / noindex, / and /welcome 200. The capture retry uses VERDANT_SEO_SNAPSHOT on Nitro's globalThis.__env__, and only outside the Cloudflare Workers runtime (navigator.userAgent is Cloudflare-Workers in production and wrangler dev). A request header alone still redirects. The oauth 307 is never skipped. CodeRabbit comments on #1943 are addressed in the follow-up commit.
-next_action: address CodeRabbit if it comments, and watch the 35 required checks. Stay draft. Do not deploy or merge.
-files: src/lib/cloudflareHostRoutingRules.ts; src/server.ts; public/_headers; src/test/cloudflare-host-routing-rules.test.ts; scripts/capture-ssr-head-snapshots-with-server.mjs; docs/agents/HANDOFF_LOG.md
-blockers: none for the repository change. Do not deploy, merge, or write the Lovable production Supabase project. #1937 also edits src/server.ts and public/_headers; keep the two PRs separate and merge the header application if that PR lands first.
-artifacts: src/test/cloudflare-host-routing-rules.test.ts
-reviewer_seat: Critical Mass (no product .tsx; lib, Worker entry, tests)
-claimed_by: Grok, 2026-10-08 11:49 CT
-last_updated: 2026-10-08 12:21 CT, by Grok
+checkout: git fetch origin fix/not-found-404-status verdant-grow-diary && git switch fix/not-found-404-status && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1939
+head_sha: c35baaddeb5b3407060a401a411831a3ce460413 before the healthz commits. Those commits cannot name themselves; read the PR head after push.
+state: draft. Unknown paths still throw notFound(). /healthz is answered in the Worker before SSR. withHostHeaders still copies a 404 status and sets the security headers. /manifest.webmanifest stays a 404; the app links /site.webmanifest.
+next_action: required checks at the new head and local Worker curl evidence. Stay draft. No ready, merge, or deploy.
+files: src/routes/$.tsx; src/server.ts; src/lib/cloudflareHostRoutingRules.ts; src/test/not-found-route-status.test.tsx; src/test/host-headers-404-status.test.ts; docs/agents/HANDOFF_LOG.md (this record)
+blockers: none for the repository change. Do not deploy or write production Supabase.
+artifacts: PR #1939 claim comment 6074014428; local Worker curl receipt on the PR
+reviewer_seat: Blue Dream (src/routes/$.tsx); Critical Mass (test)
+claimed_by: Canopy (Cursor cloud agent), 2026-10-09 04:02 UTC — reassigned by Matthew, overriding Codex claim 2026-10-08 05:56 UTC
+last_updated: 2026-10-08 23:46 CT, by Canopy
 ```
 
 ### CLAUDE-CODE-ACTION-002
@@ -758,6 +738,27 @@ last_updated: 2026-09-28 23:53 CT, by Codex
 ```
 
 ## Closed
+
+### CLOUDFLARE-VERCEL-ROUTING-PORT
+
+```text
+TASK CLOUDFLARE-VERCEL-ROUTING-PORT  priority: P1  status: CLOSED
+goal: Make the Cloudflare Worker reproduce every vercel.json redirect, the SPA-rewrite exclusion, and every header rule. /~oauth/* must hop to the Lovable project host, /strains and /refund-policy (and the other legacy aliases) must redirect, and /unsubscribe must send no-store / no-referrer / noindex.
+branch: cursor/cloudflare-worker-routing-54eb
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical: git fetch origin cursor/cloudflare-worker-routing-54eb verdant-grow-diary && git switch cursor/cloudflare-worker-routing-54eb && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1943 (merged)
+head_sha: 3412513bf3f9a9094e1966275bfb32ffc6a6f9b7
+state: CLOSED. Merged to verdant-grow-diary as 3412513bf on 2026-10-08 12:55 PM CT (GitHub merged_at 2026-10-08T17:55:16Z). #1937 (report-only CSP) then merged as eaf0b092257af57acb724dfe9f817d6c8881943b on 2026-10-08T19:23:18Z. The deploy-tip copy of this block still said OPEN; that line was stale.
+next_action: None; closed.
+files: src/lib/cloudflareHostRoutingRules.ts; src/server.ts; public/_headers; src/test/cloudflare-host-routing-rules.test.ts; scripts/capture-ssr-head-snapshots-with-server.mjs; docs/agents/HANDOFF_LOG.md
+blockers: none. Do not deploy from this closed record, and do not write the production Supabase project.
+artifacts: src/test/cloudflare-host-routing-rules.test.ts
+reviewer_seat: Critical Mass (no product .tsx; lib, Worker entry, tests)
+claimed_by: Grok, 2026-10-08 11:49 CT
+last_updated: 2026-10-08 23:02 CT, by Canopy (log maintenance on #1939; not a new claim on #1943)
+closure: Merged via #1943 as 3412513bf3f9a9094e1966275bfb32ffc6a6f9b7 at 2026-10-08 12:55 PM CT. #1937 merged afterward as eaf0b092257af57acb724dfe9f817d6c8881943b, so the header application this block was waiting on has landed. Historical last_updated before this closure note: 2026-10-08 12:21 CT, by Grok.
+```
 
 ### CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001
 

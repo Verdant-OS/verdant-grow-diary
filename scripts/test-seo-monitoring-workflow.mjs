@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { test } from "node:test";
+import { load as loadYaml } from "js-yaml";
 
 const ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const workflow = readFileSync(
@@ -87,4 +88,34 @@ test("GSC runner always emits the terminal summary even when OAuth is unavailabl
   assert.match(inspectionScript, /observedGscRun\.oauthConfigured = creds\.ok/);
   assert.match(inspectionScript, /observedGscRun\.explicitlySkipped = true/);
   assert.match(inspectionScript, /gscObservation: observedGscRun/);
+});
+
+test("SEO monitoring installs dependencies with Bun from bun.lock", () => {
+  // Assert on the parsed job, not the raw text: a commented-out step or one
+  // moved into another job must fail this contract.
+  const steps = loadYaml(workflow)?.jobs?.["seo-monitoring"]?.steps;
+  assert.ok(Array.isArray(steps), "seo-monitoring job must declare steps");
+
+  const setupBun = steps.filter((step) => /^oven-sh\/setup-bun@/.test(step.uses ?? ""));
+  assert.equal(setupBun.length, 1, "exactly one setup-bun step");
+  assert.match(setupBun[0].uses, /^oven-sh\/setup-bun@[0-9a-f]{40}$/);
+  assert.equal(String(setupBun[0].with?.["bun-version"]), "1.3.14");
+
+  const cache = steps.find((step) => step.with?.path === "~/.bun/install/cache");
+  assert.ok(cache, "Bun install cache step must exist");
+  assert.equal(cache.with.key, "${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}");
+
+  const installIndex = steps.findIndex((step) => step.run === "bun install --frozen-lockfile");
+  const validateIndex = steps.findIndex((step) =>
+    /node --test scripts\/test-seo-monitoring-workflow\.mjs/.test(step.run ?? ""),
+  );
+  assert.ok(installIndex >= 0, "frozen Bun install step must exist");
+  assert.ok(
+    installIndex > steps.indexOf(setupBun[0]) && installIndex < validateIndex,
+    "install must run after setup-bun and before the scripts that need dependencies",
+  );
+
+  // Forbidden-construct scans stay on the source text.
+  assert.doesNotMatch(workflow, /\bnpm\s+(?:ci|install)\b/);
+  assert.doesNotMatch(workflow, /package-lock\.json/);
 });

@@ -69,3 +69,33 @@ version-floor gates continue to enforce it. Reverting this two-file change resto
 2026-10-02 deadline and its fail-closed result. No data rollback is needed. No merge,
 Publish, production APPLY, device or Action Queue operation, credential, or production
 acceptance is authorized by this review.
+
+## Addendum — SEO monitoring moved to Bun (2026-10-03)
+
+On the owner's instruction, the first follow-up option above is taken in a stacked
+change. `.github/workflows/seo-monitoring.yml` now installs with
+`bun install --frozen-lockfile`, after the same pinned `oven-sh/setup-bun` 1.3.14 and
+`bun.lock`-keyed install cache that the other Bun workflows use. `setup-node` stays at
+Node 20 because the job runs its scripts with `node` and its own workflow test pins that
+version. Its `consumerContracts` entry is removed, because a declared consumer that no
+longer carries its marker fails the policy.
+
+That leaves three npm references, none of which installs from `package-lock.json`:
+
+| Contract                                         | What it is                                                | Lock-dependent? |
+| ------------------------------------------------ | --------------------------------------------------------- | --------------- |
+| `README.md`                                      | Documented build command.                                 | No              |
+| `.claude/skills/run-verdant-grow-diary/SKILL.md` | Local public-registry bootstrap; restores the lock after. | No              |
+| `docs/preview-deployment-verification.md`        | Preview dashboard checklist.                              | No              |
+
+The job needs its install step. Measured over `scripts/seo/*.mjs` and the ten
+`scripts/test-seo-*.mjs` files the job runs, every import is a Node built-in except one:
+`scripts/test-seo-monitoring-workflow.mjs` imports `js-yaml` to assert on the parsed
+workflow (#1870 review follow-up). The `bun install --frozen-lockfile` step provides it
+from `bun.lock`; removing that step would break the job's validation step on a clean
+runner.
+
+Removing `package-lock.json` itself is still the dependency security owner's decision,
+and lockfile changes stay owner-gated. This addendum does not remove it. Hosted
+execution of the edited workflow is NOT_MEASURED until it runs, which happens after a
+successful `ci` run on `verdant-grow-diary` or a manual dispatch.

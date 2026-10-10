@@ -93,23 +93,82 @@ jobs:
           const { writeFileSync, readFileSync, existsSync } = require('node:fs');
           const assert = require('node:assert/strict');
 
+          // path-guard-source:begin
+          function normalizeRepoPath(raw) {
+            if (typeof raw !== "string") return null;
+            if (raw.includes("\0") || raw.includes("\n") || raw.includes("\r")) return null;
+            const path = raw.replaceAll("\\", "/");
+            if (path.startsWith("/") || /^[A-Za-z]:(?:\/|$)/.test(path)) return null;
+            const parts = [];
+            for (const segment of path.split("/")) {
+              if (segment === "" || segment === ".") continue;
+              if (segment === "..") {
+                if (parts.length === 0) return null;
+                parts.pop();
+                continue;
+              }
+              parts.push(segment);
+            }
+            if (parts.length === 0) return null;
+            return parts.join("/");
+          }
+
+          // Full normalized paths, compared case-insensitively. Root HOLD prefixes from the
+          // locked-path rules, plus the two files a filename match lets through
+          // (Codex P1, deferred from #1774 to #1927).
+          const LOCKED_EXACT_PATHS = [
+            "agents.md",
+            "claude.md",
+            "gemini.md",
+            "docs/agents/ownership.md",
+            "docs/agents/current_state.md",
+            "config/claude-slice-lock-exceptions.json",
+            "src/pages/resetpassword.tsx",
+            "src/lib/pendingoutcomereviewrules.ts",
+          ];
+          const LOCKED_PREFIXES = [".github/", ".claude/", ".grok/", ".git/", "scripts/", "src/test/setup"];
+
+          function matchesLockedPrefix(folded, prefix) {
+            const rule = prefix.toLowerCase();
+            if (rule.endsWith("/")) {
+              const directory = rule.slice(0, -1);
+              return folded === directory || folded.startsWith(rule);
+            }
+            return folded === rule || folded.startsWith(rule);
+          }
+
           function lockedPath(raw) {
-            const path = raw.replaceAll('\\', '/');
-            if (!path || path.startsWith('/') || path.split('/').includes('..')) return true;
+            const path = normalizeRepoPath(raw);
+            if (path == null) return true;
+            const folded = path.toLowerCase();
+            if (LOCKED_EXACT_PATHS.includes(folded)) return true;
+            if (LOCKED_PREFIXES.some((prefix) => matchesLockedPrefix(folded, prefix))) return true;
             if (/^(?:\.github|\.claude|\.grok|\.git)(?:\/|$)/i.test(path)) return true;
             if (/^(?:AGENTS|CLAUDE|GEMINI)\.md$/i.test(path)) return true;
             if (/^docs\/agents\/(?:OWNERSHIP|CURRENT_STATE)\.md$/i.test(path)) return true;
-            if (/(?:^|\/)(?:supabase|migrations?|sql|rls|edge-functions?|functions)(?:\/|$)/i.test(path)) return true;
+            if (/(?:^|\/)(?:supabase|migrations?|sql|rls|edge-functions?|functions)(?:\/|$)/i.test(path))
+              return true;
             if (/\.sql$/i.test(path)) return true;
-            if (/(?:\.lockb?$|(?:^|\/)(?:package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|Pipfile\.lock)$)/i.test(path)) return true;
+            if (
+              /(?:\.lockb?$|(?:^|\/)(?:package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|Pipfile\.lock)$)/i.test(
+                path,
+              )
+            )
+              return true;
             if (/(?:^|\/)\.env(?:\.|$)/i.test(path)) return true;
             // Code CI executes with repository secrets: manifests (scripts), tool
             // configs and test setup. A draft could otherwise plant code there.
             if (/(?:^|\/)package\.json$/i.test(path)) return true;
-            if (/(?:^|\/)(?:[tj]sconfig[^/]*\.json|\.npmrc|\.yarnrc(?:\.yml)?|bunfig\.toml|\.nvmrc|\.node-version)$/i.test(path)) return true;
+            if (
+              /(?:^|\/)(?:[tj]sconfig[^/]*\.json|\.npmrc|\.yarnrc(?:\.yml)?|bunfig\.toml|\.nvmrc|\.node-version)$/i.test(
+                path,
+              )
+            )
+              return true;
             if (/(?:^|\/)[^/]+\.config\.[^/]+$/i.test(path)) return true;
             if (/(?:^|\/)(?:vitest|vite|playwright)\.(?:setup|workspace)[^/]*$/i.test(path)) return true;
-            if (/(?:^|\/)(?:setup-?tests?|test-?setup|global[-_.]?(?:setup|teardown))[^/]*$/i.test(path)) return true;
+            if (/(?:^|\/)(?:setup-?tests?|test-?setup|global[-_.]?(?:setup|teardown))[^/]*$/i.test(path))
+              return true;
             if (/^src\/test\/setup/i.test(path)) return true;
             // Prettier and legacy ESLint configs can load plugins. CI runs scripts/**
             // (ci.yml and other workflows) in jobs that hold write tokens or secrets.
@@ -118,11 +177,37 @@ jobs:
             if (/^config\/claude-slice-lock-exceptions\.json$/i.test(path)) return true;
             // Same roots as the content rules, e2e-local/ included (Codex P1 at cbc0ab0f).
             const executable = CONTENT_ROOTS.test(path) && !/\.md$/i.test(path);
-            return executable && (
-              /auth|oauth|rls|action[-_]?(?:queue|detail|outcome|follow[-_]?up|response[-_]?memory|completion|status)|linked[-_]?actions?|assigned[-_]?tent[-_]?actions?|live[-_]?proof[-_]?action[-_]?status|recent[-_]?action[-_]?response|device[-_]?(?:control|command)|actuator/i.test(path) ||
-              /(?:^|\/)(?:actions|edge)(?:[/._]|$)/i.test(path)
+            return (
+              executable &&
+              (/auth|oauth|rls|action[-_]?(?:queue|detail|outcome|follow[-_]?up|response[-_]?memory|completion|status)|linked[-_]?actions?|assigned[-_]?tent[-_]?actions?|live[-_]?proof[-_]?action[-_]?status|recent[-_]?action[-_]?response|device[-_]?(?:control|command)|actuator/i.test(
+                path,
+              ) ||
+                /(?:^|\/)(?:actions|edge)(?:[/._]|$)/i.test(path))
             );
           }
+
+          // Compare-API entries. A symlink or submodule is rejected, not read as text.
+          // A missing or unknown mode is fail-closed only when a mode is actually present;
+          // GitHub's compare payload often omits mode on ordinary files.
+          function compareNonBlobReason(file) {
+            if (!file || typeof file !== "object") return "unparsable";
+            const labels = [file.type, file.object_type]
+              .filter((value) => typeof value === "string")
+              .map((value) => value.toLowerCase());
+            if (labels.some((label) => label === "symlink" || label === "submodule" || label === "commit")) {
+              return "symlink-or-submodule";
+            }
+            const modes = [file.mode, file.new_mode, file.old_mode].filter(
+              (value) => value !== undefined && value !== null && value !== "",
+            );
+            for (const mode of modes) {
+              const text = String(mode);
+              if (text === "120000" || text === "160000") return "symlink-or-submodule";
+              if (text !== "100644" && text !== "100755") return "unknown-mode";
+            }
+            return null;
+          }
+          // path-guard-source:end
 
           // Content locks. A file that calls Supabase auth mutations or reads or
           // writes the Action Queue is locked whatever its name (Matthew, 2026-10-06:
@@ -1024,6 +1109,19 @@ jobs:
                   throw new Error(`Compare entry ${JSON.stringify(name)} is missing previous_filename`);
                 }
               }
+              const knownStatus = status === 'renamed' || status === 'copied' || status === 'added'
+                || status === 'removed' || status === 'modified' || status === 'changed';
+              if (knownStatus) {
+                const nonBlob = compareNonBlobReason(file)
+                  || (normalizeRepoPath(name) == null ? 'unparsable-path' : null)
+                  || (status === 'renamed' && normalizeRepoPath(file.previous_filename) == null ? 'unparsable-path' : null);
+                if (nonBlob) {
+                  const blocked = (entryPath) => ({ path: entryPath, binary: false, base: null, head: null, nonBlob });
+                  if (status === 'renamed') entries.push(blocked(file.previous_filename));
+                  entries.push(blocked(name));
+                  continue;
+                }
+              }
               if (status === 'renamed') {
                 entries.push(record(file.previous_filename, textOf(file.previous_filename, 'base'), null));
                 entries.push(record(name, null, textOf(name, 'head')));
@@ -1043,6 +1141,7 @@ jobs:
           // Why an entry is locked: [] when allowed. A path lock is final and can't
           // be excepted; content locks check both the base and the head text.
           function entryLocks(entry, exceptions = []) {
+            if (entry && typeof entry.nonBlob === 'string' && entry.nonBlob) return [entry.nonBlob];
             if (lockedPath(entry.path)) return ['path'];
             if (!contentScoped(entry.path)) return [];
             if (entry.binary) return ['binary'];
@@ -1133,6 +1232,7 @@ jobs:
               './**/*global-setup*', './**/*global-teardown*', './**/*globalSetup*', './**/*globalTeardown*',
               './src/test/setup*', './**/.prettierrc*', './**/.eslintrc*', './scripts/**',
               './config/claude-slice-lock-exceptions.json',
+              './src/pages/ResetPassword.tsx', './src/lib/pendingOutcomeReviewRules.ts',
             ];
             const codeGlobs = [
               '*auth*', '*Auth*', '*OAuth*', '*[rR][lL][sS]*',
@@ -1247,7 +1347,11 @@ jobs:
               '.prettierrc', '.prettierrc.json', 'nested/.prettierrc.cjs', '.eslintrc', '.eslintrc.json',
               'scripts/e2e/materialize-managed-session.mjs', 'scripts/check-no-src-lib-imports.mjs',
               'scripts/verify-edge-shared-in-sync.mjs', 'scripts/notify-edge-shared-drift.mjs',
-              'scripts/sync-edge-shared-notes.md',
+              'scripts/sync-edge-shared-notes.md', 'scripts/claude-slice-path-guard.cjs',
+              'src/pages/ResetPassword.tsx', 'SRC/Pages/resetpassword.tsx',
+              'src/./pages/ResetPassword.tsx', './src/pages/../pages/ResetPassword.tsx',
+              'src/lib/pendingOutcomeReviewRules.ts', 'src/lib/./pendingOutcomeReviewRules.ts',
+              'src/foo/../../src/lib/pendingOutcomeReviewRules.ts', 'src/../../outside.ts',
             ];
             const allowed = [
               'docs/library.md', 'docs/auth-guide.md', 'docs/agents/claude-slices.md',
@@ -1256,9 +1360,11 @@ jobs:
               'src/pages/Knowledge.tsx', 'docs/authorization-guide.md', 'docs/package-json.md',
               'src/lib/guidedActionChecklistRules.ts', 'src/lib/actionResponsePairingRules.ts',
               'src/test/action-response-pairing-rules.test.ts', 'docs/prettierrc-notes.md',
+              './src/lib/libraryRules.ts', 'src/lib/./libraryRules.ts', 'SRC/LIB/LIBRARYRULES.TS',
             ];
             blocked.forEach(path => assert.equal(lockedPath(path), true, path));
             allowed.forEach(path => assert.equal(lockedPath(path), false, path));
+            for (const value of [null, undefined, 0, {}, []]) assert.equal(lockedPath(value), true);
             assert.doesNotThrow(() => assertAllowed([]));
             assert.doesNotThrow(() => assertAllowed(allowed));
             assert.throws(() => assertAllowed(['docs/library.md', 'bun.lock']));
@@ -1269,6 +1375,8 @@ jobs:
               'Edit(./**/package.json)', 'Write(./**/package.json)', 'Edit(./**/*.config.*)',
               'Write(./**/*.config.*)', 'Edit(./**/tsconfig*.json)', 'Write(./src/test/setup*)',
               'Edit(./**/.prettierrc*)', 'Edit(./**/.eslintrc*)', 'Edit(./scripts/**)', 'Write(./scripts/**)',
+              'Edit(./src/pages/ResetPassword.tsx)', 'Write(./src/pages/ResetPassword.tsx)',
+              'Edit(./src/lib/pendingOutcomeReviewRules.ts)', 'Write(./src/lib/pendingOutcomeReviewRules.ts)',
               'Bash(*--pathspec-from-file*)', 'Bash(*--pathspec-file-nul*)',
             ];
             requiredDenies.forEach(rule => assert.ok(deny.includes(rule), rule));
@@ -1334,7 +1442,8 @@ jobs:
               return readFileSync(path, 'utf8');
             };
             // Must lock.
-            assert.match(locks('src/pages/ResetPassword.tsx', real('src/pages/ResetPassword.tsx')).join(), /auth-mutation, head/);
+            assert.deepEqual(locks('src/pages/ResetPassword.tsx', real('src/pages/ResetPassword.tsx')), ['path']);
+            assert.ok(contentLocked('src/pages/ResetPassword.tsx', real('src/pages/ResetPassword.tsx')).rules.includes('auth-mutation'));
             assert.deepEqual(locks('src/lib/fooRules.ts', 'export const out = () => supabase.auth.signOut();'), ['auth-mutation, head']);
             assert.deepEqual(locks('src/lib/fooRules.ts', 'supabase.auth.onAuthStateChange(cb);'), ['auth-mutation, head']);
             assert.deepEqual(locks('src/lib/fooRules.ts', 'await supabase.from("action_queue").select("*");'), ['aq-io, head']);
@@ -1593,8 +1702,15 @@ jobs:
               'src/lib/pendingOutcomeReviewRules.ts', 'src/lib/guidedActionChecklistRules.ts',
               'src/lib/actionResponsePairingRules.ts', 'src/lib/libraryRules.ts', 'src/lib/sensorDeviceLabels.ts',
             ]) {
-              if (path.endsWith('pendingOutcomeReviewRules.ts')) real(path);
-              if (existsSync(path)) assert.deepEqual(locks(path, readFileSync(path, 'utf8')), [], path);
+              if (!existsSync(path)) continue;
+              const text = readFileSync(path, 'utf8');
+              if (path.endsWith('pendingOutcomeReviewRules.ts')) {
+                real(path);
+                assert.deepEqual(locks(path, text), ['path'], path);
+                assert.deepEqual(contentLocked(path, text).rules, [], path);
+                continue;
+              }
+              assert.deepEqual(locks(path, text), [], path);
             }
             // Exceptions apply to content locks only and must be well formed.
             const exception = [{ path: 'src/lib/fooRules.ts', rule: 'aq-io', reason: 'test', approved_by: 'Matthew' }];
@@ -1657,6 +1773,53 @@ jobs:
             assert.deepEqual(entryLocks(renamed[0]), ['aq-io, base']);
             cases += 1;
             assert.deepEqual(entryLocks(renamed[1]), ['aq-io, head']);
+            let blobReads = 0;
+            const readCounted = (path, side) => {
+              blobReads += 1;
+              const text = readBlob(path, side);
+              return typeof text === 'string' ? text : 'export const n = 1;\n';
+            };
+            const intoLocked = entriesFromCompare([
+              { filename: 'src/pages/ResetPassword.tsx', previous_filename: 'src/lib/libraryRules.ts', status: 'renamed' },
+            ], readCounted);
+            cases += 1;
+            assert.deepEqual(intoLocked.map(entry => entry.path), ['src/lib/libraryRules.ts', 'src/pages/ResetPassword.tsx']);
+            cases += 1;
+            assert.deepEqual(entryLocks(intoLocked[0]), []);
+            cases += 1;
+            assert.deepEqual(entryLocks(intoLocked[1]), ['path']);
+            const outOfLocked = entriesFromCompare([
+              { filename: 'src/lib/libraryRules.ts', previous_filename: 'src/pages/ResetPassword.tsx', status: 'renamed' },
+            ], readCounted);
+            cases += 1;
+            assert.deepEqual(entryLocks(outOfLocked[0]), ['path']);
+            cases += 1;
+            assert.deepEqual(entryLocks(outOfLocked[1]), []);
+            blobReads = 0;
+            const symlink = entriesFromCompare([
+              { filename: 'src/lib/libraryRules.ts', status: 'added', type: 'symlink' },
+            ], readCounted);
+            cases += 1;
+            assert.equal(blobReads, 0);
+            cases += 1;
+            assert.deepEqual(entryLocks(symlink[0]), ['symlink-or-submodule']);
+            const submodule = entriesFromCompare([
+              { filename: 'vendor/mod', status: 'added', mode: '160000' },
+            ], readCounted);
+            cases += 1;
+            assert.equal(blobReads, 0);
+            cases += 1;
+            assert.deepEqual(entryLocks(submodule[0]), ['symlink-or-submodule']);
+            const linkRename = entriesFromCompare([
+              { filename: 'src/lib/libraryRules.ts', previous_filename: 'src/lib/plainRules.ts', status: 'renamed', type: 'symlink' },
+            ], readCounted);
+            cases += 1;
+            assert.equal(blobReads, 0);
+            cases += 1;
+            assert.deepEqual(linkRename.map(entry => [entry.path, entry.nonBlob]), [
+              ['src/lib/plainRules.ts', 'symlink-or-submodule'],
+              ['src/lib/libraryRules.ts', 'symlink-or-submodule'],
+            ]);
             const modified = entriesFromCompare([{ filename: 'src/lib/plainRules.ts', status: 'modified' }], readBlob);
             cases += 1;
             assert.equal(modified.length, 1);
@@ -1828,7 +1991,7 @@ jobs:
             else if (mode === '--unlock-receipt') process.stdout.write(unlockReceipt(readFileSync(first, 'utf8')));
             else throw new Error('Unknown Claude policy command');
           }
-          module.exports = { lockedPath, contentLocked, contentScoped, changedPaths, changedEntries, entriesFromCompare, entryLocks, assertAllowed };
+          module.exports = { normalizeRepoPath, lockedPath, compareNonBlobReason, contentLocked, contentScoped, changedPaths, changedEntries, entriesFromCompare, entryLocks, assertAllowed };
           NODE
           # The TypeScript parser for the AST content rules (Option 1): only this exact
           # registry tarball, checked against a pinned sha512 (the integrity bun.lock and
@@ -1951,7 +2114,7 @@ jobs:
           # Never '*' and never another user.
           allowed_non_write_users: cheekhimself
           base_branch: verdant-grow-diary
-          branch_prefix: claude/
+          branch_prefix: claude-slice/
           label_trigger: claude-slice
           settings: ${{ runner.temp }}/claude-slice-settings.json
           show_full_output: "false"
@@ -1960,7 +2123,7 @@ jobs:
             --model claude-sonnet-5-5
             --max-turns 40
             --permission-mode acceptEdits
-            --allowedTools "Read,Glob,Grep,Bash(git status *),Bash(git diff),Bash(git diff --stat),Bash(git diff --cached),Bash(git diff --cached --stat),Bash(git log *),Bash(git switch -c claude/*),Bash(git add *),Bash(git commit -m *),Bash(gh issue view *),Bash(gh pr view *),Bash(gh pr list *),Bash(${{ runner.temp }}/claude-bin/scorer-unlock *)"
+            --allowedTools "Read,Glob,Grep,Bash(git status *),Bash(git diff),Bash(git diff --stat),Bash(git diff --cached),Bash(git diff --cached --stat),Bash(git log *),Bash(git switch -c claude-slice/*),Bash(git add *),Bash(git commit -m *),Bash(gh issue view *),Bash(gh pr view *),Bash(gh pr list *),Bash(${{ runner.temp }}/claude-bin/scorer-unlock *)"
             --disallowedTools "Bash(gh issue comment),Bash(gh issue comment *),Bash(*--no-index*),Bash(*--output*),Bash(*/proc/*),Bash(*environ*),Bash(git commit *-F*),Bash(git commit *--file*),Bash(git commit *-t *),Bash(git commit *--template*),Bash(git commit *-C *),Bash(git commit *-c *),Bash(git commit *--reuse-message*),Bash(git commit *--reedit-message*),Bash(*--pathspec-from-file*),Bash(*--pathspec-file-nul*),Bash(gh pr merge),Bash(gh pr merge *),Bash(gh pr ready),Bash(gh pr ready *),Bash(gh pr review),Bash(gh pr review *),Bash(gh pr create *),Bash(git push *),Bash(git *push*),Bash(gh api *),Bash(gh workflow *),Bash(bun *),Bash(bunx *),Bash(npm *),Bash(npx *),Bash(node *),WebFetch,WebSearch"
           prompt: |
             You are Claude, builder of one Verdant slice. Read AGENTS.md, CLAUDE.md
@@ -1984,9 +2147,10 @@ jobs:
             If this is a nudge on an existing Claude draft, continue its branch and PR;
             never create a competing PR or modify a different owner's branch.
 
-            Branch from verdant-grow-diary as claude/<slice-id>, using a simple branch
+            Branch from verdant-grow-diary as claude-slice/<slice-id>, using a simple branch
             name containing only letters, digits, dots, underscores and hyphens after
-            claude/. One slice per PR. Commit your work on that one local branch and leave
+            claude-slice/. One slice per PR. Claude Code's own branches stay claude/*,
+            so a slice branch cannot collide with them. Commit your work on that one local branch and leave
             it checked out. You cannot push or open a PR: your token is read-only. After
             you finish, a separate trusted job runs the locked-path check, pushes the
             branch and opens exactly one DRAFT PR, or adds your commits to the existing
@@ -2035,8 +2199,8 @@ jobs:
           fi
           out="$RUNNER_TEMP/claude-slice-out"
           branch=$(git branch --show-current)
-          if [[ ! "$branch" =~ ^claude/[A-Za-z0-9._-]+$ ]]; then
-            echo "No claude/<slice-id> branch is checked out; nothing to publish."
+          if [[ ! "$branch" =~ ^claude-slice/[A-Za-z0-9._-]+$ ]]; then
+            echo "No claude-slice/<slice-id> branch is checked out; nothing to publish."
             echo "publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -2096,7 +2260,7 @@ jobs:
           set -euo pipefail
           in="$RUNNER_TEMP/claude-slice-in"
           branch=$(head -n 1 "$in/branch")
-          [[ "$branch" =~ ^claude/[A-Za-z0-9._-]+$ ]] || { echo 'Only claude/<slice-id> branches may be published' >&2; exit 1; }
+          [[ "$branch" =~ ^claude-slice/[A-Za-z0-9._-]+$ ]] || { echo 'Only claude-slice/<slice-id> branches may be published' >&2; exit 1; }
           git -c core.hooksPath=/dev/null bundle verify "$in/slice.bundle"
           git -c core.hooksPath=/dev/null fetch --no-tags "$in/slice.bundle" "refs/heads/$branch:refs/claude-slice/head"
           head=$(git rev-parse refs/claude-slice/head)
@@ -2127,7 +2291,7 @@ jobs:
 
   claude-locked-paths:
     name: Claude locked paths
-    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'claude/')
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'claude-slice/')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

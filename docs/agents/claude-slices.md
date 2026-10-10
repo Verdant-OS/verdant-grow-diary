@@ -41,15 +41,15 @@ the builder. Accepted events are a newly created comment (on an issue or a PR)
 containing `@claude`, or an issue labeled `claude-slice`. Opening an issue whose
 body mentions `@claude` does not start it; comment `@claude` afterwards. A comment from any other account
 skips at the job gate. Labels applied by another account also skip. PR events
-only run configuration tests and, for `claude/**` heads, the path guard; they
+only run configuration tests and, for `claude-slice/**` heads, the path guard; they
 cannot enter the Claude builder. There is no schedule or `pull_request_target`.
 
 Grok 91 must provide a closed file plan and a slice ID in the issue. Claude checks
-for collisions, branches from `verdant-grow-diary` as `claude/<slice-id>`, and
+for collisions, branches from `verdant-grow-diary` as `claude-slice/<slice-id>`, and
 commits locally. Nudges continue the existing Claude draft. Claude cannot push,
 merge, mark ready, review or open a PR: its job holds only a read-only token. A
 separate publish job, with no Claude in it, checks the committed diff against the
-locked-path policy, pushes the `claude/*` branch with a normal (fast-forward)
+locked-path policy, pushes the `claude-slice/*` branch with a normal (fast-forward)
 push and opens one draft PR into `verdant-grow-diary`; it never opens a second PR
 for the same branch. Claude's final commit message becomes the PR title and body,
 which names its owner and independent reviewer.
@@ -185,8 +185,9 @@ when its text:
   A same-name mock property (`{ from: mock.from }`) and a write to a member named `from`
   don't count either. Mentioning an Action Queue row ID, type or
   comment doesn't lock, and neither does a bare string literal elsewhere
-  (generated types, view models, source-scan tests), so pure helpers such as
-  `pendingOutcomeReviewRules.ts` stay editable.
+  (generated types, view models, source-scan tests), so pure helpers stay editable
+  under the content rules. The path guard still locks the full paths
+  `src/pages/ResetPassword.tsx` and `src/lib/pendingOutcomeReviewRules.ts`.
 
 Test files follow the same rules. The publish job and `claude-locked-paths` check
 the text on both sides of every change: the merge-base version catches editing,
@@ -271,12 +272,15 @@ possible.
 Following imports and data flow would close these, and is deferred.
 
 `claude-locked-paths` has read-only permission and runs only on PR heads starting
-with `claude/`. It checks out the exact base, fetches the PR head, verifies that
-head SHA, and compares against the merge base without executing PR code. A
-locked path fails the real check. `claude-configuration` runs checksum-verified
-actionlint and focused policy regressions on PRs, including this Codex draft. It
-also checks out the base, verifies the PR head and extracts only the workflow
-file for actionlint; it does not check out or execute PR application code.
+with `claude-slice/`. Slice branches use that prefix so they do not collide with
+Claude Code's own `claude/*` branches. The job checks out the exact base and reads
+the PR head as blob data through the GitHub compare and contents APIs at the
+immutable base and head SHAs. It does not fetch or check out the PR head, and it
+does not execute PR code. A locked path fails the real check. `claude-configuration`
+runs checksum-verified actionlint and focused policy regressions on PRs, including
+this Codex draft. It also checks out the base and reads only the workflow file
+from the contents API at the head SHA for actionlint; it does not check out or
+execute PR application code.
 Neither job impersonates an existing required check. In a `merge_group` run all
 four jobs (builder, publish, locked paths, configuration) report skipped: the builder still requires an authorized comment or
 label, and both validation jobs are gated on `pull_request` events, where

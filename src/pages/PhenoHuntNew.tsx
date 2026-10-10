@@ -28,6 +28,11 @@ import {
   type PhenoOnboardingStepId,
 } from "@/lib/phenoHuntOnboardingViewModel";
 import type { PhenoEvidenceGoalId } from "@/lib/phenoEvidenceGoals";
+import {
+  describePhenoEvidenceGoalSelection,
+  normalizeEvidenceGoalIds,
+  PHENO_EVIDENCE_GOALS_STEP_INTRO,
+} from "@/lib/phenoEvidenceGoalSelectionRules";
 import PhenoHuntOnboardingStepper from "@/components/PhenoHuntOnboardingStepper";
 import PhenoEvidenceGoalsSelector from "@/components/PhenoEvidenceGoalsSelector";
 import PhenoFirstEvidencePacketMapPreview from "@/components/PhenoFirstEvidencePacketMapPreview";
@@ -77,9 +82,8 @@ function readHuntDraft(key: string): PhenoHuntSetupDraft | null {
       selected: Array.isArray(parsed.selected)
         ? parsed.selected.filter((v): v is string => typeof v === "string")
         : [],
-      evidenceGoals: Array.isArray(parsed.evidenceGoals)
-        ? (parsed.evidenceGoals as PhenoEvidenceGoalId[])
-        : [],
+      // Unknown/removed ids are dropped so readiness and the summary agree.
+      evidenceGoals: normalizeEvidenceGoalIds(parsed.evidenceGoals),
       currentStep:
         typeof parsed.currentStep === "string" &&
         (PHENO_ONBOARDING_STEP_ORDER as readonly string[]).includes(parsed.currentStep)
@@ -279,11 +283,16 @@ export default function PhenoHuntNew() {
         tentId: tentId ?? null,
         notes,
         candidateIds,
-        evidenceGoals,
+        evidenceGoals: normalizeEvidenceGoalIds(evidenceGoals),
         setupCompleted: setupConfirmed,
         goalsReviewed,
       }),
     [name, growId, tentId, notes, candidateIds, evidenceGoals, setupConfirmed, goalsReviewed],
+  );
+
+  const goalSelection = useMemo(
+    () => describePhenoEvidenceGoalSelection(evidenceGoals),
+    [evidenceGoals],
   );
 
   const canSave = vm.canCreate && !saving && !!user;
@@ -571,9 +580,9 @@ export default function PhenoHuntNew() {
           data-testid="pheno-step-goals"
         >
           <h2 className="text-sm font-semibold">Evidence goals</h2>
-          <p className="text-xs text-muted-foreground">
-            Choose what you plan to track. You decide what matters — Verdant preserves the evidence
-            you record.
+          <p className="text-xs text-muted-foreground">{PHENO_EVIDENCE_GOALS_STEP_INTRO}</p>
+          <p className="text-xs font-medium" data-testid="pheno-evidence-goals-summary">
+            {goalSelection.summary}
           </p>
           <PhenoEvidenceGoalsSelector selected={evidenceGoals} onToggle={toggleGoal} />
         </section>
@@ -629,7 +638,7 @@ export default function PhenoHuntNew() {
             data-testid="pheno-confirmation-summary"
           >
             <li>• Candidates selected: {candidateIds.length}</li>
-            <li>• Evidence goals selected: {evidenceGoals.length}</li>
+            <li>• Evidence goals: {goalSelection.summary}</li>
             <li>• Readiness: {vm.readinessLabel}</li>
           </ul>
           <label className="flex items-start gap-2 text-sm">

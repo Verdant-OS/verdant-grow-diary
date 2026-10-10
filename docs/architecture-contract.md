@@ -992,17 +992,24 @@ and `supabase/functions/ai-cultivar-qa/index.ts:14` (no queue writes);
 
 ## 8. Toolchain and dependency management
 
-**AC-8.1 — Bun is canonical; `package-lock.json` is a synchronized compatibility artifact.**
-`bun.lock` is authoritative. The npm lockfile exists for compatibility and must stay in sync; it is
-never the source of truth.
-The repository has `bun.lock`, a text lockfile, and `package-lock.json`. **There is no `bun.lockb`.**
-Governance prose that calls `bun.lockb` authoritative is stale.
-_Source:_ `scripts/check-bun-lockfile-policy.mjs:5` ("Bun and bun.lock are canonical"), `:22`
-(`REQUIRED_LOCKFILES`), `:186-191` (the canonical check and throw); `bunfig.toml`.
-`established fact`.
-_Enforcement:_ **gated.** `src/test/check-bun-lockfile-policy.test.ts:492` runs the checker against
-the repository in the required test shards. It requires both files and rejects a transition config
-that does not keep Bun canonical. The non-required `dependency-security-ci.yml` also runs it.
+**AC-8.1 — Bun is canonical; `bun.lock` is the only lockfile.**
+`bun.lock`, a text lockfile, is authoritative and is the only lockfile. The npm compatibility lock,
+`package-lock.json`, was retired on 2026-10-03; it, `bun.lockb`, `yarn.lock` and `pnpm-lock.yaml`
+are forbidden. **There is no `bun.lockb`.** Governance prose that calls `bun.lockb` authoritative,
+or `package-lock.json` a synchronized compatibility lock, is stale.
+_Source:_ `scripts/check-bun-lockfile-policy.mjs:5` ("Bun and bun.lock are canonical, and bun.lock
+is the only lockfile"), `:24` (`REQUIRED_LOCKFILES`), `:66-71` (`FORBIDDEN_LOCKFILES`), `:179-190`
+(the schema-2 transition config check; the canonical check and throw at `:185-186`);
+`config/dependency-lockfile-transition.json`; `bunfig.toml`;
+`docs/dependency-lockfile-transition-review-2026-10-03.md`. `established fact`.
+_Enforcement:_ **gated.** `src/test/check-bun-lockfile-policy.test.ts:537` runs the checker against
+the repository in the required test shards. It requires `bun.lock`, rejects every forbidden
+lockfile, and rejects a transition config that does not keep Bun canonical or that still declares a
+compatibility lockfile or review date. The non-required `dependency-security-ci.yml` also runs it
+(`:48-49`).
+
+> Until 2026-10-03 this clause read "`package-lock.json` is a synchronized compatibility artifact",
+> and the checker required both files and failed closed after a dated `reviewBy`.
 
 **AC-8.2 — New dependency versions wait 24 hours.**
 `bunfig.toml` sets `minimumReleaseAge = 86400` as a supply-chain guard. Each entry in

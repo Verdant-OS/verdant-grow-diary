@@ -93,6 +93,8 @@ import {
   resolveDailyCheckDashboardBreadcrumbHref,
   buildDailyCheckSavedItems,
   buildDailyCheckTimelineHref,
+  resolveDailyCheckEntrySavedSource,
+  type DailyCheckSavedSource,
   formatDailyCheckLoggedAt,
   parseDailyCheckEntrySource,
   parseDailyCheckMethodHint,
@@ -167,7 +169,9 @@ export default function DailyCheck() {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const [appliedRouteIdentity, setAppliedRouteIdentity] = useState<string | null>(null);
   const [lastSubmittedAt, setLastSubmittedAt] = useState<number | null>(null);
-  const [lastSubmittedSource, setLastSubmittedSource] = useState<"note" | "sensor" | null>(null);
+  const [lastSubmittedSource, setLastSubmittedSource] = useState<DailyCheckSavedSource | null>(
+    null,
+  );
 
   const selectablePlants = useMemo(
     () => (urlGrowId ? plants.filter((plant) => plant.grow_id === urlGrowId) : plants),
@@ -353,11 +357,13 @@ export default function DailyCheck() {
   // real save time, not the moment the React listener happened to run.
   useEffect(() => {
     function onEntry(e: Event) {
-      const detail = (e as CustomEvent<{ createdAt?: string | number | Date }>).detail;
+      const detail = (
+        e as CustomEvent<{ createdAt?: string | number | Date; activityId?: string | null }>
+      ).detail;
       const raw = detail?.createdAt;
       const parsed = raw != null ? new Date(raw).getTime() : NaN;
       setLastSubmittedAt(Number.isFinite(parsed) ? parsed : Date.now());
-      setLastSubmittedSource("note");
+      setLastSubmittedSource(resolveDailyCheckEntrySavedSource(detail));
       setState((s) => {
         const next = { ...s };
         if (renderedStep === "quicklog" && s.quicklog === "pending") next.quicklog = "added";
@@ -1353,14 +1359,13 @@ export default function DailyCheck() {
         </>
       ) : null}
 
-      {/* Step indices for tests/debug only — non-visual AND never announced
-          to real screen readers. `sr-only` alone still puts this raw,
-          comma-joined internal step-slug list (e.g. "select,environment,
-          manual,quicklog,handheld,review,done") in front of every real
-          screen-reader user on this page; aria-hidden removes it from the
-          accessibility tree while keeping it queryable by test tooling via
-          data-testid. */}
-      <span className="sr-only" aria-hidden="true" data-testid="daily-grow-check-step-list">
+      {/* Step indices for tests/debug only. `sr-only` still paints this
+          comma-joined slug list when that utility does not clip (Pollen,
+          2026-10-10, Log tab at 390px). `hidden` is display:none, and the
+          HTML hidden attribute does not depend on Tailwind. aria-hidden
+          keeps it out of the accessibility tree. The test id stays so
+          tooling can still find the node. */}
+      <span className="hidden" hidden aria-hidden="true" data-testid="daily-grow-check-step-list">
         {DAILY_GROW_CHECK_STEPS.join(",")}
       </span>
     </div>

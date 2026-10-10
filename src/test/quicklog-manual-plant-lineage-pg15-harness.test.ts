@@ -31,7 +31,7 @@ const harness = readFileSync(
 describe("Quick Log manual plant/tent lineage fence", () => {
   it("accepts only the deterministic full order without mutating the caller's input", () => {
     const order = [...MANUAL_DELIVERY_ORDER];
-    expect(order).toEqual(["20260927002000", "20260927160000", "20260928183000"]);
+    expect(order).toEqual(["20260927002000", "20260927160000", "20260928183000", "20261001180000"]);
     expect(validManualDeliveryOrder(order)).toBe(true);
     expect(validManualDeliveryOrder(order)).toBe(true);
     expect(order).toEqual(MANUAL_DELIVERY_ORDER);
@@ -88,12 +88,13 @@ describe("Quick Log manual plant/tent lineage fence", () => {
     expect(spawnImpl).not.toHaveBeenCalled();
   });
 
-  it.each([0, 1, 2])("rejects changed migration bytes at chain position %i", (position) => {
+  it.each([0, 1, 2, 3])("rejects changed migration bytes at chain position %i", (position) => {
     const directory = mkdtempSync(resolve(tmpdir(), "quicklog-chain-pin-"));
     const filenames = [
       "20260927002000_quicklog_manual_reuse_fence.sql",
       "20260927160000_quicklog_manual_plant_tent_lineage.sql",
       "20260928183000_quicklog_manual_replay_metadata_lock.sql",
+      "20261001180000_quicklog_manual_occurred_at_utc_hash.sql",
     ];
     try {
       for (const [index, file] of filenames.entries()) {
@@ -119,6 +120,8 @@ describe("Quick Log manual plant/tent lineage fence", () => {
     ["ACL unrelated SQL failure", "acl", "sql"],
     ["skipped lineage connection failure", "skipped", "connection"],
     ["skipped lineage unrelated SQL failure", "skipped", "sql"],
+    ["skipped metadata connection failure", "skipped_metadata", "connection"],
+    ["skipped metadata unrelated SQL failure", "skipped_metadata", "sql"],
   ])(
     "requires genuine SQL refusals before full-chain acceptance: %s",
     async (_label, failureStage, failureKind) => {
@@ -135,6 +138,7 @@ describe("Quick Log manual plant/tent lineage fence", () => {
       let aclInjected = false;
       let lineageAttempt = 0;
       let metadataAttempt = 0;
+      let utcHashAttempt = 0;
       let rejectedKeyCalls = 0;
       const spawnImpl = vi.fn((_command, _args, options) => {
         const input = options.input as string;
@@ -170,6 +174,8 @@ describe("Quick Log manual plant/tent lineage fence", () => {
           }
           if (position === 2 && ++metadataAttempt === 1)
             return refusal("skipped", "delivery_order_rejected");
+          if (position === 3 && ++utcHashAttempt === 1)
+            return refusal("skipped_metadata", "delivery_order_rejected");
           applied.push(position);
           return result();
         }
@@ -211,22 +217,24 @@ describe("Quick Log manual plant/tent lineage fence", () => {
           }),
         ).toBe(failureStage ? 1 : 0);
         if (failureStage) {
-          expect(applied).toEqual(failureStage === "skipped" ? [0] : []);
+          expect(applied).toEqual(
+            failureStage === "skipped" ? [0] : failureStage === "skipped_metadata" ? [0, 1] : [],
+          );
           expect(errorWrite).toHaveBeenCalledWith(
             expect.stringContaining("expected_sql_refusal_missing"),
           );
           expect(write).not.toHaveBeenCalled();
         } else {
-          expect(applied).toEqual([0, 1, 2]);
-          expect(aclRefusals).toEqual([0, 0, 0, 1, 1, 1, 2, 2, 2]);
+          expect(applied).toEqual([0, 1, 2, 3]);
+          expect(aclRefusals).toEqual([0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]);
           expect(aclInjected).toBe(false);
           expect(
             spawnImpl.mock.calls.filter(
               ([, , options]) => options.input === DELIVERY_DATABASE_SNAPSHOT_SQL,
             ),
-          ).toHaveLength(40);
+          ).toHaveLength(54);
           expect(write).toHaveBeenCalledWith(
-            expect.stringContaining("full chain 002000 -> 160000 -> 183000"),
+            expect.stringContaining("full chain 002000 -> 160000 -> 183000 -> 20261001180000"),
           );
         }
       } finally {
@@ -242,6 +250,8 @@ describe("Quick Log manual plant/tent lineage fence", () => {
       ["20260927002000", "20260928183000", "20260927160000"],
       ["20260928183000", "20260927160000", "20260927002000"],
       ["20260927002000", "20260927002000", "20260928183000"],
+      ["20260927002000", "20260927160000", "20260928183000"],
+      ["20260927002000", "20260927160000", "20261001180000", "20260928183000"],
       [],
       null,
     ].map((deliveryOrder) => [deliveryOrder]),

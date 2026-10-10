@@ -268,7 +268,7 @@ export async function runPlantLineageHarness({
   const env = psqlEnvironment(connection, containerId, containerRuntime);
   try {
     // Validate every immutable input before even the disposable reset.
-    const [reuseSql, lineageSql, metadataSql] = loadManualDeliverySql();
+    const [reuseSql, lineageSql, metadataSql, utcHashSql] = loadManualDeliverySql();
     attestDisposableTarget(env, spawnImpl);
     resetScaffold(env, spawnImpl);
     executeSql(sqlFile("20260818010000_quicklog_manual_delegate_forward_repair.sql"), env, {
@@ -408,6 +408,36 @@ export async function runPlantLineageHarness({
     };
     proveDeliveryAclRefusals(lineageInput);
     completed = deliverManualMigration(lineageInput);
+    // A fabricated completed prefix must not permit skipping 183000 either:
+    // the UTC-hash step's catalog gate requires 183000's wrapper source.
+    const skippedMetadataBefore = executeSql(DELIVERY_DATABASE_SNAPSHOT_SQL, env, {
+      stage: "skipped_metadata_database_before",
+      spawnImpl,
+    });
+    requireSqlRefusal({
+      stage: "skipped_metadata",
+      expectedMessage: "delivery_order_rejected",
+      spawnImpl,
+      run: (observedSpawn) =>
+        deliverManualMigration({
+          order: deliveryOrder,
+          completed: MANUAL_DELIVERY_ORDER.slice(0, 3),
+          version: MANUAL_DELIVERY_ORDER[3],
+          sql: utcHashSql,
+          env,
+          spawnImpl: observedSpawn,
+        }),
+    });
+    const skippedMetadataAfter = executeSql(DELIVERY_DATABASE_SNAPSHOT_SQL, env, {
+      stage: "skipped_metadata_database_after",
+      spawnImpl,
+    });
+    if (
+      !/^[0-9a-f]{32}$/.test(skippedMetadataBefore) ||
+      skippedMetadataAfter !== skippedMetadataBefore
+    ) {
+      throw new Error("skipped_metadata_changed_database");
+    }
     const metadataInput = {
       order: deliveryOrder,
       completed,
@@ -417,10 +447,30 @@ export async function runPlantLineageHarness({
       spawnImpl,
     };
     proveDeliveryAclRefusals(metadataInput);
-    deliverManualMigration(metadataInput);
+    completed = deliverManualMigration(metadataInput);
     requireTrue(
       "full_chain_wrapper_identity_and_grants",
       `select md5(replace(prosrc, E'\\r', ''))='1875cf01f7d1aa843d4b8ad080f9bcb2'
+        and not has_function_privilege('anon', oid, 'EXECUTE')
+        and has_function_privilege('authenticated', oid, 'EXECUTE')
+        and has_function_privilege('service_role', oid, 'EXECUTE')
+       from pg_proc where oid='public.quicklog_save_manual(${signature})'::regprocedure;`,
+      env,
+      spawnImpl,
+    );
+    const utcHashInput = {
+      order: deliveryOrder,
+      completed,
+      version: MANUAL_DELIVERY_ORDER[3],
+      sql: utcHashSql,
+      env,
+      spawnImpl,
+    };
+    proveDeliveryAclRefusals(utcHashInput);
+    deliverManualMigration(utcHashInput);
+    requireTrue(
+      "utc_hash_wrapper_identity_and_grants",
+      `select md5(replace(prosrc, E'\\r', ''))='f587dc4669f65580eed2d5097caac806'
         and not has_function_privilege('anon', oid, 'EXECUTE')
         and has_function_privilege('authenticated', oid, 'EXECUTE')
         and has_function_privilege('service_role', oid, 'EXECUTE')
@@ -503,7 +553,7 @@ export async function runPlantLineageHarness({
     return 1;
   }
   process.stdout.write(
-    "Quick Log plant lineage PG15 harness PASS: full chain 002000 -> 160000 -> 183000; reverse and skipped-lineage refused, covered persistent state unchanged\n",
+    "Quick Log plant lineage PG15 harness PASS: full chain 002000 -> 160000 -> 183000 -> 20261001180000; reverse, skipped-lineage and skipped-metadata refused, covered persistent state unchanged\n",
   );
   return 0;
 }

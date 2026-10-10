@@ -5,6 +5,7 @@ export const MANUAL_DELIVERY_ORDER = Object.freeze([
   "20260927002000",
   "20260927160000",
   "20260928183000",
+  "20261001180000",
 ]);
 
 export const MANUAL_DELIVERY_FILES = Object.freeze([
@@ -24,6 +25,13 @@ export const MANUAL_DELIVERY_FILES = Object.freeze([
     file: "20260928183000_quicklog_manual_replay_metadata_lock.sql",
     sha256: "ef8e208bb306b8aed8d29be4ecca72344cfc1f0dc7de236de48c12aa6b4f14a7",
     wrapperBefore: "85e40fcd47d1e38dca8f057fee2d905a",
+    delegateBefore: "ccd841f1af11a03bfca191cf9989c3fd",
+  }),
+  // 183000 leaves the 160000 delegate unchanged and writes wrapper 1875cf01.
+  Object.freeze({
+    file: "20261001180000_quicklog_manual_occurred_at_utc_hash.sql",
+    sha256: "1fcb23dd5c1285c036e8a498ab4539d5a37a706a614dca26643f036973ba2f5a",
+    wrapperBefore: "1875cf01f7d1aa843d4b8ad080f9bcb2",
     delegateBefore: "ccd841f1af11a03bfca191cf9989c3fd",
   }),
 ]);

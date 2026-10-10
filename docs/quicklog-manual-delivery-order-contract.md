@@ -9,6 +9,7 @@ The only accepted sequence is:
 1. `20260927002000_quicklog_manual_reuse_fence.sql`
 2. `20260927160000_quicklog_manual_plant_tent_lineage.sql`
 3. `20260928183000_quicklog_manual_replay_metadata_lock.sql`
+4. `20261001180000_quicklog_manual_occurred_at_utc_hash.sql` (#1841)
 
 `scripts/lib/quicklogManualDeliveryOrder.mjs` rejects any other plan and any step
 whose completed prefix differs from that exact order. The PG15 delivery adapter
@@ -16,7 +17,7 @@ also checks the immutable SHA-256 of each file before starting its database
 process. Failed steps never advance the completed prefix. Migration files remain
 unchanged.
 
-After the actual PostgreSQL proofs pass, CI compiles all three guarded scripts from
+After the actual PostgreSQL proofs pass, CI compiles all four guarded scripts from
 the exact candidate's committed migration bytes and retains a `manual-delivery-bundle`
 artifact. Its deterministic manifest binds the candidate, exact order, original file
 hashes and generated script hashes. Changed, reversed or incomplete inputs are
@@ -29,17 +30,17 @@ The existing manual replay workflow proves this against its attested, loopback-o
 PostgreSQL 15 service. It first fingerprints scaffold data and catalog objects,
 rejects a reverse-order delivery before starting a database process, then deliberately
 attempts `183000` without its parent as a negative control. That SQL must fail and
-the database fingerprint must remain identical. It then delivers all three files
+the database fingerprint must remain identical. It then delivers all four files
 in order and checks the resulting wrapper, grants, mixed-grow refusal, zero writes
 for refusal, and same-key save/reuse after repairing the assignment.
 
 Every SQL negative control requires psql's script-error exit status and the exact
 expected PostgreSQL refusal message. A lost connection, missing executable or
 unrelated SQL error fails the proof instead of counting as an unchanged-database
-refusal. The three negative controls are covered by injected connection and
+refusal. The four negative controls are covered by injected connection and
 unrelated-error regressions. Generated-gate assertions also pin the required
 `postgres` runner role and the private delegate's service-role exclusion at all
-three steps.
+four steps.
 
 Each step also requires the exact ACL rows, including grantor and grant options:
 the wrapper permits only `postgres`, `authenticated` and `service_role` EXECUTE
@@ -47,7 +48,7 @@ grants from `postgres`, without grant options; the private delegate permits only
 the corresponding `postgres` grant. An extra grantee, PUBLIC access, missing grant
 or altered grant option fails closed. The PG15 proof injects an extra wrapper
 grantee, an extra private-delegate grantee and a wrapper grant option before each
-of the three steps. All nine actual SQL attempts must refuse delivery without
+of the four steps. All twelve actual SQL attempts must refuse delivery without
 changing the covered catalog or data, and the original fixture ACL must be
 restored before ordinary ordered delivery proceeds. Equal snapshots establish
 unchanged covered persistent state; the negative controls do execute SQL.
@@ -60,7 +61,7 @@ errors (`1`) and a lost connection (`2`), per the
 
 At inspected head `114da090a5e2d4ec271563570dfbc84f1546bcf7`, #1742 delivers only
 `20260927094000_linked_quicklog_diary_client_write_fence.sql`. It is not a delivery
-lane for the three files above. Its existing protections must be retained:
+lane for the four files above. Its existing protections must be retained:
 
 - `verdant-production-migration-writer` concurrency, with cancellation disabled;
 - the protected `verdant-production-solo-founder` environment;
@@ -94,6 +95,15 @@ caller-supplied completed prefix can replace these checks. In particular,
 `183000` requires the `160000` delegate; its original migration preflight checks
 only the `002000` wrapper. The PG15 proof now also tries `183000` after `002000`
 with a fabricated completed prefix and verifies unchanged catalog and data.
+
+Step 4 (`20261001180000`, #1841) changes only how the wrapper hashes `p_occurred_at`.
+Its gate requires the wrapper source `183000` writes (`1875cf01…`) and the
+unchanged `160000` delegate (`ccd841f1…`); its own migration preflight pins the
+same wrapper source. The PG15 proof also tries step 4 right after `160000`, with
+a fabricated completed prefix that claims `183000`, and verifies the refusal
+leaves catalog and data unchanged. After delivering step 4 it checks the
+resulting wrapper source (`f587dc46…`) and grants. A three-file plan that stops
+at `183000` is no longer a complete delivery.
 
 This adapter is production-compatible SQL construction, not a production dispatch
 entry point. Integration into #1742's protected runner remains BLOCKED pending

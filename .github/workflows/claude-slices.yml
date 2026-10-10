@@ -992,6 +992,54 @@ jobs:
             }));
           }
 
+          // The same records as changedEntries, built from a compare payload instead
+          // of a local git tree. readBlob(path, side) returns blob text, or null
+          // when that side has no blob. A required blob that comes back null throws.
+          // GitHub's compare payload stops at 300 files, so that many is incomplete.
+          function entriesFromCompare(files, readBlob) {
+            if (!Array.isArray(files)) throw new Error('Compare file list is missing');
+            if (files.length >= 300) {
+              throw new Error(`Compare file list has ${files.length} files; GitHub stops at 300, so the diff is incomplete`);
+            }
+            const textOf = (path, side) => {
+              const text = readBlob(path, side);
+              if (typeof text !== 'string') throw new Error(`Missing ${side} blob for ${JSON.stringify(path)}`);
+              return text;
+            };
+            const record = (path, base, head) => ({
+              path,
+              binary: (base !== null && base.includes('\0')) || (head !== null && head.includes('\0')),
+              base,
+              head,
+            });
+            const entries = [];
+            for (const file of files) {
+              if (!file || typeof file.filename !== 'string' || file.filename.length === 0) {
+                throw new Error('Compare entry is missing a path');
+              }
+              const status = file.status;
+              const name = file.filename;
+              if (status === 'renamed' || status === 'copied') {
+                if (typeof file.previous_filename !== 'string' || file.previous_filename.length === 0) {
+                  throw new Error(`Compare entry ${JSON.stringify(name)} is missing previous_filename`);
+                }
+              }
+              if (status === 'renamed') {
+                entries.push(record(file.previous_filename, textOf(file.previous_filename, 'base'), null));
+                entries.push(record(name, null, textOf(name, 'head')));
+              } else if (status === 'copied' || status === 'added') {
+                entries.push(record(name, null, textOf(name, 'head')));
+              } else if (status === 'removed') {
+                entries.push(record(name, textOf(name, 'base'), null));
+              } else if (status === 'modified' || status === 'changed') {
+                entries.push(record(name, textOf(name, 'base'), textOf(name, 'head')));
+              } else {
+                throw new Error(`Unexpected compare status ${JSON.stringify(status)} for ${JSON.stringify(name)}`);
+              }
+            }
+            return entries;
+          }
+
           // Why an entry is locked: [] when allowed. A path lock is final and can't
           // be excepted; content locks check both the base and the head text.
           function entryLocks(entry, exceptions = []) {
@@ -1573,7 +1621,105 @@ jobs:
             assert.throws(() => loadExceptions(bad), /approved_by/);
             cases += 1;
             assert.equal(literalGlob('src/routes/[id].tsx'), 'src/routes/\\[id\\].tsx');
+            cases += compareBlobSelfTest();
             return cases + contentGitFixtures();
+          }
+
+          // Compare-API records must match a --no-renames diff: a rename is a delete
+          // plus an add, a copy is only the new path, and 300 files is incomplete.
+          function compareBlobSelfTest() {
+            const blobs = {
+              'base:src/lib/queueReader.ts': 'export const q = (db) => db.from("action_queue").select("*");\n',
+              'head:src/lib/neutralRules.ts': 'export const q = (db) => db.from("action_queue").select("*");\n',
+              'base:src/lib/plainRules.ts': 'export const one = 1;\n',
+              'head:src/lib/plainRules.ts': 'export const out = (s) => s.auth.signOut();\n',
+              'base:src/keep.ts': 'export const keep = 1;\n',
+              'head:src/keep.ts': 'export const keep = 2;\n',
+              'head:src/new.ts': 'export const n = 1;\n',
+              'base:src/gone.ts': 'export const g = 1;\n',
+              'base:src/bin.ts': 'a\0b',
+              'head:src/bin.ts': 'a\0c',
+            };
+            const readBlob = (path, side) => {
+              const key = `${side}:${path}`;
+              return Object.prototype.hasOwnProperty.call(blobs, key) ? blobs[key] : null;
+            };
+            let cases = 0;
+            const renamed = entriesFromCompare([
+              { filename: 'src/lib/neutralRules.ts', previous_filename: 'src/lib/queueReader.ts', status: 'renamed' },
+            ], readBlob);
+            cases += 1;
+            assert.deepEqual(renamed.map(entry => [entry.path, entry.base === null, entry.head === null]), [
+              ['src/lib/queueReader.ts', false, true],
+              ['src/lib/neutralRules.ts', true, false],
+            ]);
+            cases += 1;
+            assert.deepEqual(entryLocks(renamed[0]), ['aq-io, base']);
+            cases += 1;
+            assert.deepEqual(entryLocks(renamed[1]), ['aq-io, head']);
+            const modified = entriesFromCompare([{ filename: 'src/lib/plainRules.ts', status: 'modified' }], readBlob);
+            cases += 1;
+            assert.equal(modified.length, 1);
+            cases += 1;
+            assert.deepEqual(entryLocks(modified[0]), ['auth-mutation, head']);
+            cases += 1;
+            assert.deepEqual(
+              entriesFromCompare([{ filename: 'src/new.ts', status: 'added' }], readBlob),
+              [{ path: 'src/new.ts', binary: false, base: null, head: blobs['head:src/new.ts'] }],
+            );
+            const removed = entriesFromCompare([{ filename: 'src/gone.ts', status: 'removed' }], readBlob);
+            cases += 1;
+            assert.deepEqual([removed[0].base, removed[0].head], [blobs['base:src/gone.ts'], null]);
+            const changed = entriesFromCompare([{ filename: 'src/keep.ts', status: 'changed' }], readBlob);
+            cases += 1;
+            assert.deepEqual([changed[0].base, changed[0].head], [blobs['base:src/keep.ts'], blobs['head:src/keep.ts']]);
+            const copied = entriesFromCompare([
+              { filename: 'src/new.ts', previous_filename: 'src/keep.ts', status: 'copied' },
+            ], readBlob);
+            cases += 1;
+            assert.deepEqual(copied.map(entry => entry.path), ['src/new.ts']);
+            assert.equal(copied[0].base, null);
+            const binary = entriesFromCompare([{ filename: 'src/bin.ts', status: 'modified' }], readBlob);
+            cases += 1;
+            assert.equal(binary[0].binary, true);
+            cases += 1;
+            assert.deepEqual(entryLocks(binary[0]), ['binary']);
+            const present = () => 'export const x = 1;\n';
+            cases += 1;
+            assert.equal(entriesFromCompare(
+              Array.from({ length: 299 }, (_, i) => ({ filename: `src/f${i}.ts`, status: 'added' })),
+              present,
+            ).length, 299);
+            cases += 1;
+            assert.throws(() => entriesFromCompare(
+              Array.from({ length: 300 }, (_, i) => ({ filename: `src/f${i}.ts`, status: 'added' })),
+              present,
+            ), /300/);
+            cases += 1;
+            assert.throws(() => entriesFromCompare([{ filename: 'src/new.ts', status: 'weird' }], readBlob), /Unexpected compare status/);
+            cases += 1;
+            assert.throws(() => entriesFromCompare([{ filename: 'src/renamed.ts', status: 'renamed' }], readBlob), /previous_filename/);
+            cases += 1;
+            assert.throws(() => entriesFromCompare(null, readBlob), /file list/);
+            cases += 1;
+            assert.throws(() => entriesFromCompare([{ filename: 'src/missing.ts', status: 'added' }], readBlob), /Missing head blob/);
+            const { mkdtempSync, writeFileSync: write, rmSync } = require('node:fs');
+            const { tmpdir } = require('node:os');
+            const { join } = require('node:path');
+            const { spawnSync } = require('node:child_process');
+            const dir = mkdtempSync(join(tmpdir(), 'claude-entries-'));
+            const file = join(dir, 'entries.json');
+            write(file, JSON.stringify([{ path: 'docs/library.md', binary: false, base: null, head: 'ok' }]));
+            const pass = spawnSync(process.execPath, [__filename, '--entries', file], { encoding: 'utf8' });
+            cases += 1;
+            assert.equal(pass.status, 0, pass.stderr);
+            write(file, JSON.stringify([{ path: 'bun.lock', binary: false, base: null, head: '' }]));
+            const blocked = spawnSync(process.execPath, [__filename, '--entries', file], { encoding: 'utf8' });
+            cases += 1;
+            assert.notEqual(blocked.status, 0);
+            assert.match(blocked.stderr, /bun\.lock/);
+            rmSync(dir, { recursive: true, force: true });
+            return cases;
           }
 
           // Real git: base and head commits run through the --diff entry point.
@@ -1678,10 +1824,11 @@ jobs:
             if (mode === '--self-test') selfTest();
             else if (mode === '--settings') writeFileSync(first, JSON.stringify(settings()));
             else if (mode === '--diff') assertAllowed(changedEntries(first, second, '.'), loadExceptions());
+            else if (mode === '--entries') assertAllowed(JSON.parse(readFileSync(first, 'utf8')), loadExceptions());
             else if (mode === '--unlock-receipt') process.stdout.write(unlockReceipt(readFileSync(first, 'utf8')));
             else throw new Error('Unknown Claude policy command');
           }
-          module.exports = { lockedPath, contentLocked, changedPaths, changedEntries, entryLocks, assertAllowed };
+          module.exports = { lockedPath, contentLocked, contentScoped, changedPaths, changedEntries, entriesFromCompare, entryLocks, assertAllowed };
           NODE
           # The TypeScript parser for the AST content rules (Option 1): only this exact
           # registry tarball, checked against a pinned sha512 (the integrity bun.lock and
@@ -1997,12 +2144,55 @@ jobs:
       - name: Check the exact PR diff, including deleted and renamed paths
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COMPARE_HEAD: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git fetch --no-tags origin "$HEAD_SHA"
-          test "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA"
-          node "$RUNNER_TEMP/claude-slice-policy.cjs" --diff "$BASE_SHA" "$HEAD_SHA"
+          node <<'NODE'
+          const { spawnSync } = require('node:child_process');
+          const { writeFileSync } = require('node:fs');
+          const policy = require(process.env.RUNNER_TEMP + '/claude-slice-policy.cjs');
+          const base = process.env.BASE_SHA;
+          const head = process.env.COMPARE_HEAD;
+          const repo = process.env.GITHUB_REPOSITORY;
+          if (!/^[a-f0-9]{40}$/.test(base) || !/^[a-f0-9]{40}$/.test(head)) {
+            throw new Error('Expected exact commit SHAs');
+          }
+          const compareRaw = gh([
+            'api', '--method', 'GET', '-H', 'Accept: application/vnd.github+json',
+            `repos/${repo}/compare/${base}...${head}`,
+          ], false);
+          const compare = JSON.parse(compareRaw.toString('utf8'));
+          if (compare.truncated === true) throw new Error('Compare response is truncated');
+          const mergeBase = compare.merge_base_commit && compare.merge_base_commit.sha;
+          if (!/^[a-f0-9]{40}$/i.test(mergeBase || '')) throw new Error('Compare response is missing merge_base_commit.sha');
+          const entries = policy.entriesFromCompare(compare.files, (path, side) => readBlob(path, side, mergeBase, head, repo, policy));
+          const out = process.env.RUNNER_TEMP + '/claude-slice-entries.json';
+          writeFileSync(out, JSON.stringify(entries));
+
+          function gh(args, allowMissing) {
+            const result = spawnSync('gh', args, { encoding: 'buffer', maxBuffer: 8 * 1024 * 1024 });
+            if (result.error) throw result.error;
+            const stdout = result.stdout || Buffer.alloc(0);
+            const stderr = (result.stderr || Buffer.alloc(0)).toString('utf8');
+            if (result.status === 0) return stdout;
+            const preview = `${stderr}\n${stdout.toString('utf8').slice(0, 400)}`;
+            if (allowMissing && (/\bHTTP 404\b/.test(preview) || /"message":\s*"Not Found"/.test(preview))) return null;
+            throw new Error(`gh ${args[args.length - 1]} failed: ${preview.slice(0, 500)}`);
+          }
+          function readBlob(path, side, mergeBaseSha, headSha, repository, rules) {
+            if (rules.lockedPath(path) || !rules.contentScoped(path)) return '';
+            const rev = side === 'base' ? mergeBaseSha : headSha;
+            const encoded = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+            const body = gh([
+              'api', '--method', 'GET', '-H', 'Accept: application/vnd.github.raw',
+              `repos/${repository}/contents/${encoded}?ref=${rev}`,
+            ], true);
+            if (body === null) return null;
+            if (body.length > 1024 * 1024) throw new Error(`Blob ${JSON.stringify(path)} exceeds 1MB`);
+            return body.toString('utf8');
+          }
+          NODE
+          node "$RUNNER_TEMP/claude-slice-policy.cjs" --entries "$RUNNER_TEMP/claude-slice-entries.json"
 
   claude-configuration:
     name: Claude workflow syntax and policy tests
@@ -2020,17 +2210,35 @@ jobs:
           persist-credentials: false
       - name: Extract only the workflow from the verified PR head
         env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          WORKFLOW_COMMIT: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git fetch --no-tags origin "refs/pull/$PR_NUMBER/head"
-          test "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA"
-          if git cat-file -e "$HEAD_SHA:.github/workflows/claude-slices.yml" 2>/dev/null; then
-            git show "$HEAD_SHA:.github/workflows/claude-slices.yml" > "$RUNNER_TEMP/claude-slices.yml"
-          else
-            # The PR head predates this workflow; validate the base checkout's copy instead.
-            cp .github/workflows/claude-slices.yml "$RUNNER_TEMP/claude-slices.yml"
-          fi
+          node <<'NODE'
+          const { spawnSync } = require('node:child_process');
+          const { writeFileSync, copyFileSync, existsSync } = require('node:fs');
+          const sha = process.env.WORKFLOW_COMMIT;
+          if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('WORKFLOW_COMMIT is not a 40-hex commit');
+          const dest = process.env.RUNNER_TEMP + '/claude-slices.yml';
+          const repo = process.env.GITHUB_REPOSITORY;
+          const result = spawnSync('gh', [
+            'api', '--method', 'GET', '-H', 'Accept: application/vnd.github.raw',
+            `repos/${repo}/contents/.github/workflows/claude-slices.yml?ref=${sha}`,
+          ], { encoding: 'buffer', maxBuffer: 2 * 1024 * 1024 });
+          if (result.error) throw result.error;
+          if (result.status === 0) {
+            const body = result.stdout || Buffer.alloc(0);
+            if (body.length === 0 || body.length > 1024 * 1024) throw new Error('Workflow blob is empty or over 1MB');
+            writeFileSync(dest, body);
+          } else {
+            const preview = `${(result.stderr || Buffer.alloc(0)).toString('utf8')}\n${(result.stdout || Buffer.alloc(0)).toString('utf8').slice(0, 400)}`;
+            if (!/\bHTTP 404\b/.test(preview) && !/"message":\s*"Not Found"/.test(preview)) {
+              throw new Error(`Could not read the workflow blob: ${preview.slice(0, 500)}`);
+            }
+            const baseCopy = '.github/workflows/claude-slices.yml';
+            if (!existsSync(baseCopy)) throw new Error('PR head has no claude-slices.yml and the base checkout has none either');
+            copyFileSync(baseCopy, dest);
+          }
+          NODE
       - name: Check workflow syntax with checksum-verified actionlint
         run: |
           archive="$RUNNER_TEMP/actionlint.tar.gz"
@@ -2131,5 +2339,8 @@ jobs:
           const nudgeExit = publish.indexOf('pushed the new commits only.');
           assert.ok(render > 0 && render < comment && comment < nudgeExit, 'a nudge must post the unlock reasons before it exits');
           assert.ok(publish.includes('body+=$\'\\n\\n\'"$receipt"'), 'a new draft must carry the unlock reasons in its body');
+          assert.equal((yml.match(/\bgit\s+fetch\b/g) || []).length, 0, 'fetching a remote head must not appear');
+          assert.equal((yml.match(/\bgit\s+pull\b/g) || []).length, 0, 'pulling a remote head must not appear');
+          assert.equal((yml.match(/refs\/pull\//g) || []).length, 0, 'a pull ref must not appear');
           console.log('Claude credential guards: PASS');
           NODE

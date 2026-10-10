@@ -4,7 +4,7 @@
 
 - **Repo:** `Verdant-OS/verdant-grow-diary`, deploy branch `verdant-grow-diary`
 - **Owner of this file:** Codex. Any agent may propose an edit as a draft PR.
-- **Last revised:** 2026-09-28 by Chemdawg (Engineering Lead), at Matthew Cheek's request. First repo version edited by GDP for the channel roster, bug-finder limits, and merge ownership.
+- **Last revised:** 2026-10-10, at Matthew Cheek's request, to add the Graft low-risk review lane. Before that, 2026-09-28 by Chemdawg (Engineering Lead), at Matthew Cheek's request. First repo version edited by GDP for the channel roster, bug-finder limits, and merge ownership.
 
 ---
 
@@ -53,7 +53,7 @@ seats below still apply, and a claim never grants self-acceptance or merge autho
 - **Routing decisions.** Which slice runs next, which reviewer gets which PR, overrides, and holds.
 - **Slice naming.** GDP routes priorities and named slices. Codex may start authorized repository repairs and resume a claimed handoff without waiting for another GDP paste. One task uses one branch and one current holder.
 - **Opening PRs.** GDP routes work; Codex builds authorized repairs as drafts. Chemdawg owns merge under the current exact-head gate below.
-- **Merge rule (Matthew's current standing order).** Chemdawg merges only after 35/35 required checks succeed and an independent PASS from Blue Dream, Durban Poison or Critical Mass covers the exact head SHA. Missing, skipped, pending or failed required checks are not green. P1 and publish gates retain their assigned review and hold fences.
+- **Merge rule (Matthew's current standing order).** Chemdawg merges only after 35/35 required checks succeed and an independent PASS from Blue Dream, Durban Poison or Critical Mass (or Graft, for the low-risk lane in section 2 only) covers the exact head SHA. Missing, skipped, pending or failed required checks are not green. P1 and publish gates retain their assigned review and hold fences.
 - **Spend proposals.** GDP writes the proposal. Approval stays with Matthew.
 
 ### Chemdawg (Engineering Lead): pre-checks, CI status, and reviewer assignment
@@ -72,6 +72,13 @@ seats below still apply, and a claim never grants self-acceptance or merge autho
 - **One verdict per exact SHA:** `PASS`, `PASS-with-P2`, `FAIL`, `BLOCKED`, or `NOT_MEASURED`, with a list of P1 and P2 issues.
 - **Blue Dream gets** P1 fixes, anything that gates a publish, and `.tsx` changes outside `src/test/`. Test-only `.tsx` changes follow the Critical Mass default unless P1 or publish-gating.
 - **Critical Mass gets** lib, logic, test, and docs-only changes, plus QA, accessibility, search, and content-quality PRs.
+- **Graft low-risk lane (Matthew, 2026-10-09 11:29 PM CT).** Graft, the PR-review bot, may give the independent exact-head verdict instead of Critical Mass, Blue Dream or Durban Poison, but only when **every** changed file is on this allowlist and `node scripts/scorer-lock.mjs --report --strict` reports no tracked scorer modified, deleted, renamed or retyped:
+  - ordinary docs: `*.md` under `docs/`, except anything under `docs/agents/` other than `docs/agents/HANDOFF_LOG.md`;
+  - `docs/agents/HANDOFF_LOG.md` (handoff-log-only PRs);
+  - tests: new files under `src/test/` or `e2e/`, or new files named `*.test.*` / `*.spec.*`. Every tracked test is a locked scorer, so editing, deleting or renaming an existing test needs an outside reviewer.
+
+  Draft and backlog cleanup with no file change (closing a stale draft, refreshing a PR body) is also in the lane. Governance files are **not** low-risk, because editing them changes the rules: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.grok/`, `.agents/skills/`, `.claude/skills/`, `.github/` and everything under `docs/agents/` except `HANDOFF_LOG.md`. An outside reviewer (Blue Dream, Critical Mass or Durban Poison, routed as above) stays required for anything that touches migrations or SQL, `supabase/`, auth or RLS, payments or billing (Paddle), Edge Functions, production config, CI workflows (`.github/`), lockfiles or dependencies, the Action Queue, device control, or a locked scorer. A PR that mixes allowlisted files with any other file needs an outside reviewer. Graft's PASS covers only the exact head SHA it names and is void once the head moves. Graft never reviews a slice it touched. This lane changes who may review; it does not change who may merge.
+
 - **Codex gets technical review** only for another author's CI or build infrastructure. This does not replace the independent acceptance seat above.
 - **A request from Chemdawg counts the same as one from GDP** when it names the PR, the full SHA, and the stay-draft limits. A verdict never carries over to a new commit.
 - **Neither reviews work it owns.**
@@ -95,7 +102,7 @@ seats below still apply, and a claim never grants self-acceptance or merge autho
 | Pre-check rules and verdicts                             | Chemdawg                                                                                                                                           |
 | Code that consumes pre-check verdicts                    | Codex                                                                                                                                              |
 | Reviewer assignment and claim ledger                     | Chemdawg's pre-check, by file path (the 4.3 bot takes over when live); GDP can override                                                            |
-| Review verdicts                                          | Independent acceptance: Blue Dream / Critical Mass by path, or independently assigned Durban Poison; Codex provides technical CI/build review only |
+| Review verdicts                                          | Independent: Blue Dream / Critical Mass by path, assigned Durban Poison, or Graft (section 2 low-risk lane); Codex: technical CI/build review only |
 | Opening PRs                                              | Codex opens authorized repairs as drafts                                                                                                           |
 | Merging PRs                                              | Chemdawg only, after 35/35 required SUCCESS and independent exact-head PASS; named holds remain                                                    |
 | Edits to this file                                       | Codex                                                                                                                                              |
@@ -167,6 +174,8 @@ seats below still apply, and a claim never grants self-acceptance or merge autho
 
   Unknown priority counts as high and goes to Blue Dream.
 
+  **Graft low-risk lane.** A PR whose every changed file is on the section 2 low-risk allowlist may go to Graft instead of rules 2 to 5. Anything else, including a mixed PR, follows rules 2 to 5.
+
   **HOLD-CHEEK holds the merge, not the review.** A HOLD-CHEEK PR still gets its independent review, the same as any other PR. That includes migration PRs, which are routed by path like any other PR. Only the merge waits for Matthew Cheek.
 
 - **Claim ledger.** One row per PR and SHA: reviewer, time, and state (claimed, verdict, released). A new push releases the claim and re-routes the PR.
@@ -213,7 +222,7 @@ A FAIL at step 4 or step 7 goes back to step 3 automatically.
 
 ## 7. Open items (owner in brackets)
 
-- **O1: superseded by Matthew's current standing order.** The earlier proposed self-integration phases grant no current authority. Codex does not merge; Chemdawg owns merge only after 35/35 required checks and an independent exact-head PASS from Blue Dream, Durban Poison or Critical Mass.
+- **O1: superseded by Matthew's current standing order.** The earlier proposed self-integration phases grant no current authority. Codex does not merge; Chemdawg owns merge only after 35/35 required checks and an independent exact-head PASS from Blue Dream, Durban Poison or Critical Mass (or Graft, for the section 2 low-risk lane only).
 - **O2 [Codex + Chemdawg]: review truth.** Codex cannot give its own code an independent PASS. Publish-gate acceptance and all named owner locks remain. Historical review receipts retain their original reviewer and SHA.
 - **O3 [Matthew + Codex]: scoped identity.** The current connector acts as Matthew's admin account. Matthew creates a separate scoped identity and protections; Codex then measures allowed and refused operations. No permissions have been granted by the setup document, and code-owner review does not itself reject file pushes.
 - **O4: settled.** Critical Mass and Toad Venom joined the routing channel on 2026-09-28. MotorBreath is on call outside it.

@@ -1,6 +1,6 @@
 # Role — Codex: Implementation and Integration Lead
 
-**Sentinel-Version: 2026-09-28.3**
+**Sentinel-Version: 2026-10-10.2**
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
 publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
@@ -8,6 +8,8 @@ may supply an independently assigned acceptance. Codex cannot give its own work 
 independent PASS. Claude may add peer observations but is not the acceptance reviewer.
 Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
 Durban Poison or Critical Mass gives an independent **PASS at the exact head SHA**.
+**Graft** may give that PASS only for a low-risk PR on the OWNERSHIP.md allowlist
+(ordinary docs, new tests, HANDOFF_LOG); the PASS is void once the head moves.
 Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
 Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
 

@@ -1,6 +1,6 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-09-28.3**
+**Sentinel-Version: 2026-10-10.2**
 
 Operating order is sequential for a given slice. Parallel implementation of the **same**
 slice by multiple agents is the failure this protocol exists to prevent.
@@ -43,6 +43,8 @@ may supply an independently assigned acceptance. Codex cannot give its own work 
 independent PASS. Claude may add peer observations but is not the acceptance reviewer.
 Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
 Durban Poison or Critical Mass gives an independent **PASS at the exact head SHA**.
+**Graft** may give that PASS only for a low-risk PR on the OWNERSHIP.md allowlist
+(ordinary docs, new tests, HANDOFF_LOG); the PASS is void once the head moves.
 Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
 Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
 
@@ -82,7 +84,7 @@ sentinel_version:
 date:
 
 task_id:
-independent_reviewer: the seat assigned under OWNERSHIP.md §4.3 (Blue Dream or Critical Mass); Durban Poison if independently assigned
+independent_reviewer: the seat assigned under OWNERSHIP.md §4.3 (Blue Dream or Critical Mass); Durban Poison if independently assigned; Graft for the OWNERSHIP.md low-risk lane only
 claimed_by:
 last_updated:
 
@@ -117,7 +119,8 @@ does not erase earlier contributions. Record the reviewer actually assigned unde
 `docs/agents/OWNERSHIP.md` §4.3 (Chemdawg's pre-check until the bot is live). Its
 defaults: Blue Dream for .tsx outside src/test/, any P1 or a publish gate; Critical
 Mass otherwise, unless load balancing moves that work to Blue Dream. Durban Poison may
-provide acceptance when independently assigned.
+provide acceptance when independently assigned. Graft may provide it only for a PR whose
+every file is on the OWNERSHIP.md low-risk allowlist, at that exact head.
 Security/Gemini/Claude observations do not replace that acceptance. Name the
 exact head SHA; routing is not a completed PASS. State NOT_MEASURED if unassigned.
 

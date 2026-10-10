@@ -41,7 +41,8 @@ and CI cannot establish applied schema, Edge deployment or live save/retrieve.
 Independent acceptance routing: **Blue Dream** reviews `.tsx` files outside
 `src/test/`, P1s and publish gates; **Critical Mass** is the default for other
 acceptance. Independently assigned **Durban Poison** is also a valid acceptance
-seat. Another author's CI/build infrastructure additionally receives **Codex**
+seat. **Graft** is valid only for the OWNERSHIP.md low-risk lane (ordinary docs, new
+tests, HANDOFF_LOG). Another author's CI/build infrastructure additionally receives **Codex**
 technical review; that does not replace independent acceptance, and Codex cannot
 review its own work. Claude may add peer observations but is not the acceptance
 reviewer. Codex opens repairs as drafts and uses normal pushes only. **Chemdawg**

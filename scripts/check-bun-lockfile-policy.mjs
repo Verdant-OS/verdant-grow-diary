@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 /**
- * Enforce Verdant's transitional lockfile policy.
+ * Enforce Verdant's lockfile policy.
  *
- * Bun and bun.lock are canonical. package-lock.json remains a synchronized
- * compatibility lock only while the explicitly documented npm consumers in
- * config/dependency-lockfile-transition.json still exist.
+ * Bun and bun.lock are canonical, and bun.lock is the only lockfile. The npm
+ * compatibility lock (package-lock.json) was retired on 2026-10-03; it and every
+ * other package manager's lockfile are forbidden. The remaining npm command
+ * references in documentation are an exact allowlist in
+ * config/dependency-lockfile-transition.json.
  *
  * Safety posture:
- *  - Read-only. Never modifies package.json or either lockfile.
- *  - Fails closed on malformed policy files, stale locks, undeclared npm
- *    entrypoints, or an overdue transition review.
+ *  - Read-only. Never modifies package.json or bun.lock.
+ *  - Fails closed on malformed policy files, a stale bun.lock, a forbidden
+ *    lockfile, below-floor security resolutions, or undeclared npm entrypoints.
  *  - Exit 0 on pass, 1 on policy failure, 2 on tooling error.
  */
 import { existsSync, readFileSync } from "node:fs";
@@ -19,40 +21,21 @@ import { pathToFileURL } from "node:url";
 
 const CRITICAL_PACKAGE = "@lovable.dev/mcp-js";
 const TRANSITION_CONFIG = "config/dependency-lockfile-transition.json";
-const REQUIRED_LOCKFILES = Object.freeze(["bun.lock", "package-lock.json"]);
-export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
+const REQUIRED_LOCKFILES = Object.freeze(["bun.lock"]);
+// Every floor the retired package-lock.json check enforced is carried here, so
+// retiring that lock removes no security floor.
+export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   "@hono/node-server": "2.0.10",
   "@modelcontextprotocol/sdk": "1.31.0",
   hono: "4.13.7",
   vite: "6.4.3",
   postcss: "8.5.18",
-  "brace-expansion": "1.1.21",
   "fast-uri": "3.1.8",
   "form-data": "4.0.6",
   "js-yaml": "4.3.2",
   qs: "6.16.0",
   ajv: "6.15.0",
   picomatch: "2.3.2",
-  vitest: "4.1.11",
-  "@vitest/mocker": "4.1.11",
-  undici: "6.28.1",
-  "proxy-addr": "2.0.8",
-  seroval: "1.6.3",
-  "shell-quote": "1.11.0",
-  "source-map-js": "1.2.2",
-});
-// Vitest 4 uses the root Vite/Rolldown graph and no longer brings in Rollup.
-// Absence is safe; every copy must still be patched if it returns transitively.
-export const PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS = Object.freeze({
-  rollup: "4.59.0",
-});
-export const BUN_LOCK_OPTIONAL_SECURITY_FLOORS = PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS;
-export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
-  "@hono/node-server": "2.0.10",
-  "@modelcontextprotocol/sdk": "1.31.0",
-  hono: "4.13.7",
-  "js-yaml": "4.3.2",
-  qs: "6.16.0",
   vitest: "4.1.11",
   "@vitest/mocker": "4.1.11",
   esbuild: "0.28.1",
@@ -63,7 +46,12 @@ export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   "shell-quote": "1.11.0",
   "source-map-js": "1.2.2",
 });
-export const PACKAGE_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({
+// Vitest 4 uses the root Vite/Rolldown graph and no longer brings in Rollup.
+// Absence is safe; every copy must still be patched if it returns transitively.
+export const BUN_LOCK_OPTIONAL_SECURITY_FLOORS = Object.freeze({
+  rollup: "4.59.0",
+});
+export const BUN_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({
   "brace-expansion": Object.freeze({
     1: "1.1.21",
     2: "2.1.7",
@@ -72,8 +60,15 @@ export const PACKAGE_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({
     5: "5.0.12",
   }),
 });
-export const BUN_LOCK_MAJOR_SECURITY_FLOORS = PACKAGE_LOCK_MAJOR_SECURITY_FLOORS;
-export const FORBIDDEN_LOCKFILES = Object.freeze(["bun.lockb", "yarn.lock", "pnpm-lock.yaml"]);
+// Patched minimatch within the two majors that carried the advisory. Other
+// majors present in the graph (for example 5.x and 10.x) are outside it.
+export const BUN_LOCK_MINIMATCH_FLOORS = Object.freeze({ 3: "3.1.5", 9: "9.0.9" });
+export const FORBIDDEN_LOCKFILES = Object.freeze([
+  "bun.lockb",
+  "package-lock.json",
+  "yarn.lock",
+  "pnpm-lock.yaml",
+]);
 const NPM_COMMAND = String.raw`npm(?:\.cmd|\.exe)?`;
 const NPM_CONSUMER_PATTERN = new RegExp(
   String.raw`\b${NPM_COMMAND}\s+(?:ci\b|install\b(?!\s+(?:-g|--global)\b)|run\s+(?:build|dev)\b)`,
@@ -92,13 +87,27 @@ function normalizedRelative(root, absolutePath) {
   return relative(root, absolutePath).replaceAll("\\", "/");
 }
 
+function listTrackedPaths(root) {
+  const result = spawnSync("git", ["-C", root, "ls-files", "-z"], {
+    encoding: "utf8",
+    timeout: 30_000,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.error || result.status !== 0) {
+    throw new Error(
+      `git ls-files failed: ${result.error?.message ?? `exit ${result.status ?? "unknown"}`}`,
+    );
+  }
+  return result.stdout.split("\0").filter(Boolean);
+}
+
 function listPolicyFiles(root) {
-  // NPM_INSTALL_PATTERN cannot match a file that does not contain "npm".
-  // Ask Git for that lossless tracked-file candidate set first instead of
+  // Install commands/npm caches contain "npm"; retired-lock hashes contain
+  // "package-lock". Ask Git for that tracked-file candidate set first instead of
   // synchronously reading every tracked text file in the repository.
   const result = spawnSync(
     "git",
-    ["-C", root, "grep", "-l", "-z", "-i", "-F", "-e", "npm", "--", "."],
+    ["-C", root, "grep", "-l", "-z", "-i", "-F", "-e", "npm", "-e", "package-lock", "--", "."],
     {
       encoding: "utf8",
       timeout: 30_000,
@@ -115,10 +124,8 @@ function listPolicyFiles(root) {
   // literals. Keep the exclusion exact so other tracked scripts remain scanned.
   const excludedFiles = new Set([
     "bun.lock",
-    "package-lock.json",
     "config/dependency-lockfile-transition.json",
     "scripts/check-bun-lockfile-policy.mjs",
-    "scripts/check-npm-lock-semantic.mjs",
     "src/test/check-bun-lockfile-policy.test.ts",
   ]);
   const binaryExtensions = new Set([
@@ -169,49 +176,29 @@ function requireNonEmptyString(value, label) {
   return value.trim();
 }
 
-function requireIsoDate(value, label) {
-  requireNonEmptyString(value, label);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new Error(`${label} must use YYYY-MM-DD.`);
-  }
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
-    throw new Error(`${label} is not a valid calendar date.`);
-  }
-  return value;
-}
-
-function normalizeToday(value) {
-  if (value === undefined) return new Date().toISOString().slice(0, 10);
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) throw new Error("today must be a valid date.");
-    return value.toISOString().slice(0, 10);
-  }
-  return requireIsoDate(value, "today");
-}
-
 function parseTransitionConfig(document) {
-  if (!isObject(document) || document.schemaVersion !== 1) {
-    throw new Error("Lockfile transition config must use schemaVersion 1.");
-  }
-  if (
-    document.canonicalPackageManager !== "bun" ||
-    document.canonicalLockfile !== "bun.lock" ||
-    document.compatibilityLockfile !== "package-lock.json"
-  ) {
+  if (!isObject(document) || document.schemaVersion !== 2) {
     throw new Error(
-      "Lockfile transition config must keep Bun/bun.lock canonical and package-lock.json compatible.",
+      "Lockfile policy config must use schemaVersion 2 (npm compatibility lock retired).",
+    );
+  }
+  if (document.canonicalPackageManager !== "bun" || document.canonicalLockfile !== "bun.lock") {
+    throw new Error("Lockfile policy config must keep Bun and bun.lock canonical.");
+  }
+  if ("compatibilityLockfile" in document || "reviewBy" in document) {
+    throw new Error(
+      "Lockfile policy config must not declare a compatibility lockfile or review date; " +
+        "package-lock.json is retired.",
     );
   }
 
   const normalized = {
     owner: requireNonEmptyString(document.owner, "transition.owner"),
     reason: requireNonEmptyString(document.reason, "transition.reason"),
-    reviewBy: requireIsoDate(document.reviewBy, "transition.reviewBy"),
     consumerContracts: [],
   };
-  if (!Array.isArray(document.consumerContracts) || document.consumerContracts.length === 0) {
-    throw new Error("transition.consumerContracts must be a non-empty array.");
+  if (!Array.isArray(document.consumerContracts)) {
+    throw new Error("transition.consumerContracts must be an array.");
   }
 
   const paths = new Set();
@@ -266,22 +253,6 @@ function stableObject(value) {
   return Object.fromEntries(
     Object.entries(value).sort(([left], [right]) => left.localeCompare(right)),
   );
-}
-
-function packageLockVersions(packageLock, packageName) {
-  if (!isObject(packageLock.packages)) return [];
-  const suffix = `/node_modules/${packageName}`;
-  const versions = new Set();
-  for (const [key, entry] of Object.entries(packageLock.packages)) {
-    if (
-      (key === `node_modules/${packageName}` || key.endsWith(suffix)) &&
-      isObject(entry) &&
-      typeof entry.version === "string"
-    ) {
-      versions.add(entry.version);
-    }
-  }
-  return [...versions].sort();
 }
 
 function versionAtLeast(actual, minimum) {
@@ -369,7 +340,7 @@ export function evaluatePolicy({
   readFile = readFileSync,
   exists = existsSync,
   listFiles = listPolicyFiles,
-  today,
+  listTracked = listTrackedPaths,
 } = {}) {
   const root = cwd ?? process.cwd();
   const errors = [];
@@ -379,25 +350,22 @@ export function evaluatePolicy({
       errors.push(`Required lockfile is missing: ${lockfile}.`);
     }
   }
-  for (const forbidden of FORBIDDEN_LOCKFILES) {
-    if (exists(resolve(root, forbidden))) {
-      errors.push(
-        `Forbidden lockfile present: ${forbidden}. Bun is canonical and only the reviewed npm compatibility lock is allowed.`,
-      );
-    }
+  // Reject a tracked forbidden lockfile at any depth, the root included: a
+  // workspace or spike can carry its own lockfile. Only tracked paths count, so
+  // a gitignored local artifact (say, from a stray `npm install`) cannot fail
+  // the policy for something the repository does not contain.
+  for (const tracked of listTracked(root)) {
+    const path = tracked.replaceAll("\\", "/");
+    if (!FORBIDDEN_LOCKFILES.includes(path.slice(path.lastIndexOf("/") + 1))) continue;
+    errors.push(
+      `Forbidden lockfile present: ${path}. Bun is canonical; bun.lock is the only lockfile.`,
+    );
   }
 
   const packageJson = parseJson(readFile, resolve(root, "package.json"), "package.json");
   const transition = parseTransitionConfig(
     parseJson(readFile, resolve(root, TRANSITION_CONFIG), TRANSITION_CONFIG),
   );
-  const currentDate = normalizeToday(today);
-  if (currentDate > transition.reviewBy) {
-    errors.push(
-      `Lockfile transition review is overdue (owner=${transition.owner}, reviewBy=${transition.reviewBy}).`,
-    );
-  }
-
   const declaredConsumers = new Set(transition.consumerContracts.map(({ path }) => path));
   for (const consumer of transition.consumerContracts) {
     const consumerPath = resolve(root, consumer.path);
@@ -447,13 +415,31 @@ export function evaluatePolicy({
   }
   for (const path of policyFiles) {
     const relativePath = normalizedRelative(root, path);
-    if (relativePath === TRANSITION_CONFIG || relativePath === "package-lock.json") continue;
+    if (relativePath === TRANSITION_CONFIG) continue;
     let contents;
     try {
       contents = readFile(path, "utf8");
     } catch (error) {
       errors.push(`Failed to scan ${relativePath}: ${String(error?.message ?? error)}`);
       continue;
+    }
+    if (/^\.github\/workflows\/.+\.ya?ml$/i.test(relativePath)) {
+      const activeLines = contents
+        .split(/\r?\n/)
+        .filter((line) => !/^\s*#/.test(line))
+        .join("\n");
+      if (
+        /(?:^|[\s{,])(?:cache|"cache"|'cache')\s*:\s*(?:npm|"npm"|'npm')(?=[\s,}#]|$)/im.test(
+          activeLines,
+        )
+      ) {
+        errors.push(`Forbidden npm cache found at ${relativePath}; use the Bun install cache.`);
+      }
+      if (/\bhashFiles\s*\([^)]*package-lock/i.test(activeLines)) {
+        errors.push(
+          `Workflow cache hashes the retired npm lock at ${relativePath}; hash bun.lock instead.`,
+        );
+      }
     }
     if (NPM_INSTALL_PATTERN.test(contents) && !declaredConsumers.has(relativePath)) {
       errors.push(
@@ -548,6 +534,16 @@ export function evaluatePolicy({
         }
       }
 
+      for (const version of resolvedVersionInBunLock(bunLockText, "minimatch") ?? []) {
+        const minimum = BUN_LOCK_MINIMATCH_FLOORS[Number(version.split(".")[0])];
+        if (typeof minimum === "string" && !versionAtLeast(version, minimum)) {
+          errors.push(
+            `bun.lock minimatch security floor drifted at ${version} ` +
+              "(required 3.1.5+ within major 3 and 9.0.9+ within major 9).",
+          );
+        }
+      }
+
       const versions = resolvedVersionInBunLock(bunLockText, CRITICAL_PACKAGE);
       if (declared && (!versions || !versions.includes(declared))) {
         errors.push(
@@ -560,123 +556,11 @@ export function evaluatePolicy({
     }
   }
 
-  const packageLockPath = resolve(root, "package-lock.json");
-  if (exists(packageLockPath)) {
-    const packageLock = parseJson(readFile, packageLockPath, "package-lock.json");
-    if (packageLock.lockfileVersion !== 3 || !isObject(packageLock.packages?.[""])) {
-      errors.push("package-lock.json must be lockfileVersion 3 with a root packages entry.");
-    } else {
-      const rootEntry = packageLock.packages[""];
-      for (const group of [
-        "dependencies",
-        "devDependencies",
-        "optionalDependencies",
-        "peerDependencies",
-      ]) {
-        const manifestGroup = stableObject(packageJson[group]);
-        const lockGroup = stableObject(rootEntry[group]);
-        if (JSON.stringify(manifestGroup) !== JSON.stringify(lockGroup)) {
-          errors.push(`package-lock.json root ${group} is not synchronized with package.json.`);
-        }
-      }
-
-      for (const group of [
-        "dependencies",
-        "devDependencies",
-        "optionalDependencies",
-        "peerDependencies",
-      ]) {
-        for (const [packageName, spec] of Object.entries(packageJson[group] ?? {})) {
-          if (!isExactSemver(spec)) continue;
-          const resolvedVersion = packageLock.packages[`node_modules/${packageName}`]?.version;
-          if (resolvedVersion !== spec) {
-            errors.push(
-              `package-lock.json root resolution for exact ${group} ${packageName}@${spec} ` +
-                `is ${resolvedVersion ?? "missing"}.`,
-            );
-          }
-        }
-      }
-
-      if (declared) {
-        const versions = packageLockVersions(packageLock, CRITICAL_PACKAGE);
-        if (!versions.includes(declared)) {
-          errors.push(
-            `package-lock.json resolves ${CRITICAL_PACKAGE} to ${versions.join(", ") || "none"} but package.json pins ${declared}.`,
-          );
-        }
-      }
-
-      if (isObject(packageJson.overrides)) {
-        for (const [packageName, version] of Object.entries(packageJson.overrides)) {
-          if (typeof version !== "string" || !isExactSemver(version)) continue;
-          const versions = packageLockVersions(packageLock, packageName);
-          if (
-            versions.length === 0 ||
-            versions.some((resolvedVersion) => resolvedVersion !== version)
-          ) {
-            errors.push(
-              `package-lock.json override for ${packageName}@${version} is not synchronized ` +
-                `(found ${versions.join(", ") || "none"}).`,
-            );
-          }
-        }
-      }
-
-      for (const [packageName, minimum] of Object.entries({
-        ...PACKAGE_LOCK_SECURITY_FLOORS,
-        ...PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS,
-      })) {
-        const versions = packageLockVersions(packageLock, packageName);
-        if (
-          (versions.length === 0 && Object.hasOwn(PACKAGE_LOCK_SECURITY_FLOORS, packageName)) ||
-          versions.some((resolvedVersion) => !versionAtLeast(resolvedVersion, minimum))
-        ) {
-          errors.push(
-            `package-lock.json security floor for ${packageName} is ${minimum}; ` +
-              `found ${versions.join(", ") || "none"}.`,
-          );
-        }
-      }
-      for (const [packageName, floors] of Object.entries(PACKAGE_LOCK_MAJOR_SECURITY_FLOORS)) {
-        const versions = packageLockVersions(packageLock, packageName);
-        const rejected = versions.filter(
-          (resolvedVersion) => !versionMeetsMajorSecurityFloors(resolvedVersion, floors),
-        );
-        if (versions.length === 0 || rejected.length > 0) {
-          const requirements = Object.entries(floors)
-            .map(([major, minimum]) =>
-              typeof minimum === "string" ? `${major}.x >= ${minimum}` : `no safe ${major}.x`,
-            )
-            .join(", ");
-          errors.push(
-            `package-lock.json major-aware security floor for ${packageName} rejected ` +
-              `${rejected.join(", ") || "a missing resolution"}; required ${requirements}, ` +
-              `with majors above ${Math.max(...Object.keys(floors).map(Number))} allowed.`,
-          );
-        }
-      }
-      const minimatchVersions = packageLockVersions(packageLock, "minimatch");
-      for (const version of minimatchVersions) {
-        if (
-          (version.startsWith("3.") && !versionAtLeast(version, "3.1.5")) ||
-          (version.startsWith("9.") && !versionAtLeast(version, "9.0.9"))
-        ) {
-          errors.push(
-            `package-lock.json minimatch security floor drifted at ${version} ` +
-              "(required 3.1.5+ within major 3 and 9.0.9+ within major 9).",
-          );
-        }
-      }
-    }
-  }
-
   return {
     ok: errors.length === 0,
     errors,
     transition: {
       owner: transition.owner,
-      reviewBy: transition.reviewBy,
       consumers: transition.consumerContracts.map(({ path }) => path),
     },
   };
@@ -687,9 +571,9 @@ function main() {
     const result = evaluatePolicy();
     if (result.ok) {
       process.stdout.write(
-        `check-bun-lockfile-policy: OK (bun.lock canonical; package-lock.json synchronized ` +
-          `for ${result.transition.consumers.length} npm consumers; owner=${result.transition.owner}; ` +
-          `reviewBy=${result.transition.reviewBy})\n`,
+        `check-bun-lockfile-policy: OK (bun.lock canonical and the only lockfile; ` +
+          `${result.transition.consumers.length} reviewed npm command references; ` +
+          `owner=${result.transition.owner})\n`,
       );
       return;
     }

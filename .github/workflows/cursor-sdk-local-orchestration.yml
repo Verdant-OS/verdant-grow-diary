@@ -10,7 +10,6 @@ on:
       - "supabase/functions/**"
       - "package.json"
       - "bun.lock"
-      - "package-lock.json"
       - ".github/workflows/cursor-sdk-local-orchestration.yml"
       - "src/test/cursor-sdk-production-isolation-fence.test.ts"
       - "docs/specs/cursor-sdk-local-orchestration-spike.md"

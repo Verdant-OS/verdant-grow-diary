@@ -85,25 +85,29 @@ claimed_by: Claude, session_019KztxwgLfeEaNDYyGfkbfS, holds #1927 and its branch
 last_updated: 2026-10-07 11:32 CT, by Claude (session_01VsMEJU, log-block maintainer)
 ```
 
+### DASHBOARD-SINGLE-LOG-ENTRY-CODERABBIT-FIXES
+
 ```text
-TASK DASHBOARD-SINGLE-LOG-ENTRY  priority: P2  status: OPEN
-goal: remove the Dashboard header Quick Log link and the page's own QuickLogV2Fab (GDP D1.1-A,
-  D1.2-A, decided 2026-10-06); add the dashboard-ready readiness marker; renegotiate E1-E4 and
-  U1-U4 per docs/specs/dashboard-single-log-entry-readiness-marker.md
-branch: claude/dashboard-single-log-entry
+TASK DASHBOARD-SINGLE-LOG-ENTRY-CODERABBIT-FIXES  priority: other  status: OPEN
+goal: land CodeRabbit's findings on #1844's merged head 2df60a64 (#1844 was in the merge queue and
+  could not take the push): spec §7 records the D1.1-A/D1.2-A outcome; spec §6/§9 name the
+  merge-queue owner role; visibleLogControls moves to e2e/lib with no behavior change. Docs and
+  e2e helper only; no product code, supabase/, lockfile or governance file.
+branch: claude/dashboard-single-log-entry-coderabbit-fixes
 base: verdant-grow-diary
-checkout: git switch claude/dashboard-single-log-entry && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1844
-head_sha: read from the PR (a commit cannot contain its own SHA); implementation commit follows 42d195f01
-state: pushed draft, CI pending
-next_action: drive 35/35 required checks green; request Blue Dream (Dashboard.tsx) and Critical Mass (tests, e2e)
-files: src/pages/Dashboard.tsx; src/test/dashboard-single-log-entry.test.tsx (new); U1-U4 and the
-  D1.1-A pins (first-plant-memory-cta, onboarding-checklist-view-model); e2e E1-E4; the spec
-blockers: none
-artifacts: PR #1844 body (RED/GREEN counts, e2e runs)
-reviewer_seat: Blue Dream (Dashboard.tsx), Critical Mass (tests, e2e)
-claimed_by: Claude, 2026-10-06 20:47 UTC (PR #1844 comment)
-last_updated: 2026-10-06 16:05 CT, by Claude
+checkout: git switch claude/dashboard-single-log-entry-coderabbit-fixes && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1934 (draft)
+head_sha: read from the PR (a commit cannot contain its own SHA). Last measured head e2f73961 had
+  35/35 required checks SUCCESS at 2026-10-06 23:32 UTC; this block's commit moves the head.
+state: pushed draft; required CI green on the prior head; Codex review P2 (this block) addressed
+next_action: Critical Mass independent review at the exact current head; merge base after #1924 lands
+files: docs/specs/dashboard-single-log-entry-readiness-marker.md; e2e/lib/visibleLogControls.ts (new);
+  e2e/core-link-form-census.spec.ts; e2e/dashboard-mobile-overflow.spec.ts; docs/agents/HANDOFF_LOG.md
+blockers: independent PASS (Critical Mass). Non-required dependency-audit checks stay red until #1924 merges.
+artifacts: PR #1934 body and comments
+reviewer_seat: Critical Mass (docs and e2e)
+claimed_by: Claude, 2026-10-06 22:39 UTC (PR #1934 opened by this session)
+last_updated: 2026-10-07 02:10 UTC, by Claude
 ```
 
 ### CHEM-MOVE-TENT-READ-HONESTY-001
@@ -759,6 +763,35 @@ reviewer_seat: Critical Mass (no product .tsx; lib, Worker entry, tests)
 claimed_by: Grok, 2026-10-08 11:49 CT
 last_updated: 2026-10-08 23:02 CT, by Canopy (log maintenance on #1939; not a new claim on #1943)
 closure: Merged via #1943 as 3412513bf3f9a9094e1966275bfb32ffc6a6f9b7 at 2026-10-08 12:55 PM CT. #1937 merged afterward as eaf0b092257af57acb724dfe9f817d6c8881943b, so the header application this block was waiting on has landed. Historical last_updated before this closure note: 2026-10-08 12:21 CT, by Grok.
+```
+
+### DASHBOARD-SINGLE-LOG-ENTRY
+
+```text
+TASK DASHBOARD-SINGLE-LOG-ENTRY  priority: P2  status: CLOSED
+goal: remove the Dashboard header Quick Log link and the page's own QuickLogV2Fab (GDP D1.1-A,
+  D1.2-A, decided 2026-10-06); add the dashboard-ready readiness marker; renegotiate E1-E4 and
+  U1-U4 per docs/specs/dashboard-single-log-entry-readiness-marker.md
+branch: claude/dashboard-single-log-entry
+base: verdant-grow-diary
+checkout: None; closed (merged)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1844 (merged)
+head_sha: 2df60a6423bbf0898c3a7c8dbc42498dad59e6de, the merged head
+state: Merged via #1844 as 1209caaba6044fa0de790505a9ed28d79593e2bd at 2026-10-06 22:33 UTC
+  (merge queue; enqueued by the cheekhimself account). On that head: required checks 35/35
+  PASS; Codex code and security review no findings; CodeRabbit 3 minor + 1 nitpick. Blue Dream
+  and Critical Mass verdicts at that head: NOT_MEASURED (none posted before the merge).
+next_action: None; closed. CodeRabbit's findings at 2df60a64 land in the follow-up branch
+  claude/dashboard-single-log-entry-coderabbit-fixes (docs and e2e helper only).
+files: src/pages/Dashboard.tsx; src/test/dashboard-single-log-entry.test.tsx (new); U1-U4 and the
+  D1.1-A pins; grow-scoped-cta-growid; e2e E1-E4; the spec
+blockers: None for this closed task.
+artifacts: PR #1844 body (RED/GREEN counts, e2e runs)
+reviewer_seat: Blue Dream (Dashboard.tsx), Critical Mass (tests, e2e)
+claimed_by: Claude, 2026-10-06 20:47 UTC (PR #1844 comment)
+last_updated: 2026-10-06 22:40 UTC, by Claude
+closure: Merged as 1209caaba from head 2df60a64. Production behavior NOT_MEASURED: a merge is not a
+  release until live /version.json reports the SHA.
 ```
 
 ### CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001

@@ -31,7 +31,9 @@ the policy scanner found no undeclared npm references in the paths it scans.
 | `docs/preview-deployment-verification.md`        | The checklist lists npm's install, build and dev commands.              | PASS: npm is documented. Actual dashboard configuration and execution are NOT_MEASURED.              |
 
 `vercel.json` already pins Bun install and build commands and is correctly absent
-from this npm-reference inventory. Its source does not prove that every external
+from this npm-reference inventory. Historical note (2026-10-10, Matthew Cheek):
+that pin is a dated repository fact. Production runs on Cloudflare Workers at
+https://verdantgrowdiary.com. Its source does not prove that every external
 dashboard or preview deployment follows those commands. Reconcile the preview
 checklist before removing its marker; do not infer a production change from either file.
 

@@ -47,7 +47,7 @@ Current product priority:
 Grow -> Tent -> Plant -> Quick Log -> Timeline -> Sensor Snapshot -> AI Doctor -> Alert -> Approval-Required Action Queue
 ```
 
-Do not expand into community, competitions, public mode, broad enterprise features, heavy automation, or device control until the One-Tent Loop is clean, safe, and tested.
+Do not expand into community, competitions, public profiles or feeds, broad enterprise features, heavy automation, or device control until the One-Tent Loop is clean, safe, and tested. One narrow exception, approved by Matthew Cheek on 2026-10-10 as design direction only (building it needs its own yes): earned badges, and the photo linked to each badge, may be visible to signed-in Verdant community members, never on the open web. Location and EXIF data are stripped from any photo before others see it. No follows, comments, feeds, leaderboards, or other community features come with this exception. Once the community launches, users can make their badges private. Every badge needs a linked photo, except badges earned from text-only diary entries.
 
 ---
 
@@ -104,7 +104,7 @@ Use small, scoped changes. Avoid broad rewrites.
   or repair (OWNERSHIP.md allowlist). Migrations, payments or billing, `.github`
   workflows, security or auth, and dependency or lockfile changes still need Codex
   (not on a PR Codex authored or repaired), or Blue Dream, Critical Mass, or Durban
-  Poison. Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. A skipped, missing, pending
+  Poison. Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. Chemdawg is a Grok Bot running on a separate account. It can be unavailable (it is currently out of tokens). A merge waits for Chemdawg or for Matthew's direction. A skipped, missing, pending
   or failed required check is not green. There is no author-integration exception.
   Off-limits paths and named holds still require explicit reassignment before editing.
   Merges, production database changes, production and config changes, spend, deletes, outbound messages, installs, publish gates and the publish decision all need Matthew's per-item yes (see Standing approval). Repository work does not authorize them.
@@ -128,7 +128,7 @@ Local/CI fixtures validate code, not production. See
 
 ## Multi-Agent Coordination
 
-This repo is worked on by several AI agents at once: Codex, Claude Code (currently out of tokens), Lovable, Cursor cloud agents, GitHub Copilot, and Matthew Cheek's Grok Bot team (Canopy, Graft, Root Cause, Trellis, Verdante and others). Sometimes two of them work on the same feature without knowing.
+This repo is worked on by several AI agents at once: Codex, Claude Code (currently out of tokens), Cursor cloud agents, GitHub Copilot, and Matthew Cheek's Grok Bot team (Canopy, Graft, Root Cause, Trellis, Verdante, Chemdawg, Golden Toad, and others). Lovable is no longer an active agent (Matthew Cheek, 2026-10-10). Sometimes two of them work on the same feature without knowing.
 
 - Before starting substantial new work, check recent merged PRs and open PRs (`gh pr list --state all`, `git log`) for the same or an overlapping feature area. Do not build a second implementation of something that already shipped or is already in review elsewhere.
 - If you discover another agent already has open, unmerged work in your target area, stop and report the collision rather than silently building a competing version.
@@ -203,7 +203,7 @@ agent from one written block.
   eligible open block: a pushed branch and a PR, and either no effective claim or a last
   activity (the newer of `last_updated` and the effective claim) older than 24 hours, with
   no conflicting assignment or named lock. Priority order: publish gate, then P1, then P2, then everything else.
-  Ties go to the oldest `last_updated`. Graft owns the open-PR backlog. Before resuming a stale block, check Graft's latest backlog note. If you resume one, say so in your claim comment so Graft can track it. Agents without repository access (for example Security, Council Chair, Verdante, Trellis, and Petal) cannot set `claimed_by` or touch a branch, so they never select or resume a block. They read the log for context and act only on an explicit assignment.
+  Ties go to the oldest `last_updated`. Graft owns the open-PR backlog. Before resuming a stale block, check Graft's latest backlog note. If you resume one, say so in your claim comment so Graft can track it. Agents without repository access (for example Verdante, Trellis, and Petal) cannot set `claimed_by` or touch a branch, so they never select or resume a block. They read the log for context and act only on an explicit assignment.
 - **Role seats still hold.** Resuming a task does not change who merges, who reviews, or
   who owns CI; those stay as `docs/agents/OWNERSHIP.md` lists them. An agent that touched
   a task can never give its independent acceptance PASS. Peer observations do not
@@ -240,7 +240,7 @@ Never violate these:
 - Do not recommend aggressive nutrient, irrigation, or equipment changes from weak evidence.
 - Do not expose service role keys, bridge tokens, API keys, webhook secrets, private env values, or internal secrets.
 - Treat user data, sensor data, CSVs, bridge payloads, and AI outputs as untrusted.
-- Never show one user's photo or record to anyone else unless its location and EXIF metadata have been stripped, and only through a surface Matthew has approved.
+- Never show one user's photo or record to anyone else unless its location and EXIF metadata have been stripped, and only through a surface Matthew has approved. Every badge needs a linked photo, except badges earned from text-only diary entries.
 
 ---
 
@@ -713,16 +713,15 @@ assigned role and read its file.
 - Grok must read `docs/agents/roles/grok.md`.
 - Claude must read `docs/agents/roles/claude.md`.
 - Gemini must read `docs/agents/roles/gemini.md`.
-- Security reviewer must read `docs/agents/roles/security.md`.
-- Council Chair must read `docs/agents/roles/council-chair.md`.
+- Canopy must read `docs/agents/roles/canopy.md`.
+- Graft must read `docs/agents/roles/graft.md`.
+- Root Cause must read `docs/agents/roles/root-cause.md`.
+- Trellis must read `docs/agents/roles/trellis.md`.
+- Verdante must read `docs/agents/roles/verdante.md`.
+- Chemdawg must read `docs/agents/roles/chemdawg.md`.
+- Golden Toad must read `docs/agents/roles/golden-toad.md`.
 
-Named Grok Bot roles (Matthew Cheek, 2026-10-09). Until each has its own role file, these agents read `docs/agents/roles/grok.md` for the shared rules only, not for its job title, and follow the job below:
-
-- **Canopy**: engineering lead. Owns post-deploy production checks. Holds Claude's reassigned code work.
-- **Graft**: exact-head PR reviews and the open-PR backlog.
-- **Root Cause**: bug triage.
-- **Trellis**: product manager, Linear team VER.
-- **Verdante**: chief of staff. Collects approvals and sends the 9:12 AM CT weekday approvals batch.
+There is no Council Chair role and no Security role (Matthew Cheek, 2026-10-10). Historical receipts that name them stay as history.
 
 Any agent may resume an open task from its block in `docs/agents/HANDOFF_LOG.md` under
 Agent Handoff / Coverage. Claim it first with a `claimed_by:` comment on the task's PR, as
@@ -754,14 +753,14 @@ tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments 
 billing, `.github` workflows, security or auth, and dependency or lockfile changes
 still need Codex (not on a PR Codex authored or repaired), or Blue Dream, Critical
 Mass, or Durban Poison.
-Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge.
+Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. Chemdawg is a Grok Bot running on a separate account. It can be unavailable (it is currently out of tokens). A merge waits for Chemdawg or for Matthew's direction.
 Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
 Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
 
 Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The preferred sequence is:
 
 ```text
-Research -> Architecture -> Build -> Security Review -> QA Audit -> Council -> Cheek approval
+Research -> Architecture -> Build -> QA Audit -> Cheek approval
 ```
 
 That sequence is a preferred path, not rank. The current task may require only a scoped
@@ -889,15 +888,16 @@ snapshots can differ.
   `/welcome`, and `/internal/demo-proof-walkthrough`.
   These count as evidence only when live `/version.json` reports the SHA under test;
   otherwise report `NOT_MEASURED`.
-- **Governance edit gate.** If you change any of the **twelve versioned governance
+- **Governance edit gate.** If you change any of the **seventeen versioned governance
   files** — `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.grok/rules/verdant-grok-role.md`,
-  `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, and the six
-  `docs/agents/roles/*.md` — you must bump `Sentinel-Version` in **all twelve** in the
-  same commit. The `sentinel-version-parity` CI gate enforces PARITY (all versions
-  equal), MIRROR (GEMINI.md's embedded constitution stays byte-equivalent to
-  `AGENTS.md`), and BUMP (changed content requires a new version).
+  `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, and the eleven
+  `docs/agents/roles/*.md` (`grok`, `claude`, `codex`, `gemini`, `canopy`, `graft`,
+  `root-cause`, `trellis`, `verdante`, `chemdawg`, `golden-toad`) — you must bump
+  `Sentinel-Version` in **all seventeen** in the same commit. The `sentinel-version-parity`
+  CI gate enforces PARITY (all versions equal), MIRROR (GEMINI.md's embedded constitution
+  stays byte-equivalent to `AGENTS.md`), and BUMP (changed content requires a new version).
   **`docs/agents/CURRENT_STATE.md` is exempt.** It carries no `Sentinel-Version` at all
-  and is not one of the twelve: it is the changing shift report, revised several times a
+  and is not one of the seventeen: it is the changing shift report, revised several times a
   day, and `scripts/check-sentinel-version-parity.mjs` treats it as existence-only.
   Editing it alone requires no bump — see merged precedent #729 (`1ae167764`) and #746
   (`a0c30e565`), each a single-file `CURRENT_STATE.md` change with no version change.

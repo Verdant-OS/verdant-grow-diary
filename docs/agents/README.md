@@ -45,7 +45,7 @@ ROOT — auto-loaded by the platforms
   .grok/rules/verdant-grok-role.md   Grok's automatic role rules
 
 ROLE DOCUMENTS
-  docs/agents/roles/{grok,claude,codex,security,gemini,council-chair}.md
+  docs/agents/roles/{grok,claude,codex,gemini,canopy,graft,root-cause,trellis,verdante,chemdawg,golden-toad}.md
 
 OPERATING STATE
   docs/agents/CURRENT_STATE.md   the changing shift report
@@ -66,15 +66,22 @@ HISTORICAL — never active instructions
 | Claude        | `CLAUDE.md` (imports constitution + role) | `CURRENT_STATE.md`, `HANDOFF_LOG.md` — read before `SENTINEL_ACK`                   |
 | Grok          | `AGENTS.md`, `.grok/rules/*`              | `docs/agents/roles/grok.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                   |
 | Gemini        | `GEMINI.md`                               | `docs/agents/roles/gemini.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                 |
-| Security      | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`, `roles/security.md`      |
-| Council Chair | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`, `roles/council-chair.md` |
+| Canopy        | `AGENTS.md`                               | `docs/agents/roles/canopy.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                 |
+| Graft         | `AGENTS.md`                               | `docs/agents/roles/graft.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                  |
+| Root Cause    | `AGENTS.md`                               | `docs/agents/roles/root-cause.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`             |
+| Trellis       | nothing automatically                     | `docs/agents/roles/trellis.md` (no repository writes)                               |
+| Verdante      | nothing automatically                     | `docs/agents/roles/verdante.md` (no repository writes)                              |
+| Chemdawg      | `AGENTS.md`                               | `docs/agents/roles/chemdawg.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`               |
+| Golden Toad   | `AGENTS.md`                               | `docs/agents/roles/golden-toad.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`            |
 
 Every agent reads `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK` and records
 `open_handoffs_checked`. After acknowledgment, keep an explicit assignment. If
 unassigned, select the highest-priority open block as `AGENTS.md` defines it (a pushed
 branch and a PR, with no effective claim or a last activity older than 24 hours); do not take a fresh claim or bypass a named lock.
-Security and Council Chair have no repository access, so they never select or resume a
-block; they act only on an explicit assignment.
+Verdante and Trellis have no repository access, so they never select or resume a
+block; they act only on an explicit assignment. There is no Council Chair role and no
+Security role (Matthew Cheek, 2026-10-10). Lovable is no longer an active agent
+(Matthew Cheek, 2026-10-10).
 
 Grok is Verdant's **Product Intelligence, Adversarial Audit, and Implementation Lead**
 (Cheek, 2026-08-20, refined): equally empowered to research, audit the live app,
@@ -86,14 +93,14 @@ task holder. See `docs/agents/roles/grok.md` and
 
 Verify Grok's discovery with `grok inspect`.
 
-**Security and Council Chair run as web-chat agents with no repository access.** A file in
-GitHub does not reach a disconnected chat session. Those two need the role prompt pasted
-into their persistent project instructions, or the files attached as project knowledge.
-Assuming otherwise is how an agent operates with no constitution at all.
+Verdante and Trellis have no repository access. A file in GitHub does not reach a
+disconnected chat session. They need the role prompt pasted into their persistent
+project instructions, or the file attached as project knowledge. Assuming otherwise
+is how an agent operates with no constitution at all.
 
 ## Why the constitution is not the whole prompt pack
 
-`AGENTS.md` deliberately does not contain all six role prompts. Every agent reads it, and
+`AGENTS.md` deliberately does not contain all eleven role prompts. Every agent reads it, and
 an agent that reads everyone else's role tends to blur responsibilities and absorb work
 that was not assigned. Roles stay in separate files for that reason.
 

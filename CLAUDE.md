@@ -163,7 +163,7 @@ prefer what the code shows:
 | UI         | React, Tailwind v4 (`@tailwindcss/vite`), shadcn/ui over Radix primitives, `lucide-react`, `sonner`          |
 | Data       | `@tanstack/react-query`; hosted Supabase via `@supabase/supabase-js` + `@supabase/ssr`                       |
 | Validation | `zod`                                                                                                        |
-| Platform   | Production runs on Cloudflare Workers. Lovable (`@lovable.dev/*` preset, project sync) is no longer the production publisher. |
+| Platform   | Production runs on Cloudflare Workers. Lovable (`@lovable.dev/*` preset, project sync) is no longer the production publisher and is no longer an active agent (Matthew Cheek, 2026-10-10). |
 
 There is **no `App.tsx` and no react-router** — but see the compat shim below, which is
 what almost all component code imports.
@@ -171,7 +171,7 @@ what almost all component code imports.
 `vite.config.ts` is a thin wrapper over the Lovable preset. The preset already supplies
 tanstackStart, viteReact, tailwindcss, tsconfigPaths and the `@` alias; do not re-add them.
 
-**Production runs on Cloudflare Workers.** Lovable is no longer the production publisher. Vercel statuses on PRs and commits are not evidence of a production release, and a Vercel failure is not a production failure. Release evidence is live `/version.json` reporting the target SHA. A host configuration file governs production only while
+**Production runs on Cloudflare Workers.** Lovable is no longer the production publisher and is no longer an active agent (Matthew Cheek, 2026-10-10). Vercel statuses on PRs and commits are not evidence of a production release, and a Vercel failure is not a production failure. Release evidence is live `/version.json` reporting the target SHA. A host configuration file governs production only while
 the measured publisher applies it: `vercel.json`'s redirects and headers fire when Vercel serves the
 apex and are inert under Cloudflare Workers (`docs/seo/lighting-launch-verification.md`,
 §Non-blocking host mismatch, records a period when its redirects returned HTTP 200 with no
@@ -361,9 +361,11 @@ Environment and install gotchas are owned by
 - `src/integrations/supabase/client.ts` is header-marked "generated, do not edit" but carries
   a deliberate hardening — `storage: window.sessionStorage`, not `localStorage`. If you
   regenerate it, re-apply that line.
-- **Editing any of the twelve governance files bumps all twelve.** `AGENTS.md`, `CLAUDE.md`,
+- **Editing any of the seventeen governance files bumps all seventeen.** `AGENTS.md`, `CLAUDE.md`,
   `GEMINI.md`, `.grok/rules/verdant-grok-role.md`, `docs/agents/README.md`,
-  `docs/agents/HANDOFF_PROTOCOL.md` and the six `docs/agents/roles/*.md` must share one
+  `docs/agents/HANDOFF_PROTOCOL.md` and the eleven `docs/agents/roles/*.md`
+  (`grok`, `claude`, `codex`, `gemini`, `canopy`, `graft`, `root-cause`, `trellis`,
+  `verdante`, `chemdawg`, `golden-toad`) must share one
   `Sentinel-Version`, and `GEMINI.md`'s `SENTINEL-CORE` block must stay byte-equivalent to
   `AGENTS.md`. Do it with `node scripts/sync-sentinel-mirror.mjs --set-version=YYYY-MM-DD.N`,
   then verify with `node scripts/check-sentinel-version-parity.mjs <base>`.

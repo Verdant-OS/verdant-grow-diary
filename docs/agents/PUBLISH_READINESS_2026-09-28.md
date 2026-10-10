@@ -1,5 +1,10 @@
 # Verdant release checkpoint — September 28, 2026
 
+Historical checkpoint. Production runs on Cloudflare Workers at
+https://verdantgrowdiary.com (Matthew Cheek, 2026-10-10). Vercel statuses in
+this packet are dated observations. The Vercel "Account is blocked." status is
+an owner-side account issue. Do not investigate it.
+
 ## Current addendum — September 29, 2026, 21:09–21:13 UTC
 
 This addendum supersedes the current-state claims in the earlier packet below.

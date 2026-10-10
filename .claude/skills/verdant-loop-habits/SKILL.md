@@ -107,5 +107,5 @@ never loosen a pin to make a round pass.
 - **Size.** Keep this file under twelve active habits. Beyond that, the oldest low-evidence
   entries retire first. The skill body loads on demand; its description is what stays in every
   session's context, so the description must stay one paragraph.
-- **Not governance.** This file is not one of the twelve `Sentinel-Version` files. Editing it
+- **Not governance.** This file is not one of the seventeen `Sentinel-Version` files. Editing it
   alone needs no parity bump and no `CURRENT_STATE.md` row; operational facts stay there.

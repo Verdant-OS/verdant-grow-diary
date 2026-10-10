@@ -3,7 +3,7 @@
  * Sentinel mirror sync — the fixer half of check-sentinel-version-parity.mjs.
  *
  * The parity gate can tell you GEMINI.md's embedded SENTINEL-CORE has drifted
- * from AGENTS.md, and that the 12 governance files disagree on
+ * from AGENTS.md, and that the 17 governance files disagree on
  * Sentinel-Version, but it cannot repair either. Both are mechanical, and
  * doing them by hand is how a governance edit ends up failing CI twice: once
  * for the un-bumped version, once for the un-synced mirror. (Same fixer +
@@ -14,7 +14,7 @@
  *       Re-embed AGENTS.md into GEMINI.md between the SENTINEL-CORE markers.
  *
  *   node scripts/sync-sentinel-mirror.mjs --set-version=2026-08-09.2
- *       Also stamp that Sentinel-Version across all 12 governance files first.
+ *       Also stamp that Sentinel-Version across all 17 governance files first.
  *
  *   node scripts/sync-sentinel-mirror.mjs --check
  *       Report drift without writing (exit 1 if a write would be needed).
@@ -37,9 +37,14 @@ const GOVERNANCE_FILES = [
   "docs/agents/roles/grok.md",
   "docs/agents/roles/claude.md",
   "docs/agents/roles/codex.md",
-  "docs/agents/roles/security.md",
   "docs/agents/roles/gemini.md",
-  "docs/agents/roles/council-chair.md",
+  "docs/agents/roles/canopy.md",
+  "docs/agents/roles/graft.md",
+  "docs/agents/roles/root-cause.md",
+  "docs/agents/roles/trellis.md",
+  "docs/agents/roles/verdante.md",
+  "docs/agents/roles/chemdawg.md",
+  "docs/agents/roles/golden-toad.md",
 ];
 
 const VERSION_RE = /(Sentinel-Version:\s*)([0-9]{4}-[0-9]{2}-[0-9]{2}\.[0-9]+)/g;

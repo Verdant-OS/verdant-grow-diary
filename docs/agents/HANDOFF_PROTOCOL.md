@@ -182,4 +182,4 @@ Conflicts between this protocol, a role file, and `AGENTS.md` resolve in that or
 `AGENTS.md` wins, then the role file, then this protocol. Report the conflict; do not
 silently pick one.
 
-Only Cheek approves what ships. The Council Chair recommends; it does not release.
+Only Cheek approves what ships. There is no Council Chair role and no Security role (Matthew Cheek, 2026-10-10).

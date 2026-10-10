@@ -20,9 +20,14 @@ const GOVERNANCE_FILES = [
   "docs/agents/roles/grok.md",
   "docs/agents/roles/claude.md",
   "docs/agents/roles/codex.md",
-  "docs/agents/roles/security.md",
   "docs/agents/roles/gemini.md",
-  "docs/agents/roles/council-chair.md",
+  "docs/agents/roles/canopy.md",
+  "docs/agents/roles/graft.md",
+  "docs/agents/roles/root-cause.md",
+  "docs/agents/roles/trellis.md",
+  "docs/agents/roles/verdante.md",
+  "docs/agents/roles/chemdawg.md",
+  "docs/agents/roles/golden-toad.md",
 ];
 
 const ROLE_FILES = GOVERNANCE_FILES.filter((path) => path.startsWith("docs/agents/roles/"));
@@ -217,7 +222,7 @@ test("passes when all governance versions agree and no rules drifted", () => {
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-08-01\.1 across 12/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-08-01\.1 across 17/);
 });
 
 test("fails when GEMINI.md has a different Sentinel-Version", () => {
@@ -267,12 +272,12 @@ test("fails when governance content changes without a version bump", () => {
 
 test("fails when a detailed role loses the exact startup gate", () => {
   const root = makeFixture();
-  replace(root, "docs/agents/roles/security.md", "MANDATORY STARTUP GATE", "OPTIONAL STARTUP GATE");
+  replace(root, "docs/agents/roles/grok.md", "MANDATORY STARTUP GATE", "OPTIONAL STARTUP GATE");
 
   const result = runChecker(root);
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /security\.md: exact mandatory SENTINEL_ACK/);
+  assert.match(result.stderr, /grok\.md: exact mandatory SENTINEL_ACK/);
 });
 
 test("fails when Claude's automatic imports drift", () => {
@@ -475,7 +480,7 @@ test("passes a coordinated rule update with one shared bumped version", () => {
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-08-01\.2 across 12/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-08-01\.2 across 17/);
 });
 
 test("keeps the exact legacy startup gate valid through 2026-09-28.1", () => {
@@ -483,7 +488,7 @@ test("keeps the exact legacy startup gate valid through 2026-09-28.1", () => {
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.1 across 12/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.1 across 17/);
 });
 
 test("accepts shipped 2026-09-28.2 with its legacy ACK and no handoff log", () => {
@@ -491,7 +496,7 @@ test("accepts shipped 2026-09-28.2 with its legacy ACK and no handoff log", () =
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.2 across 12/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.2 across 17/);
 });
 
 test("accepts the exact coverage startup gate at 2026-09-28.3", () => {
@@ -503,7 +508,7 @@ test("accepts the exact coverage startup gate at 2026-09-28.3", () => {
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.3 across 12/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.3 across 17/);
 });
 
 test("accepts CRLF copies of the coverage gate without relaxing its field order", () => {
@@ -546,11 +551,11 @@ test("rejects a detailed role that omits the coverage field at 2026-09-28.3", ()
     startupGate: COVERAGE_STARTUP_GATE,
     handoffLog: true,
   });
-  replace(root, "docs/agents/roles/security.md", "open_handoffs_checked:\n", "");
+  replace(root, "docs/agents/roles/grok.md", "open_handoffs_checked:\n", "");
   const result = runChecker(root);
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /security\.md: exact mandatory SENTINEL_ACK/);
+  assert.match(result.stderr, /grok\.md: exact mandatory SENTINEL_ACK/);
 });
 
 test("rejects a coverage field placed after current_task instead of files_read", () => {
@@ -561,14 +566,14 @@ test("rejects a coverage field placed after current_task instead of files_read",
   });
   replace(
     root,
-    "docs/agents/roles/security.md",
+    "docs/agents/roles/grok.md",
     "files_read:\nopen_handoffs_checked:\ncurrent_task:",
     "files_read:\ncurrent_task:\nopen_handoffs_checked:",
   );
   const result = runChecker(root);
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /security\.md: exact mandatory SENTINEL_ACK/);
+  assert.match(result.stderr, /grok\.md: exact mandatory SENTINEL_ACK/);
 });
 
 test("rejects the coverage version when its handoff log is missing", () => {
@@ -588,7 +593,7 @@ test("passes a coordinated upgrade from the legacy gate to the coverage gate", (
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.3 across 12/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.3 across 17/);
 });
 
 test("rejects a coordinated downgrade that removes coverage and its handoff log", () => {
@@ -653,5 +658,5 @@ test("allows a same-date revision upgrade from 9 to 10", () => {
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.10 across 12/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.10 across 17/);
 });

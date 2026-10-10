@@ -4,7 +4,7 @@
 
 - **Repo:** `Verdant-OS/verdant-grow-diary`, deploy branch `verdant-grow-diary`
 - **Owner of this file:** Codex. Any agent may propose an edit as a draft PR.
-- **Last revised:** 2026-10-10, constitution clash fixes stacked on the Graft low-risk review lane (smoke account, standing approval, named Grok Bot jobs, Cloudflare Workers). Before that, 2026-10-10, at Matthew Cheek's request, to add the Graft low-risk review lane. Before that, 2026-09-28 by Chemdawg (Engineering Lead), at Matthew Cheek's request. First repo version edited by GDP for the channel roster, bug-finder limits, and merge ownership.
+- **Last revised:** 2026-10-10, Matthew Cheek's 3:16 PM CT answers (badges exception, Chemdawg availability, Golden Toad availability, Lovable retired, Council Chair and Security retired, role files). Before that, 2026-10-10, constitution clash fixes stacked on the Graft low-risk review lane (smoke account, standing approval, named Grok Bot jobs, Cloudflare Workers). Before that, 2026-10-10, at Matthew Cheek's request, to add the Graft low-risk review lane. Before that, 2026-09-28 by Chemdawg (Engineering Lead), at Matthew Cheek's request. First repo version edited by GDP for the channel roster, bug-finder limits, and merge ownership.
 
 ---
 
@@ -30,7 +30,7 @@ seats below still apply, and a claim never grants self-acceptance or merge autho
 
 ### Codex: the repo, CI, builds, connectors, and CI/build reviews
 
-- **Repo.** CI, builds and repository repairs. Matthew configures the separate scoped identity, branch rulesets and code-owner protections. Codex uses normal PR-branch pushes only: no force-push, merge, Publish, SQL apply or production Supabase writes. Drafts stay draft. Chemdawg merges only after 35/35 required checks succeed and Blue Dream, Durban Poison, Critical Mass or Codex gives an independent PASS on the exact head SHA. Codex cannot be that reviewer on a PR Codex authored or repaired (for example #1938). Graft's exact-head PASS counts as that outside review on docs-only and low-risk PRs Graft did not author or repair (section 2). Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. Production operations require Matthew's separate approval.
+- **Repo.** CI, builds and repository repairs. Matthew configures the separate scoped identity, branch rulesets and code-owner protections. Codex uses normal PR-branch pushes only: no force-push, merge, Publish, SQL apply or production Supabase writes. Drafts stay draft. Chemdawg merges only after 35/35 required checks succeed and Blue Dream, Durban Poison, Critical Mass or Codex gives an independent PASS on the exact head SHA. Codex cannot be that reviewer on a PR Codex authored or repaired (for example #1938). Graft's exact-head PASS counts as that outside review on docs-only and low-risk PRs Graft did not author or repair (section 2). Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. Chemdawg is a Grok Bot running on a separate account. It can be unavailable (it is currently out of tokens). A merge waits for Chemdawg or for Matthew's direction. Production operations require Matthew's separate approval.
 - **CI infrastructure.** Workflows, runners, check definitions, re-runs, and fixing flaky or broken checks.
 - **Build pipelines.** Builds and deploy pipeline configuration. Production runs on Cloudflare Workers. Vercel statuses on PRs and commits are not evidence of a production release, and a Vercel failure is not a production failure. There are no preview or staging targets. Promotion to production stays with Matthew, and the publish decision stays with Matthew (section 1).
 - **The three connectors** (section 4). Codex builds, runs, and fixes them:
@@ -46,7 +46,7 @@ seats below still apply, and a claim never grants self-acceptance or merge autho
 - **Routing decisions.** Which slice runs next, which reviewer gets which PR, overrides, and holds.
 - **Slice naming.** GDP routes priorities and named slices. Codex may start authorized repository repairs and resume a claimed handoff without waiting for another GDP paste. One task uses one branch and one current holder.
 - **Opening PRs.** Any agent with repository access may open its own PR, as a draft (Matthew Cheek's standing approval, 2026-10-09). An agent without repository access asks the agent that holds the task. Chemdawg owns merge under the current exact-head gate below.
-- **Merge rule (Matthew's current standing order).** Chemdawg merges only after 35/35 required checks succeed and an independent PASS from Blue Dream, Durban Poison, Critical Mass or Codex covers the exact head SHA. Codex cannot give that PASS on a PR Codex authored or repaired (for example #1938). Graft's exact-head PASS counts as the outside review on docs-only and low-risk PRs Graft did not author or repair (section 2). Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. Missing, skipped, pending or failed required checks are not green. P1 and publish gates retain their assigned review and hold fences.
+- **Merge rule (Matthew's current standing order).** Chemdawg merges only after 35/35 required checks succeed and an independent PASS from Blue Dream, Durban Poison, Critical Mass or Codex covers the exact head SHA. Codex cannot give that PASS on a PR Codex authored or repaired (for example #1938). Graft's exact-head PASS counts as the outside review on docs-only and low-risk PRs Graft did not author or repair (section 2). Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. Chemdawg is a Grok Bot running on a separate account. It can be unavailable (it is currently out of tokens). A merge waits for Chemdawg or for Matthew's direction. Missing, skipped, pending or failed required checks are not green. P1 and publish gates retain their assigned review and hold fences.
 - **Spend proposals.** GDP writes the proposal. Approval stays with Matthew.
 
 ### Chemdawg (Engineering Lead): pre-checks, CI status, and reviewer assignment
@@ -76,21 +76,25 @@ seats below still apply, and a claim never grants self-acceptance or merge autho
 - **A request from Chemdawg counts the same as one from GDP** when it names the PR, the full SHA, and the stay-draft limits. A verdict never carries over to a new commit.
 - **Neither reviews work it owns.**
 
-### Named Grok Bot roles (Matthew Cheek, 2026-10-09)
+### Named Grok Bot roles (Matthew Cheek, 2026-10-09; role files 2026-10-10)
 
-Until each has its own role file, these agents read `docs/agents/roles/grok.md` for the shared rules only, not for its job title, and follow the job below. This list does not remove or redefine Chemdawg or Grand Daddy Grok.
+Each named role has its own file. Shared rules (disposable test accounts only, the per-item-yes list, and Collision Guard) live in that file. This list does not remove or redefine Chemdawg's merge seat or Grand Daddy Grok's historical receipts.
 
-- **Canopy**: engineering lead. Owns post-deploy production checks. Holds Claude's reassigned code work.
-- **Graft**: exact-head PR reviews and the open-PR backlog.
-- **Root Cause**: bug triage.
-- **Trellis**: product manager, Linear team VER.
-- **Verdante**: chief of staff. Collects approvals and sends the 9:12 AM CT weekday approvals batch.
+- **Canopy** (`docs/agents/roles/canopy.md`): engineering lead. Builds through Cursor cloud agents, drives its own pull requests to done, and merges only through Chemdawg after Matthew's per-item yes. Owns post-deploy production checks. Holds Claude's reassigned Tranche B+ work.
+- **Graft** (`docs/agents/roles/graft.md`): exact-head pull-request reviewer and open-PR backlog owner. Its PASS counts as the outside review only on docs-only and low-risk pull requests it did not author or repair.
+- **Root Cause** (`docs/agents/roles/root-cause.md`): bug triage on GitHub and Linear issues. May open draft fix pull requests.
+- **Trellis** (`docs/agents/roles/trellis.md`): project manager in Linear team VER. Task routing and assignment. No repository writes.
+- **Verdante** (`docs/agents/roles/verdante.md`): chief of staff and Matthew's single point of contact. Collects approvals and sends the 9:12 AM CT weekday approvals batch. No repository writes.
+- **Chemdawg** (`docs/agents/roles/chemdawg.md`): merge actor only. Chemdawg is a Grok Bot running on a separate account. It can be unavailable (it is currently out of tokens). A merge waits for Chemdawg or for Matthew's direction.
+- **Golden Toad** (`docs/agents/roles/golden-toad.md`): fixture sweeps on a disposable test account only. It can be unavailable (it is currently out of tokens).
+
+Lovable is no longer an active agent (Matthew Cheek, 2026-10-10). There is no Council Chair role and no Security role (Matthew Cheek, 2026-10-10).
 
 ### Golden Toad and Toad Venom: finding bugs
 
 - Fixture-break sweeps run every day, all day, at :03 and :33 past the hour.
 - Ranked FAILs go to GDP, who opens them as fix slices right away.
-- Golden Toad uses only a disposable test account, never Matthew Cheek's own accounts (`cheekhimself@gmail.com`, `matt@verdantgrowdiary.com`) and never the KEEP account. Toad Venom never signs in as the owner.
+- Golden Toad still runs fixture sweeps and uses only a disposable test account, never Matthew Cheek's own accounts (`cheekhimself@gmail.com`, `matt@verdantgrowdiary.com`) and never the KEEP account. Golden Toad can be unavailable (it is currently out of tokens). Toad Venom never signs in as the owner.
 - Neither one publishes, runs APPLY, saves to the Action Queue, writes to the diary, or touches knk. HOLD #1250 applies to both.
 - If the live build doesn't match the build being checked, the verdict is NOT_MEASURED. A network miss is not a product FAIL.
 - If the fixture is signed out, a sweep stops with AUTH_NEEDED and does not try a saved password.
@@ -107,7 +111,7 @@ Until each has its own role file, these agents read `docs/agents/roles/grok.md` 
 | Reviewer assignment and claim ledger                     | Chemdawg's pre-check, by file path (the 4.3 bot takes over when live); GDP can override                                                                                                                                                                                    |
 | Review verdicts                                          | Independent: Blue Dream / Critical Mass by path, assigned Durban Poison, or Codex (not on a PR Codex authored or repaired, for example #1938); Graft's exact-head PASS counts as the outside review on section 2 docs-only and low-risk PRs Graft did not author or repair |
 | Opening PRs                                              | Any agent with repository access may open its own PR, as a draft (Matthew Cheek's standing approval, 2026-10-09). An agent without repository access asks the agent that holds the task.                                                                                  |
-| Merging PRs                                              | Chemdawg only, after 35/35 required SUCCESS and independent exact-head PASS; named holds remain. Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. |
+| Merging PRs                                              | Chemdawg only, after 35/35 required SUCCESS and independent exact-head PASS; named holds remain. Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. Chemdawg is a Grok Bot running on a separate account. It can be unavailable (it is currently out of tokens). A merge waits for Chemdawg or for Matthew's direction. |
 | Edits to this file                                       | Codex                                                                                                                                                                                                                                                                      |
 | Anything not listed                                      | GDP decides and adds a row here                                                                                                                                                                                                                                            |
 

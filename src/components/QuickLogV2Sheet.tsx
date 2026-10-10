@@ -1831,6 +1831,11 @@ function QuickLogV2SheetForOwner({
       const built = buildQuickLogV2SavePayload({
         resolved,
         action: form.action,
+        // New V2 Note submissions only: tag the diary row with the resolved
+        // target's stage (plant, else tent). The builder normalizes and omits
+        // unknown values. Retries replay the stored payload, so a later stage
+        // change never rewrites an in-flight save.
+        stage: targetStage,
         volumeMl: form.volumeMl,
         note: form.note,
         temperatureC: typedTempToCelsiusInput(

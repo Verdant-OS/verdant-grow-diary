@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-09-28.3**
+**Sentinel-Version: 2026-10-10.1**
 
 _Amended 2026-09-28 (Matthew Cheek): added Release and Environment Rules and Agent
 Handoff / Coverage; open tasks are resumable by any agent from `docs/agents/HANDOFF_LOG.md`._

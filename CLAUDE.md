@@ -3,7 +3,7 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-09-28.3**
+**Sentinel-Version: 2026-10-10.1**
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
 publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
@@ -392,6 +392,7 @@ pre-resolution SHA do not count. See `docs/agents/merge-queue.md` and
 | What is live, blocked, or approved right now                       | `docs/agents/CURRENT_STATE.md`                   |
 | Running, screenshotting, driving the app                           | `.claude/skills/run-verdant-grow-diary/SKILL.md` |
 | Writing a migration                                                | `docs/contributing-supabase-migrations.md`       |
+| Before installing or enabling an outside agent skill or hook       | `docs/agents/third-party-agent-skills.md`        |
 
 ---
 

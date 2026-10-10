@@ -3,6 +3,7 @@
  * safety invariants (source: manual, never live).
  */
 import { describe, it, expect } from "vitest";
+import { MANUAL_READING_OBSERVED_AT_LOOKBACK_MS } from "@/lib/manualSensorObservedAtRules";
 import { reviewManualSensorSnapshot } from "@/lib/sensorSnapshotReviewRules";
 
 const NOW = new Date("2026-07-09T12:00:00.000Z");
@@ -65,7 +66,7 @@ describe("reviewManualSensorSnapshot · blockers", () => {
     expect(r.canSave).toBe(false);
   });
 
-  it("blocks when capturedAt is missing, invalid, in the future, or > 24h old", () => {
+  it("blocks when capturedAt is missing, invalid, in the future, or older than the lookback", () => {
     const missing = reviewManualSensorSnapshot({ ...VALID_INPUT, capturedAt: null }, { now: NOW });
     expect(missing.findings.some((f) => f.key === "captured_at_missing")).toBe(true);
 
@@ -84,12 +85,42 @@ describe("reviewManualSensorSnapshot · blockers", () => {
     ).toBe(true);
 
     const tooOld = reviewManualSensorSnapshot(
-      { ...VALID_INPUT, capturedAt: "2026-07-07T00:00:00.000Z" },
+      {
+        ...VALID_INPUT,
+        capturedAt: new Date(
+          NOW.getTime() - MANUAL_READING_OBSERVED_AT_LOOKBACK_MS - 1,
+        ).toISOString(),
+      },
       { now: NOW },
     );
     expect(
       tooOld.findings.some((f) => f.key === "captured_at_too_old" && f.severity === "blocker"),
     ).toBe(true);
+
+    const insideLookback = reviewManualSensorSnapshot(
+      {
+        ...VALID_INPUT,
+        capturedAt: new Date(NOW.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      { now: NOW },
+    );
+    expect(insideLookback.canSave).toBe(true);
+    expect(insideLookback.findings.some((f) => f.key === "captured_at_too_old")).toBe(false);
+    expect(
+      insideLookback.findings.some(
+        (f) => f.key === "captured_at_stale" && f.severity === "warning",
+      ),
+    ).toBe(true);
+
+    const atLookback = reviewManualSensorSnapshot(
+      {
+        ...VALID_INPUT,
+        capturedAt: new Date(NOW.getTime() - MANUAL_READING_OBSERVED_AT_LOOKBACK_MS).toISOString(),
+      },
+      { now: NOW },
+    );
+    expect(atLookback.canSave).toBe(true);
+    expect(atLookback.findings.some((f) => f.key === "captured_at_too_old")).toBe(false);
   });
 
   it("blocks when no metrics are entered", () => {

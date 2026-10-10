@@ -17,6 +17,10 @@
  *    subset of these metrics) is out of scope. This module just reviews.
  */
 
+import {
+  MANUAL_READING_OBSERVED_AT_LOOKBACK_MS,
+  MANUAL_READING_OBSERVED_AT_WINDOW_LABEL,
+} from "@/lib/manualSensorObservedAtRules";
 import { PPFD_MAX } from "@/lib/ppfdRules";
 import { computeVpdKpa, fahrenheitToCelsius } from "@/lib/sensorReadingManualEntryRules";
 
@@ -162,12 +166,12 @@ export function reviewManualSensorSnapshot(
         label: "Captured at",
         message: "Capture time is in the future.",
       });
-    } else if (-deltaMs > 24 * HOUR_MS) {
+    } else if (-deltaMs > MANUAL_READING_OBSERVED_AT_LOOKBACK_MS) {
       push({
         key: "captured_at_too_old",
         severity: "blocker",
         label: "Captured at",
-        message: "Capture time is older than 24h — save as historical import instead.",
+        message: `Capture time is older than ${MANUAL_READING_OBSERVED_AT_WINDOW_LABEL} — save as historical import instead.`,
       });
     } else if (-deltaMs > HOUR_MS) {
       push({

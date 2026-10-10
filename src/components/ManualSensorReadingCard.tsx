@@ -58,6 +58,11 @@ import {
   validateManualEntry,
   type ManualEntryInput,
 } from "@/lib/sensorReadingManualEntryRules";
+import { toDateTimeLocalInputValue } from "@/lib/dateTimeLocalRules";
+import {
+  MANUAL_READING_OBSERVED_AT_HINT,
+  decideManualReadingObservedAt,
+} from "@/lib/manualSensorObservedAtRules";
 import {
   getManualSensorDeviceOptions,
   normalizeManualSourceNote,
@@ -223,6 +228,22 @@ export default function ManualSensorReadingCard({
     (pendingDraft?.revision === values.revision
       ? pendingDraft.payloads[0]?.captured_at
       : undefined);
+  const [observedAtTouched, setObservedAtTouched] = useState(false);
+  const [observedAtLocal, setObservedAtLocal] = useState(() =>
+    toDateTimeLocalInputValue(new Date()),
+  );
+  const [observedAtError, setObservedAtError] = useState<string | null>(null);
+  const chosenObservedIso = (() => {
+    if (isCorrection || !observedAtTouched) return undefined;
+    const decision = decideManualReadingObservedAt({
+      touched: true,
+      localValue: observedAtLocal,
+      now: new Date(),
+    });
+    if (decision.kind === "observed") return decision.iso;
+    if (decision.kind === "rejected") return decision.parsedIso;
+    return undefined;
+  })();
 
   const updateValues = useCallback(
     (update: (current: ManualDraftValues) => ManualDraftValues) => {
@@ -402,7 +423,7 @@ export default function ManualSensorReadingCard({
     }
     const snap: ManualSensorSnapshotInput = {
       source: "manual",
-      captured_at: draftCapturedAt ?? new Date().toISOString(),
+      captured_at: draftCapturedAt ?? chosenObservedIso ?? new Date().toISOString(),
       ...fields,
     };
     // Any other blocking error (VPD -1, CO₂ -5, PPFD 5000, a malformed
@@ -412,7 +433,7 @@ export default function ManualSensorReadingCard({
       evaluateManualSensorSnapshotQuality(snap),
       manualEntryValueErrors(validation),
     );
-  }, [validation, draftCapturedAt, form.humidityPct, form.soilMoisturePct]);
+  }, [validation, draftCapturedAt, chosenObservedIso, form.humidityPct, form.soilMoisturePct]);
 
   // Structured pre-save review (source: "manual", never live). Renders inside
   // the review prompt so the grower sees findings + normalized preview before
@@ -426,10 +447,10 @@ export default function ManualSensorReadingCard({
       soilWaterContent: form.soilMoisturePct,
       co2Ppm: form.co2Ppm,
       ppfd: form.ppfd,
-      capturedAt: draftCapturedAt ?? new Date().toISOString(),
+      capturedAt: draftCapturedAt ?? chosenObservedIso ?? new Date().toISOString(),
       tentId: tentId || null,
     });
-  }, [form, airTempFBridge, tentId, draftCapturedAt, isCorrection]);
+  }, [form, airTempFBridge, tentId, draftCapturedAt, chosenObservedIso, isCorrection]);
 
   // Entered VPD vs air-VPD estimate. Uses only sanitized numeric metrics —
   // never relabels source. If the grower entered a VPD that disagrees with
@@ -457,10 +478,10 @@ export default function ManualSensorReadingCard({
     }
     return validateManualSensorSnapshotFields({
       source: "manual",
-      capturedAt: draftCapturedAt ?? new Date().toISOString(),
+      capturedAt: draftCapturedAt ?? chosenObservedIso ?? new Date().toISOString(),
       ...fields,
     });
-  }, [validation.metrics, form.vpdKpa, draftCapturedAt]);
+  }, [validation.metrics, form.vpdKpa, draftCapturedAt, chosenObservedIso]);
   const enteredVpd =
     fieldValidation.derivedVpd.kind === "entered" ? fieldValidation.derivedVpd.vpdKpa : null;
   const derivedVpdFromTempRh = useMemo(() => {
@@ -505,6 +526,14 @@ export default function ManualSensorReadingCard({
     if (reviewOpen) setReviewOpen(false);
   }
 
+  function updateObservedAt(value: string) {
+    setObservedAtTouched(true);
+    setObservedAtLocal(value);
+    setObservedAtError(null);
+    updateValues((current) => editManualDraftValues(current, {}));
+    if (reviewOpen) setReviewOpen(false);
+  }
+
   async function doSave() {
     // Belt-and-suspenders: even though Save buttons are disabled while
     // pending, guard against a second concurrent call from any path.
@@ -525,6 +554,19 @@ export default function ManualSensorReadingCard({
     const submissionCorrection = correction;
     const capturedMetrics = validation.metrics;
     const pendingSnapshot = values.pendingStandardSnapshot;
+    let observedIso: string | undefined;
+    if (!submissionCorrection && observedAtTouched) {
+      const decision = decideManualReadingObservedAt({
+        touched: true,
+        localValue: observedAtLocal,
+        now: new Date(),
+      });
+      if (decision.kind === "rejected") {
+        setObservedAtError(decision.message);
+        return;
+      }
+      if (decision.kind === "observed") observedIso = decision.iso;
+    }
     let payloads =
       !submissionCorrection && pendingSnapshot?.revision === submissionRevision
         ? pendingSnapshot.payloads
@@ -532,7 +574,7 @@ export default function ManualSensorReadingCard({
             tentId: submissionTentId,
             metrics: capturedMetrics,
             deviceNote,
-            ts: submissionCorrection?.originalCapturedAt,
+            ts: submissionCorrection?.originalCapturedAt ?? observedIso,
           });
     let sessionClaim: SensorsSaveClaim | null = null;
     if (session) {
@@ -619,7 +661,14 @@ export default function ManualSensorReadingCard({
       }
       if (showConfirmation)
         onSaved?.({ tentId: submissionTentId, metricsSaved: savedMetrics.length, createdAt });
-      if (stillOwnsDraft) setReviewOpen(false);
+      if (stillOwnsDraft) {
+        setReviewOpen(false);
+        if (!submissionCorrection) {
+          setObservedAtTouched(false);
+          setObservedAtLocal(toDateTimeLocalInputValue(new Date()));
+          setObservedAtError(null);
+        }
+      }
     } catch (err) {
       // Preserve entered values (we don't clear the form on failure) and
       // surface a safe operator-facing error. Never echo raw internals.
@@ -658,6 +707,19 @@ export default function ManualSensorReadingCard({
     if (!validation.ok) {
       toast.error(validation.errors[0] ?? "Reading is invalid.");
       return;
+    }
+    if (!isCorrection) {
+      const decision = decideManualReadingObservedAt({
+        touched: observedAtTouched,
+        localValue: observedAtLocal,
+        now: new Date(),
+      });
+      if (decision.kind === "rejected") {
+        setObservedAtError(decision.message);
+        toast.error(decision.message);
+        return;
+      }
+      setObservedAtError(null);
     }
     // Every manual snapshot must go through the review gate before insert.
     // Normal, warning, and blocker cases all open the review panel; only
@@ -825,6 +887,37 @@ export default function ManualSensorReadingCard({
                 <p className="text-[11px] text-muted-foreground">
                   Saving to: <strong>{tents.find((t) => t.id === tentId)?.name ?? "—"}</strong>
                 </p>
+              </div>
+            )}
+
+            {!isCorrection && (
+              <div className="space-y-1" data-testid="manual-reading-observed-at-row">
+                <Label htmlFor="manual-reading-observed-at" className="text-xs">
+                  Observed at
+                </Label>
+                <Input
+                  id="manual-reading-observed-at"
+                  data-testid="manual-reading-observed-at"
+                  type="datetime-local"
+                  value={observedAtLocal}
+                  onChange={(event) => updateObservedAt(event.target.value)}
+                  disabled={isSaving || !draft}
+                />
+                <p
+                  className="text-[11px] text-muted-foreground"
+                  data-testid="manual-reading-observed-at-hint"
+                >
+                  {MANUAL_READING_OBSERVED_AT_HINT}
+                </p>
+                {observedAtError && (
+                  <p
+                    role="alert"
+                    data-testid="manual-reading-observed-at-error"
+                    className="text-xs text-destructive"
+                  >
+                    {observedAtError}
+                  </p>
+                )}
               </div>
             )}
 

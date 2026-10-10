@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PR-1959-MANUAL-READING-OBSERVED-AT
+
+```text
+TASK PR-1959-MANUAL-READING-OBSERVED-AT  priority: P2  status: OPEN
+goal: Optional observed-at on a new manual sensor reading. Untouched saves the device instant at save time. A chosen time is stored on ts and captured_at, rejected when future or older than 7 days. Cheeko chose 7 days on 2026-10-09, relayed by Verdo. Backdated readings use that observed instant for freshness and must not look live. No schema change. Draft only.
+branch: cursor/manual-reading-observed-at-4bcf
+base: verdant-grow-diary
+checkout: git fetch origin cursor/manual-reading-observed-at-4bcf verdant-grow-diary && git switch cursor/manual-reading-observed-at-4bcf && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED until the draft PR is opened
+head_sha: this block's commit cannot name itself. Read the PR head after push.
+state: local implementation. Collision guard CLEAR at deploy tip 2574b187b9c72d3a1dc3b7fe0e590b6da84d7285 on 2026-10-10. Stay draft. No ready, merge, or publish.
+next_action: push the branch, open the draft PR with Fixes #1959, then run full vitest, lint, typecheck, build, localStorage gate, and scorer-lock --report --strict.
+files: src/lib/manualSensorObservedAtRules.ts; src/components/ManualSensorReadingCard.tsx (minimal; live tent/VPD session bc-79430256 also edits this card); src/lib/manualSensorSnapshotQualityRules.ts; src/lib/sensorSnapshotReviewRules.ts; src/lib/sensorSnapshotReviewRules.test.ts; src/test/manual-sensor-correction-review-rules.test.ts; src/test/manual-sensor-observed-at-rules.test.ts; src/test/manual-sensor-observed-at-chicago.test.ts; src/test/manual-sensor-observed-at-freshness.test.ts; src/test/manual-sensor-observed-at-card.test.tsx; docs/agents/HANDOFF_LOG.md
+blockers: none for the repository change. Do not edit #1948 or #1956 product files. Do not edit the locked captured_at === ts scorers. No schema, publish, or production write.
+artifacts: overlap audit /tmp/pr-overlap.json generated 2026-10-10T00:27:04.975Z
+reviewer_seat: Blue Dream (.tsx); Critical Mass (rules and tests)
+claimed_by:
+last_updated: 2026-10-09 19:42 CT, by Grok
+```
+
 ### PR-1939-NOT-FOUND-COVERAGE
 
 ```text

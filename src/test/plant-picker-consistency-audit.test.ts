@@ -17,6 +17,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { buildQuickLogPlantSelectOptions } from "@/lib/quickLogPlantOptionRules";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -55,7 +56,41 @@ describe("QuickLog plant picker — scoped via pure rule", () => {
     expect(PICKERS.QuickLog).toMatch(/quickLogPlantHelperText/);
   });
   it("renders options from the scoped list, not the raw plants list", () => {
-    expect(PICKERS.QuickLog).toMatch(/\{scopedPlants\.map/);
+    const scoped = [
+      { id: "plant-new", name: "Newer plant" },
+      { id: "plant-legacy", name: "Legacy plant" },
+    ];
+    const namedArchived = { id: "plant-old", name: "Archived plant" };
+    const rawOnly = { id: "plant-other", name: "Other grow plant" };
+
+    expect(buildQuickLogPlantSelectOptions(scoped, null).map((plant) => plant.id)).toEqual([
+      "plant-new",
+      "plant-legacy",
+    ]);
+    expect(buildQuickLogPlantSelectOptions(scoped, namedArchived).map((plant) => plant.id)).toEqual(
+      ["plant-old", "plant-new", "plant-legacy"],
+    );
+    expect(
+      buildQuickLogPlantSelectOptions([...scoped, namedArchived], namedArchived).map(
+        (plant) => plant.id,
+      ),
+    ).toEqual(["plant-new", "plant-legacy", "plant-old"]);
+    expect(
+      buildQuickLogPlantSelectOptions(scoped, namedArchived).some(
+        (plant) => plant.id === rawOnly.id,
+      ),
+    ).toBe(false);
+
+    // @source-scan-justified: the select JSX is not an importable value. This
+    // pin proves QuickLog maps plantSelectOptions from
+    // buildQuickLogPlantSelectOptions(scopedPlants), and that the raw plants
+    // array is not the mapped source.
+    expect(PICKERS.QuickLog).toMatch(
+      /buildQuickLogPlantSelectOptions\(\s*scopedPlants,\s*archivedNamedPlant\s*\)/,
+    );
+    expect(PICKERS.QuickLog).toMatch(/\{plantSelectOptions\.map/);
+    expect(PICKERS.QuickLog).not.toMatch(/\{plants\.map/);
+    expect(PICKERS.QuickLog).not.toMatch(/\{scopedPlants\.map/);
   });
   it("does not render the old misleading 'Showing plants from' literal", () => {
     expect(PICKERS.QuickLog).not.toMatch(/Showing plants from \$\{activeGrow\.name\}/);

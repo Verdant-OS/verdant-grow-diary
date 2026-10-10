@@ -25,7 +25,7 @@ Read this section first. It doesn't replace the observation log below.
   - Never merge #1740.
   - GitHub comments (PR, review or issue comments) need Matthew's approval.
   - There's no staging site. Smoke tests run on production only, and only on the test fixture grow.
-  - The Vercel "Account is blocked." status isn't a required check.
+  - The Vercel "Account is blocked." status isn't a required check. It comes from an owner-side account issue, not from code. Per Matthew (2026-10-01, from closed #1842): don't investigate, rerun, re-trigger or work around it, don't change deploy settings for it, and don't count it as a regression.
   - No agent changes to auth, RLS, migrations, Edge, `supabase/` or lockfiles unless Matthew names the action.
   - The live list is on the agents' shared box at `/workspace/shared/context/fleet-locks.md`.
 

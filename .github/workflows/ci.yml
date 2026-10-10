@@ -3,8 +3,8 @@ name: CI
 on:
   # Intentionally unfiltered: this required workflow must run for every code
   # change and for Knowledge Library changes under docs/knowledge-library/**,
-  # scripts/knowledge/**, package.json, bun.lock, and package-lock.json. Do not
-  # add paths or paths-ignore here: this is the repository-wide required gate.
+  # scripts/knowledge/**, package.json, and bun.lock. Do not add paths or
+  # paths-ignore here: this is the repository-wide required gate.
   workflow_dispatch:
   push:
     # `verdant-grow-diary` is the repository default branch — `main` alone

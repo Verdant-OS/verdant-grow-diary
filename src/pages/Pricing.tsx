@@ -597,7 +597,7 @@ export default function Pricing() {
       </header>
 
       {/* Hero */}
-      <section className="px-6 pt-10 pb-14 max-w-4xl mx-auto text-center">
+      <section className="mx-auto max-w-4xl px-6 pb-14 pt-6 text-center sm:pt-10">
         <p className="text-xs uppercase tracking-widest text-primary font-medium">
           Verdant Pro · Pricing
         </p>

@@ -157,6 +157,17 @@ describe("scrubUrl", () => {
     expect(scrubUrl(`/grows/${uuid}/plants/${longToken}`)).toBe("/grows/:id/plants/:id");
     expect(scrubUrl("/grows/abcdefghijklmnopqrstuvw")).toBe("/grows/abcdefghijklmnopqrstuvw");
   });
+
+  it("redacts path segments that contain @ or %", () => {
+    expect(scrubUrl("https://verdantgrowdiary.com/plants/grower@example.com/notes")).toBe(
+      "https://verdantgrowdiary.com/plants/:id/notes",
+    );
+    expect(scrubUrl("https://verdantgrowdiary.com/plants/a%20b")).toBe(
+      "https://verdantgrowdiary.com/plants/:id",
+    );
+    expect(scrubUrl("/grows/user%40example.com")).toBe("/grows/:id");
+    expect(scrubUrl("/grows/plant-1")).toBe("/grows/plant-1");
+  });
 });
 
 describe("scrubEvent", () => {

@@ -9,8 +9,9 @@
  * breadcrumbs that carry content. Stack frames keep only filename, abs_path,
  * lineno, colno, and in_app. Tags are rebuilt from `manualReportTags`.
  * Free-text messages are replaced so grower text does not leave. Query strings
- * never leave. A UUID path segment, or a path segment of 24 or more
- * characters, becomes `:id`. `vbscript:` and the other labeled non-http
+ * never leave. A UUID path segment, a path segment of 24 or more
+ * characters, or a path segment that contains `@` or `%`, becomes `:id`.
+ * `vbscript:` and the other labeled non-http
  * schemes keep the scheme and drop the payload (`vbscript:[redacted]`).
  */
 
@@ -187,13 +188,23 @@ export function withoutExcludedIntegrations<T extends { name: string }>(
 
 function redactPathSegment(segment: string): string {
   if (segment.length === 0) return segment;
-  let token = segment;
+  let token: string;
   try {
     token = decodeURIComponent(segment);
   } catch {
     token = segment;
   }
-  if (UUID_SEGMENT.test(token) || token.length >= 24 || segment.length >= 24) return ":id";
+  if (
+    UUID_SEGMENT.test(token) ||
+    token.length >= 24 ||
+    segment.length >= 24 ||
+    token.includes("@") ||
+    token.includes("%") ||
+    segment.includes("@") ||
+    segment.includes("%")
+  ) {
+    return ":id";
+  }
   return segment;
 }
 

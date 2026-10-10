@@ -172,6 +172,8 @@ import {
   buildTimelinePhotoAltText,
 } from "@/lib/timelinePhotoLightboxRules";
 import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
+import { TimelineEntryOpenButton } from "@/components/TimelineEntryOpenButton";
+import { timelineEntryOpenAccessibleName } from "@/lib/timelineEntryOpenLabelRules";
 import {
   PHOTO_NON_DIAGNOSTIC_LABEL,
   PHOTO_NON_DIAGNOSTIC_TESTID,
@@ -2496,6 +2498,13 @@ export default function Timeline() {
                             tentNamesById,
                           });
                           const plantName = place.plantName ?? undefined;
+                          const openOccurredAt = Number.isNaN(new Date(e.entry_at).getTime())
+                            ? ""
+                            : format(new Date(e.entry_at), "PP");
+                          const openLabel = timelineEntryOpenAccessibleName({
+                            title: et.label,
+                            occurredAtLabel: openOccurredAt,
+                          });
                           // Canonical snapshots win, followed by the legacy
                           // `sensor` shape and Plant Quick Log's compatibility
                           // envelope. No persisted row is rewritten.
@@ -2610,17 +2619,10 @@ export default function Timeline() {
                                     {place.tentName}
                                   </span>
                                 )}
-                                <button
-                                  type="button"
-                                  data-testid="timeline-entry-open"
-                                  onClick={(ev) => {
-                                    ev.stopPropagation();
-                                    setDetailEntryId(e.id);
-                                  }}
-                                  className="inline-flex items-center gap-1 rounded-full border border-border/50 px-2 py-0.5 text-[11px] text-foreground hover:bg-secondary/60"
-                                >
-                                  Open
-                                </button>
+                                <TimelineEntryOpenButton
+                                  label={openLabel}
+                                  onOpen={() => setDetailEntryId(e.id)}
+                                />
                                 <span title={format(new Date(e.entry_at), "PPpp")}>
                                   {formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}
                                 </span>

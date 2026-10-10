@@ -1,27 +1,21 @@
 /**
  * Production error reporter (client only).
  *
- * Thin side-effect layer over `errorReportingRules.ts`. The Sentry browser SDK
- * is imported lazily and only when the rules say reporting is enabled, so a
- * build without `VITE_SENTRY_DSN` ships no reporter code path at all beyond
- * this file and pays nothing at runtime.
+ * The Sentry browser SDK is imported lazily and only when
+ * `resolveErrorReportingConfig` says reporting is enabled: a DSN is set, the
+ * build mode is production, and the hostname is a production host. Otherwise
+ * this module never loads the SDK.
  *
- * Contract:
- * - `initErrorReporter()` is idempotent and safe to call on every render. It
- *   returns a promise that settles once the reporter is ready, disabled or
- *   failed; it never rejects.
- * - `reportError()` is a no-op until the SDK is ready; nothing is queued, so a
- *   burst of errors before init can never be replayed later out of context.
- * - `reportErrorWhenReady()` is for the two error surfaces. They can fire before
- *   (or instead of) the root effect that normally starts the reporter, so they
- *   start it themselves and report the one error they caught once it settles.
- * - Reporting is independent of the analytics-consent banner on purpose: it
- *   carries no identity and exists to keep the product working, not to measure
- *   growers. See the privacy posture in `errorReportingRules.ts`.
+ * `initErrorReporter` is idempotent and never rejects. `reportError` is a
+ * no-op until the SDK is ready. `reportErrorWhenReady` starts the reporter
+ * and then reports the one error a boundary caught.
  */
 import { buildInfo } from "@/generated/buildInfo";
 import {
-  buildManualReportContext,
+  ERROR_REPORTING_DATA_COLLECTION,
+  SEND_DEFAULT_PII,
+  TRACES_SAMPLE_RATE,
+  manualReportTags,
   normalizeCaughtError,
   resolveErrorReportingConfig,
   scrubBreadcrumb,
@@ -76,63 +70,43 @@ export function initErrorReporter(
   }
   const promise = loadSdk()
     .then((sentry) => {
+      // `as` keeps `sendDefaultPii` on the runtime object. Sentry 11.4 types
+      // replaced that field with `dataCollection`; omitted categories default on.
       sentry.init({
         dsn: decision.dsn,
         environment: decision.environment,
         release: decision.release,
-        // v11 replaced `sendDefaultPii` with per-category data collection.
-        // Everything identity- or content-bearing is off; beforeSend scrubs the rest.
-        dataCollection: {
-          userInfo: false,
-          cookies: false,
-          httpHeaders: false,
-          httpBodies: [],
-          urlQueryParams: false,
-          // Omitted fields resolve ON in v11, so the rest are set explicitly.
-          graphQL: { document: false, variables: false },
-          genAI: { inputs: false, outputs: false },
-          databaseQueryData: false,
-          queues: false,
-          stackFrameVariables: false,
-          frameContextLines: 0,
-        },
-        tracesSampleRate: 0,
-        maxBreadcrumbs: 20,
-        // No release-health sessions: they carry a session id and bypass beforeSend.
+        sendDefaultPii: SEND_DEFAULT_PII,
+        tracesSampleRate: TRACES_SAMPLE_RATE,
+        dataCollection: ERROR_REPORTING_DATA_COLLECTION,
         integrations: (defaults) => withoutExcludedIntegrations(defaults),
-        beforeSend: (event, hint) =>
-          scrubEvent(event, { eventId: hint?.event_id, release: decision.release }),
+        beforeSend: (event) => scrubEvent(event),
         beforeBreadcrumb: (crumb) => scrubBreadcrumb(crumb),
-      });
+      } as Parameters<SentryModule["init"]>[0]);
       state = { status: "ready", sentry };
     })
     .catch(() => {
-      // A blocked or failed SDK fetch must never affect the app.
       state = { status: "failed" };
     });
   state = { status: "loading", decision, promise };
   return promise;
 }
 
-/**
- * Reports an error a boundary caught. No-op unless the SDK is ready. Never
- * throws: the caller is already on an error path.
- */
+/** Reports one caught error. No-op unless the SDK is ready. Never throws. */
 export function reportError(error: unknown, context?: ManualReportContext): void {
   if (state.status !== "ready") return;
   try {
-    const { tags, extra } = buildManualReportContext(context);
-    state.sentry.captureException(normalizeCaughtError(error), { tags, extra });
+    state.sentry.captureException(normalizeCaughtError(error), {
+      tags: manualReportTags(context),
+    });
   } catch {
-    // Swallow: reporting must not create a second failure.
+    // Reporting must not create a second failure.
   }
 }
 
 /**
  * Starts the reporter if needed, then reports this one error. Used by the root
- * error boundary and the route error component, which can run before the root
- * effect initialises the reporter (or, for a root-route error, without that
- * effect ever running). Only the caught error waits; nothing else is queued.
+ * error boundary and the route error component.
  */
 export function reportErrorWhenReady(
   error: unknown,

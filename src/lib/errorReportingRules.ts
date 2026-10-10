@@ -2,67 +2,87 @@
  * Production error-reporting rules. Pure, deterministic, null-safe — no I/O,
  * no SDK import. The side-effecting wiring lives in `errorReporter.ts`.
  *
- * Why this exists: on Lovable hosting, client errors reached the editor via
- * `window.__lovableEvents`. On Cloudflare that global does not exist, so every
- * uncaught client error went nowhere. This module decides WHEN a reporter may
- * run and WHAT it is allowed to send; the transport (Sentry browser SDK) is
- * loaded lazily and only when `resolveErrorReportingConfig` says `enabled`.
- *
- * Privacy posture (deliberate, do not loosen without an owner decision):
- * - No user id, email, IP, or session identifiers are attached. Sentry's
- *   `dataCollection` has every category off.
- * - Page URLs are reduced to origin + route template (`/plants/:id`); a path only the
- *   catch-all renders becomes `/:unmatched`. Other URLs keep origin plus only the
- *   code-defined path segments (`/assets/<built file>`, Supabase `/<service>/v1/<name>`);
- *   every other segment becomes `:id` (UUID) or `:redacted`.
- *   Query strings and fragments are always dropped: auth flows carry tokens there.
- * - Messages, exception values and breadcrumb messages leave only as an allowlisted
- *   summary (`summarizeErrorText`). Other metadata uses closed keys and bounded values.
- *   Stack frames retain scrubbed URLs and numeric positions, never function/source text.
- * - No session replay, no performance tracing, no console capture.
+ * The reporter may run only with a hosted-Sentry DSN, a production build, and
+ * one of the production hostnames. Outgoing events drop user fields, IP,
+ * request bodies, and breadcrumbs that carry content. Free-text messages are
+ * replaced so grower text does not leave. Query strings never leave.
+ * `vbscript:` and the other labeled non-http schemes keep the scheme and drop
+ * the payload (`vbscript:[redacted]`).
  */
 
-import { APP_ROUTES } from "@/lib/appRouteManifest";
-
-export const SENTRY_INGEST_ORIGINS: ReadonlyArray<string> = [
-  "https://*.ingest.sentry.io",
-  "https://*.ingest.us.sentry.io",
-  "https://*.ingest.de.sentry.io",
-];
-
-/**
- * The only hosts that may report. Verdant has no staging or preview environment
- * (AGENTS.md › Release and Environment Rules), so a production-mode bundle served
- * anywhere else (a workers.dev or vercel.app deployment, a copied build) stays off
- * rather than sending events to the real project.
- */
 export const PRODUCTION_HOSTNAMES: ReadonlyArray<string> = [
   "verdantgrowdiary.com",
   "www.verdantgrowdiary.com",
 ];
 
-/** Hosts where the reporter must stay off: local dev, Lovable preview, tests. */
 export const LOCAL_HOSTNAMES: ReadonlyArray<string> = ["localhost", "127.0.0.1", "[::1]"];
 
+/**
+ * v11 collects these categories when the field is omitted, and the typed init
+ * options no longer include `sendDefaultPii`. The reporter still passes
+ * `sendDefaultPii: false`. This object is what actually keeps each category off.
+ */
+export const ERROR_REPORTING_DATA_COLLECTION = {
+  userInfo: false,
+  cookies: false,
+  httpHeaders: false,
+  httpBodies: [] as Array<
+    "incomingRequest" | "outgoingRequest" | "incomingResponse" | "outgoingResponse"
+  >,
+  urlQueryParams: false,
+  graphQL: { document: false, variables: false },
+  genAI: { inputs: false, outputs: false },
+  databaseQueryData: false,
+  queues: false,
+  stackFrameVariables: false,
+  frameContextLines: 0,
+} as const;
+
+/** Passed to `Sentry.init` even though v11 types omit the field. */
+export const SEND_DEFAULT_PII = false;
+
+/** Tracing sample rate. Combined with filtering `BrowserTracing`, no traces leave. */
+export const TRACES_SAMPLE_RATE = 0;
+
+/**
+ * Default or auto-added integrations that must not run. `BrowserSession`
+ * envelopes bypass `beforeSend`. Replay, tracing and profiling stay off.
+ * `GlobalHandlers` is not in this list.
+ */
+export const EXCLUDED_DEFAULT_INTEGRATIONS: ReadonlyArray<string> = [
+  "BrowserSession",
+  "BrowserTracing",
+  "BrowserProfiling",
+  "Replay",
+  "ReplayCanvas",
+];
+
+export const REDACTED = "[redacted]";
+
+/**
+ * Schemes whose payload sits after the colon. A match returns
+ * `scheme:[redacted]` so the payload is gone and the scheme is still visible.
+ * Any other non-http(s) scheme returns `[redacted]`.
+ */
+export const LABELED_NON_HTTP_SCHEMES: ReadonlyArray<string> = [
+  "data:",
+  "javascript:",
+  "vbscript:",
+  "blob:",
+  "chrome-extension:",
+  "moz-extension:",
+  "file:",
+  "about:",
+];
+
+const DSN_PATTERN = /^https:\/\/[0-9a-f]{8,}@[a-z0-9.-]+\.sentry\.io\/\d+$/i;
+
 export interface ErrorReportingEnvironment {
-  /** `import.meta.env.VITE_SENTRY_DSN` or undefined. */
   readonly dsn?: string | null;
-  /** `window.location.hostname` or undefined on the server. */
   readonly hostname?: string | null;
-  /** Build identifier from `src/generated/buildInfo.ts`. */
   readonly release?: string | null;
-  /** `import.meta.env.MODE` ("production" | "development" | "test"). */
   readonly mode?: string | null;
 }
-
-export type ErrorReportingDecision =
-  | { readonly enabled: false; readonly reason: ErrorReportingDisabledReason }
-  | {
-      readonly enabled: true;
-      readonly dsn: string;
-      readonly environment: "production";
-      readonly release: string | undefined;
-    };
 
 export type ErrorReportingDisabledReason =
   | "no_dsn"
@@ -73,9 +93,21 @@ export type ErrorReportingDisabledReason =
   | "non_production_host"
   | "not_production_build";
 
-const DSN_PATTERN = /^https:\/\/[0-9a-f]{8,}@[a-z0-9.-]+\.sentry\.io\/\d+$/i;
+export type ErrorReportingDecision =
+  | { readonly enabled: false; readonly reason: ErrorReportingDisabledReason }
+  | {
+      readonly enabled: true;
+      readonly dsn: string;
+      readonly environment: "production";
+      readonly release: string | undefined;
+    };
 
-/** Accepts only a well-formed hosted-Sentry DSN. The public key is not a secret, but a malformed value must never make the SDK retry against an arbitrary host. */
+export interface ManualReportContext {
+  readonly source?: string;
+  readonly route?: string;
+  readonly handled?: boolean;
+}
+
 export function isValidSentryDsn(value: unknown): value is string {
   return typeof value === "string" && DSN_PATTERN.test(value.trim());
 }
@@ -100,1072 +132,158 @@ export function resolveErrorReportingConfig(
   if (!PRODUCTION_HOSTNAMES.includes(hostname)) {
     return { enabled: false, reason: "non_production_host" };
   }
-  const environment = "production";
   const release = env?.release?.trim() || undefined;
-  return { enabled: true, dsn, environment, release };
+  return { enabled: true, dsn, environment: "production", release };
 }
 
-// ── Scrubbing ────────────────────────────────────────────────────────────────
-
-/** UUID with literal or percent-encoded (`%2D`) hyphens. */
-const UUID_BODY = String.raw`[0-9a-f]{8}(?:-|%2[Dd])[0-9a-f]{4}(?:-|%2[Dd])[0-9a-f]{4}(?:-|%2[Dd])[0-9a-f]{4}(?:-|%2[Dd])[0-9a-f]{12}`;
-/** A UUID anywhere in free text (row ids in error messages). */
-const UUID_TEXT_PATTERN = new RegExp(String.raw`(?<![0-9a-z])${UUID_BODY}(?![0-9a-z])`, "gi");
-export const REDACTED_ID = "[id]";
-/** E-mail addresses, with a literal or URL-encoded (`%40`) at sign. */
-const EMAIL_PATTERN = /[A-Z0-9._%+-]+(?:@|%40)[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-/** Bearer / JWT / API-key shaped values. JWTs are three base64url segments. */
-const JWT_PATTERN = /\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g;
-const BEARER_PATTERN = /\b(bearer\s+)[A-Za-z0-9._~+/=-]{4,}/gi;
-/** Verdant bridge tokens (`vbt_…`), which can appear bare with no key or scheme in front. */
-const BRIDGE_TOKEN_PATTERN = /\bvbt_[A-Za-z0-9_-]{6,}/g;
-/**
- * Secrets recognisable by prefix alone, with no key label in front (`gateway rejected
- * sk_live_…`). Prefixes follow `SECRET_LIKE_PATTERNS` in `src/lib/mcp/manifestView.ts`
- * plus standard provider formats. The prefix is kept for diagnosis; the rest is dropped.
- */
-const KNOWN_SECRET_PATTERN =
-  /\b((?:sk|rk)_(?:live|test)_|sk-|sb_secret_|sbp_|pdl_[a-z]+_|whsec_|gh[pousr]_|github_pat_|xox[abprs]-|AKIA)[A-Za-z0-9_-]{6,}/g;
-/** `Basic <base64>` credentials (HTTP Basic auth). Keeps the scheme, drops the value. */
-const BASIC_PATTERN = /\b(basic\s+)[A-Za-z0-9+/=]{4,}/gi;
-/**
- * Any key whose name contains a credential word (snake, kebab or camel case:
- * `refresh_token`, `clientSecret`, `x-api-key`, `Set-Cookie`, `session_id`), bare
- * or quoted, followed by `:`, `=` or URL-encoded `%3D` with optional spaces. The
- * value may be double- or single-quoted (escapes included), already redacted, or
- * bare. A bare value runs to the next `, ; & } ] [ "` or line end (`#` and `'`
- * do not end it: `abc#123`, `it's secret`), so a value
- * with spaces (`password: hunter two`) is redacted whole; over-redacting the
- * rest of a clause is preferred to leaking part of a credential.
- * Keeps the key, separator and value quotes; drops the value.
- * `code` and bare `key` are not credential words here, so diagnostics such as a
- * Postgres `code: 23505` stay readable; see OAUTH_PARAM_PATTERN for `code=`.
- */
-/** Separator: `:`, `=` or URL-encoded `%3D`, with optional whitespace on either side. */
-const CREDENTIAL_SEPARATOR = String.raw`(\s*(?:[:=]|%3[Dd])\s*)`;
-/**
- * A quote, or a backslash-escaped one (`\"`) when JSON was serialised inside another
- * string (`payload=\"access_token\":\"…\"`).
- */
-const QUOTE = String.raw`(?:\\*["']|[\uE022\uE027])`;
-/**
- * A value whose quote is escaped at any serialisation depth (`\"…\"`, `\\\"…\\\"`,
- * seven or more backslashes). It closes only on the same quote behind exactly the same
- * backslash run, so an inner quote escaped one level deeper (`\"abc\\\"def\"`) stays
- * inside the value; unterminated, it runs to the end.
- */
-const ESCAPED_QUOTED_VALUE = String.raw`(?<esc>\\+)(?<q>["'])[\s\S]*?(?:(?<!\\)\k<esc>\k<q>|$)`;
-/**
- * Value: escaped-quoted, quoted (escapes included), bracketed (an array, across lines too,
- * or already `[redacted]`), or bare up to the next delimiter. A quoted or bracketed value
- * with no closing quote or bracket (a truncated payload) runs to the end of the text.
- */
-const CREDENTIAL_VALUE = String.raw`(${ESCAPED_QUOTED_VALUE}|"(?:[^"\\]|\\.)*(?:"|$)|'(?:[^'\\]|\\.)*(?:'|$)|\[[^\]]*(?:\]|$)|[^\s,;&}[\]"][^,;&}[\]"\n]*)`;
-/** What a one-time or recovery code is called (`MFA code`, `recovery_codes`, `pin`). Not `error` or `status`. */
-const ONE_TIME_CODE_QUALIFIERS = String.raw`auth|authorization|verification|otp|security|confirmation|mfa|2fa|sms|totp|recovery|backup|reset|invite|login|pin`;
-/** Words that make an identifier a credential name, including `*_KEY` / `*-key`, named `…Key`s and one-time codes (`auth_code`, `mfa_code`, `recovery_codes`, PKCE `code_verifier`, `otp`). */
-const CREDENTIAL_WORDS = String.raw`token|secret|passw(?:or)?d|pwd|pass|api[-_]?key|apikey|authorization|session|cookie|credential|[-_]key|(?:private|secret|service|access|signing|encryption|master|anon|role|client)key|(?:${ONE_TIME_CODE_QUALIFIERS}|one[-_]?time)[-_]?codes?|code[-_]?verifier|otp`;
-const CREDENTIAL_PATTERN = new RegExp(
-  String.raw`(${QUOTE}|)(?<![A-Za-z0-9_-])([A-Za-z0-9_-]*(?:${CREDENTIAL_WORDS})[A-Za-z0-9_-]*)\1` +
-    CREDENTIAL_SEPARATOR +
-    CREDENTIAL_VALUE,
-  "gi",
-);
-/** What a key is called when its label has a space (`API key`, `service role key`). Not `primary` or `foreign`. */
-const SPACED_KEY_QUALIFIERS = String.raw`api|secret|signing|private|access|encryption|master|anon|client|service(?:\s+role)?`;
-/**
- * Human-readable credential labels with a space: one-time codes (`auth code: 123456`,
- * `MFA code: …`, `recovery codes: …`, `code verifier: …`), named keys (`API key: …`,
- * `service role key: …`) and an exact `pin:`. `error code:` / `status code:` /
- * `primary key:` are not matched, nor are `spin:` / `pinned:`.
- */
-const SPACED_CREDENTIAL_LABEL_PATTERN = new RegExp(
-  String.raw`(${QUOTE}|)\b((?:${ONE_TIME_CODE_QUALIFIERS}|one[- ]time)\s+codes?|code\s+verifier|(?:${SPACED_KEY_QUALIFIERS})\s+key|pin)\1` +
-    CREDENTIAL_SEPARATOR +
-    CREDENTIAL_VALUE,
-  "gi",
-);
-/**
- * An exactly quoted `"key"` / `'key'` in object form (`{"key":"sk_live_…"}`). A bare
- * `key:` is not matched, so diagnostics such as Postgres `Key (plant_id)=…` stay readable.
- */
-const QUOTED_KEY_PATTERN = new RegExp(
-  String.raw`(${QUOTE})(key)\1(\s*:\s*)` + CREDENTIAL_VALUE,
-  "gi",
-);
-/**
- * An exactly quoted `"code"` / `'code'` in object form (`{"code":"4/0Ab…"}`, an OAuth
- * exchange). Only SQLSTATE and PostgREST diagnostic codes (`"23505"`, `"42P01"`, `"PGRST116"`) are kept.
- */
-const QUOTED_CODE_PATTERN = new RegExp(
-  String.raw`(${QUOTE})(code)\1(\s*:\s*)` + CREDENTIAL_VALUE,
-  "gi",
-);
-/** SQLSTATE (`23505`, `42P01`) or PostgREST (`PGRST116`) code shape, optionally (escape-)quoted. */
-const DIAGNOSTIC_CODE_VALUE = /^(\\*["']?)(?:[0-9A-Z]{5}|PGRST\d{3})\1$/;
-/** The fields a PostgREST error object carries beside `code`. */
-const POSTGREST_ERROR_FIELDS = ["details", "hint", "message"];
-
-/**
- * The text of the innermost object enclosing `offset` at its own depth: nested objects are
- * left out. Scans from the start of the text and treats `quote` (the code key's own quote,
- * judged by backslash parity, see isDelimitingQuote), double or single, as a string delimiter, so braces inside string values are
- * not structure. Null when no balanced object encloses `offset`.
- */
-function enclosingObjectTopLevel(text: string, offset: number, quote: string): string | null {
-  const level = quote.length - 1;
-  const open: Array<{ start: number; topLevel: string }> = [];
-  // The quote character of the string being scanned, or null outside strings. Both
-  // styles are tracked: a `"…}…"` value inside a single-quoted object is still a string.
-  let openQuote: string | null = null;
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i];
-    const inString = openQuote !== null;
-    if ((char === '"' || char === "'") && isDelimitingQuote(text, i, level)) {
-      if (openQuote === null) openQuote = char;
-      else if (openQuote === char) openQuote = null;
-    } else if (!inString && char === "{") {
-      open.push({ start: i, topLevel: "" });
-      continue;
-    } else if (!inString && char === "}") {
-      const object = open.pop();
-      if (object && object.start < offset && i > offset) return object.topLevel;
-      continue;
-    }
-    if (open.length > 0) open[open.length - 1].topLevel += char;
-  }
-  return null;
-}
-
-/**
- * Whether the quote at `index` delimits a string serialised `level` times over (0 for
- * plain JSON, 1 for `\"…\"`, 3, 7, …), judged by the parity of the backslash run before
- * it: plain JSON closes on an even run (`"…\\"` ends after an escaped backslash), level 1
- * on 1, 5, 9 … backslashes, and so on. A quote escaped inside the string fails the test.
- */
-function isDelimitingQuote(text: string, index: number, level: number): boolean {
-  let run = 0;
-  while (index - run - 1 >= 0 && text[index - run - 1] === "\\") run += 1;
-  return run % (2 * (level + 1)) === level;
-}
-
-/**
- * True when the code at `offset` sits in an object whose own top-level keys, quoted
- * exactly like `code`, include `details`, `hint` and `message`: the full PostgREST error
- * shape. A code beside only some of them (`{"code":"12345","message":"OAuth exchange
- * failed"}`), with them only in a nested object or inside a string value, or in another
- * object, could be a verification or OAuth code and is redacted.
- */
-function isInPostgrestErrorObject(text: string, offset: number, quote: string): boolean {
-  const topLevel = enclosingObjectTopLevel(text, offset, quote);
-  if (topLevel == null) return false;
-  const q = quote.replace(/[\\"']/g, (char) => `\\${char}`);
-  return POSTGREST_ERROR_FIELDS.every((field) =>
-    new RegExp(String.raw`(?:^|,)\s*${q}${field}${q}\s*:`, "i").test(topLevel),
-  );
-}
-
-/**
- * `state` / `nonce` in object or colon form (`{"state":"…"}`, `nonce: …`). A nonce is
- * always redacted. An OAuth state is an opaque string of any shape, so a state is
- * redacted too unless it is one of READABLE_STATES (`state: pending`).
- */
-const STATE_NONCE_PATTERN = new RegExp(
-  String.raw`(${QUOTE}|)\b(state|nonce)\1(\s*:\s*)` + CREDENTIAL_VALUE,
-  "gi",
-);
-/** Lifecycle words a diagnostic `state` may carry; any other state value is redacted. */
-const READABLE_STATES = new Set([
-  "active",
-  "inactive",
-  "pending",
-  "idle",
-  "loading",
-  "ready",
-  "open",
-  "closed",
-  "running",
-  "stopped",
-  "complete",
-  "completed",
-  "failed",
-  "error",
-  "success",
-  "unknown",
-  "draft",
-  "archived",
-  "null",
-  "undefined",
-  "true",
-  "false",
-]);
-
-function isReadableState(value: string): boolean {
-  return READABLE_STATES.has(value.replace(/^\\*["']|\\*["']$/g, "").toLowerCase());
-}
-
-/** OAuth `code=` / `key=` / `state=` / `nonce=` parameters (auth callbacks carry them), `=` or `%3D` with optional spaces. */
-const OAUTH_PARAM_PATTERN =
-  /\b(code|key|state|nonce)(\s*(?:=|%3[Dd])\s*)("[^"]*"|'[^']*'|\[redacted\]|[^&\s"'#]+)/gi;
-
-export const REDACTED = "[redacted]";
-
-/** REDACTED, keeping the quotes of a quoted value so serialised text stays well-formed. */
-function redactedLike(value: string): string {
-  const quote = /^\\*["']/.exec(value)?.[0] ?? "";
-  return `${quote}${REDACTED}${quote}`;
-}
-
-/**
- * Most URL-encoding layers decoded (`%253D` is two). Text still encoded after this many
- * layers is redacted whole rather than sent with a recoverable layer left.
- */
-const MAX_DECODE_PASSES = 8;
-const PERCENT_RUN_PATTERN = /(?:%[0-9A-Fa-f]{2})+/g;
-const ASCII_ESCAPE_PATTERN = /%[0-7][0-9A-Fa-f]/g;
-
-/**
- * Characters that end a credential value. When decoding produces one, it is held as a
- * private-use stand-in until redaction is done, so an encoded `%26` / `%3B` / `%2C` /
- * `%22` inside a credential cannot end its value early (`access_token%3Aabc%26def…`).
- * A held quote still counts as a key quote (see QUOTE), so `%22access_token%22%3A…` is
- * recognised.
- */
-const VALUE_DELIMITERS = "&;,}][\n\"'";
-const DELIMITER_STAND_IN_BASE = 0xe000;
-const DELIMITER_STAND_IN_PATTERN = new RegExp(
-  `[${[...VALUE_DELIMITERS]
-    .map((char) => `\\u${(DELIMITER_STAND_IN_BASE + char.charCodeAt(0)).toString(16)}`)
-    .join("")}]`,
-  "g",
-);
-
-const HELD_DELIMITER_PATTERN = new RegExp(
-  `[${[...VALUE_DELIMITERS].map((char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`).join("")}]`,
-  "g",
-);
-
-function holdDelimiters(decoded: string): string {
-  return decoded.replace(HELD_DELIMITER_PATTERN, (char) =>
-    String.fromCharCode(DELIMITER_STAND_IN_BASE + char.charCodeAt(0)),
-  );
-}
-
-function restoreDelimiters(text: string): string {
-  return text.replace(DELIMITER_STAND_IN_PATTERN, (char) =>
-    String.fromCharCode(char.charCodeAt(0) - DELIMITER_STAND_IN_BASE),
-  );
-}
-
-/** HTML entities an HTML-safe diagnostic uses for quotes and separators (`&quot;`, `&#58;`, `&#x22;`). */
-/**
- * An entity starts with `&`, or with the held stand-in a decoded `&amp;` became (`&amp;quot;`),
- * and ends with `;` or its held stand-in, so a percent-encoded entity (`%26quot%3B`) decodes too.
- * Names are case-sensitive: the uppercase forms are only the four the HTML spec defines.
- */
-const HTML_ENTITY_PATTERN =
-  /[&\uE026](?:#(\d{1,7})|#[xX]([0-9A-Fa-f]{1,6})|(quot|apos|amp|colon|comma|semi|equals|lt|gt|QUOT|AMP|LT|GT))[;\uE03B]/g;
-const NAMED_HTML_ENTITIES: Record<string, string> = {
-  quot: '"',
-  apos: "'",
-  amp: "&",
-  colon: ":",
-  comma: ",",
-  semi: ";",
-  equals: "=",
-  lt: "<",
-  gt: ">",
-};
-
-/**
- * Decodes HTML entities until none remain, so nested escaping (`&amp;quot;`, `&#38;quot;`)
- * is undone too. Text still holding entities after MAX_DECODE_PASSES layers is redacted
- * whole rather than sent with a recoverable layer left.
- */
-function decodeHtmlEntities(text: string): string {
-  let current = text;
-  for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
-    const next = decodeHtmlEntityLayer(current);
-    if (next === current) return current;
-    current = next;
-  }
-  return decodeHtmlEntityLayer(current) === current ? current : REDACTED;
-}
-
-function decodeHtmlEntityLayer(text: string): string {
-  return text.replace(
-    HTML_ENTITY_PATTERN,
-    (entity, decimal?: string, hex?: string, name?: string) => {
-      const code = decimal ? Number(decimal) : hex ? parseInt(hex, 16) : null;
-      if (code !== null) {
-        return code > 0 && code <= 0x10ffff ? holdDelimiters(String.fromCodePoint(code)) : entity;
-      }
-      return holdDelimiters(NAMED_HTML_ENTITIES[(name ?? "").toLowerCase()] ?? entity);
-    },
-  );
-}
-
-/**
- * Decodes one layer of `%XX` escapes and HTML entities so encoded credentials
- * (`Bearer%20…`, `%22password%22%3A…`, `%2540`, `&quot;access_token&quot;:…`) meet the
- * same patterns as plain text. Decoded value delimiters are held (see VALUE_DELIMITERS).
- * In a percent run that is not valid UTF-8 only the ASCII escapes are decoded.
- */
-function decodeOneLayer(text: string): string {
-  return decodeHtmlEntities(text).replace(PERCENT_RUN_PATTERN, (run) => {
-    try {
-      return holdDelimiters(decodeURIComponent(run));
-    } catch {
-      // Malformed UTF-8 in the run: still decode its ASCII escapes (`%3A`, `%20`)
-      // so one bad sequence cannot hide the separator next to a credential.
-      return run.replace(ASCII_ESCAPE_PATTERN, (escape) =>
-        holdDelimiters(String.fromCharCode(parseInt(escape.slice(1), 16))),
-      );
-    }
-  });
-}
-
-/** Removes e-mail addresses, UUID row ids, bridge/JWT/bearer tokens and credential-looking query values from free text. Idempotent. */
-export function scrubText(value: unknown): string {
-  if (value == null) return "";
-  // Redact before decoding, while an encoded `%22` inside a credential cannot yet end its
-  // value, then again after each decoded layer, for credentials that only decoding
-  // reveals (`%22password%22%3A…`). Decoded delimiters stay held until the end.
-  // HTML entities decode to held characters, so decoding them first keeps `&amp;` inside a
-  // credential from ending it at the raw pass.
-  let text = redactPatterns(
-    decodeHtmlEntities(typeof value === "string" ? value : safeString(value)),
-  );
-  for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
-    const next = decodeOneLayer(text);
-    if (next === text) return restoreDelimiters(text);
-    text = redactPatterns(next);
-  }
-  return decodeOneLayer(text) === text ? restoreDelimiters(text) : REDACTED;
-}
-
-function redactPatterns(text: string): string {
-  return text
-    .replace(BRIDGE_TOKEN_PATTERN, `vbt_${REDACTED}`)
-    .replace(KNOWN_SECRET_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
-    .replace(BEARER_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
-    .replace(BASIC_PATTERN, (_m, prefix: string) => `${prefix}${REDACTED}`)
-    .replace(
-      CREDENTIAL_PATTERN,
-      (_m, quote: string, key: string, separator: string, value: string) =>
-        `${quote}${key}${quote}${separator}${redactedLike(value)}`,
-    )
-    .replace(
-      SPACED_CREDENTIAL_LABEL_PATTERN,
-      (_m, quote: string, label: string, separator: string, value: string) =>
-        `${quote}${label}${quote}${separator}${redactedLike(value)}`,
-    )
-    .replace(
-      QUOTED_KEY_PATTERN,
-      (_m, quote: string, key: string, separator: string, value: string) =>
-        `${quote}${key}${quote}${separator}${redactedLike(value)}`,
-    )
-    .replace(
-      QUOTED_CODE_PATTERN,
-      (match, quote: string, key: string, separator: string, value: string, ...rest: unknown[]) => {
-        // CREDENTIAL_VALUE has named groups, so the arguments end with offset, text, groups.
-        const offset = rest[rest.length - 3] as number;
-        const whole = rest[rest.length - 2] as string;
-        return DIAGNOSTIC_CODE_VALUE.test(value) && isInPostgrestErrorObject(whole, offset, quote)
-          ? match
-          : `${quote}${key}${quote}${separator}${redactedLike(value)}`;
-      },
-    )
-    .replace(
-      STATE_NONCE_PATTERN,
-      (match, quote: string, key: string, separator: string, value: string) =>
-        key.toLowerCase() === "state" && isReadableState(value)
-          ? match
-          : `${quote}${key}${quote}${separator}${redactedLike(value)}`,
-    )
-    .replace(
-      OAUTH_PARAM_PATTERN,
-      (_m, key: string, separator: string, value: string) =>
-        `${key}${separator}${redactedLike(value)}`,
-    )
-    .replace(JWT_PATTERN, REDACTED)
-    .replace(EMAIL_PATTERN, REDACTED)
-    .replace(UUID_TEXT_PATTERN, REDACTED_ID);
-}
-
-/** A whole path segment shaped like a UUID (grow, tent, plant and other row ids), hyphens literal or `%2D`. */
-const UUID_SEGMENT_PATTERN = new RegExp(String.raw`^${UUID_BODY}$`, "i");
-
-function hostOf(value: unknown): string | null {
-  if (typeof value !== "string" || value === "") return null;
-  try {
-    return new URL(value).hostname;
-  } catch {
-    return null;
-  }
-}
-
-/** The app's own Supabase host, from the same build variable the client is created with. */
-const CONFIGURED_SUPABASE_HOST = hostOf(import.meta.env?.VITE_SUPABASE_URL);
-export const REDACTED_HOST = "[redacted-host]";
-
-/** Hosts whose names are code-owned: the production hosts and the configured Supabase host. */
-function isTrustedHost(host: string): boolean {
-  return PRODUCTION_HOSTNAMES.includes(host) || host === CONFIGURED_SUPABASE_HOST;
-}
-
-/** An http(s) origin, or the same scheme with `[redacted-host]` when the host is not trusted. */
-function scrubOrigin(url: URL): string {
-  return isTrustedOrigin(url) ? url.origin : `${url.protocol}//${REDACTED_HOST}`;
-}
-
-function isTrustedOrigin(url: URL): boolean {
-  return url.protocol === "https:" && url.port === "" && isTrustedHost(url.hostname);
-}
-
-/** Every edge function under `supabase/functions` (a test keeps this equal to the directory). */
-export const KNOWN_EDGE_FUNCTIONS: ReadonlySet<string> = new Set([
-  "ai-coach",
-  "ai-cultivar-qa",
-  "ai-doctor-review",
-  "auth-email-hook",
-  "checkout-status",
-  "create-breeding-suggestions",
-  "delete-account",
-  "ecowitt-ingest",
-  "ecowitt-real-ingest",
-  "edge-metrics-alert-check",
-  "edge-metrics-latest",
-  "environment-summary-report-entitlement",
-  "founder-slots-remaining",
-  "get-paddle-price",
-  "handle-email-suppression",
-  "handle-email-unsubscribe",
-  "live-sensor-entitlement",
-  "mcp",
-  "mint-bridge-token",
-  "operator-credits-audit",
-  "operator-ggs-real-payload-commit",
-  "paddle-portal-session",
-  "paddle-webhook",
-  "payments-webhook",
-  "pi-ingest-readings",
-  "premium-export-entitlement",
-  "preview-transactional-email",
-  "process-email-queue",
-  "redeem-referral",
-  "revoke-bridge-token",
-  "rls-selftest",
-  "save-founder-prefs",
-  "send-transactional-email",
-  "sensor-ingest-webhook",
-]);
-/** Supabase Auth endpoint names the client calls. */
-const KNOWN_AUTH_ENDPOINTS: ReadonlySet<string> = new Set([
-  "authorize",
-  "callback",
-  "factors",
-  "health",
-  "logout",
-  "magiclink",
-  "otp",
-  "reauthenticate",
-  "recover",
-  "resend",
-  "settings",
-  "signup",
-  "sso",
-  "token",
-  "user",
-  "verify",
-]);
-const SUPABASE_SERVICES: ReadonlySet<string> = new Set([
-  "rest",
-  "auth",
-  "functions",
-  "realtime",
-  "storage",
-]);
-const STORAGE_ACCESS_SEGMENTS: ReadonlySet<string> = new Set([
-  "public",
-  "sign",
-  "authenticated",
-  "info",
-]);
-
-/**
- * Which path segments are known to be written by code, by closed list and never by
- * shape: the assets directory on our own origin (or a relative path), and on a
- * Supabase host the fixed service vocabulary plus known edge-function and auth-endpoint
- * names. Table, RPC and bucket names are not listed, so they are not kept; nor is
- * anything on another host.
- */
-function keptSegmentMask(parts: ReadonlyArray<string>, host: string | null): boolean[] {
-  const keep = parts.map(() => false);
-  const ownOrigin = host === null || PRODUCTION_HOSTNAMES.includes(host);
-  if (ownOrigin && parts.length === 2 && parts[0] === "assets") {
-    // Neither a filename shape nor a caller-supplied Error.stack proves build membership.
-    return [true, false];
-  }
-  if (host === null || host !== CONFIGURED_SUPABASE_HOST) return keep;
-  const [service = "", version = "", name = "", access = ""] = parts;
-  if (!SUPABASE_SERVICES.has(service) || version !== "v1") return keep;
-  keep[0] = true;
-  keep[1] = true;
-  if (parts.length < 3) return keep;
-  if (service === "functions") keep[2] = KNOWN_EDGE_FUNCTIONS.has(name);
-  else if (service === "auth") keep[2] = KNOWN_AUTH_ENDPOINTS.has(name);
-  else if (service === "rest") keep[2] = name === "rpc";
-  else if (service === "realtime") keep[2] = name === "websocket";
-  else if (service === "storage" && name === "object") {
-    keep[2] = true;
-    if (parts.length > 3) keep[3] = STORAGE_ACCESS_SEGMENTS.has(access);
-  }
-  return keep;
-}
-
-/**
- * Keeps only code-owned path segments (see `keptSegmentMask`). Every other segment is
- * data — a grower label, a file name, a token, possibly percent-encoded any number of
- * times — so UUIDs become `:id` and the rest `:redacted`, without decoding.
- */
-function redactPathSegments(path: string, host: string | null): string {
-  const parts = path.split("/").slice(1);
-  const keep = keptSegmentMask(parts, host);
-  const kept = parts.map((segment, index) => {
-    if (keep[index] || segment === "") return segment;
-    return UUID_SEGMENT_PATTERN.test(segment) ? ":id" : ":redacted";
-  });
-  return path.startsWith("/") ? `/${kept.join("/")}` : kept.join("/");
-}
-
-/** Reduces an http(s) URL to origin + its code-owned path segments, the rest replaced (see `redactPathSegments`); any other scheme becomes `scheme:[redacted]`. Relative or unparsable input keeps only the part before `?`/`#`. */
-export function scrubUrl(value: unknown): string {
-  if (typeof value !== "string" || value.length === 0) return "";
-  if (value === REDACTED) return REDACTED;
-  if (/^https?:\/\/\[redacted-host\](?:\/(?::redacted|:id)?)*$/.test(value)) return value;
-  try {
-    const url = new URL(value);
-    // Only http(s) has an origin + path worth keeping. data:, javascript:, vbscript:, blob:,
-    // extension and other schemes can carry a payload in what follows the scheme.
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      return [
-        "data:",
-        "javascript:",
-        "vbscript:",
-        "blob:",
-        "chrome-extension:",
-        "moz-extension:",
-        "file:",
-        "about:",
-      ].includes(url.protocol)
-        ? `${url.protocol}${REDACTED}`
-        : REDACTED;
-    }
-    const host = isTrustedOrigin(url) ? url.hostname : null;
-    const path = host === null ? redactAll(url.pathname) : redactPathSegments(url.pathname, host);
-    return `${scrubOrigin(url)}${path}`;
-  } catch {
-    return redactPathSegments(value.split(/[?#]/, 1)[0] ?? "", null);
-  }
-}
-
-/** Every segment of a path on an untrusted host is data. */
-function redactAll(path: string): string {
-  return path
-    .split("/")
-    .map((segment) =>
-      segment === "" ? segment : UUID_SEGMENT_PATTERN.test(segment) ? ":id" : ":redacted",
-    )
-    .join("/");
-}
-
-// ── Page routes ──────────────────────────────────────────────────────────────
-
-export const UNMATCHED_ROUTE = "/:unmatched";
-
-const ROUTE_TEMPLATES: ReadonlyArray<ReadonlyArray<string>> = APP_ROUTES.map((route) => route.path)
-  .filter((path) => path.startsWith("/"))
-  .map((path) => path.split("/").filter(Boolean));
-
-/**
- * The manifest route a pathname renders, as its template (`/plants/:id`); the most
- * specific match wins, so `/pheno-hunts/new` beats `/pheno-hunts/:id`. A path that only
- * the catch-all would render returns `/:unmatched`: its segments came from a link, not code.
- */
-export function routeTemplateFor(pathname: string): string {
-  const segments = pathname.split("/").filter(Boolean);
-  let best: ReadonlyArray<string> | null = null;
-  let bestStatic = -1;
-  for (const template of ROUTE_TEMPLATES) {
-    if (template.length !== segments.length) continue;
-    let staticCount = 0;
-    const matches = template.every((part, index) => {
-      if (part.startsWith(":")) return true;
-      staticCount++;
-      return part === segments[index];
-    });
-    if (matches && staticCount > bestStatic) {
-      best = template;
-      bestStatic = staticCount;
-    }
-  }
-  return best ? `/${best.join("/")}` : UNMATCHED_ROUTE;
-}
-
-/** Like `scrubUrl`, for an in-app page URL: the pathname is replaced by its route template. */
-export function scrubRouteUrl(value: unknown): string {
-  if (typeof value !== "string" || value.length === 0) return "";
-  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
-    try {
-      const url = new URL(value);
-      if (url.protocol !== "http:" && url.protocol !== "https:") return scrubUrl(value);
-      return `${scrubOrigin(url)}${routeTemplateFor(url.pathname)}`;
-    } catch {
-      return scrubUrl(value);
-    }
-  }
-  return routeTemplateFor(value.split(/[?#]/, 1)[0] ?? "");
-}
-
-// ── Free-text summary ────────────────────────────────────────────────────────
-//
-// Pattern scrubbing cannot recognise grower-authored text (a plant name, a diary
-// note) inside an error message, and provider messages forwarded verbatim can carry
-// row values. So event messages, exception values and breadcrumb messages never
-// leave as text: only an allowlisted summary does — the code-defined scope prefix,
-// a SQLSTATE/PostgREST code and an HTTP status. Nothing derived from the rest of the
-// text is sent, not even a hash: grower text is low-entropy, so any digest of it could
-// be confirmed by guessing. Grouping relies on the summary and the scrubbed stack.
-
-const SCOPE_PREFIX_PATTERN = /^\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*:/;
-/**
- * Every scope the repository's own throw sites put in front of a forwarded provider
- * message (`fail()` in `growRepo.ts` and `db.ts`, plus three direct throws). A scope not
- * listed here is grower text that happens to look like one, so it is not reported;
- * a new throw site reports only `[redacted]` until it is added.
- */
-export const KNOWN_ERROR_SCOPES: ReadonlySet<string> = new Set([
-  ...[
-    "fetchTents",
-    "fetchTent",
-    "fetchPlants",
-    "fetchPlant",
-    "fetchSensorReadings",
-    "insertSensorReading",
-    "insertSensorReadingsBatch",
-  ].map((name) => `growRepo.${name}`),
-  ...[
-    "fetchGrowRows",
-    "fetchGrowRow",
-    "insertGrowRow",
-    "updateGrowRow",
-    "archiveGrow",
-    "fetchDiaryEntryRows",
-    "insertDiaryEntryRow",
-    "updateDiaryEntryRow",
-    "deleteDiaryEntry",
-    "fetchHarvestRows",
-    "insertHarvestRow",
-    "fetchProfileRow",
-    "fetchUserRoles",
-    "assignRole",
-    "fetchUnlockRows",
-    "fetchUserQuestRows",
-  ].map((name) => `db.${name}`),
-  "piIngestIdempotencyRepo.insertPiIngestIdempotencyKeys",
-  "permissions.moderatePlantAsOperator",
-]);
-const POSTGREST_CODE_PATTERN = /\bPGRST\d{3}\b/;
-/** PostgreSQL's SQLSTATE classes (Appendix A); a five-character value outside them is not reported. */
-const SQLSTATE_CLASSES = String.raw`0[0-389ABFLPZ]|10|2[0-8BDF]|3[489BDF]|4[024]|5[3-578]|72|F0|HV|P0|XX`;
-const SQLSTATE_PATTERN = new RegExp(
-  String.raw`\bsqlstate\b["'\s:=]*((?:${SQLSTATE_CLASSES})[0-9A-Z]{3})\b`,
-  "i",
-);
-const HTTP_STATUS_PATTERN = /\b(?:status(?:[\s_-]?code)?|HTTP)\b["'\s:=]*([1-5]\d{2})\b/i;
-/** The message `normalizeCaughtError` builds for a thrown `Response`. */
-const CAUGHT_RESPONSE_PATTERN = /^Response ([1-5]\d{2})(?: at |$)/;
-const KNOWN_EXCEPTION_TYPES: ReadonlySet<string> = new Set([
-  "Error",
-  "TypeError",
-  "RangeError",
-  "ReferenceError",
-  "SyntaxError",
-  "URIError",
-  "EvalError",
-  "AggregateError",
-  "InternalError",
-  "DOMException",
-]);
-
-/**
- * Reduces a free-text message to `scope code=… status=…`, or `[redacted]` when code wrote
- * none of those fields; empty stays empty.
- * A field is kept only when code put it there: the scope must be in `KNOWN_ERROR_SCOPES`,
- * a code or status is read only after such a scope (where the rest is a provider message,
- * and a code needs an explicit `PGRST###` or `SQLSTATE` label), and the only other status
- * kept is the one `normalizeCaughtError` writes for a thrown `Response`.
- */
-export function summarizeErrorText(value: unknown): string {
-  if (typeof value !== "string" || value === "") return "";
-  // beforeBreadcrumb and beforeSend both run, and a retry may re-use an event.
-  // Accept only the exact bounded summary grammar, never arbitrary trailing text.
-  const summary = /^(\S+)(?: code=(PGRST\d{3}|[0-9A-Z]{5}))?(?: status=([1-5]\d{2}))?$/.exec(value);
-  if (
-    summary &&
-    KNOWN_ERROR_SCOPES.has(summary[1]) &&
-    (!summary[2] ||
-      POSTGREST_CODE_PATTERN.test(summary[2]) ||
-      SQLSTATE_PATTERN.test(`SQLSTATE ${summary[2]}`))
-  )
-    return value;
-  if (/^status=[1-5]\d{2}$/.test(value)) return value;
-  const parts: string[] = [];
-  const scope = SCOPE_PREFIX_PATTERN.exec(value)?.[1];
-  if (scope && KNOWN_ERROR_SCOPES.has(scope)) {
-    parts.push(scope);
-    const code =
-      POSTGREST_CODE_PATTERN.exec(value)?.[0] ?? SQLSTATE_PATTERN.exec(value)?.[1]?.toUpperCase();
-    if (code) parts.push(`code=${code}`);
-    const status = HTTP_STATUS_PATTERN.exec(value)?.[1];
-    if (status) parts.push(`status=${status}`);
-  } else {
-    const status = CAUGHT_RESPONSE_PATTERN.exec(value)?.[1];
-    if (status) parts.push(`status=${status}`);
-  }
-  return parts.length > 0 ? parts.join(" ") : REDACTED;
-}
-
-/** Only standard exception names are diagnostic metadata; identifier shape is not provenance. */
-function safeExceptionType(type: string): string {
-  return KNOWN_EXCEPTION_TYPES.has(type) ? type : "Error";
-}
-
-function safeString(value: unknown): string {
-  try {
-    return typeof value === "object" ? (JSON.stringify(value) ?? String(value)) : String(value);
-  } catch {
-    return String(value);
-  }
-}
-
-// ── Sentry event shaping (SDK-agnostic shape, matches Sentry's `Event`) ─────
-
-export interface ReportableRequest {
-  url?: string;
-  headers?: Record<string, string>;
-  cookies?: unknown;
-  data?: unknown;
-  query_string?: unknown;
-  env?: unknown;
-}
-
-export interface ReportableException {
-  type?: string;
-  value?: string;
-  mechanism?: { type?: string; handled?: boolean; data?: unknown };
-  stacktrace?: {
-    frames?: Array<{
-      filename?: string;
-      abs_path?: string;
-      vars?: unknown;
-      lineno?: number;
-      colno?: number;
-      in_app?: boolean;
-    }>;
-  };
-}
-
-export interface ReportableBreadcrumb {
-  category?: string;
-  message?: string;
-  data?: Record<string, unknown>;
-}
-
-export interface ReportableEvent {
-  event_id?: string;
-  timestamp?: number;
-  level?: string;
-  platform?: string;
-  environment?: string;
-  release?: string;
-  message?: string;
-  logentry?: { message?: string; formatted?: string; params?: unknown };
-  transaction?: string;
-  contexts?: Record<string, unknown>;
-  request?: ReportableRequest;
-  user?: unknown;
-  server_name?: string;
-  exception?: { values?: ReportableException[] };
-  breadcrumbs?: ReportableBreadcrumb[];
-  extra?: Record<string, unknown>;
-  tags?: Record<string, unknown>;
-}
-
-/**
- * Default SDK integrations removed at init. `BrowserSession` sends a release-health
- * session envelope with a generated session id on every page load, even when no error
- * occurs; session envelopes never pass through `beforeSend`, so they cannot be scrubbed.
- */
-export const EXCLUDED_DEFAULT_INTEGRATIONS: ReadonlyArray<string> = ["BrowserSession"];
-
-/** Filters SDK default integrations by name; usable as Sentry's `integrations` callback. */
-export function withoutExcludedIntegrations<T extends { name: string }>(defaults: T[]): T[] {
+export function withoutExcludedIntegrations<T extends { name: string }>(
+  defaults: readonly T[],
+): T[] {
   return defaults.filter(
     (integration) => !EXCLUDED_DEFAULT_INTEGRATIONS.includes(integration.name),
   );
 }
 
-/** Breadcrumb categories that may carry page content, grower data or credentials; dropped outright. */
-export const DROPPED_BREADCRUMB_CATEGORIES: ReadonlyArray<string> = [
-  "console",
-  "ui.input",
-  // DOM click descriptors include element attributes (e.g. a cultivar name in `title`).
-  "ui.click",
-];
-
-/** Device/runtime contexts that carry no identity. Every other context (e.g. `response`, `state`, custom) is dropped. */
-export const ALLOWED_EVENT_CONTEXTS: ReadonlyArray<string> = ["browser", "os", "device", "runtime"];
-
-/**
- * Scrubs an outgoing event in place-safe fashion (returns a new object). Returns
- * null for null/undefined so it can be used directly as Sentry's `beforeSend`.
- */
-export function scrubEvent<T extends ReportableEvent | null | undefined>(
-  event: T,
-  metadata: { readonly eventId?: string; readonly release?: string } = {},
-): T {
-  if (!event) return event;
-  // Never spread an SDK event or a nested payload: unknown properties may contain rows.
-  const next: ReportableEvent = {};
-  if (typeof metadata.eventId === "string" && /^[0-9a-f]{32}$/.test(metadata.eventId))
-    next.event_id = metadata.eventId;
-  if (metadata.release) next.release = metadata.release;
-  if (event.environment === "production") next.environment = "production";
-  if (event.platform === "javascript") next.platform = "javascript";
-  if (
-    typeof event.timestamp === "number" &&
-    Number.isFinite(event.timestamp) &&
-    event.timestamp >= 0 &&
-    event.timestamp < 100_000_000_000
-  )
-    next.timestamp = event.timestamp;
-  if (typeof event.level === "string" && KNOWN_LEVELS.has(event.level)) next.level = event.level;
-  if (typeof event.message === "string") next.message = summarizeErrorText(event.message);
-  if (event.logentry) {
-    const logentry: NonNullable<ReportableEvent["logentry"]> = {};
-    if (typeof event.logentry.message === "string")
-      logentry.message = summarizeErrorText(event.logentry.message);
-    if (typeof event.logentry.formatted === "string")
-      logentry.formatted = summarizeErrorText(event.logentry.formatted);
-    next.logentry = logentry;
-  }
-  if (typeof event.transaction === "string") next.transaction = scrubRouteUrl(event.transaction);
-  if (event.contexts) {
-    const contexts: Record<string, unknown> = {};
-    for (const name of ALLOWED_EVENT_CONTEXTS) {
-      const context = event.contexts[name];
-      if (
-        isRecord(context) &&
-        typeof context.name === "string" &&
-        KNOWN_CONTEXT_NAMES[name]?.has(context.name)
-      )
-        contexts[name] = { name: context.name };
+/** http(s) keeps origin + path. Labeled non-http schemes keep `scheme:[redacted]`. */
+export function scrubUrl(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const raw = value.trim();
+  if (raw.length === 0) return "";
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return LABELED_NON_HTTP_SCHEMES.includes(url.protocol)
+        ? `${url.protocol}${REDACTED}`
+        : REDACTED;
     }
-    next.contexts = contexts;
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return raw.split(/[?#]/, 1)[0] ?? "";
   }
-  if (event.request) {
-    const request: ReportableRequest = {};
-    if (typeof event.request.url === "string") request.url = scrubRouteUrl(event.request.url);
-    next.request = request;
+}
+
+export function scrubBreadcrumb<T>(crumb: T): T | null {
+  if (crumb == null) return crumb;
+  if (typeof crumb !== "object") return null;
+  const record = crumb as { message?: unknown; data?: unknown };
+  if (typeof record.message === "string" && record.message.length > 0) return null;
+  if (
+    record.data != null &&
+    typeof record.data === "object" &&
+    Object.keys(record.data as object).length > 0
+  ) {
+    return null;
   }
-  if (Array.isArray(event.exception?.values)) {
-    next.exception = {
-      values: event.exception.values
-        .filter((ex): boolean => isRecord(ex))
-        .slice(0, 10)
-        .map((ex) => ({
-          ...(typeof ex.type === "string" && { type: safeExceptionType(ex.type) }),
-          ...(typeof ex.value === "string" && { value: summarizeErrorText(ex.value) }),
-          ...(ex.mechanism && {
-            mechanism: {
-              type: "generic",
-              ...(typeof ex.mechanism.handled === "boolean" && {
-                handled: ex.mechanism.handled,
-              }),
-            },
-          }),
-          ...(Array.isArray(ex.stacktrace?.frames) && {
-            stacktrace: {
-              frames: ex.stacktrace.frames.slice(0, 100).map(scrubFrame),
-            },
-          }),
-        })),
+  return crumb;
+}
+
+function scrubRequest(request: Record<string, unknown>): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...request };
+  delete next.data;
+  delete next.body;
+  delete next.cookies;
+  delete next.headers;
+  delete next.query_string;
+  delete next.env;
+  if (typeof next.url === "string") next.url = scrubUrl(next.url);
+  return next;
+}
+
+function scrubFrame(frame: unknown): unknown {
+  if (!frame || typeof frame !== "object") return frame;
+  const next: Record<string, unknown> = { ...(frame as Record<string, unknown>) };
+  delete next.vars;
+  if (typeof next.filename === "string") next.filename = scrubUrl(next.filename);
+  if (typeof next.abs_path === "string") next.abs_path = scrubUrl(next.abs_path);
+  return next;
+}
+
+function scrubException(exception: Record<string, unknown>): Record<string, unknown> {
+  const values = exception.values;
+  if (!Array.isArray(values)) return { ...exception };
+  return {
+    ...exception,
+    values: values.map((entry) => {
+      if (!entry || typeof entry !== "object") return entry;
+      const next: Record<string, unknown> = { ...(entry as Record<string, unknown>) };
+      if ("value" in next) next.value = REDACTED;
+      const stacktrace = next.stacktrace;
+      if (stacktrace && typeof stacktrace === "object") {
+        const frames = (stacktrace as { frames?: unknown }).frames;
+        next.stacktrace = {
+          ...(stacktrace as Record<string, unknown>),
+          frames: Array.isArray(frames) ? frames.map(scrubFrame) : frames,
+        };
+      }
+      return next;
+    }),
+  };
+}
+
+function scrubBreadcrumbsField(breadcrumbs: unknown): unknown {
+  if (Array.isArray(breadcrumbs)) {
+    return breadcrumbs
+      .map((crumb) => scrubBreadcrumb(crumb))
+      .filter((crumb): crumb is NonNullable<typeof crumb> => crumb != null);
+  }
+  if (
+    breadcrumbs &&
+    typeof breadcrumbs === "object" &&
+    Array.isArray((breadcrumbs as { values?: unknown }).values)
+  ) {
+    const values = (breadcrumbs as { values: unknown[] }).values;
+    return {
+      ...(breadcrumbs as Record<string, unknown>),
+      values: values
+        .map((crumb) => scrubBreadcrumb(crumb))
+        .filter((crumb): crumb is NonNullable<typeof crumb> => crumb != null),
     };
   }
-  if (Array.isArray(event.breadcrumbs)) {
-    next.breadcrumbs = event.breadcrumbs
-      .slice(-20)
-      .map((crumb) => scrubBreadcrumb(crumb))
-      .filter((crumb): crumb is ReportableBreadcrumb => crumb !== null);
-  }
-  if (event.extra) {
-    next.extra = {};
-    if (typeof event.extra.route === "string") next.extra.route = scrubRouteUrl(event.extra.route);
-  }
-  if (event.tags) {
-    next.tags = {};
-    if (typeof event.tags.source === "string" && KNOWN_REPORT_SOURCES.has(event.tags.source))
-      next.tags.source = event.tags.source;
-    if (event.tags.handled === "true" || event.tags.handled === "false")
-      next.tags.handled = event.tags.handled;
-  }
-  return next as T;
-}
-
-const KNOWN_LEVELS: ReadonlySet<string> = new Set([
-  "fatal",
-  "error",
-  "warning",
-  "log",
-  "info",
-  "debug",
-]);
-const KNOWN_REPORT_SOURCES: ReadonlySet<string> = new Set([
-  "manual",
-  "react_error_boundary",
-  "route_error_component",
-]);
-const KNOWN_CONTEXT_NAMES: Readonly<Record<string, ReadonlySet<string>>> = {
-  browser: new Set([
-    "Chrome",
-    "Chrome Mobile",
-    "Chromium",
-    "Firefox",
-    "Firefox Mobile",
-    "Safari",
-    "Mobile Safari",
-    "Edge",
-    "Opera",
-    "Samsung Internet",
-  ]),
-  os: new Set(["Windows", "macOS", "Mac OS X", "Linux", "Android", "iOS", "Chrome OS"]),
-  runtime: new Set(["browser", "Browser", "JavaScript"]),
-};
-const KNOWN_BREADCRUMB_CATEGORIES: ReadonlySet<string> = new Set([
-  "fetch",
-  "xhr",
-  "navigation",
-  "sentry.event",
-  "sentry.transaction",
-  "error",
-]);
-const KNOWN_HTTP_METHODS: ReadonlySet<string> = new Set([
-  "GET",
-  "POST",
-  "PUT",
-  "PATCH",
-  "DELETE",
-  "HEAD",
-  "OPTIONS",
-]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** Only finite, nonnegative positions survive; source and symbol text is never forwarded. */
-type ReportableFrame = NonNullable<
-  NonNullable<ReportableException["stacktrace"]>["frames"]
->[number];
-
-function scrubFrame(frame: unknown): ReportableFrame {
-  if (!isRecord(frame)) return {};
-  const out: ReportableFrame = {};
-  for (const key of ["filename", "abs_path"] as const) {
-    if (typeof frame[key] === "string") out[key] = scrubUrl(frame[key]);
-  }
-  for (const key of ["lineno", "colno"] as const) {
-    const value = frame[key];
-    if (
-      typeof value === "number" &&
-      Number.isInteger(value) &&
-      value >= 0 &&
-      value <= 2_147_483_647
-    )
-      out[key] = value;
-  }
-  if (typeof frame.in_app === "boolean") out.in_app = frame.in_app;
-  return out;
-}
-
-/** Returns null to drop the breadcrumb; otherwise a scrubbed copy. Usable as `beforeBreadcrumb`. */
-export function scrubBreadcrumb<T extends ReportableBreadcrumb | null | undefined>(
-  crumb: T,
-): T | null {
-  if (!crumb) return null;
-  if (!crumb.category || !KNOWN_BREADCRUMB_CATEGORIES.has(crumb.category)) return null;
-  const next: ReportableBreadcrumb = { category: crumb.category };
-  if (typeof crumb.message === "string") next.message = summarizeErrorText(crumb.message);
-  if (crumb.data) {
-    const data: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(crumb.data)) {
-      if (key === "from" || key === "to") {
-        // Navigation breadcrumbs: in-app page paths.
-        data[key] = scrubRouteUrl(value);
-      } else if (key === "url") {
-        data[key] = scrubUrl(value);
-      } else if (key === "method" && typeof value === "string" && KNOWN_HTTP_METHODS.has(value)) {
-        data[key] = value;
-      } else if (
-        key === "status_code" &&
-        typeof value === "number" &&
-        Number.isInteger(value) &&
-        value >= 100 &&
-        value <= 599
-      ) {
-        data[key] = value;
-      }
-      // Objects (request/response bodies, headers) are dropped.
-    }
-    next.data = data;
-  }
-  return next as T;
-}
-
-// ── Manual capture context ───────────────────────────────────────────────────
-
-export interface ManualReportContext {
-  readonly source: "react_error_boundary" | "route_error_component" | "manual";
-  readonly route?: string | null;
-  readonly handled?: boolean;
+  return breadcrumbs;
 }
 
 /**
- * Normalises whatever a boundary caught into something Sentry can group on.
- * Loaders and server fns commonly throw a raw `Response`; `String(it)` is the
- * opaque "[object Response]", so surface the status and path instead.
+ * Small `beforeSend` floor. Returns null only when the event itself is null.
+ * Drops user (including IP), request bodies, and content breadcrumbs. Redacts
+ * free text. Strips query strings and rejects non-http schemes, including
+ * `vbscript:`.
  */
-export function normalizeCaughtError(error: unknown): Error {
-  if (error instanceof Error) return error;
-  if (typeof Response !== "undefined" && error instanceof Response) {
-    const where = error.url ? ` at ${scrubUrl(error.url)}` : "";
-    return new Error(`Response ${error.status}${where}`);
+export function scrubEvent<T>(event: T): T {
+  if (event == null || typeof event !== "object") return event;
+  const next: Record<string, unknown> = { ...(event as Record<string, unknown>) };
+  delete next.user;
+  delete next.extra;
+  if (typeof next.message === "string") next.message = REDACTED;
+  if (next.logentry && typeof next.logentry === "object") {
+    next.logentry = { ...(next.logentry as Record<string, unknown>), message: REDACTED };
   }
-  return new Error(scrubText(error) || "Unknown error");
+  if (next.request && typeof next.request === "object") {
+    next.request = scrubRequest(next.request as Record<string, unknown>);
+  }
+  if (next.exception && typeof next.exception === "object") {
+    next.exception = scrubException(next.exception as Record<string, unknown>);
+  }
+  if ("breadcrumbs" in next) next.breadcrumbs = scrubBreadcrumbsField(next.breadcrumbs);
+  return next as T;
 }
 
-/** Deterministic tag/extra payload attached to a manual capture. */
-export function buildManualReportContext(context: ManualReportContext | null | undefined): {
-  tags: Record<string, string>;
-  extra: Record<string, string>;
-} {
-  const source = context?.source ?? "manual";
-  const handled = context?.handled === true ? "true" : "false";
-  const route = typeof context?.route === "string" ? scrubRouteUrl(context.route) : "";
-  return {
-    tags: { source, handled },
-    extra: route ? { route } : {},
-  };
+export function normalizeCaughtError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  return new Error(REDACTED);
+}
+
+export function manualReportTags(
+  context: ManualReportContext | null | undefined,
+): Record<string, string> {
+  if (!context) return {};
+  const tags: Record<string, string> = {};
+  if (typeof context.source === "string" && /^[a-z0-9_]{1,64}$/.test(context.source)) {
+    tags.source = context.source;
+  }
+  if (typeof context.handled === "boolean") tags.handled = context.handled ? "true" : "false";
+  if (typeof context.route === "string" && context.route.length > 0) {
+    const route = scrubUrl(context.route);
+    if (route) tags.route = route.slice(0, 300);
+  }
+  return tags;
 }

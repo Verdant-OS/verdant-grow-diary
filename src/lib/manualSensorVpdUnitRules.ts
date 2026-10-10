@@ -73,6 +73,22 @@ export function displayManualVpdFromCanonical(canonical: string, unit: ManualVpd
   return String(kpaToUnit(parsed, unit));
 }
 
+/**
+ * True when two canonical kPa strings are the same reading. `1.20` and `1.2`
+ * match. Blank matches only blank. Non-numeric text matches only itself.
+ */
+export function sameCanonicalManualVpd(left: string, right: string): boolean {
+  if (left === right) return true;
+  const a = left.trim();
+  const b = right.trim();
+  if (a === b) return true;
+  if (a === "" || b === "") return false;
+  const leftNumber = Number(a);
+  const rightNumber = Number(b);
+  if (!Number.isFinite(leftNumber) || !Number.isFinite(rightNumber)) return false;
+  return leftNumber === rightNumber;
+}
+
 /** Reexpress the number the grower is looking at when they change units. */
 export function reexpressManualVpdInput(
   raw: string,

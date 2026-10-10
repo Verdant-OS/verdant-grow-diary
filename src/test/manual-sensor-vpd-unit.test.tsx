@@ -6,21 +6,31 @@
  * in the unit the grower selected. Default unit is kPa. The choice is not
  * stored in localStorage.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
-import { applyManualVpdRangeGate } from "@/lib/manualSensorVpdUnitRules";
+import { applyManualVpdRangeGate, sameCanonicalManualVpd } from "@/lib/manualSensorVpdUnitRules";
 import { validateManualEntry } from "@/lib/sensorReadingManualEntryRules";
 
 const TENT = "11111111-1111-4111-8111-111111111111";
+const FIRST_CAPTURED_AT = "2026-10-10T22:00:00.000Z";
+const RETRY_CAPTURED_AT = "2026-10-10T22:05:00.000Z";
 const insertedRows: unknown[] = [];
+const insertPosts: unknown[][] = [];
+let failInsertsRemaining = 0;
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
       insert: async (row: unknown) => {
+        const copy = JSON.parse(JSON.stringify(row)) as unknown;
+        insertPosts.push(Array.isArray(copy) ? copy : [copy]);
+        if (failInsertsRemaining > 0) {
+          failInsertsRemaining -= 1;
+          return { error: { message: "Failed to fetch" } };
+        }
         insertedRows.push(row);
         return { error: null };
       },
@@ -56,6 +66,27 @@ function savedVpd(): number | undefined {
   const match = flattened.find((row) => (row as { metric?: string }).metric === "vpd_kpa") as
     { value?: number } | undefined;
   return match?.value;
+}
+
+function vpdPosts(): { captured_at?: string; ts?: string; value?: number }[] {
+  return insertPosts.map((post) => {
+    const match = post.find((row) => (row as { metric?: string }).metric === "vpd_kpa") as
+      { captured_at?: string; ts?: string; value?: number } | undefined;
+    if (!match) throw new Error("vpd row missing from insert");
+    return match;
+  });
+}
+
+async function saveUntilUnconfirmed() {
+  fireEvent.click(screen.getByTestId("manual-reading-save"));
+  fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+  await screen.findByTestId("manual-reading-save-unconfirmed");
+}
+
+function resetInserts() {
+  insertedRows.length = 0;
+  insertPosts.length = 0;
+  failInsertsRemaining = 0;
 }
 
 describe("ManualSensorReadingCard VPD units", () => {
@@ -108,6 +139,72 @@ describe("ManualSensorReadingCard VPD units", () => {
     expect(screen.getByTestId("manual-reading-errors").textContent ?? "").toMatch(
       /VPD 30 mbar is outside the accepted range \(2–25 mbar\)/,
     );
+  });
+});
+
+describe("manual VPD unit toggle pending save", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    resetInserts();
+  });
+
+  it("keeps the pending snapshot identity when a unit round trip does not change kPa", async () => {
+    resetInserts();
+    failInsertsRemaining = 1;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(FIRST_CAPTURED_AT);
+    renderCard();
+    fireEvent.change(vpdInput(), { target: { value: "1.20" } });
+    await saveUntilUnconfirmed();
+    expect(vpdPosts()).toHaveLength(1);
+
+    vi.setSystemTime(RETRY_CAPTURED_AT);
+    fireEvent.click(screen.getByTestId("manual-reading-vpd-unit-hPa"));
+    expect(vpdInput().value).toBe("12");
+    fireEvent.click(screen.getByTestId("manual-reading-vpd-unit-kPa"));
+    expect(vpdInput().value).toBe("1.2");
+
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+    await screen.findByTestId("manual-reading-saved-confirmation");
+
+    const posts = vpdPosts();
+    expect(posts).toHaveLength(2);
+    expect(posts[1]).toEqual(posts[0]);
+    expect(posts[0]?.captured_at).toBe(FIRST_CAPTURED_AT);
+    expect(posts[1]?.captured_at).toBe(posts[0]?.captured_at);
+    expect(new Set(posts.map((post) => post.captured_at)).size).toBe(1);
+    expect(savedVpd()).toBe(1.2);
+  });
+
+  it("resets the pending snapshot identity when the reading itself changes", async () => {
+    resetInserts();
+    failInsertsRemaining = 1;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(FIRST_CAPTURED_AT);
+    renderCard();
+    fireEvent.change(vpdInput(), { target: { value: "1.20" } });
+    await saveUntilUnconfirmed();
+
+    vi.setSystemTime(RETRY_CAPTURED_AT);
+    fireEvent.change(vpdInput(), { target: { value: "1.30" } });
+    await confirmSave();
+
+    const posts = vpdPosts();
+    expect(posts).toHaveLength(2);
+    expect(posts[0]?.captured_at).toBe(FIRST_CAPTURED_AT);
+    expect(posts[1]?.captured_at).toBe(RETRY_CAPTURED_AT);
+    expect(posts[1]?.captured_at).not.toBe(posts[0]?.captured_at);
+    expect(posts[1]?.value).toBe(1.3);
+    expect(savedVpd()).toBe(1.3);
+  });
+});
+
+describe("sameCanonicalManualVpd", () => {
+  it("treats numerically equal kPa strings as the same reading", () => {
+    expect(sameCanonicalManualVpd("1.20", "1.2")).toBe(true);
+    expect(sameCanonicalManualVpd("1.20", "1.21")).toBe(false);
+    expect(sameCanonicalManualVpd("", "")).toBe(true);
+    expect(sameCanonicalManualVpd("1.2", "")).toBe(false);
   });
 });
 

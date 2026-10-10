@@ -49,20 +49,20 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ```text
 TASK MANUAL-TENT-LABEL-VPD-UNIT-1957-1958  priority: other  status: OPEN
-goal: Client-only fixes for #1957 and #1958. Duplicate manual-reading tent names show a distinguishing label (grow name, otherwise a stable id suffix) while unique names stay plain and the option value stays the tent id. The manual VPD field accepts kPa, hPa, or mbar, converts to canonical kPa before save, and rejects out-of-range values after conversion. No schema, migration, RLS, Edge, or localStorage unit preference.
+goal: Client-only fixes for #1957 and #1958. Duplicate manual-reading tent names show a distinguishing label (grow name, otherwise a stable id suffix) while unique names stay plain and the option value stays the tent id. Labels that still collide across those styles, or with a unique tent's plain name, fall back to a longer id suffix until every option label is unique. The manual VPD field accepts kPa, hPa, or mbar, converts to canonical kPa before save, and rejects out-of-range values after conversion. A unit toggle that keeps the same kPa number does not clear the pending snapshot. No schema, migration, RLS, Edge, or localStorage unit preference.
 branch: cursor/manual-tent-vpd-units-19a1
 base: verdant-grow-diary
 checkout: git fetch origin cursor/manual-tent-vpd-units-19a1 verdant-grow-diary && git switch cursor/manual-tent-vpd-units-19a1 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1963
-head_sha: 7b92a95c5185483a191566581ce2c3e47b7e9fad is the pushed head before this PR-URL commit. Implementation is d649b7b2ff9e67f910400098d08589d9ec3a09af. This commit cannot name itself; read the PR head after push. Base observed at 2574b187b9c72d3a1dc3b7fe0e590b6da84d7285 on 2026-10-10 00:25 UTC.
-state: pushed draft #1963. DailyCheck.tsx is not edited (#1740 holds it). sensorTruthRules.ts, sensorReadingManualEntryRules.ts, and the manual snapshot history files are not edited (#1956 holds them).
-next_action: required checks at the PR head. Stay draft. No ready, merge, or deploy.
+head_sha: eb6cfb66716594d57e37232a38898b9cf57467ba was the owner merge head this fix started from. This commit cannot name itself; read the PR head after push.
+state: pushed draft #1963. DailyCheck.tsx is not edited (#1740 holds it). sensorTruthRules.ts, sensorReadingManualEntryRules.ts, and the manual snapshot history files are not edited (#1956 holds them). ManualSensorReadingCard.tsx is shared with #1962; this change is only the VPD unit toggle's pending-snapshot guard, and this PR merges before #1962.
+next_action: required checks at the new head. Stay draft. No ready, merge, or deploy.
 files: src/components/ManualSensorReadingCard.tsx; src/pages/Sensors.tsx; src/lib/manualTentOptionLabelRules.ts; src/lib/manualSensorVpdUnitRules.ts; src/test/manual-tent-option-labels.test.tsx; src/test/manual-sensor-vpd-unit.test.tsx; docs/agents/HANDOFF_LOG.md (this record)
 blockers: none for the repository change. Do not edit locked scorers. Do not deploy or write production Supabase. HANDOFF_LOG.md is also touched by open PRs #1830, #1923, #1925, #1933, #1934, #1938, #1941, #1949, #1952, and #1956; this block is additive and is not a second implementation of those tasks.
-artifacts: Collision Guard receipt /opt/cursor/artifacts/pr-file-overlap.json (overlap audit exit 0 at 2026-10-10T00:25:50.209Z, 49 open PRs). Product paths ManualSensorReadingCard.tsx and Sensors.tsx had no open-PR overlap.
+artifacts: Collision Guard receipt /opt/cursor/artifacts/pr-file-overlap.json (overlap audit exit 0 at 2026-10-10T23:01:55.604Z, 58 open PRs, 129 overlapping pairs, 84 hot-path collisions). ManualSensorReadingCard.tsx is shared with #1962 only. HANDOFF_LOG.md is shared with the docs PRs named in blockers. The label and VPD rule files are unique to this PR.
 reviewer_seat: Blue Dream (.tsx product files)
-claimed_by: Grok, 2026-10-10 01:37 UTC
-last_updated: 2026-10-09 20:37 CT, by Grok
+claimed_by: Grok, 2026-10-10 22:56 UTC
+last_updated: 2026-10-10 17:56 CT, by Grok
 ```
 
 ### PR-1939-NOT-FOUND-COVERAGE

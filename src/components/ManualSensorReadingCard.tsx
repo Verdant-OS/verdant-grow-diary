@@ -87,6 +87,7 @@ import {
   MANUAL_VPD_UNITS,
   relabelManualVpdMessage,
   reexpressManualVpdInput,
+  sameCanonicalManualVpd,
   type ManualVpdUnit,
 } from "@/lib/manualSensorVpdUnitRules";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
@@ -534,7 +535,9 @@ export default function ManualSensorReadingCard({
     const canonical = canonicalManualVpdInput(nextText, next);
     setVpdUnit(next);
     setVpdText(nextText);
-    if (canonical !== formVpd) {
+    // Display-only when the kPa number is unchanged. Rewriting the draft
+    // would drop the pending snapshot and let a retry insert a second reading.
+    if (!sameCanonicalManualVpd(canonical, formVpd)) {
       lastWrittenVpd.current = canonical;
       update("vpdKpa", canonical);
     }

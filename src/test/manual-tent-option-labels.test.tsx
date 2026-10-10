@@ -17,6 +17,11 @@ const SOUTH = "22222222-2222-4222-8222-222222222222";
 const UNIQUE = "33333333-3333-4333-8333-333333333333";
 const SAME_GROW_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
 const SAME_GROW_B = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2";
+const GROW_CAFE = "11111111-1111-4111-8111-11111111cafe";
+const SUFFIX_CAFE = "22222222-2222-4222-8222-22222222cafe";
+const GROW_NAMED_CAFE = "11111111-1111-4111-8111-111111111111";
+const SUFFIX_ONLY_CAFE = "22222222-2222-4222-8222-22222222cafe";
+const LITERAL_CAFE = "44444444-4444-4444-8444-444444444444";
 
 function renderCard(tents: { id: string; name: string; growName?: string | null }[]) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -58,6 +63,45 @@ describe("manualTentOptionLabels", () => {
     expect(labels.get(NORTH)).toBe(`Flower · ${stableTentIdSuffix(NORTH, peers)}`);
     expect(new Set(labels.values()).size).toBe(3);
     expect(labels.get(SAME_GROW_A)).not.toContain("Shared");
+    expect(manualTentOptionLabels(input)).toEqual(labels);
+  });
+
+  it("does not let a grow-name label collide with an id-suffix label", () => {
+    const input = [
+      { id: GROW_NAMED_CAFE, name: "Flower", growName: "cafe" },
+      { id: SUFFIX_ONLY_CAFE, name: "Flower" },
+    ];
+    const labels = manualTentOptionLabels(input);
+    expect(labels.get(GROW_NAMED_CAFE)).not.toBe(labels.get(SUFFIX_ONLY_CAFE));
+    expect(new Set(labels.values()).size).toBe(2);
+    expect([...labels.keys()].sort()).toEqual([GROW_NAMED_CAFE, SUFFIX_ONLY_CAFE].sort());
+    expect(manualTentOptionLabels(input)).toEqual(labels);
+  });
+
+  it("keeps a unique tent name when it matches another option's disambiguated label", () => {
+    const input = [
+      { id: LITERAL_CAFE, name: "Flower · cafe" },
+      { id: GROW_NAMED_CAFE, name: "Flower", growName: "cafe" },
+      { id: SUFFIX_ONLY_CAFE, name: "Flower" },
+    ];
+    const labels = manualTentOptionLabels(input);
+    expect(labels.get(LITERAL_CAFE)).toBe("Flower · cafe");
+    expect(labels.get(GROW_NAMED_CAFE)).not.toBe("Flower · cafe");
+    expect(labels.get(SUFFIX_ONLY_CAFE)).not.toBe("Flower · cafe");
+    expect(new Set(labels.values()).size).toBe(3);
+    expect(manualTentOptionLabels(input)).toEqual(labels);
+  });
+
+  it("keeps id-suffix labels unique when two ids share a short tail", () => {
+    const peers = [GROW_CAFE, SUFFIX_CAFE];
+    const input = [
+      { id: GROW_CAFE, name: "Flower" },
+      { id: SUFFIX_CAFE, name: "Flower" },
+    ];
+    const labels = manualTentOptionLabels(input);
+    expect(labels.get(GROW_CAFE)).toBe(`Flower · ${stableTentIdSuffix(GROW_CAFE, peers)}`);
+    expect(labels.get(SUFFIX_CAFE)).toBe(`Flower · ${stableTentIdSuffix(SUFFIX_CAFE, peers)}`);
+    expect(labels.get(GROW_CAFE)).not.toBe(labels.get(SUFFIX_CAFE));
     expect(manualTentOptionLabels(input)).toEqual(labels);
   });
 });
@@ -133,5 +177,18 @@ describe("ManualSensorReadingCard tent chooser", () => {
     expect(second).toHaveAccessibleName(String(second.textContent));
     expect(first.textContent ?? "").toContain("Flower ·");
     expect(second.textContent ?? "").toContain("Flower ·");
+  });
+
+  it("gives a grow-name label and an id-suffix label different accessible names", async () => {
+    renderCard([
+      { id: GROW_NAMED_CAFE, name: "Flower", growName: "cafe" },
+      { id: SUFFIX_ONLY_CAFE, name: "Flower" },
+    ]);
+    await openTentOptions();
+    const grow = await screen.findByTestId(`manual-reading-tent-option-${GROW_NAMED_CAFE}`);
+    const suffix = await screen.findByTestId(`manual-reading-tent-option-${SUFFIX_ONLY_CAFE}`);
+    expect(grow.textContent).not.toBe(suffix.textContent);
+    expect(grow).toHaveAccessibleName(String(grow.textContent));
+    expect(suffix).toHaveAccessibleName(String(suffix.textContent));
   });
 });

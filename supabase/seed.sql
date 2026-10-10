@@ -220,6 +220,28 @@ BEGIN
   END IF;
 END $$;
 
+-- Owner badge awards are owner-read only. The evaluator is the only writer.
+-- badge_award_runtime is a service_role switch (SELECT and UPDATE of the
+-- single row). Reapply that after the blanket local parity grant.
+DO $$
+BEGIN
+  IF to_regclass('public.badge_awards') IS NOT NULL
+     AND to_regclass('public.badge_evidence') IS NOT NULL
+     AND to_regclass('public.badge_award_runtime') IS NOT NULL THEN
+    REVOKE ALL ON TABLE public.badge_awards
+      FROM PUBLIC, anon, authenticated, service_role;
+    GRANT SELECT ON TABLE public.badge_awards TO authenticated;
+
+    REVOKE ALL ON TABLE public.badge_evidence
+      FROM PUBLIC, anon, authenticated, service_role;
+    GRANT SELECT ON TABLE public.badge_evidence TO authenticated;
+
+    REVOKE ALL ON TABLE public.badge_award_runtime
+      FROM PUBLIC, anon, authenticated, service_role;
+    GRANT SELECT, UPDATE ON TABLE public.badge_award_runtime TO service_role;
+  END IF;
+END $$;
+
 -- Signup acquisition attributions are written only by handle_new_user() and
 -- read only through its SECURITY DEFINER snapshot/reporting functions
 -- (20260813030000). No role -- not even service_role -- holds direct table

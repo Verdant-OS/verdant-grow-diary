@@ -646,12 +646,13 @@ export function scrubUrl(value: unknown): string {
   if (/^https?:\/\/\[redacted-host\](?:\/(?::redacted|:id)?)*$/.test(value)) return value;
   try {
     const url = new URL(value);
-    // Only http(s) has an origin + path worth keeping. data:, javascript:, blob:,
+    // Only http(s) has an origin + path worth keeping. data:, javascript:, vbscript:, blob:,
     // extension and other schemes can carry a payload in what follows the scheme.
     if (url.protocol !== "http:" && url.protocol !== "https:") {
       return [
         "data:",
         "javascript:",
+        "vbscript:",
         "blob:",
         "chrome-extension:",
         "moz-extension:",

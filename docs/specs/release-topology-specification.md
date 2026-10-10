@@ -13,6 +13,11 @@ and a third build integration (§2.6); evidence-status and hosting-timeline note
 architecture-contract work, sequenced after `#1221` merged (`cb6c3288`, 2026-09-25 00:12 UTC).
 First opened as `#1699`; carried forward on `claude/clever-davinci-hk7o03` after its owning session
 was archived (§2.4)
+**Hosting note (2026-10-10, Matthew Cheek):** production runs on Cloudflare Workers at
+https://verdantgrowdiary.com. Vercel and Lovable measurements in this specification are
+dated records of earlier hosts. Release evidence is live `/version.json`. The Vercel
+"Account is blocked." status is an owner-side account issue. Do not investigate it.
+
 **Status:** **Specification with a measured baseline, one measured incident and one measured
 change of promotion path.** §§3–9 are durable: the topology model, the rules, and the measurement
 procedures. Appendix A is the founding measurement, Appendix B the promotion incident that followed

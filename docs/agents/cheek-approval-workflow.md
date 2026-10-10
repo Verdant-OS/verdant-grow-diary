@@ -12,8 +12,8 @@ role-reassignment power. Agents recommend; **only Cheek approves what ships**.
 | Doc | Role |
 |-----|------|
 | [`AGENTS.md`](../../AGENTS.md) | Constitution; pipeline ends at Cheek approval |
-| [`HANDOFF_PROTOCOL.md`](./HANDOFF_PROTOCOL.md) | Serial handoffs; Council recommends |
-| [`roles/council-chair.md`](./roles/council-chair.md) | One recommendation for Cheek |
+| [`HANDOFF_PROTOCOL.md`](./HANDOFF_PROTOCOL.md) | Serial handoffs; Cheek approves what ships |
+| Retired 2026-10-10 | There is no Council Chair role and no Security role (Matthew Cheek). Do not load `roles/council-chair.md` or `roles/security.md`. |
 | [`CURRENT_STATE.md`](./CURRENT_STATE.md) | Deploy branch + production verification state |
 | [`.github/pull_request_template.md`](../../.github/pull_request_template.md) | Per-PR review surface |
 | [`docs/v0-release-validation-checklist.md`](../v0-release-validation-checklist.md) | V0 merge checklist |
@@ -28,16 +28,16 @@ role-reassignment power. Agents recommend; **only Cheek approves what ships**.
 **Cheek** is the human product owner for Verdant (GitHub actor typically
 `cheekhimself`). In multi-agent operations:
 
-| Power | Cheek | Agents / Council |
+| Power | Cheek | Agents |
 |-------|-------|------------------|
 | Approve what ships | **Yes — sole** | No |
 | Reassign agent roles | **Yes — sole** | No (unless Cheek reassigns) |
 | Domain product decisions (e.g. 15m vs 30m live UI) | **Yes** | May recommend only |
 | Merge / close / comment as owner | **Yes** | Only if Cheek grants or executes |
-| Security stop-ship | Accepts Security `FAIL` as binding | Security may declare `FAIL`; cannot ship over it |
+| Security checklist stop-ship | Accepts a security-checklist `FAIL` as binding | There is no Security role. A checklist `FAIL` cannot be shipped over |
 | Production “it is live and healthy” claims | **Yes**, with evidence | Never invent deploy/index/traffic outcomes |
 
-Council Chair **recommends**. It does **not** release.
+There is no Council Chair role and no Security role (Matthew Cheek, 2026-10-10). Neither recommends nor releases. Cheek approval does not wait on either.
 
 ---
 
@@ -49,11 +49,9 @@ Default preferred path ([`AGENTS.md`](../../AGENTS.md) / [`HANDOFF_PROTOCOL.md`]
 Research (often Grok)
   → Architecture (often Claude)
     → Build (often Codex)
-      → Security Review (stop-ship on FAIL)
-        → QA Audit (Gemini)
-          → Council (one recommendation)
-            → Cheek approval          ← terminal human gate
-              → merge / hold / close / reassign / ship-verify
+      → QA Audit (Gemini)
+        → Cheek approval          ← terminal human gate
+          → merge / hold / close / reassign / ship-verify
 ```
 
 **Peers (Cheek, 2026-08-20, refined):** Codex, Claude, and Grok have equal authority —
@@ -66,8 +64,8 @@ the slice.
 different peer as independent reviewer. Owner cannot review their own work.
 
 Standing collision fences in `CURRENT_STATE.md` still bind (Tranche A remaining edit
-points = Codex until reassigned; Tranche B+ = Claude until reassigned; no competing
-Timeline / Alerts / Action Queue rewrite).
+points = Codex until reassigned; Tranche B+ was reassigned to Canopy on 2026-10-10;
+no competing Timeline / Alerts / Action Queue rewrite).
 
 Scoped work may use a **subset** of roles. Parallel implementation of the same
 slice is a protocol failure — Cheek should reject “two agents both shipping X.”
@@ -95,7 +93,7 @@ another explicit action). Not whether an agent “liked” the work.
 6. **Domain decisions** agents cannot average (product windows, ship/no-ship)  
 7. **Ref:** deploy-branch SHA / PR head named  
 8. **Risk / rollback** acceptable  
-9. **Council** (if full pipeline): one recommendation, one next_slice  
+9. **Council** — retired (Matthew Cheek, 2026-10-10). Do not wait for a Council recommendation.  
 
 ### 3.2 Status vocabulary (reject laundering)
 
@@ -131,8 +129,8 @@ outcomes. Require authorized source + provenance.
 ### 4.2 Full multi-agent slice
 
 - All five handoffs (or explicit N/A with reason)
-- Council synthesis: one paragraph recommendation first
-- Security `PASS` / `FAIL` / `BLOCKED`
+- Council synthesis is retired (Matthew Cheek, 2026-10-10). Do not wait for it.
+- Security-checklist `PASS` / `FAIL` / `BLOCKED` (there is no Security role)
 - Gemini claim audit (CI ≠ production ≠ indexing)
 
 ### 4.3 Paste-ready packet (agents → Cheek)
@@ -195,7 +193,7 @@ owner control. **Authority** remains Cheek’s either way.
 
 1. Author completes PR template + relevant checklists.  
 2. Required CI green on **head**.  
-3. Optional Security / Gemini / Council for sensitive areas.  
+3. Optional Gemini audit for sensitive areas. There is no Security role and no Council Chair.  
 4. Cheek reviews packet → merge (e.g. squash) to `verdant-grow-diary`.  
 5. If production claims matter: verify with CURRENT_STATE discipline
    (`version.json`, scoped SEO/monitoring, etc.).
@@ -203,7 +201,7 @@ owner control. **Authority** remains Cheek’s either way.
 ### 6.2 Full multi-agent program slice
 
 1. Serial handoffs complete (no parallel implement of same slice).  
-2. Council emits one recommendation + one next_slice.  
+2. There is no Council step (Matthew Cheek, 2026-10-10). Cheek does not wait for one.  
 3. Cheek **approves, holds, redirects, or reassigns**.  
 4. Only after Cheek approval is “shipped” language valid for that slice.
 
@@ -244,7 +242,7 @@ owner control. **Authority** remains Cheek’s either way.
 | Signal | Why insufficient alone |
 |--------|-------------------------|
 | Agent LGTM / “ship it” | No ship authority |
-| Council recommendation | Input only |
+| Council recommendation | Retired role (2026-10-10). Not a current step, and never ship authority |
 | CI green | Necessary often; not domain/product decision |
 | Green on `main` | Production is `verdant-grow-diary` |
 | Local tests without named ref | Not a deploy-branch finding |
@@ -321,7 +319,7 @@ applies_to_prs:
 - [ ] No invented metrics or deploy claims  
 - [ ] BLOCKED axes still labeled BLOCKED  
 - [ ] Rollback notes present for behavior changes  
-- [ ] If full pipeline: Council packet attached or N/A justified  
+- [ ] Do not wait for a Council packet. That role is retired (Matthew Cheek, 2026-10-10)  
 - [ ] `merge_permission: none` roles do not self-merge  
 
 ---
@@ -382,19 +380,15 @@ flowchart TB
     Grok["Grok - Product intelligence / audit / implement"]
     Claude["Claude - Specs (peer when owning)"]
     Codex["Codex - Often build (not exclusive)"]
-    Security["Security - Trust boundaries"]
     Gemini["Gemini - QA / release risk"]
-    Council["Council Chair - One recommendation"]
     Grok --> Claude
     Claude --> Codex
-    Codex --> Security
-    Security --> Gemini
-    Gemini --> Council
+    Codex --> Gemini
   end
 
   subgraph cheek_gate["Cheek approval - sole ship authority"]
     Packet["CHEEK_APPROVAL_PACKET + CI + security"]
-    SecFail{"Security FAIL?"}
+    SecFail{"Security checklist FAIL?"}
     Evidence{"Required evidence OK?"}
     Ask{"single_ask"}
     StopShip["STOP-SHIP - remediate before re-ask"]
@@ -406,7 +400,7 @@ flowchart TB
     Prod["Optional production verify"]
   end
 
-  Council --> Packet
+  Gemini --> Packet
   Packet --> SecFail
   SecFail -->|yes| StopShip
   SecFail -->|no| Evidence
@@ -428,8 +422,7 @@ flowchart LR
   subgraph inputs["Inputs"]
     P["Approval packet"]
     CI["Required CI on PR head"]
-    S["Security PASS / FAIL / BLOCKED"]
-    C["Council rec or N/A"]
+    S["Security checklist PASS / FAIL / BLOCKED"]
     D["Domain decisions"]
   end
 
@@ -449,7 +442,6 @@ flowchart LR
   P --> J
   CI --> J
   S --> J
-  C --> J
   D --> J
   J --> M
   J --> H
@@ -465,7 +457,7 @@ flowchart LR
 flowchart TB
   subgraph not_enough["Not ship authority alone"]
     LGTM["Agent LGTM"]
-    CounRec["Council recommendation"]
+    CounRec["Retired Council recommendation"]
     GreenCI["CI green"]
     Main["Green on main"]
     Local["Local tests no ref"]
@@ -513,7 +505,7 @@ For editors that do not render Mermaid:
 |-------|--------|
 | Type | Process / authority workflow |
 | Grants merge to agents? | **No** |
-| Replaces Council? | **No** — consumes Council output |
+| Replaces Council? | The Council Chair role is retired (Matthew Cheek, 2026-10-10). This workflow does not wait on it |
 | Implementation code changes? | **None** by this doc alone |
 | Success metric | Cheek decisions are explicit, evidence-based, and non-laundering |
 

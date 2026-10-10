@@ -1,6 +1,7 @@
 # Lighting launch verification
 
 **Generated:** 2026-08-02T05:19:48.245Z
+**Hosting note (2026-10-10, Matthew Cheek):** production runs on Cloudflare Workers at https://verdantgrowdiary.com. Sentences in this report that name Lovable as the production publisher are the 2026-08-02 measurement, kept as history.
 **Production host:** https://verdantgrowdiary.com
 **Merged PR:** [#595](https://github.com/Verdant-OS/verdant-grow-diary/pull/595)
 **Merge commit:** `1223c56c9db586160a2798d017c2e78d1de1dd5a`

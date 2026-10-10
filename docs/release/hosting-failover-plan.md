@@ -1,5 +1,11 @@
 # Hosting failover plan (contingency only)
 
+Historical as of 2026-10-10 (Matthew Cheek). Production runs on Cloudflare Workers
+at https://verdantgrowdiary.com. This plan describes an earlier Vercel-hosted period.
+Do not use it as the current deploy procedure. The Vercel "Account is blocked." status
+is an owner-side account issue. Do not investigate it, rerun it, re-trigger it, or
+work around it. Do not change deploy settings.
+
 Status: a contingency map. **Nothing in this document has been executed.** Any host move,
 DNS change, project creation or publisher switch is **Matthew's decision** under the
 existing publish hold. Agents don't promote, publish, repoint DNS or move hosts. Handoff

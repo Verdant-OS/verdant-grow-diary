@@ -3,7 +3,10 @@
 Repository review by Claude, on Matthew Cheek's instruction of 2026-10-03 to bump the
 transition review date. Based on deploy tip `80176bad5c9c6ef6a2d8d53faaf65d55e68f06b1`.
 Previous review: [`dependency-lockfile-transition-review-2026-09-25.md`](dependency-lockfile-transition-review-2026-09-25.md).
-This is a repository CI decision, not production or release acceptance.
+This is a repository CI decision, not production or release acceptance. Historical note
+(2026-10-10): production runs on Cloudflare Workers at https://verdantgrowdiary.com.
+A `vercel.json` install pin in this review is a dated repository fact, not current host
+evidence.
 
 ## Decision and reason
 

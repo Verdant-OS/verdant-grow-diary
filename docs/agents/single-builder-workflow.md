@@ -13,7 +13,7 @@ visible in shipped Codex PRs (e.g. #1019, #1021). Cheek asked for that pattern
 to be captured as the template for single-builder operation, for use when one
 agent (whichever Cheek designates) carries the build lane alone.
 
-**Alignment note:** This doc is not one of the twelve Sentinel-versioned
+**Alignment note:** This doc is not one of the eighteen Sentinel-versioned
 governance files. If the constitution's ship-authority or startup-gate rules
 change, update this file to match `AGENTS.md`; `AGENTS.md` controls any
 conflict.

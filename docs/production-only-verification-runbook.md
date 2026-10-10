@@ -5,8 +5,7 @@ This is docs-only policy/plan. It dispatches no job and changes no CI.
 
 ## Fixture identity
 
-The assigned smoke account is cheekhimself@gmail.com. Never use
-matt@verdantgrowdiary.com or the KEEP account. Verify account and fixture
+Smoke and QA writes use a disposable test account only, never Matthew Cheek's own accounts (`cheekhimself@gmail.com`, `matt@verdantgrowdiary.com`) and never the KEEP account. Writes go only to that test account's own fixture grow, tagged `[smoke <timestamp>]`. Never touch customer data. Backdated notes are allowed on archived grows. Verify account and fixture
 ownership before a write; the email alone does not grant scope.
 
 ## Target and safety

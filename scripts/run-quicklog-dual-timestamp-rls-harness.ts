@@ -10,6 +10,7 @@
  * Temporary @verdant.test users and all fixture rows are deleted in finally.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { describeRpcResult, rpcResultDetail } from "./lib/rpcResultDetail";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? "";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -388,9 +389,10 @@ async function proveManualResponseLoss(seedA: Seed, seedB: Seed, clientB: Supaba
   check(
     "response-loss witness Note is accepted for the other fixture",
     !witness.error && witness.data?.ok === true && Boolean(witness.data?.grow_event_id),
+    describeRpcResult(witness),
   );
   if (witness.error || witness.data?.ok !== true || !witness.data?.grow_event_id) {
-    throw new Error("response-loss witness setup failed");
+    throw new Error(`response-loss witness setup failed: ${describeRpcResult(witness)}`);
   }
   const witnessBefore = await readNoteFixture(seedB.uid);
   if (
@@ -470,6 +472,7 @@ async function proveManualResponseLoss(seedA: Seed, seedB: Seed, clientB: Supaba
           rejected.data?.reason === "invalid_logged_at" &&
           rpcFetches === 1 &&
           discardedResponses === 0,
+        describeRpcResult(rejected),
       );
       const afterRejection = await readNoteFixture(seedA.uid);
       check(
@@ -493,6 +496,7 @@ async function proveManualResponseLoss(seedA: Seed, seedB: Seed, clientB: Supaba
         rpcFetches - fetchesBeforeLoss === 1 &&
           lost.data == null &&
           Boolean(lost.error?.message?.includes("harness discarded accepted Note response")),
+        describeRpcResult(lost),
       );
     }
 
@@ -594,6 +598,7 @@ async function proveManualResponseLoss(seedA: Seed, seedB: Seed, clientB: Supaba
         retry.data?.ok === true &&
         retry.data?.reused === true &&
         retry.data?.grow_event_id === receipt.grow_event_id,
+      describeRpcResult(retry),
     );
     const recovered = await readNoteFixture(seedA.uid);
     check(
@@ -672,7 +677,7 @@ async function main() {
       !eventSave.error &&
         (eventSave.data as { ok?: boolean } | null)?.ok === true &&
         Boolean(eventId),
-      eventSave.error?.message,
+      describeRpcResult(eventSave),
     );
 
     if (!eventId) throw new Error("event RPC returned no grow_event_id");
@@ -718,7 +723,7 @@ async function main() {
       !invalidEvent.error &&
         (invalidEvent.data as { reason?: string } | null)?.reason === "invalid_logged_at" &&
         invalidBefore === invalidAfter,
-      JSON.stringify(invalidEvent.data),
+      describeRpcResult(invalidEvent),
     );
 
     const rawDetailsCases: Array<{
@@ -778,8 +783,8 @@ async function main() {
           rawMirrors.length === 1 &&
           !("__verdant_request_details_hash_v1" in (rawMirrorDetails ?? {})),
         JSON.stringify({
-          initial: rawInitial.data,
-          exact: rawExactRetry.data,
+          initial: rpcResultDetail(rawInitial),
+          exact: rpcResultDetail(rawExactRetry),
           mirrors: rawMirrors,
         }),
       );
@@ -789,7 +794,7 @@ async function main() {
           (rawChangedRetry.data as { reason?: string } | null)?.reason ===
             "idempotency_key_conflict" &&
           rawAfter === rawBefore + 1,
-        JSON.stringify(rawChangedRetry.data),
+        describeRpcResult(rawChangedRetry),
       );
     }
 
@@ -806,7 +811,7 @@ async function main() {
         (oversizedRawDetails.data as { reason?: string } | null)?.reason ===
           "invalid_typed_payload" &&
         rawBoundaryAfterOversized === rawBoundaryBefore,
-      JSON.stringify(oversizedRawDetails.data),
+      describeRpcResult(oversizedRawDetails),
     );
 
     const secretLikeValue = ["sk", "test", "abcdefghijklmnop"].join("_");
@@ -822,7 +827,7 @@ async function main() {
         (secretLikeRawDetails.data as { reason?: string } | null)?.reason ===
           "invalid_typed_payload" &&
         rawBoundaryAfterSecret === rawBoundaryBefore,
-      JSON.stringify(secretLikeRawDetails.data),
+      describeRpcResult(secretLikeRawDetails),
     );
 
     const rawValidationOrder = await callEvent(clientA, {
@@ -837,7 +842,7 @@ async function main() {
       !rawValidationOrder.error &&
         (rawValidationOrder.data as { reason?: string } | null)?.reason === "invalid_event_type" &&
         rawBoundaryAfterValidationOrder === rawBoundaryBefore,
-      JSON.stringify(rawValidationOrder.data),
+      describeRpcResult(rawValidationOrder),
     );
 
     const reservedMarkerValue = `caller-controlled-${STAMP}`;
@@ -879,8 +884,8 @@ async function main() {
         (reservedMarkerChangedRetry.data as { reason?: string } | null)?.reason ===
           "idempotency_key_conflict",
       JSON.stringify({
-        initial: reservedMarkerDetails.data,
-        changed: reservedMarkerChangedRetry.data,
+        initial: rpcResultDetail(reservedMarkerDetails),
+        changed: rpcResultDetail(reservedMarkerChangedRetry),
         mirrors: reservedMarkerMirrors,
       }),
     );
@@ -913,7 +918,7 @@ async function main() {
         (malformedLegacyRetry.data as { reused?: boolean } | null)?.reused === true &&
         (malformedLegacyRetry.data as { grow_event_id?: string } | null)?.grow_event_id ===
           malformedLegacy.event.id,
-      JSON.stringify(malformedLegacyRetry.data),
+      describeRpcResult(malformedLegacyRetry),
     );
     check(
       "malformed legacy retry preserves event capture/updated_at and repairs mirror parity",
@@ -936,7 +941,7 @@ async function main() {
         (changedMalformedLegacy.data as { reason?: string } | null)?.reason ===
           "invalid_logged_at" &&
         changedLegacyBefore === changedLegacyAfter,
-      JSON.stringify(changedMalformedLegacy.data),
+      describeRpcResult(changedMalformedLegacy),
     );
 
     const futureLegacy = await seedLegacyEventRetryFixture({
@@ -966,7 +971,7 @@ async function main() {
         (futureLegacyRetry.data as { reused?: boolean } | null)?.reused === true &&
         (futureLegacyRetry.data as { grow_event_id?: string } | null)?.grow_event_id ===
           futureLegacy.event.id,
-      JSON.stringify(futureLegacyRetry.data),
+      describeRpcResult(futureLegacyRetry),
     );
     check(
       "future legacy retry preserves event capture/updated_at and repairs mirror parity",
@@ -1003,7 +1008,7 @@ async function main() {
       !legacyMarkerRetry.error &&
         (legacyMarkerRetry.data as { reused?: boolean } | null)?.reused === true &&
         legacyMarkerDetails?.__verdant_request_details_hash_v1 === legacyMarkerValue,
-      JSON.stringify({ retry: legacyMarkerRetry.data, mirrors: legacyMarkerMirrors }),
+      JSON.stringify({ retry: rpcResultDetail(legacyMarkerRetry), mirrors: legacyMarkerMirrors }),
     );
 
     const manualOccurred = "2026-07-19T19:30:00.000Z";
@@ -1028,7 +1033,7 @@ async function main() {
       !manualSave.error &&
         (manualSave.data as { ok?: boolean } | null)?.ok === true &&
         Boolean(manualId),
-      manualSave.error?.message,
+      describeRpcResult(manualSave),
     );
 
     if (!manualId) throw new Error("manual RPC returned no grow_event_id");
@@ -1063,7 +1068,7 @@ async function main() {
       (manualRetry.data as { reused?: boolean } | null)?.reused === true &&
         (manualRetry.data as { grow_event_id?: string } | null)?.grow_event_id === manualId &&
         sameInstant(manualAfterRetry.logged_at, manualCaptured),
-      JSON.stringify(manualRetry.data),
+      describeRpcResult(manualRetry),
     );
 
     const changedManualRetry = await callManual(clientA, {
@@ -1081,7 +1086,7 @@ async function main() {
           "idempotency_key_conflict" &&
         sameInstant(manualAfterChangedRetry.logged_at, manualCaptured) &&
         sameInstant(manualAfterChangedRetry.updated_at, manualRow.updated_at),
-      JSON.stringify(changedManualRetry.data),
+      describeRpcResult(changedManualRetry),
     );
 
     const malformedManualRetry = await callManual(clientA, {
@@ -1096,7 +1101,7 @@ async function main() {
           "idempotency_key_conflict" &&
         sameInstant(manualAfterMalformedRetry.logged_at, manualCaptured) &&
         sameInstant(manualAfterMalformedRetry.updated_at, manualRow.updated_at),
-      JSON.stringify(malformedManualRetry.data),
+      describeRpcResult(malformedManualRetry),
     );
 
     const invalidManualBefore = await countEvents(uidA);
@@ -1111,7 +1116,7 @@ async function main() {
       !invalidManual.error &&
         (invalidManual.data as { reason?: string } | null)?.reason === "invalid_logged_at" &&
         invalidManualBefore === invalidManualAfter,
-      JSON.stringify(invalidManual.data),
+      describeRpcResult(invalidManual),
     );
 
     const scalarManualBefore = await countEvents(uidA);
@@ -1126,7 +1131,7 @@ async function main() {
       !scalarManual.error &&
         (scalarManual.data as { reason?: string } | null)?.reason === "invalid_details" &&
         scalarManualBefore === scalarManualAfter,
-      JSON.stringify(scalarManual.data),
+      describeRpcResult(scalarManual),
     );
 
     await proveManualResponseLoss(seedA, seedB, clientB);
@@ -1155,7 +1160,7 @@ async function main() {
           (result) => !result.error && (result.data as { ok?: boolean } | null)?.ok === true,
         ) &&
         concurrentIds.every((id) => id === concurrentId),
-      concurrentIds.join(","),
+      JSON.stringify(concurrent.map((result) => rpcResultDetail(result))),
     );
     if (concurrentId) {
       const beforeRetry = await readEvent(concurrentId);
@@ -1166,6 +1171,7 @@ async function main() {
         (retry.data as { reused?: boolean } | null)?.reused === true &&
           sameInstant(beforeRetry.logged_at, afterRetry.logged_at) &&
           sameInstant(beforeRetry.updated_at, afterRetry.updated_at),
+        describeRpcResult(retry),
       );
     }
 
@@ -1240,7 +1246,7 @@ async function main() {
       "retry across malformed and spoofed mirrors still succeeds",
       !duplicateRetry.error &&
         (duplicateRetry.data as { reused?: boolean } | null)?.reused === true,
-      duplicateRetry.error?.message,
+      describeRpcResult(duplicateRetry),
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1358,7 +1364,7 @@ async function main() {
         (await countEvents(uidA)) === eventCountBeforeRetractedRetry &&
         eventAfterRetractedRetry.is_deleted === true &&
         sameInstant(eventAfterRetraction.updated_at, eventAfterRetractedRetry.updated_at),
-      JSON.stringify(retractedRetry.data),
+      describeRpcResult(retractedRetry),
     );
 
     const missingReceiptArgs = {
@@ -1370,7 +1376,9 @@ async function main() {
     const missingReceiptId = (missingReceiptSave.data as { grow_event_id?: string } | null)
       ?.grow_event_id;
     if (missingReceiptSave.error || !missingReceiptId) {
-      throw new Error(`missing-receipt fixture save failed: ${missingReceiptSave.error?.message}`);
+      throw new Error(
+        `missing-receipt fixture save failed: ${describeRpcResult(missingReceiptSave)}`,
+      );
     }
     const receiptMirrors = await readMirrors(uidA, seedA.growId, missingReceiptId);
     if (receiptMirrors.length === 0) throw new Error("missing-receipt fixture has no diary mirror");
@@ -1399,7 +1407,7 @@ async function main() {
         receiptMirrorsAfterRetry.length === receiptMirrors.length &&
         receiptMirrorsAfterRetry.every((mirror) => mirror.retracted_at != null) &&
         sameInstant(receiptEventBeforeRetry.updated_at, receiptEventAfterRetry.updated_at),
-      JSON.stringify(missingReceiptRetry.data),
+      describeRpcResult(missingReceiptRetry),
     );
 
     const anon = createClient(SUPABASE_URL, ANON_KEY, {

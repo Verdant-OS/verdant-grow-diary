@@ -144,11 +144,14 @@ import { buildTimelineLocalDateRangeBounds } from "@/lib/timelineDateRangeRules"
 import {
   deriveTimelineEventTypeOptions,
   deriveTimelinePlantOptions,
+  deriveTimelineRowSensorSource,
   deriveTimelineTentOptions,
   filterTimelineEvidenceRows,
   isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
+  resolveTimelineCardPlaceLabels,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
+  withResolvedTimelinePlaceDetails,
 } from "@/lib/timelineEvidenceFilterRules";
 import {
   buildMissingActionCopy,
@@ -187,7 +190,10 @@ import {
   type TimelineSensorSourceKind,
 } from "@/lib/timelineSensorSourceBadgeRules";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
-import { SENSOR_SOURCE_KINDS, SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
+import {
+  SENSOR_SOURCE_SHORT_LABEL,
+  timelineSensorSourceFilterKinds,
+} from "@/constants/sensorSourceLabels";
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
 import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
@@ -1176,6 +1182,19 @@ export default function Timeline() {
     user,
     directoryGrowId,
   );
+  const demoSensorDataPresent = useMemo(
+    () => displayEntries.some((row) => deriveTimelineRowSensorSource(row) === "demo"),
+    [displayEntries],
+  );
+  const sensorSourceFilterKinds = useMemo(
+    () =>
+      timelineSensorSourceFilterKinds({
+        demoDataPresent: demoSensorDataPresent,
+        demoMode: false,
+        selected: sensorSourceFilter,
+      }),
+    [demoSensorDataPresent, sensorSourceFilter],
+  );
   const plantOptions = useMemo(
     () => deriveTimelinePlantOptions(displayEntries, plantNamesById),
     [displayEntries, plantNamesById],
@@ -2005,7 +2024,7 @@ export default function Timeline() {
           <span className="text-[11px] uppercase tracking-wide text-muted-foreground mr-1">
             Sensor source
           </span>
-          {SENSOR_SOURCE_KINDS.map((kind) => {
+          {sensorSourceFilterKinds.map((kind) => {
             const active = sensorSourceFilter.includes(kind);
             return (
               <button
@@ -2469,7 +2488,14 @@ export default function Timeline() {
                           });
                           const et = getEventType(effectiveCareType);
                           const Icon = et.icon;
-                          const plantName = e.details?.plant_name as string | undefined;
+                          const place = resolveTimelineCardPlaceLabels({
+                            plantId: e.plant_id,
+                            tentId: e.tent_id,
+                            details: e.details,
+                            plantNamesById,
+                            tentNamesById,
+                          });
+                          const plantName = place.plantName ?? undefined;
                           // Canonical snapshots win, followed by the legacy
                           // `sensor` shape and Plant Quick Log's compatibility
                           // envelope. No persisted row is rewritten.
@@ -2568,11 +2594,33 @@ export default function Timeline() {
                                   {stageLabel(resolveTimelineDiaryEntryStage(e))}
                                 </span>
                                 {plantName && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 text-[11px]">
+                                  <span
+                                    data-testid="timeline-entry-plant-name"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 text-[11px]"
+                                  >
                                     <Leaf className="h-3 w-3" />
                                     {plantName}
                                   </span>
                                 )}
+                                {place.tentName && (
+                                  <span
+                                    data-testid="timeline-entry-tent-name"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 text-[11px]"
+                                  >
+                                    {place.tentName}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  data-testid="timeline-entry-open"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setDetailEntryId(e.id);
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-full border border-border/50 px-2 py-0.5 text-[11px] text-foreground hover:bg-secondary/60"
+                                >
+                                  Open
+                                </button>
                                 <span title={format(new Date(e.entry_at), "PPpp")}>
                                   {formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}
                                 </span>
@@ -2987,18 +3035,24 @@ export default function Timeline() {
         open={!!detailEntryId}
         entry={(() => {
           const row = displayEntries.find((r) => r.id === detailEntryId);
-          return row
-            ? {
-                id: row.id,
-                note: row.note,
-                photo_url: row.photo_url,
-                stage: resolveTimelineDiaryEntryStage(row),
-                entry_at: row.entry_at,
-                plant_id: row.plant_id,
-                tent_id: row.tent_id,
-                details: row.details,
-              }
-            : null;
+          if (!row) return null;
+          const labels = resolveTimelineCardPlaceLabels({
+            plantId: row.plant_id,
+            tentId: row.tent_id,
+            details: row.details,
+            plantNamesById,
+            tentNamesById,
+          });
+          return {
+            id: row.id,
+            note: row.note,
+            photo_url: row.photo_url,
+            stage: resolveTimelineDiaryEntryStage(row),
+            entry_at: row.entry_at,
+            plant_id: row.plant_id,
+            tent_id: row.tent_id,
+            details: withResolvedTimelinePlaceDetails(row.details, labels),
+          };
         })()}
         onClose={() => setDetailEntryId(null)}
       />

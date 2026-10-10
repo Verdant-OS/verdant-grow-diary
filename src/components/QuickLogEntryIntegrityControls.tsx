@@ -107,6 +107,19 @@ function toDatetimeLocalValue(iso: string | null | undefined): string {
   )}:${pad(d.getMinutes())}`;
 }
 
+function RevisionInlineFailure({ reason, testId }: { reason: string | null; testId: string }) {
+  if (!reason) return null;
+  return (
+    <p
+      role="alert"
+      data-testid={testId}
+      className="rounded-lg border border-destructive/40 bg-destructive/10 p-2.5 text-[12px] text-destructive"
+    >
+      {quickLogRevisionFailureCopy(reason)}
+    </p>
+  );
+}
+
 function ReasonChips({
   chips,
   selected,
@@ -181,6 +194,8 @@ function RevisionControls({
   const [timeDraft, setTimeDraft] = useState<string>(toDatetimeLocalValue(currentOccurredAt));
   const [plantDraft, setPlantDraft] = useState<string>(currentPlantId ?? "");
   const [explain, setExplain] = useState("");
+  const [correctFailureReason, setCorrectFailureReason] = useState<string | null>(null);
+  const [retractFailureReason, setRetractFailureReason] = useState<string | null>(null);
 
   const plantsQuery = useOwnedPlantOptions(correctOpen, ownerId);
 
@@ -215,6 +230,7 @@ function RevisionControls({
   if (!hasHandle) return null;
 
   const openCorrect = () => {
+    setCorrectFailureReason(null);
     if (unconfirmed) {
       setCorrectOpen(true);
       return;
@@ -227,11 +243,18 @@ function RevisionControls({
     setCorrectOpen(true);
   };
 
+  const rememberDefiniteFailure = (reason: string, setReason: (next: string | null) => void) => {
+    // Ambiguous commits already render the same copy in the role="status"
+    // recovery line. A second alert would duplicate that path.
+    setReason(reason === "rpc_error" ? null : reason);
+  };
+
   const submitCorrection = async () => {
     if (!correctReason) {
       toast.error("Pick a reason chip first.");
       return;
     }
+    setCorrectFailureReason(null);
     const changes: {
       note?: string | null;
       occurredAt?: string;
@@ -251,6 +274,7 @@ function RevisionControls({
     const result = await submit("correction", correctReason, changes, explain);
     if (!result) return;
     if (!result.ok) {
+      rememberDefiniteFailure(result.reason, setCorrectFailureReason);
       toast.error(quickLogRevisionFailureCopy(result.reason));
       return;
     }
@@ -265,9 +289,11 @@ function RevisionControls({
       toast.error("Pick a reason chip first.");
       return;
     }
+    setRetractFailureReason(null);
     const result = await submit("retraction", retractReason, {}, explain);
     if (!result) return;
     if (!result.ok) {
+      rememberDefiniteFailure(result.reason, setRetractFailureReason);
       toast.error(quickLogRevisionFailureCopy(result.reason));
       return;
     }
@@ -297,6 +323,7 @@ function RevisionControls({
         type="button"
         onClick={(ev) => {
           ev.stopPropagation();
+          setRetractFailureReason(null);
           if (!unconfirmed) {
             setRetractReason(null);
             setExplain("");
@@ -315,7 +342,9 @@ function RevisionControls({
       <Dialog
         open={correctOpen}
         onOpenChange={(open) => {
-          if (!busy) setCorrectOpen(open);
+          if (busy) return;
+          if (!open) setCorrectFailureReason(null);
+          setCorrectOpen(open);
         }}
       >
         <DialogContent data-testid="quicklog-entry-correct-dialog">
@@ -324,18 +353,28 @@ function RevisionControls({
             <DialogDescription>{QUICKLOG_CORRECT_DIALOG_BODY}</DialogDescription>
           </DialogHeader>
           {unconfirmed && <p role="status">{quickLogRevisionFailureCopy("rpc_error")}</p>}
+          <RevisionInlineFailure
+            reason={correctFailureReason}
+            testId="quicklog-correct-inline-error"
+          />
           <fieldset disabled={busy || unconfirmed} className="space-y-3">
             <ReasonChips
               chips={QUICKLOG_CORRECTION_REASON_CHIPS}
               selected={correctReason}
-              onSelect={setCorrectReason}
+              onSelect={(reason) => {
+                setCorrectFailureReason(null);
+                setCorrectReason(reason);
+              }}
               testIdPrefix="quicklog-correct"
             />
             <label className="block text-xs text-muted-foreground">
               Note
               <textarea
                 value={noteDraft}
-                onChange={(e) => setNoteDraft(e.target.value)}
+                onChange={(e) => {
+                  setCorrectFailureReason(null);
+                  setNoteDraft(e.target.value);
+                }}
                 rows={3}
                 data-testid="quicklog-correct-note-input"
                 className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
@@ -346,7 +385,10 @@ function RevisionControls({
               <input
                 type="datetime-local"
                 value={timeDraft}
-                onChange={(e) => setTimeDraft(e.target.value)}
+                onChange={(e) => {
+                  setCorrectFailureReason(null);
+                  setTimeDraft(e.target.value);
+                }}
                 data-testid="quicklog-correct-time-input"
                 className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
               />
@@ -355,7 +397,10 @@ function RevisionControls({
               Plant
               <select
                 value={plantDraft}
-                onChange={(e) => setPlantDraft(e.target.value)}
+                onChange={(e) => {
+                  setCorrectFailureReason(null);
+                  setPlantDraft(e.target.value);
+                }}
                 data-testid="quicklog-correct-plant-select"
                 className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
               >
@@ -373,7 +418,10 @@ function RevisionControls({
                 type="text"
                 value={explain}
                 maxLength={QUICKLOG_REVISION_NOTE_MAX_LENGTH}
-                onChange={(e) => setExplain(e.target.value)}
+                onChange={(e) => {
+                  setCorrectFailureReason(null);
+                  setExplain(e.target.value);
+                }}
                 data-testid="quicklog-correct-explain-input"
                 className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
               />
@@ -383,7 +431,10 @@ function RevisionControls({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setCorrectOpen(false)}
+              onClick={() => {
+                setCorrectFailureReason(null);
+                setCorrectOpen(false);
+              }}
               disabled={busy}
               data-testid="quicklog-correct-cancel"
             >
@@ -404,7 +455,9 @@ function RevisionControls({
       <AlertDialog
         open={retractOpen}
         onOpenChange={(open) => {
-          if (!busy) setRetractOpen(open);
+          if (busy) return;
+          if (!open) setRetractFailureReason(null);
+          setRetractOpen(open);
         }}
       >
         <AlertDialogContent data-testid="quicklog-entry-retract-dialog">
@@ -413,11 +466,18 @@ function RevisionControls({
             <AlertDialogDescription>{QUICKLOG_RETRACT_DIALOG_BODY}</AlertDialogDescription>
           </AlertDialogHeader>
           {unconfirmed && <p role="status">{quickLogRevisionFailureCopy("rpc_error")}</p>}
+          <RevisionInlineFailure
+            reason={retractFailureReason}
+            testId="quicklog-retract-inline-error"
+          />
           <fieldset disabled={busy || unconfirmed} className="space-y-3">
             <ReasonChips
               chips={QUICKLOG_RETRACTION_REASON_CHIPS}
               selected={retractReason}
-              onSelect={setRetractReason}
+              onSelect={(reason) => {
+                setRetractFailureReason(null);
+                setRetractReason(reason);
+              }}
               testIdPrefix="quicklog-retract"
             />
             <label className="block text-xs text-muted-foreground">
@@ -426,7 +486,10 @@ function RevisionControls({
                 type="text"
                 value={explain}
                 maxLength={QUICKLOG_REVISION_NOTE_MAX_LENGTH}
-                onChange={(e) => setExplain(e.target.value)}
+                onChange={(e) => {
+                  setRetractFailureReason(null);
+                  setExplain(e.target.value);
+                }}
                 data-testid="quicklog-retract-explain-input"
                 className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
               />

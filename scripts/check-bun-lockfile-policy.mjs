@@ -40,6 +40,7 @@ export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
   seroval: "1.6.3",
   "shell-quote": "1.11.0",
   "source-map-js": "1.2.2",
+  "postcss-selector-parser": "7.1.6",
 });
 // Vitest 4 uses the root Vite/Rolldown graph and no longer brings in Rollup.
 // Absence is safe; every copy must still be patched if it returns transitively.
@@ -62,6 +63,7 @@ export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   seroval: "1.6.3",
   "shell-quote": "1.11.0",
   "source-map-js": "1.2.2",
+  "postcss-selector-parser": "7.1.6",
 });
 export const PACKAGE_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({
   "brace-expansion": Object.freeze({

@@ -53,6 +53,7 @@ import {
 } from "@/lib/paidAcquisitionAttributionRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
+import { SandboxCheckoutTestModeNote } from "@/components/SandboxCheckoutTestModeNote";
 import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -655,6 +656,7 @@ export default function Pricing() {
       </section>
 
       <section className="px-6 pb-8 max-w-3xl mx-auto" aria-label="Checkout status">
+        <SandboxCheckoutTestModeNote environment={checkoutEnvironment} />
         <div
           data-testid="pricing-checkout-trust"
           data-checkout-state={checkoutTrustCopy.state}

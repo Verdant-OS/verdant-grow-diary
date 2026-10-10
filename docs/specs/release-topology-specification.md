@@ -385,8 +385,8 @@ UTC. Appendix E holds the readings and a consolidated hosting timeline.
   `Vercel: Account is blocked.`, two passing Workers Builds runs and a failing `Supabase Preview`.
   What any production hostname serves is still `BLOCKED` from this session (egress `403`).
 - **`#1857`.** It touches no file this document cites, so it is not a topology change. Its review
-  history is recorded on `#1857` itself (the architecture contract carries no PR status, §15.2 of
-  `#1899` as revised 2026-10-08): a clean Blue Dream PASS at
+  history is recorded on `#1857` itself. `#1899` proposes removing PR status from the contract,
+  and is still open, so this section records that history on `#1857`: a clean Blue Dream PASS at
   `4ee43c6e`, then a Codex **FAIL** (one P1) at the same SHA. One line of that FAIL review is
   topology evidence and is carried into E.4 as a `SOURCE CLAIM`. It says that one of three Workers
   checks on that head reported "This Worker does not exist on your account".

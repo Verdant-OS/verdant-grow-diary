@@ -54,15 +54,15 @@ branch: cursor/calendar-local-day-fc13
 base: verdant-grow-diary
 checkout: git fetch origin cursor/calendar-local-day-fc13 verdant-grow-diary && git switch cursor/calendar-local-day-fc13 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1952 (draft)
-head_sha: implementation a1c66ccb43b1c7b9efb60ee4f450bd164a17264d. This log line cannot name its own commit; read origin/cursor/calendar-local-day-fc13 after the log push.
-state: pushed draft. Chicago-pinned tests were red (3 failed, 2 passed) before the calendar call sites changed. Targeted calendar tests 52/52 and the full Vitest suite passed aside from 4 pre-existing PostgreSQL-tool BLOCKED files. Lint 0 errors. Typecheck passed. Production build passed. Stay draft.
-next_action: independent review at the exact head. Stay draft. No ready, merge, or deploy.
+head_sha: previous remote head 147a04a1d2cc4a6ec73414d07132bce464cdee97. This log line cannot name its own commit; read origin/cursor/calendar-local-day-fc13 after the label-fix push.
+state: pushed draft. Graft's exact-head review at 147a04a1 failed because the upcoming-review line still formatted the UTC date. The line now uses calendarInstantDayKey. Chicago test was red (1 failed, 5 passed) before that label change: the grid already showed Oct 11 and the line read Mon, Oct 12. Stay draft.
+next_action: independent review at the exact head after this label fix. Stay draft. No ready, merge, or deploy.
 files: src/lib/calendarLocalDayRules.ts; src/lib/diaryCalendarViewModel.ts; src/lib/cultivationCalendarMonthGridRules.ts; src/lib/flowerWindowCalendarRules.ts; src/components/DiaryCalendarSection.tsx; src/test/calendar-local-day-grouping.test.ts; docs/agents/HANDOFF_LOG.md
 blockers: none for the repository change. No production data, schema, auth, or lockfile edits.
 artifacts: src/test/calendar-local-day-grouping.test.ts
 reviewer_seat: Blue Dream (DiaryCalendarSection.tsx); Critical Mass (rules and tests)
 claimed_by: Grok, 2026-10-09 14:45 CT
-last_updated: 2026-10-09 15:05 CT, by Grok
+last_updated: 2026-10-10 17:30 CT, by Grok
 ```
 
 ### PR-1939-NOT-FOUND-COVERAGE

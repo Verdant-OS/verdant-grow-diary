@@ -8,12 +8,16 @@
  * re-read that zone on each call in this runtime. The first test asserts
  * the pin actually took effect.
  */
+import { render, screen, within } from "@testing-library/react";
+import { createElement } from "react";
 import { afterAll, describe, expect, it, vi } from "vitest";
+import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { buildCultivationCalendarMonthGrid } from "@/lib/cultivationCalendarMonthGridRules";
 import { calendarStartDateDayKey } from "@/lib/calendarLocalDayRules";
 import { buildDiaryCalendarViewModel, currentMonthKey } from "@/lib/diaryCalendarViewModel";
 import { deriveFlowerWindowCalendar } from "@/lib/flowerWindowCalendarRules";
 import {
+  buildCultivationCalendarProjectedReviewBlocks,
   CULTIVATION_CALENDAR_SUGGESTED_REVIEW_TITLE,
   type CultivationCalendarProjectedReviewBlock,
 } from "@/lib/cultivationCalendarProjectionRules";
@@ -156,5 +160,49 @@ describe("calendar local-day grouping (America/Chicago)", () => {
     expect(cultivationCellIds("2026-11", NOV_1_TEN_THIRTY_PM_CT, "fall").reviews).toEqual([
       "2026-11-01",
     ]);
+  });
+
+  it("puts an 8:30 PM CT review on Oct 11 in the grid and the upcoming line", () => {
+    const scheduledAt = "2026-10-12T01:30:00.000Z";
+    const dayMs = 86_400_000;
+    const reviewMs = Date.parse(scheduledAt);
+    const rawEntries = [3, 2, 1].map((daysBack, index) => ({
+      id: `evening-water-${index}`,
+      entry_at: new Date(reviewMs - daysBack * dayMs).toISOString(),
+      event_type: "watering" as const,
+    }));
+    const now = new Date(reviewMs - 5 * 60 * 60 * 1000);
+    const groups = buildDiaryCalendarViewModel(rawEntries);
+    const reviews = buildCultivationCalendarProjectedReviewBlocks(
+      groups.flatMap((group) =>
+        group.events
+          .filter((event) => event.kind === "watering")
+          .map((event) => ({
+            category: "watering" as const,
+            occurredAt: event.occurredAt,
+            id: event.id,
+          })),
+      ),
+      now,
+    );
+    expect(reviews.map((review) => review.scheduledAt)).toEqual([scheduledAt]);
+
+    render(createElement(DiaryCalendarSection, { rawEntries, now }));
+
+    const october11 = document.querySelector('[data-date-key="2026-10-11"]');
+    const october12 = document.querySelector('[data-date-key="2026-10-12"]');
+    expect(october11).not.toBeNull();
+    expect(october12).not.toBeNull();
+    expect(
+      within(october11 as HTMLElement).getByTestId("cultivation-calendar-advisory-block"),
+    ).toBeInTheDocument();
+    expect(
+      within(october12 as HTMLElement).queryByTestId("cultivation-calendar-advisory-block"),
+    ).toBeNull();
+
+    const upcoming = screen.getByTestId("cultivation-calendar-upcoming-review");
+    expect(upcoming).toHaveTextContent(/Upcoming suggested review/);
+    expect(upcoming).toHaveTextContent(/Oct 11/);
+    expect(upcoming.textContent).not.toMatch(/Oct 12/);
   });
 });

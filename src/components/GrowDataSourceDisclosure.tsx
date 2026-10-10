@@ -14,6 +14,15 @@ import type { SnapshotSource } from "@/lib/sensorSnapshot";
 
 type Label = "Live" | "Demo" | "Mixed" | "Unavailable";
 
+/**
+ * A successful read that returned no rows. Empty is not the same as a
+ * failed read. Every meta must say `no-rows`; one fetch error keeps the
+ * Unavailable badge.
+ */
+export function isSuccessfulEmptyGrowRead(metas: readonly GrowDataSourceMeta[]): boolean {
+  return metas.length > 0 && metas.every((meta) => meta.sourceReason === "no-rows");
+}
+
 const LABEL_BY_SOURCE: Record<GrowDataSourceMeta["dataSource"], Label> = {
   supabase: "Live",
   mock: "Demo",
@@ -104,23 +113,27 @@ export default function GrowDataSourceDisclosure({
 
   // Welcome / empty state — no usable data anywhere.
   if (!hasAnyData && combined.dataSource === "unavailable") {
+    const emptySuccess = isSuccessfulEmptyGrowRead(metas);
     return (
       <section
         data-testid={testId}
         data-source={combined.dataSource}
+        data-empty-reason={emptySuccess ? "no-rows" : "unavailable"}
         className={cn("glass rounded-2xl p-4 mb-4", className)}
         aria-label={`Grow ${resource} data source`}
       >
-        <div className="flex items-center gap-2 mb-2">
-          <Badge
-            variant="destructive"
-            data-testid={`${testId}-badge`}
-            data-label="Unavailable"
-            className="text-[10px] uppercase tracking-wide"
-          >
-            Unavailable
-          </Badge>
-        </div>
+        {!emptySuccess && (
+          <div className="flex items-center gap-2 mb-2">
+            <Badge
+              variant="destructive"
+              data-testid={`${testId}-badge`}
+              data-label="Unavailable"
+              className="text-[10px] uppercase tracking-wide"
+            >
+              Unavailable
+            </Badge>
+          </div>
+        )}
         {emptyStateScope === "record" ? (
           <>
             <h2 className="font-display font-semibold">

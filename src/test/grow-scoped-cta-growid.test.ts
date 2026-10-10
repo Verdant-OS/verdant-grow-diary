@@ -64,7 +64,11 @@ describe("grow-scoped continue CTAs retain growId", () => {
     expect(dashboard).toMatch(/sensorsPath\(scopedGrowId\)/);
     expect(dashboard).toMatch(/withGrowId\("\/sensors#manual-reading",\s*scopedGrowId\)/);
     expect(dashboard).toMatch(/withGrowId\("\/sensors#csv-import",\s*scopedGrowId\)/);
-    expect(dashboard).toMatch(/withGrowId\("\/daily-check",\s*scopedGrowId\)/);
+    // The Dashboard's /daily-check CTA is the One-Tent Home card's Log (the
+    // header Quick Log link was removed as a duplicate); it keeps the grow.
+    expect(dashboard).toMatch(
+      /logHref=\{withGrowId\("\/daily-check",\s*homeTent\?\.growId \?\? scopedGrowId\)\}/,
+    );
     expect(dashboard).toMatch(/growId=\{scopedGrowId\s*\?\?\s*null\}/);
 
     expect(card).toMatch(/withGrowId\("\/daily-check",\s*growId\)/);

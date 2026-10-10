@@ -96,7 +96,7 @@ Use small, scoped changes. Avoid broad rewrites.
   or repair (OWNERSHIP.md allowlist). Migrations, payments or billing, `.github`
   workflows, security or auth, and dependency or lockfile changes still need Codex
   (not on a PR Codex authored or repaired), or Blue Dream, Critical Mass, or Durban
-  Poison. Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. Chemdawg is a Grok Bot running on a separate account. It can be unavailable (it is currently out of tokens). A merge waits for Chemdawg or for Matthew's direction. A skipped, missing, pending
+  Poison. Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. Chemdawg is a Grok Bot running on a separate account. It can be unavailable (it is currently out of tokens). Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge actor under the same gates. A skipped, missing, pending
   or failed required check is not green. There is no author-integration exception.
   Off-limits paths and named holds still require explicit reassignment before editing.
   Merges, production database changes, production and config changes, spend, deletes, outbound messages, installs, publish gates and the publish decision all need Matthew's per-item yes (see Standing approval). Repository work does not authorize them.
@@ -120,7 +120,7 @@ Local/CI fixtures validate code, not production. See
 
 ## Multi-Agent Coordination
 
-This repo is worked on by several AI agents at once: Codex, Claude Code (currently out of tokens), Cursor cloud agents, GitHub Copilot, and Matthew Cheek's Grok Bot team (Canopy, Graft, Root Cause, Trellis, Verdante, Chemdawg, Golden Toad, and others). Lovable is no longer an active agent (Matthew Cheek, 2026-10-10). Sometimes two of them work on the same feature without knowing.
+This repo is worked on by several AI agents at once: Codex, Claude Code (currently out of tokens), Cursor cloud agents, GitHub Copilot, and Matthew Cheek's Grok Bot team (Canopy, Graft, Root Cause, Trellis, Verdante, Chemdawg, Harvest, Golden Toad, and others). Lovable is no longer an active agent (Matthew Cheek, 2026-10-10). Sometimes two of them work on the same feature without knowing.
 
 - Before starting substantial new work, check recent merged PRs and open PRs (`gh pr list --state all`, `git log`) for the same or an overlapping feature area. Do not build a second implementation of something that already shipped or is already in review elsewhere.
 - If you discover another agent already has open, unmerged work in your target area, stop and report the collision rather than silently building a competing version.
@@ -712,6 +712,7 @@ assigned role and read its file.
 - Verdante must read `docs/agents/roles/verdante.md`.
 - Chemdawg must read `docs/agents/roles/chemdawg.md`.
 - Golden Toad must read `docs/agents/roles/golden-toad.md`.
+- Harvest must read `docs/agents/roles/harvest.md`.
 
 There is no Council Chair role and no Security role (Matthew Cheek, 2026-10-10). Historical receipts that name them stay as history.
 
@@ -729,7 +730,8 @@ not exclusivity. Standing collision fences in `CURRENT_STATE.md` still bind, for
 Every slice names its independent review route, and at any moment one agent holds the
 claim to build it. An agent that touched a slice cannot give it an independent PASS.
 Codex does not integrate its own work. Chemdawg owns the required-check and independent
-exact-head PASS gate. High-risk work, publish gates and named owner locks retain their
+exact-head PASS gate. Chemdawg merges; while Chemdawg is unavailable, Harvest is the
+backup merge actor under the same gates. High-risk work, publish gates and named owner locks retain their
 review and acceptance fences.
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
@@ -745,7 +747,7 @@ tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments 
 billing, `.github` workflows, security or auth, and dependency or lockfile changes
 still need Codex (not on a PR Codex authored or repaired), or Blue Dream, Critical
 Mass, or Durban Poison.
-Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. Chemdawg is a Grok Bot running on a separate account. It can be unavailable (it is currently out of tokens). A merge waits for Chemdawg or for Matthew's direction.
+Chemdawg merges only after Matthew Cheek gives a per-item yes for that PR, usually through Verdante's numbered approvals batch. Green checks and a PASS make a PR eligible; they do not approve the merge. Chemdawg is a Grok Bot running on a separate account. It can be unavailable (it is currently out of tokens). Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge actor under the same gates.
 Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
 Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
 
@@ -880,16 +882,16 @@ snapshots can differ.
   `/welcome`, and `/internal/demo-proof-walkthrough`.
   These count as evidence only when live `/version.json` reports the SHA under test;
   otherwise report `NOT_MEASURED`.
-- **Governance edit gate.** If you change any of the **seventeen versioned governance
+- **Governance edit gate.** If you change any of the **eighteen versioned governance
   files** — `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.grok/rules/verdant-grok-role.md`,
-  `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, and the eleven
+  `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, and the twelve
   `docs/agents/roles/*.md` (`grok`, `claude`, `codex`, `gemini`, `canopy`, `graft`,
-  `root-cause`, `trellis`, `verdante`, `chemdawg`, `golden-toad`) — you must bump
-  `Sentinel-Version` in **all seventeen** in the same commit. The `sentinel-version-parity`
+  `root-cause`, `trellis`, `verdante`, `chemdawg`, `golden-toad`, `harvest`) — you must bump
+  `Sentinel-Version` in **all eighteen** in the same commit. The `sentinel-version-parity`
   CI gate enforces PARITY (all versions equal), MIRROR (GEMINI.md's embedded constitution
   stays byte-equivalent to `AGENTS.md`), and BUMP (changed content requires a new version).
   **`docs/agents/CURRENT_STATE.md` is exempt.** It carries no `Sentinel-Version` at all
-  and is not one of the seventeen: it is the changing shift report, revised several times a
+  and is not one of the eighteen: it is the changing shift report, revised several times a
   day, and `scripts/check-sentinel-version-parity.mjs` treats it as existence-only.
   Editing it alone requires no bump — see merged precedent #729 (`1ae167764`) and #746
   (`a0c30e565`), each a single-file `CURRENT_STATE.md` change with no version change.

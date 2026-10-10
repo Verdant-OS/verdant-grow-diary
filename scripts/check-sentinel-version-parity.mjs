@@ -11,11 +11,11 @@
  *           Sentinel-Version must have changed too.
  *
  * They compose. Editing a safety rule in AGENTS.md trips BUMP, which forces a new
- * version, which trips PARITY on the other sixteen files until each is updated — so the
+ * version, which trips PARITY on the other seventeen files until each is updated — so the
  * GEMINI.md mirror lands in the same commit and in front of a reviewer.
  *
  * PARITY alone is not enough, and an earlier version of this file claimed otherwise. If
- * you change AGENTS.md and touch no version, all seventeen still agree and PARITY passes.
+ * you change AGENTS.md and touch no version, all eighteen still agree and PARITY passes.
  * That check catches divergent versions, never unchanged versions beside changed content.
  * BUMP is the half that was missing.
  *
@@ -46,6 +46,7 @@ const MIRRORS = [
   "docs/agents/roles/verdante.md",
   "docs/agents/roles/chemdawg.md",
   "docs/agents/roles/golden-toad.md",
+  "docs/agents/roles/harvest.md",
 ];
 const ALL = [CANONICAL, ...MIRRORS];
 
@@ -61,6 +62,7 @@ const ROLE_FILES = [
   "docs/agents/roles/verdante.md",
   "docs/agents/roles/chemdawg.md",
   "docs/agents/roles/golden-toad.md",
+  "docs/agents/roles/harvest.md",
 ];
 
 const REQUIRED_STARTUP_GATE = `MANDATORY STARTUP GATE

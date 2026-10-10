@@ -5,7 +5,7 @@ observed inside an agent sandbox. This document records the failure that produce
 the reason the negative was false, and the procedure that was actually verified.
 
 This is a durable reference, not a governance file. It carries no `Sentinel-Version`
-and is not one of the seventeen versioned governance documents.
+and is not one of the eighteen versioned governance documents.
 
 ---
 

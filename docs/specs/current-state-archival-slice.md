@@ -114,7 +114,7 @@ Entries are appended newest-first, each under a stamp line:
    in full, regardless of size.
 4. **Scope fence.** The executing PR touches exactly: `CURRENT_STATE.md`, the new
    archive file, the relocated runbook file, and nothing else. No edits to any of the
-   seventeen versioned governance files (which would trip BUMP), no application code, no
+   eighteen versioned governance files (which would trip BUMP), no application code, no
    rewording of retained text.
 5. **Conflict window.** `practical observation`: this file is edited several times a
    day and is the repo's most conflict-prone path. Execute in one small PR, rebased

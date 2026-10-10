@@ -9,6 +9,8 @@ exact-head reviewer, except on a PR Codex authored or repaired (for example #193
 Claude may add peer observations but is not the acceptance reviewer.
 Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
 Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
+Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge actor under
+the same gates.
 **Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
 PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
 tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments or
@@ -45,7 +47,7 @@ ROOT — auto-loaded by the platforms
   .grok/rules/verdant-grok-role.md   Grok's automatic role rules
 
 ROLE DOCUMENTS
-  docs/agents/roles/{grok,claude,codex,gemini,canopy,graft,root-cause,trellis,verdante,chemdawg,golden-toad}.md
+  docs/agents/roles/{grok,claude,codex,gemini,canopy,graft,root-cause,trellis,verdante,chemdawg,golden-toad,harvest}.md
 
 OPERATING STATE
   docs/agents/CURRENT_STATE.md   the changing shift report
@@ -73,6 +75,7 @@ HISTORICAL — never active instructions
 | Verdante      | nothing automatically                     | `docs/agents/roles/verdante.md` (no repository writes)                              |
 | Chemdawg      | `AGENTS.md`                               | `docs/agents/roles/chemdawg.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`               |
 | Golden Toad   | `AGENTS.md`                               | `docs/agents/roles/golden-toad.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`            |
+| Harvest       | `AGENTS.md`                               | `docs/agents/roles/harvest.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                |
 
 Every agent reads `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK` and records
 `open_handoffs_checked`. After acknowledgment, keep an explicit assignment. If
@@ -100,7 +103,7 @@ is how an agent operates with no constitution at all.
 
 ## Why the constitution is not the whole prompt pack
 
-`AGENTS.md` deliberately does not contain all eleven role prompts. Every agent reads it, and
+`AGENTS.md` deliberately does not contain all twelve role prompts. Every agent reads it, and
 an agent that reads everyone else's role tends to blur responsibilities and absorb work
 that was not assigned. Roles stay in separate files for that reason.
 

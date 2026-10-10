@@ -12,6 +12,8 @@ exact-head reviewer, except on a PR Codex authored or repaired (for example #193
 Claude may add peer observations but is not the acceptance reviewer.
 Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
 Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
+Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge actor under
+the same gates.
 **Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
 PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
 tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments or
@@ -361,11 +363,11 @@ Environment and install gotchas are owned by
 - `src/integrations/supabase/client.ts` is header-marked "generated, do not edit" but carries
   a deliberate hardening — `storage: window.sessionStorage`, not `localStorage`. If you
   regenerate it, re-apply that line.
-- **Editing any of the seventeen governance files bumps all seventeen.** `AGENTS.md`, `CLAUDE.md`,
+- **Editing any of the eighteen governance files bumps all eighteen.** `AGENTS.md`, `CLAUDE.md`,
   `GEMINI.md`, `.grok/rules/verdant-grok-role.md`, `docs/agents/README.md`,
-  `docs/agents/HANDOFF_PROTOCOL.md` and the eleven `docs/agents/roles/*.md`
+  `docs/agents/HANDOFF_PROTOCOL.md` and the twelve `docs/agents/roles/*.md`
   (`grok`, `claude`, `codex`, `gemini`, `canopy`, `graft`, `root-cause`, `trellis`,
-  `verdante`, `chemdawg`, `golden-toad`) must share one
+  `verdante`, `chemdawg`, `golden-toad`, `harvest`) must share one
   `Sentinel-Version`, and `GEMINI.md`'s `SENTINEL-CORE` block must stay byte-equivalent to
   `AGENTS.md`. Do it with `node scripts/sync-sentinel-mirror.mjs --set-version=YYYY-MM-DD.N`,
   then verify with `node scripts/check-sentinel-version-parity.mjs <base>`.

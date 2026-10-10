@@ -10,7 +10,7 @@ claim about production, deployment, indexing, or which migrations are applied â€
 axes belong to [`docs/agents/CURRENT_STATE.md`](agents/CURRENT_STATE.md) and keep their
 `BLOCKED` / `NOT_MEASURED` labels there.
 
-This file is **not** one of the seventeen versioned governance files. It carries no
+This file is **not** one of the eighteen versioned governance files. It carries no
 `Sentinel-Version` and editing it does not trigger the parity gate.
 
 ---

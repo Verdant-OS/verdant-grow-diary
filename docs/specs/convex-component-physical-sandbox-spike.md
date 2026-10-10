@@ -318,7 +318,7 @@ Quick Log, or credits UI work.
    Do not gitignore the spike source.
 6. No changes under `supabase/migrations/`.
 7. No changes to grower-facing pages or edge functions.
-8. Do not edit the seventeen versioned governance files. `CURRENT_STATE.md` may
+8. Do not edit the eighteen versioned governance files. `CURRENT_STATE.md` may
    record Phase 1 completion in a follow-up.
 
 If Convex CLI cannot run in CI without credentials, document the blocker as

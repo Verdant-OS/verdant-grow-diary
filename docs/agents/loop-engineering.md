@@ -6,7 +6,7 @@
 **Independent reviewer:** Critical Mass (no `.tsx` outside `src/test/`, not a P1, not a publish
 gate), per the routing in `AGENTS.md`. Claude cannot give this slice its own PASS.
 **Measured against:** deploy tip `80176bad5` (`#1864`), read locally 2026-10-02.
-**Carries no `Sentinel-Version`.** It is not one of the seventeen governance files.
+**Carries no `Sentinel-Version`.** It is not one of the eighteen governance files.
 
 This page does not change who merges, who reviews, or what is authorised. No Publish, APPLY,
 production SQL, device control or Action Queue operation is implied anywhere below.
@@ -71,7 +71,7 @@ with Matthew or behind named locks, and a loop has no business near them:
   measured by a person at a target SHA, never by a loop);
 - `supabase/migrations`, any SQL, RLS policies, auth, and Edge Functions;
 - the Action Queue, device control, and anything that writes to a grower's data;
-- lockfile or dependency changes, and the seventeen `Sentinel-Version` governance files;
+- lockfile or dependency changes, and the eighteen `Sentinel-Version` governance files;
 - `docs/agents/CURRENT_STATE.md` (operating state is measured and written by a person or by a
   single explicit stamp, not iterated);
 - Publish, promote, rollback, and the AI Doctor provider or model selection;
@@ -154,7 +154,7 @@ body loads when a session is about to build, review or finish a slice.
 - **Results file:** `docs/agents/HANDOFF_LOG.md`. Its closed blocks are the rounds; a habit cites
   the blocks or merged PRs that show the mistake recurring.
 - **Who may amend it:** any peer, from a closed block or a merged PR, without a `Sentinel-Version`
-  bump, because the skill is not one of the seventeen governance files. The amendment rules are in
+  bump, because the skill is not one of the eighteen governance files. The amendment rules are in
   the skill itself.
 - **What the habits process may never do:** the habits process never edits a check, test, spec or
   gate to make a round pass. If a habit needs a new check, that check is a separate change and

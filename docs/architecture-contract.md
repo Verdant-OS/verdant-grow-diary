@@ -50,7 +50,7 @@ name superseded lines by design and were not re-read. Two kinds of statement wer
 re-derived and keep the labels and dates they carry: dated runtime results recorded with their own
 runtime (AC-1.4's bare-specifier build), and history about which PR introduced a behaviour. First
 verified at `7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05 by Grok (PR #1281).
-**Carries no `Sentinel-Version`.** This is not one of the seventeen governance files; editing it does
+**Carries no `Sentinel-Version`.** This is not one of the eighteen governance files; editing it does
 not require a parity bump. See §15 for how it is amended.
 
 The stamped SHA above is **verification provenance, not an operating claim**. It records the tree
@@ -1371,7 +1371,7 @@ stale every time the operating picture moved. Only the durable rules stay:
    amendment — it needs a test.
 4. Removing a clause requires stating what replaced it. A clause that is merely inconvenient is not
    obsolete.
-5. This file carries no `Sentinel-Version` and is not one of the seventeen governance files. Editing it
+5. This file carries no `Sentinel-Version` and is not one of the eighteen governance files. Editing it
    alone requires no parity bump.
 
    **Why, stated correctly.** `scripts/check-sentinel-version-parity.mjs` iterates a fixed

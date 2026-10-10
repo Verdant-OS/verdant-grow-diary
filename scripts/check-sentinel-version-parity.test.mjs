@@ -28,6 +28,7 @@ const GOVERNANCE_FILES = [
   "docs/agents/roles/verdante.md",
   "docs/agents/roles/chemdawg.md",
   "docs/agents/roles/golden-toad.md",
+  "docs/agents/roles/harvest.md",
 ];
 
 const ROLE_FILES = GOVERNANCE_FILES.filter((path) => path.startsWith("docs/agents/roles/"));
@@ -222,7 +223,7 @@ test("passes when all governance versions agree and no rules drifted", () => {
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-08-01\.1 across 17/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-08-01\.1 across 18/);
 });
 
 test("fails when GEMINI.md has a different Sentinel-Version", () => {
@@ -480,7 +481,7 @@ test("passes a coordinated rule update with one shared bumped version", () => {
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-08-01\.2 across 17/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-08-01\.2 across 18/);
 });
 
 test("keeps the exact legacy startup gate valid through 2026-09-28.1", () => {
@@ -488,7 +489,7 @@ test("keeps the exact legacy startup gate valid through 2026-09-28.1", () => {
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.1 across 17/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.1 across 18/);
 });
 
 test("accepts shipped 2026-09-28.2 with its legacy ACK and no handoff log", () => {
@@ -496,7 +497,7 @@ test("accepts shipped 2026-09-28.2 with its legacy ACK and no handoff log", () =
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.2 across 17/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.2 across 18/);
 });
 
 test("accepts the exact coverage startup gate at 2026-09-28.3", () => {
@@ -508,7 +509,7 @@ test("accepts the exact coverage startup gate at 2026-09-28.3", () => {
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.3 across 17/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.3 across 18/);
 });
 
 test("accepts CRLF copies of the coverage gate without relaxing its field order", () => {
@@ -593,7 +594,7 @@ test("passes a coordinated upgrade from the legacy gate to the coverage gate", (
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.3 across 17/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.3 across 18/);
 });
 
 test("rejects a coordinated downgrade that removes coverage and its handoff log", () => {
@@ -658,5 +659,5 @@ test("allows a same-date revision upgrade from 9 to 10", () => {
   const result = runChecker(root);
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.10 across 17/);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-09-28\.10 across 18/);
 });

@@ -57,7 +57,7 @@ CREATE POLICY badge_award_runtime_service_update
   ON public.badge_award_runtime
   FOR UPDATE
   TO service_role
-  USING (true)
+  USING (id = 1)
   WITH CHECK (id = 1);
 
 CREATE POLICY badge_awards_owner_select

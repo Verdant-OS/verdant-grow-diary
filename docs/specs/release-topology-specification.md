@@ -419,8 +419,8 @@ every appendix stays as dated.
   `docs/agents/RUNBOOK_VERCEL_PROMOTE.md` ("Manual promotion — Matthew only"), M10's hostname
   reads. Because the checklist's later runs pin the deploy tip, its chosen first build is the
   frozen tip.
-- **Pointer.** §2.7 said `#1857`'s review history is in the architecture contract. `#1899` removed
-  PR status from the contract the same day, so §2.7 now points at `#1857` itself.
+- **Pointer.** §2.7 said `#1857`'s review history is in the architecture contract. `#1899` proposes removing
+  PR status from the contract, and is still open, so §2.7 now points at `#1857` itself.
 
 ---
 

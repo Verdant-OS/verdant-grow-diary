@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { Droplets, NotebookPen, History, PlusCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,8 @@ import {
   QUICK_LOG_SAMPLE_SOURCE_LABEL,
   quickLogActionLabel,
   formatQuickLogOccurredAt,
+  groupByQuickLogLocalDay,
+  orderQuickLogTimelineDemosIntoLocalDays,
   quickLogSourceAccessibleLabel,
   quickLogOccurredAtAccessibleLabel,
   filterQuickLogGroupedTimelineEntries,
@@ -366,7 +368,7 @@ function EntryItem({ entry, demoVariant, correctionCount }: EntryItemProps) {
                   className="text-xs text-muted-foreground"
                   data-testid="quick-log-grouped-review-action-occurred-at"
                 >
-                  {reviewActionSection.occurredAt}
+                  {formatQuickLogOccurredAt(reviewActionSection.occurredAt)}
                 </p>
                 {reviewActionSection.volumeMl != null && (
                   <p className="text-xs" data-testid="quick-log-grouped-review-action-volume">
@@ -478,6 +480,7 @@ function aiDoctorResultsHrefFor(props: Props): string {
 export const QUICK_LOG_GROUPED_TIMELINE_UPDATING_LABEL = "Updating QuickLog timeline…";
 
 export default function QuickLogGroupedTimelineSection(props: Props) {
+  const dayHeadingPrefix = useId();
   const scope = toScope(props);
   const { entries, isLoading, isFetching, isError } = useQuickLogGroupedTimeline(scope);
   const [filter, setFilter] = useState<QuickLogGroupedTimelineFilter>("all");
@@ -513,6 +516,26 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
   const revisionLedgerUnread = revisionBadgesStatus === "unavailable";
 
   const hasAnyEntries = wrapped.length > 0;
+  const orderedWrapped = useMemo(
+    () =>
+      orderQuickLogTimelineDemosIntoLocalDays(
+        filteredWrapped,
+        (item) => item.entry.occurredAt,
+        (item) => item.demoVariant !== undefined,
+      ),
+    [filteredWrapped],
+  );
+  const timelineDays = useMemo(() => {
+    const seenDayHeadings = new Map<string, string>();
+    return groupByQuickLogLocalDay(orderedWrapped, (item) => item.entry.occurredAt).map((day) => {
+      const dayToken = day.dayKey.length > 0 ? day.dayKey : "unknown";
+      const existingHeadingId = seenDayHeadings.get(dayToken);
+      const showHeading = existingHeadingId === undefined;
+      const headingId = existingHeadingId ?? `${dayHeadingPrefix}-day-${dayToken}`;
+      if (showHeading) seenDayHeadings.set(dayToken, headingId);
+      return { day, showHeading, headingId };
+    });
+  }, [orderedWrapped, dayHeadingPrefix]);
   const aiDoctorResultsHref = aiDoctorResultsHrefFor(props);
   const isAiDoctorEvidenceFilter = filter === "ai-doctor-evidence";
 
@@ -658,28 +681,40 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
               </p>
             ) : null}
             <ul className="space-y-3" data-testid="quick-log-grouped-timeline-list">
-              {filteredWrapped.map((w, i) => {
-                const entry = w.entry;
-                const key =
-                  entry.kind === "environment"
-                    ? `env:${entry.environment.id}:${i}`
-                    : `act:${entry.action.id}:${i}`;
-                const actionId =
-                  entry.kind === "action" || entry.kind === "grouped" ? entry.action.id : null;
-                const correctionCount =
-                  revisionBadgesReady && actionId
-                    ? (revisionBadges.get(actionId)?.correctionCount ?? 0)
-                    : 0;
-                return (
-                  <li key={key}>
-                    <EntryItem
-                      entry={entry}
-                      demoVariant={w.demoVariant}
-                      correctionCount={correctionCount}
-                    />
-                  </li>
-                );
-              })}
+              {timelineDays.flatMap(({ day, showHeading, headingId }) =>
+                day.items.map((w, i) => {
+                  const entry = w.entry;
+                  const key =
+                    entry.kind === "environment"
+                      ? `env:${entry.environment.id}:${day.dayKey}:${i}`
+                      : `act:${entry.action.id}:${day.dayKey}:${i}`;
+                  const actionId =
+                    entry.kind === "action" || entry.kind === "grouped" ? entry.action.id : null;
+                  const correctionCount =
+                    revisionBadgesReady && actionId
+                      ? (revisionBadges.get(actionId)?.correctionCount ?? 0)
+                      : 0;
+                  return (
+                    <li key={key} data-local-day={day.dayKey}>
+                      {showHeading && i === 0 ? (
+                        <h4
+                          id={headingId}
+                          className="text-xs font-semibold text-muted-foreground"
+                          data-testid="quick-log-grouped-timeline-day-label"
+                          data-local-day={day.dayKey}
+                        >
+                          {day.label}
+                        </h4>
+                      ) : null}
+                      <EntryItem
+                        entry={entry}
+                        demoVariant={w.demoVariant}
+                        correctionCount={correctionCount}
+                      />
+                    </li>
+                  );
+                }),
+              )}
             </ul>
           </>
         )}

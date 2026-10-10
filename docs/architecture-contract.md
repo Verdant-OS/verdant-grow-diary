@@ -2,9 +2,10 @@
 
 **Scope:** the permanent architectural invariants of the Verdant Grow OS application.
 **Verified from source at:** `ba991f60b86ba3ee51a2e62cbf6cefcf28d79ea3`, 2026-10-10, by Canopy
-(§15 re-verification with the AC-8.1 lockfile amendment; see §15.1). That SHA is the tree this
-file was read against: deploy branch `verdant-grow-diary` at `15525dca` merged into
-`claude/remove-package-lock`, which retires `package-lock.json`. **This stamp re-read every
+(§15 re-verification with the AC-8.1 lockfile amendment; see §15.1). That SHA is the docs
+commit on top of merge `d0414768` (deploy branch `verdant-grow-diary` at `15525dca` merged
+into `claude/remove-package-lock`), and it is the tree this file was read against. The branch
+retires `package-lock.json`. **This stamp re-read every
 citation into a file that changed between `66ea7bd3` and the stamped SHA, and carried the rest by
 file identity.** `git diff --name-only 66ea7bd3 ba991f60` names 742 files across 115 first-parent
 commits, 282 of them under `src/test/` and 6 migrations. That list was intersected with every path
@@ -279,9 +280,11 @@ Treating edge functions as the only trusted server layer would steer new work aw
 boundary that already exists.
 _Source:_ `package.json:369` (`@supabase/ssr` declared); `src/test/auth-hardening-static-safety.test.ts:101-108`
 (forbids the import); clients at `src/integrations/supabase/client.ts`, `client.server.ts` and
-`auth-middleware.ts`. `quicklog_save_manual`:
-`supabase/migrations/20260928183000_quicklog_manual_replay_metadata_lock.sql:32,48,52` (latest
-`CREATE`). `action_queue_create`:
+`auth-middleware.ts`. `quicklog_save_manual`: first `CREATE` at
+`supabase/migrations/20260725024026_quicklog_dual_timestamp_foundation.sql:762,778,782`;
+latest `CREATE` at
+`supabase/migrations/20260928183000_quicklog_manual_replay_metadata_lock.sql:32,48,52`.
+`action_queue_create`:
 `supabase/migrations/20260807140000_action_queue_create_allow_ai_coach.sql:13,29,33`. `ai_credit_spend`:
 `supabase/migrations/20260728090736_ai_credit_pack_portability.sql:31-42,385-390`. There are 34 edge
 function directories plus `_shared`; inventories live in `docs/codebase-map.md`, not here.
@@ -1283,7 +1286,7 @@ merged or mergeable is operating state, and it lives in `docs/agents/CURRENT_STA
 - **T1.** A runner that pins only the five `sensorSourceRules.ts` cites from GDP-ARCH-CITE-001, as
   #1643 proposes, is a partial T1, not the gate §11 specifies.
 - **Prototype keys.** A change to the `normalizeSensorSource` return line that AC-4.1 cites, such as
-  the own-key guard #1655 proposes, fixes the AC-4.1 defect and breaks every T1 pin on that line,
+  the own-key guard #1655 added, fixes the AC-4.1 defect and breaks every T1 pin on that line,
   including the one #1643 proposes. It must amend AC-4.1 and update those pins in the same change.
 - **Quick Log.** `established fact` at the stamped SHA: Quick Log persists through **two** RPCs,
   not one. Direct callers, found by searching non-test `src/` for each RPC name within two lines of

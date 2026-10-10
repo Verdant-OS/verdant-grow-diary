@@ -97,7 +97,12 @@ jobs:
           function normalizeRepoPath(raw) {
             if (typeof raw !== "string") return null;
             if (raw.includes("\0") || raw.includes("\n") || raw.includes("\r")) return null;
-            const path = raw.replaceAll("\\", "/");
+            let path;
+            try {
+              path = raw.normalize("NFKC").replaceAll("\\", "/");
+            } catch {
+              return null;
+            }
             if (path.startsWith("/") || /^[A-Za-z]:(?:\/|$)/.test(path)) return null;
             const parts = [];
             for (const segment of path.split("/")) {
@@ -107,7 +112,15 @@ jobs:
                 parts.pop();
                 continue;
               }
-              parts.push(segment);
+              // Windows treats a trailing dot or space on a segment as absent.
+              const stripped = segment.replace(/[. ]+$/u, "");
+              if (stripped === "" || stripped === ".") continue;
+              if (stripped === "..") {
+                if (parts.length === 0) return null;
+                parts.pop();
+                continue;
+              }
+              parts.push(stripped);
             }
             if (parts.length === 0) return null;
             return parts.join("/");
@@ -123,10 +136,20 @@ jobs:
             "docs/agents/ownership.md",
             "docs/agents/current_state.md",
             "config/claude-slice-lock-exceptions.json",
+            "config/required-status-checks.json",
+            "config/dependency-lockfile-transition.json",
             "src/pages/resetpassword.tsx",
             "src/lib/pendingoutcomereviewrules.ts",
           ];
-          const LOCKED_PREFIXES = [".github/", ".claude/", ".grok/", ".git/", "scripts/", "src/test/setup"];
+          const LOCKED_PREFIXES = [
+            ".github/",
+            ".claude/",
+            ".grok/",
+            ".git/",
+            ".husky/",
+            "scripts/",
+            "src/test/setup",
+          ];
 
           function matchesLockedPrefix(folded, prefix) {
             const rule = prefix.toLowerCase();
@@ -143,7 +166,7 @@ jobs:
             const folded = path.toLowerCase();
             if (LOCKED_EXACT_PATHS.includes(folded)) return true;
             if (LOCKED_PREFIXES.some((prefix) => matchesLockedPrefix(folded, prefix))) return true;
-            if (/^(?:\.github|\.claude|\.grok|\.git)(?:\/|$)/i.test(path)) return true;
+            if (/^(?:\.github|\.claude|\.grok|\.git|\.husky)(?:\/|$)/i.test(path)) return true;
             if (/^(?:AGENTS|CLAUDE|GEMINI)\.md$/i.test(path)) return true;
             if (/^docs\/agents\/(?:OWNERSHIP|CURRENT_STATE)\.md$/i.test(path)) return true;
             if (/(?:^|\/)(?:supabase|migrations?|sql|rls|edge-functions?|functions)(?:\/|$)/i.test(path))
@@ -175,6 +198,8 @@ jobs:
             if (/(?:^|\/)(?:\.prettierrc|\.eslintrc)[^/]*$/i.test(path)) return true;
             if (/^scripts(?:\/|$)/i.test(path)) return true;
             if (/^config\/claude-slice-lock-exceptions\.json$/i.test(path)) return true;
+            if (/^config\/(?:required-status-checks|dependency-lockfile-transition)\.json$/i.test(path))
+              return true;
             // Same roots as the content rules, e2e-local/ included (Codex P1 at cbc0ab0f).
             const executable = CONTENT_ROOTS.test(path) && !/\.md$/i.test(path);
             return (
@@ -186,26 +211,164 @@ jobs:
             );
           }
 
-          // Compare-API entries. A symlink or submodule is rejected, not read as text.
-          // A missing or unknown mode is fail-closed only when a mode is actually present;
-          // GitHub's compare payload often omits mode on ordinary files.
-          function compareNonBlobReason(file) {
-            if (!file || typeof file !== "object") return "unparsable";
-            const labels = [file.type, file.object_type]
-              .filter((value) => typeof value === "string")
-              .map((value) => value.toLowerCase());
-            if (labels.some((label) => label === "symlink" || label === "submodule" || label === "commit")) {
-              return "symlink-or-submodule";
+          // GitHub compare `files` entries have filename, status, and sha. They do not
+          // carry mode or type, so those fields on `file` are ignored. Modes come from
+          // the git tree of the side that contains the path (head for an add, merge-base
+          // for a delete, both for an edit or rename). 120000 is a symlink and 160000 is
+          // a submodule. A missing tree, a truncated listing, or an entry with no usable
+          // mode fails closed.
+          function indexTree(tree) {
+            if (!tree || typeof tree !== "object" || tree.truncated === true) return null;
+            const list = Array.isArray(tree) ? tree : tree.tree;
+            if (!Array.isArray(list)) return null;
+            const indexed = new Map();
+            for (const entry of list) {
+              if (
+                !entry ||
+                typeof entry !== "object" ||
+                typeof entry.path !== "string" ||
+                entry.path.length === 0
+              ) {
+                return null;
+              }
+              indexed.set(entry.path, entry);
             }
-            const modes = [file.mode, file.new_mode, file.old_mode].filter(
-              (value) => value !== undefined && value !== null && value !== "",
-            );
-            for (const mode of modes) {
-              const text = String(mode);
-              if (text === "120000" || text === "160000") return "symlink-or-submodule";
-              if (text !== "100644" && text !== "100755") return "unknown-mode";
+            return indexed;
+          }
+
+          function reasonForTreeEntry(entry) {
+            if (!entry || typeof entry !== "object") return "mode-unknown";
+            const label = typeof entry.type === "string" ? entry.type.toLowerCase() : "";
+            if (label === "symlink" || label === "submodule" || label === "commit")
+              return "symlink-or-submodule";
+            const mode = entry.mode == null || entry.mode === "" ? "" : String(entry.mode);
+            if (mode === "120000" || mode === "160000") return "symlink-or-submodule";
+            if (mode === "100644" || mode === "100755") return null;
+            return "mode-unknown";
+          }
+
+          function treeSides(file) {
+            if (
+              !file ||
+              typeof file !== "object" ||
+              typeof file.filename !== "string" ||
+              file.filename.length === 0
+            ) {
+              return null;
+            }
+            const name = file.filename;
+            if (file.status === "added" || file.status === "copied") return [["head", name]];
+            if (file.status === "removed") return [["base", name]];
+            if (file.status === "modified" || file.status === "changed")
+              return [
+                ["base", name],
+                ["head", name],
+              ];
+            if (file.status === "renamed") {
+              if (typeof file.previous_filename !== "string" || file.previous_filename.length === 0)
+                return null;
+              return [
+                ["base", file.previous_filename],
+                ["head", name],
+              ];
             }
             return null;
+          }
+
+          function compareNonBlobReason(file, trees) {
+            if (!file || typeof file !== "object") return "unparsable";
+            const sides = treeSides(file);
+            const head = trees && indexTree(trees.head);
+            const base = trees && indexTree(trees.base);
+            if (!sides || !head || !base) return "mode-unknown";
+            for (const [side, path] of sides) {
+              const entry = (side === "head" ? head : base).get(path);
+              if (!entry) return "mode-unknown";
+              const reason = reasonForTreeEntry(entry);
+              if (reason) return reason;
+            }
+            return null;
+          }
+
+          // Compare responses have no `truncated` field. 300 files is GitHub's cap, and
+          // commits ahead of the base with an empty file list is an omitted diff.
+          function assertCompareComplete(compare) {
+            if (!compare || typeof compare !== "object") throw new Error("Compare response is unparsable");
+            if (!Array.isArray(compare.files)) throw new Error("Compare file list is missing");
+            if (compare.files.length >= 300) {
+              throw new Error(
+                `Compare file list has ${compare.files.length} files; GitHub stops at 300, so the diff is incomplete`,
+              );
+            }
+            if (
+              typeof compare.ahead_by !== "number" ||
+              !Number.isInteger(compare.ahead_by) ||
+              compare.ahead_by < 0
+            ) {
+              throw new Error("Compare response is missing ahead_by");
+            }
+            if (compare.ahead_by > 0 && compare.files.length === 0) {
+              throw new Error("Compare reports commits ahead but lists no files");
+            }
+          }
+
+          // `git diff --raw -z` records: ":oldmode newmode oldsha newsha STATUS\0path\0",
+          // and for a rename or copy a second path. 000000 is the absent side of an add
+          // or delete, not an unknown mode.
+          function diffModeReason(oldMode, newMode) {
+            for (const mode of [oldMode, newMode]) {
+              if (mode === "000000") continue;
+              if (mode === "120000" || mode === "160000") return "symlink-or-submodule";
+              if (mode !== "100644" && mode !== "100755") return "mode-unknown";
+            }
+            return null;
+          }
+
+          function recordModeReason(record) {
+            if (
+              !record ||
+              (record.status !== "A" &&
+                record.status !== "C" &&
+                record.status !== "D" &&
+                record.status !== "M" &&
+                record.status !== "R" &&
+                record.status !== "T")
+            ) {
+              return "mode-unknown";
+            }
+            return diffModeReason(record.oldMode, record.newMode);
+          }
+
+          function parseRawDiff(raw) {
+            const text = Buffer.isBuffer(raw) ? raw.toString("utf8") : String(raw ?? "");
+            const parts = text.split("\0");
+            const records = [];
+            let index = 0;
+            while (index < parts.length) {
+              const header = parts[index];
+              index += 1;
+              if (header === "") continue;
+              const match = /^:([0-7]+) ([0-7]+) ([0-9a-f]+) ([0-9a-f]+) ([ACDMRTUX])([0-9]*)$/.exec(header);
+              if (!match) throw new Error("Unparsable git diff --raw record");
+              const oldMode = match[1];
+              const newMode = match[2];
+              const status = match[5];
+              const path = parts[index];
+              index += 1;
+              if (typeof path !== "string" || path.length === 0)
+                throw new Error("git diff --raw record is missing a path");
+              if (status === "R" || status === "C") {
+                const nextPath = parts[index];
+                index += 1;
+                if (typeof nextPath !== "string" || nextPath.length === 0) {
+                  throw new Error("git diff --raw rename is missing a path");
+                }
+                records.push({ oldMode, newMode, status, oldPath: path, path: nextPath });
+                continue;
+              }
+              records.push({ oldMode, newMode, status, path });
+            }
+            return records;
           }
           // path-guard-source:end
 
@@ -1048,40 +1211,50 @@ jobs:
             return execFileSync('git', args, { cwd, maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
           }
 
-          function blobText(cwd, rev, path) {
+          function blobText(cwd, rev, path, required) {
             try {
               git(['cat-file', '-e', `${rev}:${path}`], cwd);
             } catch {
+              if (required) throw new Error(`cat-file failed for ${JSON.stringify(path)}`);
               return null;
             }
-            return git(['cat-file', 'blob', `${rev}:${path}`], cwd).toString('utf8');
+            try {
+              return git(['cat-file', 'blob', `${rev}:${path}`], cwd).toString('utf8');
+            } catch {
+              throw new Error(`cat-file failed for ${JSON.stringify(path)}`);
+            }
           }
 
           // Base and head blob text for every changed path. Blobs are read as data;
-          // the head is never checked out or executed.
+          // the head is never checked out or executed. Modes come from git diff --raw:
+          // a symlink or submodule is rejected, and cat-file failure on a side the
+          // diff says exists fails closed instead of being read as absent.
           function changedEntries(base, head, cwd) {
             if (![base, head].every(ref => /^[a-f0-9]{40}$/i.test(ref))) throw new Error('Expected exact commit SHAs');
             const mergeBase = git(['merge-base', base, head], cwd).toString('utf8').trim();
-            const paths = git(['diff', '--name-only', '--no-renames', '-z', mergeBase, head], cwd)
-              .toString('utf8').split('\0').filter(Boolean);
+            const records = parseRawDiff(git(['diff', '--raw', '--no-renames', '-z', mergeBase, head], cwd));
             const binary = new Set();
             for (const record of git(['diff', '--numstat', '--no-renames', '-z', mergeBase, head], cwd).toString('utf8').split('\0')) {
               const match = /^(-|\d+)\t(-|\d+)\t(.+)$/.exec(record);
               if (match && match[1] === '-') binary.add(match[3]);
             }
-            return paths.map(path => ({
-              path,
-              binary: binary.has(path),
-              base: blobText(cwd, mergeBase, path),
-              head: blobText(cwd, head, path),
-            }));
+            return records.map(record => {
+              const reason = recordModeReason(record);
+              if (reason) return { path: record.path, binary: false, base: null, head: null, nonBlob: reason };
+              return {
+                path: record.path,
+                binary: binary.has(record.path),
+                base: blobText(cwd, mergeBase, record.path, record.oldMode !== '000000'),
+                head: blobText(cwd, head, record.path, record.newMode !== '000000'),
+              };
+            });
           }
 
           // The same records as changedEntries, built from a compare payload instead
           // of a local git tree. readBlob(path, side) returns blob text, or null
           // when that side has no blob. A required blob that comes back null throws.
           // GitHub's compare payload stops at 300 files, so that many is incomplete.
-          function entriesFromCompare(files, readBlob) {
+          function entriesFromCompare(files, readBlob, trees) {
             if (!Array.isArray(files)) throw new Error('Compare file list is missing');
             if (files.length >= 300) {
               throw new Error(`Compare file list has ${files.length} files; GitHub stops at 300, so the diff is incomplete`);
@@ -1112,7 +1285,7 @@ jobs:
               const knownStatus = status === 'renamed' || status === 'copied' || status === 'added'
                 || status === 'removed' || status === 'modified' || status === 'changed';
               if (knownStatus) {
-                const nonBlob = compareNonBlobReason(file)
+                const nonBlob = compareNonBlobReason(file, trees)
                   || (normalizeRepoPath(name) == null ? 'unparsable-path' : null)
                   || (status === 'renamed' && normalizeRepoPath(file.previous_filename) == null ? 'unparsable-path' : null);
                 if (nonBlob) {
@@ -1232,6 +1405,8 @@ jobs:
               './**/*global-setup*', './**/*global-teardown*', './**/*globalSetup*', './**/*globalTeardown*',
               './src/test/setup*', './**/.prettierrc*', './**/.eslintrc*', './scripts/**',
               './config/claude-slice-lock-exceptions.json',
+              './config/required-status-checks.json', './config/dependency-lockfile-transition.json',
+              './.husky/**',
               './src/pages/ResetPassword.tsx', './src/lib/pendingOutcomeReviewRules.ts',
             ];
             const codeGlobs = [
@@ -1352,6 +1527,10 @@ jobs:
               'src/./pages/ResetPassword.tsx', './src/pages/../pages/ResetPassword.tsx',
               'src/lib/pendingOutcomeReviewRules.ts', 'src/lib/./pendingOutcomeReviewRules.ts',
               'src/foo/../../src/lib/pendingOutcomeReviewRules.ts', 'src/../../outside.ts',
+              'config/required-status-checks.json', 'config/dependency-lockfile-transition.json',
+              '.husky/pre-commit', '.husky',
+              'src/pages/ResetPassword.tsx.', 'src/pages/ResetPassword.tsx ',
+              'src\uFF0Fpages\uFF0FResetPassword.tsx',
             ];
             const allowed = [
               'docs/library.md', 'docs/auth-guide.md', 'docs/agents/claude-slices.md',
@@ -1361,6 +1540,7 @@ jobs:
               'src/lib/guidedActionChecklistRules.ts', 'src/lib/actionResponsePairingRules.ts',
               'src/test/action-response-pairing-rules.test.ts', 'docs/prettierrc-notes.md',
               './src/lib/libraryRules.ts', 'src/lib/./libraryRules.ts', 'SRC/LIB/LIBRARYRULES.TS',
+              'src/lib/libraryRules.ts.', 'src/lib/libraryRules.ts ', 'src/lib/foo..bar.ts',
             ];
             blocked.forEach(path => assert.equal(lockedPath(path), true, path));
             allowed.forEach(path => assert.equal(lockedPath(path), false, path));
@@ -1377,6 +1557,9 @@ jobs:
               'Edit(./**/.prettierrc*)', 'Edit(./**/.eslintrc*)', 'Edit(./scripts/**)', 'Write(./scripts/**)',
               'Edit(./src/pages/ResetPassword.tsx)', 'Write(./src/pages/ResetPassword.tsx)',
               'Edit(./src/lib/pendingOutcomeReviewRules.ts)', 'Write(./src/lib/pendingOutcomeReviewRules.ts)',
+              'Edit(./config/required-status-checks.json)', 'Write(./config/required-status-checks.json)',
+              'Edit(./config/dependency-lockfile-transition.json)', 'Write(./config/dependency-lockfile-transition.json)',
+              'Edit(./.husky/**)', 'Write(./.husky/**)',
               'Bash(*--pathspec-from-file*)', 'Bash(*--pathspec-file-nul*)',
             ];
             requiredDenies.forEach(rule => assert.ok(deny.includes(rule), rule));
@@ -1761,9 +1944,35 @@ jobs:
               return Object.prototype.hasOwnProperty.call(blobs, key) ? blobs[key] : null;
             };
             let cases = 0;
-            const renamed = entriesFromCompare([
-              { filename: 'src/lib/neutralRules.ts', previous_filename: 'src/lib/queueReader.ts', status: 'renamed' },
-            ], readBlob);
+            function treesFor(files, overlays = []) {
+              const head = [];
+              const base = [];
+              const add = (side, path) => {
+                if (typeof path !== 'string' || path.length === 0) return;
+                (side === 'base' ? base : head).push({
+                  path, mode: '100644', type: 'blob', sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                });
+              };
+              for (const file of files) {
+                if (!file || typeof file.filename !== 'string') continue;
+                if (file.status === 'added' || file.status === 'copied') add('head', file.filename);
+                else if (file.status === 'removed') add('base', file.filename);
+                else if (file.status === 'renamed') {
+                  add('base', file.previous_filename);
+                  add('head', file.filename);
+                } else if (file.status === 'modified' || file.status === 'changed') {
+                  add('base', file.filename);
+                  add('head', file.filename);
+                }
+              }
+              for (const overlay of overlays) (overlay.side === 'base' ? base : head).push(overlay);
+              return { head: { truncated: false, tree: head }, base: { truncated: false, tree: base } };
+            }
+            const fromCompare = (files, read, overlays) => entriesFromCompare(files, read, treesFor(files, overlays));
+            const renamedFiles = [
+              { filename: 'src/lib/neutralRules.ts', previous_filename: 'src/lib/queueReader.ts', status: 'renamed', sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+            ];
+            const renamed = fromCompare(renamedFiles, readBlob);
             cases += 1;
             assert.deepEqual(renamed.map(entry => [entry.path, entry.base === null, entry.head === null]), [
               ['src/lib/queueReader.ts', false, true],
@@ -1779,8 +1988,8 @@ jobs:
               const text = readBlob(path, side);
               return typeof text === 'string' ? text : 'export const n = 1;\n';
             };
-            const intoLocked = entriesFromCompare([
-              { filename: 'src/pages/ResetPassword.tsx', previous_filename: 'src/lib/libraryRules.ts', status: 'renamed' },
+            const intoLocked = fromCompare([
+              { filename: 'src/pages/ResetPassword.tsx', previous_filename: 'src/lib/libraryRules.ts', status: 'renamed', sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
             ], readCounted);
             cases += 1;
             assert.deepEqual(intoLocked.map(entry => entry.path), ['src/lib/libraryRules.ts', 'src/pages/ResetPassword.tsx']);
@@ -1788,31 +1997,39 @@ jobs:
             assert.deepEqual(entryLocks(intoLocked[0]), []);
             cases += 1;
             assert.deepEqual(entryLocks(intoLocked[1]), ['path']);
-            const outOfLocked = entriesFromCompare([
-              { filename: 'src/lib/libraryRules.ts', previous_filename: 'src/pages/ResetPassword.tsx', status: 'renamed' },
+            const outOfLocked = fromCompare([
+              { filename: 'src/lib/libraryRules.ts', previous_filename: 'src/pages/ResetPassword.tsx', status: 'renamed', sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
             ], readCounted);
             cases += 1;
             assert.deepEqual(entryLocks(outOfLocked[0]), ['path']);
             cases += 1;
             assert.deepEqual(entryLocks(outOfLocked[1]), []);
             blobReads = 0;
-            const symlink = entriesFromCompare([
-              { filename: 'src/lib/libraryRules.ts', status: 'added', type: 'symlink' },
-            ], readCounted);
+            const symlinkFiles = [{ filename: 'src/lib/libraryRules.ts', status: 'added', sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' }];
+            const symlink = fromCompare(symlinkFiles, readCounted, [
+              { side: 'head', path: 'src/lib/libraryRules.ts', mode: '120000', type: 'blob', sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+            ]);
             cases += 1;
             assert.equal(blobReads, 0);
             cases += 1;
             assert.deepEqual(entryLocks(symlink[0]), ['symlink-or-submodule']);
-            const submodule = entriesFromCompare([
-              { filename: 'vendor/mod', status: 'added', mode: '160000' },
-            ], readCounted);
+            blobReads = 0;
+            const submoduleFiles = [{ filename: 'vendor/mod', status: 'added', sha: 'cccccccccccccccccccccccccccccccccccccccc' }];
+            const submodule = fromCompare(submoduleFiles, readCounted, [
+              { side: 'head', path: 'vendor/mod', mode: '160000', type: 'commit', sha: 'cccccccccccccccccccccccccccccccccccccccc' },
+            ]);
             cases += 1;
             assert.equal(blobReads, 0);
             cases += 1;
             assert.deepEqual(entryLocks(submodule[0]), ['symlink-or-submodule']);
-            const linkRename = entriesFromCompare([
-              { filename: 'src/lib/libraryRules.ts', previous_filename: 'src/lib/plainRules.ts', status: 'renamed', type: 'symlink' },
-            ], readCounted);
+            blobReads = 0;
+            const linkRenameFiles = [{
+              filename: 'src/lib/libraryRules.ts', previous_filename: 'src/lib/plainRules.ts', status: 'renamed',
+              sha: 'dddddddddddddddddddddddddddddddddddddddd',
+            }];
+            const linkRename = fromCompare(linkRenameFiles, readCounted, [
+              { side: 'head', path: 'src/lib/libraryRules.ts', mode: '120000', type: 'blob', sha: 'dddddddddddddddddddddddddddddddddddddddd' },
+            ]);
             cases += 1;
             assert.equal(blobReads, 0);
             cases += 1;
@@ -1820,39 +2037,50 @@ jobs:
               ['src/lib/plainRules.ts', 'symlink-or-submodule'],
               ['src/lib/libraryRules.ts', 'symlink-or-submodule'],
             ]);
-            const modified = entriesFromCompare([{ filename: 'src/lib/plainRules.ts', status: 'modified' }], readBlob);
+            blobReads = 0;
+            const unknownFiles = [{ filename: 'src/lib/libraryRules.ts', status: 'added', sha: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' }];
+            const unknown = entriesFromCompare(unknownFiles, readCounted, { head: { truncated: false, tree: [] }, base: { truncated: false, tree: [] } });
+            cases += 1;
+            assert.equal(blobReads, 0);
+            cases += 1;
+            assert.deepEqual(entryLocks(unknown[0]), ['mode-unknown']);
+            const truncated = entriesFromCompare(unknownFiles, readCounted, {
+              head: { truncated: true, tree: [{ path: 'src/lib/libraryRules.ts', mode: '100644', type: 'blob', sha: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' }] },
+              base: { truncated: false, tree: [] },
+            });
+            cases += 1;
+            assert.deepEqual(entryLocks(truncated[0]), ['mode-unknown']);
+            const modified = fromCompare([{ filename: 'src/lib/plainRules.ts', status: 'modified', sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }], readBlob);
             cases += 1;
             assert.equal(modified.length, 1);
             cases += 1;
             assert.deepEqual(entryLocks(modified[0]), ['auth-mutation, head']);
             cases += 1;
             assert.deepEqual(
-              entriesFromCompare([{ filename: 'src/new.ts', status: 'added' }], readBlob),
+              fromCompare([{ filename: 'src/new.ts', status: 'added', sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }], readBlob),
               [{ path: 'src/new.ts', binary: false, base: null, head: blobs['head:src/new.ts'] }],
             );
-            const removed = entriesFromCompare([{ filename: 'src/gone.ts', status: 'removed' }], readBlob);
+            const removed = fromCompare([{ filename: 'src/gone.ts', status: 'removed', sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }], readBlob);
             cases += 1;
             assert.deepEqual([removed[0].base, removed[0].head], [blobs['base:src/gone.ts'], null]);
-            const changed = entriesFromCompare([{ filename: 'src/keep.ts', status: 'changed' }], readBlob);
+            const changed = fromCompare([{ filename: 'src/keep.ts', status: 'changed', sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }], readBlob);
             cases += 1;
             assert.deepEqual([changed[0].base, changed[0].head], [blobs['base:src/keep.ts'], blobs['head:src/keep.ts']]);
-            const copied = entriesFromCompare([
-              { filename: 'src/new.ts', previous_filename: 'src/keep.ts', status: 'copied' },
+            const copied = fromCompare([
+              { filename: 'src/new.ts', previous_filename: 'src/keep.ts', status: 'copied', sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
             ], readBlob);
             cases += 1;
             assert.deepEqual(copied.map(entry => entry.path), ['src/new.ts']);
             assert.equal(copied[0].base, null);
-            const binary = entriesFromCompare([{ filename: 'src/bin.ts', status: 'modified' }], readBlob);
+            const binary = fromCompare([{ filename: 'src/bin.ts', status: 'modified', sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }], readBlob);
             cases += 1;
             assert.equal(binary[0].binary, true);
             cases += 1;
             assert.deepEqual(entryLocks(binary[0]), ['binary']);
             const present = () => 'export const x = 1;\n';
+            const many = Array.from({ length: 299 }, (_, i) => ({ filename: `src/f${i}.ts`, status: 'added', sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }));
             cases += 1;
-            assert.equal(entriesFromCompare(
-              Array.from({ length: 299 }, (_, i) => ({ filename: `src/f${i}.ts`, status: 'added' })),
-              present,
-            ).length, 299);
+            assert.equal(fromCompare(many, present).length, 299);
             cases += 1;
             assert.throws(() => entriesFromCompare(
               Array.from({ length: 300 }, (_, i) => ({ filename: `src/f${i}.ts`, status: 'added' })),
@@ -1865,7 +2093,20 @@ jobs:
             cases += 1;
             assert.throws(() => entriesFromCompare(null, readBlob), /file list/);
             cases += 1;
-            assert.throws(() => entriesFromCompare([{ filename: 'src/missing.ts', status: 'added' }], readBlob), /Missing head blob/);
+            assert.throws(() => fromCompare([{ filename: 'src/missing.ts', status: 'added', sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }], readBlob), /Missing head blob/);
+            cases += 1;
+            assert.doesNotThrow(() => assertCompareComplete({ files: [], ahead_by: 0 }));
+            cases += 1;
+            assert.throws(() => assertCompareComplete({ files: [], ahead_by: 1 }), /no files/);
+            cases += 1;
+            assert.throws(() => assertCompareComplete({ files: [{ filename: 'a.ts', status: 'added' }] }), /ahead_by/);
+            cases += 1;
+            assert.throws(() => assertCompareComplete({ ahead_by: 1 }), /file list/);
+            cases += 1;
+            assert.throws(() => assertCompareComplete({
+              files: Array.from({ length: 300 }, () => ({ filename: 'a.ts', status: 'added' })),
+              ahead_by: 1,
+            }), /300/);
             const { mkdtempSync, writeFileSync: write, rmSync } = require('node:fs');
             const { tmpdir } = require('node:os');
             const { join } = require('node:path');
@@ -1887,7 +2128,7 @@ jobs:
 
           // Real git: base and head commits run through the --diff entry point.
           function contentGitFixtures() {
-            const { mkdtempSync, writeFileSync: write, mkdirSync, rmSync, renameSync } = require('node:fs');
+            const { mkdtempSync, writeFileSync: write, mkdirSync, rmSync, renameSync, symlinkSync } = require('node:fs');
             const { tmpdir } = require('node:os');
             const { join } = require('node:path');
             const { spawnSync } = require('node:child_process');
@@ -1922,6 +2163,13 @@ jobs:
                 mkdirSync(join(repo, 'e2e-local/lib'), { recursive: true });
                 write(join(repo, 'e2e-local/lib/fixtures.ts'), 'export const drop = (a, id) => a.auth.admin.deleteUser(id);\n');
               }),
+              link: commit('link', () => symlinkSync('../.github/workflows/ci.yml', join(repo, 'src/lib/escapeLink.ts'))),
+              submodule: (() => {
+                run(repo, ['checkout', '-q', base]);
+                run(repo, ['update-index', '--add', '--cacheinfo', `160000,${base},vendor/mod`]);
+                run(repo, ['commit', '-q', '-m', 'submodule']);
+                return run(repo, ['rev-parse', 'HEAD']);
+              })(),
             };
             // Written after the commits so it is never part of a diff: the trusted checkout's
             // exceptions. Excepting auth-mutation must leave aq-io on the same file locked.
@@ -1935,6 +2183,8 @@ jobs:
               add: /HOLD-CHEEK: needs locked path "src\/lib\/plainRules\.ts" \(auth-mutation, head\)/,
               both: /^(?![\s\S]*auth-mutation)[\s\S]*HOLD-CHEEK: needs locked path "src\/lib\/bothRules\.ts" \(aq-io, head\)/,
               e2eLocal: /HOLD-CHEEK: needs locked path "e2e-local\/lib\/fixtures\.ts" \(auth-mutation, head\)/,
+              link: /symlink-or-submodule/,
+              submodule: /symlink-or-submodule/,
             };
             let cases = 0;
             for (const [label, head] of Object.entries(heads)) {
@@ -1954,6 +2204,10 @@ jobs:
               contentLockedTree(repo, loadExceptions(join(repo, EXCEPTIONS_FILE))).filter(({ path }) => path === 'src/lib/bothRules.ts'),
               [{ path: 'src/lib/bothRules.ts', rules: ['aq-io'] }],
             );
+            cases += 1;
+            assert.throws(() => blobText(repo, base, 'src/lib/missing.ts', true), /cat-file failed/);
+            cases += 1;
+            assert.equal(blobText(repo, base, 'src/lib/missing.ts', false), null);
             rmSync(repo, { recursive: true, force: true });
             return cases;
           }
@@ -1991,7 +2245,7 @@ jobs:
             else if (mode === '--unlock-receipt') process.stdout.write(unlockReceipt(readFileSync(first, 'utf8')));
             else throw new Error('Unknown Claude policy command');
           }
-          module.exports = { normalizeRepoPath, lockedPath, compareNonBlobReason, contentLocked, contentScoped, changedPaths, changedEntries, entriesFromCompare, entryLocks, assertAllowed };
+          module.exports = { normalizeRepoPath, lockedPath, compareNonBlobReason, assertCompareComplete, parseRawDiff, diffModeReason, recordModeReason, contentLocked, contentScoped, changedPaths, changedEntries, entriesFromCompare, entryLocks, assertAllowed };
           NODE
           # The TypeScript parser for the AST content rules (Option 1): only this exact
           # registry tarball, checked against a pinned sha512 (the integrity bun.lock and
@@ -2326,13 +2580,35 @@ jobs:
             `repos/${repo}/compare/${base}...${head}`,
           ], false);
           const compare = JSON.parse(compareRaw.toString('utf8'));
-          if (compare.truncated === true) throw new Error('Compare response is truncated');
+          policy.assertCompareComplete(compare);
           const mergeBase = compare.merge_base_commit && compare.merge_base_commit.sha;
           if (!/^[a-f0-9]{40}$/i.test(mergeBase || '')) throw new Error('Compare response is missing merge_base_commit.sha');
-          const entries = policy.entriesFromCompare(compare.files, (path, side) => readBlob(path, side, mergeBase, head, repo, policy));
+          const entries = policy.entriesFromCompare(
+            compare.files,
+            (path, side) => readBlob(path, side, mergeBase, head, repo, policy),
+            { head: readTree(head), base: readTree(mergeBase) },
+          );
           const out = process.env.RUNNER_TEMP + '/claude-slice-entries.json';
           writeFileSync(out, JSON.stringify(entries));
 
+          function readTree(commitSha) {
+            const commit = JSON.parse(gh([
+              'api', '--method', 'GET', '-H', 'Accept: application/vnd.github+json',
+              `repos/${repo}/git/commits/${commitSha}`,
+            ], false).toString('utf8'));
+            const treeSha = commit && commit.tree && commit.tree.sha;
+            if (typeof treeSha !== 'string' || !/^[a-f0-9]{40}$/i.test(treeSha)) {
+              throw new Error('Commit is missing its tree SHA');
+            }
+            const tree = JSON.parse(gh([
+              'api', '--method', 'GET', '-H', 'Accept: application/vnd.github+json',
+              `repos/${repo}/git/trees/${treeSha}?recursive=1`,
+            ], false).toString('utf8'));
+            if (!tree || !Array.isArray(tree.tree) || tree.truncated === true) {
+              throw new Error('Git tree listing is missing or truncated');
+            }
+            return tree;
+          }
           function gh(args, allowMissing) {
             const result = spawnSync('gh', args, { encoding: 'buffer', maxBuffer: 8 * 1024 * 1024 });
             if (result.error) throw result.error;

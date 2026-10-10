@@ -275,10 +275,13 @@ Following imports and data flow would close these, and is deferred.
 with `claude-slice/`. Slice branches use that prefix so they do not collide with
 Claude Code's own `claude/*` branches. The job checks out the exact base and reads
 the PR head as blob data through the GitHub compare and contents APIs at the
-immutable base and head SHAs. It does not fetch or check out the PR head, and it
-does not execute PR code. A locked path fails the real check. `claude-configuration`
-runs checksum-verified actionlint and focused policy regressions on PRs, including
-this Codex draft. It also checks out the base and reads only the workflow file
+immutable base and head SHAs. Each changed path's mode comes from the git tree of
+that head commit and of the merge-base commit, also at those SHAs. A symlink
+(mode 120000), a submodule (mode 160000), or a mode that cannot be read fails
+the check. It does not fetch or check out the PR head, and it does not execute
+PR code. A locked path fails the real check. `claude-configuration` runs
+checksum-verified actionlint and focused policy regressions on pull requests,
+including #1927. It also checks out the base and reads only the workflow file
 from the contents API at the head SHA for actionlint; it does not check out or
 execute PR application code.
 Neither job impersonates an existing required check. In a `merge_group` run all

@@ -53,16 +53,16 @@ goal: Client-only fixes for #1957 and #1958. Duplicate manual-reading tent names
 branch: cursor/manual-tent-vpd-units-19a1
 base: verdant-grow-diary
 checkout: git fetch origin cursor/manual-tent-vpd-units-19a1 verdant-grow-diary && git switch cursor/manual-tent-vpd-units-19a1 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED until the draft PR is opened
-head_sha: NOT_MEASURED until origin/cursor/manual-tent-vpd-units-19a1 is pushed. Base observed at 2574b187b9c72d3a1dc3b7fe0e590b6da84d7285 on 2026-10-10 00:25 UTC.
-state: local implementation. DailyCheck.tsx is not edited (#1740 holds it). sensorTruthRules.ts, sensorReadingManualEntryRules.ts, and the manual snapshot history files are not edited (#1956 holds them).
-next_action: finish local validation, push, and open one draft PR with Fixes #1957 and Fixes #1958. Stay draft. No ready, merge, or deploy.
+pr: NOT_MEASURED until the draft PR is opened. This handoff commit cannot name the PR URL or its own SHA.
+head_sha: implementation d649b7b2ff9e67f910400098d08589d9ec3a09af. The handoff-record commit cannot name itself; read origin/cursor/manual-tent-vpd-units-19a1 after push. Base observed at 2574b187b9c72d3a1dc3b7fe0e590b6da84d7285 on 2026-10-10 00:25 UTC.
+state: local validation finished. DailyCheck.tsx is not edited (#1740 holds it). sensorTruthRules.ts, sensorReadingManualEntryRules.ts, and the manual snapshot history files are not edited (#1956 holds them).
+next_action: push and open one draft PR with Fixes #1957 and Fixes #1958. Stay draft. No ready, merge, or deploy.
 files: src/components/ManualSensorReadingCard.tsx; src/pages/Sensors.tsx; src/lib/manualTentOptionLabelRules.ts; src/lib/manualSensorVpdUnitRules.ts; src/test/manual-tent-option-labels.test.tsx; src/test/manual-sensor-vpd-unit.test.tsx; docs/agents/HANDOFF_LOG.md (this record)
 blockers: none for the repository change. Do not edit locked scorers. Do not deploy or write production Supabase. HANDOFF_LOG.md is also touched by open PRs #1830, #1923, #1925, #1933, #1934, #1938, #1941, #1949, #1952, and #1956; this block is additive and is not a second implementation of those tasks.
 artifacts: Collision Guard receipt /opt/cursor/artifacts/pr-file-overlap.json (overlap audit exit 0 at 2026-10-10T00:25:50.209Z, 49 open PRs). Product paths ManualSensorReadingCard.tsx and Sensors.tsx had no open-PR overlap.
 reviewer_seat: Blue Dream (.tsx product files)
-claimed_by: Grok, 2026-10-10 00:46 UTC
-last_updated: 2026-10-09 19:46 CT, by Grok
+claimed_by: Grok, 2026-10-10 01:35 UTC
+last_updated: 2026-10-09 20:35 CT, by Grok
 ```
 
 ### PR-1939-NOT-FOUND-COVERAGE

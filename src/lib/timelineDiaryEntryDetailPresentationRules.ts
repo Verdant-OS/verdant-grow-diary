@@ -66,6 +66,10 @@ export const HIDDEN_DIARY_DETAIL_KEYS: ReadonlySet<string> = new Set([
   // Redundant with the dedicated photo render, which reads the row-level
   // photo_url column directly.
   "photo_url",
+  // Written by the photo diary seam. Growers see a labeled local time and
+  // "Attached to", never the raw snake_case chip.
+  "logged_at",
+  "attached_to_action",
 ]);
 
 /**
@@ -123,15 +127,69 @@ export function isFullySuppressedTimelineDetail(details: unknown, suppress = fal
  * null value is "not provided", never "feeding: null" (matching this
  * codebase's absence-stays-unknown doctrine).
  */
+export interface TimelineDiaryDetailPresentationOptions {
+  suppress?: boolean;
+  /** IANA zone for `logged_at`. Omitted uses the runtime local zone. */
+  timeZone?: string;
+  /** Test seam. When set, it replaces the local timestamp formatter. */
+  formatTimestamp?: (iso: string) => string | null;
+}
+
+function formatDiaryDetailTimestamp(iso: string, timeZone?: string): string | null {
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      ...(timeZone ? { timeZone } : {}),
+    }).format(date);
+  } catch {
+    return null;
+  }
+}
+
+function friendlyAttachedAction(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed === "" || trimmed.length > 80) return null;
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
+function withGrowerFacingDetailLines(
+  record: Record<string, unknown>,
+  lines: readonly QuickLogDetailDisplayLine[],
+  options: TimelineDiaryDetailPresentationOptions,
+): QuickLogDetailDisplayLine[] {
+  const next = [...lines];
+  if (typeof record.logged_at === "string" && !next.some((line) => line.key === "logged_at")) {
+    const iso = record.logged_at.trim();
+    const formatted = options.formatTimestamp
+      ? options.formatTimestamp(iso)
+      : formatDiaryDetailTimestamp(iso, options.timeZone);
+    if (formatted) next.push({ key: "logged_at", label: "Logged at", value: formatted });
+  }
+  const attached = friendlyAttachedAction(record.attached_to_action);
+  if (attached && !next.some((line) => line.key === "attached_to_action")) {
+    next.push({ key: "attached_to_action", label: "Attached to", value: attached });
+  }
+  return next;
+}
+
 export function presentTimelineDiaryEntryDetails(
   details: unknown,
   tempUnit: TemperatureUnitPreference,
-  options: { suppress?: boolean } = {},
+  options: TimelineDiaryDetailPresentationOptions = {},
 ): TimelineDiaryEntryDetailPresentation {
   if (isFullySuppressedTimelineDetail(details, options.suppress)) return EMPTY_PRESENTATION;
 
-  const detailLines = describeQuickLogDetailsFromExtras(details, tempUnit);
-  const extra = Object.entries(detailsRecord(details))
+  const record = detailsRecord(details);
+  const detailLines = withGrowerFacingDetailLines(
+    record,
+    describeQuickLogDetailsFromExtras(details, tempUnit),
+    options,
+  );
+  const extra = Object.entries(record)
     .filter(
       ([k, v]) =>
         v != null && !HIDDEN_DIARY_DETAIL_KEYS.has(k) && !QUICK_LOG_DETAIL_FIELD_KEYS.has(k),

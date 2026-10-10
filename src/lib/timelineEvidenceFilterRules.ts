@@ -244,6 +244,56 @@ export interface TimelineEvidenceFilterOption {
  * an array, so callers can tell a failed read from an empty directory.
  * Malformed rows are skipped; the first name seen for an id wins. Pure.
  */
+export interface TimelineCardPlaceLabels {
+  plantName: string | null;
+  tentName: string | null;
+}
+
+function trimmedLabel(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Plant and tent names for a Timeline card and its detail drawer.
+ * A name already stored on the diary details wins. Otherwise the loaded
+ * directory supplies the name for the row's plant_id / tent_id. Never
+ * invents a name when both are missing.
+ */
+export function resolveTimelineCardPlaceLabels(input: {
+  plantId?: string | null;
+  tentId?: string | null;
+  details?: Record<string, unknown> | null;
+  plantNamesById?: ReadonlyMap<string, string> | null;
+  tentNamesById?: ReadonlyMap<string, string> | null;
+}): TimelineCardPlaceLabels {
+  const detailsPlant = trimmedLabel(input.details?.plant_name);
+  const detailsTent = trimmedLabel(input.details?.tent_name);
+  const plantId = trimmedLabel(input.plantId);
+  const tentId = trimmedLabel(input.tentId);
+  const directoryPlant =
+    plantId && input.plantNamesById ? trimmedLabel(input.plantNamesById.get(plantId)) : "";
+  const directoryTent =
+    tentId && input.tentNamesById ? trimmedLabel(input.tentNamesById.get(tentId)) : "";
+  return {
+    plantName: detailsPlant || directoryPlant || null,
+    tentName: detailsTent || directoryTent || null,
+  };
+}
+
+/**
+ * Copy of `details` with plant_name / tent_name filled only where the row
+ * did not already carry a non-blank name. The drawer reads those two keys.
+ */
+export function withResolvedTimelinePlaceDetails(
+  details: Record<string, unknown> | null | undefined,
+  labels: TimelineCardPlaceLabels,
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...(details ?? {}) };
+  if (labels.plantName && trimmedLabel(next.plant_name) === "") next.plant_name = labels.plantName;
+  if (labels.tentName && trimmedLabel(next.tent_name) === "") next.tent_name = labels.tentName;
+  return next;
+}
+
 export function buildTimelineNameLookup(rows: unknown): ReadonlyMap<string, string> | null {
   if (!Array.isArray(rows)) return null;
   const m = new Map<string, string>();

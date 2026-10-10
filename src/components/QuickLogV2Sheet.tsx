@@ -75,6 +75,7 @@ import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 
+import { quickLogArchivedGrowActionBlock } from "@/lib/archivedGrowQuickLogRules";
 import {
   buildQuickLogV2TargetOptions,
   filterQuickLogV2TargetOptions,
@@ -630,7 +631,7 @@ function QuickLogV2SheetForOwner({
   // Visible grow roster gates Target Select: dangling grow_id rows (UUID
   // present but grow not in useGrows()) must not appear — live FAIL tip
   // 87b3b322 offered Tent · Flower with Grow "No grow linked".
-  const { grows } = useGrows();
+  const { grows, archivedGrows } = useGrows();
   const visibleGrowIds = useMemo(() => {
     const ids = new Set<string>();
     for (const g of grows ?? []) {
@@ -638,9 +639,16 @@ function QuickLogV2SheetForOwner({
     }
     return ids;
   }, [grows]);
+  const archivedGrowIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const g of archivedGrows ?? []) {
+      if (typeof g?.id === "string" && g.id.trim().length > 0) ids.add(g.id.trim());
+    }
+    return ids;
+  }, [archivedGrows]);
   const baseOptions = useMemo(
-    () => buildQuickLogV2TargetOptions(tents, plants, visibleGrowIds),
-    [tents, plants, visibleGrowIds],
+    () => buildQuickLogV2TargetOptions(tents, plants, visibleGrowIds, archivedGrowIds),
+    [tents, plants, visibleGrowIds, archivedGrowIds],
   );
 
   // Tent context from open intent / selected tent key (route registration
@@ -837,6 +845,11 @@ function QuickLogV2SheetForOwner({
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
   const selectedTargetStale = isStaleQuickLogV2TargetSelection(resolvedTarget);
   const noteLength = form.note.length;
+  const archivedGrowActionBlock = quickLogArchivedGrowActionBlock({
+    growId: resolvedTarget.ok ? resolvedTarget.growId : null,
+    action: form.action,
+    archivedGrowIds,
+  });
   const volumeMissing = form.action === "water" && wateringForm.volumeMl.trim() === "";
   const criticalContentMissing = isQuickLogV2CriticalContentMissing({
     action: form.action,
@@ -1494,6 +1507,21 @@ function QuickLogV2SheetForOwner({
       pendingSubmission?.resolved ?? resolveQuickLogV2Target(options, form.selectedKey);
     if (!resolved.ok) {
       setLocalError("Choose a plant or tent before saving.");
+      return;
+    }
+    const archivedSaveBlock = quickLogArchivedGrowActionBlock({
+      growId: resolved.growId,
+      action: pendingWateringSubmission
+        ? "water"
+        : pendingFeedingSubmission
+          ? "feed"
+          : pendingManualSubmission
+            ? "note"
+            : form.action,
+      archivedGrowIds,
+    });
+    if (archivedSaveBlock) {
+      setLocalError(archivedSaveBlock);
       return;
     }
 
@@ -3299,6 +3327,16 @@ function QuickLogV2SheetForOwner({
             </div>
           )}
 
+          {archivedGrowActionBlock && (
+            <p
+              role="alert"
+              data-testid="qlv2-archived-grow-block"
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive"
+            >
+              {archivedGrowActionBlock}
+            </p>
+          )}
+
           {localError && (
             <div
               role="alert"
@@ -3475,7 +3513,8 @@ function QuickLogV2SheetForOwner({
                       (contextBlocked && !retryPending) ||
                       (selectedTargetMissing && !retryPending) ||
                       (selectedTargetStale && !retryPending) ||
-                      (criticalContentMissing && !retryPending)
+                      (criticalContentMissing && !retryPending) ||
+                      Boolean(archivedGrowActionBlock)
                     }
                     aria-describedby="qlv2-save-helper"
                     data-testid="qlv2-save"

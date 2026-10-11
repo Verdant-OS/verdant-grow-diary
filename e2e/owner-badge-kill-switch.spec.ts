@@ -2,6 +2,7 @@
 // default (enabled = false) must create no badge_awards row.
 // Never point E2E_LOCAL_SUPABASE_URL at https://verdantgrowdiary.com.
 import { test, expect } from "@playwright/test";
+import { isOwnerBadgeLocalSupabaseHost } from "../src/lib/badgeAwardLocalHostRules";
 
 const LOCAL_URL = process.env.E2E_LOCAL_SUPABASE_URL?.trim() ?? "";
 const ANON_KEY = process.env.E2E_LOCAL_SUPABASE_ANON_KEY?.trim() ?? "";
@@ -11,7 +12,7 @@ function assertLoopback(url: string) {
   if (host === "verdantgrowdiary.com" || host.endsWith(".verdantgrowdiary.com")) {
     throw new Error("refusing production host");
   }
-  if (host !== "127.0.0.1" && host !== "localhost" && host !== "::1") {
+  if (!isOwnerBadgeLocalSupabaseHost(host)) {
     throw new Error(`refusing non-loopback supabase host ${host}`);
   }
 }

@@ -114,6 +114,12 @@ DECLARE
   v_queue int;
   v_stamped timestamptz;
   v_shape uuid;
+  v_switch_at timestamptz;
+  v_batch_user uuid;
+  v_batch_grow uuid;
+  v_batch_n int;
+  v_batch_first int;
+  v_batch_second int;
 BEGIN
   INSERT INTO auth.users (
     id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
@@ -200,11 +206,15 @@ BEGIN
   SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
   ASSERT v_count = 0, 'failed client insert must leave no award';
 
+  SELECT updated_at INTO v_switch_at FROM public.badge_award_runtime WHERE id = 1;
+  PERFORM pg_sleep(0.01);
   PERFORM set_config('role', 'service_role', true);
   UPDATE public.badge_award_runtime SET enabled = true WHERE id = 1;
   RESET role;
   ASSERT (SELECT enabled FROM public.badge_award_runtime WHERE id = 1) IS TRUE,
     'service_role must be able to turn the switch on';
+  ASSERT (SELECT updated_at FROM public.badge_award_runtime WHERE id = 1) > v_switch_at,
+    'turning the switch on must move updated_at';
 
   UPDATE public.diary_entries
      SET note = '',
@@ -271,6 +281,18 @@ BEGIN
   RESET role;
   SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
   ASSERT v_count = 0, 'wrong prefix must not create an award';
+
+  UPDATE public.diary_entries
+     SET photo_url = v_owner::text || '/../' || v_stranger::text || '/x.jpg'
+   WHERE id = v_entry;
+  INSERT INTO storage.objects (bucket_id, name)
+  VALUES ('diary-photos', v_owner::text || '/../' || v_stranger::text || '/x.jpg');
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'unchanged', 'a parent-directory segment must not qualify';
+  RESET role;
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
+  ASSERT v_count = 0, 'a parent-directory segment must not create an award';
 
   UPDATE public.diary_entries
      SET grow_id = v_other_grow,
@@ -589,6 +611,37 @@ BEGIN
     're-evaluation must keep revoked_at';
   ASSERT (SELECT restored_at FROM public.badge_awards WHERE id = v_award) IS NOT NULL,
     're-evaluation must not clear an earlier restore stamp';
+
+  RESET role;
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  PERFORM set_config('request.jwt.claims', '{}', true);
+  UPDATE public.badge_award_runtime SET reconcile_after = NULL WHERE id = 1;
+  FOR v_batch_n IN 1..26 LOOP
+    v_batch_user := gen_random_uuid();
+    v_batch_grow := gen_random_uuid();
+    INSERT INTO auth.users (
+      id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
+      raw_app_meta_data, raw_user_meta_data, aud, role
+    ) VALUES (
+      v_batch_user,
+      'badge-batch-' || v_batch_user::text || '@verdant.test',
+      crypt('harness-password', gen_salt('bf')),
+      now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'
+    );
+    INSERT INTO public.grows (id, user_id, name)
+    VALUES (v_batch_grow, v_batch_user, 'badge batch grow');
+    INSERT INTO public.diary_entries (user_id, grow_id, note, entry_at)
+    VALUES (v_batch_user, v_batch_grow, '', now());
+  END LOOP;
+  PERFORM set_config('role', 'service_role', true);
+  v_batch_first := public.badge_awards_reconcile();
+  ASSERT (SELECT reconcile_after FROM public.badge_award_runtime WHERE id = 1) IS NOT NULL,
+    'a full batch must store the cursor';
+  v_batch_second := public.badge_awards_reconcile();
+  RESET role;
+  ASSERT v_batch_first = 25, format('one reconcile call must visit one batch of 25, got %s', v_batch_first);
+  ASSERT v_batch_second >= 1 AND v_batch_second <= 25,
+    format('the next reconcile call must visit a later batch, got %s', v_batch_second);
 
   DELETE FROM auth.users WHERE id = v_owner;
   SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;

@@ -5,9 +5,19 @@
 -- before any lock or write. A missing row, a null, or any value other than
 -- true returns {"status":"disabled"} and writes nothing.
 --
--- Matthew turns the switch on, with the service_role key only:
+-- Matthew turns the switch on, with the service_role key only, after Petal
+-- approves the badge copy. A BEFORE UPDATE trigger sets updated_at to
+-- clock_timestamp() when enabled changes:
 --   UPDATE public.badge_award_runtime SET enabled = true WHERE id = 1;
 -- There is no Settings control and no client UPDATE grant.
+--
+-- Matthew enables the inactive pg_cron job only after that flip. Hosted
+-- cron.alter_job needs the postgres role:
+--   SELECT cron.alter_job(job.jobid, active := true)
+--   FROM cron.job AS job
+--   WHERE job.jobname = 'badge-awards-reconcile';
+-- Order: Petal copy approval, then the runtime flip, then cron enable.
+-- This migration does none of those three.
 --
 -- This migration creates no trigger on diary_entries, storage.objects,
 -- grows, or tents. Existing diary saves do not call the evaluator.
@@ -17,9 +27,12 @@
 -- unchanged, so a later qualifying diary does not restore it.
 --
 -- badge_awards_reconcile() is the server sweep. It reads the kill switch
--- first and writes nothing unless that switch is exactly true. EXECUTE is
--- service_role only. The pg_cron job badge-awards-reconcile is inserted
--- inactive when pg_cron is installed. This migration does not enable it.
+-- first and writes nothing unless that switch is exactly true. Each call
+-- visits at most 25 owners and stores the cursor in reconcile_after, so
+-- one transaction holds at most 25 advisory locks. EXECUTE is service_role
+-- only. The pg_cron job badge-awards-reconcile is inserted inactive when
+-- pg_cron is installed. When pg_cron is absent the schedule block returns
+-- before it reads cron.job. This migration does not enable the job.
 --
 -- Evidence can name a diary entry, tent, setup, or harvest. Only
 -- first_diary_entry has a qualification rule. The other keys are stored
@@ -28,11 +41,37 @@
 CREATE TABLE public.badge_award_runtime (
   id smallint PRIMARY KEY CHECK (id = 1),
   enabled boolean NOT NULL DEFAULT false,
+  reconcile_after uuid,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 INSERT INTO public.badge_award_runtime (id, enabled)
 VALUES (1, false);
+
+-- updated_at tracks a kill-switch change. Cursor updates keep the previous
+-- timestamp so a reconcile batch is not recorded as a switch flip.
+CREATE OR REPLACE FUNCTION public.badge_award_runtime_touch_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  IF NEW.enabled IS DISTINCT FROM OLD.enabled THEN
+    NEW.updated_at := clock_timestamp();
+  ELSE
+    NEW.updated_at := OLD.updated_at;
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+CREATE TRIGGER badge_award_runtime_touch_updated_at
+  BEFORE UPDATE ON public.badge_award_runtime
+  FOR EACH ROW
+  EXECUTE FUNCTION public.badge_award_runtime_touch_updated_at();
+
+REVOKE ALL ON FUNCTION public.badge_award_runtime_touch_updated_at()
+  FROM PUBLIC, anon, authenticated, service_role;
 
 CREATE TABLE public.badge_awards (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -449,6 +488,16 @@ COMMENT ON FUNCTION public.badge_awards_evaluate_owner(text) IS
 
 -- Server sweep. No trigger on diary_entries, grows, tents, or storage.objects.
 -- Fail closed unless badge_award_runtime.enabled is exactly true.
+--
+-- pg_advisory_xact_lock is held until the calling transaction commits, so a
+-- sweep of every owner would keep one lock per owner. A session-level
+-- lock/unlock pair can stay held on a pooled connection if the call errors
+-- before unlock. A procedure that COMMITs each owner would release the xact
+-- lock per iteration, and it would change this call from SELECT to CALL.
+-- This function visits at most 25 owners per call, ordered by user id, and
+-- stores the last id in reconcile_after. The next call continues after that
+-- id. A short or empty batch clears the cursor. A failure rolls back only
+-- that call.
 CREATE OR REPLACE FUNCTION public.badge_awards_reconcile()
 RETURNS integer
 LANGUAGE plpgsql
@@ -457,11 +506,14 @@ SET search_path TO 'public', 'pg_temp'
 AS $function$
 DECLARE
   runtime_enabled boolean;
+  cursor_after uuid;
   owner uuid;
+  last_owner uuid;
   reconciled integer := 0;
+  batch_limit constant integer := 25;
 BEGIN
-  SELECT runtime.enabled
-    INTO runtime_enabled
+  SELECT runtime.enabled, runtime.reconcile_after
+    INTO runtime_enabled, cursor_after
   FROM public.badge_award_runtime AS runtime
   WHERE runtime.id = 1;
 
@@ -470,18 +522,38 @@ BEGIN
   END IF;
 
   FOR owner IN
-    SELECT entry.user_id
-    FROM public.diary_entries AS entry
-    WHERE entry.user_id IS NOT NULL
-    UNION
-    SELECT award.user_id
-    FROM public.badge_awards AS award
+    SELECT owners.user_id
+    FROM (
+      SELECT entry.user_id
+      FROM public.diary_entries AS entry
+      WHERE entry.user_id IS NOT NULL
+      UNION
+      SELECT award.user_id
+      FROM public.badge_awards AS award
+    ) AS owners
+    WHERE cursor_after IS NULL OR owners.user_id > cursor_after
+    ORDER BY owners.user_id
+    LIMIT batch_limit
   LOOP
     PERFORM set_config('request.jwt.claim.sub', owner::text, true);
     PERFORM set_config('request.jwt.claims', json_build_object('sub', owner)::text, true);
     PERFORM public.badge_awards_evaluate_owner('first_diary_entry');
     reconciled := reconciled + 1;
+    last_owner := owner;
   END LOOP;
+
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  PERFORM set_config('request.jwt.claims', '{}', true);
+
+  IF reconciled < batch_limit THEN
+    UPDATE public.badge_award_runtime
+       SET reconcile_after = NULL
+     WHERE id = 1;
+  ELSE
+    UPDATE public.badge_award_runtime
+       SET reconcile_after = last_owner
+     WHERE id = 1;
+  END IF;
 
   RETURN reconciled;
 END;
@@ -491,8 +563,11 @@ REVOKE ALL ON FUNCTION public.badge_awards_reconcile()
   FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.badge_awards_reconcile() TO service_role;
 
--- Disabled schedule. active is false on insert. Absent pg_cron skips this.
--- Equivalent command:
+-- Disabled schedule. active is false on insert. The procedure check is its
+-- own statement so cron.job is not planned when pg_cron is absent. Matthew
+-- enables the job later with cron.alter_job (see the header). Order is
+-- Petal copy approval, then the runtime flip, then this job.
+-- Equivalent command, only where pg_cron is installed:
 --   SELECT cron.schedule_in_database(
 --     'badge-awards-reconcile',
 --     '15 * * * *',
@@ -503,10 +578,12 @@ GRANT EXECUTE ON FUNCTION public.badge_awards_reconcile() TO service_role;
 --   );
 DO $schedule$
 BEGIN
-  IF to_regprocedure('cron.schedule_in_database(text, text, text, text, text, boolean)') IS NOT NULL
-     AND NOT EXISTS (
-       SELECT 1 FROM cron.job WHERE jobname = 'badge-awards-reconcile'
-     ) THEN
+  IF to_regprocedure('cron.schedule_in_database(text, text, text, text, text, boolean)') IS NULL THEN
+    RETURN;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM cron.job WHERE jobname = 'badge-awards-reconcile'
+  ) THEN
     PERFORM cron.schedule_in_database(
       'badge-awards-reconcile',
       '15 * * * *',

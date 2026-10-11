@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BADGE_AWARD_COPY } from "@/constants/badgeAwardCopy";
 import { ownerBadgeShelfEnabled } from "@/lib/badgeAwardFlags";
+import { isOwnerBadgeLocalSupabaseHost } from "@/lib/badgeAwardLocalHostRules";
 import {
   BADGE_AWARD_PLACEHOLDER_NOTE,
   FIRST_DIARY_ENTRY_BADGE_KEY,
@@ -12,6 +13,16 @@ import {
 describe("badge award display rules", () => {
   it("keeps the shelf flag off", () => {
     expect(ownerBadgeShelfEnabled).toBe(false);
+  });
+
+  it("accepts bracketed IPv6 loopback and refuses every other host", () => {
+    expect(new URL("http://[::1]:54321").hostname).toBe("[::1]");
+    expect(isOwnerBadgeLocalSupabaseHost("[::1]")).toBe(true);
+    expect(isOwnerBadgeLocalSupabaseHost("::1")).toBe(true);
+    expect(isOwnerBadgeLocalSupabaseHost("127.0.0.1")).toBe(true);
+    expect(isOwnerBadgeLocalSupabaseHost("localhost")).toBe(true);
+    expect(isOwnerBadgeLocalSupabaseHost("verdantgrowdiary.com")).toBe(false);
+    expect(isOwnerBadgeLocalSupabaseHost("example.com")).toBe(false);
   });
 
   it("uses the Quick Log placeholder sentence the evaluator compares", () => {

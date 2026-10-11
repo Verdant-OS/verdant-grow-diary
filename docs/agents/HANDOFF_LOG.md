@@ -53,10 +53,10 @@ goal: Replace the Quick Log Alert Walk "coming later" placeholder with final in-
 branch: cursor/alert-walk-final-guidance-b6de
 base: verdant-grow-diary
 checkout: git fetch origin cursor/alert-walk-final-guidance-b6de verdant-grow-diary && git switch cursor/alert-walk-final-guidance-b6de && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED until the draft exists
-head_sha: NOT_MEASURED until push
-state: local implementation in progress
-next_action: draft PR against verdant-grow-diary; stay draft; required checks at the exact head
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2025 (draft)
+head_sha: 3c77397724c3c88109c61fb5b06d9de2ead0351b until this log update; read the PR head after the follow-up push
+state: pushed draft
+next_action: required checks at the exact head; stay draft; Blue Dream reviews the .tsx
 files: src/lib/growWalkContracts.ts; src/components/GuidedGrowWalkPanel.tsx; src/test/alert-walk-guidance.test.tsx; docs/agents/HANDOFF_LOG.md
 blockers: none for the copy change. No merge, ready, publish, or production write.
 artifacts: GitHub issue #2021

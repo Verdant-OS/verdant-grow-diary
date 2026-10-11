@@ -34,17 +34,38 @@ const H = vi.hoisted(() => ({
   growEvents: [] as Array<Record<string, unknown>>,
   growEventError: null as { message: string } | null,
   requests: [] as string[],
+  filters: [] as Array<{ table: string; op: "eq" | "in"; column: string; value: unknown }>,
+  returnedRows: null as Array<Record<string, unknown>> | null,
   tentStage: "seedling",
 }));
 
+function rowMatchesQuery(
+  row: Record<string, unknown>,
+  filters: Array<{ op: "eq" | "in"; column: string; value: unknown }>,
+): boolean {
+  for (const filter of filters) {
+    if (!Object.prototype.hasOwnProperty.call(row, filter.column)) continue;
+    const cell = row[filter.column];
+    if (filter.op === "eq") {
+      if (cell !== filter.value) return false;
+      continue;
+    }
+    if (!Array.isArray(filter.value) || !filter.value.includes(cell)) return false;
+  }
+  return true;
+}
+
 function chain(table: string) {
+  const filters: Array<{ op: "eq" | "in"; column: string; value: unknown }> = [];
   const finish = () => {
     if (table === "grow_events") {
       H.requests.push(table);
-      return Promise.resolve({
-        data: H.growEventError ? null : H.growEvents,
-        error: H.growEventError,
-      });
+      for (const filter of filters) H.filters.push({ table, ...filter });
+      const data = H.growEventError
+        ? null
+        : H.growEvents.filter((row) => rowMatchesQuery(row, filters));
+      H.returnedRows = data;
+      return Promise.resolve({ data, error: H.growEventError });
     }
     return Promise.resolve({ data: [], error: null });
   };
@@ -57,6 +78,18 @@ function chain(table: string) {
       }
       if (prop === "catch") {
         return (reject: (reason: unknown) => unknown) => finish().catch(reject);
+      }
+      if (prop === "eq") {
+        return (column: string, value: unknown) => {
+          filters.push({ op: "eq", column, value });
+          return proxy;
+        };
+      }
+      if (prop === "in") {
+        return (column: string, value: unknown) => {
+          filters.push({ op: "in", column, value });
+          return proxy;
+        };
       }
       return () => proxy;
     },
@@ -333,6 +366,8 @@ beforeEach(() => {
   H.growEvents = [];
   H.growEventError = null;
   H.requests = [];
+  H.filters = [];
+  H.returnedRows = null;
   H.tentStage = "seedling";
 });
 
@@ -598,8 +633,18 @@ describe("feeding cadence tent scope and grow events", () => {
   });
 });
 
+function expectFeedingQueryFilters() {
+  expect(H.filters).toEqual(
+    expect.arrayContaining([
+      { table: "grow_events", op: "eq", column: "grow_id", value: GROW },
+      { table: "grow_events", op: "eq", column: "is_deleted", value: false },
+      { table: "grow_events", op: "in", column: "event_type", value: ["watering", "feeding"] },
+    ]),
+  );
+}
+
 describe("checklist panel passes grow_events into the cadence", () => {
-  it("clears the null copy from an owner-scoped grow_events feeding", async () => {
+  function mountFeeding(row: Record<string, unknown>) {
     H.plants = [
       {
         id: "p1",
@@ -609,23 +654,65 @@ describe("checklist panel passes grow_events into the cadence", () => {
         stage: "veg",
       },
     ];
-    H.growEvents = [
-      {
-        id: "ge-panel",
-        event_type: "watering",
-        plant_id: "p1",
-        tent_id: TENT,
-        occurred_at: RECENT,
-      },
-    ];
+    H.growEvents = [row];
     mount(
       <MemoryRouter>
         <GuidedActionChecklistPanel scopedGrowId={GROW} />
       </MemoryRouter>,
     );
+  }
+
+  it("clears the null copy from a grow-scoped grow_events feeding", async () => {
+    mountFeeding({
+      id: "ge-panel",
+      event_type: "watering",
+      plant_id: "p1",
+      tent_id: TENT,
+      occurred_at: RECENT,
+      grow_id: GROW,
+      is_deleted: false,
+    });
     await waitFor(() => {
       expect(H.requests).toContain("grow_events");
       expect(screen.queryByText(NULL_COPY)).toBeNull();
     });
+    expectFeedingQueryFilters();
+    expect(H.returnedRows).toEqual([
+      expect.objectContaining({ id: "ge-panel", grow_id: GROW, is_deleted: false }),
+    ]);
+  });
+
+  it("does not count a grow_events feeding from another grow_id", async () => {
+    mountFeeding({
+      id: "ge-other-grow",
+      event_type: "watering",
+      plant_id: "p1",
+      tent_id: TENT,
+      occurred_at: RECENT,
+      grow_id: "other-grow",
+      is_deleted: false,
+    });
+    await waitFor(() => {
+      expect(H.returnedRows).toEqual([]);
+    });
+    expect(screen.getByText(NULL_COPY)).toBeTruthy();
+    expectFeedingQueryFilters();
+  });
+
+  it("does not count a soft-deleted grow_events feeding", async () => {
+    mountFeeding({
+      id: "ge-deleted",
+      event_type: "feeding",
+      plant_id: null,
+      tent_id: TENT,
+      occurred_at: RECENT,
+      grow_id: GROW,
+      is_deleted: true,
+    });
+    await waitFor(() => {
+      expect(H.returnedRows).toEqual([]);
+    });
+    expect(screen.getByText(NULL_COPY)).toBeTruthy();
+    expectFeedingQueryFilters();
   });
 });

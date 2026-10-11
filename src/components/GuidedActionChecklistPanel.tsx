@@ -68,7 +68,10 @@ const KIND_LABEL: Record<GuidedActionItemKind, string> = {
 const CHECKLIST_FEEDING_EVENT_TYPES = ["watering", "feeding"] as const;
 
 /**
- * Owner-scoped grow_events read. RLS limits rows to the signed-in grower.
+ * Grow-scoped grow_events read. The query filters grow_id, is_deleted = false,
+ * and event_type in watering or feeding. It does not filter user_id.
+ * RLS limits a non-operator to rows where auth.uid() = user_id. An operator
+ * matches "Operators view all grow_events", so this read is not owner-scoped.
  * A failed or empty read returns no events, so a gap stays visible instead
  * of being treated as a recent feeding.
  */

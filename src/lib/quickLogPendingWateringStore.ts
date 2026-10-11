@@ -1,6 +1,5 @@
 import type { WateringTypedEventInput } from "./writeQuickLogWateringTypedEvent";
 import {
-  copyHistoryReviewTarget,
   historyReviewTargetAllowed,
   type PendingQuickLogHistoryReviewTarget,
 } from "./quickLogHistoryReviewTargetRules";

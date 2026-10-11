@@ -36,22 +36,12 @@ import {
   stagePhotoperiodReadiness,
 } from "@/lib/growHelpToolkitReadiness";
 import { M2_PER_FT2, areaM2, areaM2FromFeet } from "@/lib/unitsCalc";
+import {
+  calculateWhenReady as attempt,
+  hasCompleteFivePointReading,
+} from "@/lib/growHelpToolkitReadiness";
 import NumberField from "./NumberField";
 import ResultBlock from "./ResultBlock";
-
-interface SafeResult<T> {
-  value: T | null;
-  error: string | null;
-}
-
-function attempt<T>(ready: boolean, fn: () => T): SafeResult<T> {
-  if (!ready) return { value: null, error: null };
-  try {
-    return { value: fn(), error: null };
-  } catch (error) {
-    return { value: null, error: error instanceof Error ? error.message : "Check the inputs." };
-  }
-}
 
 function fmt(value: number, digits = 2): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: digits });
@@ -203,7 +193,7 @@ export default function LightCalculatorTab({
     [inputs.chartHeight, inputs.chartPpfd, targetPpfd.value],
   );
 
-  const pointsReady = Object.values(inputs.fivePoint).every((value) => value !== null);
+  const pointsReady = hasCompleteFivePointReading(inputs);
   const points: FivePointPpfd = useMemo(
     () => ({
       center: inputs.fivePoint.center as number,
@@ -231,6 +221,8 @@ export default function LightCalculatorTab({
           bothPhotoperiodsReady &&
           cycle.vegDays !== null &&
           cycle.flowerDays !== null &&
+          cycle.vegPhotoperiodHours !== null &&
+          cycle.flowerPhotoperiodHours !== null &&
           cycle.electricityRate !== null,
         () =>
           calculateLightCycleEnergy({
@@ -264,7 +256,10 @@ export default function LightCalculatorTab({
           fixtureCountReady &&
           bothPhotoperiodsReady &&
           cycle.vegDays !== null &&
-          cycle.flowerDays !== null,
+          cycle.flowerDays !== null &&
+          cycle.vegPhotoperiodHours !== null &&
+          cycle.flowerPhotoperiodHours !== null &&
+          inputs.fixtureCount !== null,
         () =>
           calculateEnergyCostPerMol({
             ppfPerFixture: fixturePpf.value!.ppf,
@@ -314,6 +309,7 @@ export default function LightCalculatorTab({
   const areaFt2 = canopyAreaM2.value === null ? null : canopyAreaM2.value / M2_PER_FT2;
   const canPush =
     inputs.actualWattsPerFixture !== null &&
+    inputs.fixtureCount !== null &&
     inputs.actualWattsPerFixture >= 0 &&
     inputs.fixtureCount !== null &&
     inputs.fixtureCount >= 1 &&
@@ -327,7 +323,7 @@ export default function LightCalculatorTab({
       id: "linked-light-plan",
       name: "Grow lights (from Light plan)",
       actualWatts: inputs.actualWattsPerFixture,
-      quantity: inputs.fixtureCount,
+      quantity: inputs.fixtureCount as number,
       // Null means "follow the shared Cycle bar" in Expense. A grower can
       // still override either phase after the row is copied.
       vegHoursPerDay: null,

@@ -83,8 +83,8 @@ export default function PrivacyPolicy() {
           function, and email delivery providers used to run the Service.
         </li>
         <li>
-          <strong>Analytics</strong> — privacy-respecting analytics used to understand aggregate
-          usage. See "Cookies" below.
+          <strong>Analytics</strong> — consent-gated Google Analytics and Ahrefs Web Analytics used
+          to understand aggregate usage. See "Cookies" below.
         </li>
         <li>
           <strong>Professional advisers</strong> — legal, accounting, or insurance advisers where

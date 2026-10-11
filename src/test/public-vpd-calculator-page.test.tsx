@@ -38,6 +38,13 @@ afterEach(() => {
 });
 
 describe("public VPD calculator page", () => {
+  it("links back to the complementary local Grow Help Toolkit without transferring inputs", () => {
+    renderPage();
+    const link = screen.getByTestId("vpd-grow-help-toolkit-link");
+    expect(link).toHaveAttribute("href", "/tools/grow-help-toolkit");
+    expect(link.parentElement).toHaveTextContent("Inputs are not transferred between tools.");
+  });
+
   it("shows a manual air estimate without claiming the stage target", async () => {
     const user = userEvent.setup();
     renderPage();

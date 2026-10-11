@@ -34,6 +34,7 @@ import {
 import { ppm500, ppm700 } from "@/lib/unitsCalc";
 import NumberField from "./NumberField";
 import ResultBlock from "./ResultBlock";
+import { hasNutrientPrimaryResult } from "@/lib/growHelpToolkitReadiness";
 
 interface SafeResult<T> {
   value: T | null;
@@ -303,12 +304,13 @@ export default function NutrientCalculatorTab({
 
   const costRows = buildCostRows();
   const hasRecipeResult = costRows.length > 0;
-  const hasPrimaryResult =
-    (inputs.mode === "label" && label.value !== null) ||
-    (inputs.mode === "ec_target" && ecTarget.value !== null && targetStrength.value !== null) ||
-    (inputs.mode === "c1v1" && dilution.value !== null) ||
-    (inputs.mode === "dry_salt" && drySalt.value !== null) ||
-    (inputs.mode === "converter" && conversion.value !== null);
+  const hasPrimaryResult = hasNutrientPrimaryResult(inputs.mode, {
+    label: label.value !== null,
+    ec_target: ecTarget.value !== null && targetStrength.value !== null,
+    c1v1: dilution.value !== null,
+    dry_salt: drySalt.value !== null,
+    converter: conversion.value !== null,
+  });
 
   return (
     <div className="space-y-6" data-testid="nutrient-calculator-tab">
@@ -553,6 +555,10 @@ export default function NutrientCalculatorTab({
                 unit="mS/cm"
                 help="Optional grower-entered reading stored only in this browser. Manual data — not a live sensor or telemetry feed. Shows remaining or overshoot versus target."
               />
+              <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                Source: <span className="font-medium text-foreground">Manual entry</span>. This is
+                not a live sensor reading and is stored only in this browser.
+              </div>
             </div>
             <div>
               <p className="text-sm font-medium">

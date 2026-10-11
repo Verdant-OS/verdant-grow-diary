@@ -32,8 +32,10 @@ import {
   nextStepAfter,
   progressLabel,
   plantDetailQuickLogHref,
+  resolveStartYourRoomResume,
   type StartYourRoomForm,
   type StartYourRoomIds,
+  type StartYourRoomResumePlant,
   type StartYourRoomStep,
 } from "@/lib/startYourRoomRules";
 import { setStartScreenChoice } from "@/lib/startScreenPreferences";
@@ -48,6 +50,17 @@ import {
 } from "@/lib/hierarchyCreatePersistence";
 import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 
+const ROOM_LIMITS_LOADING_COPY = "Checking your plan and active room limits…";
+
+function plantsSelectAvailable(): boolean {
+  try {
+    const builder = supabase.from("plants") as { select?: unknown };
+    return typeof builder?.select === "function";
+  } catch {
+    return false;
+  }
+}
+
 const STAGES = [
   { value: "seedling", label: "Seedling" },
   { value: "veg", label: "Vegetative" },
@@ -56,7 +69,14 @@ const STAGES = [
 
 export default function StartYourRoom() {
   const { user, loading } = useAuth();
-  const { grows, setActiveGrowId, refresh, loading: growsLoading, error: growsError } = useGrows();
+  const {
+    grows,
+    activeGrowId,
+    setActiveGrowId,
+    refresh,
+    loading: growsLoading,
+    error: growsError,
+  } = useGrows();
   const tentsQuery = useTents();
   const {
     loading: entitlementLoading,
@@ -68,6 +88,13 @@ export default function StartYourRoom() {
   const nav = useNavigate();
   const headingRef = useRef<HTMLHeadingElement>(null);
 
+  const plantsReadable = useMemo(() => plantsSelectAvailable(), []);
+  const [plantsRead, setPlantsRead] = useState<{
+    loading: boolean;
+    plants: readonly StartYourRoomResumePlant[] | null;
+  }>(() =>
+    plantsSelectAvailable() ? { loading: true, plants: null } : { loading: false, plants: [] },
+  );
   const [step, setStep] = useState<StartYourRoomStep>("grow");
   const [form, setForm] = useState<StartYourRoomForm>({ ...DEFAULT_START_YOUR_ROOM_FORM });
   const [ids, setIds] = useState<StartYourRoomIds>({ ...EMPTY_START_YOUR_ROOM_IDS });
@@ -83,7 +110,51 @@ export default function StartYourRoom() {
     headingRef.current?.focus();
   }, [step]);
 
-  const progress = useMemo(() => progressLabel(step), [step]);
+  const ownerId = user?.id ?? null;
+  useEffect(() => {
+    if (!plantsReadable || !ownerId) return;
+    let cancelled = false;
+    const growId = activeGrowId ?? (grows.length === 1 ? grows[0]?.id : null);
+    void (async () => {
+      try {
+        let query = supabase
+          .from("plants")
+          .select("id,grow_id,tent_id,name")
+          .eq("is_archived", false);
+        if (growId) query = query.eq("grow_id", growId);
+        const { data, error: plantsError } = await query;
+        if (cancelled) return;
+        if (plantsError) {
+          setPlantsRead({ loading: false, plants: null });
+          return;
+        }
+        setPlantsRead({
+          loading: false,
+          plants: (data ?? []) as StartYourRoomResumePlant[],
+        });
+      } catch {
+        if (!cancelled) setPlantsRead({ loading: false, plants: null });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [plantsReadable, ownerId, activeGrowId, grows]);
+
+  const resumeIds = useMemo(
+    () =>
+      resolveStartYourRoomResume({
+        grows,
+        tents: tentsQuery.data ?? (tentsQuery.isError ? null : []),
+        plants: plantsRead.plants,
+        activeGrowId: activeGrowId ?? (grows.length === 1 ? grows[0]?.id : null),
+      }),
+    [grows, tentsQuery.data, tentsQuery.isError, plantsRead.plants, activeGrowId],
+  );
+  const shownStep: StartYourRoomStep = resumeIds ? "done" : step;
+  const shownIds: StartYourRoomIds = resumeIds ?? ids;
+  const roomSourcesLoading = growsLoading || tentsQuery.isLoading || plantsRead.loading;
+  const progress = useMemo(() => progressLabel(shownStep), [shownStep]);
   const growCountRequired = entitlement.capabilities.maxActiveGrows != null;
   const tentCountRequired = !entitlement.capabilities.multiTent;
   const creationVerificationLoading =
@@ -310,10 +381,25 @@ export default function StartYourRoom() {
   }
 
   function finish() {
-    if (!canFinish(ids) || !ids.plantId || !user) return;
+    if (!canFinish(shownIds) || !shownIds.plantId || !user) return;
     // Persist diary-first start screen so next login skips empty onboarding.
     setStartScreenChoice(user.id, "quickLog");
-    nav(plantDetailQuickLogHref(ids.plantId), { replace: true });
+    nav(plantDetailQuickLogHref(shownIds.plantId), { replace: true });
+  }
+
+  function submitGrowFromForm(event: { preventDefault: () => void }) {
+    event.preventDefault();
+    void submitGrow();
+  }
+
+  function submitTentFromForm(event: { preventDefault: () => void }) {
+    event.preventDefault();
+    void submitTent();
+  }
+
+  function submitPlantFromForm(event: { preventDefault: () => void }) {
+    event.preventDefault();
+    void submitPlant();
   }
 
   return (
@@ -321,7 +407,7 @@ export default function StartYourRoom() {
       <div
         className="w-full max-w-md glass rounded-2xl p-6 space-y-4"
         data-testid="start-your-room"
-        data-step={step}
+        data-step={shownStep}
       >
         <div className="flex items-center justify-between gap-2">
           <p
@@ -359,133 +445,143 @@ export default function StartYourRoom() {
           </p>
         )}
 
-        {step === "grow" && (
-          <section className="space-y-3" data-testid="start-your-room-step-grow">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <Sprout className="h-4 w-4 text-primary" aria-hidden />
-              {START_YOUR_ROOM_COPY.growTitle}
-            </div>
-            <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_COPY.growHelp}</p>
-            <div>
-              <Label htmlFor="start-room-grow-name">Grow name</Label>
-              <Input
-                id="start-room-grow-name"
-                data-testid="start-room-grow-name"
-                value={form.growName}
-                onChange={(e) => patchForm({ growName: e.target.value })}
-                placeholder="Spring run · Tent A"
-                autoComplete="off"
-                maxLength={80}
-              />
-            </div>
-            <Button
-              type="button"
-              className="w-full gradient-leaf text-primary-foreground"
-              disabled={
-                busy || createOutcomeUnknown || !roomPreflightGate.allowed || !canProceedGrow(form)
-              }
-              onClick={submitGrow}
-              data-testid="start-room-grow-submit"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : START_YOUR_ROOM_COPY.ctaGrow}
-            </Button>
-          </section>
-        )}
-
-        {step === "tent" && (
-          <section className="space-y-3" data-testid="start-your-room-step-tent">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <Box className="h-4 w-4 text-primary" aria-hidden />
-              {START_YOUR_ROOM_COPY.tentTitle}
-            </div>
-            <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_COPY.tentHelp}</p>
-            <p
-              className="text-xs rounded-md border border-primary/30 bg-primary/10 px-3 py-2"
-              data-testid="start-room-bound-grow"
-            >
-              Bound to grow:{" "}
-              <span className="font-medium">{form.growName.trim() || "your grow"}</span>
-            </p>
-            <div>
-              <Label htmlFor="start-room-tent-name">Tent name</Label>
-              <Input
-                id="start-room-tent-name"
-                data-testid="start-room-tent-name"
-                value={form.tentName}
-                onChange={(e) => patchForm({ tentName: e.target.value })}
-                placeholder="4×4 flower"
-                autoComplete="off"
-                maxLength={80}
-              />
-            </div>
-            <Button
-              type="button"
-              className="w-full gradient-leaf text-primary-foreground"
-              disabled={
-                busy || createOutcomeUnknown || !tentGate.allowed || !canProceedTent(form, ids)
-              }
-              onClick={submitTent}
-              data-testid="start-room-tent-submit"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : START_YOUR_ROOM_COPY.ctaTent}
-            </Button>
-          </section>
-        )}
-
-        {step === "plant" && (
-          <section className="space-y-3" data-testid="start-your-room-step-plant">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <Leaf className="h-4 w-4 text-primary" aria-hidden />
-              {START_YOUR_ROOM_COPY.plantTitle}
-            </div>
-            <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_COPY.plantHelp}</p>
-            <p className="text-xs rounded-md border border-primary/30 bg-primary/10 px-3 py-2">
-              Bound to grow + tent:{" "}
-              <span className="font-medium">
-                {form.growName.trim()} · {form.tentName.trim()}
-              </span>
-            </p>
-            <div>
-              <Label htmlFor="start-room-plant-name">Plant name</Label>
-              <Input
-                id="start-room-plant-name"
-                data-testid="start-room-plant-name"
-                value={form.plantName}
-                onChange={(e) => patchForm({ plantName: e.target.value })}
-                placeholder="Plant A"
-                autoComplete="off"
-                maxLength={80}
-              />
-            </div>
-            <div>
-              <Label htmlFor="start-room-plant-stage">Stage</Label>
-              <select
-                id="start-room-plant-stage"
-                data-testid="start-room-plant-stage"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={form.plantStage}
-                onChange={(e) => patchForm({ plantStage: e.target.value })}
+        {!roomSourcesLoading && shownStep === "grow" && (
+          <form onSubmit={submitGrowFromForm}>
+            <section className="space-y-3" data-testid="start-your-room-step-grow">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Sprout className="h-4 w-4 text-primary" aria-hidden />
+                {START_YOUR_ROOM_COPY.growTitle}
+              </div>
+              <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_COPY.growHelp}</p>
+              <div>
+                <Label htmlFor="start-room-grow-name">Grow name</Label>
+                <Input
+                  id="start-room-grow-name"
+                  data-testid="start-room-grow-name"
+                  value={form.growName}
+                  onChange={(e) => patchForm({ growName: e.target.value })}
+                  placeholder="Spring run · Tent A"
+                  autoComplete="off"
+                  maxLength={80}
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full gradient-leaf text-primary-foreground"
+                disabled={
+                  busy ||
+                  createOutcomeUnknown ||
+                  !roomPreflightGate.allowed ||
+                  !canProceedGrow(form)
+                }
+                data-testid="start-room-grow-submit"
               >
-                {STAGES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <Button
-              type="button"
-              className="w-full gradient-leaf text-primary-foreground"
-              disabled={busy || createOutcomeUnknown || !canProceedPlant(form, ids)}
-              onClick={submitPlant}
-              data-testid="start-room-plant-submit"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : START_YOUR_ROOM_COPY.ctaPlant}
-            </Button>
-          </section>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : START_YOUR_ROOM_COPY.ctaGrow}
+              </Button>
+            </section>
+          </form>
         )}
 
-        {step === "done" && (
+        {!roomSourcesLoading && shownStep === "tent" && (
+          <form onSubmit={submitTentFromForm}>
+            <section className="space-y-3" data-testid="start-your-room-step-tent">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Box className="h-4 w-4 text-primary" aria-hidden />
+                {START_YOUR_ROOM_COPY.tentTitle}
+              </div>
+              <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_COPY.tentHelp}</p>
+              <p
+                className="text-xs rounded-md border border-primary/30 bg-primary/10 px-3 py-2"
+                data-testid="start-room-bound-grow"
+              >
+                Bound to grow:{" "}
+                <span className="font-medium">{form.growName.trim() || "your grow"}</span>
+              </p>
+              <div>
+                <Label htmlFor="start-room-tent-name">Tent name</Label>
+                <Input
+                  id="start-room-tent-name"
+                  data-testid="start-room-tent-name"
+                  value={form.tentName}
+                  onChange={(e) => patchForm({ tentName: e.target.value })}
+                  placeholder="4×4 flower"
+                  autoComplete="off"
+                  maxLength={80}
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full gradient-leaf text-primary-foreground"
+                disabled={
+                  busy || createOutcomeUnknown || !tentGate.allowed || !canProceedTent(form, ids)
+                }
+                data-testid="start-room-tent-submit"
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : START_YOUR_ROOM_COPY.ctaTent}
+              </Button>
+            </section>
+          </form>
+        )}
+
+        {!roomSourcesLoading && shownStep === "plant" && (
+          <form onSubmit={submitPlantFromForm}>
+            <section className="space-y-3" data-testid="start-your-room-step-plant">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Leaf className="h-4 w-4 text-primary" aria-hidden />
+                {START_YOUR_ROOM_COPY.plantTitle}
+              </div>
+              <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_COPY.plantHelp}</p>
+              <p className="text-xs rounded-md border border-primary/30 bg-primary/10 px-3 py-2">
+                Bound to grow + tent:{" "}
+                <span className="font-medium">
+                  {form.growName.trim()} · {form.tentName.trim()}
+                </span>
+              </p>
+              <div>
+                <Label htmlFor="start-room-plant-name">Plant name</Label>
+                <Input
+                  id="start-room-plant-name"
+                  data-testid="start-room-plant-name"
+                  value={form.plantName}
+                  onChange={(e) => patchForm({ plantName: e.target.value })}
+                  placeholder="Plant A"
+                  autoComplete="off"
+                  maxLength={80}
+                />
+              </div>
+              <div>
+                <Label htmlFor="start-room-plant-stage">Stage</Label>
+                <select
+                  id="start-room-plant-stage"
+                  data-testid="start-room-plant-stage"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={form.plantStage}
+                  onChange={(e) => patchForm({ plantStage: e.target.value })}
+                >
+                  {STAGES.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button
+                type="submit"
+                className="w-full gradient-leaf text-primary-foreground"
+                disabled={busy || createOutcomeUnknown || !canProceedPlant(form, ids)}
+                data-testid="start-room-plant-submit"
+              >
+                {busy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  START_YOUR_ROOM_COPY.ctaPlant
+                )}
+              </Button>
+            </section>
+          </form>
+        )}
+
+        {!roomSourcesLoading && shownStep === "done" && (
           <section className="space-y-3" data-testid="start-your-room-step-done">
             <div className="flex items-center gap-2 text-sm font-medium text-emerald-500">
               <CheckCircle2 className="h-4 w-4" aria-hidden />
@@ -500,18 +596,26 @@ export default function StartYourRoom() {
             <Button
               type="button"
               className="w-full gradient-leaf text-primary-foreground"
-              disabled={!canFinish(ids)}
+              disabled={!canFinish(shownIds)}
               onClick={finish}
               data-testid="start-room-finish"
             >
               {START_YOUR_ROOM_COPY.ctaDone}
             </Button>
+            {shownIds.plantId ? (
+              <Link
+                to={plantDetailQuickLogHref(shownIds.plantId)}
+                data-testid="start-room-plant-link"
+              >
+                {START_YOUR_ROOM_COPY.ctaDone}
+              </Link>
+            ) : null}
           </section>
         )}
 
-        {!error && currentCreationGate && creationVerificationLoading ? (
+        {roomSourcesLoading ? (
           <p role="status" className="text-sm text-muted-foreground">
-            Checking your plan and active room limits…
+            {ROOM_LIMITS_LOADING_COPY}
           </p>
         ) : !error && currentCreationGate && creationVerificationFailed ? (
           <div className="space-y-2" data-testid="start-room-creation-gate">

@@ -168,6 +168,54 @@ export function plantDetailQuickLogHref(plantId: string): string {
   return `/plants/${encodeURIComponent(plantId)}?open=quick-log`;
 }
 
+export interface StartYourRoomResumeGrow {
+  id: string;
+}
+
+export interface StartYourRoomResumeTent {
+  id: string;
+  grow_id?: string | null;
+}
+
+export interface StartYourRoomResumePlant {
+  id: string;
+  grow_id?: string | null;
+  tent_id?: string | null;
+}
+
+export interface StartYourRoomResumeInput {
+  grows: readonly StartYourRoomResumeGrow[] | null | undefined;
+  tents: readonly StartYourRoomResumeTent[] | null | undefined;
+  plants: readonly StartYourRoomResumePlant[] | null | undefined;
+  activeGrowId: string | null | undefined;
+}
+
+/**
+ * Reload lands on done only when the single active grow has exactly one tent
+ * and exactly one plant linked to that tent. Anything partial, ambiguous, or
+ * unread returns null so the wizard stays on the grow step.
+ */
+export function resolveStartYourRoomResume(
+  input: StartYourRoomResumeInput,
+): { growId: string; tentId: string; plantId: string } | null {
+  if (input.plants == null || input.grows == null || input.tents == null) return null;
+  if (input.grows.length !== 1) return null;
+  const grow = input.grows[0];
+  if (!grow?.id) return null;
+  if (input.activeGrowId != null && input.activeGrowId !== grow.id) return null;
+
+  const tents = input.tents.filter((tent) => tent.grow_id === grow.id && !!tent.id);
+  if (tents.length !== 1) return null;
+  const tent = tents[0];
+
+  const plants = input.plants.filter(
+    (plant) => plant.grow_id === grow.id && plant.tent_id === tent.id && !!plant.id,
+  );
+  if (plants.length !== 1) return null;
+
+  return { growId: grow.id, tentId: tent.id, plantId: plants[0].id };
+}
+
 /**
  * Whether first-session should prefer Start your room over start-screen choice.
  * True when the account has zero grows (empty room).

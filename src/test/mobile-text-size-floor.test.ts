@@ -4,7 +4,7 @@
  * The @media (max-width: 640px) rule in src/styles.css lifts the smallest
  * utility sizes to 0.875rem so a phone does not render a larger class
  * smaller than a smaller class. 10px, 11px, 12px and text-xs share that
- * floor. 9px is not part of this slice.
+ * floor. 9px shares that floor too.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -40,13 +40,13 @@ function mobileTextFloorRule(css: string): string {
 }
 
 describe("mobile text-size floor", () => {
-  it("covers 10px, 11px, 12px and xs inside the 640px rule", () => {
+  it("covers 9px, 10px, 11px, 12px and xs inside the 640px rule", () => {
     const rule = mobileTextFloorRule(CSS);
+    expect(rule).toContain(".text-\\[9px\\]");
     expect(rule).toContain(".text-\\[10px\\]");
     expect(rule).toContain(".text-\\[11px\\]");
     expect(rule).toContain(".text-\\[12px\\]");
     expect(rule).toContain(".text-xs");
-    expect(rule).not.toContain(".text-\\[9px\\]");
     expect(rule).toContain("font-size: 0.875rem");
     expect(rule).toContain("line-height: 1.25rem");
   });

@@ -4,7 +4,6 @@ import {
   type ExpenseUnitCosts,
 } from "./expenseCalc";
 import type { GrowHelpToolkitState } from "./growHelpToolkitState";
-import { isExpenseSummaryReady } from "./growHelpToolkitReadiness";
 import {
   MEASURED_MIXED_EC_SOURCE,
   MEASURED_MIXED_EC_SOURCE_LABEL,

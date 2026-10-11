@@ -54,7 +54,7 @@ branch: cursor/stop-selling-founder-lifetime-0628
 base: verdant-grow-diary
 checkout: git fetch origin cursor/stop-selling-founder-lifetime-0628 verdant-grow-diary && git switch cursor/stop-selling-founder-lifetime-0628 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2028 (draft)
-head_sha: ec128ea0ad645396d9264cf3b87534ba8c33ab2e
+head_sha: read the PR head after push; this handoff commit cannot name itself
 state: draft PR open; waiting on required checks
 next_action: keep the PR draft; fix in-scope required-check failures only
 files: pricing constants and config, Pricing.tsx, Upgrade.tsx, paddle config, legacy billing redirect, founder route redirect, checkout success, SEO/sitemap/llms, AGENTS.md, docs/billing.md

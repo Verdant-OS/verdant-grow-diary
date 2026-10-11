@@ -35,6 +35,9 @@ import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import { useAuth } from "@/store/auth";
 import { isArchivedGrowNoteActivity } from "@/lib/archivedGrowQuickLogRules";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
+import { uploadOwnerSubjectPhoto } from "@/lib/ownerSubjectPhotoService";
 import {
   createQuickLogPhotoDiaryEntry,
   hasConfirmedQuickLogPhotoDiaryEntryForOwner,
@@ -46,7 +49,6 @@ import {
   hasQuickLogPhotoAttachmentRecoveryLock,
   recordQuickLogPhotoAttachmentRecoveryLock,
 } from "@/lib/quickLogPhotoAttachmentRecovery";
-import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import {
@@ -265,6 +267,7 @@ export default function QuickLogAllActivitiesSection({
   const selected = selectedDraft ? QUICK_LOG_ACTIVITY_DEFINITIONS[selectedDraft.activityId] : null;
   const [note, setNote] = useState("");
   const [harvestWet, setHarvestWet] = useState("");
+  const [harvestPhotoFile, setHarvestPhotoFile] = useState<File | null>(null);
   const [harvestDry, setHarvestDry] = useState("");
   const [harvestUnit, setHarvestUnit] = useState<QuickLogWeightUnit>("g");
   // Generic per-activity structured detail values (e.g. training technique),
@@ -1313,6 +1316,35 @@ export default function QuickLogAllActivitiesSection({
           return;
         }
         savedGrowEventId = result.growEventId ?? null;
+        if (selected.id === "harvest" && harvestPhotoFile && user?.id && growId) {
+          const checked = validatePlantProfilePhotoFile(harvestPhotoFile);
+          if (!checked.ok) {
+            toast.error(checked.message);
+          } else {
+            try {
+              const harvestId = crypto.randomUUID();
+              const uploaded = await uploadOwnerSubjectPhoto({
+                file: harvestPhotoFile,
+                mime: checked.mime,
+                userId: user.id,
+                kind: "harvest",
+                subjectId: harvestId,
+              });
+              const { error: harvestPhotoError } = await supabase.from("harvests").insert({
+                id: harvestId,
+                user_id: user.id,
+                grow_id: growId,
+                grow_type: "indoor",
+                photo_url: uploaded.reference,
+              });
+              if (harvestPhotoError) {
+                toast.error("The harvest photo was not saved.");
+              }
+            } catch {
+              toast.error("The harvest photo was not saved.");
+            }
+          }
+        }
         if (clearPendingQuickLogActivity(claim.record)) {
           if (stillCurrent) setPendingActivity(null);
         } else {
@@ -1921,6 +1953,28 @@ export default function QuickLogAllActivitiesSection({
                         ))}
                       </select>
                     </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor={`${testIdPrefix}-harvest-photo`}
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      Photo (optional)
+                    </Label>
+                    <Input
+                      id={`${testIdPrefix}-harvest-photo`}
+                      data-testid={`${testIdPrefix}-harvest-photo`}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                      disabled={mutationBlocked}
+                      onChange={(e) => {
+                        if (isMutationBlocked()) return;
+                        setHarvestPhotoFile(e.target.files?.[0] ?? null);
+                      }}
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      A photo is optional. Saving without one still records the harvest activity.
+                    </p>
                   </div>
                   <div className="space-y-1">
                     <Label

@@ -33,6 +33,8 @@ export interface ReportsHubOnboardingInput {
   latestSensorCapturedAt: string | null;
   outcomeTotal: number;
   alertsOpen: number;
+  /** Plants already on the scoped or active grow. Omit or 0 keeps the add-plant card. */
+  plantCount?: number;
 }
 
 export interface ReportsHubOnboarding {
@@ -99,5 +101,7 @@ export function buildReportsHubOnboarding(input: ReportsHubOnboardingInput): Rep
       hrefLabel: "Open actions",
     },
   ];
-  return { visible: true, cards };
+  const plantCount = safeInt(input.plantCount);
+  const visibleCards = plantCount >= 1 ? cards.filter((card) => card.id !== "add_plant") : cards;
+  return { visible: true, cards: visibleCards };
 }

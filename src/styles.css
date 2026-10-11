@@ -334,6 +334,8 @@
 
   @media (max-width: 640px) {
     .text-\[10px\],
+    .text-\[11px\],
+    .text-\[12px\],
     .text-xs {
       font-size: 0.875rem;
       line-height: 1.25rem;

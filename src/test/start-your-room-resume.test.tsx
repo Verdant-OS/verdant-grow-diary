@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
@@ -10,7 +10,7 @@ const testState = vi.hoisted(() => ({
   growsLoading: false,
   tentsLoading: false,
   plantsResult: {
-    data: [] as Array<{ id: string; grow_id: string; tent_id: string }>,
+    data: [] as Array<{ id: string; name?: string; grow_id: string; tent_id: string }>,
     error: null as { message: string } | null,
   },
   plantsThrows: false,
@@ -87,7 +87,18 @@ vi.mock("@/integrations/supabase/client", () => ({
         insert: (payload: Record<string, unknown>) => {
           testState.insert(table, payload);
           return {
-            select: () => ({ single: async () => ({ data: null, error: { message: "unused" } }) }),
+            select: () => ({
+              single: async () => ({
+                data: {
+                  id: payload.id,
+                  name: payload.name,
+                  user_id: payload.user_id,
+                  grow_id: payload.grow_id,
+                  tent_id: payload.tent_id,
+                },
+                error: null,
+              }),
+            }),
           };
         },
       };
@@ -164,14 +175,18 @@ describe("Start your room resume", () => {
 
   it("renders done and the plant link when grow, tent and plant exist, with no insert", async () => {
     testState.grows = [{ id: "grow-1", name: "QA Test" }];
-    testState.tents = [{ id: "tent-1", name: "QA Test", grow_id: "grow-1" }];
+    testState.tents = [{ id: "tent-1", name: "QA Tent", grow_id: "grow-1" }];
     testState.plantsResult = {
-      data: [{ id: "plant-1", grow_id: "grow-1", tent_id: "tent-1" }],
+      data: [{ id: "plant-1", name: "QA Plant", grow_id: "grow-1", tent_id: "tent-1" }],
       error: null,
     };
     renderPage();
 
     expect(await screen.findByTestId("start-your-room-step-done")).toBeInTheDocument();
+    expect(screen.getByText("Grow: QA Test")).toBeInTheDocument();
+    expect(screen.getByText("Tent: QA Tent")).toBeInTheDocument();
+    expect(screen.getByText("Plant: QA Plant")).toBeInTheDocument();
+    expect(screen.getByTestId("start-room-finish")).toBeEnabled();
     expect(screen.getByTestId("start-room-plant-link")).toHaveAttribute(
       "href",
       "/plants/plant-1?open=quick-log",
@@ -217,7 +232,33 @@ describe("Start your room resume", () => {
     expect(await screen.findByTestId("start-your-room-step-plant")).toBeInTheDocument();
     expect(screen.getByText(/Bound to grow \+ tent:/)).toHaveTextContent("QA Mid · QA Tent");
     expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "QA Plant" },
+    });
+    expect(screen.getByTestId("start-room-plant-submit")).toBeEnabled();
     expect(testState.insert).not.toHaveBeenCalled();
+  });
+
+  it("keeps the resumed grow and tent names after a tent is created", async () => {
+    testState.grows = [{ id: "grow-mid", name: "QA Mid" }];
+    testState.plantsResult = { data: [], error: null };
+    renderPage();
+    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("start-room-tent-name"), {
+      target: { value: "Bound Tent" },
+    });
+    fireEvent.click(screen.getByTestId("start-room-tent-submit"));
+    expect(await screen.findByTestId("start-your-room-step-plant")).toBeInTheDocument();
+    expect(screen.getByText(/Bound to grow \+ tent:/)).toHaveTextContent("QA Mid · Bound Tent");
+    fireEvent.change(screen.getByTestId("start-room-plant-name"), {
+      target: { value: "QA Plant" },
+    });
+    expect(screen.getByTestId("start-room-plant-submit")).toBeEnabled();
+    expect(testState.insert).toHaveBeenCalledWith(
+      "tents",
+      expect.objectContaining({ grow_id: "grow-mid", name: "Bound Tent" }),
+    );
+    expect(testState.insert).not.toHaveBeenCalledWith("grows", expect.anything());
   });
 
   it("renders the grow step with submit disabled on Free for a tent only", () => {
@@ -235,6 +276,12 @@ describe("Start your room resume", () => {
     renderPage();
     expect(await screen.findByTestId("start-your-room-step-grow")).toBeInTheDocument();
     expect(screen.queryByTestId("start-your-room-step-done")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("start-room-grow-name"), {
+      target: { value: "Second Grow" },
+    });
+    expect(screen.getByTestId("start-room-grow-submit")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("start-room-grow-submit"));
+    expect(testState.insert).not.toHaveBeenCalledWith("grows", expect.anything());
   });
 
   it("shows the loading state and no empty form while grows are loading", () => {

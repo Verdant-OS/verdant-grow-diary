@@ -93,9 +93,7 @@ export default function StartYourRoom() {
   const [plantsRead, setPlantsRead] = useState<{
     loading: boolean;
     plants: readonly StartYourRoomResumePlant[] | null;
-  }>(() =>
-    plantsSelectAvailable() ? { loading: true, plants: null } : { loading: false, plants: [] },
-  );
+  }>({ loading: false, plants: plantsSelectAvailable() ? null : [] });
   const [step, setStep] = useState<StartYourRoomStep>("grow");
   const [form, setForm] = useState<StartYourRoomForm>({ ...DEFAULT_START_YOUR_ROOM_FORM });
   const [ids, setIds] = useState<StartYourRoomIds>({ ...EMPTY_START_YOUR_ROOM_IDS });
@@ -112,10 +110,23 @@ export default function StartYourRoom() {
   }, [step]);
 
   const ownerId = user?.id ?? null;
+  const plantsFetchKey = useRef<string | null>(null);
   useEffect(() => {
-    if (!plantsReadable || !ownerId) return;
+    if (!plantsReadable || !ownerId || grows.length !== 1) {
+      plantsFetchKey.current = null;
+      setPlantsRead((prev) =>
+        !prev.loading && Array.isArray(prev.plants) && prev.plants.length === 0
+          ? prev
+          : { loading: false, plants: [] },
+      );
+      return;
+    }
     let cancelled = false;
-    const growId = activeGrowId ?? (grows.length === 1 ? grows[0]?.id : null);
+    const growId = activeGrowId ?? grows[0]?.id ?? null;
+    const fetchKey = `${ownerId}:${growId ?? ""}`;
+    if (plantsFetchKey.current === fetchKey) return;
+    plantsFetchKey.current = fetchKey;
+    setPlantsRead({ loading: true, plants: null });
     void (async () => {
       try {
         let query = supabase
@@ -155,7 +166,8 @@ export default function StartYourRoom() {
       }),
     [grows, tentsQuery.data, tentsQuery.isError, plantsRead.plants, activeGrowId],
   );
-  const roomSourcesLoading = growsLoading || tentsQuery.isLoading || plantsRead.loading;
+  const roomSourcesLoading =
+    growsLoading || tentsQuery.isLoading || (grows.length === 1 && plantsRead.loading);
   const growCountRequired = entitlement.capabilities.maxActiveGrows != null;
   const tentCountRequired = !entitlement.capabilities.multiTent;
   const creationVerificationLoading =
@@ -186,7 +198,10 @@ export default function StartYourRoom() {
   // A paid plan can still start another grow from this page. Partial resume
   // would hide that choice, so keep the grow step when the gate allows it.
   // A finished room still opens done.
-  const appliedResume = resume && (resume.step === "done" || !growGate.allowed) ? resume : null;
+  const appliedResume = useMemo(
+    () => (resume && (resume.step === "done" || !growGate.allowed) ? resume : null),
+    [resume, growGate.allowed],
+  );
   const showingResume = appliedResume != null && stepIndex(step) <= stepIndex(appliedResume.step);
   const shownStep: StartYourRoomStep = showingResume ? appliedResume.step : step;
   const shownIds: StartYourRoomIds = showingResume
@@ -208,6 +223,41 @@ export default function StartYourRoom() {
     shownStep === "grow" ? roomPreflightGate : shownStep === "tent" ? tentGate : null;
   const currentCreationGate = !growGate.allowed ? growGate : stepCreationGate;
   const progress = useMemo(() => progressLabel(shownStep), [shownStep]);
+
+  useEffect(() => {
+    if (!appliedResume) return;
+    setStep((current) =>
+      stepIndex(current) < stepIndex(appliedResume.step) ? appliedResume.step : current,
+    );
+    setIds((prev) => {
+      const next = {
+        growId: prev.growId ?? appliedResume.growId,
+        tentId: prev.tentId ?? appliedResume.tentId,
+        plantId: prev.plantId ?? appliedResume.plantId,
+      };
+      if (
+        next.growId === prev.growId &&
+        next.tentId === prev.tentId &&
+        next.plantId === prev.plantId
+      ) {
+        return prev;
+      }
+      return next;
+    });
+    setForm((prev) => {
+      const growName = prev.growName || appliedResume.growName;
+      const tentName = prev.tentName || appliedResume.tentName;
+      const plantName = prev.plantName || appliedResume.plantName;
+      if (
+        growName === prev.growName &&
+        tentName === prev.tentName &&
+        plantName === prev.plantName
+      ) {
+        return prev;
+      }
+      return { ...prev, growName, tentName, plantName };
+    });
+  }, [appliedResume]);
 
   if (loading) return null;
   if (!user) return <Navigate to="/auth" replace />;
@@ -335,7 +385,16 @@ export default function StartYourRoom() {
         ...payload,
       });
       if (!confirmed) return;
-      setIds((prev) => ({ ...prev, tentId: confirmed.row.id }));
+      setIds((prev) => ({
+        growId: prev.growId ?? shownIds.growId,
+        tentId: confirmed.row.id,
+        plantId: prev.plantId ?? shownIds.plantId,
+      }));
+      setForm((prev) => ({
+        ...prev,
+        growName: prev.growName || shownForm.growName,
+        tentName: prev.tentName || shownForm.tentName,
+      }));
       toast.success("Tent created and linked to grow");
       setStep(nextStepAfter("tent"));
     } finally {
@@ -395,7 +454,17 @@ export default function StartYourRoom() {
         queryClient.invalidateQueries({ queryKey: ["tents"] }),
         queryClient.invalidateQueries({ queryKey: ["plants"] }),
       ]);
-      setIds((prev) => ({ ...prev, plantId: confirmed.row.id }));
+      setIds((prev) => ({
+        growId: prev.growId ?? shownIds.growId,
+        tentId: prev.tentId ?? shownIds.tentId,
+        plantId: confirmed.row.id,
+      }));
+      setForm((prev) => ({
+        ...prev,
+        growName: prev.growName || shownForm.growName,
+        tentName: prev.tentName || shownForm.tentName,
+        plantName: prev.plantName || shownForm.plantName,
+      }));
       toast.success("Plant created and linked");
       setStep(nextStepAfter("plant"));
     } finally {

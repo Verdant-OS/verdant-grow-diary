@@ -132,10 +132,14 @@ describe("StartYourRoom entitlement creation gates", () => {
     expect(screen.getByTestId("start-room-bound-grow")).toHaveTextContent(
       "Bound to grow: Existing Grow",
     );
+    expect(screen.queryByTestId("start-your-room-step-grow")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
     expect(screen.queryByTestId("start-room-grow-submit")).not.toBeInTheDocument();
     expect(screen.getByTestId("start-room-creation-upgrade")).toHaveAttribute("href", "/pricing");
     fireEvent.click(screen.getByTestId("start-room-tent-submit"));
+    fireEvent.click(screen.getByTestId("start-your-room-skip-start-screen"));
     expect(testState.insert).not.toHaveBeenCalled();
+    expect(testState.insert).not.toHaveBeenCalledWith("grows", expect.anything());
   });
 
   it("does not begin the room when a Free account already has one active tent", () => {

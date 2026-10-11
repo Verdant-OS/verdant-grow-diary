@@ -163,27 +163,17 @@ export default function GlobalSearchResultPreview({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-        <span
-          className={cn(
-            "rounded-sm border px-1.5 py-0.5 font-medium",
-            row.match_kind === "exact"
-              ? "border-primary/40 bg-primary/10 text-primary"
-              : row.match_kind === "prefix"
-                ? "border-foreground/20 bg-muted text-foreground/80"
-                : "border-border bg-transparent",
-          )}
-          data-testid="global-search-preview-match-kind"
-        >
-          {row.match_kind}
-        </span>
-        <span className="tabular-nums" data-testid="global-search-preview-score">
-          r{row.rank}·{row.score.toFixed(2)}
-        </span>
+      <div
+        className="flex flex-wrap items-center gap-1.5 text-[10px] tracking-wide text-muted-foreground"
+        aria-label={`Match ${row.match_kind}, rank ${row.rank}, score ${row.score.toFixed(2)}`}
+        data-testid="global-search-preview-match-kind"
+        data-match-kind={row.match_kind}
+        data-rank={row.rank}
+        data-score={row.score.toFixed(2)}
+      >
+        <span data-testid="global-search-preview-score" hidden />
         {query.trim().length > 0 ? (
-          <span className="normal-case tracking-normal text-muted-foreground">
-            for “{query.trim()}”
-          </span>
+          <span className="text-muted-foreground">for “{query.trim()}”</span>
         ) : null}
       </div>
 

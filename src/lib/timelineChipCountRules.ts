@@ -22,6 +22,23 @@ export interface TimelinePhotoIdentityRow {
   details?: unknown;
 }
 
+export type TimelineEventChip =
+  "all" | "photo" | "note" | "measurement" | "followup" | "actionresponse";
+
+/**
+ * Whether a display row may appear under an event chip.
+ * All keeps receipts on the list. Measurements keeps them because that
+ * chip counts them. Every other chip lists diary rows only, the same
+ * rows its count uses.
+ */
+export function timelineEventChipIncludesRow(
+  chip: TimelineEventChip,
+  rowId: string | null | undefined,
+): boolean {
+  if (chip === "all" || chip === "measurement") return true;
+  return !isTimelineSensorDerivedDiaryId(rowId);
+}
+
 /** Diary rows that event and stage chips may count. Receipts are excluded. */
 export function timelineDiaryRowsForChipCounts<T extends { id: string }>(rows: readonly T[]): T[] {
   return rows.filter((row) => !isTimelineSensorDerivedDiaryId(row.id));

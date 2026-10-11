@@ -4,6 +4,7 @@ import {
   EMPTY_TIMELINE_DIARY_PHOTO_IDS,
   timelineDiaryRowsForChipCounts,
   timelineEntryCountsAsPhoto,
+  timelineEventChipIncludesRow,
   timelineMeasurementChipCount,
   unionTimelineDiaryPhotoIds,
 } from "@/lib/timelineChipCountRules";
@@ -43,6 +44,21 @@ describe("timeline chip count rules", () => {
     expect(timelineMeasurementChipCount(0, rows)).toBe(3);
     expect(timelineMeasurementChipCount(Number.NaN, null)).toBe(0);
     expect(timelineMeasurementChipCount(-2, undefined)).toBe(0);
+  });
+
+  it("keeps receipts on All and Measurements and off every other event chip", () => {
+    const receiptId = "sensor-reading:tent:2026-07-20T08:00:00.000Z";
+    const diaryId = "diary-1";
+    for (const chip of ["all", "measurement"] as const) {
+      expect(timelineEventChipIncludesRow(chip, receiptId)).toBe(true);
+      expect(timelineEventChipIncludesRow(chip, diaryId)).toBe(true);
+    }
+    for (const chip of ["photo", "note", "followup", "actionresponse"] as const) {
+      expect(timelineEventChipIncludesRow(chip, receiptId)).toBe(false);
+      expect(timelineEventChipIncludesRow(chip, diaryId)).toBe(true);
+    }
+    expect(timelineEventChipIncludesRow("note", null)).toBe(true);
+    expect(timelineEventChipIncludesRow("note", undefined)).toBe(true);
   });
 
   it("drops sensor receipts from the diary chip set", () => {

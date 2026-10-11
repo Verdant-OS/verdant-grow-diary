@@ -129,6 +129,7 @@ import {
   EMPTY_TIMELINE_DIARY_PHOTO_IDS,
   timelineDiaryRowsForChipCounts,
   timelineEntryCountsAsPhoto,
+  timelineEventChipIncludesRow,
   timelineMeasurementChipCount,
   unionTimelineDiaryPhotoIds,
 } from "@/lib/timelineChipCountRules";
@@ -331,7 +332,10 @@ interface AlertEventRow {
 type EventFilter = "all" | "photo" | "note" | "measurement" | "followup" | "actionresponse";
 
 function entryKinds(e: Entry, diaryPhotoIds: ReadonlySet<string>): EventFilter[] {
-  const kinds: EventFilter[] = ["note"];
+  const kinds: EventFilter[] = [];
+  // Receipts are measurements, not diary notes. The Notes chip counts
+  // diary rows, so the Notes filter must not list those receipts.
+  if (!isTimelineSensorDerivedDiaryId(e.id)) kinds.push("note");
   if (timelineEntryCountsAsPhoto(e, diaryPhotoIds)) kinds.push("photo");
   // Diary measurement keys, QL environment envelopes, and tent
   // `sensor_readings` (source=manual) projected as receipts. Stale-drawer
@@ -1262,6 +1266,7 @@ export default function Timeline() {
   const filtered = useMemo(() => {
     const afterStageEvent = displayEntries.filter((e) => {
       if (stageFilter !== "all" && resolveTimelineDiaryEntryStage(e) !== stageFilter) return false;
+      if (!timelineEventChipIncludesRow(eventFilter, e.id)) return false;
       if (eventFilter !== "all" && !entryKinds(e, diaryPhotoIds).includes(eventFilter))
         return false;
       return true;

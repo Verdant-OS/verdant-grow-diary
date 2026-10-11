@@ -192,13 +192,19 @@ const GROW_A = {
 const TENT_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const SENSOR_USER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
-function diaryEntry(id: string, note: string, entryAt: string, photoUrl: string | null = null) {
+function diaryEntry(
+  id: string,
+  note: string,
+  entryAt: string,
+  photoUrl: string | null = null,
+  details: Record<string, unknown> = { event_type: "note", source: "manual" },
+) {
   return {
     id,
     note,
     photo_url: photoUrl,
     stage: "vegetative",
-    details: { event_type: "note", source: "manual" },
+    details,
     entry_at: entryAt,
     plant_id: null,
     tent_id: null,
@@ -265,6 +271,14 @@ function chipCount(label: string): number {
   const value = Number(raw);
   if (!Number.isFinite(value)) throw new Error(`Chip ${label} count missing: ${raw}`);
   return value;
+}
+
+function listedEntries(): HTMLElement[] {
+  return screen.queryAllByTestId("timeline-entry");
+}
+
+function isReceiptEntry(row: HTMLElement): boolean {
+  return (row.textContent ?? "").includes("Manual sensor snapshot:");
 }
 
 function renderTimeline() {
@@ -367,6 +381,80 @@ describe("Timeline chip counts stay on diary rows", () => {
     expect(screen.getByTestId("timeline-results-count").textContent).toMatch(
       /showing 4 of 4 entries/,
     );
+  }, 20_000);
+
+  it("matches every chip count to the rows that chip lists", async () => {
+    const diaryRows = [
+      diaryEntry("note-1", "Plain diary note", "2026-07-20T12:00:00.000Z"),
+      diaryEntry("note-2", "Second plain note", "2026-07-20T11:00:00.000Z"),
+      diaryEntry(
+        "photo-1",
+        "Leaf photo",
+        "2026-07-20T10:00:00.000Z",
+        "https://cdn.example/leaf.jpg",
+      ),
+      diaryEntry("measure-1", "Runoff 6.2", "2026-07-20T09:00:00.000Z", null, {
+        event_type: "measurement",
+        source: "manual",
+        ph: 6.2,
+      }),
+      diaryEntry("follow-1", "Checked the canopy", "2026-07-20T08:00:00.000Z", null, {
+        event_type: "action_followup",
+        source: "manual",
+      }),
+      diaryEntry("response-1", "Leaves recovered", "2026-07-20T07:00:00.000Z", null, {
+        event_type: "action_followup",
+        source: "manual",
+        action_queue_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        outcome: "improved",
+      }),
+    ];
+    const readings = receiptReadings(3);
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 6 };
+      if (spec.table === "tents") return { data: [{ id: TENT_ID }], error: null };
+      if (spec.table === "sensor_readings_effective") return { data: readings, error: null };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Plain diary note")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByText(/^Manual sensor snapshot:/)).toHaveLength(3);
+    });
+
+    const chips = [
+      "All",
+      "All stages",
+      "Photos",
+      "Notes",
+      "Measurements",
+      "Follow-ups",
+      "Action responses",
+    ] as const;
+
+    for (const label of chips) {
+      fireEvent.click(chipButton(label));
+      const rows = listedEntries();
+      const receiptRows = rows.filter(isReceiptEntry);
+      const listed =
+        label === "All" || label === "All stages"
+          ? rows.filter((row) => !isReceiptEntry(row))
+          : rows;
+      expect(listed, label).toHaveLength(chipCount(label));
+      if (label === "Notes") {
+        expect(receiptRows).toHaveLength(0);
+        expect(screen.queryByText(/^Manual sensor snapshot:/)).not.toBeInTheDocument();
+      }
+      if (label === "Measurements") {
+        expect(receiptRows).toHaveLength(3);
+        expect(screen.getByText("Runoff 6.2")).toBeInTheDocument();
+      }
+      if (label === "All" || label === "All stages") {
+        expect(receiptRows).toHaveLength(3);
+      }
+    }
   }, 20_000);
 
   it("counts storage photos before the signed URL arrives and keeps All and Y still", async () => {

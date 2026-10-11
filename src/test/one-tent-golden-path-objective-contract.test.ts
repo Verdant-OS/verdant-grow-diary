@@ -470,6 +470,25 @@ describe("authenticated One-Tent proof covers the production objective", () => {
   });
 
   it("proves Paddle remains visibly sandboxed without opening checkout", () => {
+    const paddleStage = SPEC.slice(
+      SPEC.indexOf('await stage("paddle_sandbox_verified"'),
+      SPEC.indexOf("expect(sawPasswordAuth)"),
+    );
+    expect(paddleStage).toContain("sandbox-checkout-test-mode-note");
+    const noteBeforeRole = paddleStage.slice(0, paddleStage.indexOf("has_role"));
+    expect(noteBeforeRole).toContain("sandbox-checkout-test-mode-note");
+    const operatorBranch = paddleStage.slice(
+      paddleStage.indexOf("operatorGranted === true"),
+      paddleStage.indexOf("} else if (operatorRoleError == null)"),
+    );
+    expect(operatorBranch).toContain("payments-test-mode-banner");
+    expect(operatorBranch).toContain('data-payment-env", "sandbox"');
+    expect(operatorBranch).toContain("No real charges");
+    const nonOperatorBranch = paddleStage.slice(
+      paddleStage.indexOf("} else if (operatorRoleError == null)"),
+      paddleStage.indexOf("} else if ((await page.getByTestId"),
+    );
+    expect(nonOperatorBranch).toContain("toHaveCount(0)");
     expect(SPEC).toContain("paddle_sandbox_verified");
     expect(SPEC).toContain("payments-test-mode-banner");
     expect(SPEC).toContain('data-payment-env", "sandbox"');

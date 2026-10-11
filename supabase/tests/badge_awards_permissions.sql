@@ -86,6 +86,7 @@ DECLARE
   v_owner uuid := gen_random_uuid();
   v_stranger uuid := gen_random_uuid();
   v_grow uuid := gen_random_uuid();
+  v_other_grow uuid := gen_random_uuid();
   v_entry uuid := gen_random_uuid();
   v_earlier uuid := gen_random_uuid();
   v_photo text;
@@ -107,7 +108,9 @@ BEGIN
     (v_stranger, 'badge-stranger-' || v_stranger::text || '@verdant.test', crypt('harness-password', gen_salt('bf')), now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated');
 
   INSERT INTO public.grows (id, user_id, name)
-  VALUES (v_grow, v_owner, 'badge harness grow');
+  VALUES
+    (v_grow, v_owner, 'badge harness grow'),
+    (v_other_grow, v_stranger, 'someone else grow');
 
   v_photo := v_owner::text || '/diary/photo.jpg';
   INSERT INTO storage.objects (bucket_id, name)
@@ -182,7 +185,40 @@ BEGIN
     'service_role must be able to turn the switch on';
 
   UPDATE public.diary_entries
-     SET note = 'Photo attached from Quick Log.'
+     SET note = '',
+         photo_url = v_photo,
+         details = '{}'::jsonb
+   WHERE id = v_entry;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'unchanged', 'an empty note must not qualify';
+  RESET role;
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
+  ASSERT v_count = 0, 'an empty note must not create an award';
+
+  UPDATE public.diary_entries SET note = '   ' WHERE id = v_entry;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'unchanged', 'a whitespace-only note must not qualify';
+  RESET role;
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
+  ASSERT v_count = 0, 'a whitespace-only note must not create an award';
+
+  UPDATE public.diary_entries
+     SET note = 'First real diary note',
+         photo_url = NULL,
+         details = '{}'::jsonb
+   WHERE id = v_entry;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'unchanged', 'a text-only entry must not qualify';
+  RESET role;
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
+  ASSERT v_count = 0, 'a text-only entry must not create an award';
+
+  UPDATE public.diary_entries
+     SET note = 'Photo attached from Quick Log.',
+         photo_url = v_photo
    WHERE id = v_entry;
   PERFORM set_config('role', 'authenticated', true);
   v_result := public.badge_awards_evaluate_owner('first_diary_entry');
@@ -213,6 +249,37 @@ BEGIN
   RESET role;
   SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
   ASSERT v_count = 0, 'wrong prefix must not create an award';
+
+  UPDATE public.diary_entries
+     SET grow_id = v_other_grow,
+         note = 'First real diary note',
+         photo_url = v_photo,
+         details = '{}'::jsonb
+   WHERE id = v_entry;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'unchanged', 'a grow owned by someone else must not qualify';
+  RESET role;
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
+  ASSERT v_count = 0, 'someone else grow must not create an award';
+  UPDATE public.diary_entries SET grow_id = v_grow WHERE id = v_entry;
+
+  UPDATE storage.objects
+     SET owner = v_stranger,
+         owner_id = v_stranger::text
+   WHERE bucket_id = 'diary-photos'
+     AND name = v_photo;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'unchanged', 'a stored photo owned by someone else must not qualify';
+  RESET role;
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
+  ASSERT v_count = 0, 'someone else photo owner must not create an award';
+  UPDATE storage.objects
+     SET owner = v_owner,
+         owner_id = v_owner::text
+   WHERE bucket_id = 'diary-photos'
+     AND name = v_photo;
 
   UPDATE public.diary_entries
      SET photo_url = v_owner::text || '/diary/missing.jpg'
@@ -322,6 +389,46 @@ BEGIN
   ASSERT (SELECT first_recognized_at FROM public.badge_awards WHERE id = v_award) = v_recognized,
     'restore must keep the original recognition time';
 
+  PERFORM set_config('storage.allow_delete_query', 'true', true);
+  DELETE FROM storage.objects
+   WHERE bucket_id = 'diary-photos'
+     AND name = v_owner::text || '/diary/earlier.jpg';
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'hidden', format('a hard-deleted photo should hide, got %s', v_result);
+  RESET role;
+  ASSERT (SELECT count(*) FROM public.badge_evidence WHERE award_id = v_award) = 0,
+    'a hard-deleted photo must remove evidence';
+
+  INSERT INTO storage.objects (bucket_id, name)
+  VALUES ('diary-photos', v_owner::text || '/diary/earlier.jpg');
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'restored', format('putting the photo back should restore, got %s', v_result);
+  RESET role;
+
+  DELETE FROM public.diary_entries WHERE id = v_earlier;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'hidden', format('a hard-deleted entry should hide, got %s', v_result);
+  RESET role;
+  ASSERT (SELECT count(*) FROM public.badge_evidence WHERE award_id = v_award) = 0,
+    'a hard-deleted entry must remove evidence';
+
+  INSERT INTO public.diary_entries (id, user_id, grow_id, note, photo_url, entry_at)
+  VALUES (
+    v_earlier,
+    v_owner,
+    v_grow,
+    'Earlier qualifying note',
+    v_owner::text || '/diary/earlier.jpg',
+    '2026-09-01T12:00:00Z'
+  );
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'restored', format('reinserting the entry should restore, got %s', v_result);
+  RESET role;
+
   SELECT count(*) INTO v_queue FROM public.action_queue WHERE user_id = v_owner;
   ASSERT v_queue = 0, 'evaluation must not write an action queue row';
 
@@ -344,10 +451,112 @@ BEGIN
   SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
   ASSERT v_count = 1, 'disabling the switch must not insert another award';
 
+  UPDATE public.badge_award_runtime SET enabled = true WHERE id = 1;
+  DELETE FROM auth.users WHERE id = v_owner;
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
+  ASSERT v_count = 0, 'deleting the account must cascade the award';
+  SELECT count(*) INTO v_count FROM public.badge_evidence;
+  ASSERT v_count = 0, 'deleting the account must cascade the evidence';
+  UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1;
+
   RAISE NOTICE '✓ kill switch, qualification, lifecycle, and owner visibility';
 END $$;
 
-\echo 1..1
+\echo 1..2
 \echo ok 1 - badge awards permissions, kill switch, and owner visibility
 
 ROLLBACK;
+
+-- Petal test 23: two sessions evaluate the same owner at once.
+-- The fixture commits so the second connection can see it, then this
+-- session deletes it and turns the kill switch back off.
+CREATE EXTENSION IF NOT EXISTS dblink;
+
+BEGIN;
+CREATE TEMP TABLE badge_two_session (owner uuid) ON COMMIT PRESERVE ROWS;
+INSERT INTO badge_two_session VALUES (gen_random_uuid());
+DELETE FROM auth.users
+ WHERE email LIKE 'badge-two-session-%@verdant.test';
+INSERT INTO auth.users (
+  id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
+  raw_app_meta_data, raw_user_meta_data, aud, role
+)
+SELECT owner,
+  'badge-two-session-' || owner::text || '@verdant.test',
+  crypt('harness-password', gen_salt('bf')),
+  now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'
+FROM badge_two_session;
+INSERT INTO public.grows (id, user_id, name)
+SELECT gen_random_uuid(), owner, 'two session grow' FROM badge_two_session;
+INSERT INTO storage.objects (bucket_id, name, owner, owner_id)
+SELECT 'diary-photos', owner::text || '/diary/two.jpg', owner, owner::text
+FROM badge_two_session;
+INSERT INTO public.diary_entries (user_id, grow_id, note, photo_url, entry_at)
+SELECT grow.user_id, grow.id, 'Two session note', grow.user_id::text || '/diary/two.jpg', now()
+FROM public.grows AS grow
+JOIN badge_two_session AS probe ON probe.owner = grow.user_id;
+UPDATE public.badge_award_runtime SET enabled = true WHERE id = 1;
+COMMIT;
+
+DO $$
+DECLARE
+  v_owner uuid;
+  v_conn text;
+  v_sql text;
+  v_count int;
+BEGIN
+  SELECT owner INTO v_owner FROM badge_two_session;
+  SELECT format(
+    'host=%s port=%s dbname=postgres user=postgres password=postgres',
+    host(inet_server_addr()),
+    inet_server_port()
+  ) INTO v_conn;
+  v_sql := format($q$
+    SELECT public.badge_awards_evaluate_owner('first_diary_entry')
+    FROM (
+      SELECT
+        set_config('request.jwt.claim.sub', %L, false),
+        set_config('request.jwt.claims', %L, false),
+        set_config('role', 'authenticated', false)
+    ) AS session_cfg
+  $q$, v_owner::text, json_build_object('sub', v_owner)::text);
+
+  PERFORM dblink_connect('badge_s1', v_conn);
+  PERFORM dblink_connect('badge_s2', v_conn);
+  IF dblink_send_query('badge_s1', v_sql) <> 1 OR dblink_send_query('badge_s2', v_sql) <> 1 THEN
+    RAISE EXCEPTION 'two-session queries were not sent';
+  END IF;
+  PERFORM 1 FROM dblink_get_result('badge_s1') AS remote_result(result jsonb);
+  PERFORM 1 FROM dblink_get_result('badge_s2') AS remote_result(result jsonb);
+  PERFORM dblink_disconnect('badge_s1');
+  PERFORM dblink_disconnect('badge_s2');
+
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
+  ASSERT v_count = 1, format('two sessions must leave one award, got %s', v_count);
+  SELECT count(*) INTO v_count
+  FROM public.badge_evidence AS evidence
+  JOIN public.badge_awards AS award ON award.id = evidence.award_id
+  WHERE award.user_id = v_owner;
+  ASSERT v_count = 1, 'two sessions must leave one evidence row';
+
+  DELETE FROM auth.users WHERE id = v_owner;
+  UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1;
+  ASSERT (SELECT enabled FROM public.badge_award_runtime WHERE id = 1) IS FALSE,
+    'two-session test must turn the switch back off';
+EXCEPTION WHEN OTHERS THEN
+  BEGIN
+    PERFORM dblink_disconnect('badge_s1');
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+  BEGIN
+    PERFORM dblink_disconnect('badge_s2');
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+  UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1;
+  DELETE FROM auth.users WHERE email LIKE 'badge-two-session-%@verdant.test';
+  RAISE;
+END $$;
+
+\echo ok 2 - two simultaneous sessions leave one award

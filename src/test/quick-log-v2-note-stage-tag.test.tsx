@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
-import * as quickLogSaveHook from "@/hooks/useQuickLogV2Save";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 
 vi.setConfig({ testTimeout: 15_000 });

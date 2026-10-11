@@ -1,6 +1,6 @@
 /**
- * QA walk bug 5: search results must not show match_kind or rank·score.
- * Rank and score stay on the aria-label and data attributes.
+ * QA walk bug 5: search results must not show match_kind or rank·score,
+ * including in aria-labels. Diagnostics stay on data attributes.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -42,6 +42,16 @@ function visibleText(element: HTMLElement): string {
   return (element.textContent ?? "").replace(/\s+/g, " ");
 }
 
+function assertNoDebugAria(root: HTMLElement) {
+  const nodes = [root, ...root.querySelectorAll<HTMLElement>("[aria-label]")];
+  for (const node of nodes) {
+    const label = node.getAttribute("aria-label") ?? "";
+    expect(label).not.toMatch(/rank/i);
+    expect(label).not.toMatch(/score/i);
+    expect(label).not.toMatch(/prefix/i);
+  }
+}
+
 describe("global search hides debug tags", () => {
   it("does not show match kind or rank·score on the result preview", () => {
     render(
@@ -60,11 +70,12 @@ describe("global search hides debug tags", () => {
     expect(text).toContain("North Tent");
 
     const meta = screen.getByTestId("global-search-preview-match-kind");
-    expect(meta).toHaveAttribute("aria-label", "Match prefix, rank 1, score 0.42");
+    expect(meta.getAttribute("aria-label") ?? "").not.toMatch(/rank|score/i);
     expect(meta).toHaveAttribute("data-match-kind", "prefix");
     expect(meta).toHaveAttribute("data-rank", "1");
     expect(meta).toHaveAttribute("data-score", "0.42");
-    expect(screen.getByTestId("global-search-preview-score")).toBeInTheDocument();
+    assertNoDebugAria(preview);
+    expect(preview.getAttribute("aria-label")).toBe("Preview of Tent North Tent");
   });
 
   it("does not show match kind or rank·score on a dialog result", async () => {
@@ -91,7 +102,8 @@ describe("global search hides debug tags", () => {
     expect(text).toContain("North Tent");
 
     const meta = screen.getByTestId("global-search-item-meta-tent-tent-1");
-    expect(meta).toHaveAttribute("aria-label", "Match prefix, rank 1, score 0.42");
+    expect(meta.getAttribute("aria-label") ?? "").not.toMatch(/rank|score/i);
+    assertNoDebugAria(item);
     expect(meta).toHaveAttribute("data-match-kind", "prefix");
     expect(meta).toHaveAttribute("data-rank", "1");
     expect(meta).toHaveAttribute("data-score", "0.42");

@@ -912,8 +912,6 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                               ) : null}
                             </div>
                             <div
-                              className="sr-only"
-                              aria-label={`Match ${row.match_kind}, rank ${row.rank}, score ${row.score.toFixed(2)}`}
                               data-testid={`global-search-item-meta-${row.entity_type}-${row.id}`}
                               data-match-kind={row.match_kind}
                               data-rank={row.rank}

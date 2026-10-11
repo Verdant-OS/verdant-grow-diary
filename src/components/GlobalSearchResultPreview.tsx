@@ -165,13 +165,11 @@ export default function GlobalSearchResultPreview({
 
       <div
         className="flex flex-wrap items-center gap-1.5 text-[10px] tracking-wide text-muted-foreground"
-        aria-label={`Match ${row.match_kind}, rank ${row.rank}, score ${row.score.toFixed(2)}`}
         data-testid="global-search-preview-match-kind"
         data-match-kind={row.match_kind}
         data-rank={row.rank}
         data-score={row.score.toFixed(2)}
       >
-        <span data-testid="global-search-preview-score" hidden />
         {query.trim().length > 0 ? (
           <span className="text-muted-foreground">for “{query.trim()}”</span>
         ) : null}

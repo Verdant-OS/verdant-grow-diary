@@ -53,10 +53,10 @@ goal: Stop selling Founder Lifetime on public sales surfaces. Keep existing Foun
 branch: cursor/stop-selling-founder-lifetime-0628
 base: verdant-grow-diary
 checkout: git fetch origin cursor/stop-selling-founder-lifetime-0628 verdant-grow-diary && git switch cursor/stop-selling-founder-lifetime-0628 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: draft, URL recorded after open
-head_sha: local until push
-state: implemented / local only
-next_action: open the draft PR and wait for required checks
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2028 (draft)
+head_sha: ec128ea0ad645396d9264cf3b87534ba8c33ab2e
+state: draft PR open; waiting on required checks
+next_action: keep the PR draft; fix in-scope required-check failures only
 files: pricing constants and config, Pricing.tsx, Upgrade.tsx, paddle config, legacy billing redirect, founder route redirect, checkout success, SEO/sitemap/llms, AGENTS.md, docs/billing.md
 blockers: none for the draft; entitlement removal is a later PR plus migration
 artifacts: .claude/scorer-unlock.json is gitignored and must not be committed

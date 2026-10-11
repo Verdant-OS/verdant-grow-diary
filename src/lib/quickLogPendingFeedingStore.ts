@@ -1,6 +1,5 @@
 import type { FeedingTypedEventInput } from "./writeFeedingTypedEvent";
 import {
-  copyHistoryReviewTarget,
   historyReviewTargetAllowed,
   type PendingQuickLogHistoryReviewTarget,
 } from "./quickLogHistoryReviewTargetRules";

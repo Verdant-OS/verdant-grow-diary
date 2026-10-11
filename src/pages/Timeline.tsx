@@ -125,6 +125,13 @@ import {
   timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
 import {
+  collectTimelineDiaryPhotoIds,
+  EMPTY_TIMELINE_DIARY_PHOTO_IDS,
+  timelineDiaryRowsForChipCounts,
+  timelineEntryCountsAsPhoto,
+  unionTimelineDiaryPhotoIds,
+} from "@/lib/timelineChipCountRules";
+import {
   effectiveSensorReadingsQuery,
   requireEffectiveSensorReadings,
 } from "@/lib/effectiveSensorReadings";
@@ -322,9 +329,9 @@ interface AlertEventRow {
 
 type EventFilter = "all" | "photo" | "note" | "measurement" | "followup" | "actionresponse";
 
-function entryKinds(e: Entry): EventFilter[] {
+function entryKinds(e: Entry, diaryPhotoIds: ReadonlySet<string>): EventFilter[] {
   const kinds: EventFilter[] = ["note"];
-  if (e.photo_url) kinds.push("photo");
+  if (timelineEntryCountsAsPhoto(e, diaryPhotoIds)) kinds.push("photo");
   // Diary measurement keys, QL environment envelopes, and tent
   // `sensor_readings` (source=manual) projected as receipts. Stale-drawer
   // manuals use the same LIVE window as the evidence drawer badge.
@@ -444,6 +451,12 @@ export default function Timeline() {
     if (urlGrowId !== storeGrowId) setActiveGrowId(urlGrowId);
   }, [urlGrowId, grows, storeGrowId, setActiveGrowId]);
   const [entries, setEntries] = useState<Entry[]>([]);
+  // Original diary photo references, captured before storage paths are
+  // replaced by signed URLs. Chip membership reads this set so signing
+  // cannot move the Photos count.
+  const [diaryPhotoIds, setDiaryPhotoIds] = useState<ReadonlySet<string>>(
+    () => EMPTY_TIMELINE_DIARY_PHOTO_IDS,
+  );
   // Tent Manual Snapshots live in `sensor_readings`, not diary_entries.
   // Read-side receipts only — never a second write path.
   const [manualSensorMeasurementEntries, setManualSensorMeasurementEntries] = useState<Entry[]>([]);
@@ -627,6 +640,7 @@ export default function Timeline() {
     const requestId = ++readRequestIdRef.current;
     if (!user || !activeGrowId) {
       setEntries([]);
+      setDiaryPhotoIds(EMPTY_TIMELINE_DIARY_PHOTO_IDS);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
@@ -648,6 +662,7 @@ export default function Timeline() {
     // the network boundary instead of ever issuing an unscoped read.
     if (!activeReadKey) {
       setEntries([]);
+      setDiaryPhotoIds(EMPTY_TIMELINE_DIARY_PHOTO_IDS);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
@@ -703,6 +718,7 @@ export default function Timeline() {
       if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
 
       const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
+      const nextDiaryPhotoIds = collectTimelineDiaryPhotoIds(rows, user);
       const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rows,
         user,
@@ -736,6 +752,7 @@ export default function Timeline() {
       // visible immediately; photos/action/alert context continues separately
       // and is never allowed to hold the diary or watering history hostage.
       setEntries(coreRows);
+      setDiaryPhotoIds(nextDiaryPhotoIds);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
@@ -1015,6 +1032,7 @@ export default function Timeline() {
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
       const rawOlder = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
+      const olderPhotoIds = collectTimelineDiaryPhotoIds(rawOlder, user);
       const { rows: older, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rawOlder,
         user,
@@ -1048,6 +1066,7 @@ export default function Timeline() {
         }
       }
       if (isCurrentPage() && older.length) {
+        setDiaryPhotoIds((current) => unionTimelineDiaryPhotoIds(current, olderPhotoIds));
         setEntries((prev) => {
           const seen = new Set(prev.map((e) => e.id));
           return [...prev, ...older.filter((e) => !seen.has(e.id))];
@@ -1120,22 +1139,29 @@ export default function Timeline() {
     [entries, manualSensorMeasurementEntries],
   );
 
+  // Receipts stay visible. Chips count diary rows only, and a storage photo
+  // counts from its original reference so signing cannot move Photos.
+  const diaryChipEntries = useMemo(
+    () => timelineDiaryRowsForChipCounts(displayEntries),
+    [displayEntries],
+  );
+
   const eventCounts = useMemo(() => {
     const m = {
-      all: displayEntries.length,
+      all: diaryChipEntries.length,
       photo: 0,
       note: 0,
       measurement: 0,
       followup: 0,
       actionresponse: 0,
     };
-    displayEntries.forEach((e) =>
-      entryKinds(e).forEach((k) => {
+    diaryChipEntries.forEach((e) =>
+      entryKinds(e, diaryPhotoIds).forEach((k) => {
         m[k] = (m[k] || 0) + 1;
       }),
     );
     return m;
-  }, [displayEntries]);
+  }, [diaryChipEntries, diaryPhotoIds]);
 
   // Canonical Action Response Memory (read-only). One grower response renders
   // as ONE compact card inside its own evidence row — never an extra event.
@@ -1232,7 +1258,8 @@ export default function Timeline() {
   const filtered = useMemo(() => {
     const afterStageEvent = displayEntries.filter((e) => {
       if (stageFilter !== "all" && resolveTimelineDiaryEntryStage(e) !== stageFilter) return false;
-      if (eventFilter !== "all" && !entryKinds(e).includes(eventFilter)) return false;
+      if (eventFilter !== "all" && !entryKinds(e, diaryPhotoIds).includes(eventFilter))
+        return false;
       return true;
     });
     return filterTimelineEvidenceRows(afterStageEvent, evidenceFilterInput);
@@ -1247,6 +1274,7 @@ export default function Timeline() {
     sensorSourceFilter,
     effectiveStartDate,
     effectiveEndDate,
+    diaryPhotoIds,
   ]);
 
   const renderedDiaryAnchorIds = useMemo(
@@ -2165,7 +2193,7 @@ export default function Timeline() {
             active={stageFilter === "all"}
             onClick={() => setStageFilter("all")}
             label="All stages"
-            count={displayEntries.length}
+            count={diaryChipEntries.length}
           />
           {STAGES.map((s) => (
             <FilterChip

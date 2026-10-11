@@ -1,6 +1,6 @@
 /** V2 Note stage tag: mounted sheet, modeled RPC and lost replies. Synthetic fixtures only. */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";

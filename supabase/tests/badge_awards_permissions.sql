@@ -186,10 +186,10 @@ BEGIN
    WHERE id = v_entry;
   PERFORM set_config('role', 'authenticated', true);
   v_result := public.badge_awards_evaluate_owner('first_diary_entry');
-  ASSERT v_result->>'status' = 'unchanged', format('placeholder note must not qualify, got %s', v_result);
+  ASSERT v_result->>'status' = 'unchanged', format('stock photo note must not qualify, got %s', v_result);
   RESET role;
   SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
-  ASSERT v_count = 0, 'placeholder note must not create an award';
+  ASSERT v_count = 0, 'stock photo note must not create an award';
 
   UPDATE public.diary_entries
      SET note = 'First real diary note',
@@ -267,7 +267,7 @@ BEGIN
   ASSERT v_result->>'status' = 'unchanged', 'archiving the grow must not hide a still-qualifying diary';
   RESET role;
   ASSERT (SELECT hidden_at FROM public.badge_awards WHERE id = v_award) IS NULL,
-    'archived grow must leave the award visible';
+    'is_archived grow must leave the award visible';
   UPDATE public.grows SET is_archived = false WHERE id = v_grow;
 
   UPDATE public.diary_entries SET note = 'First real diary note, edited' WHERE id = v_entry;

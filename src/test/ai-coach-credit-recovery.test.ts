@@ -59,7 +59,7 @@ describe("AI Coach credit recovery boundary", () => {
   it("resolves cached, pending, stale, and refunded spends before the provider call", () => {
     const decision = EDGE.indexOf("const spendDecision = classifyAiDoctorCreditSpend");
     const freshBoundary = EDGE.indexOf("const spendId = spendDecision.spendId", decision);
-    const provider = EDGE.indexOf('fetch("https://ai.gateway.lovable.dev');
+    const provider = EDGE.indexOf("fetch(GATEWAY_URL");
 
     expect(decision).toBeGreaterThan(-1);
     expect(freshBoundary).toBeGreaterThan(decision);
@@ -77,7 +77,7 @@ describe("AI Coach credit recovery boundary", () => {
   });
 
   it("refunds failed response parsing and invalid model output", () => {
-    const provider = EDGE.indexOf('fetch("https://ai.gateway.lovable.dev');
+    const provider = EDGE.indexOf("fetch(GATEWAY_URL");
     const attachment = EDGE.indexOf('creditSupabase.rpc("ai_credit_attach_result"', provider);
     const providerBlock = EDGE.slice(provider, attachment);
 

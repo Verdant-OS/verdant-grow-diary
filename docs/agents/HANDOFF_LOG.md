@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### ALERT-WALK-FINAL-GUIDANCE
+
+```text
+TASK ALERT-WALK-FINAL-GUIDANCE  priority: P2  status: OPEN
+goal: Replace the Quick Log Alert Walk "coming later" placeholder with final in-person guidance. Keep the alert_walk mode. Do not hide it.
+branch: cursor/alert-walk-final-guidance-b6de
+base: verdant-grow-diary
+checkout: git fetch origin cursor/alert-walk-final-guidance-b6de verdant-grow-diary && git switch cursor/alert-walk-final-guidance-b6de && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED until the draft exists
+head_sha: NOT_MEASURED until push
+state: local implementation in progress
+next_action: draft PR against verdant-grow-diary; stay draft; required checks at the exact head
+files: src/lib/growWalkContracts.ts; src/components/GuidedGrowWalkPanel.tsx; src/test/alert-walk-guidance.test.tsx; docs/agents/HANDOFF_LOG.md
+blockers: none for the copy change. No merge, ready, publish, or production write.
+artifacts: GitHub issue #2021
+reviewer_seat: Blue Dream (.tsx product file)
+claimed_by: Grok, 2026-10-11 01:20 CT
+last_updated: 2026-10-11 01:20 CT, by Grok
+```
+
 ### PR-1939-NOT-FOUND-COVERAGE
 
 ```text

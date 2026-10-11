@@ -20,6 +20,20 @@ export const GROW_WALK_VISIT_MODES = [
   },
 ] as const;
 
+/**
+ * Final Alert Walk guidance. The grower checks the alert and the tent.
+ * Verdant does not diagnose, and it does not control equipment.
+ */
+export const ALERT_WALK_GUIDANCE_LEAD =
+  "Verify the alert in person before changing anything." as const;
+
+export const ALERT_WALK_GUIDANCE_STEPS = [
+  "Open the alert and note what it says.",
+  "Check the tent in person: the reading, the plant, and the equipment.",
+  "Log what you actually saw.",
+  "Change something only if you confirmed the cause.",
+] as const;
+
 export const GROW_WALK_MISSINGNESS_OPTIONS = [
   "Checked",
   "Concern",

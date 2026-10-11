@@ -68,4 +68,20 @@ describe("badge award display rules", () => {
       selectVisibleOwnerBadgeAwards([{ badgeKey: "first_recorded_harvest", hiddenAt: null }]),
     ).toEqual([]);
   });
+
+  it("returns no shelf rows when the owner user id is empty", () => {
+    expect(
+      selectVisibleOwnerBadgeAwards(
+        [
+          {
+            badgeKey: "first_diary_entry",
+            hiddenAt: null,
+            revokedAt: null,
+            userId: "user-shelf-a",
+          },
+        ],
+        "",
+      ),
+    ).toEqual([]);
+  });
 });

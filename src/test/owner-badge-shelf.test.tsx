@@ -43,6 +43,27 @@ describe("OwnerBadgeShelf", () => {
     );
   });
 
+  it("passes the owner user id into the backup filter", () => {
+    const otherGrower = {
+      badgeKey: "first_diary_entry",
+      hiddenAt: null,
+      revokedAt: null,
+      userId: "user-other",
+    };
+    const { rerender } = render(
+      <OwnerBadgeShelf enabled ownerUserId="user-shelf-a" awards={[otherGrower]} />,
+    );
+    expect(screen.queryByTestId("owner-badge-shelf")).not.toBeInTheDocument();
+    rerender(
+      <OwnerBadgeShelf
+        enabled
+        ownerUserId="user-shelf-a"
+        awards={[{ ...otherGrower, userId: "user-shelf-a" }]}
+      />,
+    );
+    expect(screen.getByTestId("owner-badge-shelf")).toBeInTheDocument();
+  });
+
   it("renders nothing when the only award is hidden", () => {
     render(
       <OwnerBadgeShelf

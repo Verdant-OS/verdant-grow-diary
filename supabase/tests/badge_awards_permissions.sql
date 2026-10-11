@@ -2,8 +2,12 @@
 -- The first plan rolls back every row it creates. The two-session plan
 -- (ok 2) commits, so it runs only on a disposable local database named
 -- badge_pgtap_<12 hex>. It refuses dbname=postgres and any public host.
--- Loopback, a unix socket, and a local 172.16/12 bridge (the address
--- Postgres reports for a 127.0.0.1 publish) are the only accepted hosts.
+-- The committing case also requires a runner-issued token: the session GUC
+-- badge_pgtap.token must equal the database comment. A 172.16/12 address is
+-- accepted only after that token matches. The database must contain no rows
+-- in auth.users, diary_entries, or badge_awards before the fixture writes.
+-- scripts/run-badge-pgtap-disposable.sh creates that database, loads the
+-- migrated schema, sets the token, runs this file, and always drops it.
 -- Run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/badge_awards_permissions.sql
 
 \set ON_ERROR_STOP on
@@ -731,26 +735,16 @@ BEGIN
   ) AS owners
   ORDER BY owners.user_id DESC
   LIMIT 1;
-  v_fail_owner := NULL;
-  v_next_owner := NULL;
-  FOR v_batch_n IN 1..1000 LOOP
-    v_batch_user := gen_random_uuid();
-    IF v_cursor_max IS NULL OR v_batch_user > v_cursor_max THEN
-      IF v_fail_owner IS NULL THEN
-        v_fail_owner := v_batch_user;
-      ELSIF v_batch_user <> v_fail_owner THEN
-        v_next_owner := v_batch_user;
-        EXIT;
-      END IF;
-    END IF;
-  END LOOP;
-  ASSERT v_fail_owner IS NOT NULL AND v_next_owner IS NOT NULL,
-    'could not draw two owners past the reconcile cursor';
-  IF v_next_owner < v_fail_owner THEN
-    v_batch_user := v_fail_owner;
-    v_fail_owner := v_next_owner;
-    v_next_owner := v_batch_user;
-  END IF;
+  -- Fixed high UUIDs. A version-4 id has 4 in the version nibble, so these
+  -- sort after every v4 and the draw cannot miss.
+  v_fail_owner := 'ffffffff-ffff-ffff-ffff-fffffffffffe';
+  v_next_owner := 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+  ASSERT v_cursor_max IS NULL OR (v_fail_owner > v_cursor_max AND v_next_owner > v_cursor_max),
+    format(
+      'fixed owners must sort after the reconcile cursor %, got % and %',
+      v_cursor_max, v_fail_owner, v_next_owner
+    );
+  ASSERT v_fail_owner < v_next_owner, 'the failing owner must sort before the next owner';
   UPDATE public.badge_award_runtime
      SET reconcile_after = v_cursor_max
    WHERE id = 1;
@@ -831,6 +825,91 @@ BEGIN
   DROP FUNCTION public.badge_reconcile_fail_owner();
   DELETE FROM auth.users WHERE id IN (v_fail_owner, v_next_owner);
 
+  -- The cursor stores the last owner visited, not the last success. Twenty-five
+  -- owners sit past the current max. The last one raises. A function that
+  -- advanced the cursor by successes would store owner 24.
+  SELECT owners.user_id
+    INTO v_cursor_max
+  FROM (
+    SELECT entry.user_id
+    FROM public.diary_entries AS entry
+    WHERE entry.user_id IS NOT NULL
+    UNION
+    SELECT award.user_id
+    FROM public.badge_awards AS award
+  ) AS owners
+  ORDER BY owners.user_id DESC
+  LIMIT 1;
+  UPDATE public.badge_award_runtime
+     SET reconcile_after = v_cursor_max
+   WHERE id = 1;
+  v_fail_owner := ('ffffffff-ffff-ffff-ffff-' || lpad(to_hex(25), 12, '0'))::uuid;
+  INSERT INTO badge_reconcile_skip (user_id) VALUES (v_fail_owner);
+  EXECUTE $failfn$
+    CREATE OR REPLACE FUNCTION public.badge_reconcile_fail_owner()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $fn$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM pg_temp.badge_reconcile_skip AS skip
+        WHERE skip.user_id = NEW.user_id
+      ) THEN
+        RAISE EXCEPTION 'forced owner reconcile error';
+      END IF;
+      RETURN NEW;
+    END;
+    $fn$;
+  $failfn$;
+  CREATE TRIGGER badge_reconcile_fail_owner
+    BEFORE INSERT ON public.badge_awards
+    FOR EACH ROW
+    EXECUTE FUNCTION public.badge_reconcile_fail_owner();
+  FOR v_batch_n IN 1..25 LOOP
+    v_batch_user := ('ffffffff-ffff-ffff-ffff-' || lpad(to_hex(v_batch_n), 12, '0'))::uuid;
+    v_batch_grow := gen_random_uuid();
+    INSERT INTO auth.users (
+      id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
+      raw_app_meta_data, raw_user_meta_data, aud, role
+    ) VALUES (
+      v_batch_user,
+      'badge-cursor-' || v_batch_user::text || '@verdant.test',
+      crypt('harness-password', gen_salt('bf')),
+      now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'
+    );
+    INSERT INTO public.grows (id, user_id, name)
+    VALUES (v_batch_grow, v_batch_user, 'badge cursor grow');
+    INSERT INTO storage.objects (bucket_id, name, owner, owner_id) VALUES (
+      'diary-photos',
+      v_batch_user::text || '/diary/cursor.jpg',
+      v_batch_user,
+      v_batch_user::text
+    );
+    INSERT INTO public.diary_entries (user_id, grow_id, note, photo_url, entry_at)
+    VALUES (
+      v_batch_user,
+      v_batch_grow,
+      '',
+      v_batch_user::text || '/diary/cursor.jpg',
+      now()
+    );
+  END LOOP;
+  PERFORM set_config('role', 'service_role', true);
+  v_batch_first := public.badge_awards_reconcile();
+  RESET role;
+  ASSERT v_batch_first = 24,
+    format('reconcile must return successes while visiting 25 owners, got %s', v_batch_first);
+  ASSERT (SELECT reconcile_after FROM public.badge_award_runtime WHERE id = 1) = v_fail_owner,
+    format(
+      'reconcile_after must be the last owner visited, got %s',
+      (SELECT reconcile_after FROM public.badge_award_runtime WHERE id = 1)
+    );
+  DROP TRIGGER badge_reconcile_fail_owner ON public.badge_awards;
+  DROP FUNCTION public.badge_reconcile_fail_owner();
+  DELETE FROM auth.users WHERE email LIKE 'badge-cursor-%@verdant.test';
+
   DELETE FROM auth.users WHERE id = v_owner;
   SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
   ASSERT v_count = 0, 'deleting the account must cascade the award';
@@ -848,23 +927,15 @@ ROLLBACK;
 
 -- Petal test 23: two sessions evaluate the same owner at once.
 -- The fixture commits, so this plan runs only when the connected database
--- is a disposable local database named badge_pgtap_<12 hex>. It does not
--- open dbname=postgres and does not commit enabled=true on a shared database.
--- Local Supabase publishes 127.0.0.1:54322 into a container, so Postgres
--- reports a 172.16/12 server address for that localhost connection. A
--- loopback address, a unix socket, or that local bridge pair is accepted.
--- A public host is refused.
+-- is a disposable local database named badge_pgtap_<12 hex>. dbname=postgres
+-- skips this plan and commits nothing. The runner token is the primary
+-- fence: badge_pgtap.token must equal the database comment before any write.
+-- A loopback or 172.16/12 address is accepted only after that token matches.
+-- The database must be empty of users, diary entries, and awards. Session-2
+-- cleanup commits through dblink so a later RAISE cannot roll it back.
 SELECT CASE
   WHEN current_database() ~ '^badge_pgtap_[0-9a-f]{12}$'
    AND current_database() <> 'postgres'
-   AND (
-     inet_server_addr() IS NULL
-     OR host(inet_server_addr()) IN ('127.0.0.1', '::1', 'localhost')
-     OR (
-       host(inet_server_addr())::inet << '172.16.0.0/12'::inet
-       AND host(inet_client_addr())::inet << '172.16.0.0/12'::inet
-     )
-   )
   THEN 1
   ELSE 0
 END AS badge_pgtap_disposable
@@ -872,6 +943,45 @@ END AS badge_pgtap_disposable
 
 \if :badge_pgtap_disposable
 CREATE EXTENSION IF NOT EXISTS dblink;
+
+DO $$
+DECLARE
+  v_token text := NULLIF(btrim(current_setting('badge_pgtap.token', true)), '');
+  v_comment text;
+  v_users bigint;
+  v_entries bigint;
+  v_awards bigint;
+BEGIN
+  IF current_database() !~ '^badge_pgtap_[0-9a-f]{12}$'
+     OR current_database() = 'postgres' THEN
+    RAISE EXCEPTION 'two-session test refuses database %', current_database();
+  END IF;
+  IF v_token IS NULL THEN
+    RAISE EXCEPTION 'two-session test refuses a missing token';
+  END IF;
+  SELECT shobj_description(d.oid, 'pg_database')
+    INTO v_comment
+  FROM pg_database AS d
+  WHERE d.datname = current_database();
+  IF v_comment IS DISTINCT FROM v_token THEN
+    RAISE EXCEPTION 'two-session test refuses a token that does not match the database comment';
+  END IF;
+  IF inet_server_addr() IS NOT NULL
+     AND host(inet_server_addr()) NOT IN ('127.0.0.1', '::1', 'localhost')
+     AND NOT (
+       host(inet_server_addr())::inet << '172.16.0.0/12'::inet
+       AND inet_client_addr() IS NOT NULL
+       AND host(inet_client_addr())::inet << '172.16.0.0/12'::inet
+     ) THEN
+    RAISE EXCEPTION 'two-session test refuses host %', host(inet_server_addr());
+  END IF;
+  SELECT count(*) INTO v_users FROM auth.users;
+  SELECT count(*) INTO v_entries FROM public.diary_entries;
+  SELECT count(*) INTO v_awards FROM public.badge_awards;
+  IF v_users <> 0 OR v_entries <> 0 OR v_awards <> 0 THEN
+    RAISE EXCEPTION 'two-session test refuses a non-empty database';
+  END IF;
+END $$;
 
 BEGIN;
 CREATE TEMP TABLE badge_two_session (owner uuid) ON COMMIT PRESERVE ROWS;
@@ -910,26 +1020,13 @@ BEGIN
      OR current_database() = 'postgres' THEN
     RAISE EXCEPTION 'two-session test refuses database %', current_database();
   END IF;
-  IF inet_server_addr() IS NOT NULL
-     AND host(inet_server_addr()) NOT IN ('127.0.0.1', '::1', 'localhost')
-     AND NOT (
-       host(inet_server_addr())::inet << '172.16.0.0/12'::inet
-       AND host(inet_client_addr())::inet << '172.16.0.0/12'::inet
-     ) THEN
-    RAISE EXCEPTION 'two-session test refuses host %', host(inet_server_addr());
-  END IF;
   SELECT owner INTO v_owner FROM badge_two_session;
-  SELECT CASE
-    WHEN inet_server_addr() IS NULL THEN
-      format('dbname=%s user=postgres password=postgres', current_database())
-    ELSE
-      format(
-        'host=%s port=%s dbname=%s user=postgres password=postgres',
-        host(inet_server_addr()),
-        inet_server_port(),
-        current_database()
-      )
-  END INTO v_conn;
+  v_conn := format(
+    'host=%s port=%s dbname=%s user=postgres password=postgres',
+    COALESCE(host(inet_server_addr()), '127.0.0.1'),
+    COALESCE(inet_server_port()::text, current_setting('port')),
+    current_database()
+  );
   v_sql := format($q$
     SELECT public.badge_awards_evaluate_owner('first_diary_entry')
     FROM (
@@ -942,6 +1039,9 @@ BEGIN
 
   PERFORM dblink_connect('badge_s1', v_conn);
   PERFORM dblink_connect('badge_s2', v_conn);
+  IF current_setting('badge_pgtap.force_session2_failure', true) = '1' THEN
+    RAISE EXCEPTION 'forced session-2 failure';
+  END IF;
   IF dblink_send_query('badge_s1', v_sql) <> 1 OR dblink_send_query('badge_s2', v_sql) <> 1 THEN
     RAISE EXCEPTION 'two-session queries were not sent';
   END IF;
@@ -973,8 +1073,20 @@ EXCEPTION WHEN OTHERS THEN
   EXCEPTION WHEN OTHERS THEN
     NULL;
   END;
-  UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1;
-  DELETE FROM auth.users WHERE email LIKE 'badge-two-session-%@verdant.test';
+  -- A RAISE below rolls this handler back. These writes commit in another
+  -- session, so a session-2 failure cannot leave the switch on.
+  BEGIN
+    PERFORM dblink_exec(
+      v_conn,
+      'UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1'
+    );
+    PERFORM dblink_exec(
+      v_conn,
+      $cleanup$DELETE FROM auth.users WHERE email LIKE 'badge-two-session-%@verdant.test'$cleanup$
+    );
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
   RAISE;
 END $$;
 

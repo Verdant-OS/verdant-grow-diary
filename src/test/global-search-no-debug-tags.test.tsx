@@ -46,6 +46,7 @@ function assertNoDebugAria(root: HTMLElement) {
   const nodes = [root, ...root.querySelectorAll<HTMLElement>("[aria-label]")];
   for (const node of nodes) {
     const label = node.getAttribute("aria-label") ?? "";
+    expect(label).not.toMatch(/r\d+·\d/);
     expect(label).not.toMatch(/rank/i);
     expect(label).not.toMatch(/score/i);
     expect(label).not.toMatch(/prefix/i);
@@ -70,7 +71,7 @@ describe("global search hides debug tags", () => {
     expect(text).toContain("North Tent");
 
     const meta = screen.getByTestId("global-search-preview-match-kind");
-    expect(meta.getAttribute("aria-label") ?? "").not.toMatch(/rank|score/i);
+    expect(meta).not.toHaveAttribute("aria-label");
     expect(meta).toHaveAttribute("data-match-kind", "prefix");
     expect(meta).toHaveAttribute("data-rank", "1");
     expect(meta).toHaveAttribute("data-score", "0.42");
@@ -102,7 +103,7 @@ describe("global search hides debug tags", () => {
     expect(text).toContain("North Tent");
 
     const meta = screen.getByTestId("global-search-item-meta-tent-tent-1");
-    expect(meta.getAttribute("aria-label") ?? "").not.toMatch(/rank|score/i);
+    expect(meta).not.toHaveAttribute("aria-label");
     assertNoDebugAria(item);
     expect(meta).toHaveAttribute("data-match-kind", "prefix");
     expect(meta).toHaveAttribute("data-rank", "1");

@@ -61,7 +61,7 @@ describe("PR A · guide bottom CTA to public demo", () => {
     expect(cta.textContent).toMatch(/grower-approved action queue/i);
     const link = getByTestId("guide-demo-cta-link") as HTMLAnchorElement;
     // Public route only. Never a protected app route.
-    expect(link.getAttribute("href")).toBe("/welcome");
+    expect(link.getAttribute("href")).toBe("/");
     for (const protectedPath of ["/dashboard", "/diary", "/plants", "/tents", "/actions"]) {
       expect(link.getAttribute("href")).not.toContain(protectedPath);
     }

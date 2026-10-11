@@ -66,7 +66,7 @@ export default function BlueprintTargetsGuide() {
       className="min-h-screen bg-background text-foreground"
     >
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
-        <Link to="/welcome" aria-label="Verdant Grow Diary home">
+        <Link to="/" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
         <nav className="flex items-center gap-4 text-sm">
@@ -137,7 +137,10 @@ export default function BlueprintTargetsGuide() {
           })}
         </section>
 
-        <section className="mt-14 rounded-lg border border-border/60 p-6" data-testid="blueprint-targets-cta">
+        <section
+          className="mt-14 rounded-lg border border-border/60 p-6"
+          data-testid="blueprint-targets-cta"
+        >
           <h2 className="font-display text-xl font-semibold tracking-tight">
             Log your grow against these targets
           </h2>
@@ -164,9 +167,7 @@ export default function BlueprintTargetsGuide() {
         </section>
 
         <section className="mt-14">
-          <h2 className="font-display text-2xl font-semibold tracking-tight">
-            Common questions
-          </h2>
+          <h2 className="font-display text-2xl font-semibold tracking-tight">Common questions</h2>
           <dl className="mt-6 space-y-6">
             {VERDANT_BLUEPRINT_TARGETS_FAQ.map((item) => (
               <div key={item.question}>

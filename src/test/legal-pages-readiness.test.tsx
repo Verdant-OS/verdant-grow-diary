@@ -234,8 +234,8 @@ describe("sitemap + robots discoverability", () => {
     expect(SITEMAP).toContain("<loc>https://verdantgrowdiary.com/refund</loc>");
   });
 
-  it("sitemap keeps /welcome and /pricing discoverable", () => {
-    expect(SITEMAP).toContain("<loc>https://verdantgrowdiary.com/welcome</loc>");
+  it("sitemap keeps /pricing discoverable and omits the retired /welcome alias", () => {
+    expect(SITEMAP).not.toContain("<loc>https://verdantgrowdiary.com/welcome</loc>");
     expect(SITEMAP).toContain("<loc>https://verdantgrowdiary.com/pricing</loc>");
   });
 

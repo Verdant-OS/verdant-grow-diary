@@ -175,8 +175,9 @@ describe("route alias scope preservation", () => {
 
 describe("stateful alias wiring", () => {
   it.each([
-    { path: "/features", to: "/welcome" },
-    { path: "/demo", to: "/welcome" },
+    { path: "/welcome", to: "/" },
+    { path: "/features", to: "/" },
+    { path: "/demo", to: "/" },
     { path: "/ai-doctor", to: "/doctor" },
     { path: "/strains", to: "/cultivars" },
     { path: "/refunds", to: "/refund" },

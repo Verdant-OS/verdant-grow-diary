@@ -117,7 +117,7 @@ export default function GrowHelpToolkit() {
       className="min-h-screen min-w-0 bg-background text-foreground"
     >
       <header className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-5 sm:px-6">
-        <Link to="/welcome" aria-label="Verdant Grow Diary home">
+        <Link to="/" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
         <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-muted-foreground">

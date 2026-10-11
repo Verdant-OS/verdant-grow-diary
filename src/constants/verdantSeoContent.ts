@@ -2084,7 +2084,7 @@ export const VERDANT_GUIDES_BREADCRUMB_ITEMS: ReadonlyArray<{
   name: string;
   url: string;
 }> = [
-  { name: "Home", url: `${VERDANT_SITE_ORIGIN}/welcome` },
+  { name: "Home", url: `${VERDANT_SITE_ORIGIN}/` },
   { name: "Grower Guides", url: `${VERDANT_SITE_ORIGIN}/guides` },
 ];
 

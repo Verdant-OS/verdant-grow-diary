@@ -95,7 +95,7 @@ export default function HowAiDoctorWorks() {
       className="min-h-screen bg-background text-foreground"
     >
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
-        <Link to="/welcome" aria-label="Verdant Grow Diary home">
+        <Link to="/" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
         <nav className="flex items-center gap-4 text-sm">
@@ -219,7 +219,7 @@ export default function HowAiDoctorWorks() {
                 Read the grower guides
               </Button>
             </Link>
-            <Link to="/welcome">
+            <Link to="/">
               <Button variant="outline" size="sm">
                 See how Verdant works
               </Button>

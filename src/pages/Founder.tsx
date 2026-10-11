@@ -95,7 +95,7 @@ export default function Founder() {
     breadcrumbScript.text = safeJsonLdStringify(
       buildBreadcrumbListJsonLd({
         items: [
-          { name: "Verdant", url: "https://verdantgrowdiary.com/welcome" },
+          { name: "Verdant", url: "https://verdantgrowdiary.com/" },
           { name: "Founder Lifetime", url: FOUNDER_LAUNCH_URL },
         ],
       }),
@@ -111,7 +111,7 @@ export default function Founder() {
   return (
     <main data-testid="founder-page" className="min-h-screen bg-background text-foreground">
       <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-3 px-6 py-5">
-        <Link to="/welcome" aria-label="Verdant Grow Diary home">
+        <Link to="/" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
         <nav

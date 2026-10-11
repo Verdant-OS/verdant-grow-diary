@@ -336,10 +336,10 @@ BEGIN
    WHERE id = v_entry;
   PERFORM set_config('role', 'authenticated', true);
   v_result := public.badge_awards_evaluate_owner('first_diary_entry');
-  ASSERT v_result->>'status' = 'unchanged', format('a placeholder note must keep the one award, got %s', v_result);
+  ASSERT v_result->>'status' = 'unchanged', format('the stock Quick Log note must keep the one award, got %s', v_result);
   RESET role;
   SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner AND badge_key = 'first_diary_entry';
-  ASSERT v_count = 1, 'a placeholder note must not create a second award';
+  ASSERT v_count = 1, 'the stock Quick Log note must not create a second award';
 
   PERFORM set_config('role', 'service_role', true);
   v_count := public.badge_awards_reconcile();

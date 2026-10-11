@@ -8,8 +8,11 @@ Status: inventory only. No SQL, deploy, publish, secret or production query was 
 produce this. Applied/published state comes **only** from `docs/agents/CURRENT_STATE.md`
 at the deploy tip. This inventory was built at `cf929cf7baf0011045430e3a38b28b09632847c6`; the tip
 is now `5ea8f1f74209c3576afea0317a471370222fbae3`, and `cf929cf7..5ea8f1f7` touches neither
-`supabase/` nor `CURRENT_STATE.md`, so nothing below changes. Anything that file doesn't record
-is `NOT_MEASURED`. Applying migrations and publishing edge functions remain Matthew's
+`supabase/` nor `CURRENT_STATE.md`, so nothing below changes. The later amendment (#1704's
+`20260925090000` and the parked #1460/#1545 versions) re-read `supabase/migrations/`,
+`CURRENT_STATE.md` and `CURRENT_STATE_ARCHIVE.md` at tip
+`a980489ad5188e36eba89461117c2b60fc10f927`. Anything those files don't record is
+`NOT_MEASURED`. Applying migrations and publishing edge functions remain Matthew's
 decisions under the existing locks (production database knk, HOLD #1250).
 
 Handoff item 3. Owner: Grok. Reviewer seat: Critical Mass.
@@ -88,14 +91,117 @@ server changes that are also not recorded as shipped, and they interact with thi
 - **#1683 also reaches `auth-email-hook` and `operator-ggs-real-payload-commit`.** Those
   changes ship whenever those functions are next deployed, even though neither is part of the
   #1658/#1869 redeploy set. Their publish state is **NOT_MEASURED**.
-- **`20260924120000` sorts ahead of every migration in the table below.** If it is not yet
-  applied, a version-ordered apply runs it first.
+- **`20260924120000` sorts ahead of every migration in the table below**, but it is not the
+  earliest version that may be pending. If it is not yet applied, a version-ordered apply
+  runs it after any earlier pending version (including the parked `20260916111000` and
+  `20260917183000`, next section) and before `20260925090000` (#1704) and the table below.
+
+### Parked earlier migrations: `20260916111000` (#1460) and `20260917183000` (#1545)
+
+`CURRENT_STATE_ARCHIVE.md` (section "Two committed migrations sit inside the lag window")
+records `20260916111000_quicklog_revision_idempotent_replay.sql` (#1460, `c8194a3d`) and
+`20260917183000_manual_sensor_correction_operations.sql` (#1545, `c00b2e29`) as "committed,
+not applied", with production applied-migration state `NOT_MEASURED`. The live
+`CURRENT_STATE.md` locks list still says "No Publish. No APPLY. `#1460` and `#1545` stay
+parked." Both versions sort **before** `20260924120000`, `20260925090000` and every
+migration in this doc. So if either is still pending in production, a version-ordered apply
+(`supabase db push`) runs it **first** and applies a parked migration nobody approved.
+
+**Before any version-ordered apply, the owner checks whether `20260916111000` and
+`20260917183000` are recorded in production** (same check as below:
+`supabase_migrations.schema_migrations` or the Remote column of `supabase migration list`).
+If either is pending, a version-ordered apply must not run until Matthew decides how to
+handle the park: lift it and apply in order, or keep it parked and use an apply path that
+doesn't run them. Record the decision in the release receipt. Doc note only: this amendment
+didn't read production.
+
+### Also not recorded as shipped: `20260925090000` (#1704, merged 2026-09-25)
+
+#1704 merged before both the window and the edge-of-window rows, so the 8-row inventory
+query doesn't return it. Nothing above mentioned it until this amendment.
+
+| PR    | Merged (UTC)     | Merge SHA                                  | Kind      | Files under `supabase/`                                             |
+| ----- | ---------------- | ------------------------------------------ | --------- | ------------------------------------------------------------------- |
+| #1704 | 2026-09-25 20:30 | `0f7b12dbf7a935bf6440beb77077e66a468d6b39` | Migration | `A migrations/20260925090000_user_roles_client_grant_hardening.sql` |
+
+**What the file does** (from its header and body, not inferred):
+
+- Changes privileges on one table, `public.user_roles`, and nothing else. It runs
+  `REVOKE ALL PRIVILEGES ON TABLE public.user_roles FROM PUBLIC, anon, authenticated` and
+  then `GRANT SELECT ON TABLE public.user_roles TO authenticated`.
+- End state: `PUBLIC` and `anon` hold **no** privilege on `user_roles`, not even `SELECT`.
+  `authenticated` holds `SELECT` only, and the existing "Users view own roles" policy still
+  decides which rows it sees. The header records that, measured read-only on 2026-09-25,
+  both browser roles held every table privilege (Supabase's default grants on new public
+  tables).
+- Every other grantee (`postgres`, `service_role`, platform roles) keeps its exact table
+  and column privileges. Rows, policies, `has_role()`, triggers and ownership are untouched.
+  The postcondition compares a hash of all non-browser grants and policies before and after,
+  and aborts if they differ.
+- Runs in one transaction (`BEGIN`/`COMMIT`) with `lock_timeout = '5s'`,
+  `statement_timeout = '30s'` and a transaction-scoped advisory lock (`20260925, 90000`).
+  It fails closed with SQLSTATE `55000`, changing nothing, if a prerequisite differs: the
+  table is missing or isn't a plain table (`relkind = 'r'`), RLS is off, the owner isn't
+  `postgres`, the migration role isn't a member of the owner role
+  (`pg_has_role(current_user, owner, 'MEMBER')`), one of the four expected roles
+  (`postgres`, `anon`, `authenticated`, `service_role`) is missing, or `anon`/`authenticated`
+  has superuser, BYPASSRLS, CREATEROLE or CREATEDB. It
+  also fails closed if a browser role would still hold a privilege afterwards, for example
+  through membership in another role. Re-running it is a no-op.
+- Client effect: a signed-in browser session can still read its roles, but no browser
+  session can insert, update or delete `user_roles` rows. The header says that is intended,
+  because roles come from the SECURITY DEFINER staff-grant trigger, `service_role` scripts
+  and operators with database access. At the current deploy tip the only browser write
+  path, `assignRole()` (`src/lib/db.ts`), is called only from `assignRoleAsOperator()`
+  (`src/lib/permissions.ts`), which has no non-test caller. The client reads
+  (`fetchUserRoles()`, `useMyEntitlements`) are `SELECT`s as `authenticated`, which stays
+  granted.
+- No other migration from `20260924120000` onward references `user_roles`, and this file
+  doesn't depend on any of them.
+
+**Applied state:** `CURRENT_STATE.md` has no entry for #1704 or `20260925090000`, so its
+applied state is **NOT_MEASURED**.
+
+**Before any version-ordered apply, the owner checks whether `20260925090000` is
+recorded in production** (for example, a row with that version in
+`supabase_migrations.schema_migrations`, or the Remote column of `supabase migration list`).
+Doc note only: this amendment didn't read production, and the knk lock and migration hold
+still stand.
+
+- **Recorded:** confirm whether the migration executed or was only marked applied.
+  Preserve any deliberate skip and its reason in the owner's release receipt. A
+  migration-history row alone does not prove the grants changed; treat grant hardening
+  as **NOT_MEASURED** until execution or the intended effective grants are confirmed.
+- **Pending:** a version-ordered apply runs it after any earlier pending version (including
+  #1460's `20260916111000` and #1545's `20260917183000` if still pending, which need the
+  owner's call above), then #1703's `20260924120000` if pending, and before
+  `20260927002000` (row 1 below) and every later version. If any later version
+  is already recorded in production, it is an out-of-order pending version like
+  `20260927012000` (step 3 below): `supabase db push` refuses it unless `--include-all` is
+  used. Before applying:
+  1. Review its effect on client grants (above). After it, `anon` can't read `user_roles` at
+     all and no browser session can write it. Confirm nothing in production depends on
+     either.
+  2. The owner decides: apply it in version order, or record a deliberate skip. A skip
+     means the broad browser grants stay in place, and `20260925090000` stays a pending
+     local version until it is applied or marked with
+     `supabase migration repair --status applied 20260925090000`. Marking it applied
+     without running it leaves the grants unchanged. Doc note only: nobody runs that
+     without the owner's decision.
+  3. Record the decision (applied in order, or skipped and why) in the release receipt.
+
+**Cross-doc gap.** #1895's `docs/release/go-live-checklist-after-402.md` (open at
+`c380a439`) restates #1894's order without `20260925090000` or the parked
+`20260916111000`/`20260917183000`, and says `20260924120000` "runs first". Whichever of
+#1895 and this amendment merges second adds them there.
 
 ## Migrations in dependency order
 
-Supabase applies by version (timestamp), not by merge order. The table is in **version
-order only**, not merge order: #1834 (row 2) merged after #1741 (row 3) and after all three
-#1831 files. In version order they are:
+Supabase applies by version (timestamp), not by merge order. Any pending earlier version
+sorts ahead of row 1: the parked `20260916111000` (#1460) and `20260917183000` (#1545), then
+`20260924120000` (#1703) and `20260925090000` (#1704); see the sections above.
+The table is in **version order only**, not merge order: #1834 (row 2) merged after #1741
+(row 3) and after all three #1831 files. In version order they are:
 
 | #   | Version        | File                                       | PR    | Recorded prerequisite (from the file)                                                                                                |
 | --- | -------------- | ------------------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------ |

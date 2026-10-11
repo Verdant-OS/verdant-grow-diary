@@ -1,5 +1,6 @@
 /**
- * Timeline chip counts — diary rows only, photos from the original reference.
+ * Timeline chip counts — diary event chips, sensor receipts on Measurements,
+ * photos from the original reference.
  *
  * Synthetic sensor receipts stay in the visible list. They are not diary
  * rows, so they do not move All, Photos, Notes, or the other event chips.

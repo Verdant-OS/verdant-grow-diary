@@ -217,6 +217,11 @@ function pgTapExemptions(): Record<string, { class: string; reason: string }> {
     reason:
       "Local-only owner-badge pgTAP. irrigation-pgtap-rls-gate.yml executes create_feeding_event.sql and create_watering_event.sql only. Matthew Cheek, 2026-10-10 5:34 PM CT, required the CI wiring for this file be proposed separately and not built in this slice. Local psql and supabase test db both PASS against loopback.",
   };
+  out["supabase/tests/badge_awards_tent_setup_harvest.sql"] = {
+    class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
+    reason:
+      "Local-only tent/setup/harvest badge pgTAP. irrigation-pgtap-rls-gate.yml executes create_feeding_event.sql and create_watering_event.sql only. No CI shard runs this file. Wiring it is a separate proposal, same fence as badge_awards_permissions.sql.",
+  };
   return out;
 }
 
@@ -320,7 +325,7 @@ describe("test execution manifest — every committed test runs, or says why not
       byClass[entry.class] = (byClass[entry.class] ?? 0) + 1;
     }
     expect(byClass).toEqual({
-      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 22,
+      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 23,
       [EXEMPTION_CLASS.NOT_HERMETIC]: 8,
       [EXEMPTION_CLASS.RED_WHEN_RUN]: 2,
       [EXEMPTION_CLASS.AWAITING_DECISION]: 2,

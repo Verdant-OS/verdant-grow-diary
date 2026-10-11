@@ -15,7 +15,13 @@ DECLARE
   v_name_only uuid := gen_random_uuid();
   v_harvest uuid := gen_random_uuid();
   v_bare_harvest uuid := gen_random_uuid();
+  v_both uuid := gen_random_uuid();
+  v_both_grow uuid := gen_random_uuid();
+  v_both_tent uuid := gen_random_uuid();
+  v_stolen uuid := gen_random_uuid();
+  v_stolen_tent uuid := gen_random_uuid();
   v_photo text;
+  v_both_photo text;
   v_stranger_photo text;
   v_result jsonb;
   v_count int;
@@ -43,17 +49,23 @@ BEGIN
     raw_app_meta_data, raw_user_meta_data, aud, role
   ) VALUES
     (v_owner, 'badge-tent-' || v_owner::text || '@verdant.test', crypt('harness-password', gen_salt('bf')), now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'),
-    (v_stranger, 'badge-tent-stranger-' || v_stranger::text || '@verdant.test', crypt('harness-password', gen_salt('bf')), now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated');
+    (v_stranger, 'badge-tent-stranger-' || v_stranger::text || '@verdant.test', crypt('harness-password', gen_salt('bf')), now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'),
+    (v_both, 'badge-tent-both-' || v_both::text || '@verdant.test', crypt('harness-password', gen_salt('bf')), now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'),
+    (v_stolen, 'badge-tent-stolen-' || v_stolen::text || '@verdant.test', crypt('harness-password', gen_salt('bf')), now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated');
 
   INSERT INTO public.grows (id, user_id, name)
-  VALUES (v_grow, v_owner, 'badge tent harness');
+  VALUES
+    (v_grow, v_owner, 'badge tent harness'),
+    (v_both_grow, v_both, 'both badges grow');
 
   v_photo := v_owner::text || '/tents/owned.jpg';
   v_stranger_photo := v_stranger::text || '/tents/other.jpg';
+  v_both_photo := v_both::text || '/tents/both.jpg';
   INSERT INTO storage.objects (bucket_id, name)
   VALUES
     ('diary-photos', v_photo),
-    ('diary-photos', v_stranger_photo);
+    ('diary-photos', v_stranger_photo),
+    ('diary-photos', v_both_photo);
 
   INSERT INTO public.tents (id, user_id, grow_id, name, stage, light_on, created_at)
   VALUES (
@@ -150,6 +162,53 @@ BEGIN
   FROM public.badge_awards
   WHERE user_id = v_owner AND badge_key = 'first_recorded_harvest';
   ASSERT v_count = 1, 'harvest badge is once per account';
+  ASSERT (
+    SELECT yield_grams FROM public.harvests WHERE id = v_harvest
+  ) = 12.5, 'the later harvest yield stays unread';
+  ASSERT position(
+    'yield_grams' in pg_get_functiondef('public.badge_awards_evaluate_photo_subject(text,uuid)'::regprocedure)
+  ) = 0, 'the photo-subject evaluator must not mention yield';
+
+  RESET role;
+  -- One save: a single tent row with an owned photo and a brand earns both tent badges.
+  INSERT INTO public.tents (
+    id, user_id, grow_id, name, stage, light_on, brand, photo_url, created_at
+  ) VALUES (
+    v_both_tent, v_both, v_both_grow, 'Both badges', 'flower', true, 'Gorilla',
+    'storage://diary-photos/' || v_both_photo, '2026-10-06T00:00:00Z'
+  );
+  PERFORM set_config('request.jwt.claim.sub', v_both::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_both)::text, true);
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_tent');
+  ASSERT v_result->>'status' = 'qualified', 'one saved tent photo earns First Tent';
+  v_result := public.badge_awards_evaluate_owner('setup_documented');
+  ASSERT v_result->>'status' = 'qualified', 'the same saved tent earns Setup Documented';
+  v_result := public.badge_awards_evaluate_owner('first_tent');
+  ASSERT v_result->>'status' = 'unchanged', 'First Tent from that save is once only';
+  SELECT count(*) INTO v_count
+  FROM public.badge_awards
+  WHERE user_id = v_both
+    AND badge_key IN ('first_tent', 'setup_documented');
+  ASSERT v_count = 2, 'one save earns both tent badges once';
+
+  RESET role;
+  -- Another user's photo, with no owned photo, earns nothing and writes nothing.
+  INSERT INTO public.tents (
+    id, user_id, grow_id, name, stage, light_on, photo_url, created_at
+  ) VALUES (
+    v_stolen_tent, v_stolen, v_both_grow, 'Stolen photo', 'veg', true,
+    'storage://diary-photos/' || v_both_photo, '2026-10-07T00:00:00Z'
+  );
+  PERFORM set_config('request.jwt.claim.sub', v_stolen::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_stolen)::text, true);
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_tent');
+  ASSERT v_result->>'status' = 'unchanged', 'another user photo earns nothing';
+  v_result := public.badge_awards_evaluate_owner('setup_documented');
+  ASSERT v_result->>'status' = 'unchanged', 'another user photo does not document a setup';
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_stolen;
+  ASSERT v_count = 0, 'another user photo writes no award';
 
   RESET role;
   PERFORM set_config('role', 'service_role', true);

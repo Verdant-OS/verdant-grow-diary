@@ -75,6 +75,15 @@ export interface GuidedChecklistSensorReading {
   quality?: string | null;
 }
 
+/** One non-deleted watering or feeding row from grow_events. */
+export interface GuidedChecklistGrowEvent {
+  id: string;
+  eventType: string;
+  plantId: string | null;
+  tentId: string | null;
+  occurredAt: string | null;
+}
+
 export interface BuildGuidedActionChecklistInput {
   now: number;
   scopedGrowId: string;
@@ -82,6 +91,12 @@ export interface BuildGuidedActionChecklistInput {
   tents: readonly GuidedChecklistTent[];
   /** Diary entries already scoped to the active grow. */
   diaryEntries: readonly NormalizedDiaryEntry[];
+  /**
+   * Non-deleted watering/feeding grow_events for this grow. Optional so
+   * callers that have not loaded them keep the diary-only cadence.
+   * A failed read must be omitted (not invented as a recent feeding).
+   */
+  growEvents?: readonly GuidedChecklistGrowEvent[];
   /** Latest sensor reading per tent id. Missing key = no reading. */
   latestReadingByTent: Readonly<Record<string, GuidedChecklistSensorReading | null | undefined>>;
   openAlerts: readonly GuidedChecklistAlert[];
@@ -132,9 +147,77 @@ function latestEntryTimestamp(
   return latest;
 }
 
-function isWateringEntry(e: NormalizedDiaryEntry): boolean {
-  const t = e.eventType.toLowerCase();
+function isFeedingType(eventType: string): boolean {
+  const t = eventType.toLowerCase();
   return t === "watering" || t === "feeding" || t === "water" || t === "feed";
+}
+
+function isWateringEntry(e: NormalizedDiaryEntry): boolean {
+  if (isFeedingType(e.eventType)) return true;
+  const declared = e.details.declaredEventType;
+  return typeof declared === "string" && isFeedingType(declared);
+}
+
+function blankToNull(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+/** Plant match, or a tent-scoped row (no plant) for this plant's tent. */
+function feedingMatchesPlant(
+  plant: GuidedChecklistPlant,
+  plantId: string | null,
+  tentId: string | null,
+): boolean {
+  const scopedPlantId = blankToNull(plantId);
+  if (scopedPlantId) return scopedPlantId === plant.id;
+  const plantTentId = blankToNull(plant.tentId);
+  const rowTentId = blankToNull(tentId);
+  return plantTentId != null && rowTentId === plantTentId;
+}
+
+function linkedGrowEventId(entry: NormalizedDiaryEntry): string | null {
+  const raw = entry.details.extras?.linked_grow_event_id;
+  return typeof raw === "string" ? blankToNull(raw) : null;
+}
+
+function considerTimestamp(latest: number | null, next: number | null): number | null {
+  if (next == null) return latest;
+  if (latest == null || next > latest) return next;
+  return latest;
+}
+
+/**
+ * Latest feeding/watering for one plant. Plant-scoped diary rows count, and
+ * so do tent-scoped diary rows (no plant, same tent). Matching grow_events
+ * count the same way. A diary companion and its grow_event are one log.
+ */
+function latestFeedingTimestamp(
+  plant: GuidedChecklistPlant,
+  diaryEntries: readonly NormalizedDiaryEntry[],
+  growEvents: readonly GuidedChecklistGrowEvent[],
+): number | null {
+  const linkedIds = new Set<string>();
+  let latest: number | null = null;
+  for (const entry of diaryEntries) {
+    if (!isWateringEntry(entry)) continue;
+    if (!feedingMatchesPlant(plant, entry.plantId, entry.tentId)) continue;
+    const linkedId = linkedGrowEventId(entry);
+    if (linkedId) linkedIds.add(linkedId);
+    const linkedEvent = linkedId
+      ? growEvents.find((event) => event.id === linkedId && isFeedingType(event.eventType))
+      : undefined;
+    latest = considerTimestamp(latest, parseIso(entry.createdAt));
+    if (linkedEvent) latest = considerTimestamp(latest, parseIso(linkedEvent.occurredAt));
+  }
+  for (const event of growEvents) {
+    if (!isFeedingType(event.eventType)) continue;
+    if (linkedIds.has(event.id)) continue;
+    if (!feedingMatchesPlant(plant, event.plantId, event.tentId)) continue;
+    latest = considerTimestamp(latest, parseIso(event.occurredAt));
+  }
+  return latest;
 }
 
 function isPhotoEntry(e: NormalizedDiaryEntry): boolean {
@@ -312,7 +395,7 @@ export function buildGuidedActionChecklist(
   for (const plant of plants) {
     const plantEntries = diaryEntries.filter((e) => e.plantId === plant.id);
 
-    const lastWatering = latestEntryTimestamp(plantEntries, isWateringEntry);
+    const lastWatering = latestFeedingTimestamp(plant, diaryEntries, input.growEvents ?? []);
     if (lastWatering == null || now - lastWatering >= WATERING_CADENCE_MS) {
       const age = lastWatering == null ? "no log yet" : formatAge(now - lastWatering);
       items.push({

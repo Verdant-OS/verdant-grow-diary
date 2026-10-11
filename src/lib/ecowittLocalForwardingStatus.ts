@@ -159,10 +159,13 @@ export function sanitizeReportValue<T = unknown>(value: T): T {
     const src = value as Record<string, unknown>;
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(src)) {
+      // Keys are untrusted too (issue #1003): a credential-shaped key is
+      // rewritten, so neither the key nor its value can echo it.
+      const safeKey = sanitizeReportText(k);
       if (FORBIDDEN_KEYS.has(k.toLowerCase())) {
-        out[k] = REDACTED;
+        out[safeKey] = REDACTED;
       } else {
-        out[k] = sanitizeReportValue(v);
+        out[safeKey] = sanitizeReportValue(v);
       }
     }
     return out as unknown as T;

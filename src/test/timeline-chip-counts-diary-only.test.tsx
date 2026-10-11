@@ -333,10 +333,39 @@ describe("Timeline chip counts stay on diary rows", () => {
     expect(chipCount("All")).toBe(100);
     expect(chipCount("Notes")).toBe(100);
     expect(chipCount("Photos")).toBe(0);
-    expect(chipCount("Measurements")).toBe(0);
+    expect(chipCount("Measurements")).toBe(3);
+    expect(chipCount("Follow-ups")).toBe(0);
+    expect(chipCount("Action responses")).toBe(0);
     expect(chipCount("All stages")).toBe(100);
     expect(screen.getByTestId("timeline-results-count").textContent).toMatch(
       /showing 100 of 140 entries/,
+    );
+  }, 20_000);
+
+  it("counts three sensor receipts on Measurements while All stays at four diary rows", async () => {
+    const diaryRows = diaryPage(4);
+    const readings = receiptReadings(3);
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 4 };
+      if (spec.table === "tents") return { data: [{ id: TENT_ID }], error: null };
+      if (spec.table === "sensor_readings_effective") return { data: readings, error: null };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Diary row 0")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByText(/^Manual sensor snapshot:/)).toHaveLength(3);
+    });
+
+    expect(chipCount("All")).toBe(4);
+    expect(chipCount("Notes")).toBe(4);
+    expect(chipCount("Photos")).toBe(0);
+    expect(chipCount("Measurements")).toBe(3);
+    expect(chipCount("All stages")).toBe(4);
+    expect(screen.getByTestId("timeline-results-count").textContent).toMatch(
+      /showing 4 of 4 entries/,
     );
   }, 20_000);
 

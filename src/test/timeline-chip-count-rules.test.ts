@@ -4,6 +4,7 @@ import {
   EMPTY_TIMELINE_DIARY_PHOTO_IDS,
   timelineDiaryRowsForChipCounts,
   timelineEntryCountsAsPhoto,
+  timelineMeasurementChipCount,
   unionTimelineDiaryPhotoIds,
 } from "@/lib/timelineChipCountRules";
 
@@ -28,6 +29,20 @@ describe("timeline chip count rules", () => {
     );
 
     expect([...ids].sort()).toEqual(["ext", "nested", "stored"]);
+  });
+
+  it("adds synthetic receipts to diary measurement rows and leaves other rows out", () => {
+    const rows = [
+      { id: "diary-measure" },
+      { id: "diary-note" },
+      { id: "sensor-reading:tent:2026-07-20T08:00:00.000Z" },
+      { id: "sensor-reading:tent:2026-07-20T07:55:00.000Z" },
+      { id: "sensor-reading:tent:2026-07-20T07:50:00.000Z" },
+    ];
+    expect(timelineMeasurementChipCount(1, rows)).toBe(4);
+    expect(timelineMeasurementChipCount(0, rows)).toBe(3);
+    expect(timelineMeasurementChipCount(Number.NaN, null)).toBe(0);
+    expect(timelineMeasurementChipCount(-2, undefined)).toBe(0);
   });
 
   it("drops sensor receipts from the diary chip set", () => {

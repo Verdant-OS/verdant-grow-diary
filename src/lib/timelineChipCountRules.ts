@@ -3,6 +3,8 @@
  *
  * Synthetic sensor receipts stay in the visible list. They are not diary
  * rows, so they do not move All, Photos, Notes, or the other event chips.
+ * Measurements is the exception: it counts diary measurement rows and
+ * those receipts together.
  * A storage photo counts as soon as the saved reference is known, including
  * while its signed URL is still outstanding.
  *
@@ -22,6 +24,26 @@ export interface TimelinePhotoIdentityRow {
 /** Diary rows that event and stage chips may count. Receipts are excluded. */
 export function timelineDiaryRowsForChipCounts<T extends { id: string }>(rows: readonly T[]): T[] {
   return rows.filter((row) => !isTimelineSensorDerivedDiaryId(row.id));
+}
+
+/**
+ * Measurements chip: diary measurement rows, plus each visible synthetic
+ * sensor receipt. Other chips do not use this total.
+ */
+export function timelineMeasurementChipCount(
+  diaryMeasurementCount: number,
+  rows: readonly { id?: string | null }[] | null | undefined,
+): number {
+  const diaryCount =
+    typeof diaryMeasurementCount === "number" && Number.isFinite(diaryMeasurementCount)
+      ? Math.max(0, Math.trunc(diaryMeasurementCount))
+      : 0;
+  if (!rows) return diaryCount;
+  let receipts = 0;
+  for (const row of rows) {
+    if (isTimelineSensorDerivedDiaryId(row?.id)) receipts += 1;
+  }
+  return diaryCount + receipts;
 }
 
 /**

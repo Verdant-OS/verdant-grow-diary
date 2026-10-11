@@ -129,6 +129,7 @@ import {
   EMPTY_TIMELINE_DIARY_PHOTO_IDS,
   timelineDiaryRowsForChipCounts,
   timelineEntryCountsAsPhoto,
+  timelineMeasurementChipCount,
   unionTimelineDiaryPhotoIds,
 } from "@/lib/timelineChipCountRules";
 import {
@@ -1139,8 +1140,10 @@ export default function Timeline() {
     [entries, manualSensorMeasurementEntries],
   );
 
-  // Receipts stay visible. Chips count diary rows only, and a storage photo
-  // counts from its original reference so signing cannot move Photos.
+  // Receipts stay visible. All, Photos, Notes, and the other event chips
+  // count diary rows only. Measurements adds those receipts to the diary
+  // measurement rows. A storage photo counts from its original reference
+  // so signing cannot move Photos.
   const diaryChipEntries = useMemo(
     () => timelineDiaryRowsForChipCounts(displayEntries),
     [displayEntries],
@@ -1160,8 +1163,9 @@ export default function Timeline() {
         m[k] = (m[k] || 0) + 1;
       }),
     );
+    m.measurement = timelineMeasurementChipCount(m.measurement, displayEntries);
     return m;
-  }, [diaryChipEntries, diaryPhotoIds]);
+  }, [diaryChipEntries, diaryPhotoIds, displayEntries]);
 
   // Canonical Action Response Memory (read-only). One grower response renders
   // as ONE compact card inside its own evidence row — never an extra event.

@@ -22,6 +22,8 @@ describe("badge award display rules", () => {
       "utf8",
     );
     expect(migration).toContain("btrim(entry.note) <> 'Photo attached from Quick Log.'");
+    expect(migration).toContain("grow.user_id = uid");
+    expect(migration).toContain("object.owner = badge_awards_owned_diary_photo_name.owner_id");
   });
 
   it("describes documentation and not skill, rank, yield, safety, or verified", () => {

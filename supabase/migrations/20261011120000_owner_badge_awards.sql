@@ -125,7 +125,9 @@ REVOKE ALL ON FUNCTION public.badge_awards_freeze_recognition() FROM PUBLIC, ano
 -- Internal photo check. Not granted to client roles.
 -- Qualifies storage://diary-photos/<path> and a scheme-less bare path only
 -- when the first segment is the owner id and storage.objects has that name
--- in the diary-photos bucket. http(s) and any other scheme do not qualify.
+-- in the diary-photos bucket. When owner or owner_id is set, it must be
+-- this account. A null owner is a legacy object and still qualifies.
+-- http(s) and any other scheme do not qualify.
 CREATE OR REPLACE FUNCTION public.badge_awards_owned_diary_photo_name(raw text, owner_id uuid)
 RETURNS text
 LANGUAGE plpgsql
@@ -194,6 +196,15 @@ BEGIN
     FROM storage.objects AS object
     WHERE object.bucket_id = 'diary-photos'
       AND object.name = object_name
+      AND (
+        object.owner IS NULL
+        OR object.owner = badge_awards_owned_diary_photo_name.owner_id
+      )
+      AND (
+        object.owner_id IS NULL
+        OR btrim(object.owner_id) = ''
+        OR object.owner_id = badge_awards_owned_diary_photo_name.owner_id::text
+      )
   ) THEN
     RETURN NULL;
   END IF;
@@ -250,6 +261,9 @@ BEGIN
          )
     INTO entry_id, photo_name
   FROM public.diary_entries AS entry
+  JOIN public.grows AS grow
+    ON grow.id = entry.grow_id
+   AND grow.user_id = uid
   WHERE entry.user_id = uid
     AND entry.retracted_at IS NULL
     AND length(btrim(entry.note)) > 0

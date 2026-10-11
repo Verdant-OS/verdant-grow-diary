@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./auth";
 import type { GrowRow } from "@/lib/db";
 import type { User } from "@supabase/supabase-js";
+import { partitionGrowsByArchive } from "@/lib/archivedGrowQuickLogRules";
 import {
   confirmHierarchyCreateAttemptRow,
   type HierarchyCreateAttempt,
@@ -24,6 +25,8 @@ export type Grow = GrowRow;
 
 interface Ctx {
   grows: Grow[];
+  /** Present after the archived-grow partition. Older harnesses omit it. */
+  archivedGrows?: Grow[];
   activeGrowId: string | null;
   setActiveGrowId: (id: string | null) => void;
   activeGrow: Grow | null;
@@ -69,6 +72,7 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
   const ownerId = user?.id ?? null;
   const storageKey = activeGrowStorageKey(ownerId);
   const [grows, setGrows] = useState<Grow[]>([]);
+  const [archivedGrows, setArchivedGrows] = useState<Grow[]>([]);
   const [activeGrowId, _setActive] = useState<string | null>(() => readActiveGrowId(ownerId));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +94,7 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
       const requestGeneration = ++growReadGenerationRef.current;
       if (!user) {
         setGrows([]);
+        setArchivedGrows([]);
         setLoading(false);
         setError(null);
         return { status: "unavailable" };
@@ -101,7 +106,6 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
         const { data, error: qErr } = await supabase
           .from("grows")
           .select("*")
-          .eq("is_archived", false)
           .order("created_at", { ascending: false });
         if (!canPublish() || requestGeneration !== growReadGenerationRef.current) {
           return { status: "stale" };
@@ -110,14 +114,16 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
         if (qErr) {
           console.error("GrowsProvider.refresh error:", qErr.message);
           setGrows([]);
+          setArchivedGrows([]);
           setError(qErr.message);
           return { status: "unavailable" };
         }
 
-        const rows = (data as Grow[] | null) ?? [];
-        setGrows(rows);
+        const partitioned = partitionGrowsByArchive((data as Grow[] | null) ?? []);
+        setGrows(partitioned.active);
+        setArchivedGrows(partitioned.archived);
         setError(null);
-        return { status: "published", rows };
+        return { status: "published", rows: partitioned.active };
       } catch (caught) {
         if (!canPublish() || requestGeneration !== growReadGenerationRef.current) {
           return { status: "stale" };
@@ -125,6 +131,7 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
         const message = caught instanceof Error ? caught.message : "Unable to load grows";
         console.error("GrowsProvider.refresh error:", message);
         setGrows([]);
+        setArchivedGrows([]);
         setError(message);
         return { status: "unavailable" };
       } finally {
@@ -169,7 +176,16 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
 
   return (
     <GrowsCtx.Provider
-      value={{ grows, activeGrowId, setActiveGrowId, activeGrow, refresh, loading, error }}
+      value={{
+        grows,
+        archivedGrows,
+        activeGrowId,
+        setActiveGrowId,
+        activeGrow,
+        refresh,
+        loading,
+        error,
+      }}
     >
       <HierarchyCreateOutcomeRecoveryCoordinator
         ownerId={ownerId}

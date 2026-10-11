@@ -356,15 +356,43 @@ BEGIN
   );
   PERFORM set_config('role', 'authenticated', true);
   v_result := public.badge_awards_evaluate_owner('first_diary_entry');
-  ASSERT v_result->>'status' = 'unchanged', 'switching evidence must keep the same award';
-  ASSERT (v_result->>'award_id')::uuid = v_award, 'evidence switch must not create a new award';
+  ASSERT v_result->>'status' = 'unchanged', 'an older qualifying entry must keep the same award';
+  ASSERT (v_result->>'award_id')::uuid = v_award, 'keeping evidence must not create a new award';
   RESET role;
   SELECT diary_entry_id INTO v_evidence_entry FROM public.badge_evidence WHERE award_id = v_award;
-  ASSERT v_evidence_entry = v_earlier, 'evidence must follow the earliest qualifying entry';
-  ASSERT (SELECT evidence_changed_at FROM public.badge_awards WHERE id = v_award) IS NOT NULL,
-    'evidence switch must stamp evidence_changed_at';
+  ASSERT v_evidence_entry = v_entry, 'evidence must stay on the current entry while it still qualifies';
+  ASSERT (SELECT evidence_changed_at FROM public.badge_awards WHERE id = v_award) IS NULL,
+    'keeping the same evidence must not stamp evidence_changed_at';
   ASSERT (SELECT first_recognized_at FROM public.badge_awards WHERE id = v_award) = v_recognized,
-    'evidence switch must keep the original recognition time';
+    'keeping evidence must keep the original recognition time';
+
+  INSERT INTO storage.objects (bucket_id, name, owner, owner_id)
+  VALUES ('diary-photos', v_owner::text || '/diary/replacement.jpg', v_owner, v_owner::text);
+  UPDATE public.diary_entries
+     SET photo_url = v_owner::text || '/diary/replacement.jpg'
+   WHERE id = v_entry;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'unchanged', 'a new photo on the current entry must keep the award';
+  RESET role;
+  ASSERT (
+    SELECT diary_entry_id FROM public.badge_evidence WHERE award_id = v_award
+  ) = v_entry, 'a photo change must stay on the current entry';
+  ASSERT (
+    SELECT photo_object_name FROM public.badge_evidence WHERE award_id = v_award
+  ) = v_owner::text || '/diary/replacement.jpg',
+    'a photo change must store the new object name';
+  ASSERT (SELECT evidence_changed_at FROM public.badge_awards WHERE id = v_award) IS NOT NULL,
+    'a photo change must stamp evidence_changed_at';
+
+  UPDATE public.diary_entries SET retracted_at = now() WHERE id = v_entry;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'unchanged', 'falling back to another entry must keep the same award';
+  RESET role;
+  ASSERT (
+    SELECT diary_entry_id FROM public.badge_evidence WHERE award_id = v_award
+  ) = v_earlier, 'evidence must move to the earliest remaining qualifying entry';
 
   UPDATE public.diary_entries SET retracted_at = now() WHERE user_id = v_owner;
   PERFORM set_config('role', 'authenticated', true);

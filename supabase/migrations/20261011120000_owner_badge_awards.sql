@@ -230,6 +230,10 @@ DECLARE
   recognized_at timestamptz;
   entry_id uuid;
   photo_name text;
+  earliest_entry_id uuid;
+  earliest_photo text;
+  kept_entry_id uuid;
+  kept_photo text;
   prior_entry_id uuid;
   prior_photo text;
   was_hidden boolean;
@@ -254,12 +258,14 @@ BEGIN
 
   PERFORM pg_advisory_xact_lock(hashtextextended(uid::text || ':first_diary_entry', 0));
 
+  -- Earliest qualifying entry is the fallback. Current evidence stays while
+  -- that diary row still qualifies, including when an older entry appears.
   SELECT entry.id,
          COALESCE(
            public.badge_awards_owned_diary_photo_name(entry.photo_url, uid),
            public.badge_awards_owned_diary_photo_name(entry.details->>'photo_url', uid)
          )
-    INTO entry_id, photo_name
+    INTO earliest_entry_id, earliest_photo
   FROM public.diary_entries AS entry
   JOIN public.grows AS grow
     ON grow.id = entry.grow_id
@@ -274,6 +280,45 @@ BEGIN
     ) IS NOT NULL
   ORDER BY entry.entry_at ASC, entry.id ASC
   LIMIT 1;
+
+  SELECT evidence.diary_entry_id
+    INTO prior_entry_id
+  FROM public.badge_awards AS award
+  JOIN public.badge_evidence AS evidence
+    ON evidence.award_id = award.id
+  WHERE award.user_id = uid
+    AND award.badge_key = 'first_diary_entry'
+    AND award.hidden_at IS NULL;
+
+  IF prior_entry_id IS NOT NULL THEN
+    SELECT entry.id,
+           COALESCE(
+             public.badge_awards_owned_diary_photo_name(entry.photo_url, uid),
+             public.badge_awards_owned_diary_photo_name(entry.details->>'photo_url', uid)
+           )
+      INTO kept_entry_id, kept_photo
+    FROM public.diary_entries AS entry
+    JOIN public.grows AS grow
+      ON grow.id = entry.grow_id
+     AND grow.user_id = uid
+    WHERE entry.id = prior_entry_id
+      AND entry.user_id = uid
+      AND entry.retracted_at IS NULL
+      AND length(btrim(entry.note)) > 0
+      AND btrim(entry.note) <> 'Photo attached from Quick Log.'
+      AND COALESCE(
+        public.badge_awards_owned_diary_photo_name(entry.photo_url, uid),
+        public.badge_awards_owned_diary_photo_name(entry.details->>'photo_url', uid)
+      ) IS NOT NULL;
+  END IF;
+
+  IF kept_entry_id IS NOT NULL THEN
+    entry_id := kept_entry_id;
+    photo_name := kept_photo;
+  ELSE
+    entry_id := earliest_entry_id;
+    photo_name := earliest_photo;
+  END IF;
 
   SELECT award.id, award.hidden_at, award.first_recognized_at
     INTO found_award, award_hidden_at, recognized_at

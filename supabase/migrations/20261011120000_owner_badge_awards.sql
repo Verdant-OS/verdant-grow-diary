@@ -35,12 +35,16 @@
 -- before it reads cron.job. This migration does not enable the job.
 --
 -- Cut 001: any photo attached to the owner's own diary entry earns
--- First Diary Entry. Note text is not a qualification input. The photo
+-- First Diary Entry. Note text is not a qualification input. A photo
+-- added later to that same entry qualifies on the next evaluation,
+-- because the function reads the current photo columns. The photo
 -- must be on that entry, on that owner's path, and present in
 -- storage.objects for this account. A '..' segment, another user's path,
 -- and an inferred link do not qualify. This migration does not publish
--- badges. Public visibility is a later slice. Evidence SELECT stays
--- owner-only, so evidence photos are not granted to other accounts.
+-- badges. Profile display, signed-in member visibility before community
+-- launch, and logged-out refusal are a later slice and are not built
+-- here. Evidence SELECT stays owner-only, so evidence photos are not
+-- granted to other accounts or to anon.
 --
 -- Evidence can name a diary entry, tent, setup, or harvest. Only
 -- first_diary_entry has a qualification rule. The other keys are stored
@@ -340,6 +344,8 @@ BEGIN
 
   -- Earliest qualifying entry is the fallback. Current evidence stays while
   -- that diary row still qualifies, including when an older entry appears.
+  -- A row saved with no photo qualifies here once an owned photo is written
+  -- onto that same row. This SELECT reads the current columns.
   SELECT entry.id,
          COALESCE(
            public.badge_awards_owned_diary_photo_name(entry.photo_url, uid),

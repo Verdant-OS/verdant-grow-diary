@@ -40,6 +40,8 @@ BEGIN
   ASSERT NOT has_table_privilege('authenticated', 'public.badge_awards', 'DELETE');
   ASSERT NOT has_table_privilege('authenticated', 'public.badge_evidence', 'INSERT');
   ASSERT NOT has_table_privilege('anon', 'public.badge_awards', 'SELECT');
+  ASSERT NOT has_table_privilege('anon', 'public.badge_evidence', 'SELECT'),
+    'anon must not read evidence photos';
   ASSERT NOT has_table_privilege('authenticated', 'public.badge_award_runtime', 'SELECT');
   ASSERT NOT has_table_privilege('authenticated', 'public.badge_award_runtime', 'UPDATE');
   ASSERT has_table_privilege('service_role', 'public.badge_award_runtime', 'SELECT');
@@ -302,6 +304,9 @@ BEGIN
   ASSERT v_result->>'status' = 'unchanged', 'missing storage object must not qualify';
   RESET role;
 
+  -- Late attachment. v_entry was evaluated above with no photo and created
+  -- no award. Writing an owned photo onto that same row and evaluating
+  -- again reads the current photo.
   UPDATE public.diary_entries
      SET note = '',
          photo_url = 'https://example.invalid/legacy.jpg',
@@ -309,7 +314,8 @@ BEGIN
    WHERE id = v_entry;
   PERFORM set_config('role', 'authenticated', true);
   v_result := public.badge_awards_evaluate_owner('first_diary_entry');
-  ASSERT v_result->>'status' = 'qualified', format('a photo plus an empty note should qualify, got %s', v_result);
+  ASSERT v_result->>'status' = 'qualified',
+    format('a photo added later to the text-only first entry should qualify, got %s', v_result);
   RESET role;
   ASSERT (SELECT note FROM public.diary_entries WHERE id = v_entry) = '',
     'the earning entry keeps an empty note';
@@ -321,6 +327,9 @@ BEGIN
   ASSERT v_recognized > '2020-01-01T00:00:00Z', 'recognition time must be stamped by the server';
   SELECT count(*) INTO v_count FROM public.badge_evidence WHERE award_id = v_award;
   ASSERT v_count = 1, 'qualifying diary must store one evidence row';
+  ASSERT (
+    SELECT diary_entry_id FROM public.badge_evidence WHERE award_id = v_award
+  ) = v_entry, 'a photo added later to the text-only first diary entry is the evidence';
 
   UPDATE public.diary_entries
      SET note = 'Photo attached from Quick Log.'

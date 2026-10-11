@@ -2,11 +2,13 @@
  * Documentation wording for owner badges.
  *
  * Cut 001: any photo attached to the owner's own diary entry earns First
- * Diary Entry. Note text is not required. These lines do not claim skill,
- * rank, yield, safety, or that a badge was verified. They do not shame a
- * text-only entry. This shelf is the owner view. Public community
- * visibility is a later slice and is not built here. Evidence photos stay
- * private to the owning account.
+ * Diary Entry, including a photo added later to an entry saved without
+ * one. Note text is not required. These lines do not claim skill, rank,
+ * yield, safety, or that a badge was verified. They do not shame a
+ * text-only entry. This shelf is the owner view. A later slice shows
+ * badges on the grower's profile. Before community launch, badges are
+ * for signed-in members only, never logged-out visitors. That visibility
+ * is not built here. Evidence photos stay private to the owning account.
  * Petal must approve this copy before ownerBadgeShelfEnabled is turned on.
  */
 export const BADGE_AWARD_COPY = {

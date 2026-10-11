@@ -32,6 +32,7 @@ describe("badge award display rules", () => {
       "supabase/migrations/20261011120000_owner_badge_awards.sql",
       "utf8",
     );
+    expect(migration).toContain("added later to that same entry qualifies on the next evaluation");
     expect(migration).not.toContain("btrim(entry.note)");
     expect(migration).not.toContain("Photo attached from Quick Log.");
     expect(migration).toContain("grow.user_id = uid");

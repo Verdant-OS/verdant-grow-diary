@@ -74,6 +74,20 @@ BEGIN
     );
   ASSERT badge_triggers = 0, 'badge triggers must not sit on diary, grow, tent, or storage rows';
 
+  ASSERT has_function_privilege('service_role', 'public.badge_awards_reconcile()', 'EXECUTE'),
+    'service_role must be able to run the reconcile sweep';
+  ASSERT NOT has_function_privilege('authenticated', 'public.badge_awards_reconcile()', 'EXECUTE'),
+    'authenticated must not run the reconcile sweep';
+  ASSERT NOT has_function_privilege('anon', 'public.badge_awards_reconcile()', 'EXECUTE'),
+    'anon must not run the reconcile sweep';
+  IF to_regclass('cron.job') IS NOT NULL THEN
+    ASSERT (
+      SELECT job.active
+      FROM cron.job AS job
+      WHERE job.jobname = 'badge-awards-reconcile'
+    ) IS FALSE, 'the reconcile schedule must stay inactive';
+  END IF;
+
   ASSERT (
     SELECT runtime.enabled FROM public.badge_award_runtime AS runtime WHERE runtime.id = 1
   ) IS FALSE, 'kill switch must default to false';
@@ -145,6 +159,13 @@ BEGIN
   ASSERT v_count = 0, 'direct call with the switch off must not insert an award';
   SELECT count(*) INTO v_count FROM public.badge_evidence;
   ASSERT v_count = 0, 'direct call with the switch off must not insert evidence';
+
+  PERFORM set_config('role', 'service_role', true);
+  v_count := public.badge_awards_reconcile();
+  RESET role;
+  ASSERT v_count = 0, 'reconcile must write nothing while the switch is off';
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
+  ASSERT v_count = 0, 'a disabled reconcile must not insert an award';
 
   DELETE FROM public.badge_award_runtime WHERE id = 1;
   PERFORM set_config('role', 'authenticated', true);
@@ -305,6 +326,15 @@ BEGIN
   ASSERT v_recognized > '2020-01-01T00:00:00Z', 'recognition time must be stamped by the server';
   SELECT count(*) INTO v_count FROM public.badge_evidence WHERE award_id = v_award;
   ASSERT v_count = 1, 'qualifying diary must store one evidence row';
+
+  PERFORM set_config('role', 'service_role', true);
+  v_count := public.badge_awards_reconcile();
+  RESET role;
+  PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_owner)::text, true);
+  ASSERT v_count > 0, 'reconcile must visit the owner while the switch is on';
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
+  ASSERT v_count = 1, 'reconcile must not insert a second award';
   ASSERT (
     SELECT photo_object_name FROM public.badge_evidence WHERE award_id = v_award
   ) = v_photo, 'evidence must store the object name, not the external URL';

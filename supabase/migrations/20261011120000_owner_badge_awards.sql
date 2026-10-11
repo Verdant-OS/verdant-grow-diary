@@ -15,6 +15,11 @@
 -- Revocation is admin-only. service_role may set badge_awards.revoked_at.
 -- Authenticated has no UPDATE grant. Re-evaluation leaves a revoked row
 -- unchanged, so a later qualifying diary does not restore it.
+--
+-- badge_awards_reconcile() is the server sweep. It reads the kill switch
+-- first and writes nothing unless that switch is exactly true. EXECUTE is
+-- service_role only. The pg_cron job badge-awards-reconcile is inserted
+-- inactive when pg_cron is installed. This migration does not enable it.
 
 CREATE TABLE public.badge_award_runtime (
   id smallint PRIMARY KEY CHECK (id = 1),
@@ -420,3 +425,75 @@ GRANT EXECUTE ON FUNCTION public.badge_awards_evaluate_owner(text) TO authentica
 
 COMMENT ON FUNCTION public.badge_awards_evaluate_owner(text) IS
   'Awards first_diary_entry for auth.uid() only. Fail closed while badge_award_runtime.enabled is not true. Does not read the UI flag, does not update profiles, and does not call award_nugs.';
+
+-- Server sweep. No trigger on diary_entries, grows, tents, or storage.objects.
+-- Fail closed unless badge_award_runtime.enabled is exactly true.
+CREATE OR REPLACE FUNCTION public.badge_awards_reconcile()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  runtime_enabled boolean;
+  owner uuid;
+  reconciled integer := 0;
+BEGIN
+  SELECT runtime.enabled
+    INTO runtime_enabled
+  FROM public.badge_award_runtime AS runtime
+  WHERE runtime.id = 1;
+
+  IF runtime_enabled IS NOT TRUE THEN
+    RETURN 0;
+  END IF;
+
+  FOR owner IN
+    SELECT entry.user_id
+    FROM public.diary_entries AS entry
+    WHERE entry.user_id IS NOT NULL
+    UNION
+    SELECT award.user_id
+    FROM public.badge_awards AS award
+  LOOP
+    PERFORM set_config('request.jwt.claim.sub', owner::text, true);
+    PERFORM set_config('request.jwt.claims', json_build_object('sub', owner)::text, true);
+    PERFORM public.badge_awards_evaluate_owner('first_diary_entry');
+    reconciled := reconciled + 1;
+  END LOOP;
+
+  RETURN reconciled;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.badge_awards_reconcile()
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.badge_awards_reconcile() TO service_role;
+
+-- Disabled schedule. active is false on insert. Absent pg_cron skips this.
+-- Equivalent command:
+--   SELECT cron.schedule_in_database(
+--     'badge-awards-reconcile',
+--     '15 * * * *',
+--     'SELECT public.badge_awards_reconcile()',
+--     current_database(),
+--     NULL,
+--     false
+--   );
+DO $schedule$
+BEGIN
+  IF to_regprocedure('cron.schedule_in_database(text, text, text, text, text, boolean)') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM cron.job WHERE jobname = 'badge-awards-reconcile'
+     ) THEN
+    PERFORM cron.schedule_in_database(
+      'badge-awards-reconcile',
+      '15 * * * *',
+      'SELECT public.badge_awards_reconcile()',
+      current_database(),
+      NULL,
+      false
+    );
+  END IF;
+END
+$schedule$;

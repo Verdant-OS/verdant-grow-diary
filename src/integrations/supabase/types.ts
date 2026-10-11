@@ -6060,6 +6060,7 @@ export type Database = {
         Args: { owner_id: string; raw: string }
         Returns: string
       }
+      badge_awards_reconcile: { Args: never; Returns: number }
       billing_customer_link_operator_audit: {
         Args: { p_limit?: number }
         Returns: Json

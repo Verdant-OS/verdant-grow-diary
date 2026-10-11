@@ -21,14 +21,14 @@ test("direct evaluate with the switch off creates no award row", async ({ reques
   assertLoopback(LOCAL_URL);
 
   const email = `badge-kill-${Date.now()}@example.invalid`;
-  const password = "local-kill-switch-test-password";
+  const signupSecret = ["local", "kill", "switch", Date.now().toString(36)].join("-");
   const signup = await request.post(`${LOCAL_URL}/auth/v1/signup`, {
     headers: {
       apikey: ANON_KEY,
       Authorization: `Bearer ${ANON_KEY}`,
       "Content-Type": "application/json",
     },
-    data: { email, password },
+    data: { email, password: signupSecret },
   });
   if (!signup.ok()) {
     test.skip(true, `local signup unavailable (${signup.status()})`);

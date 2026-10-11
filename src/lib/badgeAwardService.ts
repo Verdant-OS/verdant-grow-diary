@@ -17,6 +17,7 @@ export interface BadgeAwardEvaluation {
 
 export interface OwnerBadgeAward {
   id: string;
+  userId: string;
   badgeKey: string;
   firstRecognizedAt: string;
   hiddenAt: string | null;
@@ -60,15 +61,24 @@ export async function evaluateOwnerBadgeAward(): Promise<BadgeAwardEvaluation> {
 }
 
 export async function listOwnerBadgeAwards(): Promise<OwnerBadgeAward[]> {
+  const { data: authData, error: authError } = await supabase.auth.getSession();
+  if (authError) {
+    throw authError;
+  }
+  const userId = authData.session?.user?.id;
+  if (!userId) return [];
   const { data, error } = await supabase
     .from("badge_awards")
-    .select("id, badge_key, first_recognized_at, hidden_at, restored_at, revoked_at")
-    .order("first_recognized_at", { ascending: true });
+    .select("id, user_id, badge_key, first_recognized_at, hidden_at, restored_at, revoked_at")
+    .eq("user_id", userId)
+    .order("first_recognized_at", { ascending: true })
+    .order("id", { ascending: true });
   if (error) {
     throw error;
   }
   return (data ?? []).map((row) => ({
     id: row.id,
+    userId: row.user_id,
     badgeKey: row.badge_key,
     firstRecognizedAt: row.first_recognized_at,
     hiddenAt: row.hidden_at,

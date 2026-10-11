@@ -15,6 +15,7 @@ export interface OwnerBadgeAwardView {
   badgeKey: string;
   hiddenAt: string | null;
   revokedAt?: string | null;
+  userId?: string | null;
 }
 
 export function badgeCopyAvoidsRankLanguage(copy: readonly string[]): boolean {
@@ -23,11 +24,13 @@ export function badgeCopyAvoidsRankLanguage(copy: readonly string[]): boolean {
 
 export function selectVisibleOwnerBadgeAwards<T extends OwnerBadgeAwardView>(
   awards: readonly T[],
+  ownerUserId?: string | null,
 ): T[] {
-  return awards.filter(
-    (award) =>
-      award.badgeKey === FIRST_DIARY_ENTRY_BADGE_KEY &&
-      award.hiddenAt === null &&
-      award.revokedAt == null,
-  );
+  return awards.filter((award) => {
+    if (award.badgeKey !== FIRST_DIARY_ENTRY_BADGE_KEY) return false;
+    if (award.hiddenAt !== null) return false;
+    if (award.revokedAt != null) return false;
+    if (ownerUserId) return award.userId === ownerUserId;
+    return true;
+  });
 }

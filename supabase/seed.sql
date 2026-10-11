@@ -230,7 +230,8 @@ BEGIN
      AND to_regclass('public.badge_award_runtime') IS NOT NULL THEN
     REVOKE ALL ON TABLE public.badge_awards
       FROM PUBLIC, anon, authenticated, service_role;
-    GRANT SELECT ON TABLE public.badge_awards TO authenticated;
+    GRANT SELECT ON TABLE public.badge_awards TO authenticated, service_role;
+    GRANT UPDATE (revoked_at) ON TABLE public.badge_awards TO service_role;
 
     REVOKE ALL ON TABLE public.badge_evidence
       FROM PUBLIC, anon, authenticated, service_role;

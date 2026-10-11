@@ -21,6 +21,7 @@ export interface OwnerBadgeAward {
   firstRecognizedAt: string;
   hiddenAt: string | null;
   restoredAt: string | null;
+  revokedAt: string | null;
 }
 
 const EVALUATION_STATUSES = new Set<BadgeAwardEvaluationStatus>([
@@ -61,7 +62,7 @@ export async function evaluateOwnerBadgeAward(): Promise<BadgeAwardEvaluation> {
 export async function listOwnerBadgeAwards(): Promise<OwnerBadgeAward[]> {
   const { data, error } = await supabase
     .from("badge_awards")
-    .select("id, badge_key, first_recognized_at, hidden_at, restored_at")
+    .select("id, badge_key, first_recognized_at, hidden_at, restored_at, revoked_at")
     .order("first_recognized_at", { ascending: true });
   if (error) {
     throw error;
@@ -72,5 +73,6 @@ export async function listOwnerBadgeAwards(): Promise<OwnerBadgeAward[]> {
     firstRecognizedAt: row.first_recognized_at,
     hiddenAt: row.hidden_at,
     restoredAt: row.restored_at,
+    revokedAt: row.revoked_at,
   }));
 }

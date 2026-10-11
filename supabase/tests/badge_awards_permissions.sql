@@ -480,6 +480,45 @@ BEGIN
   ASSERT v_count = 1, 'disabling the switch must not insert another award';
 
   UPDATE public.badge_award_runtime SET enabled = true WHERE id = 1;
+  PERFORM set_config('role', 'authenticated', true);
+  BEGIN
+    UPDATE public.badge_awards
+       SET revoked_at = clock_timestamp()
+     WHERE id = v_award;
+    RAISE EXCEPTION 'authenticated must not set revoked_at';
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL;
+  END;
+  RESET role;
+  ASSERT (SELECT revoked_at FROM public.badge_awards WHERE id = v_award) IS NULL,
+    'a failed client revoke must leave revoked_at null';
+
+  PERFORM set_config('role', 'service_role', true);
+  UPDATE public.badge_awards
+     SET revoked_at = clock_timestamp()
+   WHERE id = v_award;
+  RESET role;
+  ASSERT (SELECT revoked_at FROM public.badge_awards WHERE id = v_award) IS NOT NULL,
+    'service_role must be able to set revoked_at';
+
+  UPDATE public.diary_entries SET retracted_at = now() WHERE user_id = v_owner;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'unchanged', 'revocation must ignore a diary that no longer qualifies';
+  RESET role;
+  ASSERT (SELECT hidden_at FROM public.badge_awards WHERE id = v_award) IS NULL,
+    'revocation must not be rewritten into a hide';
+  UPDATE public.diary_entries SET retracted_at = NULL WHERE user_id = v_owner;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'unchanged', 're-evaluation must not restore a revoked badge';
+  RESET role;
+  ASSERT (SELECT revoked_at FROM public.badge_awards WHERE id = v_award) IS NOT NULL,
+    're-evaluation must keep revoked_at';
+  ASSERT (SELECT restored_at FROM public.badge_awards WHERE id = v_award) IS NOT NULL,
+    're-evaluation must not clear an earlier restore stamp';
+
   DELETE FROM auth.users WHERE id = v_owner;
   SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
   ASSERT v_count = 0, 'deleting the account must cascade the award';

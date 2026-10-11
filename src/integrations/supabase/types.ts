@@ -649,6 +649,7 @@ export type Database = {
           hidden_at: string | null
           id: string
           restored_at: string | null
+          revoked_at: string | null
           rule_version: number
           user_id: string
         }
@@ -660,6 +661,7 @@ export type Database = {
           hidden_at?: string | null
           id?: string
           restored_at?: string | null
+          revoked_at?: string | null
           rule_version?: number
           user_id: string
         }
@@ -671,6 +673,7 @@ export type Database = {
           hidden_at?: string | null
           id?: string
           restored_at?: string | null
+          revoked_at?: string | null
           rule_version?: number
           user_id?: string
         }

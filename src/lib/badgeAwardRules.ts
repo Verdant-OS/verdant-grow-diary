@@ -17,6 +17,7 @@ const FORBIDDEN_BADGE_COPY = /\b(skill|rank|yield|safety|verified)\b/i;
 export interface OwnerBadgeAwardView {
   badgeKey: string;
   hiddenAt: string | null;
+  revokedAt?: string | null;
 }
 
 export function badgeCopyAvoidsRankLanguage(copy: readonly string[]): boolean {
@@ -27,6 +28,9 @@ export function selectVisibleOwnerBadgeAwards<T extends OwnerBadgeAwardView>(
   awards: readonly T[],
 ): T[] {
   return awards.filter(
-    (award) => award.badgeKey === FIRST_DIARY_ENTRY_BADGE_KEY && award.hiddenAt === null,
+    (award) =>
+      award.badgeKey === FIRST_DIARY_ENTRY_BADGE_KEY &&
+      award.hiddenAt === null &&
+      award.revokedAt == null,
   );
 }

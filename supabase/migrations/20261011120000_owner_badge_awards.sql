@@ -11,6 +11,10 @@
 --
 -- This migration creates no trigger on diary_entries, storage.objects,
 -- grows, or tents. Existing diary saves do not call the evaluator.
+--
+-- Revocation is admin-only. service_role may set badge_awards.revoked_at.
+-- Authenticated has no UPDATE grant. Re-evaluation leaves a revoked row
+-- unchanged, so a later qualifying diary does not restore it.
 
 CREATE TABLE public.badge_award_runtime (
   id smallint PRIMARY KEY CHECK (id = 1),
@@ -30,6 +34,7 @@ CREATE TABLE public.badge_awards (
   hidden_at timestamptz,
   restored_at timestamptz,
   evidence_changed_at timestamptz,
+  revoked_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (user_id, badge_key)
 );
@@ -84,7 +89,8 @@ REVOKE ALL ON TABLE public.badge_awards FROM PUBLIC, anon, authenticated, servic
 REVOKE ALL ON TABLE public.badge_evidence FROM PUBLIC, anon, authenticated, service_role;
 
 GRANT SELECT, UPDATE ON TABLE public.badge_award_runtime TO service_role;
-GRANT SELECT ON TABLE public.badge_awards TO authenticated;
+GRANT SELECT ON TABLE public.badge_awards TO authenticated, service_role;
+GRANT UPDATE (revoked_at) ON TABLE public.badge_awards TO service_role;
 GRANT SELECT ON TABLE public.badge_evidence TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.badge_awards_stamp_recognition()
@@ -237,6 +243,7 @@ DECLARE
   prior_entry_id uuid;
   prior_photo text;
   was_hidden boolean;
+  revoked_at timestamptz;
 BEGIN
   SELECT runtime.enabled
     INTO runtime_enabled
@@ -320,12 +327,16 @@ BEGIN
     photo_name := earliest_photo;
   END IF;
 
-  SELECT award.id, award.hidden_at, award.first_recognized_at
-    INTO found_award, award_hidden_at, recognized_at
+  SELECT award.id, award.hidden_at, award.first_recognized_at, award.revoked_at
+    INTO found_award, award_hidden_at, recognized_at, revoked_at
   FROM public.badge_awards AS award
   WHERE award.user_id = uid
     AND award.badge_key = 'first_diary_entry'
   FOR UPDATE;
+
+  IF revoked_at IS NOT NULL THEN
+    RETURN jsonb_build_object('status', 'unchanged', 'award_id', found_award);
+  END IF;
 
   IF entry_id IS NULL THEN
     IF found_award IS NULL OR award_hidden_at IS NOT NULL THEN

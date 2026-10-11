@@ -24,6 +24,10 @@ describe("badge award display rules", () => {
     expect(migration).toContain("btrim(entry.note) <> 'Photo attached from Quick Log.'");
     expect(migration).toContain("grow.user_id = uid");
     expect(migration).toContain("object.owner = badge_awards_owned_diary_photo_name.owner_id");
+    expect(migration).toContain("IF revoked_at IS NOT NULL THEN");
+    expect(migration).toContain(
+      "GRANT UPDATE (revoked_at) ON TABLE public.badge_awards TO service_role",
+    );
   });
 
   it("describes documentation and not skill, rank, yield, safety, or verified", () => {
@@ -32,12 +36,13 @@ describe("badge award display rules", () => {
 
   it("shows only a visible first diary entry award", () => {
     const awards = [
-      { badgeKey: "first_diary_entry", hiddenAt: null },
+      { badgeKey: "first_diary_entry", hiddenAt: null, revokedAt: null },
       { badgeKey: "first_diary_entry", hiddenAt: "2026-10-10T00:00:00Z" },
+      { badgeKey: "first_diary_entry", hiddenAt: null, revokedAt: "2026-10-10T00:00:00Z" },
       { badgeKey: "first_tent", hiddenAt: null },
     ];
     expect(selectVisibleOwnerBadgeAwards(awards)).toEqual([
-      { badgeKey: "first_diary_entry", hiddenAt: null },
+      { badgeKey: "first_diary_entry", hiddenAt: null, revokedAt: null },
     ]);
   });
 

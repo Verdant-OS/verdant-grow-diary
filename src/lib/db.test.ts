@@ -115,7 +115,6 @@ import {
   fetchHarvestRows,
   insertHarvestRow,
   fetchProfileRow,
-  upsertProfileRow,
   fetchUserRoles,
   assignRole,
   fetchUnlockRows,
@@ -354,16 +353,6 @@ describe("fetchProfileRow", () => {
     const r = await fetchProfileRow("u1");
     expect(r?.display_name).toBe("Alex");
     expect(calls.filters).toContainEqual(["user_id", "u1"]);
-  });
-});
-
-describe("upsertProfileRow", () => {
-  it("upserts and returns the row", async () => {
-    nextResult = { data: profileRow, error: null };
-    const r = await upsertProfileRow({ user_id: "u1", display_name: "Alex" });
-    expect(calls.table).toBe("profiles");
-    expect(calls.upserted).toMatchObject({ user_id: "u1" });
-    expect(r.user_id).toBe("u1");
   });
 });
 

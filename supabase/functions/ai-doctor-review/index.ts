@@ -7,7 +7,7 @@
 //    and one protected fresh-review completion RPC are the only persistence.
 //    No ai_doctor_sessions / alerts / action_queue / sensor_readings writes.
 //    No equipment / device control.
-//  - LOVABLE_API_KEY stays server-only. Never echoed to client.
+//  - GEMINI_API_KEY stays server-only. Never echoed to client.
 //  - Response is always { ok: true, result, credit? } or
 //    { ok: false, reason, credit? }.
 //  - Model tier + weight are decided SERVER-SIDE. Client cannot self-discount.
@@ -61,13 +61,24 @@ import {
   attachProviderResponseUsageToAiDoctorPromptMeasurement,
   buildAiDoctorPromptMeasurement,
 } from "../_shared/cost.ts";
+import {
+  buildGeminiDirectChatRequest,
+  lookupGeminiDirectRoute,
+  readGeminiDirectApiKey,
+  resolveGeminiDirectChat,
+} from "../_shared/geminiDirectChat.ts";
 
 const TIMEOUT_MS = 25_000;
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-3-flash-preview";
 // S2: server-pinned tier/feature. Escalation is deferred.
 const FEATURE = "ai_doctor_review";
 const MODEL_TIER = "standard";
+const doctorRoute = lookupGeminiDirectRoute(FEATURE, MODEL_TIER);
+if (!doctorRoute.ok) {
+  throw new Error("ai-doctor-review standard Gemini route is not configured");
+}
+const GATEWAY_URL = doctorRoute.url;
+const MODEL = doctorRoute.recordedModelId;
+const WIRE_MODEL = doctorRoute.geminiModelId;
 const COMPLETION_WRITE_TIMEOUT_MS = 1_500;
 const RESULT_PERSISTENCE_TIMEOUT_MS = 3_000;
 const TOOL_SCHEMA_VERSION = "ai-doctor-review-tool-v1";
@@ -172,7 +183,7 @@ async function signAiDoctorPrompt(
 ): Promise<string> {
   const frame = JSON.stringify({
     version: PROMPT_CONTRACT_VERSION,
-    model: MODEL,
+    model: WIRE_MODEL,
     messages: [
       { role: "system", content: prompt.system },
       { role: "user", content: prompt.user },
@@ -327,9 +338,18 @@ Deno.serve(async (req) => {
     });
     const billingEnvironment = billingEnvironmentResolution.environment;
 
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) {
-      console.log("ai-doctor-review status=config_missing missing=lovable_api_key");
+    const apiKey = readGeminiDirectApiKey(Deno.env);
+    const geminiResolution = resolveGeminiDirectChat({
+      feature: FEATURE,
+      tier: MODEL_TIER,
+      apiKey,
+    });
+    if (!geminiResolution.ok || apiKey === null) {
+      const missing =
+        geminiResolution.ok || geminiResolution.reason === "missing_api_key"
+          ? "gemini_api_key"
+          : geminiResolution.reason;
+      console.log(`ai-doctor-review status=config_missing missing=${missing}`);
       return calmFailure("config");
     }
 
@@ -528,15 +548,11 @@ Deno.serve(async (req) => {
     }).measurement;
     let upstream: Response;
     try {
-      upstream = await fetch(GATEWAY_URL, {
-        method: "POST",
+      const providerRequest = buildGeminiDirectChatRequest({
+        apiKey,
+        geminiModelId: WIRE_MODEL,
         signal: ctrl.signal,
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: MODEL,
+        body: {
           messages: [
             { role: "system", content: promptMessages.system },
             { role: "user", content: promptMessages.user },
@@ -546,8 +562,9 @@ Deno.serve(async (req) => {
             type: "function",
             function: { name: "submit_ai_doctor_review" },
           },
-        }),
+        },
       });
+      upstream = await fetch(GATEWAY_URL, providerRequest);
     } catch {
       console.log("ai-doctor-review status=timeout_or_network");
       return failureAfterRefund(spendId, "upstream_timeout", "timeout");

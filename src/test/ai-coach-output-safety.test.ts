@@ -142,11 +142,20 @@ describe("ai-coach — output safety contract", () => {
     ]) {
       expect(CODE, `ai-coach must not invoke device controls (${banned})`).not.toMatch(banned);
     }
-    // The only outbound call is to the AI gateway — not to any device endpoint.
-    const fetches = CODE.match(/fetch\(\s*["'`]([^"'`]+)/g) ?? [];
-    for (const f of fetches) {
-      expect(f).toMatch(/ai\.gateway\.lovable\.dev/);
-    }
+    // The only outbound call is the Gemini chat helper — not a device endpoint.
+    const literalFetches = CODE.match(/fetch\(\s*["'`]https?:/g) ?? [];
+    expect(literalFetches).toEqual([]);
+    expect(CODE.match(/fetch\(GATEWAY_URL/g) ?? []).toHaveLength(1);
+    expect(CODE).toContain("const GATEWAY_URL = coachRoute.url");
+    expect(CODE).not.toContain("ai.gateway.lovable.dev");
+    const helper = readFileSync(
+      resolve(__dirname, "../../supabase/functions/_shared/geminiDirectChat.ts"),
+      "utf8",
+    );
+    expect(helper).toContain(
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    );
+    expect(helper).not.toMatch(/mqtt|actuator|device_command|pi-bridge/i);
   });
 
   it("7. cautious language is required when photo/context data is limited", () => {
@@ -180,7 +189,7 @@ describe("ai-coach — output safety contract", () => {
     );
     // Ordering: empty short-circuit happens BEFORE the AI gateway fetch.
     const emptyIdx = CODE.search(/if\s*\(\s*empty\s*&&\s*!body\.photoUrl/);
-    const fetchIdx = CODE.search(/fetch\(\s*["']https:\/\/ai\.gateway\.lovable\.dev/);
+    const fetchIdx = CODE.search(/fetch\(GATEWAY_URL/);
     expect(emptyIdx).toBeGreaterThan(-1);
     expect(fetchIdx).toBeGreaterThan(-1);
     expect(emptyIdx).toBeLessThan(fetchIdx);

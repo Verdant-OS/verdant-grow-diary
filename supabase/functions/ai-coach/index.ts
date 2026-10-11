@@ -12,6 +12,12 @@ import {
   isConfirmedAiDoctorCreditRefund,
   parseAiDoctorResultAttachment,
 } from "../_shared/aiDoctorCreditReplayRules.ts";
+import {
+  buildGeminiDirectChatRequest,
+  lookupGeminiDirectRoute,
+  readGeminiDirectApiKey,
+  resolveGeminiDirectChat,
+} from "../_shared/geminiDirectChat.ts";
 
 type Mode = "diagnose" | "next_steps";
 interface Body {
@@ -147,6 +153,12 @@ function readCoachMessageContent(value: unknown): string | null {
 // S2: server-pinned tier/feature. Escalation is deferred.
 const FEATURE = "ai_coach";
 const MODEL_TIER = "standard";
+const coachRoute = lookupGeminiDirectRoute(FEATURE, MODEL_TIER);
+if (!coachRoute.ok) {
+  throw new Error("ai-coach standard Gemini route is not configured");
+}
+const GATEWAY_URL = coachRoute.url;
+const COACH_MODEL = coachRoute.geminiModelId;
 
 const EMPTY_ANALYSIS = {
   summary: "No diary entries yet — log a note, photo, or sensor snapshot to get a real diagnosis.",
@@ -285,8 +297,15 @@ Deno.serve(async (req) => {
     const body = parseAiCoachBody(requestBody, creditSupabaseUrl);
     if (!body) return calmFailure("shape");
 
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableKey) return json({ error: "AI not configured" }, 500);
+    const geminiKey = readGeminiDirectApiKey(Deno.env);
+    const geminiResolution = resolveGeminiDirectChat({
+      feature: FEATURE,
+      tier: MODEL_TIER,
+      apiKey: geminiKey,
+    });
+    if (!geminiResolution.ok || geminiKey === null) {
+      return json({ error: "AI not configured" }, 500);
+    }
 
     const creditSupabase = createClient(creditSupabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -608,19 +627,19 @@ Rules for diagnosis (structured view, approval-first):
     const providerTimer = setTimeout(() => providerController.abort(), PROVIDER_TIMEOUT_MS);
     let r: Response;
     try {
-      r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
+      const providerRequest = buildGeminiDirectChatRequest({
+        apiKey: geminiKey,
+        geminiModelId: COACH_MODEL,
         signal: providerController.signal,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+        body: {
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: system },
             { role: "user", content: userContent },
           ],
-        }),
+        },
       });
+      r = await fetch(GATEWAY_URL, providerRequest);
     } catch {
       return failureAfterRefund(spendId, "upstream_network", "timeout");
     } finally {

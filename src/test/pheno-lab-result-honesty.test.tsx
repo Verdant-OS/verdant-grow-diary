@@ -33,6 +33,16 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
   }),
 }));
 
+// #1005: the evidence → Quick Log target gate reads the canonical tent
+// catalog; stub it so these suites keep their original axis without a
+// QueryClient (the gate has its own suites).
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({ data: [], isError: false, refetch: () => Promise.resolve() }),
+}));
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({ data: [], isError: false, refetch: () => Promise.resolve() }),
+}));
+
 vi.mock("@/hooks/usePhenoHuntWorkspace", () => ({
   usePhenoHuntWorkspace: () => hookMock(),
 }));
@@ -83,6 +93,7 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     hasMore: false,
     loadNextPage: vi.fn(),
     reload: vi.fn(),
+    applyHuntName: vi.fn(),
     filters: {},
     setFilter: vi.fn(),
     resetFilters: vi.fn(),

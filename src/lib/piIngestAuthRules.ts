@@ -13,6 +13,8 @@
  * and never returns the credential secret.
  */
 
+import { timingSafeEqualHex } from "@/lib/timingSafeCompareRules";
+
 // ----------------------------- Types -----------------------------
 
 export interface BridgeCredential {
@@ -79,14 +81,12 @@ export function buildSigningString(
   return `${method.toUpperCase()}\n${path}\n${timestamp}\n${rawBody}`;
 }
 
-/** Constant-time hex string equality. */
+/**
+ * Hex digest equality via the shared helper (#1002): no early exit,
+ * lowercase-canonical, non-hex never matches. Timing hygiene only.
+ */
 export function constantTimeEqualHex(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
+  return timingSafeEqualHex(a, b);
 }
 
 /** Compute HMAC SHA-256 of `message` with `secret`, returned as lowercase hex. */

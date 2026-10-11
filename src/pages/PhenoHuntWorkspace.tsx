@@ -65,6 +65,7 @@ import PhenoProductSamplingSection from "@/components/PhenoProductSamplingSectio
 import PhenoStressTestingSection from "@/components/PhenoStressTestingSection";
 import PhenoSamplingWorkspaceTools from "@/components/PhenoSamplingWorkspaceTools";
 import PhenoDocumentationSections from "@/components/PhenoDocumentationSections";
+import PhenoDocumentationBackupPanel from "@/components/PhenoDocumentationBackupPanel";
 import PhenoStressObservationsList from "@/components/PhenoStressObservationsList";
 import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
 import { usePhenoStressObservations } from "@/hooks/usePhenoStressObservations";
@@ -72,9 +73,24 @@ import PhenoHuntSetupProgressCard from "@/components/PhenoHuntSetupProgressCard"
 import PhenoCompareCandidatesAction from "@/components/PhenoCompareCandidatesAction";
 import { buildPhenoComparisonActionState } from "@/lib/phenoComparisonActionState";
 import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
+import PhenoHuntRenameControl from "@/components/PhenoHuntRenameControl";
+import { usePhenoHuntRenameSession } from "@/hooks/usePhenoHuntRenameSession";
+import { huntScopedOverrideValue, type HuntScopedOverride } from "@/lib/phenoHuntRenameRules";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
+import { useTents } from "@/hooks/use-tents";
+import { usePlants } from "@/hooks/use-plants";
+import { useGrows } from "@/store/grows";
+import {
+  phenoEvidenceGrowCatalogFromProvider,
+  phenoEvidencePlantCatalogFromQuery,
+  phenoEvidenceTentCatalogFromQuery,
+  resolvePhenoEvidenceQuickLogTarget,
+  type PhenoEvidenceGrowCatalog,
+  type PhenoEvidencePlantCatalog,
+  type PhenoEvidenceTentCatalog,
+} from "@/lib/phenoEvidenceQuickLogTargetGate";
 import type { PhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
 import { phenoHuntKeepersPath } from "@/lib/routes";
 import {
@@ -872,6 +888,12 @@ interface EditorProps {
    * readiness. Null while its batch is loading. */
   evidencePacket: PhenoCandidateEvidencePacket | null;
   evidenceStatus: "loading" | "ready" | "error" | "disabled";
+  /** The tent catalog Quick Log resolves against (#1005 target gate). */
+  evidenceTentCatalog: PhenoEvidenceTentCatalog;
+  evidenceGrowCatalog: PhenoEvidenceGrowCatalog;
+  /** Quick Log's live plant catalog — the plant's CURRENT grow/tent. */
+  evidencePlantCatalog: PhenoEvidencePlantCatalog;
+  onRetryEvidenceTentCatalog: () => void;
   selected: boolean;
   onToggleSelect: (plantId: string) => void;
   canAssign: boolean;
@@ -963,6 +985,10 @@ const CandidateEditor = memo(function CandidateEditor({
   saving,
   evidencePacket,
   evidenceStatus,
+  evidenceTentCatalog,
+  evidenceGrowCatalog,
+  evidencePlantCatalog,
+  onRetryEvidenceTentCatalog,
   selected,
   onToggleSelect,
   canAssign,
@@ -1013,6 +1039,19 @@ const CandidateEditor = memo(function CandidateEditor({
 
   // Readiness is derived from THIS card's evidence props, so it only recomputes
   // when this candidate's data changes — one save never re-renders every card.
+  // #1005: the evidence → Quick Log handoff targets this plant's own CURRENT
+  // grow/tent from Quick Log's live plant catalog (never the candidate
+  // snapshot), resolved through the canonical Quick Log target rules.
+  const evidenceQuickLogTarget = useMemo(
+    () =>
+      resolvePhenoEvidenceQuickLogTarget({
+        plantId,
+        plants: evidencePlantCatalog,
+        catalog: evidenceTentCatalog,
+        grows: evidenceGrowCatalog,
+      }),
+    [plantId, evidencePlantCatalog, evidenceTentCatalog, evidenceGrowCatalog],
+  );
   const readiness = useMemo(
     () => candidateReadiness(candidate, score, decision, sexRow, smokeRow, labRow, cloneInsured),
     [candidate, score, decision, sexRow, smokeRow, labRow, cloneInsured],
@@ -1124,8 +1163,8 @@ const CandidateEditor = memo(function CandidateEditor({
           packet={evidencePacket}
           status={evidenceStatus}
           plantName={candidate.plantLabel ?? null}
-          growId={growId}
-          tentId={tentId}
+          quickLogTarget={evidenceQuickLogTarget}
+          onRetryQuickLogTarget={onRetryEvidenceTentCatalog}
           allowRecordActions
           data-testid={`workspace-evidence-coverage-${plantId}`}
         />
@@ -1423,6 +1462,50 @@ export default function PhenoHuntWorkspace() {
     plantIds: loadedCandidateIds,
     configuredGoals: ws.hunt?.evidenceGoals ?? [],
   });
+  // #1005: the same canonical tent catalog (and cache) Quick Log resolves
+  // against. An error wins over cached data, exactly as Quick Log's own
+  // named-prefill check does (QuickLog.tsx `namedPrefillQueryError`): a
+  // failed background refetch keeps `data` but Quick Log holds the target
+  // empty, so this surface must not offer the handoff either (Codex on #1825).
+  const tentsQuery = useTents();
+  const evidenceTentCatalog = useMemo<PhenoEvidenceTentCatalog>(
+    () => phenoEvidenceTentCatalogFromQuery({ isError: tentsQuery.isError, data: tentsQuery.data }),
+    [tentsQuery.data, tentsQuery.isError],
+  );
+  // Codex on #1825: Quick Log only targets ACTIVE grows (GrowsProvider lists
+  // non-archived grows), so a candidate in an archived grow must not offer
+  // the handoff. Missing provider/state → loading (fail closed).
+  const growsCtx = useGrows();
+  const evidenceGrowCatalog = useMemo<PhenoEvidenceGrowCatalog>(
+    () =>
+      phenoEvidenceGrowCatalogFromProvider({
+        error: growsCtx.error,
+        loading: growsCtx.loading,
+        grows: growsCtx.grows,
+      }),
+    [growsCtx.error, growsCtx.loading, growsCtx.grows],
+  );
+  // Codex on #1825: the plant's CURRENT grow/tent come from the same live
+  // plant catalog (and cache) Quick Log validates the prefill against, so a
+  // plant moved after this page loaded cannot open a dead handoff.
+  const plantsQuery = usePlants();
+  const evidencePlantCatalog = useMemo<PhenoEvidencePlantCatalog>(
+    () =>
+      phenoEvidencePlantCatalogFromQuery({ isError: plantsQuery.isError, data: plantsQuery.data }),
+    [plantsQuery.data, plantsQuery.isError],
+  );
+  const refetchTents = tentsQuery.refetch;
+  const refetchPlants = plantsQuery.refetch;
+  const plantsFailed = Boolean(plantsQuery.isError);
+  const refreshGrows = growsCtx.refresh;
+  const growsFailed = Boolean(growsCtx.error);
+  // Retry whichever catalog failed: a grow- or plant-catalog error is not
+  // cleared by a tent refetch (Codex on #1825).
+  const retryEvidenceTentCatalog = useCallback(() => {
+    void refetchTents();
+    if (plantsFailed && typeof refetchPlants === "function") void refetchPlants();
+    if (growsFailed && typeof refreshGrows === "function") void refreshGrows();
+  }, [refetchTents, refetchPlants, plantsFailed, refreshGrows, growsFailed]);
   const { entitlement, refetch: refetchEntitlement } = useMyEntitlements();
   // Owner-only + Pro. Pheno surfaces are owner-only via RLS, so the viewer owns
   // the hunt; the presentation gate is an active Pheno Tracker Pro plan. The
@@ -1443,18 +1526,24 @@ export default function PhenoHuntWorkspace() {
   const [setupCompletedLocal, setSetupCompletedLocal] = useState<string | null>(null);
   // Same optimistic-override pattern for the breeding objective: the grower's
   // save should reflect instantly without waiting on a full hunt refetch.
-  const [breedingObjectiveLocal, setBreedingObjectiveLocal] = useState<
-    BreedingObjectiveTarget[] | null
-  >(null);
+  // Scoped to the hunt it was saved on: the route isn't keyed by hunt id.
+  const [breedingObjectiveLocal, setBreedingObjectiveLocal] = useState<HuntScopedOverride<
+    BreedingObjectiveTarget[]
+  > | null>(null);
   const [objectiveSaving, setObjectiveSaving] = useState(false);
+  // #551: a confirmed rename is applied to the hook's hunt (applyHuntName),
+  // which also supersedes any load that read the row before the save.
+  const effectiveHuntName = ws.hunt?.name ?? null;
   const effectiveBreedingObjective: BreedingObjectiveTarget[] =
-    breedingObjectiveLocal ?? ws.hunt?.breedingObjective ?? [];
+    huntScopedOverrideValue(breedingObjectiveLocal, ws.hunt?.id) ??
+    ws.hunt?.breedingObjective ??
+    [];
   const selectedRoundLoadState =
     round === "overall"
       ? null
       : (ws.roundLoadStates?.[round] ?? { status: "idle" as const, error: null });
 
-  const { setFilter } = ws;
+  const { setFilter, applyHuntName } = ws;
 
   const handleMarkSetupComplete = async () => {
     if (!canWrite || !ws.hunt?.id || setupSaving) return;
@@ -1481,7 +1570,7 @@ export default function PhenoHuntWorkspace() {
     setObjectiveSaving(true);
     try {
       await updatePhenoHuntSetup({ huntId: ws.hunt.id, breedingObjective: targets });
-      setBreedingObjectiveLocal([...targets]);
+      setBreedingObjectiveLocal({ huntId: ws.hunt.id, value: [...targets] });
       return true;
     } catch {
       return false;
@@ -1489,6 +1578,23 @@ export default function PhenoHuntWorkspace() {
       setObjectiveSaving(false);
     }
   };
+
+  // #551: rename resolves true only after the row is read back (RLS + the
+  // Pro entitlement policy filter blocked writes silently otherwise).
+  const handleRenameHunt = async (name: string): Promise<boolean> => {
+    if (!canWrite || !ws.hunt?.id) return false;
+    const huntId = ws.hunt.id;
+    try {
+      await updatePhenoHuntSetup({ huntId, name });
+      applyHuntName(huntId, name);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  // Held here, not in the control: a reload unmounts the control mid-save,
+  // and the save must still settle against the editor the grower used.
+  const renameSession = usePhenoHuntRenameSession(ws.hunt?.id, handleRenameHunt);
 
   // Debounce the free-text search into the server-side filter (resets paging).
   useEffect(() => {
@@ -1656,7 +1762,7 @@ export default function PhenoHuntWorkspace() {
       };
     }
     const csv = buildPhenoHuntCsv({
-      huntName: ws.hunt?.name ?? "hunt",
+      huntName: effectiveHuntName ?? "hunt",
       huntId: ws.hunt?.id ?? null,
       candidates,
       scoresByPlant: ws.scoresByPlant,
@@ -1683,7 +1789,7 @@ export default function PhenoHuntWorkspace() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = phenoHuntCsvFilename(ws.hunt?.name ?? "hunt");
+    a.download = phenoHuntCsvFilename(effectiveHuntName ?? "hunt");
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1734,7 +1840,18 @@ export default function PhenoHuntWorkspace() {
         className="container mx-auto max-w-5xl space-y-4 px-4 py-6"
       >
         <header className="space-y-1">
-          <h1 className="text-2xl font-semibold">Hunt workspace: {ws.hunt?.name ?? "this hunt"}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold">
+              Hunt workspace: {effectiveHuntName ?? "this hunt"}
+            </h1>
+            {ws.hunt?.id ? (
+              <PhenoHuntRenameControl
+                currentName={effectiveHuntName ?? ""}
+                canWrite={canWrite}
+                session={renameSession}
+              />
+            ) : null}
+          </div>
           <p className="text-xs text-muted-foreground">{PHENO_KEEPER_DECISION_CAVEAT}</p>
           {id ? (
             <nav
@@ -1784,6 +1901,10 @@ export default function PhenoHuntWorkspace() {
             </p>
           )}
         </header>
+
+        {/* #552: candidate documentation is device-only; offer a backup. Local
+            only, so it stays available to read-only growers too. */}
+        <PhenoDocumentationBackupPanel />
 
         {!canWrite && (
           <p
@@ -2143,6 +2264,10 @@ export default function PhenoHuntWorkspace() {
                       saving={ws.saving === c.candidateId}
                       evidencePacket={evidencePackets.packets.get(c.candidateId) ?? null}
                       evidenceStatus={evidencePackets.status}
+                      evidenceTentCatalog={evidenceTentCatalog}
+                      evidenceGrowCatalog={evidenceGrowCatalog}
+                      evidencePlantCatalog={evidencePlantCatalog}
+                      onRetryEvidenceTentCatalog={retryEvidenceTentCatalog}
                       selected={selectedIds.includes(c.candidateId)}
                       onToggleSelect={onToggleSelect}
                       canAssign={canAssign}

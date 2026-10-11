@@ -45,6 +45,67 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PR-1939-NOT-FOUND-COVERAGE
+
+```text
+TASK PR-1939-NOT-FOUND-COVERAGE  priority: P2  status: OPEN
+goal: Unknown paths return HTTP 404 with the branded not-found page. /healthz stays HTTP 200 with a body of {"ok":true}, cache-control no-store, and x-robots-tag noindex, and no app data. Preserve Cloudflare Worker redirects, host headers, and report-only CSP from #1943 and #1937.
+branch: fix/not-found-404-status
+base: verdant-grow-diary
+checkout: git fetch origin fix/not-found-404-status verdant-grow-diary && git switch fix/not-found-404-status && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1939
+head_sha: c35baaddeb5b3407060a401a411831a3ce460413 before the healthz commits. Those commits cannot name themselves; read the PR head after push.
+state: draft. Unknown paths still throw notFound(). /healthz is answered in the Worker before SSR. withHostHeaders still copies a 404 status and sets the security headers. /manifest.webmanifest stays a 404; the app links /site.webmanifest.
+next_action: required checks at the new head and local Worker curl evidence. Stay draft. No ready, merge, or deploy.
+files: src/routes/$.tsx; src/server.ts; src/lib/cloudflareHostRoutingRules.ts; src/test/not-found-route-status.test.tsx; src/test/host-headers-404-status.test.ts; docs/agents/HANDOFF_LOG.md (this record)
+blockers: none for the repository change. Do not deploy or write production Supabase.
+artifacts: PR #1939 claim comment 6074014428; local Worker curl receipt on the PR
+reviewer_seat: Blue Dream (src/routes/$.tsx); Critical Mass (test)
+claimed_by: Canopy (Cursor cloud agent), 2026-10-09 04:02 UTC — reassigned by Matthew, overriding Codex claim 2026-10-08 05:56 UTC
+last_updated: 2026-10-08 23:46 CT, by Canopy
+```
+
+### CLAUDE-CODE-ACTION-002
+
+```text
+TASK CLAUDE-CODE-ACTION-002  priority: P1  status: OPEN
+goal: Lock auth-mutation and Action Queue I/O files for Claude slices by content, not only by filename (Codex's P1 finding on #1774: neutral-named files such as src/pages/ResetPassword.tsx passed). Priority is P1: Matthew raised it from other on 2026-10-07, matching the P1 finding it repairs. Workflow, doc and an empty exceptions file only; no app, schema, RLS, auth behavior, Edge, lockfile or device-control change.
+branch: claude/vigilant-faraday-usy9mb
+base: verdant-grow-diary at 1209caaba (#1844), as the branch was last rebuilt; the deploy tip has since moved (c5b1d1c32 at 2026-10-06 18:28 CT)
+checkout: git switch claude/vigilant-faraday-usy9mb && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1927 (draft)
+head_sha: ad1a617778ea67c775fa9098e3f9532e23927d3f, observed on origin/claude/vigilant-faraday-usy9mb at 2026-10-06 23:30 UTC (18:30 CT). Commits on the tip: 36f9f521 (carries #1774's net change, byte-identical to 343fe91b), 707874ab (round 1), 6209b316 (round 2), ad1a6177 (round 3). The three slice files at 6209b316 are byte-identical to e425a3db. History was rewritten twice: once to e425a3db with Matthew's go-ahead, once by session_019Kztxw onto 1209caaba. Earlier heads, none an ancestor: e425a3db, 2c3609b1, 5e4254d3. This block travels on a separate log-only branch (PR #1932), not on the task branch.
+state: pushed draft, round 3 by session_019Kztxw. Durban Poison gave PASS-with-P2 at e425a3db (0 P1 / 1 P2, P2-A: auth-mutation bypasses through parentheses, casts and ASI); it was recorded in ad1a6177's commit message, not posted on GitHub. ad1a6177 closes P2-A. Self-test 224/224 PASS, re-run locally at ad1a6177 by session_01VsMEJU (the log-block maintainer). Per that commit: census auth-mutation 65, aq-io 31 (94 files, 34 not already path-locked); actionlint 0 diagnostics; RED shown against the e425a3db matcher. Round 2 (2c3609b1, four Durban Poison P2s at 5e4254d3) was peer-verified in issuecomment-6026225154 by another Claude session; that is not acceptance. No review covers ad1a6177 yet. Durban Poison's exact-head re-review was requested in issuecomment-6027452325, but Durban Poison is unavailable: on 2026-10-07 Matthew named Codex the independent reviewer instead (issuecomment-6042253781). That overrides AGENTS.md's Blue Dream / Durban Poison / Critical Mass routing and its rule that Codex can't PASS its own work (36f9f521 carries Codex's #1774 change); the override applies to #1927 only. Codex's review at ad1a6177 was requested in issuecomment-6042223102 and is running. Hosted required checks at ad1a6177: 35/35 SUCCESS, verified by the log-block maintainer on 2026-10-07. #1927 merges cleanly into verdant-grow-diary at e0bb3930 and has not been updated. Expected red and not required: Claude locked paths (by design), Workers Builds (Cloudflare), and Vercel "Account is blocked.". The dependency audit fix (#1924) is on the deploy branch, so check:deps should go green at #1927's next base update.
+next_action: Codex reviews the exact head ad1a6177 (running; no verdict yet). #1774 is still open at 343fe91b. After #1774 squash-merges, merge origin/verdant-grow-diary into this branch. No rebuild and no force-push: the carried commit 36f9f521 is byte-identical to #1774's change, so the normal base merge drops it from the PR diff. That merge is a new head and needs a fresh exact-head review. Don't merge #1774 and #1927 in a way that lands #1774's change twice. Stay draft; no ready, merge or publish.
+files: .github/workflows/claude-slices.yml; docs/agents/claude-slices.md; config/claude-slice-lock-exceptions.json (new, { "exceptions": [] }). The first two also carry #1774's change while 36f9f521 is in the PR diff.
+blockers: Codex's review at ad1a6177. The narrowed table-name rule (declarations only; a bare-literal version locked 280 files, mostly source-scan tests) is a trade-off for the reviewer or Matthew to confirm. No claimed_by PR comment: Matthew said not to post one (2026-10-06).
+artifacts: PR #1927 body and the commit messages of 6209b316 and ad1a6177 (P2 mappings, census, test and RED evidence, residual risk); docs/agents/claude-slices.md (Content locks, Residual risk); policy self-test inside .github/workflows/claude-slices.yml (extract the claude-slice-policy.cjs heredoc, then run node <file> --self-test).
+reviewer_seat: Codex, by Matthew's override for #1927 (2026-10-07, issuecomment-6042253781); Durban Poison unavailable. Claude authored and cannot PASS.
+claimed_by: Claude, session_019KztxwgLfeEaNDYyGfkbfS, holds #1927 and its branch (Matthew, 2026-10-06 18:36 CT). Claude session_01VsMEJU3e1qoicFgNKiJL3y maintains this log block in PR #1932 and does not push to #1927. No claimed_by PR comment, by Matthew's instruction.
+last_updated: 2026-10-07 11:32 CT, by Claude (session_01VsMEJU, log-block maintainer)
+```
+
+```text
+TASK DASHBOARD-SINGLE-LOG-ENTRY  priority: P2  status: OPEN
+goal: remove the Dashboard header Quick Log link and the page's own QuickLogV2Fab (GDP D1.1-A,
+  D1.2-A, decided 2026-10-06); add the dashboard-ready readiness marker; renegotiate E1-E4 and
+  U1-U4 per docs/specs/dashboard-single-log-entry-readiness-marker.md
+branch: claude/dashboard-single-log-entry
+base: verdant-grow-diary
+checkout: git switch claude/dashboard-single-log-entry && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1844
+head_sha: read from the PR (a commit cannot contain its own SHA); implementation commit follows 42d195f01
+state: pushed draft, CI pending
+next_action: drive 35/35 required checks green; request Blue Dream (Dashboard.tsx) and Critical Mass (tests, e2e)
+files: src/pages/Dashboard.tsx; src/test/dashboard-single-log-entry.test.tsx (new); U1-U4 and the
+  D1.1-A pins (first-plant-memory-cta, onboarding-checklist-view-model); e2e E1-E4; the spec
+blockers: none
+artifacts: PR #1844 body (RED/GREEN counts, e2e runs)
+reviewer_seat: Blue Dream (Dashboard.tsx), Critical Mass (tests, e2e)
+claimed_by: Claude, 2026-10-06 20:47 UTC (PR #1844 comment)
+last_updated: 2026-10-06 16:05 CT, by Claude
+```
+
 ### CHEM-MOVE-TENT-READ-HONESTY-001
 
 ```text
@@ -657,6 +718,48 @@ last_updated: 2026-09-28 23:53 CT, by Codex
 ```
 
 ## Closed
+
+### CLAUDE-LOOP-ENGINEERING-001
+
+```text
+TASK CLAUDE-LOOP-ENGINEERING-001  priority: other  status: CLOSED
+goal: Close the three gaps between Verdant's loop discipline and the Karpathy-loop workflow (AI LABS video qLfSDQ5NGh0): a scorer lock as a PreToolUse hook, a loop-habits skill with a check-safe amendment path, and docs/agents/loop-engineering.md with the four-condition eligibility gate and never-loop list. Docs plus tooling; no src/ product code, no supabase/, no workflow, no lockfile, no governance file.
+branch: claude/fervent-mccarthy-ga3vwv
+base: verdant-grow-diary at 80176bad5 (#1864)
+checkout: None; closed (merged; the remote branch was deleted after the squash). Historical: git switch claude/fervent-mccarthy-ga3vwv && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1866 (merged)
+head_sha: ef931932d30e8939ab0b67bf360f3a52307ae70e, the final head of #1866 (27 commits), squash-merged as 1d12e5a51afd3999064049f0c1057d303d6844cc whose sole parent is the deploy tip of its merge-queue group. Heads after the 2026-10-02 log entry, oldest first: a9bb2997f9747ea2fd8b8688fbd2dc7415fe28d2, 0689dc3f72e02894f260d281cd4460efd5b9a7c1, 239eed1c3f788f27febf808d919d8a0c5910e464, 2db758e5fc84ee2e64ff639d1db3f680b947ec48, faa3727f747452d180332c483e0b6f085fe10c7f, 55c6a85216c03f90a5cfd08dfff1fc0a4c56dd3e (owner-side base merge), 366ef52c65e4f838163ff168eed24699bb7b43d3, 2ee370de3f54cb33ba847a21993adf0c317def19, f38916464c68f92ecab6fe3f2cd1f1c91c80193b, be51d1f1baa493813456cc384c1086021ebf7f77, ec866f314431e5039d2a2cbd8ac9a7e75ac097f3, fd169ddea345fa1e8bf524a34f092005a8abe460 (last Claude push), 10cddbeace414a69a31a197c8796fdfdd2e0179a and ef931932d30e8939ab0b67bf360f3a52307ae70e (owner-side, Critical Mass P2-1 and K2). Earlier heads, oldest first: 639892d544bd0747183b5dd7cb503b41be925586, a665161a7e57be0086a6db3c4a1b535421009a56, 28ad3b0e958f961b84df46221a9d883331d7d705, 20cd4a97ceb3684e9ea856dc77e39f82c73e11aa, 3715dac6f1f68e0361d647c0afb6d94c6e822b4d, 4f9aff416044346e5fe6dc2eab84a91939f676d2, a715d25e16f0a0b0a0c5e6bf1695af83895bb8aa, 97455693e32f2fc92e82123607dab5a0161f7d49, 2a7ada309b2b820863595fc24348379ad21f9db1, d3f7fd4233e0ad3794500338046b13d204841806, 109aba953c25d0d2d26de4b26597d3688c4367cf, f1a165844d9ba22a7ff958dbfc1174f7f85b2427, 2a1e01f4f46ac818b5751a9ee0e4a6e4d051fca0
+state: Merged via #1866 as 1d12e5a51 (merge queue; enqueued by the owner 2026-10-05 17:44 UTC, merged 18:21 UTC) from final head ef931932d. Last Claude-measured head fd169ddea: ci.yml run 37125292724 success, 35/35 required contexts success read job by job against config/required-status-checks.json (2026-10-03 13:16 UTC); must-be-green lanes present green; the lockfile lane green after #1868; 37 review threads resolved (Codex rounds 1 to 19, thirty-two P2 findings, each fixed in the next push; CodeRabbit one Major, four Minors, one security Low, one merge-risk note). Critical Mass reviewed as handoff packets rather than PR threads: P2-1 (case-fold and realpath of each judged path) fixed owner-side at 10cddbeac and the K2 nit (relative symlink-then-..) at ef931932d, both 2026-10-04. Final head ef931932d: ci.yml run 37257849172 attempt 2 success, 35/35 required contexts success read job by job against config/required-status-checks.json (completed 2026-10-05 17:41 UTC, three minutes before the owner enqueued it); attempt 1 at 03:03 UTC had failed across every workflow, including PR description required, which this diff cannot affect, consistent with the GitHub billing lock the PR body records for 2026-10-04 and 2026-10-05. CI on 10cddbeac and on the merge-queue group itself: NOT_MEASURED from this seat. Non-required reds stood down with one PR comment each: Vercel (owner account block), copilot-pull-request-reviewer (quota). Scorer set at merge: tests and specs (src/test, e2e, e2e-local, *.test.*, *.spec.*, Deno *_test.ts, Python test_*.py, Pester *.Tests.ps1, supabase/tests, every file inside a test/, tests/ or __tests__/ directory), fixture inputs (fixtures/, the two testbench fixtures/ directories, scripts/fixtures/), scripts/ judges by verb token or run-/test- prefix in .mjs/.cjs/.js/.ts/.ps1/.sh, test-runner configs, the Vitest suite runners, the verb-less migration gates and their manifests, scripts/ci/, scripts/releases/, the release-receipt derivation chain, the smoke-lane runners, the gate contract modules, gate wiring (.github/workflows, .github/actions, .husky, package.json at any depth), scripts/lib, gate-owned configuration (config/, scripts/config/, every *.config.* under scripts/, eslint and tsconfig at any depth, the edge sync manifest, the workbook manifest), and the lock's own control files; paths judged as written and at their real path, case-insensitively.
+next_action: None; closed. Deferred items stay in docs/agents/loop-engineering.md section 7: moving the scorer rule into verdant-guard waits for #1865; a link from docs/agents/claude-slices.md waits for #1774; a CI job running scorer-lock --report --strict from a reviewable input is a separate slice.
+files: .claude/settings.json (new); .claude/skills/verdant-loop-habits/SKILL.md (new); .gitignore; docs/agents/loop-engineering.md (new); scripts/lib/scorerLockRules.mjs (new); scripts/scorer-lock.mjs (new); src/test/scorer-lock-rules.test.ts (new); src/test/loop-engineering-doc.test.ts (new); docs/agents/HANDOFF_LOG.md (this block).
+blockers: None for this closed task. Historical: dependency bootstrap in a cloud container needed xlsx re-pointed to the public registry for validation only (cdn.sheetjs.com is egress-denied); neither manifest is in the diff.
+artifacts: PR #1866 body (per-head TDD evidence and validation table, twenty-six heads); squash 1d12e5a51; src/test/scorer-lock-rules.test.ts; src/test/loop-engineering-doc.test.ts; docs/agents/loop-engineering.md.
+reviewer_seat: Critical Mass (no .tsx outside src/test/, not P1, not a publish gate); Grok may add an independent review under the standing architecture assignment
+claimed_by: Claude, 2026-10-02 18:20 CT (owner instruction in session: "Build the three gaps as a draft PR")
+last_updated: 2026-10-06 15:35 CT, by Claude. Earlier entry: 2026-10-02 20:58 CT, by Claude
+closure: Merged via #1866 as 1d12e5a51afd3999064049f0c1057d303d6844cc (squash through the merge queue, 2026-10-05 18:21 UTC / 13:21 CT) from final head ef931932d30e8939ab0b67bf360f3a52307ae70e, merged by the owner. Nine files, 2631 insertions, no deletions; no src/ product code, supabase/, workflow, lockfile or governance file. The deploy tip at closure time is cfe09322e (#1839). Moved from Open to Closed 2026-10-06 by Claude; no Sentinel-Version bump (the log is not a versioned governance file).
+```
+
+### CLOUDFLARE-VERCEL-ROUTING-PORT
+
+```text
+TASK CLOUDFLARE-VERCEL-ROUTING-PORT  priority: P1  status: CLOSED
+goal: Make the Cloudflare Worker reproduce every vercel.json redirect, the SPA-rewrite exclusion, and every header rule. /~oauth/* must hop to the Lovable project host, /strains and /refund-policy (and the other legacy aliases) must redirect, and /unsubscribe must send no-store / no-referrer / noindex.
+branch: cursor/cloudflare-worker-routing-54eb
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical: git fetch origin cursor/cloudflare-worker-routing-54eb verdant-grow-diary && git switch cursor/cloudflare-worker-routing-54eb && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1943 (merged)
+head_sha: 3412513bf3f9a9094e1966275bfb32ffc6a6f9b7
+state: CLOSED. Merged to verdant-grow-diary as 3412513bf on 2026-10-08 12:55 PM CT (GitHub merged_at 2026-10-08T17:55:16Z). #1937 (report-only CSP) then merged as eaf0b092257af57acb724dfe9f817d6c8881943b on 2026-10-08T19:23:18Z. The deploy-tip copy of this block still said OPEN; that line was stale.
+next_action: None; closed.
+files: src/lib/cloudflareHostRoutingRules.ts; src/server.ts; public/_headers; src/test/cloudflare-host-routing-rules.test.ts; scripts/capture-ssr-head-snapshots-with-server.mjs; docs/agents/HANDOFF_LOG.md
+blockers: none. Do not deploy from this closed record, and do not write the production Supabase project.
+artifacts: src/test/cloudflare-host-routing-rules.test.ts
+reviewer_seat: Critical Mass (no product .tsx; lib, Worker entry, tests)
+claimed_by: Grok, 2026-10-08 11:49 CT
+last_updated: 2026-10-08 23:02 CT, by Canopy (log maintenance on #1939; not a new claim on #1943)
+closure: Merged via #1943 as 3412513bf3f9a9094e1966275bfb32ffc6a6f9b7 at 2026-10-08 12:55 PM CT. #1937 merged afterward as eaf0b092257af57acb724dfe9f817d6c8881943b, so the header application this block was waiting on has landed. Historical last_updated before this closure note: 2026-10-08 12:21 CT, by Grok.
+```
 
 ### CHEM-SETTINGS-ACCOUNT-CONSENT-PROOF-001
 

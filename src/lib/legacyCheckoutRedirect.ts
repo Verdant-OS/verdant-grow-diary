@@ -14,8 +14,9 @@
  *
  * Contract:
  *   - Legacy hyphenated plan slugs (`pro-monthly`, `pro-annual`,
- *     `founder-lifetime`) map to canonical underscore PlanIds
- *     (`pro_monthly`, `pro_annual`, `founder_lifetime`).
+ *     `founder-lifetime` is no longer sold and falls through to bare
+ *     `/pricing` (no plan preselect). Other legacy slugs map to canonical
+ *     underscore PlanIds (`pro_monthly`, `pro_annual`).
  *   - Canonical PlanIds are passed through unchanged (defense in depth for
  *     any caller that already knows the canonical form).
  *   - Unknown / missing / free plan slug → bare `/pricing` (never invent a
@@ -42,8 +43,6 @@ const LEGACY_PLAN_SLUG_MAP: Readonly<Record<string, PlanId>> = Object.freeze({
   pro_monthly: "pro_monthly",
   "pro-annual": "pro_annual",
   pro_annual: "pro_annual",
-  "founder-lifetime": "founder_lifetime",
-  founder_lifetime: "founder_lifetime",
 });
 
 /**

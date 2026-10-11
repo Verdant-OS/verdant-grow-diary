@@ -7,7 +7,7 @@
  * instead — same bytes, same @id, same public offer list.
  *
  * DISPLAY TRUTH: only plans a grower can actually buy from the PUBLIC pricing
- * grid may appear here. Founder Lifetime is deep-link-only and must never be
+ * grid may appear here. Founder Lifetime is no longer sold and must never be
  * advertised. Prices come from the pricing single source of truth.
  * `src/test/software-application-offers-truth.test.ts` pins both invariants.
  */

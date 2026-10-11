@@ -46,9 +46,10 @@ describe("Pricing Page UI", () => {
     expect(screen.queryByTestId("pricing-card-founder")).toBeNull();
   });
 
-  it("still shows Founder Lifetime on an explicit deep link", () => {
+  it("still shows no Founder Lifetime card on an explicit deep link", () => {
     renderPricing({ founderDeepLink: true });
-    expect(screen.getByTestId("pricing-card-founder")).toBeInTheDocument();
+    expect(screen.queryByTestId("pricing-card-founder")).toBeNull();
+    expect(screen.queryByText(/\$129/)).toBeNull();
   });
 
   it("default billing state is Annual", () => {
@@ -92,16 +93,15 @@ describe("Pricing Page UI", () => {
     expect(proCard.textContent).toContain("100 AI Doctor credits / month");
   });
 
-  it("Founder Lifetime card displays 100 AI Doctor credits/month", () => {
+  it("a founder deep link does not render a Founder credit card", () => {
     renderPricing({ founderDeepLink: true });
-    const founderCard = screen.getByTestId("pricing-card-founder");
-    expect(founderCard.textContent).toContain("100 AI Doctor credits / month");
+    expect(screen.queryByTestId("pricing-card-founder")).toBeNull();
+    expect(screen.queryByText(/Founder Lifetime/i)).toBeNull();
   });
 
-  it("Founder Lifetime card never says unlimited AI", () => {
+  it("a founder deep link never says unlimited AI", () => {
     renderPricing({ founderDeepLink: true });
-    const founderCard = screen.getByTestId("pricing-card-founder");
-    expect(founderCard.textContent?.toLowerCase()).not.toContain("unlimited ai");
+    expect(document.body.textContent?.toLowerCase()).not.toContain("unlimited ai");
   });
 
   it("trust strip renders read-only / honest labels / no blind automation copy", () => {
@@ -125,11 +125,9 @@ describe("Pricing Page UI", () => {
     expect(freePrice.textContent).toContain("$0");
   });
 
-  it("Founder Lifetime card price is $129 one-time", () => {
+  it("a founder deep link does not show a $129 Founder price", () => {
     renderPricing({ founderDeepLink: true });
-    const founderPrice = screen.getByTestId("pricing-card-founder-price");
-    expect(founderPrice.textContent).toContain("$129");
-    expect(founderPrice.textContent).toContain("one-time");
+    expect(screen.queryByText(/\$129/)).toBeNull();
   });
 
   it("annual savings footnote appears on default annual view", () => {
@@ -140,10 +138,11 @@ describe("Pricing Page UI", () => {
 });
 
 describe("Pricing constants completeness", () => {
-  it("constants define all three tiers", () => {
+  it("constants define Free, Pro and Craft, and not a Founder tier", () => {
     expect(PRICING.free.slug).toBe("free");
     expect(PRICING.pro.slug).toBe("pro");
-    expect(PRICING.founder.slug).toBe("founder-lifetime");
+    expect(PRICING.craft.slug).toBe("craft");
+    expect(PRICING).not.toHaveProperty("founder");
   });
 
   it("Pro annual price is 99 and monthly is 12", () => {
@@ -151,9 +150,8 @@ describe("Pricing constants completeness", () => {
     expect(PRICING.pro.monthlyPrice).toBe(12);
   });
 
-  it("Founder limit is 100 and price is 129", () => {
-    expect(PRICING.founder.limit).toBe(100);
-    expect(PRICING.founder.price).toBe(129);
+  it("historical Founder figures stay off the public PRICING object", () => {
+    expect(PRICING).not.toHaveProperty("founder");
   });
 
   it("AI credit explainer does not claim unlimited AI", () => {
@@ -167,7 +165,7 @@ describe("Pricing constants completeness", () => {
     // buttons are disabled for anonymous and free viewers (see
     // creditPackEligibility.ts / resolveCreditPackPurchaseGate). Free and
     // signed-out visitors read a price they could not act on.
-    expect(AI_CREDIT_EXPLAINER.note).toContain("Pro, Craft and Founder");
+    expect(AI_CREDIT_EXPLAINER.note).toContain("Pro and Craft");
     // The price-bearing sentence and the eligibility clause must be the
     // same sentence, not merely present somewhere in the note — otherwise
     // this assertion would pass for a note that re-introduces an
@@ -176,7 +174,8 @@ describe("Pricing constants completeness", () => {
       .split(/(?<=[.!?])\s+/)
       .find((s) => s.includes("$9"));
     expect(priceSentence).toBeDefined();
-    expect(priceSentence).toMatch(/Pro, Craft and Founder/);
+    expect(priceSentence).toMatch(/Pro and Craft/);
+    expect(priceSentence).not.toMatch(/Founder/);
   });
 });
 

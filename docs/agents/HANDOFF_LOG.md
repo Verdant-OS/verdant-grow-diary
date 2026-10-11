@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### STOP-SELLING-FOUNDER-LIFETIME
+
+```text
+TASK STOP-SELLING-FOUNDER-LIFETIME  priority: P1  status: OPEN
+goal: Stop selling Founder Lifetime on public sales surfaces. Keep existing Founder entitlements until a separate PR and migration.
+branch: cursor/stop-selling-founder-lifetime-0628
+base: verdant-grow-diary
+checkout: git fetch origin cursor/stop-selling-founder-lifetime-0628 verdant-grow-diary && git switch cursor/stop-selling-founder-lifetime-0628 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: draft, URL recorded after open
+head_sha: local until push
+state: implemented / local only
+next_action: open the draft PR and wait for required checks
+files: pricing constants and config, Pricing.tsx, Upgrade.tsx, paddle config, legacy billing redirect, founder route redirect, checkout success, SEO/sitemap/llms, AGENTS.md, docs/billing.md
+blockers: none for the draft; entitlement removal is a later PR plus migration
+artifacts: .claude/scorer-unlock.json is gitignored and must not be committed
+reviewer_seat: Blue Dream (.tsx product files)
+claimed_by: Grok, 2026-10-11 01:27 CT
+last_updated: 2026-10-11 01:27 CT, by Grok
+```
+
 ### PR-1939-NOT-FOUND-COVERAGE
 
 ```text

@@ -6,7 +6,6 @@ const PLAN_LABELS: Readonly<Record<PricingPreselectPlan, string>> = Object.freez
   pro_annual: "Pro Annual",
   craft_monthly: "Craft Monthly",
   craft_annual: "Craft Annual",
-  founder_lifetime: "Founder Lifetime",
 });
 
 export interface CheckoutCancelRecovery {

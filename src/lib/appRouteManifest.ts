@@ -193,8 +193,8 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/feedback", access: "public", description: "Public support feedback page." },
   {
     path: "/founder",
-    access: "public",
-    description: "Public Founder Lifetime acquisition and offer explainer.",
+    access: "redirect",
+    description: "→ /pricing. Founder Lifetime is no longer sold.",
   },
   {
     path: "/genetics",

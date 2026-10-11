@@ -89,15 +89,13 @@ async function captureAnalyticsEvents(page: Page) {
 
 type CapturedAnalyticsEvent = { name: string; props: Record<string, unknown> | null };
 
-type PaidCheckoutPlanId =
-  "pro_monthly" | "pro_annual" | "craft_monthly" | "craft_annual" | "founder_lifetime";
+type PaidCheckoutPlanId = "pro_monthly" | "pro_annual" | "craft_monthly" | "craft_annual";
 
 const EXPECTED_PAID_CHECKOUT_PLAN_IDS: readonly PaidCheckoutPlanId[] = [
   "pro_monthly",
   "pro_annual",
   "craft_monthly",
   "craft_annual",
-  "founder_lifetime",
 ];
 
 const PAID_RECOVERY_PLAN_IDS: readonly PaidCheckoutPlanId[] = [
@@ -105,7 +103,6 @@ const PAID_RECOVERY_PLAN_IDS: readonly PaidCheckoutPlanId[] = [
   "pro_annual",
   "craft_monthly",
   "craft_annual",
-  "founder_lifetime",
 ];
 
 const PAID_CTA_TEST_IDS: Readonly<Record<PaidCheckoutPlanId, string>> = {
@@ -113,7 +110,6 @@ const PAID_CTA_TEST_IDS: Readonly<Record<PaidCheckoutPlanId, string>> = {
   pro_annual: "pricing-cta-pro-annual",
   craft_monthly: "pricing-cta-craft-monthly",
   craft_annual: "pricing-cta-craft-annual",
-  founder_lifetime: "pricing-cta-founder-lifetime",
 };
 
 async function readAnalyticsEvents(page: Page): Promise<CapturedAnalyticsEvent[]> {

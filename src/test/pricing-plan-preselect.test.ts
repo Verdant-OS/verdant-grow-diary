@@ -15,14 +15,14 @@ describe("resolvePricingPlanPreselect", () => {
       billing: "annual",
     });
     expect(resolvePricingPlanPreselect("founder_lifetime")).toEqual({
-      plan: "founder_lifetime",
+      plan: null,
       billing: null,
     });
   });
 
   it("normalizes case", () => {
     expect(resolvePricingPlanPreselect("Pro_Monthly").plan).toBe("pro_monthly");
-    expect(resolvePricingPlanPreselect("FOUNDER_LIFETIME").plan).toBe("founder_lifetime");
+    expect(resolvePricingPlanPreselect("FOUNDER_LIFETIME").plan).toBeNull();
   });
 
   it("returns null preselect for unknown / missing / empty input", () => {
@@ -42,7 +42,7 @@ describe("isPreselectPlanId", () => {
   it("accepts canonical PlanIds only", () => {
     expect(isPreselectPlanId("pro_monthly")).toBe(true);
     expect(isPreselectPlanId("pro_annual")).toBe(true);
-    expect(isPreselectPlanId("founder_lifetime")).toBe(true);
+    expect(isPreselectPlanId("founder_lifetime")).toBe(false);
   });
   it("rejects everything else", () => {
     for (const v of [null, undefined, "", "free", "pro-monthly", 42]) {

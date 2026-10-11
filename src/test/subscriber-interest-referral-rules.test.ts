@@ -9,7 +9,6 @@ describe("subscriber interest referral rules", () => {
   it.each([
     ["pro_monthly", "Pro Monthly"],
     ["pro_annual", "Pro Annual"],
-    ["founder_lifetime", "Founder Lifetime"],
   ] as const)("builds a preselected, attributed %s link", (plan, label) => {
     const data = buildSubscriberInterestReferralData(plan);
     expect(data).not.toBeNull();
@@ -24,6 +23,17 @@ describe("subscriber interest referral rules", () => {
     });
     expect(data!.title).toBe(`Verdant ${label}`);
     expect(subscriberInterestReferralButtonLabel(plan)).toBe(`Share ${label}`);
+  });
+
+  it("does not preselect founder_lifetime on a share link", () => {
+    const data = buildSubscriberInterestReferralData("founder_lifetime");
+    expect(data).not.toBeNull();
+    const url = new URL(data!.url);
+    expect(url.searchParams.get("plan")).toBeNull();
+    expect(url.searchParams.get("utm_source")).toBe("pricing_interest_share");
+    expect(subscriberInterestReferralButtonLabel("founder_lifetime")).toBe(
+      "Share Founder Lifetime",
+    );
   });
 
   it("rejects unknown plans instead of generating an arbitrary checkout path", () => {

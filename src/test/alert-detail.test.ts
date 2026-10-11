@@ -75,10 +75,10 @@ describe("AlertDetail page composition", () => {
     expect(DETAIL_PAGE).toMatch(/growDetailPath\(alert\.grow_id\)/);
   });
   it("links tent_id to /tents/:id when present", () => {
-    expect(DETAIL_PAGE).toMatch(/tentDetailPath\(alert\.tent_id\)/);
+    expect(DETAIL_PAGE).toMatch(/tentDetailPath\(targetInput\.tentId\)/);
   });
   it("links plant_id to /plants/:id when present", () => {
-    expect(DETAIL_PAGE).toMatch(/plantDetailPath\(alert\.plant_id\)/);
+    expect(DETAIL_PAGE).toMatch(/plantDetailPath\(targetInput\.plantId\)/);
   });
 
   it("shows acknowledge action only for open alerts", () => {

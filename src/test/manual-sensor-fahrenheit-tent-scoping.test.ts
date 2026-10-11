@@ -30,6 +30,10 @@ import {
 } from "@/lib/sensorReadingManualEntryRules";
 import { celsiusToFahrenheit, formatTempFFromC, tempFFromC } from "@/lib/temperatureUnits";
 import { temperatureInputUnitFromPreference } from "@/lib/sensorInputUnitConversion";
+import {
+  createManualDraftValues,
+  reexpressManualDraftTemperature,
+} from "@/lib/sensorsPageSessionRules";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -101,7 +105,12 @@ describe("Manual sensor temperature is collected and labeled in Fahrenheit", () 
     expect(CARD).not.toMatch(/unit="°F"/);
     expect(CARD).toContain("Entered in");
     expect(CARD).toContain("saved as Celsius");
-    expect(CARD).toContain("convertTemperatureInputString");
+    const enteredF = createManualDraftValues({ airTemp: "77", airTempUnit: "F" });
+    const displayedC = reexpressManualDraftTemperature(enteredF, "C", "F");
+    expect(displayedC.form).toMatchObject({ airTemp: "25", airTempUnit: "C" });
+    expect(validateManualEntry(displayedC.form).metrics).toEqual(
+      validateManualEntry(enteredF.form).metrics,
+    );
   });
 
   it("converts a Celsius entry to Celsius storage without a Fahrenheit detour error", () => {

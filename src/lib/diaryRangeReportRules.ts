@@ -34,6 +34,9 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export interface DiaryRangeDiaryRow {
   id: string;
+  grow_id?: string | null;
+  linked_grow_event_id?: string | null;
+  grow_event_id?: string | null;
   note?: string | null;
   photo_url?: string | null;
   entry_at?: string | null;
@@ -42,6 +45,7 @@ export interface DiaryRangeDiaryRow {
 
 export interface DiaryRangeGrowEventRow {
   id: string;
+  grow_id?: string | null;
   event_type?: string | null;
   occurred_at?: string | null;
   note?: string | null;
@@ -65,7 +69,7 @@ export interface DiaryRangeSensorReadingRow {
 }
 
 export interface BuildDiaryRangeReportInput {
-  grow: { name?: unknown; stage?: unknown } | null;
+  grow: { id?: string | null; name?: unknown; stage?: unknown } | null;
   diaryEntries: ReadonlyArray<DiaryRangeDiaryRow>;
   growEvents: ReadonlyArray<DiaryRangeGrowEventRow>;
   harvests: ReadonlyArray<DiaryRangeHarvestRow>;
@@ -169,6 +173,55 @@ function inRange(day: string | null, start: string, end: string): boolean {
   return day !== null && day >= start && day <= end;
 }
 
+function nonBlankString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+}
+
+/**
+ * Adapt the explicit companion identity used by
+ * connectedOneTentActivationRules.dedupeMergedManualGrowActivityRows.
+ * Reports retain the rich diary row and suppress only a matching event
+ * actually present in the same grow and date range. An absent parent or
+ * a coincident timestamp must not erase separately logged evidence.
+ */
+function reconcileRangeActivities(
+  diaryRows: DiaryRangeDiaryRow[],
+  eventRows: DiaryRangeGrowEventRow[],
+  growId: string | null,
+): { diaryInRange: DiaryRangeDiaryRow[]; eventsInRange: DiaryRangeGrowEventRow[] } {
+  const key = (row: { grow_id?: string | null }, id: string) =>
+    JSON.stringify([nonBlankString(row.grow_id) ?? growId, id]);
+  const eventsByKey = new Map(eventRows.map((row) => [key(row, row.id), row] as const));
+  const companionKeys = new Set<string>();
+  const diaryInRange = diaryRows.map((row) => {
+    // Keep the canonical top-level and details link aliases; no fuzzy matching.
+    const links = new Set(
+      [
+        row.linked_grow_event_id,
+        row.grow_event_id,
+        row.details?.linked_grow_event_id,
+        row.details?.grow_event_id,
+      ]
+        .map(nonBlankString)
+        .filter((id): id is string => id !== null),
+    );
+    let eventType = nonBlankString(row.details?.event_type);
+    for (const id of [...links].sort()) {
+      const companionKey = key(row, id);
+      const event = eventsByKey.get(companionKey);
+      if (!event) continue;
+      companionKeys.add(companionKey);
+      eventType ??= nonBlankString(event.event_type);
+    }
+    if (nonBlankString(row.details?.event_type) || !eventType) return row;
+    return { ...row, details: { ...row.details, event_type: eventType } };
+  });
+  return {
+    diaryInRange,
+    eventsInRange: eventRows.filter((row) => !companionKeys.has(key(row, row.id))),
+  };
+}
+
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
@@ -235,8 +288,15 @@ export function buildDiaryRangeReport(
 
   // ---- range partition (diary + grow events) --------------------------
   let excludedNoTimestamp = 0;
+  const growId = nonBlankString(input.grow?.id);
+  const inGrow = (row: { grow_id?: string | null }) => {
+    const rowGrowId = nonBlankString(row.grow_id);
+    // Legacy callers omit row scope after fetching one grow's rows.
+    return !growId || !rowGrowId || rowGrowId === growId;
+  };
 
-  const diaryInRange = (input.diaryEntries ?? []).filter((r) => {
+  const diaryRows = (input.diaryEntries ?? []).filter((r) => {
+    if (!inGrow(r)) return false;
     const day = utcDay(r.entry_at);
     if (day === null) {
       excludedNoTimestamp += 1;
@@ -245,7 +305,8 @@ export function buildDiaryRangeReport(
     return inRange(day, startDate, endDate);
   });
 
-  const eventsInRange = (input.growEvents ?? []).filter((r) => {
+  const eventRows = (input.growEvents ?? []).filter((r) => {
+    if (!inGrow(r)) return false;
     const day = utcDay(r.occurred_at);
     if (day === null) {
       excludedNoTimestamp += 1;
@@ -253,6 +314,7 @@ export function buildDiaryRangeReport(
     }
     return inRange(day, startDate, endDate);
   });
+  const { diaryInRange, eventsInRange } = reconcileRangeActivities(diaryRows, eventRows, growId);
 
   // Normalized diary rows give us grower-logged amounts (ml, pH, EC,
   // nutrients) without hand-parsing loose details.

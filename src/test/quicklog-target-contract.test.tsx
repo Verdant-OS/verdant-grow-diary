@@ -167,7 +167,10 @@ beforeEach(() => {
   harness.tentsRefetch.mockReset();
   harness.tentsRefetch.mockResolvedValue({ data: harness.tents });
   harness.rpc.mockReset();
-  harness.rpc.mockResolvedValue({ data: { ok: true, grow_event_id: "event-1" }, error: null });
+  harness.rpc.mockResolvedValue({
+    data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" },
+    error: null,
+  });
   harness.growUpdate.mockReset();
   harness.growUpdateEq.mockReset();
   harness.growUpdateEq.mockResolvedValue({ error: null });
@@ -314,6 +317,42 @@ describe("Quick Log canonical target contract", () => {
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();
     fireEvent.submit(screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement);
     expect(harness.rpc).not.toHaveBeenCalled();
+  });
+
+  it("keeps note saves enabled for an in-grow plant with no tent", async () => {
+    harness.plants = [
+      { id: "tentless-p", name: "Tentless Plant", grow_id: "g1", tent_id: null, stage: "veg" },
+    ];
+    harness.tents = [];
+    renderQuickLog({ plantId: "tentless-p", growId: "g1", eventType: "observation" });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+        "data-target-plant-id",
+        "tentless-p",
+      ),
+    );
+    expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+      "data-target-grow-id",
+      "g1",
+    );
+    expect(screen.getByTestId("quick-log-target-card")).not.toHaveAttribute("data-target-tent-id");
+    expect(screen.queryByTestId("quick-log-target-error")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-save")).toBeEnabled();
+
+    fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
+      target: { value: "Tentless grow note" },
+    });
+    fireEvent.submit(screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement);
+
+    await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(1));
+    expect(harness.rpc).toHaveBeenCalledWith(
+      "quicklog_save_manual",
+      expect.objectContaining({
+        p_target_type: "plant",
+        p_target_id: "tentless-p",
+      }),
+    );
   });
 
   it("fails closed when the assigned tent belongs to another grow", async () => {
@@ -581,7 +620,10 @@ describe("Quick Log canonical target contract", () => {
     expect(eventSelect).toHaveTextContent("Observation");
 
     await act(async () => {
-      resolveRpc({ data: { ok: true, grow_event_id: "event-1" }, error: null });
+      resolveRpc({
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" },
+        error: null,
+      });
       await pendingRpc;
     });
     await waitFor(() => expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument());

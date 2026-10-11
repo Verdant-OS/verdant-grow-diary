@@ -37,7 +37,13 @@ describe("timelineEvidenceDetailViewModel", () => {
         plant_name: "Blue Dream",
         tent_name: "Tent A",
         source: "manual",
-        sensor_snapshot: { ts: "2025-06-01T11:55:00Z", temp: 24, rh: 55, vpd: 1.1, source: "live" },
+        sensor_snapshot: {
+          ts: "2025-06-01T11:55:00Z",
+          temp: 24,
+          rh: 55,
+          vpd: 1.1,
+          source: "manual",
+        },
       },
     });
     expect(m).not.toBeNull();
@@ -54,10 +60,10 @@ describe("timelineEvidenceDetailViewModel", () => {
     expect(m!.contextHint.label).toBe("Useful for AI Doctor context");
   });
 
-  it("labels manual/live/csv/demo/stale/invalid sources correctly", () => {
+  it("labels persisted sources without accepting an unverified live claim", () => {
     const cases: Array<[string, string]> = [
       ["manual", "Manual"],
-      ["live", "Live"],
+      ["live", "Invalid"],
       ["csv", "CSV import"],
       ["demo", "Demo"],
       ["stale", "Stale"],
@@ -72,6 +78,33 @@ describe("timelineEvidenceDetailViewModel", () => {
       });
       expect(m!.sourceLabels).toContain(label);
     }
+  });
+
+  it("uses the parent source when a snapshot source is blank without trusting a nonblank invalid source", () => {
+    const entry = {
+      id: "blank-source",
+      entry_at: "2025-06-01T11:55:00Z",
+      details: {
+        source: "manual",
+        sensor_snapshot: { ts: "2025-06-01T11:55:00Z", temp: 23, source: "  " },
+      },
+    };
+    expect(vm(entry)?.sensor?.source).toBe("manual");
+    expect(vm(entry)?.sensor?.isStale).toBe(false);
+    expect(vm(entry)?.sourceLabels).toContain("Manual");
+
+    const csv = vm({ ...entry, details: { ...entry.details, source: "csv" } });
+    expect(csv?.sensor?.source).toBe("csv");
+    expect(csv?.sourceLabels).toContain("CSV import");
+
+    const invalid = vm({
+      ...entry,
+      details: {
+        ...entry.details,
+        sensor_snapshot: { ...entry.details.sensor_snapshot, source: "bogus" },
+      },
+    });
+    expect(invalid?.sensor?.source).toBe("invalid");
   });
 
   it("flags stale sensor snapshot when older than the live window", () => {
@@ -107,7 +140,7 @@ describe("timelineEvidenceDetailViewModel", () => {
       entry_at: "2025-06-01T11:55:00Z",
       details: {
         event_type: "measurement",
-        sensor_snapshot: { ts: "2025-06-01T11:55:00Z", temp: 23 },
+        sensor_snapshot: { ts: "2025-06-01T11:55:00Z", temp: 23, source: "manual" },
       },
     });
     expect(m!.contextHint.level).toBe("partial_missing_photo");
@@ -244,5 +277,152 @@ describe("timelineEvidenceDetailViewModel", () => {
       details: { event_type: "photo", plant_name: "P", source: "manual" },
     } as const;
     expect(JSON.stringify(vm(input))).toBe(JSON.stringify(vm(input)));
+  });
+});
+
+describe("Timeline drawer sensor evidence honesty", () => {
+  const snapshotVm = (snapshot: Record<string, unknown>, photo = true) =>
+    vm({
+      id: "sensor-evidence",
+      photo_url: photo ? "https://example.test/photo.jpg" : null,
+      entry_at: "2025-06-01T11:55:00Z",
+      details: { sensor_snapshot: snapshot },
+    })!;
+  const recentManual = { source: "manual", ts: "2025-06-01T11:55:00Z", temp: 24 };
+
+  it.each(["invalid", "unknown", "demo", "stale", "live", "csv"])(
+    "does not promote a persisted %s snapshot into strong current evidence",
+    (source) => {
+      const result = snapshotVm({ ...recentManual, source });
+      expect(result.contextHint.level).toBe("limited");
+      expect(result.contextHint.description).toContain("Photo and sensor record are present");
+      expect(result.contextHint.description).not.toMatch(/strong evidence|no photo/i);
+    },
+  );
+
+  it.each([{}, { temp: null }, { temp: Number.NaN }])(
+    "does not call an empty sensor record strong evidence: %j",
+    (metrics) => {
+      const result = snapshotVm({ source: "manual", ts: recentManual.ts, ...metrics });
+      expect(result.contextHint.level).toBe("limited");
+      expect(result.contextHint.description).toContain("No usable sensor readings");
+    },
+  );
+
+  it.each([
+    ["temp", 200, "tempC"],
+    ["rh", 101, "rhPercent"],
+    ["vpd", -1, "vpdKpa"],
+    ["co2", -1, "co2Ppm"],
+    ["soil", 101, "soilPercent"],
+  ] as const)("omits invalid %s while retaining usable readings", (field, value, output) => {
+    const result = snapshotVm({ ...recentManual, rh: 55, [field]: value });
+    expect(result.sensor?.[output]).toBeNull();
+    expect(result.contextHint.level).toBe("limited");
+    expect(result.contextHint.description).toMatch(/invalid/i);
+  });
+
+  it.each(["2025-06-01T13:00:00Z", "not-a-time"])(
+    "does not call an invalid capture time recent: %s",
+    (ts) => {
+      const result = snapshotVm({ ...recentManual, ts });
+      expect(result.contextHint.level).toBe("limited");
+      expect(result.contextHint.description).toMatch(/timestamp/i);
+    },
+  );
+
+  it.each(["", 0, { bad: "timestamp" }])(
+    "does not replace a malformed supplied capture time with the recent diary time: %j",
+    (ts) => {
+      const result = snapshotVm({ ...recentManual, ts });
+      expect(result.contextHint.level).toBe("limited");
+      expect(result.contextHint.description).toMatch(/timestamp/i);
+    },
+  );
+
+  it.each([0, 100])("keeps stuck humidity %s visible with caution", (rh) => {
+    const result = snapshotVm({ ...recentManual, rh });
+    expect(result.sensor?.rhPercent).toBe(rh);
+    expect(result.contextHint.level).toBe("limited");
+    expect(result.contextHint.description).toContain("Humidity stuck");
+  });
+
+  it("does not claim current evidence when both capture and diary timestamps are missing", () => {
+    const result = vm({
+      id: "missing-time",
+      photo_url: "https://example.test/photo.jpg",
+      details: { sensor_snapshot: { source: "manual", temp: 24 } },
+    })!;
+    expect(result.contextHint.level).toBe("limited");
+    expect(result.contextHint.description).toMatch(/timestamp/i);
+  });
+
+  it.each([
+    ["sensor_snapshot", undefined],
+    ["sensor_snapshot", null],
+    ["sensor", undefined],
+    ["sensor", null],
+  ])("does not date %s from its diary when capture time is %s", (key, captureTime) => {
+    const result = vm({
+      id: "missing-capture-with-recent-diary",
+      entry_at: recentManual.ts,
+      photo_url: "https://example.test/photo.jpg",
+      details: {
+        [key as string]: {
+          source: "manual",
+          ts: captureTime,
+          captured_at: captureTime,
+          temp: 24,
+        },
+      },
+    })!;
+    expect(result.sensor?.tempC).toBe(24);
+    expect(result.sensor?.capturedAt).toBeNull();
+    expect(result.sensor?.canSupportCurrentContext).toBe(false);
+    expect(result.contextHint.level).toBe("limited");
+    expect(result.contextHint.description).toMatch(/timestamp/i);
+  });
+
+  it("uses captured_at before the diary time when ts is absent", () => {
+    const result = snapshotVm({ source: "manual", captured_at: "2025-05-30T12:00:00Z", temp: 24 });
+    expect(result.sensor?.capturedAt).toBe("2025-05-30T12:00:00Z");
+    expect(result.sensor?.isStale).toBe(true);
+    expect(result.contextHint.level).toBe("limited");
+  });
+
+  it("keeps a usable one-hour-old manual snapshot within its 24-hour current window", () => {
+    const result = snapshotVm({ ...recentManual, ts: "2025-06-01T11:00:00Z" });
+    expect(result.sensor?.isStale).toBe(false);
+    expect(result.contextHint.level).toBe("strong");
+  });
+
+  it.each([true, false])("describes present stale evidence honestly (photo=%s)", (photo) => {
+    const result = snapshotVm({ ...recentManual, ts: "2025-05-30T12:00:00Z" }, photo);
+    expect(result.contextHint.level).toBe("limited");
+    expect(result.contextHint.description).toContain("older");
+    expect(result.contextHint.description).not.toContain("no sensor snapshot");
+    if (photo) expect(result.contextHint.description).not.toMatch(/no photo/i);
+  });
+
+  it("does not repeat an unverifiable persisted live claim in the Source summary", () => {
+    const result = vm({
+      id: "unverified-live",
+      photo_url: "https://example.test/photo.jpg",
+      entry_at: recentManual.ts,
+      details: { source: "live", sensor_snapshot: { ...recentManual, source: "live" } },
+    })!;
+    expect(result.sourceLabels).not.toContain("Live");
+    expect(result.sourceLabels).toContain("Invalid");
+  });
+
+  it("does not present metadata-only live provenance as verified sensor evidence", () => {
+    const result = vm({
+      id: "source-only",
+      photo_url: "https://example.test/photo.jpg",
+      details: { source: "live" },
+    })!;
+    expect(result.sourceLabels).toEqual(["Invalid"]);
+    expect(result.sensor).toBeNull();
+    expect(result.contextHint.level).toBe("partial_missing_sensor");
   });
 });

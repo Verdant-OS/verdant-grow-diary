@@ -31,8 +31,14 @@ import { useRetractedQuickLogEntries } from "@/hooks/useRetractedQuickLogEntries
 import {
   adaptQuickLogRevisionDatabaseRow,
   correctQuickLogEntry,
+  decodeQuickLogRevisionDatabaseRows,
   retractQuickLogEntry,
 } from "@/lib/quickLogRevisionService";
+
+// The revision RPCs return Postgres UUIDs. Keep receipt fixtures valid apart from the field a
+// test is about, so a stricter receipt parser cannot reject them for an unrelated reason.
+const RECEIPT_REVISION_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+const RECEIPT_DIARY_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
 function makeRevisionRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -121,6 +127,12 @@ describe("Quick Log revision client contract", () => {
     expect(retractedHook).not.toMatch(/\bas\s+QuickLogRevisionRow\[\]/);
   });
 
+  it("does not publicly export the deleted silent-filter batch adapter", async () => {
+    const serviceExports = await import("@/lib/quickLogRevisionService");
+
+    expect(serviceExports).not.toHaveProperty("adaptQuickLogRevisionDatabaseRows");
+  });
+
   it("fails closed when an RPC claims success without its required result fields", async () => {
     supabaseMock.rpc.mockResolvedValue({ data: { ok: true }, error: null });
 
@@ -130,39 +142,83 @@ describe("Quick Log revision client contract", () => {
     });
   });
 
-  it("calls the exact generated correction and retraction RPC names", async () => {
+  it.each([
+    ["PGRST202 schema-cache miss", { code: "PGRST202", message: "Could not find the function" }],
+    ["42883 undefined function", { code: "42883", message: "function does not exist" }],
+    ["42501 permission denied", { code: "42501", message: "permission denied for function" }],
+  ] as const)(
+    "maps transport failure %s to the classified revision reason",
+    async (_label, error) => {
+      supabaseMock.rpc.mockResolvedValue({ data: null, error });
+
+      await expect(
+        retractQuickLogEntry({ diaryEntryId: "diary-1" }, "accidental"),
+      ).resolves.toEqual({
+        ok: false,
+        reason: error.code === "42501" ? "forbidden" : "rpc_unavailable",
+      });
+    },
+  );
+
+  it("fails closed when success payload carries an empty revision_id", async () => {
     supabaseMock.rpc.mockResolvedValue({
       data: {
         ok: true,
-        revision_id: "revision-1",
+        revision_id: "",
         revision_no: 1,
         grow_event_id: null,
-        diary_entry_ids: ["diary-1"],
+        diary_entry_ids: [RECEIPT_DIARY_ID],
       },
       error: null,
     });
 
-    await retractQuickLogEntry({ diaryEntryId: "diary-1" }, "accidental");
-    await correctQuickLogEntry({ diaryEntryId: "diary-1" }, "typo", {
-      note: "Corrected note",
+    await expect(
+      retractQuickLogEntry({ diaryEntryId: RECEIPT_DIARY_ID }, "accidental"),
+    ).resolves.toEqual({
+      ok: false,
+      reason: "rpc_error",
+    });
+  });
+
+  it("calls the exact generated correction and retraction RPC names", async () => {
+    supabaseMock.rpc.mockResolvedValue({
+      data: {
+        ok: true,
+        revision_id: RECEIPT_REVISION_ID,
+        revision_no: 1,
+        grow_event_id: null,
+        diary_entry_ids: [RECEIPT_DIARY_ID],
+      },
+      error: null,
     });
 
+    await expect(
+      retractQuickLogEntry({ diaryEntryId: RECEIPT_DIARY_ID }, "accidental"),
+    ).resolves.toMatchObject({ ok: true });
+    await expect(
+      correctQuickLogEntry({ diaryEntryId: RECEIPT_DIARY_ID }, "typo", {
+        note: "Corrected note",
+      }),
+    ).resolves.toMatchObject({ ok: true });
+
     expect(supabaseMock.rpc).toHaveBeenNthCalledWith(1, "quicklog_retract_entry", {
+      p_idempotency_key: expect.any(String),
       p_reason_code: "accidental",
       p_grow_event_id: undefined,
-      p_diary_entry_id: "diary-1",
+      p_diary_entry_id: RECEIPT_DIARY_ID,
       p_reason_note: undefined,
     });
     expect(supabaseMock.rpc).toHaveBeenNthCalledWith(2, "quicklog_correct_entry", {
+      p_idempotency_key: expect.any(String),
       p_reason_code: "typo",
       p_changes: { note: "Corrected note" },
       p_grow_event_id: undefined,
-      p_diary_entry_id: "diary-1",
+      p_diary_entry_id: RECEIPT_DIARY_ID,
       p_reason_note: undefined,
     });
   });
 
-  it("rejects malformed physical revision rows before building badges", async () => {
+  it("marks malformed physical revision rows unavailable before building badges", async () => {
     supabaseMock.revisionResult = {
       data: [makeRevisionRow({ actor_id: 42 })],
       error: null,
@@ -175,6 +231,131 @@ describe("Quick Log revision client contract", () => {
 
     expect(supabaseMock.from).toHaveBeenCalledWith("quicklog_entry_revisions");
     expect(result.current.badges.size).toBe(0);
+    expect(result.current.status).toBe("unavailable");
+  });
+
+  it("marks a non-array revision payload unavailable", async () => {
+    supabaseMock.revisionResult = { data: null, error: null };
+
+    const { result } = renderHook(() => useQuickLogRevisionBadges(["diary-1"]), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.badges.size).toBe(0);
+    expect(result.current.status).toBe("unavailable");
+  });
+
+  it.each([
+    ["unknown kind", { kind: "unknown" }],
+    ["unknown reason", { reason_code: "unknown" }],
+    ["zero revision number", { revision_no: 0 }],
+    ["fractional revision number", { revision_no: 1.5 }],
+    ["empty revision id", { id: "" }],
+    ["empty root id", { root_id: "" }],
+    ["empty creation timestamp", { created_at: "" }],
+  ])("marks a row with %s unavailable", async (_label, overrides) => {
+    supabaseMock.revisionResult = {
+      data: [makeRevisionRow(overrides)],
+      error: null,
+    };
+
+    const { result } = renderHook(() => useQuickLogRevisionBadges(["diary-1"]), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.badges.size).toBe(0);
+    expect(result.current.status).toBe("unavailable");
+  });
+
+  it("rejects a mixed semantic payload without exposing partial badges", async () => {
+    supabaseMock.revisionResult = {
+      data: [
+        makeRevisionRow({ kind: "correction" }),
+        makeRevisionRow({ id: "revision-2", kind: "unknown", revision_no: 2 }),
+      ],
+      error: null,
+    };
+
+    const { result } = renderHook(() => useQuickLogRevisionBadges(["diary-1"]), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.badges.size).toBe(0);
+    expect(result.current.status).toBe("unavailable");
+  });
+
+  it("strictly decodes valid revision-row arrays, including empty success", () => {
+    const validRow = makeRevisionRow();
+
+    expect(decodeQuickLogRevisionDatabaseRows([])).toEqual({ ok: true, rows: [] });
+    expect(decodeQuickLogRevisionDatabaseRows([validRow])).toEqual({
+      ok: true,
+      rows: [validRow],
+    });
+  });
+
+  it.each([
+    ["non-array payload", null],
+    [
+      "partially malformed array",
+      [makeRevisionRow(), makeRevisionRow({ id: "revision-2", actor_id: 42 })],
+    ],
+    ["semantically malformed array", [makeRevisionRow({ kind: "unknown" })]],
+    [
+      "partially semantic array",
+      [
+        makeRevisionRow({ kind: "correction" }),
+        makeRevisionRow({ id: "revision-2", kind: "unknown", revision_no: 2 }),
+      ],
+    ],
+  ])("strictly rejects a %s without exposing partial rows", (_label, payload) => {
+    expect(decodeQuickLogRevisionDatabaseRows(payload)).toEqual({ ok: false });
+  });
+
+  it("marks empty-success badge reads as ok, not unavailable", async () => {
+    supabaseMock.revisionResult = { data: [], error: null };
+
+    const { result } = renderHook(() => useQuickLogRevisionBadges(["diary-1"]), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.badges.size).toBe(0);
+    expect(result.current.status).toBe("ok");
+  });
+
+  it("marks missing resolved data as pending, not ok", () => {
+    const { result } = renderHook(() => useQuickLogRevisionBadges([]), {
+      wrapper: makeWrapper(),
+    });
+
+    // Disabled query: no query.data yet — must not look like empty-success.
+    expect(result.current.badges.size).toBe(0);
+    expect(result.current.status).toBe("pending");
+  });
+
+  it("marks hung/isLoading reads without data as pending, not ok", async () => {
+    const revisionBuilder = {
+      select: vi.fn(),
+      in: vi.fn(),
+      order: vi.fn(),
+    };
+    revisionBuilder.select.mockReturnValue(revisionBuilder);
+    revisionBuilder.in.mockReturnValue(revisionBuilder);
+    // Never resolve — hung network.
+    revisionBuilder.order.mockReturnValue(new Promise(() => {}));
+    supabaseMock.from.mockReturnValue(revisionBuilder);
+
+    const { result } = renderHook(() => useQuickLogRevisionBadges(["diary-1"]), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(true));
+
+    expect(result.current.badges.size).toBe(0);
+    expect(result.current.status).toBe("pending");
   });
 
   it.each([
@@ -200,7 +381,10 @@ describe("Quick Log revision client contract", () => {
       count: 1,
     };
     supabaseMock.revisionResult = {
-      data: [makeRevisionRow({ diary_entry_id: 42 })],
+      data: [
+        makeRevisionRow(),
+        makeRevisionRow({ id: "revision-2", diary_entry_id: 42, revision_no: 2 }),
+      ],
       error: null,
     };
 
@@ -226,7 +410,30 @@ describe("Quick Log revision client contract", () => {
     });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
+    // Fail-soft: never crash the timeline surface.
     expect(result.current.badges.size).toBe(0);
+    // Honesty: unread ledger must not look like "truly no edits."
+    expect(result.current.status).toBe("unavailable");
+  });
+
+  it("marks network/query throws as unavailable without throwing to the surface", async () => {
+    const revisionBuilder = {
+      select: vi.fn(),
+      in: vi.fn(),
+      order: vi.fn(),
+    };
+    revisionBuilder.select.mockReturnValue(revisionBuilder);
+    revisionBuilder.in.mockReturnValue(revisionBuilder);
+    revisionBuilder.order.mockRejectedValue(new Error("network down"));
+    supabaseMock.from.mockReturnValue(revisionBuilder);
+
+    const { result } = renderHook(() => useQuickLogRevisionBadges(["diary-1"]), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.badges.size).toBe(0);
+    expect(result.current.status).toBe("unavailable");
   });
 
   it("keeps retained entries visible without revision metadata when that lookup fails", async () => {

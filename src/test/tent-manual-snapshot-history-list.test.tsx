@@ -6,10 +6,10 @@
  * sensor ingestion, alerts, action_queue, automation, device control, or
  * service_role.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import React from "react";
 
 import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
@@ -30,6 +30,7 @@ const TENT_DETAIL = read("src/pages/TentDetail.tsx");
 
 const TENT_A = "tent-a";
 const TENT_B = "tent-b";
+const SUCCESS_READ = { readStatus: "success" as const, onRetry: () => {} };
 
 function row(
   ts: string,
@@ -191,7 +192,7 @@ describe("buildManualSnapshotHistoryList — pure rules", () => {
 
 describe("TentManualSnapshotHistoryList — render", () => {
   it("renders empty state when no manual snapshots exist for this tent", () => {
-    render(<TentManualSnapshotHistoryList tentId={TENT_A} readings={[]} />);
+    render(<TentManualSnapshotHistoryList {...SUCCESS_READ} tentId={TENT_A} readings={[]} />);
     expect(screen.getByTestId("tent-manual-snapshot-history-empty")).toBeInTheDocument();
   });
 
@@ -204,7 +205,7 @@ describe("TentManualSnapshotHistoryList — render", () => {
         co2_ppm: 800,
       }),
     ];
-    render(<TentManualSnapshotHistoryList tentId={TENT_A} readings={rows} />);
+    render(<TentManualSnapshotHistoryList {...SUCCESS_READ} tentId={TENT_A} readings={rows} />);
     const items = screen.getAllByTestId("tent-manual-snapshot-history-item");
     expect(items.length).toBe(1);
     expect(within(items[0]).getByTestId("tent-manual-snapshot-history-source")).toHaveTextContent(
@@ -225,7 +226,7 @@ describe("TentManualSnapshotHistoryList — render", () => {
       ...manualSnapshot(T[0], TENT_A, { temperature_c: 24, humidity_pct: 55 }),
       ...manualSnapshot(T[1], TENT_A, { temperature_c: 25, humidity_pct: 51 }),
     ];
-    render(<TentManualSnapshotHistoryList tentId={TENT_A} readings={rows} />);
+    render(<TentManualSnapshotHistoryList {...SUCCESS_READ} tentId={TENT_A} readings={rows} />);
     const items = screen.getAllByTestId("tent-manual-snapshot-history-item");
     expect(items.length).toBe(2);
     const latestChange = within(items[0]).getByTestId("tent-manual-snapshot-history-change");
@@ -241,7 +242,7 @@ describe("TentManualSnapshotHistoryList — render", () => {
       row(T[1], "temperature_c", 25, "demo", TENT_A),
       row(T[2], "temperature_c", 26, "live", TENT_A),
     ];
-    render(<TentManualSnapshotHistoryList tentId={TENT_A} readings={rows} />);
+    render(<TentManualSnapshotHistoryList {...SUCCESS_READ} tentId={TENT_A} readings={rows} />);
     expect(screen.getByTestId("tent-manual-snapshot-history-empty")).toBeInTheDocument();
     expect(screen.queryAllByTestId("tent-manual-snapshot-history-item").length).toBe(0);
   });
@@ -251,7 +252,7 @@ describe("TentManualSnapshotHistoryList — render", () => {
       ...manualSnapshot(T[0], TENT_A, { temperature_c: 24 }),
       ...manualSnapshot(T[1], TENT_B, { temperature_c: 99 }),
     ];
-    render(<TentManualSnapshotHistoryList tentId={TENT_A} readings={rows} />);
+    render(<TentManualSnapshotHistoryList {...SUCCESS_READ} tentId={TENT_A} readings={rows} />);
     const items = screen.getAllByTestId("tent-manual-snapshot-history-item");
     expect(items.length).toBe(1);
     const metrics = within(items[0]).getAllByTestId("tent-manual-snapshot-history-metric");
@@ -261,7 +262,9 @@ describe("TentManualSnapshotHistoryList — render", () => {
 
   it("renders nothing when tentId is null", () => {
     const rows = manualSnapshot(T[0], TENT_A, { temperature_c: 24 });
-    const { container } = render(<TentManualSnapshotHistoryList tentId={null} readings={rows} />);
+    const { container } = render(
+      <TentManualSnapshotHistoryList {...SUCCESS_READ} tentId={null} readings={rows} />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -270,8 +273,134 @@ describe("TentManualSnapshotHistoryList — render", () => {
     for (let i = 0; i < 6; i++) {
       rows.push(...manualSnapshot(T[i], TENT_A, { temperature_c: 20 + i }));
     }
-    render(<TentManualSnapshotHistoryList tentId={TENT_A} readings={rows} />);
+    render(<TentManualSnapshotHistoryList {...SUCCESS_READ} tentId={TENT_A} readings={rows} />);
     const items = screen.getAllByTestId("tent-manual-snapshot-history-item");
     expect(items.length).toBe(DEFAULT_HISTORY_LIMIT);
   });
+});
+
+describe("TentManualSnapshotHistoryList — fail-closed read states", () => {
+  const cachedRows = manualSnapshot(T[0], TENT_A, { temperature_c: 24 });
+  const outcomes = [
+    { label: "empty", readings: [] as SensorReadingRow[] },
+    { label: "populated", readings: cachedRows },
+  ];
+
+  function expectNoHistory() {
+    expect(screen.queryByTestId("tent-manual-snapshot-history-empty")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tent-manual-snapshot-history-item")).not.toBeInTheDocument();
+  }
+
+  for (const { label, readings } of outcomes) {
+    it.each([
+      { readStatus: "pending" as const, isFetching: true },
+      { readStatus: "pending" as const, isFetching: false },
+      { readStatus: "success" as const, isFetching: true },
+    ])(`shows loading, not ${label} history, for $readStatus / fetching=$isFetching`, (state) => {
+      render(
+        <TentManualSnapshotHistoryList
+          {...SUCCESS_READ}
+          {...state}
+          tentId={TENT_A}
+          readings={readings}
+        />,
+      );
+      expect(screen.getByRole("status")).toHaveTextContent(/Loading manual snapshots/i);
+      expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "true");
+      expectNoHistory();
+      expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+    });
+
+    it(`shows unavailable and Retry after failure with ${label} cached data`, () => {
+      render(
+        <TentManualSnapshotHistoryList
+          {...SUCCESS_READ}
+          readStatus="error"
+          tentId={TENT_A}
+          readings={readings}
+        />,
+      );
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Manual snapshot history is unavailable.",
+      );
+      expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+      expectNoHistory();
+    });
+
+    it(`recovers to verified ${label} history only after Retry succeeds`, () => {
+      const onRetry = vi.fn();
+      const props = { tentId: TENT_A, readings, onRetry };
+      const { rerender } = render(
+        <TentManualSnapshotHistoryList {...props} readStatus="error" />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      expect(onRetry).toHaveBeenCalledTimes(1);
+      rerender(<TentManualSnapshotHistoryList {...props} readStatus="pending" isFetching />);
+      expectNoHistory();
+      rerender(<TentManualSnapshotHistoryList {...props} readStatus="success" />);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      if (label === "empty") {
+        expect(screen.getByTestId("tent-manual-snapshot-history-empty")).toHaveTextContent(
+          "No manual snapshots saved yet for this tent.",
+        );
+      } else {
+        expect(screen.getAllByTestId("tent-manual-snapshot-history-item")).toHaveLength(1);
+        expect(screen.getByTestId("tent-manual-snapshot-history-source")).toHaveTextContent(
+          "Manual",
+        );
+      }
+    });
+  }
+
+  it("does not retry automatically and disables repeat clicks while a retry is fetching", () => {
+    const onRetry = vi.fn();
+    const props = { tentId: TENT_A, readings: cachedRows, onRetry, readStatus: "error" as const };
+    const { rerender } = render(<TentManualSnapshotHistoryList {...props} />);
+    expect(onRetry).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    rerender(<TentManualSnapshotHistoryList {...props} isFetching />);
+    expect(screen.getByRole("alert")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expectNoHistory();
+    rerender(<TentManualSnapshotHistoryList {...props} />);
+    expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+    expectNoHistory();
+  });
+
+  it("does not reveal the previous tent's history while the next tent is pending", () => {
+    const { rerender } = render(
+      <TentManualSnapshotHistoryList {...SUCCESS_READ} tentId={TENT_A} readings={cachedRows} />,
+    );
+    expect(screen.getByTestId("tent-manual-snapshot-history-item")).toBeInTheDocument();
+    rerender(
+      <TentManualSnapshotHistoryList
+        {...SUCCESS_READ}
+        tentId={TENT_B}
+        readings={cachedRows}
+        readStatus="pending"
+        isFetching
+      />,
+    );
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expectNoHistory();
+  });
+
+  it.each(["pending", "error"] as const)(
+    "renders nothing without a tent during %s",
+    (readStatus) => {
+      const { container } = render(
+        <TentManualSnapshotHistoryList
+          {...SUCCESS_READ}
+          tentId={null}
+          readings={cachedRows}
+          readStatus={readStatus}
+        />,
+      );
+      expect(container).toBeEmptyDOMElement();
+    },
+  );
 });

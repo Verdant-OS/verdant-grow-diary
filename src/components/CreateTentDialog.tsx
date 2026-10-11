@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { tentSizeValidationMessage } from "@/lib/tentManagementRules";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
@@ -40,6 +41,7 @@ import {
   persistHierarchyCreateAttempt,
 } from "@/lib/hierarchyCreatePersistence";
 import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
+import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
 
 export interface CreatedTent {
   id: string;
@@ -52,6 +54,12 @@ interface Props {
   defaultGrowId?: string;
   onCreated?: (tent: CreatedTent) => void;
   initiallyOpen?: boolean;
+  /**
+   * Optional controlled open. When set, the parent owns visibility (e.g. Assign
+   * empty-state CTA) so this dialog is not nested DialogTrigger-inside-Dialog.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   writeBlocked?: boolean;
 }
 
@@ -62,6 +70,8 @@ export default function CreateTentDialog({
   defaultGrowId,
   onCreated,
   initiallyOpen = false,
+  open: openProp,
+  onOpenChange,
   writeBlocked = false,
 }: Props) {
   const { user } = useAuth();
@@ -73,7 +83,9 @@ export default function CreateTentDialog({
     refresh: refreshGrows,
   } = useGrows();
   const qc = useQueryClient();
-  const [open, setOpen] = useState(initiallyOpen);
+  const isControlled = openProp !== undefined;
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(initiallyOpen);
+  const open = isControlled ? openProp : uncontrolledOpen;
   const [busy, setBusy] = useState(false);
   const createInFlightRef = useRef(false);
   const [form, setForm] = useState(EMPTY_TENT_FORM);
@@ -119,6 +131,11 @@ export default function CreateTentDialog({
     setForm(EMPTY_TENT_FORM);
   }
 
+  function setOpen(next: boolean) {
+    if (!isControlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  }
+
   useEffect(() => {
     if (!writeBlocked) return;
     setOpen(false);
@@ -153,8 +170,14 @@ export default function CreateTentDialog({
       if (binding.toastMessage) toast.error(binding.toastMessage);
       return;
     }
+    if (!hasTrimmedRequiredIdentity(form.name)) return;
     if (!targetGrowId) {
       toast.error("Choose a verified grow before creating a tent.");
+      return;
+    }
+    const sizeMessage = tentSizeValidationMessage(form.size);
+    if (sizeMessage) {
+      toast.error(sizeMessage);
       return;
     }
     let tentId: string;
@@ -227,19 +250,25 @@ export default function CreateTentDialog({
     }
   }
 
+  // Controlled callers (Assign empty-state CTA) own a sibling Button and omit
+  // DialogTrigger so this dialog is never nested Trigger-inside-Trigger.
+  const showTrigger = trigger !== undefined || !isControlled;
+
   return (
     <Dialog open={open && !writeBlocked} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button
-            size="sm"
-            className="gradient-leaf text-primary-foreground gap-1"
-            disabled={createOutcomeUnknown}
-          >
-            <Plus className="h-4 w-4" /> New tent
-          </Button>
-        )}
-      </DialogTrigger>
+      {showTrigger ? (
+        <DialogTrigger asChild>
+          {trigger ?? (
+            <Button
+              size="sm"
+              className="gradient-leaf text-primary-foreground gap-1"
+              disabled={createOutcomeUnknown}
+            >
+              <Plus className="h-4 w-4" /> New tent
+            </Button>
+          )}
+        </DialogTrigger>
+      ) : null}
       <DialogContent className="glass max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display">New tent</DialogTitle>
@@ -444,7 +473,13 @@ export default function CreateTentDialog({
               </div>
             </details>
             <Button
-              disabled={busy || createOutcomeUnknown || !tentGate.allowed || formBlocked}
+              disabled={
+                busy ||
+                createOutcomeUnknown ||
+                !tentGate.allowed ||
+                formBlocked ||
+                !hasTrimmedRequiredIdentity(form.name)
+              }
               className="gradient-leaf text-primary-foreground"
               data-testid="tent-create-submit"
             >

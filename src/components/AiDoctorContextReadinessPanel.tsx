@@ -16,6 +16,7 @@ import {
   type AiDoctorReadinessState,
 } from "@/lib/aiDoctorReadinessViewModel";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
+import type { AlertsListStatus } from "@/hooks/useAlertsList";
 import AiDoctorImportedHistoryDisclosurePanel from "@/components/AiDoctorImportedHistoryDisclosurePanel";
 import {
   ACTION_SUGGESTION_INVALID_FIELD_LABELS,
@@ -42,9 +43,18 @@ export interface AiDoctorReadinessQuickActions {
 export interface AiDoctorContextReadinessPanelProps {
   context: AiDoctorContext;
   openAlertsCount?: number;
+  openAlertsStatus?: "idle" | "loading" | "unavailable" | "ok" | "no_tent";
+  onRetryAlerts?: () => void;
   className?: string;
   quickActions?: AiDoctorReadinessQuickActions;
 }
+
+const OPEN_ALERTS_STATUS_COPY = {
+  idle: "Loading…",
+  loading: "Loading…",
+  unavailable: "Unavailable",
+  no_tent: "No assigned tent",
+} as const;
 
 const QUICK_ACTION_COPY = {
   photo: "A recent plant photo helps AI Doctor avoid guessing from logs alone.",
@@ -164,12 +174,18 @@ function QuickActionsRow({
 export default function AiDoctorContextReadinessPanel({
   context,
   openAlertsCount,
+  openAlertsStatus = "ok",
+  onRetryAlerts,
   className,
   quickActions,
 }: AiDoctorContextReadinessPanelProps) {
   const view = useMemo(
-    () => buildAiDoctorReadinessView({ context, openAlertsCount }),
-    [context, openAlertsCount],
+    () =>
+      buildAiDoctorReadinessView({
+        context,
+        openAlertsCount: openAlertsStatus === "ok" ? openAlertsCount : undefined,
+      }),
+    [context, openAlertsCount, openAlertsStatus],
   );
   const style = STATE_STYLES[view.state];
 
@@ -290,8 +306,20 @@ export default function AiDoctorContextReadinessPanel({
           <dd
             className="font-medium"
             data-testid="ai-doctor-context-readiness-panel-count-open-alerts"
+            aria-live="polite"
           >
-            {view.counts.openAlerts}
+            {openAlertsStatus === "ok"
+              ? view.counts.openAlerts
+              : OPEN_ALERTS_STATUS_COPY[openAlertsStatus]}
+            {openAlertsStatus === "unavailable" && onRetryAlerts ? (
+              <button
+                type="button"
+                onClick={onRetryAlerts}
+                className="mt-1 block rounded-md border border-border/60 px-2 py-0.5 text-xs hover:bg-muted/40"
+              >
+                Retry alerts
+              </button>
+            ) : null}
           </dd>
         </div>
       </dl>

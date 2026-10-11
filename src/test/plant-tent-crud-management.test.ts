@@ -16,6 +16,11 @@ import {
   buildPlantTentMovePayload,
   buildRemovePlantFromTentPayload,
   buildArchivePlantPayload,
+  buildRestorePlantPayload,
+  resolvePlantArchiveMenuAction,
+  plantMoveRequiresPhenoUntag,
+  buildPlantPhenoUntagPayload,
+  buildPlantTentMoveUpdate,
 } from "@/lib/plantTentRelationshipRules";
 
 const ROOT = resolve(__dirname, "../..");
@@ -92,6 +97,81 @@ describe("plantTentRelationshipRules · getEligibleTentsForPlantMove", () => {
     expect(out.current).toEqual([]);
     expect(out.others.map((t) => t.id).sort()).toEqual(["t1", "t2"]);
   });
+
+  it("keeps cross-grow tents out until includeCrossGrow after explicit untag", () => {
+    const blocked = getEligibleTentsForPlantMove(tents, "t1", "g1");
+    expect(blocked.others.map((t) => t.id)).not.toContain("t4");
+    const released = getEligibleTentsForPlantMove(tents, "t1", "g1", { includeCrossGrow: true });
+    expect(released.others.map((t) => t.id).sort()).toEqual(["t2", "t4"]);
+  });
+});
+
+describe("plantTentRelationshipRules · hunt-linked cross-grow untag gate", () => {
+  it("blocks silent grow_id change while pheno_hunt_id is set", () => {
+    expect(
+      plantMoveRequiresPhenoUntag({
+        phenoHuntId: "hunt-1",
+        plantGrowId: "g1",
+        destinationGrowId: "g2",
+      }),
+    ).toBe(true);
+    expect(
+      buildPlantTentMoveUpdate({
+        tentId: "t4",
+        plantGrowId: "g1",
+        destinationGrowId: "g2",
+        usedGrowFallback: false,
+        phenoHuntId: "hunt-1",
+      }),
+    ).toBeNull();
+  });
+
+  it("allows same-grow move without untag", () => {
+    expect(
+      plantMoveRequiresPhenoUntag({
+        phenoHuntId: "hunt-1",
+        plantGrowId: "g1",
+        destinationGrowId: "g1",
+      }),
+    ).toBe(false);
+    expect(
+      buildPlantTentMoveUpdate({
+        tentId: "t2",
+        plantGrowId: "g1",
+        destinationGrowId: "g1",
+        usedGrowFallback: false,
+        phenoHuntId: "hunt-1",
+      }),
+    ).toEqual({ tent_id: "t2" });
+  });
+
+  it("after untag, cross-grow move sets grow_id without touching pheno_hunt_id", () => {
+    expect(buildPlantPhenoUntagPayload()).toEqual({
+      pheno_hunt_id: null,
+      candidate_label: null,
+    });
+    expect(buildPlantPhenoUntagPayload()).not.toHaveProperty("tent_id");
+    expect(buildPlantPhenoUntagPayload()).not.toHaveProperty("grow_id");
+    expect(
+      buildPlantTentMoveUpdate({
+        tentId: "t4",
+        plantGrowId: "g1",
+        destinationGrowId: "g2",
+        usedGrowFallback: false,
+        phenoHuntId: null,
+      }),
+    ).toEqual({ tent_id: "t4", grow_id: "g2" });
+  });
+
+  it("does not require untag when destination tent has no grow_id", () => {
+    expect(
+      plantMoveRequiresPhenoUntag({
+        phenoHuntId: "hunt-1",
+        plantGrowId: "g1",
+        destinationGrowId: null,
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("plantTentRelationshipRules · payload helpers", () => {
@@ -113,11 +193,23 @@ describe("plantTentRelationshipRules · payload helpers", () => {
     expect(buildArchivePlantPayload("p1")).toEqual({ is_archived: true });
   });
 
+  it("buildRestorePlantPayload only clears is_archived", () => {
+    expect(buildRestorePlantPayload("p1")).toEqual({ is_archived: false });
+  });
+
+  it("resolvePlantArchiveMenuAction offers Restore for archived, Archive for active", () => {
+    expect(resolvePlantArchiveMenuAction(true)).toBe("restore");
+    expect(resolvePlantArchiveMenuAction(false)).toBe("archive");
+    expect(resolvePlantArchiveMenuAction(null)).toBe("archive");
+    expect(resolvePlantArchiveMenuAction(undefined)).toBe("archive");
+  });
+
   it("payload helpers never include user_id / grow_id / strain / stage", () => {
     for (const p of [
       buildPlantTentMovePayload("p1", "t1") as Record<string, unknown>,
       buildRemovePlantFromTentPayload("p1") as Record<string, unknown>,
       buildArchivePlantPayload("p1") as Record<string, unknown>,
+      buildRestorePlantPayload("p1") as Record<string, unknown>,
     ]) {
       expect(p).not.toHaveProperty("user_id");
       expect(p).not.toHaveProperty("grow_id");
@@ -182,7 +274,7 @@ describe("PlantDetail · Edit / Move / Remove / Archive action row", () => {
   });
 });
 
-describe("PlantCardActionsMenu · separate Remove vs Archive", () => {
+describe("PlantCardActionsMenu · separate Remove vs Archive / Restore", () => {
   it("Remove from Tent uses tent_id:null and shows confirmation", () => {
     expect(ACTIONS_MENU).toContain("Remove this plant from this tent?");
     expect(ACTIONS_MENU).toContain("buildRemovePlantFromTentPayload");
@@ -191,6 +283,14 @@ describe("PlantCardActionsMenu · separate Remove vs Archive", () => {
   it("Archive uses is_archived:true and asks for confirmation", () => {
     expect(ACTIONS_MENU).toContain("buildArchivePlantPayload");
     expect(ACTIONS_MENU).toMatch(/Archive .{0,40}\?/);
+  });
+
+  it("Restore uses is_archived:false and asks for confirmation", () => {
+    expect(ACTIONS_MENU).toContain("buildRestorePlantPayload");
+    expect(ACTIONS_MENU).toContain("resolvePlantArchiveMenuAction");
+    expect(ACTIONS_MENU).toMatch(/Restore .{0,40}\?/);
+    expect(ACTIONS_MENU).toContain('data-testid="plant-card-action-restore"');
+    expect(ACTIONS_MENU).toContain('data-testid="plant-detail-restore-plant"');
   });
 
   it("does not call .delete on the plants table (uses archive instead)", () => {
@@ -213,15 +313,12 @@ describe("EditPlantDialog · safe field-level updates", () => {
     expect(EDIT_DIALOG).toMatch(/started_at/);
   });
 
-  it("update payload never touches user_id or grow_id", () => {
-    const updates = [
-      ...EDIT_DIALOG.matchAll(/payload:\s*Record<string,\s*unknown>\s*=\s*\{([\s\S]*?)\};/g),
-    ];
-    expect(updates.length).toBeGreaterThan(0);
-    for (const m of updates) {
-      expect(m[1]).not.toMatch(/\buser_id\b/);
-      expect(m[1]).not.toMatch(/\bgrow_id\b/);
-    }
+  it("update payload never touches user_id; grow_id only via empty-grow re-home helper", () => {
+    expect(EDIT_DIALOG).not.toMatch(/\buser_id\s*:/);
+    // Direct grow_id literals in the payload object are banned; the only
+    // allowed write is the spread from buildPlantEditGrowIdFromTent.
+    expect(EDIT_DIALOG).toMatch(/\.\.\.\(growPatch\s*\?\?\s*\{\}\)/);
+    expect(EDIT_DIALOG).toMatch(/buildPlantEditGrowIdFromTent\(/);
   });
 });
 
@@ -233,6 +330,13 @@ describe("AssignTentDialog · Move Plant empty-state and current-tent labeling",
 
   it("shows empty message when no eligible tents exist", () => {
     expect(ASSIGN_DIALOG).toMatch(/No tents available/i);
+  });
+
+  it("requires a dedicated pheno untag confirm before any grow_id move write", () => {
+    expect(ASSIGN_DIALOG).toContain("confirmPhenoUntag");
+    expect(ASSIGN_DIALOG).toContain("buildPlantPhenoUntagPayload");
+    expect(ASSIGN_DIALOG).toContain("buildPlantTentMoveUpdate");
+    expect(ASSIGN_DIALOG).not.toMatch(/pheno_hunt_id:\s*null[\s\S]{0,80}tent_id/);
   });
 });
 

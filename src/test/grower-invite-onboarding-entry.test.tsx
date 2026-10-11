@@ -37,6 +37,7 @@ describe("post-value grower invite entry", () => {
       sensorReadingCount: 0,
     });
     expect(screen.queryByRole("link", { name: "Invite a grower" })).toBeNull();
-    expect(screen.getByTestId("onboarding-checklist-card")).toBeInTheDocument();
+    // Plant memory → operating frame; get-started shell is no longer primary.
+    expect(screen.queryByTestId("onboarding-checklist-card")).not.toBeInTheDocument();
   });
 });

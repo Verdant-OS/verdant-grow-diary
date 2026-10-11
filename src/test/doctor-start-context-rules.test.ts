@@ -293,8 +293,16 @@ describe("partitionDoctorEntryOptionsByTent — carried plant (D-B6 / B6)", () =
     }
   });
 
-  it("flags unavailable when a plant was carried but tent scope is missing", () => {
-    const r = partitionDoctorEntryOptionsByTent({ options, plants, carriedPlantId: "p1" });
+  it("labels a plant-only carry when that plant is already in the loaded options", () => {
+    const r = partitionDoctorEntryOptionsByTent({ options, plants, carriedPlantId: "p2" });
+    expect(r.carriedPlantOptionId).toBe("p2");
+    expect(r.hasUnavailableCarriedPlant).toBe(false);
+    expect(r.inScope).toEqual([]);
+    expect(r.others.map((o) => o.id)).toEqual(["p2", "p1", "p3"]);
+  });
+
+  it("flags unavailable for a plant-only carry that is outside the loaded options", () => {
+    const r = partitionDoctorEntryOptionsByTent({ options, plants, carriedPlantId: "p9" });
     expect(r.carriedPlantOptionId).toBeNull();
     expect(r.hasUnavailableCarriedPlant).toBe(true);
     expect(r.inScope).toEqual([]);

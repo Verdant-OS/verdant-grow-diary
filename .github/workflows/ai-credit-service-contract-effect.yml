@@ -3,11 +3,10 @@ name: AI-credit service contract effect (production)
 # Migration history proves that SQL ran once. This monitor separately proves
 # that the two money-critical service overloads and their privilege boundary
 # still express the forward-reasserted contract now.
+# ENV-RETIRE-001: retire the schedule bound to owner-reported hollow
+# verdant-production. Guarded manual dispatch remains; no run is NOT_MEASURED.
+# See docs/production-environment-retirement-runbook.md before any dispatch.
 on:
-  schedule:
-    # Run after the 07:30 UTC migration-presence monitor so the two findings
-    # remain separate and operators see history before current effect.
-    - cron: "0 8 * * *"
   workflow_dispatch: {}
 
 permissions:

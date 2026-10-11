@@ -32,19 +32,23 @@ const tentsState: typeof plantsState = {
 vi.mock("@/hooks/use-plants", () => ({ usePlants: () => plantsState }));
 vi.mock("@/hooks/use-tents", () => ({ useTents: () => tentsState }));
 
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({ grows: [{ id: "grow-1", name: "Grow 1" }] }),
+}));
+
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 
-function renderSheet() {
+function renderSheet(defaultTargetKey?: string | null) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <QuickLogV2Sheet open={true} onOpenChange={() => {}} />
+      <QuickLogV2Sheet open={true} onOpenChange={() => {}} defaultTargetKey={defaultTargetKey} />
     </QueryClientProvider>,
   );
 }
@@ -118,14 +122,70 @@ describe("QuickLogV2Sheet — empty plant + tent lists", () => {
   });
 });
 
-describe("QuickLogV2Sheet — happy path still enables Save", () => {
-  it("with plants present and no error/loading, Save is enabled", () => {
+describe("QuickLogV2Sheet — Save requires an explicit plant or tent target", () => {
+  beforeEach(() => {
     plantsState.data = [{ id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" }];
     tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
+  });
+
+  it("keeps helper copy and disables Save when targets exist but none is selected", () => {
     renderSheet();
     expect(screen.queryByTestId("qlv2-context-loading")).toBeNull();
     expect(screen.queryByTestId("qlv2-context-error")).toBeNull();
     expect(screen.queryByTestId("qlv2-context-empty")).toBeNull();
+    expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
+      "Choose a plant or tent before saving.",
+    );
+    const save = screen.getByTestId("qlv2-save") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(save);
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("LIVE MISS #1310: note text without a plant/tent target keeps Save disabled (no toast/RPC)", () => {
+    renderSheet();
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "Has note text but no plant or tent selected." },
+    });
+    expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
+      "Choose a plant or tent before saving.",
+    );
+    const save = screen.getByTestId("qlv2-save") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(save);
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("disables Save when a plant target is selected but note content is empty", () => {
+    renderSheet("plant:plant-1");
+    expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
+      "Add a note, photo, or reading before saving.",
+    );
+    const save = screen.getByTestId("qlv2-save") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(save);
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("enables Save when a plant target is selected and a note is entered", () => {
+    renderSheet("plant:plant-1");
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "Slight droop" },
+    });
+    expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
+      "Ready to save when this log matches what happened.",
+    );
+    expect((screen.getByTestId("qlv2-save") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("enables Save when a tent target is selected and a note is entered", () => {
+    renderSheet("tent:tent-1");
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "Canopy check" },
+    });
+    expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
+      "Ready to save when this log matches what happened.",
+    );
     expect((screen.getByTestId("qlv2-save") as HTMLButtonElement).disabled).toBe(false);
   });
 });

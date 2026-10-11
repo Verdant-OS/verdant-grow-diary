@@ -12,9 +12,8 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useSensorReadings } from "@/hooks/use-sensor-readings";
-import { useDiaryEntries } from "@/hooks/use-diary-entries";
-import { usePlants } from "@/hooks/use-plants";
+import { useDailyGrowCheckReads } from "@/hooks/useDailyGrowCheckReads";
+import { DailyGrowCheckReadNotice } from "@/components/DailyGrowCheckReadNotice";
 import {
   buildDailyGrowCheckConsistency,
   buildDailyMethodBreakdown,
@@ -35,13 +34,18 @@ import {
 interface Props {
   plantId: string;
   currentTentId: string | null;
+  /** Plant `created_at`; earlier days are "not tracked", not "missed". */
+  trackingStartedAt?: string | null;
 }
 
-export default function PlantDailyGrowCheckConsistencyCard({ plantId, currentTentId }: Props) {
+export default function PlantDailyGrowCheckConsistencyCard({
+  plantId,
+  currentTentId,
+  trackingStartedAt,
+}: Props) {
   const queryClient = useQueryClient();
-  const { data: rawReadings = [] } = useSensorReadings(currentTentId ?? undefined);
-  const { data: rawDiary = [] } = useDiaryEntries();
-  const { data: plants = [] } = usePlants();
+  const reads = useDailyGrowCheckReads(currentTentId);
+  const { rawReadings, rawDiary, plants } = reads;
 
   // Belt-and-suspenders: when QuickLog dispatches
   // `verdant:entry-created` OR a manual sensor snapshot dispatches
@@ -65,6 +69,17 @@ export default function PlantDailyGrowCheckConsistencyCard({ plantId, currentTen
     };
   }, [queryClient]);
 
+  if (reads.state !== "ready") {
+    return (
+      <DailyGrowCheckReadNotice
+        kind="consistency"
+        plantId={plantId}
+        {...reads}
+        state={reads.state}
+      />
+    );
+  }
+
   const plantsInTentCount = currentTentId
     ? plants.filter((p) => p.tent_id === currentTentId).length
     : 0;
@@ -72,6 +87,7 @@ export default function PlantDailyGrowCheckConsistencyCard({ plantId, currentTen
   const summary = buildDailyGrowCheckConsistency({
     now: new Date(),
     windowDays: CONSISTENCY_WINDOW_DAYS,
+    trackingStartedAt: trackingStartedAt ?? null,
     plantId,
     currentTentId,
     plantsInTentCount,

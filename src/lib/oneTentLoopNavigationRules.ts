@@ -16,7 +16,8 @@ import {
   buildPlantQuickLogPrefill,
   type PlantQuickLogPrefill,
 } from "@/lib/plantQuickLogPrefillRules";
-import { actionsPath, alertsPath, timelinePath } from "@/lib/routes";
+import { buildConnectedActivationRoutes } from "@/lib/connectedOneTentActivationRules";
+import { actionsPath, alertsPath, timelinePath, withGrowId } from "@/lib/routes";
 
 export type OneTentLoopStep =
   | "grow"
@@ -193,10 +194,19 @@ export function resolveOneTentLoopNextStep(
 
   switch (current) {
     case "grow":
-      // CTA is "Open tent" — must route to an actual tent, never self-link
-      // back to Grow Detail. When no tentId is selected, stay disabled so
-      // the operator is not misled into thinking a tent is opened.
-      if (tentId) return enable(base, `/tents/${tentId}`);
+      // CTA is "Open tent" when a tent is already known — never self-link
+      // back to Grow Detail. When the grow itself is selected (route or
+      // explicit id) but no tent is known yet, advance with the same
+      // grow-scoped Add tent activation path onboarding uses. Do not
+      // strand the grower with "unavailable until this record is selected"
+      // while they are already on that grow's detail page.
+      if (normalizedTentId) return enable(base, `/tents/${normalizedTentId}`);
+      if (normalizedGrowId) {
+        return {
+          ...enable(base, buildConnectedActivationRoutes({ growId: normalizedGrowId }).addTent),
+          ctaLabel: "Add tent",
+        };
+      }
       return base;
     case "tent":
       // CTA is "Open plant" — must route to an actual plant, never self-link
@@ -227,16 +237,24 @@ export function resolveOneTentLoopNextStep(
       // from pairing that plant with a first-available fallback if its tent
       // disappears before the destination resolves. Direct callers that pass
       // a plant without a tent fail closed to a generic Sensors route.
+      // Grow scope is additive via the shared withGrowId helper (same as
+      // Reports "Open sensor context") — never invent a growId.
       if (normalizedTentId && normalizedPlantId) {
         return enable(
           base,
-          withSensorsPlantIntent(
-            buildSensorsTentRouteHref(normalizedTentId, { requireExactMatch: true }),
-            normalizedPlantId,
+          withGrowId(
+            withSensorsPlantIntent(
+              buildSensorsTentRouteHref(normalizedTentId, { requireExactMatch: true }),
+              normalizedPlantId,
+            ),
+            normalizedGrowId,
           ),
         );
       }
-      return enable(base, buildSensorsTentRouteHref(normalizedTentId));
+      return enable(
+        base,
+        withGrowId(buildSensorsTentRouteHref(normalizedTentId), normalizedGrowId),
+      );
     case "sensor-snapshot":
       if (normalizedGrowId && normalizedTentId) {
         const scopedHref = `/doctor?growId=${encodeURIComponent(normalizedGrowId)}&tentId=${encodeURIComponent(normalizedTentId)}`;

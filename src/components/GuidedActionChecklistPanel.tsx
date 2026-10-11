@@ -3,7 +3,8 @@
  *
  * Presenter only. All ranking, deduplication, and gap detection happens in
  * `guidedActionChecklistRules.ts`. Every item is advisory: taps deep-link
- * into an existing screen (Quick Log, Alerts) and the grower still saves.
+ * into an existing authenticated screen (Daily Check, Alerts) and the grower
+ * still saves. Never the public `/quick-log` starter.
  * Dismissals are stored per-browser via `guidedActionChecklistDismissals`
  * with a 12h TTL so a genuine gap eventually resurfaces.
  */
@@ -28,14 +29,19 @@ import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useAlertsList } from "@/hooks/useAlertsList";
+import { useNowTick } from "@/hooks/useNowTick";
+import {
+  resolveGuidedChecklistReadState,
+  selectGuidedChecklistEvidence,
+} from "@/lib/guidedChecklistEvidenceRules";
 import { normalizeDiaryEntries } from "@/lib/diaryEntryRules";
 import {
   buildGuidedActionChecklist,
   type GuidedActionItem,
   type GuidedActionItemKind,
-  type GuidedChecklistSensorReading,
 } from "@/lib/guidedActionChecklistRules";
 import { dismissItem, readActiveDismissals } from "@/lib/guidedActionChecklistDismissals";
+import { resolveSensorReadingTentScope } from "@/lib/tentScopedSensorReadingsRules";
 
 interface Props {
   scopedGrowId: string | null;
@@ -73,19 +79,39 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
   const plantsQuery = useGrowPlants(undefined, scopedGrowId ?? undefined);
   const tentsQuery = useGrowTents(scopedGrowId ?? undefined);
   const diaryQuery = useDiaryEntries();
-  const readingsQuery = useSensorReadings(undefined, 500);
+  // Per-tent windows over this grow's tents; never the unscoped all-tents
+  // read, which hit the Postgres statement timeout (BUG-003). With no grow in
+  // scope the panel renders nothing, so it reads nothing. Unresolved or
+  // failed tents keep the read pending/error, never an empty success.
+  const tentScope = resolveSensorReadingTentScope({
+    enabled: Boolean(scopedGrowId),
+    tents: tentsQuery,
+  });
+  const readingsQuery = useSensorReadings(
+    {
+      tentIds: tentScope.tentIds,
+      scopeError: tentScope.scopeError,
+      retryScope: tentsQuery.refetch,
+    },
+    500,
+  );
   const alertsQuery = useAlertsList(
     { growId: scopedGrowId ?? undefined, status: "open" },
     { enabled: Boolean(scopedGrowId) },
   );
 
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const now = useNowTick();
+  const readState = resolveGuidedChecklistReadState(
+    [plantsQuery, tentsQuery, diaryQuery, readingsQuery],
+    alertsQuery.status,
+  );
   useEffect(() => {
     setDismissedIds(readActiveDismissals());
   }, [scopedGrowId]);
 
   const items = useMemo<GuidedActionItem[]>(() => {
-    if (!scopedGrowId) return [];
+    if (!scopedGrowId || readState !== "ready") return [];
     const rawPlants = plantsQuery.data ?? [];
     const rawTents = tentsQuery.data ?? [];
     const rawDiary = diaryQuery.data ?? [];
@@ -95,6 +121,7 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
     const plants = rawPlants.map((p) => ({
       id: p.id,
       name: p.name ?? "Unnamed plant",
+      growId: p.growId ?? null,
       tentId: p.tentId ?? null,
       stage: (p.stage as string | null | undefined) ?? null,
     }));
@@ -107,31 +134,13 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
       (e) => e.growId === scopedGrowId,
     );
 
-    // Latest reading per tent (readings are ordered newest-first upstream;
-    // we defend with an explicit compare in case that ever changes).
-    const latestReadingByTent: Record<string, GuidedChecklistSensorReading | null> = {};
-    for (const t of tents) latestReadingByTent[t.id] = null;
-    for (const r of rawReadings as ReadonlyArray<{
-      tent_id?: string | null;
-      captured_at?: string | null;
-      created_at?: string | null;
-      source?: string | null;
-      quality?: string | null;
-    }>) {
-      const tentId = r.tent_id ?? null;
-      if (!tentId || !(tentId in latestReadingByTent)) continue;
-      const capturedAt = r.captured_at ?? r.created_at ?? null;
-      const current = latestReadingByTent[tentId];
-      const currentT = current?.capturedAt ? Date.parse(current.capturedAt) : -Infinity;
-      const nextT = capturedAt ? Date.parse(capturedAt) : -Infinity;
-      if (nextT > currentT) {
-        latestReadingByTent[tentId] = {
-          capturedAt,
-          source: r.source ?? null,
-          quality: r.quality ?? null,
-        };
-      }
-    }
+    const latestReadingByTent = selectGuidedChecklistEvidence({
+      now,
+      growId: scopedGrowId,
+      tentIds: tents.map((t) => t.id),
+      readings: rawReadings,
+      diaryEntries: rawDiary,
+    });
 
     const openAlerts = rawAlerts.map((a) => ({
       id: a.id,
@@ -142,7 +151,7 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
     }));
 
     return buildGuidedActionChecklist({
-      now: Date.now(),
+      now,
       scopedGrowId,
       plants,
       tents,
@@ -152,6 +161,8 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
       dismissedIds,
     });
   }, [
+    now,
+    readState,
     scopedGrowId,
     plantsQuery.data,
     tentsQuery.data,
@@ -166,12 +177,15 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
     setDismissedIds(next);
   };
 
-  const isLoading =
-    plantsQuery.isLoading ||
-    tentsQuery.isLoading ||
-    diaryQuery.isLoading ||
-    readingsQuery.isLoading ||
-    alertsQuery.status === "loading";
+  const retry = async () => {
+    await Promise.allSettled([
+      plantsQuery.refetch(),
+      tentsQuery.refetch(),
+      diaryQuery.refetch(),
+      readingsQuery.refetch(),
+      Promise.resolve(alertsQuery.reload()),
+    ]);
+  };
 
   if (!scopedGrowId) return null;
 
@@ -187,7 +201,18 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
         </span>
       </header>
 
-      {isLoading && items.length === 0 ? (
+      {readState === "error" || readState === "paused" ? (
+        <div role="status" className="py-4 text-sm text-muted-foreground">
+          <p>
+            {readState === "paused"
+              ? "Waiting for connection to confirm your diary context."
+              : "Could not confirm your diary context. Suggestions are unavailable until the reads succeed."}
+          </p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={() => void retry()}>
+            Retry
+          </Button>
+        </div>
+      ) : readState === "pending" ? (
         <p
           className="py-4 text-sm text-muted-foreground"
           data-testid="guided-action-checklist-loading"
@@ -201,10 +226,10 @@ export default function GuidedActionChecklistPanel({ scopedGrowId, className }: 
         >
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <div>
-            <p className="font-medium text-foreground">You're up to date.</p>
+            <p className="font-medium text-foreground">No diary actions to show.</p>
             <p className="mt-0.5 text-xs">
-              No overdue logs, stale sensor context, or open alerts. Verdant will surface the next
-              thing when it appears.
+              No suggestions from the loaded context. Dismissed suggestions stay hidden for 12
+              hours.
             </p>
           </div>
         </div>

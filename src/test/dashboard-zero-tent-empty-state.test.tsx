@@ -25,6 +25,7 @@ const DASH = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
 const DASH_EXEC = stripSourceComments(DASH);
 const EMPTY = readFileSync(resolve(ROOT, "src/components/DashboardZeroTentEmptyState.tsx"), "utf8");
 const EMPTY_EXEC = stripSourceComments(EMPTY);
+const GROW = "4cad3cae-21e3-42f8-8372-2f6237205db3";
 
 describe("DashboardZeroTentEmptyState — render", () => {
   it("renders the headline, support copy, expectation reset, and CTA", () => {
@@ -44,6 +45,17 @@ describe("DashboardZeroTentEmptyState — render", () => {
     const cta = screen.getByTestId("dashboard-zero-tent-create-cta");
     expect(cta).toHaveTextContent(/Create Tent/i);
     expect(cta.closest("a")?.getAttribute("href")).toBe("/tents");
+  });
+
+  it("carries growId on Create Tent when growId prop is provided", () => {
+    render(
+      <MemoryRouter>
+        <DashboardZeroTentEmptyState growId={GROW} />
+      </MemoryRouter>,
+    );
+
+    const cta = screen.getByTestId("dashboard-zero-tent-create-cta");
+    expect(cta.closest("a")?.getAttribute("href")).toBe(`/tents?growId=${GROW}`);
   });
 
   it("does not promise the retired /demo route", () => {

@@ -1,0 +1,78 @@
+name: Quick Log event replay locking PG15
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths: &event_replay_lock_paths
+      - "supabase/migrations/20260927012000_quicklog_event_replay_active_receipt.sql"
+      - "supabase/migrations/20261001140000_quicklog_event_replay_mirrorless_legacy.sql"
+      - "supabase/migrations/20260725023000_core_schema_forward_repair.sql"
+      - "supabase/migrations/20260725024026_quicklog_dual_timestamp_foundation.sql"
+      - "supabase/migrations/20260811090000_quicklog_corrections_retractions.sql"
+      - "scripts/run-quicklog-event-replay-lock-pg15-harness.mjs"
+      - "scripts/run-quicklog-manual-delegate-forward-repair-pg15-harness.mjs"
+      - "src/test/quicklog-event-replay-lock-pg15-harness.test.ts"
+      - "src/test/quicklog-event-replay-active-receipt.test.ts"
+      - "src/test/quicklog-event-replay-mirrorless-legacy.test.ts"
+      - ".github/workflows/quicklog-event-replay-lock-pg15.yml"
+  push:
+    branches:
+      - verdant-grow-diary
+    paths: *event_replay_lock_paths
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pg15_runtime:
+    name: PostgreSQL 15 replay and diary-first revision locks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: verdant-runtime-only
+          POSTGRES_DB: verdant_quicklog_delegate_repair
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d verdant_quicklog_delegate_repair"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      QUICKLOG_EVENT_REPLAY_LOCK_PG15_URL: postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_quicklog_delegate_repair
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+      - name: Create disposable harness sentinel
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i \
+            -e PGHOST=127.0.0.1 -e PGPORT=5432 -e PGUSER=postgres \
+            -e PGPASSWORD=verdant-runtime-only -e PGDATABASE=verdant_quicklog_delegate_repair \
+            "$POSTGRES_CONTAINER" \
+            psql -X -q -v ON_ERROR_STOP=1 --single-transaction --file=- <<'SQL'
+          create schema verdant_quicklog_delegate_repair_harness authorization postgres;
+          revoke all on schema verdant_quicklog_delegate_repair_harness from public;
+          create table verdant_quicklog_delegate_repair_harness.runtime_sentinel(sentinel text primary key);
+          revoke all on table verdant_quicklog_delegate_repair_harness.runtime_sentinel from public;
+          insert into verdant_quicklog_delegate_repair_harness.runtime_sentinel(sentinel)
+          values ('verdant_quicklog_delegate_repair_pg15_disposable_v1');
+          SQL
+      - name: Force both lock inversions and verify corrected serialization
+        env:
+          QUICKLOG_EVENT_REPLAY_LOCK_PG15_CONTAINER: ${{ job.services.postgres.id }}
+        run: node scripts/run-quicklog-event-replay-lock-pg15-harness.mjs

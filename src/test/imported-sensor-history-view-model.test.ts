@@ -129,6 +129,125 @@ describe("buildImportedSensorHistoryViewModel — empty + summary", () => {
     expect(vm.recentRows[9].capturedAt).toBe("2026-06-01T00:50:00.000Z");
   });
 
+  it("formats known metrics for display-only readability", () => {
+    const readings = [
+      row({ metric: "temperature_c", value: 24.444444444444443 }),
+      row({ metric: "humidity_pct", value: 52.04 }),
+      row({ metric: "vpd_kpa", value: 1.115 }),
+      row({ metric: "co2_ppm", value: 800.6 }),
+      row({ metric: "soil_moisture_pct", value: 43.04 }),
+      row({ metric: "ppfd", value: 600.6 }),
+      row({ metric: "soil_temp_c", value: 18.04 }),
+      row({ metric: "ec", value: 1.8 }),
+    ];
+    const vm = buildImportedSensorHistoryViewModel({ readings });
+    const rowsByMetric = Object.fromEntries(vm.recentRows.map((r) => [r.metric, r]));
+    expect(Object.fromEntries(vm.recentRows.map((r) => [r.metric, r.displayValue]))).toEqual({
+      temperature_c: "24.4 °C",
+      humidity_pct: "52%",
+      vpd_kpa: "1.11 kPa",
+      co2_ppm: "801 ppm",
+      soil_moisture_pct: "43%",
+      ppfd: "601 µmol/m²/s",
+      soil_temp_c: "18 °C",
+      ec: "1.8 mS/cm",
+    });
+    expect(rowsByMetric.temperature_c?.value).toBe(24.444444444444443);
+    expect(buildImportedSensorHistoryViewModel({ readings }).recentRows).toEqual(vm.recentRows);
+  });
+
+  it.each([
+    ["temperature_c", 24, "24 °C"],
+    ["humidity_pct", 58, "58%"],
+    ["soil_moisture_pct", 43, "43%"],
+    ["soil_temp_c", 18, "18 °C"],
+    ["vpd_kpa", 1.2, "1.2 kPa"],
+    ["co2_ppm", 600, "600 ppm"],
+    ["ppfd", 400, "400 µmol/m²/s"],
+  ] as const)("keeps compact %s display without changing stored %s", (metric, value, display) => {
+    const readings = [row({ metric, value })];
+    const vm = buildImportedSensorHistoryViewModel({ readings });
+    expect(vm.recentRows[0]).toMatchObject({ metric, value, displayValue: display });
+    expect(readings[0].value).toBe(value);
+    expect(buildImportedSensorHistoryViewModel({ readings })).toEqual(vm);
+  });
+
+  it.each([
+    [100.04, "100%"],
+    [-0.04, "0%"],
+  ] as const)("keeps raw humidity %s out of range after display rounding", (value, display) => {
+    const vm = buildImportedSensorHistoryViewModel({
+      readings: [row({ metric: "humidity_pct", value })],
+    });
+    expect(vm.recentRows[0]).toMatchObject({
+      value,
+      displayValue: display,
+      outOfRangeNote: "Humidity is out of range.",
+    });
+  });
+
+  it.each([null, undefined, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    "keeps a missing or non-finite value %s unknown",
+    (value) => {
+      const vm = buildImportedSensorHistoryViewModel({ readings: [row({ value })] });
+      expect(vm.recentRows[0]).toMatchObject({ value: null, displayValue: "—" });
+    },
+  );
+
+  it("does not invent units for unknown metrics or missing values", () => {
+    const vm = buildImportedSensorHistoryViewModel({
+      readings: [
+        row({ metric: "unmapped_metric", value: 7 }),
+        row({ metric: "__proto__", value: 8 }),
+        row({ metric: "temperature_c", value: null }),
+        row({ metric: "humidity_pct", value: Number.NaN }),
+      ],
+    });
+    expect(Object.fromEntries(vm.recentRows.map((r) => [r.metric, r.displayValue]))).toEqual({
+      unmapped_metric: "7",
+      temperature_c: "—",
+      humidity_pct: "—",
+      ["__proto__"]: "8",
+    });
+    expect(vm.recentRows.every((r) => (r.value === null ? r.displayValue === "—" : true))).toBe(
+      true,
+    );
+  });
+
+  it("flags out-of-range values and keeps in-range boundaries unflagged", () => {
+    const vm = buildImportedSensorHistoryViewModel({
+      readings: [
+        row({ metric: "humidity_pct", value: -0.1, captured_at: "2026-06-01T00:00:00Z" }),
+        row({ metric: "humidity_pct", value: 0, captured_at: "2026-06-01T00:01:00Z" }),
+        row({ metric: "humidity_pct", value: 100, captured_at: "2026-06-01T00:02:00Z" }),
+        row({ metric: "humidity_pct", value: 100.1, captured_at: "2026-06-01T00:03:00Z" }),
+        row({ metric: "soil_moisture_pct", value: -0.1, captured_at: "2026-06-01T00:04:00Z" }),
+        row({ metric: "soil_moisture_pct", value: 0, captured_at: "2026-06-01T00:05:00Z" }),
+        row({ metric: "soil_moisture_pct", value: 100, captured_at: "2026-06-01T00:06:00Z" }),
+        row({ metric: "soil_moisture_pct", value: 100.1, captured_at: "2026-06-01T00:07:00Z" }),
+      ],
+      limit: 20,
+    });
+
+    const flagged = vm.recentRows
+      .filter((r) => r.outOfRangeNote)
+      .map((r) => [r.metric, r.value, r.outOfRangeNote] as const);
+    expect(flagged).toEqual([
+      ["soil_moisture_pct", 100.1, "Soil moisture is out of range."],
+      ["soil_moisture_pct", -0.1, "Soil moisture is out of range."],
+      ["humidity_pct", 100.1, "Humidity is out of range."],
+      ["humidity_pct", -0.1, "Humidity is out of range."],
+    ]);
+
+    const boundaryRows = vm.recentRows.filter(
+      (r) =>
+        (r.metric === "humidity_pct" || r.metric === "soil_moisture_pct") &&
+        (r.value === 0 || r.value === 100),
+    );
+    expect(boundaryRows.length).toBe(4);
+    expect(boundaryRows.every((r) => r.outOfRangeNote === null)).toBe(true);
+  });
+
   it("default limit is 25", () => {
     expect(IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT).toBe(25);
   });
@@ -157,7 +276,7 @@ describe("buildImportedSensorHistoryViewModel — empty + summary", () => {
     expect(IMPORTED_SENSOR_HISTORY_SOURCE).toBe("csv");
     expect(IMPORTED_SENSOR_HISTORY_ANCHOR_ID).toBe("imported-history");
     expect(IMPORTED_SENSOR_HISTORY_NOT_LIVE_COPY).toBe("Not live data");
-    expect(IMPORTED_SENSOR_HISTORY_EMPTY_COPY).toContain("No imported CSV sensor history");
+    expect(IMPORTED_SENSOR_HISTORY_EMPTY_COPY).toContain("No CSV readings are available");
   });
 });
 

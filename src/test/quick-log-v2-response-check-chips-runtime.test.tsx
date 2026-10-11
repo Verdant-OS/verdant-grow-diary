@@ -19,6 +19,8 @@ import { RESPONSE_CHECK_STATUSES, applyResponseCheck } from "@/lib/tenSecondQuic
 
 const rpcMock = vi.fn();
 
+vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { rpc: (...a: unknown[]) => rpcMock(...a) },
 }));
@@ -32,6 +34,10 @@ vi.mock("@/hooks/use-plants", () => ({
 }));
 vi.mock("@/hooks/use-tents", () => ({
   useTents: () => ({ data: [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }] }),
+}));
+
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({ grows: [{ id: "grow-1", name: "Grow 1" }] }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -93,8 +99,9 @@ async function savedNote(): Promise<string | null> {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   rpcMock.mockReset();
-  rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "ge-1" }, error: null });
+  rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
 });
 afterEach(() => cleanup());
 
@@ -112,6 +119,44 @@ describe("D7 chips — target gating", () => {
     // Positive control: the sheet rendered, it just has no plant to ask about.
     expect(noteTextarea()).toBeInTheDocument();
     expect(screen.queryByTestId("qlv2-response-chips")).not.toBeInTheDocument();
+  });
+});
+
+/** True when `a` comes before `b` in document order. */
+function precedes(a: Element, b: Element): boolean {
+  return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}
+
+describe("D7 chips — hoisted to the top of the sheet", () => {
+  it("renders the chips right after Target and before Action, Photo, Video and Note", () => {
+    renderSheet("plant:plant-1");
+
+    const chips = screen.getByTestId("qlv2-response-chips");
+    const target = screen.getByLabelText("Target");
+    const action = screen.getByRole("group", { name: "Quick Log action type" });
+    const photo = screen.getByTestId("qlv2-photo-attachment");
+    const video = screen.getByTestId("qlv2-video-attachment");
+
+    expect(precedes(target, chips)).toBe(true);
+    expect(precedes(chips, action)).toBe(true);
+    expect(precedes(chips, photo)).toBe(true);
+    expect(precedes(chips, video)).toBe(true);
+    expect(precedes(chips, noteTextarea())).toBe(true);
+  });
+
+  it("stays first on a Water draft, and Feed still withholds it", async () => {
+    renderSheet("plant:plant-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Water" }));
+    const chips = screen.getByTestId("qlv2-response-chips");
+    const action = screen.getByRole("group", { name: "Quick Log action type" });
+    expect(precedes(chips, action)).toBe(true);
+    expect(precedes(chips, screen.getByTestId("qlv2-photo-attachment"))).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+    await waitFor(() =>
+      expect(screen.queryByTestId("qlv2-response-chips")).not.toBeInTheDocument(),
+    );
   });
 });
 
@@ -405,7 +450,7 @@ describe("D7 chips — a plant response never survives a switch to a tent", () =
   });
 
   it("does not carry chip provenance into a Log another draft", async () => {
-    rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "ge-1" }, error: null });
+    rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
     renderSheet("plant:plant-1");
     fireEvent.click(chip("same"));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));

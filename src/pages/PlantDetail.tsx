@@ -27,6 +27,13 @@ import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActions
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
+import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
+import { formatPlantAge, plantStartDisplayDate, resolvePlantAge } from "@/lib/plantStartDateRules";
+import {
+  plantLastActivityTypeLabel,
+  resolvePlantLastActivityLabel,
+  resolvePlantLastActivitySummary,
+} from "@/lib/plantLastActivityRules";
 import PlantLogStreakMarker from "@/components/PlantLogStreakMarker";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
@@ -34,6 +41,7 @@ import PhotoDiagnosisReviewDialog from "@/components/PhotoDiagnosisReviewDialog"
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
 import PlantDetailRecentActionResponse from "@/components/PlantDetailRecentActionResponse";
 import PlantPendingOutcomeNotice from "@/components/PlantPendingOutcomeNotice";
+import PendingCheckpointBanner from "@/components/PendingCheckpointBanner";
 import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
 import { usePlantGalleryPhotoCount } from "@/hooks/usePlantGalleryPhotoCount";
 import PlantDetailHarvestEvidenceReportMount from "@/components/PlantDetailHarvestEvidenceReportMount";
@@ -78,7 +86,7 @@ import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { useAlertDoctorCreditGateReads } from "@/hooks/useAlertDoctorCreditGateReads";
 import { buildAlertDoctorCreditGate } from "@/lib/alertDoctorCreditGateRules";
 import { useAuth } from "@/store/auth";
-import { format, formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 
 import PlantQuickLog from "@/components/PlantQuickLog";
 import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshnessCard";
@@ -122,7 +130,10 @@ function BlockedStateView({
 }) {
   const isMissingLike = view.kind === "not-found" || view.kind === "archived";
   return (
-    <div data-testid={view.testId} role={view.kind === "loading-slow" ? "alert" : undefined}>
+    <div
+      data-testid={view.testId}
+      role={view.kind === "paused" ? "status" : view.kind === "loading-slow" ? "alert" : undefined}
+    >
       <EmptyState
         icon={
           isMissingLike ? (
@@ -256,12 +267,37 @@ export default function PlantDetail() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const contextTentId = searchParams.get("tentId");
-  const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
-  const { data: tent } = useGrowTent(plant?.tentId);
+  const contextGrowId = searchParams.get("growId");
+  const { data: plant, isLoading, isPending, fetchStatus, isError, refetch } = useGrowPlant(id);
+  const tentQuery = useGrowTent(plant?.tentId);
+  // The plant row owns the assignment; a missing/failed details read must
+  // neither clear that assignment nor substitute a row for another tent.
+  const tent = tentQuery.data?.id === plant?.tentId ? tentQuery.data : null;
+  const tentReadMessage = tentQuery.isError
+    ? tent
+      ? "Could not refresh assigned tent details. Showing cached details."
+      : "Assigned tent details unavailable."
+    : tentQuery.fetchStatus === "paused"
+      ? tent
+        ? "Waiting for connection to refresh assigned tent details. Showing cached details."
+        : "Waiting for connection to load assigned tent details."
+      : tentQuery.isFetching || tentQuery.isPending
+        ? tent
+          ? "Refreshing assigned tent details. Showing cached details."
+          : "Loading assigned tent details…"
+        : !tent
+          ? "Assigned tent details unavailable."
+          : null;
+  const canRetryTentRead =
+    !tentQuery.isFetching &&
+    tentQuery.fetchStatus !== "paused" &&
+    (tentQuery.isError || (!tent && !tentQuery.isPending));
   const { openGroups, setGroupOpen, revealAndNavigate } = usePlantDetailDisclosureNavigation({
     plantId: plant?.id ?? null,
   });
   const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null);
+  // Same query key as PlantQuickStatusStrip, so this adds no request.
+  const recentActivityQuery = usePlantRecentActivity(plant?.id ?? null);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null], user?.id);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null], user?.id);
 
@@ -295,20 +331,24 @@ export default function PlantDetail() {
   // hung Supabase request, etc.) we must not leave the grower on a blank
   // skeleton. After PLANT_DETAIL_LOAD_TIMEOUT_MS, promote the loading
   // state to a retryable failure surface. Reset whenever the id changes
-  // or the query is no longer pending.
+  // or the query is no longer pending. A paused first read waits for connection
+  // instead of timing out before it can start.
+  const isLoadingPlant = (isPending ?? isLoading) && fetchStatus !== "paused";
   const [loadTimedOut, setLoadTimedOut] = useState(false);
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoadingPlant) {
       setLoadTimedOut(false);
       return;
     }
     setLoadTimedOut(false);
     const handle = setTimeout(() => setLoadTimedOut(true), PLANT_DETAIL_LOAD_TIMEOUT_MS);
     return () => clearTimeout(handle);
-  }, [id, isLoading]);
+  }, [id, isLoadingPlant]);
 
   const loadState = classifyPlantDetailLoadState({
     isLoading,
+    isPending,
+    isPaused: fetchStatus === "paused",
     isError,
     hasPlant: !!plant,
     loadTimedOut,
@@ -318,6 +358,7 @@ export default function PlantDetail() {
     loadState,
     plant: plant ?? null,
     contextTentId,
+    contextGrowId,
   });
 
   if (loadState === "loading") {
@@ -330,6 +371,10 @@ export default function PlantDetail() {
         className="glass rounded-2xl h-64 animate-pulse"
       />
     );
+  }
+
+  if (blockedView && blockedView.kind === "paused") {
+    return <BlockedStateView view={blockedView} />;
   }
 
   if (blockedView && blockedView.kind === "loading-slow") {
@@ -348,7 +393,10 @@ export default function PlantDetail() {
     return <BlockedStateView view={blockedView} onRetry={() => refetch()} />;
   }
 
-  // Renders the "Plant not found" empty state with data-source disclosure.
+  // Renders the "Plant not found" state with a record-scoped data-source
+  // disclosure. A single-plant miss says nothing about whether the account
+  // has other plants, so it never says "No real plants yet" (QA 2026-09-24,
+  // BUG-016).
   if (blockedView && blockedView.kind === "not-found") {
     return (
       <div>
@@ -356,6 +404,7 @@ export default function PlantDetail() {
           resource="plants"
           hasAnyData={false}
           metas={[plantMeta]}
+          emptyStateScope="record"
           testId="plant-detail-data-source-disclosure"
         />
         <BlockedStateView view={blockedView} />
@@ -400,7 +449,23 @@ export default function PlantDetail() {
   // query result, in which case rendering nothing is the honest fallback.
   if (!plant) return null;
 
-  const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
+  // Calendar-date semantics: a legacy UTC-midnight start date reads as the
+  // day the grower picked, and a future date never yields a negative age.
+  const ageDaysLabel = formatPlantAge(resolvePlantAge(plant.startedAt, new Date()));
+  const startedDisplayDate = plantStartDisplayDate(plant.startedAt);
+  const lastActivityInput = {
+    status: recentActivityQuery.isError
+      ? ("error" as const)
+      : recentActivityQuery.isPending
+        ? ("loading" as const)
+        : ("ready" as const),
+    rows: recentActivityQuery.data,
+    now: new Date(),
+  };
+  const lastActivityLabel = resolvePlantLastActivityLabel(lastActivityInput);
+  // Text and time come from the same newest diary row; the profile note is
+  // shown separately under its Edit Plant name, "Notes".
+  const lastActivitySummary = resolvePlantLastActivitySummary(lastActivityInput);
   const harvestWatchEligible = isHarvestWatchEligible({
     stage: plant.stage,
     isArchived: plant.isArchived,
@@ -534,6 +599,7 @@ export default function PlantDetail() {
             lastNote: plant.lastNote,
             isArchived: plant.isArchived ?? false,
             photo: plant.photo ?? null,
+            plantType: plant.plantType ?? null,
           }}
           variant="row"
           hideView
@@ -564,9 +630,25 @@ export default function PlantDetail() {
             <div className="grid min-w-0 grid-cols-1 gap-3 text-sm sm:grid-cols-2">
               <div className="min-w-0" data-testid="plant-detail-tent">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Tent</div>
-                {tent ? (
+                {plant.tentId ? (
                   <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-                    <span className="min-w-0 break-words">{tent.name}</span>
+                    <div className="min-w-0 space-y-1">
+                      <span className="break-words">{tent?.name ?? "Assigned tent"}</span>
+                      {tentReadMessage && (
+                        <p role="status" className="text-xs text-muted-foreground">
+                          {tentReadMessage}
+                        </p>
+                      )}
+                      {canRetryTentRead && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void tentQuery.refetch()}
+                        >
+                          Retry
+                        </Button>
+                      )}
+                    </div>
                     <div className="flex flex-wrap items-center gap-1">
                       <Button
                         asChild
@@ -575,7 +657,7 @@ export default function PlantDetail() {
                         className="min-h-11 gap-1 px-2 whitespace-normal"
                         data-testid="plant-detail-view-tent"
                       >
-                        <Link to={tentDetailPath(tent.id)}>
+                        <Link to={tentDetailPath(plant.tentId)}>
                           <Box className="h-3.5 w-3.5" /> View Tent{" "}
                           <ArrowRight className="h-3.5 w-3.5" />
                         </Link>
@@ -605,13 +687,15 @@ export default function PlantDetail() {
               </div>
               <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Age</div>
-                <div>{ageDays} days</div>
+                <div data-testid="plant-detail-age">{ageDaysLabel}</div>
               </div>
               <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">
                   Started
                 </div>
-                <div>{format(new Date(plant.startedAt), "PP")}</div>
+                <div data-testid="plant-detail-started">
+                  {startedDisplayDate ? format(startedDisplayDate, "PP") : "Unknown"}
+                </div>
               </div>
               <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Health</div>
@@ -622,11 +706,29 @@ export default function PlantDetail() {
               <div className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
                 Last activity
               </div>
-              <p className="break-words text-sm">{plant.lastNote}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Updated {formatDistanceToNow(new Date(plant.startedAt), { addSuffix: true })}
+              {lastActivitySummary ? (
+                <p className="break-words text-sm" data-testid="plant-detail-last-activity-summary">
+                  {plantLastActivityTypeLabel(lastActivitySummary.eventType)}
+                  {lastActivitySummary.text ? `: ${lastActivitySummary.text}` : ""}
+                </p>
+              ) : null}
+              <p
+                className="mt-1 text-xs text-muted-foreground"
+                data-testid="plant-detail-last-activity-age"
+              >
+                {lastActivityLabel}
               </p>
             </div>
+            {plant.lastNote?.trim() ? (
+              <div className="min-w-0">
+                <div className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
+                  Notes
+                </div>
+                <p className="break-words text-sm" data-testid="plant-detail-profile-note">
+                  {plant.lastNote}
+                </p>
+              </div>
+            ) : null}
             <div className="flex min-w-0 flex-wrap gap-2">
               <Button
                 size="sm"
@@ -705,6 +807,12 @@ export default function PlantDetail() {
             setQuickLogOpen(true);
           }}
         />
+        <PendingCheckpointBanner
+          plantId={plant.id}
+          plantName={plant.name}
+          growId={plant.growId ?? null}
+          tentId={plant.tentId ?? null}
+        />
         <PlantPendingOutcomeNotice growId={plant.growId ?? null} plantId={plant.id} />
         <PlantDetailRecentActionResponse growId={plant.growId ?? null} plantId={plant.id} />
 
@@ -782,6 +890,7 @@ export default function PlantDetail() {
           <PlantDailyGrowCheckConsistencyCard
             plantId={plant.id}
             currentTentId={plant.tentId ?? null}
+            trackingStartedAt={plant.createdAt ?? null}
           />
           <PlantDailyGrowCheckHistoryCard
             plantId={plant.id}

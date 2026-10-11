@@ -78,6 +78,8 @@ import {
   resolveDailyCheckPlantSelection,
   type DailyCheckPlantResolution,
 } from "@/lib/dailyCheckPlantSelectionRules";
+import { resolveDailyCheckActivityTarget } from "@/lib/dailyCheckWaterContextRules";
+import { resolveDailyCheckGrowContext } from "@/lib/dailyCheckGrowContextRules";
 import {
   DAILY_CHECK_NOTE_SAVED_TOAST,
   DAILY_CHECK_SENSOR_SAVED_TOAST,
@@ -88,11 +90,15 @@ import {
   DAILY_CHECK_TIMELINE_CONFIRMATION_TITLE,
   DAILY_CHECK_TIMELINE_CTA_LABEL,
   buildDailyCheckPostSubmitActions,
+  resolveDailyCheckDashboardBreadcrumbHref,
   buildDailyCheckSavedItems,
   buildDailyCheckTimelineHref,
   formatDailyCheckLoggedAt,
   parseDailyCheckEntrySource,
   parseDailyCheckMethodHint,
+  searchParamsFromCompatLocation,
+  isQuickLogDailyCheckMethodHint,
+  dailyCheckMethodToActivityId,
   resolveDailyCheckPostSubmitHref,
 } from "@/lib/dailyCheckPostSubmitRules";
 import { toast } from "sonner";
@@ -121,7 +127,7 @@ import {
 
 function useQueryParam(name: string): string | null {
   const loc = useLocation();
-  return useMemo(() => new URLSearchParams(loc.search).get(name), [loc.search, name]);
+  return useMemo(() => searchParamsFromCompatLocation(loc).get(name), [loc, name]);
 }
 
 function resolveCompatibleAssignedTentId(
@@ -222,11 +228,12 @@ export default function DailyCheck() {
     ],
   );
   const routeStep: DailyGrowCheckStep =
-    methodHint === "note" && routePlant
+    isQuickLogDailyCheckMethodHint(methodHint) && routePlant
       ? "quicklog"
       : methodHint === "sensor" && routePlant && routeTentId
         ? "manual"
         : "select";
+  const requestedActivityId = dailyCheckMethodToActivityId(methodHint);
   const routeIdentityPending = appliedRouteIdentity !== routeIdentity;
   const renderedPlantId = routeIdentityPending ? routePlantId : plantId;
 
@@ -236,14 +243,20 @@ export default function DailyCheck() {
   );
   const selectedPlantTentId = resolveCompatibleAssignedTentId(selectedPlant, selectableTents);
   const selectedStandaloneTentId = selectableTents.some((tent) => tent.id === tentId) ? tentId : "";
+  const activityTarget = resolveDailyCheckActivityTarget({
+    plantId: selectedPlant?.id ?? null,
+    plantAssignedTentId: routeIdentityPending ? routeTentId : selectedPlantTentId,
+    standaloneTentId: selectedStandaloneTentId,
+    firstSelectableTentId: selectableTents[0]?.id ?? null,
+    routeTentId,
+    plantResolutionStatus: plantResolution.status,
+  });
   // A selected plant owns the tent context. Derive this synchronously so an
   // untented plant can never render one frame against a previously selected or
-  // default tent while the state-synchronizing effect catches up.
-  const effectiveTentId = routeIdentityPending
-    ? routeTentId
-    : renderedPlantId
-      ? selectedPlantTentId
-      : selectedStandaloneTentId;
+  // default tent while the state-synchronizing effect catches up. When no
+  // plant is selected, carry an explicit tent or the first selectable tent
+  // on the same paint so Water is not a Choose-plant/tent trap.
+  const effectiveTentId = activityTarget.tentId ?? "";
   const requestedStep = routeIdentityPending ? routeStep : step;
   const renderedStep = requestedStep === "manual" && !effectiveTentId ? "select" : requestedStep;
   const requestedQuickLogOpen = routeIdentityPending ? routeStep === "quicklog" : quickLogOpen;
@@ -307,17 +320,12 @@ export default function DailyCheck() {
     () => selectableTents.find((tent) => tent.id === effectiveTentId) ?? null,
     [effectiveTentId, selectableTents],
   );
-  // Grow context, most specific first: the selected plant's own grow, then an
-  // explicit `?growId=` scope, then the workspace's active grow. That last
-  // fallback matters for the plain `/daily-check` entry (sidebar link, Quick
-  // Log CTA): without it a grower who HAS an active grow still saw
-  // "Select a grow to enable Quick Log actions" with every action disabled,
-  // because no plant is selected yet and no URL scope is present.
-  const growId =
-    (selectedPlant as { grow_id?: string | null } | null)?.grow_id ??
-    urlGrowId ??
-    activeGrowId ??
-    null;
+  const growId = resolveDailyCheckGrowContext({
+    plant: selectedPlant,
+    assignedTent: selectedTent,
+    urlGrowId,
+    activeGrowId,
+  });
   const quickLogTargetIdentity = JSON.stringify([
     selectedPlant?.id ?? null,
     effectiveTentId || null,
@@ -383,16 +391,27 @@ export default function DailyCheck() {
       buildDailyCheckPostSubmitActions({
         plantId: selectedPlant?.id ?? null,
         source: entrySource,
+        growId: urlGrowId,
       }),
-    [selectedPlant?.id, entrySource],
+    [selectedPlant?.id, entrySource, urlGrowId],
   );
   const postSubmitHref = useMemo(
     () =>
       resolveDailyCheckPostSubmitHref({
         plantId: selectedPlant?.id ?? null,
         source: entrySource,
+        growId: urlGrowId,
       }),
-    [selectedPlant?.id, entrySource],
+    [selectedPlant?.id, entrySource, urlGrowId],
+  );
+  const scopedBackAction = urlGrowId ? postSubmitActions.find((action) => action.primary) : null;
+  const backHref = useMemo(
+    () =>
+      resolveDailyCheckDashboardBreadcrumbHref({
+        growId: urlGrowId,
+        actions: postSubmitActions,
+      }),
+    [urlGrowId, postSubmitActions],
   );
 
   const loggedAtLabel = useMemo(() => formatDailyCheckLoggedAt(lastSubmittedAt), [lastSubmittedAt]);
@@ -454,8 +473,11 @@ export default function DailyCheck() {
   return (
     <div className="mx-auto w-full min-w-0 max-w-2xl pb-24" data-testid="daily-grow-check-page">
       <Button asChild variant="ghost" size="sm" className="mb-3 min-h-11 whitespace-normal">
-        <Link to="/">
-          <ArrowLeft className="h-4 w-4" /> Dashboard
+        <Link to={backHref}>
+          <ArrowLeft className="h-4 w-4" />{" "}
+          {scopedBackAction && scopedBackAction.key !== "dashboard"
+            ? scopedBackAction.label
+            : "Dashboard"}
         </Link>
       </Button>
       <PageHeader
@@ -575,10 +597,11 @@ export default function DailyCheck() {
       <div className="mb-4 w-full min-w-0">
         <QuickLogAllActivitiesSection
           growId={growId}
-          tentId={effectiveTentId || null}
-          plantId={selectedPlant?.id ?? null}
+          tentId={activityTarget.tentId}
+          plantId={activityTarget.plantId}
           plantStage={(selectedPlant as { stage?: unknown } | null)?.stage ?? null}
           testIdPrefix="daily-check-all-activities"
+          requestedActivityId={requestedActivityId}
           // D5: Daily Check is a real plant-scoped save surface. Without this
           // the remembered target goes stale here, so an unscoped Quick Log
           // would offer an OLDER plant than the one just logged. Only a save
@@ -753,18 +776,21 @@ export default function DailyCheck() {
               data-testid="daily-grow-check-empty-no-tents-actions"
             >
               <Button asChild className="min-h-11 whitespace-normal">
-                <Link to={tentsPath()} data-testid="daily-grow-check-add-tent">
+                <Link to={tentsPath(growId)} data-testid="daily-grow-check-add-tent">
                   Add Tent <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
               <Button asChild variant="outline" size="sm" className="min-h-11 whitespace-normal">
-                <Link to={plantsPath()} data-testid="daily-grow-check-empty-no-tents-go-plants">
+                <Link
+                  to={plantsPath(growId)}
+                  data-testid="daily-grow-check-empty-no-tents-go-plants"
+                >
                   {DAILY_CHECK_EMPTY_GO_TO_PLANTS_LABEL}
                 </Link>
               </Button>
               <Button asChild variant="ghost" size="sm" className="min-h-11 whitespace-normal">
                 <Link
-                  to={timelinePath()}
+                  to={timelinePath(growId)}
                   data-testid="daily-grow-check-empty-no-tents-open-timeline"
                 >
                   {DAILY_CHECK_EMPTY_OPEN_TIMELINE_LABEL}
@@ -785,18 +811,21 @@ export default function DailyCheck() {
               data-testid="daily-grow-check-empty-no-plants-actions"
             >
               <Button asChild className="min-h-11 whitespace-normal">
-                <Link to={plantsPath()} data-testid="daily-grow-check-add-plant">
+                <Link to={plantsPath(growId)} data-testid="daily-grow-check-add-plant">
                   Add Plant <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
               <Button asChild variant="outline" size="sm" className="min-h-11 whitespace-normal">
-                <Link to={tentsPath()} data-testid="daily-grow-check-empty-no-plants-go-tents">
+                <Link
+                  to={tentsPath(growId)}
+                  data-testid="daily-grow-check-empty-no-plants-go-tents"
+                >
                   {DAILY_CHECK_EMPTY_GO_TO_TENTS_LABEL}
                 </Link>
               </Button>
               <Button asChild variant="ghost" size="sm" className="min-h-11 whitespace-normal">
                 <Link
-                  to={sensorsPath()}
+                  to={sensorsPath(growId)}
                   data-testid="daily-grow-check-empty-no-plants-open-sensors"
                 >
                   {DAILY_CHECK_EMPTY_OPEN_SENSORS_LABEL}
@@ -838,11 +867,11 @@ export default function DailyCheck() {
                 <Button
                   variant="outline"
                   className={`h-auto min-h-11 w-full min-w-0 flex-col items-start gap-1 whitespace-normal py-3 text-left ${
-                    methodHint === "note" ? "ring-2 ring-primary" : ""
+                    isQuickLogDailyCheckMethodHint(methodHint) ? "ring-2 ring-primary" : ""
                   }`}
                   data-testid="daily-grow-check-choose-quicklog"
-                  data-method-focused={methodHint === "note" ? "1" : "0"}
-                  aria-pressed={methodHint === "note"}
+                  data-method-focused={isQuickLogDailyCheckMethodHint(methodHint) ? "1" : "0"}
+                  aria-pressed={isQuickLogDailyCheckMethodHint(methodHint)}
                   disabled={!selectedPlant}
                   onClick={openSelectedPlantQuickLog}
                 >
@@ -892,7 +921,7 @@ export default function DailyCheck() {
                       className="min-h-11 whitespace-normal"
                     >
                       <Link
-                        to={plantsPath()}
+                        to={plantsPath(growId)}
                         data-testid="daily-grow-check-choose-no-plant-go-plants"
                       >
                         {DAILY_CHECK_EMPTY_GO_TO_PLANTS_LABEL}
@@ -905,7 +934,7 @@ export default function DailyCheck() {
                       className="min-h-11 whitespace-normal"
                     >
                       <Link
-                        to={timelinePath()}
+                        to={timelinePath(growId)}
                         data-testid="daily-grow-check-choose-no-plant-open-timeline"
                       >
                         {DAILY_CHECK_EMPTY_OPEN_TIMELINE_LABEL}
@@ -949,7 +978,10 @@ export default function DailyCheck() {
                       variant="ghost"
                       className="min-h-11 whitespace-normal"
                     >
-                      <Link to={tentsPath()} data-testid="daily-grow-check-choose-no-tent-go-tents">
+                      <Link
+                        to={tentsPath(growId)}
+                        data-testid="daily-grow-check-choose-no-tent-go-tents"
+                      >
                         {DAILY_CHECK_EMPTY_GO_TO_TENTS_LABEL}
                       </Link>
                     </Button>
@@ -1315,6 +1347,7 @@ export default function DailyCheck() {
               plantId: selectedPlant?.id ?? null,
               growId,
               tentId: effectiveTentId || null,
+              activityId: requestedActivityId,
             }}
           />
         </>

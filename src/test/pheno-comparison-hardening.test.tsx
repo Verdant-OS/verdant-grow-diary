@@ -142,3 +142,20 @@ describe("PhenoComparison hardening", () => {
     expect(text).not.toMatch(/import data/i);
   });
 });
+
+describe("normalizePhenoSensorSource — #1003 canon delegation (#592)", () => {
+  it("honors sanctioned aliases and fails everything else closed", async () => {
+    const { normalizePhenoSensorSource } = await import("@/lib/phenoComparisonRules");
+    // Canonical vocabulary passes through.
+    for (const s of ["live", "manual", "csv", "demo", "stale", "invalid"] as const) {
+      expect(normalizePhenoSensorSource(s)).toBe(s);
+    }
+    // First-party aliases: pi_bridge is live, diary is manual, sim is demo.
+    expect(normalizePhenoSensorSource("pi_bridge")).toBe("live");
+    expect(normalizePhenoSensorSource("diary")).toBe("manual");
+    expect(normalizePhenoSensorSource("sim")).toBe("demo");
+    // Unrecognized providers fail closed.
+    expect(normalizePhenoSensorSource("ecowitt")).toBe("invalid");
+    expect(normalizePhenoSensorSource(null)).toBe("invalid");
+  });
+});

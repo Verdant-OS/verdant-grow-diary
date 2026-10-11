@@ -31,12 +31,12 @@ const DETAIL = stripSourceComments(
 );
 const BUTTON = readFileSync(resolve(__dirname, "../..", "src/components/ui/button.tsx"), "utf8");
 
-// Only two RPC-invocation shapes are legitimate in this codebase (see
-// action-detail-linked-alert.test.tsx for the full writeup):
+// Legitimate RPC-invocation shapes in this codebase:
 //   1. Direct call:       supabase.rpc("name", args)
-//   2. Cast-wrapped call: (supabase.rpc as unknown as (fn: string, args:
-//      unknown) => Promise<...>)("name", args) — used before the RPC's
-//      generated typing lands (see actionQueueRpcAvailability).
+//   2. Legacy unbound cast-wrapped call (FORBIDDEN for live paths — loses `this`):
+//      (supabase.rpc as unknown as (...)=>(...))("name", args)
+//   3. Method-bound client cast (required when generated typing lags):
+//      (supabase as unknown as UntypedActionQueueRpcClient).rpc("name", args)
 // Anchoring to the call's own first argument (and second argument
 // identifier) rather than "any quote within N characters of supabase.rpc"
 // stops a dynamic/foreign RPC call from being credited with the canonical
@@ -44,6 +44,8 @@ const BUTTON = readFileSync(resolve(__dirname, "../..", "src/components/ui/butto
 const DIRECT_RPC_CALL_PATTERN = /supabase\.rpc\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
 const CAST_RPC_CALL_PATTERN =
   /supabase\.rpc\s+as\s+unknown\s+as\s*\([\s\S]{0,150}?\)\s*=>\s*[\s\S]{0,150}?\)\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
+const CLIENT_CAST_RPC_CALL_PATTERN =
+  /\(\s*supabase\s+as\s+unknown\s+as\s+\w+\s*\)\s*\.rpc\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
 
 function resolveRpcCalls(src: string): Array<{ name: string; argsVar?: string }> {
   const direct = [...src.matchAll(DIRECT_RPC_CALL_PATTERN)].map((m) => ({
@@ -54,7 +56,11 @@ function resolveRpcCalls(src: string): Array<{ name: string; argsVar?: string }>
     name: m[1],
     argsVar: m[2],
   }));
-  return [...direct, ...cast];
+  const clientCast = [...src.matchAll(CLIENT_CAST_RPC_CALL_PATTERN)].map((m) => ({
+    name: m[1],
+    argsVar: m[2],
+  }));
+  return [...direct, ...cast, ...clientCast];
 }
 
 const FORBIDDEN_IN_LABELS = ["[alert:", "[session:"];
@@ -236,7 +242,9 @@ describe("static safety — no automation/device-command copy introduced", () =>
     );
     expect(m).not.toBeNull();
     expect(m![1]).not.toMatch(/\buser_id\b|\bgrow_id\b|\bevent_type\b|\bnew_status\b/);
-    const rpcCallSiteCount = (QUEUE.match(/supabase\.rpc\b/g) ?? []).length;
+    const rpcCallSiteCount =
+      (QUEUE.match(/supabase\.rpc\b/g) ?? []).length +
+      (QUEUE.match(/\(\s*supabase\s+as\s+unknown\s+as\s+\w+\s*\)\s*\.rpc\b/g) ?? []).length;
     const rpcCalls = resolveRpcCalls(QUEUE);
     // Every call site must independently resolve its own first-argument
     // name and second-argument identifier — a dynamic/foreign call site

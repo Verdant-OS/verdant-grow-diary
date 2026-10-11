@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "@/lib/react-router-compat";
+import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { ArrowLeft, Dna, Sparkles } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { createBreedingProgram } from "@/lib/breeding/breedingProgramApi";
+import { resolveNavigationGrowId } from "@/lib/navigationGrowIdRules";
+import { breedingProgramsPath, withGrowId } from "@/lib/routes";
 import { BREEDING_GENERATIONS } from "@/constants/breedingSopSteps";
 import {
   DEFAULT_CULTIVARS,
@@ -18,6 +20,9 @@ import {
 
 export default function BreedingProgramNew() {
   const navigate = useNavigate();
+  const { pathname, search } = useLocation();
+  const growId = resolveNavigationGrowId({ pathname, search });
+  const programsHref = breedingProgramsPath(growId);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -65,7 +70,7 @@ export default function BreedingProgramNew() {
         notes: form.notes || null,
       });
       toast({ title: "Program created" });
-      navigate(`/breeding/${programId}`);
+      navigate(withGrowId(`/breeding/${programId}`, growId));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create program.";
       toast({ title: msg, variant: "destructive" });
@@ -86,8 +91,9 @@ export default function BreedingProgramNew() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => navigate("/breeding")}
+            onClick={() => navigate(programsHref)}
             className="w-full sm:w-auto"
+            data-testid="breeding-program-new-back"
           >
             <ArrowLeft data-icon="inline-start" />
             All programs
@@ -224,8 +230,9 @@ export default function BreedingProgramNew() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate("/breeding")}
+                onClick={() => navigate(programsHref)}
                 className="w-full sm:w-auto"
+                data-testid="breeding-program-new-cancel"
               >
                 Cancel
               </Button>

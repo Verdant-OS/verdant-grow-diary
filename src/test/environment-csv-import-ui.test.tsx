@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { EnvironmentCsvImportModal } from "@/components/EnvironmentCsvImportModal";
 
 function makeFile(text: string, name = "export.csv"): File {
@@ -163,5 +164,84 @@ describe("EnvironmentCsvImportModal — source safety scan (test 32, 40-44)", ()
     expect(src).not.toMatch(/device.?control/i);
     expect(src).not.toMatch(/\bautomation\b/i);
     expect(src).not.toMatch(/\bscheduler\b/i);
+  });
+});
+
+describe("CSV modal uncertainty and explicit recovery", () => {
+  it("keeps uncertainty and confirmed counts through a rejected retry until reconciliation succeeds", async () => {
+    const onConfirm = vi
+      .fn()
+      .mockResolvedValueOnce({
+        insertedCount: 2,
+        partialWrite: true,
+        unconfirmedWrite: true,
+        error: "private first failure",
+      })
+      .mockResolvedValueOnce({
+        insertedCount: 0,
+        partialWrite: false,
+        error: "private rejected retry",
+      })
+      .mockResolvedValueOnce({ insertedCount: 0, duplicateCount: 3, error: null });
+    render(
+      <MemoryRouter>
+        <EnvironmentCsvImportModal
+          open
+          onOpenChange={() => {}}
+          onConfirm={onConfirm}
+          viewHistoryHref="/tents/t1#imported-sensor-history"
+        />
+      </MemoryRouter>,
+    );
+    await uploadCsv("Timestamp,Temp(°C),RH\n2026-06-01T10:00:00Z,25,50\n");
+    fireEvent.click(screen.getByTestId("csv-import-confirm"));
+    await waitFor(() =>
+      expect(screen.getByTestId("csv-import-error").textContent).toMatch(
+        /couldn.t confirm|unconfirmed/i,
+      ),
+    );
+    expect(screen.getByTestId("csv-import-error").textContent).toMatch(/2 .*confirmed/i);
+    expect(screen.getByRole("link", { name: /View imported history/i }).getAttribute("href")).toBe(
+      "/tents/t1#imported-sensor-history",
+    );
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: /Retry import/i }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByTestId("csv-import-error").textContent).toMatch(/2 .*confirmed/i),
+    );
+    expect(screen.getByTestId("csv-import-error").textContent).toMatch(
+      /couldn.t confirm|unconfirmed/i,
+    );
+    expect(screen.getByTestId("csv-import-error").textContent).not.toMatch(
+      /No CSV readings were saved|private/i,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Retry import/i }));
+    await waitFor(() => expect(screen.getByTestId("csv-import-done")).toBeTruthy());
+    expect(screen.getByTestId("csv-import-done").textContent).toMatch(/already exist/i);
+    expect(screen.queryByTestId("csv-import-error")).toBeNull();
+    expect(onConfirm.mock.calls[1][0]).toEqual(onConfirm.mock.calls[0][0]);
+    expect(onConfirm.mock.calls[2][0]).toEqual(onConfirm.mock.calls[0][0]);
+  });
+
+  it("dispatches only once for two clicks before the saving render", async () => {
+    let complete!: (value: { insertedCount: number; error: null }) => void;
+    const onConfirm = vi.fn(
+      () =>
+        new Promise<{ insertedCount: number; error: null }>((r) => {
+          complete = r;
+        }),
+    );
+    render(<EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={onConfirm} />);
+    await uploadCsv("Timestamp,Temp(°C),RH\n2026-06-01T10:00:00Z,25,50\n");
+    const confirm = screen.getByTestId("csv-import-confirm");
+    act(() => {
+      confirm.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      confirm.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    await act(async () => complete({ insertedCount: 3, error: null }));
+    expect(screen.getByTestId("csv-import-done")).toBeTruthy();
   });
 });

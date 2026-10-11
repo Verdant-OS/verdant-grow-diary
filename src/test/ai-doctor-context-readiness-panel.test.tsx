@@ -6,7 +6,7 @@
  * calls happen during render.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
 import { compileAiDoctorContextFromRows } from "@/lib/aiDoctorEngine";
 
@@ -23,7 +23,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((() => {
   throw new Error("fetch not allowed in readiness panel render test");
 }) as never);
 
@@ -53,6 +53,118 @@ function ctx(
 }
 
 describe("AiDoctorContextReadinessPanel", () => {
+  it.each(["idle", "loading"] as const)(
+    "shows Loading… instead of a retained alert count when alerts are %s",
+    (openAlertsStatus) => {
+      const onRetryAlerts = vi.fn();
+      render(
+        <AiDoctorContextReadinessPanel
+          context={ctx([], [])}
+          openAlertsCount={42}
+          openAlertsStatus={openAlertsStatus}
+          onRetryAlerts={onRetryAlerts}
+        />,
+      );
+
+      expect(
+        screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts").textContent,
+      ).toBe("Loading…");
+      expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+      expect(onRetryAlerts).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([0, 42])("shows Unavailable with Retry alerts instead of count %s", (count) => {
+    const onRetryAlerts = vi.fn();
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={count}
+        openAlertsStatus="unavailable"
+        onRetryAlerts={onRetryAlerts}
+      />,
+    );
+
+    const alertCount = screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts");
+    expect(alertCount.textContent).toContain("Unavailable");
+    expect(alertCount.textContent).not.toMatch(/\d/);
+    const retry = screen.getByRole("button", { name: "Retry alerts" });
+    expect(retry.getAttribute("type")).toBe("button");
+    expect(onRetryAlerts).not.toHaveBeenCalled();
+    fireEvent.click(retry);
+    expect(onRetryAlerts).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("shows No assigned tent instead of a retained alert count", () => {
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={42}
+        openAlertsStatus="no_tent"
+        onRetryAlerts={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts").textContent,
+    ).toBe("No assigned tent");
+    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+  });
+
+  it.each([0, 127])("shows successful open alert count %s without a display cap", (count) => {
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={count}
+        openAlertsStatus="ok"
+        onRetryAlerts={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts").textContent,
+    ).toBe(String(count));
+    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+  });
+
+  it("hides a previous successful count through loading and failure until recovery", () => {
+    const context = ctx([], []);
+    const { rerender } = render(
+      <AiDoctorContextReadinessPanel
+        context={context}
+        openAlertsCount={42}
+        openAlertsStatus="ok"
+      />,
+    );
+    const alertCount = () =>
+      screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts").textContent;
+    expect(alertCount()).toBe("42");
+
+    rerender(
+      <AiDoctorContextReadinessPanel
+        context={context}
+        openAlertsCount={42}
+        openAlertsStatus="loading"
+      />,
+    );
+    expect(alertCount()).toBe("Loading…");
+
+    rerender(
+      <AiDoctorContextReadinessPanel
+        context={context}
+        openAlertsCount={42}
+        openAlertsStatus="unavailable"
+      />,
+    );
+    expect(alertCount()).toBe("Unavailable");
+
+    rerender(
+      <AiDoctorContextReadinessPanel context={context} openAlertsCount={0} openAlertsStatus="ok" />,
+    );
+    expect(alertCount()).toBe("0");
+  });
+
   it("renders 'Ready for cautious check-in' when context is strong", () => {
     const context = ctx(
       [{ occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" }],
@@ -292,5 +404,91 @@ describe("AiDoctorContextReadinessPanel", () => {
     expect(src).not.toMatch(/\.delete\s*\(/);
     // No alert-creation helpers
     expect(src).not.toMatch(/createAlert|insertAlert/);
+  });
+});
+
+describe("AiDoctorContextReadinessPanel — open-alert read state", () => {
+  const count = () => screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts");
+  // The status copy is the <dd>'s own text; a nested Retry button (when a retry
+  // callback is wired) contributes its own label, so read only the direct text nodes.
+  const statusText = (el: HTMLElement) =>
+    Array.from(el.childNodes)
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .map((node) => node.textContent)
+      .join("");
+
+  it.each(["idle", "loading"] as const)(
+    "shows loading for %s even with a retained count",
+    (status) => {
+      render(
+        <AiDoctorContextReadinessPanel
+          context={ctx([], [])}
+          openAlertsCount={7}
+          openAlertsStatus={status}
+        />,
+      );
+      expect(count()).toHaveTextContent(/^Loading…$/);
+      expect(count()).not.toHaveTextContent("7");
+      expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+    },
+  );
+
+  it.each([0, 7])("shows unavailable instead of the stale numeric prop %s", (staleCount) => {
+    const retry = vi.fn();
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={staleCount}
+        openAlertsStatus="unavailable"
+        onRetryAlerts={retry}
+      />,
+    );
+    expect(statusText(count())).toBe("Unavailable");
+    expect(count()).not.toHaveTextContent(String(staleCount));
+    const retryButton = screen.getByRole("button", { name: "Retry alerts" });
+    expect(count()).toContainElement(retryButton);
+    fireEvent.click(retryButton);
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([0, 8])("shows the successful uncapped open count %s", (openCount) => {
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={openCount}
+        openAlertsStatus="ok"
+      />,
+    );
+    expect(count()).toHaveTextContent(new RegExp(`^${openCount}$`));
+    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+  });
+
+  it("shows no assigned tent without inventing an empty result or a retry target", () => {
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={0}
+        openAlertsStatus="no_tent"
+      />,
+    );
+    expect(count()).toHaveTextContent(/^No assigned tent$/);
+    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+  });
+
+  it("keeps unavailable truthful when no retry callback is available", () => {
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={3}
+        openAlertsStatus="unavailable"
+      />,
+    );
+    expect(count()).toHaveTextContent(/^Unavailable$/);
+    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+  });
+
+  it("preserves numeric-only presenter callers", () => {
+    render(<AiDoctorContextReadinessPanel context={ctx([], [])} openAlertsCount={5} />);
+    expect(count()).toHaveTextContent(/^5$/);
   });
 });

@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { Link, MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import type { ResolvedEntitlement } from "@/lib/entitlements";
 import { PLAN_CATALOG } from "@/lib/entitlements";
+import { isKnownPlanIntent, PLAN_INTENT_IDS } from "@/lib/checkoutPlanIntent";
+import { PAID_PLAN_IDS } from "@/lib/paidPlanAllowlist";
 import Pricing from "@/pages/Pricing";
 
 const mocks = vi.hoisted(() => ({
@@ -83,6 +85,14 @@ function renderPricing() {
   );
 }
 
+function renderPricingWithQueryOnlyPack(pack: "credit_pack_50" | "credit_pack_150") {
+  return render(
+    <MemoryRouter initialEntries={[`/pricing?plan=${pack}`]}>
+      <Pricing />
+    </MemoryRouter>,
+  );
+}
+
 function renderPricingFromSource() {
   return render(
     <MemoryRouter initialEntries={["/source"]}>
@@ -127,6 +137,33 @@ afterEach(() => {
 });
 
 describe("Pricing credit-pack entitlement gate", () => {
+  it("derives the complete checkout-intent allowlist from canonical paid plan ids", () => {
+    expect(PLAN_INTENT_IDS).toBe(PAID_PLAN_IDS);
+    for (const id of PAID_PLAN_IDS) {
+      expect(isKnownPlanIntent(id), `${id} should be accepted without a parallel allowlist`).toBe(
+        true,
+      );
+    }
+  });
+
+  it.each(["credit_pack_50", "credit_pack_150"] as const)(
+    "focuses and visibly selects query-only %s without auto-opening checkout",
+    async (pack) => {
+      mocks.entitlements.entitlement = entitlementFor("pro_monthly", "lovable_paddle_subscription");
+      renderPricingWithQueryOnlyPack(pack);
+
+      const target = await screen.findByTestId("pricing-credit-packs");
+      await waitFor(() => expect(target).toHaveFocus());
+      expect(target).toHaveAttribute("id", "buy-credits");
+      expect(screen.getByTestId(`pricing-credit-pack-${pack}`)).toHaveAttribute(
+        "data-preselected",
+        "true",
+      );
+      expect(scrollIntoView).toHaveBeenCalled();
+      expect(mocks.openCheckout).not.toHaveBeenCalled();
+    },
+  );
+
   it("scrolls and focuses the real credit-pack target after cross-route SPA navigation", async () => {
     const user = userEvent.setup();
     renderPricingFromSource();

@@ -110,6 +110,15 @@ describe("useReportsHubData — sensor query scoping (static wiring)", () => {
     // Never a hand-maintained raw literal list that could drift from the fence.
     expect(HOOK_SRC).not.toMatch(/\.in\(\s*["']source["']\s*,\s*\[/);
   });
+
+  it("recent and older sensor windows keep null captured_at rows on ts bounds", () => {
+    expect(HOOK_SRC).toContain(
+      "`captured_at.gte.${input.recentSince},and(captured_at.is.null,ts.gte.${input.recentSince})`",
+    );
+    expect(HOOK_SRC).toContain(
+      "`captured_at.lt.${input.before},and(captured_at.is.null,ts.lt.${input.before})`",
+    );
+  });
 });
 
 describe("rawSensorSourceValuesFor — alias-table derivation", () => {

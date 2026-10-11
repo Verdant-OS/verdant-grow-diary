@@ -245,7 +245,8 @@ describe("Quick Log corrections/retractions migration delivery", () => {
     expect(sql).not.toContain("set local search_path = public, pg_catalog;");
 
     expect(sql).toContain("'authenticated_role_contract'");
-    expect(sql).toContain("not authenticated_role.rolinherit");
+    // authenticated is INHERIT on production; privilege fences resolve membership instead.
+    expect(sql).not.toContain("rolinherit");
     expect(sql).toContain("not authenticated_role.rolcanlogin");
     expect(sql).toContain("not authenticated_role.rolbypassrls");
     expect(sql).toContain("'user_roles_contract'");
@@ -565,7 +566,7 @@ describe("Quick Log corrections/retractions migration delivery", () => {
 
     expect(Object.keys(trigger)).toEqual(["workflow_dispatch"]);
     expect(workflow.permissions).toEqual({ contents: "read", actions: "read" });
-    expect(workflow.jobs.apply.environment).toBe("verdant-production");
+    expect(workflow.jobs.apply.environment).toBe("verdant-production-solo-founder");
     expect(workflowSource).toContain("refs/heads/verdant-grow-diary");
     expect(workflowSource).toContain("verify-quicklog-corrections-preflight-artifact.mjs");
     expect(workflowSource).toContain(

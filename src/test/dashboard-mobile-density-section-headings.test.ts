@@ -44,20 +44,23 @@ describe("Dashboard · mobile density section headings", () => {
   });
 
   it("preserves canonical route targets for primary grower paths", () => {
-    // Primary Quick Log CTA route is unchanged.
-    expect(DASHBOARD).toMatch(/to="\/daily-check"/);
-    // Sensors primary + secondary anchors remain.
-    expect(DASHBOARD).toMatch(/to="\/sensors"/);
-    expect(DASHBOARD).toMatch(/to="\/sensors#manual-reading"/);
-    expect(DASHBOARD).toMatch(/to="\/sensors#csv-import"/);
+    // Primary Log CTA (the One-Tent Home card) still routes to /daily-check.
+    expect(DASHBOARD).toMatch(
+      /logHref=\{withGrowId\("\/daily-check",\s*homeTent\?\.growId \?\? scopedGrowId\)\}/,
+    );
+    // Sensors primary + secondary anchors remain, grow-scoped via helpers.
+    expect(DASHBOARD).toMatch(/sensorsPath\(scopedGrowId\)/);
+    expect(DASHBOARD).toMatch(/withGrowId\("\/sensors#manual-reading",\s*scopedGrowId\)/);
+    expect(DASHBOARD).toMatch(/withGrowId\("\/sensors#csv-import",\s*scopedGrowId\)/);
     // AI Doctor link is unchanged.
     expect(DASHBOARD).toMatch(/to="\/doctor"/);
   });
 
   it("does not reintroduce legacy 'Daily Grow Check' primary CTA copy", () => {
-    // The PageHeader CTA was unified to "Quick Log" in slice 2.
+    // The PageHeader actions wrapper carries the readiness marker.
     const headerActions =
-      DASHBOARD.match(/dashboard-daily-grow-check-entry[\s\S]{0,400}<\/Button>/)?.[0] ?? "";
+      DASHBOARD.match(/data-testid="dashboard-ready"[\s\S]{0,400}<\/div>/)?.[0] ?? "";
+    expect(headerActions).not.toBe("");
     expect(headerActions).not.toMatch(/>Daily Grow Check</);
   });
 

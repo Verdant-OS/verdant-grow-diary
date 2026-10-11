@@ -7,6 +7,7 @@
  * control.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { formatAiDoctorSensorEvidenceStatus } from "@/lib/plantDetailAiDoctorReadiness";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import React from "react";
@@ -159,6 +160,8 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
       expect(COMPONENT_SRC).toMatch(/useSensorReadingsByTents/);
       expect(COMPONENT_SRC).toMatch(/classifyAiDoctorCurrentSensorEvidence/);
       expect(COMPONENT_SRC).toMatch(/selectAiDoctorSensorEvidenceClassification/);
+      expect(COMPONENT_SRC).toMatch(/AI_DOCTOR_MANUAL_SENSOR_SOURCES/);
+      expect(COMPONENT_SRC).toMatch(/mergeAiDoctorCurrentSensorWindows/);
     });
   });
 
@@ -256,12 +259,13 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
         expect(panel.getAttribute("data-counts-as-healthy")).toBe(
           c.status === "usable" ? "true" : "false",
         );
+        // Grower-facing label; the raw token stays in data-status only.
         expect(
           screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-status").textContent,
-        ).toContain(c.status);
-        expect(
-          screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-reason").textContent,
-        ).toBeTruthy();
+        ).toBe(formatAiDoctorSensorEvidenceStatus(c.status));
+        expect(panel.getAttribute("data-reason")).toBeTruthy();
+        expect(screen.queryByTestId("plant-detail-ai-doctor-sensor-evidence-reason")).toBeNull();
+        expect(panel.textContent).not.toMatch(/fresh_accept|none_accepted|no_rows|status:|reason:/);
 
         if (c.nextActionLabel) {
           const btn = screen.getByTestId(
@@ -325,6 +329,69 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
       expect(panel.getAttribute("data-status")).toBe("no_data");
       expect(panel.getAttribute("data-mode")).toBe("missing");
     });
+  });
+
+  it("treats a fresh tent manual snapshot as healthy Doctor evidence without a live bridge", () => {
+    currentSensorState.rows = [
+      {
+        metric: "temp_f",
+        value: 75,
+        captured_at: new Date(Date.now() - 60_000).toISOString(),
+        source: "manual",
+        quality: "ok",
+      },
+      {
+        metric: "humidity",
+        value: 60,
+        captured_at: new Date(Date.now() - 60_000).toISOString(),
+        source: "manual",
+        quality: "ok",
+      },
+      {
+        metric: "vpd",
+        value: 1,
+        captured_at: new Date(Date.now() - 60_000).toISOString(),
+        source: "manual",
+        quality: "ok",
+      },
+    ];
+    setBridge(null, null);
+    renderCard();
+    const panel = screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-panel");
+    expect(panel.getAttribute("data-status")).toBe("usable");
+    expect(panel.getAttribute("data-mode")).toBe("healthy");
+    expect(panel.getAttribute("data-counts-as-healthy")).toBe("true");
+    expect(
+      screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-status").textContent,
+    ).not.toMatch(/needs review/i);
+  });
+
+  it("treats the remasure 76°F / 58% RH tent save as healthy, not none_inserted review", () => {
+    const capturedAt = new Date(Date.now() - 60_000).toISOString();
+    currentSensorState.rows = [
+      {
+        metric: "temp_f",
+        value: 76,
+        captured_at: capturedAt,
+        source: "manual",
+        quality: null,
+      },
+      {
+        metric: "humidity",
+        value: 58,
+        captured_at: capturedAt,
+        source: "manual",
+        quality: null,
+      },
+    ];
+    setBridge("needs_review", "none_accepted");
+    renderCard();
+    const panel = screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-panel");
+    expect(panel.getAttribute("data-status")).toBe("usable");
+    expect(panel.getAttribute("data-mode")).toBe("healthy");
+    expect(
+      screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-status").textContent,
+    ).not.toMatch(/needs review — not used for recommendations/i);
   });
 
   it("never lets an audit success plus a test packet raise readiness", () => {

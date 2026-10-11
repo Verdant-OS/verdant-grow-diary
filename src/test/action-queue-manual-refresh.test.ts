@@ -57,7 +57,7 @@ describe("Action Queue manual refresh button structure", () => {
     // Widened from the RPC-availability re-probe added to the onClick body
     // (setRpcAvailability("unknown") before void load()), which pushed the
     // opening `variant="ghost"` attribute further ahead of the testid.
-    const block = SRC.slice(Math.max(0, idx - 500), idx + 300);
+    const block = SRC.slice(Math.max(0, idx - 800), idx + 300);
     expect(block).toMatch(/variant="ghost"/);
     expect(block).toMatch(/size="sm"/);
   });
@@ -88,17 +88,17 @@ describe("Action Queue manual refresh button behavior", () => {
 
   it("does not gate approve/reject/complete/cancel buttons with refresh state", () => {
     // Action row buttons must remain disabled only when the per-row mutation is in flight.
-    expect(SRC).toMatch(/const disabled = busyId === row\.id;/);
-    // In the action row button block, no disabled prop should reference isRefreshing.
-    const btnBlockStart = SRC.indexOf("action-queue-refresh-button");
-    const actionRowsStart = SRC.indexOf("const disabled = busyId === row.id;");
+    expect(SRC).toMatch(/const disabled = busyId === row\.id \|\| transitionMutationsBlocked;/);
+    const actionRowsStart = SRC.indexOf(
+      "const disabled = busyId === row.id || transitionMutationsBlocked",
+    );
     const actionBlock = SRC.slice(actionRowsStart, actionRowsStart + 700);
     expect(actionBlock).not.toMatch(/disabled=\{.*isRefreshing.*\}/);
     expect(actionBlock).not.toMatch(/disabled=\{.*loading.*\}/);
   });
 
-  it("approve/reject buttons remain governed by busyId only", () => {
-    expect(SRC).toMatch(/const disabled = busyId === row\.id;/);
+  it("approve/reject buttons remain governed by busyId plus availability fail-closed", () => {
+    expect(SRC).toMatch(/const disabled = busyId === row\.id \|\| transitionMutationsBlocked;/);
   });
 });
 

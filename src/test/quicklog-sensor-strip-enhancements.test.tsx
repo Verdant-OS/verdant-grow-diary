@@ -76,8 +76,9 @@ describe("QuickLogSensorSnapshotStrip — provider label, ARIA, mini-chart", () 
     const src = screen.getByTestId("quicklog-sensor-snapshot-source");
     expect(src).toHaveTextContent("source: EcoWitt");
     expect(src).toHaveAttribute("aria-label", "Sensor source: EcoWitt");
-    // Pill is still Usable, never Live.
-    expect(screen.getByTestId("quicklog-sensor-snapshot-pill")).toHaveTextContent("Usable");
+    // Provider chips survive the provenance fence, but the pill fails
+    // closed: receiving-transport labels are untrusted, never Usable/Live.
+    expect(screen.getByTestId("quicklog-sensor-snapshot-pill")).toHaveTextContent("Invalid");
   });
 
   it("renders friendly label for home_assistant", () => {

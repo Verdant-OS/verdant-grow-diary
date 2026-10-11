@@ -207,8 +207,9 @@ describe("landing subscriber funnel", () => {
     // buildSignedOutRedirect, which always lands on /welcome (optionally
     // carrying a manifest-validated redirectTo for deep-link restore).
     expect(APP_SHELL).toMatch(
-      /const signedOutRedirect = buildSignedOutRedirect\(\s*location\.pathname,\s*location\.search,\s*location\.hash,?\s*\)/,
+      /buildSignedOutRedirect\(\s*location\.pathname,\s*location\.search,\s*location\.hash,?\s*\)/,
     );
+    expect(APP_SHELL).toMatch(/retainSignedOutReturnIntent\(/);
     expect(APP_SHELL).toMatch(/useRequireAuth\(signedOutRedirect\)/);
     expect(APP_SHELL).toMatch(/nav\(signedOutRedirect/);
     expect(APP_SHELL).not.toMatch(/useRequireAuth\("\/auth"\)/);

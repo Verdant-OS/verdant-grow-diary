@@ -17,7 +17,33 @@ import {
   type SensorQualityResult,
 } from "@/lib/sensorQuality";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
-import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
+import {
+  resolveSensorObservationTime,
+  type SensorObservationTimeLike,
+} from "@/lib/sensorObservationTimeRules";
+import { classifyCurrentStateSource, isCurrentStateStale } from "@/lib/sensorTruthCanon";
+import type { SnapshotStatus } from "@/lib/sensorSnapshotStatusContract";
+
+/** Historical chart acceptance does not establish current healthy evidence. */
+export function resolveDashboardSensorBadgeStatus(
+  reading: (SensorObservationTimeLike & { source?: unknown }) | null | undefined,
+  now: number,
+): SnapshotStatus {
+  if (!reading) return "no_data";
+  const capturedAt = resolveSensorObservationTime(reading);
+  const capturedMs = capturedAt === null ? Number.NaN : Date.parse(capturedAt);
+  if (!Number.isFinite(now) || !Number.isFinite(capturedMs) || capturedMs > now) {
+    return "invalid";
+  }
+  const source = typeof reading.source === "string" ? reading.source : null;
+  const kind = classifyCurrentStateSource(source);
+  if (kind === "invalid") return "invalid";
+  if (kind === "stale") return "stale";
+  // CSV remains useful history, but neither it nor unverified/synthetic
+  // provenance may support a green current-health cue on the Dashboard.
+  if (kind !== "live" && kind !== "manual") return "needs_review";
+  return isCurrentStateStale(capturedAt, { now, source }) ? "stale" : "usable";
+}
 
 export interface DashboardSensorEvidenceRow extends SensorProvenanceRowLike {
   tent_id: string;

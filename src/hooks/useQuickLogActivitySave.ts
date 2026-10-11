@@ -14,18 +14,24 @@
  *     sensor reading path (ManualSensorReadingCard) already handles it.
  */
 import { useCallback, useState } from "react";
+import { isUuid } from "@/lib/isUuid";
 import { supabase } from "@/integrations/supabase/client";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
   QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
   type QuickLogActivityId,
 } from "@/constants/quickLogActivityTypes";
-import { planQuickLogPersistence } from "@/lib/quickLogActivityRules";
+import {
+  isDefinitiveQuickLogActivityRejection,
+  planQuickLogPersistence,
+} from "@/lib/quickLogActivityRules";
 import {
   QUICK_LOG_V2_ENTRY_CREATED_EVENT,
   dispatchQuickLogV2EntryCreated,
 } from "@/lib/quickLogV2EntryCreatedEvent";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
+import { verifyReusedQuickLogActivityEvent } from "@/lib/quickLogReusedActivityReceipt";
+import { resolveManualNoteReceiptTentId } from "@/lib/quickLogReusedActivityReceiptRules";
 
 export interface QuickLogActivitySaveInput {
   activityId: QuickLogActivityId;
@@ -33,6 +39,8 @@ export interface QuickLogActivitySaveInput {
   tentId?: string | null;
   plantId?: string | null;
   note?: string | null;
+  /** Caller-pinned occurrence time, reused verbatim on an exact retry. */
+  occurredAt?: string | null;
   photoUrl?: string | null;
   /**
    * Required for event-route dedupe. The manual route forwards it too when
@@ -52,6 +60,7 @@ export type QuickLogActivitySaveReason =
   | "unsupported_activity"
   | "missing_idempotency_key"
   | "missing_target"
+  | "server_rejected"
   | "save_failed";
 
 export interface QuickLogActivitySaveResult {
@@ -110,6 +119,14 @@ export function useQuickLogActivitySave() {
       setError(null);
       try {
         if (plan.saveRoute === "manual_note") {
+          // Fail-closed before target resolution and before constructing the
+          // RPC: trim once, then never call quicklog_save_manual with an
+          // empty/short/overlong key.
+          const idempotencyKey = input.idempotencyKey?.trim();
+          if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 200) {
+            setError("missing_idempotency_key");
+            return { ok: false, reason: "missing_idempotency_key" };
+          }
           // quicklog_save_manual is target-scoped (p_target_type/p_target_id)
           // and derives grow/tent/plant server-side from the owned target row
           // — mirroring useQuickLogV2Save + quickLogV2SavePayload. No deployed
@@ -123,14 +140,7 @@ export function useQuickLogActivitySave() {
           const manualDetails: Record<string, unknown> = {
             ...(input.extraDetails ?? {}),
           };
-          const manualIdempotencyKey =
-            input.idempotencyKey &&
-            input.idempotencyKey.length >= 8 &&
-            input.idempotencyKey.length <= 200
-              ? input.idempotencyKey
-              : null;
           const { data, error: rpcErr } = await supabase.rpc(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_manual" as any,
             {
               p_target_type: targetType,
@@ -141,9 +151,9 @@ export function useQuickLogActivitySave() {
               p_temperature_c: null,
               p_humidity_pct: null,
               p_vpd_kpa: null,
-              p_occurred_at: null,
+              p_occurred_at: input.occurredAt ?? null,
               ...(Object.keys(manualDetails).length > 0 ? { p_details: manualDetails } : {}),
-              p_idempotency_key: manualIdempotencyKey,
+              p_idempotency_key: idempotencyKey,
             } as unknown as Record<string, unknown>,
           );
           if (rpcErr) {
@@ -151,7 +161,30 @@ export function useQuickLogActivitySave() {
             return { ok: false, reason: "save_failed" };
           }
           const r = (data ?? {}) as ManualRpcResponse;
-          if (!r.ok) {
+          if (r.ok !== true || !isUuid(r.grow_event_id)) {
+            if (r.ok === false && isDefinitiveQuickLogActivityRejection(r.reason)) {
+              setError("server_rejected");
+              return {
+                ok: false,
+                reason: "server_rejected",
+                disabledReason: "The server refused this activity. Check its target and fields.",
+              };
+            }
+            setError("save_failed");
+            return { ok: false, reason: "save_failed" };
+          }
+          if (
+            r.reused === true &&
+            !(await verifyReusedQuickLogActivityEvent({
+              id: r.grow_event_id,
+              eventType: "observation",
+              growId: input.growId,
+              tentId: resolveManualNoteReceiptTentId(input),
+              plantId: input.plantId ?? null,
+              note: input.note || null,
+              occurredAt: input.occurredAt ?? null,
+            }))
+          ) {
             setError("save_failed");
             return { ok: false, reason: "save_failed" };
           }
@@ -170,7 +203,8 @@ export function useQuickLogActivitySave() {
         }
 
         if (plan.saveRoute === "event") {
-          if (!input.idempotencyKey || input.idempotencyKey.length < 8) {
+          const idempotencyKey = input.idempotencyKey?.trim();
+          if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 200) {
             setError("missing_idempotency_key");
             return { ok: false, reason: "missing_idempotency_key" };
           }
@@ -188,10 +222,9 @@ export function useQuickLogActivitySave() {
           // migration is applied to prod.
           details.event_type = plan.eventType;
           const { data, error: rpcErr } = await supabase.rpc(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_event" as any,
             {
-              p_idempotency_key: input.idempotencyKey,
+              p_idempotency_key: idempotencyKey,
               p_grow_id: input.growId,
               p_event_type: plan.eventType,
               p_tent_id: input.tentId ?? null,
@@ -199,7 +232,7 @@ export function useQuickLogActivitySave() {
               p_note: input.note ?? null,
               p_photo_url: input.photoUrl ?? null,
               p_sensor_snapshot: null,
-              p_occurred_at: null,
+              p_occurred_at: input.occurredAt ?? null,
               p_details: Object.keys(details).length > 0 ? details : null,
             } as unknown as Record<string, unknown>,
           );
@@ -208,7 +241,7 @@ export function useQuickLogActivitySave() {
             return { ok: false, reason: "save_failed" };
           }
           const r = (data ?? {}) as EventRpcResponse;
-          if (!r.ok || !r.grow_event_id) {
+          if (r.ok !== true || !isUuid(r.grow_event_id)) {
             // Stale backend fence: v1b client but validator/allow-list
             // does not accept harvest yet. Never fake-save as observation.
             if (input.activityId === "harvest" && r.reason === "invalid_event_type") {
@@ -219,6 +252,29 @@ export function useQuickLogActivitySave() {
                 disabledReason: QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
               };
             }
+            if (r.ok === false && isDefinitiveQuickLogActivityRejection(r.reason)) {
+              setError("server_rejected");
+              return {
+                ok: false,
+                reason: "server_rejected",
+                disabledReason: "The server refused this activity. Check its target and fields.",
+              };
+            }
+            setError("save_failed");
+            return { ok: false, reason: "save_failed" };
+          }
+          if (
+            r.reused === true &&
+            !(await verifyReusedQuickLogActivityEvent({
+              id: r.grow_event_id,
+              eventType: plan.eventType ?? "",
+              growId: input.growId,
+              tentId: input.tentId,
+              plantId: input.plantId ?? null,
+              note: input.note || null,
+              occurredAt: input.occurredAt ?? null,
+            }))
+          ) {
             setError("save_failed");
             return { ok: false, reason: "save_failed" };
           }

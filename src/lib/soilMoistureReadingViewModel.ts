@@ -1,4 +1,5 @@
 import { calibrateSoilMoisture } from "@/lib/soilMoistureCalibrationRules";
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 import {
   selectSoilMoistureCalibration,
   type SoilMoistureCalibrationCandidate,
@@ -31,15 +32,6 @@ export interface SoilMoistureReadingViewModel {
   selection: SoilMoistureCalibrationSelection;
 }
 
-const RAW_SOURCES: readonly SoilMoistureRawSource[] = [
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-];
-
 const CALIBRATION_SOURCE_LABELS: Record<SoilMoistureCalibrationSource, string> = {
   manual: "Manual",
   csv: "CSV",
@@ -53,10 +45,9 @@ function finiteNumber(value: number | null | undefined): number | null {
 function normalizeRawSource(
   source: SoilMoistureReadingViewModelInput["rawSource"],
 ): SoilMoistureRawSource {
-  const normalized = typeof source === "string" ? source.toLowerCase() : "";
-  return (RAW_SOURCES as readonly string[]).includes(normalized)
-    ? (normalized as SoilMoistureRawSource)
-    : "invalid";
+  // #592 fold: delegate to the sanctioned #1003 canon table — pi_bridge
+  // is live, diary is manual, everything unrecognized is invalid.
+  return normalizeSensorSource(source);
 }
 
 function formatPercent(value: number | null): string {

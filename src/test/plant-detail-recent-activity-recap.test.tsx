@@ -354,6 +354,160 @@ describe("PlantDetailRecentActivityRecap render", () => {
   });
 });
 
+describe("Plant Detail recent activity recap — read-state honesty", () => {
+  const refetch = vi.fn().mockResolvedValue({});
+  const openQuickLog = vi.fn();
+  const savedNote = (plantId = "p1") => ({
+    id: `note-${plantId}`,
+    plant_id: plantId,
+    entry_type: "note",
+    entry_at: new Date().toISOString(),
+    note: `Saved observation for ${plantId}`,
+  });
+  const success = (data: unknown[] = []) => ({
+    data,
+    isLoading: false,
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    fetchStatus: "idle",
+    refetch,
+  });
+  function expectNoUnverifiedSummary() {
+    for (const id of [
+      "plant-detail-no-recent-log-recovery",
+      "plant-detail-recent-activity-recap-empty",
+      "plant-detail-recent-activity-recap-list",
+      "plant-detail-stabilize-mode",
+      "plant-detail-action-response-pair",
+      "plant-detail-outcome-follow-up",
+    ])
+      expect(screen.queryByTestId(id)).toBeNull();
+  }
+  beforeEach(() => {
+    useRecentMock.mockReset();
+    refetch.mockClear();
+    openQuickLog.mockClear();
+  });
+
+  for (const callback of [false, true]) {
+    it(`shows unavailable after a failed first read (Quick Log callback: ${callback})`, () => {
+      useRecentMock.mockReturnValue({ ...success(), data: undefined, isError: true });
+      render(
+        <PlantDetailRecentActivityRecap
+          plantId="p1"
+          onAddQuickCheck={callback ? openQuickLog : undefined}
+        />,
+      );
+      expect(screen.getByRole("alert")).toHaveTextContent("Recent plant activity is unavailable.");
+      expectNoUnverifiedSummary();
+      fireEvent.click(screen.getByRole("button", { name: "Retry recent activity" }));
+      expect(refetch).toHaveBeenCalledTimes(1);
+      expect(openQuickLog).not.toHaveBeenCalled();
+    });
+  }
+  for (const data of [[], [savedNote()]]) {
+    it(`does not present cached ${data.length ? "activity" : "emptiness"} after a failed refresh`, () => {
+      useRecentMock.mockReturnValue({ ...success(data), isError: true });
+      render(<PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />);
+      expect(screen.getByRole("alert")).toHaveTextContent("Recent plant activity is unavailable.");
+      expectNoUnverifiedSummary();
+    });
+  }
+  it("keeps a paused first read unresolved rather than claiming empty activity", () => {
+    useRecentMock.mockReturnValue({
+      ...success(),
+      data: undefined,
+      isPending: true,
+      fetchStatus: "paused",
+    });
+    render(<PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Waiting for connection to load recent activity",
+    );
+    expectNoUnverifiedSummary();
+  });
+  it("keeps an idle pending first read unresolved", () => {
+    useRecentMock.mockReturnValue({ ...success(), data: undefined, isPending: true });
+    render(<PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading recent activity");
+    expectNoUnverifiedSummary();
+  });
+  for (const data of [null, undefined]) {
+    it(`does not infer successful empty from unresolved ${String(data)} data`, () => {
+      useRecentMock.mockReturnValue({ ...success(), data });
+      render(<PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />);
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expectNoUnverifiedSummary();
+    });
+  }
+  it("keeps the failure visible and disables Retry while the retry is running", () => {
+    useRecentMock.mockReturnValue({
+      ...success([savedNote()]),
+      isError: true,
+      isFetching: true,
+      fetchStatus: "fetching",
+    });
+    render(<PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />);
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    const retry = screen.getByRole("button", { name: "Retry recent activity" });
+    expect(retry).toBeDisabled();
+    fireEvent.click(retry);
+    expect(refetch).not.toHaveBeenCalled();
+    expectNoUnverifiedSummary();
+  });
+  it("renders no-plant copy ahead of disabled-query pending state and cached data", () => {
+    useRecentMock.mockReturnValue({
+      ...success([savedNote()]),
+      isPending: true,
+      fetchStatus: "paused",
+    });
+    render(<PlantDetailRecentActivityRecap plantId={null} onAddQuickCheck={openQuickLog} />);
+    expect(screen.getByText("No plant selected.")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expectNoUnverifiedSummary();
+  });
+  it("returns to the existing empty-state prompt only after a successful empty retry", () => {
+    useRecentMock.mockReturnValue({ ...success(), data: undefined, isError: true });
+    const view = render(
+      <PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry recent activity" }));
+    useRecentMock.mockReturnValue(success());
+    view.rerender(<PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText("No recent check-in.")).toBeInTheDocument();
+    expect(openQuickLog).not.toHaveBeenCalled();
+  });
+  it("does not carry Plant A's recap into Plant B pending/failure, then shows B after recovery", () => {
+    useRecentMock.mockReturnValue(success([savedNote("p1")]));
+    const view = render(
+      <PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />,
+    );
+    expect(screen.getByText("Saved observation for p1")).toBeInTheDocument();
+    useRecentMock.mockReturnValue({
+      ...success([savedNote("p1")]),
+      isPending: true,
+      fetchStatus: "paused",
+    });
+    view.rerender(<PlantDetailRecentActivityRecap plantId="p2" onAddQuickCheck={openQuickLog} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Waiting for connection");
+    expect(screen.queryByText("Saved observation for p1")).toBeNull();
+    expectNoUnverifiedSummary();
+    useRecentMock.mockReturnValue({ ...success(), data: undefined, isError: true });
+    view.rerender(<PlantDetailRecentActivityRecap plantId="p2" onAddQuickCheck={openQuickLog} />);
+    fireEvent.click(screen.getByRole("button", { name: "Retry recent activity" }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+    useRecentMock.mockReturnValue(success([savedNote("p2")]));
+    view.rerender(<PlantDetailRecentActivityRecap plantId="p2" onAddQuickCheck={openQuickLog} />);
+    expect(useRecentMock).toHaveBeenLastCalledWith("p2");
+    expect(screen.getByText("Saved observation for p2")).toBeInTheDocument();
+    expect(screen.queryByText("Saved observation for p1")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
 describe("Plant Detail recent activity recap — static safety", () => {
   it("helper has no React, fetch, or unsafe paths", () => {
     expect(HELPER).not.toMatch(/from\s+["']react["']/);

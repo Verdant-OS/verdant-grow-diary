@@ -47,7 +47,7 @@ function baseInput(overrides: Partial<WateringTypedEventInput> = {}): WateringTy
 
 function makeClient(
   result: { data?: unknown; error?: unknown } = {
-    data: { ok: true, grow_event_id: "event-1", reused: false },
+    data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: false },
   },
 ) {
   const rpc = vi.fn().mockResolvedValue({
@@ -294,26 +294,77 @@ describe("writeQuickLogWateringTypedEvent — validation", () => {
 describe("writeQuickLogWateringTypedEvent — RPC behavior and idempotency", () => {
   it("returns event identity and reuse state from a successful envelope", async () => {
     const { client, rpc } = makeClient({
-      data: { ok: true, grow_event_id: "event-1", reused: true },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
     });
 
-    expect(await writeQuickLogWateringTypedEvent(baseInput(), { client })).toEqual({
+    const reusedEventReader = vi.fn().mockResolvedValue({
+      data: {
+        id: "77777777-7777-4777-8777-000000000001",
+        event_type: "watering",
+        source: "manual",
+        is_deleted: false,
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+      },
+      error: null,
+    });
+    const reusedChildReader = vi.fn().mockResolvedValue({
+      data: { event_id: "77777777-7777-4777-8777-000000000001", volume_ml: 750 },
+      error: null,
+    });
+    expect(
+      await writeQuickLogWateringTypedEvent(baseInput(), {
+        client,
+        reusedEventReader,
+        reusedChildReader,
+      }),
+    ).toEqual({
       ok: true,
-      eventId: "event-1",
+      eventId: "77777777-7777-4777-8777-000000000001",
       reused: true,
     });
     expect(rpc).toHaveBeenCalledTimes(1);
+    expect(reusedEventReader).toHaveBeenCalledWith("77777777-7777-4777-8777-000000000001");
+    expect(reusedChildReader).toHaveBeenCalledWith(
+      "watering",
+      "77777777-7777-4777-8777-000000000001",
+    );
     expect(rpc).toHaveBeenCalledWith("quicklog_save_event", expect.any(Object));
   });
 
   it("reuses the exact idempotency key and RPC args on a logical retry", async () => {
     const { client, rpc } = makeClient({
-      data: { ok: true, grow_event_id: "event-1", reused: true },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
     });
     const input = baseInput({ idempotency_key: "stable-water-retry" });
+    const reusedEventReader = vi.fn().mockResolvedValue({
+      data: {
+        id: "77777777-7777-4777-8777-000000000001",
+        event_type: "watering",
+        source: "manual",
+        is_deleted: false,
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+      },
+      error: null,
+    });
+    const reusedChildReader = vi.fn().mockResolvedValue({
+      data: { event_id: "77777777-7777-4777-8777-000000000001", volume_ml: 750 },
+      error: null,
+    });
 
-    await writeQuickLogWateringTypedEvent(input, { client });
-    await writeQuickLogWateringTypedEvent(input, { client });
+    await writeQuickLogWateringTypedEvent(input, {
+      client,
+      reusedEventReader,
+      reusedChildReader,
+    });
+    await writeQuickLogWateringTypedEvent(input, {
+      client,
+      reusedEventReader,
+      reusedChildReader,
+    });
 
     expect(rpc).toHaveBeenCalledTimes(2);
     expect(rpc.mock.calls[0]).toEqual(rpc.mock.calls[1]);
@@ -343,6 +394,42 @@ describe("writeQuickLogWateringTypedEvent — RPC behavior and idempotency", () 
       ok: false,
       reason: "rpc:rejected",
     });
+  });
+
+  it("distinguishes a structured pre-write invalid-payload rejection from an unknown rejection", async () => {
+    const invalid = makeClient({ data: { ok: false, reason: "invalid_typed_payload" } });
+    const malformed = makeClient({ data: { ok: "false", reason: "invalid_typed_payload" } });
+
+    expect(await writeQuickLogWateringTypedEvent(baseInput(), { client: invalid.client })).toEqual({
+      ok: false,
+      reason: "rpc:invalid_typed_payload",
+    });
+    expect(
+      await writeQuickLogWateringTypedEvent(baseInput(), { client: malformed.client }),
+    ).toEqual({
+      ok: false,
+      reason: "rpc:rejected",
+    });
+  });
+
+  it.each([
+    "idempotency_key_retracted",
+    "idempotency_receipt_missing",
+    "idempotency_key_unverified",
+    "idempotency_key_conflict",
+  ])("keeps the replay refusal %s for history review instead of an exact retry", async (reason) => {
+    const refused = makeClient({ data: { ok: false, reason } });
+    expect(await writeQuickLogWateringTypedEvent(baseInput(), { client: refused.client })).toEqual({
+      ok: false,
+      reason,
+    });
+  });
+
+  it("does not pass through a history reason from a malformed envelope", async () => {
+    const malformed = makeClient({ data: { ok: "false", reason: "idempotency_key_retracted" } });
+    expect(
+      await writeQuickLogWateringTypedEvent(baseInput(), { client: malformed.client }),
+    ).toEqual({ ok: false, reason: "rpc:rejected" });
   });
 
   it("turns transport and thrown errors into a safe reason", async () => {
@@ -378,4 +465,98 @@ describe("writeQuickLogWateringTypedEvent — static safety", () => {
     expect(source).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|createClient\s*\(/);
     expect(source).not.toMatch(/device_command|action_queue|create_alert/);
   });
+});
+
+describe("receipt identity", () => {
+  it("does not confirm a reused Watering that was retracted after its first save", async () => {
+    const { client } = makeClient({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+    });
+    const reusedEventReader = vi.fn().mockResolvedValue({
+      data: {
+        id: "77777777-7777-4777-8777-000000000001",
+        event_type: "watering",
+        source: "manual",
+        is_deleted: true,
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+      },
+      error: null,
+    });
+    expect(
+      await writeQuickLogWateringTypedEvent(baseInput(), { client, reusedEventReader }),
+    ).toEqual({
+      ok: false,
+      reason: "rpc:receipt_unverified",
+    });
+  });
+
+  describe("unverifiable reused Watering receipts stay retryable", () => {
+    const activeEvent = {
+      data: {
+        id: "77777777-7777-4777-8777-000000000001",
+        event_type: "watering",
+        source: "manual",
+        is_deleted: false,
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+      },
+      error: null,
+    };
+    const reusedReply = {
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+    };
+
+    it.each([
+      ["a missing typed child", { data: null, error: null }],
+      ["a child read error", { data: null, error: { message: "read failed" } }],
+    ])("returns rpc:receipt_unverified for %s", async (_label, childRead) => {
+      const { client } = makeClient(reusedReply);
+      const reusedEventReader = vi.fn().mockResolvedValue(activeEvent);
+      const reusedChildReader = vi.fn().mockResolvedValue(childRead);
+      expect(
+        await writeQuickLogWateringTypedEvent(baseInput(), {
+          client,
+          reusedEventReader,
+          reusedChildReader,
+        }),
+      ).toEqual({ ok: false, reason: "rpc:receipt_unverified" });
+      expect(reusedChildReader).toHaveBeenCalledWith(
+        "watering",
+        "77777777-7777-4777-8777-000000000001",
+      );
+    });
+
+    it.each([
+      ["an event read error", vi.fn().mockResolvedValue({ data: null, error: { message: "x" } })],
+      ["a thrown event read", vi.fn().mockRejectedValue(new Error("network"))],
+    ])("returns rpc:receipt_unverified for %s without reading the child", async (_l, reader) => {
+      const { client } = makeClient(reusedReply);
+      const reusedChildReader = vi.fn().mockResolvedValue({
+        data: { event_id: "77777777-7777-4777-8777-000000000001", volume_ml: 750 },
+        error: null,
+      });
+      expect(
+        await writeQuickLogWateringTypedEvent(baseInput(), {
+          client,
+          reusedEventReader: reader,
+          reusedChildReader,
+        }),
+      ).toEqual({ ok: false, reason: "rpc:receipt_unverified" });
+      expect(reusedChildReader).not.toHaveBeenCalled();
+    });
+  });
+
+  it.each(["not-an-event", "", " ", null, undefined, 42, {}])(
+    "rejects malformed event ID %j",
+    async (id) => {
+      const { client } = makeClient({ data: { ok: true, grow_event_id: id } });
+      expect(await writeQuickLogWateringTypedEvent(baseInput(), { client })).toEqual({
+        ok: false,
+        reason: "rpc:no_event_id",
+      });
+    },
+  );
 });

@@ -294,10 +294,41 @@ function LinkedEvidenceUnavailableNotice({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+function DoctorEvidenceUnavailableNotice({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div
+      role="status"
+      data-testid="timeline-memory-doctor-evidence-unavailable"
+      className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm space-y-2"
+    >
+      <p className="text-foreground">AI Doctor timeline evidence is unavailable.</p>
+      <p className="text-muted-foreground">
+        Timeline memory may be incomplete. Retry to check this source.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="text-xs px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
+      >
+        Retry
+      </button>
+    </div>
+  );
+}
+
 export default function TimelineMemorySection(props: Props) {
   const scope = toScope(props);
-  const { items, displayItems, companionEvidenceUnavailable, isLoading, isError, refetch } =
-    useTimelineMemory(scope);
+  const {
+    items,
+    displayItems,
+    companionEvidenceUnavailable,
+    auditEvidenceUnavailable,
+    readStatus,
+    hasData,
+    isLoading,
+    isError,
+    refetch,
+  } = useTimelineMemory(scope);
   // `items` is the complete AI/readiness evidence feed. The visible timeline
   // uses its explicit deduped projection so an exact-linked Quick Log
   // companion is rendered once, by QuickLogGroupedTimelineSection.
@@ -325,11 +356,22 @@ export default function TimelineMemorySection(props: Props) {
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
+        {scope !== null && !isLoading && !isError && auditEvidenceUnavailable && (
+          <DoctorEvidenceUnavailableNotice onRetry={refetch} />
+        )}
         {scope === null ? (
           <p className="text-sm text-muted-foreground" data-testid="timeline-memory-no-scope">
             Open a {props.scope} to see its timeline.
           </p>
-        ) : isLoading ? (
+        ) : !isError && !hasData && readStatus === "paused" ? (
+          <p
+            data-testid="timeline-memory-paused"
+            role="status"
+            className="text-sm text-muted-foreground"
+          >
+            Waiting for connection to load timeline memory.
+          </p>
+        ) : isLoading || (!isError && !hasData && readStatus === "loading") ? (
           <div
             className="h-16 rounded-md bg-muted/40 animate-pulse"
             data-testid="timeline-memory-loading"
@@ -354,7 +396,8 @@ export default function TimelineMemorySection(props: Props) {
           </div>
         ) : items.length === 0 && companionEvidenceUnavailable ? (
           <LinkedEvidenceUnavailableNotice onRetry={refetch} />
-        ) : items.length === 0 ? (
+        ) : timelineDisplayItems.length === 0 && auditEvidenceUnavailable ? null : items.length ===
+          0 ? (
           <div
             data-testid="timeline-memory-empty"
             className="rounded-md border border-border/40 bg-muted/30 p-3 text-sm space-y-1"

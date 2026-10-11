@@ -1,445 +1,593 @@
+> Ownership and the connector spec: see [docs/agents/OWNERSHIP.md](OWNERSHIP.md). It wins on conflicts.
+
+## Start here (agents)
+
+Read this section first. It doesn't replace the observation log below.
+
+- **This section supersedes stale OWNERSHIP.md rows.** Line 1 says OWNERSHIP.md wins on conflicts, but its GDP routing and product-call rows and its "Chemdawg only" merge rows are out of date. GDP retired on 2026-09-29. Grok 91 routes and merges in practice; older docs and other bots may still call this role Chemdawg or GDP. Where OWNERSHIP.md and this section disagree on roles or merging, this section describes current practice until OWNERSHIP.md is updated (pending).
+- **Roles:**
+  - Grok 91: merge-queue owner. Routes PRs to reviewers, sends findings back, and merges under the rule below.
+  - Blue Dream and Durban Poison: code reviewers (peers) for `.tsx`/UI, auth, RLS, DB and Edge.
+  - Critical Mass: reviewer for lib and logic, tests, docs-only, QA, accessibility, search and content (OWNERSHIP.md line 74). Until OWNERSHIP.md assigns it, Critical Mass also gives the independent verdict on CI, build and dependency PRs; line 75 gives Codex only _technical_ CI/build review.
+  - Claude, Codex and Grok 91: authors.
+  - Nobody reviews their own work.
+- **Review loop:** [`.agents/skills/verdant-exact-sha-review/SKILL.md`](../../.agents/skills/verdant-exact-sha-review/SKILL.md).
+  - Every verdict is tied to one exact SHA, or it is BLOCKED.
+  - PASS-with-P2 always goes back to the author for a full re-review at the new head. It is never merged as is.
+  - PRs stay draft until merge.
+  - **Merge rule:** **Matthew's decision (2026-10-03, 10:53 PM CT):** all merges go through the merge queue, and the `--admin` bypass is emergency-only, at his call. Matthew's standing merge-when-green rule covers non-migration PRs: a clean PASS at the exact head SHA plus 35/35 required checks green at that SHA means mark it ready and enqueue it at that SHA with `gh pr merge <N> --squash --auto --match-head-commit <SHA>`. On this branch a plain `gh pr merge <N>` also joins the queue rather than merging directly. The queue re-runs the required checks against the latest tip before the PR lands (see [`merge-queue.md`](merge-queue.md)). There is no extra wait for a go-ahead. Skipping the queue takes the repository-admin bypass. In gh that is `gh pr merge --admin`; because the bypass belongs to the admin role, any admin merge path (the UI bypass option, or a REST or MCP merge by an admin) likely skips the queue too (untested). merge-queue.md line 9 calls that emergency-only, and whether a bypass on green is ever allowed is Matthew's call. Migration PRs need Matthew's explicit decision. Dated note (2026-10-03): #1867, #1869, #1887, #1888 and #1890 merged 5–28 s after being marked ready; #1889 (ready since 2026-10-03 11:13 UTC) merged 53 s after #1890. None has a merge-queue event, so (an inference from the GitHub events, not measured directly) they used the admin bypass. All six merged before the 10:53 PM CT decision above.
+- **Before asking for review:** run [`recurring-review-findings.md`](recurring-review-findings.md).
+- **Gates (until Matthew lifts them):**
+  - No Publish.
+  - knk production database lock: no writes.
+  - HOLD #1250: PR #1250 merged on 2026-09-29 as `d2e8dbc3`. Its 4 files (`migration-drift-probe.yml`, `money-migration-drift-alert.yml` and their two tests) still must not be touched until Matthew clears it.
+  - Migration PRs held for Matthew.
+  - Never merge #1740.
+  - GitHub comments (PR, review or issue comments) need Matthew's approval.
+  - There's no staging site. Smoke tests run on production only, and only on the test fixture grow.
+  - The Vercel "Account is blocked." status isn't a required check.
+  - No agent changes to auth, RLS, migrations, Edge, `supabase/` or lockfiles unless Matthew names the action.
+  - The live list is on the agents' shared box at `/workspace/shared/context/fleet-locks.md`.
+
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-26 UTC
-**Updated by:** Codex (2026-08-26: records the Grow Help Toolkit owner/reviewer assignment
-and Cheek's current operational boundary for the separate drift-probe lane. This edit adds the
-toolkit section and updates the Codex/Grok assignment rows; it does not independently re-probe
-provider state. Cheek's current statement that `verdant-production` has 0 secrets supersedes the
-historical 2026-08-15 environment-secret snapshot below. Prior header follows.)
+## Follow-up observation — 2026-10-02T15:39 UTC
 
-**Prior update:** 2026-08-26 UTC (03:14 UTC)
-**Updated by:** Claude (2026-08-26: records **one new section only** — the `Supabase Preview`
-42P07 replay failure and the four constraints on it, at Cheek's instruction. Nothing else in
-this file is touched, and no status below is restated, corrected or superseded by this edit.
+- **BLOCKED, decision D1 widened (GDP):** Codex automated review on #1844 (comment 4167087657, P2) found that a page-body count misses AppShell's chrome triggers. The thread was marked resolved by the shared `cheekhimself` account with no reply or change. Source classes predict (not measured in a browser) that, after the header link goes, a one-tent Dashboard has card `Log` + page `QuickLogV2Fab` + `header-quick-log-trigger` on desktop, and card `Log` + `mobile-quick-log-fab` ("Open Quick Log") on mobile. The spec defines browser-level visible-control checks in E2 (desktop) and E4 (390/320 px) to test actual visibility; they have not run, and splits D1 into two blocking parts plus one non-blocking: D1.1 page FAB (A drop, recommended / B exempt), D1.2 AppShell triggers on Dashboard (A named chrome exemption, recommended / B hide on Dashboard / C card `Log` opens the sheet, separate slice), and D1.3 `Start Check` (non-blocking, unchanged). This supersedes the 15:12 checkpoint's two-option D1. #1833 still blocks; no merge, auto-merge, Publish or production operation.
+- **#1844 head and review state:** #1844's exact head is not written here, because a commit cannot contain its own SHA; read it from the PR. Every push voids earlier CI and verdicts. Recorded: `bae8b6db` (the commit that added this entry, parent `ebc7fc3c`) reached 35/35 required SUCCESS at 2026-10-02 16:01 UTC with no review decision; the commit that adds this note moves the head again, so that result does not carry over. Independent review: Critical Mass (docs). Timestamp correction: this entry and the one below were first labelled 15:50 and 15:20 UTC; the commit times are 15:39 and 15:12 UTC.
 
-The section exists to stop a specific wasted loop: the check is red on every PR, the cause is
-already declared in `config/local-supabase-replay-compatibility.json`, and the fixes that look
-obvious — a dashboard create/Pull/Migrate sequence, a late `PATCH /v1/branches/{id}`, closing
-and reopening the PR — each fail for a different reason. The vendor-behaviour half is labelled
-`source claim` from Cheek and is **not** independently verified from inside this repository;
-the repository-side half is `established fact` and reproducible here.
+## Follow-up observation — 2026-10-02T15:12 UTC
 
-It licenses nothing. The publish stop-order, the `20260813030000` hard stop, and migration
-immutability are all unchanged, and the section says so in its own terms. Prior header
-follows.)
+- **PASS, landed / BLOCKED, dashboard slice:** #1849 merged 2026-10-01 18:38 UTC as `b5d06488`; #1793 closed at 18:38 UTC as superseded. #1833 is still an open draft at `f296a953` (no activity since 2026-10-01 04:42 UTC), so the dashboard implementation stays BLOCKED. Deploy tip `80176bad`. `git grep` there shows exactly the 11 `dashboard-daily-grow-check-entry` references the spec plans for, including #1849's `e2e/signed-in-performance.spec.ts:35`. The overnight re-lands #1859/#1860 added none. #1837 (`881a64ba`) is still an open draft, with no `Dashboard.tsx` overlap on the deploy branch yet.
+- **Correction, routing:** the 2026-10-01 16:15 and 16:58 checkpoints sent decisions D1/D2 and #1793's reassignment to Cheek. Per OWNERSHIP.md, product calls and routing belong to GDP, and Matthew is never a blocker in the review path. Those receipts stay as written. From here: D1/D2 go to GDP, and merge goes to Chemdawg after 35/35 required checks and an independent PASS on the exact head. Raised by Codex automated review on #1844 (comments 4158072653, 4158139339).
+- **BLOCKED, decision D1 (GDP):** with a single-entry test that counts buttons as well as links, the page's own desktop `QuickLogV2Fab` ("Quick Log" button) is a second visible Log control next to the home card's `Log`. A link-only count would have missed it (review comment 4158072693). GDP must choose D1-A (drop `QuickLogV2Fab` from Dashboard; recommended, since AppShell's `header-quick-log-trigger` and its `open=quick-log` handling remain) or D1-B (keep it as a named exemption). D2 (no first-fold Log for no-tent or choose-a-tent states) is non-blocking.
+- **PASS, #1844 head refresh:** the 16:15 checkpoint's ready head `1139be80` is stale (comment 4158500366). #1844 was ready for review at `bca3bb67` with 35/35 required SUCCESS (2026-10-01 18:16 UTC); this commit moves the head again, so earlier CI and any verdict do not carry over. Independent review: Critical Mass (docs). No merge, auto-merge, Publish or production operation. HOLD #1250 and the named locks remain.
 
-**Prior update:** 2026-08-26 UTC (01:30 UTC)
-**Updated by:** Claude (2026-08-26: **Pheno Hunt + LAB territory delivered as one draft PR**
-from branch `claude/verdant-pheno-hunt-lab-vq6pd9` (base `verdant-grow-diary`, cut from
-deploy tip `5e75a3a` / #1129). Scope: repo-wide territory audit with per-feature
-dispositions (`docs/pheno-hunt-lab-territory-2026-08-26.md`), source-of-truth decision,
-implementation of the hunt → evidence → comparison → scorecard → cure-gated flavor →
-grower keeper decision → lab results → stability/GxE → breeder-mode workflow, and the
-validation ladder (targeted vitest, lint 0 errors, typecheck clean, build + SEO gates,
-six mocked pheno Playwright specs 14/14). One additive migration
-(`20260825233000_pheno_hunts_ownership_check_restore.sql`) ships **in-branch only — NOT
-applied to production**; the publish stop-order and the `20260813030000` hard stop are
-untouched. No publish, no production SQL, no production data modification. Keeper
-contract intact: no winner selection anywhere; James Loud weighting remains an opt-in
-preset only. Independent-reviewer seat for this slice is **unassigned — Cheek names the
-peer on the PR**. This edit touches this file only; every release-identity, publish-lag
-and payments claim in the 2026-08-25 19:48 UTC block below stands unmodified. Prior
-header follows.)
+## Follow-up observation — 2026-10-01T16:58 UTC
 
-**Prior update:** 2026-08-25 UTC (19:48 UTC)
-**Updated by:** Claude (2026-08-25, later edit: **production republished at 18:05 UTC and the
-served commit is not in the GitHub repository at all.** `git fetch origin e8f4e7c2fe05…`
-returns `not our ref`. Two long-standing framings in this file are corrected as a result:
-**publish lag is NOT COMPUTABLE** against this build (every lag figure presumed an ancestry
-that does not hold), and **the served SHA is unrecognized by GitHub**, which is consistent
-with `ref: "__orphan__"` but does **not** establish why. The causal mechanism is
-`NOT_MEASURED` — see the correction immediately below, and do not restate it as settled.
+- **PASS, landed / BLOCKED, stacked successor:** #1792 is closed. Its fixture-proof change re-landed as #1835, which merged into `verdant-grow-diary` as `6ed854cee` at 16:49 UTC. #1793 (open draft, `074f4349`) still targets the closed #1792 branch `codex/chem-production-quicklog-fixture-001`. GitHub refused a retarget to `verdant-grow-diary` ("part of a stack"). A non-pushing `git merge-tree` trial against the deploy branch conflicts in 5 files: `e2e/lib/fixtureSafety.ts`, `e2e/lib/productionQuickLogFixtureProof.ts`, `e2e/lib/productionQuickLogFixtureRules.ts`, `e2e/quicklog-smoke.spec.ts` and `src/test/production-quicklog-fixture.test.ts`. The cause is #1835's review fixes, which #1792 never had. Source: status note on #1793 (issuecomment-5936177952, posted by another Claude session). This session has not reproduced the merge-tree trial. Proposed path: re-land #1793's signed-in performance and read-only proof work on a fresh branch from the deploy branch, keeping #1835's fixture files, with a normal merge and no force-push. It needs Codex as owner, or a reassignment from Cheek. #1799 and #1800 stack on #1793 and inherit the same block. No push to #1793 from either Claude session.
+- **NOT_MEASURED, Codex reply / PASS, coordination carried forward:** no Codex reply to the `dashboard-ready` handoff (issuecomment-5935387971) as of 16:53 UTC. If #1793 closes in favour of a re-land, our slice's "#1793 merged or closed" precondition is satisfied on paper. However, the successor will likely carry `e2e/signed-in-performance.spec.ts` with `control: "dashboard-daily-grow-check-entry"` (inference), so the handoff must move to the successor PR. Auto-fix for #1793 was unbound from the dashboard spec session at the user's request; #1793's own Copilot and Codex-connector findings, including a P1 workflow_dispatch credential-exposure finding, remain Codex's.
+- **PASS, base movement:** #1844 is now ready for review at `1139be80`. #1835 changes neither `CURRENT_STATE.md` nor `docs/specs/`, so #1844 was not updated with the new base. #1833 remains open (draft, `f296a953`); dashboard implementation stays BLOCKED. Same-file overlap, not a feature collision: #1837 (open draft, `claude/tonight-tent-home-demotion`, `881a64ba`) edits `src/pages/Dashboard.tsx` (+20/-17, KPI wall demotion) but not the header Quick Log button. Its PR body confirms it does not touch `dashboard-daily-grow-check-entry`. The implementation merges around whichever lands first. No merge, auto-merge, Publish or production operation. HOLD #1250 and the named locks remain.
 
-**Overclaimed, corrected below the same day in revision 11 (Codex P2) of the companion
-payments spec (PR #1125):** "now has a _sufficient_ explanation" outran the evidence. A
-remote fetch failure proves the SHA is unrecognized by GitHub; it does not by itself prove
-the causal mechanism (a genuinely disconnected local commit, versus a rebase/squash/re-commit
-of otherwise GitHub-derived content producing the same symptom). See the corrected point 2
-and the corrected "Open question" paragraph in the 19:48 UTC block below — the causal
-mechanism is `NOT_MEASURED`; the observation (SHA unrecognized) stands.
+## Follow-up observation — 2026-10-01T16:15 UTC
 
-The candidate-1-vs-2 correction is **not** restated here — a parallel session on this same
-branch recorded it more fully; see "#1127 landed while this PR was open" below. This edit
-merged that work rather than competing with it, and trimmed its own duplicate.
+- **PASS, spec published / BLOCKED, implementation:** new stay-draft #1844 (`claude/dashboard-single-log-entry`) adds one file, `docs/specs/dashboard-single-log-entry-readiness-marker.md`, on deploy `0107d940`. No app or test code changed. After #1833, the Dashboard header `Quick Log` (`dashboard-daily-grow-check-entry`) duplicates the One-Tent Home `Log`. The spec removes the header button and moves every readiness consumer to `data-testid="dashboard-ready"` on the loaded-branch `PageHeader` actions wrapper. That wrapper renders whatever the tent selection, and never while loading or on error. Consumers covered: #1793's signed-in performance control, core-link census, ui-overhaul-responsive, and a fourth found by audit (`dashboard-mobile-overflow`). It also covers four unit-pin renegotiations and a RED-first test. Implementation stays BLOCKED until #1833 (`f296a953`, open draft) merges and #1793 (`074f4349`, open draft) merges or closes. Owner: Claude (user-assigned). Reviewers: Blue Dream for `.tsx`, Critical Mass for everything else.
+- **PASS, coordination / NOT_MEASURED, reply:** handoff to Codex posted on #1793 (issuecomment-5935387971). It asks for a one-line `control: "dashboard-ready"` change only if #1793 is still open when #1833 lands. #1793 was not edited, and #1799/#1800 do not use the header ID. No Codex reply yet.
+- **PASS, local docs evidence / NOT_MEASURED, CI:** `assert-docs-safety` PASS; two docs-safety test files 77 PASS / 0 FAIL / 0 SKIP; pre-commit hooks PASS. At 16:15 UTC #1844 checks: 1 SUCCESS, 52 queued, 1 pending, 12 skipped, 1 FAIL. Required contexts are not yet terminal.
+- **FAIL, external provider / NOT_MEASURED, production impact:** the Vercel status on #1844 and on deploy `0107d940` (15:12:36Z) reads "Account is blocked." The deploy commit later shows "Required and affected projects deploying" (15:35Z). Account cause and production publish impact are not measured; account owner action needed. Open decisions D1 (app-chrome Quick Log triggers and `Start Check`) and D2 (no first-fold Log for no-tent or choose-a-tent states) await Cheek. No merge, ready, auto-merge, Publish or production operation. HOLD #1250 and the named locks remain.
 
-#1127 is **not in the live build** (merged 19:16 UTC, build stamped 18:05 UTC), and the
-re-measured bundle still carries a `live_`-class token and zero `test_` — counts only, no
-value printed. One open question about #1127 is flagged rather than answered, and stated
-**without** assuming any publisher mechanism: it restores from `git show HEAD:.env.production`,
-so if whatever `HEAD` resolves to in the publisher's build context already carries the
-injected value, the restore would restore the injection rather than the committed class.
-Whether it does is `NOT_MEASURED`. Establishing it needs publisher build/history evidence —
-an unrecognized SHA is not that evidence.
+## Follow-up observation — 2026-09-29T08:38 UTC
 
-Full detail in the re-measure block below, which supersedes every release-identity,
-publish-lag and payments-bundle row beneath it. **No agent published**; the stop-order
-stands. Prior header follows.)
+- **PASS, two normal merge-from-base repairs pushed:** #1651 now7f31a8d4eaaf217bab6897fbaacdb7bf0edf48c6 from0ca4487f016877b8db872fa9eeba0205e07c433b; #1355 now9eae24dd35c930b33739b16c324fcc7c700d5a60 fromd5c708740c5b8d91e5c5844d1ea92ef6789442ef. Both incorporate deploy61821446ebd7e4fb30a36a5a95b7526a34515df5 cleanly, no history rewrite. Existing draft/auto-merge-off checked before pushes; PR bodies updated. #1651's eleven feature blobs byte-identical to predecessor; #1355 remains sole .coderabbit.yaml feature, one obsolete approval comment replaced with OWNERSHIP independent-review/GDP routing, parsed configuration unchanged.
+- **PASS, local evidence / retained FAIL:** #1651 seven files155 PASS / 0 FAIL / 0 SKIP; installed TypeScript zero diagnostics, scoped lint0/0, unchanged bundle SHA256321c69e6b07cec613495f728b0a2ccbc6da823af24023dc09e638b895614514c and whitespace PASS. Original canonical shim and direct-Bun startup attempts FAIL before tests; installed Node-shebang tools pass through Node without installs/dependency/lockfile changes. #1355 one file39 PASS / 0 FAIL / 0 SKIP, canonical typecheck0 diagnostics, YAML parse/effective-config equality/whitespace PASS. These existing regression suites are not new or additive unique tests. Full local suite/build NOT_MEASURED.
+- **FAIL, hosted dependency / NOT_MEASURED, terminal acceptance:** predecessor failed logs read before updates: #1651 rootfast-uri HIGH1239943/1239946, nestedundici MODERATEGHSA-3wwx-pv8p-q78v, WebKit initial consent-banner hydration; #1355 rootfast-uri HIGH. New #1651 nested job109325182441 FAILS the same undici advisory; log read, no rerun/waiver. #1751 atf63d46fedcc9edaef034e14fa21bf19cc89460b8 is already current and remains sole analytics repair owner; fresh Chromium/WebKit10 PASS each, no duplicate implementation. Rest of new-head CI and Blue Dream(#1651)/Critical Mass(#1355) verdicts NOT_MEASURED. Advisory repair requires locked dependency authority.
+- **PASS, operational guards / FAIL, inherited full-file formatting:** all three strict docs scanners, edge-import guard, HANDOFF_LOG formatting and whitespace pass. New checkpoint formatting passes; whole CURRENT_STATE formatter still reports the unchanged historical heading layout, also failing at HEAD. Historical receipt tail preserved byte-for-byte rather than silently reformatted.
+- **PASS, supplemental readback / NOT_MEASURED, full goal:** #1800 all17 check records terminal:15 SUCCESS/2 legitimate SKIP; both public and authenticated census SUCCESS. Stacked35 required Main contexts remain absent, no inherited PASS; actual Actions read/refresh proof remains as prior receipt. #1754 merged unchanged0384753a at02:13:59Z as8b73b25a; the 8:07/8:15 ship-as-is message is historical, not fresh review/live acceptance. Four other active assigned heads remain eight commits behind plus orphan#1618; no gratuitous updates to already-current heads. Archived Quick Log write fixture, full signup/recovery mailbox proof, genuine AI credit-limit denial, independent review/integration, Timeline#1794 and locked DB/Edge/EcoWitt acceptance remain distinct. Installed mail connector belongs to KEEP, so no inbox read/reset/signup attempted. No merge/ready/auto-merge/Publish/production SQL/APPLY/PREFLIGHT/device/AQ/secret/variable/fixture change. HOLD#1250 and named locks retained; full goal ACTIVE.
 
-**Prior update:** 2026-08-25 UTC (17:11 UTC)
-**Updated by:** Claude (2026-08-25: records a **standing owner directive** — production is
-the target, not sandbox — as its own section immediately below. Scope was confirmed with
-Cheek in session as **full production posture** before writing, because the phrase reads
-three materially different ways and whatever lands here is read by every agent as standing
-instruction.
+## Follow-up observation — 2026-09-29T08:12 UTC
 
-**It is recorded as a direction, not an authorization**, and the section says so in its
-own second paragraph. The publish stop-order, the `20260813030000` hard stop, and the Hard
-Safety Rules are explicitly carried through unchanged.
+- **PASS, actual production Actions read and refresh:** new stay-draft #1800 head `b25e8cfa93b2ba4fd8e1c3c0bf2194afcf00cbfd`, parent #1793 at `35e7def61992753d34fb04c10a99febfcce5e130`. Run36540923804/job109315857747 terminal SUCCESS: hosted safety3 files267 PASS / 0 FAIL / 0 SKIP; browser2 PASS / 0 FAIL / 0 SKIP / zero retries includes existing sign-in plus owned queue readback/refresh. Normal account response and actual active-grow rows prove fixture ownership before the exact scoped read. Four real Actions rows before/after match rendered ids/titles/counts; all six checks including approval-required framing pass. Receipt appSHA expected/observed61821446ebd7e4fb30a36a5a95b7526a34515df5, elapsed1317.959747ms for whole sequence, blockedWrites0, applicationErrors0, existingRoleReads2, photoReads0. Artifact11020881186 downloaded and SHA2562b175b38203a523059f47ba888df09332c82bfd4be7eda5a7058f0fbd0b784e2 verified. No mutations, device action, raw private data, mock live rows or application/auth/barrier edit.
+- **PASS, local validation / retained FAIL and SKIP:** four new files +810/-0,97 new cases. Initial86 PASS / 11 FAIL from an incorrect UUID group in the new proof helper; corrected focused3 files267 PASS / 0 FAIL / 0 SKIP. SeparateV026/26; static AQ safety/audit/docs3 files102 PASS / 0 FAIL / 16 SKIP: existing policy-detector gates skipped, not a missing configured runtime harness and not hosted RLS proof. Canonical/E2E typechecks0 diagnostics, scoped lint0/0, format/whitespace/import/three strict docs scanners PASS. Canonical build PASS:77 head snapshots and383 JSON-LD blocks/77 pages; existing chunk/inlineDynamicImports and intentional Quick Log rich-result warnings retained. Build-generated public version/buildInfo restored to HEAD; source tree clean and closed diff unchanged.
+- **NOT_MEASURED, independent and full acceptance:** Critical Mass exact-head verdict, fresh standalone35 Main contexts after parent integration, transition/device/security/full-core-loop acceptance. At08:12 UTC17 supplemental records, zero FAIL/two census jobs pending, full unit lane skipped by stacked base. Fresh72 open heads with no other-owner/deploy drift. This moves Actions from no live read evidence to scoped read/refresh PASS, not whole-feature or end-to-end acceptance. Remaining Timeline/#1794 live correction, genuine AI credit denial, archived configured Quick Log write fixture, full auth/reset and locked database/Edge/EcoWitt lanes remain distinct. GDP integrates; no ready, auto-merge, merge, Publish, SQL/APPLY/PREFLIGHT, customer/KEEP write, device or AQ operation. HOLD #1250 and ownership locks remain; full goal ACTIVE.
 
-Two things gathered while writing it, both new since 2026-08-23 — one measured, one that did
-not survive review: **#1124 moved the payments BUILD gate to accept `live_`, while the
-RUNTIME resolver still fails closed on `live_` on every host** — `established fact` — so a
-publish today would still disable checkout, and #1124 must not be read as having enabled
-live payments. **The second claim — that #1124's body settles the build-time token
-question — is corrected below, on this same PR, after Codex review**: the guard #1124
-shipped still requires the effective and canonical tokens to match exactly, which is
-inconsistent with the injected-value mechanism it was credited with confirming. See "The
-build-time token question" subsection for the full account. The `treeHash` / `dirty: true`
-provenance question stays `NOT_MEASURED` either way.
+## Follow-up observation — 2026-09-29T07:51 UTC
 
-Touches this file only. Does **not** publish, does **not** apply any migration, does
-**not** change payments code, and re-measures no GA4/GSC, Day 0, sitemap, or
-release-identity row — the release rows below keep their own 2026-08-23 dates and are
-stale by two days. Prior header follows.)
+- **PASS, current production Settings/account/consent proof:** stay-draft #1799 head3b81addb65fbe17f206193e3cf4643861def3132, parent #1793 head35e7def61992753d34fb04c10a99febfcce5e130; run36538876591/job109309263434 terminal SUCCESS. Hosted safety3 files236 PASS / 0 FAIL / 0 SKIP; browser4 PASS / 0 FAIL / 0 SKIP / zero retries includes existing sign-in and all three real production sequences. Artifact11019502703 downloaded; digest6a908779c67add1612473aa44685c5268ea0003e36126dbacf4a5c2487dd9183 matches. Before/after appSHA61821446ebd7e4fb30a36a5a95b7526a34515df5 on every receipt. Whole tested sequence elapsed: browser preferences2539.6115809999997ms; own account readback780.840784ms; analytics refusal1509.8273239999999ms. Every receipt blockedWrites0, applicationErrors0, analyticsRequests0. Existing source/app/auth/barrier unchanged; browser preferences and refusal only affect disposable browser storage. Initial failed teardown remains recorded at07:48; final fence retained, no waiver.
+- **NOT_MEASURED, independent/full acceptance:** Critical Mass exact-head verdict and35 standalone Main contexts still needed after parent integration; parent stack does not inherit required checks. Excluded account mutations/legal re-acceptance, billing portal/cancellation/deletion, positive analytics consent and backend security acceptance remain unmeasured. This advances the composite Settings/account/consent area with scoped live receipts, not a full feature/core-loop PASS or a speed budget. Remaining full-goal gaps: genuine AI Doctor credit-limit denial, archived QuickLog write fixture, original Timeline invalid-legacy acceptance/#1794 integration, locked DB/Edge/EcoWitt lanes, Actions and full auth/reset, independent review/integration/publish packet. Current71 open heads checked; no other-owner/deploy drift. GDP integrates; HOLD #1250, no ready/merge/auto-merge/Publish/production SQL/APPLY/PREFLIGHT.
 
-**Prior update:** 2026-08-23 UTC (~17:15 UTC)
-**Updated by:** Claude (2026-08-23, PR #1093 review round: **the 2026-08-22
-project-identity downgrade in the "Function default-privilege exposure"
-section overcorrected, and two further defects in that same section are
-fixed.** Raised by Codex review on PR #1093, verified against primary
-sources before accepting.
+## Follow-up observation — 2026-09-29T07:48 UTC
 
-The 2026-08-22 correction said this file "has never recorded a checked
-mapping" from Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db` to
-Supabase ref `knkwiiywfkbqznbxwqfh` — false. `docs/LOCAL_SUPABASE_SETUP.md`
-and `docs/signup-attribution-outage-operator-runbook.md:61-64` both record
-that exact mapping, dated 2026-08-13, attributed, and operationally
-confirmed by the signup-attribution fix this file's own RESOLVED section
-verified worked in production. The 66/76 and 3/76 counts are restored to
-`established fact` about production. Full account:
-"Correction (2026-08-23)" under "Function default-privilege exposure."
+- **PASS, new test/proof draft:** #1799 head3b81addb65fbe17f206193e3cf4643861def3132, based on #1793 head35e7def61992753d34fb04c10a99febfcce5e130. Four new files (+706/-0) measure production Settings browser-local preference persistence, own-account marketing/legal-history readback and durable analytics refusal. Existing fixture identity/write barrier and application/auth source unchanged; no profile, agreement, billing, AI, customer or Action Queue writes. Local broad9 files369 PASS / 0 FAIL / 0 SKIP includes66 new cases; current-head focused3 files236 PASS / 0 FAIL / 0 SKIP overlaps that set. Canonical/E2E typechecks zero diagnostics, final scoped lint zero errors/warnings; initial1 unsafe-finally error corrected and retained. Separate V0 26/26 and docs-safety67/67, not unique aggregate tests.
+- **FAIL, predecessor production / PASS, narrow observation:** run36538588974/job109308328634 at1df2e35d986bab0811140a516ec73f0150780b7d: hosted safety236/236 PASS; browser2 PASS / 2 FAIL / 0 SKIP / zero retries. Existing sign-in and account-readback passed; preferences and refusal UI sequences completed but final read-only proof stayed BLOCKED due unfinished identity/role reads cancelled by reload/teardown. All receipts blockedWrites0, applicationErrors0, analyticsRequests0. Account-readback801.5922729999998ms at before/after appSHA61821446ebd7e4fb30a36a5a95b7526a34515df5. Artifact11019193698 downloaded, digest07f7e02a712b9bc9156cac7954011bda3b7aec1d22be81aeefb26f8cffcd811c matches. Current +11-line repair settles the existing identity proof before reloads/close, retaining the final closed-context barrier. No waiver or blind rerun.
+- **NOT_MEASURED / BLOCKED, wider goal:** current #1799 hosted result and Critical Mass acceptance pending; all35 standalone required contexts absent on the parent stack. Whole Settings/account/security acceptance and account mutation/re-acceptance/deletion/billing/positive-consent behavior are not claimed. AI Doctor hosted credit-limit denial still needs genuine exhausted fixture credit state and usable evidence; no model spend, fake denial or backend credit write. Quick Log archived-fixture write block remains. 70 open heads and15 recent closed PRs refreshed before new draft; other owners/deploy unchanged, now71 open after creation. PR attachment UI hit the100-identity limit; draft itself exists and exact head/base/body/draft/auto-merge-off were read back. HOLD #1250 and owner locks remain; GDP controls integration. No ready, merge, auto-merge, Publish or production SQL/APPLY/PREFLIGHT.
 
-Also fixed in the same pass: a self-contradiction (this file's own ~15:23
-UTC entry already said the signup readiness RPC has `service_role=X`, while
-a later paragraph in the same section claimed it did not — only
-`handle_new_user` actually lacks the exposure, and it has a mundane
-explanation: an already-hardened function survived a later body replacement,
-which `CREATE OR REPLACE FUNCTION` is expected to do); and an unproven "by
-default" attribution (`has_function_privilege` cannot distinguish a default
-grant from an explicit one, and 2 of the 66 are proven explicit grants from
-their own defining migrations). Neither finding changes any table, function,
-grant, or default privilege — docs-only, same as the section it corrects.
-Prior header follows.)
+## Follow-up observation — 2026-09-29T07:31 UTC
 
-**Prior update:** 2026-08-23 UTC (02:09 UTC)
-**Updated by:** Claude (2026-08-22, review round: **the payments-token severity was
-INVERTED and is corrected.** An earlier revision said production "is running **live**
-payments". It is not. At the served SHA a `live_` token resolves to `unavailable`
-(`src/lib/paddleEnvironment.ts`; confirmed in the shipped bundle's minified resolver),
-so checkout is **disabled** — a checkout-blocking configuration and provenance defect,
-not an unnoticed live billing surface. The publish risk flips with it: a live → test
-swap **restores** sandbox checkout rather than breaking anything. Raised by Copilot,
-verified in source and bundle before conceding.
+- **PASS, current production readiness proof:** draft #1793 head35e7def61992753d34fb04c10a99febfcce5e130, run36536846789/job109302743684 completed SUCCESS. Hosted three-file safety tests219 PASS / 0 FAIL / 0 SKIP; browser4 PASS / 0 FAIL / 0 SKIP / zero retries includes existing sign-in plus all three readiness checks. Artifact11019051579 downloaded and digest5934f74e3b19d051867fcc94a6ce5c7c7f1fb0a39712d5eab833364416b3e496 matches. All expected/observed app SHAs61821446ebd7e4fb30a36a5a95b7526a34515df5. Dashboard1447.4758849999998ms, Timeline1912.6403689999997ms and Sensors1355.4961920000005ms control readiness PASS. Each zero blocked requests/two permitted fixture operator reads; Timeline alone completed one owner-validated photo-signing read. The production read is now observed, predecessor FAILs retained, no blanket POST exemption. JSON receipt and full dated report saved in Downloads.
+- **NOT_MEASURED, broader acceptance:** these preauthenticated warm navigation-to-enabled-control timings do not establish speed budget/cold-load/full-data/saved-value/core-loop/schema/Edge acceptance or validate #1794's not-yet-integrated Timeline correction. Quick Log save remains BLOCKED by archived configured plant; no save attempted or fixture changed. Current draft still needs Critical Mass review and parent landing/normal retarget for35 required Main contexts. GDP integrates; no self-review/ready/auto-merge/merge/Publish/SQL/APPLY/PREFLIGHT/device/AQ/secret/variable operation.
+- **PASS, complete check inventory / FAIL, residual gates:** 70 open heads checked at07:30:45UTC, zero read errors;58 heads have all35 required contexts SUCCESS. Two required-failing heads are held #1369 and untouchable #1735;10 heads lack all35 contexts (orphan/stacked/excluded).43 heads have at least one latest supplemental-or-required failure; one head has pending jobs. Counts overlap, not release acceptance. Assigned13 repair set:12 now35/35 SUCCESS, #1618 still orphan with35 absent and closure proposal. Dependencies and locked owner lanes are not waived. Inventory JSON retained. Full11 named shaky-feature outcomes, three unmeasured composite surfaces, AI credit-limit, full core-loop and independent/pilot/payment acceptance remain open; limited readiness proof does not lower whole-feature scorecard. Goal stays active; HOLD1250 and all named locks retained.
 
-Also withdrawn the same round, after a further P2: **"the shipped bundle came from
-neither `.env.production` file"** — both files were read AFTER deployment, so a
-workspace file carrying a `live_` value at build time and restored afterwards is
-excluded by nothing measured. Two build-time candidates are now recorded, with a
-direction not to discard the second.
+## Follow-up observation — 2026-09-29T07:29 UTC
 
-**Sixth review finding of the round, and the sixth correct one.** #1092 merged at
-17:55:57 UTC from head `fcf400ec7` while a fix for it was queue-locked (`GH006`), so
-this follow-up carries it: the over-claim "the file demonstrably is not what produced
-the current bundle" **survived the earlier correction in a second sentence of the same
-section**, contradicting candidate 2 that the section itself says not to discard. That
-is the failure mode named two corrections earlier — fixing the pointed-at instance
-rather than the class — so this pass swept the whole file, and the only remaining
-occurrences are inside withdrawal notes quoting the withdrawn text.
+- **PASS, narrow photo-read correction:** #1793 now35e7def61992753d34fb04c10a99febfcce5e130, normal push from c98a5d9e463887c36bdc944434a0bab6c1bd593b, unchanged #1792 parent34f8beae3334cceb6f914df904a6842c90005eb4. Three test/proof files +268/-4; whole eight-file draft +1728/-6. Read-only source audit found Timeline createSignedUrls(paths,3600); installed storage client transports that as POST /storage/v1/object/sign/diary-photos. Sole added allowance requires positive fixture account, exact endpoint/no query, exactly paths/expiresIn, fixed3600 expiry, 1–100 unique viewer-owned unencoded paths, and complete matching successful response. Pending/failed/invalid/foreign-owner reads invalidate timing. Storage GETs also wait for account proof. Upload/delete, other bucket/owner/RPC/POST remain blocked; tokens and paths never enter receipts. Application/auth/Supabase/SQL unchanged.
+- **PASS, local correction / FAIL, predecessor production:** photo-read baseline1 FAIL / 0 PASS / 72 excluded. Final7 files293 PASS / 0 FAIL / 0 SKIP includes112 extension cases and V0/photo-parser coverage; no overlapping sums. Canonical/E2E typechecks zero diagnostics, three-file lint zero errors/warnings, formatting/whitespace PASS. Current synthetic Chromium transport5/5, three writes blocked, receiver writes0 and disposal barrier retained. Origin diagnostic predecessor run36536274509/job109300944087: hosted184 PASS, browser3 PASS / 1 FAIL / 0 SKIP / zero retries. App61821446, Dashboard986.8835049999998ms and Sensors1125.2072190000001ms readiness PASS; Timeline one POST backend-other BLOCKED elapsednull. Artifact11019045851 digest ea52def34c717da3c1e4ba2616d6073780c6d25d7885fba955055391d4a0ccf7 verified. This identifies only origin class; exact photo-read endpoint still NOT_MEASURED in production before this run.
+- **NOT_MEASURED, current production / independent acceptance:** new run36536846789/job109302743684 in progress. All35 required Main contexts absent on stacked base, no previous-head inheritance. Readiness observations do not prove speed budget/full-data/saved-value/core-loop/schema/Edge acceptance; Quick Log save still BLOCKED archived plant. All70 open heads/bases refreshed, other owners/deploy unchanged. Critical Mass reviews current test/CI head, Blue Dream retains parent, GDP integrates. Goal active; no merge/ready/auto-merge/Publish/APPLY/PREFLIGHT/device/AQ/secret/variable/fixture operation. HOLD1250 and locks remain.
 
-Tip and lag re-measured 2026-08-23 02:09 UTC: tip `a3ae36765` (#1105), publish lag
-**12**; production still serves `faea6e9c59ad`, **unchanged since 2026-08-22 16:16
-UTC — nearly ten hours with no republish**, while the tip advanced seven times in the
-same span. Read which half moved before drawing any conclusion from the widening
-number.
+## Follow-up observation — 2026-09-29T07:23 UTC
 
-Same round, from Codex and Copilot findings: the hand-maintained publish count
-(four → **five**), the #1076 gate row (**re-queried**, not carried forward), the
-`/version.json` row's own date (was 2026-08-21 while neighbouring rows quoted
-2026-08-22 readings of the same endpoint), and a malformed markdown quotation.
-Prior header follows.)
+- **PASS, limited production readiness / FAIL, overall workflow:** #1793 proof head fa2c673fe6530bccfdd170a59d29c51f13b2e698, run 36535554628 / job 109298652779: hosted safety tests 3 files / 181 PASS / 0 FAIL / 0 SKIP; browser 3 PASS / 1 FAIL / 0 SKIP / zero retries (existing sign-in, Dashboard and Sensors pass; Timeline fails). Expected/observed app SHA both 61821446ebd7e4fb30a36a5a95b7526a34515df5. Dashboard control ready in 1322.2586700000002 ms, Sensors manual-reading control ready in 1316.775901 ms; each zero blocked requests/two permitted fixture-bound role reads. These are warm, preauthenticated control-readiness observations, not a speed budget, cold load, complete-data retrieval or full core-loop acceptance.
+- **BLOCKED, Timeline / PASS, no fence waiver:** Timeline receipt has elapsedMs=null, operation_postcondition_failed, one blocked POST classified only as other and two permitted role reads. Its destination and cause remain NOT_MEASURED; no mutation, telemetry or wrong-account diagnosis inferred. Failed log and sanitized artifact 11017559477 read; downloaded ZIP digest 52ae742d1d32df19ff0b0158b054c17aef9be4cfa2b76fbb259a6025cba865d1 matches. Quick Log save remains separately BLOCKED by the archived configured plant; no save attempted.
+- **PASS, normal-pushed diagnostic:** stay-draft #1793 now c98a5d9e463887c36bdc944434a0bab6c1bd593b on unchanged #1792 parent 34f8beae3334cceb6f914df904a6842c90005eb4; two files +25/-2, whole PR eight +1464/-6. Finite origin classes distinguish backend-other, application-other and external without exporting URL/path/query/id/payload or allowing another request. Final six focused files 247 PASS / 0 FAIL / 0 SKIP includes V0 26 and 77 extension cases; prior overlapping totals are not summed. Canonical and E2E typechecks zero diagnostics; changed-file lint zero errors/warnings, format/whitespace PASS. New-head production outcome, Critical Mass review and full local suite/build NOT_MEASURED; 35 required Main CI contexts absent on stacked base. All 70 open head/base pairs refreshed, no other-owner drift. Full goal stays active; no merge/ready/auto-merge/Publish/production SQL/APPLY/PREFLIGHT/device/AQ/secret/variable/fixture change. HOLD #1250 and locks retained.
 
-**Prior update:** 2026-08-22 UTC (17:10 UTC)
-**Updated by:** Claude (2026-08-22, later edit: records the **#1092 owner/reviewer
-pairing** in the architecture-audit section, per `HANDOFF_PROTOCOL.md:25` — Cheek
-named **Grok (GDP)** as independent peer reviewer on the PR at 17:09 UTC and marked
-it ready for review in the same minute. No agent performed either transition, and a
-_named_ seat is not a _discharged_ one. Also flags that the MACAE row lower in this
-file names Grok for a **different** slice; do not collapse the two.
+## Follow-up observation — 2026-09-29T07:16 UTC
 
-Re-measured at 17:09–17:10 UTC because the base moved again while this was open:
-tip is now `fd2d3e3f7553` (#1100) and publish lag is **7** — production still serves
-`faea6e9c59ad`, unchanged since the 16:16 UTC reading. Prior header follows.)
+- **PASS, same-draft harness correction:** #1793 now fa2c673fe6530bccfdd170a59d29c51f13b2e698, parent/base #1792 unchanged at 34f8beae3334cceb6f914df904a6842c90005eb4; eight test/CI files (+1441/-6), normal commits only, draft and auto-merge-off read back. First two production attempts each 1 PASS / 3 FAIL / 0 SKIP / zero retries; artifacts show all route bootstraps blocked on POST has_role, a harness policy incompatibility. Source audit confirms its authored STABLE boolean SELECT and app operator lookup. Sole exact-endpoint exception now requires positively proved fixture id, exact two arguments/operator role and successful boolean response; all other mutations, RPCs and WebSockets still blocked. No auth application, SQL, Supabase, RLS, fixture, secret or variable change; parent write guard/Quick Log integration unchanged. Hosted function definition remains NOT_MEASURED; no schema acceptance inferred.
+- **PASS, local proof / NOT_MEASURED, current production outcome:** role baseline 1 FAIL / 46 excluded SKIP; intermediate 217 PASS / 1 FAIL exposed a missed static hook replacement. Corrected six-file run 244 PASS / 0 FAIL / 0 SKIP includes V0 26 and 74 extension cases, not added to overlapping older runs. Canonical and E2E typechecks zero errors, scoped lint zero errors/warnings; format/whitespace/import/docs guards PASS. Current-source local Chromium transport 5/5, zero receiver writes. New job 109298652779 / run 36535554628 is in progress. Critical Mass independent acceptance and production timings NOT_MEASURED; Main CI's 35 required contexts still absent on stacked base. Full goal remains active; no merge/ready/auto-merge/Publish/APPLY/PREFLIGHT/device/AQ operation. HOLD #1250 and named locks preserved.
 
-**Prior update:** 2026-08-22 UTC (16:16 UTC)
-**Updated by:** Claude (2026-08-22: **docs-only re-measurement.** Production
-republished overnight and the deploy tip moved six commits, so every perishable
-release row this file carries was stale in the same direction. Re-read first-hand at
-16:16 UTC: tip `93d8ea23ff58` (#1097); production serves `faea6e9c59ad` (#1087),
-`buildTime 2026-08-21T20:51:46.584Z`, `dirty: true`, `ref: "__orphan__"`,
-`treeHash 7d9cc8a12898`; ancestor of tip; publish lag **6**.
+## Follow-up observation — 2026-09-29T07:04 UTC
 
-**The post-#1090 provenance test finally had a build to run against, and it returned
-no information — which is the correct reading, not a disappointment.** `faea6e9c59ad`
-contains #1090, and its recomputed tree `436eede41e4b` still mismatches the stamped
-`7d9cc8a12898`. The record's own one-directional rule says persistence neither
-confirms nor refutes the #1090 candidate, because a workspace already dirtied stays
-dirty until reset. Do not report this as a refutation. The publisher's build log
-remains the only route that settles it, and stays owner-gated.
+- **PASS, pushed proof extension:** existing stay-draft #1793 now 51e632e604a921c3654f443773892171b9e307ed, from c449a0b486d37b3128d3bab18538dda498e111a3; parent/base remains #1792 at 34f8beae3334cceb6f914df904a6842c90005eb4. Seven extension files (+614/-33), whole PR eight (+1182/-6). Read-only routes verify the approved fixture account independently of active plant status. HTTP mutation methods and WebSockets blocked before navigation; row reads wait for account proof. Any failed/changed/pending identity or attempted write invalidates timing, including after browser context closes. Existing Quick Log timing/parent fixture guard/auth bootstrap and CI variables/secrets unchanged; no application change.
+- **PASS, scoped evidence:** baseline one file 45 PASS / 4 FAIL / 0 SKIP; final five files 186 PASS / 0 FAIL / 0 SKIP includes 42 new cases. Separate V0 26/26 and local synthetic Chromium transport 5/5, three HTTP writes blocked and receiver writes=0. Overlapping earlier 149-test runs not additional unique tests. Canonical and targeted E2E typechecks zero diagnostics; six-file lint zero errors/warnings; seven-file format, whitespace/import/docs guards PASS. Discovery four cases in two files, zero execution. Initial standalone Bun browser check stalled and was stopped; first bundle failed on optional module resolution; Node-run local exercise passes without installs/lockfile edits. Downloads CHEM-performance-readonly-2026-09-29.md retains commands, failures and handoff.
+- **NOT_MEASURED, production performance / independent acceptance:** new job 109294765994 passes approved fixture/host preflight, checkout, current deploy-SHA pin, dependency install, safety regressions and Chromium; three-route step running at 07:03:22 UTC. Main CI still excludes this stacked base: 35 required contexts absent, no previous-head PASS inherited. Full local suite/build NOT_MEASURED. Critical Mass reviews this tests/CI head; Blue Dream retains P1 parent; GDP lands. Archived plant still blocks Quick Log save proof, not read-only account timing. No fake data, self-review, ready, auto-merge, merge, Publish, production DB operation, secrets, device or Action Queue action. Full goal remains active; all named locks retained.
 
-**The live-class payments token survives the republish — and it FAILS CLOSED.**
-Severity corrected 2026-08-22 after review: a `live_` token resolves to
-`unavailable` in the served code, so production is taking **no** payments rather
-than live ones, and checkout is disabled. See the severity-correction block in the
-payments-token section. Re-measured against the new
-bundle `/assets/index-C-R0_Bat.js` (the path changed from `index-aTS7aKMk.js`, so
-this is a rebuild, not a cache): still `live_` class, body length 27, one distinct
-value, two occurrences — while the Lovable project `.env.production`, re-read in the
-same window per the owner's standing pre-publish instruction, still says `test_`. A
-build cycle did not reconcile them. **Publishing remains stopped by owner order**,
-and reading the env file is not a clearance: it said `test_` yesterday too, while
-production shipped `live_`.
+## Follow-up observation — 2026-09-29T06:44:33 UTC
 
-Touches this file only. Does **not** publish, does **not** apply
-`20260813030000` (the hard stop below is unchanged), does **not** re-measure
-GA4/GSC, Day 0, or migration state, and invents no metric. Prior header follows.)
+- **PASS, terminal required CI:** stay-draft #1798 at ee352c59ac7abe33db639d700f4e8c0785975fb8 has all 35 required contexts SUCCESS, zero required failure/missing/pending. Main CI 109287680782 completed SUCCESS at 06:44:23 UTC, including typecheck, Build and build summary. Conditional QuickLog RPC runtime harness SKIPPED. Downloads CHEM-move-tent-read-required-CI-terminal-2026-09-29.json retains every required context ID; initial partial snapshot preserved. Root high fast-uri and nested moderate undici FAILs remain with logs read; native save/retrieve, census and JavaScript CodeQL still pending. Blue Dream/live acceptance NOT_MEASURED. No waiver, ready, auto-merge, merge or production operation; full goal stays active.
 
-**Prior update:** 2026-08-21 UTC (function default-privilege investigation)
-**Updated by:** Claude (2026-08-21: investigation only — no code, migration, or
-production write in this edit. Recorded for Grok, who has been actively
-working this exact signup/production surface today (`20260821150000`,
-the RAISE LOG guard, the readiness RPC): before drafting any further
-`service_role` hardening, measured how widespread the class of gap
-`20260821064300` closed for one table actually is across every
-SECURITY DEFINER function in `public`. See the new subsection under
-"Second production drift" below for the full findings and the specific
-open question. Headline, evidence-labeled: `established fact` — 66 of 76
-SECURITY DEFINER functions in `public` currently grant `service_role`
-EXECUTE by default, and 3 grant `anon` EXECUTE (one an uninvokable trigger
-function; the other two look like an intentional public "founders wall"
-counter — `founders_seats_consumed`, `founders_wall_count` — worth one owner
-confirmation, not urgent).
-`uncertainty` — `20260807133000`'s own self-test fails if reproduced today
-against a fresh probe function, but two functions from Grok's own
-`20260821150000` migration do _not_ show the same exposure despite one of
-them never receiving an explicit `service_role` revoke. Left unresolved
-rather than guessed at. No fix proposed or applied.
+## Follow-up observation — 2026-09-29T06:39 UTC
 
-**2026-08-22 correction, added on PR #1093 in response to Grok's independent
-review:** the "production" attribution above is disputed, not confirmed — the
-measurement was against Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db`,
-which Grok's review says is a different, non-production project, contradicting
-two of Grok's own same-day entries elsewhere in this file that call the same
-id "production, not sandbox." See the correction under "Function
-default-privilege exposure" below for the full account. Every count above
-holds only as a claim about whichever database that id actually is; whether
-that is production is now `NOT_MEASURED`, downgraded from the `established
-fact` framing this block originally used.
+- **PASS, Alerts remeasurement at 06:41:59 UTC:** existing #1673 remains 74587f9c7cb9f7357c6fb617b9312243448f9b93 on deploy base 61821446, with 35/35 required SUCCESS, zero required failure/missing/pending, zero pending supplemental jobs. Two extra audit FAILs remain: root 109250092287 high fast-uri 1239943/1239946 and nested 109250092561 moderate undici; both exact-head logs read. No new implementation or test run; prior local counts are historical. Blue Dream/live acceptance NOT_MEASURED. Downloads CHEM-alert-aging-CI-recheck-2026-09-29.json retains every required context ID.
+- **PASS, source repair / pushed stay-draft:** #1798 at ee352c59ac7abe33db639d700f4e8c0785975fb8, deploy base 61821446ebd7e4fb30a36a5a95b7526a34515df5. Four closed files (+387/-4) distinguish failed eligible-tent reads from successful emptiness. Cached destinations are hidden after a failed refresh; Retry refetches the existing complete query. Pure rule also guards submit. Existing query filters, owner fallback, explicit hunt untag, same-grow/cross-grow payloads and movement note unchanged. No competing implementation: only overlapping #1618 has a deploy-identical AssignTentDialog blob and unrelated unique feeding-demo tests.
+- **PASS, regression evidence:** original dialog 6 FAIL / 3 PASS / 0 SKIP. Intermediate focused 1 FAIL / 20 PASS (test corrected for real QueryClient first-read Retry pending semantics); final related 13 files / 154 PASS / 0 FAIL / 0 SKIP includes 22 new cases. Separate V0 26/26 and docs-safety 67/67, not added as unique counts. Canonical typecheck zero errors; scoped ESLint four files zero errors/warnings; format/whitespace/docs/secret/import PASS; bridge evidence 37/37. Final source checkout clean. Downloads CHEM-move-tent-read-honesty-2026-09-29.md retains exact commands, earlier failures and handoff.
+- **NOT_MEASURED, terminal required CI / FAIL, dependency lanes:** initial new-head snapshot 2/35 required SUCCESS, 33 pending, zero required FAIL. Root 109287637525 FAILS high fast-uri 1239943/1239946; nested 109287635022 FAILS moderate undici GHSA-3wwx-pv8p-q78v. Both failed logs read, off-limits dependency/lockfile repair, no rerun/waiver. Blue Dream exact-head acceptance and live Move Plant behavior NOT_MEASURED. Archived smoke fixture remains a separate write-acceptance blocker. No lower whole-feature shaky count inferred from source tests.
+- **PASS, historical merge remeasurement / NOT_MEASURED, Timeline acceptance:** #1754 is closed/merged unchanged from reviewed/override head 0384753ae911eca2a989694f8514f116dc903757 at 2026-09-29T02:13:59Z, squash 8b73b25a879e8d1fc526fdd7035ae1d368eab3f6. Its earlier 8:07/8:15 deadline update is historical. This does not turn the owner's Blue Dream FAIL override into PASS or prove live correctness; P1 correction #1794 remains separate. No merge, ready, auto-merge, Publish, production SQL/APPLY/PREFLIGHT/dispatch, secrets, device or Action Queue operation. HOLD #1250 and all named locks remain; full goal stays active.
 
-**Superseded 2026-08-23 — see the top of this file.** This downgrade
-overcorrected: two in-repo documents already record a checked, dated,
-attributed mapping from this Lovable project id to production Supabase ref
-`knkwiiywfkbqznbxwqfh`, which this paragraph should have found and cited
-instead of downgrading to `NOT_MEASURED`. The 66/76 and 3/76 counts are
-`established fact` about production again — but "by default" in the
-headline just above is not: `has_function_privilege` proves effective
-access, not provenance, and 2 of the 66 are proven explicit grants. Also
-flagged: the committed migration for `founders_guard_immutables()` (one of
-the 3 in the `anon` set) does not declare `SECURITY DEFINER`, so it should
-not satisfy the query's own `p.prosecdef = true` filter — either the live
-function differs from its migration (unrecorded drift) or this list has an
-error; not resolved. See "Function default-privilege exposure" below for
-the full account of all three. Prior header follows.)
+## Follow-up observation — 2026-09-29T06:22:50 UTC
 
-**Prior update:** 2026-08-21 UTC (~15:23 UTC / 10:23 AM CT)
-**Updated by:** Grok (2026-08-21: **docs-only correction** — #1077 pinned
-production at `1400a7e77eff` and leftover Action Queue prose still said
-`20260813030000` was unapplied; both are now false on a fresh point-in-time
-re-measure. Host `/version.json` re-fetched just now serves
-`39935889fe02` (#1080), **not** #1077 (`999b6da`) and **not** #1083
-(`1400a7e`). Identity vs provenance recorded separately: identity
-`39935889fe022efd441dc5ab86bfbf636d284739`; provenance remains
-`dirty: true` / `ref: "__orphan__"` / `commitSource: "git"` — **not** upgraded
-to provenance `PASS`. Cause of dirty/orphan `NOT_MEASURED`. Do **not**
-compare `treeHash` to `git rev-parse ^{tree}` (different hash functions;
-#1077 already corrected that false corroboration).
+- **PASS, terminal parent required CI:** #1672 at 9b0053e79e38b9c7585c6e7cf6bdeb48935a53f2 now has all 35 required contexts SUCCESS, zero required failure/missing/pending. Main CI 109282458900 terminal SUCCESS. Context IDs retained in Downloads CHEM-tent-aging-parent-CI-terminal-2026-09-29.json. Earlier partial receipt preserved. Additional root fast-uri and nested undici FAILs remain; supplemental jobs still pending. Child #1694 still needs standalone required CI after parent landing/normal retarget. Blue Dream acceptance and live Tent Detail behavior NOT_MEASURED. No merge, ready, auto-merge, waiver or production operation.
 
-Production signup objects re-checked the same window via Lovable
-`query_database` on project `66255e7b-892c-4be5-8686-ab1cfc3666db`
-(production, not sandbox): table + helpers + failure-safe `handle_new_user`
-(`md5 34405b3ee446340a55ad4f25e2193c9a`, `RAISE LOG` guard present from
-`20260821150000_signup_acquisition_failure_safe_attribution.sql` via Lovable
-SQL — **not** via the GitHub apply-signup workflow, which still shows only
-the failed PREFLIGHT) + readiness RPC. Ledger **name-rows** for
-`20260813030000` and `20260821150000` are present (founder backfill marker
-`ledger-only;objects-already-applied;no-rerun`, `created_by`
-`founder-ledger-backfill`); `20260821064300` is still **not** in the ledger.
-**Hard stop:** do **not** GitHub-APPLY
-`20260813030000_signup_acquisition_forward_repair.sql` — that file would
-re-issue an unguarded `handle_new_user` and overwrite the live `RAISE LOG`
-guard. Touches this file only. Does **not** re-measure GA4/GSC, Day 0,
-parked #828/#817/#696, or invent metrics.)
+## Follow-up observation — 2026-09-29T06:21:14 UTC
 
-**Prior update:** 2026-08-21 UTC (post-publish Production status rows, #1077)
-**Updated by:** Claude (2026-08-21: applies the measured post-publish production
-rows. The 2026-08-20 sitemap adjudication PUBLISHED, so five Production status
-rows plus the branch-topology row were stale in the direction that matters —
-they described a fix as pending that had already shipped. Re-measured over live
-HTTPS, most recently at 2026-08-21T12:57 UTC: live sitemap is **61** `<loc>`
-(was 56), and **"Indexable routes outside the sitemap" moves `FAIL` → `PASS`** —
-five advertised and self-canonical, `/breeder-beta` correctly absent while
-cross-canonicalising to `/creator-beta` and staying `index, follow`, verified
-live rather than inferred from the merge. Closes blocker 8's sibling item.
+- **PASS, normal integration:** #1672 now 9b0053e79e38b9c7585c6e7cf6bdeb48935a53f2 from 89552fe7330625e4516b0d97d1c3689d46a08a4e, merged with deploy 61821446ebd7e4fb30a36a5a95b7526a34515df5. Child #1694 now 450d998ad5e6759f25964f9a144a9ebdb48767eb from b94a463133f8d5c61f7ab48c90a13fd2a45e4079, normally merged with the refreshed parent. Both stay draft, auto-merge off, heads/base/body read back. Zero conflicts; both parent feature blobs and both child test blobs are byte-identical to their predecessors. Parent diff remains two files (+137/-1); child remains two tests (+31/-0). No new implementation or assertion rewrite.
+- **PASS, local evidence:** parent seven files / 136 PASS / 0 FAIL / 0 SKIP; child seven files / 139 PASS / 0 FAIL / 0 SKIP. Overlap is not 275 unique tests. Both Bun canonical typechecks exit 0 with zero diagnostics; scoped ESLint two files each 0 errors/0 warnings; format, whitespace, three docs-safety categories and import guard PASS. Missing command shims initially blocked execution; reusing verified shared dependencies resolved setup without installs/lockfile edits. First format passes failed only on checkout CRLF (897 parent, 419 child warnings); LF normalization changed no Git blobs. Hook autofixes were skipped for inherited base files after explicit checks. Receipts retain these earlier failures.
+- **NOT_MEASURED, required completion/review/live:** parent at this time has 33/35 required SUCCESS and two in progress; new root 109282411050 FAILS high fast-uri 1239943/1239946 and nested 109282410911 FAILS moderate undici. Failed logs read, locked dependency repair, no rerun/waiver. Child has 35 required contexts missing because its stacked base is excluded by Main CI; after parent landing it needs normal retarget and new required CI. Blue Dream reviews both exact heads per OWNERSHIP. No parent-first landing, full browser or production acceptance inferred from local checks.
+- **PASS, additional Pricing source proof:** #1797 remains a3d5269435bbcdabac65b84536238017a7f66095 with all 35 required SUCCESS and no pending job at 06:21:14 UTC; root/nested FAIL retained. Native local-backend log 109277517082 reports 21 PASS / 0 FAIL / 0 SKIP. Mocked census logs report public 5 PASS and authenticated 6 PASS. These are separate scopes, not extra unique unit cases or live acceptance; census uses synthetic session/reads. No production checkout, credit spend, customer access or live writes.
+- **BLOCKED, production acceptance / NOT_MEASURED, wider goal:** archived write-smoke fixture and owner-controlled review/database/publish gates remain. Existing #1793 timing harness has 16 terminal named contexts but zero required contexts on its stacked base; no required or production performance PASS. Shipped 28.2 and proposed ops 28.3 remain distinct. HOLD #1250 and named locks unchanged. No ready, auto-merge, merge, Publish, production APPLY/PREFLIGHT/SQL/dispatch, secret, device or Action Queue operation. CHEM-GOAL-3DAY-001 remains active.
 
-**Read the Production commit row before quoting it.** At that 12:57 UTC
-reading production served `1400a7e77eff` with **`dirty: true`** and provenance
-**`NO_MATCH`**. **Superseded same day ~15:23 UTC** — host now serves
-`39935889fe02` (#1080); see the Latest updated block and the Production
-status table. Commit _identity_ remains separable from _provenance_; do not
-smooth provenance into a `PASS`. Cause of dirty/orphan stays `NOT_MEASURED`.
+## Follow-up observation — 2026-09-29T06:06 UTC
 
-These rows were specified in §8 of `docs/specs/current-state-refresh-2026-08-20.md`
-(#1067) and routed to PR #1060, which owned this file; #1060 merged without
-folding them in, and the collision that blocked a direct edit ended with it. The
-values here were a FRESH measurement at write time, not a replay of §8 —
-production moved `6cf3ffda0686` → `92a983b4832e` → `1400a7e77eff` across that
-session, then later to `39935889fe02`, which is the whole argument for
-re-measuring before writing, and the reason every row here carries its own
-timestamp.
+- **PASS, terminal required CI:** stay-draft #1797 at `a3d5269435bbcdabac65b84536238017a7f66095`, base `61821446`, has all 35 required contexts SUCCESS, zero required failure/missing/pending. Main CI `109277565013` Build and build summary SUCCESS; conditional QuickLog RPC runtime harness SKIPPED. Context IDs saved in Downloads CHEM-pricing-pack-retry-CI-terminal-2026-09-29.json. Earlier partial snapshots remain dated history. Supplemental jobs pending; high fast-uri and moderate undici jobs remain FAIL with logs read. Blue Dream/live acceptance NOT_MEASURED; no waiver, merge or production operation. Goal stays active.
 
-This edit changes no schema, migration, or governance file — it touches this file
-only. The merge commit carrying it does inherit the deploy branch's own changes
-(#1051's governance bump to `2026-09-01.2`, #1080's signup hardening migration);
-those are inherited, not authored here. Does **not** measure indexation or
-migration state, and does **not** set Day 0.
+## Follow-up observation — 2026-09-29T06:02 UTC
 
-Ordering note: this edit and the signup-attribution resolution directly below
-are independent same-day changes touching different sections of this file. The
-order here reflects when each edit landed in this document, not when each
-measurement was taken.)
+- **PASS, pricing repair:** stay-draft #1797 at `a3d5269435bbcdabac65b84536238017a7f66095`, base `61821446ebd7e4fb30a36a5a95b7526a34515df5`, four closed files (+306/-28). Exact-base pack-retry reproduction 8 FAIL / 0 PASS / 3 excluded. Pure retry gate reuses canonical SKU/eligibility logic, keeps blocked recovery intact and shows existing honest copy; verified pack/plan retries and success URL preserved. Forty-one new cases; new set 2 files / 41 PASS, related final set 15 files / 168 PASS, each 0 FAIL / 0 SKIP. Canonical typecheck 0 diagnostics, ESLint 4 files 0 errors/0 warnings, format/whitespace/three scanner categories/import guard PASS. No hook/provider, price/entitlement, auth, Supabase, migration, lockfile, device or Action Queue change or actual checkout/charge.
+- **NOT_MEASURED, terminal CI/review/live:** #1797 at 06:01:35 UTC has 21 required SUCCESS / 14 in progress; no old result inherited. Root `109277517177` FAIL fast-uri 1239943/1239946 and nested `109277517160` FAIL moderate undici; failed logs read, locked repair, no rerun/waiver. Blue Dream acceptance and actual production pricing/eligibility behavior NOT_MEASURED. Full 68-head collision inventory refreshed; zero pricing target overlap. Alerts #1673 remains untouched. After new draft creation the open count is 69; no new aggregate failure count inferred from the older 68-head snapshot.
+- **PASS, current-head required contexts / FAIL, additional checks:** #1796 still 35/35 SUCCESS at `8f874b59`; supplemental work remains. Pre-checkpoint #1777 at `e945d9a6` has 35/35 SUCCESS but governance `109275163130` rejects the proposed ACK coverage until #1779's checker lands; root `109275162934` FAIL fast-uri; old smoke `109275163763` reports 1 PASS / 1 FAIL / 0 SKIP and one automatic retry, refusing the configured production host before the write checklist. Logs read. #1792 already owns the fixture guard; no duplicate implementation or bypass. Later ops push invalidates these current-head CI claims.
+- **PASS, anonymous HTTP/SSR only / NOT_MEASURED, product behavior:** fresh public version at 06:01:01.9913132 UTC is HTTP 200, commit `61821446`, dirty:false, buildTime 03:02:39.564Z, cache HIT/Age 7062. Anonymous /pricing and sign-in/reset URLs return HTTP 200; Pricing has its rendered heading, auth responses contain no server-rendered inputs. Web reader could not access those pages; direct HTTP succeeded. This does not prove hydrated forms, sign-in/reset, checkout, schema or the core loop. No form submitted, user created, signed-in account accessed or live write.
+- **BLOCKED, full production acceptance:** configured write-smoke fixture remains archived; no automatic unarchive, CI-variable/secret change or KEEP/customer access. Source repairs do not lower all eleven named shaky rows without live evidence. Independent acceptance, credit-limit smoke, performance, schema/Edge/payments and complete core loop remain NOT_MEASURED. HOLD #1250 and named locks remain. No merge, ready, auto-merge, Publish, SQL/APPLY/PREFLIGHT/dispatch, device/AQ or credentials. CHEM-GOAL-3DAY-001 stays active.
 
-**Prior update:** 2026-08-21 UTC (signup-attribution resolution, #1080)
-**Updated by:** Claude (2026-08-21: **the signup-attribution forward repair is
-now APPLIED and the live outage is CLOSED.** Acted on Cheek's in-session
-"fix things I deliberately left for you" instruction, covering the three items
-recorded at the end of the prior turn's work. Applied
-`supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql` to
-production verbatim through the same Lovable SQL channel as the Action Queue
-repairs, guarded by an md5 transcription check against the runbook's pinned
-SHA-256 identity so the applied bytes are verified, not assumed — the first
-attempt caught a real transcription slip and aborted with zero writes before
-the corrected retry succeeded. `public.signup_acquisition_attributions` and
-all four functions now exist; a rolled-back end-to-end probe of the exact
-allowlisted-source failure path passed. The merged migration never revokes
-`service_role` (zero occurrences, confirmed by grep), so this project's legacy
-default privileges would otherwise leave `service_role` holding unintended
-access on all five objects — the same class of gap already recorded for the
-Action Queue guard below. An ad-hoc supplemental `service_role` revoke was
-applied through the same channel at apply time and is now captured as a new
-additive migration, `20260821064300_signup_acquisition_service_role_hardening.sql`,
-validated on a local PostgreSQL 16 replay, so a fresh provision or
-disaster-recovery restore reaches the same hardened state rather than
-silently reopening it. See the 2026-08-21 resolution block under the
-signup-attribution section for full evidence. No `schema_migrations` ledger
-row was written for either signup version, consistent with this file's own
-"founder decision" framing for that class of write. No governance file
-changed in this edit.)
+## Follow-up observation — 2026-09-29T05:48:34 UTC
 
-**Prior update:** 2026-08-20 UTC (second same-day edit)
-**Updated by:** Claude (2026-08-20, later edit: **the Action Queue transition
-contract is now APPLIED and the live security gap is CLOSED.** Cheek authorized
-the full sequence in session. `20260819190000` (guard forward repair) applied
-first, then `20260819190852` (transition forward repair) applied and passed its
-own postflight. `authenticated` no longer holds UPDATE or DELETE on
-`action_queue` or `action_queue_events`; a rolled-back end-to-end probe proved a
-direct UPDATE is refused 42501 while the owner-scoped RPC still approves and
-writes its audit event. See the 2026-08-20 resolution block. No repository code
-changed in this edit.)
+- **PASS, reproduced and pushed onboarding repair:** new stay-draft #1796 at `8f874b595709d2b4f0b7d94a8d0e8fb515d4271c`, base `61821446ebd7e4fb30a36a5a95b7526a34515df5`, changes only Onboarding and its focused test file (+126/-2). Same-turn double activations reproduced 3 FAIL / 0 PASS / 9 excluded on the exact base. Shared synchronous presenter guard serializes setup and plan retry; seven new cases preserve sequential retry and CSV handoff. Final 7 files / 66 PASS / 0 FAIL / 0 SKIP; separate V0 1 file / 26 PASS / 0 FAIL / 0 SKIP. Bun typecheck 0 diagnostics, lint 2 files 0 errors/0 warnings, format/whitespace/scanners/import guard PASS. Failed ESLint output-file setup retained; stdout capture correction PASS. Per-mounted-presenter protection only; cross-tab/remount/database concurrency NOT_MEASURED.
+- **PASS, complete inventory read / FAIL, additional checks:** 68 open heads completely paginated at 05:42–05:45:45 UTC; follow-up open listing shows no head changes, additions or closures. 55 heads have all 35 required SUCCESS; 40 have at least one latest failed check/status. Two heads have pending jobs; categories overlap. 39 heads fail the root audit and 27 the nested static/audit job. Original 13 repairs: 12 all-35 SUCCESS; orphan #1618 missing all 35. #1651 still has a GA WebKit failure (6 PASS / 1 FAIL / 1 flaky classification), logs read; #1751 already owns the corresponding hydration repair. No causal improvement claim against the different earlier inventory or duplicate fix. Receipt: Downloads CHEM-open-pr-checks-2026-09-29-0547Z.json.
+- **PASS, required contexts / NOT_MEASURED, all-job completion:** #1796 had 34/35 required SUCCESS at 05:46:17 UTC; fresh read at 05:48:34 UTC confirms 35/35 SUCCESS, zero required failure/missing/pending. Supplemental browser census/local-backend/CodeQL jobs remain pending. Additional root `109273300041` FAIL fast-uri 1239943/1239946 and nested `109273301682` FAIL moderate undici; logs read, dependency scope locked, no rerun/waiver. #1795 now has its own exact-head 35/35 required SUCCESS and Main CI `109270820218` SUCCESS, conditional runtime harness SKIPPED; root `109270773395` remains FAIL. Independent Blue Dream/Critical Mass acceptance remains NOT_MEASURED.
+- **BLOCKED, complete product acceptance:** public frontend identity previously matched deploy `61821446`; this does not measure onboarding, Timeline repair, credits, schema, Edge, payments or full loop. The active-smoke fixture remains archived; no unarchive/configuration bypass. Eleven named shaky rows remain unpromoted by local-only proofs. No merge, ready, auto-merge, Publish/promote, production SQL/APPLY/PREFLIGHT/dispatch, credentials, device or Action Queue operation. HOLD #1250 and ownership locks remain; CHEM-GOAL-3DAY-001 stays active.
 
-**Prior update:** 2026-08-20 UTC
-**Updated by:** Claude (2026-08-20: corrects a production-liveness false negative on
-branch `claude/verdantgrowdiary-dns-issue-hag3co`. An agent reported
-`verdantgrowdiary.com` **offline and unindexed** from a single sandboxed DNS
-failure and recommended repointing production DNS; the site was live throughout.
-Re-measures seven Production status rows over live HTTPS — release identity is now
-`f09febc354a4` (#1049), build `2026-08-20T18:49:50.600Z`, provenance MATCH — and
-refreshes the deploy-branch topology row to tip `9b644565` (#1042). Adds
-`docs/agent-session-network-reachability.md`.
+## Follow-up observation — 2026-09-29T05:32 UTC
 
-Second, executes Cheek's 2026-08-20 **SITEMAP** adjudication on the unsitemapped
-indexable routes. The set measured **six**, not the four this file recorded; five
-were added to `public/sitemap.xml` (56 → 61 `<loc>` in-repo). `/breeder-beta`, a
-self-declared copy-only duplicate of `/creator-beta`, was held for an owner call
-and then resolved the same day: Cheek chose canonicalisation, so it now points its
-canonical at `/creator-beta`, stays `index, follow`, and stays out of the sitemap
-by design. That adds a `canonicalPath` option to `usePageSeo` and a
-`crossCanonicalDocument` build-time helper, pinned by
-`src/test/breeder-beta-cross-canonical.test.ts` and
-`src/test/use-page-seo-canonical-path.test.tsx`.
+- **PASS, release packet:** new stay-draft #1795 is `69a54f84aef49846847cb5d6f3315f9470c0cc89` on deploy `61821446ebd7e4fb30a36a5a95b7526a34515df5`, one Markdown file +190/-0. Existing local release branch advanced normally; no source/runtime change. Fresh all-66 head/base check shows no drift before push; complete file inventories reused only for unchanged pairs and read fresh for #1777/#1794. #1780 retains its separate runbook. Docs safety 1 file / 67 PASS / 0 FAIL / 0 SKIP; three scanner categories, format and whitespace PASS. New document-head CI and Critical Mass acceptance NOT_MEASURED.
+- **PASS, frontend identity / NOT_MEASURED, runtime:** public version at 05:27:31.9666602 UTC reports HTTP 200, deploy `61821446`, dirty:false, buildTime 03:02:39.564Z, cache HIT/Age 5052. Advertised source/live commit gap zero. GitHub Vercel status remains pending alongside a successful deployment-summary status; native checks, traffic allocation and complete product acceptance remain NOT_MEASURED. #1754's owner override of Blue Dream FAIL remains unchanged; #1794 remains unmerged at `7866ad8d`, required 35/35 SUCCESS, independent acceptance/live repair NOT_MEASURED.
+- **FAIL, additional target gates / BLOCKED, acceptance:** all 149 deploy check records read over two pages, current required 35/35 SUCCESS. Required audit `109236324585` still FAILS on local-DB proof unfinished at merge; a later green result is not a waiver. Root `109236324433` FAILS fast-uri 1239943/1239946. Provider check `109236481745` reports remote migration versions absent locally; Actions log request returns 404 because it is external-provider evidence, not production schema proof. Archived owned-fixture refusal remains; no unarchive/configuration bypass. Full hosted loop, AI credit-limit smoke, schema, Edge and payments remain NOT_MEASURED. No merge, ready, auto-merge, Publish/promote, SQL/APPLY/PREFLIGHT, credentials, device or Action Queue operation. HOLD #1250 and ownership locks remain; CHEM-GOAL-3DAY-001 stays active.
 
-No schema, migration, or governance-file changes. Does **not** measure indexation
-or migration state, does **not** move production — the live sitemap stays at 56
-until the next publish — and does **not** set Day 0.)
+## Follow-up observation — 2026-09-29T05:20:48 UTC
 
-**Prior update:** 2026-08-20 UTC
-**Updated by:** Claude (2026-08-20: records the owner-authorized apply attempt of
-the Action Queue transition forward repair. The apply **fail-closed with zero
-writes** at a precondition the earlier evidence never covered, and the
-investigation proved a **third** unapplied migration in production
-(`20260725093000`). Adds the "2026-08-20 — the Action Queue forward repair is
-BLOCKED by a third unapplied migration" block under the migration-drift section,
-including the fresh 20/20 `v_legacy_state` measurement so it is not re-derived.
-Docs-only edit; no code, schema, or migration changes, and no production write.)
+- **PASS, terminal required CI:** stay-draft #1794 at `7866ad8d3281cadb46efa9ef32222cfe79541c59`, base `61821446`, has all 35 required contexts SUCCESS, including all 32 full-suite shards. Zero required failure/missing/pending. Main CI `109266800261` SUCCESS; Build and Generate build summary steps succeed, overall build summary PASS. Named check receipt saved in Downloads GDP-1794-CI-terminal-2026-09-29.json. Earlier first-head failures and partial snapshots remain history.
+- **NOT_MEASURED, runtime proof:** conditional QuickLog RPC runtime harness is SKIPPED. Separate Main CI summaries include 8 files / 167 PASS / 0 FAIL / 16 SKIP, 2 files / 31 PASS / 0 FAIL / 16 SKIP, Deno 248 PASS / 0 FAIL, scanner 20 files / 332 PASS / 0 FAIL, and 1 file / 6 PASS / 0 FAIL. These overlap other executions and are not unique-test sums or production proof.
+- **FAIL, additional audits / BLOCKED, locked repair:** exact-head root `109266743481` reports fast-uri 1239943/1239946; nested `109266743639` reports undici GHSA-3wwx-pv8p-q78v. Logs read; no locked dependency edit or waiver. Blue Dream exact-head acceptance and hosted behavior remain NOT_MEASURED. No ready, auto-merge, merge, Publish/promote or production operation. HOLD #1250 and ownership locks remain; CHEM-GOAL-3DAY-001 stays active.
 
-**Prior update:** 2026-08-19 UTC (third same-day edit)
-**Updated by:** Claude (2026-08-19, third edit: records Cheek's approval of
-One-Tent Loop **Tranche B+** — the efficiency program's second tranche — with
-Claude explicitly reassigned as architect and implementer for B+ only.
-Approval covers the design at
-`docs/superpowers/specs/2026-08-19-one-tent-loop-efficiency-design.md`, owner
-decisions D4/D5/D7, and the design's §11 copy; baseline at
-`docs/one-tent-loop-efficiency-baseline.md`, both verified at deploy tip
-`e012b633`. See the "Current approved slices" section for the tranche record.
-Docs-only edit; no code, schema, or migration changes.)
+## Follow-up observation — 2026-09-29T05:14 UTC
 
-**Prior update:** 2026-08-19 UTC (second same-day edit)
-**Updated by:** Claude (2026-08-19, later edit: Quick Log errors/diagnostics
-slice on `claude/quicklog-errors-diagnostics-c06rci` (owner-assigned). Adds the
-2026-08-19 production re-measure block under the second-drift section: the
-Quick Log manual-save catalog now matches the 20260818010000 forward-repair
-end-state in production, `quicklog_entry_revisions` and
-`diary_entries.retracted_at` are now PRESENT (superseding the 2026-08-15/16
-absence findings), and a rolled-back end-to-end probe of
-`quicklog_save_manual` passed on every axis. No schema changes; no migrations
-applied by this slice.)
+- **FAIL, first-head CI / PASS, scoped correction:** #1794 predecessor `cb27310a` failed required shards 7/32 and 14/32 on three static page-wiring assertions (failing batches: 2 FAIL / 118 PASS and 1 FAIL / 148 PASS). Logs `109264969705` and `109264969632` read before repair. The original direct sensor-envelope resolver and explicit literal-true validation request are now preserved, with no unrelated test edits. Normal correction push is `7866ad8d3281cadb46efa9ef32222cfe79541c59`, stay-draft on base `61821446`, final five-file diff +387/-57. An intermediate local run 1 FAIL / 186 PASS remains dated evidence; no blind rerun.
+- **PASS, final local proof:** 15 related files / 333 PASS / 0 FAIL / 0 SKIP including 44 new cases; final source-matrix mutation 5 FAIL / 0 PASS / 50 excluded, byte-for-byte restore then 5 PASS / 0 FAIL / 50 excluded. Stable final Bun project typecheck 0 diagnostics; five-file ESLint 0 errors/1 base-existing hook warning, format and whitespace PASS. Earlier 304/158 runs are predecessor evidence and overlap the final set, not unique sums. Separate operational docs-safety test 1 file / 67 PASS / 0 FAIL / 0 SKIP; a prior misspelled filename yielded no tests and was corrected. Historical CURRENT_STATE tail retained byte-for-byte.
+- **FAIL, additional audits / BLOCKED, locked repair:** predecessor root `109264968745` fails fast-uri advisories 1239943/1239946; nested `109264968992` fails undici GHSA-3wwx-pv8p-q78v after separate 1-file/7 and 10-file/91 passing sets. Those runs overlap other evidence. Locked dependency files unchanged; no audit waiver. Current-head terminal CI/build, Blue Dream acceptance and hosted Timeline repair remain NOT_MEASURED. No merge, ready, auto-merge, Publish/promote, SQL/APPLY/PREFLIGHT, credential, device or Action Queue operation. HOLD #1250 and all named locks remain; CHEM-GOAL-3DAY-001 stays active.
 
-**Prior update:** 2026-08-19 UTC
-**Updated by:** Claude (2026-08-19: records Cheek's approval of One-Tent Loop
-**Tranche A** — five context-threading wiring PRs — and lands the implementation
-specification at `docs/specs/one-tent-loop-tranche-a-specification.md` for the
-Codex handoff. Docs-only; no code, schema, or slice-scope changes. See the
-"Current approved slices" section for the tranche record.)
+## Follow-up observation — 2026-09-29T05:08 UTC
 
-**Prior update:** 2026-08-18 UTC
-**Updated by:** Claude (2026-08-18, third same-day edit: re-applies the Lovable
-project Knowledge as Version 2026-08-18.1 at Cheek's instruction, sourced from
-this file at deploy tip `87ae05e` (#1026) after the archival slice merged.
-Snapshot: `docs/lovable/verdant-project-knowledge-2026-08-18.md` (9,979/10,000
-chars). Pre-write read confirmed the live field matched the committed
-2026-08-15 snapshot exactly. Live `/version.json` re-measure was `BLOCKED`
-from the agent session (network policy 403), so the pack carries the
-2026-08-15 stamp labeled as last measurement. Topology row refreshed to
-fetched tip `87ae05e` (#1026). Still no Knowledge sync automation authorized.
-Does **not** apply migrations or set Day 0.)
+- **PASS, pushed repair:** new stay-draft #1794 is `cb27310a4d47799d13b2a4f53802f19772d066cb` on deploy `61821446ebd7e4fb30a36a5a95b7526a34515df5`, five closed files (+381/-62). The requested first Sep 29 slice removes raw non-manual Timeline metric rendering and reuses the canonical validator for every persisted source. Invalid readings are withheld with neutral review copy; valid survivors, history, manual behavior, source badges and freshness remain. VPD stage interpretation requires a displayed validated chip. #1754's owner override of Blue Dream FAIL remains historical, not converted to PASS.
+- **PASS, local proof:** 13 related files / 304 PASS / 0 FAIL / 0 SKIP, including 42 new cases; restored focused 3-file run / 158 PASS is overlapping verification. Exact-tip baseline 5 FAIL / 0 PASS / 44 excluded, validation-disabled mutation 5 FAIL / 0 PASS / 50 excluded, source restored byte-for-byte. Bun project typecheck 0 diagnostics; ESLint five files 0 errors and one base-existing hook-dependency warning; format, whitespace, three docs-safety categories and import guard PASS. Windows base checkout adds CRLF formatting warnings; the committed base blob matches and its non-format warning is the same. Vite/React act warnings retained.
+- **NOT_MEASURED, acceptance:** fresh #1794 CI has 34 required contexts queued/in progress and the combined Main CI context not yet present; zero inherited success. Blue Dream exact-head and hosted behavior remain open. Public version shows deploy `61821446`, dirty:false, confirming frontend identity only. No new fix deployment or live test is claimed. Active production fixture remains blocked by its archived plant; no fixture/configuration change or smoke write.
+- **PASS, collision audit / BLOCKED, locked lanes:** all 65 open head/base pairs unchanged immediately before push; complete path audit surfaces #1763's separate freshness extraction and held #1741, never-merge #1740, untouchable #1737, and inherited orphan #1618. None changed. #1763 must preserve this fix when refreshed. Preserved unpushed P2 CO2 receipt work remains outside this closed scope. No merge, ready, auto-merge, Publish/promote, SQL/APPLY/PREFLIGHT, credential, device or Action Queue operation. HOLD #1250; CHEM-GOAL-3DAY-001 remains active.
+
+## Follow-up observation — 2026-09-29T04:52:32 UTC
+
+- **PASS, required CI / FAIL, additional audits:** #1760 remains draft at `074daa6270dd190ef2a214e931d8b9d0a847df66`, base `61821446`, with 35/35 required contexts SUCCESS and zero required failure, missing or pending. Main CI `109259988370` completes successfully; separate logged sets include 248 Deno tests, 20 files / 332 scanner tests and 1 file / 6 tests, with zero failures in each shown summary, followed by a passing build summary. These overlapping executions are not a unique-test sum. Root fast-uri and nested undici audits remain FAIL and locked.
+- **PASS, single infrastructure retry / BLOCKED, partial proof:** local DB retry `109260510539` succeeds after the initial axe-core integrity failure. Its logs retain profiles-gamification RPC paths BLOCKED because local exec_sql is unavailable, even though the enclosing Vitest runs pass. Do not describe those paths as verified. Separate harness summaries include support forms 165 PASS / 0 FAIL, restricted-role Phase 1 10 PASS / 0 FAIL / 0 BLOCKED and Quick Log dual-timestamp 67 PASS / 0 FAIL; repeated harness runs are not unique tests. This is disposable local-backend proof only, not production.
+- **NOT_MEASURED, acceptance:** Blue Dream exact-head acceptance and live Dashboard/Daily Check remain open. No ready, auto-merge, merge, Publish or production operation. Earlier partial-CI and failed-install receipts remain dated history. HOLD #1250; Timeline successor remains first slice tomorrow; goal remains active.
+
+## Follow-up observation — 2026-09-29T04:46:20 UTC
+
+- **PASS, normal integration:** existing draft #1760 is now `074daa6270dd190ef2a214e931d8b9d0a847df66`, a clean merge of deploy `61821446ebd7e4fb30a36a5a95b7526a34515df5` into predecessor `b2007583d70046519852f29104fb1972a43b0a3e`. Zero conflicts, no history rewrite. Final diff remains 12 client/test files (+255/-26); all twelve feature blobs are byte-identical to the predecessor. Selected-grow links still require the plant's own matching grow; legacy null-grow plants retain unscoped working links. No held or off-limits repair.
+- **PASS, exact-head local proof:** six focused test files / 118 PASS / 0 FAIL / 0 SKIP, Vitest 4.1.11. Canonical Bun project typecheck exits 0 with zero diagnostics. Scoped ESLint twelve files 0 errors/0 warnings; format twelve files, whitespace and three docs-safety categories PASS. Earlier checkout line endings yielded 5405 lint warnings and format FAIL; conversion to committed LF changed no blobs. Mounted-run Vite/React act warnings remain recorded. These are existing overlapping tests, not 118 new cases. Full local suite/build, independent review and live acceptance are NOT_MEASURED.
+- **NOT_MEASURED, new hosted completion:** at 04:45:44 UTC the new head's required shard/preflight/legal contexts are queued/in progress, and the combined Main CI context is not yet present. Previous-head 35/35 is historical. P1/.tsx acceptance stays with Blue Dream; GDP owns landing. Normal push and PR body readback confirm draft state and exact head/base. Fresh all-pages audit of 65 open PRs identifies distinct #1660 guided-evidence/freshness and #1674 auth-mock test overlap; serialize later while preserving both. #1740 never-merge composition and #1618 orphaned inherited diff remain untouched.
+- **FAIL, additional gates / BLOCKED, dependency repair:** fresh #1760 jobs `109259942449` and `109259941580` fail fast-uri advisories 1239943/1239946 and nested undici GHSA-3wwx-pv8p-q78v. Logs read; locked dependency files untouched. The nested lane separately passed 1 file / 7 tests and 10 files / 91 tests before its audit failed; do not add these to the overlapping local 118 as unique tests. Job `109259942043` failed before tests on axe-core tarball integrity. One job-only infrastructure retry was accepted at 04:48:06 UTC, not a blind suite rerun; result is NOT_MEASURED and no further retry is authorized here.
+- **PASS, partial current CI / NOT_MEASURED completion:** at 04:48:52 UTC #1760 has 34/35 required contexts SUCCESS, zero required FAIL, zero missing and one in progress (`Lint, typecheck, test, build`, job `109259988370`). The infrastructure retry is in progress; initial failure remains in its receipt. Eighty raw check records resolve to 77 latest named contexts. Required-check records are not test counts, and additional audit FAILs are not waived.
+- **PASS, stack state only:** owner merges #1749 at 04:27:34 UTC into `codex/quicklog-manual-lineage-fence-20260927` as `19d767d0c62179b224cabb9c45f2544cf0894645`; #1745 then merges that head at 04:28:28 UTC into `codex/quicklog-active-replay-fence-20260926` as `851239d4170e90f2121129b42ad229bc70f6343f`. Neither merge landed on deploy; locked #1735 remains open at the latter head. No migration APPLY or production acceptance is inferred.
+- **PASS, shipped history only:** GitHub confirms #1754 merged unchanged `0384753ae911eca2a989694f8514f116dc903757` at 02:13:59 UTC as `8b73b25a879e8d1fc526fdd7035ae1d368eab3f6`. This is merge evidence, not a fresh Blue Dream receipt or proof of remaining Timeline defects. Timeline successor remains first slice tomorrow; no Timeline source edit tonight. No ready, auto-merge, merge, Publish, production APPLY/PREFLIGHT/dispatch, credential, device or Action Queue action by this continuation. HOLD #1250 and all named locks remain; CHEM-GOAL-3DAY-001 stays active.
+
+## Follow-up observation — 2026-09-29T04:29:55 UTC
+
+- **PASS, pushed test harness:** draft #1793 at `c449a0b486d37b3128d3bab18538dda498e111a3` is stacked on #1792 `34f8beae3334cceb6f914df904a6842c90005eb4`. Five files (+601/-6) add opt-in signed-in Dashboard/Timeline/Sensors readiness timings and instrument the existing first Quick Log save. No product or Timeline code changed, and no additional saves are introduced. The current deploy remains `61821446ebd7e4fb30a36a5a95b7526a34515df5`.
+- **PASS, local validation:** four test files / 113 PASS / 0 FAIL / 0 SKIP, including 44 new cases. Removing the exact deployment-match fence causes 2 FAIL / 42 PASS; restoring it returns all 113 to PASS. Project Bun/direct Node and targeted E2E typechecks: 0 diagnostics; scoped ESLint five files 0 errors/0 warnings; format, whitespace, three docs-safety categories and import scan PASS. Discovery lists five cases in three files, not five executed passes. Earlier 111 PASS / 2 FAIL test-setup run and failed describe-local trace/video discovery remain retained. No unique-test sum across repeats.
+- **BLOCKED hosted / NOT_MEASURED performance:** the configured parent fixture is archived; no timing or new production write has executed. Main CI filters PR bases to main/verdant-grow-diary and excludes this intentionally stacked parent, so a complete 35-context PASS cannot be inherited. Other checks are queued/in progress at the observation time. After parent acceptance/landing, update normally and retarget to deploy for fresh exact-head required CI. Receipts measure navigation-to-control-ready after fixture preflight or save-click-to-confirmation; they do not establish cold-load speed, complete data loading, retrieved values or a performance budget.
+- **PASS, collision read / NOT_MEASURED acceptance:** the earlier full 66-open-PR path audit was refreshed against 64 open heads; changed-head files inspected immediately before creation. Only parent #1792 overlaps the Quick Log smoke path. Critical Mass owns this .ts evidence review; Blue Dream retains the P1 parent. No held branch, auth, supabase, migration, lockfile, workflow, variable, credential, device or Action Queue change. No ready, auto-merge, merge, Publish, production APPLY/PREFLIGHT or dispatch. HOLD #1250; CHEM-GOAL-3DAY-001 remains active. Timeline successor stays first slice tomorrow.
+- **PASS historical / NOT_MEASURED latest CI completion:** 04:31:32 UTC re-read confirms all six repair heads unchanged. #1175/#1659/#1671/#1673/#1675 each have 35/35 latest required SUCCESS, with locked fast-uri/undici or provider failures still recorded. #1751 is now non-draft through an external action; Codex did not mark it ready. Its new same-head run has 27/35 required SUCCESS and remaining jobs pending, so the earlier 35/35 packet remains historical. New failed jobs `109255474198` and `109255473859` were read: the old fixture guard refuses the production URL and fast-uri advisories remain. No blind rerun or bypass.
+
+## Follow-up observation — 2026-09-29T04:12 UTC
+
+- **PASS, pushed repairs:** existing drafts #1175 `c2b2e500`, #1659 `6b9d0289`, #1671 `74e19c02`, #1673 `74587f9c`, #1675 `b7a1e8fc` and #1751 `f63d46fe` now normally include deploy `61821446`. Six earlier local-only candidates are pushed without force/history rewrite. Focused file/test counts respectively: 3/71, 6/93, 1/8, 3/64, 1/5 and 2/46, each zero failures/skips. Project compilers 0 diagnostics; scoped lint/format PASS. Four older caches needed explicit Node/TypeScript after Bun launcher startup failures; three memory-contention attempts were stopped and rerun sequentially. Failed launchers and cancelled attempts are not passed runs.
+- **PASS, reproduced analytics correction:** #1751 local WebKit baseline 8 PASS / 2 FAIL / 0 SKIP; two remaining suites now use existing bounded hydration setup. Final local and hosted Chromium/WebKit each report the same 10 cases PASS, zero failures/skips; local zero flaky/retries. Required contexts at `f63d46fe`: 35/35 SUCCESS. Native `109247230247`: 21 browser PASS / 0 FAIL / 0 SKIP plus separate 22 static PASS. Root fast-uri and old production-host Quick Log guard still FAIL; Critical Mass acceptance NOT_MEASURED. Assertions, assertion timeouts, consent and retries unchanged.
+- **PASS, bounded inventory / NOT_MEASURED completion:** 04:03 UTC read: 66 open heads, 31 failed latest contexts, five pending heads and 48 all-35 required SUCCESS. Categories overlap; fresh pushes reset CI, so no defect trend is established. Original 13: seven all-35 SUCCESS, five newly pushed pending required contexts, orphan #1618 missing all 35. Required success does not waive other audit/provider failures.
+- **PASS, frontend identity only:** public `/version.json` at 04:04:25 UTC: HTTP 200, commit `61821446ebd7e4fb30a36a5a95b7526a34515df5`, dirty:false, buildTime 03:02:39.564Z, cache HIT/Age 66. Deploy verified 04:06:21 UTC matches. Earlier differing receipts remain history; no cause/product acceptance inferred. The initial 04:03 receipt read the wrong SHA property and is HTTP evidence only; 04:04 receipt reads actual `commit`.
+- **PASS local-backend / BLOCKED production fixture:** #1792 native `109241785670` and pre-checkpoint #1777 `109244115472` each 21 browser PASS / 0 FAIL / 0 SKIP plus separate 22 static PASS. These overlap, not 42 unique browser cases or production proof. #1792 production smoke remains 1 PASS / 1 FAIL / 0 SKIP, one automatic retry; archived fixture refused before writes. Matthew identifies active owned fixture; no auto-unarchive/CI-variable change.
+- **BLOCKED locked scope / NOT_MEASURED acceptance:** #1175 provider `109249445526`: SQLSTATE 42P07, `ai_credit_grants` already exists. Root fast-uri/nested undici fixes need locked dependency files. #1777 depends on #1779 checker; legacy grammar FAIL not waived. No merge, ready, auto-merge, Publish, production SQL/APPLY/PREFLIGHT/dispatch, secret, device or Action Queue operation. Blue Dream/Critical Mass acceptance open; HOLD #1250 and owner locks remain. Phase 2 not declared; CHEM-GOAL-3DAY-001 active.
+
+## Follow-up observation — 2026-09-29T03:33:31 UTC
+
+- **PASS, source identity:** owner merge #1773 is now deploy `61821446ebd7e4fb30a36a5a95b7526a34515df5`, preserving the unknown-evidence-freshness correction from `c2fa6e13`. Codex performed no merge; live AI Doctor behavior and independent acceptance receipt remain NOT_MEASURED.
+- **PASS, inventory read / FAIL, additional gates:** 66 open heads measured; 33 have at least one failed latest check, 2 have pending checks, and 53 have all 35 source-pinned required contexts SUCCESS. These categories overlap. Root dependency audit is red on 28 heads and nested static/audit job on 18; other failures remain individually recorded. This replaces no dated prior receipt and does not establish a before/after defect trend while jobs were pending. Of the original 13 repair heads, 12 have all 35 required SUCCESS; orphan #1618 is missing all 35. No new push to those 13 in this follow-up.
+- **PASS, required CI / FAIL, additional audits:** #1790 (`13499d83`), #1791 (`171cd0a2`) and #1738 (`15e7fb79`) each have all 35 required contexts SUCCESS at the exact head. Their native local-backend jobs each report 21 PASS / 0 FAIL / 0 SKIP / 0 retries. These overlap; they are not 63 unique tests or production proof. #1790/#1791 still fail fast-uri and nested undici audits; #1738 still fails fast-uri and GA WebKit (6 passed / 1 failed / 1 flaky runner classification). The earlier native retraction failure is retained; a later pass does not prove a flake cause.
+- **PASS, local fixture repair:** P1 draft #1792 at `34f8beae3334cceb6f914df904a6842c90005eb4`, based on `61821446`, repairs the production-only Quick Log fixture lane with positive server identity, plant/tent/grow ownership, empty/in-flight-read fences and tagged notes. Nine files (+1020/-46), 63 new cases. Related run: 7 files / 257 PASS / 0 FAIL / 0 SKIP; project and targeted E2E typechecks 0 diagnostics; lint 9 files 0 errors/0 warnings; format 9 files and 3 docs-safety scanners PASS. Previous head `6ba962d2` stopped at fixture verification with 1 PASS / 1 FAIL / 0 SKIP and one automatic retry; its checklist was skipped. Logs showed the first guard rejected the existing legitimate `tentId` URL query and optional grow-name setting. The correction binds context to verified owned rows and derives an omitted grow name from the verified owned grow; CI variables remain unchanged. Follow-up red proof: 2 FAIL / 0 PASS / 57 excluded; both now PASS. Playwright discovery lists 3 tests; no browser execution locally or manual production write. Blue Dream acceptance and actual fixture ownership remain NOT_MEASURED.
+- **FAIL hosted / BLOCKED active fixture:** #1792 now has all 35 required SUCCESS, but Quick Log job `109241785410` reports 1 PASS / 1 FAIL / 0 SKIP / 0 flaky with one automatic retry. Authentication passed; ownership verification refused; the write-producing checklist was skipped. Artifact `11010864748` shows the configured live plant is archived. Keep the refusal; Matthew must identify an active fixture in the approved account's own grow. No auto-unarchive, CI-variable or credential change. Root fast-uri and nested undici audits FAIL on this head too; local-backend job is still in progress at this sample and cannot establish production acceptance.
+- **PASS, scoped docs repair:** #1777 failed two unit pins because this docs slice removed the dormant-workflow marker and three historical npm consumer markers. Logs read, then local reproduction: 89 PASS / 2 FAIL / 0 SKIP. Restoring those markers as explicit history gives 2 files / 91 PASS / 0 FAIL / 0 SKIP without altering workflow semantics or dependency policy. The draft still waits for #1779's grammar checker; its current deployed-checker failure is not waived.
+- **FAIL, stable live/deploy match:** source is `61821446`. The earlier endpoint receipt at 02:34:39Z returned `95464496` (cache MISS, Age 0). The fresh 03:10:56Z read returned `5feb5471` (cache MISS, Age 0); the 03:11:43Z repeat returned `5feb5471` (cache HIT, Age 47), HTTP 200 and dirty:false. This proves differing observations, not a rollback cause or stable deployment identity. Preserve both receipts; production acceptance remains NOT_MEASURED and the release decision remains Matthew-owned.
+- **BLOCKED, locked repairs:** fast-uri/undici require locked dependency files; no audit waiver, lockfile, production SQL/APPLY/PREFLIGHT, secret/configuration change, Publish, device or Action Queue action. HOLD #1250 and named owner locks remain. Phase 2 is not declared. CHEM-GOAL-3DAY-001 remains active.
+
+## Updated operating observation — 2026-09-29T01:12:45.079Z
+
+- **PASS, source identity:** #1781 merged at 00:48:36 UTC as `0755bfcc0d7ee9d4c88ee716384c28b9beb51cce`. Shipped Sentinel is 2026-09-28.2 with the exact legacy ACK. Its any-.tsx and HOLD-CHEEK-review routing remains intact. The coverage amendment in #1777 now proposes 2026-09-28.3. Earlier observations below are historical.
+- **PASS, release identity only:** current live /version.json is `6ca97026437ab556f7fbac752abfbe8085c1f271`, dirty:false, buildTime 2026-09-28T23:05:10.630Z. No production promotion was performed by Codex; product, database and Edge acceptance remain NOT_MEASURED.
+- **PASS locally / NOT_MEASURED new CI:** #1779 was returned to draft and removed from the queue before normal-pushing `d35115453371725d788a858d670ce0d8674bafff`. Thirty-one focused tests pass, zero fail, zero skip. The three downgrade cases fail on the pre-repair checker; the shipped-28.2 compatibility case also reproduced failure in an isolated old-script copy. Explicit coverage literals remove the shared-replacement risk. Fresh CI must finish; old-head 35/35 does not cover this push.
+- **PASS, required contexts / NOT_MEASURED landing:** #1778 and #1780 were still open and ready at the latest PR read, with their earlier exact-head 35/35 required success. No completed merge is claimed.
+- **NOT_MEASURED, publish acceptance:** #1754 remains at `0384753ae911eca2a989694f8514f116dc903757` with 242 focused passing tests and 35/35 required success. No fresh Blue Dream PASS appeared in the current PR discussion read. The 20:15 CT gate and 20:45 CT publish decision remain Matthew-owned.
+- **NOT_MEASURED, supplied correction:** Matthew supplied #1773 unknown-evidence-freshness behavior and patch SHA256 `66d2e98e307db02088afb1df7d9605726d3926e7ce4dbf8230f1bf359360dd9b`. Reported 29 new test cases are not treated as current execution, review or hosted acceptance until verified.
+- **BLOCKED, owner lanes:** dependency/lockfile repairs, Vercel dashboard selection/authentication, scoped identity creation, and held production database changes remain owner-controlled. Zero permissions were granted. Phase 2 is not declared. HOLD #1250 and named locks remain.
+
+## Operating jobs — 2026-09-29 00:53:48 UTC
+
+- **PASS, source identity:** #1767 merged as `6fb27c5aec715c14213dd79cdb5077351e40dea0`; deploy Sentinel is 2026-09-28.1. The 2026-09-28.2 operating amendment remains pending. The latest user amendment permits own low-risk Phase 1 integration on exact-head required-check success; no Phase 2 declaration.
+- **PASS, required contexts / NOT_MEASURED, landing:** #1778 and #1779 have 35/35 required contexts SUCCESS at their exact heads. Both have actual merge-queue refs, with #1779 following #1778. Their queue-head required checks are still pending; neither is claimed merged. #1780 also has 35/35 and was submitted to the queue. Additional dependency FAILs remain visible; no waiver or independent PASS is claimed.
+- **PASS locally / NOT_MEASURED, final CI:** concurrency draft #1782 changes 69 PR workflow files and one resolved-YAML regression file. Five focused files: 57 passed / 0 failed / 0 skipped; typecheck 0; lint 0 errors / 0 warnings. Fifty-eight concurrency groups and 69 ready-for-review triggers were checked; overlapping checks are not a unique-test total.
+- **PASS, cancellation / NOT_MEASURED, aggregate improvement:** controlled pushes at 00:27:21 and 00:29:46 UTC (2m25s apart) changed queued workflow runs from 130 before to 189 at 00:40:10. The first controlled commit finished with 63 cancelled, 5 success, 3 skipped. Concurrent PRs and queue runs prevent a causal runtime/cost conclusion.
+- **FAIL, fixture contract:** #1782 Quick Log job 109199183114 reports fixture check 1 passed / 1 failed / 0 skipped. `e2e/lib/fixtureSafety.ts:224` refuses a production URL before write-producing smoke. The smoke step was skipped. Fix the production-fixture contract separately while keeping positive identity/ownership/tagging fences; do not change the production CI variables or request another host.
+- **PASS, proposals / NOT_MEASURED, deployment or access:** #1780 contains the promotion/rollback runbook; #1787 contains scoped-identity setup; #1788 contains a separate suite-consolidation proposal. Zero permissions were granted and no deployment changed. Native Vercel check selection was not exposed by the connector, and the browser redirected to sign-in. Matthew owns dashboard configuration and scoped identity setup.
+- **PASS, discovery only:** configured Vitest lists 3,153 files; legacy two-root discovery lists 3,127, missing 26 with no extras. This executed zero tests. #1757 owns discovery; no job was removed in the consolidation proposal.
+- **PASS, required CI / NOT_MEASURED, publish acceptance:** #1754 at `0384753ae911eca2a989694f8514f116dc903757` has 35/35 required SUCCESS; full record 87 SUCCESS / 4 SKIPPED / 2 dependency FAIL. Local 11 files / 242 passed / 0 failed / 0 skipped. Fresh Blue Dream acceptance is still needed for the 20:15 CT publish gate.
+- **BLOCKED, locked scope:** high fast-uri and moderate nested undici findings remain; no lockfile, exception or audit bypass was edited. Production database, Publish, HOLD #1250, device and Action Queue locks remain.
+- **BLOCKED, single governance landing:** #1777 and GDP #1781 overlap thirteen files at the same proposed 2026-09-28.2 version. #1781 lacks the new ACK field and HANDOFF_LOG required by #1779. Keep GDP's held branch untouched and reconcile one amendment before landing. Earlier measurements below remain historical.
+
+## Release and coverage measurement — 2026-09-28 23:46:17 UTC
+
+- **PASS, release identity only:** live `/version.json` reports
+  `566315cedd80e8d2a9ba3d312b5c466fdb568fa3`, `dirty:false`; its build time is
+  `2026-09-28T18:32:56.291Z`. The response does not prove an RPC, migration,
+  deployment platform or signed-in product result.
+- **PASS, source history:** deploy tip
+  `6ca97026437ab556f7fbac752abfbe8085c1f271` is four merged commits ahead:
+  #1752 `13c28a14c28fc27342a4c5d46dbb094642dcacde`,
+  #1744 `bed36ab5d447136100fa776882a69af0b5ce2de7`,
+  #1684 `3c8113eae50bee83a7f7fe4086ab53879817784a`,
+  #1762 `6ca97026437ab556f7fbac752abfbe8085c1f271`.
+- **NOT_MEASURED, publisher control plane:** the supplied founder handoff reports
+  seven failed Vercel Production gates since September 26 and last success
+  `4ddb2322`. Codex has not independently measured that dashboard count,
+  Deployment Checks list or production deployment URL. Vercel promotion is the
+  owner's release lane; no agent publishes, promotes or rolls back.
+- **PASS, bounded inventory read:** at 23:40 UTC, all pages of the current-head
+  check results were read for 61 open PRs. Seventeen heads had failures,
+  seventeen had pending checks, and thirty-five had all 35 source-pinned required
+  contexts successful. Categories overlap. This is not independent review,
+  live ruleset inspection or merge readiness. #1778 opened after that snapshot.
+- **PASS locally / NOT_MEASURED acceptance:** #1754 is now
+  `0384753ae911eca2a989694f8514f116dc903757`, after merging the deploy base and
+  repairing invalid VPD/CO2 and legacy manual validation. Eleven focused files:
+  242 passed, 0 failed, 0 skipped; actual typecheck: 0 diagnostics. Fresh CI and
+  Blue Dream review at that exact head are not replaced by the old 4c40dfcc receipt.
+  Blue Dream PASS is needed by 8:15 p.m. America/Chicago for tonight's publish.
+- **FAIL / in progress, #1754 hosted checks at 23:58 UTC:** 92 records at that
+  exact head: 42 success, 4 skipped, 32 queued, 12 in progress, 2 failed.
+  The root job 109183930277 fails on high `fast-uri` advisories; nested job
+  109183929756 fails on moderate `undici` GHSA-3wwx-pv8p-q78v. Both logs were
+  read. These are check records, not unique tests; no current acceptance review
+  is posted. Dependency changes remain locked.
+- **PASS locally / NOT_MEASURED acceptance:** #1778 is the separate two-file
+  core CI draft at `4e6710b9872e4c75cb478ea342f083796a561c7a`.
+  `verify-sandbox` becomes manual-only; `verify-production` is unchanged.
+  Two files: 167 passed, 0 failed, 0 skipped; actual typecheck: 0 diagnostics.
+  Critical Mass owns the named CI slice's acceptance; GDP owns merge.
+- **FAIL, retired core probe; no production verdict:** run 36489973074 at
+  `bed36ab5d447136100fa776882a69af0b5ce2de7` failed its exact catalog query
+  (psql 1, runner 5). The production job was skipped.
+- **PASS, sandbox money probe only:** run 36489972966 at that same source head
+  reported 17 expected / 17 applied / 0 missing. Its production job was skipped.
+  The conditional same-cause money repair does not apply. Its automatic
+  non-production trigger remains a separate policy follow-up; #1778 does not change it.
+- **BLOCKED, dependency scope:** fresh repaired-head logs identify high
+  `fast-uri` advisories 1239943/1239946 and the nested-static lane's separate
+  moderate `undici` advisory GHSA-3wwx-pv8p-q78v. Existing dependency/lockfile
+  locks prevent a repair in these slices. No exception, audit bypass or lock edit
+  was made. Earlier successful local audits are historical, not current acceptance.
+- **PASS locally / NOT_MEASURED acceptance:** #1757 is
+  `f2b13c0609bacae468902d1adc9634c2b1ecc6d7`, a two-file discovery diff after
+  merging base. Nine focused tests passed; helper checks 29/29 and workflow-safety
+  checks 6/6; typecheck: 0 diagnostics. These are separate overlapping checks,
+  not a summed unique-test count. Empty #1765 is proposed for GDP closure only.
+- **BLOCKED, governance sequencing:** #1767 remains open at
+  `54c6c3281aea83c868b83cb25e248f53bd8da2d9`. Existing #1777 carries the
+  production-only docs draft; the final 2026-09-28.2 amendment and initial
+  `HANDOFF_LOG.md` are prepared locally behind #1767. #1696 is not updated
+  until #1767 lands. Historical receipts below are preserved.
+- **PASS locally / NOT_MEASURED acceptance, startup-gate compatibility:** separate
+  CI draft #1779 is `a8c4b29740dbdec01f0d7b4b281bbe80f9d41130`. The old checker
+  failed on the new `open_handoffs_checked` field. The version-aware repair passes
+  26 governance tests, 0 failed, 0 skipped, and accepts the prepared 2026-09-28.2
+  documents against #1767's exact head. Its candidate validation does not replace
+  the checker currently on the deploy branch. #1779 must land before the final
+  #1777 amendment; #1767 still lands first. Critical Mass reviews #1779.
+- **NOT_MEASURED, production acceptance:** no repaired draft has been declared
+  deployed. Signed-in save/readback, hosted schema and Edge acceptance remain
+  unmeasured. Fixture-only smoke uses `cheekhimself@gmail.com`, never matt@/KEEP;
+  tag records `[smoke <timestamp>]`. The proposed plus-alias signup is unconfirmed
+  and no fixture user has been created.
+- **Locks:** production database (knk), HOLD #1250; do not edit #1625, #1727,
+  #1735, #1737 or #1369 (REVIEW ONLY). #1740 NEVER MERGE; #1742/#1658 locked;
+  #1741/#1745 retain database-approval holds. No ready, auto-merge, merge, Publish,
+  production SQL/APPLY/PREFLIGHT, device or Action Queue operation was performed.
+
+Current coverage blocks: [HANDOFF_LOG.md](HANDOFF_LOG.md).
+Owner/reviewer seats: [OWNERSHIP.md](OWNERSHIP.md).
+These measured facts do not change the durable rules or any historical review SHA.
+
+## Current verification/review decision — 2026-09-28
+
+Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
+E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
+disposable test account owns the fixture grow and its selected tent/plant;
+tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
+use the KEEP account. Stop a write if identity, ownership or tagging cannot
+be verified; report that exact safety gap rather than proposing another host.
+Local/CI fixtures validate code, not production. Repository integration follows
+the explicit merge phases in AGENTS.md; it is not production acceptance. No
+Publish, production APPLY, real charge, role/auth change, device control or
+Action Queue operation is authorized here. Existing owner locks remain.
+See docs/production-only-verification-runbook.md.
+
+Earlier non-production smoke-host requests are superseded, not a current
+blocker. Existing CI dependencies require separate reviewed slices.
+
+Independent acceptance routing: **Blue Dream** reviews any .tsx file,
+P1s and publish gates; **Critical Mass** reviews everything else. An author cannot
+give its own work an independent PASS. Claude may add peer observations but is not
+the acceptance reviewer. Matthew's Phase 1 exception permits Codex to integrate
+its own low-risk PRs through the PR flow after every required check is SUCCESS
+at the exact head SHA. High-risk work remains draft for GDP review and merge;
+publish gates remain with Matthew. Phase 2 requires Matthew's explicit confirmation
+that CI is proven. Historical receipts keep their original reviewer.
+
+OWNERSHIP.md controls ownership. HOLD #1250; #1369 REVIEW ONLY;
+#1735/#1737 untouchable; #1740 NEVER MERGE; #1742/#1658 locked;
+#1741/#1745 retain protected database-approval holds. No Publish, production
+APPLY, device or Action Queue operation was performed in this docs change.
+Live acceptance remains NOT_MEASURED here.
+
+### Historical operating receipts — unchanged below
+
+**Last updated:** 2026-09-24 UTC (~11:25 UTC; tip, live and board measured 11:14–11:17 UTC)
+**Updated by:** Claude (2026-09-24 late morning, restamp on **deploy tip
+`b0bfdb028600b63ec7b8bff914632a20b06020b7`**, the `#1685` squash. **Four commits** merged since the
+`f6b2fb97` stamp: **two docs (`#1681`, `#1685`) and two product (`#1670`, `#1664`)**, and none touches
+`supabase/` (§1, §3). **Live is MEASURED by Claude and equals the tip**: the apex `version.json`
+reports `b0bfdb02`, `dirty:false`. It is the first successful Claude read after eleven egress
+refusals (§2). **`#1684` carries an independent `PASS` from Claude** (§4). **`#1685` merged with
+CodeRabbit in the independent-review seat**, on the owner's instruction while Grok was out of tokens
+(§4). The session-backed _Restore pending correction_ finding is **still open** (§5). The board was
+re-listed: **40 open PRs besides this one**, **no other open PR writes this file**, **all 40 merge
+cleanly**, and **`#1683` adds a migration and edits an edge function** (§6). No Publish by Claude. No
+APPLY. `HOLD #1250`. Prior header follows.)
+
+## 1. Deploy tip `b0bfdb02` — four commits since `f6b2fb97`, two of them product
+
+`established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-24
+11:14:29 UTC.
+
+| Field      | Value                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| Tip        | **`b0bfdb028600b63ec7b8bff914632a20b06020b7`**                                                    |
+| Subject    | `docs(architecture): re-verify the contract at ef15b2c — counts, Quick Log deferral, …` (`#1685`) |
+| Parent     | `ef15b2c1be949d720f34bc33e4b980d18d6114e2` (`#1664`)                                              |
+| Committed  | 2026-09-24 **10:33:01 UTC**; merged through the queue at 10:39:14 UTC                             |
+| Since      | `f6b2fb97` (`#1668`, the tip the last merged stamp measured): **4 commits**                       |
+| Migrations | **0** (`git diff --name-only f6b2fb97 b0bfdb02 -- supabase/` is empty)                            |
+
+**Commits since `f6b2fb97`, oldest first:**
+
+| Commit      | PR      | Kind    | Summary                                                          |
+| ----------- | ------- | ------- | ---------------------------------------------------------------- |
+| `e154ae3c1` | `#1681` | docs    | CURRENT_STATE restamp on `f6b2fb97`                              |
+| `a0c452695` | `#1670` | product | Timeline: inline snapshot guidance ages without interaction      |
+| `ef15b2c1b` | `#1664` | product | AI Doctor: readiness evidence ages while Plant Detail stays open |
+| `b0bfdb028` | `#1685` | docs    | Architecture contract: §15 re-verification at `ef15b2c`          |
+
+## 2. Live — MEASURED by Claude, equal to the tip
+
+`established fact` for the fields read. One attempt each, apex and `www`, not routed around.
+
+| Field             | Value                                                                              |
+| ----------------- | ---------------------------------------------------------------------------------- |
+| Claude's own read | **`PASS`** → HTTP `200`, `https://verdantgrowdiary.com/version.json`               |
+| When              | 2026-09-24 **11:14:43 UTC**                                                        |
+| `commit`          | **`b0bfdb028600b63ec7b8bff914632a20b06020b7`** = the tip                           |
+| `dirty`           | `false`                                                                            |
+| `commitTime`      | `2026-09-24T10:33:01Z`                                                             |
+| `buildTime`       | `2026-09-24T10:39:24.197Z`                                                         |
+| `treeHash`        | `c63a5caf9186…`; `ciRunId` `null`; `commitSource` `git`                            |
+| `www`             | HTTP `308` → `https://verdantgrowdiary.com/version.json`                           |
+| Serving headers   | `server: Vercel`, `x-vercel-cache: HIT` (observation only; not publisher evidence) |
+| Live vs tip       | **equal at the instant read**                                                      |
+
+What this read does **not** establish:
+
+- **Who published it.** Serving headers are not publisher evidence (contract §14). The publish
+  trigger is still `NOT_MEASURED`.
+- **Edge functions and applied schema.** `version.json` describes the frontend build only. Deployed
+  edge-function code and applied migrations are `NOT_MEASURED` (contract AC-9.3).
+- **Runtime behaviour.** No grower flow was exercised. **The live run of the `"26"` pin
+  (`e2e-local/native-manual-correction-recovery.spec.ts:153`) is still `NOT_MEASURED`.**
+- **A standing state.** It is one instant. Re-read `version.json` before relying on it later.
+
+The eleven earlier refusals were `connect_rejected` at the session proxy. This session's egress
+reached the apex; the reason for the change is `NOT_MEASURED`.
+
+## 3. What changed for growers — two product commits, measured from `git` only
+
+`established fact` for files and subjects. **Runtime behaviour of both is `NOT_MEASURED` by Claude.**
+Neither touches `supabase/`, an edge function or a migration.
+
+- **Timeline inline snapshot aging (`#1670`).** `TimelineSnapshotClock.tsx` (new) arms one timeout
+  just past a fresh row's staleness boundary, so inline VPD guidance turns historical while the page
+  stays idle. Rows already historical arm no timer. 4 files, +524 / −118.
+- **AI Doctor readiness aging (`#1664`).** `PlantDetailAiDoctorReadiness.tsx` passes the existing
+  minute tick into the freshness classifier, so live and manual evidence age to stale while Plant
+  Detail stays open. 2 files, +89 / −4.
+
+**Review state** — `established fact` from the GitHub API, read ~11:17 UTC.
+
+- **`#1670`.** All five bot threads (Codex ×2, Copilot ×2, Vercel ×1) were answered and resolved
+  before merge. A Claude session pushed the one-shot clock fix `67d2ac69` into Codex's branch, so
+  Claude is not independent for that commit. No approving review is recorded. The finding that
+  inline manual snapshots use the 15-minute live window instead of the 24-hour manual window is
+  **pre-existing and deferred to issue `#1682`**, which is open.
+- **`#1664`.** Automated reviews only: Copilot recommended approval with no findings; CodeRabbit had
+  no actionable comments on `48d8f02` and was rate-limited on the final range to `3c12961b`; the
+  Codex app's review completed. **No peer review is recorded.** The rule is "no code ships without
+  peer review"; this stamp records the gap and does not resolve it.
+
+## 4. AI Doctor cutoff fix and the contract — review outcomes
+
+- **`#1684` (Codex) — independent review `PASS` by Claude**, SHA-locked to head `a9f182df`
+  (`7b38cebe` merged with `ef15b2c1`). Its tree `5a007bec` equals the hosted post-fix checkout.
+  - **Measured locally:** RED 36 passed / 3 failed with only the component reverted, then 39 / 0;
+    31 targeted files 489 / 0 / 0; `tsc` 0 diagnostics; combined with `#1683` (tree `0585e416`)
+    52 files 759 / 0 / 0 and `tsc` 0.
+  - **Findings:** a non-blocking Prettier nit (line 18 import over 100 columns). The PR body's
+    "13 passed" for `plant-detail-ai-doctor-live-review.test.tsx` is **not reproduced**: the file
+    has 9 tests at the tested tree, and the cited batch-14 job `107579868796` does not run that
+    file at all.
+  - **State:** open, no longer draft, `mergeable_state: unstable` (non-required red checks). Its
+    body still reads "DRAFT". Merge and readiness belong to Codex and Cheek.
+  - It is the fix for the `#1666` CodeRabbit **Major** finding carried in the `f6b2fb97` stamp. That
+    thread is still unresolved.
+- **`#1685` (Claude) — MERGED** at 10:39:14 UTC through the merge queue. Docs only
+  (`docs/architecture-contract.md`). All six bot findings (Copilot ×2, Codex ×2, CodeRabbit ×2) were
+  answered and resolved; CodeRabbit withdrew one as invalid. **CodeRabbit filled the
+  independent-review seat** on the owner's instruction because Grok was out of tokens. CodeRabbit is
+  not one of the peers the constitution names for that seat; whether it satisfies peer review is
+  **Cheek's decision**, recorded here, not resolved.
+- **Collision to watch.** `#1655` rewrites the `sensorSourceRules.ts:82` line that contract AC-4.1
+  cites and `#1643` pins. Whichever merges second must update the other's pin and amend AC-4.1 in
+  the same change.
+
+## 5. Session-backed _Restore pending correction_ — still open on the tip
+
+**`inference`, from a static read of `b0bfdb02`. This is not a runtime measurement.**
+
+- `git diff 8fc38407 b0bfdb02` over `ManualSensorReadingCard.tsx`, `sensorsPageSessionRules.ts` and
+  the correction e2e spec is **empty**. Restore still calls
+  `updateValues(() => recoveredCorrectionDraftValues(…))` at `ManualSensorReadingCard.tsx:1200-1202`.
+  **The finding stands.**
+- **`#1625`** (Cursor) is still **open**, not draft, head `4a177e5df8`, **10 commits behind the
+  tip**, and **merges cleanly**. It is the one fix in flight. **Runtime behaviour: `NOT_MEASURED`.**
+  Claude does not choose, push, ready or review it.
+
+## 6. Board — re-listed
+
+`established fact`, listed from the GitHub API at ~11:15 UTC. Every head was fetched by
+`refs/pull/N/head`, diffed against its merge-base with `b0bfdb02`, and checked with
+`git merge-tree --write-tree` against the tip.
+
+**40 open PRs besides this one.** **37 target `verdant-grow-diary` and 3 are stacked:** `#1680` on
+`#1677`, `#1679` on `#1680`, and `#1618` on the branch of `#1151`, which **closed unmerged** at
+08:03:53 UTC, so `#1618`'s base PR no longer exists.
+
+- **No other open PR touches `docs/agents/CURRENT_STATE.md`.**
+- **One open PR adds a migration: `#1683`** (Claude, draft, 82 files) adds
+  `supabase/migrations/20260924120000_plants_health_unassessed_default.sql` as a new file. It also
+  edits the `ai-doctor-review` edge function and the `_shared` mirror. Committed is not applied.
+- **All 40 merge cleanly into the tip.** The `#1670` conflict in the last stamp ended when `#1670`
+  merged.
+- **Reconciliation with the last merged stamp:** 42 open besides `#1681`. Since then `#1670` and
+  `#1664` merged (−2), `#1151` closed unmerged (−1), `#1481` merged into `#1478`'s branch at
+  08:02:42 UTC (−1), and `#1683` and `#1684` opened (+2). `#1685` opened and merged in between.
+  42 − 4 + 2 = **40**.
+
+## 7. Soft-park register — carried
+
+`source claim` (GDP), unchanged since the `#1624` stamp; **not re-measured**.
+
+- **`HOLD #1250`.** Do not touch, ready or merge it.
+- **No Publish. No APPLY.** `#1460` and `#1545` stay parked. No production SQL.
+- **Fixture AUTH Soft-park:** after `cheekhimself` re-banks, re-measure the empty Action Queue and the
+  archived Restore XOR. **Never KEEP on fixture walks.** No owner email is recorded in this file.
+- **Soft P2 — parked, do not implement:** sensors / Start Check `growId` omit; Quick Log target count;
+  `/onboarding` preference gate; Assign true-empty needs a zero-tent fixture.
+
+## 8. CI lanes
+
+`established fact` from the GitHub Actions API for push runs on `verdant-grow-diary`.
+
+- **The tip's own push build on `b0bfdb02`:** `CI` (which supplies every required context) and
+  `Full Vitest Suite` **success**; so are `ESLint`, `TypeScript typecheck`, `Typecheck (tsgo) +
+build`, `Security regression` and `Security DB Local`.
+- **Red on the tip and on `ef15b2c1` / `a0c45269` before it** (none is a required context):
+  - `Dependency & Security CI`: `hono` moderate ×3, `js-yaml` **high**.
+    `config/dependency-security-exceptions.json` stays empty. `#1343` is the open dependency PR,
+    and it also moves Vitest 3 → 4; **no owner is recorded.**
+  - `Required core schema present` and `Required money-critical migrations present`. They are
+    consistent with the sandbox gaps carried in §9; the target they probed is not re-measured.
+- **On PR heads:** the `Cursor SDK local orchestration spike` fails `bun audit` on the Vitest
+  advisory GHSA-82fw-gwwq-j7x9 (seen on `#1684`'s head).
+
+## 9. Carried, not re-measured
+
+- **Sandbox schema and money-migration gaps.** Last measured on `aabbd2b3` (`TARGET_ENV: sandbox`):
+  core schema 14 of 51 columns missing; money-critical migrations 2 of 17. **Sandbox-scoped only;
+  production applied state is `NOT_MEASURED`. No APPLY.** No migration has merged since.
+- **Golden Toad:** AUTH_NEEDED; the one-tent Next step is `NOT_MEASURED`. This is **not**
+  `AUTH_CHOOSER_READY`. Passkey, 2FA and chooser decisions stay **Cheek's**.
+- **AC-4.1 prototype-key defect** still reaches the `#1088` display canon; `#1655` is the open fix.
+- **Release Topology Specification stays deferred:** `#1175` and `#1221` are both still open.
+- **`#1665` Copilot Medium and `#1663` Copilot Low** findings from the `f6b2fb97` stamp: not
+  re-checked here.
+- **Stale restamp branches** still on the remote (`git ls-remote` at 11:14 UTC; the owner deletes
+  them): `claude/current-state-restamp-98fdd446` → `7a034f8e`, `…-8b73c140` → `cb031eac`,
+  `…-1231` → `7762b0e9`.
+
+## 10. The `f6b2fb97` / ~08:11 UTC stamp below is SUPERSEDED
+
+`established fact`. Its rows that are now stale:
+
+- It cites the tip as `f6b2fb97`; the tip is `b0bfdb02` (§1).
+- Its §2 says live is `NOT_MEASURED` and 18 commits behind; live was read at the tip (§2).
+- Its §6 counted 42 open PRs and said `#1670` conflicts; the count is 40 and none conflicts (§6).
+- Its §3 recorded the `#1666` CodeRabbit Major finding as unanswered; its fix `#1684` now carries an
+  independent `PASS`, though the thread is still unresolved (§4).
+- Its §11 says the slice is `#1681`, unmerged; `#1681` merged as `e154ae3c` (commit time 09:04:40
+  UTC).
+
+Carried rows keep their original labels.
+
+## 11. Current locks
+
+- **No Publish. No History-restore. No APPLY. No production SQL.** No device control, no automatic
+  Action Queue writes, no invented credentials. **Never KEEP. No owner email.** Claude merges only on
+  the owner's explicit instruction.
+- **`HOLD #1250`.**
+- **The tip this stamp measured is `b0bfdb028600b63ec7b8bff914632a20b06020b7`.** Once this PR merges,
+  the tip is its squash commit; cite `git rev-parse` at the time, not this line.
+- **Live equalled the tip at 11:14:43 UTC.** That is one read, not a standing state. Do not
+  green-lane the live `"26"` pin on it; its live run is still `NOT_MEASURED`.
+- **§5: `#1625` is the one session-restore fix in flight.** Claude does not choose, push, ready or
+  close.
+- **Quick Log remembered-target and only-plant auto-selection stay banned and test-pinned.**
+- This slice is **N=1** on branch `claude/new-session-ed1j4n`, cut from `b0bfdb02`. Its only file is
+  `docs/agents/CURRENT_STATE.md`. It contains no `src/`, `supabase/`, `package.json`, lockfile, test,
+  workflow or governance-file changes.
+- **Slice owner: Claude. Independent reviewer: Codex** (the peer who reviewed the last restamp), with
+  a CodeRabbit review requested per the owner's 2026-09-24 instruction while Grok is out of tokens.
+  Claude does not self-merge without instruction and does not assign its own next slice.
+
+---
+
+**Superseded restamp chain (2026-09-24 ~08:11 UTC back to 2026-08-18, `f6b2fb97` → `87ae05e`): archived — see `docs/agents/CURRENT_STATE_ARCHIVE.md`, "Archived 2026-09-29".** Moved verbatim on 2026-09-29 (503,873 bytes, 7,258 lines, every block already marked SUPERSEDED by the stamp above it). Standing fences that appeared only in the moved chain, kept here so nothing operative is lost: **Do not ping Tolu.** **Stay on Paddle; live checkout off.** **Do not revoke the existing `live_` token.** `#1221` merged on 2026-09-25; `#1174` is open and non-draft. Current holds and routing defer to `docs/agents/OWNERSHIP.md`; this pointer does not lift any hold. All other locks (`HOLD #1250`, No Publish, No History-restore, No APPLY, No production SQL, Never KEEP, No owner email, `knk`) are carried in §11 above and in `docs/agents/OWNERSHIP.md` §3.
 
 **Prior same-day update:** 2026-08-18 UTC
 **Updated by:** Claude (2026-08-18, later edit: executes the Cheek-approved

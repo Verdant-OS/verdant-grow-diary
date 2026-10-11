@@ -16,7 +16,8 @@
  *   5. The resulting snapshot remains labeled "manual" (never "live").
  *   6. Static safety scan: the manual save path does not reference
  *      action_queue, ai/ai-coach, device control terms, service_role,
- *      bridge_token, raw_payload writes, or inserts into unrelated tables.
+ *      bridge_token or inserts into unrelated tables. The rules builder may
+ *      persist only the canonical manual provenance envelope as raw metadata.
  *
  * Strict scope: tests only. No schema, RLS, Edge Function, or product
  * behaviour changes. Mocks the alerts lib and growRepo at the boundary.
@@ -369,9 +370,38 @@ describe("manual sensor save path — static safety guard", () => {
       expect(src).not.toMatch(/bridge_token/i);
     });
 
-    it(`${path}: no raw_payload writes`, () => {
-      expect(src).not.toMatch(/raw_payload\s*:/);
-    });
+    if (path === "src/lib/sensorReadingManualEntryRules.ts") {
+      it(`${path}: persists only canonical manual metadata, never arbitrary caller fields`, () => {
+        const input = {
+          tentId: TENT_UUID,
+          ts: "2026-09-16T08:00:00.000Z",
+          metrics: validateManualEntry({ airTempF: 77, humidityPct: 55, co2Ppm: 600 }).metrics,
+          raw_payload: { operator_note: "not persisted", private_value: "test-only-value" },
+          source_identity: "untrusted-identity",
+          transport: "live",
+          confidence: 1,
+        };
+        const payloads = buildManualReadingPayloads(input);
+        expect(payloads).toHaveLength(3);
+        for (const payload of payloads) {
+          expect(payload.raw_payload).toEqual({
+            manual_provenance: {
+              source: "manual",
+              source_identity: "manual_entry",
+              transport: "manual",
+              confidence: null,
+            },
+          });
+        }
+        expect(JSON.stringify(payloads)).not.toMatch(
+          /operator_note|private_value|untrusted-identity/,
+        );
+      });
+    } else {
+      it(`${path}: no raw_payload writes`, () => {
+        expect(src).not.toMatch(/raw_payload\s*:/);
+      });
+    }
 
     it(`${path}: only writes sensor_readings (no inserts into unrelated tables)`, () => {
       // Allowed: insertSensorReading / insertSensorReadingsBatch helpers and

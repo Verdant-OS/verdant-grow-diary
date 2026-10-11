@@ -143,7 +143,8 @@ export function useOneTentActivationEvidence(
   }, [enabled, growId, ownerId, plantId, queryClient, tentId]);
 
   if (!enabled) return { status: "idle", summary: EMPTY_SUMMARY };
-  if (query.isLoading) return { status: "loading", summary: EMPTY_SUMMARY };
+  // A first read paused offline is still unresolved, even though it is not fetching.
+  if (query.isPending) return { status: "loading", summary: EMPTY_SUMMARY };
   if (query.isError) return { status: "unavailable", summary: EMPTY_SUMMARY };
   return { status: "ok", summary: query.data ?? EMPTY_SUMMARY };
 }

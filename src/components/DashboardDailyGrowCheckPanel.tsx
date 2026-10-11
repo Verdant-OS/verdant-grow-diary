@@ -51,7 +51,16 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
   const { data: rawPlants = [] } = plantsQuery;
   const tentsQuery = useGrowTents(scopedGrowId ?? undefined);
   const { data: rawTents = [] } = tentsQuery;
-  const readingsQuery = useSensorReadings(undefined, 500);
+  // Per-tent windows over the tents in scope; never the unscoped all-tents
+  // read, which hit the Postgres statement timeout on the Dashboard.
+  const readingsQuery = useSensorReadings(
+    {
+      tentIds: tentsQuery.data ? tentsQuery.data.map((tent) => tent.id) : null,
+      scopeError: tentsQuery.isError,
+      retryScope: tentsQuery.refetch,
+    },
+    500,
+  );
   const { data: rawReadings = [] } = readingsQuery;
   const diaryQuery = useDiaryEntries();
   const { data: rawDiary = [] } = diaryQuery;
@@ -381,6 +390,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
                     <Link
                       to={buildDailyCheckEntryHref({
                         plantId: row.plantId,
+                        growId: row.dailyCheckGrowId,
                         source: "dashboard",
                         method: "note",
                       })}
@@ -400,6 +410,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
                     <Link
                       to={buildDailyCheckEntryHref({
                         plantId: row.plantId,
+                        growId: row.dailyCheckGrowId,
                         source: "dashboard",
                         method: "sensor",
                       })}

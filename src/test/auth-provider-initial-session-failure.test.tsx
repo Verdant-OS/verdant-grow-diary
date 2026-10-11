@@ -66,6 +66,12 @@ describe("AuthProvider initial session read failure", () => {
 
     expect(await screen.findByText("signed-out")).toBeInTheDocument();
 
+    mocks.getSession.mockResolvedValue({
+      data: {
+        session: { access_token: "fixture-recovered-bearer", user: { id: "recovered-user" } },
+      },
+      error: null,
+    });
     act(() => {
       mocks.authListener?.("SIGNED_IN", { user: { id: "recovered-user" } });
     });
@@ -75,7 +81,7 @@ describe("AuthProvider initial session read failure", () => {
 
   it("keeps the fulfilled path unchanged", async () => {
     mocks.getSession.mockResolvedValue({
-      data: { session: { user: { id: "existing-user" } } },
+      data: { session: { access_token: "fixture-existing-bearer", user: { id: "existing-user" } } },
     });
 
     render(
@@ -85,5 +91,59 @@ describe("AuthProvider initial session read failure", () => {
     );
 
     expect(await screen.findByText("existing-user")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["whitespace user id", { access_token: "fixture-existing-bearer", user: { id: "   " } }],
+    ["whitespace bearer", { access_token: "   ", user: { id: "existing-user" } }],
+    ["missing user id", { access_token: "fixture-existing-bearer", user: {} }],
+    ["non-string user id", { access_token: "fixture-existing-bearer", user: { id: 42 } }],
+    ["non-string bearer", { access_token: 42, user: { id: "existing-user" } }],
+  ])(
+    "resolves to signed-out when bootstrap confirms a held session with %s",
+    async (_label, session) => {
+      mocks.getSession.mockResolvedValue({ data: { session }, error: null });
+
+      render(
+        <AuthProvider>
+          <Probe />
+        </AuthProvider>,
+      );
+
+      expect(await screen.findByText("signed-out")).toBeInTheDocument();
+      expect(screen.queryByText("loading")).not.toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    ["missing session field", { data: {}, error: null }],
+    ["explicit undefined session", { data: { session: undefined }, error: null }],
+  ])("resolves to signed-out when bootstrap getSession returns %s", async (_label, response) => {
+    mocks.getSession.mockResolvedValue(response);
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("signed-out")).toBeInTheDocument();
+    expect(screen.queryByText("loading")).not.toBeInTheDocument();
+  });
+
+  it("resolves to signed-out when bootstrap getSession returns an error without throwing", async () => {
+    mocks.getSession.mockResolvedValue({
+      data: { session: { access_token: "fixture-existing-bearer", user: { id: "existing-user" } } },
+      error: { message: "fixture store unavailable" },
+    });
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("signed-out")).toBeInTheDocument();
+    expect(screen.queryByText("loading")).not.toBeInTheDocument();
   });
 });

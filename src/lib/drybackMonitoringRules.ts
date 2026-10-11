@@ -22,12 +22,12 @@ import {
   type SoilMoistureCalibrationCandidate,
   type SoilMoistureCalibrationContext,
 } from "@/lib/soilMoistureCalibrationSelectionRules";
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 
 export const DRYBACK_MONITORING_TITLE = "Dryback monitoring";
 export const DRYBACK_MONITORING_CAVEAT =
   "Evidence only — dryback is arithmetic VWC change between waterings (calibrated when a dry/wet baseline is active; otherwise raw). Not a schedule, not plant health, not a watering recommendation." as const;
-export const DRYBACK_EMPTY_NO_SAMPLES =
-  "No usable soil moisture samples for this tent yet.";
+export const DRYBACK_EMPTY_NO_SAMPLES = "No usable soil moisture samples for this tent yet.";
 export const DRYBACK_EMPTY_NO_WATERINGS =
   "No dated watering markers yet — log waterings to open dryback windows.";
 export const DRYBACK_INSUFFICIENT_COPY =
@@ -43,14 +43,7 @@ export const DRYBACK_MIN_DELTA_PCT_POINTS = 2;
 export const DRYBACK_RECENT_WINDOW_CAP = 5;
 
 export type DrybackSourceClass =
-  | "live"
-  | "manual"
-  | "csv"
-  | "imported"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "unknown";
+  "live" | "manual" | "csv" | "imported" | "demo" | "stale" | "invalid" | "unknown";
 
 export type DrybackWindowKind = "closed" | "open";
 export type DrybackWindowQuality = "usable" | "weak" | "unusable";
@@ -194,13 +187,11 @@ function parseIso(raw: string | null | undefined): { iso: string; ms: number } |
 export function classifyDrybackSource(source: string | null | undefined): DrybackSourceClass {
   const s = (source ?? "").trim().toLowerCase();
   if (!s) return "unknown";
-  if (s === "live" || s === "pi_bridge" || s === "bridge" || s.startsWith("live")) return "live";
-  if (s === "manual") return "manual";
-  if (s === "csv" || s === "import" || s === "imported") return "csv";
-  if (s === "demo" || s === "sample" || s === "synthetic") return "demo";
-  if (s === "stale") return "stale";
-  if (s === "invalid" || s === "error" || s === "diagnostic") return "invalid";
-  return "unknown";
+  // #592 fold: delegate to the sanctioned #1003 canon table. The old
+  // private branches promoted "bridge" and any "live*" prefix to live;
+  // the canon keeps pi_bridge live and fails everything unrecognized
+  // closed to invalid. "unknown" remains only for a missing label.
+  return normalizeSensorSource(s);
 }
 
 export function drybackSourceLabel(sourceClass: DrybackSourceClass): string {
@@ -273,8 +264,9 @@ function normalizeSamples(samples: readonly DrybackVwcSampleInput[]): Normalized
     const vwc = finiteNumber(s.vwcPct);
     if (vwc === null || !isPlausibleDrybackVwc(vwc)) continue;
     const sourceClass = classifyDrybackSource(s.source);
-    if (sourceClass === "invalid") continue;
-    // Quality string invalid also rejected.
+    // Invalid *source* stays tagged as evidence. Do not drop it here —
+    // that hid real EcoWitt/MQTT/HA soil probes behind empty-copy.
+    // Quality string invalid/error still rejected.
     const q = (s.quality ?? "").trim().toLowerCase();
     if (q === "invalid" || q === "error") continue;
     out.push({
@@ -289,9 +281,7 @@ function normalizeSamples(samples: readonly DrybackVwcSampleInput[]): Normalized
   return out;
 }
 
-function normalizeWaterings(
-  markers: readonly DrybackWateringMarkerInput[],
-): NormalizedWatering[] {
+function normalizeWaterings(markers: readonly DrybackWateringMarkerInput[]): NormalizedWatering[] {
   const out: NormalizedWatering[] = [];
   for (const m of markers) {
     const id = trim(m.id);
@@ -358,6 +348,9 @@ function scoreWindow(args: {
   if (args.sourceClass === "stale") {
     warnings.push("Stale source present in window.");
   }
+  if (args.sourceClass === "invalid") {
+    warnings.push("Invalid-labeled samples — not live telemetry.");
+  }
   if (args.sampleCount < args.minSamples) {
     return { quality: "unusable", confidence: null, warnings: [...warnings, "Too few samples."] };
   }
@@ -404,10 +397,11 @@ function buildWindow(args: {
   const endMs = args.end ? args.end.ms : args.nowMs;
   // Samples strictly after watering start, at or before next watering (or now).
   const inWindow = args.samples.filter((s) => s.ms > args.start.ms && s.ms <= endMs);
+  const mathSamples = inWindow.filter((s) => s.sourceClass !== "invalid");
 
   const peakDeadline = args.start.ms + args.peakSearchMs;
-  const peakCandidates = inWindow.filter((s) => s.ms <= peakDeadline);
-  const peakPool = peakCandidates.length > 0 ? peakCandidates : inWindow;
+  const peakCandidates = mathSamples.filter((s) => s.ms <= peakDeadline);
+  const peakPool = peakCandidates.length > 0 ? peakCandidates : mathSamples;
 
   let peak: NormalizedSample | null = null;
   for (const s of peakPool) {
@@ -418,7 +412,7 @@ function buildWindow(args: {
 
   let trough: NormalizedSample | null = null;
   if (peak) {
-    for (const s of inWindow) {
+    for (const s of mathSamples) {
       if (s.ms < peak.ms) continue;
       if (!trough || s.vwcPct < trough.vwcPct || (s.vwcPct === trough.vwcPct && s.ms > trough.ms)) {
         trough = s;
@@ -447,7 +441,11 @@ function buildWindow(args: {
     durationLabel = formatDuration(durationMs);
   }
 
-  const sourceClass = majoritySource(inWindow);
+  // Invalid-source samples remain counted evidence and still block a Live /
+  // usable label, but they do not participate in peak/trough math.
+  const sourceClass = inWindow.some((s) => s.sourceClass === "invalid")
+    ? "invalid"
+    : majoritySource(inWindow);
   const scored = scoreWindow({
     kind,
     sampleCount: inWindow.length,
@@ -528,10 +526,7 @@ export function projectDrybackSamplesForMonitoring(
     };
   }
 
-  const selection = selectSoilMoistureCalibration(
-    calibration.context,
-    calibration.calibrations,
-  );
+  const selection = selectSoilMoistureCalibration(calibration.context, calibration.calibrations);
 
   if (selection.status === "unavailable") {
     return {
@@ -685,7 +680,9 @@ export function buildDrybackMonitoring(
   const latestClosed = closed[0] ?? null;
 
   const hasAnyEvidence = windows.some(
-    (w) => w.sampleCount > 0 && (w.deltaPctPoints !== null || w.kind === "open"),
+    (w) =>
+      w.sampleCount > 0 &&
+      (w.deltaPctPoints !== null || w.kind === "open" || w.sourceClass === "invalid"),
   );
 
   if (!hasAnyEvidence) {

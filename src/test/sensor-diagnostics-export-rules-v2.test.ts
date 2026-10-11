@@ -132,3 +132,73 @@ describe("buildDownloadFilename", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Fail-closed body redaction (recorded #1163 leftover) — payload preview and
+// run-history bodies. Same secret-value class as the other export/redact
+// paths; the `vbt_`-prefix-only pass let every other shape through.
+// ---------------------------------------------------------------------------
+
+const V2_SECRETS = {
+  mac: "AA:BB:CC:DD:EE:FF",
+  uuid: "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+  hex64: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+  skKey: "sk-ABCDEFGHIJKLMNOPQRSTUV",
+  envValue: "hunter2hunter2",
+};
+
+const V2_BODY = {
+  device: V2_SECRETS.mac,
+  row_id: V2_SECRETS.uuid,
+  digest: V2_SECRETS.hex64,
+  provider_key: V2_SECRETS.skKey,
+  env_line: `SUPABASE_SERVICE_ROLE_KEY="${V2_SECRETS.envValue}"`,
+};
+
+function expectNoV2Secrets(out: string) {
+  for (const [name, value] of Object.entries(V2_SECRETS)) {
+    expect(out, `leaked ${name}`).not.toContain(value);
+  }
+}
+
+describe("fail-closed payload preview and history body redaction", () => {
+  it("payload preview scrubs every secret-value shape", () => {
+    expectNoV2Secrets(buildRedactedPayloadPreview(V2_BODY));
+  });
+
+  it("payload preview survives a circular payload without throwing", () => {
+    const circular: Record<string, unknown> = { device: V2_SECRETS.mac };
+    circular.self = circular;
+    let out = "";
+    expect(() => {
+      out = buildRedactedPayloadPreview(circular);
+    }).not.toThrow();
+    expectNoV2Secrets(out);
+  });
+
+  it("payload preview survives an undefined payload without throwing", () => {
+    expect(() => buildRedactedPayloadPreview(undefined)).not.toThrow();
+  });
+
+  it("history JSON export scrubs secrets in item bodies", () => {
+    const json = historyExportToJson({
+      generated_at: "2026-06-06T18:00:00Z",
+      tent_id: "tent-1",
+      tent_name: "Veg",
+      ingest_url: ENDPOINT,
+      items: [
+        buildSensorIngestHistoryItem({
+          attempted_at: "2026-06-06T18:00:00Z",
+          request_url: ENDPOINT,
+          idempotency_key: "idem-1",
+          http_status: 200,
+          body: V2_BODY,
+          classification: classifySensorIngestTestResult({ status: 200, body: V2_BODY }),
+        }),
+      ],
+    });
+    expectNoV2Secrets(json);
+    expect(json).toContain('"http_status": 200');
+    expect(json).toContain("tent-1");
+  });
+});

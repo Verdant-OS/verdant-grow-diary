@@ -22,11 +22,38 @@ import { buildPsqlEnvironment, writeTextFile } from "./lib/candidateNumberToolRu
 import { hardenProductionPsqlEnvironment } from "./lib/productionSupabaseTls.mjs";
 import { SOLO_FOUNDER_POLICY } from "./lib/solo-founder-production-authorization.mjs";
 import {
+  ledgerColumnRowsWithDefaultText,
+  MIGRATION_LEDGER_CONSTRAINTS,
+  MIGRATION_LEDGER_INDEXES,
+  sqlTextArrayLiteral,
+} from "./lib/supabaseMigrationLedgerShape.mjs";
+import {
   assertSupabaseDatabaseTargetIdentity,
   SUPABASE_DATABASE_TARGETS,
+  SupabaseDatabaseTargetIdentityError,
 } from "./lib/supabaseDatabaseTargetIdentity.mjs";
 
 export { findUnsafeSqlReason };
+
+/** Fail-closed identity detail codes only — never URLs, passwords, or free text. */
+const IDENTITY_REASON_CODE_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+
+/**
+ * Nested identity detail for the production URL reject gate.
+ * Keeps reason_code/outcome class names unchanged; never echoes the URL or password.
+ */
+export function identityRejectAuditFields(err) {
+  const code =
+    err instanceof SupabaseDatabaseTargetIdentityError &&
+    typeof err.code === "string" &&
+    IDENTITY_REASON_CODE_PATTERN.test(err.code)
+      ? err.code
+      : "unknown_identity_error";
+  return {
+    reason_code: "target_identity_rejected",
+    identity_reason_code: code,
+  };
+}
 
 export const PRODUCTION_PROJECT_REF = SUPABASE_DATABASE_TARGETS.production.projectRef;
 export const APPLY_CONFIRMATION = "APPLY SIGNUP ACQUISITION FORWARD REPAIR";
@@ -448,33 +475,28 @@ export function buildApplySql(migration) {
     "          a.attgenerated, a.attidentity",
     "        ) order by a.attnum",
     "      ) = array[",
-    "        '1|version|text|t|||',",
-    "        '2|name|text|f|||',",
-    "        '3|statements|text[]|f|||'",
+    ...ledgerColumnRowsWithDefaultText().map(
+      (row, index, rows) => `        '${row}'${index < rows.length - 1 ? "," : ""}`,
+    ),
     "      ]::text[]",
     "      from pg_attribute a",
     "      left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum",
     "      where a.attrelid = ledger.oid and a.attnum > 0 and not a.attisdropped",
     "    ), false)",
     "    and coalesce((",
-    "      select count(*) = 1 and bool_and(",
-    "        con.conname = 'schema_migrations_pkey'",
-    "        and con.contype = 'p'",
-    "        and con.convalidated",
-    "        and not con.condeferrable",
-    "        and not con.condeferred",
-    "        and pg_get_constraintdef(con.oid, true) = 'PRIMARY KEY (version)'",
-    "      )",
+    `      select count(*) = ${MIGRATION_LEDGER_CONSTRAINTS.length}`,
+    ...MIGRATION_LEDGER_CONSTRAINTS.map(
+      (constraint) =>
+        `        and count(*) filter (where con.conname = '${constraint.name}' and con.contype = '${constraint.type}' and con.convalidated and not con.condeferrable and not con.condeferred and pg_get_constraintdef(con.oid, true) = '${constraint.definition}') = 1`,
+    ),
     "      from pg_constraint con where con.conrelid = ledger.oid",
     "    ), false)",
     "    and coalesce((",
-    "      select count(*) = 1 and bool_and(",
-    "        index_class.relname = 'schema_migrations_pkey'",
-    "        and idx.indisprimary and idx.indisunique and idx.indisvalid and idx.indisready",
-    "        and idx.indimmediate and not idx.indisexclusion",
-    "        and idx.indpred is null and idx.indexprs is null",
-    "        and idx.indnkeyatts = 1 and idx.indnatts = 1",
-    "      )",
+    `      select count(*) = ${MIGRATION_LEDGER_INDEXES.length}`,
+    ...MIGRATION_LEDGER_INDEXES.map(
+      (index) =>
+        `        and count(*) filter (where index_class.relname = '${index.name}' and ${index.primary ? "" : "not "}idx.indisprimary and idx.indisunique and idx.indisvalid and idx.indisready and idx.indimmediate and not idx.indisexclusion and idx.indpred is null and idx.indexprs is null and idx.indnkeyatts = 1 and idx.indnatts = 1) = 1`,
+    ),
     "      from pg_index idx",
     "      join pg_class index_class on index_class.oid = idx.indexrelid",
     "      where idx.indrelid = ledger.oid",
@@ -483,15 +505,16 @@ export function buildApplySql(migration) {
     "      select array_agg(",
     "        format('%s|%s|%s|%s', coalesce(grantee.rolname, 'PUBLIC'), acl.privilege_type, acl.is_grantable, grantor.rolname)",
     "        order by coalesce(grantee.rolname, 'PUBLIC'), acl.privilege_type",
-    "      ) = array[",
-    "        format('%s|DELETE|f|%s', current_user, current_user),",
-    "        format('%s|INSERT|f|%s', current_user, current_user),",
-    "        format('%s|REFERENCES|f|%s', current_user, current_user),",
-    "        format('%s|SELECT|f|%s', current_user, current_user),",
-    "        format('%s|TRIGGER|f|%s', current_user, current_user),",
-    "        format('%s|TRUNCATE|f|%s', current_user, current_user),",
-    "        format('%s|UPDATE|f|%s', current_user, current_user)",
-    "      ]::text[]",
+    // Owner-only: exactly PostgreSQL's default owner ACL (PG17 adds MAINTAIN).
+    "      ) = (",
+    "        select array_agg(",
+    "          format('%s|%s|%s|%s', coalesce(grantee.rolname, 'PUBLIC'), expected.privilege_type, expected.is_grantable, grantor.rolname)",
+    "          order by coalesce(grantee.rolname, 'PUBLIC'), expected.privilege_type",
+    "        )",
+    "        from aclexplode(acldefault('r', ledger.relowner)) expected",
+    "        left join pg_roles grantee on grantee.oid = expected.grantee",
+    "        join pg_roles grantor on grantor.oid = expected.grantor",
+    "      )",
     "      from aclexplode(coalesce(ledger.relacl, acldefault('r', ledger.relowner))) acl",
     "      left join pg_roles grantee on grantee.oid = acl.grantee",
     "      join pg_roles grantor on grantor.oid = acl.grantor",
@@ -662,11 +685,7 @@ with target_ledger as (
         a.attgenerated,
         a.attidentity
       ) order by a.attnum
-    ) = array[
-      '1|version|text|t|||',
-      '2|name|text|f|||',
-      '3|statements|text[]|f|||'
-    ]::text[],
+    ) = ${sqlTextArrayLiteral(ledgerColumnRowsWithDefaultText())},
     false
   ) as contract
   from migration_ledger ledger
@@ -677,23 +696,26 @@ with target_ledger as (
   left join pg_attrdef d on d.adrelid = ledger.oid and d.adnum = a.attnum
 ), migration_ledger_constraint_state as (
   select
-    count(*) = 1
-    and count(*) filter (
-      where con.conname = 'schema_migrations_pkey'
-        and con.contype = 'p'
+    count(*) = ${MIGRATION_LEDGER_CONSTRAINTS.length}
+${MIGRATION_LEDGER_CONSTRAINTS.map(
+  (constraint) => `    and count(*) filter (
+      where con.conname = '${constraint.name}'
+        and con.contype = '${constraint.type}'
         and con.convalidated
         and not con.condeferrable
         and not con.condeferred
-        and pg_get_constraintdef(con.oid, true) = 'PRIMARY KEY (version)'
-    ) = 1 as contract
+        and pg_get_constraintdef(con.oid, true) = '${constraint.definition}'
+    ) = 1`,
+).join("\n")} as contract
   from migration_ledger ledger
   join pg_constraint con on con.conrelid = ledger.oid
 ), migration_ledger_index_state as (
   select
-    count(*) = 1
-    and count(*) filter (
-      where index_class.relname = 'schema_migrations_pkey'
-        and idx.indisprimary
+    count(*) = ${MIGRATION_LEDGER_INDEXES.length}
+${MIGRATION_LEDGER_INDEXES.map(
+  (index) => `    and count(*) filter (
+      where index_class.relname = '${index.name}'
+        and ${index.primary ? "" : "not "}idx.indisprimary
         and idx.indisunique
         and idx.indisvalid
         and idx.indisready
@@ -703,7 +725,8 @@ with target_ledger as (
         and idx.indexprs is null
         and idx.indnkeyatts = 1
         and idx.indnatts = 1
-    ) = 1 as contract
+    ) = 1`,
+).join("\n")} as contract
   from migration_ledger ledger
   join pg_index idx on idx.indrelid = ledger.oid
   join pg_class index_class on index_class.oid = idx.indexrelid
@@ -717,15 +740,23 @@ with target_ledger as (
         acl.is_grantable,
         grantor.rolname
       ) order by coalesce(grantee.rolname, 'PUBLIC'), acl.privilege_type
-    ) = array[
-      format('%s|DELETE|f|%s', current_user, current_user),
-      format('%s|INSERT|f|%s', current_user, current_user),
-      format('%s|REFERENCES|f|%s', current_user, current_user),
-      format('%s|SELECT|f|%s', current_user, current_user),
-      format('%s|TRIGGER|f|%s', current_user, current_user),
-      format('%s|TRUNCATE|f|%s', current_user, current_user),
-      format('%s|UPDATE|f|%s', current_user, current_user)
-    ]::text[],
+    ) = (
+      -- Owner-only: exactly PostgreSQL's default owner ACL (PG17 adds MAINTAIN).
+      -- Uncorrelated: this query aggregates, so it cannot reference ledger.
+      select array_agg(
+        format(
+          '%s|%s|%s|%s',
+          coalesce(grantee.rolname, 'PUBLIC'),
+          expected.privilege_type,
+          expected.is_grantable,
+          grantor.rolname
+        ) order by coalesce(grantee.rolname, 'PUBLIC'), expected.privilege_type
+      )
+      from migration_ledger expected_ledger
+      cross join lateral aclexplode(acldefault('r', expected_ledger.relowner)) expected
+      left join pg_roles grantee on grantee.oid = expected.grantee
+      join pg_roles grantor on grantor.oid = expected.grantor
+    ),
     false
   ) as contract
   from migration_ledger ledger
@@ -2015,6 +2046,12 @@ export function sanitizeAuditExtras(extra = {}) {
     safe.prerequisites_live = extra.prerequisites_live;
   }
   if (AUDIT_REASON_CODES.has(extra.reason_code)) safe.reason_code = extra.reason_code;
+  if (
+    typeof extra.identity_reason_code === "string" &&
+    IDENTITY_REASON_CODE_PATTERN.test(extra.identity_reason_code)
+  ) {
+    safe.identity_reason_code = extra.identity_reason_code;
+  }
   return safe;
 }
 
@@ -2255,13 +2292,17 @@ export function runSignupAcquisitionForwardRepair({
   try {
     assertSupabaseDatabaseTargetIdentity({ targetEnv: "production", databaseUrl });
     childEnv = buildPsqlEnvironment(env, databaseUrl, "production");
-  } catch {
-    logger.error("Production database identity was rejected.");
+  } catch (error) {
+    const rejectFields = identityRejectAuditFields(error);
+    logger.error(
+      `Production database identity was rejected. identity_reason_code=${rejectFields.identity_reason_code}`,
+    );
     writeReport("BLOCKED - target identity rejected", [
       "The protected URL did not prove the pinned Verdant production project.",
       "No database process was started.",
+      `identity_reason_code: ${rejectFields.identity_reason_code}`,
     ]);
-    writeAudit("target_rejected", base, { reason_code: "target_identity_rejected" });
+    writeAudit("target_rejected", base, rejectFields);
     return EXIT.TARGET_REJECTED;
   }
 

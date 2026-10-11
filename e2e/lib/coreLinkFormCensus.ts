@@ -25,6 +25,21 @@ export type CoreCensusRoute = {
   fieldPolicy: FieldExercisePolicy;
 };
 
+/** Keep every route contract while bounding each independent browser sweep. */
+export function batchCensusRoutes<T>(
+  routes: readonly T[],
+  maxRoutes: number,
+): readonly (readonly T[])[] {
+  if (!Number.isSafeInteger(maxRoutes) || maxRoutes < 1) {
+    throw new Error("Census batch limit must be a positive integer.");
+  }
+  const batches: T[][] = [];
+  for (let offset = 0; offset < routes.length; offset += maxRoutes) {
+    batches.push(routes.slice(offset, offset + maxRoutes));
+  }
+  return batches;
+}
+
 export const PRIVILEGED_ROUTE_PREFIXES = [
   "/admin",
   "/diagnostics",
@@ -144,6 +159,11 @@ export const PUBLIC_CORE_CENSUS_ROUTES = [
   { path: "/privacy", label: "Privacy", fieldPolicy: "audit-only" },
   { path: "/refund", label: "Refund policy", fieldPolicy: "audit-only" },
 ] as const satisfies readonly CoreCensusRoute[];
+
+// The public sweep includes field exercises and revisits every safe internal
+// href. One cumulative timer for all 35 routes left little hosted-runner
+// headroom; each batch keeps the full route/link/network assertions.
+export const PUBLIC_CORE_CENSUS_BATCHES = batchCensusRoutes(PUBLIC_CORE_CENSUS_ROUTES, 7);
 
 export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
   { path: "/dashboard", label: "Dashboard", fieldPolicy: "fill-safe-fields" },
@@ -352,6 +372,13 @@ export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
   { path: "/health", label: "App health", fieldPolicy: "audit-only" },
 ] as const satisfies readonly CoreCensusRoute[];
 
+// Preserve every authenticated route and its contract while isolating the total
+// sweep budget. Each batch runs with its own browser context and network guards.
+export const AUTHENTICATED_CORE_CENSUS_BATCHES = batchCensusRoutes(
+  AUTHENTICATED_CORE_CENSUS_ROUTES,
+  12,
+);
+
 export type LinkDisposition =
   | "navigate"
   | "excluded-privileged"
@@ -395,6 +422,7 @@ const READ_ONLY_RPCS = new Set([
   "genetics_trace_resolve",
   "get_latest_tent_sensor_snapshot",
   "has_role",
+  "pheno_candidate_diary_entries_top_n",
   "verdant_search",
 ]);
 
@@ -490,6 +518,12 @@ function matchingManifestRoute(
     })[0];
 }
 
+/**
+ * Where a clicked link must finish. On the signed-out lane a protected target
+ * lands on the sign-in screen (`SIGNED_OUT_LANDING` in
+ * src/lib/authRedirectRules.ts: "/auth", destination preserved as redirectTo),
+ * never the marketing /welcome.
+ */
 export function expectedCensusNavigationPath(
   pathname: string,
   manifest: ReadonlyArray<Pick<AppRouteEntry, "path" | "access">>,
@@ -499,7 +533,7 @@ export function expectedCensusNavigationPath(
 
   const route = matchingManifestRoute(pathname, manifest);
   if (route && ["auth", "operator", "internal"].includes(route.access)) {
-    return "/welcome";
+    return "/auth";
   }
   return pathname;
 }

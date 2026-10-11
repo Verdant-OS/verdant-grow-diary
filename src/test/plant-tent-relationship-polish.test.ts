@@ -15,20 +15,20 @@ const PLANT_DETAIL = readFileSync(resolve(ROOT, "src/pages/PlantDetail.tsx"), "u
 const TENT_DETAIL = readFileSync(resolve(ROOT, "src/pages/TentDetail.tsx"), "utf8");
 
 describe("PlantDetail tent relationship visibility", () => {
-  it("renders the assigned tent name when a tent is present", () => {
+  it("uses the plant assignment while resolving the assigned tent name", () => {
     expect(PLANT_DETAIL).toContain('data-testid="plant-detail-tent"');
-    expect(PLANT_DETAIL).toMatch(/tent\s*\?\s*\(/);
-    expect(PLANT_DETAIL).toContain("{tent.name}");
+    expect(PLANT_DETAIL).toMatch(/plant\.tentId\s*\?\s*\(/);
+    expect(PLANT_DETAIL).toContain('{tent?.name ?? "Assigned tent"}');
   });
 
-  it('shows "No tent assigned." warning when tent is missing', () => {
+  it('keeps the "No tent assigned." warning for a missing assignment', () => {
     expect(PLANT_DETAIL).toContain('data-testid="plant-detail-no-tent"');
     expect(PLANT_DETAIL).toContain("No tent assigned.");
   });
 
-  it("includes a View Tent link when tent exists", () => {
+  it("links to the plant's assigned tent without requiring its details row", () => {
     expect(PLANT_DETAIL).toContain('data-testid="plant-detail-view-tent"');
-    expect(PLANT_DETAIL).toMatch(/to=\{tentDetailPath\(tent\.id\)\}/);
+    expect(PLANT_DETAIL).toMatch(/to=\{tentDetailPath\(plant\.tentId\)\}/);
     expect(PLANT_DETAIL).toContain("View Tent");
   });
 });

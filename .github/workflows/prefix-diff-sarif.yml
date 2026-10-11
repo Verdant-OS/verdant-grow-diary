@@ -1,4 +1,8 @@
 name: Prefix Diff — SARIF upload
+# Hosted acceptance uses https://verdantgrowdiary.com only (2026-09-28).
+# Existing CI/diagnostic bindings remain unchanged and supply no live acceptance.
+# Any target/status-message alignment requires a separate reviewed CI slice.
+# See docs/production-only-verification-runbook.md; no dispatch/APPLY here.
 
 # Trust lanes:
 #   - Pull requests run only offline file/manifest checks.
@@ -26,6 +30,7 @@ on:
       - "src/test/money-database-target-identity.test.ts"
       - "src/test/required-money-migrations-workflow-trust-boundary.test.ts"
       - ".github/workflows/prefix-diff-sarif.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [verdant-grow-diary]
     paths:

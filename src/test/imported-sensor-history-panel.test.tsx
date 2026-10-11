@@ -53,7 +53,7 @@ describe("ImportedSensorHistoryPanel", () => {
       wrap(<ImportedSensorHistoryPanel tentId="tent-A" readings={[csvRow({ source: "live" })]} />),
     );
     expect(screen.getByTestId("imported-history-empty")).toHaveTextContent(
-      "No imported CSV sensor history for this tent yet.",
+      "No CSV readings are available for this tent in the current history view.",
     );
   });
 
@@ -65,6 +65,43 @@ describe("ImportedSensorHistoryPanel", () => {
     expect(screen.queryByTestId("imported-history-empty")).not.toBeInTheDocument();
     expect(screen.queryByTestId("imported-history-ai-doctor-handoff")).not.toBeInTheDocument();
     expect(trackFunnelEvent).not.toHaveBeenCalled();
+  });
+
+  it.each(["error", "unknown"] as const)(
+    "shows history access retry when window verification is %s",
+    (status) => {
+      const onRetryHistoryWindow = vi.fn();
+      render(
+        wrap(
+          <ImportedSensorHistoryPanel
+            tentId="tent-A"
+            readings={[csvRow()]}
+            historyWindow={{ status }}
+            onRetryHistoryWindow={onRetryHistoryWindow}
+          />,
+        ),
+      );
+      expect(screen.getByTestId("imported-history-window")).toHaveTextContent(/couldn't verify/i);
+      fireEvent.click(screen.getByRole("button", { name: "Retry history access" }));
+      expect(onRetryHistoryWindow).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("does not offer history access retry while the window is still loading", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[csvRow()]}
+          historyWindow={{ status: "loading" }}
+          onRetryHistoryWindow={vi.fn()}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("imported-history-window")).toHaveTextContent(
+      /Checking your sensor history window/i,
+    );
+    expect(screen.queryByRole("button", { name: "Retry history access" })).not.toBeInTheDocument();
   });
 
   it("keeps a failed read distinct from empty history and offers an explicit retry", () => {
@@ -92,7 +129,7 @@ describe("ImportedSensorHistoryPanel", () => {
   it("renders a safe empty state when no tent context is provided", () => {
     render(wrap(<ImportedSensorHistoryPanel tentId={null} readings={[]} />));
     expect(screen.getByTestId("imported-sensor-history-panel")).toBeInTheDocument();
-    expect(screen.getByText(/No imported CSV sensor history/)).toBeInTheDocument();
+    expect(screen.getByText("Select a tent to view its imported CSV history.")).toBeInTheDocument();
   });
 
   it("renders summary counts and metrics for CSV readings", () => {
@@ -114,6 +151,75 @@ describe("ImportedSensorHistoryPanel", () => {
     expect(filters).toHaveTextContent("temperature_c");
     // Live row never leaks into the metric filter list.
     expect(filters.textContent ?? "").not.toContain("co2_ppm");
+  });
+
+  it("shows rounded imported values with canonical units on the reopened history table", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[
+            csvRow({ metric: "temperature_c", value: 24.444444444444443 }),
+            csvRow({ metric: "humidity_pct", value: 52.04 }),
+            csvRow({ metric: "vpd_kpa", value: 1.11 }),
+          ]}
+        />,
+      ),
+    );
+    const rows = screen.getByTestId("imported-history-recent-rows").querySelectorAll("tbody tr");
+    const values = Object.fromEntries(
+      Array.from(rows, (row) => [
+        row.querySelectorAll("td")[1].textContent,
+        row.querySelectorAll("td")[2].textContent,
+      ]),
+    );
+    expect(values).toEqual({
+      temperature_c: "24.4 °C",
+      humidity_pct: "52%",
+      vpd_kpa: "1.11 kPa",
+    });
+  });
+
+  it("flags out-of-range rows in plain language without hiding the stored value", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[csvRow({ metric: "humidity_pct", value: 150 })]}
+        />,
+      ),
+    );
+    const table = screen.getByTestId("imported-history-recent-rows");
+    expect(table).toHaveTextContent("150%");
+    expect(screen.getByTestId("imported-history-out-of-range-note")).toHaveTextContent(
+      "Humidity is out of range.",
+    );
+  });
+
+  it("keeps whole readings compact and discloses a raw value rounded to the boundary", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[
+            csvRow({ metric: "temperature_c", value: 24 }),
+            csvRow({ metric: "vpd_kpa", value: 1.2 }),
+            csvRow({ metric: "humidity_pct", value: 100.04 }),
+          ]}
+        />,
+      ),
+    );
+    const table = screen.getByTestId("imported-history-recent-rows");
+    expect(table).toHaveTextContent("24 °C");
+    expect(table).toHaveTextContent("1.2 kPa");
+    expect(table).toHaveTextContent("100%");
+    expect(screen.getByTestId("imported-history-out-of-range-note")).toHaveTextContent(
+      "Humidity is out of range.",
+    );
+    expect(screen.getByTestId("imported-history-source-badge")).toHaveTextContent("Source: CSV");
+    expect(screen.getByTestId("imported-history-not-live-badge")).toHaveTextContent(
+      "Not live data",
+    );
   });
 
   it("never renders raw_payload or forbidden live-creation wording", () => {

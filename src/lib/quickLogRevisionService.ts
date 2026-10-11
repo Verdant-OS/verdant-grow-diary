@@ -10,8 +10,11 @@
  * corrections and retractions are core Free behavior for every plan.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
+import { isUuid } from "@/lib/isUuid";
 import type { Database, Json } from "@/integrations/supabase/types";
 import {
+  parseQuickLogRevisionRow,
   validateQuickLogCorrection,
   type QuickLogCorrectionChanges,
   type QuickLogRevisionReasonCode,
@@ -122,14 +125,31 @@ export function adaptQuickLogRevisionDatabaseRow(value: unknown): QuickLogRevisi
   return row;
 }
 
-export function adaptQuickLogRevisionDatabaseRows(data: unknown): QuickLogRevisionRow[] {
-  if (!Array.isArray(data)) return [];
-  return data
-    .map(adaptQuickLogRevisionDatabaseRow)
-    .filter((row): row is QuickLogRevisionRow => row !== null);
+export type QuickLogRevisionRowsDecodeResult =
+  { ok: true; rows: QuickLogRevisionRow[] } | { ok: false };
+
+/**
+ * Decode a complete physical revision-row response for confidence-bearing UI.
+ * A non-array payload or one rejected row makes the entire response unreadable;
+ * partial rows are never exposed as a trustworthy ledger result.
+ */
+export function decodeQuickLogRevisionDatabaseRows(
+  data: unknown,
+): QuickLogRevisionRowsDecodeResult {
+  if (!Array.isArray(data)) return { ok: false };
+
+  const rows: QuickLogRevisionRow[] = [];
+  for (const value of data) {
+    const row = adaptQuickLogRevisionDatabaseRow(value);
+    if (row === null || parseQuickLogRevisionRow(row) === null) {
+      return { ok: false };
+    }
+    rows.push(row);
+  }
+  return { ok: true, rows };
 }
 
-function parseRpcResult(data: unknown): QuickLogRevisionWriteResult {
+function parseRpcResult(data: unknown, handle: QuickLogEntryHandle): QuickLogRevisionWriteResult {
   if (!isRecord(data)) {
     return { ok: false, reason: "rpc_error" };
   }
@@ -140,26 +160,31 @@ function parseRpcResult(data: unknown): QuickLogRevisionWriteResult {
     };
   }
   if (
-    typeof data.revision_id !== "string" ||
-    data.revision_id.length === 0 ||
+    !isUuid(data.revision_id) ||
     typeof data.revision_no !== "number" ||
     !Number.isInteger(data.revision_no) ||
     data.revision_no < 1 ||
-    !isNullableString(data.grow_event_id) ||
+    (data.grow_event_id !== null && !isUuid(data.grow_event_id)) ||
     !Array.isArray(data.diary_entry_ids) ||
-    !data.diary_entry_ids.every(
-      (value): value is string => typeof value === "string" && value.length > 0,
-    )
+    !data.diary_entry_ids.every(isUuid) ||
+    (data.grow_event_id === null && data.diary_entry_ids.length === 0)
   ) {
     return { ok: false, reason: "rpc_error" };
   }
-  return {
+  const result: Extract<QuickLogRevisionWriteResult, { ok: true }> = {
     ok: true,
     revisionId: data.revision_id,
     revisionNo: data.revision_no,
     growEventId: data.grow_event_id,
     diaryEntryIds: data.diary_entry_ids,
   };
+  if (handle.growEventId && result.growEventId !== handle.growEventId) {
+    return { ok: false, reason: "receipt_mismatch" };
+  }
+  if (handle.diaryEntryId && !result.diaryEntryIds.includes(handle.diaryEntryId)) {
+    return { ok: false, reason: "receipt_mismatch" };
+  }
+  return result;
 }
 
 function rpcErrorReason(error: { code?: string | null }): string {
@@ -173,18 +198,26 @@ export async function retractQuickLogEntry(
   handle: QuickLogEntryHandle,
   reasonCode: QuickLogRevisionReasonCode,
   reasonNote?: string | null,
+  idempotencyKey: string = newQuickLogSaveKey(),
 ): Promise<QuickLogRevisionWriteResult> {
   if (!handle.growEventId && !handle.diaryEntryId) {
     return { ok: false, reason: "missing_root" };
   }
-  const { data, error } = await supabase.rpc(QUICKLOG_RETRACT_RPC, {
+  // The additive keyed overload keeps the legacy generated argument shape.
+  const args = {
+    p_idempotency_key: idempotencyKey,
     p_reason_code: reasonCode,
     p_grow_event_id: handle.growEventId ?? undefined,
     p_diary_entry_id: handle.diaryEntryId ?? undefined,
     p_reason_note: reasonNote?.trim() ? reasonNote.trim() : undefined,
-  });
-  if (error) return { ok: false, reason: rpcErrorReason(error) };
-  return parseRpcResult(data);
+  };
+  try {
+    const { data, error } = await supabase.rpc(QUICKLOG_RETRACT_RPC, args);
+    if (error) return { ok: false, reason: rpcErrorReason(error) };
+    return parseRpcResult(data, handle);
+  } catch {
+    return { ok: false, reason: "rpc_error" };
+  }
 }
 
 export async function correctQuickLogEntry(
@@ -192,6 +225,7 @@ export async function correctQuickLogEntry(
   reasonCode: QuickLogRevisionReasonCode,
   changes: QuickLogCorrectionChanges,
   reasonNote?: string | null,
+  idempotencyKey: string = newQuickLogSaveKey(),
 ): Promise<QuickLogRevisionWriteResult> {
   if (!handle.growEventId && !handle.diaryEntryId) {
     return { ok: false, reason: "missing_root" };
@@ -199,13 +233,19 @@ export async function correctQuickLogEntry(
   const validated = validateQuickLogCorrection(changes, reasonNote ?? null);
   if (!validated.ok) return { ok: false, reason: validated.reason };
   if (!isJson(validated.changes)) return { ok: false, reason: "invalid_changes" };
-  const { data, error } = await supabase.rpc(QUICKLOG_CORRECT_RPC, {
+  const args = {
+    p_idempotency_key: idempotencyKey,
     p_reason_code: reasonCode,
     p_changes: validated.changes,
     p_grow_event_id: handle.growEventId ?? undefined,
     p_diary_entry_id: handle.diaryEntryId ?? undefined,
     p_reason_note: reasonNote?.trim() ? reasonNote.trim() : undefined,
-  });
-  if (error) return { ok: false, reason: rpcErrorReason(error) };
-  return parseRpcResult(data);
+  };
+  try {
+    const { data, error } = await supabase.rpc(QUICKLOG_CORRECT_RPC, args);
+    if (error) return { ok: false, reason: rpcErrorReason(error) };
+    return parseRpcResult(data, handle);
+  } catch {
+    return { ok: false, reason: "rpc_error" };
+  }
 }

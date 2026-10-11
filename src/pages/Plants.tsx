@@ -36,6 +36,7 @@ import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { dashboardPath, plantDetailPath, plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { plantHealthTone, type PlantHealthTone } from "@/lib/plantHealthRules";
 import {
   filterVisiblePlants,
   getArchivedPlantLabel,
@@ -80,6 +81,13 @@ import {
 // outside render prevents false dependency changes in the derived view models.
 const EMPTY_QUERY_ROWS: never[] = [];
 
+const HEALTH_DOT_CLASSES: Readonly<Record<PlantHealthTone, string>> = {
+  success: "bg-[hsl(var(--success))]",
+  warning: "bg-[hsl(var(--warning))]",
+  destructive: "bg-destructive",
+  neutral: "bg-muted-foreground",
+};
+
 function formatPlantHealthLabel(health: string | null | undefined): string {
   return `Plant health: ${health ?? "unknown"}`;
 }
@@ -119,7 +127,22 @@ export default function Plants() {
   const workspacePlantsQuery = useGrowPlants(undefined, undefined);
   const tentsQuery = useGrowTents(urlGrowId ?? undefined);
   const diaryQuery = useDiaryEntries();
-  const sensorReadingsQuery = useSensorReadings(undefined, 500);
+  // Sensor evidence is read per tent in scope, never as one unscoped
+  // all-tents read (that read hit the Postgres statement timeout). Scope is
+  // unresolved (pending) until both the plants and tents reads have data.
+  const scopePlants = selectCurrentPlantsQueryData(allPlantsQuery);
+  const scopeTents = selectCurrentPlantsQueryData(tentsQuery);
+  const sensorReadingsQuery = useSensorReadings(
+    {
+      tentIds:
+        scopePlants && scopeTents
+          ? [...scopePlants.map((plant) => plant.tentId), ...scopeTents.map((tent) => tent.id)]
+          : null,
+      scopeError: allPlantsQuery.isError || tentsQuery.isError,
+      retryScope: () => Promise.all([allPlantsQuery.refetch(), tentsQuery.refetch()]),
+    },
+    500,
+  );
   const activePlants = selectCurrentPlantsQueryData(activePlantsQuery) ?? EMPTY_QUERY_ROWS;
   const allPlants = selectCurrentPlantsQueryData(allPlantsQuery) ?? EMPTY_QUERY_ROWS;
   const allGrowsActivePlants =
@@ -220,9 +243,12 @@ export default function Plants() {
   );
 
   // Grow filter — sourced from the workspace grows list + active plants.
+  // Until the grows list has loaded it is empty, so the "in archived grows"
+  // count would name every assigned plant.
+  const growsListResolved = !growsLoading && !growsError;
   const growFilterOptions = useMemo(
-    () => buildGrowFilterOptions(grows, allGrowsActivePlants, tentGrowById),
-    [grows, allGrowsActivePlants, tentGrowById],
+    () => buildGrowFilterOptions(grows, allGrowsActivePlants, tentGrowById, { growsListResolved }),
+    [grows, allGrowsActivePlants, tentGrowById, growsListResolved],
   );
 
   // Grow scope: real grows are scoped server-side via urlGrowId; the
@@ -752,12 +778,7 @@ export default function Plants() {
         >
           {filtered.map((p) => {
             const tent = tents.find((t) => t.id === p.tentId);
-            const dot =
-              p.health === "healthy"
-                ? "bg-[hsl(var(--success))]"
-                : p.health === "watch"
-                  ? "bg-[hsl(var(--warning))]"
-                  : "bg-destructive";
+            const dot = HEALTH_DOT_CLASSES[plantHealthTone(p.health)];
             const archivedLabel = getArchivedPlantLabel(p);
             const isInactive = archivedLabel.kind !== "active";
             const dailyCheckEntry = dailyCheckByPlant.get(p.id);
@@ -929,6 +950,7 @@ export default function Plants() {
                       lastNote: p.lastNote ?? null,
                       isArchived: p.isArchived ?? false,
                       photo: p.photo ?? null,
+                      plantType: p.plantType ?? null,
                     }}
                   />
                 </div>

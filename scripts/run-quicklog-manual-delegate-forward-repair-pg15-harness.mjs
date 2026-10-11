@@ -11,6 +11,7 @@ import {
   classifyPreflight,
   parsePreflightStdout,
 } from "./apply-quicklog-manual-delegate-forward-repair.mjs";
+import { MIGRATION_LEDGER_CREATE_TABLE_SQL } from "./lib/supabaseMigrationLedgerShape.mjs";
 
 const MAX_PSQL_OUTPUT_BYTES = 1_048_576;
 const DISPOSABLE_DATABASE = "verdant_quicklog_delegate_repair";
@@ -55,7 +56,7 @@ export function buildPsqlArgs({ quiet }) {
   return ["-X", ...(quiet ? ["-q"] : []), "-A", "-t", "-v", "ON_ERROR_STOP=1"];
 }
 
-function disposableConnection(value) {
+export function disposableConnection(value) {
   try {
     const url = new URL(value);
     if (!new Set(["postgres:", "postgresql:"]).has(url.protocol)) return null;
@@ -81,7 +82,7 @@ function disposableConnection(value) {
   }
 }
 
-function psqlEnvironment(connection, containerId, containerRuntime, source = process.env) {
+export function psqlEnvironment(connection, containerId, containerRuntime, source = process.env) {
   return {
     PATH: source.PATH ?? "",
     SYSTEMROOT: source.SYSTEMROOT ?? source.SystemRoot ?? "",
@@ -140,7 +141,7 @@ function spawnPsql({ env, input, file, spawnImpl = spawnSync }) {
   });
 }
 
-function executeSql(sql, env, { stage = "sql", spawnImpl = spawnSync } = {}) {
+export function executeSql(sql, env, { stage = "sql", spawnImpl = spawnSync } = {}) {
   const result = spawnPsql({ env, input: sql, spawnImpl });
   if (result?.error || result?.status !== 0) {
     throw new Error(formatPsqlFailureCode(stage, result?.stderr));
@@ -149,7 +150,7 @@ function executeSql(sql, env, { stage = "sql", spawnImpl = spawnSync } = {}) {
 }
 
 function extractFunctionDefinition(relativePath, functionPrefix) {
-  const source = readFileSync(resolve(repoRoot, relativePath), "utf8");
+  const source = readFileSync(resolve(repoRoot, relativePath), "utf8").replace(/\r\n/g, "\n");
   const start = source.indexOf(functionPrefix);
   if (start < 0 || source.indexOf(functionPrefix, start + functionPrefix.length) >= 0) {
     throw new Error("dependency_source_missing_or_ambiguous");
@@ -199,35 +200,35 @@ const publicManualWrapperDefinition = extractFunctionDefinition(
   "CREATE FUNCTION public.quicklog_save_manual(\n",
 );
 
-const BASE_SCAFFOLD_SQL = `
+export const BASE_SCAFFOLD_SQL = `
 drop schema if exists public cascade;
 drop schema if exists auth cascade;
 drop schema if exists supabase_migrations cascade;
 do $roles$
 begin
   if not exists(select 1 from pg_roles where rolname='anon') then
-    execute 'create role anon nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls';
+    execute 'create role anon nologin nosuperuser nocreatedb nocreaterole inherit noreplication nobypassrls';
   elsif not exists(
     select 1 from pg_roles where rolname='anon'
-      and not rolsuper and not rolinherit and not rolcreaterole and not rolcreatedb
+      and not rolsuper and rolinherit and not rolcreaterole and not rolcreatedb
       and not rolcanlogin and not rolreplication and not rolbypassrls
   ) then
     raise exception 'existing harness role anon has unsafe attributes' using errcode = '55000';
   end if;
   if not exists(select 1 from pg_roles where rolname='authenticated') then
-    execute 'create role authenticated nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls';
+    execute 'create role authenticated nologin nosuperuser nocreatedb nocreaterole inherit noreplication nobypassrls';
   elsif not exists(
     select 1 from pg_roles where rolname='authenticated'
-      and not rolsuper and not rolinherit and not rolcreaterole and not rolcreatedb
+      and not rolsuper and rolinherit and not rolcreaterole and not rolcreatedb
       and not rolcanlogin and not rolreplication and not rolbypassrls
   ) then
     raise exception 'existing harness role authenticated has unsafe attributes' using errcode = '55000';
   end if;
   if not exists(select 1 from pg_roles where rolname='service_role') then
-    execute 'create role service_role nologin nosuperuser nocreatedb nocreaterole noinherit noreplication bypassrls';
+    execute 'create role service_role nologin nosuperuser nocreatedb nocreaterole inherit noreplication bypassrls';
   elsif not exists(
     select 1 from pg_roles where rolname='service_role'
-      and not rolsuper and not rolinherit and not rolcreaterole and not rolcreatedb
+      and not rolsuper and rolinherit and not rolcreaterole and not rolcreatedb
       and not rolcanlogin and not rolreplication and rolbypassrls
   ) then
     raise exception 'existing harness role service_role has unsafe attributes' using errcode = '55000';
@@ -249,11 +250,7 @@ create schema auth authorization postgres;
 create schema supabase_migrations authorization postgres;
 grant usage on schema public, auth to anon, authenticated, service_role;
 
-create table supabase_migrations.schema_migrations(
-  version text primary key,
-  name text,
-  statements text[]
-);
+${MIGRATION_LEDGER_CREATE_TABLE_SQL}
 
 create function auth.uid()
 returns uuid
@@ -415,7 +412,7 @@ end;
 commit;
 `;
 
-function attestDisposableTarget(env, spawnImpl) {
+export function attestDisposableTarget(env, spawnImpl) {
   const observed = executeSql(TARGET_ATTESTATION_SQL, env, {
     stage: "target_attestation",
     spawnImpl,
@@ -423,7 +420,7 @@ function attestDisposableTarget(env, spawnImpl) {
   if (observed !== DISPOSABLE_SENTINEL) throw new Error("database_target_attestation_rejected");
 }
 
-function resetScaffold(env, spawnImpl) {
+export function resetScaffold(env, spawnImpl) {
   executeSql(`begin;\n${BASE_SCAFFOLD_SQL}\ncommit;`, env, {
     stage: "scaffold",
     spawnImpl,
@@ -434,7 +431,7 @@ export function validatePinnedMigrationFile({
   root = resolve(repoRoot, "supabase", "migrations"),
 } = {}) {
   const path = resolve(root, PINNED_MIGRATION_FILE);
-  const sql = readFileSync(path, "utf8");
+  const sql = readFileSync(path, "utf8").replace(/\r\n/g, "\n");
   const sha256 = createHash("sha256").update(sql).digest("hex");
   if (sha256 !== EXPECTED_MIGRATION_SHA256) throw new Error("migration_fingerprint_mismatch");
   if (!/(?:^|\r?\n)BEGIN;\r?\n/i.test(sql) || !/\r?\nCOMMIT;\r?\n/i.test(sql)) {

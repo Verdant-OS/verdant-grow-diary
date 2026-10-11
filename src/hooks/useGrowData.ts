@@ -4,6 +4,7 @@
 // database read must stay honest: empty reads return an empty/null value and
 // failed tent/plant reads remain React Query errors. Mock fixtures live behind
 // the separate, explicit useMockData surface and are never injected here.
+import { EFFECTIVE_SENSOR_QUERY_VERSION } from "@/lib/effectiveSensorReadings";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import type { Tent, Plant, SensorReading } from "@/mock";
 import {
@@ -343,7 +344,11 @@ export function useGrowSensorReadings(tentId?: string | null): UseQueryResult<Se
   const scopeKey = tentId === null ? "none" : (tentId ?? "all");
   const key = ["grow", "sensors", scopeKey] as const;
   return useQuery({
-    queryKey: buildPrivateGrowQueryKey(ownerId, ["sensors", scopeKey]),
+    queryKey: buildPrivateGrowQueryKey(ownerId, [
+      "sensors",
+      scopeKey,
+      EFFECTIVE_SENSOR_QUERY_VERSION,
+    ]),
     // `undefined` is the intentional all-tents aggregate used by Coach.
     // `null` is an explicit no-scope sentinel used while Sensors has no
     // selected tent, and must never fetch or reuse aggregate data.

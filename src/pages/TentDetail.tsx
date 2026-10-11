@@ -8,6 +8,7 @@ import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useParams, Link, useSearchParams } from "@/lib/react-router-compat";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/store/auth";
+import { useNowTick } from "@/hooks/useNowTick";
 import { formatDistanceToNow } from "date-fns";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -40,10 +41,17 @@ import TentSensorSourceHealthCard from "@/components/TentSensorSourceHealthCard"
 import SensorSnapshotTruthStrip from "@/components/SensorSnapshotTruthStrip";
 import { buildSensorSnapshotReadModel } from "@/lib/sensors/sensorSnapshotReadModel";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
-import { useImportedSensorHistory } from "@/hooks/useImportedSensorHistory";
+import {
+  useImportedSensorHistory,
+  IMPORTED_SENSOR_HISTORY_QUERY_LIMIT,
+} from "@/hooks/useImportedSensorHistory";
+import { useCsvHistoryWindow } from "@/hooks/useCsvHistoryWindow";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
+import { useGrows } from "@/store/grows";
+import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
 import { buildTentSensorChartSeries, buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 import { resolveVerifiedAssignedPlantCount } from "@/lib/tentManagementRules";
+import { buildTentPlantListReadView } from "@/lib/tentPlantListReadStateRules";
 import {
   convertCelsiusForDisplay,
   getTemperatureUnitSymbol,
@@ -90,6 +98,7 @@ import {
 } from "@/lib/tentPlantTabsUrlState";
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";
+import { isQueryGrowScopeMismatch } from "@/lib/detailGrowScopeRules";
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 import { useTentQuickLogTargetEvidence } from "@/context/TentQuickLogTargetContext";
 import TentPendingOutcomeNotice from "@/components/TentPendingOutcomeNotice";
@@ -99,6 +108,7 @@ const EMPTY_TENT_PLANTS: never[] = [];
 export default function TentDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const historyAccess = useCsvHistoryWindow(!!id);
   const [showArchived, setShowArchived] = useState(false);
   const [rosterIncludeArchived, setRosterIncludeArchived] = useState<boolean>(() =>
     readTentPlantRosterIncludeArchived(id ?? null),
@@ -130,17 +140,40 @@ export default function TentDetail() {
     setSearchParams((current) => applyTentPlantTabsUrlPlantId(current, next), { replace: true });
   };
 
-  const { data: tent, isLoading, isError, refetch } = useGrowTent(id);
+  const { data: tent, isLoading, isPending, fetchStatus, isError, refetch } = useGrowTent(id);
   const activePlantsQuery = useGrowPlants(id);
   const activePlants = activePlantsQuery.data ?? EMPTY_TENT_PLANTS;
   const activePlantsIsFetching = activePlantsQuery.isFetching;
   const activePlantsIsError = activePlantsQuery.isError;
+  // Stage for the environment chips, VPD hint, stage-missing badge and
+  // stability card. Resolved like the Sensors page and the scoped Dashboard's
+  // single-tent view: the tent's grow row, the tent, and the active plants in
+  // it (QA 2026-09-24, BUG-006 follow-up). The stage badge and tent menu still
+  // show the tent's own. Until the tent's grow row and the plant rows are
+  // known, stage grading is withheld (Codex review on #1683).
+  const { grows, loading: growsLoading, error: growsError } = useGrows();
+  const envStage = resolveTentEnvironmentStage({
+    tentId: tent?.id ?? null,
+    tentGrowId: tent?.growId ?? null,
+    tentStage: tent?.stage ?? null,
+    ...resolveTentGrowStage({
+      growId: tent?.growId,
+      grows,
+      loading: growsLoading,
+      error: growsError,
+    }),
+    // A failed refresh keeps the cached stages (React Query retains data).
+    plants: activePlantsQuery.data ?? null,
+  });
   const allPlantsQuery = useGrowPlants(id, undefined, { includeArchived: true });
-  const allPlants = allPlantsQuery.data ?? EMPTY_TENT_PLANTS;
-  const { data: readings = [] } = useSensorReadings(id);
+  const plantListRead = buildTentPlantListReadView(allPlantsQuery, activePlantsQuery);
+  const allPlants = plantListRead.plants;
+  const sensorReadings = useSensorReadings(id);
+  const { data: readings = [] } = sensorReadings;
   const importedHistory = useImportedSensorHistory(id);
   const series = buildTentSensorChartSeries(readings);
-  const header = buildTentSensorHeaderView(readings);
+  const nowMs = useNowTick();
+  const header = buildTentSensorHeaderView(readings, nowMs);
   const snap = header.snapshot;
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null], user?.id);
   const activeCount = getActivePlantCount(activePlants);
@@ -170,7 +203,7 @@ export default function TentDetail() {
   // If the restored plant id no longer exists, or is archived while archived
   // plants are hidden, fall back to "All plants" and clear storage + URL.
   useEffect(() => {
-    if (selectedPlantTabId == null) return;
+    if (!plantListRead.complete || selectedPlantTabId == null) return;
     if (!Array.isArray(allPlants) || allPlants.length === 0) return;
     const match = allPlants.find((p) => p.id === selectedPlantTabId);
     const isVisible = match ? rosterIncludeArchived || match.isArchived !== true : false;
@@ -179,9 +212,37 @@ export default function TentDetail() {
       writeTentPlantTabsSelectedPlantId(id ?? null, null);
       setSearchParams((current) => applyTentPlantTabsUrlPlantId(current, null), { replace: true });
     }
-  }, [selectedPlantTabId, allPlants, rosterIncludeArchived, id, setSearchParams]);
+  }, [
+    selectedPlantTabId,
+    allPlants,
+    rosterIncludeArchived,
+    id,
+    setSearchParams,
+    plantListRead.complete,
+  ]);
 
-  if (isLoading) {
+  // A first paused query is pending without being loading/fetching. It has
+  // not established absence; already resolved tent rows keep their branch.
+  const awaitingFirstTentRead = !tent && (isPending ?? isLoading);
+  if (awaitingFirstTentRead && fetchStatus === "paused") {
+    return (
+      <div data-testid="tent-detail-paused" role="status">
+        <EmptyState
+          icon={<Box className="h-6 w-6" />}
+          title="Waiting for connection"
+          description="Tent details have not loaded yet. Loading will resume when your connection returns."
+          action={
+            <Button asChild variant="ghost" className="min-h-11">
+              <Link to={tentsPath()}>
+                <ArrowLeft className="h-4 w-4" /> Back to tents
+              </Link>
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+  if (isLoading || awaitingFirstTentRead) {
     return (
       <div
         className="glass rounded-2xl h-64 animate-pulse"
@@ -195,12 +256,9 @@ export default function TentDetail() {
   if (isError) {
     return (
       <div data-testid="tent-detail-error" role="alert">
-        <GrowDataSourceDisclosure
-          resource="tents"
-          hasAnyData={false}
-          metas={[tentMeta]}
-          testId="tent-detail-data-source-disclosure"
-        />
+        <Badge variant="destructive" className="mb-4">
+          Unavailable
+        </Badge>
         <EmptyState
           icon={<Box className="h-6 w-6" />}
           title="Couldn't load this tent"
@@ -228,9 +286,9 @@ export default function TentDetail() {
       </div>
     );
   }
-  if (!tent) {
+  if (!tent || isQueryGrowScopeMismatch(tent, searchParams.get("growId"))) {
     return (
-      <div>
+      <div data-testid="tent-detail-not-found">
         <GrowDataSourceDisclosure
           resource="tents"
           hasAnyData={false}
@@ -333,7 +391,7 @@ export default function TentDetail() {
             value={(convertCelsiusForDisplay(snap.temp) ?? 0).toFixed(1)}
             unit={getTemperatureUnitSymbol()}
             status={environmentMetricChipStatus(
-              classifyTempAgainstStage(snap.temp, { stage: tent.stage, stale: header.stale }),
+              classifyTempAgainstStage(snap.temp, { stage: envStage, stale: header.stale }),
             )}
           />
         )}
@@ -343,7 +401,7 @@ export default function TentDetail() {
             value={snap.rh}
             unit="%"
             status={environmentMetricChipStatus(
-              classifyRhAgainstStage(snap.rh, { stage: tent.stage, stale: header.stale }),
+              classifyRhAgainstStage(snap.rh, { stage: envStage, stale: header.stale }),
             )}
           />
         )}
@@ -352,7 +410,7 @@ export default function TentDetail() {
           (() => {
             const vpd = classifyVpdAgainstStage({
               value: snap.vpd,
-              stage: tent.stage,
+              stage: envStage,
               stale: header.stale,
             });
             // #21: route VPD chip through the canonical sensor formatter so
@@ -381,7 +439,7 @@ export default function TentDetail() {
         (() => {
           const vpd = classifyVpdAgainstStage({
             value: snap.vpd,
-            stage: tent.stage,
+            stage: envStage,
             stale: header.stale,
           });
           return (
@@ -395,14 +453,14 @@ export default function TentDetail() {
         })()}
       {snap?.vpd !== null &&
         snap?.vpd !== undefined &&
-        normalizeVpdStage(tent.stage) === "unknown" && (
+        normalizeVpdStage(envStage) === "unknown" && (
           <VpdStageMissingBadge testId="tent-detail-vpd-stage-missing-badge" className="mb-4" />
         )}
 
       <EnvironmentStabilityCard
         testId="tent-detail-environment-stability"
         className="mb-4"
-        result={computeEnvironmentStability(series, { stage: tent.stage })}
+        result={computeEnvironmentStability(series, { stage: envStage })}
       />
       <WateringCadenceHistoryStrip
         tentId={id ?? null}
@@ -478,7 +536,15 @@ export default function TentDetail() {
         <EcowittTentSnapshotV0Card tentId={id ?? null} />
       </section>
 
-      <TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />
+      <TentManualSnapshotHistoryList
+        tentId={id ?? null}
+        readings={readings}
+        readStatus={sensorReadings.status}
+        isFetching={sensorReadings.isFetching}
+        onRetry={() => {
+          void sensorReadings.refetch();
+        }}
+      />
 
       <ManualSnapshotTimelineSection scope="tent" tentId={id ?? null} />
 
@@ -488,16 +554,25 @@ export default function TentDetail() {
 
       <ImportedSensorHistoryPanel
         tentId={id ?? null}
+        historyWindow={historyAccess.window}
+        onRetryHistoryWindow={() => {
+          void historyAccess.refetch();
+        }}
+        queryLimit={IMPORTED_SENSOR_HISTORY_QUERY_LIMIT}
         readings={importedHistory.data ?? []}
         plants={activePlants}
         plantReadStatus={resolveImportedHistoryHandoffReadStatus({
           isError: activePlantsIsError,
           isFetching: activePlantsIsFetching,
+          isPending: activePlantsQuery.isPending,
+          isPaused: activePlantsQuery.isPaused,
           hasRows: activePlants.length > 0,
         })}
         readStatus={resolveImportedSensorHistoryReadStatus({
           isError: importedHistory.isError,
           isFetching: importedHistory.isFetching,
+          isPending: importedHistory.isPending,
+          isPaused: importedHistory.isPaused,
           hasRows: (importedHistory.data?.length ?? 0) > 0,
         })}
         onRetry={() => {
@@ -527,7 +602,32 @@ export default function TentDetail() {
           );
         })()}
 
+      {plantListRead.message && (
+        <div
+          role={plantListRead.canRetry ? "alert" : "status"}
+          className="glass rounded-2xl p-4 mb-4"
+          data-testid="tent-plant-list-read-status"
+        >
+          <p>{plantListRead.message}</p>
+          {plantListRead.availableNotice && (
+            <p className="text-sm text-muted-foreground">{plantListRead.availableNotice}</p>
+          )}
+          {plantListRead.canRetry && (
+            <Button
+              variant="outline"
+              className="mt-2"
+              onClick={() => {
+                void activePlantsQuery.refetch();
+                void allPlantsQuery.refetch();
+              }}
+            >
+              Retry plant list
+            </Button>
+          )}
+        </div>
+      )}
       {(() => {
+        if (!plantListRead.showRows) return null;
         const tabsVm = buildTentPlantTabsViewModel({
           plants: allPlants.map((p) => ({
             id: p.id,
@@ -541,6 +641,9 @@ export default function TentDetail() {
           tabsVm.selectedPlantId == null
             ? allPlants
             : allPlants.filter((p) => p.id === tabsVm.selectedPlantId);
+        const scopedRosterKnown =
+          plantListRead.complete ||
+          rosterPlantSource.some((plant) => rosterIncludeArchived || plant.isArchived !== true);
         return (
           <div className="space-y-3">
             <TentPlantTabs viewModel={tabsVm} onSelect={setSelectedPlantTabId} />
@@ -563,47 +666,55 @@ export default function TentDetail() {
                 tentName: tent.name ?? null,
                 growId: tent.growId ?? null,
               }}
-              viewModel={buildTentPlantRosterViewModel({
-                tentId: id ?? null,
-                includeArchived: rosterIncludeArchived,
-                plants: rosterPlantSource.map((p) => {
-                  const a = rosterActivity.byPlantId[p.id];
-                  return {
+              viewModel={{
+                ...buildTentPlantRosterViewModel({
+                  tentId: id ?? null,
+                  relationshipKnown: scopedRosterKnown,
+                  includeArchived: rosterIncludeArchived,
+                  plants: rosterPlantSource.map((p) => {
+                    const a = rosterActivity.byPlantId[p.id];
+                    return {
+                      id: p.id,
+                      name: p.name,
+                      strain: p.strain,
+                      stage: p.stage,
+                      tentId: p.tentId,
+                      isArchived: p.isArchived,
+                      latestLogAt: a?.latestLogAt ?? null,
+                      hasRecentPhoto: a?.hasRecentPhoto ?? false,
+                      harvestWatchPublicState: a?.harvestWatchPublicState ?? null,
+                    };
+                  }),
+                  tentSensorContextLabel: header.sourceLabel ?? null,
+                }),
+                ...(plantListRead.countNotice
+                  ? { headerCountsCopy: plantListRead.countNotice }
+                  : {}),
+              }}
+            />
+            {scopedRosterKnown && (
+              <TentPlantActivityPanels
+                isLoading={rosterActivity.isLoading}
+                viewModel={buildTentPlantActivityPanelsViewModel({
+                  plants: allPlants.map((p) => ({
                     id: p.id,
                     name: p.name,
                     strain: p.strain,
                     stage: p.stage,
-                    tentId: p.tentId,
                     isArchived: p.isArchived,
-                    latestLogAt: a?.latestLogAt ?? null,
-                    hasRecentPhoto: a?.hasRecentPhoto ?? false,
-                    harvestWatchPublicState: a?.harvestWatchPublicState ?? null,
-                  };
-                }),
-                tentSensorContextLabel: header.sourceLabel ?? null,
-              })}
-            />
-            <TentPlantActivityPanels
-              isLoading={rosterActivity.isLoading}
-              viewModel={buildTentPlantActivityPanelsViewModel({
-                plants: allPlants.map((p) => ({
-                  id: p.id,
-                  name: p.name,
-                  strain: p.strain,
-                  stage: p.stage,
-                  isArchived: p.isArchived,
-                })),
-                activityByPlantId: rosterActivity.byPlantId,
-                includeArchived: rosterIncludeArchived,
-                selectedPlantId: tabsVm.selectedPlantId,
-                tentId: id ?? null,
-                tentName: tent.name ?? null,
-                growId: tent.growId ?? null,
-              })}
-              viewer={{ currentUserId: user?.id ?? null }}
-              tentId={id ?? null}
-              growId={tent.growId ?? null}
-            />
+                  })),
+                  activityByPlantId: rosterActivity.byPlantId,
+                  includeArchived: rosterIncludeArchived,
+                  selectedPlantId: tabsVm.selectedPlantId,
+                  tentId: id ?? null,
+                  tentName: tent.name ?? null,
+                  growId: tent.growId ?? null,
+                })}
+                viewer={{ currentUserId: user?.id ?? null }}
+                tentId={id ?? null}
+                growId={tent.growId ?? null}
+              />
+            )}
           </div>
         );
       })()}
@@ -611,11 +722,17 @@ export default function TentDetail() {
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="font-display font-semibold">
-            Plants in this tent ({activeCount}
-            {hasArchived && allPlants.length > activeCount
-              ? ` active · ${allPlants.length - activeCount} archived`
-              : ""}
-            )
+            Plants in this tent
+            {plantListRead.complete && (
+              <>
+                {" "}
+                ({activeCount}
+                {hasArchived && allPlants.length > activeCount
+                  ? ` active · ${allPlants.length - activeCount} archived`
+                  : ""}
+                )
+              </>
+            )}
           </h2>
           <div className="flex flex-wrap items-center gap-2">
             {hasArchived && (
@@ -648,51 +765,53 @@ export default function TentDetail() {
           </div>
         </div>
         {visiblePlants.length === 0 ? (
-          <div
-            className="flex flex-col items-start gap-3 py-4"
-            data-testid="tent-detail-plants-empty"
-          >
-            <p className="text-sm text-muted-foreground">
-              {activeCount === 0 && hasArchived
-                ? "No active plants in this tent."
-                : "No plants in this tent yet."}
-            </p>
-            <p
-              className="text-xs text-muted-foreground"
-              data-testid="tent-detail-plants-empty-one-tent-loop-copy"
+          plantListRead.complete ? (
+            <div
+              className="flex flex-col items-start gap-3 py-4"
+              data-testid="tent-detail-plants-empty"
             >
-              Add or open a plant to continue the One-Tent Loop.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <AddExistingPlantDialog
-                tentId={id ?? ""}
-                growId={tent.growId ?? null}
-                trigger={
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1"
-                    data-testid="tent-detail-empty-add-existing-plant"
-                  >
-                    Add Existing Plant
-                  </Button>
-                }
-              />
-              <CreatePlantDialog
-                defaultTentId={id}
-                defaultGrowId={tent.growId ?? undefined}
-                trigger={
-                  <Button
-                    size="sm"
-                    className="gradient-leaf text-primary-foreground gap-1"
-                    data-testid="tent-detail-empty-add-plant"
-                  >
-                    <Plus className="h-4 w-4" /> Add Plant to This Tent
-                  </Button>
-                }
-              />
+              <p className="text-sm text-muted-foreground">
+                {activeCount === 0 && hasArchived
+                  ? "No active plants in this tent."
+                  : "No plants in this tent yet."}
+              </p>
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="tent-detail-plants-empty-one-tent-loop-copy"
+              >
+                Add or open a plant to continue the One-Tent Loop.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <AddExistingPlantDialog
+                  tentId={id ?? ""}
+                  growId={tent.growId ?? null}
+                  trigger={
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      data-testid="tent-detail-empty-add-existing-plant"
+                    >
+                      Add Existing Plant
+                    </Button>
+                  }
+                />
+                <CreatePlantDialog
+                  defaultTentId={id}
+                  defaultGrowId={tent.growId ?? undefined}
+                  trigger={
+                    <Button
+                      size="sm"
+                      className="gradient-leaf text-primary-foreground gap-1"
+                      data-testid="tent-detail-empty-add-plant"
+                    >
+                      <Plus className="h-4 w-4" /> Add Plant to This Tent
+                    </Button>
+                  }
+                />
+              </div>
             </div>
-          </div>
+          ) : null
         ) : (
           <div
             className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"
@@ -747,9 +866,6 @@ export default function TentDetail() {
                           {archivedLabel.kind === "merged" ? "Merged / Archived" : "Archived"}
                         </Badge>
                       )}
-                      <p className="text-[11px] text-muted-foreground mt-1 capitalize">
-                        {p.health}
-                      </p>
                     </div>
                   </Link>
                   <div className="absolute top-2 right-2">
@@ -766,6 +882,7 @@ export default function TentDetail() {
                         lastNote: p.lastNote,
                         isArchived: p.isArchived ?? false,
                         photo: p.photo ?? null,
+                        plantType: p.plantType ?? null,
                       }}
                     />
                   </div>

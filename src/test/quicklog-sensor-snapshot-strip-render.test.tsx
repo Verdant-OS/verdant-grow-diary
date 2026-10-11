@@ -125,7 +125,10 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
     expect(screen.queryByTestId("quicklog-sensor-snapshot-action")).not.toBeInTheDocument();
   });
 
-  it("usable — provider source (ecowitt) is fresh_non_live but still usable, never Live", () => {
+  it("provider source (ecowitt) is receiving-transport, not trust — Invalid, never Usable or Live (#1003)", () => {
+    // `fresh_non_live` proves freshness, not provenance. A legacy
+    // transport label outside the canonical vocabulary must never
+    // present as healthy "Usable" context.
     mockUseLatestTentSensorSnapshot.mockReturnValue(
       stateReady(
         fullSnapshot({
@@ -138,10 +141,32 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
 
     const strip = screen.getByTestId("quicklog-sensor-snapshot-strip");
-    expect(strip).toHaveAttribute("data-status", "usable");
-    expect(screen.getByTestId("quicklog-sensor-snapshot-pill")).toHaveTextContent("Usable");
+    expect(strip).toHaveAttribute("data-status", "invalid");
+    expect(screen.getByTestId("quicklog-sensor-snapshot-pill")).toHaveTextContent("Invalid");
     // No "Live" wording from the strip itself
     expect(strip).not.toHaveTextContent(/Live/i);
+  });
+
+  it("provider-source card is coherent: Invalid pill, invalid badge, invalid advisory (#1003)", () => {
+    // Pill, trust badge, and view-model advisory must all agree on the
+    // untrusted verdict — no more "Usable" pill beside an invalid
+    // advisory or a stale badge for the same row.
+    mockUseLatestTentSensorSnapshot.mockReturnValue(
+      stateReady(
+        fullSnapshot({
+          source: "ecowitt",
+          status: "fresh_non_live" as SensorSnapshotStatus,
+          badge_label: "ecowitt • as of 5 min ago",
+        }),
+      ),
+    );
+    render(<QuickLogSensorSnapshotStrip tentId="t1" />);
+
+    expect(screen.getByTestId("quicklog-sensor-snapshot-pill")).toHaveTextContent("Invalid");
+    expect(screen.getByTestId("snapshot-trust-badge")).toHaveAttribute("data-badge", "invalid");
+    const advisory = screen.getByTestId("quicklog-sensor-snapshot-advisory");
+    expect(advisory).toHaveAttribute("data-advisory-kind", "invalid");
+    expect(screen.getByTestId("quicklog-sensor-snapshot-strip")).not.toHaveTextContent(/Live/i);
   });
 
   it("stale — resolver-stale snapshot renders Stale pill + refresh action", () => {
@@ -171,7 +196,7 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
 
     const action = screen.getByTestId("quicklog-sensor-snapshot-action");
     expect(action).toHaveAttribute("data-action-kind", "refresh");
-    expect(action).toHaveAttribute("href", "/sensors");
+    expect(action).toHaveAttribute("href", "/sensors?tentIntent=required");
     expect(action).toHaveTextContent("Refresh snapshot");
   });
 
@@ -194,7 +219,7 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
 
     const action = screen.getByTestId("quicklog-sensor-snapshot-action");
     expect(action).toHaveAttribute("data-action-kind", "review");
-    expect(action).toHaveAttribute("href", "/sensors");
+    expect(action).toHaveAttribute("href", "/sensors?tentIntent=required");
     expect(action).toHaveTextContent("Review sensor intake");
   });
 
@@ -210,7 +235,7 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
 
     const action = screen.getByTestId("quicklog-sensor-snapshot-action");
     expect(action).toHaveAttribute("data-action-kind", "add");
-    expect(action).toHaveAttribute("href", "/sensors#manual-reading");
+    expect(action).toHaveAttribute("href", "/sensors?tentIntent=required#manual-reading");
     expect(action).toHaveTextContent("Add snapshot");
   });
 
@@ -307,5 +332,50 @@ describe("QuickLogSensorSnapshotStrip — Temp metric is live-reactive to the te
     expect(screen.getByTestId("quicklog-sensor-snapshot-metric-temp")).toHaveTextContent(
       "Temp 24.3°C",
     );
+  });
+});
+
+describe("QuickLogSensorSnapshotStrip — tent-scoped Sensors handoff", () => {
+  const TENT_A = "0094303d-5f4a-444a-8fd2-878dd57be453";
+  const TENT_B = "604edf84-1040-40e2-a31e-cf67640a981e";
+
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    vi.setSystemTime(NOW);
+    mockUseLatestTentSensorSnapshot.mockReset();
+    clearTemperatureUnitPreference();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("edit/add action retains the non-default tent (Veg B), not Veg A", () => {
+    mockUseLatestTentSensorSnapshot.mockReturnValue(
+      stateReady(
+        fullSnapshot({
+          source: "manual",
+          status: "fresh_non_live",
+          freshness: "fresh",
+          badge_label: "manual • as of 5 min ago",
+        }),
+      ),
+    );
+    render(<QuickLogSensorSnapshotStrip tentId={TENT_B} />);
+    const action = screen.getByTestId("quicklog-sensor-snapshot-action");
+    expect(action).toHaveAttribute(
+      "href",
+      `/sensors?tentId=${TENT_B}&tentIntent=required#manual-reading`,
+    );
+    expect(action.getAttribute("href")).not.toContain(TENT_A);
+  });
+
+  it("malformed tentId does not silently open another tent's form", () => {
+    mockUseLatestTentSensorSnapshot.mockReturnValue(stateAs("loading"));
+    render(<QuickLogSensorSnapshotStrip tentId="t1" />);
+    const action = screen.getByTestId("quicklog-sensor-snapshot-action");
+    expect(action).toHaveAttribute("href", "/sensors?tentIntent=required#manual-reading");
+    expect(action.getAttribute("href")).not.toContain(TENT_A);
+    expect(action.getAttribute("href")).not.toBe("/sensors#manual-reading");
   });
 });

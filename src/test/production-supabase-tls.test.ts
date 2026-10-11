@@ -29,6 +29,26 @@ const AGREEMENT_ACCEPTANCE_APPLY_WORKFLOW_PATH = resolve(
   __dirname,
   "../../.github/workflows/apply-agreement-acceptance-insert-forward-repair.yml",
 );
+const REVISION_REPLAY_APPLY_WORKFLOW_PATH = resolve(
+  __dirname,
+  "../../.github/workflows/apply-quicklog-revision-idempotent-replay.yml",
+);
+const REVISION_REPLAY_PG15_WORKFLOW_PATH = resolve(
+  __dirname,
+  "../../.github/workflows/quicklog-revision-idempotent-replay-pg15.yml",
+);
+const PLANTS_HEALTH_APPLY_WORKFLOW_PATH = resolve(
+  __dirname,
+  "../../.github/workflows/apply-plants-health-unassessed-default.yml",
+);
+const LINKED_DIARY_APPLY_WORKFLOW_PATH = resolve(
+  __dirname,
+  "../../.github/workflows/apply-linked-quicklog-diary-client-write-fence.yml",
+);
+const PLANTS_HEALTH_PG15_WORKFLOW_PATH = resolve(
+  __dirname,
+  "../../.github/workflows/plants-health-unassessed-default-pg15.yml",
+);
 const CORE_WORKFLOW_PATH = resolve(
   __dirname,
   "../../.github/workflows/required-core-migrations.yml",
@@ -290,6 +310,8 @@ describe("production Supabase CA workflow boundary", () => {
       PG15_WORKFLOW_PATH,
       SIGNUP_PG15_WORKFLOW_PATH,
       DELEGATE_PG15_WORKFLOW_PATH,
+      REVISION_REPLAY_PG15_WORKFLOW_PATH,
+      PLANTS_HEALTH_PG15_WORKFLOW_PATH,
     ]) {
       const source = readFileSync(path, "utf8");
       expect(source).toContain('"scripts/lib/productionSupabaseTls.mjs"');
@@ -301,7 +323,7 @@ describe("production Supabase CA workflow boundary", () => {
     const parsed = workflow(APPLY_WORKFLOW_PATH);
     const job = parsed.jobs.apply;
 
-    expectProtectedCaWorkflow(job);
+    expectProtectedCaWorkflow(job, "verdant-production-solo-founder");
     const runner = job.steps.find(
       (step) => step.name === "Run the environment-gated Quick Log delivery gate",
     );
@@ -317,6 +339,16 @@ describe("production Supabase CA workflow boundary", () => {
     const job = parsed.jobs.apply;
 
     expectProtectedCaWorkflow(job, "verdant-production-solo-founder");
+    const materialize = materializeStep(job);
+    expect(materialize?.run).toContain("BEGIN CERTIFICATE");
+    expect(materialize?.run).toContain(
+      "tr -d '[:space:]' | base64 --decode > \"$SUPABASE_DB_CA_CERT_PATH\"",
+    );
+    expect(materialize?.run).toContain("::error::");
+    expect(materialize?.run).toContain("ca_materialize_invalid_secret");
+    expect(materialize?.run).toContain('> "$REPORT_PATH"');
+    expect(materialize?.run).toContain('> "$AUDIT_PATH"');
+    expect(materialize?.run).not.toMatch(/\becho\s+"\$SUPABASE_DB_CA_CERT_B64"/);
     const runner = job.steps.find(
       (step) => step.name === "Run the environment-gated signup-acquisition repair gate",
     );
@@ -372,6 +404,51 @@ describe("production Supabase CA workflow boundary", () => {
     expect(JSON.stringify(runner)).not.toContain("SUPABASE_DB_CA_CERT_B64");
   });
 
+  it("protects, validates, and removes the CA in the Quick Log revision replay workflow", () => {
+    const parsed = workflow(REVISION_REPLAY_APPLY_WORKFLOW_PATH);
+    const job = parsed.jobs.apply;
+
+    expectProtectedCaWorkflow(job, "verdant-production-solo-founder");
+    const runner = job.steps.find(
+      (step) => step.name === "Run the environment-gated Quick Log revision replay",
+    );
+    expect(runner?.env).toEqual({
+      SUPABASE_DB_URL: "${{ secrets.SUPABASE_DB_URL }}",
+      SUPABASE_DB_CA_CERT_PATH: FIXED_WORKFLOW_CA_PATH,
+    });
+    expect(JSON.stringify(runner)).not.toContain("SUPABASE_DB_CA_CERT_B64");
+  });
+
+  it("protects, validates, and removes the CA in the plants health default workflow", () => {
+    const parsed = workflow(PLANTS_HEALTH_APPLY_WORKFLOW_PATH);
+    const job = parsed.jobs.apply;
+
+    expectProtectedCaWorkflow(job, "verdant-production-solo-founder");
+    const runner = job.steps.find(
+      (step) => step.name === "Run the environment-gated plants health default delivery",
+    );
+    expect(runner?.env).toEqual({
+      SUPABASE_DB_URL: "${{ secrets.SUPABASE_DB_URL }}",
+      SUPABASE_DB_CA_CERT_PATH: FIXED_WORKFLOW_CA_PATH,
+    });
+    expect(JSON.stringify(runner)).not.toContain("SUPABASE_DB_CA_CERT_B64");
+  });
+
+  it("protects, validates, and removes the CA in the linked diary fence workflow", () => {
+    const parsed = workflow(LINKED_DIARY_APPLY_WORKFLOW_PATH);
+    const job = parsed.jobs.apply;
+
+    expectProtectedCaWorkflow(job, "verdant-production-solo-founder");
+    const runner = job.steps.find(
+      (step) => step.name === "Run the environment-gated linked diary fence delivery",
+    );
+    expect(runner?.env).toEqual({
+      SUPABASE_DB_URL: "${{ secrets.SUPABASE_DB_URL }}",
+      SUPABASE_DB_CA_CERT_PATH: FIXED_WORKFLOW_CA_PATH,
+    });
+    expect(JSON.stringify(runner)).not.toContain("SUPABASE_DB_CA_CERT_B64");
+  });
+
   it("protects the production core verifier without exposing CA material to sandbox", () => {
     const parsed = workflow(CORE_WORKFLOW_PATH);
     const production = parsed.jobs["verify-production"];
@@ -394,6 +471,9 @@ describe("production Supabase CA workflow boundary", () => {
       DELEGATE_APPLY_WORKFLOW_PATH,
       ACTION_QUEUE_APPLY_WORKFLOW_PATH,
       AGREEMENT_ACCEPTANCE_APPLY_WORKFLOW_PATH,
+      REVISION_REPLAY_APPLY_WORKFLOW_PATH,
+      PLANTS_HEALTH_APPLY_WORKFLOW_PATH,
+      LINKED_DIARY_APPLY_WORKFLOW_PATH,
       CORE_WORKFLOW_PATH,
     ]) {
       const source = readFileSync(path, "utf8");

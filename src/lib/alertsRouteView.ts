@@ -70,6 +70,8 @@ export interface AlertRowAriaInput {
   title: string;
   source: string | null | undefined;
   firstSeenAt: string | null | undefined;
+  /** Optional tent/plant target sentence; omitted from the label when empty. */
+  targetText?: string | null;
 }
 
 /**
@@ -83,5 +85,7 @@ export function buildAlertRowAriaLabel(input: AlertRowAriaInput): string {
   const source = formatAlertSourceLabel(input.source);
   const seen = formatAlertSeenLabel(input.firstSeenAt);
   const title = input.title?.trim() || "Untitled alert";
-  return `${severity} alert, ${status}. ${title}. Source: ${source}. First seen ${seen}.`;
+  const target = input.targetText?.trim();
+  const targetClause = target ? ` ${target}.` : "";
+  return `${severity} alert, ${status}. ${title}. Source: ${source}. First seen ${seen}.${targetClause}`;
 }

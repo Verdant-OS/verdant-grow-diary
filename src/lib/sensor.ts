@@ -13,11 +13,16 @@
 import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/store/auth";
+import {
+  EFFECTIVE_SENSOR_QUERY_VERSION,
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+} from "@/lib/effectiveSensorReadings";
 import {
   buildSensorSnapshot,
   EMPTY_SENSOR_SNAPSHOT,
   prepareSensorSnapshotRowsForCache,
-  type RawSensorRow,
   type SensorSnapshot,
   type SensorSnapshotCacheRow,
 } from "@/lib/latestSensorSnapshotRules";
@@ -47,8 +52,15 @@ export const LATEST_SENSOR_REALTIME_INVALIDATE_DEBOUNCE_MS = 500;
 /** Stable React Query key for the latest single-tent sensor snapshot. */
 export function latestTentSensorSnapshotQueryKey(
   tentId: string | null | undefined,
-): readonly [string, string, string] {
-  return ["sensor", "latest", tentId ?? "none"] as const;
+  ownerId?: string | null,
+) {
+  return [
+    "sensor",
+    "latest",
+    tentId ?? "none",
+    EFFECTIVE_SENSOR_QUERY_VERSION,
+    ownerId ?? "anon",
+  ] as const;
 }
 
 /**
@@ -63,17 +75,18 @@ export function latestTentSensorSnapshotQueryKey(
 export function useLatestTentSensorSnapshot(
   tentId: string | null | undefined,
 ): LatestTentSensorSnapshotState {
-  const enabled = typeof tentId === "string" && tentId.length > 0;
+  const { user } = useAuth();
+  const ownerId = user?.id;
+  const enabled = !!ownerId && typeof tentId === "string" && tentId.length > 0;
 
   const queryClient = useQueryClient();
 
   const query = useQuery<SensorSnapshotCacheRow[]>({
-    queryKey: latestTentSensorSnapshotQueryKey(tentId),
+    queryKey: latestTentSensorSnapshotQueryKey(tentId, ownerId),
     enabled,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sensor_readings")
-        .select("id,tent_id,metric,value,source,quality,captured_at,ts,created_at,raw_payload")
+      const { data, error } = await effectiveSensorReadingsQuery()
+        .select("*")
         .eq("tent_id", tentId as string)
         .order("captured_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
@@ -82,7 +95,7 @@ export function useLatestTentSensorSnapshot(
       // Keep raw_payload only inside this acquisition boundary. The pure
       // builder uses it to reject diagnostic/testbench provenance, selects
       // one coherent cohort, and returns a redacted snapshot for the cache.
-      return prepareSensorSnapshotRowsForCache((data ?? []) as RawSensorRow[]);
+      return prepareSensorSnapshotRowsForCache(requireEffectiveSensorReadings(data));
     },
     staleTime: 1000 * 25,
     gcTime: 1000 * 60 * 5,
@@ -110,7 +123,7 @@ export function useLatestTentSensorSnapshot(
       pendingTimerRef.current = setTimeout(() => {
         pendingTimerRef.current = null;
         queryClient.invalidateQueries({
-          queryKey: latestTentSensorSnapshotQueryKey(activeTentId),
+          queryKey: latestTentSensorSnapshotQueryKey(activeTentId, ownerId),
         });
       }, LATEST_SENSOR_REALTIME_INVALIDATE_DEBOUNCE_MS);
     };
@@ -142,13 +155,14 @@ export function useLatestTentSensorSnapshot(
         }
       }
     };
-  }, [enabled, tentId, queryClient]);
+  }, [enabled, tentId, ownerId, queryClient]);
 
   const lastUpdatedAt =
     enabled && query.dataUpdatedAt && query.dataUpdatedAt > 0 ? query.dataUpdatedAt : null;
 
   if (!enabled) return { status: "idle", snapshot: EMPTY_SENSOR_SNAPSHOT, lastUpdatedAt: null };
-  if (query.isLoading) return { status: "loading", snapshot: EMPTY_SENSOR_SNAPSHOT, lastUpdatedAt };
+  if (query.isPending || query.isFetching || query.fetchStatus === "paused")
+    return { status: "loading", snapshot: EMPTY_SENSOR_SNAPSHOT, lastUpdatedAt };
   if (query.isError) return { status: "error", snapshot: EMPTY_SENSOR_SNAPSHOT, lastUpdatedAt };
   const rows = query.data ?? [];
   if (rows.length === 0) {

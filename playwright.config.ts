@@ -1,4 +1,4 @@
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig, devices, type ReporterDescription } from "@playwright/test";
 
 /**
  * Minimal Playwright config for Verdant Grow OS authenticated smoke tests.
@@ -13,6 +13,12 @@ import { defineConfig, devices } from "@playwright/test";
  * Run locally:
  *   E2E_TEST_EMAIL=... E2E_TEST_PASSWORD=... E2E_BASE_URL=http://localhost:5173 \
  *     bunx playwright test
+ *
+ * Optional TestDino live streaming (no post-run upload):
+ *   TESTDINO_TOKEN=... bunx playwright test
+ * If bunx is missing, `npx playwright test` is the same command.
+ * Leave TESTDINO_TOKEN unset in CI unless Cheek adds a secret — the
+ * TestDino reporter is added only when the env var is non-empty.
  */
 // Treat an empty / whitespace-only E2E_BASE_URL the same as unset — a missing
 // GitHub Actions var referenced via `env:` arrives as "" and must fall back to
@@ -30,6 +36,12 @@ const parsedRetries = Number.parseInt(process.env.PLAYWRIGHT_RETRIES ?? "", 10);
 const RETRIES =
   Number.isFinite(parsedRetries) && parsedRetries >= 0 ? parsedRetries : process.env.CI ? 1 : 0;
 
+// Applies to every project, including auth setup and fixture verification.
+// Proof runs retain sanitized receipts without authenticated browser media.
+const DISABLE_FAILURE_MEDIA =
+  process.env.E2E_MEASURE_SIGNED_IN_PERFORMANCE === "true" ||
+  process.env.E2E_DISABLE_FAILURE_MEDIA === "true";
+
 // Trace policy.
 //
 // `on-first-retry` guarantees a trace zip for the retried attempt whenever a
@@ -37,11 +49,23 @@ const RETRIES =
 // exact evidence needed to pinpoint a Quick Log smoke failure. Real-auth runs
 // (E2E_TEST_EMAIL present) still turn tracing OFF because trace zips would
 // bake the disposable test account's Supabase bearer/session tokens into a
-// publicly-downloadable CI artifact; those runs rely on screenshots + video
-// (pixels only, no headers) for triage.
-const TRACE_MODE: "off" | "on-first-retry" | "retain-on-failure" = process.env.E2E_TEST_EMAIL
-  ? "off"
-  : "on-first-retry";
+// CI artifact. Ordinary smoke runs may retain pixel media for triage; proof
+// modes disable that media too, including when auth setup fails.
+const TRACE_MODE: "off" | "on-first-retry" | "retain-on-failure" =
+  DISABLE_FAILURE_MEDIA || process.env.E2E_TEST_EMAIL ? "off" : "on-first-retry";
+
+// TestDino streams results during the run. The package prints a hard
+// configuration error (then no-ops) when the token is missing, so we only
+// attach the reporter when TESTDINO_TOKEN is set. Token is never hardcoded.
+const testdinoToken = process.env.TESTDINO_TOKEN?.trim();
+const reporters: ReporterDescription[] = [
+  ["list"],
+  ["html", { open: "never" }],
+  ["json", { outputFile: "e2e/results/playwright-report.json" }],
+];
+if (testdinoToken) {
+  reporters.push(["@testdino/playwright", { token: process.env.TESTDINO_TOKEN }]);
+}
 
 export default defineConfig({
   testDir: "./e2e",
@@ -57,11 +81,7 @@ export default defineConfig({
   // artifact paths in the CI job summary. With tracing disabled on
   // real-auth runs (see `use` below), the report contains only
   // screenshots/videos — no network headers.
-  reporter: [
-    ["list"],
-    ["html", { open: "never" }],
-    ["json", { outputFile: "e2e/results/playwright-report.json" }],
-  ],
+  reporter: reporters,
   use: {
     baseURL: BASE_URL,
     // Bound every action (click/fill/press). Playwright's default is 0 =
@@ -78,8 +98,8 @@ export default defineConfig({
     // land in test-results/ and are uploaded by the workflow. See TRACE_MODE
     // above for the token-safety carve-out on real-auth runs.
     trace: TRACE_MODE,
-    video: "retain-on-failure",
-    screenshot: "only-on-failure",
+    video: DISABLE_FAILURE_MEDIA ? "off" : "retain-on-failure",
+    screenshot: DISABLE_FAILURE_MEDIA ? "off" : "only-on-failure",
   },
 
   // Mocked, non-destructive specs navigate to relative routes

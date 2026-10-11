@@ -23,7 +23,8 @@ import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
 import { dashboardPath } from "../src/lib/routes";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
-  PUBLIC_CORE_CENSUS_ROUTES,
+  AUTHENTICATED_CORE_CENSUS_BATCHES,
+  PUBLIC_CORE_CENSUS_BATCHES,
   classifyLink,
   expectedCensusNavigationPath,
   fallbackSelectExerciseFailureIsFatal,
@@ -572,9 +573,9 @@ async function seedFakeSession(context: BrowserContext) {
  * events over anything beneath it — on the authenticated lane it blocked the
  * sidebar's lowest links for the entire test budget (926 click retries on
  * /account/preferences). The census audits app surfaces, not the consent
- * flow; "denied" keeps the banner away AND guarantees no analytics code can
- * load (every loader gates on readAnalyticsConsent() === "granted"), which
- * preserves the lane's hermetic zero-external-fetch contract.
+ * flow; "denied" keeps the banner away and leaves Google Analytics consent
+ * denied. The network fence separately blocks ancillary analytics scripts;
+ * this census does not prove analytics consent compliance.
  */
 async function seedDeniedAnalyticsConsent(context: BrowserContext) {
   await context.addInitScript(
@@ -610,6 +611,19 @@ async function installNetworkFence(
     }
     await route.abort("blockedbyclient");
   });
+
+  // Block this known ancillary script locally. Other methods and URLs must
+  // still reach the broad fence and remain visible in its external audit.
+  await context.route(
+    "https://va.vercel-scripts.com/v1/script.debug.js",
+    async (route, request) => {
+      if (request.method() === "GET") {
+        await route.abort("blockedbyclient");
+        return;
+      }
+      await route.fallback();
+    },
+  );
 
   await context.route("https://fonts.googleapis.com/**", (route) =>
     route.fulfill({ status: 200, contentType: "text/css", body: "" }),
@@ -766,6 +780,14 @@ function installContextErrorAudit(context: BrowserContext, report: LaneReport) {
   });
   context.on("console", (message) => {
     if (message.type() === "error") {
+      // The fence deliberately aborts this script. Keep every other resource
+      // error, and every unrelated error originating from that same URL.
+      if (
+        message.location().url === "https://va.vercel-scripts.com/v1/script.debug.js" &&
+        /^Failed to load resource: net::ERR_BLOCKED_BY_CLIENT(?:\.Inspector)?$/.test(message.text())
+      ) {
+        return;
+      }
       const source = message.page()?.url() || message.location().url || "unknown page";
       report.consoleErrors.push(`${source}: ${message.text()}`);
     }
@@ -1608,10 +1630,11 @@ async function assertExpectedRouteContent(page: Page, route: CoreCensusRoute) {
 async function settleRouteReadsBeforeLinkAudit(page: Page, sourcePath: string) {
   // The census records links for a later revisit/click sweep, so the snapshot
   // must describe the route's settled read model rather than an intermediate
-  // loading render. In particular, Dashboard's connected-loop evidence can
-  // briefly expose the "Log your first plant memory" CTA before the mocked
-  // diary read proves that step complete; recording that transient href makes
-  // the later revisit fail even though the product reached the correct state.
+  // loading render. Dashboard's connected-loop evidence can change operating-frame
+  // progress and conditional links after diary evidence settles. Once plant memory
+  // exists, the operating frame intentionally does not render the first-time
+  // checklist or its transient first-log CTA; the helper must still wait for all
+  // read-driven state before recording revisit links.
   //
   // Every external request in this lane is hermetically intercepted above.
   // Playwright's built-in `networkidle` load state can remain latched after the
@@ -1637,10 +1660,7 @@ async function settleRouteReadsBeforeLinkAudit(page: Page, sourcePath: string) {
     if (!state) {
       throw new Error(`${sourcePath} lost the mocked-read lifecycle tracker`);
     }
-    if (
-      state.pending === 0 &&
-      state.now - state.lastActivityAt >= ROUTE_READ_QUIET_WINDOW_MS
-    ) {
+    if (state.pending === 0 && state.now - state.lastActivityAt >= ROUTE_READ_QUIET_WINDOW_MS) {
       expect(
         new URL(page.url()).pathname,
         `${sourcePath} changed routes while its mocked reads were settling`,
@@ -1745,7 +1765,7 @@ async function clickEverySafeInternalHref(
         // query). `expectedPathname === classification.pathname` confirms the
         // destination was NOT rewritten: on the signed-out lane
         // expectedCensusNavigationPath redirects protected targets to
-        // /welcome, and a fragment link clicked from /welcome would otherwise
+        // /auth, and a fragment link clicked from /auth would otherwise
         // look same-page and be asserted for an anchor the redirect never
         // carries.
         const expectedHash = link.classification.hash;
@@ -1859,7 +1879,88 @@ test.describe("core link and form census", () => {
     await page.clock.setFixedTime(CORE_CENSUS_FIXED_TIME);
   });
 
-  test("scheduled authenticated Dashboard evidence settles before recording revisit links", async ({
+  test("scheduled public network fence blocks the exact ancillary script and audits other requests", async ({
+    page,
+  }) => {
+    test.setTimeout(30_000);
+    const network: NetworkAudit = {
+      blockedMutations: [],
+      unexpectedExternalFetches: [],
+      mockedReadRequests: 0,
+    };
+    const report: LaneReport = {
+      lane: "public",
+      routeAudits: [],
+      fieldAudits: [],
+      linkAudits: [],
+      clickedInternalHrefs: [],
+      consoleErrors: [],
+      pageErrors: [],
+      network,
+    };
+    installContextErrorAudit(page.context(), report);
+    await installNetworkFence(page.context(), false, network);
+
+    const requestThroughBrowser = async (url: string, method = "GET") => {
+      const consoleError = page.waitForEvent("console", {
+        predicate: (message) => message.type() === "error" && message.location().url === url,
+      });
+      const result = await page.evaluate(
+        async ({ requestUrl, requestMethod }) => {
+          try {
+            await fetch(requestUrl, { method: requestMethod, mode: "no-cors" });
+            return "completed";
+          } catch {
+            return "blocked";
+          }
+        },
+        { requestUrl: url, requestMethod: method },
+      );
+      await consoleError;
+      return result;
+    };
+
+    const scriptUrl = "https://va.vercel-scripts.com/v1/script.debug.js";
+    expect(await requestThroughBrowser(scriptUrl)).toBe("blocked");
+    expect(network.unexpectedExternalFetches).toEqual([]);
+    expect(report.consoleErrors).toEqual([]);
+
+    const unexpectedRequests = [
+      { url: scriptUrl, method: "POST" },
+      { url: `${scriptUrl}?unexpected=1`, method: "GET" },
+      { url: "https://va.vercel-scripts.com/v1/other.js", method: "GET" },
+      { url: "https://va.vercel-scripts.com.example.invalid/v1/script.debug.js", method: "GET" },
+      { url: "https://census-unapproved.example.invalid/script.js", method: "GET" },
+    ];
+    for (const { url, method } of unexpectedRequests) {
+      expect(await requestThroughBrowser(url, method)).toBe("blocked");
+    }
+    expect(network.unexpectedExternalFetches).toEqual(
+      unexpectedRequests.map(({ url, method }) => `${method} ${url}`),
+    );
+    // The same-URL POST is caught by the network audit above; resource errors
+    // for all four nonmatching URLs must also survive the console audit.
+    expect(report.consoleErrors).toHaveLength(4);
+
+    const unrelatedError = page.waitForEvent("console", {
+      predicate: (message) => message.text() === "census unrelated script error",
+    });
+    await page.evaluate((url) => {
+      const script = document.createElement("script");
+      script.textContent = `console.error("census unrelated script error");\n//# sourceURL=${url}`;
+      document.head.append(script);
+    }, scriptUrl);
+    expect((await unrelatedError).location().url).toBe(scriptUrl);
+    expect(report.consoleErrors).toHaveLength(5);
+    expect(report.consoleErrors[report.consoleErrors.length - 1]).toContain(
+      "census unrelated script error",
+    );
+    expect(network.blockedMutations).toEqual([]);
+    expect(network.mockedReadRequests).toBe(0);
+    expect(report.pageErrors).toEqual([]);
+  });
+
+  test("scheduled authenticated Dashboard operating frame settles delayed diary evidence before recording revisit links", async ({
     page,
   }) => {
     test.setTimeout(60_000);
@@ -1885,37 +1986,57 @@ test.describe("core link and form census", () => {
     expect(dashboardRoute.path).toBe("/dashboard");
     await navigateForAudit(page, dashboardRoute);
 
+    const progressPill = page.getByTestId("onboarding-progress-pill");
+    await expect(progressPill).toHaveAttribute("data-complete-count", "3");
+
+    await expect(page.getByTestId("onboarding-checklist-card")).toHaveCount(0);
+    await expect(page.getByTestId("onboarding-step-first_log")).toHaveCount(0);
+    await expect(page.getByTestId("dashboard-ready")).toBeVisible();
+    await expect(page.getByTestId("dashboard-daily-grow-check-entry")).toHaveCount(0);
+    await expect(page.getByTestId("tonight-tent-home-log")).toHaveAttribute(
+      "href",
+      `/daily-check?growId=${GROW_ID}`,
+    );
+    // Desktop chrome exemption (GDP D1.2-A): AppShell's header Quick Log trigger.
+    expect(await visibleLogControls(page)).toEqual([
+      "header-quick-log-trigger",
+      "tonight-tent-home-log",
+    ]);
+
     const pendingHrefs = (await visibleLinkAudits(page, dashboardRoute.path)).map(
       (link) => link.href,
     );
     expect(
       pendingHrefs,
-      "the delayed diary read must expose the Dashboard's transient first-log CTA",
-    ).toContain(dashboardPath(GROW_ID));
+      "the plants-present operating frame must not reintroduce the onboarding first-log CTA",
+    ).not.toContain(dashboardPath(GROW_ID));
 
     const settlePromise = settleRouteReadsBeforeLinkAudit(page, dashboardRoute.path);
     const settledBeforeRelease = await Promise.race([
       settlePromise.then(() => true),
       new Promise<false>((resolve) => setTimeout(() => resolve(false), 100)),
     ]);
-    releaseDiaryRead();
+
     expect(
       settledBeforeRelease,
       "the settling helper must wait for the delayed diary evidence read",
     ).toBe(false);
+
+    releaseDiaryRead();
     await settlePromise;
 
-    const links = await visibleLinkAudits(page, dashboardRoute.path);
-    const firstLogComplete = await page
-      .getByTestId("onboarding-step-first_log")
-      .getAttribute("data-complete");
-    const hrefs = links.map((link) => link.href);
+    await expect(progressPill).toHaveAttribute("data-complete-count", "4");
+    await expect(page.getByTestId("onboarding-checklist-card")).toHaveCount(0);
+    await expect(page.getByTestId("onboarding-step-first_log")).toHaveCount(0);
 
-    expect(firstLogComplete).toBe("true");
+    const settledHrefs = (await visibleLinkAudits(page, dashboardRoute.path)).map(
+      (link) => link.href,
+    );
     expect(
-      hrefs,
-      "the completed first-log step must not leave its loading-state CTA in the settled link set",
+      settledHrefs,
+      "the settled operating frame must not contain a stale grow-scoped onboarding CTA",
     ).not.toContain(dashboardPath(GROW_ID));
+
     expect(network.blockedMutations, "the focused regression must remain read-only").toEqual([]);
     expect(
       network.unexpectedExternalFetches,
@@ -2077,26 +2198,68 @@ test.describe("core link and form census", () => {
     ).toEqual([]);
   });
 
-  test("audits every scheduled public page, visible field, and safe internal link", async ({
-    page,
-  }) => {
-    // This exhaustive lane now proves a fresh quiet window after every route,
-    // click-source revisit, and destination; keep that work below the 40m job ceiling.
-    test.setTimeout(420_000);
-    const report = await runLaneCensus(page, "public", PUBLIC_CORE_CENSUS_ROUTES);
-    expect(report.routeAudits).toHaveLength(PUBLIC_CORE_CENSUS_ROUTES.length);
-    expect(report.linkAudits.length).toBeGreaterThan(0);
-    expect(report.clickedInternalHrefs.length).toBeGreaterThan(0);
-  });
+  for (const [index, routes] of PUBLIC_CORE_CENSUS_BATCHES.entries()) {
+    test(`audits every scheduled public page, visible field, and safe internal link (batch ${index + 1}/${PUBLIC_CORE_CENSUS_BATCHES.length})`, async ({
+      page,
+    }) => {
+      // Preserve the timeout and all per-route assertions. Independent batches
+      // prevent earlier pages from consuming the last route's entire budget.
+      test.setTimeout(420_000);
+      const report = await runLaneCensus(page, "public", routes);
+      expect(report.routeAudits.map((route) => route.path)).toEqual(
+        routes.map((route) => route.path),
+      );
+      expect(report.linkAudits.length).toBeGreaterThan(0);
+      expect(report.clickedInternalHrefs.length).toBeGreaterThan(0);
+    });
+  }
 
-  test("audits every scheduled authenticated page, visible field, and safe internal link", async ({
-    page,
-  }) => {
-    test.setTimeout(1_800_000);
-    const report = await runLaneCensus(page, "authenticated", AUTHENTICATED_CORE_CENSUS_ROUTES);
-    expect(report.routeAudits).toHaveLength(AUTHENTICATED_CORE_CENSUS_ROUTES.length);
-    expect(report.fieldAudits.length).toBeGreaterThan(0);
-    expect(report.linkAudits.length).toBeGreaterThan(0);
-    expect(report.clickedInternalHrefs.length).toBeGreaterThan(0);
+  test.describe("authenticated census batches", () => {
+    test.describe.configure({ mode: "parallel" });
+
+    for (const [index, routes] of AUTHENTICATED_CORE_CENSUS_BATCHES.entries()) {
+      test(`audits every scheduled authenticated page, visible field, and safe internal link (batch ${index + 1}/${AUTHENTICATED_CORE_CENSUS_BATCHES.length})`, async ({
+        page,
+      }) => {
+        test.setTimeout(1_800_000);
+        const report = await runLaneCensus(page, "authenticated", routes);
+        expect(report.routeAudits.map((route) => route.path)).toEqual(
+          routes.map((route) => route.path),
+        );
+        expect(report.fieldAudits.length).toBeGreaterThan(0);
+        expect(report.linkAudits.length).toBeGreaterThan(0);
+        expect(report.clickedInternalHrefs.length).toBeGreaterThan(0);
+      });
+    }
   });
 });
+
+/**
+ * Identity of every visible Log control (links and buttons named Log, Quick
+ * Log or Open Quick Log; not Log out or Start Check), sorted: its test ID,
+ * or for an untagged control its landmark label and href. GDP D1.1-A/D1.2-A
+ * (docs/specs/dashboard-single-log-entry-readiness-marker.md): the page body
+ * shows only the home card's Log; AppShell's chrome triggers are named
+ * exemptions. A new duplicate fails the exact set.
+ */
+async function visibleLogControls(page: Page): Promise<string[]> {
+  const name = /^(open )?(quick )?log$/i;
+  const ids: string[] = [];
+  for (const role of ["link", "button"] as const) {
+    // One atomic read per role: a re-render between per-index reads could
+    // otherwise count a control twice or skip it.
+    const roleIds = await page
+      .getByRole(role, { name })
+      .filter({ visible: true })
+      .evaluateAll((elements) =>
+        elements.map((element) => {
+          const testId = element.getAttribute("data-testid");
+          if (testId) return testId;
+          const landmark = element.closest("nav, header, main, aside")?.getAttribute("aria-label");
+          return `${landmark ?? "unlabelled region"} > ${element.getAttribute("href") ?? element.tagName}`;
+        }),
+      );
+    ids.push(...roleIds);
+  }
+  return ids.sort();
+}

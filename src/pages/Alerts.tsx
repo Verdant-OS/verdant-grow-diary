@@ -1,5 +1,8 @@
 import { useId, useMemo, useState } from "react";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
+import AlertReasonText from "@/components/AlertReasonText";
+import { usePlants } from "@/hooks/use-plants";
+import { ALERT_LIST_MANUAL_RESOLUTION_NOTE } from "@/lib/alertReasonDisplayRules";
 import { Link } from "@/lib/react-router-compat";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
@@ -16,13 +19,16 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import { AlertTargetContext } from "@/components/AlertTargetContext";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
 import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
 import AlertsContextHeaderForGrow from "@/components/AlertsContextHeaderForGrow";
 import AlertsEmptyStateSnapshotCta from "@/components/AlertsEmptyStateSnapshotCta";
+import { useAlertsPresentationClock } from "@/hooks/useAlertsPresentationClock";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import { pickAlertsGrowContext } from "@/lib/alertFreshnessContext";
+import { plantsForAlertPersistence } from "@/lib/alertPlantStageScopeRules";
 import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
 import { deriveAlertReadingSource } from "@/lib/alertReadingSourceRules";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +44,13 @@ import {
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import { useAlertsList } from "@/hooks/useAlertsList";
+import { useAlertTargetNames } from "@/hooks/useAlertTargetNames";
+import { useAlertLinkedTargetEvidence } from "@/hooks/useAlertLinkedTargetEvidence";
+import {
+  buildAlertTargetPresenterInput,
+  deriveAlertTargetContext,
+  type AlertTargetContextInput,
+} from "@/lib/alertTargetContextRules";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
 import { useAlertsLinkedActionCounts } from "@/hooks/useAlertsLinkedActionCounts";
 import {
@@ -86,6 +99,7 @@ const STATUS_TONE: Record<AlertStatusRow, string> = {
 };
 
 export default function Alerts() {
+  const presentationClock = useAlertsPresentationClock();
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const scopedGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : undefined;
   // A grow id was passed in the URL but doesn't map to a grow the viewer
@@ -106,6 +120,15 @@ export default function Alerts() {
   const stageByGrow = new Map<string, string | null>(
     grows.map((g) => [g.id, (g as { stage?: string | null }).stage ?? null]),
   );
+  // Plant stages count toward the alert stage (QA 2026-09-24, BUG-006). Each
+  // alert component keeps the plants that resolve to its grow, by grow_id or
+  // through the grow's tents (growAttributionRules). The header shows the
+  // cached stages through a failed refresh; persistence needs a current,
+  // successful read, so a pending or failed read (`null`) holds it back
+  // (Codex review on #1683).
+  const plantsQuery = usePlants();
+  const plantsForAlertStage = plantsQuery.data ?? null;
+  const plantsForPersistence = plantsForAlertPersistence(plantsQuery);
 
   const headerStage = scopedGrowId ? (stageByGrow.get(scopedGrowId) ?? null) : null;
 
@@ -122,6 +145,8 @@ export default function Alerts() {
     status: statusFilter,
     severity: severityFilter,
   });
+  const targetNames = useAlertTargetNames();
+  const linkedTargets = useAlertLinkedTargetEvidence(alerts);
 
   // Deterministic grow ids that currently have an open alert. Feeds the
   // unscoped Alerts header fallback so an alerting grow is preferred over
@@ -213,7 +238,12 @@ export default function Alerts() {
       {/* Side-effect only: evaluate latest valid snapshot vs grow targets
           and persist breaches into public.alerts. Renders nothing. */}
       {persistGrowIds.map((gid) => (
-        <AlertsAutoPersistForGrow key={gid} growId={gid} stage={stageByGrow.get(gid) ?? null} />
+        <AlertsAutoPersistForGrow
+          key={gid}
+          growId={gid}
+          stage={stageByGrow.get(gid) ?? null}
+          plants={plantsForPersistence}
+        />
       ))}
       <GrowBreadcrumbs
         growId={urlGrowId}
@@ -250,9 +280,11 @@ export default function Alerts() {
 
       {headerContext ? (
         <AlertsContextHeaderForGrow
+          clock={presentationClock}
           growId={headerContext.growId}
           growName={headerContext.growName}
           stage={headerContext.stage}
+          plants={plantsForAlertStage}
           isFallback={headerContext.isFallback}
           hasOpenAlerts={growIdsWithOpenAlerts.includes(headerContext.growId)}
         />
@@ -366,7 +398,10 @@ export default function Alerts() {
           />
           {headerContext ? (
             <>
-              <AlertsEmptyStateSnapshotCta growId={headerContext.growId} />
+              <AlertsEmptyStateSnapshotCta
+                growId={headerContext.growId}
+                clock={presentationClock}
+              />
               <div className="mt-3 flex flex-wrap gap-2 justify-center">
                 <Button
                   size="sm"
@@ -418,11 +453,30 @@ export default function Alerts() {
                   {group.label}{" "}
                   <span className="text-xs text-muted-foreground">{items.length}</span>
                 </h2>
+                {group.key === "open" ? (
+                  <p
+                    className="text-xs text-muted-foreground mb-2"
+                    data-testid="alerts-open-manual-resolution-note"
+                  >
+                    {ALERT_LIST_MANUAL_RESOLUTION_NOTE}
+                  </p>
+                ) : null}
                 <ul className="space-y-2">
                   {items.map((a) => (
                     <AlertCard
                       key={a.id}
                       alert={a}
+                      targetInput={buildAlertTargetPresenterInput({
+                        tentId: a.tent_id,
+                        plantId: a.plant_id,
+                        growId: a.grow_id,
+                        tentNameById: targetNames.tentNameById,
+                        plantNameById: targetNames.plantNameById,
+                        linkedEvidence: linkedTargets.evidenceByAlertId.get(a.id) ?? [],
+                        singleTentIdByGrowId: targetNames.singleTentIdByGrowId,
+                        namesLoading: targetNames.status === "loading",
+                        idsLoading: linkedTargets.idsLoading,
+                      })}
                       linkedSummary={linkedActionCounts.get(a.id)}
                       onAcknowledge={handleAcknowledge}
                       onResolve={handleResolve}
@@ -475,6 +529,7 @@ type AlertActionHandler = (id: string, growId: string, prev: AlertStatusRow) => 
 
 interface AlertCardProps {
   alert: AlertRow;
+  targetInput: AlertTargetContextInput;
   linkedSummary: ReturnType<ReturnType<typeof useAlertsLinkedActionCounts>["get"]>;
   onAcknowledge: AlertActionHandler;
   onResolve: AlertActionHandler;
@@ -483,6 +538,7 @@ interface AlertCardProps {
 
 function AlertCard({
   alert: a,
+  targetInput,
   linkedSummary,
   onAcknowledge,
   onResolve,
@@ -493,12 +549,14 @@ function AlertCard({
   const sourceLabel = formatAlertSourceLabel(a.source);
   const severityLabel = SEVERITY_LABEL[a.severity] ?? "Info";
   const statusLabel = STATUS_LABEL[a.status] ?? "Open";
+  const target = deriveAlertTargetContext(targetInput);
   const ariaLabel = buildAlertRowAriaLabel({
     severity: a.severity,
     status: a.status,
     title: a.title,
     source: a.source,
     firstSeenAt: a.first_seen_at,
+    targetText: target.text,
   });
   const seenIso =
     a.first_seen_at && Number.isFinite(Date.parse(a.first_seen_at)) ? a.first_seen_at : undefined;
@@ -556,7 +614,18 @@ function AlertCard({
             {seenLabel}
           </time>
         </div>
-        <p className="text-xs text-muted-foreground">{a.reason}</p>
+        <AlertReasonText reason={a.reason} className="text-xs text-muted-foreground" />
+        <AlertTargetContext
+          tentId={targetInput.tentId}
+          plantId={targetInput.plantId}
+          tentName={targetInput.tentName}
+          plantName={targetInput.plantName}
+          namesLoading={targetInput.namesLoading}
+          idsLoading={targetInput.idsLoading}
+          linkedEvidence={targetInput.linkedEvidence}
+          singleTentId={targetInput.singleTentId}
+          variant="compact"
+        />
         <AlertWhyContext alert={a} variant="compact" />
         <LinkedActionCountBadge
           alertId={a.id}

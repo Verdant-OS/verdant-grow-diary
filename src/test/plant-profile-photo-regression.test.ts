@@ -106,7 +106,7 @@ describe("EditPlantDialog · native camera + library flow", () => {
     expect(EDIT_DIALOG).toMatch(/retirePreviousPlantProfilePhoto/);
     // Retire call must live after the update-error early-return, i.e.
     // AFTER the plant update succeeded. Enforce structural ordering.
-    const errIdx = EDIT_DIALOG.indexOf('toast.error("Could not save changes');
+    const errIdx = EDIT_DIALOG.indexOf("formatPlantEditSaveError(error)");
     const retireIdx = EDIT_DIALOG.indexOf("retirePreviousPlantProfilePhoto(");
     expect(errIdx).toBeGreaterThan(-1);
     expect(retireIdx).toBeGreaterThan(errIdx);

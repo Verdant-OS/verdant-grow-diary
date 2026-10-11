@@ -13,6 +13,10 @@
  */
 
 import { SENSOR_CHART_METRIC_META, type SensorChartMetricKey } from "./sensorChartAxisRules";
+import {
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "./temperatureUnitPreference";
 
 /** Extended metric keys supported by the unit helper. */
 export type SensorMetricKey =
@@ -48,7 +52,11 @@ function resolveMeta(metric: SensorMetricKey): SensorMetricUnitMeta {
 }
 
 /** Canonical unit string for a metric. Empty string for unit-less metrics (pH). */
-export function getSensorMetricUnit(metric: SensorMetricKey): string {
+export function getSensorMetricUnit(
+  metric: SensorMetricKey,
+  temperatureUnit?: TemperatureUnitPreference,
+): string {
+  if (metric === "temp") return getTemperatureUnitSymbol(temperatureUnit);
   return resolveMeta(metric).unit;
 }
 
@@ -56,9 +64,13 @@ export function getSensorMetricUnit(metric: SensorMetricKey): string {
  * Human-readable label for a metric, e.g. "Temperature (°F)" or
  * "Reservoir pH". Metrics without a unit render as the plain label.
  */
-export function formatSensorMetricLabel(metric: SensorMetricKey): string {
-  const m = resolveMeta(metric);
-  return m.unit ? `${m.label} (${m.unit})` : m.label;
+export function formatSensorMetricLabel(
+  metric: SensorMetricKey,
+  temperatureUnit?: TemperatureUnitPreference,
+): string {
+  const { label } = resolveMeta(metric);
+  const unit = getSensorMetricUnit(metric, temperatureUnit);
+  return unit ? `${label} (${unit})` : label;
 }
 
 /**
@@ -66,14 +78,16 @@ export function formatSensorMetricLabel(metric: SensorMetricKey): string {
  * string for null / undefined / NaN / non-finite values so callers
  * never render "NaN °F". Compound alphabetic units (kPa, ppm, mS/cm)
  * get a hair of separation; attached symbols (°F, %) stay flush.
+ * This helper changes only the suffix; it does not convert the value.
  */
 export function formatSensorMetricValue(
   metric: SensorMetricKey,
   value: number | null | undefined,
+  temperatureUnit?: TemperatureUnitPreference,
 ): string {
   if (value === null || value === undefined) return "";
   if (typeof value !== "number" || !Number.isFinite(value)) return "";
-  const unit = getSensorMetricUnit(metric);
+  const unit = getSensorMetricUnit(metric, temperatureUnit);
   if (!unit) return `${value}`;
   const sep = /^[a-z]/i.test(unit) ? " " : "";
   return `${value}${sep}${unit}`;

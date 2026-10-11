@@ -389,7 +389,22 @@ export interface PhenoDatabase {
       >;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      // Server-side top-N-per-plant diary evidence read
+      // (20260826100000_pheno_candidate_diary_entries_top_n_rpc.sql).
+      // SECURITY INVOKER — caller RLS on diary_entries binds every row.
+      pheno_candidate_diary_entries_top_n: {
+        Args: { p_plant_ids: string[]; p_limit_per_plant?: number };
+        Returns: {
+          id: string;
+          plant_id: string;
+          entry_at: string;
+          note: string;
+          photo_url: string | null;
+          details: Json;
+        }[];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

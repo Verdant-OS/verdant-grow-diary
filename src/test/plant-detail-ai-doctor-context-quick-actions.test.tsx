@@ -3,6 +3,10 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import PlantDetailAiDoctorContextPanel from "@/components/PlantDetailAiDoctorContextPanel";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
+import {
+  readSensorsTentRouteIntent,
+  resolveSensorsTentRouteSelection,
+} from "@/lib/sensorRouteTentIntentRules";
 
 const insertSpy = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
@@ -50,11 +54,89 @@ vi.mock("@/hooks/useRootZoneObservations", () => ({
   }),
 }));
 
+const TENT_A = "11111111-1111-4111-8111-111111111111";
+const TENT_B = "22222222-2222-4222-8222-222222222222";
+
+function contextPanel(tentId: string | null | undefined, growId: string | undefined = "grow-A") {
+  return (
+    <MemoryRouter>
+      <PlantDetailAiDoctorContextPanel
+        plantId="plant-B"
+        plant={{ id: "plant-B", name: "Beta", growId, tentId }}
+      />
+    </MemoryRouter>
+  );
+}
+
+function sensorLinkUrl() {
+  const href = screen.getByRole("link", { name: "Add sensor snapshot" }).getAttribute("href");
+  return new URL(href!, "https://verdant.example");
+}
+
 describe("PlantDetailAiDoctorContextPanel — quick actions", () => {
   beforeEach(() => {
     contextSources.timelineItems = [];
     contextSources.currentRows = [];
     contextSources.currentStatus = "success";
+  });
+
+  it.each(["grow-A", ""])(
+    "carries the assigned tent to manual capture when grow context is %j",
+    (growId) => {
+      render(contextPanel(TENT_B, growId));
+      const url = sensorLinkUrl();
+      expect(url.pathname).toBe("/sensors");
+      expect(url.searchParams.get("tentId")).toBe(TENT_B);
+      expect(url.searchParams.get("tentIntent")).toBe("required");
+      expect(url.hash).toBe("#manual-reading");
+      // Consume the rendered link with the real destination selection rule:
+      // neither the first owned tent nor the previous selection may win.
+      expect(
+        resolveSensorsTentRouteSelection({
+          intent: readSensorsTentRouteIntent(url.searchParams),
+          currentTentId: TENT_A,
+          tents: [{ id: TENT_A }, { id: TENT_B }],
+        }),
+      ).toBe(TENT_B);
+    },
+  );
+
+  it("does not let an unavailable assigned tent silently select another owned tent", () => {
+    render(contextPanel(TENT_B));
+    expect(
+      resolveSensorsTentRouteSelection({
+        intent: readSensorsTentRouteIntent(sensorLinkUrl().searchParams),
+        currentTentId: TENT_A,
+        tents: [{ id: TENT_A }],
+      }),
+    ).toBeNull();
+  });
+
+  it("replaces the capture target when the displayed plant's tent changes", () => {
+    const { rerender } = render(contextPanel(TENT_B));
+    expect(sensorLinkUrl().searchParams.get("tentId")).toBe(TENT_B);
+    rerender(contextPanel(TENT_A));
+    expect(sensorLinkUrl().searchParams.get("tentId")).toBe(TENT_A);
+    expect(sensorLinkUrl().searchParams.get("tentIntent")).toBe("required");
+  });
+
+  it.each([null, undefined, "not-a-uuid"])(
+    "keeps ordinary grow selection when no valid tent is known (%j)",
+    (tentId) => {
+      render(contextPanel(tentId));
+      const url = sensorLinkUrl();
+      expect(url.pathname).toBe("/sensors");
+      expect(url.searchParams.get("growId")).toBe("grow-A");
+      expect(url.searchParams.has("tentId")).toBe(false);
+      expect(url.searchParams.has("tentIntent")).toBe(false);
+      expect(url.hash).toBe("#manual-reading");
+    },
+  );
+
+  it("keeps manual capture available without inventing a grow or tent", () => {
+    render(contextPanel(null, ""));
+    const url = sensorLinkUrl();
+    expect(url.pathname + url.search + url.hash).toBe("/sensors#manual-reading");
   });
 
   it("renders quick actions for supported missing context with preserved plant scope", () => {

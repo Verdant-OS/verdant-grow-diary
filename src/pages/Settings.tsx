@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
-import { Link } from "@/lib/react-router-compat";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { Link, useNavigate } from "@/lib/react-router-compat";
+import { useCommittedRouteDeparture } from "@/hooks/useCommittedRouteDeparture";
 import { Settings as SettingsIcon } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -16,7 +18,12 @@ import { Input } from "@/components/ui/input";
 import { useOpenCustomerPortalState } from "@/lib/customerPortal";
 import { usePaddleCancelNotice } from "@/hooks/usePaddleCancelNotice";
 
-import { DELETE_ACCOUNT_CONFIRMATION, requestAccountDeletion } from "@/lib/accountDeletion";
+import {
+  DELETE_ACCOUNT_CONFIRMATION,
+  DELETE_ACCOUNT_CLEANUP_UNCONFIRMED,
+  requestAccountDeletion,
+} from "@/lib/accountDeletion";
+import { createAccountDeletionContinuation } from "@/lib/accountDeletionContinuationRules";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import AccountPlanBadge from "@/components/AccountPlanBadge";
@@ -454,23 +461,85 @@ function SubscriptionTile() {
  *  - Rows in public.* cascade via existing FKs on auth.users(id).
  */
 function DeleteAccountTile() {
+  const { user, beginSignOutNavigation } = useAuth();
+  const subscribeToDeparture = useCommittedRouteDeparture();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mounted = useRef(false);
+  const busyRef = useRef(false);
+  const confirmationOwner = useRef<string | null>(null);
+  const previousOwner = useRef(user?.id);
+  const activeRequest = useRef<ReturnType<typeof createAccountDeletionContinuation> | null>(null);
   const canConfirm = confirmation === DELETE_ACCOUNT_CONFIRMATION && !busy;
 
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      activeRequest.current?.unmount();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (previousOwner.current === user?.id) return;
+    previousOwner.current = user?.id;
+    // Reset the visible confirmation, but let the request's held-session
+    // reconciliation decide ownership. AuthProvider can briefly expose a
+    // relayed tab's identity before reconciling this client's session.
+    confirmationOwner.current = null;
+    if (!activeRequest.current) {
+      busyRef.current = false;
+      setBusy(false);
+    }
+    setOpen(false);
+    setConfirmation("");
+    setError(null);
+  }, [user?.id]);
+
   async function handleDelete() {
+    if (
+      busyRef.current ||
+      confirmation !== DELETE_ACCOUNT_CONFIRMATION ||
+      !user?.id ||
+      confirmationOwner.current !== user.id
+    )
+      return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
-    const result = await requestAccountDeletion(confirmation);
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error ?? "Something went wrong.");
-      return;
+    const ticket = createAccountDeletionContinuation();
+    activeRequest.current = ticket;
+    // This request owns its route subscription beyond the expected provider
+    // mask/unmount. Actual navigation away permanently cancels continuation.
+    const unsubscribeRoute = subscribeToDeparture(ticket.invalidate);
+    try {
+      const result = await requestAccountDeletion(confirmation, {
+        expectedUserId: user.id,
+        isCurrent: ticket.isCurrent,
+        beginCleanup: () => {
+          if (!ticket.beginCleanup()) return null;
+          return beginSignOutNavigation?.() ?? null;
+        },
+        onDeleted: () => navigate("/welcome", { replace: true }),
+      });
+      if (ticket.isCurrent() && result.ok && result.disposition === "cleanup_unconfirmed")
+        toast.error(DELETE_ACCOUNT_CLEANUP_UNCONFIRMED);
+      if (!mounted.current || activeRequest.current !== ticket || !ticket.isCurrent()) return;
+      if (!result.ok) setError(result.error);
+      else if (result.disposition === "cleanup_unconfirmed")
+        setError(DELETE_ACCOUNT_CLEANUP_UNCONFIRMED);
+    } finally {
+      unsubscribeRoute();
+      if (activeRequest.current === ticket) {
+        activeRequest.current = null;
+        busyRef.current = false;
+        if (mounted.current) setBusy(false);
+      }
+      ticket.invalidate();
     }
-    // On success the session is invalidated; redirect out.
-    window.location.replace("/welcome");
   }
 
   return (
@@ -483,6 +552,7 @@ function DeleteAccountTile() {
         variant="destructive"
         data-testid="settings-delete-account"
         onClick={() => {
+          confirmationOwner.current = user?.id ?? null;
           setConfirmation("");
           setError(null);
           setOpen(true);
@@ -619,8 +689,8 @@ export default function Settings() {
 
         <Tile name="Analytics consent" state="available">
           <p className="text-sm text-muted-foreground mb-3">
-            See whether analytics is currently on for this browser, and grant or revoke it at
-            any time. Your grow data is never sent to analytics.
+            See whether analytics is currently on for this browser, and grant or revoke it at any
+            time. Your grow data is never sent to analytics.
           </p>
           <Button asChild size="sm" data-testid="analytics-consent-settings-link">
             <Link to="/settings/analytics">Open analytics consent</Link>
@@ -628,7 +698,6 @@ export default function Settings() {
         </Tile>
 
         <DeleteAccountTile />
-
       </div>
     </div>
   );

@@ -4,12 +4,22 @@
 **Mode:** Read-only QA + docs-only
 **Verdict:** PASS — ready to tag and demo
 
-## Surfaces checked
+## Current hosted verification target — 2026-09-28
+
+Use https://verdantgrowdiary.com only. Smoke writes stay in the test fixture's
+own grow, tagged `[smoke <timestamp>]`; never customer data or the KEEP account.
+Local/mocked receipts below are code checks, not production acceptance. See
+docs/production-only-verification-runbook.md. Historical Action Queue/device
+demo steps or privileged setup are not authorized by this host decision.
+
+## Historical surfaces checked
 
 - Dashboard / Grow entry
 - Tent detail
 - Plant detail
-- Quick Log (`src/lib/quick-log/createQuickLogEvent.ts` — idempotent RPC, snapshot provenance preserved)
+- Quick Log — recorded at the time against `src/lib/quick-log/createQuickLogEvent.ts`, a save path
+  no grower could reach. That file was dead code and was removed under #593; this row is not
+  evidence for the live Quick Log save, which persists through `quicklog_save_manual`.
 - Plant timeline (category sections, evidence indicators, readability + print summary)
 - Sensors page (`src/pages/Sensors.tsx`)
 - Sensors Operator Mode (`?operator=1`) — EcoWitt live-row proof + ingest-audit proof panels
@@ -21,19 +31,19 @@
 
 ## Pass / fail table
 
-| Surface | Result | Notes |
-| --- | --- | --- |
-| Quick Log save | PASS | Idempotent RPC; snapshot source/captured_at preserved |
-| Plant timeline | PASS | Category/evidence/readability/print sections render |
-| Sensors operator EcoWitt live-row proof | PASS | live/stale/invalid/limited/no-recent states intact |
-| Sensors operator ingest-audit proof | PASS | blocked vs error copy now distinguished |
-| One-Tent Live Proof checklist | PASS | needs-confirmation when state cannot be inferred |
-| One-Tent sensor-proof section | PASS | present / live_only / audit_only / stale / invalid / blocked / missing |
-| One-Tent copy/print report | PASS | static-safety asserts no UUID / ISO-second leaks |
-| AI Doctor readiness | PASS | no overconfidence, missing-context disclosed |
-| Alerts | PASS | stale/invalid telemetry never marked healthy |
-| Action Queue | PASS | approval-required; no auto-execution; no device control |
-| EcoWitt-only scanner | PASS | no non-EcoWitt vendor regressions |
+| Surface                                 | Result | Notes                                                                  |
+| --------------------------------------- | ------ | ---------------------------------------------------------------------- |
+| Quick Log save                          | PASS   | Unreachable path at the time (removed, #593); not live-save evidence   |
+| Plant timeline                          | PASS   | Category/evidence/readability/print sections render                    |
+| Sensors operator EcoWitt live-row proof | PASS   | live/stale/invalid/limited/no-recent states intact                     |
+| Sensors operator ingest-audit proof     | PASS   | blocked vs error copy now distinguished                                |
+| One-Tent Live Proof checklist           | PASS   | needs-confirmation when state cannot be inferred                       |
+| One-Tent sensor-proof section           | PASS   | present / live_only / audit_only / stale / invalid / blocked / missing |
+| One-Tent copy/print report              | PASS   | static-safety asserts no UUID / ISO-second leaks                       |
+| AI Doctor readiness                     | PASS   | no overconfidence, missing-context disclosed                           |
+| Alerts                                  | PASS   | stale/invalid telemetry never marked healthy                           |
+| Action Queue                            | PASS   | approval-required; no auto-execution; no device control                |
+| EcoWitt-only scanner                    | PASS   | no non-EcoWitt vendor regressions                                      |
 
 ## Validation counts
 
@@ -54,7 +64,7 @@
 2. With an operator-role account, append `?operator=1` to the Sensors URL — show row-level live proof + ingest-audit proof panels (counts, last-accepted, last-rejected, proof window).
 3. Open One-Tent Live Proof — show the 6-step checklist + sensor-proof section + shortcut links.
 4. Click **Copy proof summary** — paste into a notes app to show the sanitized markdown report (no IDs, no timestamps below day-level for audit rows).
-5. Walk the loop: Quick Log → Timeline category → AI Doctor readiness → Alert → Add to Action Queue (approval required) → Complete → Follow-up diary entry → Timeline back-pointer.
+5. Walk the loop: Quick Log → Timeline category → AI Doctor readiness → Alert → Add to Action Queue (approval required) → Complete → the grower enters a follow-up (never created automatically; see `one-tent-loop-golden-path.md`) → Timeline back-pointer.
 6. Refresh One-Tent Live Proof to show all six checklist steps green.
 
 ## Rollback notes
@@ -71,6 +81,7 @@
 This docs-only update intentionally triggers the Demo Proof Walkthrough read-only CI workflow.
 
 Expected CI checks:
+
 - demo proof route guards
 - proof report redaction guards
 - targeted Demo Proof Walkthrough vitest suites
@@ -125,7 +136,6 @@ bun run test:e2e:demo-proof-readonly
    ```
 4. If still not triggered, revert/remove this "Demo Proof CI verification" section from `docs/one-tent-loop-rc-smoke-test.md`.
 5. No product rollback is required — this PR is docs-only.
-
 
 ### Path-filter verification (one-liner)
 
@@ -241,10 +251,12 @@ Notes:
 ### Downloaded artifact file layout
 
 **`demo-proof-playwright-report`** — Playwright HTML report bundle.
+
 - Entry point: `index.html` (may be nested one directory deep after extraction).
 - Open with `bun run test:demo-proof:open-report` or `bunx playwright show-report <dir>`.
 
 **`demo-proof-playwright-results`** — raw results from CI's `test-results/`.
+
 - Expected per-test shape:
   - `test-results/<spec-or-test-name>/trace.zip`
   - `test-results/<spec-or-test-name>/*.webm`

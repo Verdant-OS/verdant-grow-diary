@@ -24,8 +24,8 @@ const TRANSITION_REASON_COPY = {
   status_conflict: "This action changed elsewhere. The latest status has been reloaded.",
   action_not_found: "This action is no longer available. The queue has been reloaded.",
   rpc_missing:
-    "Action updates are temporarily unavailable — the backend hasn't finished deploying. " +
-    "Your queue is unchanged. Please try again in a few minutes.",
+    "That decision was not saved. Try again. If another button already succeeded, that status is kept. " +
+    "This queue never sends equipment control.",
 } as const;
 
 /**

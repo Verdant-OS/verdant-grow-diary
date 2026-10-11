@@ -5,8 +5,12 @@
  */
 
 import type { QuickLogV2Action, ResolvedQuickLogV2Target } from "./quickLogV2Rules";
+import { isQuickLogV2CriticalContentMissing } from "./quickLogV2Rules";
 import { isTemperatureValid, isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
 import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
+import { hasQuickLogMaturityEvidence } from "./quickLogMaturityEvidenceRules";
+import type { QuickLogMaturityEvidenceFormState } from "./quickLogMaturityEvidenceRules";
+import { buildManualSensorProvenance } from "./manualSensorProvenanceRules";
 
 export interface QuickLogV2SavePayload {
   p_target_type: "tent" | "plant";
@@ -46,6 +50,14 @@ export interface BuildQuickLogV2PayloadInput {
   /** Stage tag; normalized here — unknown/blank values are simply omitted. */
   stage?: string | null;
   idempotencyKey: string;
+  /**
+   * Companion photo/video selected on the sheet. Media is not part of the
+   * RPC payload shape, but it counts as critical content for note saves so
+   * an empty-note photo log can still persist after the empty-content gate.
+   */
+  hasCompanionMedia?: boolean;
+  /** Optional maturity form; non-empty evidence also satisfies the content gate. */
+  maturityEvidenceForm?: QuickLogMaturityEvidenceFormState | null;
 }
 
 export type BuildResult =
@@ -110,6 +122,31 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
   }
 
   const note = (input.note ?? "").trim();
+  const hasMaturityEvidence =
+    input.details != null ||
+    (input.maturityEvidenceForm != null && hasQuickLogMaturityEvidence(input.maturityEvidenceForm));
+  if (
+    isQuickLogV2CriticalContentMissing({
+      action,
+      note,
+      temperatureC: input.temperatureC ?? "",
+      humidityPct: input.humidityPct ?? "",
+      vpdKpa: input.vpdKpa ?? "",
+      hasPhoto: input.hasCompanionMedia === true,
+      hasVideo: false,
+      hasMaturityEvidence,
+    })
+  ) {
+    return { ok: false, reason: "empty_content" };
+  }
+
+  // Metadata belongs to the existing diary companion. Do not duplicate the
+  // measurements: the RPC already creates their environment event sibling.
+  const details =
+    t !== null || h !== null || v !== null
+      ? { ...input.details, manual_provenance: buildManualSensorProvenance() }
+      : input.details;
+
   return {
     ok: true,
     payload: {
@@ -122,7 +159,7 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
       p_humidity_pct: h,
       p_vpd_kpa: v,
       p_occurred_at: input.occurredAt ?? null,
-      ...(input.details ? { p_details: input.details } : {}),
+      ...(details ? { p_details: details } : {}),
       ...((): { p_stage?: string } => {
         const stage = normalizeQuickLogStage(input.stage ?? "");
         return stage ? { p_stage: stage } : {};

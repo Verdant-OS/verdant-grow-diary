@@ -28,7 +28,9 @@ import {
 import { Link } from "@/lib/react-router-compat";
 
 import {
+  AI_DOCTOR_SENSOR_EVIDENCE_MODE_LABELS,
   buildPlantDetailAiDoctorReadiness,
+  formatAiDoctorSensorEvidenceStatus,
   type PlantDetailAiDoctorReadinessInput,
   type AiDoctorReadinessLevel,
   type AiDoctorSensorEvidenceMode,
@@ -41,11 +43,14 @@ import {
 import { buildSensorsTentRouteHref } from "@/lib/sensorRouteTentIntentRules";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
+import { useNowTick } from "@/hooks/useNowTick";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import {
   AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
   AI_DOCTOR_CURRENT_SENSOR_SOURCES,
+  AI_DOCTOR_MANUAL_SENSOR_SOURCES,
   classifyAiDoctorCurrentSensorEvidence,
+  mergeAiDoctorCurrentSensorWindows,
   selectAiDoctorSensorEvidenceClassification,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { isUuid } from "@/lib/isUuid";
@@ -199,27 +204,40 @@ export default function PlantDetailAiDoctorReadiness({
   stage,
   hasPlantPhoto = false,
 }: PlantDetailAiDoctorReadinessProps) {
+  const nowMs = useNowTick();
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId ?? null);
   const { data: bridgeHealth } = useSensorBridgeHealth();
-  const {
-    byTent: currentReadingsByTent,
-    statusByTent: currentSensorStatusByTent,
-    refetch: refetchCurrentSensorRows,
-  } = useSensorReadingsByTents(
-    isUuid(tentId) ? [tentId] : [],
+  const tentIds = isUuid(tentId) ? [tentId] : [];
+  const mixedWindow = useSensorReadingsByTents(
+    tentIds,
     AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
     AI_DOCTOR_CURRENT_SENSOR_SOURCES,
   );
-  const currentSensorStatus = isUuid(tentId)
-    ? (currentSensorStatusByTent[tentId] ?? "loading")
+  const manualWindow = useSensorReadingsByTents(
+    tentIds,
+    AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
+    AI_DOCTOR_MANUAL_SENSOR_SOURCES,
+  );
+  const mixedStatus = isUuid(tentId) ? (mixedWindow.statusByTent[tentId] ?? "loading") : "success";
+  const manualStatus = isUuid(tentId)
+    ? (manualWindow.statusByTent[tentId] ?? "loading")
     : "success";
-  const currentSensorLoading = currentSensorStatus === "loading";
-  const currentSensorError =
-    currentSensorStatus === "error" || currentSensorStatus === "refresh_error";
-  const currentSensorRows =
-    tentId && !currentSensorError
-      ? (currentReadingsByTent[tentId] ?? NO_CURRENT_SENSOR_ROWS)
+  const mixedFailed = mixedStatus === "error" || mixedStatus === "refresh_error";
+  const manualFailed = manualStatus === "error" || manualStatus === "refresh_error";
+  const currentSensorLoading = mixedStatus === "loading" || manualStatus === "loading";
+  const mixedRows =
+    tentId && !mixedFailed
+      ? (mixedWindow.byTent[tentId] ?? NO_CURRENT_SENSOR_ROWS)
       : NO_CURRENT_SENSOR_ROWS;
+  const manualRows =
+    tentId && !manualFailed
+      ? (manualWindow.byTent[tentId] ?? NO_CURRENT_SENSOR_ROWS)
+      : NO_CURRENT_SENSOR_ROWS;
+  const currentSensorRows = mergeAiDoctorCurrentSensorWindows(mixedRows, manualRows);
+  const refetchCurrentSensorRows = () => {
+    void mixedWindow.refetch();
+    void manualWindow.refetch();
+  };
 
   const signals = useMemo(() => {
     return deriveSignals(plantId, hasPlantPhoto, rawRows ?? []);
@@ -229,7 +247,9 @@ export default function PlantDetailAiDoctorReadiness({
   // Audit counts may preserve a cautionary/unsafe state, but a coarse audit
   // `usable` result cannot override row-level no-data/testbench filtering.
   const sensorSnapshot = useMemo<Classification | null>(() => {
-    const current = classifyAiDoctorCurrentSensorEvidence(currentSensorRows);
+    const current = classifyAiDoctorCurrentSensorEvidence(currentSensorRows, {
+      now: new Date(nowMs),
+    });
     const audit = bridgeHealth
       ? classificationFromStatusResult({
           status: bridgeHealth.status,
@@ -237,7 +257,10 @@ export default function PlantDetailAiDoctorReadiness({
         })
       : null;
     return selectAiDoctorSensorEvidenceClassification(current, audit);
-  }, [bridgeHealth, currentSensorRows]);
+  }, [bridgeHealth, currentSensorRows, nowMs]);
+
+  // A failed read cannot prove absence; a surviving usable snapshot can still help.
+  const currentSensorError = (mixedFailed || manualFailed) && sensorSnapshot?.status !== "usable";
 
   const result = useMemo(() => {
     return buildPlantDetailAiDoctorReadiness({
@@ -391,23 +414,15 @@ export default function PlantDetailAiDoctorReadiness({
                 data-testid="plant-detail-ai-doctor-sensor-evidence-mode-badge"
               >
                 {modeIcon(sensor.mode)}
-                {sensor.mode}
+                {AI_DOCTOR_SENSOR_EVIDENCE_MODE_LABELS[sensor.mode]}
               </Badge>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
               <span data-testid="plant-detail-ai-doctor-sensor-evidence-status">
-                status:{" "}
-                <span className="font-mono text-foreground/80">{sensor.status ?? "unknown"}</span>
-              </span>
-              <span data-testid="plant-detail-ai-doctor-sensor-evidence-reason">
-                reason:{" "}
-                <span className="font-mono text-foreground/80">{sensor.reason ?? "unknown"}</span>
+                {formatAiDoctorSensorEvidenceStatus(sensor.status)}
               </span>
               <span data-testid="plant-detail-ai-doctor-sensor-evidence-healthy">
-                healthy evidence:{" "}
-                <span className="font-mono text-foreground/80">
-                  {sensor.countsAsHealthyEvidence ? "yes" : "no"}
-                </span>
+                Counts as current evidence: {sensor.countsAsHealthyEvidence ? "yes" : "no"}
               </span>
             </div>
             <p

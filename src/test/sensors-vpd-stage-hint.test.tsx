@@ -9,6 +9,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Sensors from "@/pages/Sensors";
 import { VPD_STAGE_HELPER_TEXT } from "@/lib/vpdStageTargetRules";
 
+vi.mock("@/hooks/useSensorsQuickLogManualReadings", () => ({
+  useSensorsQuickLogManualReadings: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
+
+// The Sensors page reads active plants for its stage (BUG-006 follow-up).
+vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: [], isError: false }) }));
 vi.mock("@/hooks/useGrowData", () => ({
   useGrowTents: () => ({
     data: [],

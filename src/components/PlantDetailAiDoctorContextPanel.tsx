@@ -35,6 +35,8 @@ import { ROOT_ZONE_OBSERVATION_CAP } from "@/lib/rootZoneObservationRules";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { AI_DOCTOR_CURRENT_SENSOR_ROW_CAP } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { isUuid } from "@/lib/isUuid";
+import { buildAiDoctorContextReadView } from "@/lib/aiDoctorContextReadStateRules";
+import { Button } from "@/components/ui/button";
 
 const AI_DOCTOR_CONTEXT_MANUAL_SENSOR_SOURCES = ["manual"] as const;
 
@@ -76,10 +78,11 @@ export default function PlantDetailAiDoctorContextPanel({
   plant,
   vpdDrift,
 }: PlantDetailAiDoctorContextPanelProps) {
-  const { items: evidenceItems, isLoading } = useTimelineMemory(
+  const timelineHistory = useTimelineMemory(
     { kind: "plant", plantId, tentId: plant?.tentId ?? null },
     TIMELINE_MEMORY_DEFAULT_LIMIT,
   );
+  const evidenceItems = timelineHistory.items;
   const rootZoneScope = buildAiDoctorRootZoneReadinessScope({
     plantId,
     tentId: plant?.tentId,
@@ -88,12 +91,27 @@ export default function PlantDetailAiDoctorContextPanel({
   const rootZoneHistory = useRootZoneObservations(rootZoneScope, ROOT_ZONE_OBSERVATION_CAP);
   const rootZoneObservations = selectSettledAiDoctorRootZoneObservations(rootZoneHistory);
   const tentId = isUuid(plant?.tentId) ? plant.tentId : null;
-  const { byTent: currentReadingsByTent, statusByTent: currentSensorStatusByTent } =
-    useSensorReadingsByTents(
-      tentId ? [tentId] : [],
-      AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
-      AI_DOCTOR_CONTEXT_MANUAL_SENSOR_SOURCES,
-    );
+  const currentSensors = useSensorReadingsByTents(
+    tentId ? [tentId] : [],
+    AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
+    AI_DOCTOR_CONTEXT_MANUAL_SENSOR_SOURCES,
+  );
+  const { byTent: currentReadingsByTent, statusByTent: currentSensorStatusByTent } = currentSensors;
+  const readView = buildAiDoctorContextReadView({
+    timeline: timelineHistory,
+    rootZone: rootZoneScope ? rootZoneHistory : null,
+    manual: tentId
+      ? {
+          status: currentSensorStatusByTent[tentId],
+          refreshing: currentSensors.refreshingByTent?.[tentId],
+        }
+      : null,
+  });
+  const retryContext = () => {
+    timelineHistory.refetch();
+    if (rootZoneScope) void rootZoneHistory.refetch();
+    void currentSensors.refetch();
+  };
   const currentSensorRows = useMemo(
     () =>
       tentId && currentSensorStatusByTent[tentId] === "success"
@@ -137,7 +155,7 @@ export default function PlantDetailAiDoctorContextPanel({
     <section
       aria-labelledby="plant-ai-doctor-context-heading"
       data-testid="plant-ai-doctor-context-panel"
-      data-readiness={result.readiness}
+      data-readiness={readView.showAssessment ? result.readiness : readView.status}
       className="glass my-3 min-w-0 space-y-3 rounded-2xl p-4"
     >
       <header className="flex items-start justify-between gap-2 flex-wrap">
@@ -153,27 +171,51 @@ export default function PlantDetailAiDoctorContextPanel({
             claim a diagnosis.
           </p>
         </div>
-        <span
-          className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs ${style.badge}`}
-          data-testid="plant-ai-doctor-context-readiness"
-        >
-          {style.icon}
-          {AI_DOCTOR_READINESS_LABELS[result.readiness]}
-        </span>
+        {readView.showAssessment ? (
+          <span
+            className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs ${style.badge}`}
+            data-testid="plant-ai-doctor-context-readiness"
+          >
+            {style.icon}
+            {AI_DOCTOR_READINESS_LABELS[result.readiness]}
+          </span>
+        ) : null}
       </header>
 
-      {result.readiness !== "strong" ? (
+      {readView.message ? (
+        <div role="status" className="space-y-2 text-xs text-muted-foreground">
+          <p>{readView.message}</p>
+          {readView.cachedNotice ? <p>{readView.cachedNotice}</p> : null}
+          {readView.canRetry ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={
+                timelineHistory.isFetching || rootZoneHistory.isFetching || currentSensors.isLoading
+              }
+              onClick={retryContext}
+            >
+              Retry context
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {readView.showAssessment && result.readiness !== "strong" ? (
         <p className="text-xs text-muted-foreground" data-testid="plant-ai-doctor-context-notice">
           {AI_DOCTOR_INSUFFICIENT_NOTICE}
         </p>
       ) : null}
 
-      <div className="grid min-w-0 grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-        <Stat label="Recent events (7d)" value={result.counts.recentEvents} />
-        <Stat label="Recent watering/feeding" value={result.counts.recentWateringOrFeeding} />
-        <Stat label="Manual snapshots (7d)" value={result.counts.recentManualSnapshots} />
-        <Stat label="Warnings (7d)" value={result.counts.recentWarnings} />
-      </div>
+      {readView.showAssessment ? (
+        <div className="grid min-w-0 grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+          <Stat label="Recent events (7d)" value={result.counts.recentEvents} />
+          <Stat label="Recent watering/feeding" value={result.counts.recentWateringOrFeeding} />
+          <Stat label="Manual snapshots (7d)" value={result.counts.recentManualSnapshots} />
+          <Stat label="Warnings (7d)" value={result.counts.recentWarnings} />
+        </div>
+      ) : null}
 
       {latestSnap ? (
         <p
@@ -187,7 +229,7 @@ export default function PlantDetailAiDoctorContextPanel({
       <div className="grid sm:grid-cols-2 gap-3">
         <div data-testid="plant-ai-doctor-context-evidence">
           <div className="text-xs font-medium mb-1">Evidence available</div>
-          {result.evidence.length === 0 ? (
+          {result.evidence.length === 0 && readView.showAssessment ? (
             <p className="text-xs text-muted-foreground">No supporting context yet.</p>
           ) : (
             <ul className="space-y-0.5 text-xs">
@@ -209,33 +251,35 @@ export default function PlantDetailAiDoctorContextPanel({
             </ul>
           )}
         </div>
-        <div data-testid="plant-ai-doctor-context-missing">
-          <div className="text-xs font-medium mb-1">Missing information</div>
-          {result.missing.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Nothing critical missing.</p>
-          ) : (
-            <ul className="space-y-0.5 text-xs">
-              {result.missing.map((code) => (
-                <li
-                  key={code}
-                  className="flex items-start gap-1.5"
-                  title={tooltipForMissing(code)}
-                  data-tooltip={tooltipForMissing(code)}
-                  data-code={code}
-                >
-                  <AlertTriangle
-                    className="h-3.5 w-3.5 mt-0.5 text-amber-400 shrink-0"
-                    aria-hidden="true"
-                  />
-                  <span>{labelMissing(code)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        {readView.showAssessment ? (
+          <div data-testid="plant-ai-doctor-context-missing">
+            <div className="text-xs font-medium mb-1">Missing information</div>
+            {result.missing.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nothing critical missing.</p>
+            ) : (
+              <ul className="space-y-0.5 text-xs">
+                {result.missing.map((code) => (
+                  <li
+                    key={code}
+                    className="flex items-start gap-1.5"
+                    title={tooltipForMissing(code)}
+                    data-tooltip={tooltipForMissing(code)}
+                    data-code={code}
+                  >
+                    <AlertTriangle
+                      className="h-3.5 w-3.5 mt-0.5 text-amber-400 shrink-0"
+                      aria-hidden="true"
+                    />
+                    <span>{labelMissing(code)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : null}
       </div>
 
-      {quickActions.length > 0 ? (
+      {readView.showAssessment && quickActions.length > 0 ? (
         <AiDoctorContextQuickActions
           actions={quickActions}
           testIdPrefix="plant-ai-doctor-context"
@@ -247,7 +291,7 @@ export default function PlantDetailAiDoctorContextPanel({
         testId="plant-ai-doctor-context-vpd-drift"
       />
 
-      {noWarningContext ? (
+      {readView.showAssessment && noWarningContext ? (
         <p
           className="text-[11px] text-muted-foreground"
           data-testid="plant-ai-doctor-context-no-warning"
@@ -256,14 +300,10 @@ export default function PlantDetailAiDoctorContextPanel({
         </p>
       ) : null}
 
-      <p className="text-xs" data-testid="plant-ai-doctor-context-safe-next-step">
-        <span className="font-medium">Safe next step: </span>
-        <span className="text-muted-foreground">{result.safeNextStep}</span>
-      </p>
-
-      {isLoading ? (
-        <p className="text-[11px] text-muted-foreground" aria-live="polite">
-          Loading recent context…
+      {readView.showAssessment ? (
+        <p className="text-xs" data-testid="plant-ai-doctor-context-safe-next-step">
+          <span className="font-medium">Safe next step: </span>
+          <span className="text-muted-foreground">{result.safeNextStep}</span>
         </p>
       ) : null}
     </section>

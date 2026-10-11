@@ -74,12 +74,11 @@ describe("webhook decide() — adjustment.created refund path", () => {
     }
   });
 
-  it("adjustment.updated stays audit-only (no side effects)", () => {
+  it("routes an approved adjustment.updated refund to revoke_lifetime", () => {
     const d = decide(
       {
         eventId: "evt_upd",
         eventType: "adjustment.updated" as const,
-        // Cast: decide() reads `data` as unknown for adjustment events.
         data: {
           action: "refund",
           status: "approved",
@@ -89,9 +88,10 @@ describe("webhook decide() — adjustment.created refund path", () => {
       "live",
       NOW,
     );
-    expect(d.kind).toBe("skip");
-    if (d.kind === "skip") {
-      expect(d.reason).toBe("adjustment_audit_only");
+    expect(d.kind).toBe("revoke_lifetime");
+    if (d.kind === "revoke_lifetime") {
+      expect(d.paddleTransactionId).toBe("txn_abc");
+      expect(d.env).toBe("live");
     }
   });
 });

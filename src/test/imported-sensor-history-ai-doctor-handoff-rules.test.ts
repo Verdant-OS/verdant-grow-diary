@@ -48,15 +48,20 @@ describe("imported sensor history AI Doctor handoff rules", () => {
   it.each([
     [{ isError: true, isFetching: true, hasRows: false }, "error"],
     [{ isError: true, isFetching: false, hasRows: true }, "error"],
+    [{ isError: true, isPaused: true, hasRows: false, isFetching: false }, "error"],
     [{ isError: false, isFetching: true, hasRows: false }, "loading"],
     [{ isError: false, isFetching: true, hasRows: true }, "success"],
     [{ isError: false, isFetching: false, hasRows: false }, "success"],
+    [{ isError: false, isPaused: true, hasRows: false, isFetching: false }, "paused"],
+    [{ isError: false, isPaused: true, hasRows: false, isFetching: true }, "paused"],
+    [{ isError: false, isPaused: true, hasRows: true, isFetching: true }, "success"],
   ] as const)("resolves cached-row read status %#", (readState, expected) => {
     expect(resolveImportedHistoryHandoffReadStatus(readState)).toBe(expected);
   });
 
   it.each([
     ["loading", "history_loading"],
+    ["paused", "history_loading"],
     ["error", "history_error"],
     ["success", "history_empty"],
   ] as const)("distinguishes %s history as %s", (historyStatus, expectedState) => {
@@ -111,6 +116,19 @@ describe("imported sensor history AI Doctor handoff rules", () => {
       distinctTimestampCount: 1,
       choices: [],
     });
+  });
+
+  it("withholds plant review links while active-plant reads are paused", () => {
+    const result = buildImportedSensorHistoryAiDoctorHandoff(input({ plantStatus: "paused" }));
+
+    expect(result).toMatchObject({
+      state: "plants_paused",
+      title: "Waiting for a connection",
+      validObservationCount: 2,
+      distinctTimestampCount: 2,
+      choices: [],
+    });
+    expect(result.body).toMatch(/Waiting for a connection to check active plants/);
   });
 
   it.each([

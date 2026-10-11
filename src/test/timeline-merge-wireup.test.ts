@@ -21,6 +21,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { mergeTimelineSources } from "@/lib/timelineMergeRules";
+import { buildRenderedDiaryTimelineAnchorIds } from "@/lib/timelineEntryAnchorRules";
+import { findSupabaseTableWrites } from "@/test/helpers/supabaseTableWriteScan";
 
 const TIMELINE_SRC = readFileSync(resolve(__dirname, "../pages/Timeline.tsx"), "utf8");
 
@@ -52,6 +54,99 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     expect(TIMELINE_SRC).toMatch(/addEventListener\(\s*["']verdant:entry-created["']/);
   });
 
+  it("refetches Timeline evidence when a confirmed manual correction lands", () => {
+    expect(TIMELINE_SRC).toMatch(/from\s+["']@\/lib\/manualSensorCorrectionEvents["']/);
+    expect(TIMELINE_SRC).toMatch(/\bsubscribeManualSensorCorrections\s*\(\s*ownerId/);
+    expect(TIMELINE_SRC).toMatch(
+      /subscribeManualSensorCorrections\s*\(\s*ownerId[\s\S]{0,120}void\s+load\s*\(\s*\)/,
+    );
+  });
+
+  it("refetches when a tent Manual Snapshot lands in sensor_readings", () => {
+    expect(TIMELINE_SRC).toMatch(/verdant:sensor-reading-created/);
+    expect(TIMELINE_SRC).toMatch(/addEventListener\(\s*["']verdant:sensor-reading-created["']/);
+  });
+
+  it("refetches when a confirmed manual correction lands for the signed-in owner", () => {
+    expect(TIMELINE_SRC).toMatch(/subscribeManualSensorCorrections\s*\(\s*ownerId/);
+    expect(TIMELINE_SRC).toMatch(/subscribeManualSensorCorrections[\s\S]{0,120}void\s+load\(\)/);
+    expect(TIMELINE_SRC).toMatch(/\[\s*ownerId\s*,\s*load\s*\]/);
+  });
+
+  it("counts supplemental manual sensor receipts toward timeline evidence", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /evidenceCount:\s*recentLaneRawEntries\.length\s*\+\s*manualSensorMeasurementEntries\.length/,
+    );
+  });
+
+  it("reads effective manual sensor values as a supplemental Timeline source", () => {
+    expect(TIMELINE_SRC).toContain("effectiveSensorReadingsQuery()");
+    expect(TIMELINE_SRC).toContain("requireEffectiveSensorReadings(capturedResult.data)");
+    expect(TIMELINE_SRC).toContain("requireEffectiveSensorReadings(legacyResult.data)");
+    expect(TIMELINE_SRC).toMatch(/eq\(\s*["']source["']\s*,\s*["']manual["']\s*\)/);
+    expect(findSupabaseTableWrites(TIMELINE_SRC, "sensor_readings", "Timeline.tsx")).toEqual([]);
+  });
+
+  it("reloads after owner-scoped manual correction notifications", () => {
+    expect(TIMELINE_SRC).toContain("subscribeManualSensorCorrections");
+    expect(TIMELINE_SRC).toMatch(
+      /subscribeManualSensorCorrections\s*\(\s*ownerId\s*,[\s\S]*void\s+load\s*\(\s*\)/,
+    );
+  });
+
+  it("counts manual sensor receipts toward Timeline evidence for empty-state gating", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /evidenceCount:\s*recentLaneRawEntries\.length\s*\+\s*manualSensorMeasurementEntries\.length/,
+    );
+  });
+
+  it("applies the active date bounds to manual sensor effective reads at query and receipt layers", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /capturedQuery\s*=\s*capturedQuery\.gte\(\s*["']captured_at["']\s*,\s*timelineDateRangeBounds\.startIso\s*\)/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /capturedQuery\s*=\s*capturedQuery\.lte\(\s*["']captured_at["']\s*,\s*timelineDateRangeBounds\.endIso\s*\)/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /legacyQuery\s*=\s*legacyQuery\.gte\(\s*["']ts["']\s*,\s*timelineDateRangeBounds\.startIso\s*\)/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /legacyQuery\s*=\s*legacyQuery\.lte\(\s*["']ts["']\s*,\s*timelineDateRangeBounds\.endIso\s*\)/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /receipts\s*=\s*receipts\.filter\([\s\S]*row\.entry_at\s*>=\s*timelineDateRangeBounds\.startIso/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /receipts\s*=\s*receipts\.filter\([\s\S]*row\.entry_at\s*<=\s*timelineDateRangeBounds\.endIso/,
+    );
+  });
+
+  it("gates supplemental tents and sensor_readings on directoryGrowId like the owner directory", () => {
+    expect(TIMELINE_SRC).toMatch(/if\s*\(\s*directoryGrowId\s*\)\s*\{/);
+    expect(TIMELINE_SRC).toMatch(/\.eq\(\s*["']grow_id["']\s*,\s*directoryGrowId\s*\)/);
+    expect(TIMELINE_SRC).toMatch(
+      /\[activeGrowId,\s*activeReadKey,\s*directoryGrowId,\s*timelineDateRangeBounds,\s*user\]/,
+    );
+  });
+
+  it("does not apply a stale sensor-read catch to a newer request", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /catch\s*\{[\s\S]{0,80}!isCurrentRequest\(\)[\s\S]{0,160}setManualSensorMeasurementEntries\(\[\]\)/,
+    );
+  });
+
+  it("keeps derived sensor receipts out of the recent Quick Log / calendar diary lane", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /displayEntries[\s\S]{0,80}\.filter\(\s*\(e\)\s*=>\s*!isTimelineSensorDerivedDiaryId\(\s*e\.id\s*\)/,
+    );
+  });
+
+  it("counts Detailed diary without mixing sensor receipts into entriesTotal", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /filtered\.filter\(\(e\)\s*=>\s*!isTimelineSensorDerivedDiaryId\(e\.id\)\)\.length/,
+    );
+  });
+
   it("still fetches both diary_entries and grow_events from supabase", () => {
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']diary_entries["']\s*\)/);
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']grow_events["']\s*\)/);
@@ -78,6 +173,29 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
   it("feeds the merged read stream into both root-zone history panels", () => {
     expect(TIMELINE_SRC).toMatch(/<WateringHistoryPanel\s+rawEntries=\{recentLaneRawEntries\}/);
     expect(TIMELINE_SRC).toMatch(/<FeedingHistoryPanel\s+rawEntries=\{recentLaneRawEntries\}/);
+  });
+
+  it("derives anchor reservations from the post-filter diary page slice", () => {
+    expect(TIMELINE_SRC).toMatch(/from\s+["']@\/lib\/timelineEntryAnchorRules["']/);
+    expect(TIMELINE_SRC).toMatch(/buildRenderedDiaryTimelineAnchorIds\s*\(\s*filtered\s*\)/);
+    expect(TIMELINE_SRC).toMatch(/const renderedDiaryAnchorIds = useMemo\(/);
+  });
+
+  it("passes rendered diary anchor reservations into both typed history panels", () => {
+    const reservationProps = TIMELINE_SRC.match(
+      /reservedTimelineAnchorIds=\{renderedDiaryAnchorIds\}/g,
+    );
+    expect(reservationProps).toHaveLength(2);
+  });
+});
+
+describe("Timeline anchor ownership — filtered page contract", () => {
+  it("reserves anchors only from diary rows on the rendered page slice", () => {
+    const reserved = buildRenderedDiaryTimelineAnchorIds([
+      { id: "visible", details: { linked_grow_event_id: "event-visible" } },
+    ]);
+    expect([...reserved]).toEqual(["timeline-entry-visible", "timeline-entry-event-visible"]);
+    expect(reserved.has("timeline-entry-off-page")).toBe(false);
   });
 });
 

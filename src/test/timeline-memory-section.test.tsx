@@ -3,9 +3,9 @@
  *
  * Mocks the Supabase client so the read-only diary fetch is deterministic.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, cleanup, render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import TimelineMemorySection from "@/components/TimelineMemorySection";
 
@@ -80,9 +80,12 @@ const ROWS: Row[] = [
 ];
 
 let nextResponse: { data: Row[] | null; error: unknown } = { data: [], error: null };
+let nextAuditResponse: { data: unknown[] | null; error: unknown } | undefined;
+const queryReads = vi.hoisted(() => vi.fn());
+const clients: QueryClient[] = [];
 
 vi.mock("@/integrations/supabase/client", () => {
-  function makeQuery() {
+  function makeQuery(table: string) {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = () => q;
@@ -91,26 +94,218 @@ vi.mock("@/integrations/supabase/client", () => {
     q.in = () => q;
     q.or = () => q;
     q.order = () => q;
-    q.limit = () => Promise.resolve(nextResponse);
+    q.limit = () =>
+      Promise.resolve(
+        table === "ai_doctor_sessions" && nextAuditResponse !== undefined
+          ? nextAuditResponse
+          : nextResponse,
+      );
     return q;
   }
-  return { supabase: { from: () => makeQuery() } };
+  return {
+    supabase: {
+      from: (table: string) => {
+        queryReads(table);
+        return makeQuery(table);
+      },
+    },
+  };
 });
 
 function renderSection(props: Parameters<typeof TimelineMemorySection>[0]) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  clients.push(qc);
+  const rendered = render(
     <QueryClientProvider client={qc}>
       <TimelineMemorySection {...props} />
     </QueryClientProvider>,
   );
+  return { ...rendered, qc };
 }
 
 beforeEach(() => {
   nextResponse = { data: [], error: null };
+  nextAuditResponse = undefined;
+  queryReads.mockClear();
+  onlineManager.setOnline(true);
+});
+
+afterEach(() => {
+  cleanup();
+  clients.splice(0).forEach((client) => client.clear());
+  onlineManager.setOnline(true);
 });
 
 describe("TimelineMemorySection", () => {
+  it.each([
+    { name: "failed", response: { data: null, error: new Error("audit read failed") } },
+    { name: "malformed", response: { data: null, error: null } },
+  ])(
+    "does not claim empty history when the Doctor evidence read is $name",
+    async ({ response }) => {
+      nextAuditResponse = response;
+      const { qc } = renderSection({ scope: "plant", plantId: "plant-1" });
+      await waitFor(() =>
+        expect(
+          qc.getQueryCache().find({ queryKey: ["timeline_memory"], exact: false })?.state.status,
+        ).toBe("success"),
+      );
+      expect(screen.queryByTestId("timeline-memory-empty")).not.toBeInTheDocument();
+      expect(screen.getByTestId("timeline-memory-doctor-evidence-unavailable")).toHaveTextContent(
+        "AI Doctor timeline evidence is unavailable.",
+      );
+      expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+    },
+  );
+
+  it("preserves surviving diary evidence and retries a failed Doctor evidence read", async () => {
+    nextResponse = { data: ROWS, error: null };
+    nextAuditResponse = { data: null, error: new Error("audit read failed") };
+    renderSection({ scope: "tent", tentId: "tent-1" });
+    await waitFor(() => expect(screen.getByTestId("timeline-memory-day-groups")).toBeVisible());
+    expect(screen.getByText("Top dressed.")).toBeVisible();
+    expect(screen.getAllByTestId("manual-snapshot-timeline-card")).toHaveLength(2);
+    expect(screen.getByTestId("timeline-memory-doctor-evidence-unavailable")).toBeVisible();
+    queryReads.mockClear();
+    nextAuditResponse = {
+      data: [
+        {
+          id: "doctor-audit-recovered",
+          created_at: "2026-01-06T10:00:00.000Z",
+          sensor_snapshot_status: "stale",
+          sensor_snapshot_reason_code: "stale_reading",
+          counts_as_healthy_evidence: false,
+          sensor_evidence_mode: "cautionary",
+          sensor_evidence_evaluated_at: "2026-01-06T10:00:00.000Z",
+        },
+      ],
+      error: null,
+    };
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("timeline-memory-doctor-evidence-unavailable"),
+      ).not.toBeInTheDocument(),
+    );
+    expect(queryReads).toHaveBeenCalledWith("ai_doctor_sessions");
+    expect(queryReads).toHaveBeenCalledWith("diary_entries");
+    expect(screen.getByText("Top dressed.")).toBeVisible();
+    expect(screen.getByTestId("timeline-memory-ai-doctor-evidence-audit")).toHaveTextContent(
+      "AI Doctor treated this as stale cautionary context.",
+    );
+    expect(screen.getByTestId("timeline-memory-ai-doctor-evidence-audit")).toHaveAttribute(
+      "data-counts-as-healthy",
+      "no",
+    );
+  });
+
+  it("shows empty history only after the failed Doctor read also completes empty", async () => {
+    nextAuditResponse = { data: null, error: new Error("audit read failed") };
+    renderSection({ scope: "plant", plantId: "plant-1" });
+    await waitFor(() =>
+      expect(screen.getByTestId("timeline-memory-doctor-evidence-unavailable")).toBeVisible(),
+    );
+    nextAuditResponse = { data: [], error: null };
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(screen.getByTestId("timeline-memory-empty")).toBeVisible());
+    expect(
+      screen.queryByTestId("timeline-memory-doctor-evidence-unavailable"),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { scope: "plant" as const, plantId: "plant-1" },
+    { scope: "tent" as const, tentId: "tent-1" },
+  ])("keeps a paused first $scope read unresolved and loads on reconnect", async (props) => {
+    onlineManager.setOnline(false);
+    nextResponse = { data: ROWS, error: null };
+    const { qc } = renderSection(props);
+    expect(
+      qc.getQueryCache().find({ queryKey: ["timeline_memory"], exact: false })?.state,
+    ).toMatchObject({
+      status: "pending",
+      fetchStatus: "paused",
+      data: undefined,
+    });
+    expect(queryReads).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("timeline-memory-empty")).not.toBeInTheDocument();
+    expect(screen.getByTestId("timeline-memory-paused")).toHaveTextContent(
+      "Waiting for connection to load timeline memory.",
+    );
+    await act(async () => onlineManager.setOnline(true));
+    await waitFor(() => expect(screen.getByTestId("timeline-memory-day-groups")).toBeVisible());
+    expect(screen.queryByTestId("timeline-memory-paused")).not.toBeInTheDocument();
+    expect(screen.getByText("Top dressed.")).toBeVisible();
+  });
+
+  it("reserves empty copy for a successfully completed empty read after reconnect", async () => {
+    onlineManager.setOnline(false);
+    const { qc } = renderSection({ scope: "plant", plantId: "plant-1" });
+    expect(screen.queryByTestId("timeline-memory-empty")).not.toBeInTheDocument();
+    await act(async () => onlineManager.setOnline(true));
+    await waitFor(() => expect(screen.getByTestId("timeline-memory-empty")).toBeVisible());
+    expect(
+      qc.getQueryCache().find({ queryKey: ["timeline_memory"], exact: false })?.state.status,
+    ).toBe("success");
+    expect(queryReads).toHaveBeenCalled();
+  });
+
+  it("shows a failed reconnect read with Retry and recovers without claiming empty", async () => {
+    onlineManager.setOnline(false);
+    nextResponse = { data: null, error: new Error("read failed") };
+    renderSection({ scope: "plant", plantId: "plant-1" });
+    expect(screen.queryByTestId("timeline-memory-empty")).not.toBeInTheDocument();
+    await act(async () => onlineManager.setOnline(true));
+    await waitFor(() => expect(screen.getByTestId("timeline-memory-error")).toBeVisible());
+    expect(screen.queryByTestId("timeline-memory-empty")).not.toBeInTheDocument();
+    nextResponse = { data: ROWS, error: null };
+    fireEvent.click(screen.getByTestId("timeline-memory-retry"));
+    await waitFor(() => expect(screen.getByTestId("timeline-memory-day-groups")).toBeVisible());
+  });
+
+  it("keeps no-scope guidance while offline without starting a read", () => {
+    onlineManager.setOnline(false);
+    renderSection({ scope: "plant", plantId: null });
+    expect(screen.getByTestId("timeline-memory-no-scope")).toBeVisible();
+    expect(screen.queryByTestId("timeline-memory-empty")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-memory-paused")).not.toBeInTheDocument();
+    expect(queryReads).not.toHaveBeenCalled();
+  });
+
+  it("retains loaded history during a paused refresh", async () => {
+    nextResponse = { data: ROWS, error: null };
+    const { qc } = renderSection({ scope: "plant", plantId: "plant-1" });
+    await waitFor(() => expect(screen.getByTestId("timeline-memory-day-groups")).toBeVisible());
+    await act(async () => {
+      onlineManager.setOnline(false);
+      void qc.invalidateQueries({ queryKey: ["timeline_memory"] });
+    });
+    expect(
+      qc.getQueryCache().find({ queryKey: ["timeline_memory"], exact: false })?.state,
+    ).toMatchObject({
+      status: "success",
+      fetchStatus: "paused",
+    });
+    expect(screen.getByText("Top dressed.")).toBeVisible();
+    expect(screen.queryByTestId("timeline-memory-paused")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-memory-empty")).not.toBeInTheDocument();
+  });
+
+  it("keeps an offline retry unresolved after a failed read", async () => {
+    nextResponse = { data: null, error: new Error("read failed") };
+    const { qc } = renderSection({ scope: "tent", tentId: "tent-1" });
+    await waitFor(() => expect(screen.getByTestId("timeline-memory-error")).toBeVisible());
+    await act(async () => onlineManager.setOnline(false));
+    fireEvent.click(screen.getByTestId("timeline-memory-retry"));
+    await waitFor(() =>
+      expect(
+        qc.getQueryCache().find({ queryKey: ["timeline_memory"], exact: false })?.state.fetchStatus,
+      ).toBe("paused"),
+    );
+    expect(screen.getByTestId("timeline-memory-paused")).toBeVisible();
+    expect(screen.queryByTestId("timeline-memory-empty")).not.toBeInTheDocument();
+  });
+
   it("renders all events under 'All' and includes manual snapshots", async () => {
     nextResponse = { data: ROWS, error: null };
     renderSection({ scope: "plant", plantId: "plant-1" });

@@ -11,13 +11,14 @@ import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
 
 const NOW = new Date("2026-05-20T12:00:00Z").getTime();
 
-function renderSummary(state: SnapshotState, activeAlertCount = 0) {
+function renderSummary(state: SnapshotState, activeAlertCount = 0, alertsKnown?: boolean) {
   const summary = buildDashboardSensorHealthSummary(state, NOW);
   return render(
     <MemoryRouter>
       <DashboardSensorHealthSummary
         summary={summary}
         activeAlertCount={activeAlertCount}
+        alertsKnown={alertsKnown}
         growId="grow-1"
       />
     </MemoryRouter>,
@@ -37,6 +38,24 @@ const fresh = (): SnapshotState => ({
 });
 
 describe("DashboardSensorHealthSummary", () => {
+  it.each([
+    ["live", "isPaused"],
+    ["manual", "isPaused"],
+    ["live", "isFetching"],
+    ["manual", "isFetching"],
+  ] as const)("withholds health for cached %s evidence while %s", (source, flag) => {
+    const state = fresh();
+    state.snapshot.source = source;
+    renderSummary({ ...state, [flag]: true });
+    expect(screen.getByTestId("sensor-health-status-pill")).toHaveAttribute(
+      "data-status",
+      "loading",
+    );
+    expect(screen.queryByText(/Healthy/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("sensor-health-body")).toHaveTextContent(
+      flag === "isPaused" ? /Waiting for connection/ : /Refreshing sensor data/,
+    );
+  });
   it("renders Sensor Health summary card with status pill", () => {
     renderSummary(fresh());
     expect(screen.getByTestId("dashboard-sensor-health-summary")).toBeInTheDocument();
@@ -53,14 +72,27 @@ describe("DashboardSensorHealthSummary", () => {
     expect(source).not.toHaveTextContent(/Live/);
   });
 
-  it("never renders missing data as healthy", () => {
+  it("renders a failed read as unavailable without claiming an empty result", () => {
     renderSummary({ status: "unavailable", snapshot: EMPTY_SNAPSHOT });
+    expect(screen.getByTestId("sensor-health-status-pill")).toHaveAttribute(
+      "data-status",
+      "unavailable",
+    );
+    expect(screen.queryByText(/Healthy/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("sensor-health-source-label")).toHaveTextContent(/Unknown/);
+    expect(screen.getByTestId("sensor-health-headline")).toHaveTextContent(/unavailable/i);
+    expect(screen.queryByText(/No sensor data yet/)).not.toBeInTheDocument();
+  });
+
+  it("reserves the no-data guidance for a completed empty read", () => {
+    renderSummary({ status: "ok", snapshot: EMPTY_SNAPSHOT });
     expect(screen.getByTestId("sensor-health-status-pill")).toHaveAttribute(
       "data-status",
       "missing",
     );
-    expect(screen.queryByText(/Healthy/i)).not.toBeInTheDocument();
-    expect(screen.getByTestId("sensor-health-source-label")).toHaveTextContent(/Unknown/);
+    expect(screen.getByTestId("sensor-health-headline")).toHaveTextContent(
+      "No sensor data yet for this grow.",
+    );
   });
 
   it("renders Stale label honestly for old reading even when source==live", () => {
@@ -158,5 +190,11 @@ describe("DashboardSensorHealthSummary", () => {
   it("hides empty-alerts block when there are active alerts", () => {
     renderSummary(fresh(), 3);
     expect(screen.queryByTestId("sensor-health-empty-alerts")).not.toBeInTheDocument();
+  });
+
+  it("hides empty-alerts copy when the alerts read is not confirmed", () => {
+    renderSummary(fresh(), 0, false);
+    expect(screen.queryByTestId("sensor-health-empty-alerts")).not.toBeInTheDocument();
+    expect(screen.queryByText("No active alerts right now.")).not.toBeInTheDocument();
   });
 });

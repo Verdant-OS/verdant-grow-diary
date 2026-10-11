@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { resolveHistoryTimelineAnchorId } from "@/lib/timelineEntryAnchorRules";
 import { Droplets, AlertTriangle } from "lucide-react";
 
 import { normalizeDiaryEntries, type NormalizeDiaryInput } from "@/lib/diaryEntryRules";
@@ -7,7 +8,10 @@ import {
   handleRootId,
   type QuickLogEntryHandleRef,
 } from "@/lib/quick-log/quickLogRevisionRules";
-import { useQuickLogRevisionBadges } from "@/hooks/useQuickLogRevisionBadges";
+import {
+  QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE,
+  useQuickLogRevisionBadges,
+} from "@/hooks/useQuickLogRevisionBadges";
 import QuickLogEntryIntegrityControls, {
   QuickLogEditedBadge,
 } from "@/components/QuickLogEntryIntegrityControls";
@@ -23,6 +27,8 @@ interface WateringHistoryPanelProps {
   rawEntries: NormalizeDiaryInput["rawEntries"];
   /** Optional cap for the rendered list. Defaults to 20. */
   limit?: number;
+  /** Fragment identities already owned by visible diary rows on this page. */
+  reservedTimelineAnchorIds?: ReadonlySet<string>;
   className?: string;
   /** Notifies the owner (e.g. Timeline local state) after a correction/retraction. */
   onEntryChanged?: () => void;
@@ -154,6 +160,7 @@ function Row({
 export default function WateringHistoryPanel({
   rawEntries,
   limit = 20,
+  reservedTimelineAnchorIds,
   className,
   onEntryChanged,
 }: WateringHistoryPanelProps) {
@@ -171,8 +178,14 @@ export default function WateringHistoryPanel({
     });
     const normalized = normalizeDiaryEntries({ rawEntries: lifted });
     const all = buildWateringHistory(normalized);
-    return all.slice(0, Math.max(0, limit));
-  }, [rawEntries, limit]);
+    return all.slice(0, Math.max(0, limit)).map((row) => ({
+      ...row,
+      timelineAnchorId: resolveHistoryTimelineAnchorId(
+        row.timelineAnchorId,
+        reservedTimelineAnchorIds,
+      ),
+    }));
+  }, [rawEntries, limit, reservedTimelineAnchorIds]);
 
   // Correction/retraction wiring (issue #786): handles resolved from the raw
   // entries; rows without a Quick Log handle stay control-free.
@@ -197,10 +210,17 @@ export default function WateringHistoryPanel({
       ].filter((id) => id.length > 0),
     [rows, handleIndex],
   );
-  const { badges } = useQuickLogRevisionBadges(rootIds);
+  const { badges, status: revisionBadgesStatus } = useQuickLogRevisionBadges(rootIds);
+  const revisionBadgesReady = revisionBadgesStatus === "ok";
+  const revisionLedgerUnread = revisionBadgesStatus === "unavailable";
 
   return (
-    <section className={"glass rounded-2xl p-4 " + (className ?? "")} aria-label="Watering history">
+    <section
+      className={"glass rounded-2xl p-4 " + (className ?? "")}
+      aria-label="Watering history"
+      data-testid="watering-history-panel"
+      data-revision-badges-status={revisionBadgesStatus}
+    >
       <header className="flex items-center justify-between mb-3">
         <h2 className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <Droplets className="h-3.5 w-3.5 text-primary" />
@@ -210,6 +230,16 @@ export default function WateringHistoryPanel({
           {rows.length === 0 ? "0" : rows.length === 1 ? "1 entry" : `${rows.length} entries`}
         </span>
       </header>
+
+      {revisionLedgerUnread && rows.length > 0 ? (
+        <p
+          className="mb-2 text-xs text-muted-foreground"
+          role="status"
+          data-testid="quicklog-revision-badges-unavailable"
+        >
+          {QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE}
+        </p>
+      ) : null}
 
       {rows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-4 text-center">
@@ -228,7 +258,7 @@ export default function WateringHistoryPanel({
                 key={r.id}
                 row={r}
                 integrityHandle={handle}
-                correctionCount={badge?.correctionCount ?? 0}
+                correctionCount={revisionBadgesReady ? (badge?.correctionCount ?? 0) : 0}
                 currentNote={rawNoteById.get(r.id) ?? null}
                 onEntryChanged={onEntryChanged}
               />

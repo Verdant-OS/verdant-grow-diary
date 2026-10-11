@@ -489,15 +489,18 @@ describe("groupRelativeTimelineByStage — pure rules", () => {
   });
 });
 
-vi.mock("@/hooks/usePlantRecentActivity", () => ({
-  usePlantRecentActivity: vi.fn(),
-  PLANT_RECENT_ACTIVITY_LIMIT: 10,
+const historyFixture = vi.hoisted(() => ({ read: vi.fn() }));
+vi.mock("@/hooks/usePlantRelativeTimelineHistory", () => ({
+  usePlantRelativeTimelineHistory: () => {
+    const read = historyFixture.read();
+    // These presentation fixtures represent complete successful reads; the
+    // real loader/count/pagination contract is exercised in the history suite.
+    return { ...read, totalCount: read?.data?.length ?? null };
+  },
 }));
-
-import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import PlantRelativeTimelineSection from "@/components/PlantRelativeTimelineSection";
 
-const mockUse = usePlantRecentActivity as unknown as ReturnType<typeof vi.fn>;
+const mockUse = historyFixture.read;
 
 describe("PlantRelativeTimelineSection — render", () => {
   it("renders the helper line about plant days", () => {
@@ -676,13 +679,18 @@ describe("filterRelativeTimelineItems — pure rules", () => {
     expect(filterRelativeTimelineItems(sample, "training").map((i) => i.id)).toEqual(["tr", "def"]);
   });
 
-  it("Notes returns note/observation/sensor/unknown safe fallback items", () => {
+  it("Notes returns note/observation/unknown safe fallback items", () => {
     expect(filterRelativeTimelineItems(sample, "notes").map((i) => i.id)).toEqual([
       "n1",
       "obs",
-      "sensor",
       "unk",
       "null",
+    ]);
+  });
+
+  it("Measurements include Quick Log environment checks", () => {
+    expect(filterRelativeTimelineItems(sample, "measurement").map((i) => i.id)).toEqual([
+      "sensor",
     ]);
   });
 

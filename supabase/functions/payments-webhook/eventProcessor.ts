@@ -127,7 +127,7 @@ export interface CustomerUpsertRow {
 // Loose shapes — the Paddle SDK returns camelCase but we defensively read.
 export interface EventLike {
   eventType?: string;
-  data?: SubscriptionData | TransactionData | CustomerData;
+  data?: SubscriptionData | TransactionData | CustomerData | AdjustmentData;
 }
 interface SubscriptionData {
   id?: string;
@@ -163,10 +163,35 @@ interface CustomerData {
   locale?: string | null;
   status?: string | null;
 }
+// adjustment.created / adjustment.updated payload shape. Raw Paddle
+// notifications keep nested snake_case (`transaction_id`); the SDK uses
+// camelCase (`transactionId`).
+interface AdjustmentData {
+  action?: string;
+  status?: string;
+  transactionId?: string;
+  transaction_id?: string;
+}
 
 function firstItem(data: SubscriptionData | TransactionData | CustomerData) {
   const items = (data as SubscriptionData | TransactionData).items;
   return Array.isArray(items) && items.length > 0 ? items[0] : null;
+}
+
+function readNonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+/**
+ * Paddle's SDK camelCases `transaction_id`, but the verified raw notification
+ * still carries nested snake_case. The transport normalizer only rewrites
+ * top-level eventId/eventType, so decide() must accept both shapes.
+ */
+function readAdjustmentTransactionId(data: {
+  transactionId?: unknown;
+  transaction_id?: unknown;
+}): string | null {
+  return readNonEmptyString(data.transactionId) ?? readNonEmptyString(data.transaction_id);
 }
 
 export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
@@ -351,21 +376,24 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
   //
   // Turn B refund-retire: for founder_lifetime purchases, an approved
   // refund or chargeback MUST revoke the Pro-level subscription row AND
-  // retire the founders row atomically. Non-refund/chargeback adjustments
-  // (credits, non-approved states) stay audit-only — the raw payload is
-  // already durably persisted to lovable_paddle_events for operator
-  // visibility upstream in the orchestrator.
+  // retire the founders row atomically. Paddle may emit that approval on
+  // adjustment.created, or later on adjustment.updated after pending_approval.
+  // Non-refund/chargeback adjustments and non-approved states stay skipped —
+  // the raw payload is already durably persisted to lovable_paddle_events.
   //
   // We route the refund to a dedicated 'revoke_lifetime' decision keyed
   // by paddle_transaction_id. The orchestrator dep resolves that to the
   // right subscription + founder row via the service-role RPC. If the
   // referenced transaction was NOT a founder_lifetime purchase, the RPC
   // no-ops (updates zero rows) — safe for recurring-plan refunds too.
-  if (type === "adjustment.created") {
+  // `adjustment_audit_only` remains in SkipReason for historical audit rows
+  // written by the previous blanket skip of adjustment.updated.
+  if (type === "adjustment.created" || type === "adjustment.updated") {
     const data = (event.data ?? {}) as {
       action?: string;
       status?: string;
-      transactionId?: string;
+      transactionId?: unknown;
+      transaction_id?: unknown;
     };
     const action = data.action ?? "";
     const status = data.status ?? "";
@@ -375,13 +403,11 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
     if (status !== "approved") {
       return { kind: "skip", reason: "adjustment_not_approved" };
     }
-    if (!data.transactionId) {
+    const transactionId = readAdjustmentTransactionId(data);
+    if (!transactionId) {
       return { kind: "skip", reason: "adjustment_missing_transaction_id" };
     }
-    return { kind: "revoke_lifetime", paddleTransactionId: data.transactionId, env };
-  }
-  if (type === "adjustment.updated") {
-    return { kind: "skip", reason: "adjustment_audit_only" };
+    return { kind: "revoke_lifetime", paddleTransactionId: transactionId, env };
   }
 
   return { kind: "skip", reason: "unhandled_event_type" };

@@ -18,7 +18,7 @@
  * supabase client + auth/grows/plants), with the REAL draft store running
  * against test localStorage.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
@@ -69,21 +69,34 @@ vi.mock("@/store/auth", () => ({
 
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
-    grows: [{ id: "grow-1", name: "Test Grow", stage: "veg" }],
-    activeGrow: { id: "grow-1", name: "Test Grow", stage: "veg" },
-    activeGrowId: "grow-1",
+    grows: [{ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Test Grow", stage: "veg" }],
+    activeGrow: { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Test Grow", stage: "veg" },
+    activeGrowId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     setActiveGrowId: vi.fn(),
   }),
 }));
 
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [{ id: "plant-1", name: "Test Plant", tent_id: "tent-1", grow_id: "grow-1" }],
+    data: [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        name: "Test Plant",
+        tent_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        grow_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
   useTents: () => ({
-    data: [{ id: "tent-1", name: "Test Tent", grow_id: "grow-1" }],
+    data: [
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        name: "Test Tent",
+        grow_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
   }),
 }));
 
@@ -97,6 +110,7 @@ import {
   serializePublicQuickLogStarterDraft,
   type PublicQuickLogStarterDraft,
 } from "@/lib/publicQuickLogStarterRules";
+import { claimPendingQuickLogActivity } from "@/lib/quickLogPendingActivityStore";
 
 function renderWithClient(ui: ReactElement) {
   const client = new QueryClient({
@@ -136,10 +150,10 @@ function storedDraftRaw(): string | null {
 
 function handoffPrefill(overrides: Partial<QuickLogPrefill> = {}): QuickLogPrefill {
   return {
-    plantId: "plant-1",
+    plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     plantName: "Test Plant",
-    growId: "grow-1",
-    tentId: "tent-1",
+    growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     eventType: "observation",
     note: "First true leaves look healthy.",
     wateringVolumeMl: null,
@@ -155,17 +169,38 @@ function saveButton() {
   return screen.getByTestId("quick-log-save");
 }
 
+const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 describe("Quick Log starter-handoff consume-once", () => {
   beforeEach(() => {
     clearLocalStorageForTest();
+    window.sessionStorage.clear();
+    let tail: Promise<unknown> = Promise.resolve();
+    Object.defineProperty(window.navigator, "locks", {
+      configurable: true,
+      value: {
+        request: (_name: string, _options: unknown, callback: () => unknown) => {
+          const turn = tail.then(callback);
+          tail = turn.then(
+            () => undefined,
+            () => undefined,
+          );
+          return turn;
+        },
+      },
+    });
     saveMock.mockReset();
     saveMock.mockResolvedValue({ ok: true });
     insertMock.mockReset();
     activityRpcMock.mockReset();
     activityRpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "feeding-event-1" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" },
       error: null,
     });
+  });
+
+  afterEach(() => {
+    if (originalLocks) Object.defineProperty(window.navigator, "locks", originalLocks);
+    else Reflect.deleteProperty(window.navigator, "locks");
   });
 
   it("rendering the prefilled dialog performs ZERO writes and never clears the draft", () => {
@@ -211,6 +246,75 @@ describe("Quick Log starter-handoff consume-once", () => {
     fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-save"));
     await waitFor(() => expect(activityRpcMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(storedDraftRaw()).toBeNull());
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("reconciling an older activity does not consume a different reviewed starter draft", async () => {
+    seedDraft(starterDraft({ logType: "feeding", note: "Light feeding" }));
+    const before = storedDraftRaw();
+    const createdAt = "2026-09-26T00:00:00.000Z";
+    expect(
+      claimPendingQuickLogActivity({
+        version: 1,
+        ownerId: "user-1",
+        createdAt,
+        input: {
+          activityId: "training",
+          growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          note: "Older training",
+          occurredAt: createdAt,
+          extraDetails: { technique: "topping" },
+          idempotencyKey: "older-training-retry-key",
+        },
+        receipt: { symptomCheck: false, harvestDetails: null },
+      }).status,
+    ).toBe("claimed");
+    renderWithClient(
+      <QuickLog
+        open
+        onOpenChange={vi.fn()}
+        prefill={handoffPrefill({
+          eventType: "feeding",
+          activityId: "feeding",
+          note: "Light feeding",
+        })}
+      />,
+    );
+
+    fireEvent.click(await screen.findByTestId("quick-log-dialog-all-activities-retry-original"));
+    await waitFor(() => expect(activityRpcMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-dialog-all-activities-pending-activity")).toBeNull(),
+    );
+    expect(storedDraftRaw()).toBe(before);
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("recovery of the exact reviewed Feeding starter consumes that draft once", async () => {
+    seedDraft(starterDraft({ logType: "feeding", note: "Light feeding" }));
+    activityRpcMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: "response lost" },
+    });
+    const prefill = handoffPrefill({
+      eventType: "feeding",
+      activityId: "feeding",
+      note: "Light feeding",
+    });
+    const first = renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-save"));
+    await waitFor(() => expect(activityRpcMock).toHaveBeenCalledTimes(1));
+    await screen.findByTestId("quick-log-dialog-all-activities-pending-activity");
+    expect(storedDraftRaw()).not.toBeNull();
+
+    first.unmount();
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={prefill} />);
+    fireEvent.click(await screen.findByTestId("quick-log-dialog-all-activities-retry-original"));
+    await waitFor(() => expect(activityRpcMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(storedDraftRaw()).toBeNull());
+    expect(activityRpcMock.mock.calls[1][1]).toEqual(activityRpcMock.mock.calls[0][1]);
     expect(saveMock).not.toHaveBeenCalled();
   });
 
@@ -402,9 +506,9 @@ describe("Quick Log starter-handoff consume-once", () => {
     setLocalStorageItemForTest(
       "verdant.quickLog.lastTarget.v2.user-1",
       JSON.stringify({
-        plantId: "plant-1",
-        growId: "grow-1",
-        tentId: "tent-1",
+        plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         savedAt: "2026-07-15T09:00:00.000Z",
       }),
     );
@@ -467,9 +571,9 @@ describe("Quick Log starter-handoff consume-once", () => {
     setLocalStorageItemForTest(
       "verdant.quickLog.lastTarget.v2.user-1",
       JSON.stringify({
-        plantId: "plant-1",
-        growId: "grow-1",
-        tentId: "tent-1",
+        plantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        growId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        tentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         savedAt: "2026-07-15T09:00:00.000Z",
       }),
     );

@@ -11,9 +11,8 @@ import { format, formatDistanceToNow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useSensorReadings } from "@/hooks/use-sensor-readings";
-import { useDiaryEntries } from "@/hooks/use-diary-entries";
-import { usePlants } from "@/hooks/use-plants";
+import { useDailyGrowCheckReads } from "@/hooks/useDailyGrowCheckReads";
+import { DailyGrowCheckReadNotice } from "@/components/DailyGrowCheckReadNotice";
 import {
   buildDailyGrowCheckHistory,
   hasDailyCheckActivity,
@@ -59,9 +58,14 @@ export default function PlantDailyGrowCheckHistoryCard({
   currentTentId,
   hideHeaderCta = false,
 }: Props) {
-  const { data: rawReadings = [] } = useSensorReadings(currentTentId ?? undefined);
-  const { data: rawDiary = [] } = useDiaryEntries();
-  const { data: plants = [] } = usePlants();
+  const reads = useDailyGrowCheckReads(currentTentId);
+  const { rawReadings, rawDiary, plants } = reads;
+
+  if (reads.state !== "ready") {
+    return (
+      <DailyGrowCheckReadNotice kind="history" plantId={plantId} {...reads} state={reads.state} />
+    );
+  }
 
   const plantsInTentCount = currentTentId
     ? plants.filter((p) => p.tent_id === currentTentId).length

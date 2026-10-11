@@ -21,9 +21,14 @@ on:
       - "supabase/migrations/20260722203000_strain_reference_library_v1.sql"
       - "docs/product/strain-reference-library-v1.md"
       - ".github/workflows/strain-reference-library-v1-gate.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
@@ -136,12 +141,16 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          mkdir -p .diagnostics
+          # Keep diagnostics OUTSIDE the checkout: an untracked file in the
+          # working tree makes prebuild's stamp report dirty:true, and the
+          # publish provenance preflight (#1175) then fails the build.
+          diag="$RUNNER_TEMP/strain-reference-diagnostics"
+          mkdir -p "$diag"
           set +e
-          bun run build > .diagnostics/strain-reference-build.txt 2>&1
+          bun run build > "$diag/strain-reference-build.txt" 2>&1
           status=$?
           set -e
-          cat .diagnostics/strain-reference-build.txt
+          cat "$diag/strain-reference-build.txt"
           exit "$status"
 
       - name: Upload focused build diagnostics
@@ -149,7 +158,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: strain-reference-build-diagnostics
-          path: .diagnostics/strain-reference-build.txt
+          path: ${{ runner.temp }}/strain-reference-diagnostics/strain-reference-build.txt
           if-no-files-found: error
           retention-days: 3
 

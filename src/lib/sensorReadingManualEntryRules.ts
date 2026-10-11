@@ -22,6 +22,10 @@
 
 import { buildManualDeviceId } from "@/lib/manualSensorSourceLabel";
 import {
+  buildManualSensorProvenance,
+  type ManualSensorPayload,
+} from "@/lib/manualSensorProvenanceRules";
+import {
   parseTemperatureInput,
   resolveTemperatureInputUnit,
   type ParsedTemperatureInput,
@@ -110,6 +114,17 @@ export function computeVpdKpa(tempC: number, rhPct: number): number {
   const svp = 0.6108 * Math.exp((17.27 * tempC) / (tempC + 237.3));
   const vpd = svp * (1 - rhPct / 100);
   return Math.max(0, Math.round(vpd * 1000) / 1000);
+}
+
+/** The one validation error that is not about a typed value: nothing entered. */
+export const MANUAL_ENTRY_EMPTY_ERROR = "Enter at least one reading.";
+
+/**
+ * Errors about values the grower typed (VPD -1, RH 101, PPFD 5000, a
+ * malformed temperature), i.e. everything except the empty-form prompt.
+ */
+export function manualEntryValueErrors(validation: ManualEntryValidation): string[] {
+  return validation.errors.filter((error) => error !== MANUAL_ENTRY_EMPTY_ERROR);
 }
 
 /** Build & validate the metric list for a manual entry. Pure. */
@@ -202,7 +217,7 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   }
 
   if (metrics.length === 0 && errors.length === 0) {
-    errors.push("Enter at least one reading.");
+    errors.push(MANUAL_ENTRY_EMPTY_ERROR);
   }
 
   return {
@@ -221,6 +236,7 @@ export interface ManualReadingPayload {
   ts: string;
   captured_at: string;
   quality: "ok";
+  raw_payload: ManualSensorPayload;
   /**
    * Optional `manual:<note>` device id capturing where the grower took
    * the reading (e.g. EcoWitt WH45 CO2/THP Monitor). Omitted when absent so
@@ -252,6 +268,7 @@ export function buildManualReadingPayloads(args: {
       ts,
       captured_at: ts,
       quality: "ok",
+      raw_payload: { manual_provenance: buildManualSensorProvenance() },
     };
     if (deviceId) row.device_id = deviceId;
     return row;

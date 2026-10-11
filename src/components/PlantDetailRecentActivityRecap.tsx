@@ -61,11 +61,20 @@ export default function PlantDetailRecentActivityRecap({
   onAddQuickCheck,
   onRevealAndNavigate,
 }: PlantDetailRecentActivityRecapProps) {
-  const { data: rawRows, isLoading } = usePlantRecentActivity(plantId ?? null);
+  const {
+    data: rawRows,
+    isLoading,
+    isPending,
+    isError,
+    isFetching,
+    fetchStatus,
+    refetch,
+  } = usePlantRecentActivity(plantId ?? null);
+  const unavailable = isError || (!isLoading && !isPending && !Array.isArray(rawRows));
 
   const rows = useMemo(() => {
-    if (!plantId) return [];
-    return buildPlantRecentActivity(rawRows ?? [], {
+    if (!plantId || !Array.isArray(rawRows)) return [];
+    return buildPlantRecentActivity(rawRows, {
       plantId,
       limit: 10,
     });
@@ -142,7 +151,27 @@ export default function PlantDetailRecentActivityRecap({
         </Button>
       </header>
 
-      {isLoading ? (
+      {!plantId ? (
+        <p className="text-sm text-muted-foreground">No plant selected.</p>
+      ) : unavailable ? (
+        <div
+          role="alert"
+          data-testid="plant-detail-recent-activity-recap-unavailable"
+          className="space-y-2 text-sm"
+        >
+          <p className="text-muted-foreground">Recent plant activity is unavailable.</p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={isFetching}
+            onClick={() => void refetch()}
+            aria-label="Retry recent activity"
+          >
+            {isFetching ? "Retrying…" : "Retry"}
+          </Button>
+        </div>
+      ) : isLoading || isPending ? (
         <ul
           data-testid="plant-detail-recent-activity-recap-loading"
           role="status"
@@ -152,7 +181,11 @@ export default function PlantDetailRecentActivityRecap({
           {Array.from({ length: 3 }).map((_, i) => (
             <li key={i} className="h-10 rounded-lg bg-secondary/40 animate-pulse" aria-hidden />
           ))}
-          <span className="sr-only">Loading recent activity…</span>
+          <li className="text-sm text-muted-foreground">
+            {fetchStatus === "paused"
+              ? "Waiting for connection to load recent activity…"
+              : "Loading recent activity…"}
+          </li>
         </ul>
       ) : recovery.showPrompt && onAddQuickCheck ? (
         <div

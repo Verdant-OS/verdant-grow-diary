@@ -12,7 +12,7 @@ import { useCallback } from "react";
 import { Link } from "@/lib/react-router-compat";
 import { AlertTriangle, ArrowDownToLine, Bell, Clock, ListTodo, Sprout } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
 import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions";
@@ -47,9 +47,28 @@ export default function PlantQuickStatusStrip({
   growId,
   onRevealAndNavigate,
 }: Props) {
-  const { data: rawEntries, isLoading: entriesLoading } = usePlantRecentActivity(plantId ?? null);
+  const {
+    data: rawEntries,
+    isLoading: entriesLoading,
+    isPending,
+    isError,
+    isFetching,
+    fetchStatus,
+    refetch,
+  } = usePlantRecentActivity(plantId ?? null);
+  const timelineState = !plantId
+    ? "no-plant"
+    : isError
+      ? "unavailable"
+      : entriesLoading || isPending
+        ? fetchStatus === "paused"
+          ? "waiting"
+          : "loading"
+        : Array.isArray(rawEntries)
+          ? "ready"
+          : "unavailable";
   const timelineItems = buildRelativeTimelineProjection({
-    rawEntries: rawEntries ?? [],
+    rawEntries: timelineState === "ready" && Array.isArray(rawEntries) ? rawEntries : [],
     plantId: plantId ?? null,
     plantStartedAt: plantStartedAt ?? null,
   });
@@ -75,7 +94,7 @@ export default function PlantQuickStatusStrip({
     timelineItems,
     alertCount,
     actionCount,
-    timelineLoading: !!plantId && entriesLoading,
+    timelineState,
     alertsLoading: hasTent ? alertsLoading : false,
     actionsLoading: hasTent ? actionsLoading : false,
     growId: growId ?? null,
@@ -120,6 +139,7 @@ export default function PlantQuickStatusStrip({
       data-alerts-state={view.alertsState}
       data-actions-state={view.actionsState}
       data-timeline-loading={view.timelineLoading ? "true" : "false"}
+      data-timeline-state={view.timelineState}
       aria-label={view.compact}
       className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-border/50 bg-card/40 px-3 py-2 text-xs"
     >
@@ -135,13 +155,29 @@ export default function PlantQuickStatusStrip({
       <span aria-hidden className="text-muted-foreground/40">
         ·
       </span>
-      {view.timelineLoading ? (
+      {view.timelineState === "unavailable" ? (
+        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+          <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+          <span>{view.lastUpdateLabel}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            aria-label="Retry recent activity"
+            disabled={isFetching}
+            onClick={() => void refetch()}
+          >
+            Retry
+          </Button>
+        </span>
+      ) : view.timelineLoading ? (
         <span
           data-testid="plant-quick-status-last-update-loading"
           className="inline-flex items-center gap-1.5 text-muted-foreground/70"
         >
           <Clock className="h-3.5 w-3.5" aria-hidden />
-          <Skeleton className="h-3 w-28" aria-label="Checking recent activity…" />
+          {view.lastUpdateLabel}
         </span>
       ) : (
         <span

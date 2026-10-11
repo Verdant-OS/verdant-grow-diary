@@ -328,17 +328,20 @@ test.describe("Plant Detail Symptom Check — local mocked branch proof", () => 
     await seedClearlyFakeSession(page);
     await installFailClosedNetworkMock(page, state);
 
+    // Header/+ now opens QuickLogV2Sheet. Symptom Check still lives in legacy
+    // QuickLog under All activity types — open that sheet via the start-screen
+    // intent so Plant Detail identity is prefilled and Field Edition first paint
+    // remains available for the guided symptom path.
+    // Assert Plant Detail identity before opening the modal: once Quick Log is
+    // open, dialog aria-hide can make the page heading unreachable via getByRole.
     await page.goto(`/plants/${FAKE_PLANT_ID}`);
     await acceptReconsentGateIfShown(page);
     await expect(page.getByRole("heading", { name: FAKE_PLANT.name, exact: true })).toBeVisible();
 
-    // Open the actual full Quick Log dialog from Plant Detail. Choosing Note
-    // only establishes the verified plant target; the grower still explicitly
-    // starts and confirms Symptom Check before any write can occur.
-    await page.getByTestId("global-fast-add-trigger").click();
-    await page.getByTestId("global-fast-add-action-diary_note").click();
+    await page.goto(`/plants/${FAKE_PLANT_ID}?open=quick-log`);
     const dialog = page.getByRole("dialog", { name: /quick log/i });
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByTestId("ql-guided-grow-walk")).toBeVisible();
     await expect(dialog.getByTestId("quick-log-target-plant")).toContainText(FAKE_PLANT.name);
 
     const symptomPrefix = "quick-log-dialog-all-activities";

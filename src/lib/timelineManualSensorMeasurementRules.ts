@@ -1,0 +1,322 @@
+/**
+ * timelineManualSensorMeasurementRules — project tent `sensor_readings`
+ * (source=manual) into Grow Timeline diary-shaped measurement receipts.
+ *
+ * Sensors Manual Snapshot persists only `sensor_readings`. Grow Timeline
+ * Measurements historically read `diary_entries` only, so those rows never
+ * appeared. This module is the read-side adapter: it does not insert diary
+ * rows, grow_events, alerts, or Action Queue items.
+ *
+ * Pure: no I/O, no React, no Supabase.
+ */
+import { groupSensorReadingRows } from "@/lib/growAdapters";
+import type { SensorReadingRow } from "@/lib/db";
+import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
+import { classifyManualMetric, classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
+import { tempFFromC } from "@/lib/temperatureUnits";
+import {
+  MEASUREMENT_DETAIL_KEYS,
+  MEASUREMENT_EVENT_TYPES,
+} from "@/lib/timelineEntryClassification";
+
+export const TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX = "sensor-reading:" as const;
+export const TIMELINE_MANUAL_SENSOR_ROW_LIMIT = 200;
+
+export type TimelineManualSensorReceipt = {
+  id: string;
+  note: string;
+  photo_url: null;
+  stage: null;
+  details: Record<string, unknown>;
+  entry_at: string;
+  plant_id: null;
+  tent_id: string;
+};
+
+/** Narrow row shape Timeline may SELECT without `raw_payload` in page source. */
+export type ManualSensorTimelineMetricRow = {
+  id?: string;
+  tent_id: string;
+  metric: string;
+  value: number | string | null;
+  source?: string | null;
+  ts: string;
+  captured_at?: string | null;
+  quality?: string | null;
+};
+
+function timelineObservationTimeMs(row: ManualSensorTimelineMetricRow): number | null {
+  const observation = resolveSensorObservationTime(row);
+  const timeMs = observation ? Date.parse(observation) : Number.NaN;
+  return Number.isFinite(timeMs) ? timeMs : null;
+}
+
+/**
+ * The query reads one extra metric row. When it finds that sentinel, the
+ * oldest observation-time group might be split across the row boundary. Exclude
+ * that whole group instead of showing a receipt with only some saved metrics.
+ * The caller must disclose that older history is outside this bounded view.
+ */
+export function completeManualSensorTimelineRows<T extends ManualSensorTimelineMetricRow>(
+  rows: readonly T[] | null | undefined,
+  limit = TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
+): { rows: T[]; hasOlderRows: boolean } {
+  if (!Array.isArray(rows) || rows.length === 0) return { rows: [], hasOlderRows: false };
+  if (!Number.isSafeInteger(limit) || limit < 1) return { rows: [], hasOlderRows: true };
+  // The read is the union of captured_at and legacy null-captured_at streams.
+  // Order by the same observation time used for receipt grouping before
+  // applying the metric-row budget; either stream can contain the newest row.
+  const sorted = [...rows].sort((a, b) => {
+    const aObservation = resolveSensorObservationTime(a);
+    const bObservation = resolveSensorObservationTime(b);
+    const aTime = timelineObservationTimeMs(a) ?? Number.NEGATIVE_INFINITY;
+    const bTime = timelineObservationTimeMs(b) ?? Number.NEGATIVE_INFINITY;
+    if (aTime !== bTime) return bTime - aTime;
+    const aKey = JSON.stringify([
+      aObservation,
+      a.tent_id,
+      a.ts,
+      a.metric,
+      a.id ?? "",
+      a.source ?? "",
+      a.value,
+      a.quality ?? "",
+    ]);
+    const bKey = JSON.stringify([
+      bObservation,
+      b.tent_id,
+      b.ts,
+      b.metric,
+      b.id ?? "",
+      b.source ?? "",
+      b.value,
+      b.quality ?? "",
+    ]);
+    return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+  });
+  if (sorted.length <= limit) return { rows: sorted, hasOlderRows: false };
+
+  // Equivalent timestamp strings belong to the same boundary instant.
+  // Unverified times share a fail-closed boundary rather than a partial group.
+  const boundaryObservationTimeMs = timelineObservationTimeMs(sorted[limit]);
+  const completeRows = sorted
+    .slice(0, limit)
+    .filter((row) => timelineObservationTimeMs(row) !== boundaryObservationTimeMs);
+  return { rows: completeRows, hasOlderRows: true };
+}
+
+export function isTimelineSensorDerivedDiaryId(id: string | null | undefined): boolean {
+  return typeof id === "string" && id.startsWith(TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX);
+}
+
+/**
+ * True when a diary-shaped row belongs in Grow Timeline Measurements.
+ * Covers watering/pH keys, manual_sensor_snapshot envelopes, QL environment
+ * event types, and handheld note blocks.
+ */
+export function diaryEntryHasMeasurementEvidence(entry: {
+  details?: Record<string, unknown> | null;
+  note?: string | null;
+}): boolean {
+  const details = entry?.details;
+  if (details && typeof details === "object") {
+    if (Object.keys(details).some((key) => MEASUREMENT_DETAIL_KEYS.has(key))) return true;
+    const eventType =
+      typeof details.event_type === "string" ? details.event_type.toLowerCase().trim() : "";
+    if (MEASUREMENT_EVENT_TYPES.has(eventType)) return true;
+  }
+  return hasManualHandheldReadings(entry?.note ?? null);
+}
+
+/**
+ * Persisted `sensor_readings.quality` allowed on a Timeline measurement
+ * receipt. Missing / blank follows the #1328 default of `ok`.
+ */
+export function isTimelineManualSensorPersistedQualityUsable(
+  quality: string | null | undefined,
+): boolean {
+  const normalized = (quality ?? "ok").trim().toLowerCase();
+  return normalized === "ok" || normalized === "";
+}
+
+/** Historical evidence stays visible without being presented as current context. */
+export function timelineManualSnapshotHistoryNotice(input: {
+  sourceKind: string;
+  capturedAt: string | null;
+  nowMs: number;
+  staleMs: number;
+}): string | null {
+  if (input.sourceKind !== "manual") return null;
+  const timestamp = classifySnapshotTimestamp(input.capturedAt, input.nowMs);
+  if (timestamp === "future") return null; // Timeline already has a future-time warning.
+  if (timestamp !== "ok") return "Capture time unverified — not current.";
+  if (input.nowMs - Date.parse(input.capturedAt!) > input.staleMs) {
+    return "Historical manual reading — not current.";
+  }
+  return null;
+}
+
+/**
+ * Grow Timeline Measurements is a history view. A stale snapshot remains an
+ * event in that history; the card and drawer separately classify freshness.
+ * A diary event time never substitutes for missing observation time there.
+ */
+export function diaryEntryBelongsInTimelineMeasurements(
+  entry: {
+    id?: string | null;
+    details?: Record<string, unknown> | null;
+    note?: string | null;
+    entry_at?: string | null;
+  },
+  _now: Date = new Date(),
+): boolean {
+  return diaryEntryHasMeasurementEvidence(entry);
+}
+
+function toSensorReadingRow(row: ManualSensorTimelineMetricRow): SensorReadingRow | null {
+  const valueNum = typeof row.value === "number" ? row.value : Number(row.value);
+  if (!Number.isFinite(valueNum) || !row.tent_id || !row.ts) return null;
+  if (!isTimelineManualSensorPersistedQualityUsable(row.quality)) return null;
+  return {
+    id: "",
+    tent_id: row.tent_id,
+    metric: row.metric,
+    value: valueNum,
+    source: row.source ?? "manual",
+    ts: row.ts,
+    captured_at: row.captured_at ?? null,
+    quality: row.quality ?? "ok",
+    raw_payload: null,
+    user_id: "",
+    created_at: row.ts,
+    device_id: null,
+  };
+}
+
+function buildReceiptNote(input: {
+  tempF: number | null;
+  humidityPct: number | null;
+  vpdKpa: number | null;
+  soilPct: number | null;
+}): string {
+  const parts: string[] = [];
+  if (input.tempF !== null) parts.push(`${formatFinite(input.tempF)}°F`);
+  if (input.humidityPct !== null) parts.push(`${formatFinite(input.humidityPct)}% RH`);
+  if (input.vpdKpa !== null) parts.push(`${formatFinite(input.vpdKpa)} kPa VPD`);
+  if (input.soilPct !== null) parts.push(`${formatFinite(input.soilPct)}% soil moisture`);
+  if (parts.length === 0) return "Manual sensor snapshot";
+  return `Manual sensor snapshot: ${parts.join(", ")}`;
+}
+
+function formatFinite(n: number): string {
+  const rounded = Math.round(n * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+/**
+ * Group per-metric manual `sensor_readings` into Timeline measurement receipts.
+ * Live/csv/demo/stale/invalid sources are excluded. Groups with no observed
+ * metrics are dropped. Never invents temperature or humidity, and never
+ * presents invalid metric values as healthy measurements.
+ */
+export function manualSensorReadingsToTimelineEntries(
+  rows: readonly ManualSensorTimelineMetricRow[] | null | undefined,
+  now: Date = new Date(),
+): TimelineManualSensorReceipt[] {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  const manualRows = rows.filter((row) => (row?.source ?? "").toLowerCase() === "manual");
+  if (manualRows.length === 0) return [];
+
+  const grouped = groupSensorReadingRows(
+    manualRows.map(toSensorReadingRow).filter((row): row is SensorReadingRow => row !== null),
+    now,
+  );
+  const receipts: TimelineManualSensorReceipt[] = [];
+
+  for (const reading of grouped) {
+    const observed = reading.observedMetrics ?? [];
+    if (observed.length === 0) continue;
+    if ((reading.source ?? "").toLowerCase() !== "manual") continue;
+
+    const capturedAt = reading.capturedAt || reading.ts;
+    if (!capturedAt || !reading.tentId) continue;
+    // Age changes current-state eligibility, not whether a valid saved
+    // reading belongs in history. Invalid/future groups still fail closed.
+    if (reading.status !== "usable" && reading.status !== "stale") continue;
+
+    const hasTempMetric = observed.includes("temp") && Number.isFinite(reading.temp);
+    const hasHumidityMetric = observed.includes("rh") && Number.isFinite(reading.rh);
+    const hasVpdMetric = observed.includes("vpd") && Number.isFinite(reading.vpd);
+    const hasSoilMetric = observed.includes("soil") && Number.isFinite(reading.soil);
+
+    const tempMetricValid =
+      hasTempMetric && classifyManualMetric("temperature_c", reading.temp).valid;
+    const humidityMetricValid =
+      hasHumidityMetric && classifyManualMetric("humidity_pct", reading.rh).valid;
+    const vpdMetricValid = hasVpdMetric && classifyManualMetric("vpd_kpa", reading.vpd).valid;
+    const soilMetricValid =
+      hasSoilMetric && classifyManualMetric("soil_moisture_pct", reading.soil).valid;
+
+    const tempF = tempMetricValid ? tempFFromC(reading.temp) : null;
+    const humidityPct = humidityMetricValid ? reading.rh : null;
+    const vpdKpa = vpdMetricValid ? reading.vpd : null;
+    const soilPct = soilMetricValid ? reading.soil : null;
+
+    const snapshot: Record<string, unknown> = { source: "manual", ts: capturedAt };
+    if (tempF !== null) snapshot.temp_f = tempF;
+    if (humidityPct !== null) snapshot.humidity_percent = humidityPct;
+    if (soilPct !== null) snapshot.soil_moisture_pct = soilPct;
+
+    const sensorSnapshot: Record<string, unknown> = { source: "manual", ts: capturedAt };
+    if (hasTempMetric) {
+      sensorSnapshot.temp_c = reading.temp;
+    }
+    if (hasHumidityMetric) sensorSnapshot.rh = reading.rh;
+    if (hasVpdMetric) sensorSnapshot.vpd_kpa = reading.vpd;
+    if (hasSoilMetric) sensorSnapshot.soil = reading.soil;
+
+    const receipt: TimelineManualSensorReceipt = {
+      id: `${TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX}${reading.tentId}:${capturedAt}`,
+      note: buildReceiptNote({ tempF, humidityPct, vpdKpa, soilPct }),
+      photo_url: null,
+      stage: null,
+      details: {
+        event_type: "measurement",
+        source: "manual",
+        tent_id: reading.tentId,
+        manual_sensor_snapshot: snapshot,
+        sensor_snapshot: sensorSnapshot,
+      },
+      entry_at: capturedAt,
+      plant_id: null,
+      tent_id: reading.tentId,
+    };
+    receipts.push(receipt);
+  }
+
+  return receipts.sort((a, b) => {
+    const byTime = new Date(b.entry_at).getTime() - new Date(a.entry_at).getTime();
+    if (byTime !== 0) return byTime;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+/** Merge sensor-derived receipts with diary rows without duplicating ids. */
+export function mergeTimelineMeasurementDisplayEntries<T extends { id: string; entry_at: string }>(
+  diaryEntries: readonly T[],
+  sensorReceipts: readonly T[],
+): T[] {
+  const seen = new Set<string>();
+  const merged: T[] = [];
+  for (const row of [...sensorReceipts, ...diaryEntries]) {
+    if (!row?.id || seen.has(row.id)) continue;
+    seen.add(row.id);
+    merged.push(row);
+  }
+  return merged.sort((a, b) => {
+    const byTime = new Date(b.entry_at).getTime() - new Date(a.entry_at).getTime();
+    if (byTime !== 0) return byTime;
+    return a.id.localeCompare(b.id);
+  });
+}

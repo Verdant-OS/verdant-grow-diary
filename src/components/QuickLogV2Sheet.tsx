@@ -1,5 +1,50 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
+import {
+  readPendingQuickLogNote,
+  claimPendingQuickLogNote,
+  clearPendingQuickLogNote,
+  markPendingQuickLogNoteHistoryCheck,
+  NOTE_RECOVERY_UNAVAILABLE,
+  NOTE_RECOVERY_PENDING,
+  NOTE_RECOVERY_CLEAR_FAILED,
+  type PendingQuickLogNote,
+  type PendingQuickLogNoteReviewTarget,
+} from "@/lib/quickLogPendingNoteStore";
+import {
+  readPendingQuickLogWatering,
+  claimPendingQuickLogWatering,
+  reconcilePendingQuickLogWateringClear,
+  reconcilePendingQuickLogWateringHistoryDiscard,
+  markPendingQuickLogWateringHistoryCheck,
+  WATERING_RECOVERY_UNAVAILABLE,
+  WATERING_RECOVERY_PENDING,
+  WATERING_RECOVERY_CLEAR_FAILED,
+  type PendingQuickLogWatering,
+} from "@/lib/quickLogPendingWateringStore";
+import {
+  readPendingStarterWater,
+  STARTER_WATER_RECOVERY_PENDING,
+  STARTER_WATER_RECOVERY_UNAVAILABLE,
+} from "@/lib/quickLogPendingStarterWaterStore";
+import { buildWateringRecoveryForm } from "@/lib/quickLogWateringRecoveryViewModel";
+import { mayCorrectRejectedWatering } from "@/lib/quickLogWateringRejectionRules";
+import {
+  feedingHistoryCheckMessage,
+  feedingRejectionNeedsHistoryCheck,
+  mayCorrectRejectedFeeding,
+} from "@/lib/quickLogFeedingRejectionRules";
+import {
+  readPendingQuickLogFeeding,
+  claimPendingQuickLogFeeding,
+  clearPendingQuickLogFeeding,
+  markPendingQuickLogFeedingHistoryCheck,
+  FEEDING_RECOVERY_UNAVAILABLE,
+  FEEDING_RECOVERY_PENDING,
+  FEEDING_RECOVERY_CLEAR_FAILED,
+  type PendingQuickLogFeeding,
+} from "@/lib/quickLogPendingFeedingStore";
+import { buildFeedingRecoveryForm } from "@/lib/quickLogFeedingRecoveryViewModel";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +53,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -19,6 +66,7 @@ import {
   buildQuickLogTimelineNavTarget,
   QUICK_LOG_TIMELINE_CTA_LABEL,
 } from "@/lib/quickLogTimelineNavigationTarget";
+import { resolveQuickLogConfirmedScope } from "@/lib/quickLogConfirmedScopeRules";
 import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -27,13 +75,23 @@ import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 
+import { quickLogArchivedGrowActionBlock } from "@/lib/archivedGrowQuickLogRules";
 import {
   buildQuickLogV2TargetOptions,
+  filterQuickLogV2TargetOptions,
+  formatQuickLogV2TargetOptionLabel,
   isStaleQuickLogV2TargetSelection,
+  partitionQuickLogV2TargetOptionsForTent,
   resolveQuickLogV2Target,
+  resolveQuickLogV2TentContextId,
+  resolveTentScopedQuickLogPlantSelection,
   EMPTY_QUICKLOG_V2_FORM,
+  QUICK_LOG_V2_TARGET_FILTER_THRESHOLD,
+  QUICK_LOG_V2_EMPTY_CONTENT_HELPER,
+  isQuickLogV2CriticalContentMissing,
   type QuickLogV2FormState,
   type QuickLogV2Action,
+  type QuickLogV2TargetOption,
   type ResolvedQuickLogV2Target,
 } from "@/lib/quickLogV2Rules";
 import {
@@ -43,7 +101,10 @@ import {
   removeChipAuthoredResponseLine,
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
-import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
+import {
+  buildQuickLogV2SavePayload,
+  type QuickLogV2SavePayload,
+} from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
 import { createQuickLogVideoDiaryEntry } from "@/lib/quickLogVideoDiaryEntry";
@@ -59,14 +120,14 @@ import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEven
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 import {
   EMPTY_QUICKLOG_FEEDING_FORM,
-  FEEDING_SAVE_FAILURE_MESSAGE,
   FEEDING_SAVE_SUCCESS_MESSAGE,
   buildFeedingFormPayload,
   feedingFormReasonToHelper,
+  findFeedingPayloadRangeViolation,
   isFeedingFormPristine,
   type QuickLogFeedingFormState,
 } from "@/lib/quickLogFeedingFormViewModel";
-import { writeFeedingTypedEvent } from "@/lib/writeFeedingTypedEvent";
+import { writeFeedingTypedEvent, type FeedingTypedEventInput } from "@/lib/writeFeedingTypedEvent";
 import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
 import QuickLogWateringForm from "@/components/QuickLogWateringForm";
 import {
@@ -90,12 +151,31 @@ import {
 } from "@/lib/feedingDefaultsViewModel";
 import { useRecentFeedingsForDefaults } from "@/hooks/useRecentFeedingsForDefaults";
 import {
+  applyWateringVolumeDefaultsToForm,
+  buildWateringVolumeDefaults,
+  WATERING_VOLUME_DEFAULTS_LABEL,
+} from "@/lib/wateringVolumeDefaultsViewModel";
+import { useRecentWateringsForVolumeDefaults } from "@/hooks/useRecentWateringsForVolumeDefaults";
+import {
   EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM,
   buildQuickLogMaturityEvidenceDetails,
+  hasQuickLogMaturityEvidence,
   quickLogMaturityEvidenceReasonToMessage,
   type QuickLogMaturityEvidenceFormState,
 } from "@/lib/quickLogMaturityEvidenceRules";
-import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
+import {
+  buildReceiptTargetMovedMessage,
+  canDiscardQuickLogHistoryDraft,
+  QUICK_LOG_HISTORY_DISCARD_FAILED,
+  QUICK_LOG_HISTORY_DISCARD_HELPER,
+  QUICK_LOG_HISTORY_DISCARD_LABEL,
+  QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY,
+  QUICK_LOG_HISTORY_REVIEW_HELPER,
+  QUICK_LOG_HISTORY_REVIEW_LINK_LABEL,
+  QUICK_LOG_HISTORY_REVIEW_LOCK_COPY,
+  quickLogReasonToOperatorMessage,
+  quickLogSaveRequiresHistoryCheck,
+} from "@/lib/quickLogSaveErrorMessage";
 import {
   QUICK_LOG_POST_SAVE_VIEW_LABEL,
   QUICK_LOG_POST_SAVE_ANOTHER_LABEL,
@@ -105,6 +185,7 @@ import {
   QUICK_LOG_CLOSE_BLOCKED_HINT,
   buildQuickLogPostSaveMessage,
   buildQuickLogPostSaveDescription,
+  resolveQuickLogPostSaveTargetLabel,
   rotateQuickLogIdempotencyKey,
   shouldAllowQuickLogSave,
   shouldBlockQuickLogClose,
@@ -119,6 +200,8 @@ import {
   resolveRecentTargetSuggestion,
 } from "@/lib/quickLogRecentTargetSuggestion";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import GuidedGrowWalkPanel from "@/components/GuidedGrowWalkPanel";
+import { type GrowWalkVisitMode } from "@/lib/growWalkContracts";
 import {
   fahrenheitToCelsius,
   getTemperatureUnitSymbol,
@@ -161,7 +244,25 @@ interface QuickLogVideoMeta {
 type QuickLogAttachmentWriteResult =
   { ok: true } | { ok: false; message: string; ambiguous?: boolean };
 
+interface LockedManualSubmission {
+  recovery: PendingQuickLogNote;
+  payload: QuickLogV2SavePayload;
+  resolved: ResolvedQuickLogV2Target;
+  photoFile: File | null;
+  videoFile: File | null;
+  videoMeta: QuickLogVideoMeta | null;
+  note: string;
+  action: "note";
+}
+
+interface LockedFeedingSubmission {
+  recovery: PendingQuickLogFeeding;
+  payload: FeedingTypedEventInput;
+  resolved: ResolvedQuickLogV2Target;
+}
+
 interface LockedWateringSubmission {
+  recovery: PendingQuickLogWatering;
   payload: WateringTypedEventInput;
   resolved: ResolvedQuickLogV2Target;
   photoFile: File | null;
@@ -201,13 +302,97 @@ function loadRecentTargetRecord(userId: string | null | undefined) {
   }
 }
 
-export default function QuickLogV2Sheet({
+function restoredNoteSubmission(record: PendingQuickLogNote): LockedManualSubmission {
+  return {
+    recovery: record,
+    payload: record.payload,
+    resolved: record.resolved,
+    photoFile: null,
+    videoFile: null,
+    videoMeta: null,
+    note: record.payload.p_note ?? "",
+    action: "note",
+  };
+}
+
+function restoredNoteForm(record: PendingQuickLogNote): QuickLogV2FormState {
+  return {
+    ...EMPTY_QUICKLOG_V2_FORM,
+    selectedKey: `${record.payload.p_target_type}:${record.payload.p_target_id}`,
+    action: "note",
+    note: record.payload.p_note ?? "",
+    temperatureC:
+      record.payload.p_temperature_c === null ? "" : String(record.payload.p_temperature_c),
+    humidityPct:
+      record.payload.p_humidity_pct === null ? "" : String(record.payload.p_humidity_pct),
+    vpdKpa: record.payload.p_vpd_kpa === null ? "" : String(record.payload.p_vpd_kpa),
+  };
+}
+
+function restoredWateringSubmission(record: PendingQuickLogWatering): LockedWateringSubmission {
+  return {
+    recovery: record,
+    payload: record.payload,
+    resolved: record.resolved,
+    photoFile: null,
+    videoFile: null,
+    videoMeta: null,
+    note: record.payload.note ?? "",
+    action: "water",
+  };
+}
+
+export default function QuickLogV2Sheet(props: Props) {
+  const { user } = useAuth();
+  // Account changes destroy the old sheet's private draft and async lifetime.
+  // Returning to that account restores only its own pending Note, Water or Feed.
+  return <QuickLogV2SheetForOwner key={user?.id ?? "signed-out"} {...props} />;
+}
+
+function QuickLogV2SheetForOwner({
   open,
   onOpenChange,
   defaultTargetKey,
   defaultAction = "note",
 }: Props) {
   const { user } = useAuth();
+  const [initialRecovery] = useState(() => readPendingQuickLogNote(user?.id ?? null));
+  const initialNote = initialRecovery.status === "pending" ? initialRecovery.record : null;
+  const [initialWateringRecovery] = useState(() => readPendingQuickLogWatering(user?.id ?? null));
+  const initialWatering =
+    !initialNote && initialWateringRecovery.status === "pending"
+      ? initialWateringRecovery.record
+      : null;
+  const initialWateringForm = initialWatering ? buildWateringRecoveryForm(initialWatering) : null;
+  const [initialFeedingRecovery] = useState(() => readPendingQuickLogFeeding(user?.id ?? null));
+  const initialFeeding =
+    !initialNote && !initialWatering && initialFeedingRecovery.status === "pending"
+      ? initialFeedingRecovery.record
+      : null;
+  const initialFeedingForm = initialFeeding ? buildFeedingRecoveryForm(initialFeeding) : null;
+  const initialMediaSubmission = initialNote ?? initialWatering;
+  const initialSubmission = initialMediaSubmission ?? initialFeeding;
+  const noteLifetimeRef = useRef({ active: true });
+  useEffect(() => {
+    const lifetime = { active: true };
+    noteLifetimeRef.current = lifetime;
+    return () => {
+      lifetime.active = false;
+    };
+  }, []);
+  const [noteStorageFence, setNoteStorageFence] = useState(false);
+  const confirmedNoteRecoveryRef = useRef<PendingQuickLogNote | null>(null);
+  const [wateringStorageFence, setWateringStorageFence] = useState(false);
+  const confirmedWateringRecoveryRef = useRef<PendingQuickLogWatering | null>(null);
+  const [feedingStorageFence, setFeedingStorageFence] = useState(false);
+  const confirmedFeedingRecoveryRef = useRef<PendingQuickLogFeeding | null>(null);
+  const recoveryStorageFence = noteStorageFence || wateringStorageFence || feedingStorageFence;
+  const [restoredMediaPending, setRestoredMediaPending] = useState(
+    Boolean(
+      initialMediaSubmission &&
+      (initialMediaSubmission.attachments.photo || initialMediaSubmission.attachments.video),
+    ),
+  );
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
@@ -285,18 +470,54 @@ export default function QuickLogV2Sheet({
     });
   }
 
-  const [form, setForm] = useState<QuickLogV2FormState>(EMPTY_QUICKLOG_V2_FORM);
+  // Seed from open props on first paint so tent:/plant: defaultTargetKey is
+  // not briefly empty — that vacancy previously let sole-plant auto-select
+  // rewrite an explicit tent: open target before the open-reset effect ran.
+  const [form, setForm] = useState<QuickLogV2FormState>(() =>
+    initialNote
+      ? restoredNoteForm(initialNote)
+      : initialWateringForm
+        ? initialWateringForm.form
+        : initialFeedingForm
+          ? initialFeedingForm.form
+          : open
+            ? {
+                ...EMPTY_QUICKLOG_V2_FORM,
+                selectedKey: defaultTargetKey ?? null,
+                action: defaultAction,
+              }
+            : EMPTY_QUICKLOG_V2_FORM,
+  );
+  // Type-to-filter for long Target lists. Reset on close/reopen so a prior
+  // query cannot hide options on the next open.
+  const [targetFilterQuery, setTargetFilterQuery] = useState("");
+  // One-shot tent-scoped plant auto-select per open (sole plant / recent-in-tent).
+  const [tentPlantAutoApplied, setTentPlantAutoApplied] = useState(false);
   const [feedingForm, setFeedingForm] = useState<QuickLogFeedingFormState>(
-    EMPTY_QUICKLOG_FEEDING_FORM,
+    initialFeedingForm?.feedingForm ?? EMPTY_QUICKLOG_FEEDING_FORM,
   );
   const [wateringForm, setWateringForm] = useState<QuickLogWateringFormState>(
-    EMPTY_QUICKLOG_WATERING_FORM,
+    initialWateringForm?.wateringForm ?? EMPTY_QUICKLOG_WATERING_FORM,
   );
   const [maturityEvidenceForm, setMaturityEvidenceForm] =
     useState<QuickLogMaturityEvidenceFormState>(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
   const [feedingSaving, setFeedingSaving] = useState(false);
   const [wateringSaving, setWateringSaving] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(
+    initialNote
+      ? initialNote.historyCheckReason
+        ? quickLogReasonToOperatorMessage(initialNote.historyCheckReason)
+        : NOTE_RECOVERY_PENDING
+      : initialWatering
+        ? initialWatering.historyCheckReason
+          ? quickLogReasonToOperatorMessage(initialWatering.historyCheckReason)
+          : WATERING_RECOVERY_PENDING
+        : initialFeeding
+          ? initialFeeding.historyCheckReason
+            ? feedingHistoryCheckMessage(initialFeeding.historyCheckReason)
+            : FEEDING_RECOVERY_PENDING
+          : null,
+  );
   const [saveStatus, setSaveStatus] = useState<string>("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -305,9 +526,38 @@ export default function QuickLogV2Sheet({
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [videoChecking, setVideoChecking] = useState(false);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
+  const [wateringVolumeDefaultsApplied, setWateringVolumeDefaultsApplied] = useState(false);
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
-  const [wateringRetryPending, setWateringRetryPending] = useState(false);
-  const [wateringSubmissionLocked, setWateringSubmissionLocked] = useState(false);
+  const [visitMode, setVisitMode] = useState<GrowWalkVisitMode>("fast_check");
+  // A Watering refused for history review is not retryable; it uses the
+  // shared exact-entry lock with its Timeline review and explicit discard.
+  const [wateringRetryPending, setWateringRetryPending] = useState(
+    Boolean(initialWatering && !initialWatering.historyCheckReason),
+  );
+  const [failedWaterPhotoUpload, setFailedWaterPhotoUpload] = useState(false);
+  const [waterPhotoOmitted, setWaterPhotoOmitted] = useState(false);
+  const [exactRetryPending, setExactRetryPending] = useState(
+    Boolean(initialNote || initialFeeding || initialWatering?.historyCheckReason),
+  );
+  const historyCheckRequiredRef = useRef(
+    Boolean(
+      initialNote?.historyCheckReason ||
+      initialFeeding?.historyCheckReason ||
+      initialWatering?.historyCheckReason,
+    ),
+  );
+  const [historyCheckRequired, setHistoryCheckRequired] = useState(historyCheckRequiredRef.current);
+  const [persistedNote, setPersistedNote] = useState<string | null | undefined>(undefined);
+  const [mismatchedReceipt, setMismatchedReceipt] = useState<{
+    note: string | null;
+    navigation: NonNullable<ReturnType<typeof buildQuickLogTimelineNavTarget>>;
+  } | null>(null);
+  // Where a target-moved original entry lives now, from the verified readback.
+  // Persisted on the pending Note so a reload still links to the right Timeline.
+  const [historyReviewScope, setHistoryReviewScope] =
+    useState<PendingQuickLogNoteReviewTarget | null>(initialNote?.historyReviewTarget ?? null);
+  const retryPending = wateringRetryPending || exactRetryPending;
+  const [submissionLocked, setSubmissionLocked] = useState(Boolean(initialSubmission));
   // Synchronous in-flight guard. The save-state flags are React
   // state and don't flip until the next paint, so rapid double-clicks
   // can slip a second save through. This ref locks the entry point
@@ -324,17 +574,31 @@ export default function QuickLogV2Sheet({
   const saveIdempotencyKeyRef = useRef<string>(newQuickLogSaveKey());
   // A server/transport failure can be ambiguous: the first call may have
   // committed even if its response never reached the browser. Keep the exact
-  // Water payload immutable across Retry so the reused idempotency key can
+  // submitted payload immutable across Retry so the reused idempotency key can
   // never confirm a different target, timestamp, or set of measurements.
-  const wateringRetrySubmissionRef = useRef<LockedWateringSubmission | null>(null);
+  const wateringRetrySubmissionRef = useRef<LockedWateringSubmission | null>(
+    initialWatering ? restoredWateringSubmission(initialWatering) : null,
+  );
+  const manualRetrySubmissionRef = useRef<LockedManualSubmission | null>(
+    initialNote ? restoredNoteSubmission(initialNote) : null,
+  );
+  const feedingRetrySubmissionRef = useRef<LockedFeedingSubmission | null>(
+    initialFeeding
+      ? {
+          recovery: initialFeeding,
+          payload: initialFeeding.payload,
+          resolved: initialFeeding.resolved,
+        }
+      : null,
+  );
   // Synchronous companion to the presenter state. It closes the same-tick
   // race where a grower taps Save and then changes target/action/media before
   // React has painted the disabled controls.
-  const wateringSubmissionLockedRef = useRef(false);
+  const submissionLockedRef = useRef(Boolean(initialSubmission));
   // Set only when a server/transport result is ambiguous. Local validation or
   // upload failures release the draft; an uncertain RPC keeps it immutable so
   // Retry can only confirm the original logical record.
-  const keepWateringSubmissionLockedRef = useRef(false);
+  const keepSubmissionLockedRef = useRef(Boolean(initialSubmission));
   // Async video metadata probes must finish before a save can capture media.
   // The generation token prevents an old close/reopen or target/action draft
   // from installing a stale file when its probe resolves late.
@@ -354,17 +618,76 @@ export default function QuickLogV2Sheet({
   // temperature draft — the manual sensor-snapshot Temp field and the
   // Water/Feed water-temperature fields can each be pinned at different
   // times, or not at all.
-  const manualTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
-  const wateringTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
-  const feedingTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
+  const manualTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(
+    initialSubmission ? "celsius" : null,
+  );
+  const wateringTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(
+    initialWatering ? "celsius" : null,
+  );
+  const feedingTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(
+    initialFeeding ? "celsius" : null,
+  );
 
-  const options = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
+  // Visible grow roster gates Target Select: dangling grow_id rows (UUID
+  // present but grow not in useGrows()) must not appear — live FAIL tip
+  // 87b3b322 offered Tent · Flower with Grow "No grow linked".
+  const { grows, archivedGrows } = useGrows();
+  const visibleGrowIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const g of grows ?? []) {
+      if (typeof g?.id === "string" && g.id.trim().length > 0) ids.add(g.id.trim());
+    }
+    return ids;
+  }, [grows]);
+  const archivedGrowIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const g of archivedGrows ?? []) {
+      if (typeof g?.id === "string" && g.id.trim().length > 0) ids.add(g.id.trim());
+    }
+    return ids;
+  }, [archivedGrows]);
+  const baseOptions = useMemo(
+    () => buildQuickLogV2TargetOptions(tents, plants, visibleGrowIds, archivedGrowIds),
+    [tents, plants, visibleGrowIds, archivedGrowIds],
+  );
+
+  // Tent context from open intent / selected tent key (route registration
+  // already arrives as defaultTargetKey `tent:<id>`).
+  const tentContextId = useMemo(() => {
+    return (
+      resolveQuickLogV2TentContextId(defaultTargetKey) ??
+      resolveQuickLogV2TentContextId(form.selectedKey)
+    );
+  }, [defaultTargetKey, form.selectedKey]);
+
+  const tentScopedPartitions = useMemo(
+    () => partitionQuickLogV2TargetOptionsForTent(baseOptions, tentContextId),
+    [baseOptions, tentContextId],
+  );
+
+  const options = tentScopedPartitions.ordered;
+
+  const filteredTargetOptions = useMemo(
+    () => filterQuickLogV2TargetOptions(options, targetFilterQuery),
+    [options, targetFilterQuery],
+  );
+
+  const filteredInTentPlants = useMemo(() => {
+    if (!tentContextId) return [] as QuickLogV2TargetOption[];
+    return filterQuickLogV2TargetOptions(tentScopedPartitions.inTentPlants, targetFilterQuery);
+  }, [tentContextId, tentScopedPartitions.inTentPlants, targetFilterQuery]);
+
+  const filteredOtherTargets = useMemo(() => {
+    if (!tentContextId) return filteredTargetOptions;
+    return filterQuickLogV2TargetOptions(tentScopedPartitions.other, targetFilterQuery);
+  }, [tentContextId, tentScopedPartitions.other, targetFilterQuery, filteredTargetOptions]);
+
+  const showTargetFilter = options.length > QUICK_LOG_V2_TARGET_FILTER_THRESHOLD;
 
   const resolvedTarget = useMemo(
     () => resolveQuickLogV2Target(options, form.selectedKey),
     [options, form.selectedKey],
   );
-  const { grows } = useGrows();
   // A remembered plant is an offer on a genuinely global/null-target open,
   // never an implicit default. Pair the record with the account key that
   // produced it so an account switch fails closed during the effect boundary.
@@ -456,6 +779,16 @@ export default function QuickLogV2Sheet({
       }),
     [resolvedTarget, plants, tents, grows],
   );
+  const targetStage =
+    resolvedTarget.ok && resolvedTarget.targetType === "plant"
+      ? ((plants as Array<{ id?: string; stage?: string | null }>).find(
+          (plant) => plant.id === resolvedTarget.plantId,
+        )?.stage ?? null)
+      : resolvedTarget.ok && resolvedTarget.targetType === "tent"
+        ? ((tents as Array<{ id?: string; stage?: string | null }>).find(
+            (tent) => tent.id === resolvedTarget.tentId,
+          )?.stage ?? null)
+        : null;
   const wateringContext = useMemo(
     () =>
       buildQuickLogWateringContext({
@@ -476,18 +809,26 @@ export default function QuickLogV2Sheet({
 
   const recentFeedingsQ = useRecentFeedingsForDefaults({
     plantId: resolvedContext.plantId,
-    tentId: resolvedContext.tentId,
-    growId: resolvedContext.growId,
   }) as { data?: unknown[] };
   const feedingDefaults = useMemo(
     () =>
       buildFeedingDefaults({
         rawEntries: recentFeedingsQ.data ?? [],
         plantId: resolvedContext.plantId,
-        tentId: resolvedContext.tentId,
-        growId: resolvedContext.growId,
       }),
-    [recentFeedingsQ.data, resolvedContext.plantId, resolvedContext.tentId, resolvedContext.growId],
+    [recentFeedingsQ.data, resolvedContext.plantId],
+  );
+
+  const recentWateringsQ = useRecentWateringsForVolumeDefaults({
+    plantId: resolvedContext.plantId,
+  }) as { data?: unknown[] };
+  const wateringVolumeDefaults = useMemo(
+    () =>
+      buildWateringVolumeDefaults({
+        rawEntries: recentWateringsQ.data ?? [],
+        plantId: resolvedContext.plantId,
+      }),
+    [recentWateringsQ.data, resolvedContext.plantId],
   );
 
   const isLoadingContext = Boolean(plantsQ.isLoading || tentsQ.isLoading);
@@ -504,7 +845,22 @@ export default function QuickLogV2Sheet({
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
   const selectedTargetStale = isStaleQuickLogV2TargetSelection(resolvedTarget);
   const noteLength = form.note.length;
+  const archivedGrowActionBlock = quickLogArchivedGrowActionBlock({
+    growId: resolvedTarget.ok ? resolvedTarget.growId : null,
+    action: form.action,
+    archivedGrowIds,
+  });
   const volumeMissing = form.action === "water" && wateringForm.volumeMl.trim() === "";
+  const criticalContentMissing = isQuickLogV2CriticalContentMissing({
+    action: form.action,
+    note: form.note,
+    temperatureC: form.temperatureC,
+    humidityPct: form.humidityPct,
+    vpdKpa: form.vpdKpa,
+    hasPhoto: photoFile !== null,
+    hasVideo: videoFile !== null,
+    hasMaturityEvidence: hasQuickLogMaturityEvidence(maturityEvidenceForm),
+  });
   const showMaturityEvidence =
     form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
   // Better/Same/Worse records the PLANT's response, so it is offered only
@@ -534,17 +890,37 @@ export default function QuickLogV2Sheet({
   const everyResponseCheckOverflows = RESPONSE_CHECK_STATUSES.every((status) =>
     responseCheckOverflowByStatus.get(status),
   );
-  const saveHelper = wateringRetryPending
-    ? "Retry sends the exact same watering record. Close and reopen Quick Log to make changes."
-    : getSaveHelperMessage({
-        contextBlocked,
-        isLoadingContext,
-        hasFetchError,
-        hasNoTargets,
-        selectedTargetMissing,
-        volumeMissing,
-        saving: saving || feedingSaving || wateringSaving,
-      });
+  const historyReviewResolved =
+    manualRetrySubmissionRef.current?.resolved ??
+    feedingRetrySubmissionRef.current?.resolved ??
+    wateringRetrySubmissionRef.current?.resolved ??
+    resolvedTarget;
+  const historyReviewNavigation = !historyCheckRequired
+    ? null
+    : historyReviewScope
+      ? buildQuickLogTimelineNavTarget(historyReviewScope)
+      : historyReviewResolved.ok
+        ? buildQuickLogTimelineNavTarget({
+            growId: historyReviewResolved.growId ?? null,
+            targetType: historyReviewResolved.targetType ?? null,
+            targetId: historyReviewResolved.targetId ?? null,
+            tentId: historyReviewResolved.tentId ?? null,
+          })
+        : null;
+  const saveHelper = historyCheckRequired
+    ? QUICK_LOG_HISTORY_REVIEW_HELPER
+    : wateringRetryPending
+      ? "Retry checks the original watering record. Closing or reloading keeps it available in this tab; confirm it before logging another."
+      : getSaveHelperMessage({
+          contextBlocked,
+          isLoadingContext,
+          hasFetchError,
+          hasNoTargets,
+          selectedTargetMissing,
+          volumeMissing,
+          criticalContentMissing,
+          saving: saving || feedingSaving || wateringSaving,
+        });
 
   function resetPhotoSelection() {
     setPhotoFile(null);
@@ -571,10 +947,22 @@ export default function QuickLogV2Sheet({
   }
 
   useEffect(() => {
+    // A parent target/action update must not replace an unresolved logical
+    // submission or discard its key. Resolve it before starting another draft.
+    if (
+      recoveryStorageFence ||
+      wateringRetrySubmissionRef.current ||
+      manualRetrySubmissionRef.current ||
+      feedingRetrySubmissionRef.current ||
+      (saveInFlightRef.current && submissionLockedRef.current)
+    )
+      return;
     // Closing or reopening invalidates any metadata probe still resolving for
     // the previous draft. A stale completion can never repopulate the sheet.
     resetVideoSelection();
     if (open) {
+      setRestoredMediaPending(false);
+      setVisitMode("fast_check");
       setForm({
         ...EMPTY_QUICKLOG_V2_FORM,
         selectedKey: defaultTargetKey ?? null,
@@ -591,27 +979,80 @@ export default function QuickLogV2Sheet({
       wateringTempEntryUnitRef.current = null;
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
+      setWateringVolumeDefaultsApplied(false);
       setLocalError(null);
       setSaveStatus("");
       setPostSave(null);
       setWateringRetryPending(false);
-      setWateringSubmissionLocked(false);
+      setFailedWaterPhotoUpload(false);
+      setWaterPhotoOmitted(false);
+      setExactRetryPending(false);
+      setHistoryCheckRequired(false);
+      setPersistedNote(undefined);
+      setMismatchedReceipt(null);
+      manualRetrySubmissionRef.current = null;
+      feedingRetrySubmissionRef.current = null;
+      setSubmissionLocked(false);
       wateringRetrySubmissionRef.current = null;
-      wateringSubmissionLockedRef.current = false;
-      keepWateringSubmissionLockedRef.current = false;
+      submissionLockedRef.current = false;
+      keepSubmissionLockedRef.current = false;
       saveInFlightRef.current = false;
       idempotencyKeyRef.current = 1;
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
       setRecentSuggestionDismissed(false);
+      setTargetFilterQuery("");
+      setTentPlantAutoApplied(false);
       resetPhotoSelection();
+    } else {
+      setTargetFilterQuery("");
+      setTentPlantAutoApplied(false);
     }
   }, [open, defaultTargetKey, defaultAction]);
+
+  // Tent-scoped plant pick: prefer recent-in-tent, else sole plant in tent.
+  // Only when selectedKey is still empty/unset — never rewrite an explicit
+  // tent:<id> (or plant:) target. One-shot per open so a grower who later
+  // picks the tent again is not forced.
+  useEffect(() => {
+    if (submissionLockedRef.current || !open || contextBlocked || tentPlantAutoApplied) return;
+    const recentPlantId = recentTargetSuggestion?.plantId ?? recentTargetRecord?.plantId ?? null;
+    // During the open-reset tick, form.selectedKey can still be the previous
+    // render's empty value while defaultTargetKey already carries an explicit
+    // tent:/plant: open target. Prefer that pending key so sole auto-select
+    // cannot race-rewrite tent:<id> → plant:<id>.
+    const draftKey =
+      typeof form.selectedKey === "string" && form.selectedKey.trim().length > 0
+        ? form.selectedKey
+        : (defaultTargetKey ?? null);
+    const nextKey = resolveTentScopedQuickLogPlantSelection({
+      tentId: tentContextId,
+      options,
+      selectedKey: draftKey,
+      recentPlantId,
+    });
+    setTentPlantAutoApplied(true);
+    if (!nextKey || nextKey === draftKey) return;
+    if (videoValidationInFlightRef.current) resetVideoSelection();
+    setForm((prev) => ({ ...prev, selectedKey: nextKey }));
+    setLocalError(null);
+    setSaveStatus("");
+  }, [
+    open,
+    contextBlocked,
+    tentPlantAutoApplied,
+    tentContextId,
+    options,
+    form.selectedKey,
+    defaultTargetKey,
+    recentTargetSuggestion,
+    recentTargetRecord,
+  ]);
 
   // One-shot prefill of the feeding form with last-used defaults. Runs only
   // when the Feed action is active, the form is still pristine, defaults
   // exist, and we have not yet applied them for this open session.
   useEffect(() => {
-    if (!open) return;
+    if (!open || submissionLockedRef.current) return;
     if (form.action !== "feed") return;
     if (feedingDefaultsApplied) return;
     if (!feedingDefaults.defaults) return;
@@ -626,13 +1067,35 @@ export default function QuickLogV2Sheet({
     setFeedingDefaultsApplied(true);
   }, [open, form.action, feedingDefaults, feedingDefaultsApplied, feedingForm]);
 
+  // One-shot prefill of Water volume from the plant's most recent watering
+  // that recorded a positive volume. Fail closed: never invent 200/500/pot
+  // size. Never overwrite a grower-typed volume. Never touch Feed.
+  useEffect(() => {
+    if (!open || submissionLockedRef.current) return;
+    if (form.action !== "water") return;
+    if (wateringVolumeDefaultsApplied) return;
+    if (!wateringVolumeDefaults.defaults) return;
+    if (wateringForm.volumeMl.trim() !== "") return;
+    setWateringForm((previous) => ({
+      ...previous,
+      volumeMl: applyWateringVolumeDefaultsToForm(wateringVolumeDefaults).volumeMl,
+    }));
+    setWateringVolumeDefaultsApplied(true);
+  }, [
+    open,
+    form.action,
+    wateringVolumeDefaults,
+    wateringVolumeDefaultsApplied,
+    wateringForm.volumeMl,
+  ]);
+
   // Idempotent: the note field receives value updates from multiple event
   // paths (onChange + onInput + onCompositionEnd + onBlur), which often
   // fire for the same user action. Returning the SAME object when the
   // value is unchanged lets React bail out of the re-render, so duplicate
   // event paths cost nothing and IME composition stays smooth.
   const setField = <K extends keyof QuickLogV2FormState>(k: K, v: QuickLogV2FormState[K]) => {
-    if (wateringSubmissionLockedRef.current) return;
+    if (submissionLockedRef.current) return;
     setForm((prev) => (prev[k] === v ? prev : { ...prev, [k]: v }));
   };
 
@@ -651,6 +1114,7 @@ export default function QuickLogV2Sheet({
       : null;
   const responseTargetPlantIdRef = useRef(responseTargetPlantId);
   useEffect(() => {
+    if (submissionLockedRef.current) return;
     const previousPlantId = responseTargetPlantIdRef.current;
     responseTargetPlantIdRef.current = responseTargetPlantId;
     // Fire when the plant the marker DESCRIBES changes — to a different plant,
@@ -684,7 +1148,7 @@ export default function QuickLogV2Sheet({
   }, [responseTargetPlantId, form.note, setField]);
 
   const handleAction = (a: QuickLogV2Action) => {
-    if (wateringSubmissionLockedRef.current) return;
+    if (submissionLockedRef.current) return;
     const prev = form.action;
     if (prev !== a && videoValidationInFlightRef.current) resetVideoSelection();
     setField("action", a);
@@ -703,6 +1167,7 @@ export default function QuickLogV2Sheet({
     if (prev === "water") {
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
+      setWateringVolumeDefaultsApplied(false);
     }
     // Entering feed → maturity evidence surface hides; clear its draft
     // so stale plant-maturity notes don't get retained under the hood. Feed
@@ -719,7 +1184,7 @@ export default function QuickLogV2Sheet({
   const photoGate = useMemo(() => buildQuickLogPhotoGateState(), []);
 
   function handlePhotoSelected(file: File | null) {
-    if (wateringSubmissionLockedRef.current) return;
+    if (submissionLockedRef.current) return;
     setPhotoFile(file);
     setPhotoPreview(file ? URL.createObjectURL(file) : null);
     setLocalError(null);
@@ -734,7 +1199,7 @@ export default function QuickLogV2Sheet({
   }
 
   async function handleVideoInputChange(e: ChangeEvent<HTMLInputElement>) {
-    if (wateringSubmissionLockedRef.current) return;
+    if (submissionLockedRef.current) return;
     const file = e.currentTarget.files?.[0] ?? null;
     e.currentTarget.value = "";
     if (!file) return;
@@ -751,7 +1216,7 @@ export default function QuickLogV2Sheet({
         setSaveStatus("");
         return;
       }
-      if (wateringSubmissionLockedRef.current) return;
+      if (submissionLockedRef.current) return;
       if (videoPreview) {
         try {
           URL.revokeObjectURL(videoPreview);
@@ -895,7 +1360,96 @@ export default function QuickLogV2Sheet({
     }
   }
 
+  function restorePendingNote(record: PendingQuickLogNote) {
+    manualRetrySubmissionRef.current = restoredNoteSubmission(record);
+    setForm(restoredNoteForm(record));
+    manualTempEntryUnitRef.current = "celsius";
+    setExactRetryPending(true);
+    historyCheckRequiredRef.current = Boolean(record.historyCheckReason);
+    setHistoryCheckRequired(Boolean(record.historyCheckReason));
+    setHistoryReviewScope(record.historyReviewTarget ?? null);
+    keepSubmissionLockedRef.current = true;
+    submissionLockedRef.current = true;
+    setSubmissionLocked(true);
+    setRestoredMediaPending(record.attachments.photo || record.attachments.video);
+    setLocalError(
+      record.historyCheckReason
+        ? quickLogReasonToOperatorMessage(record.historyCheckReason)
+        : NOTE_RECOVERY_PENDING,
+    );
+    resetPhotoSelection();
+    resetVideoSelection();
+  }
+
+  function restorePendingWatering(record: PendingQuickLogWatering) {
+    const restored = buildWateringRecoveryForm(record);
+    wateringRetrySubmissionRef.current = restoredWateringSubmission(record);
+    setForm(restored.form);
+    setWateringForm(restored.wateringForm);
+    manualTempEntryUnitRef.current = "celsius";
+    wateringTempEntryUnitRef.current = "celsius";
+    const historyCheck = Boolean(record.historyCheckReason);
+    setWateringRetryPending(!historyCheck);
+    if (historyCheck) setExactRetryPending(true);
+    historyCheckRequiredRef.current = historyCheck;
+    setHistoryCheckRequired(historyCheck);
+    setFailedWaterPhotoUpload(false);
+    setWaterPhotoOmitted(false);
+    keepSubmissionLockedRef.current = true;
+    submissionLockedRef.current = true;
+    setSubmissionLocked(true);
+    setRestoredMediaPending(record.attachments.photo || record.attachments.video);
+    setLocalError(
+      record.historyCheckReason
+        ? quickLogReasonToOperatorMessage(record.historyCheckReason)
+        : WATERING_RECOVERY_PENDING,
+    );
+    resetPhotoSelection();
+    resetVideoSelection();
+  }
+
+  function handleOmitFailedWaterPhoto() {
+    // Keep this tab's payload and idempotency key; only omit the local file
+    // that could not be uploaded. Retry then confirms or writes that exact
+    // Watering without trapping the grower on a permanently failing file.
+    if (saveInFlightRef.current || !failedWaterPhotoUpload) return;
+    const pending = wateringRetrySubmissionRef.current;
+    if (!pending?.photoFile) return;
+    wateringRetrySubmissionRef.current = { ...pending, photoFile: null };
+    resetPhotoSelection();
+    setFailedWaterPhotoUpload(false);
+    setWaterPhotoOmitted(true);
+    setLocalError(
+      "The photo was omitted from this tab’s retry. Retry will check or save the same Watering. Check Timeline before adding the photo separately.",
+    );
+  }
+
+  function restorePendingFeeding(record: PendingQuickLogFeeding) {
+    const restored = buildFeedingRecoveryForm(record);
+    feedingRetrySubmissionRef.current = {
+      recovery: record,
+      payload: record.payload,
+      resolved: record.resolved,
+    };
+    setForm(restored.form);
+    setFeedingForm(restored.feedingForm);
+    feedingTempEntryUnitRef.current = "celsius";
+    setExactRetryPending(true);
+    historyCheckRequiredRef.current = Boolean(record.historyCheckReason);
+    setHistoryCheckRequired(historyCheckRequiredRef.current);
+    keepSubmissionLockedRef.current = true;
+    submissionLockedRef.current = true;
+    setSubmissionLocked(true);
+    setLocalError(
+      record.historyCheckReason
+        ? feedingHistoryCheckMessage(record.historyCheckReason)
+        : FEEDING_RECOVERY_PENDING,
+    );
+  }
+
   const handleSave = async () => {
+    if (recoveryStorageFence || historyCheckRequiredRef.current) return;
+    const lifetime = noteLifetimeRef.current;
     if (videoValidationInFlightRef.current) {
       setLocalError("Wait for the video check to finish before saving.");
       return;
@@ -911,74 +1465,212 @@ export default function QuickLogV2Sheet({
     ) {
       return;
     }
-    const lockWateringSubmission =
-      form.action === "water" || wateringRetrySubmissionRef.current !== null;
-    if (lockWateringSubmission) {
-      wateringSubmissionLockedRef.current = true;
-      keepWateringSubmissionLockedRef.current = false;
-      setWateringSubmissionLocked(true);
-      setWateringSaving(true);
+    // Freeze every supported submission before the first await, using the
+    // same synchronous guard as Water. Local validation releases this lock.
+    const lockSubmission =
+      form.action === "water" || form.action === "note" || form.action === "feed" || retryPending;
+    if (lockSubmission) {
+      submissionLockedRef.current = true;
+      keepSubmissionLockedRef.current = false;
+      setSubmissionLocked(true);
+      if (form.action === "water") setWateringSaving(true);
     }
     saveInFlightRef.current = true;
     try {
       await runHandleSave();
     } finally {
-      saveInFlightRef.current = false;
-      if (lockWateringSubmission) {
-        setWateringSaving(false);
-        if (!keepWateringSubmissionLockedRef.current) {
-          wateringSubmissionLockedRef.current = false;
-          setWateringSubmissionLocked(false);
+      if (lifetime.active) {
+        saveInFlightRef.current = false;
+        if (lockSubmission) {
+          setWateringSaving(false);
+          if (!keepSubmissionLockedRef.current) {
+            submissionLockedRef.current = false;
+            setSubmissionLocked(false);
+          }
         }
       }
     }
   };
 
   const runHandleSave = async () => {
+    const lifetime = noteLifetimeRef.current;
+    const canContinueNote = () => lifetime.active && noteLifetimeRef.current === lifetime;
+    setMismatchedReceipt(null);
     setLocalError(null);
     setSaveStatus("");
     const pendingWateringSubmission = wateringRetrySubmissionRef.current;
+    const pendingManualSubmission = manualRetrySubmissionRef.current;
+    const pendingFeedingSubmission = feedingRetrySubmissionRef.current;
+    const pendingSubmission =
+      pendingWateringSubmission ?? pendingManualSubmission ?? pendingFeedingSubmission;
     const resolved =
-      pendingWateringSubmission?.resolved ?? resolveQuickLogV2Target(options, form.selectedKey);
+      pendingSubmission?.resolved ?? resolveQuickLogV2Target(options, form.selectedKey);
     if (!resolved.ok) {
       setLocalError("Choose a plant or tent before saving.");
       return;
     }
+    const archivedSaveBlock = quickLogArchivedGrowActionBlock({
+      growId: resolved.growId,
+      action: pendingWateringSubmission
+        ? "water"
+        : pendingFeedingSubmission
+          ? "feed"
+          : pendingManualSubmission
+            ? "note"
+            : form.action,
+      archivedGrowIds,
+    });
+    if (archivedSaveBlock) {
+      setLocalError(archivedSaveBlock);
+      return;
+    }
 
-    if (!pendingWateringSubmission && form.action === "feed") {
+    if (
+      !pendingSubmission &&
+      isQuickLogV2CriticalContentMissing({
+        action: form.action,
+        note: form.note,
+        temperatureC: form.temperatureC,
+        humidityPct: form.humidityPct,
+        vpdKpa: form.vpdKpa,
+        hasPhoto: photoFile !== null,
+        hasVideo: videoFile !== null,
+        hasMaturityEvidence: hasQuickLogMaturityEvidence(maturityEvidenceForm),
+      })
+    ) {
+      setLocalError(QUICK_LOG_V2_EMPTY_CONTENT_HELPER);
+      return;
+    }
+
+    if (pendingFeedingSubmission || (!pendingSubmission && form.action === "feed")) {
       if (!resolved.growId) {
         setLocalError(feedingFormReasonToHelper("grow_id:missing"));
         return;
       }
-      const mapped = buildFeedingFormPayload({
-        growId: resolved.growId,
-        tentId: resolved.tentId ?? null,
-        plantId: resolved.plantId ?? null,
-        idempotencyKey: saveIdempotencyKeyRef.current,
-        // Unit seam: the grower typed water temperature in the preference
-        // unit; canonical °C is produced exactly once, right here.
-        form: {
-          ...feedingForm,
-          waterTempC: typedTempToCelsiusInput(
-            feedingForm.waterTempC,
-            feedingTempEntryUnitRef.current ?? temperatureUnit,
-          ),
-        },
-      });
+      const mapped = pendingFeedingSubmission
+        ? { ok: true as const, payload: pendingFeedingSubmission.payload }
+        : buildFeedingFormPayload({
+            growId: resolved.growId,
+            tentId: resolved.tentId ?? null,
+            plantId: resolved.plantId ?? null,
+            idempotencyKey: saveIdempotencyKeyRef.current,
+            // Unit seam: the grower typed water temperature in the preference
+            // unit; canonical °C is produced exactly once, right here.
+            form: {
+              ...feedingForm,
+              waterTempC: typedTempToCelsiusInput(
+                feedingForm.waterTempC,
+                feedingTempEntryUnitRef.current ?? temperatureUnit,
+              ),
+            },
+          });
       if (mapped.ok !== true) {
         setLocalError(feedingFormReasonToHelper(mapped.reason));
         return;
       }
+      if (!user?.id || !canContinueNote()) {
+        setLocalError(FEEDING_RECOVERY_UNAVAILABLE);
+        return;
+      }
+      const createdAt = new Date().toISOString();
+      const newPayload = { ...mapped.payload, occurred_at: createdAt };
+      const exactFeedingSubmission = pendingFeedingSubmission ?? {
+        recovery: {
+          version: 1 as const,
+          ownerId: user.id,
+          createdAt,
+          payload: newPayload,
+          resolved,
+        },
+        payload: newPayload,
+        resolved,
+      };
+      if (exactFeedingSubmission.recovery.ownerId !== user.id) return;
+      const claim = claimPendingQuickLogFeeding(exactFeedingSubmission.recovery);
+      if (claim.status !== "claimed") {
+        if (claim.status === "pending") restorePendingFeeding(claim.record);
+        else {
+          if (pendingFeedingSubmission) keepSubmissionLockedRef.current = true;
+          setLocalError(FEEDING_RECOVERY_UNAVAILABLE);
+        }
+        return;
+      }
+      exactFeedingSubmission.recovery = claim.record;
+      feedingRetrySubmissionRef.current = exactFeedingSubmission;
+      keepSubmissionLockedRef.current = true;
       setFeedingSaving(true);
       setSaveStatus("Saving feeding…");
-      const result = await writeFeedingTypedEvent(mapped.payload);
+      const result = await writeFeedingTypedEvent(exactFeedingSubmission.payload);
+      if (!canContinueNote()) return;
       setFeedingSaving(false);
       if (result.ok !== true) {
-        setLocalError(FEEDING_SAVE_FAILURE_MESSAGE);
-        toast.error(FEEDING_SAVE_FAILURE_MESSAGE);
+        // A validation rejection after an earlier ambiguous attempt repeats on
+        // every same-key Retry; keep the key and route to Timeline review.
+        if (
+          quickLogSaveRequiresHistoryCheck(result.reason) ||
+          feedingRejectionNeedsHistoryCheck({
+            reason: result.reason,
+            priorClaim: pendingFeedingSubmission !== null,
+          })
+        ) {
+          const marked = markPendingQuickLogFeedingHistoryCheck(
+            exactFeedingSubmission.recovery,
+            result.reason,
+          );
+          if (marked.status === "marked") {
+            feedingRetrySubmissionRef.current = {
+              ...exactFeedingSubmission,
+              recovery: marked.record,
+            };
+          }
+          // Storage failure cannot reopen same-key Retry on this mounted sheet.
+          // Explicit discard still requires clearing the unchanged exact journal.
+          historyCheckRequiredRef.current = true;
+          setHistoryCheckRequired(true);
+          setExactRetryPending(true);
+          const message = feedingHistoryCheckMessage(result.reason);
+          setLocalError(message);
+          toast.error(message);
+          setSaveStatus("");
+          return;
+        }
+        const definitiveServerRejection = result.reason === "rpc:invalid_typed_payload";
+        const released =
+          mayCorrectRejectedFeeding({
+            reason: result.reason,
+            priorClaim: pendingFeedingSubmission !== null,
+          }) && clearPendingQuickLogFeeding(exactFeedingSubmission.recovery);
+        const unresolved = !released;
+        setExactRetryPending(unresolved);
+        keepSubmissionLockedRef.current = unresolved;
+        if (!unresolved) feedingRetrySubmissionRef.current = null;
+        // Only a fresh claim can be cleared. An older ambiguous attempt may
+        // have committed before a later validation rejection arrived.
+        if (released && definitiveServerRejection) {
+          saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+        }
+        const message = unresolved
+          ? FEEDING_RECOVERY_PENDING
+          : feedingFormReasonToHelper(
+              definitiveServerRejection
+                ? (findFeedingPayloadRangeViolation(exactFeedingSubmission.payload) ??
+                    result.reason)
+                : result.reason,
+            );
+        setLocalError(message);
+        toast.error(message);
         setSaveStatus("");
         return;
       }
+      feedingRetrySubmissionRef.current = null;
+      setExactRetryPending(false);
+      keepSubmissionLockedRef.current = false;
+      const recoveryClearFailed = !clearPendingQuickLogFeeding(exactFeedingSubmission.recovery);
+      setFeedingStorageFence(recoveryClearFailed);
+      confirmedFeedingRecoveryRef.current = recoveryClearFailed
+        ? exactFeedingSubmission.recovery
+        : null;
+      setLocalError(recoveryClearFailed ? FEEDING_RECOVERY_CLEAR_FAILED : null);
       const growEventId = result.eventId;
       rememberConfirmedPlantTarget(resolved, user?.id ?? null);
       trackQuickLogSuccess("feed", { reused: result.reused });
@@ -1024,7 +1716,7 @@ export default function QuickLogV2Sheet({
 
     const occurredAt = new Date().toISOString();
     let maturityDetails: Record<string, unknown> | null = null;
-    if (!pendingWateringSubmission) {
+    if (!pendingSubmission) {
       const maturityEvidence = buildQuickLogMaturityEvidenceDetails({
         form: maturityEvidenceForm,
         targetType: resolved.targetType ?? null,
@@ -1078,7 +1770,19 @@ export default function QuickLogV2Sheet({
 
     let exactWateringSubmission: LockedWateringSubmission | null = pendingWateringSubmission;
     if (wateringPayload && !exactWateringSubmission) {
+      if (!user?.id) {
+        setLocalError(WATERING_RECOVERY_UNAVAILABLE);
+        return;
+      }
       exactWateringSubmission = {
+        recovery: {
+          version: 1,
+          ownerId: user.id,
+          createdAt: occurredAt,
+          payload: wateringPayload,
+          resolved,
+          attachments: { photo: photoFile !== null, video: videoFile !== null },
+        },
         payload: wateringPayload,
         resolved,
         photoFile,
@@ -1092,28 +1796,142 @@ export default function QuickLogV2Sheet({
       // if a transport result is ambiguous.
       wateringRetrySubmissionRef.current = exactWateringSubmission;
     }
+    if (exactWateringSubmission) {
+      if (!canContinueNote() || exactWateringSubmission.recovery.ownerId !== user?.id) return;
+      const claim = await claimPendingQuickLogWatering(exactWateringSubmission.recovery);
+      // The claim waits on a cross-tab lock; a closed or remounted sheet must
+      // not upload media or continue this submission from its old lifetime.
+      if (!canContinueNote()) return;
+      if (claim.status !== "claimed") {
+        if (claim.status === "pending") restorePendingWatering(claim.record);
+        else {
+          if (!pendingWateringSubmission) wateringRetrySubmissionRef.current = null;
+          else keepSubmissionLockedRef.current = true;
+          setLocalError(
+            claim.status === "other_pending"
+              ? STARTER_WATER_RECOVERY_PENDING
+              : WATERING_RECOVERY_UNAVAILABLE,
+          );
+        }
+        return;
+      }
+      exactWateringSubmission.recovery = claim.record;
+      keepSubmissionLockedRef.current = true;
+    }
+    const releaseUnsentWatering = async () => {
+      if (!exactWateringSubmission) return;
+      // Keep the exact key and target while this attachment upload is
+      // unresolved. A retry must not quietly replace the claimed Watering.
+      keepSubmissionLockedRef.current = true;
+      setWateringRetryPending(true);
+    };
 
-    const submissionPhotoFile = exactWateringSubmission?.photoFile ?? photoFile;
-    const submissionVideoFile = exactWateringSubmission?.videoFile ?? videoFile;
-    const submissionVideoMeta = exactWateringSubmission?.videoMeta ?? videoMeta;
-    const submissionNote = exactWateringSubmission?.note ?? form.note;
-    const submissionAction: QuickLogV2Action = exactWateringSubmission?.action ?? form.action;
+    let exactManualSubmission = pendingManualSubmission;
+    if (!wateringPayload && !exactManualSubmission) {
+      const built = buildQuickLogV2SavePayload({
+        resolved,
+        action: form.action,
+        volumeMl: form.volumeMl,
+        note: form.note,
+        temperatureC: typedTempToCelsiusInput(
+          form.temperatureC,
+          manualTempEntryUnitRef.current ?? temperatureUnit,
+        ),
+        humidityPct: form.humidityPct,
+        vpdKpa: form.vpdKpa,
+        occurredAt,
+        details: maturityDetails,
+        maturityEvidenceForm,
+        hasCompanionMedia: Boolean(photoFile || videoFile),
+        idempotencyKey: saveIdempotencyKeyRef.current,
+      });
+      if (built.ok !== true) {
+        setLocalError(reasonToMessage(built.reason));
+        return;
+      }
+      if (!user?.id) {
+        setLocalError(NOTE_RECOVERY_UNAVAILABLE);
+        return;
+      }
+      exactManualSubmission = {
+        recovery: {
+          version: 1,
+          ownerId: user.id,
+          createdAt: occurredAt,
+          payload: built.payload,
+          resolved,
+          attachments: { photo: photoFile !== null, video: videoFile !== null },
+        },
+        payload: built.payload,
+        resolved,
+        photoFile,
+        videoFile,
+        videoMeta,
+        note: form.note,
+        action: "note",
+      };
+      manualRetrySubmissionRef.current = exactManualSubmission;
+    }
+    if (exactManualSubmission) {
+      if (!canContinueNote() || exactManualSubmission.recovery.ownerId !== user?.id) return;
+      const claim = claimPendingQuickLogNote(exactManualSubmission.recovery);
+      if (claim.status !== "claimed") {
+        if (claim.status === "pending") restorePendingNote(claim.record);
+        else {
+          // No RPC was sent. Keep a new draft editable; never replace unreadable storage.
+          if (!pendingManualSubmission) manualRetrySubmissionRef.current = null;
+          else keepSubmissionLockedRef.current = true;
+          setLocalError(NOTE_RECOVERY_UNAVAILABLE);
+        }
+        return;
+      }
+      exactManualSubmission.recovery = claim.record;
+    }
+    const releaseUnsentNote = () => {
+      if (!exactManualSubmission) return;
+      if (!pendingManualSubmission && clearPendingQuickLogNote(exactManualSubmission.recovery)) {
+        manualRetrySubmissionRef.current = null;
+      } else {
+        keepSubmissionLockedRef.current = true;
+        setExactRetryPending(true);
+      }
+    };
+    const exactSubmission = exactWateringSubmission ?? exactManualSubmission;
+    const submissionPhotoFile = exactSubmission ? exactSubmission.photoFile : photoFile;
+    const submissionVideoFile = exactSubmission ? exactSubmission.videoFile : videoFile;
+    const submissionVideoMeta = exactSubmission ? exactSubmission.videoMeta : videoMeta;
+    const submissionNote = exactSubmission?.note ?? form.note;
+    const submissionAction: QuickLogV2Action = exactSubmission?.action ?? form.action;
 
     let uploadedPath: string | null = null;
     if (submissionPhotoFile) {
       if (!resolved.growId) {
-        wateringRetrySubmissionRef.current = null;
+        await releaseUnsentWatering();
+        releaseUnsentNote();
         setLocalError("Choose a target with grow context before attaching a photo.");
         return;
       }
       setSaveStatus("Uploading photo…");
       const upload = await uploadQuickLogPhoto(resolved.growId, submissionPhotoFile);
+      if (exactSubmission && !canContinueNote()) {
+        if (upload.ok) {
+          try {
+            await supabase.storage.from("diary-photos").remove([upload.path]);
+          } catch {
+            // Best effort only; the current session may no longer own this path.
+          }
+        }
+        return;
+      }
       if (!upload.ok) {
-        wateringRetrySubmissionRef.current = null;
+        await releaseUnsentWatering();
+        releaseUnsentNote();
+        if (exactWateringSubmission) setFailedWaterPhotoUpload(true);
         setLocalError((upload as { message: string }).message);
         setSaveStatus("");
         return;
       }
+      if (exactWateringSubmission) setFailedWaterPhotoUpload(false);
       uploadedPath = upload.path;
     }
 
@@ -1122,8 +1940,43 @@ export default function QuickLogV2Sheet({
       if (!exactWateringSubmission) {
         throw new Error("Structured Water submission lock was not created.");
       }
+      if (!canContinueNote() || exactWateringSubmission.recovery.ownerId !== user?.id) return;
+      const claim = await claimPendingQuickLogWatering(exactWateringSubmission.recovery);
+      // The claim waits on a cross-tab lock; an unmount or account change
+      // (which remounts this sheet) must not dispatch from the old lifetime.
+      if (!canContinueNote()) return;
+      if (claim.status !== "claimed") {
+        keepSubmissionLockedRef.current = true;
+        setWateringRetryPending(true);
+        setLocalError(
+          claim.status === "other_pending"
+            ? STARTER_WATER_RECOVERY_PENDING
+            : WATERING_RECOVERY_UNAVAILABLE,
+        );
+        return;
+      }
+      // The public-starter form in this tab can claim Water after this sheet
+      // opens or while its photo uploads. Recheck before dispatch.
+      const starterWater = readPendingStarterWater(exactWateringSubmission.recovery.ownerId);
+      if (starterWater.status !== "empty") {
+        if (uploadedPath) {
+          await supabase.storage
+            .from("diary-photos")
+            .remove([uploadedPath])
+            .catch(() => {});
+        }
+        await releaseUnsentWatering();
+        setLocalError(
+          starterWater.status === "pending"
+            ? STARTER_WATER_RECOVERY_PENDING
+            : STARTER_WATER_RECOVERY_UNAVAILABLE,
+        );
+        setSaveStatus("");
+        return;
+      }
       setSaveStatus("Saving watering…");
       const wateringResult = await writeQuickLogWateringTypedEvent(exactWateringSubmission.payload);
+      if (!canContinueNote()) return;
       if (wateringResult.ok !== true) {
         if (uploadedPath) {
           await supabase.storage
@@ -1131,14 +1984,58 @@ export default function QuickLogV2Sheet({
             .remove([uploadedPath])
             .catch(() => {});
         }
-        setLocalError(WATERING_SAVE_FAILURE_MESSAGE);
-        setWateringRetryPending(true);
-        keepWateringSubmissionLockedRef.current = true;
-        toast.error(WATERING_SAVE_FAILURE_MESSAGE);
+        if (!canContinueNote()) return;
+        if (quickLogSaveRequiresHistoryCheck(wateringResult.reason)) {
+          const marked = await markPendingQuickLogWateringHistoryCheck(
+            exactWateringSubmission.recovery,
+            wateringResult.reason,
+          );
+          if (!canContinueNote()) return;
+          if (marked.status === "marked") {
+            wateringRetrySubmissionRef.current = {
+              ...exactWateringSubmission,
+              recovery: marked.record,
+            };
+          }
+          // Every retry of this key gets the same refusal. Keep the claim and
+          // the draft locked for Timeline review; an unmarked claim (storage
+          // refused) still needs the unchanged journal cleared by discard.
+          historyCheckRequiredRef.current = true;
+          setHistoryCheckRequired(true);
+          setWateringRetryPending(false);
+          setExactRetryPending(true);
+          keepSubmissionLockedRef.current = true;
+          const message = quickLogReasonToOperatorMessage(wateringResult.reason);
+          setLocalError(message);
+          toast.error(message);
+          setSaveStatus("");
+          return;
+        }
+        const correctable = mayCorrectRejectedWatering({
+          reason: wateringResult.reason,
+          priorClaim: pendingWateringSubmission !== null,
+        });
+        const clearance = correctable
+          ? await reconcilePendingQuickLogWateringClear(exactWateringSubmission.recovery)
+          : null;
+        if (!canContinueNote()) return;
+        // A previous unresolved claim can have committed before its reply was
+        // lost. Even a later validation rejection cannot clear that claim.
+        const released = clearance?.status === "cleared";
+        if (released) {
+          wateringRetrySubmissionRef.current = null;
+          saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+        }
+        setWateringRetryPending(!released);
+        keepSubmissionLockedRef.current = !released;
+        const message = released
+          ? wateringFormReasonToHelper(wateringResult.reason)
+          : WATERING_SAVE_FAILURE_MESSAGE;
+        setLocalError(message);
+        toast.error(message);
         setSaveStatus("");
         return;
       }
-      wateringRetrySubmissionRef.current = null;
       setWateringRetryPending(false);
       trackQuickLogSuccess("water", { reused: wateringResult.reused });
       res = {
@@ -1148,55 +2045,107 @@ export default function QuickLogV2Sheet({
         reused: wateringResult.reused,
       };
     } else {
-      const built = buildQuickLogV2SavePayload({
-        resolved,
-        action: form.action,
-        volumeMl: form.volumeMl,
-        note: form.note,
-        // Unit seam: manual snapshot temp was typed in the preference unit;
-        // canonical °C is produced exactly once, right here.
-        temperatureC: typedTempToCelsiusInput(
-          form.temperatureC,
-          manualTempEntryUnitRef.current ?? temperatureUnit,
-        ),
-        humidityPct: form.humidityPct,
-        vpdKpa: form.vpdKpa,
-        details: maturityDetails,
-        idempotencyKey: saveIdempotencyKeyRef.current,
-      });
-      if (built.ok !== true) {
-        if (uploadedPath) {
-          await supabase.storage
-            .from("diary-photos")
-            .remove([uploadedPath])
-            .catch(() => {});
-        }
-        setLocalError(reasonToMessage(built.reason));
-        setSaveStatus("");
+      if (!exactManualSubmission) throw new Error("Note submission lock was not created.");
+      // Re-read the same-tab claim after upload, and fence account/lifetime changes.
+      if (!canContinueNote() || exactManualSubmission.recovery.ownerId !== user?.id) return;
+      const claim = claimPendingQuickLogNote(exactManualSubmission.recovery);
+      if (claim.status !== "claimed") {
+        keepSubmissionLockedRef.current = true;
+        setExactRetryPending(true);
+        setLocalError(NOTE_RECOVERY_UNAVAILABLE);
         return;
       }
-
       setSaveStatus("Saving log…");
-      // Explicit opt-in: this mounted grower Quick Log surface owns the intent.
-      // Other users of the shared persistence hook fail closed by default.
-      res = await save(built.payload, { telemetryIntent: form.action });
+      res = await save(exactManualSubmission.payload, {
+        telemetryIntent: submissionAction,
+        verifyPersistedNote: pendingManualSubmission !== null,
+        canContinueNote,
+      });
+      if (!canContinueNote()) return;
     }
     if (!res.ok) {
+      // A known first-call validation rejection is safe to correct. Once an
+      // earlier result was uncertain, a later rejection (e.g. access changed)
+      // cannot prove that earlier submission did not commit.
+      let unresolved = pendingManualSubmission !== null || res.definitiveRejected !== true;
+      if (
+        !unresolved &&
+        exactManualSubmission &&
+        !clearPendingQuickLogNote(exactManualSubmission.recovery)
+      )
+        unresolved = true;
+      setExactRetryPending(unresolved);
+      keepSubmissionLockedRef.current = unresolved;
+      if (!unresolved) manualRetrySubmissionRef.current = null;
       if (uploadedPath) {
         await supabase.storage
           .from("diary-photos")
           .remove([uploadedPath])
           .catch(() => {});
       }
+      if (exactSubmission && !canContinueNote()) return;
       const reason = res.reason || "save_failed";
+      if (quickLogSaveRequiresHistoryCheck(reason) && exactManualSubmission) {
+        const movedScope =
+          reason === "receipt_target_moved" ? resolveQuickLogConfirmedScope(resolved, res) : null;
+        const reviewTarget = movedScope
+          ? { growId: movedScope.growId, tentId: movedScope.tentId, plantId: movedScope.plantId }
+          : null;
+        const marked = markPendingQuickLogNoteHistoryCheck(
+          exactManualSubmission.recovery,
+          reason,
+          reviewTarget,
+        );
+        if (marked.status === "marked") {
+          manualRetrySubmissionRef.current = {
+            ...exactManualSubmission,
+            recovery: marked.record,
+          };
+        }
+        // Even when storage fails, keep this mounted sheet fail-closed.
+        historyCheckRequiredRef.current = true;
+        setHistoryCheckRequired(true);
+        setHistoryReviewScope(reviewTarget);
+      } else {
+        historyCheckRequiredRef.current = false;
+        setHistoryCheckRequired(false);
+      }
+      if (reason === "receipt_mismatch" && res.growEventId && res.persistedNote !== undefined) {
+        const confirmedScope = resolveQuickLogConfirmedScope(resolved, res);
+        const navigation = buildQuickLogTimelineNavTarget({
+          growId: confirmedScope.growId,
+          targetType: confirmedScope.targetType,
+          targetId: confirmedScope.targetId,
+          tentId: confirmedScope.tentId,
+          plantId: confirmedScope.plantId,
+          growEventId: res.growEventId,
+        });
+        if (navigation) setMismatchedReceipt({ note: res.persistedNote, navigation });
+      }
       setLocalError(
-        reason === "save_failed" ? QUICK_LOG_SAVE_FAILED_MESSAGE : reasonToMessage(reason),
+        reason === "receipt_unverified"
+          ? "The saved note could not be confirmed. Retry to check the original submission."
+          : reason === "receipt_mismatch"
+            ? "The saved note differs from this submission. It has not been confirmed; check its Timeline before making another entry."
+            : reason === "receipt_target_moved"
+              ? buildReceiptTargetMovedMessage(res, {
+                  grows: Array.isArray(grows) ? grows : [],
+                  tents,
+                  plants,
+                })
+              : reason === "save_failed"
+                ? QUICK_LOG_SAVE_FAILED_MESSAGE
+                : reasonToMessage(reason),
       );
       setSaveStatus("");
       return;
     }
 
+    setExactRetryPending(false);
+    setHistoryCheckRequired(false);
+    setPersistedNote(res.persistedNote);
     rememberConfirmedPlantTarget(resolved, user?.id ?? null);
+    const confirmedScope = resolveQuickLogConfirmedScope(resolved, res);
 
     // The core grow event is committed. Rotate immediately, before any
     // best-effort attachment work, so a rejected media promise can never
@@ -1213,15 +2162,16 @@ export default function QuickLogV2Sheet({
     let photoAttached = false;
     let videoAttached = false;
 
-    if (uploadedPath && resolved.growId) {
+    if (uploadedPath && confirmedScope.growId) {
       const photoEntry = await createPhotoDiaryEntry({
-        growId: resolved.growId,
-        tentId: resolved.tentId ?? null,
-        plantId: resolved.plantId ?? null,
+        growId: confirmedScope.growId,
+        tentId: confirmedScope.tentId,
+        plantId: confirmedScope.plantId,
         photoPath: uploadedPath,
         noteRaw: submissionNote,
         action: submissionAction,
       });
+      if (exactSubmission && !canContinueNote()) return;
       if (photoEntry.ok) {
         photoAttached = true;
       } else {
@@ -1240,16 +2190,29 @@ export default function QuickLogV2Sheet({
       }
     }
 
-    if (submissionVideoFile && submissionVideoMeta && resolved.growId) {
+    // Photo cleanup above can await storage after a failed companion write.
+    // Recheck before starting the next write, not only after it resolves.
+    if (exactSubmission && !canContinueNote()) return;
+    if (submissionVideoFile && submissionVideoMeta && confirmedScope.growId) {
       setSaveStatus("Uploading video…");
-      const upload = await uploadQuickLogVideo(resolved.growId, submissionVideoFile);
+      const upload = await uploadQuickLogVideo(confirmedScope.growId, submissionVideoFile);
+      if (exactSubmission && !canContinueNote()) {
+        if (upload.ok) {
+          try {
+            await supabase.storage.from("diary-videos").remove([upload.path]);
+          } catch {
+            // Best effort only; the current session may no longer own this path.
+          }
+        }
+        return;
+      }
       if (!upload.ok) {
         mediaFailure = (upload as { message: string }).message;
       } else {
         const videoEntry = await createVideoDiaryEntry({
-          growId: resolved.growId,
-          tentId: resolved.tentId ?? null,
-          plantId: resolved.plantId ?? null,
+          growId: confirmedScope.growId,
+          tentId: confirmedScope.tentId,
+          plantId: confirmedScope.plantId,
           videoPath: upload.path,
           mime: submissionVideoMeta.mime,
           sizeBytes: submissionVideoMeta.sizeBytes,
@@ -1257,6 +2220,7 @@ export default function QuickLogV2Sheet({
           noteRaw: submissionNote,
           action: submissionAction,
         });
+        if (exactSubmission && !canContinueNote()) return;
         if (videoEntry.ok) {
           videoAttached = true;
         } else {
@@ -1273,6 +2237,34 @@ export default function QuickLogV2Sheet({
       }
     }
 
+    if (exactSubmission && !canContinueNote()) return;
+    let recoveryClearFailed = false;
+    if (exactWateringSubmission) {
+      const clearance = await reconcilePendingQuickLogWateringClear(
+        exactWateringSubmission.recovery,
+      );
+      // Same fence as above: a sheet closed during the locked clear must not
+      // confirm, refresh, or announce the save from its old lifetime.
+      if (!canContinueNote()) return;
+      recoveryClearFailed =
+        clearance.status !== "cleared" && clearance.status !== "already_cleared";
+      setWateringStorageFence(recoveryClearFailed);
+      confirmedWateringRecoveryRef.current = recoveryClearFailed
+        ? exactWateringSubmission.recovery
+        : null;
+      if (recoveryClearFailed) setLocalError(WATERING_RECOVERY_CLEAR_FAILED);
+      wateringRetrySubmissionRef.current = null;
+      keepSubmissionLockedRef.current = recoveryClearFailed;
+    }
+    if (exactManualSubmission) {
+      recoveryClearFailed = !clearPendingQuickLogNote(exactManualSubmission.recovery);
+      setNoteStorageFence(recoveryClearFailed);
+      confirmedNoteRecoveryRef.current = recoveryClearFailed
+        ? exactManualSubmission.recovery
+        : null;
+      if (recoveryClearFailed) setLocalError(NOTE_RECOVERY_CLEAR_FAILED);
+      manualRetrySubmissionRef.current = null;
+    }
     const successMessage =
       submissionAction === "water"
         ? photoAttached
@@ -1290,20 +2282,24 @@ export default function QuickLogV2Sheet({
             ? "Log and video saved"
             : "Log saved";
     setSaveStatus(successMessage);
-    if (mediaFailure) {
+    if (mediaFailure && !recoveryClearFailed) {
       // Non-blocking notice: the entry is saved; only the attachment failed.
       setLocalError(
         mediaFailureAmbiguous
           ? `Log saved — attachment status uncertain: ${mediaFailure}`
           : `Log saved — attachment failed: ${mediaFailure}`,
       );
+    } else if (exactWateringSubmission && waterPhotoOmitted && !recoveryClearFailed) {
+      setLocalError(
+        "Watering saved. This tab did not attach the photo. Check Timeline before adding it separately.",
+      );
     }
     showTimelineConfirmation(successMessage, {
-      growId: resolved.growId ?? null,
-      targetType: resolved.targetType as "plant" | "tent",
-      targetId: resolved.targetId as string,
-      tentId: resolved.tentId ?? null,
-      plantId: resolved.plantId ?? null,
+      growId: confirmedScope.growId,
+      targetType: confirmedScope.targetType,
+      targetId: confirmedScope.targetId,
+      tentId: confirmedScope.tentId,
+      plantId: confirmedScope.plantId,
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
     });
     applyQuickLogV2Refresh(queryClient, {
@@ -1324,10 +2320,10 @@ export default function QuickLogV2Sheet({
     resetVideoSelection();
     setPostSave({
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
-      growId: resolved.growId ?? null,
-      targetType: resolved.targetType as "plant" | "tent",
-      targetId: resolved.targetId as string,
-      tentId: resolved.tentId ?? null,
+      growId: confirmedScope.growId,
+      targetType: confirmedScope.targetType,
+      targetId: confirmedScope.targetId,
+      tentId: confirmedScope.tentId,
       action: submissionAction,
       message: buildQuickLogPostSaveMessage(submissionAction, photoAttached),
       savedAt: new Date().toISOString(),
@@ -1340,7 +2336,126 @@ export default function QuickLogV2Sheet({
    * save cycle can proceed. Preserves the selected target so the
    * grower doesn't lose their place.
    */
+  async function handleRecheckNoteStorage() {
+    if (!postSave || !recoveryStorageFence || saveInFlightRef.current) return;
+    const lifetime = noteLifetimeRef.current;
+    const confirmedFeeding = confirmedFeedingRecoveryRef.current;
+    if (confirmedFeeding) {
+      const current = readPendingQuickLogFeeding(confirmedFeeding.ownerId);
+      const cleared =
+        current.status === "empty" ||
+        (current.status === "pending" && clearPendingQuickLogFeeding(confirmedFeeding));
+      if (!cleared) {
+        setLocalError(FEEDING_RECOVERY_CLEAR_FAILED);
+        return;
+      }
+      confirmedFeedingRecoveryRef.current = null;
+      setFeedingStorageFence(false);
+      setLocalError(null);
+      return;
+    }
+    const confirmedWatering = confirmedWateringRecoveryRef.current;
+    if (confirmedWatering) {
+      // Hold the same-tick guard across the locked clear so a second click
+      // cannot race it, and treat a concurrent clear as success.
+      saveInFlightRef.current = true;
+      let clearance: Awaited<ReturnType<typeof reconcilePendingQuickLogWateringClear>>;
+      try {
+        clearance = await reconcilePendingQuickLogWateringClear(confirmedWatering);
+      } finally {
+        if (lifetime.active) saveInFlightRef.current = false;
+      }
+      if (!lifetime.active || noteLifetimeRef.current !== lifetime) return;
+      const cleared = clearance.status === "cleared" || clearance.status === "already_cleared";
+      if (!cleared) {
+        setLocalError(WATERING_RECOVERY_CLEAR_FAILED);
+        return;
+      }
+      confirmedWateringRecoveryRef.current = null;
+      setWateringStorageFence(false);
+      setLocalError(null);
+      return;
+    }
+    const confirmed = confirmedNoteRecoveryRef.current;
+    if (!confirmed) return;
+    const current = readPendingQuickLogNote(confirmed.ownerId);
+    // Another sheet may already have cleared the same confirmed operation,
+    // or removal may have succeeded before its read-back became unavailable.
+    const cleared =
+      current.status === "empty" ||
+      (current.status === "pending" && clearPendingQuickLogNote(confirmed));
+    if (!cleared) {
+      setLocalError(NOTE_RECOVERY_CLEAR_FAILED);
+      return;
+    }
+    // The server receipt is already confirmed. This action only clears that
+    // exact recovery identity; it must never submit the Note again.
+    confirmedNoteRecoveryRef.current = null;
+    setNoteStorageFence(false);
+    setLocalError(null);
+  }
+
+  const historyDrafts = [
+    manualRetrySubmissionRef.current,
+    feedingRetrySubmissionRef.current,
+    wateringRetrySubmissionRef.current,
+  ].filter((draft) => draft !== null);
+  const historyDraftOwnerId =
+    historyDrafts.length === 1 ? historyDrafts[0]?.recovery.ownerId : null;
+  // A ref update does not repaint the button after a synchronous restoration.
+  // The handler retains the authoritative same-tick in-flight ref guard.
+  const historyDiscardAllowed = canDiscardQuickLogHistoryDraft({
+    historyCheckRequired,
+    inFlight: recoveryStorageFence || saving || feedingSaving || wateringSaving,
+    currentOwnerId: user?.id,
+    draftOwnerId: historyDraftOwnerId,
+  });
+  async function handleDiscardHistoryDraft() {
+    const pending = manualRetrySubmissionRef.current;
+    const pendingFeed = feedingRetrySubmissionRef.current;
+    const pendingWater = wateringRetrySubmissionRef.current;
+    if (
+      !historyDiscardAllowed ||
+      saveInFlightRef.current ||
+      [pending, pendingFeed, pendingWater].filter((draft) => draft !== null).length !== 1
+    )
+      return;
+    if (pending && !clearPendingQuickLogNote(pending.recovery)) {
+      setLocalError(QUICK_LOG_HISTORY_DISCARD_FAILED);
+      return;
+    }
+    if (pendingFeed && !clearPendingQuickLogFeeding(pendingFeed.recovery)) {
+      setLocalError(QUICK_LOG_HISTORY_DISCARD_FAILED);
+      return;
+    }
+    if (pendingWater) {
+      const lifetime = noteLifetimeRef.current;
+      saveInFlightRef.current = true;
+      let clearance: Awaited<ReturnType<typeof reconcilePendingQuickLogWateringHistoryDiscard>>;
+      try {
+        clearance = await reconcilePendingQuickLogWateringHistoryDiscard(pendingWater.recovery);
+      } finally {
+        saveInFlightRef.current = false;
+      }
+      if (
+        !lifetime.active ||
+        noteLifetimeRef.current !== lifetime ||
+        wateringRetrySubmissionRef.current !== pendingWater
+      )
+        return;
+      if (clearance.status !== "cleared" && clearance.status !== "already_cleared") {
+        setLocalError(QUICK_LOG_HISTORY_DISCARD_FAILED);
+        return;
+      }
+    }
+    // Explicit abandonment after history review, never a confirmed server receipt.
+    saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+    handleLogAnother();
+  }
+
   function handleLogAnother() {
+    if (recoveryStorageFence) return;
+    setRestoredMediaPending(false);
     idempotencyKeyRef.current = rotateQuickLogIdempotencyKey(idempotencyKeyRef.current);
     setPostSave(null);
     setLocalError(null);
@@ -1349,6 +2464,7 @@ export default function QuickLogV2Sheet({
       ...EMPTY_QUICKLOG_V2_FORM,
       selectedKey: prev.selectedKey,
     }));
+    setVisitMode("fast_check");
     manualTempEntryUnitRef.current = null;
     // Same reason as the open reset: "Log another" begins a new draft, and its
     // note is empty, so no chip has authored anything in it yet.
@@ -1358,14 +2474,44 @@ export default function QuickLogV2Sheet({
     setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
     wateringTempEntryUnitRef.current = null;
     setWateringRetryPending(false);
-    setWateringSubmissionLocked(false);
+    setFailedWaterPhotoUpload(false);
+    setWaterPhotoOmitted(false);
+    setExactRetryPending(false);
+    historyCheckRequiredRef.current = false;
+    setHistoryCheckRequired(false);
+    setHistoryReviewScope(null);
+    setPersistedNote(undefined);
+    setMismatchedReceipt(null);
+    manualRetrySubmissionRef.current = null;
+    feedingRetrySubmissionRef.current = null;
+    setSubmissionLocked(false);
     wateringRetrySubmissionRef.current = null;
-    wateringSubmissionLockedRef.current = false;
-    keepWateringSubmissionLockedRef.current = false;
+    submissionLockedRef.current = false;
+    keepSubmissionLockedRef.current = false;
     setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
     setFeedingDefaultsApplied(false);
+    setWateringVolumeDefaultsApplied(false);
     resetPhotoSelection();
     resetVideoSelection();
+  }
+
+  function handleReviewMismatchedReceipt() {
+    if (!mismatchedReceipt || saveInFlightRef.current) return;
+    const pending = manualRetrySubmissionRef.current;
+    if (pending && !clearPendingQuickLogNote(pending.recovery)) {
+      setLocalError(NOTE_RECOVERY_UNAVAILABLE);
+      return;
+    }
+    // The grower deliberately opens the verified existing record for review.
+    // This is a resolution action, never a successful receipt for this draft.
+    manualRetrySubmissionRef.current = null;
+    keepSubmissionLockedRef.current = false;
+    submissionLockedRef.current = false;
+    setSubmissionLocked(false);
+    setExactRetryPending(false);
+    onOpenChange(false);
+    const { navigation } = mismatchedReceipt;
+    navigateToTimeline(navigation.href, navigation.hash, navigation.path);
   }
 
   function handleViewTimeline() {
@@ -1393,6 +2539,14 @@ export default function QuickLogV2Sheet({
    */
   function handleSheetOpenChange(next: boolean) {
     if (!next) {
+      if (manualRetrySubmissionRef.current || feedingRetrySubmissionRef.current) {
+        toast.message(
+          historyCheckRequired
+            ? QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY
+            : "Resolve the original save with Retry before closing or making changes.",
+        );
+        return;
+      }
       const blocked = shouldBlockQuickLogClose({
         saving: saving || feedingSaving || wateringSaving,
         inFlight: saveInFlightRef.current || photoDiaryInFlightRef.current,
@@ -1492,7 +2646,7 @@ export default function QuickLogV2Sheet({
                 setLocalError(null);
                 setSaveStatus("");
               }}
-              disabled={contextBlocked || wateringSubmissionLocked}
+              disabled={contextBlocked || submissionLocked}
             >
               <SelectTrigger
                 id="qlv2-target"
@@ -1511,13 +2665,73 @@ export default function QuickLogV2Sheet({
                   }
                 />
               </SelectTrigger>
-              <SelectContent>
-                {options.map((o) => (
-                  <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
-                    {o.type === "tent" ? "Tent · " : "Plant · "}
-                    {o.label}
-                  </SelectItem>
-                ))}
+              <SelectContent
+                data-testid="qlv2-target-content"
+                // Keep filter focus from collapsing the list (Radix Select).
+                onCloseAutoFocus={(event) => {
+                  if (showTargetFilter && targetFilterQuery.trim()) {
+                    event.preventDefault();
+                  }
+                }}
+              >
+                {showTargetFilter && (
+                  <div
+                    className="sticky top-0 z-10 bg-popover p-2 border-b border-border/60"
+                    // Pointer/keyboard must not dismiss or steal Select typeahead.
+                    onPointerDown={(event) => event.preventDefault()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    <Input
+                      value={targetFilterQuery}
+                      onChange={(event) => setTargetFilterQuery(event.target.value)}
+                      placeholder="Filter plants or tents…"
+                      aria-label="Filter Quick Log targets"
+                      data-testid="qlv2-target-filter"
+                      className="h-9"
+                      autoComplete="off"
+                    />
+                  </div>
+                )}
+                {tentContextId ? (
+                  <>
+                    {filteredInTentPlants.length > 0 && (
+                      <SelectGroup data-testid="qlv2-target-group-in-tent">
+                        <SelectLabel>In this tent</SelectLabel>
+                        {filteredInTentPlants.map((o) => (
+                          <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+                            {formatQuickLogV2TargetOptionLabel(o)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {filteredOtherTargets.length > 0 && (
+                      <SelectGroup data-testid="qlv2-target-group-other">
+                        <SelectLabel>Other</SelectLabel>
+                        {filteredOtherTargets.map((o) => (
+                          <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+                            {formatQuickLogV2TargetOptionLabel(o)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </>
+                ) : (
+                  filteredTargetOptions.map((o) => (
+                    <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+                      {formatQuickLogV2TargetOptionLabel(o)}
+                    </SelectItem>
+                  ))
+                )}
+                {showTargetFilter &&
+                  filteredTargetOptions.length === 0 &&
+                  targetFilterQuery.trim() !== "" && (
+                    <div
+                      className="px-2 py-3 text-sm text-muted-foreground"
+                      data-testid="qlv2-target-filter-empty"
+                    >
+                      No matching targets.
+                    </div>
+                  )}
               </SelectContent>
             </Select>
             <p id="qlv2-target-help" className="mt-1 text-sm text-muted-foreground">
@@ -1545,7 +2759,7 @@ export default function QuickLogV2Sheet({
                   variant="secondary"
                   data-testid="qlv2-recent-target-accept"
                   onClick={() => {
-                    if (contextBlocked || wateringSubmissionLockedRef.current) return;
+                    if (contextBlocked || submissionLockedRef.current) return;
                     // Revalidate storage and all live relationships at click
                     // time. Opening the sheet is not consent, and consent for
                     // rendered plant A must never be reinterpreted for B.
@@ -1599,6 +2813,75 @@ export default function QuickLogV2Sheet({
             <QuickLogTargetPanel panel={targetPanel} />
           </div>
 
+          <fieldset disabled={submissionLocked}>
+            <GuidedGrowWalkPanel
+              visitMode={visitMode}
+              onVisitModeChange={(next) => {
+                if (!submissionLockedRef.current) setVisitMode(next);
+              }}
+              targetOk={resolvedTarget.ok}
+              tentId={resolvedTarget.ok ? (resolvedTarget.tentId ?? null) : null}
+              targetType={resolvedTarget.ok ? (resolvedTarget.targetType ?? null) : null}
+              stage={targetStage}
+              testIdPrefix="qlv2"
+              onApplyCloseoutToNote={(composed) => {
+                if (submissionLockedRef.current) return;
+                setForm((previous) => {
+                  const existing = previous.note.trimEnd();
+                  const nextNote = existing ? `${existing}\n\n${composed}` : composed;
+                  return previous.note === nextNote ? previous : { ...previous, note: nextNote };
+                });
+              }}
+            />
+          </fieldset>
+
+          {/* Hoisted above Action and the media pickers: on a plant-scoped
+              draft the 3-tap status (open, tap a chip, Save) is the first
+              control the grower reaches. Gating and the save path are unchanged. */}
+          {showResponseCheck && (
+            <div
+              role="group"
+              aria-label="Plant response check"
+              data-testid="qlv2-response-chips"
+              className="grid gap-2"
+            >
+              <p className="text-sm font-medium">How did the plant respond?</p>
+              <div className="flex flex-wrap gap-2">
+                {RESPONSE_CHECK_STATUSES.map((status) => (
+                  <Button
+                    key={status}
+                    type="button"
+                    variant={selectedResponseStatus === status ? "default" : "outline"}
+                    size="sm"
+                    disabled={
+                      submissionLocked ||
+                      (responseCheckOverflowByStatus.get(status) === true &&
+                        selectedResponseStatus !== status)
+                    }
+                    aria-pressed={selectedResponseStatus === status}
+                    data-testid={`qlv2-response-chip-${status.toLowerCase()}`}
+                    onClick={() => {
+                      const next = applyResponseCheck(form.note, status);
+                      // Belt and braces: the chip is already disabled in this
+                      // case, but never let a programmatic write exceed the
+                      // limit the save path enforces.
+                      if (next.length > NOTE_LIMIT) return;
+                      chipAuthoredStatusRef.current = status;
+                      setField("note", next);
+                    }}
+                  >
+                    {status}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {everyResponseCheckOverflows
+                  ? "Your note is too long to add a response line. Shorten it first."
+                  : "Better/Same/Worse records the plant response, not the grow action."}
+              </p>
+            </div>
+          )}
+
           <div>
             <Label>Action</Label>
             <div
@@ -1609,7 +2892,7 @@ export default function QuickLogV2Sheet({
               <Button
                 type="button"
                 variant={form.action === "water" ? "default" : "outline"}
-                disabled={wateringSubmissionLocked}
+                disabled={submissionLocked}
                 onClick={() => handleAction("water")}
               >
                 Water
@@ -1617,7 +2900,7 @@ export default function QuickLogV2Sheet({
               <Button
                 type="button"
                 variant={form.action === "feed" ? "default" : "outline"}
-                disabled={wateringSubmissionLocked}
+                disabled={submissionLocked}
                 onClick={() => handleAction("feed")}
               >
                 Feed
@@ -1625,7 +2908,7 @@ export default function QuickLogV2Sheet({
               <Button
                 type="button"
                 variant={form.action === "note" ? "default" : "outline"}
-                disabled={wateringSubmissionLocked}
+                disabled={submissionLocked}
                 onClick={() => handleAction("note")}
               >
                 Note
@@ -1647,6 +2930,7 @@ export default function QuickLogV2Sheet({
               <QuickLogFeedingForm
                 value={feedingForm}
                 onChange={(next) => {
+                  if (submissionLockedRef.current) return;
                   const prevWaterTempC = feedingForm.waterTempC.trim();
                   const nextWaterTempC = next.waterTempC.trim();
                   if (prevWaterTempC === "" && nextWaterTempC !== "") {
@@ -1657,7 +2941,7 @@ export default function QuickLogV2Sheet({
                   setFeedingForm(next);
                   setLocalError(null);
                 }}
-                disabled={feedingSaving || wateringSaving || saving || wateringSubmissionLocked}
+                disabled={feedingSaving || wateringSaving || saving || submissionLocked}
                 defaultsApplied={feedingDefaultsApplied}
                 entryTemperatureUnit={feedingTempEntryUnitRef.current ?? temperatureUnit}
               />
@@ -1666,12 +2950,21 @@ export default function QuickLogV2Sheet({
 
           {form.action === "water" && (
             <div className="space-y-2">
+              {wateringVolumeDefaultsApplied && wateringVolumeDefaults.label && (
+                <div
+                  data-testid="qlv2-watering-volume-defaults-label"
+                  className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-sm text-muted-foreground"
+                  role="note"
+                >
+                  {WATERING_VOLUME_DEFAULTS_LABEL}
+                </div>
+              )}
               <QuickLogWateringForm
                 value={wateringForm}
                 context={wateringContext}
-                disabled={wateringSaving || feedingSaving || saving || wateringSubmissionLocked}
+                disabled={wateringSaving || feedingSaving || saving || submissionLocked}
                 onChange={(next) => {
-                  if (wateringSubmissionLockedRef.current) return;
+                  if (submissionLockedRef.current) return;
                   const prevWaterTempC = wateringForm.waterTempC.trim();
                   const nextWaterTempC = next.waterTempC.trim();
                   if (prevWaterTempC === "" && nextWaterTempC !== "") {
@@ -1685,14 +2978,27 @@ export default function QuickLogV2Sheet({
                 entryTemperatureUnit={wateringTempEntryUnitRef.current ?? temperatureUnit}
               />
               {wateringRetryPending && (
-                <p
+                <div
                   role="status"
                   className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm text-foreground"
                   data-testid="qlv2-watering-retry-lock"
                 >
-                  The first result was uncertain. Retry sends the exact same target, timestamp,
-                  measurements, note, and attachments. Close and reopen Quick Log to make changes.
-                </p>
+                  The first result is unresolved. Retry sends the exact same target, timestamp,
+                  measurements and note. Closing or reloading keeps this record available in this
+                  tab. Confirm it before choosing Log another.
+                  {failedWaterPhotoUpload && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      data-testid="qlv2-water-omit-failed-photo"
+                      onClick={handleOmitFailedWaterPhoto}
+                    >
+                      Continue without failed photo
+                    </Button>
+                  )}
+                </div>
               )}
               {volumeMissing && (
                 <p
@@ -1722,7 +3028,7 @@ export default function QuickLogV2Sheet({
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={wateringSubmissionLocked || videoChecking}
+                    disabled={submissionLocked || videoChecking}
                     onClick={resetPhotoSelection}
                     data-testid="qlv2-photo-remove"
                     aria-label="Remove selected Quick Log photo"
@@ -1736,7 +3042,7 @@ export default function QuickLogV2Sheet({
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={wateringSubmissionLocked || videoChecking}
+                      disabled={submissionLocked || videoChecking}
                       aria-controls="qlv2-photo-camera-input"
                       onClick={() => cameraInputRef.current?.click()}
                     >
@@ -1745,7 +3051,7 @@ export default function QuickLogV2Sheet({
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={wateringSubmissionLocked || videoChecking}
+                      disabled={submissionLocked || videoChecking}
                       aria-controls="qlv2-photo-library-input"
                       onClick={() => libraryInputRef.current?.click()}
                     >
@@ -1764,7 +3070,7 @@ export default function QuickLogV2Sheet({
                 className="sr-only"
                 aria-label={photoGate.cameraInputAriaLabel}
                 tabIndex={-1}
-                disabled={wateringSubmissionLocked || videoChecking}
+                disabled={submissionLocked || videoChecking}
                 onChange={handlePhotoInputChange}
                 data-testid="qlv2-photo-camera-input"
               />
@@ -1776,7 +3082,7 @@ export default function QuickLogV2Sheet({
                 className="sr-only"
                 aria-label={photoGate.libraryInputAriaLabel}
                 tabIndex={-1}
-                disabled={wateringSubmissionLocked || videoChecking}
+                disabled={submissionLocked || videoChecking}
                 onChange={handlePhotoInputChange}
                 data-testid="qlv2-photo-library-input"
               />
@@ -1803,7 +3109,7 @@ export default function QuickLogV2Sheet({
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={wateringSubmissionLocked || videoChecking}
+                    disabled={submissionLocked || videoChecking}
                     onClick={resetVideoSelection}
                     data-testid="qlv2-video-remove"
                     aria-label="Remove selected Quick Log video"
@@ -1816,7 +3122,7 @@ export default function QuickLogV2Sheet({
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={wateringSubmissionLocked || videoChecking}
+                    disabled={submissionLocked || videoChecking}
                     aria-controls="qlv2-video-input"
                     onClick={() => videoInputRef.current?.click()}
                   >
@@ -1835,7 +3141,7 @@ export default function QuickLogV2Sheet({
                 className="sr-only"
                 aria-label="Choose a video from your library"
                 tabIndex={-1}
-                disabled={wateringSubmissionLocked || videoChecking}
+                disabled={submissionLocked || videoChecking}
                 onChange={handleVideoInputChange}
                 data-testid="qlv2-video-input"
               />
@@ -1851,57 +3157,13 @@ export default function QuickLogV2Sheet({
             </div>
           )}
 
-          {showResponseCheck && (
-            <div
-              role="group"
-              aria-label="Plant response check"
-              data-testid="qlv2-response-chips"
-              className="grid gap-2"
-            >
-              <p className="text-sm font-medium">How did the plant respond?</p>
-              <div className="flex flex-wrap gap-2">
-                {RESPONSE_CHECK_STATUSES.map((status) => (
-                  <Button
-                    key={status}
-                    type="button"
-                    variant={selectedResponseStatus === status ? "default" : "outline"}
-                    size="sm"
-                    disabled={
-                      wateringSubmissionLocked ||
-                      (responseCheckOverflowByStatus.get(status) === true &&
-                        selectedResponseStatus !== status)
-                    }
-                    aria-pressed={selectedResponseStatus === status}
-                    data-testid={`qlv2-response-chip-${status.toLowerCase()}`}
-                    onClick={() => {
-                      const next = applyResponseCheck(form.note, status);
-                      // Belt and braces: the chip is already disabled in this
-                      // case, but never let a programmatic write exceed the
-                      // limit the save path enforces.
-                      if (next.length > NOTE_LIMIT) return;
-                      chipAuthoredStatusRef.current = status;
-                      setField("note", next);
-                    }}
-                  >
-                    {status}
-                  </Button>
-                ))}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {everyResponseCheckOverflows
-                  ? "Your note is too long to add a response line. Shorten it first."
-                  : "Better/Same/Worse records the plant response, not the grow action."}
-              </p>
-            </div>
-          )}
-
           {form.action !== "feed" && (
             <div>
               <Label htmlFor="qlv2-note">Note (optional)</Label>
               <Textarea
                 id="qlv2-note"
                 value={form.note}
-                disabled={wateringSubmissionLocked}
+                disabled={submissionLocked}
                 maxLength={NOTE_LIMIT}
                 aria-describedby="qlv2-note-helper qlv2-note-count"
                 onChange={(e) => setField("note", e.target.value)}
@@ -1936,12 +3198,12 @@ export default function QuickLogV2Sheet({
           <QuickLogMaturityEvidenceFields
             value={maturityEvidenceForm}
             onChange={(next) => {
-              if (wateringSubmissionLockedRef.current) return;
+              if (submissionLockedRef.current) return;
               setMaturityEvidenceForm(next);
               setLocalError(null);
             }}
             visible={showMaturityEvidence}
-            disabled={saving || feedingSaving || wateringSaving || wateringSubmissionLocked}
+            disabled={saving || feedingSaving || wateringSaving || submissionLocked}
           />
 
           {form.action !== "feed" && (
@@ -1959,7 +3221,7 @@ export default function QuickLogV2Sheet({
                     id="qlv2-temp"
                     inputMode="decimal"
                     value={form.temperatureC}
-                    disabled={wateringSubmissionLocked}
+                    disabled={submissionLocked}
                     onChange={(e) => {
                       const next = e.target.value;
                       if (form.temperatureC.trim() === "" && next.trim() !== "") {
@@ -1977,7 +3239,7 @@ export default function QuickLogV2Sheet({
                     id="qlv2-rh"
                     inputMode="decimal"
                     value={form.humidityPct}
-                    disabled={wateringSubmissionLocked}
+                    disabled={submissionLocked}
                     onChange={(e) => setField("humidityPct", e.target.value)}
                   />
                 </div>
@@ -1987,7 +3249,7 @@ export default function QuickLogV2Sheet({
                     id="qlv2-vpd"
                     inputMode="decimal"
                     value={form.vpdKpa}
-                    disabled={wateringSubmissionLocked}
+                    disabled={submissionLocked}
                     onChange={(e) => setField("vpdKpa", e.target.value)}
                   />
                 </div>
@@ -1998,6 +3260,78 @@ export default function QuickLogV2Sheet({
             </details>
           )}
 
+          {exactRetryPending && (
+            <p
+              role="status"
+              data-testid="qlv2-exact-retry-lock"
+              className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm"
+            >
+              {historyCheckRequired ? (
+                <>
+                  {QUICK_LOG_HISTORY_REVIEW_LOCK_COPY}
+                  {historyReviewNavigation && (
+                    <a
+                      className="block underline"
+                      data-testid="qlv2-history-review-link"
+                      href={historyReviewNavigation.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {QUICK_LOG_HISTORY_REVIEW_LINK_LABEL}
+                    </a>
+                  )}
+                  <span className="block mt-2">{QUICK_LOG_HISTORY_DISCARD_HELPER}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2"
+                    disabled={!historyDiscardAllowed}
+                    onClick={() => void handleDiscardHistoryDraft()}
+                  >
+                    {QUICK_LOG_HISTORY_DISCARD_LABEL}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  The first result is unresolved. Retry sends the exact original entry. Resolve it
+                  before changing the draft or closing; then choose Log another for a new entry.
+                </>
+              )}
+            </p>
+          )}
+
+          {mismatchedReceipt && (
+            <div className="rounded-md border border-amber-500/40 p-3 space-y-2">
+              <p
+                data-testid="qlv2-mismatched-note"
+                className="text-sm whitespace-pre-wrap break-words"
+              >
+                {mismatchedReceipt.note === null
+                  ? "The saved entry has no note text."
+                  : `Currently saved note: ${mismatchedReceipt.note}`}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="qlv2-review-saved-entry"
+                disabled={saving || feedingSaving || wateringSaving}
+                onClick={handleReviewMismatchedReceipt}
+              >
+                View saved entry
+              </Button>
+            </div>
+          )}
+
+          {archivedGrowActionBlock && (
+            <p
+              role="alert"
+              data-testid="qlv2-archived-grow-block"
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive"
+            >
+              {archivedGrowActionBlock}
+            </p>
+          )}
+
           {localError && (
             <div
               role="alert"
@@ -2006,7 +3340,18 @@ export default function QuickLogV2Sheet({
               className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive flex items-center justify-between gap-2"
             >
               <span>{localError}</span>
-              {!postSave && (
+              {postSave && recoveryStorageFence && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  data-testid="qlv2-note-storage-recheck"
+                  onClick={handleRecheckNoteStorage}
+                >
+                  Try again
+                </Button>
+              )}
+              {!postSave && !historyCheckRequired && (
                 <Button
                   type="button"
                   size="sm"
@@ -2015,14 +3360,16 @@ export default function QuickLogV2Sheet({
                   aria-label={
                     wateringRetryPending
                       ? "Retry the exact same watering record"
-                      : "Retry saving Quick Log"
+                      : exactRetryPending
+                        ? "Retry the exact same entry"
+                        : "Retry saving Quick Log"
                   }
                   disabled={
                     saving ||
                     feedingSaving ||
                     wateringSaving ||
                     videoChecking ||
-                    (contextBlocked && !wateringRetryPending)
+                    (contextBlocked && !retryPending)
                   }
                   onClick={handleSave}
                 >
@@ -2030,6 +3377,18 @@ export default function QuickLogV2Sheet({
                 </Button>
               )}
             </div>
+          )}
+
+          {restoredMediaPending && (
+            <p
+              data-testid="qlv2-pending-note-media"
+              role="status"
+              className="text-sm text-muted-foreground"
+            >
+              Original attachments are unavailable after reopening. Their status is unresolved;
+              retry checks only the original {form.action === "water" ? "watering record" : "Note"}.
+              Check its Timeline before adding the files separately.
+            </p>
           )}
 
           <div className="sr-only" aria-live="polite" data-testid="qlv2-save-status">
@@ -2055,10 +3414,7 @@ export default function QuickLogV2Sheet({
                   data-testid="quick-log-post-save-description"
                 >
                   {buildQuickLogPostSaveDescription({
-                    targetName: resolvedTarget.ok
-                      ? (options.find((o) => `${o.type}:${o.id}` === form.selectedKey)?.label ??
-                        null)
-                      : null,
+                    targetName: resolveQuickLogPostSaveTargetLabel(postSave, options),
                     tentName: null,
                     growName:
                       postSave.growId && Array.isArray(grows)
@@ -2070,6 +3426,16 @@ export default function QuickLogV2Sheet({
                     photoAttached: /photo/i.test(postSave.message),
                   })}
                 </p>
+                {postSave.action === "note" && persistedNote !== undefined && (
+                  <p
+                    data-testid="qlv2-persisted-note"
+                    className="text-sm whitespace-pre-wrap break-words"
+                  >
+                    {persistedNote === null
+                      ? "Saved without note text."
+                      : `Saved note: ${persistedNote}`}
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Button
                     type="button"
@@ -2094,6 +3460,7 @@ export default function QuickLogV2Sheet({
                     variant="outline"
                     className="flex-1"
                     onClick={handleLogAnother}
+                    disabled={recoveryStorageFence}
                     data-testid="quick-log-post-save-another"
                   >
                     {QUICK_LOG_POST_SAVE_ANOTHER_LABEL}
@@ -2124,7 +3491,7 @@ export default function QuickLogV2Sheet({
                     variant="outline"
                     className="flex-1"
                     onClick={() => handleSheetOpenChange(false)}
-                    disabled={saving || feedingSaving || wateringSaving}
+                    disabled={saving || feedingSaving || wateringSaving || exactRetryPending}
                   >
                     Cancel
                   </Button>
@@ -2137,15 +3504,19 @@ export default function QuickLogV2Sheet({
                       feedingSaving ||
                       wateringSaving ||
                       videoChecking ||
-                      (contextBlocked && !wateringRetryPending) ||
-                      (selectedTargetStale && !wateringRetryPending)
+                      historyCheckRequired ||
+                      (contextBlocked && !retryPending) ||
+                      (selectedTargetMissing && !retryPending) ||
+                      (selectedTargetStale && !retryPending) ||
+                      (criticalContentMissing && !retryPending) ||
+                      Boolean(archivedGrowActionBlock)
                     }
                     aria-describedby="qlv2-save-helper"
                     data-testid="qlv2-save"
                   >
                     {saving || feedingSaving || wateringSaving
                       ? "Saving…"
-                      : wateringRetryPending
+                      : retryPending
                         ? "Retry exact record"
                         : "Save"}
                   </Button>
@@ -2166,6 +3537,7 @@ function getSaveHelperMessage(input: {
   hasNoTargets: boolean;
   selectedTargetMissing: boolean;
   volumeMissing: boolean;
+  criticalContentMissing: boolean;
   saving: boolean;
 }): string {
   if (input.saving) return "Saving your Quick Log…";
@@ -2174,6 +3546,7 @@ function getSaveHelperMessage(input: {
   if (input.hasNoTargets) return "Add a plant or tent before saving a Quick Log.";
   if (input.selectedTargetMissing) return "Choose a plant or tent before saving.";
   if (input.volumeMissing) return "Watering logs need a volume before they can save.";
+  if (input.criticalContentMissing) return QUICK_LOG_V2_EMPTY_CONTENT_HELPER;
   return "Ready to save when this log matches what happened.";
 }
 

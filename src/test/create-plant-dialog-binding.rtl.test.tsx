@@ -3,8 +3,10 @@
  * Zero Supabase inserts when blocked; correct grow_id when allowed.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
+import { PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE } from "@/lib/plantHealthRules";
 import { unstable_batchedUpdates } from "react-dom";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
@@ -328,7 +330,7 @@ describe("CreatePlantDialog RTL binding", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("create-plant-tent-unavailable")).toBeNull();
     });
-    expect(screen.getByTestId("plant-create-submit")).not.toBeDisabled();
+    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
     await userEvent.type(screen.getByTestId("create-plant-name"), "Recovered");
     await userEvent.click(screen.getByTestId("plant-create-submit"));
     await waitFor(() => {
@@ -365,6 +367,103 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(payload.name).toBe("Happy Plant");
     expect(payload.id).toBe(CREATED_ROW.id);
     expect(selectMock).toHaveBeenCalledWith("*");
+  });
+
+  it("creates a plant as not assessed: 'unknown' is sent until the grower picks one (BUG-009)", async () => {
+    renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+    await waitFor(() => {
+      expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("create-plant-health")).toHaveTextContent("Not assessed yet");
+    expect(screen.getByTestId("create-plant-health")).not.toHaveTextContent("Healthy");
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Unassessed Plant");
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalled();
+    });
+    const payload = insertMock.mock.calls[0][0] as Record<string, unknown>;
+    // Written explicitly, never left to the column default: before
+    // 20260924120000 is applied that default is "healthy", a claim the
+    // grower did not make.
+    expect(payload.health).toBe("unknown");
+  });
+
+  it("fails closed when the database does not accept Not assessed yet", async () => {
+    // validate_plant_row() before 20260924120000: the whole insert is rejected.
+    singleMock.mockResolvedValueOnce({
+      data: null,
+      error: { code: "P0001", message: "invalid plant health: unknown" },
+    });
+    renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+    await waitFor(() => {
+      expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    });
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Unassessed Plant");
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+
+    await waitFor(() =>
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
+        PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE,
+      ),
+    );
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    // A definitive rejection: no reconciliation read, no success, no handoff.
+    expect(plantLookupSelectMock).not.toHaveBeenCalled();
+    expect(successToastMock).not.toHaveBeenCalled();
+    expect(funnelEventMock).not.toHaveBeenCalledWith("plant_created");
+    // The form stays open with the grower's entries, ready for a health pick.
+    expect(screen.getByTestId("create-plant-name")).toHaveValue("Unassessed Plant");
+    expect(screen.getByTestId("plant-create-submit")).not.toBeDisabled();
+  });
+
+  it("sends the health the grower explicitly picks", async () => {
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+    try {
+      renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+      await waitFor(() => {
+        expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+      });
+      fireEvent.keyDown(screen.getByTestId("create-plant-health"), { key: "ArrowDown" });
+      fireEvent.click(await screen.findByRole("option", { name: "Watch" }));
+      await waitFor(() =>
+        expect(screen.getByTestId("create-plant-health")).toHaveTextContent("Watch"),
+      );
+      await userEvent.type(screen.getByTestId("create-plant-name"), "Watched Plant");
+      await userEvent.click(screen.getByTestId("plant-create-submit"));
+      await waitFor(() => {
+        expect(insertMock).toHaveBeenCalled();
+      });
+      expect((insertMock.mock.calls[0][0] as Record<string, unknown>).health).toBe("watch");
+    } finally {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+    }
+  });
+
+  it("lets the grower take a pick back to Not assessed yet before saving", async () => {
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+    try {
+      renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+      await waitFor(() => {
+        expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+      });
+      const health = () => screen.getByTestId("create-plant-health");
+      fireEvent.keyDown(health(), { key: "ArrowDown" });
+      fireEvent.click(await screen.findByRole("option", { name: "Watch" }));
+      await waitFor(() => expect(health()).toHaveTextContent("Watch"));
+      fireEvent.keyDown(health(), { key: "ArrowDown" });
+      fireEvent.click(await screen.findByRole("option", { name: "Not assessed yet" }));
+      await waitFor(() => expect(health()).toHaveTextContent("Not assessed yet"));
+      await userEvent.type(screen.getByTestId("create-plant-name"), "Undecided Plant");
+      await userEvent.click(screen.getByTestId("plant-create-submit"));
+      await waitFor(() => {
+        expect(insertMock).toHaveBeenCalled();
+      });
+      expect((insertMock.mock.calls[0][0] as Record<string, unknown>).health).toBe("unknown");
+    } finally {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+    }
   });
 
   it("reconciles an exact preallocated plant after a duplicate response", async () => {
@@ -764,6 +863,7 @@ describe("CreatePlantDialog RTL binding", () => {
       medium: null,
       potSize: null,
       plantType: "unknown",
+      createdAt: CREATED_ROW.created_at,
     };
     expect(client.getQueryData(activeGrowPlantsKey)).toEqual([expectedMappedPlant]);
     expect(client.getQueryData(archivedGrowPlantsKey)).toEqual([expectedMappedPlant]);
@@ -898,5 +998,31 @@ describe("CreatePlantDialog RTL binding", () => {
     resolveGrowPlantsRefresh();
     await waitFor(() => expect(successToastMock).toHaveBeenCalledWith("Plant created"));
     expect(onCreated).not.toHaveBeenCalled();
+  });
+
+  it("disables Create plant when Name is empty or whitespace-only", async () => {
+    renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+    await waitFor(() => {
+      expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    });
+    const submit = screen.getByTestId("plant-create-submit");
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest("form")!);
+    expect(insertMock).not.toHaveBeenCalled();
+
+    await userEvent.type(screen.getByTestId("create-plant-name"), "   ");
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest("form")!);
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("enables Create plant when Name is trimmed non-empty", async () => {
+    renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+    await waitFor(() => {
+      expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
+    await userEvent.type(screen.getByTestId("create-plant-name"), "  Fixture Plant  ");
+    expect(screen.getByTestId("plant-create-submit")).toBeEnabled();
   });
 });

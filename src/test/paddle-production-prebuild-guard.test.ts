@@ -80,6 +80,16 @@ describe("Paddle production prebuild guard", () => {
     expect(Object.keys(guardModule)).toEqual([]);
   });
 
+  it("classifies the canonical file with the production resolver, not the sandbox resolver", () => {
+    // The CLI module exports nothing, so the forbidden sandbox import cannot
+    // be asserted via resolved bindings. Presence/absence of the import names
+    // is the gate's wiring contract; live_ acceptance tests cover behavior.
+    const source = readFileSync(GUARD_SCRIPT, "utf8");
+
+    expect(source).toContain("resolveCanonicalPaddleProductionToken");
+    expect(source).not.toContain("resolveCanonicalPaddleSandboxToken");
+  });
+
   it("runs before every existing prebuild command without changing dev scripts", () => {
     const packageJson = JSON.parse(readFileSync(resolve(REPO_ROOT, "package.json"), "utf8"));
     const prebuildCommands = packageJson.scripts.prebuild.split(/\s*&&\s*/u);
@@ -90,6 +100,7 @@ describe("Paddle production prebuild guard", () => {
       "node scripts/verify-edge-shared-in-sync.mjs",
       "node scripts/check-no-src-lib-imports.mjs",
       "node scripts/stamp-version.mjs",
+      "node scripts/verify-publish-provenance.mjs",
     ]);
     expect(packageJson.scripts.dev).toBe("vite dev");
     expect(packageJson.scripts["build:dev"]).toBe("vite build --mode development");
@@ -155,22 +166,29 @@ describe("Paddle production prebuild guard", () => {
   });
 
   it.each([
-    { name: "garbage", line: `${TOKEN_NAME}=${GARBAGE_TOKEN}`, reason: "canonical_paddle_token_invalid" },
+    {
+      name: "garbage",
+      line: `${TOKEN_NAME}=${GARBAGE_TOKEN}`,
+      reason: "canonical_paddle_token_invalid",
+    },
     { name: "empty", line: `${TOKEN_NAME}=`, reason: "canonical_paddle_token_invalid" },
     {
       name: "unquoted-broken",
       line: `${TOKEN_NAME}="unclosed`,
       reason: "canonical_paddle_token_invalid",
     },
-  ])("rejects a $name canonical token without logging credential bytes", ({ line, reason, name }) => {
-    const root = createEnvRoot([line]);
-    const result = runGuard(root);
+  ])(
+    "rejects a $name canonical token without logging credential bytes",
+    ({ line, reason, name }) => {
+      const root = createEnvRoot([line]);
+      const result = runGuard(root);
 
-    expect(result.status).toBe(1);
-    expect(result.stderr).toBe(`[paddle-production-policy] ${reason}\n`);
-    expect(result.stdout).toBe("");
-    if (name === "garbage") expect(combinedOutput(result)).not.toContain(GARBAGE_TOKEN);
-  });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toBe(`[paddle-production-policy] ${reason}\n`);
+      expect(result.stdout).toBe("");
+      if (name === "garbage") expect(combinedOutput(result)).not.toContain(GARBAGE_TOKEN);
+    },
+  );
 
   it("rejects duplicate canonical assignments regardless of their values", () => {
     const root = createEnvRoot([

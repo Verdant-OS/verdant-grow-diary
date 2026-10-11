@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeAuthRedirect, DEFAULT_AUTH_REDIRECT } from "@/lib/authRedirectRules";
+import {
+  buildSignedOutRedirect,
+  DEFAULT_AUTH_REDIRECT,
+  PUBLIC_MARKETING_LANDING,
+  retainSignedOutReturnIntent,
+  sanitizeAuthRedirect,
+  SIGNED_OUT_LANDING,
+} from "@/lib/authRedirectRules";
 
 describe("sanitizeAuthRedirect", () => {
   const cases: Array<[unknown, string]> = [
@@ -50,5 +57,74 @@ describe("sanitizeAuthRedirect", () => {
     const circ: Record<string, unknown> = {};
     circ.self = circ;
     expect(() => sanitizeAuthRedirect(circ)).not.toThrow();
+  });
+});
+
+// Signed-out re-entry (measured live on 94f9c631, tokenless tab): a protected
+// route miss landed on the full marketing /welcome, so a returning grower read
+// "I don't have an account". The miss must land on the sign-in screen with the
+// destination preserved; anonymous visits to / and /welcome stay marketing.
+describe("buildSignedOutRedirect — signed-out re-entry lands on the sign-in screen", () => {
+  it("names the sign-in screen as the signed-out landing and /welcome as marketing", () => {
+    expect(SIGNED_OUT_LANDING).toBe("/auth");
+    expect(PUBLIC_MARKETING_LANDING).toBe("/welcome");
+  });
+
+  it("sends a protected-route miss to /auth with the destination preserved", () => {
+    expect(buildSignedOutRedirect("/grows")).toBe("/auth?redirectTo=%2Fgrows");
+    expect(buildSignedOutRedirect("/dashboard")).toBe("/auth?redirectTo=%2Fdashboard");
+    expect(buildSignedOutRedirect("/dashboard", "?growId=g1")).toBe(
+      "/auth?redirectTo=%2Fdashboard%3FgrowId%3Dg1",
+    );
+    expect(buildSignedOutRedirect("/sensors", "", "#manual-reading")).toBe(
+      "/auth?redirectTo=%2Fsensors%23manual-reading",
+    );
+  });
+
+  it("never loops the sign-in screen back onto itself", () => {
+    expect(buildSignedOutRedirect("/auth")).toBe("/auth");
+    expect(buildSignedOutRedirect("/auth", "?redirectTo=%2Fgrows")).toBe("/auth");
+    expect(buildSignedOutRedirect("/auth", "", "#signup")).toBe("/auth");
+  });
+
+  it("never restores a marketing entry as a destination", () => {
+    expect(buildSignedOutRedirect("/")).toBe("/auth");
+    expect(buildSignedOutRedirect("/welcome")).toBe("/auth");
+    expect(buildSignedOutRedirect("/welcome", "?redirectTo=%2Fplants")).toBe("/auth");
+    expect(buildSignedOutRedirect("/welcome", "", "#features")).toBe("/auth");
+  });
+
+  it("falls back to plain /auth for unknown or unsafe locations", () => {
+    expect(buildSignedOutRedirect("/not-a-route")).toBe("/auth");
+    expect(buildSignedOutRedirect("//evil.example")).toBe("/auth");
+    expect(buildSignedOutRedirect("/plants", "?q=a b")).toBe("/auth");
+  });
+});
+
+describe("retainSignedOutReturnIntent — expiry must keep the protected return", () => {
+  const sensorsReturn = buildSignedOutRedirect("/sensors", "?tentId=tent-a", "#manual-reading");
+
+  it("keeps the exact redirectTo when the next build collapses to bare /auth", () => {
+    expect(sensorsReturn).toBe("/auth?redirectTo=%2Fsensors%3FtentId%3Dtent-a%23manual-reading");
+    expect(retainSignedOutReturnIntent(sensorsReturn, SIGNED_OUT_LANDING, false)).toBe(
+      sensorsReturn,
+    );
+  });
+
+  it("adopts a later protected destination instead of freezing the first one", () => {
+    const plantsReturn = buildSignedOutRedirect("/plants");
+    expect(retainSignedOutReturnIntent(sensorsReturn, plantsReturn, false)).toBe(plantsReturn);
+  });
+
+  it("resets once a user is present so a later miss uses the current location", () => {
+    expect(retainSignedOutReturnIntent(sensorsReturn, SIGNED_OUT_LANDING, true)).toBe(
+      SIGNED_OUT_LANDING,
+    );
+  });
+
+  it("leaves a bare landing alone when there was never a return intent", () => {
+    expect(retainSignedOutReturnIntent(SIGNED_OUT_LANDING, SIGNED_OUT_LANDING, false)).toBe(
+      SIGNED_OUT_LANDING,
+    );
   });
 });

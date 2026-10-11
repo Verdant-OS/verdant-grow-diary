@@ -17,6 +17,7 @@ import {
   evaluateEcowittTentSnapshotV0Metric,
   mapEcowittTentSnapshotV0MetricKey,
   readObservedAtIso,
+  resolveEcowittTentSnapshotV0TempCelsius,
   toFiniteMetricValue,
   type EcowittTentSnapshotV0MetricKey,
   type EcowittTentSnapshotV0RowLike,
@@ -76,13 +77,34 @@ const METRIC_UNIT: Record<EcowittTentSnapshotV0MetricKey, string> = {
   soil: "%",
 };
 
-/** Known EcoWitt FIELD_MAP keys V0 intentionally does not surface. */
+/** Known EcoWitt FIELD_MAP keys V0 intentionally does not surface on the card. */
 export const ECOWITT_TENT_SNAPSHOT_V0_UNUSED_FIELD_NAMES = [
   "co2",
   "co2in",
   "co2_ppm",
   "soilmoisture2",
+  "soilmoisture3",
+  "temp2f",
+  "humidity2",
+  "tempinf",
+  "humidityin",
+  "leafwetness1",
+  "tf_ch1",
 ] as const;
+
+/**
+ * Latest + sparkline share one convert path so temp_f never plots as raw °F.
+ * Celsius keys stay as-is; implausible C fails at evaluate.
+ */
+function resolvedMetricValue(
+  row: EcowittTentSnapshotV0RowLike,
+  metricKey: EcowittTentSnapshotV0MetricKey,
+): number | null {
+  const rawValue = toFiniteMetricValue(row.value);
+  if (rawValue === null) return null;
+  if (metricKey !== "temp") return rawValue;
+  return resolveEcowittTentSnapshotV0TempCelsius(row.metric, rawValue).celsius;
+}
 
 function emptyMetric(key: EcowittTentSnapshotV0MetricKey): EcowittTentSnapshotV0MetricView {
   return {
@@ -126,7 +148,7 @@ function pickLatestPerMetric(
   for (const row of rows) {
     const metricKey = mapEcowittTentSnapshotV0MetricKey(row.metric);
     if (!metricKey) continue;
-    const value = toFiniteMetricValue(row.value);
+    const value = resolvedMetricValue(row, metricKey);
     if (value === null) continue;
     const capturedAt = readObservedAtIso(row);
     if (!capturedAt) continue;
@@ -176,7 +198,7 @@ function buildSparkline(
 
   for (const row of rows) {
     if (mapEcowittTentSnapshotV0MetricKey(row.metric) !== key) continue;
-    const value = toFiniteMetricValue(row.value);
+    const value = resolvedMetricValue(row, key);
     if (value === null) continue;
     const evaluation = evaluateEcowittTentSnapshotV0Metric(key, value);
     if (!evaluation.valid) continue;

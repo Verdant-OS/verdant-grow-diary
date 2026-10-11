@@ -79,7 +79,7 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
     savePendingOAuthSignupAcquisition("csv_history", window.sessionStorage, Date.now());
     mocks.getSession.mockResolvedValue({
       data: {
-        session: { user: { id: "verified-session-user" } },
+        session: { access_token: "fixture-verified-bearer", user: { id: "verified-session-user" } },
       },
     });
 
@@ -103,7 +103,7 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
 
   it("does not call the RPC when no pending source exists", async () => {
     mocks.getSession.mockResolvedValue({
-      data: { session: { user: { id: "existing-user" } } },
+      data: { session: { access_token: "fixture-existing-bearer", user: { id: "existing-user" } } },
     });
 
     render(
@@ -118,7 +118,7 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
 
   it("clears cached rows and search memory before every new auth identity is exposed", async () => {
     mocks.getSession.mockResolvedValue({
-      data: { session: { user: { id: "owner-a" } } },
+      data: { session: { access_token: "fixture-owner-a-bearer", user: { id: "owner-a" } } },
     });
     const client = new QueryClient();
     const transitions: Array<[string | null, string | null]> = [];
@@ -144,10 +144,16 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
     window.sessionStorage.setItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY, "owner-a private query");
     expect(client.getQueryCache().getAll()).toHaveLength(1);
 
-    act(() => {
+    mocks.getSession.mockResolvedValue({
+      data: { session: { access_token: "fixture-owner-b-bearer", user: { id: "owner-b" } } },
+      error: null,
+    });
+    await act(async () => {
       mocks.authListener?.("SIGNED_IN", { user: { id: "owner-b" } });
-      // React has not committed owner B yet; the synchronous transition fence
-      // has already destroyed owner A's cache entry.
+      expect(client.getQueryCache().getAll()).toHaveLength(1);
+      await Promise.resolve();
+      // The held read confirms B; the privacy fence clears A's state before
+      // React commits that newly confirmed identity.
       expect(client.getQueryCache().getAll()).toHaveLength(0);
       expect(window.sessionStorage.getItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY)).toBeNull();
     });
@@ -155,8 +161,12 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
     expect(await screen.findByText("owner-b")).toBeInTheDocument();
     window.sessionStorage.setItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY, "owner-b private query");
 
-    act(() => {
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    await act(async () => {
       mocks.authListener?.("SIGNED_OUT", null);
+      // SIGNED_OUT is also broadcast by other tabs. Confirm this client's
+      // actual removal before expecting the privacy fence to clear its data.
+      await Promise.resolve();
       expect(window.sessionStorage.getItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY)).toBeNull();
     });
 
@@ -170,7 +180,7 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
 
   it("does not wipe query cache or search memory on same-identity remount after reload", async () => {
     mocks.getSession.mockResolvedValue({
-      data: { session: { user: { id: "owner-a" } } },
+      data: { session: { access_token: "fixture-owner-a-bearer", user: { id: "owner-a" } } },
     });
     const client = new QueryClient();
     const transitions: Array<[string | null, string | null]> = [];

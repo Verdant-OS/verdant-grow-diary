@@ -118,7 +118,7 @@ export interface CompatToObject {
 export type CompatTo = string | CompatToObject;
 
 export type CompatNavigateFunction = {
-  (to: CompatTo, options?: CompatNavigateOptions): void;
+  (to: CompatTo, options?: CompatNavigateOptions): void | Promise<void>;
   (delta: number): void;
 };
 
@@ -178,7 +178,7 @@ export function useNavigate(): CompatNavigateFunction {
         return;
       }
       const target = toTanStackTarget(flattenTo(to));
-      void navigate({
+      return navigate({
         to: target.to,
         ...(target.hash !== undefined ? { hash: target.hash } : {}),
         replace: options?.replace ?? false,

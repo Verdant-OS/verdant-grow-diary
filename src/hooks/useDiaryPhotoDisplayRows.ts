@@ -28,10 +28,14 @@ export interface UseDiaryPhotoDisplayRowsResult {
   rows: DiaryPhotoDisplayRow[];
   /** True while owned private paths are being exchanged for display URLs. */
   isResolvingPrivatePhotos: boolean;
+  /** The private-photo read is waiting for a connection. */
+  isPrivatePhotoReadPaused: boolean;
   /** A private-photo signing request failed; external photos may still render. */
   hasPrivatePhotoError: boolean;
   /** At least one supported persisted photo reference exists, even if it is loading. */
   hasPhotoReference: boolean;
+  /** Retry the owned private-photo read; a no-op when no paths need signing. */
+  refetchPrivatePhotos: () => Promise<void>;
 }
 
 export function useDiaryPhotoDisplayRows(
@@ -82,12 +86,17 @@ export function useDiaryPhotoDisplayRows(
           signedByPath.set(signed.path, signed.signedUrl);
         }
       }
+      if (storagePaths.some((path) => !signedByPath.has(path))) {
+        throw new Error("diary-photo-display-url-failed");
+      }
       return signedByPath;
     },
   });
 
   const rowsForDisplay = useMemo(() => {
-    const signedByPath = signedQuery.data ?? new Map<string, string>();
+    const signedByPath = signedQuery.isError
+      ? new Map<string, string>()
+      : (signedQuery.data ?? new Map<string, string>());
     return parsedRows.map(({ row, reference }) => {
       if (reference.kind === "external") {
         return { ...row, photo_url: reference.url };
@@ -99,15 +108,19 @@ export function useDiaryPhotoDisplayRows(
       // the generic diary normalizer / image presenter.
       return { ...row, photo_url: null };
     });
-  }, [parsedRows, signedQuery.data]);
+  }, [parsedRows, signedQuery.data, signedQuery.isError]);
 
   return {
     rows: rowsForDisplay,
     isResolvingPrivatePhotos:
-      storagePaths.length > 0 && (signedQuery.isLoading || signedQuery.isFetching),
+      storagePaths.length > 0 && (signedQuery.isPending || signedQuery.isFetching),
+    isPrivatePhotoReadPaused: storagePaths.length > 0 && signedQuery.fetchStatus === "paused",
     hasPrivatePhotoError: storagePaths.length > 0 && signedQuery.isError,
     hasPhotoReference: parsedRows.some(
       ({ reference }) => reference.kind === "external" || reference.kind === "storage",
     ),
+    refetchPrivatePhotos: async () => {
+      if (storagePaths.length > 0) await signedQuery.refetch();
+    },
   };
 }

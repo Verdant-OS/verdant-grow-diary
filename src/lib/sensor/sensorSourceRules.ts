@@ -21,8 +21,10 @@ const ALIAS: Record<string, SensorSource> = {
   live: "live",
   sensor: "live",
   realtime: "live",
-  // First-party bridge is trust-live for badge purposes (matches
-  // VERIFIED_SNAPSHOT_LIVE_ROW_SOURCES reservation in sensorSnapshot).
+  // First-party bridge is trust-live for badge/membership purposes (matches
+  // VERIFIED_SNAPSHOT_LIVE_ROW_SOURCES). Display must still use
+  // resolveSensorSourceDisplayCanon so the grower sees Source "Live sensor"
+  // with provenance "Pi bridge" — never the raw token as the Source label.
   pi_bridge: "live",
   manual: "manual",
   user: "manual",
@@ -77,7 +79,7 @@ export function normalizeSensorSource(input: unknown): SensorSource {
   if (typeof input !== "string") return "invalid";
   const v = input.trim().toLowerCase();
   if (v.length === 0) return "invalid";
-  return ALIAS[v] ?? "invalid";
+  return Object.prototype.hasOwnProperty.call(ALIAS, v) ? (ALIAS[v] ?? "invalid") : "invalid";
 }
 
 export function isHealthySensorSource(source: SensorSource): boolean {

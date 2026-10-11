@@ -51,8 +51,10 @@ import { useHasRole } from "@/hooks/useHasRole";
 import { isNavigationItemActive, type NavigationActiveRule } from "@/lib/navigationActiveRules";
 import {
   LABS_NAVIGATION_DESTINATIONS,
+  resolveLabsNavigationDestinations,
   type LabsNavigationDestinationId,
 } from "@/lib/growerNavigationRules";
+import { resolveNavigationGrowId } from "@/lib/navigationGrowIdRules";
 
 interface NavItem extends NavigationActiveRule {
   label: string;
@@ -175,17 +177,29 @@ const operatorGroups: { label: string; items: NavItem[] }[] = [
   },
 ];
 
+function navigationPathname(to: string): string {
+  return to.split(/[?#]/, 1)[0] ?? to;
+}
+
 export default function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const operatorRole = useHasRole("operator");
   const isOperator = operatorRole.status === "granted";
+  const labsNavItems: NavItem[] = resolveLabsNavigationDestinations(
+    resolveNavigationGrowId({ pathname, search }),
+  ).map((item) => ({
+    ...item,
+    icon: labsIcons[item.id],
+  }));
 
   const renderGroup = (g: NavGroup) => {
     if (g.items.length === 0 && !g.submenu) return null;
-    const submenuActive =
-      g.submenu?.items.some((item) => isNavigationItemActive(pathname, item)) ?? false;
+    const submenuItems = g.submenu?.label === "Labs" ? labsNavItems : (g.submenu?.items ?? []);
+    const submenuActive = submenuItems.some((item) =>
+      isNavigationItemActive(pathname, { ...item, to: navigationPathname(item.to) }),
+    );
 
     return (
       <SidebarGroup key={g.label}>
@@ -234,8 +248,11 @@ export default function AppSidebar() {
                   >
                     <DropdownMenuLabel>{g.submenu.label}</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    {g.submenu.items.map((item) => {
-                      const active = isNavigationItemActive(pathname, item);
+                    {submenuItems.map((item) => {
+                      const active = isNavigationItemActive(pathname, {
+                        ...item,
+                        to: navigationPathname(item.to),
+                      });
                       return (
                         <DropdownMenuItem key={item.to} asChild>
                           <Link

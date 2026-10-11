@@ -3,24 +3,31 @@ import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { resolveAlertContextStage } from "@/lib/alertStageResolution";
+import {
+  isCurrentReadForAlertWrite,
+  plantsForAlertPersistence,
+  resolveSelectedTentPlantStages,
+} from "@/lib/alertPlantStageScopeRules";
 import { formatStabilityChipView } from "@/lib/dashboardStabilityChipCopyRules";
 import StabilityChipDrilldown from "@/components/StabilityChipDrilldown";
 import {
   computeStabilityRollup,
   STABILITY_ROLLUP_TONE_CLASS,
 } from "@/lib/dashboardStabilityRollupRules";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@/lib/react-router-compat";
 
 import { AlertTriangle, Box, Sprout, Sparkles, ArrowRight } from "lucide-react";
 import type { Stage, SensorReading } from "@/mock";
 import PageHeader from "@/components/PageHeader";
 import KpiCard from "@/components/KpiCard";
-import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
 import StageBadge from "@/components/StageBadge";
 import SensorChart from "@/components/SensorChart";
+import EnvironmentRibbon from "@/components/EnvironmentRibbon";
+import { vpdTargetBandFromRange } from "@/lib/environmentRibbonViewModel";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
@@ -44,6 +51,8 @@ import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOut
 import SafeByDesignNotice from "@/components/SafeByDesignNotice";
 import DashboardSensorHealthSummary from "@/components/DashboardSensorHealthSummary";
 import { buildDashboardSensorHealthSummary } from "@/lib/dashboardSensorHealthViewModel";
+import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
+import { buildDashboardEmptyEnvironmentViewModel } from "@/lib/dashboardEmptyEnvironmentViewModel";
 import { sanitizeActionCopy } from "@/lib/actionQueueRowView";
 import { APPROVAL_QUEUE_EMPTY_COPY, mapRiskToSeverity } from "@/lib/dashboardActionQueueViewModel";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
@@ -52,6 +61,7 @@ import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationR
 import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEvidence";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useNowTick } from "@/hooks/useNowTick";
+import { describeCurrentStateStaleWindow } from "@/lib/sensorTruthCanon";
 import { isUuid } from "@/lib/isUuid";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
@@ -78,10 +88,15 @@ import {
   EMPTY_ALERTS_MESSAGE,
   type EnvironmentAlert,
 } from "@/lib/environmentAlerts";
-import { describeAlertSaveBlock } from "@/lib/alertFreshnessContext";
+import {
+  ALERT_SAVE_STAGE_UNCONFIRMED_MESSAGE,
+  describeAlertSaveBlock,
+} from "@/lib/alertFreshnessContext";
+import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
 import { saveAlert, logAlertEvent } from "@/lib/alerts";
 import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 import { useAlertsList } from "@/hooks/useAlertsList";
+import { buildDashboardOpenAlertsView } from "@/lib/dashboardOpenAlertsViewModel";
 import { resolveSelectedTentIds, type TentSelection } from "@/lib/dashboardLatestEnvironmentRules";
 import {
   Select,
@@ -111,9 +126,11 @@ import {
   alertDetailPath,
   alertsPath,
   dashboardPath,
+  sensorsPath,
   timelinePath,
   tentDetailPath,
   tentsPath,
+  withGrowId,
 } from "@/lib/routes";
 import {
   buildTentSnapshotView,
@@ -125,11 +142,26 @@ import {
   dashboardSnapshotForHealthyCues,
   evaluateDashboardSensorQuality,
   groupDashboardSensorReadings,
+  resolveDashboardSensorBadgeStatus,
   selectDashboardSensorEvidenceRows,
 } from "@/lib/dashboardSensorEvidenceRules";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
+import TonightTentHomeCard from "@/components/TonightTentHomeCard";
+import { resolveSensorReadingTentScope } from "@/lib/tentScopedSensorReadingsRules";
+import {
+  buildTonightLastLog,
+  buildTonightTentMetrics,
+  resolveTonightTentSelection,
+} from "@/lib/tonightTentHomeViewModel";
 
+/**
+ * Renders the grower's overview for a valid URL-selected grow or the full account.
+ * Keeps sensor history and saved environment evidence distinct, with scoped
+ * evidence retries and in-page access to the existing reading details.
+ */
 export default function Dashboard() {
+  const queryClient = useQueryClient();
+  const latestEnvironmentRef = useRef<HTMLElement>(null);
   usePageSeo({
     title: "Grow Room Dashboard | Verdant Grow Diary",
     description:
@@ -144,7 +176,14 @@ export default function Dashboard() {
   const plantsQuery = useGrowPlants(undefined, scopedGrowId);
   const { data: tents = [] } = tentsQuery;
   const { data: plants = [] } = plantsQuery;
-  const dashboardReadingsQuery = useSensorReadings();
+  // Per-tent windows over this scope's tents; never the unscoped all-tents
+  // read, which hit the Postgres statement timeout (QA 2026-09-24).
+  const dashboardTentScope = resolveSensorReadingTentScope({ tents: tentsQuery });
+  const dashboardReadingsQuery = useSensorReadings({
+    tentIds: dashboardTentScope.tentIds,
+    scopeError: dashboardTentScope.scopeError,
+    retryScope: tentsQuery.refetch,
+  });
   const { data: rawReadings = [] } = dashboardReadingsQuery;
   // Diagnostic packets may be stored with a canonical `live` source. Keep
   // raw provenance only through this shared fence; charts/counts receive the
@@ -185,15 +224,34 @@ export default function Dashboard() {
     ? resolveAlertContextStage({
         growStage: scopedGrow.stage,
         tentStages: stageContextTents.map((t) => t.stage),
+        // Plants in the same selection scope that belong to this grow by the
+        // canonical attribution (QA 2026-09-24, BUG-006; Codex on #1683).
+        plantStages: resolveSelectedTentPlantStages(plants, scopedGrow.id, tents, selectedTentIds),
       }).stage
     : null;
+  // Only a current, successful plant read may decide a persisted stage.
+  const plantsForPersistence = plantsForAlertPersistence(plantsQuery);
+  // Both alert writes, automatic and the manual save button, need current,
+  // successful tent and plant reads: while either is pending, has failed
+  // (`isFetched` is true then too) or is refetching, alertContextStage may
+  // rest on missing or stale rows, and an alert saved in that window would
+  // not be removed once they arrive (Codex review on #1683).
+  const stageReadsCurrentForWrite =
+    isCurrentReadForAlertWrite(tentsQuery) && plantsForPersistence !== null;
+  const stageSaveBlock = stageReadsCurrentForWrite ? null : ALERT_SAVE_STAGE_UNCONFIRMED_MESSAGE;
   const trendsState = useEnvironmentTrends(
     scopedGrowId ?? null,
     tents.map((t) => t.id),
   );
   const targetsState = useGrowTargets(scopedGrowId ?? null);
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
-  const currentSensorSnapshot = sensorState.status === "ok" ? sensorState.snapshot : null;
+  const snapshotReadState = buildSensorSnapshotReadState(sensorState);
+  const currentSensorSnapshot = snapshotReadState.confirmedSnapshot;
+  const emptyEnvironment = buildDashboardEmptyEnvironmentViewModel({
+    scoped: !!scopedGrowId,
+    state: sensorState,
+    selectedTents: stageContextTents,
+  });
   // Tent attribution for a manually saved alert, taken from the same snapshot
   // the alert was derived from. Null when the current view spans several tents
   // — inventing a winner there would pin a real breach on an arbitrary tent.
@@ -210,7 +268,7 @@ export default function Dashboard() {
 
   // First-run activation is relationship-aware. Independent grow/tent/plant
   // counts cannot prove that a usable One-Tent chain exists.
-  const { grows, activeGrowId } = useGrows();
+  const { grows, activeGrowId, loading: growsLoading, error: growsError } = useGrows();
   const activationGraph = selectConnectedOneTentGraph({
     grows,
     tents,
@@ -218,6 +276,38 @@ export default function Dashboard() {
     preferredGrowId: scopedGrowId ?? activeGrowId,
   });
   const activationEvidence = useOneTentActivationEvidence(activationGraph);
+  // One-Tent Home first fold: one tent, never an arbitrary pick among several.
+  const homeSelection = resolveTonightTentSelection({
+    tents,
+    plants,
+    connectedTentId: activationGraph.tentId,
+  });
+  const homeTent = homeSelection.kind === "tent" ? homeSelection.tent : null;
+  // Diary-inclusive snapshot for this tent alone, so Quick Log manual readings
+  // count; idle (never "missing") when the tent has no grow id.
+  const homeSnapshotState = useLatestSensorSnapshot(
+    homeTent?.growId ?? null,
+    homeTent ? [homeTent.id] : [],
+  );
+  const homeMetrics = buildTonightTentMetrics({
+    rows: homeTent ? (readingsByTent[homeTent.id] ?? []) : [],
+    // Same rule as the tent strip: a UUID tent with no reported status is still
+    // loading; non-UUID ids are never queried, so their absence is established.
+    rowsRead: {
+      status:
+        homeTent && isUuid(homeTent.id)
+          ? (sensorStatusByTent[homeTent.id] ?? "loading")
+          : "success",
+    },
+    snapshot: { status: homeSnapshotState.status, snapshot: homeSnapshotState.snapshot },
+    now: new Date(nowTick),
+  });
+  const homeLastLog = buildTonightLastLog({
+    applies: !!homeTent && activationGraph.tentId === homeTent.id,
+    status: activationEvidence.status,
+    latestAt: activationEvidence.summary.latestAt,
+    now: new Date(nowTick),
+  });
   const connectedSensorReadingCount = activationGraph.tentId
     ? countActivatingSensorReadings(readingsByTent[activationGraph.tentId] ?? [])
     : 0;
@@ -226,13 +316,25 @@ export default function Dashboard() {
   // Additive only — the sensor_readings path above is never weakened.
   const quickLogManualSnapshotCount =
     activationEvidence.status === "ok" ? (activationEvidence.summary.manualSnapshotCount ?? 0) : 0;
+  // LIVE MISS hardening: when the graph has no tent yet, tentless plant rows
+  // still carry plant memory. Prefer graph.plantId; fall back to the first
+  // loaded plant so connected-scope framing cannot ignore plants.length.
+  const plantMemoryFallbackId =
+    activationGraph.plantId ??
+    plants.find((p) => !activationGraph.growId || p.growId === activationGraph.growId)?.id ??
+    plants[0]?.id ??
+    null;
   const onboardingVm = buildOnboardingChecklistViewModel({
     growCount: grows.length,
     tentCount: tents.length,
     plantCount: plants.length,
     diaryEntryCount: 0,
     sensorReadingCount: connectedSensorReadingCount + quickLogManualSnapshotCount,
-    connectedScope: activationGraph,
+    connectedScope: {
+      growId: activationGraph.growId,
+      tentId: activationGraph.tentId,
+      plantId: plantMemoryFallbackId,
+    },
     firstLogEvidenceCount:
       activationEvidence.status === "ok" ? activationEvidence.summary.count : null,
     firstLogEvidenceStatus: activationEvidence.status,
@@ -243,6 +345,15 @@ export default function Dashboard() {
     scopedGrowId ? { growId: scopedGrowId, status: "open" } : { status: "open" },
   );
   const persistedOpenCount = scopedGrowId ? persistedAlertsState.alerts.length : 0;
+  // useAlertsList starts each read in a passive effect, so right after a grow
+  // scope change it still reports the previous scope's 'ok'. This effect
+  // follows that hook's effect, so the new scope and its loading state land
+  // together (same guard as usePlantAssignedTentAlerts).
+  const alertsScopeKey = scopedGrowId ?? null;
+  const [alertsReadScope, setAlertsReadScope] = useState(alertsScopeKey);
+  useEffect(() => {
+    setAlertsReadScope(alertsScopeKey);
+  }, [alertsScopeKey]);
 
   // Persist derived Environment Alerts into public.alerts when (and only
   // when) they are backed by real, valid sensor readings. Idempotent and
@@ -258,33 +369,56 @@ export default function Dashboard() {
       dashboardHealthSnapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
-    // Gated on the tent read having settled: while it is pending, `tents`
-    // is a placeholder empty array and alertContextStage falls back to the
-    // grow row alone — an alert persisted against a stale grow stage in
-    // that window would not be removed once the tent stages arrive.
-    enabled: !!scopedGrowId && tentsQuery.isFetched,
+    // Gated on current tent and plant reads; see stageReadsCurrentForWrite.
+    enabled: !!scopedGrowId && stageReadsCurrentForWrite,
     stage: alertContextStage,
   });
 
   // Open alert count and recent alerts come from real persisted alerts (RLS).
   const openAlerts = persistedAlertsState.alerts.filter((a) => a.status === "open").length;
+  // A pending or failed read is not "zero alerts"; see dashboardOpenAlertsViewModel.
+  const openAlertsView = buildDashboardOpenAlertsView({
+    status: persistedAlertsState.status,
+    openCount: openAlerts,
+    readScopeCurrent: alertsReadScope === alertsScopeKey,
+  });
 
   // Latest reading per tent for the strip + a read-only stability summary
   // computed from the same tent-scoped readings (no extra fetches, no writes).
+  // Each tent is graded by the stage Alerts use: its grow row, the tent and
+  // the active plants in it, like the Tents list and Tent Detail (Codex
+  // review on #1683). Grading is withheld until the grow row and the plant
+  // rows are known; a failed plant refresh keeps its cached rows.
+  const plantsForStage = plantsQuery.isPlaceholderData ? null : (plantsQuery.data ?? null);
   const latestPerTent = tents.map((t) => {
     const tentRows = selectDashboardSensorEvidenceRows(readingsByTent[t.id] ?? []);
     const chartRows = groupDashboardSensorReadings(tentRows);
     const rs = buildDashboardStabilityReadings(tentRows);
-    const stability = computeEnvironmentStability(rs, { stage: t.stage });
+    const envStage = resolveTentEnvironmentStage({
+      tentId: t.id,
+      tentGrowId: t.growId ?? null,
+      tentStage: t.stage,
+      ...resolveTentGrowStage({
+        growId: t.growId,
+        grows,
+        loading: growsLoading,
+        error: growsError,
+      }),
+      plants: plantsForStage,
+    });
+    const stability = computeEnvironmentStability(rs, { stage: envStage });
     return {
       tent: t,
+      envStage,
       last: chartRows[chartRows.length - 1],
       stability,
       tentRows,
     };
   });
 
-  const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
+  // Another scope's rows are not this grow's alerts.
+  const recentAlerts =
+    openAlertsView.kind === "known" ? persistedAlertsState.alerts.slice(0, 3) : [];
 
   if (tentsQuery.isError || plantsQuery.isError) {
     return (
@@ -311,7 +445,15 @@ export default function Dashboard() {
     );
   }
 
-  if (tentsQuery.isLoading || plantsQuery.isLoading) {
+  if (
+    tentsQuery.isPending ||
+    plantsQuery.isPending ||
+    tentsQuery.isLoading ||
+    plantsQuery.isLoading
+  ) {
+    const waitingForConnection =
+      (tentsQuery.isPending && tentsQuery.fetchStatus === "paused") ||
+      (plantsQuery.isPending && plantsQuery.fetchStatus === "paused");
     return (
       <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
         <GrowBreadcrumbs
@@ -325,7 +467,24 @@ export default function Dashboard() {
           description="Track your tents, plants, sensors, and grow activity in one place."
           icon={<Sparkles className="h-5 w-5" />}
         />
-        <GrowDataLoadingState resource="Dashboard grow data" testId="dashboard-grow-data-loading" />
+        {waitingForConnection ? (
+          <div
+            className="glass rounded-2xl p-6 text-center text-sm text-muted-foreground"
+            role="status"
+            aria-live="polite"
+            data-testid="dashboard-grow-data-loading"
+          >
+            <p className="font-semibold">Waiting for connection</p>
+            <p className="mt-1">
+              Your tents and plants haven't loaded yet. They'll appear when the connection returns.
+            </p>
+          </div>
+        ) : (
+          <GrowDataLoadingState
+            resource="Dashboard grow data"
+            testId="dashboard-grow-data-loading"
+          />
+        )}
       </div>
     );
   }
@@ -334,7 +493,6 @@ export default function Dashboard() {
   // the route Outlet, so the page root must not nest another.
   return (
     <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
-      <QuickLogV2Fab />
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}
@@ -346,20 +504,17 @@ export default function Dashboard() {
         description="Track your tents, plants, sensors, and grow activity in one place."
         icon={<Sparkles className="h-5 w-5" />}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          // data-testid="dashboard-ready" is the e2e readiness marker (census, responsive,
+          // signed-in performance). Loaded branch only; keep it unconditional.
+          <div className="flex items-center gap-2 flex-wrap" data-testid="dashboard-ready">
             <OnboardingProgressPill vm={onboardingVm} />
-            <Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">
-              {/* Route still targets /daily-check (the underlying Quick Log
-                  surface). Label unified to "Quick Log" so the Dashboard
-                  presents a single grower-facing logging concept. */}
-              <Link to="/daily-check">Quick Log</Link>
-            </Button>
             <Button asChild className="gradient-leaf text-primary-foreground">
               <Link to={tentsPath()}>Open tents</Link>
             </Button>
           </div>
         }
       />
+
       {urlGrowId && (
         <ScopedGrowBanner
           growId={urlGrowId}
@@ -369,6 +524,12 @@ export default function Dashboard() {
           backHref={backHref}
         />
       )}
+      <TonightTentHomeCard
+        selection={homeSelection}
+        metrics={homeMetrics}
+        lastLog={homeLastLog}
+        logHref={withGrowId("/daily-check", homeTent?.growId ?? scopedGrowId)}
+      />
 
       <div className="my-3">
         <PublicQuickLogHandoffCard className="mb-3" />
@@ -389,7 +550,8 @@ export default function Dashboard() {
           First-run guidance now has one canonical relationship-aware card
           above, so two checklists cannot disagree or compete on mobile. */}
 
-      {/* Dashboard intentionally has a single Quick Log entry point (QuickLogV2Fab).
+      {/* The One-Tent Home card's Log is the page's single primary Log entry;
+          AppShell owns the Quick Log sheet triggers (header button, mobile FAB).
           The "Log your first plant memory" CTA was a duplicate entry point and was removed.
           The same CTA remains on TentDetail where it is contextually unique. */}
 
@@ -401,28 +563,17 @@ export default function Dashboard() {
         snapshotSource={sensorState.status === "ok" ? sensorState.snapshot.source : undefined}
       />
 
-      <DailyGrowCheckStatusCard className="mb-6" tentIds={tents.map((t) => t.id)} />
+      <DailyGrowCheckStatusCard
+        className="mb-6"
+        growId={scopedGrowId ?? null}
+        // null while this scope's tents load (card stays loading); [] for a
+        // grow with no tents (empty scope), never "every active tent".
+        tentIds={dashboardTentScope.tentIds}
+      />
 
       <DashboardDailyGrowCheckPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
 
       <GuidedActionChecklistPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
-        <KpiCard
-          label="Plants"
-          value={plants.length}
-          icon={<Sprout className="h-3.5 w-3.5" />}
-          hint={`${plants.filter((p) => p.health === "healthy").length} marked healthy · user-assigned, not sensor-derived`}
-          accent="success"
-        />
-        <KpiCard
-          label="Open alerts"
-          value={openAlerts}
-          icon={<AlertTriangle className="h-3.5 w-3.5" />}
-          accent={openAlerts > 0 ? "destructive" : "success"}
-        />
-      </div>
 
       {tents.length === 0 ? (
         <DashboardZeroTentEmptyState growId={activationGraph.growId} />
@@ -452,7 +603,10 @@ export default function Dashboard() {
                 </p>
               </div>
               <Button asChild size="sm" variant="ghost">
-                <Link to="/sensors">
+                <Link
+                  to={sensorsPath(scopedGrowId)}
+                  data-testid="dashboard-environment-snapshot-open-sensors"
+                >
                   Open sensors <ArrowRight className="h-3 w-3" />
                 </Link>
               </Button>
@@ -467,16 +621,16 @@ export default function Dashboard() {
                   sensorStatusByTent[tentId] === "error" ||
                   sensorStatusByTent[tentId] === "refresh_error",
               );
-              const snapshotQuality = sensorState.status === "ok" ? dashboardSensorQuality : null;
+              const snapshotQuality = currentSensorSnapshot ? dashboardSensorQuality : null;
               const isStaleSnap =
                 sensorState.status === "ok" &&
                 !!sensorState.snapshot.ts &&
-                isSnapshotStale(sensorState.snapshot);
+                isSnapshotStale(sensorState.snapshot, nowTick);
               const isInvalidSnap =
                 !!snapshotQuality && snapshotQuality.suspiciousFields.length > 0;
               const isUnverifiedSnap =
-                sensorState.status === "ok" &&
-                sensorState.snapshot.source !== "unavailable" &&
+                currentSensorSnapshot !== null &&
+                currentSensorSnapshot.source !== "unavailable" &&
                 dashboardHealthSnapshot === null;
               if (dashboardReadingsQuery.isLoading || (!anyReading && hasPendingTentRead)) {
                 return (
@@ -508,24 +662,71 @@ export default function Dashboard() {
                 );
               }
               if (!anyReading) {
+                if (emptyEnvironment.kind !== "empty") {
+                  return (
+                    <div
+                      data-testid={
+                        emptyEnvironment.kind === "evidence"
+                          ? "dashboard-environment-snapshot-evidence"
+                          : `dashboard-environment-snapshot-evidence-${emptyEnvironment.kind}`
+                      }
+                      className="glass rounded-2xl p-6 space-y-2"
+                      role="status"
+                    >
+                      <h3 className="font-display font-semibold text-base">
+                        {emptyEnvironment.heading}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {emptyEnvironment.description}
+                      </p>
+                      {emptyEnvironment.kind === "evidence" && (
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="h-auto p-0"
+                          onClick={() => {
+                            latestEnvironmentRef.current?.scrollIntoView({ block: "start" });
+                            latestEnvironmentRef.current?.focus({ preventScroll: true });
+                          }}
+                        >
+                          Review saved environment evidence
+                        </Button>
+                      )}
+                      {emptyEnvironment.kind === "error" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            void queryClient.invalidateQueries({
+                              predicate: (query) =>
+                                query.queryKey[0] === "latest-sensor-snapshot" &&
+                                query.queryKey[2] === scopedGrowId,
+                            });
+                          }}
+                        >
+                          Retry environment evidence
+                        </Button>
+                      )}
+                    </div>
+                  );
+                }
                 return (
                   <div
                     data-testid="dashboard-environment-snapshot-empty"
                     className="glass rounded-2xl p-6 text-center"
                   >
                     <h3 className="font-display font-semibold text-base mb-1">
-                      No sensor snapshot yet
+                      {emptyEnvironment.heading}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      Add a manual reading or{" "}
+                      {emptyEnvironment.description}{" "}
                       <Link
-                        to="/sensors"
+                        to={sensorsPath(scopedGrowId)}
                         data-testid="dashboard-environment-snapshot-empty-sensors-link"
                         className="underline text-primary hover:opacity-80"
                       >
-                        connect Ecowitt
-                      </Link>{" "}
-                      to see your environment here.
+                        Set up a sensor.
+                      </Link>
                     </p>
                     <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
                       {/* Sensors entry-point dedupe: a single primary "Go to
@@ -534,7 +735,7 @@ export default function Dashboard() {
                       Sensors page (no new routes). */}
                       <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
                         <Link
-                          to="/sensors"
+                          to={sensorsPath(scopedGrowId)}
                           data-testid="dashboard-environment-snapshot-go-to-sensors"
                           aria-label="Go to Sensors page"
                         >
@@ -543,7 +744,7 @@ export default function Dashboard() {
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link
-                          to="/sensors#manual-reading"
+                          to={withGrowId("/sensors#manual-reading", scopedGrowId)}
                           data-testid="dashboard-environment-snapshot-add-manual-reading"
                           aria-label="Add manual sensor reading"
                         >
@@ -552,7 +753,7 @@ export default function Dashboard() {
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link
-                          to="/sensors#csv-import"
+                          to={withGrowId("/sensors#csv-import", scopedGrowId)}
                           data-testid="dashboard-environment-snapshot-import-sensor-data"
                           aria-label="Import sensor data"
                         >
@@ -577,7 +778,7 @@ export default function Dashboard() {
                         ? "Latest reading has unverified or simulated provenance — shown as context only, never as healthy sensor evidence."
                         : isInvalidSnap
                           ? "Latest reading looks invalid — not shown as current. Check the sensor source on the Sensors page."
-                          : "Latest reading is stale (older than 30 minutes) — not shown as current."}
+                          : `Latest reading is stale (${describeCurrentStateStaleWindow(sensorState.snapshot.source)}) — not shown as current.`}
                     </div>
                   )}
                   <div className="grid lg:grid-cols-3 gap-4">
@@ -614,13 +815,16 @@ export default function Dashboard() {
                               {latest && (
                                 <SensorSourceBadge
                                   source={latest.source}
-                                  status={latest.status}
+                                  status={resolveDashboardSensorBadgeStatus(latest, nowTick)}
                                   testId="dashboard-tent-chart-source-badge"
                                 />
                               )}
                             </div>
                             <Button asChild size="sm" variant="ghost">
-                              <Link to="/sensors">
+                              <Link
+                                to={sensorsPath(scopedGrowId)}
+                                data-testid="dashboard-environment-snapshot-sensor-data"
+                              >
                                 Sensor data <ArrowRight className="h-3 w-3" />
                               </Link>
                             </Button>
@@ -634,7 +838,24 @@ export default function Dashboard() {
                               sensor to see the 7-day environment here.
                             </div>
                           ) : (
-                            <SensorChart data={chartReadings} metric="temp" height={200} />
+                            <>
+                              {/* Tranche 1 (additive): 24h ribbon with provenance band.
+                                  SensorChart below is unchanged. */}
+                              <EnvironmentRibbon
+                                readings={chartReadings}
+                                now={nowTick}
+                                targetVpd={vpdTargetBandFromRange(
+                                  targetsState.status === "ok"
+                                    ? (targetsState.targets?.vpd ?? null)
+                                    : null,
+                                )}
+                                title={`${chartTentName} · last 24 hours`}
+                                testIdPrefix="dashboard-environment-ribbon"
+                              />
+                              <div className="mt-4">
+                                <SensorChart data={chartReadings} metric="temp" height={200} />
+                              </div>
+                            </>
                           )}
                         </div>
                       );
@@ -650,7 +871,7 @@ export default function Dashboard() {
                             return (
                               <SensorSourceBadge
                                 source={latest.source}
-                                status={latest.status}
+                                status={resolveDashboardSensorBadgeStatus(latest, nowTick)}
                                 testId="dashboard-env-strip-source-badge"
                               />
                             );
@@ -672,11 +893,11 @@ export default function Dashboard() {
                       </div>
 
                       <div className="space-y-2.5">
-                        {latestPerTent.map(({ tent, stability, tentRows }) => {
+                        {latestPerTent.map(({ tent, envStage, stability, tentRows }) => {
                           const stabilityView = formatStabilityChipView(stability);
                           const snapView = buildTentSnapshotView(
                             tentRows as BuildTentSnapshotInput[],
-                            tent.stage,
+                            envStage,
                             nowTick,
                           );
                           // Pending/failed reads must not masquerade as established
@@ -852,7 +1073,17 @@ export default function Dashboard() {
               </Link>
             </Button>
           </div>
-          {recentAlerts.length === 0 && (
+          {openAlertsView.kind !== "known" && (
+            <p
+              className="text-sm text-muted-foreground"
+              role="status"
+              data-testid="dashboard-active-alerts-unknown"
+              data-kind={openAlertsView.kind}
+            >
+              {openAlertsView.detail}
+            </p>
+          )}
+          {openAlertsView.kind === "known" && recentAlerts.length === 0 && (
             <div
               className="rounded-xl border border-dashed border-border/50 p-3"
               role="status"
@@ -916,15 +1147,42 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* One-Tent Home: the equal-weight KPI wall is summary context, not
+          first-fold content. It sits below the daily loop, Environment and
+          Needs attention. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
+        <KpiCard
+          label="Plants"
+          value={plants.length}
+          icon={<Sprout className="h-3.5 w-3.5" />}
+          hint={`${plants.filter((p) => p.health === "healthy").length} marked healthy · user-assigned, not sensor-derived`}
+          accent="success"
+        />
+        <KpiCard
+          label="Open alerts"
+          value={openAlertsView.kpiValue}
+          icon={<AlertTriangle className="h-3.5 w-3.5" />}
+          accent={openAlertsView.accent}
+        />
+      </div>
       {scopedGrowId ? (
         <>
           <DashboardSensorHealthSummary
             summary={buildDashboardSensorHealthSummary(sensorState)}
             activeAlertCount={openAlerts}
+            alertsKnown={openAlertsView.kind === "known"}
             growId={scopedGrowId}
             className="mt-4"
           />
-          <section className="glass rounded-2xl p-4 mt-4" aria-label="Latest environment">
+          <section
+            id="latest-environment"
+            ref={latestEnvironmentRef}
+            tabIndex={-1}
+            className="glass rounded-2xl p-4 mt-4 scroll-mt-24"
+            aria-label="Latest environment"
+          >
             <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
               <div>
                 <h2 className="font-display font-semibold">Latest Environment</h2>
@@ -964,7 +1222,8 @@ export default function Dashboard() {
                 </Link>
               </div>
             </div>
-            {persistedAlertsState.status === "ok" && (
+            {/* Known means this grow's read succeeded, not a previous scope's. */}
+            {openAlertsView.kind === "known" && (
               <div
                 className="mb-3 text-xs text-muted-foreground"
                 data-testid="latest-env-persisted-count"
@@ -982,16 +1241,27 @@ export default function Dashboard() {
                 )}
               </div>
             )}
-            {sensorState.status === "loading" || sensorState.status === "idle" ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : sensorState.status === "unavailable" ? (
+            {snapshotReadState.pendingNotice && (
+              <p
+                role="status"
+                className="text-sm text-muted-foreground"
+                data-testid="latest-env-read-status"
+              >
+                {snapshotReadState.pendingNotice}
+              </p>
+            )}
+            {sensorState.status === "loading" ||
+            sensorState.status === "idle" ? null : sensorState.status === "unavailable" ? (
               <p className="text-sm text-muted-foreground">Sensor data unavailable.</p>
             ) : sensorState.snapshot.source === "unavailable" ? (
-              <p className="text-sm text-muted-foreground">No sensor data yet.</p>
+              snapshotReadState.pendingNotice ? null : (
+                <p className="text-sm text-muted-foreground">No sensor data yet.</p>
+              )
             ) : (
               <div>
                 <div className="flex items-center gap-2 flex-wrap mb-2">
                   <Badge variant="outline" className="text-[10px] uppercase">
+                    {snapshotReadState.pendingNotice ? "Last loaded · " : null}
                     {sensorState.snapshot.source === "csv"
                       ? buildSensorSourceDisplayLabel({
                           source: "csv",
@@ -1082,7 +1352,7 @@ export default function Dashboard() {
               />
             )}
           </section>
-          {sensorState.status === "ok" && (
+          {currentSensorSnapshot && (
             <section className="glass rounded-2xl p-4 mt-4" aria-label="Sensor Data Quality">
               {(() => {
                 const q = dashboardSensorQuality;
@@ -1387,10 +1657,11 @@ export default function Dashboard() {
               // present, just ineligible. Passing the unfiltered snapshot lets
               // "context_only_source" reach the grower instead of misreporting
               // a real (if untrusted) reading as no reading at all.
-              const saveBlockedReason = describeAlertSaveBlock({
-                snapshot: currentSensorSnapshot,
-                quality: quality.quality,
-              });
+              const saveBlockedReason =
+                describeAlertSaveBlock({
+                  snapshot: currentSensorSnapshot,
+                  quality: quality.quality,
+                }) ?? stageSaveBlock;
               const canPersistAlerts = saveBlockedReason === null;
               const vpdStageMissing =
                 snap?.vpd != null && normalizeVpdStage(alertContextStage) === "unknown";
@@ -1411,7 +1682,11 @@ export default function Dashboard() {
                       className="mb-2"
                     />
                   )}
-                  {alerts.length === 0 ? (
+                  {snapshotReadState.pendingNotice ? (
+                    <p role="status" className="text-sm text-muted-foreground">
+                      {snapshotReadState.pendingNotice}
+                    </p>
+                  ) : alerts.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{EMPTY_ALERTS_MESSAGE}</p>
                   ) : (
                     <ul className="space-y-2">
@@ -1452,10 +1727,11 @@ export default function Dashboard() {
                                     // expired reading as a brand-new alert.
                                     // `currentSensorSnapshot`, not `snap` — see
                                     // the render-time comment above for why.
-                                    const blockedNow = describeAlertSaveBlock({
-                                      snapshot: currentSensorSnapshot,
-                                      quality: quality.quality,
-                                    });
+                                    const blockedNow =
+                                      describeAlertSaveBlock({
+                                        snapshot: currentSensorSnapshot,
+                                        quality: quality.quality,
+                                      }) ?? stageSaveBlock;
                                     if (blockedNow !== null) {
                                       toast.error(blockedNow);
                                       return;

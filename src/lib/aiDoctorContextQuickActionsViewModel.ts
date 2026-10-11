@@ -10,6 +10,7 @@
  *  - Copy stays calm; no AI-confidence language.
  */
 import { sensorsPath, plantDetailPath } from "@/lib/routes";
+import { buildSensorsTentRouteHref, SENSORS_TENT_ROUTE } from "@/lib/sensorRouteTentIntentRules";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
 
@@ -179,11 +180,15 @@ function buildAction(
       };
     }
     case "add_manual_sensor_snapshot": {
+      const tentHref = buildSensorsTentRouteHref(args.tentId, { requireExactMatch: true });
+      const href = `${
+        tentHref === SENSORS_TENT_ROUTE ? sensorsPath(args.growId ?? null) : tentHref
+      }#manual-reading`;
       return {
         kind,
         label: QUICK_ACTION_LABELS[kind],
         satisfies,
-        target: { kind: "link", href: sensorsPath(args.growId ?? null) },
+        target: { kind: "link", href },
         disabled: false,
         testId,
       };

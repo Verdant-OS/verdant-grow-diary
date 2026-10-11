@@ -172,8 +172,8 @@ describe("DailyCheck page — entry points and structure", () => {
     expect(extractMountedAppRoutePaths()).toContain("/daily-check");
     expect(APP).toMatch(/DailyCheck/);
   });
-  it("Dashboard exposes a Daily Grow Check entry button", () => {
-    expect(DASHBOARD).toMatch(/data-testid="dashboard-daily-grow-check-entry"/);
+  it("Dashboard exposes Log through the One-Tent Home card", () => {
+    expect(DASHBOARD).toMatch(/<TonightTentHomeCard\b/);
     expect(DASHBOARD).toMatch(/\/daily-check/);
   });
   it("PlantDetail exposes a Daily Grow Check entry button with plantId", () => {
@@ -309,19 +309,21 @@ describe("Daily Grow Check entry access — multi-surface", () => {
     expect(GROW_ROOM).toMatch(/\/daily-check/);
     expect(GROW_ROOM).toMatch(/Start Check/);
   });
-  it("Dashboard entry still routes to /daily-check with grower-native copy", () => {
-    // The visible label was renamed to the grower-native "Quick Log";
-    // the entry testid and /daily-check route are the stable contract.
-    expect(DASHBOARD).toMatch(/data-testid="dashboard-daily-grow-check-entry"/);
-    expect(DASHBOARD).toMatch(/to="\/daily-check">Quick Log</);
+  it("Dashboard entry still routes to /daily-check through the home card's Log", () => {
+    // The header Quick Log link was removed as a duplicate; the home card's
+    // logHref is the stable /daily-check contract for the Dashboard.
+    expect(DASHBOARD).toMatch(
+      /logHref=\{withGrowId\("\/daily-check",\s*homeTent\?\.growId \?\? scopedGrowId\)\}/,
+    );
+    expect(DASHBOARD).not.toMatch(/dashboard-daily-grow-check-entry/);
   });
   it("Plant Detail entry preserves ?plantId= prefill", () => {
     expect(PLANT_DETAIL).toMatch(/\/daily-check\?plantId=/);
   });
-  it("Mobile nav 'More' sheet includes the Daily Grow Check flow entry", () => {
-    // Label renamed to grower-native "Quick Log"; the /daily-check route
-    // in the More sheet is the stable contract.
-    expect(MOBILE_NAV).toMatch(/to:\s*"\/daily-check",\s*label:\s*"Quick Log"/);
+  it("Mobile nav first row includes the Daily Grow Check flow entry", () => {
+    // One-Tent Home: the entry moved from the More sheet to the first-row
+    // "Log" tab; the /daily-check route is the stable contract.
+    expect(MOBILE_NAV).toMatch(/to:\s*"\/daily-check",\s*label:\s*"Log"/);
   });
   it("does not duplicate DailyCheck flow logic outside the page/rules", () => {
     for (const surface of [GROW_ROOM, MOBILE_NAV, DASHBOARD, PLANT_DETAIL]) {

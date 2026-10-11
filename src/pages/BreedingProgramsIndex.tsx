@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "@/lib/react-router-compat";
+import { Link, useLocation } from "@/lib/react-router-compat";
 import { AlertCircle, ArrowUpRight, Dna, Loader2, Plus } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -10,8 +10,12 @@ import {
   listBreedingPrograms,
   type BreedingProgramSummary,
 } from "@/lib/breeding/breedingProgramApi";
+import { resolveNavigationGrowId } from "@/lib/navigationGrowIdRules";
+import { withGrowId } from "@/lib/routes";
 
 export default function BreedingProgramsIndex() {
+  const { pathname, search } = useLocation();
+  const growId = resolveNavigationGrowId({ pathname, search });
   const [programs, setPrograms] = useState<BreedingProgramSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +42,7 @@ export default function BreedingProgramsIndex() {
             size="sm"
             className="w-full gradient-leaf text-primary-foreground sm:w-auto"
           >
-            <Link to="/breeding/new">
+            <Link to={withGrowId("/breeding/new", growId)} data-testid="breeding-programs-new">
               <Plus data-icon="inline-start" />
               New program
             </Link>
@@ -82,7 +86,10 @@ export default function BreedingProgramsIndex() {
             diary evidence.
           </p>
           <Button asChild className="mt-5 gradient-leaf text-primary-foreground">
-            <Link to="/breeding/new">
+            <Link
+              to={withGrowId("/breeding/new", growId)}
+              data-testid="breeding-programs-empty-create"
+            >
               Create a breeding program
               <ArrowUpRight data-icon="inline-end" />
             </Link>
@@ -95,7 +102,7 @@ export default function BreedingProgramsIndex() {
           <li key={p.id} className="min-w-0">
             <Card className="group h-full overflow-hidden rounded-3xl border-border/60 bg-card/65 shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-elevated">
               <Link
-                to={`/breeding/${p.id}`}
+                to={withGrowId(`/breeding/${p.id}`, growId)}
                 className="block h-full p-5 transition-colors hover:bg-secondary/20 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 data-testid={`breeding-program-link-${p.id}`}
               >

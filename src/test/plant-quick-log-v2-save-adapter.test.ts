@@ -29,6 +29,8 @@ describe("buildPlantQuickLogV2SavePayload", () => {
       grow_id: "g1",
       tent_id: "t1",
     });
+    expect(r.payload.p_details).not.toHaveProperty("manual_provenance");
+    expect(r.payload.p_details).not.toHaveProperty("manual_sensor_snapshot");
   });
 
   it("converts typed °F to p_temperature_c and keeps manual snapshot °F", () => {
@@ -48,8 +50,48 @@ describe("buildPlantQuickLogV2SavePayload", () => {
         ph: 6.2,
         ec: null,
         source: "manual",
+        manual_provenance: {
+          source: "manual",
+          source_identity: "manual_entry",
+          transport: "manual",
+          confidence: null,
+        },
+      },
+      manual_provenance: {
+        source: "manual",
+        source_identity: "manual_entry",
+        transport: "manual",
+        confidence: null,
       },
     });
+  });
+
+  it("annotates pH-only diary evidence without inventing environment measurements", () => {
+    const sensors = Object.freeze({ temp: "", humidity: "", ph: "6.2", ec: "" });
+    const input = Object.freeze({ ...base, sensors });
+    const r = buildPlantQuickLogV2SavePayload(input);
+    if (!r.ok) throw new Error("expected valid pH-only snapshot");
+    expect(r.payload.p_temperature_c).toBeNull();
+    expect(r.payload.p_humidity_pct).toBeNull();
+    expect(r.payload.p_vpd_kpa).toBeNull();
+    expect(r.payload.p_details).not.toHaveProperty("manual_provenance");
+    expect(r.payload.p_details).toMatchObject({
+      manual_sensor_snapshot: {
+        temp_f: null,
+        humidity_percent: null,
+        ph: 6.2,
+        ec: null,
+        source: "manual",
+        manual_provenance: {
+          source: "manual",
+          source_identity: "manual_entry",
+          transport: "manual",
+          confidence: null,
+        },
+      },
+    });
+    expect(buildPlantQuickLogV2SavePayload(input)).toEqual(r);
+    expect(sensors).toEqual({ temp: "", humidity: "", ph: "6.2", ec: "" });
   });
 
   it("puts photo_url in details without expanding the RPC allow-list", () => {
@@ -70,9 +112,7 @@ describe("buildPlantQuickLogV2SavePayload", () => {
     expect(buildPlantQuickLogV2SavePayload({ ...base, plantId: "  " }).ok).toBe(false);
     expect(buildPlantQuickLogV2SavePayload({ ...base, growId: "" }).ok).toBe(false);
     expect(buildPlantQuickLogV2SavePayload({ ...base, note: "   " }).ok).toBe(false);
-    expect(buildPlantQuickLogV2SavePayload({ ...base, idempotencyKey: "short" }).ok).toBe(
-      false,
-    );
+    expect(buildPlantQuickLogV2SavePayload({ ...base, idempotencyKey: "short" }).ok).toBe(false);
   });
 
   it("never writes user_id onto the payload", () => {

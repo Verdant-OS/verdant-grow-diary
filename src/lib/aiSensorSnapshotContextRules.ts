@@ -91,6 +91,13 @@ const READING_KEYS = [
   "ph",
   "temp_c",
   "temp_f",
+  // Canonical metric names emitted by manual snapshot timeline cards.
+  "air_temp_c",
+  "humidity_pct",
+  "soil_moisture_pct",
+  "soil_ec_mscm",
+  "reservoir_ph",
+  "reservoir_ec_mscm",
 ] as const;
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -164,9 +171,13 @@ function formatReadingsForLine(snap: Record<string, unknown>): string {
     parts.push(`temp=${fmtNum(snap.temperature_c)}°C`);
   } else if (typeof snap.temp_c === "number" && Number.isFinite(snap.temp_c)) {
     parts.push(`temp=${fmtNum(snap.temp_c)}°C`);
+  } else if (typeof snap.air_temp_c === "number" && Number.isFinite(snap.air_temp_c)) {
+    parts.push(`temp=${fmtNum(snap.air_temp_c)}°C`);
   }
   if (typeof snap.humidity === "number" && Number.isFinite(snap.humidity)) {
     parts.push(`humidity=${fmtNum(snap.humidity)}%`);
+  } else if (typeof snap.humidity_pct === "number" && Number.isFinite(snap.humidity_pct)) {
+    parts.push(`humidity=${fmtNum(snap.humidity_pct)}%`);
   }
   const vpd =
     typeof snap.vpd_kpa === "number" && Number.isFinite(snap.vpd_kpa)
@@ -190,9 +201,20 @@ function formatReadingsForLine(snap: Record<string, unknown>): string {
   }
   if (typeof snap.soil_moisture === "number" && Number.isFinite(snap.soil_moisture)) {
     parts.push(`soil_moisture=${fmtNum(snap.soil_moisture)}%`);
+  } else if (typeof snap.soil_moisture_pct === "number" && Number.isFinite(snap.soil_moisture_pct)) {
+    parts.push(`soil_moisture=${fmtNum(snap.soil_moisture_pct)}%`);
   }
   if (typeof snap.soil_ec === "number" && Number.isFinite(snap.soil_ec)) {
     parts.push(`soil_ec=${fmtNum(snap.soil_ec, 2)}`);
+  } else if (typeof snap.soil_ec_mscm === "number" && Number.isFinite(snap.soil_ec_mscm)) {
+    parts.push(`soil_ec=${fmtNum(snap.soil_ec_mscm, 2)}`);
+  }
+  // Reservoir measurements retain their location; never label them as soil data.
+  if (typeof snap.reservoir_ph === "number" && Number.isFinite(snap.reservoir_ph)) {
+    parts.push(`reservoir_ph=${fmtNum(snap.reservoir_ph, 2)}`);
+  }
+  if (typeof snap.reservoir_ec_mscm === "number" && Number.isFinite(snap.reservoir_ec_mscm)) {
+    parts.push(`reservoir_ec=${fmtNum(snap.reservoir_ec_mscm, 2)}mS/cm`);
   }
   return parts.length ? parts.join(", ") : "no numeric readings present";
 }

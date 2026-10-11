@@ -51,11 +51,9 @@ import {
   quickLogRevisionFailureCopy,
   type QuickLogRevisionReasonCode,
 } from "@/lib/quick-log/quickLogRevisionRules";
-import {
-  correctQuickLogEntry,
-  retractQuickLogEntry,
-  type QuickLogEntryHandle,
-} from "@/lib/quickLogRevisionService";
+import type { QuickLogEntryHandle } from "@/lib/quickLogRevisionService";
+import { useQuickLogRevisionMutation } from "@/hooks/useQuickLogRevisionMutation";
+import { useAuth } from "@/store/auth";
 import {
   QUICKLOG_REVISION_INVALIDATION_KEY_CONTAINS,
   buildQuickLogRevisionInvalidationKeys,
@@ -81,10 +79,10 @@ interface OwnedPlantOption {
   name: string;
 }
 
-function useOwnedPlantOptions(enabled: boolean) {
+function useOwnedPlantOptions(enabled: boolean, ownerId: string | null) {
   return useQuery({
-    queryKey: ["quicklog_correction_plants"],
-    enabled,
+    queryKey: ["quicklog_correction_plants", ownerId],
+    enabled: enabled && !!ownerId,
     staleTime: 60_000,
     queryFn: async (): Promise<OwnedPlantOption[]> => {
       const { data, error } = await supabase
@@ -144,7 +142,23 @@ function ReasonChips({
   );
 }
 
-export default function QuickLogEntryIntegrityControls({
+export default function QuickLogEntryIntegrityControls(props: QuickLogEntryIntegrityControlsProps) {
+  const { user } = useAuth();
+  const ownerId = user?.id ?? null;
+  return (
+    <RevisionControls
+      key={JSON.stringify([
+        ownerId,
+        props.handle.growEventId ?? null,
+        props.handle.diaryEntryId ?? null,
+      ])}
+      {...props}
+      ownerId={ownerId}
+    />
+  );
+}
+
+function RevisionControls({
   handle,
   currentNote,
   currentOccurredAt,
@@ -154,11 +168,12 @@ export default function QuickLogEntryIntegrityControls({
   growId,
   onChanged,
   className,
-}: QuickLogEntryIntegrityControlsProps) {
+  ownerId,
+}: QuickLogEntryIntegrityControlsProps & { ownerId: string | null }) {
   const queryClient = useQueryClient();
   const [correctOpen, setCorrectOpen] = useState(false);
   const [retractOpen, setRetractOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const { busy, unconfirmed, pendingKind, submit } = useQuickLogRevisionMutation(ownerId, handle);
 
   const [correctReason, setCorrectReason] = useState<QuickLogRevisionReasonCode | null>(null);
   const [retractReason, setRetractReason] = useState<QuickLogRevisionReasonCode | null>(null);
@@ -167,7 +182,7 @@ export default function QuickLogEntryIntegrityControls({
   const [plantDraft, setPlantDraft] = useState<string>(currentPlantId ?? "");
   const [explain, setExplain] = useState("");
 
-  const plantsQuery = useOwnedPlantOptions(correctOpen);
+  const plantsQuery = useOwnedPlantOptions(correctOpen, ownerId);
 
   const hasHandle = !!handle.growEventId || !!handle.diaryEntryId;
   const invalidate = useMemo(
@@ -200,6 +215,10 @@ export default function QuickLogEntryIntegrityControls({
   if (!hasHandle) return null;
 
   const openCorrect = () => {
+    if (unconfirmed) {
+      setCorrectOpen(true);
+      return;
+    }
     setNoteDraft(currentNote ?? "");
     setTimeDraft(toDatetimeLocalValue(currentOccurredAt));
     setPlantDraft(currentPlantId ?? "");
@@ -229,9 +248,8 @@ export default function QuickLogEntryIntegrityControls({
       changes.targetType = "plant";
       changes.targetId = plantDraft;
     }
-    setBusy(true);
-    const result = await correctQuickLogEntry(handle, correctReason, changes, explain);
-    setBusy(false);
+    const result = await submit("correction", correctReason, changes, explain);
+    if (!result) return;
     if (!result.ok) {
       toast.error(quickLogRevisionFailureCopy(result.reason));
       return;
@@ -247,9 +265,8 @@ export default function QuickLogEntryIntegrityControls({
       toast.error("Pick a reason chip first.");
       return;
     }
-    setBusy(true);
-    const result = await retractQuickLogEntry(handle, retractReason, explain);
-    setBusy(false);
+    const result = await submit("retraction", retractReason, {}, explain);
+    if (!result) return;
     if (!result.ok) {
       toast.error(quickLogRevisionFailureCopy(result.reason));
       return;
@@ -270,6 +287,7 @@ export default function QuickLogEntryIntegrityControls({
         }}
         aria-label="Correct this Quick Log entry"
         data-testid="quicklog-entry-correct-button"
+        disabled={busy || pendingKind === "retraction"}
         className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-primary hover:bg-primary/10 transition"
       >
         <PencilLine className="h-3 w-3" />
@@ -279,25 +297,34 @@ export default function QuickLogEntryIntegrityControls({
         type="button"
         onClick={(ev) => {
           ev.stopPropagation();
-          setRetractReason(null);
-          setExplain("");
+          if (!unconfirmed) {
+            setRetractReason(null);
+            setExplain("");
+          }
           setRetractOpen(true);
         }}
         aria-label="Retract this Quick Log entry"
         data-testid="quicklog-entry-retract-button"
+        disabled={busy || pendingKind === "correction"}
         className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
       >
         <Undo2 className="h-3 w-3" />
         Retract
       </button>
 
-      <Dialog open={correctOpen} onOpenChange={setCorrectOpen}>
+      <Dialog
+        open={correctOpen}
+        onOpenChange={(open) => {
+          if (!busy) setCorrectOpen(open);
+        }}
+      >
         <DialogContent data-testid="quicklog-entry-correct-dialog">
           <DialogHeader>
             <DialogTitle>{QUICKLOG_CORRECT_DIALOG_TITLE}</DialogTitle>
             <DialogDescription>{QUICKLOG_CORRECT_DIALOG_BODY}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
+          {unconfirmed && <p role="status">{quickLogRevisionFailureCopy("rpc_error")}</p>}
+          <fieldset disabled={busy || unconfirmed} className="space-y-3">
             <ReasonChips
               chips={QUICKLOG_CORRECTION_REASON_CHIPS}
               selected={correctReason}
@@ -351,7 +378,7 @@ export default function QuickLogEntryIntegrityControls({
                 className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
               />
             </label>
-          </div>
+          </fieldset>
           <DialogFooter>
             <Button
               type="button"
@@ -374,13 +401,19 @@ export default function QuickLogEntryIntegrityControls({
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={retractOpen} onOpenChange={setRetractOpen}>
+      <AlertDialog
+        open={retractOpen}
+        onOpenChange={(open) => {
+          if (!busy) setRetractOpen(open);
+        }}
+      >
         <AlertDialogContent data-testid="quicklog-entry-retract-dialog">
           <AlertDialogHeader>
             <AlertDialogTitle>{QUICKLOG_RETRACT_DIALOG_TITLE}</AlertDialogTitle>
             <AlertDialogDescription>{QUICKLOG_RETRACT_DIALOG_BODY}</AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-3">
+          {unconfirmed && <p role="status">{quickLogRevisionFailureCopy("rpc_error")}</p>}
+          <fieldset disabled={busy || unconfirmed} className="space-y-3">
             <ReasonChips
               chips={QUICKLOG_RETRACTION_REASON_CHIPS}
               selected={retractReason}
@@ -398,7 +431,7 @@ export default function QuickLogEntryIntegrityControls({
                 className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
               />
             </label>
-          </div>
+          </fieldset>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy} data-testid="quicklog-retract-cancel">
               Keep entry

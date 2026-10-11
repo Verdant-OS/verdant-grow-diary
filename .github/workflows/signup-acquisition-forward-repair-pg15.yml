@@ -7,6 +7,7 @@ on:
       - "scripts/apply-pinned-production-migrations.mjs"
       - "scripts/lib/candidateNumberToolRuntime.mjs"
       - "scripts/lib/productionSupabaseTls.mjs"
+      - "scripts/lib/supabaseMigrationLedgerShape.mjs"
       - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
       - "scripts/lib/solo-founder-production-authorization.mjs"
       - "scripts/verify-solo-founder-production-authorization.mjs"
@@ -22,6 +23,7 @@ on:
       - "src/test/solo-founder-production-authorization.test.ts"
       - "src/test/production-supabase-tls.test.ts"
       - "src/test/signup-acquisition-forward-repair-pg15-harness.test.ts"
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - verdant-grow-diary
@@ -30,6 +32,7 @@ on:
       - "scripts/apply-pinned-production-migrations.mjs"
       - "scripts/lib/candidateNumberToolRuntime.mjs"
       - "scripts/lib/productionSupabaseTls.mjs"
+      - "scripts/lib/supabaseMigrationLedgerShape.mjs"
       - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
       - "scripts/lib/solo-founder-production-authorization.mjs"
       - "scripts/verify-solo-founder-production-authorization.mjs"
@@ -49,6 +52,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   pg15_runtime:

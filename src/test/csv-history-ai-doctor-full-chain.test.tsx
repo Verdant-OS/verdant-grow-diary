@@ -43,6 +43,8 @@ const database = vi.hoisted(() => ({
   duplicateReads: 0,
   importedHistoryReads: 0,
   sourceFilters: [] as unknown[][],
+  subscriptionFilters: [] as Array<[string, unknown]>,
+  forbiddenWrites: [] as string[],
   nextId: 1,
 }));
 
@@ -156,10 +158,29 @@ vi.mock("@/integrations/supabase/client", () => {
     return builder;
   }
 
+  function createHistoryAccessReader() {
+    const builder: Record<string, unknown> = {};
+    builder.select = () => builder;
+    builder.eq = (column: string, value: unknown) => {
+      database.subscriptionFilters.push([column, value]);
+      return builder;
+    };
+    builder.order = () => builder;
+    builder.limit = () => Promise.resolve({ data: [], error: null });
+    for (const operation of ["insert", "update", "upsert", "delete"]) {
+      builder[operation] = () => {
+        database.forbiddenWrites.push(`subscriptions:${operation}`);
+        throw new Error("History-window access is read-only.");
+      };
+    }
+    return builder;
+  }
+
   return {
     supabase: {
       from(table: string) {
         database.tables.push(table);
+        if (table === "subscriptions") return createHistoryAccessReader();
         if (table === "grow_events") return createEmptyRootZoneBuilder();
         if (table !== "sensor_readings") {
           throw new Error(`Unexpected table access in CSV full-chain test: ${table}`);
@@ -342,6 +363,8 @@ beforeEach(() => {
   database.duplicateReads = 0;
   database.importedHistoryReads = 0;
   database.sourceFilters = [];
+  database.subscriptionFilters = [];
+  database.forbiddenWrites = [];
   database.nextId = 1;
   supabaseFunctionsInvoke.mockReset();
   trackFunnelEvent.mockReset();
@@ -488,12 +511,12 @@ describe("CSV history -> AI Doctor full-chain regression", () => {
         return [cells[1].textContent, cells[2].textContent];
       });
     expect(visibleRows).toEqual([
-      ["humidity_pct", "58"],
-      ["temperature_c", "26"],
-      ["vpd_kpa", "1.412"],
-      ["humidity_pct", "54"],
-      ["temperature_c", "24"],
-      ["vpd_kpa", "1.373"],
+      ["humidity_pct", "58%"],
+      ["temperature_c", "26 °C"],
+      ["vpd_kpa", "1.41 kPa"],
+      ["humidity_pct", "54%"],
+      ["temperature_c", "24 °C"],
+      ["vpd_kpa", "1.37 kPa"],
     ]);
 
     const handoff = screen.getByTestId("imported-history-ai-doctor-handoff");
@@ -613,8 +636,13 @@ describe("CSV history -> AI Doctor full-chain regression", () => {
     expect(milestoneIndexes).toEqual([...milestoneIndexes].sort((a, b) => a - b));
     expect(database.tables).toContain("grow_events");
     expect(
-      database.tables.every((table) => ["sensor_readings", "grow_events"].includes(table)),
+      database.tables.every((table) =>
+        ["sensor_readings", "grow_events", "subscriptions"].includes(table),
+      ),
     ).toBe(true);
+    expect(database.subscriptionFilters).toContainEqual(["user_id", "user-csv-chain"]);
+    expect(database.subscriptionFilters).toContainEqual(["environment", "live"]);
+    expect(database.forbiddenWrites).toEqual([]);
     expect(supabaseFunctionsInvoke).not.toHaveBeenCalled();
   }, 15_000);
 });

@@ -77,15 +77,23 @@ describe("QuickLog Dialog Sensor Truth Context v1 — constants safety", () => {
 
 describe("QuickLog Dialog Sensor Truth Context v1 — behavior preserved", () => {
   it("does not change the attach-toggle test id or wiring", () => {
+    // Renegotiated with the #1168 attachable residual fix: the toggle now
+    // also requires the trust verdict (`snapshotAttachable`) — a
+    // usable-but-non-attachable snapshot must never render checked.
     expect(SRC).toMatch(/data-testid="quick-log-snapshot-toggle"/);
-    expect(SRC).toMatch(/checked=\{snapshot && !!selectedPlant && snapshotUsable\}/);
+    expect(SRC).toMatch(
+      /checked=\{snapshot && !!selectedPlant && snapshotUsable && snapshotAttachable\}/,
+    );
   });
 
   it("does not introduce device-control imports", () => {
     expect(SRC).not.toMatch(/device[-_ ]?control/i);
   });
 
-  it("missing-readings line is gated on no snapshot / not usable", () => {
-    expect(SRC).toMatch(/\(!snapshot \|\| !snapshotUsable\)/);
+  it("missing-readings line is gated on no snapshot / not usable / not attachable", () => {
+    // Renegotiated with the #1168 attachable residual fix: non-attachable
+    // snapshots also save as manual logs, so the missing-readings truth
+    // line must show for them too.
+    expect(SRC).toMatch(/\(!snapshot \|\| !snapshotUsable \|\| !snapshotAttachable\)/);
   });
 });

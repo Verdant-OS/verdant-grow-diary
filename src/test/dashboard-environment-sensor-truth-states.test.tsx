@@ -27,16 +27,16 @@ describe("Environment Snapshot (multi-tent overview) — sensor truth copy", () 
   it("empty state offers a single primary 'Go to Sensors' CTA into /sensors", () => {
     expect(DASHBOARD).toMatch(/data-testid="dashboard-environment-snapshot-empty"/);
     expect(DASHBOARD).toMatch(
-      /to="\/sensors"[\s\S]{0,200}data-testid="dashboard-environment-snapshot-go-to-sensors"/,
+      /to=\{sensorsPath\(scopedGrowId\)\}[\s\S]{0,200}data-testid="dashboard-environment-snapshot-go-to-sensors"/,
     );
   });
 
   it("secondary sensor actions point at the canonical /sensors anchors", () => {
     expect(DASHBOARD).toMatch(
-      /to="\/sensors#manual-reading"[\s\S]{0,200}data-testid="dashboard-environment-snapshot-add-manual-reading"/,
+      /to=\{withGrowId\("\/sensors#manual-reading",\s*scopedGrowId\)\}[\s\S]{0,200}data-testid="dashboard-environment-snapshot-add-manual-reading"/,
     );
     expect(DASHBOARD).toMatch(
-      /to="\/sensors#csv-import"[\s\S]{0,200}data-testid="dashboard-environment-snapshot-import-sensor-data"/,
+      /to=\{withGrowId\("\/sensors#csv-import",\s*scopedGrowId\)\}[\s\S]{0,200}data-testid="dashboard-environment-snapshot-import-sensor-data"/,
     );
   });
 

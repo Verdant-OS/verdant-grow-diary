@@ -124,16 +124,31 @@ describe("buildAiCoachSensorSnapshotContext — source-aware annotation", () => 
     expect(r.line).not.toContain("[source=live");
   });
 
-  it("unknown/unlabeled snapshot: downgraded to trust=low and clearly annotated", () => {
+  it("unlabeled snapshot: normalizes to invalid, trust=low, clearly annotated (#592)", () => {
+    // Canonical vocabulary only — there is no "unknown" source; missing
+    // or unrecognized provenance fails closed to "invalid".
     const r = buildAiCoachSensorSnapshotContext(
       { captured_at: FRESH, temperature_c: 24, humidity: 55 },
       { now: NOW },
     );
-    expect(r.source).toBe("unknown");
+    expect(r.source).toBe("invalid");
     expect(r.trust).toBe("low");
     expect(r.includesValues).toBe(false);
-    expect(r.line).toContain("[source=unknown");
+    expect(r.line).toContain("[source=invalid");
+    // The unlabeled-provenance copy is preserved (distinct from
+    // telemetry explicitly flagged invalid).
+    expect(r.safetyNotes.join(" ")).toMatch(/unlabeled|provenance/i);
     expect(r.missingInformationHints.length).toBeGreaterThan(0);
+  });
+
+  it("pi_bridge is the sanctioned first-party live alias (#592)", () => {
+    const r = buildAiCoachSensorSnapshotContext(
+      { source: "pi_bridge", captured_at: FRESH, temperature_c: 24, humidity: 55 },
+      { now: NOW },
+    );
+    expect(r.source).toBe("live");
+    expect(r.trust).toBe("medium");
+    expect(r.includesValues).toBe(true);
   });
 
   it("non-object snapshot: invalid, omitted, safety note", () => {

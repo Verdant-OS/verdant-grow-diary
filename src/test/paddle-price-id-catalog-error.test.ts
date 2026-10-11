@@ -8,6 +8,7 @@
  * calm inline message, not a generic "Failed to resolve price".
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { FunctionsFetchError } from "@supabase/supabase-js";
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { functions: { invoke: vi.fn() } },
@@ -27,6 +28,7 @@ import {
   getPaddlePriceId,
   PaddleCheckoutCatalogUnavailableError,
   getPaddleCheckoutCatalogMessage,
+  type PaddleCheckoutCatalogReason,
 } from "@/lib/paddle";
 
 const invokeMock = supabase.functions.invoke as unknown as ReturnType<typeof vi.fn>;
@@ -108,7 +110,15 @@ describe("getPaddlePriceId — catalog-unavailable mapping", () => {
     expect((err as Error).message).toMatch(/monthly AI allowance/i);
   });
 
-  it("falls back to the generic error when the body is unrecognized", async () => {
+  // RENEGOTIATED PIN (CHECKOUT_PRICE_ERROR_TRUTH). This case previously
+  // asserted the bare `Error("Failed to resolve price: pro_monthly")`, which
+  // routed the grower through usePaddleCheckout's destructive-toast branch
+  // and emitted NO checkout_catalog_unavailable telemetry. An unrecognized
+  // body on a 5xx is a resolver/gateway outage, not an unknown condition:
+  // it is now classified so the calm inline path — and its telemetry — runs.
+  // The pin is kept, inverted, rather than deleted, so the old behaviour
+  // cannot silently return.
+  it("classifies an unrecognized 5xx body as a gateway outage, not a generic error", async () => {
     invokeMock.mockResolvedValueOnce({
       data: null,
       error: {
@@ -120,8 +130,9 @@ describe("getPaddlePriceId — catalog-unavailable mapping", () => {
     });
 
     const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
-    expect(err).not.toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
-    expect((err as Error).message).toBe("Failed to resolve price: pro_monthly");
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_gateway_unavailable");
+    expect((err as Error).message).not.toBe("Failed to resolve price: pro_monthly");
   });
 
   it("returns the paddleId on success", async () => {
@@ -144,6 +155,335 @@ describe("getPaddlePriceId — catalog-unavailable mapping", () => {
       expect(msg).not.toMatch(/PADDLE_PRICE_/);
       expect(msg).not.toMatch(/env(ironment)? var/i);
       expect(msg).not.toMatch(reason);
+    }
+  });
+});
+
+/**
+ * Distinct fail-closed branches (CHECKOUT_PRICE_ERROR_TRUTH).
+ *
+ * MEASURED on live ef7cec68: a Pro Monthly click showed the generic
+ * "checkout couldn't open" recovery copy while get-paddle-price answered
+ * 502; an earlier pin saw 401 auth_required. Both collapsed into the same
+ * bare `Error("Failed to resolve price: ...")`, so the grower could not
+ * tell "sign in again" from "wait and retry" from "this plan isn't set up",
+ * and the destructive-toast branch emitted NO checkout_catalog_unavailable
+ * telemetry at all — the failure was invisible in the funnel.
+ *
+ * The contract these tests pin: EVERY resolver failure is fail-closed AND
+ * classified into a distinct, non-sensitive reason token, so the hook's
+ * calm inline path (which is what emits the telemetry) always runs.
+ */
+describe("getPaddlePriceId — every failure is classified, never generic", () => {
+  it("maps the resolver's own 401 auth_required body to the auth branch", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: {
+        name: "FunctionsHttpError",
+        context: new Response(JSON.stringify({ error: "auth_required" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+      },
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect(err).toMatchObject({ reason: "auth_required", planId: "pro_monthly" });
+  });
+
+  it("classifies a platform 401 whose body is NOT our contract as the auth branch", async () => {
+    // The gateway rejects the JWT before the function runs, so the body is
+    // the platform's shape ({ code, message }), not our { error } envelope.
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: {
+        name: "FunctionsHttpError",
+        context: new Response(JSON.stringify({ code: 401, message: "Invalid JWT" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+      },
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("auth_required");
+  });
+
+  it("classifies a 502 with a non-JSON gateway body as the gateway branch, not auth or config", async () => {
+    // This is the MEASURED case: an HTML/empty 502 from above the function,
+    // so there is no sanitized `error` code to read.
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: {
+        name: "FunctionsHttpError",
+        context: new Response("<html><body>Bad Gateway</body></html>", {
+          status: 502,
+          headers: { "Content-Type": "text/html" },
+        }),
+      },
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_gateway_unavailable");
+  });
+
+  // This plain object is also the dual-realm fallback's only positive case: it
+  // cannot be an `instanceof FunctionsFetchError` match, so reaching
+  // `price_request_failed` proves the name-and-shape path still works. A
+  // second test with this same input was removed rather than kept as a
+  // near-duplicate of it.
+  it("classifies a transport failure with no HTTP response as the request branch", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "FunctionsFetchError", context: new TypeError("Failed to fetch") },
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_request_failed");
+  });
+
+  // Coverage gap closed alongside this change: paddle.ts reads a reason off
+  // the `data` body as well as off `error.context`, and no test in the repo
+  // exercised the `data` path. Defensive rather than live — the resolver
+  // proves a non-empty paddleId before its only 200 — but it is a real
+  // branch in the classifier, so it is pinned rather than assumed.
+  it("reads a server reason off a 2xx body when there is no invoke error", async () => {
+    invokeMock.mockResolvedValueOnce({ data: { error: "price_not_configured" }, error: null });
+
+    const err = await getPaddlePriceId("craft_annual").catch((e) => e);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect(err).toMatchObject({ reason: "price_not_configured", planId: "craft_annual" });
+  });
+
+  it("ignores a client-classified reason claimed by a response body", async () => {
+    // The resolver never emits these; honouring one off the wire would let
+    // an upstream pick which message the grower reads.
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: {
+        context: new Response(JSON.stringify({ error: "price_request_failed" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        }),
+      },
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_gateway_unavailable");
+  });
+
+  // Copilot round 1: a missing `context.status` is not evidence the device is
+  // offline. An invoke error with no context at all reached the transport
+  // branch and told the grower to check their connection — wrong advice for
+  // a malformed or already-consumed reply. Only a real fetch failure earns
+  // that message now.
+  it("does not blame the connection for a status-less error that is not a transport failure", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "FunctionsHttpError", message: "context went missing" },
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_response_unusable");
+    expect((err as Error).message).not.toMatch(/connection/i);
+  });
+
+  // Instantiates the REAL exported class rather than a hand-built lookalike.
+  // A synthetic `{ name, context }` fixture restates the implementation's own
+  // assumptions, so it would keep passing even if the installed supabase-js
+  // changed shape — leaving the dependency contract this branch rests on
+  // untested. Same convention as `customer-portal-lifetime-only.test.ts` and
+  // `ggs-real-payload-commit.test.ts`, which construct `FunctionsHttpError`.
+  it("still names a real transport failure as such", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: new FunctionsFetchError(new TypeError("Failed to fetch")),
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_request_failed");
+    expect((err as Error).message).toMatch(/connection/i);
+  });
+
+  // Pins the library shape itself, so a supabase-js upgrade that renamed the
+  // class or moved the network cause out of `context` fails here — loudly, in
+  // this file — instead of silently degrading grower copy in production.
+  it("pins the supabase-js contract the transport branch depends on", () => {
+    const real = new FunctionsFetchError(new TypeError("Failed to fetch"));
+    expect(real).toBeInstanceOf(Error);
+    expect(real.name).toBe("FunctionsFetchError");
+    expect(real.context).toBeInstanceOf(Error);
+  });
+
+  // REGRESSION: the fallback used to accept EITHER signal, so any error that
+  // merely held an `Error` in `context` — an unrelated wrapper, a malformed
+  // FunctionsHttpError — was labelled a network fault and the grower was told
+  // to check a connection that was fine. That is the same wrong-cause advice
+  // this whole slice exists to remove, so the fallback now needs both.
+  it("does not treat an unrelated error with an Error context as a transport failure", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "FunctionsHttpError", context: new TypeError("context went missing") },
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_response_unusable");
+    expect((err as Error).message).not.toMatch(/connection/i);
+  });
+
+  // REGRESSION, and the one the suite was missing: the *inverse* single signal
+  // — the right name with no usable `Error` in `context`. Without this, dropping
+  // the context check and matching on name alone left all 28 tests green
+  // (measured), so the "both signals" contract was documented but unenforced.
+  //
+  // Neither context carries a numeric `status`; otherwise the status branch
+  // would classify the failure before the transport predicate is consulted,
+  // and this would silently stop testing what it claims to.
+  it.each([
+    ["no context at all", { name: "FunctionsFetchError" }],
+    ["a context that is not an Error", { name: "FunctionsFetchError", context: { detail: "x" } }],
+  ])("does not treat the fetch-error name alone as transport evidence — %s", async (_label, e) => {
+    invokeMock.mockResolvedValueOnce({ data: null, error: e });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_response_unusable");
+    expect((err as Error).message).not.toMatch(/connection/i);
+  });
+
+  it("does not treat an unnamed error with an Error context as a transport failure", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: { context: new TypeError("some wrapper") },
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_response_unusable");
+    expect((err as Error).message).not.toMatch(/connection/i);
+  });
+
+  it("classifies a 2xx that carries no paddleId as an unusable response", async () => {
+    invokeMock.mockResolvedValueOnce({ data: {}, error: null });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_response_unusable");
+  });
+
+  it("classifies an unrecognized 4xx body as an unusable response, not a gateway outage", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: {
+        context: new Response(JSON.stringify({ error: "method_not_allowed" }), {
+          status: 405,
+          headers: { "Content-Type": "application/json" },
+        }),
+      },
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_response_unusable");
+  });
+
+  it("fails closed on every branch — no failure ever resolves a price id", async () => {
+    const failures = [
+      { data: null, error: { context: new Response("", { status: 401 }) } },
+      { data: null, error: { context: new Response("", { status: 502 }) } },
+      { data: null, error: { context: new TypeError("offline") } },
+      { data: {}, error: null },
+      { data: { paddleId: "" }, error: null },
+    ];
+    for (const outcome of failures) {
+      invokeMock.mockResolvedValueOnce(outcome);
+      await expect(getPaddlePriceId("pro_monthly")).rejects.toBeInstanceOf(
+        PaddleCheckoutCatalogUnavailableError,
+      );
+    }
+  });
+});
+
+describe("catalog copy — auth, gateway and config tell the grower different things", () => {
+  const AUTH = getPaddleCheckoutCatalogMessage("auth_required");
+  const GATEWAY = getPaddleCheckoutCatalogMessage("price_gateway_unavailable");
+  const REQUEST = getPaddleCheckoutCatalogMessage("price_request_failed");
+  const UNUSABLE = getPaddleCheckoutCatalogMessage("price_response_unusable");
+  const CONFIG = getPaddleCheckoutCatalogMessage("price_not_configured");
+
+  it("gives auth, gateway and missing-config three different messages", () => {
+    expect(new Set([AUTH, GATEWAY, CONFIG]).size).toBe(3);
+  });
+
+  it("every reason's copy is unique, so no two failures read alike", () => {
+    const reasons: readonly PaddleCheckoutCatalogReason[] = [
+      "unknown_plan",
+      "price_not_configured",
+      "price_resolution_unavailable",
+      "plan_sold_out",
+      "pack_requires_monthly_plan",
+      "auth_required",
+      "price_gateway_unavailable",
+      "price_request_failed",
+      "price_response_unusable",
+    ];
+    const copies = reasons.map((r) => getPaddleCheckoutCatalogMessage(r));
+    expect(new Set(copies).size).toBe(reasons.length);
+  });
+
+  it("tells a signed-out grower to sign in, and never says that for a gateway failure", () => {
+    expect(AUTH).toMatch(/sign in/i);
+    expect(GATEWAY).not.toMatch(/sign in/i);
+    expect(REQUEST).not.toMatch(/sign in/i);
+    expect(CONFIG).not.toMatch(/sign in/i);
+  });
+
+  it("reassures the grower that a failed resolve charged nothing", () => {
+    for (const copy of [GATEWAY, REQUEST, UNUSABLE]) {
+      expect(copy).toMatch(/nothing was charged/i);
+    }
+  });
+
+  // Copilot round 1 (nit): checking each message only against its OWN token
+  // still passes if the auth copy leaks `price_gateway_unavailable`. Cross-
+  // check every message against the COMPLETE reason vocabulary instead.
+  it("no catalog message leaks ANY reason token, env var name, or status code", () => {
+    const ALL_REASONS: readonly PaddleCheckoutCatalogReason[] = [
+      "unknown_plan",
+      "price_not_configured",
+      "price_resolution_unavailable",
+      "plan_sold_out",
+      "pack_requires_monthly_plan",
+      "auth_required",
+      "price_gateway_unavailable",
+      "price_request_failed",
+      "price_response_unusable",
+    ];
+    const TELEMETRY_ONLY_TOKENS = [...ALL_REASONS, "checkout_env_unavailable"];
+
+    for (const reason of ALL_REASONS) {
+      const msg = getPaddleCheckoutCatalogMessage(reason);
+      for (const token of TELEMETRY_ONLY_TOKENS) {
+        expect(msg, `message for "${reason}" leaked token "${token}"`).not.toContain(token);
+      }
+      expect(msg).not.toMatch(/PADDLE_PRICE_/);
+      expect(msg).not.toMatch(/env(ironment)? var/i);
+      expect(msg).not.toMatch(/\b(401|403|404|500|502|503)\b/);
+    }
+  });
+
+  it("new branch copy names no token, JWT, or provider", () => {
+    for (const reason of [
+      "auth_required",
+      "price_gateway_unavailable",
+      "price_request_failed",
+      "price_response_unusable",
+    ] as const) {
+      expect(getPaddleCheckoutCatalogMessage(reason)).not.toMatch(/token|JWT|Paddle\b/i);
     }
   });
 });

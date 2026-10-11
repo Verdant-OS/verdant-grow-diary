@@ -14,6 +14,7 @@
 import { format } from "date-fns";
 import { Gauge, History } from "lucide-react";
 import type { SensorReadingRow } from "@/lib/db";
+import { Button } from "@/components/ui/button";
 import {
   buildManualSnapshotHistoryList,
   DEFAULT_HISTORY_LIMIT,
@@ -23,6 +24,9 @@ import type { ChangeContextReading } from "@/lib/manualSensorSnapshotChangeConte
 interface Props {
   tentId: string | null | undefined;
   readings: ReadonlyArray<SensorReadingRow>;
+  readStatus: "pending" | "error" | "success";
+  isFetching?: boolean;
+  onRetry: () => void;
   limit?: number;
 }
 
@@ -35,19 +39,27 @@ function formatTs(ts: string): string {
 export default function TentManualSnapshotHistoryList({
   tentId,
   readings,
+  readStatus,
+  isFetching = false,
+  onRetry,
   limit = DEFAULT_HISTORY_LIMIT,
 }: Props) {
   if (!tentId) return null;
 
-  const rows: ChangeContextReading[] = readings.map((r) => ({
-    ts: r.ts,
-    metric: r.metric as string,
-    value: r.value as number | null | undefined,
-    source: r.source as string | null | undefined,
-    tent_id: r.tent_id as string | null | undefined,
-  }));
+  // Only a settled successful read establishes empty or populated history.
+  // Retained cache must not hide a pending read or failed refresh.
+  const canShowHistory = readStatus === "success" && !isFetching;
+  const rows: ChangeContextReading[] = canShowHistory
+    ? readings.map((r) => ({
+        ts: r.ts,
+        metric: r.metric as string,
+        value: r.value as number | null | undefined,
+        source: r.source as string | null | undefined,
+        tent_id: r.tent_id as string | null | undefined,
+      }))
+    : [];
 
-  const entries = buildManualSnapshotHistoryList(rows, { tentId, limit });
+  const entries = canShowHistory ? buildManualSnapshotHistoryList(rows, { tentId, limit }) : [];
 
   return (
     <div className="glass rounded-2xl p-4 mb-6" data-testid="tent-manual-snapshot-history">
@@ -58,7 +70,35 @@ export default function TentManualSnapshotHistoryList({
         </h2>
       </div>
 
-      {entries.length === 0 ? (
+      {readStatus === "error" ? (
+        <div
+          role="alert"
+          aria-busy={isFetching}
+          data-testid="tent-manual-snapshot-history-error"
+        >
+          <p className="text-sm text-muted-foreground">Manual snapshot history is unavailable.</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-2 min-h-11"
+            onClick={onRetry}
+            disabled={isFetching}
+            data-testid="tent-manual-snapshot-history-retry"
+          >
+            Retry
+          </Button>
+        </div>
+      ) : !canShowHistory ? (
+        <p
+          role="status"
+          aria-busy="true"
+          className="text-sm text-muted-foreground py-2"
+          data-testid="tent-manual-snapshot-history-loading"
+        >
+          Loading manual snapshots…
+        </p>
+      ) : entries.length === 0 ? (
         <p
           className="text-sm text-muted-foreground py-2"
           data-testid="tent-manual-snapshot-history-empty"

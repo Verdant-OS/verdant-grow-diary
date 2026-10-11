@@ -19,6 +19,8 @@
  * No React. No I/O. No side effects.
  */
 
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
+
 export type SensorMetricKey = "temp" | "rh" | "vpd" | "co2" | "soil" | "ppfd";
 
 export type SensorMetricStateKind =
@@ -172,34 +174,19 @@ const CALM_EMPTY_COPY: Record<SensorMetricKey, string> = {
   ppfd: "No PPFD reading yet. Add a manual reading or connect a source when ready.",
 };
 
-function normalizeSource(s: unknown): string | null {
-  if (typeof s !== "string") return null;
-  const t = s.trim().toLowerCase();
-  return t.length > 0 ? t : null;
-}
+// #592 fold: the private live/manual/csv/demo alias sets are gone — they
+// promoted transport strings (hassio/ha/broker/api/device/gateway/
+// supabase) to the Live kind and fell back to Demo for anything
+// unrecognized. Source classification now delegates to the sanctioned
+// #1003 canon table in `@/lib/sensor/sensorSourceRules`: unlabeled or
+// unrecognized provenance is Invalid, never Live or Demo.
 
-const LIVE_SOURCES = new Set([
-  "live",
-  "supabase",
-  "sensor",
-  "hassio",
-  "ha",
-  "broker",
-  "api",
-  "device",
-  "gateway",
-]);
-const MANUAL_SOURCES = new Set(["manual", "user", "entry", "log"]);
-const CSV_SOURCES = new Set(["csv", "import"]);
-const DEMO_SOURCES = new Set(["demo", "mock", "fake", "sample", "fixture"]);
-
-function sourceKind(source: string | null): SensorMetricStateKind | null {
-  if (!source) return null;
-  if (LIVE_SOURCES.has(source)) return "live";
-  if (MANUAL_SOURCES.has(source)) return "manual";
-  if (CSV_SOURCES.has(source)) return "csv";
-  if (DEMO_SOURCES.has(source)) return "demo";
-  return null;
+function sourceKind(source: unknown): SensorMetricStateKind | null {
+  // A missing label on presenter input keeps the pre-existing Demo
+  // fallback at the call site; a PRESENT label is decided by the canon
+  // (unrecognized → invalid, never Live or Demo).
+  if (typeof source !== "string" || source.trim().length === 0) return null;
+  return normalizeSensorSource(source);
 }
 
 const KIND_LABEL: Record<SensorMetricStateKind, string> = {
@@ -257,7 +244,7 @@ export function classifySensorMetricState(input: ClassifyMetricInput): SensorMet
     return makeState("derived", metric, "Calculated from temperature and humidity.", true);
   }
   if (hasValue) {
-    const kind = sourceKind(normalizeSource(input.source)) ?? "demo";
+    const kind = sourceKind(input.source ?? null) ?? "demo";
     return makeState(kind, metric, KIND_LABEL[kind], true);
   }
 

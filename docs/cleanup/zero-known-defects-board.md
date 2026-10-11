@@ -72,7 +72,7 @@ session). Security DB Local and One-Tent Loop smoke were `PASS` on the
 | # | Title (short) | Status this pass |
 | - | ------------- | ---------------- |
 | [#564](https://github.com/Verdant-OS/verdant-grow-diary/issues/564)–[#569](https://github.com/Verdant-OS/verdant-grow-diary/issues/569) | Pheno hunt cluster | **CLOSED** (2026-08-08). No regression re-litigation this pass. |
-| [#586](https://github.com/Verdant-OS/verdant-grow-diary/issues/586) | Action Queue audit + durable dedupe | **CLOSED** as the expand-step RPC. Residual **still true in code**: client `INSERT` policy remains; `phenoActionQueueService.ts` and `usePostGrowLearningReportData.ts` still `.insert` instead of `action_queue_create`. Production apply of the RPC remains **BLOCKED** (MCP is sandbox). Proposed follow-up, not reopened here. |
+| [#586](https://github.com/Verdant-OS/verdant-grow-diary/issues/586) | Action Queue audit + durable dedupe | **CLOSED** as the expand-step RPC. **2026-09-16 source correction — PASS:** `phenoActionQueueService.ts` calls `createActionQueueItem`, which invokes `action_queue_create`; the earlier Pheno bypass assertion is stale. `usePostGrowLearningReportData.ts` still directly inserts post-grow lesson drafts into `action_queue`, a separate residual. Hosted Action Queue grants/policies and exact migration history are **NOT_MEASURED** by this source correction; Claude's relayed anonymous `42501` response is not an apply receipt. Proposed follow-up, not reopened here. |
 | [#587](https://github.com/Verdant-OS/verdant-grow-diary/issues/587) | Timeline UTC vs local day bounds | **CLOSED**. Code uses `timelineDateRangeRules.ts` local bounds. Re-run `timeline-date-range-rules.test.ts` PASS. Prior snapshot incorrectly left this OPEN. |
 | [#588](https://github.com/Verdant-OS/verdant-grow-diary/issues/588) | Sign-out / AppShell revalidation | **CLOSED**. AppShell still waits on `hydrated \|\| loading \|\| authStatus === "loading"`. |
 | [#589](https://github.com/Verdant-OS/verdant-grow-diary/issues/589) | Demo static-safety overclaim | **CLOSED**. Suites narrowed; `operator-demo-preview-static-safety.test.ts` re-run PASS. |
@@ -105,12 +105,50 @@ not filed issues. Do not treat them as live GitHub items.
 
 | Proposed severity | Finding | Evidence | Notes |
 | ----------------- | ------- | -------- | ----- |
-| P2 | Two Action Queue writers still bypass `action_queue_create` | `src/lib/phenoActionQueueService.ts` (herm cull); `src/hooks/usePostGrowLearningReportData.ts` (post-grow lesson). Drafts are `pending_approval` / no `target_device`. | Residual of closed #586 expand step. Needs a revoke/migrate slice, not a silent reopen. |
+| P2 | Post-grow lesson writer still bypasses `action_queue_create` | **2026-09-16 source check — PASS:** `src/hooks/usePostGrowLearningReportData.ts` directly inserts into `action_queue`. The previous inclusion of `src/lib/phenoActionQueueService.ts` is obsolete: it calls the RPC via `src/lib/actionQueueCreateService.ts`. | Residual of closed #586 expand step. No Action Queue operation, policy or application change made in this documentation correction. |
 | P2 | `useRequireAuth` has no rejection handler | `src/hooks/useRequireAuth.ts` — `.then` only; tests cover resolve-with-error, not reject. AppShell treats `authStatus === "loading"` as a spinner. | Same *class* as #582; **not reproduced** (supabase-js usually resolves `{error}`). |
 | P2 | AI Doctor device-command strip skips 24h / 3-day fields | `aiDoctorSafetyRules.ts`: `DEVICE_COMMAND_PATTERNS` applied to `immediate_action` only; `follow_up_24h` / `recovery_plan_3_day` get feed-language gating only. AQ rewrite still forces advisory + `pending_approval`. | Advice-text gap, not execution. |
 | P2 (SEO) | Six indexable public routes are sitemap-excluded by allowlist | Live 2026-08-13: HTTP 200 + `robots: index, follow` on `/glossary`, `/breeder-beta`, `/creator-beta`, `/pheno-comparison`, `/pheno-expression-showcase`, `/docs/mcp-api`. Listed in `scripts/public-route-parity.config.mjs` `STATIC_ONLY_ROUTES`. Sitemap still 56 `<loc>`. | CURRENT_STATE still says four routes; two more now. Eligibility decision still open (blocker 8 family). |
 | P2 (infra) | Scheduled / dispatch money probes fail while **push** gates are green | Push on this SHA: Required money-critical migrations `success`. `workflow_dispatch` LIVE job failed exit 6 *before* reading `schema_migrations` (applied state **UNKNOWN**, not "missing"). Scheduled: Sandbox credit-packs, Paddle Craft catalog, AI-credit production contract — all `failure`. | Do not read those reds as proof production credits/catalog are broken. Cluster with #561 / secret-binding. |
 | Process | Close or retarget #590 | `tsconfig.json` `"strict": true` is an ancestor of HEAD. | GitHub still OPEN. |
+
+## Pheno / breeding findings — 2026-09-16
+
+These twelve rows register the owner's supplied summary of Claude's audit at
+`c22340c7d16ca1f14c20bf9582c849bbf79cdbb2`. They preserve its H1–H3 / M1–M9 references;
+they do not invent GitHub issue numbers, create issues, change the historical August
+inventory counts, or assign repository P1/P2 labels without triage. The full named
+`claude/audits/pheno-hunt-breeding-audit-2026-09-16-grok-handoff.md` was not available in
+the inspected repository, local attachments or Lovable project files. The ten Claude-owned
+findings below are attributed reports, not new Codex reproductions. Claude owns the Pheno
+application code; Codex owns H1/M7 hosted verification and the approved migration lane.
+
+Fresh Codex catalog/ledger evidence was collected through the sanctioned Lovable Cloud
+SQL read-only path at **19:36–19:37 UTC**, scoped to the Verdant Grow Diary project whose
+config identifies `knkwiiywfkbqznbxwqfh`. Source ref:
+`4dc19a15e5ef7b8539712f587e18296d2606aaf8`. See the dated
+[Pheno / breeding operational record](../agents/CURRENT_STATE.md#pheno--breeding-hosted-verification--2026-09-16-codex)
+for exact counts, policy evidence, marker inventory, external raw-receipt filename and
+the blocked apply plan. No APPLY or application save happened in this audit.
+
+| Audit ID | Finding | Lane | Status / evidence | Next evidence required |
+| --- | --- | --- | --- | --- |
+| H1 | Breeding save RPC absent | **Codex** | **FAIL:** fresh hosted `pg_proc` read found no `breeding_log_save_event` at any signature; `breeding_events` was absent and both requested breeding markers returned `matches: []`. Claude separately reported live `404 PGRST202` and the form's nothing-written error. | **BLOCKED:** resolve pinned-lane prerequisites and reviewed recovery, then founder go/no-go; after apply, verify canonical RPC permissions and one approved disposable-grow save/reopen. |
+| H2 | Score write fence | **Claude** | **NOT_MEASURED** by Codex; open finding supplied by the owner. Exact reproduction awaits Claude's audit/repair evidence. | Targeted invalid/boundary-input reproduction, repair diff and regression evidence. |
+| H3 | Delete cascade copy / atomicity | **Claude** | **NOT_MEASURED** by Codex; open finding supplied by the owner. No audit fixture or user data deleted. | Exact copy-versus-operation account and atomicity evidence using a disposable test fixture. |
+| M1 | Herm-queue “cull” wording | **Claude** | **NOT_MEASURED** by Codex; open wording finding supplied by the owner. The separate RPC-writer correction above does not resolve this finding. | Correct approval-required wording and a targeted presentation test. |
+| M2 | Smoke clamp | **Claude** | **NOT_MEASURED** by Codex; title supplied by the owner. Exact clamp inputs and behavior await the audit. | Precise reproduction, intended boundary and regression evidence. |
+| M3 | Undecided decision-log noise | **Claude** | **NOT_MEASURED** by Codex; open finding supplied by the owner. | Reproducible logging case and a focused test distinguishing meaningful decisions from undecided noise. |
+| M4 | One-hunt-per-grow UX | **Claude** | **NOT_MEASURED** by Codex; open UX finding supplied by the owner. | Documented current behavior and a founder decision if the repair changes the product rule. |
+| M5 | Keepers versus archived candidates | **Claude** | **NOT_MEASURED** by Codex; open finding supplied by the owner. | Exact archived/keeper case, intended membership semantics and regression evidence. |
+| M6 | SOP self-attestation | **Claude** | **NOT_MEASURED** by Codex; open finding supplied by the owner. Historical #572/#573 may be related but are not automatically reopened or declared duplicates. | Exact attestation path and evidence before relating it to an existing GitHub issue. |
+| M7 | Top-N candidate diary RPC absent | **Codex** | **FAIL:** fresh hosted catalog found no `pheno_candidate_diary_entries_top_n` at any signature; the `20260826100000` marker returned `matches: []`. Claude reported per-plant fallback; current first-render timing is **NOT_MEASURED**. | **BLOCKED:** a covering pinned lane and recovery plan, then founder go/no-go; post-apply permission and bounded-read evidence. Relate to #571 without declaring its performance target passed. |
+| M8 | Fail-open reads | **Claude** | **NOT_MEASURED** by Codex; open finding supplied by the owner. Specific affected reads await the audit. | Exact failed/unresolved-read reproduction and focused honesty regression tests. |
+| M9 | Candidate-number overflow copy | **Claude** | **NOT_MEASURED** by Codex; open copy finding supplied by the owner. No renumbering or schema maintenance performed. | Overflow case, corrected copy and a targeted boundary/presentation test. |
+
+**Safety verdict — FAIL** for sending real customers through breeding saves while the save
+RPC is absent. Customer acceptance remains **BLOCKED** pending the named operational gates
+and Claude's relevant application repairs. Green source tests are not production acceptance.
 
 ## Live public-surface re-measure (2026-08-13)
 

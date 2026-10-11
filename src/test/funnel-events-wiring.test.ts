@@ -5,6 +5,7 @@
  * emission seam, and fences the module against privacy regressions:
  *
  *   signup                  → Auth.tsx (after supabase.auth.signUp succeeds)
+ *                             and AuthProvider (first Google OAuth session)
  *   grow_created            → Grows.tsx (after insert succeeds)
  *   tent_created            → CreateTentDialog.tsx (after insert succeeds)
  *   plant_created           → CreatePlantDialog.tsx (after insert succeeds)
@@ -50,20 +51,26 @@ function listSourceFiles(dir: string): string[] {
   });
 }
 
+const LEGACY_QUICK_LOG_SAVE_CALL =
+  /saveViaRpc\(\s*built\.payload,\s*saveEventType === "watering"\s*\?\s*\{\s*expectedWaterTarget:\s*saveTarget\s*\}\s*:\s*\{\s*telemetryIntent:\s*saveEventType\s*\},?\s*\)/;
+
 const QUICK_LOG_V2_SAVE_CALLERS = [
   {
     file: "src/components/QuickLog.tsx",
-    telemetryIntent: /saveViaRpc\(built\.payload,\s*\{\s*telemetryIntent:\s*saveEventType\s*\}\)/,
+    telemetryIntent: LEGACY_QUICK_LOG_SAVE_CALL,
   },
   {
     file: "src/components/QuickLogV2Sheet.tsx",
-    telemetryIntent: /save\(built\.payload,\s*\{\s*telemetryIntent:\s*form\.action\s*\}\)/,
+    // Recovery submits the frozen intent rather than a mutable form action.
+    telemetryIntent:
+      /save\(exactManualSubmission\.payload,\s*\{\s*telemetryIntent:\s*submissionAction,\s*verifyPersistedNote:\s*pendingManualSubmission !== null,\s*canContinueNote,?\s*\}\)/,
   },
   { file: "src/components/AiDoctorCheckInPreviewPanel.tsx", telemetryIntent: null },
   { file: "src/pages/EcowittIngestAudit.tsx", telemetryIntent: null },
   {
     file: "src/components/PlantQuickLog.tsx",
-    telemetryIntent: /save\(built\.payload,\s*\{\s*telemetryIntent:\s*"plant_quick_log"\s*\}\)/,
+    telemetryIntent:
+      /save\(built\.payload,\s*\{\s*telemetryIntent:\s*"plant_quick_log",\s*canContinueNote:\s*canContinue,?\s*\}\)/,
   },
 ] as const;
 
@@ -72,6 +79,11 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
     event: "signup",
     file: "src/pages/Auth.tsx",
     extra: [/trackFunnelEvent\("signup",\s*\{\s*method:\s*"email"\s*\}\)/],
+  },
+  {
+    event: "signup",
+    file: "src/store/auth.tsx",
+    extra: [/trackFunnelEvent\("signup",\s*\{\s*method:\s*"google"\s*\}\)/],
   },
   { event: "grow_created", file: "src/pages/Grows.tsx" },
   { event: "tent_created", file: "src/components/CreateTentDialog.tsx" },
@@ -193,6 +205,11 @@ const QUICK_LOG_SUCCESS_SEAMS: Array<{
   calls: number;
   extra: RegExp;
 }> = [
+  {
+    file: "src/components/QuickLog.tsx",
+    calls: 2,
+    extra: /trackQuickLogSuccess\("water"\)/,
+  },
   {
     file: "src/hooks/useQuickLogV2Save.ts",
     calls: 1,
@@ -324,12 +341,15 @@ describe("each funnel event fires from its canonical seam", () => {
 describe("ordering and safety constraints at the seams", () => {
   it("shared manual RPC telemetry defaults off and fires only after explicit confirmed success", () => {
     const src = read("src/hooks/useQuickLogV2Save.ts");
-    const okBranch = src.indexOf("if (!r.ok)");
+    const okBranch = src.indexOf("if (r.ok !== true)");
+    const uuidGate = src.indexOf("if (!isUuid(r.grow_event_id))");
     const optIn = src.indexOf("if (options.telemetryIntent !== undefined)");
     const track = src.indexOf("trackQuickLogSuccess(options.telemetryIntent");
     const okReturn = src.indexOf("ok: true");
     expect(okBranch).toBeGreaterThan(-1);
-    expect(optIn).toBeGreaterThan(okBranch);
+    expect(uuidGate).toBeGreaterThan(okBranch);
+    expect(optIn).toBeGreaterThan(uuidGate);
+    expect(src.lastIndexOf("if (!canContinue())", optIn)).toBeGreaterThan(uuidGate);
     expect(track).toBeGreaterThan(optIn);
     expect(okReturn).toBeGreaterThan(track);
     expect(src).toMatch(/reused:\s*r\.reused === true/);
@@ -339,9 +359,15 @@ describe("ordering and safety constraints at the seams", () => {
   it("legacy Quick Log tracks the grower's validated semantic UI selection", () => {
     const src = read("src/components/QuickLog.tsx");
     const supportedGate = src.indexOf("if (!isSupportedLegacyEventType(effectiveEventType))");
-    const save = src.indexOf("saveViaRpc(built.payload, { telemetryIntent: saveEventType })");
+    const save = src.search(LEGACY_QUICK_LOG_SAVE_CALL);
     expect(supportedGate).toBeGreaterThan(-1);
     expect(save).toBeGreaterThan(supportedGate);
+    expect(src).toMatch(
+      /const waterClear = waterRecord \? await reconcilePendingStarterWaterClear\(waterRecord\)[\s\S]*if \(waterClear\?\.status === "cleared"\) trackQuickLogSuccess\("water"\)/,
+    );
+    expect(src).toMatch(
+      /const clearance = await reconcilePendingStarterWaterClear\(record\)[\s\S]*if \(clearance\.status === "cleared"\) trackQuickLogSuccess\("water"\)/,
+    );
     expect(src).not.toMatch(/telemetryIntent:\s*built\.payload\.p_action/);
   });
 
@@ -514,8 +540,9 @@ describe("ordering and safety constraints at the seams", () => {
     expect(app).not.toContain("useCheckoutReturnCompletionTracking");
     expect(shell).toMatch(/const \{ status: authStatus \} = useRequireAuth\(signedOutRedirect\)/);
     expect(shell).toMatch(
-      /const \{ loading: entitlementLoading, entitlement \} = useMyEntitlements\(\)/,
+      /const \{ loading: entitlementLoading, entitlement \} = useMyEntitlements\(\{\s*enabled:\s*sessionReady,?\s*\}\)/,
     );
+    expect(shell).not.toMatch(/useMyEntitlements\(\)/);
     expect(shell).toMatch(/authStatus === "authenticated"/);
     expect(shell).toMatch(/!entitlementLoading/);
     expect(shell).toMatch(/entitlement\.isActive/);
@@ -541,13 +568,21 @@ describe("ordering and safety constraints at the seams", () => {
       "if (!packet || pendingAcceptedReviewStartRef.current === historyScopeKey) return;",
       canStartGate,
     );
-    const acceptedGate = src.indexOf("if (!acceptedEligibility.allowed) return;", requestGate);
+    const acceptedGate = src.indexOf("if (!acceptedEligibility.allowed) {", requestGate);
+    const rejectedReturn = src.indexOf("return;", acceptedGate);
+    const acceptedMode = src.indexOf("const acceptedMode =", acceptedGate);
     const acceptedRequest = src.indexOf("setAcceptedReviewRequest({", acceptedGate);
     const historicalGate = src.indexOf(
       'acceptedEligibility.mode === "historical_review" &&',
       acceptedRequest,
     );
     const track = src.indexOf('trackFunnelEvent("historical_ai_review_started")', historicalGate);
+    const retryHandler = src.indexOf("const handleRetryReview = () => {", handler);
+    const staleRetryGuard = src.indexOf(
+      'if (activeReviewVisibility.retryBlockedReason === "stale-evidence") {',
+      retryHandler,
+    );
+    const retryInvoke = src.indexOf("review.retry();", staleRetryGuard);
     const handlerEnd = src.indexOf("const confidenceCopy", handler);
 
     expect(startBinding).toBeGreaterThan(-1);
@@ -558,14 +593,22 @@ describe("ordering and safety constraints at the seams", () => {
     expect(canStartGate).toBeGreaterThan(handler);
     expect(requestGate).toBeGreaterThan(canStartGate);
     expect(acceptedGate).toBeGreaterThan(requestGate);
-    expect(acceptedRequest).toBeGreaterThan(acceptedGate);
+    expect(rejectedReturn).toBeGreaterThan(acceptedGate);
+    expect(acceptedMode).toBeGreaterThan(rejectedReturn);
+    expect(src.slice(acceptedGate, acceptedMode)).toMatch(/return;\s*\}\s*$/);
+    expect(acceptedRequest).toBeGreaterThan(acceptedMode);
     expect(historicalGate).toBeGreaterThan(acceptedRequest);
     expect(track).toBeGreaterThan(historicalGate);
+    expect(retryHandler).toBeGreaterThan(track);
+    expect(staleRetryGuard).toBeGreaterThan(retryHandler);
+    expect(retryInvoke).toBeGreaterThan(staleRetryGuard);
     expect(src.slice(handler, handlerEnd)).not.toContain("startReview()");
     expect(src).toMatch(
-      /onClick=\{review\.status === "error" \? review\.retry : handleInitialStart\}/,
+      /onClick=\{review\.status === "error" \? handleRetryReview : handleInitialStart\}/,
     );
-    expect(src).toMatch(/activeReviewRequest\s*\?\s*review\.status === "error" && canRetryReview/);
+    expect(src).toMatch(
+      /activeReviewRequest\s*\?\s*review\.status === "error" && canRetryReview && retryBlockedReason === null/,
+    );
     expect(src).toMatch(
       /allowed\s*&&\s*historyRecovery\.state !== "decision_required"\s*&&\s*rootZoneRecovery\.state !== "decision_required"\s*&&\s*review\.status === "idle"/,
     );

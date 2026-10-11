@@ -747,6 +747,34 @@ export interface ParseVerdantSkillRunResultDeps {
   readiness?: AiDoctorContextReadiness;
 }
 
+function validateReadinessCeiling(
+  confidence: SkillConfidenceResult,
+  readiness?: AiDoctorContextReadiness,
+): SkillError | null {
+  if (readiness == null) return null;
+
+  const readinessCeiling = AI_DOCTOR_READINESS_CONFIDENCE_CEILING[readiness];
+  // Fail CLOSED on an unknown readiness label — a safety fence must never
+  // silently no-op because a caller supplied a value outside the vocabulary.
+  if (typeof readinessCeiling !== "number" || !Number.isFinite(readinessCeiling)) {
+    return deepFreeze({
+      code: "insufficient_context" as const,
+      message: "deps: unknown context readiness label",
+      field: "confidence",
+      issues: [],
+    });
+  }
+  if (confidence.system.displayedConfidence > readinessCeiling) {
+    return deepFreeze({
+      code: "insufficient_context" as const,
+      message: "confidence: displayed confidence exceeds the context readiness ceiling",
+      field: "confidence",
+      issues: [],
+    });
+  }
+  return null;
+}
+
 /**
  * Validate untrusted model output into a SkillRunSuccess. Never throws; never
  * mutates input; sensitive keys are silently dropped; the system-confidence
@@ -778,33 +806,12 @@ export function parseVerdantSkillRunResult(
     deps.evidenceConfidence,
     deps.ceiling,
   );
-  if (deps.readiness != null) {
-    const readinessCeiling = AI_DOCTOR_READINESS_CONFIDENCE_CEILING[deps.readiness];
-    // Fail CLOSED on an unknown readiness label — a safety fence must never
-    // silently no-op because a caller supplied a value outside the vocabulary.
-    if (typeof readinessCeiling !== "number" || !Number.isFinite(readinessCeiling)) {
-      return {
-        ok: false,
-        error: deepFreeze({
-          code: "insufficient_context" as const,
-          message: "deps: unknown context readiness label",
-          field: "confidence",
-          issues: [],
-        }),
-      };
-    }
-    if (confidence.system.displayedConfidence > readinessCeiling) {
-      return {
-        ok: false,
-        error: deepFreeze({
-          code: "insufficient_context" as const,
-          message: "confidence: displayed confidence exceeds the context readiness ceiling",
-          field: "confidence",
-          issues: [],
-        }),
-      };
-    }
+
+  const readinessError = validateReadinessCeiling(confidence, deps.readiness);
+  if (readinessError) {
+    return { ok: false, error: readinessError };
   }
+
   const { confidence: _modelConfidenceInput, ...rest } = parsed.data;
   void _modelConfidenceInput;
   // zod v4 infers transformed (piped) object fields as optional in the output

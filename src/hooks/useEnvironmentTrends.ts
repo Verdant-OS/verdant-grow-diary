@@ -11,7 +11,7 @@
  * Read-only. No .insert/.update/.delete/.upsert/.rpc. No ai-coach call.
  * No external-control surface. No elevated keys. RLS enforces ownership.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
@@ -25,6 +25,12 @@ import {
 import { isDiaryRowInTentScope } from "@/lib/diaryEvidenceTentScopeRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
+import {
+  EFFECTIVE_SENSOR_QUERY_VERSION,
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+} from "@/lib/effectiveSensorReadings";
+
 export type TrendsState =
   | { status: "idle"; trends: EnvironmentTrends }
   | { status: "loading"; trends: EnvironmentTrends }
@@ -36,90 +42,60 @@ export function useEnvironmentTrends(
   tentIds: string[],
 ): TrendsState {
   const { user } = useAuth();
-  const [state, setState] = useState<TrendsState>({
-    status: "idle",
-    trends: EMPTY_TRENDS,
-  });
+
   const tentKey = tentIds.join("|");
-
-  const load = useCallback(async () => {
-    if (!user || !growId) {
-      setState({ status: "idle", trends: EMPTY_TRENDS });
-      return;
-    }
-    setState({ status: "loading", trends: EMPTY_TRENDS });
-
-    try {
+  const query = useQuery<EnvironmentTrends>({
+    queryKey: [
+      "environment-trends",
+      user?.id ?? "anon",
+      growId ?? "none",
+      tentKey,
+      EFFECTIVE_SENSOR_QUERY_VERSION,
+    ],
+    enabled: !!user && !!growId,
+    retry: false,
+    queryFn: async () => {
+      if (!user || !growId) return EMPTY_TRENDS;
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
+      let sensorReadFailed = false;
       if (tentIds.length > 0) {
-        const { data, error } = await supabase
-          .from("sensor_readings")
-          .select("ts,captured_at,metric,value,source,tent_id,raw_payload")
-          .in("tent_id", tentIds)
-          .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"])
-          // Current-window filtering uses physical observation time. Legacy
-          // rows without `captured_at` retain their established `ts` fallback.
-          .or(`captured_at.gte.${since},and(captured_at.is.null,ts.gte.${since})`)
-          .order("captured_at", { ascending: false, nullsFirst: false })
-          .order("ts", { ascending: false })
-          .limit(500);
-        if (!error && data && data.length > 0) {
-          const samples = samplesFromReadings(
-            data.map((r) => ({
-              ts: r.ts,
-              captured_at: (r as { captured_at?: string | null }).captured_at ?? null,
-              metric: r.metric,
-              value: r.value as number | string | null,
-              source: r.source as string | null,
-              tent_id: r.tent_id as string | null,
-              raw_payload: r.raw_payload,
-            })),
-          );
-          if (samples.length > 0) {
-            const windowed = selectWindow(samples);
-            setState({
-              status: "ok",
-              trends: computeEnvironmentTrends(windowed),
-            });
-            return;
-          }
-        }
-        if (!error && (!data || data.length === 0)) {
-          // Try a broader fetch without the time window so we can fall back
-          // to "latest 20 readings" if no 24h data exists.
-          const { data: any20, error: err20 } = await supabase
-            .from("sensor_readings")
-            .select("ts,captured_at,metric,value,source,tent_id,raw_payload")
-            .in("tent_id", tentIds)
-            .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"])
-            .order("captured_at", { ascending: false, nullsFirst: false })
-            .order("ts", { ascending: false })
-            .limit(60);
-          if (!err20 && any20 && any20.length > 0) {
+        try {
+          // Keep the current window first, then the established historical
+          // fallback only after a successfully completed empty window read.
+          for (const limit of [500, 60]) {
+            let readingsQuery = effectiveSensorReadingsQuery()
+              .select("*")
+              .in("tent_id", tentIds)
+              .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"]);
+            if (limit === 500) {
+              readingsQuery = readingsQuery.or(
+                `captured_at.gte.${since},and(captured_at.is.null,ts.gte.${since})`,
+              );
+            }
+            const { data, error } = await readingsQuery
+              .order("captured_at", { ascending: false, nullsFirst: false })
+              .order("ts", { ascending: false })
+              .limit(limit);
+            if (error) throw error;
+            const readings = requireEffectiveSensorReadings(data);
             const samples = samplesFromReadings(
-              any20.map((r) => ({
+              readings.map((r) => ({
                 ts: r.ts,
-                captured_at: (r as { captured_at?: string | null }).captured_at ?? null,
+                captured_at: r.captured_at,
                 metric: r.metric,
-                value: r.value as number | string | null,
-                source: r.source as string | null,
-                tent_id: r.tent_id as string | null,
+                value: r.value,
+                source: r.source,
+                tent_id: r.tent_id,
                 raw_payload: r.raw_payload,
               })),
             );
-            if (samples.length > 0) {
-              const windowed = selectWindow(samples);
-              setState({
-                status: "ok",
-                trends: computeEnvironmentTrends(windowed),
-              });
-              return;
-            }
+            if (samples.length > 0) return computeEnvironmentTrends(selectWindow(samples));
+            if (readings.length > 0) break;
           }
+        } catch {
+          sensorReadFailed = true;
         }
       }
-
       const { data: diaryRows, error: diaryErr } = await selectWithRetractionCompat(
         (withRetractionFilter) => {
           let query = supabase.from("diary_entries").select("entry_at,details,tent_id");
@@ -127,33 +103,27 @@ export function useEnvironmentTrends(
           return query.eq("grow_id", growId).order("entry_at", { ascending: false }).limit(50);
         },
       );
-      if (diaryErr) {
-        setState({ status: "unavailable", trends: EMPTY_TRENDS });
-        return;
-      }
-      // #602: tent-scoped trends only use diary rows attributed to those tents.
-      const scopedDiaryRows = (diaryRows ?? []).filter((r) =>
-        isDiaryRowInTentScope((r as { tent_id?: string | null }).tent_id, tentIds),
-      );
+      if (diaryErr || !Array.isArray(diaryRows)) throw new Error("unavailable");
+      const scopedDiaryRows = diaryRows.filter((r) => isDiaryRowInTentScope(r.tent_id, tentIds));
       const diarySamples = samplesFromDiary(
         scopedDiaryRows.map((r) => ({
           entry_at: r.entry_at,
           details: r.details as Record<string, unknown> | null | undefined,
         })),
       );
-      const windowed = selectWindow(diarySamples);
-      setState({ status: "ok", trends: computeEnvironmentTrends(windowed) });
-    } catch {
-      setState({ status: "unavailable", trends: EMPTY_TRENDS });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, growId, tentKey]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  return state;
+      const trends = computeEnvironmentTrends(selectWindow(diarySamples));
+      if (sensorReadFailed && trends.count === 0) throw new Error("unavailable");
+      return trends;
+    },
+  });
+  if (!user || !growId) return { status: "idle", trends: EMPTY_TRENDS };
+  // Withhold a cached trend while its correction refresh is pending or paused.
+  // Query ownership also keeps late results isolated from the selected scope.
+  if (query.isPending || query.isFetching || query.isPaused) {
+    return { status: "loading", trends: EMPTY_TRENDS };
+  }
+  if (query.isError) return { status: "unavailable", trends: EMPTY_TRENDS };
+  return { status: "ok", trends: query.data };
 }
 
 export default useEnvironmentTrends;

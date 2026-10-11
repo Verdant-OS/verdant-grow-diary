@@ -8,7 +8,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("@/lib/react-router-compat", () => ({
   Link: ({
@@ -241,6 +241,139 @@ const NOTE_ENTRY = (id: string, entry_at: string | null) => ({
   note: "n",
   photo_url: null,
   details: null,
+});
+
+describe("PlantQuickStatusStrip — recent activity read honesty", () => {
+  function setActivityRead(overrides: Record<string, unknown> = {}) {
+    setupHooks();
+    const refetch = vi.fn().mockResolvedValue({ data: [] });
+    mockEntries.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      isFetching: false,
+      fetchStatus: "idle",
+      refetch,
+      ...overrides,
+    });
+    return refetch;
+  }
+
+  const cached = [NOTE_ENTRY("cached-entry", "2026-05-31T08:00:00Z")];
+
+  it.each([
+    [
+      "initial loading",
+      { data: undefined, isLoading: true, isPending: true },
+      "Checking recent activity…",
+    ],
+    [
+      "paused first read",
+      { data: undefined, isPending: true, fetchStatus: "paused" },
+      "Waiting for connection to check recent activity.",
+    ],
+    ["failed first read", { data: undefined, isError: true }, "Recent activity unavailable."],
+    [
+      "failed refresh with cached rows",
+      { data: cached, isError: true },
+      "Recent activity unavailable.",
+    ],
+    [
+      "failed refresh with cached empty result",
+      { data: [], isError: true },
+      "Recent activity unavailable.",
+    ],
+    ["null response", { data: null }, "Recent activity unavailable."],
+    ["undefined completed response", { data: undefined }, "Recent activity unavailable."],
+    ["malformed response", { data: { message: "private-error" } }, "Recent activity unavailable."],
+  ])("keeps %s distinct from an empty or verified timeline", (_name, state, label) => {
+    setActivityRead(state as Record<string, unknown>);
+    const reveal = vi.fn();
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        onRevealAndNavigate={reveal}
+      />,
+    );
+    const strip = screen.getByTestId("plant-quick-status-strip");
+    expect(strip).toHaveTextContent(label as string);
+    expect(strip.getAttribute("aria-label")).toContain(label);
+    expect(strip.getAttribute("data-compact")).toContain(label);
+    expect(strip).not.toHaveTextContent(
+      /No updates yet|Last updated|Add a quick log|private-error/,
+    );
+    expect(strip.getAttribute("aria-label")).not.toMatch(
+      /No updates yet|Last updated|Add a quick log|private-error/,
+    );
+    const latest = screen.getByTestId("plant-quick-status-view-latest");
+    expect(latest).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(latest);
+    expect(reveal).not.toHaveBeenCalled();
+    if ((state as Record<string, unknown>).isPending) {
+      expect(screen.queryByRole("button", { name: "Retry recent activity" })).toBeNull();
+    } else {
+      expect(screen.getByRole("button", { name: "Retry recent activity" })).toBeEnabled();
+    }
+  });
+
+  it.each([undefined, null])("requires a plant before interpreting query state (%s)", (plantId) => {
+    setActivityRead({ data: cached, isPending: true, isError: true });
+    render(<PlantQuickStatusStrip plantId={plantId} plantStartedAt={PLANT_STARTED} />);
+    const strip = screen.getByTestId("plant-quick-status-strip");
+    expect(strip).toHaveTextContent("Select a plant to view recent activity.");
+    expect(strip).not.toHaveTextContent(/No updates yet|Last updated|Checking|Add a quick log/);
+    expect(screen.queryByRole("button", { name: "Retry recent activity" })).toBeNull();
+    expect(screen.getByTestId("plant-quick-status-view-latest")).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(mockEntries).toHaveBeenLastCalledWith(null);
+  });
+
+  it("disables Retry during the same query's retry and restores the verified latest entry", async () => {
+    const refetch = setActivityRead({ data: cached, isError: true });
+    const { rerender } = render(
+      <PlantQuickStatusStrip plantId={PLANT} plantStartedAt={PLANT_STARTED} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry recent activity" }));
+    await waitFor(() => expect(refetch).toHaveBeenCalledTimes(1));
+    setActivityRead({ data: cached, isError: true, isFetching: true, refetch });
+    rerender(<PlantQuickStatusStrip plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    expect(screen.getByRole("button", { name: "Retry recent activity" })).toBeDisabled();
+    expect(screen.getByTestId("plant-quick-status-view-latest")).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry recent activity" }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+    setActivityRead({ data: cached });
+    rerender(<PlantQuickStatusStrip plantId={PLANT} plantStartedAt={PLANT_STARTED} />);
+    expect(screen.getByTestId("plant-quick-status-last-update")).toHaveTextContent("Last updated");
+    expect(screen.getByTestId("plant-quick-status-view-latest")).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.queryByRole("button", { name: "Retry recent activity" })).toBeNull();
+    expect(mockEntries).toHaveBeenLastCalledWith(PLANT);
+  });
+
+  it("keeps a successful empty read distinct from the next plant's paused first read", () => {
+    setActivityRead();
+    const { rerender } = render(
+      <PlantQuickStatusStrip plantId={PLANT} plantStartedAt={PLANT_STARTED} />,
+    );
+    expect(screen.getByTestId("plant-quick-status-strip")).toHaveTextContent("No updates yet");
+    expect(screen.queryByRole("button", { name: "Retry recent activity" })).toBeNull();
+    setActivityRead({ data: undefined, isPending: true, fetchStatus: "paused" });
+    rerender(<PlantQuickStatusStrip plantId="next-plant" plantStartedAt={PLANT_STARTED} />);
+    const strip = screen.getByTestId("plant-quick-status-strip");
+    expect(strip).toHaveTextContent("Waiting for connection to check recent activity.");
+    expect(strip).not.toHaveTextContent(/No updates yet|Add a quick log/);
+    expect(strip.getAttribute("aria-label")).not.toContain("No updates yet");
+    expect(mockEntries).toHaveBeenLastCalledWith("next-plant");
+  });
 });
 
 describe("PlantQuickStatusStrip — render", () => {

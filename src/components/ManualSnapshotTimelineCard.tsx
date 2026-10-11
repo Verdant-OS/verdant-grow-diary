@@ -24,6 +24,7 @@ import {
 import { formatSensorFieldLabel } from "@/constants/sensorFields";
 import { DERIVED_LABEL, formatSensorValue } from "@/lib/sensorFormat";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import { buildManualSensorProvenanceLabels } from "@/lib/manualSensorProvenanceRules";
 import {
   evaluateManualSensorSnapshotQuality,
   type ManualSensorSnapshotInput,
@@ -131,6 +132,8 @@ export default function ManualSnapshotTimelineCard({
     return evaluateManualSensorSnapshotQuality(snap, { mode: "historical" });
   }, [card.readings, card.source, card.capturedAt]);
 
+  const provenanceLabels = buildManualSensorProvenanceLabels(card.source);
+
   return (
     <Card
       data-testid="manual-snapshot-timeline-card"
@@ -212,12 +215,7 @@ export default function ManualSnapshotTimelineCard({
             data-testid="manual-snapshot-timeline-card-truth-chips"
             aria-label="Sensor truth chips"
           >
-            {[
-              `Source: ${card.source === "manual" ? "manual" : "unknown"}`,
-              `Identity: ${card.source === "manual" ? "manual_entry" : "unknown"}`,
-              `Transport: ${card.source === "manual" ? "manual" : "unknown"}`,
-              "Confidence: unknown",
-            ].map((label) => (
+            {provenanceLabels.map((label) => (
               <li key={label}>
                 <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-normal">
                   {label}

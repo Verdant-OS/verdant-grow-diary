@@ -8,7 +8,7 @@ import { isInactiveQuickLogPlant, type MinimalQuickLogPlant } from "@/lib/quickL
 export type QuickLogResolvedTarget = Readonly<{
   plantId: string;
   growId: string;
-  tentId: string;
+  tentId: string | null;
 }>;
 
 export type QuickLogTargetBlockReason =
@@ -22,6 +22,7 @@ export type QuickLogTargetBlockReason =
   | "prefill_tent_mismatch"
   | "prefill_target_pending"
   | "active_grow_mismatch"
+  | "grow_archived"
   | "tent_not_found"
   | "tent_inactive"
   | "selected_tent_mismatch"
@@ -38,11 +39,12 @@ export const QUICK_LOG_TARGET_BLOCKED_COPY: Readonly<Record<QuickLogTargetBlockR
   plant_not_found: "That plant is no longer available. Choose another plant.",
   plant_inactive: "That plant is archived or merged. Choose an active plant.",
   plant_grow_unassigned: "Assign this plant to a grow and tent before saving.",
-  plant_tent_unassigned: "Assign this plant to a grow and tent before saving.",
+  plant_tent_unassigned: "Assign this plant to a tent before saving.",
   prefill_grow_mismatch: "The Quick Log grow context changed. Reopen it from the plant.",
   prefill_tent_mismatch: "The Quick Log tent context changed. Reopen it from the plant.",
   prefill_target_pending: "Confirming this Quick Log target. Please wait.",
   active_grow_mismatch: "This plant belongs to another grow. Review the target before saving.",
+  grow_archived: "This plant's grow is archived. Restore the grow to log to it.",
   tent_not_found: "The assigned tent is unavailable. Review the plant assignment before saving.",
   tent_inactive: "The assigned tent is archived. Choose an active tent before saving.",
   selected_tent_mismatch:
@@ -72,12 +74,14 @@ export interface ResolveQuickLogPrefillTargetInput {
   prefill?: QuickLogPrefillTargetRequest | null;
   plants?: ReadonlyArray<QuickLogTargetPlant> | null;
   tents?: ReadonlyArray<QuickLogTargetTent> | null;
+  requireTent?: boolean;
 }
 
 export interface ResolveQuickLogWriteTargetInput {
   activeGrowId?: string | null;
   selectedPlant?: QuickLogTargetPlant | null;
   selectedTent?: QuickLogTargetTent | null;
+  requireTent?: boolean;
 }
 
 export interface ResolveQuickLogEditorTargetInput {
@@ -85,6 +89,14 @@ export interface ResolveQuickLogEditorTargetInput {
   prefillResolution: QuickLogTargetResolution;
   writeResolution: QuickLogTargetResolution;
   dismissedBlockedPrefillKey?: string | null;
+  /**
+   * True when the named prefill's grow is archived. A named archived grow
+   * finalizes in this call: notes stay ready, every other kind is blocked.
+   * Callers omit it for ordinary active-grow launches.
+   */
+  namedGrowArchived?: boolean;
+  /** Notes may target an archived grow. Other log kinds may not. */
+  allowArchivedGrowNote?: boolean;
 }
 
 const blocked = (reason: QuickLogTargetBlockReason): QuickLogTargetResolution => ({
@@ -98,7 +110,7 @@ function normalizeId(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-function ready(plantId: string, growId: string, tentId: string): QuickLogTargetResolution {
+function ready(plantId: string, growId: string, tentId: string | null): QuickLogTargetResolution {
   return {
     status: "ready",
     target: Object.freeze({ plantId, growId, tentId }),
@@ -158,6 +170,9 @@ export function resolveQuickLogEditorTarget(
   if (input.prefillResolution.status === "blocked") {
     return input.prefillResolution;
   }
+  if (input.namedGrowArchived) {
+    return input.allowArchivedGrowNote ? input.prefillResolution : blocked("grow_archived");
+  }
   if (input.writeResolution.status === "blocked") {
     return blocked("prefill_target_pending");
   }
@@ -191,7 +206,7 @@ export function resolveQuickLogPrefillTarget(
   const growId = normalizeId(plant.grow_id);
   if (!growId) return blocked("plant_grow_unassigned");
   const tentId = normalizeId(plant.tent_id);
-  if (!tentId) return blocked("plant_tent_unassigned");
+  if (!tentId && input.requireTent !== false) return blocked("plant_tent_unassigned");
 
   const requestedGrowId = normalizeId(input.prefill?.growId);
   if (requestedGrowId && requestedGrowId !== growId) {
@@ -201,6 +216,8 @@ export function resolveQuickLogPrefillTarget(
   if (requestedTentId && requestedTentId !== tentId) {
     return blocked("prefill_tent_mismatch");
   }
+
+  if (!tentId) return ready(requestedPlantId, growId, null);
 
   const tent = (input.tents ?? []).find((candidate) => normalizeId(candidate.id) === tentId);
   if (!tent) return blocked("tent_not_found");
@@ -231,7 +248,15 @@ export function resolveQuickLogWriteTarget(
   const plantGrowId = normalizeId(plant.grow_id);
   if (!plantGrowId) return blocked("plant_grow_unassigned");
   const plantTentId = normalizeId(plant.tent_id);
-  if (!plantTentId) return blocked("plant_tent_unassigned");
+  if (!plantTentId) {
+    if (plantGrowId !== activeGrowId) return blocked("active_grow_mismatch");
+    if (input.requireTent === false && normalizeId(input.selectedTent?.id)) {
+      return blocked("selected_tent_mismatch");
+    }
+    return input.requireTent === false
+      ? ready(plantId, plantGrowId, null)
+      : blocked("plant_tent_unassigned");
+  }
   if (plantGrowId !== activeGrowId) return blocked("active_grow_mismatch");
 
   const tent = input.selectedTent;

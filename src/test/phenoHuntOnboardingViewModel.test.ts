@@ -5,6 +5,9 @@ import { describe, it, expect } from "vitest";
 import {
   computePhenoHuntOnboardingViewModel,
   defaultEvidenceGoalSelection,
+  isPhenoOnboardingStepLocked,
+  resolvePhenoOnboardingResumeStep,
+  PHENO_GOALS_REVIEW_REQUIRED_REASON,
   PHENO_ONBOARDING_STEP_ORDER,
   type PhenoOnboardingDraft,
 } from "@/lib/phenoHuntOnboardingViewModel";
@@ -17,6 +20,8 @@ function draft(over: Partial<PhenoOnboardingDraft> = {}): PhenoOnboardingDraft {
     notes: "",
     candidateIds: ["p1", "p2"],
     evidenceGoals: defaultEvidenceGoalSelection(),
+    setupCompleted: true,
+    goalsReviewed: true,
     ...over,
   };
 }
@@ -127,10 +132,57 @@ describe("computePhenoHuntOnboardingViewModel", () => {
   });
 
   it("confirmation step is only complete after setupCompleted flip", () => {
-    const notConfirmed = computePhenoHuntOnboardingViewModel(draft());
+    const notConfirmed = computePhenoHuntOnboardingViewModel(draft({ setupCompleted: false }));
     const confirmed = computePhenoHuntOnboardingViewModel(draft({ setupCompleted: true }));
     expect(notConfirmed.steps.find((s) => s.id === "confirmation")!.complete).toBe(false);
     expect(confirmed.steps.find((s) => s.id === "confirmation")!.complete).toBe(true);
+  });
+
+  it("blocks creation until the grower confirms setup", () => {
+    const vm = computePhenoHuntOnboardingViewModel(draft({ setupCompleted: false }));
+
+    expect(vm.canCreate).toBe(false);
+    expect(vm.blockingReasons).toContain("Confirm setup to enter the workspace");
+  });
+
+  it("allows creation after confirmation when all required fields are present", () => {
+    const vm = computePhenoHuntOnboardingViewModel(draft({ setupCompleted: true }));
+
+    expect(vm.canCreate).toBe(true);
+    expect(vm.blockingReasons).toEqual([]);
+  });
+
+  // ---- #573: Goals step must be reviewed before Confirmation / Create ----
+
+  it("goals not reviewed → creation blocked with a goals-review reason", () => {
+    const vm = computePhenoHuntOnboardingViewModel(draft({ goalsReviewed: false }));
+    expect(vm.canCreate).toBe(false);
+    expect(vm.blockingReasons).toContain(PHENO_GOALS_REVIEW_REQUIRED_REASON);
+  });
+
+  it("goalsReviewed missing (legacy draft) fails closed", () => {
+    const { goalsReviewed: _omit, ...legacy } = draft();
+    const vm = computePhenoHuntOnboardingViewModel(legacy);
+    expect(vm.canCreate).toBe(false);
+    expect(vm.blockingReasons).toContain(PHENO_GOALS_REVIEW_REQUIRED_REASON);
+  });
+
+  it("confirmation step is locked and incomplete until goals are reviewed", () => {
+    const vm = computePhenoHuntOnboardingViewModel(draft({ goalsReviewed: false }));
+    const confirmation = vm.steps.find((s) => s.id === "confirmation")!;
+    expect(confirmation.locked).toBe(true);
+    expect(confirmation.complete).toBe(false);
+    expect(confirmation.reason).toBe(PHENO_GOALS_REVIEW_REQUIRED_REASON);
+    // Only the confirmation step is locked; steps 1-5 stay freely navigable.
+    expect(vm.steps.filter((s) => s.locked).map((s) => s.id)).toEqual(["confirmation"]);
+  });
+
+  it("goals reviewed → confirmation unlocked and creation allowed", () => {
+    const vm = computePhenoHuntOnboardingViewModel(draft({ goalsReviewed: true }));
+    const confirmation = vm.steps.find((s) => s.id === "confirmation")!;
+    expect(confirmation.locked).toBe(false);
+    expect(vm.canCreate).toBe(true);
+    expect(vm.blockingReasons).toEqual([]);
   });
 
   // ---- Setup complete vs Comparison-ready separation ----
@@ -223,5 +275,31 @@ describe("computePhenoHuntOnboardingViewModel", () => {
       }),
     );
     expect(full.checklist.find((c) => c.id === "replication_readiness")!.status).toBe("pending");
+  });
+});
+
+describe("resume step follows the lock rule (#1840 review P2)", () => {
+  it("reopens a locked confirmation draft on Goals", () => {
+    expect(resolvePhenoOnboardingResumeStep("confirmation", false)).toBe("goals");
+    expect(resolvePhenoOnboardingResumeStep("confirmation", undefined)).toBe("goals");
+  });
+
+  it("keeps the saved step once goals were reviewed, and for every unlocked step", () => {
+    expect(resolvePhenoOnboardingResumeStep("confirmation", true)).toBe("confirmation");
+    for (const step of PHENO_ONBOARDING_STEP_ORDER.filter((s) => s !== "confirmation")) {
+      expect(resolvePhenoOnboardingResumeStep(step, false)).toBe(step);
+    }
+  });
+
+  it("agrees with the stepper's locked flag for every step", () => {
+    for (const goalsReviewed of [true, false]) {
+      const vm = computePhenoHuntOnboardingViewModel(draft({ goalsReviewed }));
+      for (const step of vm.steps) {
+        expect(step.locked === true).toBe(isPhenoOnboardingStepLocked(step.id, goalsReviewed));
+        expect(resolvePhenoOnboardingResumeStep(step.id, goalsReviewed) !== step.id).toBe(
+          step.locked === true,
+        );
+      }
+    }
   });
 });

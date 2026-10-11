@@ -5,16 +5,20 @@ import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
+import { useManualSensorCorrectionRefresh } from "@/hooks/useManualSensorCorrectionRefresh";
 import { useHydrated } from "@/hooks/useHydrated";
-import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { buildSignedOutRedirect } from "@/lib/authRedirectRules";
+import { AUTH_REVALIDATE_EVENT, useRequireAuth } from "@/hooks/useRequireAuth";
+import {
+  buildSignedOutRedirect,
+  retainSignedOutReturnIntent,
+  SIGNED_OUT_LANDING,
+} from "@/lib/authRedirectRules";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
 import QuickLog, { type QuickLogPrefill } from "./QuickLog";
 import QuickLogV2Sheet from "./QuickLogV2Sheet";
 import BrandLogo from "./BrandLogo";
-import GlobalFastAddButton from "./GlobalFastAddButton";
 import AuthStatusIndicator from "./AuthStatusIndicator";
 import SignOutConfirmDialog from "./SignOutConfirmDialog";
 import VerificationPendingBanner from "./VerificationPendingBanner";
@@ -41,30 +45,51 @@ import {
 } from "@/lib/quickLogV2OpenIntent";
 
 export default function AppShell({ children }: { children?: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, isSignOutNavigationPending } = useAuth();
   const hydrated = useHydrated();
-  const location = useLocation();
+  const observedLocation = useLocation();
+  const protectedLocationRef = useRef(observedLocation);
+  // Before the initial route resolves, an auth redirect can expose its target
+  // location to this still-mounted shell. Keep the protected source location
+  // so neither session guard replaces /auth?redirectTo=... with bare /auth.
+  if (observedLocation.pathname !== SIGNED_OUT_LANDING)
+    protectedLocationRef.current = observedLocation;
+  const location = protectedLocationRef.current;
   const previousNavigationKeyRef = useRef(location.key);
   // Protected-route boundary: re-validate session against the auth server.
   // Keep both session checks on the same signed-out destination. Sending the
-  // server revalidation to /auth while the shell sent cached-session misses to
-  // /welcome created a race at the public root and bypassed the landing page.
-  // The destination stays /welcome; buildSignedOutRedirect only appends a
-  // manifest-validated redirectTo so a signed-out deep link (e.g. a /plants
-  // bookmark) can be restored after sign-in instead of silently dropped.
-  const signedOutRedirect = buildSignedOutRedirect(
+  // server revalidation and cached-session misses to /auth preserves the
+  // manifest-validated return path. An explicit sign-out owns its separate
+  // destination and suppresses both guards until that navigation commits.
+  const builtSignedOutRedirect = buildSignedOutRedirect(
     location.pathname,
     location.search,
     location.hash,
   );
+  const signedOutRedirectRef = useRef(builtSignedOutRedirect);
+  signedOutRedirectRef.current = retainSignedOutReturnIntent(
+    signedOutRedirectRef.current,
+    builtSignedOutRedirect,
+    Boolean(user),
+  );
+  const signedOutRedirect = signedOutRedirectRef.current;
   const { status: authStatus } = useRequireAuth(signedOutRedirect);
-  const { loading: entitlementLoading, entitlement } = useMyEntitlements();
+  // One server-validated session gate for every private REST read this shell
+  // issues: a cached user while getUser() is still settling, missed
+  // (revalidation_failed) or is about to redirect must not fire any of them.
+  const sessionReady = !loading && !!user && authStatus === "authenticated";
+  useManualSensorCorrectionRefresh(sessionReady ? user.id : null);
+  // Same trust gate as alerts (#1256 P2): the entitlements read is
+  // presentation-only, but GET /rest/v1/subscriptions and user_roles are
+  // still private REST.
+  const { loading: entitlementLoading, entitlement } = useMyEntitlements({
+    enabled: sessionReady,
+  });
   // Real persisted alerts (open only). RLS-scoped to the signed-in user.
   // Replaces the prior mock badge to remove the demo-vs-live mismatch.
   // Gated on a server-validated session: a cached user while getUser() is
   // still settling (or about to redirect) must not fire GET /rest/v1/alerts —
   // the never-healthy E2E spec forbids that request along the redirect path.
-  const sessionReady = !loading && !!user && authStatus === "authenticated";
   const { alerts: openAlerts } = useAlertsList({ status: "open" }, { enabled: sessionReady });
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
@@ -93,6 +118,26 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     location.pathname,
     tentQuickLogTargetEvidence,
   );
+
+  // Header + and mobile FAB share one entry: open QuickLogV2Sheet with a
+  // route-derived tent:/plant: launch target when on Tent/Plant Detail.
+  // Field Edition visit modes live inside V2 (same as TentDetail FAB). Do not
+  // route through the legacy 8-type GlobalFastAdd preset menu or legacy
+  // QuickLog for this grower entry — other paths (prefill event, start-screen
+  // intent) may still open legacy when they need activity-type flows.
+  const openGrowerQuickLog = useCallback(() => {
+    const routePlantId = resolvePlantQuickLogRouteTarget(location.pathname);
+    const launchTargetKey = mobileQuickLogTarget ?? (routePlantId ? `plant:${routePlantId}` : null);
+
+    // Close and remount-reset legacy Quick Log in the same state transition
+    // before opening V2, so two modal focus locks can never remain active.
+    setOpenLog(false);
+    setPrefill(null);
+    setLegacyQuickLogSession((session) => session + 1);
+    setStructuredOpenIntent(null);
+    setMobileLaunchTargetKey(launchTargetKey);
+    setOpenScopedLog(true);
+  }, [location.pathname, mobileQuickLogTarget]);
 
   // This shell lives inside the route-level Suspense boundary. Tracking here
   // waits for server-auth revalidation and the paid entitlement read as well
@@ -197,8 +242,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // updated while AppShell is rendering (React update-during-render error,
   // asserted clean by the never-healthy E2E console check).
   useEffect(() => {
-    if (!loading && !user) nav(signedOutRedirect, { replace: true });
-  }, [loading, user, nav, signedOutRedirect]);
+    if (!loading && !user && !isSignOutNavigationPending?.())
+      nav(signedOutRedirect, { replace: true });
+  }, [loading, user, nav, signedOutRedirect, isSignOutNavigationPending]);
 
   // Never carry an open structured sheet or typed intent across navigations,
   // including same-path scope changes. Seeding the ref from the initial key
@@ -225,6 +271,47 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Loading…
+      </div>
+    );
+  // getUser transport/server error is not signed-out. Stay on this URL, do not
+  // mount pageContent (no private REST), do not bounce to /welcome. But never
+  // a dead end either: a bare loading shell left a grower with no way out.
+  // Retry re-runs getUser through the same event the agreements gate uses;
+  // sign-out stays an explicit choice behind the usual confirmation.
+  if (authStatus === "revalidation_failed")
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="app-shell-revalidation-failed"
+          className="w-full max-w-md space-y-3 rounded-md border border-border bg-muted/30 p-4 text-sm"
+        >
+          <p className="font-medium text-foreground">We couldn&apos;t confirm your session.</p>
+          <p className="text-muted-foreground">
+            Retry to check again. Signing out ends your session on every device, so use it only if
+            Retry keeps failing.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new Event(AUTH_REVALIDATE_EVENT));
+                }
+              }}
+            >
+              Retry
+            </Button>
+            <SignOutConfirmDialog
+              trigger={
+                <Button type="button" variant="ghost">
+                  Sign out
+                </Button>
+              }
+            />
+          </div>
+        </div>
       </div>
     );
   if (!user || authStatus === "unauthenticated") return null;
@@ -289,13 +376,19 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   <Search className="h-4 w-4" />
                 </Button>
                 {/* Quick Log is the single grower-facing logging entry
-                    point on desktop. The dropdown surfaces event-type
-                    presets (diary note, watering, feeding, training,
-                    photo, environment, diagnosis, harvest) and opens the
-                    existing Quick Log sheet via the wired window event.
-                    The previous standalone "Quick log" button has been
-                    removed to eliminate duplicate add/log CTAs. */}
-                <GlobalFastAddButton className="hidden md:inline-flex" />
+                    point on desktop. Opens QuickLogV2Sheet (Field Edition
+                    visit modes first) with the same route target as the
+                    mobile FAB / TentDetail desktop FAB. */}
+                <button
+                  type="button"
+                  onClick={openGrowerQuickLog}
+                  aria-label="Quick Log"
+                  data-testid="header-quick-log-trigger"
+                  className="hidden md:inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/40 px-4 min-h-11 min-w-11 text-sm font-medium hover:bg-secondary/70 active:bg-secondary/80 transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background touch-manipulation"
+                >
+                  <Plus className="h-5 w-5" aria-hidden="true" />
+                  Quick Log
+                </button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -345,28 +438,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           </main>
         </div>
 
-        {/* Mobile floating + */}
+        {/* Mobile floating + — same QuickLogV2 entry as header/+ */}
         <button
-          onClick={() => {
-            if (mobileQuickLogTarget) {
-              setOpenLog(false);
-              setPrefill(null);
-              setLegacyQuickLogSession((session) => session + 1);
-              setStructuredOpenIntent(null);
-              // Freeze the evidence available at the grower's tap. A plant
-              // query that settles later may improve the NEXT launch, but it
-              // cannot retarget this open sheet and erase its draft.
-              setMobileLaunchTargetKey(mobileQuickLogTarget);
-              setOpenScopedLog(true);
-            } else {
-              setOpenScopedLog(false);
-              setMobileLaunchTargetKey(null);
-              setStructuredOpenIntent(null);
-              const routePlantId = resolvePlantQuickLogRouteTarget(location.pathname);
-              setPrefill(routePlantId ? { plantId: routePlantId } : null);
-              setOpenLog(true);
-            }
-          }}
+          type="button"
+          onClick={openGrowerQuickLog}
           aria-label="Open Quick Log"
           data-testid="mobile-quick-log-fab"
           className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full gradient-leaf text-primary-foreground shadow-elevated transition hover:scale-105 active:scale-95 glow-accent md:hidden"

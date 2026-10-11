@@ -440,7 +440,7 @@ describe("decide — dedicated subscription lifecycle events", () => {
     expect(d).toEqual({ kind: "skip", reason: "unhandled_event_type" });
   });
 
-  describe("adjustment.* (Code #7) — approved refund revocation, updated audit-only", () => {
+  describe("adjustment.* (Code #7) — approved refund revocation on created and updated", () => {
     function adjustmentEvent(type: "adjustment.created" | "adjustment.updated") {
       return {
         eventId: `evt_adj_${type}`,
@@ -466,23 +466,34 @@ describe("decide — dedicated subscription lifecycle events", () => {
       });
     });
 
-    it("adjustment.updated → skip with reason adjustment_audit_only", () => {
+    it("adjustment.updated → revoke_lifetime for an approved refund with a transaction id", () => {
       const d = decide(adjustmentEvent("adjustment.updated"), "live", NOW);
-      expect(d).toEqual({ kind: "skip", reason: "adjustment_audit_only" });
+      expect(d).toEqual({
+        kind: "revoke_lifetime",
+        paddleTransactionId: "txn_01abcd",
+        env: "live",
+      });
     });
 
-    it("regression: only approved adjustment.created may revoke; neither adjustment path grants", () => {
+    it("regression: approved created and updated both revoke; neither path grants", () => {
       const created = decide(adjustmentEvent("adjustment.created"), "sandbox", NOW);
       const updated = decide(adjustmentEvent("adjustment.updated"), "sandbox", NOW);
 
-      expect(created.kind).toBe("revoke_lifetime");
-      expect(updated).toEqual({ kind: "skip", reason: "adjustment_audit_only" });
+      expect(created).toEqual({
+        kind: "revoke_lifetime",
+        paddleTransactionId: "txn_01abcd",
+        env: "sandbox",
+      });
+      expect(updated).toEqual({
+        kind: "revoke_lifetime",
+        paddleTransactionId: "txn_01abcd",
+        env: "sandbox",
+      });
       for (const decision of [created, updated]) {
         expect(["upsert_subscription", "update_subscription", "record_lifetime"]).not.toContain(
           decision.kind,
         );
       }
-      expect(updated.kind).not.toBe("revoke_lifetime");
     });
 
     it("audit fields extract cleanly for adjustment events (no crash on missing sub fields)", () => {

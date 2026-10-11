@@ -112,10 +112,19 @@ export interface BreedingLogSaveEventResult {
   rawReason: string | null;
 }
 
-type RpcInvoker = (
-  fn: string,
-  args: Record<string, unknown>,
-) => Promise<{ data: unknown; error: unknown }>;
+/**
+ * Narrow cast for the audit RPC (not yet in generated Database types).
+ * Call through the client object — never extract `supabase.rpc` into a free
+ * function. supabase-js implements rpc as `return this.rest.rpc(...)`; an
+ * unbound extract leaves `this` undefined and throws
+ * "Cannot read properties of undefined (reading 'rest')" (live on Log Event).
+ */
+type UntypedRpcClient = {
+  rpc: (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => PromiseLike<{ data: unknown; error: unknown }>;
+};
 
 interface RawResult {
   ok?: boolean;
@@ -134,17 +143,19 @@ function readErrorMessage(error: unknown): string {
 export async function callBreedingLogSaveEvent(
   args: BreedingLogSaveEventArgs,
 ): Promise<BreedingLogSaveEventResult> {
-  const invoke = supabase.rpc as unknown as RpcInvoker;
-  const { data, error } = await invoke(BREEDING_LOG_SAVE_EVENT_RPC_NAME, {
-    p_idempotency_key: args.idempotencyKey,
-    p_grow_id: args.growId,
-    p_plant_id: args.plantId,
-    p_event_type: args.eventType,
-    p_tent_id: args.tentId,
-    p_method: args.method,
-    p_intensity: args.intensity,
-    p_details: args.details,
-  });
+  const { data, error } = await (supabase as unknown as UntypedRpcClient).rpc(
+    BREEDING_LOG_SAVE_EVENT_RPC_NAME,
+    {
+      p_idempotency_key: args.idempotencyKey,
+      p_grow_id: args.growId,
+      p_plant_id: args.plantId,
+      p_event_type: args.eventType,
+      p_tent_id: args.tentId,
+      p_method: args.method,
+      p_intensity: args.intensity,
+      p_details: args.details,
+    },
+  );
 
   if (error) {
     if (isMissingRpcError(error, BREEDING_LOG_SAVE_EVENT_RPC_NAME)) {

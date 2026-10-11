@@ -76,6 +76,8 @@ export interface UseManualSnapshotTimelineCardsResult {
   isLoading: boolean;
   isError: boolean;
   error: unknown;
+  readStatus: "loading" | "paused" | "refreshing" | "error" | "success";
+  refetch: () => Promise<unknown>;
 }
 
 export function useManualSnapshotTimelineCards(
@@ -110,6 +112,17 @@ export function useManualSnapshotTimelineCards(
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,
+    readStatus:
+      query.fetchStatus === "paused"
+        ? "paused"
+        : query.isPending
+          ? "loading"
+          : query.isFetching
+            ? "refreshing"
+            : query.isError
+              ? "error"
+              : "success",
+    refetch: query.refetch,
   };
 }
 

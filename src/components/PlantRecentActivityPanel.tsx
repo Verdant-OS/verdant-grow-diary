@@ -191,7 +191,8 @@ function EntryRow({
 export default function PlantRecentActivityPanel({ plantId, plantName }: Props) {
   const enabled = !!plantId;
   const temperatureUnit = useTemperatureUnitPreference();
-  const { data, isLoading } = usePlantRecentActivity(plantId);
+  const { data, isLoading, isError, isFetching, refetch, isPending, fetchStatus } =
+    usePlantRecentActivity(plantId);
   const rawRows = enabled ? (data ?? []) : [];
   const rows = buildPlantRecentActivity(rawRows, {
     plantId: plantId ?? null,
@@ -234,8 +235,27 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
           <p className="text-muted-foreground" data-testid="plant-recent-activity-empty-no-plant">
             No plant selected.
           </p>
-        ) : isLoading ? (
-          <p className="text-muted-foreground">Loading recent activity…</p>
+        ) : isLoading || isPending ? (
+          <p className="text-muted-foreground" role="status">
+            {fetchStatus === "paused"
+              ? "Waiting for connection to load recent activity…"
+              : "Loading recent activity…"}
+          </p>
+        ) : isError ? (
+          <div role="alert" data-testid="plant-recent-activity-unavailable">
+            <p className="text-muted-foreground">Recent plant activity is unavailable.</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-2"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+              aria-label="Retry recent activity"
+            >
+              {isFetching ? "Retrying…" : "Retry"}
+            </Button>
+          </div>
         ) : rows.length === 0 ? (
           <p className="text-muted-foreground" data-testid="plant-recent-activity-empty">
             No activity logged for this plant yet.

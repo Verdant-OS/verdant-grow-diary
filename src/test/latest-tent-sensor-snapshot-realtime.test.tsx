@@ -16,6 +16,9 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
+const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: owner } }) }));
+
 type Handler = (payload: unknown) => void;
 
 interface FakeChannel {
@@ -56,7 +59,17 @@ const queryBuilder = {
   select: () => queryBuilder,
   eq: () => queryBuilder,
   order: () => queryBuilder,
-  limit: async () => ({ data: queryRows, error: null }),
+  limit: async () => ({
+    data: queryRows.map((row, index) => ({
+      ...(row as Record<string, unknown>),
+      id: `cccccccc-cccc-4ccc-8ccc-${String(index).padStart(12, "0")}`,
+      tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      user_id: owner,
+      device_id: null,
+      correction_valid: true,
+    })),
+    error: null,
+  }),
 };
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -136,7 +149,7 @@ describe("useLatestTentSensorSnapshot — realtime cache invalidation", () => {
       const burstCalls = spy.mock.calls.length - before;
       expect(burstCalls).toBe(1);
       expect(spy).toHaveBeenLastCalledWith({
-        queryKey: latestTentSensorSnapshotQueryKey("tent-A"),
+        queryKey: latestTentSensorSnapshotQueryKey("tent-A", owner),
       });
 
       // A subsequent insert after the window schedules a new invalidation
@@ -215,8 +228,20 @@ describe("useLatestTentSensorSnapshot — realtime cache invalidation", () => {
   });
 
   it("query key matches the documented shape", () => {
-    expect(latestTentSensorSnapshotQueryKey("tent-A")).toEqual(["sensor", "latest", "tent-A"]);
-    expect(latestTentSensorSnapshotQueryKey(null)).toEqual(["sensor", "latest", "none"]);
+    expect(latestTentSensorSnapshotQueryKey("tent-A", owner)).toEqual([
+      "sensor",
+      "latest",
+      "tent-A",
+      "effective-v1",
+      owner,
+    ]);
+    expect(latestTentSensorSnapshotQueryKey(null, owner)).toEqual([
+      "sensor",
+      "latest",
+      "none",
+      "effective-v1",
+      owner,
+    ]);
   });
 
   it("classifies diagnostics before caching and returns no attachable snapshot", async () => {
@@ -250,7 +275,7 @@ describe("useLatestTentSensorSnapshot — realtime cache invalidation", () => {
     await waitFor(() => expect(result.current.status).toBe("empty"));
     expect(result.current.snapshot.status).toBe("empty");
     expect(result.current.snapshot.usable).toBe(false);
-    const cached = client.getQueryData(latestTentSensorSnapshotQueryKey("tent-A"));
+    const cached = client.getQueryData(latestTentSensorSnapshotQueryKey("tent-A", owner));
     expect(JSON.stringify(cached)).not.toMatch(/raw_payload|classification-only-secret/i);
   });
 
@@ -303,7 +328,7 @@ describe("useLatestTentSensorSnapshot — realtime cache invalidation", () => {
     expect(result.current.snapshot.status).toBe("fresh_live");
     expect(result.current.snapshot.usable).toBe(true);
     expect(result.current.snapshot.metrics.humidity_pct).toBe(55);
-    const cached = client.getQueryData(latestTentSensorSnapshotQueryKey("tent-A"));
+    const cached = client.getQueryData(latestTentSensorSnapshotQueryKey("tent-A", owner));
     expect(JSON.stringify(cached)).not.toMatch(/raw_payload|PASSKEY|classification-only-secret/i);
   });
 });

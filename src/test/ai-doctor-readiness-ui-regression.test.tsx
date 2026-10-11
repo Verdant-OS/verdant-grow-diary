@@ -41,7 +41,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((() => {
   throw new Error("fetch not allowed in readiness regression test");
 }) as never);
 
@@ -69,6 +69,16 @@ vi.mock("@/hooks/usePlantAssignedTentAlerts", () => ({
     status: "idle",
     rows: alertsState.rows,
     error: null,
+  }),
+}));
+vi.mock("@/hooks/use-sensor-readings", () => ({
+  useSensorReadingsByTents: () => ({
+    byTent: {},
+    statusByTent: {},
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+    retryTent: vi.fn(),
   }),
 }));
 

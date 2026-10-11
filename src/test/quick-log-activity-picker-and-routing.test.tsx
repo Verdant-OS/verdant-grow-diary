@@ -82,8 +82,11 @@ describe("QuickLogActivityPicker", () => {
 });
 
 describe("useQuickLogActivitySave — routing", () => {
-  it("routes Note through quicklog_save_manual with p_action=note", async () => {
-    rpcMock.mockResolvedValueOnce({ data: { ok: true, grow_event_id: "n1" }, error: null });
+  it("routes Note through quicklog_save_manual with p_action=note and forwards a valid idempotency key", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" },
+      error: null,
+    });
     const { result } = renderHook(() => useQuickLogActivitySave());
     let res!: Awaited<ReturnType<typeof result.current.save>>;
     await act(async () => {
@@ -92,6 +95,7 @@ describe("useQuickLogActivitySave — routing", () => {
         growId: "g1",
         plantId: "p1",
         note: "hello",
+        idempotencyKey: "idem-key-12345",
       });
     });
     expect(res.ok).toBe(true);
@@ -102,6 +106,7 @@ describe("useQuickLogActivitySave — routing", () => {
     // Real deployed signature is target-scoped; p_grow_id never existed.
     expect(payload.p_target_type).toBe("plant");
     expect(payload.p_target_id).toBe("p1");
+    expect(payload.p_idempotency_key).toBe("idem-key-12345");
     expect(payload).not.toHaveProperty("p_grow_id");
   });
 
@@ -120,18 +125,45 @@ describe("useQuickLogActivitySave — routing", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
-  it("refuses the manual route without a tent or plant target (no RPC call)", async () => {
+  it("refuses the manual route without a tent or plant target when a valid key is supplied (no RPC call)", async () => {
     const { result } = renderHook(() => useQuickLogActivitySave());
     let res!: Awaited<ReturnType<typeof result.current.save>>;
     await act(async () => {
       res = await result.current.save({
         activityId: "note",
         growId: "g1",
+        idempotencyKey: "idem-key-12345",
       });
     });
     expect(res).toEqual({ ok: false, reason: "missing_target" });
     expect(rpcMock).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["short (<8)", "short"],
+    ["eight spaces", " ".repeat(8)],
+    ["eight tabs", "\t".repeat(8)],
+    ["overlong (>200)", "x".repeat(201)],
+  ] as const)(
+    "manual route fail-closes %s idempotency key without RPC",
+    async (_label, idempotencyKey) => {
+      const { result } = renderHook(() => useQuickLogActivitySave());
+      let res!: Awaited<ReturnType<typeof result.current.save>>;
+      await act(async () => {
+        res = await result.current.save({
+          activityId: "note",
+          growId: "g1",
+          plantId: "p1",
+          note: "hello",
+          ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+        });
+      });
+      expect(res).toEqual({ ok: false, reason: "missing_idempotency_key" });
+      expect(rpcMock).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     ["feeding", "feeding"],
@@ -144,7 +176,7 @@ describe("useQuickLogActivitySave — routing", () => {
     "routes %s through quicklog_save_event with event_type=%s",
     async (activityId, eventType) => {
       rpcMock.mockResolvedValueOnce({
-        data: { ok: true, grow_event_id: "e1" },
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002" },
         error: null,
       });
       const { result } = renderHook(() => useQuickLogActivitySave());
@@ -163,7 +195,7 @@ describe("useQuickLogActivitySave — routing", () => {
 
   it("Defoliation persists as event_type=training with details.subtype=defoliation", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "d1" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000003" },
       error: null,
     });
     const { result } = renderHook(() => useQuickLogActivitySave());
@@ -182,7 +214,7 @@ describe("useQuickLogActivitySave — routing", () => {
 
   it("Harvest saves via quicklog_save_event with event_type='harvest' and dispatches on success", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "h1" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000004" },
       error: null,
     });
     const listener = vi.fn();
@@ -209,7 +241,7 @@ describe("useQuickLogActivitySave — routing", () => {
 
   it("Harvest never routes through quicklog_save_manual", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "h2" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000005" },
       error: null,
     });
     const { result } = renderHook(() => useQuickLogActivitySave());
@@ -249,7 +281,10 @@ describe("useQuickLogActivitySave — routing", () => {
   });
 
   it("no NON-harvest activity ever writes event_type='harvest'", async () => {
-    rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "x" }, error: null });
+    rpcMock.mockResolvedValue({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000006" },
+      error: null,
+    });
     const { result } = renderHook(() => useQuickLogActivitySave());
     for (const id of [
       "note",
@@ -296,7 +331,10 @@ describe("useQuickLogActivitySave — routing", () => {
   });
 
   it("successful save dispatches verdant:entry-created exactly once", async () => {
-    rpcMock.mockResolvedValueOnce({ data: { ok: true, grow_event_id: "e2" }, error: null });
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000007" },
+      error: null,
+    });
     const listener = vi.fn();
     window.addEventListener("verdant:entry-created", listener);
     const { result } = renderHook(() => useQuickLogActivitySave());
@@ -310,6 +348,59 @@ describe("useQuickLogActivitySave — routing", () => {
     window.removeEventListener("verdant:entry-created", listener);
     expect(listener).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    ["min 8 after trim", "  abcdefgh  ", "abcdefgh"],
+    ["max 200 after trim", `  ${"k".repeat(200)}  `, "k".repeat(200)],
+  ] as const)(
+    "event route trims %s and forwards p_idempotency_key",
+    async (_label, rawKey, trimmed) => {
+      rpcMock.mockResolvedValueOnce({
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000008" },
+        error: null,
+      });
+      const { result } = renderHook(() => useQuickLogActivitySave());
+      let res!: Awaited<ReturnType<typeof result.current.save>>;
+      await act(async () => {
+        res = await result.current.save({
+          activityId: "training",
+          growId: "g1",
+          idempotencyKey: rawKey,
+        });
+      });
+      expect(res.ok).toBe(true);
+      expect(rpcMock).toHaveBeenCalledTimes(1);
+      const [name, payload] = rpcMock.mock.calls[0];
+      expect(name).toBe("quicklog_save_event");
+      expect(payload.p_idempotency_key).toBe(trimmed);
+    },
+  );
+
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["empty", ""],
+    ["short (<8)", "short"],
+    ["whitespace-only", " ".repeat(8)],
+    ["trimmed-short", "  short  "],
+    ["overlong (>200)", "x".repeat(201)],
+    ["trimmed-overlong", `  ${"x".repeat(201)}  `],
+  ] as const)(
+    "event route fail-closes %s idempotency key without RPC",
+    async (_label, idempotencyKey) => {
+      const { result } = renderHook(() => useQuickLogActivitySave());
+      let res!: Awaited<ReturnType<typeof result.current.save>>;
+      await act(async () => {
+        res = await result.current.save({
+          activityId: "training",
+          growId: "g1",
+          ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+        });
+      });
+      expect(res).toEqual({ ok: false, reason: "missing_idempotency_key" });
+      expect(rpcMock).not.toHaveBeenCalled();
+    },
+  );
 
   it("event route requires an idempotency key", async () => {
     const { result } = renderHook(() => useQuickLogActivitySave());

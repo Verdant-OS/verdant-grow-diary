@@ -10,17 +10,23 @@
  */
 import { useCallback, useMemo } from "react";
 import { Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
 import AiDoctorCheckInPreviewPanel from "@/components/AiDoctorCheckInPreviewPanel";
 import PlantSensorContextAuditPanel from "@/components/PlantSensorContextAuditPanel";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
+import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import {
   buildPlantAiDoctorContext,
+  mergePlantAndTentManualSensorLogs,
+  tentManualSensorRowsToPlantSensorLogs,
   type DiaryEntryRowLike,
   type ManualSensorLogLike,
 } from "@/lib/plantAiDoctorContextAdapter";
+import { AI_DOCTOR_CURRENT_SENSOR_ROW_CAP } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
+import { isUuid } from "@/lib/isUuid";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
 import type { PlantRowLike } from "@/lib/aiDoctorContextCompiler";
@@ -51,10 +57,14 @@ export interface PlantDetailAiDoctorContextReadinessMountProps {
   potSize?: string | null;
 }
 
+/** Stable empty identity so tent-unscoped plants do not recompile context every render. */
+const NO_TENT_MANUAL_ROWS: never[] = [];
+
 function FallbackShell({ testId, message }: { testId: string; message: string }) {
   return (
     <section
       data-testid={testId}
+      role="status"
       className="glass rounded-2xl p-4 my-3 text-xs text-muted-foreground flex items-center gap-2"
     >
       <Activity className="h-4 w-4" aria-hidden="true" />
@@ -77,8 +87,38 @@ export default function PlantDetailAiDoctorContextReadinessMount({
   const recentActivity = usePlantRecentActivity(plantId);
   const manualLogs = usePlantManualSensorLogs(plantId);
   const alerts = usePlantAssignedTentAlerts(tentId, growId);
+  const tentUuid = isUuid(tentId) ? tentId : null;
+  const tentReadings = useSensorReadingsByTents(
+    tentUuid ? [tentUuid] : [],
+    AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
+    ["manual"],
+  );
+  const tentSensorStatus = tentUuid
+    ? (tentReadings.statusByTent[tentUuid] ?? "loading")
+    : "success";
+  const tentSensorFailed = tentSensorStatus === "error" || tentSensorStatus === "refresh_error";
+  const tentSensorRows =
+    tentUuid && !tentSensorFailed
+      ? (tentReadings.byTent[tentUuid] ?? NO_TENT_MANUAL_ROWS)
+      : NO_TENT_MANUAL_ROWS;
 
-  const isLoading = recentActivity.isLoading || manualLogs.isLoading;
+  const hasReadError = recentActivity.isError || manualLogs.isError || tentSensorFailed;
+  const isLoading =
+    recentActivity.isLoading ||
+    recentActivity.isFetching ||
+    recentActivity.data === undefined ||
+    manualLogs.isLoading ||
+    manualLogs.isFetching ||
+    manualLogs.data === undefined ||
+    Boolean(
+      tentUuid && (tentSensorStatus === "loading" || tentReadings.refreshingByTent?.[tentUuid]),
+    );
+
+  const retryContextReads = () => {
+    void recentActivity.refetch();
+    void manualLogs.refetch();
+    void tentReadings.refetch();
+  };
 
   const plantRow: PlantRowLike = useMemo(
     () => ({
@@ -105,6 +145,8 @@ export default function PlantDetailAiDoctorContextReadinessMount({
         plant: plantRow,
         diaryEntries: diary,
         manualSensorLogs: logs,
+        tentSensorRows,
+        tentId: tentUuid ?? tentId,
       });
       return { context, error: null as Error | null };
     } catch (e) {
@@ -113,7 +155,7 @@ export default function PlantDetailAiDoctorContextReadinessMount({
         error: e instanceof Error ? e : new Error("Failed to compile AI Doctor context"),
       };
     }
-  }, [plantRow, recentActivity.data, manualLogs.data]);
+  }, [plantRow, recentActivity.data, manualLogs.data, tentSensorRows, tentUuid, tentId]);
 
   // NOTE: All hooks below MUST be called unconditionally on every render.
   // Previously `useMemo(auditIdentity)` and `useCallback(openManualSensorEntry)`
@@ -189,6 +231,24 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     );
   }
 
+  if (hasReadError) {
+    return (
+      <section
+        data-testid="plant-detail-ai-doctor-context-readiness-mount-error"
+        role="alert"
+        className="glass rounded-2xl p-4 my-3 space-y-2"
+      >
+        <p className="text-sm font-medium">Context preview unavailable.</p>
+        <p className="text-xs text-muted-foreground">
+          Some plant or tent records could not be loaded. Try again to check what is available.
+        </p>
+        <Button type="button" size="sm" variant="outline" onClick={retryContextReads}>
+          Try context read again
+        </Button>
+      </section>
+    );
+  }
+
   if (isLoading) {
     return (
       <FallbackShell
@@ -207,7 +267,10 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     );
   }
 
-  const auditLogs = (manualLogs.data ?? []) as ReadonlyArray<ManualSensorLog>;
+  const auditLogs = mergePlantAndTentManualSensorLogs(
+    (manualLogs.data ?? []) as ReadonlyArray<ManualSensorLog>,
+    tentManualSensorRowsToPlantSensorLogs(tentSensorRows, tentUuid ?? tentId),
+  );
 
   const safeOpenPhoto = growId && tentId ? () => openQuickLogActivity("photo") : undefined;
   const safeOpenFeeding = growId && tentId ? () => openQuickLogActivity("feeding") : undefined;
@@ -217,12 +280,24 @@ export default function PlantDetailAiDoctorContextReadinessMount({
 
   return (
     <div data-testid="plant-detail-ai-doctor-context-readiness-mount" className="my-3 space-y-2">
+      <p
+        className="text-xs text-muted-foreground"
+        data-testid="plant-detail-ai-doctor-context-readiness-mount-scope"
+      >
+        This preview uses recent plant diary records and manual sensor readings from its assigned
+        tent. Readiness summaries use sensor readings from the last 7 days. Current sensor health is
+        shown in AI Doctor readiness.
+      </p>
       <AiDoctorContextReadinessPanel
         context={built.context}
         // The readiness panel renders this under "Open alerts", so it must be
         // the strictly-open count over the UNCAPPED set — the hook's rows
         // include acknowledged alerts and are truncated for display.
-        openAlertsCount={alerts.openCount}
+        // Loading and failed reads cannot establish a count, even if rows
+        // from a previous read are still retained by the underlying hook.
+        openAlertsCount={tentId && alerts.status === "ok" ? alerts.openCount : undefined}
+        openAlertsStatus={tentId ? alerts.status : "no_tent"}
+        onRetryAlerts={alerts.reload}
         quickActions={{
           // Every action routes into an existing Quick Log surface; the
           // grower still reviews and saves. Dispatching never writes.

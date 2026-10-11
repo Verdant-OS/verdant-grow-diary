@@ -13,6 +13,8 @@
  * Pricing CTA. This helper is presenter-only.
  */
 
+import { CREDIT_PACK_IDS, type CreditPackId } from "@/lib/paidPlanAllowlist";
+
 export type PricingBillingPeriod = "monthly" | "annual";
 
 export type PricingPreselectPlan =
@@ -70,4 +72,17 @@ export function isPreselectPlanId(value: unknown): value is PricingPreselectPlan
     value === "craft_annual" ||
     value === "founder_lifetime"
   );
+}
+
+/**
+ * Resolve a query-only credit-pack handoff to its visible Pricing surface.
+ * This is presentation state only: callers must never treat it as authority
+ * to open checkout without a fresh, explicit grower click.
+ */
+export function resolvePricingCreditPackPreselect(
+  planParam: string | null | undefined,
+): CreditPackId | null {
+  if (typeof planParam !== "string" || planParam.length === 0) return null;
+  const normalized = planParam.toLowerCase();
+  return CREDIT_PACK_IDS.find((id) => id === normalized) ?? null;
 }

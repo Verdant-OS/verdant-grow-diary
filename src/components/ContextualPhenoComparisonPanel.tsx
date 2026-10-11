@@ -6,7 +6,7 @@
  *  - Presenter only. No fetch, no Supabase, no Edge Functions, no AI,
  *    no Action Queue writes, no alerts, no device control.
  *  - Does not rank, score, or pick a winner. Grower decides.
- *  - Demo / stale / invalid / unknown sources render as caution / untrusted
+ *  - Demo / stale / invalid sources render as caution / untrusted
  *    and are never labeled healthy.
  */
 import { cn } from "@/lib/utils";
@@ -23,7 +23,6 @@ const SENSOR_SOURCE_ORDER: readonly ContextualPhenoSensorSource[] = [
   "demo",
   "stale",
   "invalid",
-  "unknown",
 ];
 
 const TRUSTED_SOURCES: ReadonlySet<ContextualPhenoSensorSource> = new Set([
@@ -39,7 +38,6 @@ const SOURCE_LABEL: Record<ContextualPhenoSensorSource, string> = {
   demo: "Demo",
   stale: "Stale",
   invalid: "Invalid",
-  unknown: "Unknown",
 };
 
 const SOURCE_TONE: Record<ContextualPhenoSensorSource, string> = {
@@ -49,7 +47,6 @@ const SOURCE_TONE: Record<ContextualPhenoSensorSource, string> = {
   demo: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   stale: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   invalid: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
-  unknown: "border-muted-foreground/30 bg-muted/40 text-muted-foreground",
 };
 
 function fmtNum(value: number | null, digits = 1, suffix = ""): string {
@@ -156,10 +153,7 @@ function buildEvidenceBadges(
   const ev = plant.evidenceCounts;
   const env = plant.environmentSummary;
   const untrustedCount =
-    plant.sourceCounts.demo +
-    plant.sourceCounts.stale +
-    plant.sourceCounts.invalid +
-    plant.sourceCounts.unknown;
+    plant.sourceCounts.demo + plant.sourceCounts.stale + plant.sourceCounts.invalid;
 
   const presentOrMissing = (count: number, label: string): EvidenceBadgeDescriptor => ({
     type: label.toLowerCase(),

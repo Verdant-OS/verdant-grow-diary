@@ -1,120 +1,62 @@
-# Preview Deployment Verification
+# Hosted verification: production only
 
-Checklist for verifying the `verdant-command-center-preview` Vercel project
-is configured and deployed safely. Use this before sharing a preview URL or
-merging changes that affect deployment configuration.
+Matthew's 2026-09-28 decision supersedes the old preview-deployment checklist.
+Verify at **https://verdantgrowdiary.com**. Use the
+[production-only runbook](production-only-verification-runbook.md) for fixture
+safety, exact receipts, review routing and legacy CI follow-ups.
 
-This is a **preview-only** project. Production deployment from `main` and
-`master` is disabled (see `vercel.json`).
+Prior Vite/Vercel project settings were historical configuration, not today's
+verified publisher. Measure the deployed identity before claiming platform or
+release status. Build artifacts and preview URLs cannot establish live acceptance.
 
----
+## Historical npm compatibility record
 
-## 1. Vercel Project Settings
+The existing `config/dependency-lockfile-transition.json` retains these exact
+markers until its reviewed consumer inventory changes. They record historical
+dashboard settings, not verified production configuration or instructions to
+use another smoke host. Bun remains canonical; this documentation slice does
+not alter the dependency transition policy.
 
-These must match `vercel.json` and the Vite app layout:
-
-| Setting              | Value          |
-| -------------------- | -------------- |
-| Framework preset     | Vite           |
+```text
 | Install command      | `npm install`  |
 | Build command        | `npm run build`|
-| Output directory     | `dist`         |
 | Dev command          | `npm run dev`  |
+```
 
-SPA routing is handled by the rewrite rule in `vercel.json`
-(`/((?!assets/).*) → /index.html`). Direct route refresh must work without
-404s.
+## Live checks
 
----
+- Confirm frontend identity and dirty flag at the measurement time.
+- Exercise direct route load/refresh for the approved fixture flow.
+- Preserve manual/CSV/live/demo/stale/invalid labels; never fake live data.
+- Never show unknown, stale or invalid telemetry as healthy.
+- Verify the test account and grow/tent/plant ownership before a write.
+- Tag grow records `[smoke <timestamp>]` and read them back in the same grow.
+- Exclude customer data and the KEEP account.
+- Preserve approval-required Action Queue, no AI execution and no device control.
+- Keep credentials and server-only secret values out of output and receipts.
 
-## 2. Required Client-Safe Environment Variables
+## Frontend secret-exposure gate
 
-Only `VITE_`-prefixed, publishable values may be set in Vercel for this
-project. These are intentionally exposed to the browser bundle:
+Identify the current production publisher and selected project from measured
+configuration before inspecting its environment. An authorized operator checks
+the frontend build's variable names and exposure settings, without copying secret
+values: no service-role key, JWT secret, private database URL or other privileged
+credential may enter a public/client variable or browser bundle. Check the actual
+browser-delivered JavaScript with secret detection whose output is limited to the
+finding category and file location; never print matching values or token fragments.
+The committed publishable/anon key is the only allowed browser credential and does
+not waive inspection for privileged credentials.
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
-- `VITE_SUPABASE_PROJECT_ID`
+Both the publisher configuration and delivered bundle checks require an exact
+deployment identity and dated PASS / FAIL / BLOCKED / NOT_MEASURED receipts. If
+access is closed, retain NOT_MEASURED and block the release verdict; build success,
+secret masking in logs, or an old preview project's settings are not substitutes.
+A finding stops the release for the authorized owner to remediate. This checklist
+does not authorize secret reads, edits, rotation, environment changes or Publish.
 
-Values must match the published Supabase project ref. See `.env.example`
-for the expected format.
+## Limits and rollback
 
----
-
-## 3. Forbidden Secrets (must NOT exist in Vercel envs)
-
-The preview project is a **client-only** Vite build. The following must
-never be added to Vercel — they would be bundled into the browser and
-leak privileged access:
-
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_JWT_SECRET`
-- `SERVICE_ROLE_KEY`
-- `DATABASE_URL` with privileged credentials
-- Any non-`VITE_`-prefixed secret intended only for server-side use
-
-Server-only secrets belong in Supabase Edge Function secrets, not in
-Vercel.
-
----
-
-## 4. Preview Deployment Checklist
-
-- [ ] Preview deployment created for a non-`main` branch
-- [ ] No production deployment from `main`
-- [ ] No production deployment from `master`
-- [ ] App loads at the preview URL
-- [ ] Direct route refresh works (e.g. open `/dashboard` directly, then reload)
-- [ ] Supabase env vars (§2) are present in Vercel
-- [ ] No forbidden secrets (§3) exist in Vercel envs
-- [ ] No browser console env/init errors (`verifyEnv` is silent)
-
----
-
-## 5. Sensor Truthfulness Checklist
-
-Per the Live vs Demo contract (`docs/grow-os-architecture.md` §3):
-
-- [ ] No fake live data is surfaced as real
-- [ ] Mock / demo readings are visibly labeled (`Demo` badge or caption)
-- [ ] Manual readings are distinguishable from live sensor readings
-      (`Manual` vs `Live` label)
-- [ ] Stale or unavailable readings are not presented as current
-      telemetry (`Stale` / `Unavailable` labels are shown)
-
----
-
-## 6. Safety Boundary Checklist
-
-Verdant is observe-only / approval-required by default. The preview must
-not demonstrate or imply otherwise:
-
-- [ ] No device-command behavior (no fan/light/pump/heater/dosing control)
-- [ ] No external-control behavior
-- [ ] No blind automation
-- [ ] No auto-created Action Queue items without grower review
-- [ ] No AI language implying Verdant grows automatically
-
----
-
-## 7. Rollback Steps
-
-If the repo-controlled preview configuration is retired:
-
-1. Remove `vercel.json` if repo-controlled preview config is no longer used.
-2. Remove `.env.example` entries only if no longer used by any environment.
-3. Remove preview env vars from the Vercel project if the preview project
-   is retired.
-4. Reconfirm production deployment rules after rollback — `main` and
-   `master` must remain protected from accidental production deploys
-   unless an explicit production path is approved.
-
----
-
-## References
-
-- `vercel.json` — repo-controlled deployment config
-- `.env.example` — required client env vars
-- `src/lib/verifyEnv.ts` — runtime env validation
-- `docs/grow-os-architecture.md` — Live vs Demo contract, AI safety
-- `docs/security-checklist.md` — secret handling, service_role rules
+No merge, Publish, APPLY or secret/environment edit is authorized. Frontend
+identity does not prove Edge deployment, applied schema or live save/retrieve.
+Record unmeasured axes. Revert prose only; production rollback requires its own
+reviewed owner operation, not configuration or secret deletion.

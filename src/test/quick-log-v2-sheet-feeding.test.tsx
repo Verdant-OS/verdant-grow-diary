@@ -48,6 +48,10 @@ vi.mock("@/hooks/use-tents", () => ({
   }),
 }));
 
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({ grows: [{ id: "grow-1", name: "Grow 1" }] }),
+}));
+
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "user-1" } }),
 }));
@@ -68,6 +72,10 @@ vi.mock("@/lib/writeFeedingTypedEvent", () => ({
 
 vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
   useRecentFeedingsForDefaults: () => ({ data: [] }),
+}));
+
+vi.mock("@/hooks/useRecentWateringsForVolumeDefaults", () => ({
+  useRecentWateringsForVolumeDefaults: () => ({ data: [] }),
 }));
 
 function renderSheet(defaultTargetKey: string) {
@@ -111,6 +119,7 @@ function clickSave() {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   clearLocalStorageForTest();
   clearTemperatureUnitPreference();
   rpcMock.mockReset();
@@ -400,7 +409,9 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     fillRequiredFeedingFields();
     clickSave();
     await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith("Could not log feeding. Nothing else was changed."),
+      expect(toastError).toHaveBeenCalledWith(
+        "This Feeding is unconfirmed. Retry checks the original entry and destination.",
+      ),
     );
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(rpcMock).not.toHaveBeenCalled();

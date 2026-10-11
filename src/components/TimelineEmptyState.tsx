@@ -118,10 +118,14 @@ export default function TimelineEmptyState({
           <button
             type="button"
             onClick={onClearFilters}
-            data-testid="timeline-empty-state-clear-filters"
+            data-testid={
+              view.kind === "date_window"
+                ? "timeline-empty-state-clear-dates"
+                : "timeline-empty-state-clear-filters"
+            }
             className="inline-flex items-center rounded-lg border border-border/60 px-4 min-h-11 text-sm hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
           >
-            Clear filters
+            {view.clearFiltersLabel}
           </button>
         </div>
       ) : null}

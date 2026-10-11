@@ -130,6 +130,45 @@ describe("sensorMetricStateRules", () => {
     ).toBe("demo");
   });
 
+  it("follows the #1003 canon: unrecognized providers are Invalid, never Live or Demo (#592)", () => {
+    // The old private table promoted transport strings (hassio/ha/broker/
+    // api/device/gateway/supabase) to the Live kind and fell back to Demo
+    // for anything unrecognized. The canon fails both closed.
+    for (const source of ["hassio", "ha", "broker", "api", "device", "gateway", "supabase"]) {
+      expect(
+        classifySensorMetricState({ metric: "temp", value: 24, source, hasAnyReading: true }).kind,
+        `source=${source}`,
+      ).toBe("invalid");
+    }
+    expect(
+      classifySensorMetricState({
+        metric: "temp",
+        value: 24,
+        source: "totally_unknown",
+        hasAnyReading: true,
+      }).kind,
+    ).toBe("invalid");
+    // Sanctioned first-party alias keeps its Live kind.
+    expect(
+      classifySensorMetricState({
+        metric: "temp",
+        value: 24,
+        source: "pi_bridge",
+        hasAnyReading: true,
+      }).kind,
+    ).toBe("live");
+    // A row whose stored label is literally "stale" renders the Stale
+    // kind, never Demo.
+    expect(
+      classifySensorMetricState({
+        metric: "temp",
+        value: 24,
+        source: "stale",
+        hasAnyReading: true,
+      }).kind,
+    ).toBe("stale");
+  });
+
   it("metric classification helpers identify optional vs core", () => {
     expect(isOptionalMetric("co2")).toBe(true);
     expect(isOptionalMetric("ppfd")).toBe(true);
@@ -167,8 +206,14 @@ describe("sensorMetricStateRules static safety", () => {
       expect(src).not.toMatch(/ai[_-]?doctor/i);
       expect(src).not.toMatch(/device[_-]?control/i);
       expect(src).not.toMatch(/automation/i);
-      expect(src).not.toMatch(/import\s+/);
     }
+    // #592 fold renegotiation: sensorMetricStateRules may import EXACTLY
+    // the sanctioned source canon (so it cannot grow a private alias
+    // table again) — nothing else. vpdCalculationRules stays import-free.
+    const metricImports = SRC.match(/^import[\s\S]*?;$/gm) ?? [];
+    expect(metricImports).toHaveLength(1);
+    expect(metricImports[0]).toContain("@/lib/sensor/sensorSourceRules");
+    expect(VPD_SRC).not.toMatch(/import\s+/);
   });
 });
 

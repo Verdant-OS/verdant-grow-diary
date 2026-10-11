@@ -89,6 +89,8 @@ export function resolveSignOutRedirect(requested?: unknown): string {
 export interface PerformSafeSignOutDeps {
   signOut: () => Promise<unknown> | unknown;
   clearUiState?: () => void;
+  /** Old operations must not clear transient UI state belonging to a newer session. */
+  isCurrent?: () => boolean;
 }
 
 export type SafeSignOutResult =
@@ -101,6 +103,8 @@ export async function performSafeSignOut(
   const redirectTo = resolveSignOutRedirect(requestedRedirect);
   let ok = true;
   try {
+    // A timeout cannot cancel SDK logout. Never report completion while that
+    // operation could still remove a subsequently created client session.
     const result = await deps.signOut();
     // Supabase-style failures resolve as `{ error }` without throwing. Treat
     // any truthy `.error` as sign-out failure so callers that pass through
@@ -118,7 +122,7 @@ export async function performSafeSignOut(
     ok = false;
   }
   try {
-    deps.clearUiState?.();
+    if (deps.isCurrent?.() !== false) deps.clearUiState?.();
   } catch {
     /* never throw to caller */
   }

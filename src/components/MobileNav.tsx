@@ -7,6 +7,7 @@ import {
   Bell,
   MoreHorizontal,
   Sprout,
+  Leaf,
   Activity,
   Stethoscope,
   Settings,
@@ -34,17 +35,23 @@ import OperatorModeLink from "@/components/OperatorModeLink";
 import { isNavigationItemActive, type NavigationActiveRule } from "@/lib/navigationActiveRules";
 import {
   LABS_NAVIGATION_DESTINATIONS,
+  resolveLabsNavigationDestinations,
+  resolveMobilePrimaryHref,
   type LabsNavigationDestinationId,
 } from "@/lib/growerNavigationRules";
+import { resolveNavigationGrowId } from "@/lib/navigationGrowIdRules";
 
 type PrimaryItem = MoreItem & NavigationActiveRule;
 
+/**
+ * One-Tent Home first row: Tent / Log / Timeline / More. Tent is the
+ * session-aware home; Log is the existing `/daily-check` route. Tents,
+ * Plants and Alerts stay reachable under More.
+ */
 export const primary: PrimaryItem[] = [
-  { to: "/", label: "Home", icon: LayoutDashboard, end: true, aliases: ["/dashboard"] },
-  { to: "/tents", label: "Tents", icon: Box },
-  { to: "/plants", label: "Plants", icon: Sprout },
+  { to: "/", label: "Tent", icon: LayoutDashboard, end: true, aliases: ["/dashboard"] },
+  { to: "/daily-check", label: "Log", icon: ClipboardCheck },
   { to: "/timeline", label: "Timeline", icon: NotebookText },
-  { to: "/alerts", label: "Alerts", icon: Bell },
 ];
 
 export interface MoreItem {
@@ -78,25 +85,28 @@ const labsItems: MoreItem[] = LABS_NAVIGATION_DESTINATIONS.map((item) => ({
  * Cultivation (workspace structure) → Daily (today's actions) →
  * Insight (signals) → Labs (advanced tools) → Account.
  *
- * Route targets are unchanged from the prior flat list. Operator-only
+ * Tents, Plants and Alerts moved here from the first row; Quick Log is the
+ * first-row Log tab, so it is not repeated. Operator-only
  * surfaces are NOT included here — they render separately via the
  * role-gated OperatorModeLink.
  */
 export const moreGroups: MoreGroup[] = [
   {
     heading: "Cultivation",
-    items: [{ to: "/grows", label: "My Grows", icon: Sprout }],
+    items: [
+      { to: "/grows", label: "My Grows", icon: Sprout },
+      { to: "/tents", label: "Tents", icon: Box },
+      { to: "/plants", label: "Plants", icon: Leaf },
+    ],
   },
   {
     heading: "Daily",
-    items: [
-      { to: "/daily-check", label: "Quick Log", icon: ClipboardCheck },
-      { to: "/actions", label: "Action Queue", icon: ListChecks },
-    ],
+    items: [{ to: "/actions", label: "Action Queue", icon: ListChecks }],
   },
   {
     heading: "Insight",
     items: [
+      { to: "/alerts", label: "Alerts", icon: Bell },
       { to: "/sensors", label: "Sensors", icon: Activity },
       { to: "/doctor", label: "AI Doctor", icon: Stethoscope },
       { to: "/reports", label: "Reports", icon: LineChart },
@@ -124,19 +134,26 @@ export const more: MoreItem[] = moreGroups.flatMap((g) => g.items);
 
 export default function MobileNav() {
   const [open, setOpen] = useState(false);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const navigationGrowId = resolveNavigationGrowId({ pathname, search });
+  const labsNavItems: MoreItem[] = resolveLabsNavigationDestinations(navigationGrowId).map(
+    (item) => ({
+      ...item,
+      icon: labsIcons[item.id],
+    }),
+  );
   return (
     <nav
       aria-label="Primary navigation"
       className="fixed inset-x-2 bottom-2 z-30 rounded-2xl border border-border/60 bg-card/90 shadow-elevated backdrop-blur-2xl pb-[env(safe-area-inset-bottom)] md:hidden"
     >
-      <div className="grid grid-cols-6 h-16">
+      <div className="grid grid-cols-4 h-16">
         {primary.map((n) => {
           const active = isNavigationItemActive(pathname, n);
           return (
             <Link
               key={n.to}
-              to={n.to}
+              to={resolveMobilePrimaryHref(n.to, navigationGrowId)}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "relative flex flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] transition-colors",
@@ -181,7 +198,7 @@ export default function MobileNav() {
                     {group.heading}
                   </h3>
                   <div className="grid grid-cols-3 gap-2">
-                    {group.items.map((m) => (
+                    {(group.heading === "Labs" ? labsNavItems : group.items).map((m) => (
                       <NavLink
                         key={m.to}
                         to={m.to}

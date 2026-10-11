@@ -43,6 +43,13 @@ describe("Action Queue failure copy", () => {
         reason: "attacker-supplied-detail",
       }),
     ).toBe("Action status couldn't be saved. No new transition was recorded. Try again.");
+    const rpcMissing = safeActionQueueFailureCopy("transition", {
+      ok: false,
+      reason: "rpc_missing",
+    });
+    expect(rpcMissing).not.toMatch(/no status was updated/i);
+    expect(rpcMissing).not.toMatch(/queue is unchanged/i);
+    expect(rpcMissing).toMatch(/That decision was not saved/i);
   });
 
   it.each<ActionQueueFailureOperation>(["load", "transition", "audit", "outcome", "followup"])(

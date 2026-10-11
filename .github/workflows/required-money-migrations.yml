@@ -1,4 +1,8 @@
 name: Required money-critical migrations present
+# Hosted acceptance uses https://verdantgrowdiary.com only (2026-09-28).
+# Existing CI/diagnostic bindings remain unchanged and supply no live acceptance.
+# Any target/status-message alignment requires a separate reviewed CI slice.
+# See docs/production-only-verification-runbook.md; no dispatch/APPLY here.
 
 on:
   pull_request:
@@ -22,6 +26,7 @@ on:
       - "src/test/required-money-migrations-version.test.ts"
       - ".github/workflows/prefix-diff-sarif.yml"
       - ".github/workflows/required-money-migrations.yml"
+    types: [opened, synchronize, reopened, ready_for_review]
 
   push:
     branches: [verdant-grow-diary]
@@ -38,6 +43,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   unit-tests-migration-version:

@@ -50,6 +50,8 @@ import QuickLogAllActivitiesSection, {
   type QuickLogAllActivitiesSaveSuccess,
   type QuickLogAllActivitiesSaveTarget,
 } from "@/components/QuickLogAllActivitiesSection";
+import { buildQuickLogTargetKey } from "@/lib/quickLogActivityRules";
+import { readPendingQuickLogActivity } from "@/lib/quickLogPendingActivityStore";
 import { STAGES } from "@/lib/grow";
 import {
   resolveQuickLogStageDefault,
@@ -70,6 +72,7 @@ import {
   appendHardwareReadingsToNote,
   computeQuickLogHardwareDefaultOpen,
   hasAnyHardwareReading,
+  validateHardwareReadings,
   type QuickLogHardwareReadings,
 } from "@/lib/quickLogHardwareReadingsRules";
 import {
@@ -79,10 +82,18 @@ import {
   QUICK_LOG_WATERING_VOLUME_PRESET_OPTIONS,
 } from "@/lib/quickLogWateringVolumePresetRules";
 import {
+  buildQuickLogPlantSelectOptions,
   filterQuickLogPlantOptions,
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
+import {
+  isQuickLogGrowStageUnconfirmed,
+  QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE,
+  shouldAttemptQuickLogGrowStageWriteback,
+} from "@/lib/quickLogGrowStageWritebackRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
+import GuidedGrowWalkPanel from "@/components/GuidedGrowWalkPanel";
+import { type GrowWalkVisitMode } from "@/lib/growWalkContracts";
 import EventTypeSelector from "@/components/EventTypeSelector";
 import {
   clearPublicQuickLogStarterDraft,
@@ -92,6 +103,20 @@ import { matchesReviewedPublicStarterDraftRevision } from "@/lib/publicQuickLogH
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
+import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
+import {
+  STARTER_WATER_RECOVERY_CLEAR_FAILED,
+  STARTER_WATER_RECOVERY_PENDING,
+  STARTER_WATER_RECOVERY_UNAVAILABLE,
+  STARTER_WATER_RETRACTED_CLEAR_FAILED,
+  STARTER_WATER_SAVED_THEN_RETRACTED,
+  TYPED_WATER_RECOVERY_PENDING,
+  claimPendingStarterWater,
+  canPersistStarterWaterRecovery,
+  reconcilePendingStarterWaterClear,
+  readPendingStarterWater,
+  type PendingStarterWater,
+} from "@/lib/quickLogPendingStarterWaterStore";
 import {
   buildLegacyQuickLogUnifiedPayload,
   isSupportedLegacyEventType,
@@ -100,6 +125,11 @@ import {
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
 import {
+  ARCHIVED_GROW_QUICK_LOG_BLOCKED_COPY,
+  isArchivedGrowId,
+  isArchivedGrowQuickLogNote,
+} from "@/lib/archivedGrowQuickLogRules";
+import {
   QUICK_LOG_TARGET_BLOCKED_COPY,
   quickLogPrefillTargetKey,
   resolveQuickLogEditorTarget,
@@ -107,6 +137,7 @@ import {
   resolveQuickLogWriteTarget,
   type QuickLogResolvedTarget,
 } from "@/lib/quickLogTargetIntegrityRules";
+import { legacyQuickLogEventRequiresTent } from "@/lib/quickLogTentRequirementRules";
 import {
   buildRecentTargetStorageKey,
   getRecentTargetSuggestionWakeDelayMs,
@@ -116,7 +147,19 @@ import {
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { resolveQuickLogTargetPlan } from "@/lib/quickLogTargetResolutionRules";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
-import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
+import { persistedSensorSourceLabel } from "@/lib/quickLogSnapshotStripAdapter";
+import {
+  quickLogDraftPreservedFailureMessage,
+  quickLogReasonToOperatorMessage,
+  quickLogSaveRecoveryAction,
+  quickLogSaveRequiresHistoryCheck,
+  canDiscardQuickLogHistoryDraft,
+  QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY,
+  QUICK_LOG_HISTORY_REVIEW_LINK_LABEL,
+  QUICK_LOG_HISTORY_DISCARD_LABEL,
+  QUICK_LOG_HISTORY_DISCARD_HELPER,
+  QUICK_LOG_HISTORY_DISCARD_FAILED,
+} from "@/lib/quickLogSaveErrorMessage";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
 import { buildQuickLogDraftPreview } from "@/lib/quickLogDraftPreviewViewModel";
 import {
@@ -254,12 +297,48 @@ interface Props {
   successMessage?: string;
 }
 
+function quickLogDraftHandoffKeyPart(value: unknown): string | number | boolean | null {
+  if (typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return null;
+}
+
+function quickLogDraftHandoffKey(prefill?: QuickLogPrefill | null): string | null {
+  if (!prefill) return null;
+  try {
+    return JSON.stringify([
+      quickLogDraftHandoffKeyPart(prefill.plantId),
+      quickLogDraftHandoffKeyPart(prefill.plantName),
+      quickLogDraftHandoffKeyPart(prefill.growId),
+      quickLogDraftHandoffKeyPart(prefill.tentId),
+      quickLogDraftHandoffKeyPart(prefill.eventType),
+      quickLogDraftHandoffKeyPart(prefill.activityId),
+      quickLogDraftHandoffKeyPart(prefill.suggestSnapshot),
+      quickLogDraftHandoffKeyPart(prefill.note),
+      quickLogDraftHandoffKeyPart(prefill.source),
+      quickLogDraftHandoffKeyPart(prefill.photoCount),
+      quickLogDraftHandoffKeyPart(prefill.preset),
+      quickLogDraftHandoffKeyPart(prefill.phenoHuntId),
+      quickLogDraftHandoffKeyPart(prefill.phenoEvidenceGoal),
+      quickLogDraftHandoffKeyPart(prefill.wateringVolumeMl),
+      quickLogDraftHandoffKeyPart(prefill.publicStarterDraftId),
+      quickLogDraftHandoffKeyPart(prefill.publicStarterDraftUpdatedAt),
+      quickLogDraftHandoffKeyPart(prefill.suppressPlantDefault),
+    ]);
+  } catch {
+    return null;
+  }
+}
+
 const QUICK_OBSERVATION_CHIPS = [
   { label: "Watered", text: "Watered today." },
   { label: "Fed", text: "Fed today." },
   { label: "Spotted issue", text: "Spotted an issue — see photo or notes." },
   { label: "Photo only", text: "Photo only — no other changes today." },
 ] as const;
+
+const WATER_CONTEXT_CHANGED_MESSAGE =
+  "Watering was saved after this plant changed tents or grows. Open its Timeline to confirm the saved location.";
 
 type SavedTarget = {
   id: string;
@@ -271,6 +350,8 @@ type SavedTarget = {
   growEventId: string | null;
   eventType: string;
   savedAt: string;
+  growStageUnconfirmed?: boolean;
+  waterContextChanged?: boolean;
 };
 
 type LastQuickLogTarget = {
@@ -336,7 +417,8 @@ export default function QuickLog({
   successMessage = "Logged 🌱",
 }: Props) {
   const { user } = useAuth();
-  const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
+  const { grows, archivedGrows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
+  const archivedGrowList = useMemo(() => archivedGrows ?? [], [archivedGrows]);
   const plantsQuery = usePlants();
   const tentsQuery = useTents();
   const plants = useMemo(() => plantsQuery.data ?? [], [plantsQuery.data]);
@@ -370,6 +452,8 @@ export default function QuickLog({
   // Once touched, stale prefill metadata must never override the current form.
   const eventTypeUserTouchedRef = useRef(false);
   const [plantId, setPlantId] = useState<string>("");
+  /** Field Edition visit mode — presentation-only; never part of save payloads. */
+  const [visitMode, setVisitMode] = useState<GrowWalkVisitMode>("fast_check");
   const [dismissedBlockedPrefillKey, setDismissedBlockedPrefillKey] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState(false);
   const [remindAt, setRemindAt] = useState<string>("");
@@ -397,11 +481,23 @@ export default function QuickLog({
   });
   const [busy, setBusy] = useState(false);
   const [childSaveBusy, setChildSaveBusy] = useState(false);
+  const [activityRecoveryLockKey, setActivityRecoveryLockKey] = useState<string | null>(null);
   const [inFlightSaveContext, setInFlightSaveContext] = useState<InFlightSaveContext | null>(null);
   const [hardwareOpen, setHardwareOpen] = useState(false);
   const [wateringError, setWateringError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [starterWaterPending, setStarterWaterPending] = useState<PendingStarterWater | null>(null);
+  const [starterWaterStorageBlocked, setStarterWaterStorageBlocked] = useState(false);
+  const [historyCheckRequired, setHistoryCheckRequired] = useState(false);
+  const historyCheckRequiredRef = useRef(false);
+  const historyDraftOwnerRef = useRef<string | null>(null);
+  // The starter Water recovery claim a history check is about, if any. Only the
+  // grower's explicit "I checked Timeline" discard may release it.
+  const historyWaterRecordRef = useRef<PendingStarterWater | null>(null);
+  const [historyReviewNavigation, setHistoryReviewNavigation] =
+    useState<ReturnType<typeof buildQuickLogTimelineNavTarget>>(null);
   const [savedTarget, setSavedTarget] = useState<SavedTarget | null>(null);
+  const [savedDraftHandoffKey, setSavedDraftHandoffKey] = useState<string | null>(null);
   const [earlyMilestone, setEarlyMilestone] = useState<EarlyStageMilestone | null>(null);
   const [earlyVigor, setEarlyVigor] = useState<EarlyStageVigor | null>(null);
   const [earlyNotes, setEarlyNotes] = useState<string>("");
@@ -451,10 +547,15 @@ export default function QuickLog({
   // One synchronous guard shared by the parent form and the all-activities
   // child. Presenter state complements this ref but never replaces it.
   const saveInFlightRef = useRef(false);
-  const saveLocked = busy || childSaveBusy;
+  const saveLocked = busy || childSaveBusy || historyCheckRequired;
+  // A known unresolved Water locks the dialog. If storage is unavailable
+  // before any known attempt, only Water dispatch needs the storage fence;
+  // Note and other activities have independent receipts and may still save.
+  const recoveryLocked = starterWaterPending !== null;
   const isMainDraftMutationLocked = useCallback(
-    () => saveInFlightRef.current || saveLocked,
-    [saveLocked],
+    () =>
+      saveInFlightRef.current || historyCheckRequiredRef.current || saveLocked || recoveryLocked,
+    [saveLocked, recoveryLocked],
   );
   // One idempotency key per LOGICAL submission (quickLogIdempotencyKey
   // contract, same pattern as the V2 sheet): retries after a failure or a
@@ -469,7 +570,27 @@ export default function QuickLog({
   // payload, so an edited retry is distinguished from a pure retry.
   const lastFailedSaveSigRef = useRef<string | null>(null);
 
+  useEffect(() => {
+    if (!open || !user?.id) {
+      setStarterWaterPending(null);
+      setStarterWaterStorageBlocked(false);
+      return;
+    }
+    const current = readPendingStarterWater(user.id);
+    setStarterWaterPending(current.status === "pending" ? current.record : null);
+    setStarterWaterStorageBlocked(current.status === "blocked");
+    if (current.status === "pending") setSaveError(STARTER_WATER_RECOVERY_PENDING);
+    if (current.status === "blocked") setSaveError(STARTER_WATER_RECOVERY_UNAVAILABLE);
+  }, [open, user?.id]);
+
   const prefillRequestKey = quickLogPrefillTargetKey(prefill);
+  const draftHandoffKey = quickLogDraftHandoffKey(prefill);
+  const reviewedStarterHandoffKey =
+    prefill?.source === "public-starter" &&
+    prefill.publicStarterDraftId &&
+    prefill.publicStarterDraftUpdatedAt
+      ? draftHandoffKey
+      : null;
   const namedPrefillQueryError =
     prefillRequestKey !== null && (plantsQuery.isError || tentsQuery.isError);
   const namedPrefillQueryPending =
@@ -479,15 +600,39 @@ export default function QuickLog({
       plantsQuery.isLoading ||
       tentsQuery.isPending ||
       tentsQuery.isLoading);
-  const prefillTarget = useMemo(
+  const strictPrefillTarget = useMemo(
     () =>
       namedPrefillQueryPending || namedPrefillQueryError
         ? ({ status: "blocked", reason: "prefill_target_pending" } as const)
         : resolveQuickLogPrefillTarget({ prefill, plants, tents: activeTents }),
     [prefill, plants, activeTents, namedPrefillQueryPending, namedPrefillQueryError],
   );
+  const prefillTarget = useMemo(
+    () =>
+      namedPrefillQueryPending || namedPrefillQueryError
+        ? ({ status: "blocked", reason: "prefill_target_pending" } as const)
+        : resolveQuickLogPrefillTarget({
+            prefill,
+            plants,
+            tents: activeTents,
+            requireTent: false,
+          }),
+    [prefill, plants, activeTents, namedPrefillQueryPending, namedPrefillQueryError],
+  );
   const prefillPlantId = prefillTarget.status === "ready" ? prefillTarget.target.plantId : null;
   const prefillGrowId = prefillTarget.status === "ready" ? prefillTarget.target.growId : null;
+  const archivedGrowIds = useMemo(
+    () =>
+      archivedGrowList
+        .map((grow) => grow.id)
+        .filter((id): id is string => typeof id === "string" && id.trim().length > 0),
+    [archivedGrowList],
+  );
+  const namedGrowArchived = isArchivedGrowId(prefillGrowId, archivedGrowIds);
+  const allowArchivedGrowNote = isArchivedGrowQuickLogNote({
+    eventType: eventTypeUserTouchedRef.current ? eventType : (prefill?.eventType ?? eventType),
+    activityId: prefill?.activityId ?? null,
+  });
   // Legacy adapter boundary: AppShell currently supplies one already-collapsed
   // named prefill, so this first consumer maps it to the highest named tier.
   // The shared resolver still owns the complete explicit → route → selection
@@ -632,9 +777,21 @@ export default function QuickLog({
     !prefillNamesPlant && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;
 
   useEffect(() => {
+    // Match V2 sheet open reset: a fresh dialog session always starts on Fast Check.
+    if (open) setVisitMode("fast_check");
+  }, [open]);
+
+  useEffect(() => {
     if (!open || saveLocked) return;
     if (targetPlan.step === "apply-named") {
-      if (targetPlan.target.growId && targetPlan.target.growId !== activeGrowId) {
+      // Only an id already in the active roster may become the stored setup.
+      // Archived grows are absent from that roster, so this launch cannot
+      // write one and then have the store snap back to another grow.
+      if (
+        targetPlan.target.growId &&
+        targetPlan.target.growId !== activeGrowId &&
+        grows.some((grow) => grow.id === targetPlan.target.growId)
+      ) {
         setActiveGrowId(targetPlan.target.growId);
       }
       setPlantId(targetPlan.target.type === "plant" ? targetPlan.target.plantId : "");
@@ -649,7 +806,9 @@ export default function QuickLog({
     if (!prefill?.plantId && prefill?.growId && prefill.growId !== activeGrowId) {
       // Grow/tent launchers without a plant remain explicit manual-selection
       // flows. Preserve their known grow scope, but never invent a plant.
-      setActiveGrowId(prefill.growId);
+      if (grows.some((grow) => grow.id === prefill.growId)) {
+        setActiveGrowId(prefill.growId);
+      }
     }
     if (prefill?.eventType) {
       eventTypeUserTouchedRef.current = false;
@@ -694,10 +853,20 @@ export default function QuickLog({
     () => filterQuickLogPlantOptions(plants, activeGrowId),
     [plants, activeGrowId],
   );
+  const archivedNamedPlant = useMemo(() => {
+    if (!editorPlantId || !namedGrowArchived) return null;
+    return plants.find((plant) => plant.id === editorPlantId) ?? null;
+  }, [editorPlantId, namedGrowArchived, plants]);
+  const plantSelectOptions = useMemo(
+    () => buildQuickLogPlantSelectOptions(scopedPlants, archivedNamedPlant),
+    [archivedNamedPlant, scopedPlants],
+  );
 
   const selectedPlant = useMemo(
-    () => scopedPlants.find((p) => p.id === editorPlantId) ?? null,
-    [editorPlantId, scopedPlants],
+    () =>
+      scopedPlants.find((p) => p.id === editorPlantId) ??
+      (archivedNamedPlant?.id === editorPlantId ? archivedNamedPlant : null),
+    [archivedNamedPlant, editorPlantId, scopedPlants],
   );
 
   const selectedPhenoHuntId = useMemo(() => {
@@ -719,7 +888,7 @@ export default function QuickLog({
     [activeTents, selectedPlant?.tent_id],
   );
 
-  const writeTarget = useMemo(
+  const strictWriteTarget = useMemo(
     () =>
       resolveQuickLogWriteTarget({
         activeGrowId,
@@ -728,6 +897,35 @@ export default function QuickLog({
       }),
     [activeGrowId, selectedPlant, selectedTent],
   );
+  const writeTarget = useMemo(
+    () =>
+      resolveQuickLogWriteTarget({
+        activeGrowId,
+        selectedPlant,
+        selectedTent,
+        requireTent: false,
+      }),
+    [activeGrowId, selectedPlant, selectedTent],
+  );
+  const strictEditorTarget = useMemo(
+    () =>
+      resolveQuickLogEditorTarget({
+        prefill,
+        prefillResolution: strictPrefillTarget,
+        writeResolution: strictWriteTarget,
+        dismissedBlockedPrefillKey,
+        namedGrowArchived,
+        allowArchivedGrowNote,
+      }),
+    [
+      prefill,
+      strictPrefillTarget,
+      strictWriteTarget,
+      dismissedBlockedPrefillKey,
+      namedGrowArchived,
+      allowArchivedGrowNote,
+    ],
+  );
   const editorTarget = useMemo(
     () =>
       resolveQuickLogEditorTarget({
@@ -735,15 +933,30 @@ export default function QuickLog({
         prefillResolution: prefillTarget,
         writeResolution: writeTarget,
         dismissedBlockedPrefillKey,
+        namedGrowArchived,
+        allowArchivedGrowNote,
       }),
-    [prefill, prefillTarget, writeTarget, dismissedBlockedPrefillKey],
+    [
+      prefill,
+      prefillTarget,
+      writeTarget,
+      dismissedBlockedPrefillKey,
+      namedGrowArchived,
+      allowArchivedGrowNote,
+    ],
   );
   const editorResolvedTarget = editorTarget.status === "ready" ? editorTarget.target : null;
   const resolvedTarget = inFlightSaveContext?.target ?? editorResolvedTarget;
+  const sameTargetRecoveryLocked =
+    !!resolvedTarget && activityRecoveryLockKey === buildQuickLogTargetKey(resolvedTarget);
   const resolvedTargetGrow = useMemo(
     () =>
-      resolvedTarget ? (grows.find((grow) => grow.id === resolvedTarget.growId) ?? null) : null,
-    [grows, resolvedTarget],
+      resolvedTarget
+        ? (grows.find((grow) => grow.id === resolvedTarget.growId) ??
+          archivedGrowList.find((grow) => grow.id === resolvedTarget.growId) ??
+          null)
+        : null,
+    [archivedGrowList, grows, resolvedTarget],
   );
   const resolvedTargetPlant = useMemo(
     () =>
@@ -760,19 +973,21 @@ export default function QuickLog({
 
   const beginAllActivitiesSave = useCallback(
     (target: QuickLogAllActivitiesSaveTarget): boolean => {
-      if (saveInFlightRef.current || !target.plantId || !target.tentId || !target.growId) {
+      if (saveInFlightRef.current || !target.plantId || !target.growId) {
         return false;
       }
       const targetPlant = plants.find((plant) => plant.id === target.plantId) ?? null;
-      const targetTent = activeTents.find((tent) => tent.id === target.tentId) ?? null;
+      const targetTent = target.tentId
+        ? (activeTents.find((tent) => tent.id === target.tentId) ?? null)
+        : null;
       const targetGrow = grows.find((grow) => grow.id === target.growId) ?? null;
       if (
         !targetPlant ||
-        !targetTent ||
+        (target.tentId !== null && !targetTent) ||
         !targetGrow ||
         targetPlant.grow_id !== target.growId ||
-        targetPlant.tent_id !== target.tentId ||
-        targetTent.grow_id !== target.growId
+        (targetPlant.tent_id ?? null) !== (target.tentId ?? null) ||
+        (targetTent !== null && targetTent.grow_id !== target.growId)
       ) {
         return false;
       }
@@ -787,7 +1002,7 @@ export default function QuickLog({
             growId: target.growId,
           }),
           plantName: targetPlant.name,
-          tentName: targetTent.name ?? null,
+          tentName: targetTent?.name ?? null,
           growName: targetGrow.name ?? null,
           eventType,
           stage,
@@ -804,6 +1019,15 @@ export default function QuickLog({
     setChildSaveBusy(false);
     setInFlightSaveContext(null);
   }, []);
+  const handleActivityRecoveryLockChange = useCallback(
+    (target: QuickLogAllActivitiesSaveTarget, locked: boolean) => {
+      const targetKey = buildQuickLogTargetKey(target);
+      setActivityRecoveryLockKey((current) =>
+        locked ? targetKey : current === targetKey ? null : current,
+      );
+    },
+    [],
+  );
   const isSaveInFlight = useCallback(() => saveInFlightRef.current, []);
   const consumeReviewedPublicStarterDraft = useCallback(() => {
     if (
@@ -829,6 +1053,15 @@ export default function QuickLog({
    */
   const handleAllActivitiesSaveSuccess = useCallback(
     (result: QuickLogAllActivitiesSaveSuccess) => {
+      // An older recovered write must not consume the draft on screen. A
+      // recovered write carrying this exact reviewed handoff did save it.
+      if (
+        result.recovered &&
+        (!reviewedStarterHandoffKey ||
+          result.reviewedStarterHandoffKey !== reviewedStarterHandoffKey)
+      )
+        return;
+      if (draftHandoffKey !== null) setSavedDraftHandoffKey(draftHandoffKey);
       consumeReviewedPublicStarterDraft();
       const plantId = result.target.plantId;
       if (!plantId) return;
@@ -842,7 +1075,7 @@ export default function QuickLog({
         user?.id ?? null,
       );
     },
-    [consumeReviewedPublicStarterDraft, user?.id],
+    [consumeReviewedPublicStarterDraft, draftHandoffKey, reviewedStarterHandoffKey, user?.id],
   );
 
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
@@ -898,13 +1131,19 @@ export default function QuickLog({
     if (!open || saveInFlightRef.current) return;
     if (snapshotUserTouchedRef.current) return;
     if (!selectedPlant?.tent_id) return;
-    if (stripView.status === "usable" && !snapshot) setSnapshot(true);
-  }, [open, stripView.status, selectedPlant?.tent_id, snapshot]);
+    // Auto-attach only when the trust verdict says this snapshot may be
+    // attached (`trustBadge.attachable`). A usable-but-non-attachable row
+    // must never self-enable the toggle — the save path below will not
+    // include it.
+    if (stripView.status === "usable" && stripView.trustBadge.attachable && !snapshot)
+      setSnapshot(true);
+  }, [open, stripView.status, stripView.trustBadge.attachable, selectedPlant?.tent_id, snapshot]);
 
   useEffect(() => {
     if (!open || saveInFlightRef.current) return;
-    if (stripView.status !== "usable" && snapshot) setSnapshot(false);
-  }, [open, stripView.status, snapshot]);
+    if ((stripView.status !== "usable" || !stripView.trustBadge.attachable) && snapshot)
+      setSnapshot(false);
+  }, [open, stripView.status, stripView.trustBadge.attachable, snapshot]);
 
   useEffect(() => {
     if (!open || saveInFlightRef.current) return;
@@ -1003,11 +1242,9 @@ export default function QuickLog({
   }
 
   function reset() {
-    // Closing the dialog abandons the current logical submission, so the
-    // idempotency key rotates too. Only an in-place retry (save error
-    // shown, dialog still open) reuses the key — a fresh dialog session
-    // must never be deduped against an abandoned one, or the RPC could
-    // hand back the OLD entry and silently skip the new content.
+    // Closing rotates the key for a genuinely new submission. An uncertain
+    // starter Water attempt is never abandoned here: its exact payload and
+    // key stay in session storage, and the next open must reconcile it first.
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
     lastFailedSaveSigRef.current = null;
     setNote("");
@@ -1015,6 +1252,7 @@ export default function QuickLog({
     eventTypeUserTouchedRef.current = false;
     setEventType("observation");
     setPlantId("");
+    setVisitMode("fast_check");
     setDismissedBlockedPrefillKey(null);
     setRecentSuggestionDismissed(false);
     setStage("");
@@ -1030,6 +1268,7 @@ export default function QuickLog({
     setWateringError(null);
     setSaveError(null);
     setSavedTarget(null);
+    setSavedDraftHandoffKey(null);
     setEarlyMilestone(null);
     setEarlyVigor(null);
     setEarlyNotes("");
@@ -1113,6 +1352,7 @@ export default function QuickLog({
   }
 
   function resetForAnother() {
+    if (recoveryLocked) return;
     // "Log another" starts a genuinely new logical submission.
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
     lastFailedSaveSigRef.current = null;
@@ -1121,6 +1361,7 @@ export default function QuickLog({
     setShowMore(false);
     eventTypeUserTouchedRef.current = true;
     setEventType("observation");
+    setVisitMode("fast_check");
     setSnapshot(false);
     snapshotUserTouchedRef.current = false;
     setRemindAt("");
@@ -1131,6 +1372,7 @@ export default function QuickLog({
     setWateringError(null);
     setSaveError(null);
     setSavedTarget(null);
+    setSavedDraftHandoffKey(null);
     setEarlyMilestone(null);
     setEarlyVigor(null);
     setEarlyNotes("");
@@ -1169,7 +1411,36 @@ export default function QuickLog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (saveInFlightRef.current || saveLocked || savedTarget) return;
+    // The previous Water may have committed. Never let a new/edited payload
+    // rotate its key until the exact stored attempt has been reconciled.
+    if (user?.id) {
+      const recovery = readPendingStarterWater(user.id);
+      if (recovery.status === "pending") {
+        setStarterWaterPending(recovery.record);
+        setSaveError(STARTER_WATER_RECOVERY_PENDING);
+        return;
+      }
+      const intendedEventType = eventTypeUserTouchedRef.current
+        ? eventType
+        : (prefill?.eventType ?? eventType);
+      if (recovery.status === "blocked" && intendedEventType === "watering") {
+        setStarterWaterStorageBlocked(true);
+        setSaveError(STARTER_WATER_RECOVERY_UNAVAILABLE);
+        return;
+      }
+      if (recovery.status === "empty" && starterWaterStorageBlocked) {
+        setStarterWaterStorageBlocked(false);
+      }
+    }
+    if (saveInFlightRef.current || historyCheckRequiredRef.current || saveLocked || savedTarget)
+      return;
+    if (user?.id && resolvedTarget) {
+      const recovery = readPendingQuickLogActivity(user.id, resolvedTarget);
+      if (recovery.status !== "empty") {
+        setActivityRecoveryLockKey(buildQuickLogTargetKey(resolvedTarget));
+        return;
+      }
+    }
     saveInFlightRef.current = true;
     try {
       await runSubmit();
@@ -1195,17 +1466,26 @@ export default function QuickLog({
       toast.message(UNSUPPORTED_EVENT_TYPE_COPY);
       return;
     }
-    if (editorTarget.status !== "ready" || !selectedPlant || !selectedTent) {
+    const saveTargetResolution =
+      legacyQuickLogEventRequiresTent(effectiveEventType) || snapshot
+        ? strictEditorTarget
+        : editorTarget;
+    if (
+      saveTargetResolution.status !== "ready" ||
+      !selectedPlant ||
+      (legacyQuickLogEventRequiresTent(effectiveEventType) && !selectedTent)
+    ) {
       const message =
-        editorTarget.status === "blocked"
-          ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
+        saveTargetResolution.status === "blocked"
+          ? QUICK_LOG_TARGET_BLOCKED_COPY[saveTargetResolution.reason]
           : "Review the Quick Log target before saving.";
       setSaveError(message);
       toast.error(message);
       if (!selectedPlant) focusPlant();
       return;
     }
-    const saveTarget = Object.freeze({ ...editorTarget.target });
+    const saveTarget = Object.freeze({ ...saveTargetResolution.target });
+    const saveDraftHandoffKey = draftHandoffKey;
     const saveStage = stage;
     const saveStageWasUserTouched = stageUserTouchedRef.current;
     const saveEventType = effectiveEventType;
@@ -1240,12 +1520,18 @@ export default function QuickLog({
       toast.message(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);
       return;
     }
+    const hardwareValidation = validateHardwareReadings(hardware);
+    if (hardwareValidation.ok !== true) {
+      setSaveError(hardwareValidation.message);
+      toast.error(hardwareValidation.message);
+      return;
+    }
 
     setInFlightSaveContext(
       Object.freeze({
         target: saveTarget,
         plantName: savePlant.name,
-        tentName: saveTent.name ?? null,
+        tentName: saveTent?.name ?? null,
         growName: saveGrow?.name ?? null,
         eventType: saveEventType,
         stage: saveStage,
@@ -1255,9 +1541,23 @@ export default function QuickLog({
     setBusy(true);
     try {
       const noteWithHardware = appendHardwareReadingsToNote(note, hardware);
+      // Honor `trustBadge.attachable` on the save path (GDP / Blue Dream
+      // #1168 residual): attachable=false means this log must NOT include
+      // the snapshot as sensor context, whatever the toggle says.
       const sensorAttachPayload =
-        snapshot && sensorTentId && stripView.status === "usable"
-          ? buildSensorSnapshotSavePayload(sensorState.snapshot)
+        snapshot && sensorTentId && stripView.status === "usable" && stripView.trustBadge.attachable
+          ? buildSensorSnapshotSavePayload(
+              sensorState.snapshot
+                ? {
+                    ...sensorState.snapshot,
+                    // Persist a contract-valid source for manual/CSV aliases.
+                    // See persistedSensorSourceLabel — Codex P1 + Copilot on #1170.
+                    source: persistedSensorSourceLabel(
+                      sensorState.snapshot.source,
+                    ) as typeof sensorState.snapshot.source,
+                  }
+                : sensorState.snapshot,
+            )
           : null;
       const earlyStageEnvelope = buildEarlyStageDetails({
         milestone: earlyMilestone,
@@ -1363,18 +1663,122 @@ export default function QuickLog({
         built.payload.p_idempotency_key = saveIdempotencyKeyRef.current;
       }
 
+      let waterRecord: PendingStarterWater | null = null;
+      if (saveEventType === "watering") {
+        // Keep the client time as recovery metadata. A fresh Watering leaves
+        // occurrence time null so the server assigns it; retries replay that
+        // same null rather than inventing a later client timestamp.
+        const firstAttemptAt = new Date().toISOString();
+        const claim = await claimPendingStarterWater({
+          version: 1,
+          ownerId: user.id,
+          createdAt: firstAttemptAt,
+          payload: built.payload,
+          target: saveTarget,
+          plantName: savePlant.name,
+          tentName: saveTent?.name ?? null,
+          growName: saveGrow?.name ?? null,
+          stageWasUserTouched: saveStageWasUserTouched,
+          reviewedDraftId: prefill?.publicStarterDraftId ?? null,
+          reviewedDraftUpdatedAt: prefill?.publicStarterDraftUpdatedAt ?? null,
+        });
+        if (claim.status !== "claimed") {
+          if (claim.status === "pending") setStarterWaterPending(claim.record);
+          else if (claim.status === "blocked") setStarterWaterStorageBlocked(true);
+          setSaveError(
+            claim.status === "pending"
+              ? STARTER_WATER_RECOVERY_PENDING
+              : claim.status === "other_pending"
+                ? TYPED_WATER_RECOVERY_PENDING
+                : STARTER_WATER_RECOVERY_UNAVAILABLE,
+          );
+          return;
+        }
+        waterRecord = claim.record;
+        setStarterWaterStorageBlocked(false);
+        setStarterWaterPending(waterRecord);
+        // Dispatch the serialized copy. It is the exact payload every later
+        // retry will replay, including the target, null occurrence time and key.
+        built.payload = waterRecord.payload;
+      }
+
       // The shared RPC hook also serves non-Quick-Log adapters. Opt in with
       // the grower's validated UI selection so observation/environment keep
       // their semantic activity even though the legacy RPC stores both as
       // `p_action: "note"`.
-      const result = await saveViaRpc(built.payload, { telemetryIntent: saveEventType });
+      // Water remains untracked until its tab recovery record is cleared.
+      // A later exact-key replay may be `reused`, but no success was counted
+      // for this logical submission while its first receipt was uncertain.
+      const result = await saveViaRpc(
+        built.payload,
+        saveEventType === "watering"
+          ? { expectedWaterTarget: saveTarget }
+          : { telemetryIntent: saveEventType },
+      );
       if (!result.ok) {
+        // A history-check reason cannot confirm or rule out the original
+        // Watering, so its recovery claim is kept while the form locks for
+        // review; it is neither cleared nor left silently pending.
+        const waterHistoryCheck =
+          waterRecord !== null && quickLogSaveRequiresHistoryCheck(result.reason);
+        if (
+          waterRecord &&
+          !waterHistoryCheck &&
+          result.definitiveRejected !== true &&
+          result.savedThenRetracted !== true
+        ) {
+          setSaveError(STARTER_WATER_RECOVERY_PENDING);
+          toast.message(STARTER_WATER_RECOVERY_PENDING);
+          return;
+        }
+        if (waterRecord && !waterHistoryCheck) {
+          const clearance = await reconcilePendingStarterWaterClear(waterRecord);
+          if (clearance.status !== "cleared" && clearance.status !== "already_cleared") {
+            setStarterWaterStorageBlocked(true);
+            setSaveError(STARTER_WATER_RECOVERY_UNAVAILABLE);
+            return;
+          }
+          setStarterWaterPending(null);
+          setStarterWaterStorageBlocked(false);
+          saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+        }
+        if (result.savedThenRetracted === true) {
+          lastFailedSaveSigRef.current = null;
+          setSaveError(STARTER_WATER_SAVED_THEN_RETRACTED);
+          toast.message(STARTER_WATER_SAVED_THEN_RETRACTED);
+          return;
+        }
         lastFailedSaveSigRef.current = attemptSig;
         const reason = result.reason ?? "save_failed";
         const message = quickLogReasonToOperatorMessage(reason);
-        setSaveError(
-          `${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`,
-        );
+        setSaveError(quickLogDraftPreservedFailureMessage(reason));
+        if (quickLogSaveRequiresHistoryCheck(reason)) {
+          historyCheckRequiredRef.current = true;
+          historyDraftOwnerRef.current = user.id;
+          historyWaterRecordRef.current = waterHistoryCheck ? waterRecord : null;
+          setHistoryCheckRequired(true);
+          // A moved receipt's original entry no longer lives on the draft's
+          // target; review it where the verified readback says it is now.
+          const movedReceipt =
+            reason === "receipt_target_moved" && result.persistedGrowId !== undefined;
+          setHistoryReviewNavigation(
+            buildQuickLogTimelineNavTarget(
+              movedReceipt
+                ? {
+                    growId: result.persistedGrowId ?? null,
+                    plantId: result.persistedPlantId ?? null,
+                    tentId: result.persistedTentId ?? null,
+                  }
+                : {
+                    growId: saveTarget.growId,
+                    targetType: "plant",
+                    targetId: saveTarget.plantId,
+                    plantId: saveTarget.plantId,
+                    tentId: saveTarget.tentId,
+                  },
+            ),
+          );
+        }
         // Surface the (allow-listed) reason code alongside the friendly
         // copy so the operator and tests can correlate the failure with
         // logs without exposing tokens, endpoints, or raw payloads.
@@ -1384,19 +1788,56 @@ export default function QuickLog({
         return;
       }
 
+      const confirmedTarget = result.savedWaterTarget ?? saveTarget;
+      const waterContextChanged = result.waterContextChanged === true;
+
+      const waterClear = waterRecord ? await reconcilePendingStarterWaterClear(waterRecord) : null;
+      const waterRecoveryClearFailed =
+        waterClear !== null &&
+        waterClear.status !== "cleared" &&
+        waterClear.status !== "already_cleared";
+      if (waterRecoveryClearFailed) {
+        setStarterWaterStorageBlocked(waterClear.status === "blocked");
+        if (waterClear.status === "pending") setStarterWaterPending(waterClear.record);
+        setSaveError(STARTER_WATER_RECOVERY_CLEAR_FAILED);
+      } else if (waterRecord) {
+        setStarterWaterPending(null);
+        if (waterClear?.status === "cleared") trackQuickLogSuccess("water");
+      }
+
       // Persist the stage back to the grow ONLY when the grower changed it by
       // hand. Originally `stage` initialized to the grow's own stage, so this
       // writeback fired only on a manual edit; Slice A2 now defaults `stage`
       // from the selected PLANT, which can differ from the grow, so we gate on
       // the touched ref to avoid silently mutating the grow's stage on an
       // ordinary save. Still never writes an unknown/empty stage.
+      let growStageUnconfirmed = waterContextChanged && saveStageWasUserTouched;
       if (
-        saveGrow &&
-        saveStageWasUserTouched &&
-        normalizeQuickLogStage(saveStage) &&
-        saveStage !== saveGrow.stage
+        !waterContextChanged &&
+        shouldAttemptQuickLogGrowStageWriteback({
+          saveGrow,
+          saveStageWasUserTouched,
+          saveStage,
+        })
       ) {
-        await supabase.from("grows").update({ stage: saveStage }).eq("id", saveTarget.growId);
+        // The diary entry is already confirmed. A separate stage write must
+        // neither hide its own failure nor turn that saved entry into a retry.
+        try {
+          const { data: updatedGrow, error: stageError } = await supabase
+            .from("grows")
+            .update({ stage: saveStage })
+            .eq("id", saveTarget.growId)
+            .select("id,stage")
+            .maybeSingle();
+          growStageUnconfirmed = isQuickLogGrowStageUnconfirmed({
+            stageError,
+            updatedGrow,
+            expectedGrowId: saveTarget.growId!,
+            expectedStage: saveStage,
+          });
+        } catch {
+          growStageUnconfirmed = true;
+        }
       }
 
       // Submission completed: the next logical submission gets a fresh key.
@@ -1410,27 +1851,40 @@ export default function QuickLog({
         successMessage && successMessage !== "Logged 🌱"
           ? successMessage
           : `Saved ${savedVerb(saveEventType)} for ${plantLabel}`;
-      toast.success(finalMessage);
+      if (waterRecoveryClearFailed) {
+        toast.message(STARTER_WATER_RECOVERY_CLEAR_FAILED, { duration: 12_000 });
+      } else if (waterContextChanged) {
+        toast.message(WATER_CONTEXT_CHANGED_MESSAGE, { duration: 12_000 });
+      } else if (growStageUnconfirmed) {
+        // Some callers navigate after onCreated, so keep the partial outcome
+        // visible outside this dialog as well as in its saved-entry panel.
+        toast.message(QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE, { duration: 12_000 });
+      } else {
+        toast.success(finalMessage);
+      }
 
       rememberLastTarget(
         {
           plantId: saveTarget.plantId,
-          growId: saveTarget.growId,
-          tentId: saveTarget.tentId,
+          growId: confirmedTarget.growId,
+          tentId: confirmedTarget.tentId,
           savedAt: new Date().toISOString(),
         },
         user?.id ?? null,
       );
+      setSavedDraftHandoffKey(saveDraftHandoffKey);
       setSavedTarget({
         id: savePlant.id,
         name: plantLabel,
-        tentName: saveTent.name ?? null,
-        growName: saveGrow?.name ?? null,
-        growId: saveTarget.growId ?? null,
-        tentId: saveTarget.tentId ?? null,
+        tentName: waterContextChanged ? null : (saveTent?.name ?? null),
+        growName: waterContextChanged ? null : (saveGrow?.name ?? null),
+        growId: confirmedTarget.growId ?? null,
+        tentId: confirmedTarget.tentId ?? null,
         growEventId: result.growEventId ?? null,
         eventType: saveEventType,
         savedAt: new Date().toISOString(),
+        growStageUnconfirmed,
+        waterContextChanged,
       });
       onCreated?.();
       // Public starter handoff consume-once: the shared helper clears the
@@ -1442,7 +1896,7 @@ export default function QuickLog({
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
         targetId: saveTarget.plantId,
-        tentId: saveTarget.tentId,
+        tentId: confirmedTarget.tentId,
       });
       // Explicit, statically-grep-able invalidations for the two V0-loop
       // memory surfaces (Recent Plant Activity + shared diary_entries
@@ -1466,8 +1920,172 @@ export default function QuickLog({
     }
   }
 
+  async function retryStarterWater() {
+    if (!user?.id || saveInFlightRef.current || saveLocked) return;
+    const current = readPendingStarterWater(user.id);
+    if (current.status !== "pending") {
+      setStarterWaterPending(null);
+      setStarterWaterStorageBlocked(current.status === "blocked");
+      setSaveError(
+        current.status === "blocked"
+          ? STARTER_WATER_RECOVERY_UNAVAILABLE
+          : "The earlier Watering is no longer pending. Review the Timeline before saving again.",
+      );
+      return;
+    }
+    const record = current.record;
+    saveInFlightRef.current = true;
+    setBusy(true);
+    setSaveError(null);
+    setInFlightSaveContext({
+      target: record.target,
+      plantName: record.plantName,
+      tentName: record.tentName,
+      growName: record.growName,
+      eventType: "watering",
+      stage: "",
+      stageWasUserTouched: record.stageWasUserTouched,
+    });
+    try {
+      const result = await saveViaRpc(record.payload, { expectedWaterTarget: record.target });
+      if (!result.ok) {
+        // A sign-in refusal is returned before the idempotency lookup, so on a
+        // retry it cannot show that the original key never committed. Keep the
+        // exact claim for a retry after sign-in instead of releasing the key.
+        const signInRefused = result.reason === "not_authenticated";
+        if (
+          (result.definitiveRejected === true && !signInRefused) ||
+          result.savedThenRetracted === true
+        ) {
+          const clearance = await reconcilePendingStarterWaterClear(record);
+          if (clearance.status !== "cleared" && clearance.status !== "already_cleared") {
+            setStarterWaterStorageBlocked(clearance.status === "blocked");
+            if (clearance.status === "pending") setStarterWaterPending(clearance.record);
+            setSaveError(
+              result.savedThenRetracted === true
+                ? STARTER_WATER_RETRACTED_CLEAR_FAILED
+                : STARTER_WATER_RECOVERY_UNAVAILABLE,
+            );
+            return;
+          }
+          setStarterWaterPending(null);
+          setStarterWaterStorageBlocked(false);
+          saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+          lastFailedSaveSigRef.current = null;
+          const message =
+            result.savedThenRetracted === true
+              ? STARTER_WATER_SAVED_THEN_RETRACTED
+              : `${quickLogReasonToOperatorMessage(result.reason)} Your input is still here — re-select a valid grow, tent, and plant before saving again.`;
+          setSaveError(message);
+          toast.message(message);
+          return;
+        }
+        if (quickLogSaveRequiresHistoryCheck(result.reason)) {
+          // Every retry of this key returns the same answer, so hand the
+          // claim to the history-review escape instead of retrying forever.
+          historyCheckRequiredRef.current = true;
+          historyDraftOwnerRef.current = user.id;
+          historyWaterRecordRef.current = record;
+          setHistoryCheckRequired(true);
+          setHistoryReviewNavigation(
+            buildQuickLogTimelineNavTarget({
+              growId: record.target.growId,
+              targetType: "plant",
+              targetId: record.target.plantId,
+              plantId: record.target.plantId,
+              tentId: record.target.tentId,
+            }),
+          );
+          setSaveError(quickLogDraftPreservedFailureMessage(result.reason));
+          return;
+        }
+        setSaveError(
+          signInRefused
+            ? `${quickLogSaveRecoveryAction(result.reason)} ${STARTER_WATER_RECOVERY_PENDING}`
+            : STARTER_WATER_RECOVERY_PENDING,
+        );
+        return;
+      }
+      const confirmedTarget = result.savedWaterTarget ?? record.target;
+      const waterContextChanged = result.waterContextChanged === true;
+      const clearance = await reconcilePendingStarterWaterClear(record);
+      const resolved = clearance.status === "cleared" || clearance.status === "already_cleared";
+      setStarterWaterStorageBlocked(clearance.status === "blocked");
+      if (resolved) {
+        setStarterWaterPending(null);
+        if (clearance.status === "cleared") trackQuickLogSuccess("water");
+      } else {
+        if (clearance.status === "pending") setStarterWaterPending(clearance.record);
+        setSaveError(STARTER_WATER_RECOVERY_CLEAR_FAILED);
+      }
+      saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      lastFailedSaveSigRef.current = null;
+
+      const savedAt = new Date().toISOString();
+      rememberLastTarget({ ...confirmedTarget, savedAt }, user.id);
+      setSavedTarget({
+        id: record.target.plantId,
+        name: record.plantName,
+        tentName: waterContextChanged ? null : record.tentName,
+        growName: waterContextChanged ? null : record.growName,
+        growId: confirmedTarget.growId,
+        tentId: confirmedTarget.tentId,
+        growEventId: result.growEventId ?? null,
+        eventType: "watering",
+        savedAt,
+        // A separate grow-stage write was not proven by the ambiguous RPC.
+        growStageUnconfirmed: record.stageWasUserTouched,
+        waterContextChanged,
+      });
+      if (
+        record.reviewedDraftId === prefill?.publicStarterDraftId &&
+        record.reviewedDraftUpdatedAt === prefill?.publicStarterDraftUpdatedAt
+      ) {
+        setSavedDraftHandoffKey(draftHandoffKey);
+      }
+      if (
+        matchesReviewedPublicStarterDraftRevision({
+          storedDraft: readPublicQuickLogStarterDraft(),
+          reviewedDraftId: record.reviewedDraftId,
+          reviewedUpdatedAt: record.reviewedDraftUpdatedAt,
+        })
+      ) {
+        clearPublicQuickLogStarterDraft();
+      }
+      onCreated?.();
+      applyQuickLogV2Refresh(queryClient, {
+        targetType: "plant",
+        targetId: record.target.plantId,
+        tentId: confirmedTarget.tentId,
+      });
+      queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
+      queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
+      window.dispatchEvent(
+        new CustomEvent("verdant:entry-created", { detail: { createdAt: savedAt } }),
+      );
+      if (!resolved) toast.message(STARTER_WATER_RECOVERY_CLEAR_FAILED, { duration: 12_000 });
+      else if (waterContextChanged)
+        toast.message(WATER_CONTEXT_CHANGED_MESSAGE, { duration: 12_000 });
+      else if (record.stageWasUserTouched)
+        toast.message(QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE, { duration: 12_000 });
+      else toast.success(`Saved watering for ${record.plantName}`);
+      setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
+    } catch {
+      setSaveError(STARTER_WATER_RECOVERY_PENDING);
+    } finally {
+      setBusy(false);
+      setInFlightSaveContext(null);
+      saveInFlightRef.current = false;
+    }
+  }
+
   const snapshotUsable = stripView.status === "usable";
-  const attachDisabled = saveLocked || !resolvedTarget || !snapshotUsable;
+  // Trust verdict, not toggle state: only truth-contract-approved context
+  // is attachable. Usable-but-non-attachable rows render a disabled,
+  // unchecked toggle and save as manual logs only.
+  const snapshotAttachable = stripView.trustBadge.attachable;
+  const attachDisabled =
+    saveLocked || !resolvedTarget?.tentId || !snapshotUsable || !snapshotAttachable;
   const showMismatch = !!(
     prefill?.plantId &&
     selectedPlant &&
@@ -1492,15 +2110,28 @@ export default function QuickLog({
     (resolvedTarget ? (resolvedTargetPlant?.name ?? "Assigned plant") : "Choose a plant");
   const targetTentName =
     inFlightSaveContext?.tentName ??
-    (resolvedTarget ? (resolvedTargetTent?.name ?? "Assigned tent") : "Plant required before save");
+    (resolvedTarget
+      ? (resolvedTargetTent?.name ?? "No tent assigned")
+      : "Plant required before save");
   const targetGrowName =
     inFlightSaveContext?.growName ??
     (resolvedTarget ? (resolvedTargetGrow?.name ?? "Assigned grow") : "No setup selected");
+  const mainFormRequiresTent = legacyQuickLogEventRequiresTent(displayedEventType) || snapshot;
+  const mainFormTarget =
+    inFlightSaveContext === null && mainFormRequiresTent ? strictEditorTarget : editorTarget;
+  const mainFormResolvedTarget =
+    mainFormTarget.status === "ready"
+      ? mainFormTarget.target
+      : (inFlightSaveContext?.target ?? null);
+  const allActivitiesTentRequiredBlockReason =
+    strictEditorTarget.status === "blocked"
+      ? QUICK_LOG_TARGET_BLOCKED_COPY[strictEditorTarget.reason]
+      : null;
   const editorTargetBlocked =
     inFlightSaveContext === null &&
     !targetQueryPending &&
     !targetQueryError &&
-    editorTarget.status === "blocked";
+    mainFormTarget.status === "blocked";
   const showTargetError = editorTargetBlocked && (prefillHoldActive || selectedPlant !== null);
   const plantSelectErrorId = targetQueryPending
     ? "quick-log-target-loading"
@@ -1518,6 +2149,39 @@ export default function QuickLog({
         ? "plant details"
         : "tent details";
   const selectedResponseStatus = readResponseCheckStatus(note);
+  const emptyDraftNoteWasSaved =
+    draftHandoffKey !== null && savedDraftHandoffKey === draftHandoffKey;
+
+  const historyDiscardAllowed = canDiscardQuickLogHistoryDraft({
+    historyCheckRequired,
+    inFlight: busy || childSaveBusy || saveInFlightRef.current,
+    currentOwnerId: user?.id,
+    draftOwnerId: historyDraftOwnerRef.current,
+  });
+  async function handleDiscardHistoryDraft() {
+    if (!historyDiscardAllowed || saveInFlightRef.current) return;
+    const waterRecord = historyWaterRecordRef.current;
+    if (waterRecord) {
+      // The grower reviewed Timeline and chose to release the unresolved
+      // Watering claim. If tab storage refuses, the lock stays in place.
+      const clearance = await reconcilePendingStarterWaterClear(waterRecord);
+      if (clearance.status !== "cleared" && clearance.status !== "already_cleared") {
+        setStarterWaterStorageBlocked(clearance.status === "blocked");
+        if (clearance.status === "pending") setStarterWaterPending(clearance.record);
+        setSaveError(QUICK_LOG_HISTORY_DISCARD_FAILED);
+        return;
+      }
+      historyWaterRecordRef.current = null;
+      setStarterWaterPending(null);
+      setStarterWaterStorageBlocked(false);
+      lastFailedSaveSigRef.current = null;
+    }
+    historyCheckRequiredRef.current = false;
+    historyDraftOwnerRef.current = null;
+    setHistoryCheckRequired(false);
+    setHistoryReviewNavigation(null);
+    reset();
+  }
 
   return (
     <Dialog
@@ -1529,7 +2193,11 @@ export default function QuickLog({
             inFlight: saveInFlightRef.current,
           });
           if (blocked) {
-            toast.message(QUICK_LOG_CLOSE_BLOCKED_HINT);
+            toast.message(
+              historyCheckRequired
+                ? QUICK_LOG_HISTORY_REVIEW_CLOSE_COPY
+                : QUICK_LOG_CLOSE_BLOCKED_HINT,
+            );
             return;
           }
           onOpenChange(false);
@@ -1553,45 +2221,115 @@ export default function QuickLog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Field Edition first paint — presentation order only. Visit modes
+            must own the grower Quick Log surface ahead of the legacy
+            "All activity types" menu; save payloads and idempotency are
+            unchanged. Fast Check remains the default visitMode. */}
+        <GuidedGrowWalkPanel
+          visitMode={visitMode}
+          onVisitModeChange={setVisitMode}
+          targetOk={!!resolvedTarget}
+          tentId={resolvedTarget?.tentId ?? null}
+          targetType={resolvedTarget ? "plant" : null}
+          stage={
+            (resolvedTargetPlant as { stage?: string | null } | null)?.stage ??
+            (stage.trim().length > 0 ? stage : null)
+          }
+          testIdPrefix="ql"
+          onApplyCloseoutToNote={(composed) => {
+            setNote((previous) => {
+              const existing = previous.trimEnd();
+              if (!existing) return composed;
+              return `${existing}\n\n${composed}`;
+            });
+          }}
+        />
+
         {/* Shared v1a activity surface — consumes canonical
             QUICK_LOG_ACTIVITY_DEFINITIONS. Additive to the existing
             note/photo/watering flow below; every save routes through
             useQuickLogActivitySave and dispatches
-            verdant:entry-created only on confirmed success. */}
+            verdant:entry-created only on confirmed success. Kept reachable
+            below Field Edition; must not own first paint. */}
         <QuickLogAllActivitiesSection
-          growId={resolvedTarget?.growId ?? activeGrow?.id ?? null}
-          tentId={resolvedTarget?.tentId ?? null}
-          plantId={resolvedTarget?.plantId ?? null}
+          growId={
+            resolvedTarget?.growId ?? (namedGrowArchived ? prefillGrowId : (activeGrow?.id ?? null))
+          }
+          tentId={
+            resolvedTarget?.tentId ??
+            (namedGrowArchived && prefillTarget.status === "ready"
+              ? prefillTarget.target.tentId
+              : null)
+          }
+          plantId={resolvedTarget?.plantId ?? (namedGrowArchived ? prefillPlantId : null)}
+          tentRequiredBlockReason={allActivitiesTentRequiredBlockReason}
           externalPersistenceBlockReason={
             targetQueryPending
               ? QUICK_LOG_TARGET_BLOCKED_COPY.prefill_target_pending
               : targetQueryError
                 ? `We couldn't load the ${targetQueryErrorSubject} needed to confirm this Quick Log target.`
-                : editorTargetBlocked && editorTarget.status === "blocked"
+                : editorTarget.status === "blocked" && editorTarget.reason !== "grow_archived"
                   ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
                   : null
+          }
+          nonNoteArchivedGrowBlockReason={
+            namedGrowArchived ? ARCHIVED_GROW_QUICK_LOG_BLOCKED_COPY : null
           }
           plantStage={(resolvedTargetPlant as { stage?: unknown } | null)?.stage ?? null}
           heading="All activity types"
           testIdPrefix="quick-log-dialog-all-activities"
           requestedActivityId={prefill?.activityId ?? null}
           requestedNote={prefill?.activityId ? (prefill.note ?? null) : null}
+          reviewedStarterHandoffKey={reviewedStarterHandoffKey}
           onSaveSuccess={handleAllActivitiesSaveSuccess}
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
-          saveBlocked={saveLocked}
+          onRecoveryLockChange={handleActivityRecoveryLockChange}
+          saveBlocked={saveLocked || recoveryLocked}
           isSaveBlocked={isSaveInFlight}
           onBeforeStructuredWaterOpen={() => {
+            // This tab's starter form may claim Water after the dialog mounts.
+            // Read recovery at the handoff boundary, not only in the
+            // mount-time effect that supplies the presenter's current state.
+            const current = readPendingStarterWater(user?.id);
+            if (
+              current.status !== "empty" ||
+              (starterWaterStorageBlocked && !canPersistStarterWaterRecovery(user?.id))
+            ) {
+              const reason =
+                current.status === "pending"
+                  ? STARTER_WATER_RECOVERY_PENDING
+                  : STARTER_WATER_RECOVERY_UNAVAILABLE;
+              setStarterWaterPending(current.status === "pending" ? current.record : null);
+              setStarterWaterStorageBlocked(
+                current.status === "blocked" || starterWaterStorageBlocked,
+              );
+              setSaveError(reason);
+              return reason;
+            }
+            setStarterWaterPending(null);
+            setStarterWaterStorageBlocked(false);
             onOpenChange(false);
             reset();
+            return undefined;
           }}
         />
 
         <form onSubmit={submit} className="grid gap-4">
+          {sameTargetRecoveryLocked && (
+            <p
+              role="status"
+              data-testid="quick-log-activity-recovery-lock"
+              className="text-sm text-muted-foreground"
+            >
+              An earlier activity save for this target is unresolved. Retry it in All activity types
+              before saving another log.
+            </p>
+          )}
           <fieldset
             data-testid="quick-log-main-draft-fields"
-            disabled={saveLocked}
-            aria-disabled={saveLocked}
+            disabled={saveLocked || recoveryLocked}
+            aria-disabled={saveLocked || recoveryLocked}
             className="contents"
           >
             {(() => {
@@ -1636,7 +2374,7 @@ export default function QuickLog({
                       {draftPreview.noteSummary}
                     </p>
                   ) : null}
-                  {draftPreview.emptyNoteHint ? (
+                  {draftPreview.emptyNoteHint && !emptyDraftNoteWasSaved ? (
                     <p
                       data-testid="quick-log-draft-preview-empty-note"
                       className="text-[11px] text-muted-foreground italic"
@@ -1907,7 +2645,7 @@ export default function QuickLog({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none">Choose a plant…</SelectItem>
-                      {scopedPlants.map((p) => (
+                      {plantSelectOptions.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           <span data-testid="quick-log-plant-option-name">{p.name}</span>
                           {p.strain ? ` · ${p.strain}` : ""}
@@ -1974,14 +2712,14 @@ export default function QuickLog({
                     Retry
                   </Button>
                 </div>
-              ) : showTargetError && editorTarget.status === "blocked" ? (
+              ) : showTargetError && mainFormTarget.status === "blocked" ? (
                 <p
                   id="quick-log-target-error"
                   role="alert"
                   className="text-[11px] text-destructive"
                   data-testid="quick-log-target-error"
                 >
-                  {QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]}
+                  {QUICK_LOG_TARGET_BLOCKED_COPY[mainFormTarget.reason]}
                 </p>
               ) : !selectedPlant ? (
                 <p
@@ -2128,9 +2866,11 @@ export default function QuickLog({
                 className="text-[12px] text-muted-foreground leading-snug"
               >
                 {stripView.status === "usable"
-                  ? snapshot
-                    ? "Sensor context is usable and will attach to this log."
-                    : "Sensor context is usable but not attached."
+                  ? snapshotAttachable
+                    ? snapshot
+                      ? "Sensor context is usable and will attach to this log."
+                      : "Sensor context is usable but not attached."
+                    : "Sensor context is present but not attachable. This will save as a manual log only."
                   : stripView.status === "no_data"
                     ? "No usable sensor context. This will save as a manual log only."
                     : "Sensor context is not usable enough to attach. This will save as a manual log only."}
@@ -2147,7 +2887,7 @@ export default function QuickLog({
                       {line}
                     </li>
                   ))}
-                  {(!snapshot || !snapshotUsable) && (
+                  {(!snapshot || !snapshotUsable || !snapshotAttachable) && (
                     <li
                       data-testid="quick-log-snapshot-manual-truth-missing"
                       className="text-muted-foreground"
@@ -2181,9 +2921,19 @@ export default function QuickLog({
                     <Switch
                       data-testid="quick-log-snapshot-toggle"
                       data-snapshot-status={stripView.status}
-                      checked={snapshot && !!selectedPlant && snapshotUsable}
+                      data-snapshot-attachable={snapshotAttachable ? "true" : "false"}
+                      checked={snapshot && !!selectedPlant && snapshotUsable && snapshotAttachable}
                       onCheckedChange={(v) => {
                         if (isMainDraftMutationLocked()) return;
+                        // Refuse to arm local snapshot state for a
+                        // non-attachable row (GDP #1170 residual): `disabled`
+                        // is presentation, not a fence — a forced/programmatic
+                        // onCheckedChange(true) must not set `snapshot` when
+                        // the trust verdict forbids attach. The refused gesture
+                        // also never counts as a grower touch. Turning OFF
+                        // stays allowed. The save gate's own attachable AND
+                        // stays regardless.
+                        if (v && !snapshotAttachable) return;
                         snapshotUserTouchedRef.current = true;
                         setSnapshot(v);
                       }}
@@ -2197,7 +2947,11 @@ export default function QuickLog({
                     data-testid="quick-log-snapshot-session-helper"
                     className="text-[11px] text-muted-foreground"
                   >
-                    {selectedPlant && !snapshotUsable && stripView.status !== "no_data" ? (
+                    {selectedPlant && snapshotUsable && !snapshotAttachable ? (
+                      <span data-testid="quick-log-snapshot-non-attachable-helper">
+                        This snapshot is view-only and won't be included in this log.
+                      </span>
+                    ) : selectedPlant && !snapshotUsable && stripView.status !== "no_data" ? (
                       <span data-testid="quick-log-snapshot-stale-helper">
                         {buildStaleSnapshotHelperCopy(stripView.capturedAt)}
                       </span>
@@ -2213,7 +2967,7 @@ export default function QuickLog({
               <QuickLogSensorSnapshotStrip
                 growId={resolvedTarget?.growId ?? null}
                 tentId={resolvedTarget?.tentId ?? null}
-                attached={snapshot && !!resolvedTarget}
+                attached={snapshot && !!resolvedTarget && snapshotAttachable}
               />
             )}
 
@@ -3100,11 +3854,17 @@ export default function QuickLog({
 
             <Button
               type="submit"
-              disabled={saveLocked || !resolvedTarget || !!savedTarget}
+              disabled={
+                saveLocked ||
+                recoveryLocked ||
+                sameTargetRecoveryLocked ||
+                !mainFormResolvedTarget ||
+                !!savedTarget
+              }
               data-testid="quick-log-save"
               className="gradient-leaf text-primary-foreground"
             >
-              {saveLocked ? (
+              {busy || childSaveBusy ? (
                 <>
                   <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
                   <span>Saving…</span>
@@ -3149,6 +3909,22 @@ export default function QuickLog({
                         photoAttached: false,
                       })}
                     </p>
+                    {savedTarget.growStageUnconfirmed && (
+                      <p
+                        className="mt-2 text-xs text-amber-700 dark:text-amber-400"
+                        data-testid="quick-log-stage-save-unconfirmed"
+                      >
+                        {QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE}
+                      </p>
+                    )}
+                    {savedTarget.waterContextChanged && (
+                      <p
+                        className="mt-2 text-xs text-amber-700 dark:text-amber-400"
+                        data-testid="quick-log-water-context-changed"
+                      >
+                        {WATER_CONTEXT_CHANGED_MESSAGE}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -3224,6 +4000,63 @@ export default function QuickLog({
               </div>
             )}
           </fieldset>
+          {(recoveryLocked || starterWaterStorageBlocked) && (
+            <div
+              data-testid="quick-log-starter-water-recovery"
+              role="alert"
+              className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 space-y-2 text-sm"
+            >
+              <p>
+                {starterWaterStorageBlocked
+                  ? STARTER_WATER_RECOVERY_UNAVAILABLE
+                  : STARTER_WATER_RECOVERY_PENDING}
+              </p>
+              {starterWaterPending && (
+                <>
+                  <p data-testid="quick-log-starter-water-original">
+                    Original Watering: {starterWaterPending.payload.p_volume_ml} ml for{" "}
+                    {starterWaterPending.plantName}
+                    {starterWaterPending.tentName ? ` · ${starterWaterPending.tentName}` : ""}.
+                  </p>
+                  <Button
+                    type="button"
+                    data-testid="quick-log-starter-water-retry"
+                    disabled={saveLocked}
+                    onClick={() => void retryStarterWater()}
+                  >
+                    Retry original Watering
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+          {/* Outside the draft fieldset on purpose: that fieldset is disabled while a
+              history check is required, and a button inside a disabled fieldset
+              cannot be clicked in a browser. This panel is the only exit from that
+              state (save, close and Escape are locked), so it must stay enabled. */}
+          {historyCheckRequired && (
+            <div className="rounded-lg border border-amber-500/40 p-3 space-y-2">
+              {historyReviewNavigation && (
+                <a
+                  href={historyReviewNavigation.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block underline"
+                >
+                  {QUICK_LOG_HISTORY_REVIEW_LINK_LABEL}
+                </a>
+              )}
+              <p className="text-sm">{QUICK_LOG_HISTORY_DISCARD_HELPER}</p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!historyDiscardAllowed}
+                onClick={() => void handleDiscardHistoryDraft()}
+              >
+                {QUICK_LOG_HISTORY_DISCARD_LABEL}
+              </Button>
+            </div>
+          )}
         </form>
       </DialogContent>
     </Dialog>

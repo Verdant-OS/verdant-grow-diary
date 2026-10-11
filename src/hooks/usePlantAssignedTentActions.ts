@@ -40,7 +40,10 @@ export interface UsePlantAssignedTentActionsResult {
   proofSelectedAiDoctorActionRow: PlantAssignedTentActionRow | null;
   isLoading: boolean;
   isError: boolean;
+  isFetching: boolean;
   error: unknown;
+  /** Retry the existing action_queue read only. No writes. */
+  refetch: () => void;
 }
 
 export interface UsePlantAssignedTentActionsOptions {
@@ -57,6 +60,37 @@ export interface UsePlantAssignedTentActionsOptions {
 
 const ACTION_QUEUE_READ_COLUMNS =
   "id,grow_id,tent_id,plant_id,status,source,action_type,target_metric,suggested_change,reason,risk_level,target_device,created_at";
+
+/**
+ * Copy React Query flags before combining them. Discriminated UseQueryResult
+ * unions drop `isLoading` / `isFetching` to `never` after `!isError &&
+ * !isPaused && data === undefined`, which is exactly the initial-pending
+ * shape this hook must treat as Loading.
+ */
+function snapshotAssignedTentQueryFlags(query: {
+  isPaused: boolean;
+  isError: boolean;
+  isPending: boolean;
+  isLoading: boolean;
+  isFetching: boolean;
+  data: unknown;
+}): {
+  paused: boolean;
+  errored: boolean;
+  pending: boolean;
+  loading: boolean;
+  fetching: boolean;
+  dataUndefined: boolean;
+} {
+  return {
+    paused: query.isPaused,
+    errored: query.isError,
+    pending: query.isPending,
+    loading: query.isLoading,
+    fetching: query.isFetching,
+    dataUndefined: query.data === undefined,
+  };
+}
 
 /**
  * The generic panel intentionally remains small. Live Proof gets one
@@ -149,7 +183,10 @@ export function usePlantAssignedTentActions(
       if (growId) query = query.eq("grow_id", growId);
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as AssignedTentActionInputRow[];
+      if (!Array.isArray(data)) {
+        throw new Error("Pending actions are temporarily unavailable.");
+      }
+      return data as AssignedTentActionInputRow[];
     },
   });
 
@@ -177,7 +214,10 @@ export function usePlantAssignedTentActions(
       if (growId) query = query.eq("grow_id", growId);
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as AssignedTentActionInputRow[];
+      if (!Array.isArray(data)) {
+        throw new Error("Pending actions are temporarily unavailable.");
+      }
+      return data as AssignedTentActionInputRow[];
     },
   });
 
@@ -204,7 +244,10 @@ export function usePlantAssignedTentActions(
       if (growId) query = query.eq("grow_id", growId);
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as AssignedTentActionInputRow[];
+      if (!Array.isArray(data)) {
+        throw new Error("Pending actions are temporarily unavailable.");
+      }
+      return data as AssignedTentActionInputRow[];
     },
   });
 
@@ -231,9 +274,14 @@ export function usePlantAssignedTentActions(
       if (growId) query = query.eq("grow_id", growId);
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as AssignedTentActionInputRow[];
+      if (!Array.isArray(data)) {
+        throw new Error("Pending actions are temporarily unavailable.");
+      }
+      return data as AssignedTentActionInputRow[];
     },
   });
+
+  const genericQueryFlags = snapshotAssignedTentQueryFlags(q);
 
   // A proof-mode response is only evidence after every requested scoped read
   // settles cleanly. Cached data is also incomplete while a scope is
@@ -266,14 +314,26 @@ export function usePlantAssignedTentActions(
       proofAiDoctorQ.isError ||
       proofReadFetching ||
       proofReadPaused);
-  const rows = proofReadIncomplete
-    ? []
-    : buildAssignedTentActions(q.data ?? [], {
-        tentId,
-        growId,
-        limit,
-        selectedPlantIdForAiCoach,
-      });
+  // Generic panel: TanStack v5 reports an initial offline pause as
+  // isPending + isPaused with isLoading false and no data. Treating that as
+  // settled turns a missing read into a false empty Action Queue.
+  const genericReadUnproven = enabled && genericQueryFlags.dataUndefined;
+  const genericOfflineUnproven = genericReadUnproven && genericQueryFlags.paused;
+  const genericPendingUnproven =
+    genericReadUnproven &&
+    !genericQueryFlags.errored &&
+    !genericQueryFlags.paused &&
+    (genericQueryFlags.pending || genericQueryFlags.loading || genericQueryFlags.fetching);
+  const genericUnavailable = genericQueryFlags.errored || genericOfflineUnproven;
+  const rows =
+    proofReadIncomplete || genericUnavailable || genericPendingUnproven
+      ? []
+      : buildAssignedTentActions(q.data ?? [], {
+          tentId,
+          growId,
+          limit,
+          selectedPlantIdForAiCoach,
+        });
   const proofSelectedPlantAiCoachRow = proofReadIncomplete
     ? null
     : (buildAssignedTentActions(proofAiCoachQ.data ?? [], {
@@ -311,6 +371,14 @@ export function usePlantAssignedTentActions(
           getActionQueueSourceKind(row) === "ai_doctor" &&
           row.aiDoctorSessionBackPointerId === selectedAiDoctorSessionIdForProof,
       ) ?? null);
+  const isError =
+    q.isError ||
+    proofAiCoachQ.isError ||
+    proofAlertQ.isError ||
+    proofAiDoctorQ.isError ||
+    genericOfflineUnproven;
+  const isFetching =
+    q.isFetching || proofAiCoachQ.isFetching || proofAlertQ.isFetching || proofAiDoctorQ.isFetching;
   return {
     rows,
     proofSelectedPlantAiCoachRow,
@@ -322,8 +390,18 @@ export function usePlantAssignedTentActions(
       proofAlertQ.isLoading ||
       proofAiDoctorQ.isLoading ||
       proofReadFetching ||
-      proofReadPaused,
-    isError: q.isError || proofAiCoachQ.isError || proofAlertQ.isError || proofAiDoctorQ.isError,
+      proofReadPaused ||
+      genericPendingUnproven ||
+      genericReadUnproven ||
+      genericUnavailable,
+    isError,
+    isFetching,
     error: q.error ?? proofAiCoachQ.error ?? proofAlertQ.error ?? proofAiDoctorQ.error,
+    refetch: () => {
+      void q.refetch();
+      if (selectedPlantIdForAiCoach !== null) void proofAiCoachQ.refetch();
+      if (selectedAlertIdForProof !== null) void proofAlertQ.refetch();
+      if (selectedAiDoctorSessionIdForProof !== null) void proofAiDoctorQ.refetch();
+    },
   };
 }

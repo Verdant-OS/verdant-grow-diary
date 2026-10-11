@@ -18,6 +18,8 @@ import {
   parseQuickLogCatalogContract,
   QUICKLOG_CORRECTIONS_CATALOG_SQL,
 } from "./assert-required-core-migrations-applied.mjs";
+import { validatePinnedMigrationFile as validateKeyedOverloadMigrationFile } from "./apply-quicklog-revision-idempotent-replay.mjs";
+import { MIGRATION_LEDGER_CREATE_TABLE_SQL } from "./lib/supabaseMigrationLedgerShape.mjs";
 
 export { validatePinnedMigrationFile };
 
@@ -108,13 +110,24 @@ function executeSqlExpectFailure(sql, env, stage, spawnImpl = spawnSync) {
   return formatPsqlFailureCode(stage, result?.stderr);
 }
 
-function extractFunctionDefinition(relativePath, functionPrefix, terminator) {
-  const source = readFileSync(resolve(repoRoot, relativePath), "utf8");
+export function extractFunctionDefinitionFromSource(sourceText, functionPrefix, terminator) {
+  // Windows can check out the same immutable migration blob with CRLF. Work
+  // from its committed LF shape so the harness's exact source edits remain
+  // deterministic without changing any published migration file.
+  const source = sourceText.replace(/\r\n?/g, "\n");
   const start = source.indexOf(functionPrefix);
   if (start < 0) throw new Error("dependency_source_missing");
   const end = source.indexOf(`\n${terminator}`, start);
   if (end < 0) throw new Error("dependency_source_malformed");
   return source.slice(start, end + terminator.length + 1);
+}
+
+function extractFunctionDefinition(relativePath, functionPrefix, terminator) {
+  return extractFunctionDefinitionFromSource(
+    readFileSync(resolve(repoRoot, relativePath), "utf8"),
+    functionPrefix,
+    terminator,
+  );
 }
 
 const hasRoleDefinition = extractFunctionDefinition(
@@ -143,29 +156,29 @@ drop schema if exists supabase_migrations cascade;
 do $roles$
 begin
   if not exists(select 1 from pg_roles where rolname='anon') then
-    execute 'create role anon nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls';
+    execute 'create role anon nologin nosuperuser nocreatedb nocreaterole inherit noreplication nobypassrls';
   elsif not exists(
     select 1 from pg_roles where rolname='anon'
-      and not rolsuper and not rolinherit and not rolcreaterole and not rolcreatedb
+      and not rolsuper and rolinherit and not rolcreaterole and not rolcreatedb
       and not rolcanlogin and not rolreplication and not rolbypassrls
   ) then
     raise exception 'existing harness role anon has unsafe attributes' using errcode = '55000';
   end if;
   if not exists(select 1 from pg_roles where rolname='authenticated') then
-    execute 'create role authenticated nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls';
+    execute 'create role authenticated nologin nosuperuser nocreatedb nocreaterole inherit noreplication nobypassrls';
   elsif not exists(
     select 1 from pg_roles where rolname='authenticated'
-      and not rolsuper and not rolinherit and not rolcreaterole and not rolcreatedb
+      and not rolsuper and rolinherit and not rolcreaterole and not rolcreatedb
       and not rolcanlogin and not rolreplication and not rolbypassrls
   ) then
     raise exception 'existing harness role authenticated has unsafe attributes' using errcode = '55000';
   end if;
   if not exists(select 1 from pg_roles where rolname='service_role') then
-    execute 'create role service_role nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls';
+    execute 'create role service_role nologin nosuperuser nocreatedb nocreaterole inherit noreplication bypassrls';
   elsif not exists(
     select 1 from pg_roles where rolname='service_role'
-      and not rolsuper and not rolinherit and not rolcreaterole and not rolcreatedb
-      and not rolcanlogin and not rolreplication and not rolbypassrls
+      and not rolsuper and rolinherit and not rolcreaterole and not rolcreatedb
+      and not rolcanlogin and not rolreplication and rolbypassrls
   ) then
     raise exception 'existing harness role service_role has unsafe attributes' using errcode = '55000';
   end if;
@@ -216,9 +229,7 @@ create table public.diary_entries(
   note text, details jsonb not null default '{}'::jsonb,
   entry_at timestamptz not null default now()
 );
-create table supabase_migrations.schema_migrations(
-  version text primary key, name text, statements text[]
-);
+${MIGRATION_LEDGER_CREATE_TABLE_SQL}
 `;
 
 const TARGET_ATTESTATION_SQL = `
@@ -326,6 +337,20 @@ function applyPinnedMigration(env, spawnImpl, mutations = {}) {
   return result;
 }
 
+/**
+ * The required-core gate (#1756) pins the seven-function set: the five the pinned
+ * delivery ships plus the keyed overloads that 20260916111000 adds. The delivery
+ * preflight pins exactly those five (target_object_count 13), so this runs only
+ * after the last five-function verify_only read that shares the scaffold.
+ */
+function applyKeyedOverloadMigration(env, spawnImpl) {
+  const migration = validateKeyedOverloadMigrationFile({
+    root: resolve(repoRoot, "supabase", "migrations"),
+  });
+  // The reviewed file owns its exact BEGIN/COMMIT; psql runs it verbatim.
+  executeSql(migration.text, env, { stage: "keyed_overload_apply", spawnImpl });
+}
+
 function requireGuardedRollback(label, env, spawnImpl, mutations, expectedMessage) {
   resetScaffold(env, spawnImpl);
   const result = applyPinnedMigration(env, spawnImpl, {
@@ -392,18 +417,32 @@ function proveClientAccessFences(env, spawnImpl) {
   if (result !== "t") throw new Error("client_access:mismatch");
 }
 
+const HOSTILE_OVERLOAD_SQL =
+  "create function public.quicklog_correct_entry(integer) returns integer language sql as $$ select $1 $$;";
+const HOSTILE_OVERLOAD_RESTORE_SQL = "drop function public.quicklog_correct_entry(integer);";
+
 function proveCatalogDrift(env, spawnImpl) {
-  executeSql(
-    "create function public.quicklog_correct_entry(integer) returns integer language sql as $$ select $1 $$;",
-    env,
-    { stage: "catalog_mutation", spawnImpl },
-  );
+  executeSql(HOSTILE_OVERLOAD_SQL, env, { stage: "catalog_mutation", spawnImpl });
   requireStatus("catalog_drift", readPreflight(env, spawnImpl), "schema_drift");
-  executeSql("drop function public.quicklog_correct_entry(integer);", env, {
-    stage: "catalog_restore",
+  executeSql(HOSTILE_OVERLOAD_RESTORE_SQL, env, { stage: "catalog_restore", spawnImpl });
+  requireStatus("catalog_restored", readPreflight(env, spawnImpl), "verify_only");
+
+  // The required-core gate is measured on the seven-function catalog it requires.
+  applyKeyedOverloadMigration(env, spawnImpl);
+  if (readRequiredCoreCatalog(env, spawnImpl).target_function_overloads_contract !== true) {
+    throw new Error("catalog_drift:required_core_baseline");
+  }
+  executeSql(HOSTILE_OVERLOAD_SQL, env, { stage: "required_core_catalog_mutation", spawnImpl });
+  if (readRequiredCoreCatalog(env, spawnImpl).target_function_overloads_contract !== false) {
+    throw new Error("catalog_drift:required_core_false_green");
+  }
+  executeSql(HOSTILE_OVERLOAD_RESTORE_SQL, env, {
+    stage: "required_core_catalog_restore",
     spawnImpl,
   });
-  requireStatus("catalog_restored", readPreflight(env, spawnImpl), "verify_only");
+  if (readRequiredCoreCatalog(env, spawnImpl).target_function_overloads_contract !== true) {
+    throw new Error("catalog_drift:required_core_restore_failed");
+  }
 }
 
 function proveHostilePolicyDrift(env, spawnImpl) {

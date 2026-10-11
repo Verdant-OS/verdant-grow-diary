@@ -19,7 +19,7 @@ import { AI_DOCTOR_HISTORICAL_REVIEW_MIN_VALID_OBSERVATIONS } from "@/lib/aiDoct
 import { AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP } from "@/lib/aiDoctorReviewRequestPacket";
 import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 
-export type ImportedHistoryAiDoctorHandoffReadStatus = "loading" | "error" | "success";
+export type ImportedHistoryAiDoctorHandoffReadStatus = "loading" | "paused" | "error" | "success";
 
 export interface ImportedHistoryAiDoctorHandoffPlant {
   id?: string | null;
@@ -37,6 +37,7 @@ export type ImportedHistoryAiDoctorHandoffState =
   | "too_few_valid_observations"
   | "single_timestamp"
   | "plants_loading"
+  | "plants_paused"
   | "plants_error"
   | "no_active_plants"
   | "single_active_plant"
@@ -69,16 +70,21 @@ export interface BuildImportedSensorHistoryAiDoctorHandoffInput {
 
 /**
  * Match the cached-row read convention used by imported history: a failed
- * read wins; an empty initial fetch is loading; cached rows remain usable
- * while a background refresh runs.
+ * read wins; unresolved empty reads stay loading or paused; cached rows
+ * remain usable while a background refresh runs.
  */
 export function resolveImportedHistoryHandoffReadStatus(input: {
   isError: boolean;
   isFetching: boolean;
   hasRows: boolean;
+  isPending?: boolean;
+  isPaused?: boolean;
 }): ImportedHistoryAiDoctorHandoffReadStatus {
   if (input.isError) return "error";
-  if (input.isFetching && !input.hasRows) return "loading";
+  if (!input.hasRows) {
+    if (input.isPaused) return "paused";
+    if (input.isPending || input.isFetching) return "loading";
+  }
   return "success";
 }
 
@@ -213,11 +219,13 @@ export function buildImportedSensorHistoryAiDoctorHandoff(
     );
   }
 
-  if (input.historyStatus === "loading") {
+  if (input.historyStatus === "loading" || input.historyStatus === "paused") {
     return result(
       "history_loading",
       "Checking imported history",
-      "Imported sensor history is still loading.",
+      input.historyStatus === "paused"
+        ? "Waiting for a connection to check imported sensor history."
+        : "Imported sensor history is still loading.",
       validObservationCount,
       distinctTimestampCount,
     );
@@ -258,6 +266,16 @@ export function buildImportedSensorHistoryAiDoctorHandoff(
       "single_timestamp",
       "More than one timestamp is needed",
       "The valid observations all come from one timestamp. Add history from another time before starting a historical review.",
+      validObservationCount,
+      distinctTimestampCount,
+    );
+  }
+
+  if (input.plantStatus === "paused") {
+    return result(
+      "plants_paused",
+      "Waiting for a connection",
+      "Imported history is eligible. Waiting for a connection to check active plants in this tent.",
       validObservationCount,
       distinctTimestampCount,
     );

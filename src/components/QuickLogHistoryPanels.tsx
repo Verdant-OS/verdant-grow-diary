@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 import { toast } from "sonner";
+import { buildManualReadingChips } from "@/lib/quickLogManualReadingChipsViewModel";
 import {
   Activity,
   AlertTriangle,
@@ -31,7 +32,10 @@ import {
   handleRootId,
   type QuickLogEntryHandleRef,
 } from "@/lib/quick-log/quickLogRevisionRules";
-import { useQuickLogRevisionBadges } from "@/hooks/useQuickLogRevisionBadges";
+import {
+  QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE,
+  useQuickLogRevisionBadges,
+} from "@/hooks/useQuickLogRevisionBadges";
 import QuickLogEntryIntegrityControls, {
   QuickLogEditedBadge,
 } from "@/components/QuickLogEntryIntegrityControls";
@@ -126,17 +130,8 @@ function buildRecentDiaryPdfInput(
   };
 }
 
-function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
-  const m = row.manualHandheld;
-  if (!m) return null;
-  const items: Array<{ label: string; value: string }> = [];
-  if (m.inputPh) items.push({ label: "Input pH", value: m.inputPh });
-  if (m.inputEc) items.push({ label: "Input EC/PPM", value: m.inputEc });
-  if (m.runoffPh) items.push({ label: "Runoff pH", value: m.runoffPh });
-  if (m.runoffEc) items.push({ label: "Runoff EC/PPM", value: m.runoffEc });
-  if (m.ppfdCanopy) items.push({ label: "PPFD canopy", value: m.ppfdCanopy });
-  if (m.lightDistance) items.push({ label: "Light distance", value: m.lightDistance });
-  if (m.other) m.other.forEach((o) => items.push(o));
+export function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
+  const items = buildManualReadingChips(row.manualHandheld);
   if (items.length === 0) return null;
   return (
     <div
@@ -154,10 +149,16 @@ function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
         {items.map((it, i) => (
           <span
             key={`${row.id}-mh-${i}`}
-            className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background/40 px-2 py-1 text-xs text-muted-foreground"
+            data-invalid={it.invalid ? "true" : undefined}
+            className={
+              it.invalid
+                ? "inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-200"
+                : "inline-flex items-center gap-1 rounded-full border border-border/50 bg-background/40 px-2 py-1 text-xs text-muted-foreground"
+            }
           >
             <span className="font-medium text-foreground/80">{it.label}</span>
             <span>{it.value}</span>
+            {it.invalid ? <span>· outside valid range, not used</span> : null}
           </span>
         ))}
       </div>
@@ -297,13 +298,16 @@ function QuickLogHistorySection({
       ].filter((id) => id.length > 0),
     [rows, handleIndex],
   );
-  const { badges } = useQuickLogRevisionBadges(rootIds);
+  const { badges, status: revisionBadgesStatus } = useQuickLogRevisionBadges(rootIds);
+  const revisionBadgesReady = revisionBadgesStatus === "ok";
+  const revisionLedgerUnread = revisionBadgesStatus === "unavailable";
 
   return (
     <section
       className={"glass rounded-2xl p-4 " + (className ?? "")}
       aria-label={title}
       data-testid={`quicklog-history-section-${laneKey}`}
+      data-revision-badges-status={revisionBadgesStatus}
     >
       <header className="mb-3 flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
         <h2 className="inline-flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -317,6 +321,15 @@ function QuickLogHistorySection({
           </span>
         </div>
       </header>
+      {revisionLedgerUnread && rows.length > 0 ? (
+        <p
+          className="mb-2 text-xs text-muted-foreground"
+          role="status"
+          data-testid="quicklog-revision-badges-unavailable"
+        >
+          {QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE}
+        </p>
+      ) : null}
       {rows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-4 text-center">
           <p className="text-sm text-muted-foreground">{emptyTitle}</p>
@@ -332,7 +345,9 @@ function QuickLogHistorySection({
                 key={r.id}
                 row={r}
                 integrityHandle={handle}
-                correctionCount={badge?.correctionCount ?? 0}
+                // Edited chrome only after a successful resolve (status === "ok").
+                // pending and unavailable must not look like confident edits/no-edits.
+                correctionCount={revisionBadgesReady ? (badge?.correctionCount ?? 0) : 0}
                 onEntryChanged={onEntryChanged}
               />
             );

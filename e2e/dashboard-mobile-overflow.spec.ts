@@ -6,6 +6,18 @@
 // - Performs no real writes, AI calls, ingest, alerts, Action Queue changes,
 //   or device control.
 import { expect, test, type Page } from "@playwright/test";
+import { CURRENT_AGREEMENT_LIST } from "../src/constants/agreements";
+
+// AgreementReconsentGate renders inside the authenticated shell and queries
+// user_agreement_acceptances on mount. Without this fixture the catch-all below
+// answers `[]`, computeAgreementGaps reports both agreements missing, and the
+// modal opens over the page, intercepting clicks depending on whether the query
+// resolves before or after the interaction. Derived from the product registry
+// so an agreement bump cannot silently reintroduce the flake.
+const CURRENT_AGREEMENT_ROWS = CURRENT_AGREEMENT_LIST.map((agreement) => ({
+  agreement_type: agreement.type,
+  version: agreement.version,
+}));
 
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
@@ -83,21 +95,23 @@ async function mockSignedInSupabase(page: Page) {
   });
   await page.route(/\/rest\/v1\//, async (route, request) => {
     const pathname = new URL(request.url()).pathname;
-    const rows = pathname.endsWith("/rest/v1/tents")
-      ? [FAKE_TENT]
-      : pathname.endsWith("/rest/v1/plants")
-        ? [FAKE_PLANT]
-        : pathname.endsWith("/rest/v1/grows")
-          ? [
-              {
-                id: FAKE_GROW_ID,
-                name: "Mobile Proof Grow",
-                stage: "veg",
-                is_archived: false,
-                created_at: "2020-01-01T00:00:00.000Z",
-              },
-            ]
-          : [];
+    const rows = pathname.endsWith("/rest/v1/user_agreement_acceptances")
+      ? CURRENT_AGREEMENT_ROWS
+      : pathname.endsWith("/rest/v1/tents")
+        ? [FAKE_TENT]
+        : pathname.endsWith("/rest/v1/plants")
+          ? [FAKE_PLANT]
+          : pathname.endsWith("/rest/v1/grows")
+            ? [
+                {
+                  id: FAKE_GROW_ID,
+                  name: "Mobile Proof Grow",
+                  stage: "veg",
+                  is_archived: false,
+                  created_at: "2020-01-01T00:00:00.000Z",
+                },
+              ]
+            : [];
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -132,9 +146,46 @@ async function openDashboard(page: Page, viewport: { width: number; height: numb
 
   const dashboard = page.getByTestId("dashboard-root");
   await expect(dashboard).toBeVisible();
-  await expect(page.getByRole("link", { name: "Quick Log", exact: true }).first()).toBeVisible();
+  await expect(page.getByTestId("dashboard-ready")).toBeVisible();
   await expect(page.getByRole("link", { name: "Open tents", exact: true })).toBeVisible();
+  // Chrome exemptions on mobile (GDP D1.2-A): AppShell's floating Quick Log
+  // button and MobileNav's primary Log tab. The page body adds only the card's Log.
+  expect(await visibleLogControls(page)).toEqual([
+    "Primary navigation > /daily-check",
+    "mobile-quick-log-fab",
+    "tonight-tent-home-log",
+  ]);
   return dashboard;
+}
+
+/**
+ * Identity of every visible Log control (links and buttons named Log, Quick
+ * Log or Open Quick Log; not Log out or Start Check), sorted: its test ID,
+ * or for an untagged control its landmark label and href. GDP D1.1-A/D1.2-A
+ * (docs/specs/dashboard-single-log-entry-readiness-marker.md): the page body
+ * shows only the home card's Log; AppShell's chrome triggers are named
+ * exemptions. A new duplicate fails the exact set.
+ */
+async function visibleLogControls(page: Page): Promise<string[]> {
+  const name = /^(open )?(quick )?log$/i;
+  const ids: string[] = [];
+  for (const role of ["link", "button"] as const) {
+    // One atomic read per role: a re-render between per-index reads could
+    // otherwise count a control twice or skip it.
+    const roleIds = await page
+      .getByRole(role, { name })
+      .filter({ visible: true })
+      .evaluateAll((elements) =>
+        elements.map((element) => {
+          const testId = element.getAttribute("data-testid");
+          if (testId) return testId;
+          const landmark = element.closest("nav, header, main, aside")?.getAttribute("aria-label");
+          return `${landmark ?? "unlabelled region"} > ${element.getAttribute("href") ?? element.tagName}`;
+        }),
+      );
+    ids.push(...roleIds);
+  }
+  return ids.sort();
 }
 
 async function readOverflowMetrics(page: Page) {

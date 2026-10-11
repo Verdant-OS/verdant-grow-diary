@@ -169,6 +169,71 @@ describe("<CultivationCalendarMonthGrid />", () => {
     expect(screen.getByTestId("cultivation-calendar-fact-block").className).toMatch(/secondary/);
   });
 
+  it("paints a continuous flower window band distinct from facts and reviews", () => {
+    const watering = event("water-1", "watering", "2026-03-02T09:00:00Z", "veg");
+    render(
+      <CultivationCalendarMonthGrid
+        monthKey="2026-03"
+        groups={[group("2026-03-02", [watering])]}
+        projectedReviews={[review("review-1", "watering", "2026-03-04T12:00:00Z")]}
+        flowerWindowBandDateKeys={["2026-03-02", "2026-03-03", "2026-03-04"]}
+        plantDayLabel="Plant day 70"
+        flowerDayLabel="Flower day 10 of 60"
+        now={new Date("2026-03-12T12:00:00Z")}
+      />,
+    );
+
+    expect(screen.getByTestId("cultivation-calendar-plant-day")).toHaveTextContent("Plant day 70");
+    expect(screen.getByTestId("cultivation-calendar-flower-day")).toHaveTextContent(
+      "Flower day 10 of 60",
+    );
+    expect(screen.queryByTestId("cultivation-calendar-duration-honesty")).toBeNull();
+
+    const banded = screen
+      .getAllByTestId("cultivation-calendar-day")
+      .filter((day) => day.getAttribute("data-stage-band") === "flower");
+    expect(banded.map((day) => day.getAttribute("data-date-key"))).toEqual([
+      "2026-03-02",
+      "2026-03-03",
+      "2026-03-04",
+    ]);
+    expect(banded[0].className).toMatch(/fuchsia/);
+
+    const flipDay = banded[0];
+    expect(within(flipDay).getByTestId("cultivation-calendar-fact-block")).toBeInTheDocument();
+    const reviewDay = banded[2];
+    expect(
+      within(reviewDay).getByTestId("cultivation-calendar-advisory-block"),
+    ).toBeInTheDocument();
+    expect(within(reviewDay).queryByTestId("cultivation-calendar-fact-block")).toBeNull();
+
+    expect(screen.getByTestId("cultivation-calendar-stage-legend")).toHaveTextContent(
+      /Stage colour follows the manually logged stage/i,
+    );
+    expect(screen.getByTestId("cultivation-calendar-stage-legend")).toHaveTextContent(
+      /derived overlay/i,
+    );
+  });
+
+  it("does not invent Plant day 0 or a flower band without anchors", () => {
+    render(
+      <CultivationCalendarMonthGrid
+        monthKey="2026-07"
+        groups={[]}
+        now={new Date("2026-07-14T12:00:00Z")}
+      />,
+    );
+
+    expect(screen.queryByTestId("cultivation-calendar-plant-day")).toBeNull();
+    expect(screen.queryByTestId("cultivation-calendar-flower-day")).toBeNull();
+    expect(screen.queryByText(/Plant day 0/i)).toBeNull();
+    expect(
+      screen
+        .getAllByTestId("cultivation-calendar-day")
+        .every((day) => day.getAttribute("data-stage-band") == null),
+    ).toBe(true);
+  });
+
   it("has a calm invalid-month empty state rather than manufacturing calendar content", () => {
     render(
       <CultivationCalendarMonthGrid

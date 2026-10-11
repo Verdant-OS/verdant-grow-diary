@@ -9,6 +9,7 @@ import { MagicLinkEmail } from "../_shared/email-templates/magic-link.tsx";
 import { RecoveryEmail } from "../_shared/email-templates/recovery.tsx";
 import { EmailChangeEmail } from "../_shared/email-templates/email-change.tsx";
 import { ReauthenticationEmail } from "../_shared/email-templates/reauthentication.tsx";
+import { timingSafeEqual } from "../_shared/lib/lib/timingSafeCompareRules.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,7 +47,7 @@ const FROM_DOMAIN = "verdantgrowdiary.com"; // Domain shown in From address (may
 // The sample email uses a fixed placeholder (RFC 6761 .test TLD) so the Go backend
 // can always find-and-replace it with the actual recipient when sending test emails,
 // even if the project's domain has changed since the template was scaffolded.
-const SAMPLE_PROJECT_URL = "https://verdantgrowdiary-com.lovable.app";
+const SAMPLE_PROJECT_URL = "https://verdantgrowdiary.com";
 const SAMPLE_EMAIL = "user@example.test";
 const SAMPLE_DATA: Record<string, object> = {
   signup: {
@@ -94,7 +95,7 @@ async function handlePreview(req: Request): Promise<Response> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
   const authHeader = req.headers.get("Authorization");
 
-  if (!apiKey || authHeader !== `Bearer ${apiKey}`) {
+  if (!apiKey || !timingSafeEqual(authHeader ?? "", `Bearer ${apiKey}`)) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...previewCorsHeaders, "Content-Type": "application/json" },

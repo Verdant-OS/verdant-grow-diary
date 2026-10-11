@@ -10,12 +10,22 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import { supabase } from "@/integrations/supabase/client";
 
-function mockSensorRows(data: unknown[], error: unknown = null) {
+function mockSensorRows(data: Array<Record<string, unknown>>, error: unknown = null) {
+  const effectiveRows = data.map((row, index) => ({
+    ...row,
+    id: `cccccccc-cccc-4ccc-8ccc-${String(index).padStart(12, "0")}`,
+    user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    ts: row.ts ?? row.captured_at,
+    created_at: row.created_at ?? row.captured_at,
+    device_id: null,
+    correction_valid: row.correction_valid ?? true,
+  }));
   const builder: Record<string, ReturnType<typeof vi.fn>> = {};
   for (const method of ["select", "eq", "gte", "lte", "order"]) {
     builder[method] = vi.fn(() => builder);
   }
-  builder.limit = vi.fn(() => Promise.resolve({ data, error }));
+  builder.limit = vi.fn(() => Promise.resolve({ data: effectiveRows, error }));
   (supabase.from as unknown as ReturnType<typeof vi.fn>).mockReturnValue(builder);
   return builder;
 }
@@ -40,6 +50,58 @@ beforeEach(() => {
 });
 
 describe("fetchLatestSensorSnapshot", () => {
+  it("uses a corrected manual value instead of the flat RPC value and preserves observation time", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({
+      data: { captured_at: "2026-06-09T12:00:00Z", temperature: 99 },
+      error: null,
+    } as never);
+    const builder = mockSensorRows([
+      {
+        metric: "temperature_c",
+        value: 24,
+        quality: "ok",
+        source: "manual",
+        captured_at: "2026-06-09T11:59:00Z",
+        raw_payload: null,
+      },
+    ]);
+    await expect(fetchLatestSensorSnapshot("tent-1")).resolves.toEqual({
+      source: "manual",
+      captured_at: "2026-06-09T11:59:00Z",
+      metrics: { temperature: 24 },
+    });
+    expect(supabase.from).toHaveBeenCalledWith("sensor_readings_effective");
+    expect(builder.eq).toHaveBeenCalledWith("tent_id", "tent-1");
+    expect(builder.gte).toHaveBeenCalledWith("captured_at", "2026-06-09T08:00:00.000Z");
+    expect(builder.lte).toHaveBeenCalledWith("captured_at", "2026-06-09T12:00:00Z");
+    expect(builder.limit).toHaveBeenCalledWith(200);
+  });
+  it("does not fall back to the flat RPC when correction evidence is invalid", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({
+      data: { captured_at: "2026-06-09T12:00:00Z", temperature: 99 },
+      error: null,
+    } as never);
+    mockSensorRows([
+      {
+        metric: "temperature_c",
+        value: 24,
+        quality: "ok",
+        source: "manual",
+        captured_at: "2026-06-09T12:00:00Z",
+        raw_payload: null,
+        correction_valid: false,
+      },
+    ]);
+    await expect(fetchLatestSensorSnapshot("tent-1")).resolves.toBeNull();
+  });
+  it("does not attach the flat RPC value when the effective view read fails", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({
+      data: { captured_at: "2026-06-09T12:00:00Z", temperature: 99 },
+      error: null,
+    } as never);
+    mockSensorRows([], new Error("private failure"));
+    await expect(fetchLatestSensorSnapshot("tent-1")).resolves.toBeNull();
+  });
   it("returns null when RPC returns null data", async () => {
     (supabase.rpc as any).mockResolvedValue({ data: null, error: null });
     const result = await fetchLatestSensorSnapshot("tent-1");
@@ -66,6 +128,18 @@ describe("fetchLatestSensorSnapshot", () => {
     const result = await fetchLatestSensorSnapshot("tent-1");
     expect(result).toBeNull();
   });
+
+  it.each(["not-a-date", ""])(
+    "returns null for non-finite RPC captured_at %j without querying effective readings",
+    async (capturedAt) => {
+      vi.mocked(supabase.rpc).mockResolvedValue({
+        data: { captured_at: capturedAt, temperature: 24 },
+        error: null,
+      } as never);
+      await expect(fetchLatestSensorSnapshot("tent-1")).resolves.toBeNull();
+      expect(supabase.from).not.toHaveBeenCalled();
+    },
+  );
 
   it("transforms flat JSONB into canonical snapshot shape", async () => {
     (supabase.rpc as any).mockResolvedValue({

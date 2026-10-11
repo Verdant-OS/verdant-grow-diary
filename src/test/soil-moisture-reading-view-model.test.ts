@@ -106,6 +106,14 @@ describe("buildSoilMoistureReadingViewModel", () => {
     expect(vm.calibrationSourceLine).toBe("Calibration source: demo");
   });
 
+  it("labels the first-party pi_bridge raw source as live per the #1003 canon (#592)", () => {
+    const vm = buildSoilMoistureReadingViewModel({
+      ...baseInput,
+      rawSource: "pi_bridge",
+    });
+    expect(vm.rawSourceLine).toBe("Raw source: live");
+  });
+
   it("keeps the read-only display slice free of action, alert, automation, and device-control writes", () => {
     const files = [
       "src/lib/soilMoistureCalibrationSelectionRules.ts",

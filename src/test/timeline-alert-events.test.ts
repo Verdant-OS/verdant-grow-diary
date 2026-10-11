@@ -48,15 +48,19 @@ describe("Timeline — alert_events fetch", () => {
   });
 
   it("orders newest-first at the DB layer", () => {
+    // #593: ordered through orderNewestFirstStable (created_at desc, then id
+    // desc as a tie-breaker — unit-tested in timeline-stable-order.test.ts).
     expect(TIMELINE).toMatch(
-      /alert_events[\s\S]{0,400}\.order\(\s*["']created_at["']\s*,\s*\{\s*ascending:\s*false\s*\}\s*\)/,
+      /orderNewestFirstStable\(\s*supabase\s*\.from\(\s*["']alert_events["']\s*\)[\s\S]{0,400}?["']created_at["'],?\s*\)\.limit\(50\)/,
     );
   });
 
   it("does not load alert events when no grow is active", () => {
     // load() short-circuits and resets state when activeGrowId is missing.
+    // The receipts clear sits in the same block (directoryGrowId gate is
+    // independent); keep the window wide enough to reach setAlertEvents.
     expect(TIMELINE).toMatch(
-      /if\s*\(\s*!user\s*\|\|\s*!activeGrowId\s*\)\s*\{[\s\S]{0,200}setAlertEvents\(\[\]\)/,
+      /if\s*\(\s*!user\s*\|\|\s*!activeGrowId\s*\)\s*\{[\s\S]{0,500}setAlertEvents\(\[\]\)/,
     );
   });
 });

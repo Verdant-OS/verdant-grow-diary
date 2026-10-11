@@ -7,6 +7,7 @@
 // surfaces.
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { insertSensorReadingsBatch } from "@/lib/growRepo";
+import { confirmManualSnapshotConflict } from "@/lib/manualSensorSnapshotRecovery";
 import {
   validateSensorReadingPayload,
   type InsertSensorReadingPayload,
@@ -43,7 +44,11 @@ export function useInsertSensorReadings(): UseMutationResult<
   return useMutation({
     mutationFn: async (rows: InsertSensorReadingPayload[]) => {
       validateSensorReadingBatch(rows);
-      await insertSensorReadingsBatch(rows);
+      try {
+        await insertSensorReadingsBatch(rows);
+      } catch (error) {
+        if (!(await confirmManualSnapshotConflict(rows, error))) throw error;
+      }
     },
     onSuccess: (_data, rows) => {
       qc.invalidateQueries({ queryKey: ["grow", "sensors"] });

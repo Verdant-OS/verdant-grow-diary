@@ -1,7 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { buildPlantTypeUpdate } from "@/lib/plantTypeRules";
+import {
+  plantStartDateInputMax,
+  plantStartDateInputToIso,
+  plantStartDateInputValue,
+  plantStartDateSaveMessage,
+} from "@/lib/plantStartDateRules";
 import { useTents } from "@/hooks/use-tents";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,15 +44,29 @@ import {
 import { retirePreviousPlantProfilePhoto } from "@/lib/plantProfilePhotoReplacementCleanupService";
 import { usePlantProfilePhotoPreview } from "@/hooks/usePlantProfilePhotoPreview";
 import PlantProfilePhotoPreview from "@/components/PlantProfilePhotoPreview";
+import {
+  buildPlantEditGrowIdFromTent,
+  formatPlantEditSaveError,
+  normalizePlantEditTentSelectValue,
+  resolvePlantEditTentOptions,
+} from "@/lib/plantEditSaveRules";
+import {
+  PLANT_HEALTH_NOT_ASSESSED_LABEL,
+  PLANT_HEALTH_NOT_ASSESSED_OPTION,
+  buildPlantHealthEditUpdate,
+  editablePlantHealth,
+  plantHealthFromSelectValue,
+} from "@/lib/plantHealthRules";
 
 /**
  * Edits an existing plant's user-facing fields. Profile photo is now
  * a native camera / library upload — the grower never has to find or
  * enter a link. See docs/plant-profile-photo-upload-v1.md.
  *
- * RLS enforces ownership; user_id and grow_id are never touched here.
- * This dialog writes only to `plants` and only uploads to the
- * private `diary-photos` bucket. No alerts, Action Queue, sensor,
+ * RLS enforces ownership; user_id is never touched here. grow_id is only
+ * written when re-homing from an empty-grow tent fallback (copy from the
+ * selected tent). This dialog writes only to `plants` and only uploads to
+ * the private `diary-photos` bucket. No alerts, Action Queue, sensor,
  * AI, Edge Function, or device writes.
  */
 const STAGES = [
@@ -70,7 +91,7 @@ interface Plant {
   name: string;
   strain?: string | null;
   stage: string;
-  health: string;
+  health?: string | null;
   startedAt?: string | null;
   tentId?: string | null;
   growId?: string | null;
@@ -93,11 +114,16 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const { data: allTents = [] } = useTents();
-  const tents = plant.growId
-    ? (allTents as Array<{ id: string; name: string; grow_id: string | null }>).filter(
-        (t) => t.grow_id === plant.growId,
-      )
-    : allTents;
+  const tentOptions = useMemo(
+    () =>
+      resolvePlantEditTentOptions(
+        allTents as Array<{ id: string; name: string; grow_id: string | null }>,
+        plant.growId ?? null,
+      ),
+    [allTents, plant.growId],
+  );
+  const tents = tentOptions.tents;
+  const availableTentIds = useMemo(() => tents.map((t) => t.id), [tents]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [photoErr, setPhotoErr] = useState<string | null>(null);
@@ -110,9 +136,9 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     name: plant.name ?? "",
     strain: plant.strain ?? "",
     stage: plant.stage ?? "seedling",
-    health: plant.health ?? "healthy",
-    tent_id: plant.tentId ?? "none",
-    started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
+    health: editablePlantHealth(plant.health),
+    tent_id: normalizePlantEditTentSelectValue(plant.tentId, availableTentIds),
+    started_at: plantStartDateInputValue(plant.startedAt),
     last_note: plant.lastNote ?? "",
     plant_type: plant.plantType ?? "unknown",
   });
@@ -131,9 +157,9 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
         name: plant.name ?? "",
         strain: plant.strain ?? "",
         stage: plant.stage ?? "seedling",
-        health: plant.health ?? "healthy",
-        tent_id: plant.tentId ?? "none",
-        started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
+        health: editablePlantHealth(plant.health),
+        tent_id: normalizePlantEditTentSelectValue(plant.tentId, availableTentIds),
+        started_at: plantStartDateInputValue(plant.startedAt),
         last_note: plant.lastNote ?? "",
         plant_type: plant.plantType ?? "unknown",
       });
@@ -143,7 +169,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     }
     // Also reset when the target plant id changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, plant.id]);
+  }, [open, plant.id, availableTentIds.join("|")]);
 
   // Object-URL lifecycle (create + decode-probe + revoke) is owned by
   // the preview hook so unsupported HEIC/HEIF browsers see the
@@ -173,6 +199,19 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       toast.error("Not signed in");
       return;
     }
+    // Validate the calendar start date before any upload or write
+    // (QA 2026-09-24, BUG-004/005), but only when the grower changed it: an
+    // unchanged prefill is never rewritten, and a stored future date must
+    // not block an unrelated edit (CodeRabbit review on #1683).
+    let startedAtIso: string | null = null;
+    if (form.started_at && form.started_at !== plantStartDateInputValue(plant.startedAt)) {
+      const startedAt = plantStartDateInputToIso(form.started_at, new Date());
+      if (startedAt.ok !== true) {
+        toast.error(plantStartDateSaveMessage(startedAt.reason));
+        return;
+      }
+      startedAtIso = startedAt.iso;
+    }
     setBusy(true);
 
     let uploadedPath: string | null = null;
@@ -195,22 +234,36 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       return;
     }
 
+    // Never re-submit a stale tent_id that is not in the selectable list —
+    // plants UPDATE RLS WITH CHECK rejects missing tents and previously
+    // blocked every field change (including stage → Flowering).
+    const resolvedTentId =
+      form.tent_id === "none" || !availableTentIds.includes(form.tent_id) ? null : form.tent_id;
+    const selectedTent = resolvedTentId ? tents.find((t) => t.id === resolvedTentId) : undefined;
+    const growPatch = buildPlantEditGrowIdFromTent({
+      selectedTentId: resolvedTentId,
+      selectedTentGrowId: selectedTent?.grow_id ?? null,
+      plantGrowId: plant.growId ?? null,
+      usedGrowFallback: tentOptions.usedGrowFallback,
+    });
+
     const payload: Record<string, unknown> = {
       name: form.name.trim(),
       strain: form.strain.trim(),
       stage: form.stage,
-      health: form.health,
-      tent_id: form.tent_id === "none" ? null : form.tent_id,
+      ...buildPlantHealthEditUpdate(plant.health, form.health),
+      tent_id: resolvedTentId,
       last_note: form.last_note.trim() || null,
-      plant_type: form.plant_type,
+      ...buildPlantTypeUpdate(plant.plantType, form.plant_type),
+      ...(growPatch ?? {}),
     };
     if (newReference) {
       payload.photo_url = newReference;
     } else if (clearPhoto) {
       payload.photo_url = null;
     }
-    if (form.started_at) {
-      payload.started_at = new Date(form.started_at).toISOString();
+    if (startedAtIso) {
+      payload.started_at = startedAtIso;
     }
 
     const { error } = await supabase
@@ -225,7 +278,9 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       }
       setBusy(false);
       setPhotoErr(null);
-      toast.error("Could not save changes. Please try again.");
+      // Fail closed with the real PostgREST / trigger message so RLS and
+      // constraint failures are diagnosable (was: opaque retry toast).
+      toast.error(formatPlantEditSaveError(error));
       return;
     }
 
@@ -282,7 +337,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
         )}
       </DialogTrigger>
       <DialogContent
-        className="glass max-w-md max-h-[90vh] overflow-y-auto"
+        className="glass max-w-md w-[calc(100%-1.5rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto flex flex-col gap-4 top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%] sm:max-h-[min(90vh,calc(100dvh-2rem))]"
         data-testid="edit-plant-dialog"
       >
         <DialogHeader>
@@ -491,11 +546,17 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             </div>
             <div>
               <Label>Health</Label>
-              <Select value={form.health} onValueChange={(v) => setForm({ ...form, health: v })}>
+              <Select
+                value={form.health}
+                onValueChange={(v) => setForm({ ...form, health: plantHealthFromSelectValue(v) })}
+              >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder={PLANT_HEALTH_NOT_ASSESSED_LABEL} />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={PLANT_HEALTH_NOT_ASSESSED_OPTION}>
+                    {PLANT_HEALTH_NOT_ASSESSED_LABEL}
+                  </SelectItem>
                   {HEALTH.map((h) => (
                     <SelectItem key={h.value} value={h.value}>
                       {h.label}
@@ -528,6 +589,13 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             <Label>Started at</Label>
             <Input
               type="date"
+              // An unchanged stored date (even a legacy future one) must not
+              // trip the browser's own limit and block unrelated edits.
+              max={
+                form.started_at === plantStartDateInputValue(plant.startedAt)
+                  ? undefined
+                  : plantStartDateInputMax(new Date())
+              }
               value={form.started_at}
               onChange={(e) => setForm({ ...form, started_at: e.target.value })}
             />

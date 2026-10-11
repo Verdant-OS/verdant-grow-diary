@@ -8,11 +8,12 @@
  *  - Only reads sensor_readings with source = "csv".
  *  - Never relabels CSV as Live. Derived VPD label only.
  *  - Scoped strictly by grow_id + per-entry tent_id.
- *  - Renders nothing when no matches exist.
+ *  - Renders nothing after a successful read with no matches.
  */
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CsvTimelineEnvironmentChip } from "@/components/CsvTimelineEnvironmentChip";
+import { Button } from "@/components/ui/button";
 import {
   buildCsvTimelineContext,
   type CsvSensorReadingRow,
@@ -32,40 +33,83 @@ export interface TimelineCsvContextPanelProps {
 
 export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
   const { growId, entries } = props;
-  const [rows, setRows] = useState<CsvSensorReadingRow[]>([]);
+  const [readState, setReadState] = useState<{
+    scopeKey: string;
+    rows: CsvSensorReadingRow[];
+    status: "loading" | "success" | "error";
+  } | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
 
   const tentIds = useMemo(() => {
     const s = new Set<string>();
     for (const e of entries) {
       if (e.tent_id) s.add(e.tent_id);
     }
-    return [...s];
+    return [...s].sort();
   }, [entries]);
 
+  const tentIdsKey = JSON.stringify(tentIds);
+  const scopeKey = JSON.stringify([growId ?? null, tentIdsKey]);
+  const activeRead = readState?.scopeKey === scopeKey ? readState : null;
+  const rows = activeRead?.rows ?? [];
+  const readStatus = activeRead?.status ?? "loading";
+
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (!growId || tentIds.length === 0) {
-        setRows([]);
-        return;
-      }
-      const { data } = await supabase
-        .from("sensor_readings")
-        .select("id,tent_id,source,metric,value,captured_at,raw_payload")
-        .eq("source", "csv")
-        .in("tent_id", tentIds)
-        .order("captured_at", { ascending: false })
-        .limit(2000);
-      if (!cancelled) setRows((data as CsvSensorReadingRow[]) ?? []);
+    const scopedTentIds = JSON.parse(tentIdsKey) as string[];
+    if (!growId || scopedTentIds.length === 0) {
+      setReadState(null);
+      return;
     }
-    load();
-    const onImported = () => load();
+
+    let cancelled = false;
+    let latestRequest = 0;
+
+    async function load() {
+      const request = ++latestRequest;
+      setReadState((previous) => ({
+        scopeKey,
+        rows: previous?.scopeKey === scopeKey ? previous.rows : [],
+        status: "loading",
+      }));
+
+      try {
+        const { data, error } = await supabase
+          .from("sensor_readings")
+          .select("id,tent_id,source,metric,value,captured_at,raw_payload")
+          .eq("source", "csv")
+          .in("tent_id", scopedTentIds)
+          .order("captured_at", { ascending: false })
+          .limit(2000);
+
+        if (cancelled || request !== latestRequest) return;
+        if (error) throw error;
+        if (!Array.isArray(data))
+          throw new Error("CSV environment context response is not a list.");
+        setReadState({
+          scopeKey,
+          rows: data as CsvSensorReadingRow[],
+          status: "success",
+        });
+      } catch {
+        if (cancelled || request !== latestRequest) return;
+        setReadState((previous) => ({
+          scopeKey,
+          rows: previous?.scopeKey === scopeKey ? previous.rows : [],
+          status: "error",
+        }));
+      }
+    }
+
+    void load();
+    const onImported = () => {
+      void load();
+    };
     window.addEventListener("verdant:csv-imported", onImported);
     return () => {
       cancelled = true;
       window.removeEventListener("verdant:csv-imported", onImported);
     };
-  }, [growId, tentIds.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [growId, tentIdsKey, scopeKey, retryAttempt]);
 
   const matchedByEntry = useMemo(() => {
     const out = new Map<string, CsvTimelineContextEntry>();
@@ -93,7 +137,10 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
     return out;
   }, [rows, entries, growId, tentIds]);
 
-  if (matchedByEntry.size === 0) return null;
+  if (!growId || tentIds.length === 0) return null;
+  if (readStatus === "success" && matchedByEntry.size === 0) return null;
+
+  const hasCachedMatches = matchedByEntry.size > 0;
 
   return (
     <section data-testid="timeline-csv-context-panel" className="mt-4 space-y-2">
@@ -108,6 +155,30 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
         CSV context is read-only. Verdant shows this history only when the source is explicitly
         labeled csv. Live and manual sensor readings remain separate.
       </div>
+      {readStatus === "loading" ? (
+        <p role="status" className="text-xs text-muted-foreground">
+          {hasCachedMatches
+            ? "Refreshing CSV environment context. Showing previously loaded CSV readings."
+            : "Loading CSV environment context…"}
+        </p>
+      ) : null}
+      {readStatus === "error" ? (
+        <div role="alert" className="space-y-2 text-xs text-muted-foreground">
+          <p>
+            {hasCachedMatches
+              ? "CSV environment context could not be refreshed. Showing previously loaded CSV readings."
+              : "CSV environment context is unavailable."}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setRetryAttempt((attempt) => attempt + 1)}
+          >
+            Retry CSV context
+          </Button>
+        </div>
+      ) : null}
       {[...matchedByEntry.values()].map((c) => (
         <CsvTimelineEnvironmentChip
           key={c.diaryEntryId}

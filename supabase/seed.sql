@@ -86,7 +86,8 @@ BEGIN
     'pi_ingest_bridge_credentials_safe',
     'billing_customer_links',
     'paddle_event_processing',
-    'lovable_paddle_events'
+    'lovable_paddle_events',
+    'quicklog_revision_idempotency'
   ] LOOP
     IF to_regclass('public.' || obj) IS NOT NULL THEN
       EXECUTE format(

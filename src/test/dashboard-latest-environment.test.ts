@@ -182,8 +182,9 @@ describe("sensorSnapshot pure helpers", () => {
 });
 
 describe("useLatestSensorSnapshot hook — source priority and safety", () => {
-  it("queries sensor_readings filtered to the scoped tent ids, newest-first", () => {
-    expect(HOOK).toMatch(/\.from\(\s*['"]sensor_readings['"]\s*\)/);
+  it("queries effective readings filtered to the scoped tent ids, newest-first", () => {
+    expect(HOOK).toContain("await effectiveSensorReadingsQuery()");
+    expect(HOOK).toContain("requireEffectiveSensorReadings(data)");
     expect(HOOK).toMatch(
       /\.in\(\s*['"]tent_id['"]\s*,\s*tentIds\s*\)[\s\S]*?\.order\(\s*['"]ts['"]\s*,\s*\{\s*ascending:\s*false\s*\}\s*\)/,
     );

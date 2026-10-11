@@ -169,6 +169,24 @@ describe("resolvedVersionInBunLock", () => {
   it("returns null when the package is missing", () => {
     expect(resolvedVersionInBunLock('"other": ["other@1.0.0"]', MCP)).toBeNull();
   });
+
+  it("finds versions under nested Bun lock keys and aliases", () => {
+    const nested = [
+      '"hono": ["hono@4.13.5", "", {}]',
+      '"legacy/hono": ["hono@4.13.5", "", {}]',
+      '"compat-rollup/rollup": ["rollup@4.59.0", "", {}]',
+    ].join(",\n");
+    expect(resolvedVersionInBunLock(nested, "hono")).toEqual(["4.13.5"]);
+    expect(resolvedVersionInBunLock(nested, "rollup")).toEqual(["4.59.0"]);
+  });
+
+  it("returns every distinct resolved version sorted", () => {
+    const nested = [
+      '"hono": ["hono@4.13.5", "", {}]',
+      '"legacy/hono": ["hono@4.13.4", "", {}]',
+    ].join(",\n");
+    expect(resolvedVersionInBunLock(nested, "hono")).toEqual(["4.13.4", "4.13.5"]);
+  });
 });
 
 describe("evaluatePolicy", () => {
@@ -247,11 +265,11 @@ describe("evaluatePolicy", () => {
   });
 
   it("fails when an exact npm override is not resolved consistently", () => {
-    const manifest = packageJson("0.24.0", { "fast-uri": "3.1.5" });
+    const manifest = packageJson("0.24.0", { "fast-uri": "3.1.6" });
     const stale = packageLock(manifest);
     stale.packages["node_modules/fast-uri"]!.version = "3.0.0";
     expect(evaluate(policyFiles({ manifest, npmLock: stale })).errors.join(" ")).toContain(
-      "package-lock.json override for fast-uri@3.1.5 is not synchronized",
+      "package-lock.json override for fast-uri@3.1.6 is not synchronized",
     );
   });
 
@@ -259,30 +277,128 @@ describe("evaluatePolicy", () => {
     ["@hono/node-server", "2.0.9"],
     ["@modelcontextprotocol/sdk", "1.29.0"],
     ["hono", "4.12.33"],
+    ["hono", "4.13.4"],
+    ["js-yaml", "4.3.1"],
+    ["qs", "6.15.3"],
+    ["vitest", "4.1.10"],
+    ["@vitest/mocker", "4.1.10"],
     ["postcss", "8.5.6"],
     ["postcss", "8.5.18-rc.0"],
     ["brace-expansion", "1.1.17"],
+    ["fast-uri", "3.1.5"],
+    ["fast-uri", "3.1.6"],
+    ["undici", "6.28.0"],
   ])("fails when the npm graph regresses the %s security floor", (packageName, version) => {
     const files = policyFiles();
     const stale = JSON.parse(files[at("package-lock.json")]);
-    stale.packages[`node_modules/${packageName}`].version = version;
+    stale.packages[`node_modules/${packageName}`] = { version };
     files[at("package-lock.json")] = JSON.stringify(stale);
     expect(evaluate(files).errors.join(" ")).toContain(
       `package-lock.json security floor for ${packageName}`,
     );
   });
 
+  it("accepts removal of the retired Rollup transitive dependency", () => {
+    const files = policyFiles();
+    const current = JSON.parse(files[at("package-lock.json")]);
+    delete current.packages["node_modules/rollup"];
+    files[at("package-lock.json")] = JSON.stringify(current);
+    expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+  });
+
+  it("rejects an outdated undici in the canonical Bun graph", () => {
+    const files = policyFiles();
+    const stale = JSON.parse(files[at("bun.lock")]);
+    stale.packages.undici = ["undici@6.28.0", "", {}];
+    files[at("bun.lock")] = JSON.stringify(stale);
+    expect(evaluate(files).errors.join(" ")).toContain("bun.lock security floor for undici");
+  });
+
+  it("accepts removal of optional Rollup from the canonical Bun graph", () => {
+    const files = policyFiles();
+    const current = JSON.parse(files[at("bun.lock")]);
+    for (const key of Object.keys(current.packages)) {
+      if (key === "rollup" || key.endsWith("/rollup")) delete current.packages[key];
+    }
+    files[at("bun.lock")] = JSON.stringify(current);
+    expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+  });
+
+  it("fails when a required Bun security floor package is absent entirely", () => {
+    const files = policyFiles();
+    const current = JSON.parse(files[at("bun.lock")]);
+    delete current.packages.vitest;
+    files[at("bun.lock")] = JSON.stringify(current);
+    expect(evaluate(files).errors.join(" ")).toContain("bun.lock security floor for vitest");
+  });
+
+  it.each(["node_modules/rollup", "node_modules/legacy-vite/node_modules/rollup"])(
+    "rejects vulnerable Rollup when it is present at %s",
+    (lockPath) => {
+      const files = policyFiles();
+      const stale = JSON.parse(files[at("package-lock.json")]);
+      stale.packages[lockPath] = { version: "4.58.0" };
+      files[at("package-lock.json")] = JSON.stringify(stale);
+      expect(evaluate(files).errors.join(" ")).toContain(
+        "package-lock.json security floor for rollup",
+      );
+    },
+  );
+
+  it("accepts patched Rollup if a dependency brings it back", () => {
+    const files = policyFiles();
+    const current = JSON.parse(files[at("package-lock.json")]);
+    current.packages["node_modules/legacy-vite/node_modules/rollup"] = { version: "4.59.0" };
+    files[at("package-lock.json")] = JSON.stringify(current);
+    expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+  });
+
+  it.each(["rollup", "legacy-vite/rollup", "compat-rollup"])(
+    "rejects below-floor Rollup in Bun at %s",
+    (lockPath) => {
+      const files = policyFiles();
+      const stale = JSON.parse(files[at("bun.lock")]);
+      stale.packages[lockPath] = ["rollup@4.58.0", "", {}];
+      files[at("bun.lock")] = JSON.stringify(stale);
+      expect(evaluate(files).errors.join(" ")).toContain("bun.lock security floor for rollup");
+    },
+  );
+
+  it.each(["rollup", "legacy-vite/rollup", "compat-rollup"])(
+    "accepts patched optional Rollup in Bun at %s",
+    (lockPath) => {
+      const files = policyFiles();
+      const current = JSON.parse(files[at("bun.lock")]);
+      current.packages[lockPath] = ["rollup@4.59.0", "", {}];
+      files[at("bun.lock")] = JSON.stringify(current);
+      expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+    },
+  );
+
+  it("rejects a stale nested Bun package even when its root copy meets the floor", () => {
+    const files = policyFiles();
+    const stale = JSON.parse(files[at("bun.lock")]);
+    stale.packages["legacy/hono"] = ["hono@4.13.4", "", {}];
+    files[at("bun.lock")] = JSON.stringify(stale);
+    expect(evaluate(files).errors.join(" ")).toContain("bun.lock security floor for hono");
+  });
+
   it.each([
     ["@hono/node-server", "2.0.9"],
     ["@modelcontextprotocol/sdk", "1.29.0"],
     ["hono", "4.12.33"],
+    ["hono", "4.13.4"],
+    ["js-yaml", "4.3.1"],
+    ["qs", "6.15.3"],
+    ["vitest", "4.1.10"],
+    ["@vitest/mocker", "4.1.10"],
     ["esbuild", "0.28.0"],
   ])(
     "fails when the canonical Bun graph regresses the %s security floor",
     (packageName, version) => {
       const files = policyFiles();
       const stale = JSON.parse(files[at("bun.lock")]);
-      stale.packages[packageName][0] = `${packageName}@${version}`;
+      stale.packages[packageName] = [`${packageName}@${version}`, "", {}];
       files[at("bun.lock")] = JSON.stringify(stale);
       expect(evaluate(files).errors.join(" ")).toContain(
         `bun.lock security floor for ${packageName}`,
@@ -290,7 +406,7 @@ describe("evaluatePolicy", () => {
     },
   );
 
-  it.each(["2.1.3", "3.0.5", "4.0.1", "5.0.8"])(
+  it.each(["1.1.18", "1.1.20", "2.1.4", "2.1.6", "3.0.6", "3.0.8", "4.0.1", "5.0.9", "5.0.11"])(
     "fails when brace-expansion regresses to vulnerable release %s",
     (version) => {
       const files = policyFiles();
@@ -303,13 +419,39 @@ describe("evaluatePolicy", () => {
     },
   );
 
-  it.each(["1.1.18", "2.1.4", "3.0.6", "5.0.9", "6.0.0"])(
+  it.each(["1.1.21", "2.1.7", "3.0.9", "5.0.12", "6.0.0"])(
     "accepts brace-expansion patched boundary %s",
     (version) => {
       const files = policyFiles();
       const current = JSON.parse(files[at("package-lock.json")]);
       current.packages["node_modules/brace-expansion"].version = version;
       files[at("package-lock.json")] = JSON.stringify(current);
+      expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+    },
+  );
+
+  it.each(["1.1.18", "1.1.20", "2.1.4", "2.1.6", "3.0.6", "3.0.8", "4.0.1", "5.0.9", "5.0.11"])(
+    "rejects a vulnerable nested Bun brace-expansion %s alongside a patched root",
+    (version) => {
+      const files = policyFiles();
+      const stale = JSON.parse(files[at("bun.lock")]);
+      stale.packages["brace-expansion"] = ["brace-expansion@1.1.21", "", {}];
+      stale.packages["legacy/brace-expansion"] = [`brace-expansion@${version}`, "", {}];
+      files[at("bun.lock")] = JSON.stringify(stale);
+      expect(evaluate(files).errors.join(" ")).toContain(
+        "bun.lock major-aware security floor for brace-expansion",
+      );
+    },
+  );
+
+  it.each(["1.1.21", "2.1.7", "3.0.9", "5.0.12", "6.0.0"])(
+    "accepts a patched nested Bun brace-expansion %s",
+    (version) => {
+      const files = policyFiles();
+      const current = JSON.parse(files[at("bun.lock")]);
+      current.packages["brace-expansion"] = ["brace-expansion@1.1.21", "", {}];
+      current.packages["legacy/brace-expansion"] = [`brace-expansion@${version}`, "", {}];
+      files[at("bun.lock")] = JSON.stringify(current);
       expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
     },
   );
@@ -337,11 +479,13 @@ describe("evaluatePolicy", () => {
   it("fails when a new npm entrypoint is not declared", () => {
     const files = policyFiles({
       extra: {
-        [at("vercel.json")]: '{"installCommand":"npm install"}',
+        // Synthetic undeclared path — not the real vercel.json (which pins bun,
+        // not npm, via top-level installCommand).
+        [at("scripts/ad-hoc-npm-install.sh")]: "npm install",
       },
     });
     expect(evaluate(files).errors.join(" ")).toContain(
-      "Undeclared npm install/ci consumer found at vercel.json",
+      "Undeclared npm install/ci consumer found at scripts/ad-hoc-npm-install.sh",
     );
   });
 
@@ -390,6 +534,28 @@ describe("evaluatePolicy", () => {
     for (const forbidden of FORBIDDEN_LOCKFILES) {
       expect(existsSync(resolve(root, forbidden)), forbidden).toBe(false);
     }
+
+    // vercel.json must not reintroduce illegal `projectSettings`. Top-level
+    // bunVersion/installCommand/buildCommand are schema-legal and pin the same
+    // package manager GitHub CI uses. npm install policy for the separate
+    // preview checklist stays pinned via docs/preview-deployment-verification.md.
+    const vercel = JSON.parse(readFileSync(resolve(root, "vercel.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    expect(vercel).not.toHaveProperty("projectSettings");
+    expect(vercel.installCommand).toBe("bun install --frozen-lockfile");
+    expect(vercel.buildCommand).toBe("bun run build");
+    expect(vercel.bunVersion).toBe("1.x");
+    expect(vercel).not.toHaveProperty("outputDirectory");
+
+    const transition = JSON.parse(
+      readFileSync(resolve(root, "config/dependency-lockfile-transition.json"), "utf8"),
+    ) as { consumerContracts: Array<{ path: string }> };
+    const consumerPaths = transition.consumerContracts.map(({ path }) => path);
+    // bun install is not an npm consumer — keep vercel.json off the npm allowlist.
+    expect(consumerPaths).not.toContain("vercel.json");
+    expect(consumerPaths).toContain("docs/preview-deployment-verification.md");
   }, 15_000);
 
   it("runs as a CLI on Windows and finds uppercase undeclared consumers", () => {

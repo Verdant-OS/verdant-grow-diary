@@ -586,7 +586,7 @@ test.describe("I. Core one-tent regression", () => {
   }) => {
     await page.goto("/dashboard");
     await page.waitForURL(
-      (url) => url.pathname === "/welcome" && url.searchParams.get("redirectTo") === "/dashboard",
+      (url) => url.pathname === "/auth" && url.searchParams.get("redirectTo") === "/dashboard",
     );
     const bodyText = await page.locator("body").innerText();
     expect(bodyText.length).toBeGreaterThan(0);

@@ -35,9 +35,9 @@ const reconcile = job.steps.find(
 const script: string = reconcile.with.script;
 
 describe("money migration drift alert — runs at all", () => {
-  it("is scheduled, because a gate nobody remembers to dispatch is not a gate", () => {
-    expect(Object.keys(doc.on)).toContain("schedule");
-    expect(doc.on.schedule[0].cron).toBe("30 7 * * *");
+  it("retires the hollow-environment schedule and retains explicit manual dispatch", () => {
+    expect(Object.keys(doc.on)).toEqual(["workflow_dispatch"]);
+    expect(doc.on.workflow_dispatch).toEqual({});
   });
 
   it("only ever runs from the trusted default branch", () => {
@@ -54,6 +54,14 @@ describe("money migration drift alert — runs at all", () => {
     expect(guard.with["secret-name"]).toBe("SUPABASE_DB_URL");
     expect(guard.with["secret-value"]).toBe("${{ secrets.SUPABASE_DB_URL }}");
     expect(WORKFLOW).not.toContain("SUPABASE_DB_URL_LIVE");
+  });
+
+  it("points the missing-secret fix steps at the verdant-production environment", () => {
+    // Default require-ci-secret copy points at repository secrets; this job
+    // reads the verdant-production environment secret.
+    expect(WORKFLOW).toContain("Settings → Environments → verdant-production");
+    expect(WORKFLOW).toContain("knkwiiywfkbqznbxwqfh");
+    expect(WORKFLOW).toContain("pooler.supabase.com");
   });
 
   it("bounds the checker so a stalled query still reaches the reconciler", () => {

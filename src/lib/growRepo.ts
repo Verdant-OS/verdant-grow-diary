@@ -2,6 +2,10 @@
 // Boring, predictable: each fn returns mapped domain objects or throws.
 // Not wired into UI yet; safe to import alongside mock data.
 import { supabase } from "@/integrations/supabase/client";
+import {
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+} from "@/lib/effectiveSensorReadings";
 import type { SensorReadingInsert } from "@/lib/db";
 import type { Tent, Plant, SensorReading } from "@/mock";
 import { mapTentRow, mapPlantRow, groupSensorReadingRows } from "./growAdapters";
@@ -52,9 +56,16 @@ export async function fetchPlants(
   if (growId && !tentId) {
     // BUG-A: resolve the grow's plants through tent rollup too, so plants
     // whose own grow_id is null but whose tent belongs to the grow don't
-    // vanish from grow-scoped views. Tent-fetch failure degrades to the
-    // legacy own-grow_id filter (never a silent empty grid).
-    const { data: tents } = await supabase.from("tents").select("id").eq("grow_id", growId);
+    // vanish from grow-scoped views. A grow with no tents degrades to the
+    // own-grow_id filter. A failed tent lookup fails the read instead: a
+    // partial list would drop those plants while reading as current, and
+    // their stages decide alert targets (Codex review on #1683; Grow Detail's
+    // plant count likewise reports "unavailable" rather than undercounting).
+    const { data: tents, error: tentsError } = await supabase
+      .from("tents")
+      .select("id")
+      .eq("grow_id", growId);
+    if (tentsError) fail("fetchPlants", tentsError);
     q = q.or(
       buildGrowScopedPlantsOrFilter(
         growId,
@@ -92,7 +103,7 @@ export async function fetchSensorReadings(tentId?: string | null): Promise<Senso
   // the caller has no selected tent and must fail closed without a query.
   if (tentId === null) return [];
   if (tentId !== undefined && !isUuid(tentId)) return [];
-  let q = supabase.from("sensor_readings").select("*");
+  let q = effectiveSensorReadingsQuery().select("*");
   if (tentId) q = q.eq("tent_id", tentId);
   const { data, error } = await q
     // Actual observation time leads: imported CSV rows preserve historical
@@ -101,7 +112,7 @@ export async function fetchSensorReadings(tentId?: string | null): Promise<Senso
     .order("ts", { ascending: false })
     .limit(2000);
   if (error) fail("fetchSensorReadings", error);
-  return groupSensorReadingRows(data ?? []);
+  return groupSensorReadingRows(requireEffectiveSensorReadings(data));
 }
 
 export async function insertSensorReading(row: SensorReadingInsert): Promise<void> {
@@ -122,5 +133,11 @@ export async function insertSensorReading(row: SensorReadingInsert): Promise<voi
 export async function insertSensorReadingsBatch(rows: SensorReadingInsert[]): Promise<void> {
   if (!rows || rows.length === 0) return;
   const { error } = await supabase.from("sensor_readings").insert(rows);
-  if (error) fail("insertSensorReadingsBatch", error);
+  if (error) {
+    // Keep the structured code so a frozen manual retry can verify a genuine
+    // uniqueness conflict; callers must never infer one from message text.
+    throw Object.assign(new Error(`growRepo.insertSensorReadingsBatch: ${error.message}`), {
+      code: error.code,
+    });
+  }
 }

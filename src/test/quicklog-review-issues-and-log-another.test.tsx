@@ -14,7 +14,7 @@ import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const { rpcMock, snapshotState } = vi.hoisted(() => ({
-  rpcMock: vi.fn().mockResolvedValue({ data: { ok: true }, error: null }),
+  rpcMock: vi.fn().mockResolvedValue({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null }),
   snapshotState: {
     status: "ready" as "ready" | "loading" | "empty",
     payload: {
@@ -78,7 +78,7 @@ function renderQL(props: Parameters<typeof QuickLog>[0]) {
 
 beforeEach(() => {
   rpcMock.mockClear();
-  rpcMock.mockResolvedValue({ data: { ok: true }, error: null });
+  rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
   snapshotState.status = "ready";
   snapshotState.payload = {
     status: "fresh_live",

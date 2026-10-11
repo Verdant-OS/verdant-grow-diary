@@ -3,36 +3,60 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-09-01.5**
+**Sentinel-Version: 2026-09-28.3**
+
+Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
+publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
+may supply an independently assigned acceptance. Codex cannot give its own work an
+independent PASS. Claude may add peer observations but is not the acceptance reviewer.
+Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
+Durban Poison or Critical Mass gives an independent **PASS at the exact head SHA**.
+Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
+Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
+
+Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
+E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
+disposable test account owns the fixture grow and its selected tent/plant;
+tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
+use the KEEP account. Stop a write if identity, ownership or tagging cannot
+be verified; report that exact safety gap rather than proposing another host.
+Local/CI fixtures validate code, not production. Repository integration follows
+the explicit merge gate in AGENTS.md; it is not production acceptance. No
+Publish, production APPLY, real charge, role/auth change, device control or
+Action Queue operation is authorized here. Existing owner locks remain.
+See docs/production-only-verification-runbook.md.
 
 Claude Code reads this file at the start of every project session. The two `@` imports
 above load the universal constitution and Claude's assigned role. They are imports, not
 suggestions.
 
 **`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file tool
-before you acknowledge.** It is still the third required context file and nothing about
-its authority has changed. Measured 2026-08-21 at 153,142 bytes / ~27,400 tokens, it was
+before you acknowledge.** Also read `docs/agents/HANDOFF_LOG.md` before acknowledging;
+these are the two required files beyond the imported constitution and role. Nothing about
+their authority has changed. Measured 2026-08-21 at 153,142 bytes / ~27,400 tokens, CURRENT_STATE.md was
 68.9% of the whole memory chain and 19.1% of every context window, re-sent on every turn
 of every session whether or not that session touched operating state. It is also the
 changing shift report, revised several times a day, so most of what it costs on any given
 turn is history that has already been superseded. Loading it on demand costs the same
 tokens once, in the sessions that actually need it, instead of in all of them.
 
-Nothing else carries what it carries. Every claim about branch state, production, applied
-migrations, blockers, approved slices, and agent assignment lives in that file and nowhere
-else — reasoning about any of them from this file, from `AGENTS.md`, or from memory is how
-an agent ends up confidently wrong about production.
+CURRENT_STATE.md carries production, applied-migration and approved-scope evidence;
+HANDOFF_LOG.md records current task claims, branches, checkpoints and blockers. Confirm
+branch state against GitHub before continuing. Reasoning about production from this file,
+from `AGENTS.md`, or from memory is how an agent ends up confidently wrong.
 
 Before planning, writing specifications, using tools, or proposing implementation:
 
 1. Read `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.
-   `files_read:` must name it truthfully, or state that it was not read and why.
+   Also read `docs/agents/HANDOFF_LOG.md` as the fourth required context file before
+   acknowledgment. `files_read:` must name all four truthfully, or
+   state which was not read and why; `open_handoffs_checked:` records the log check.
 2. Report any conflicting instructions rather than silently picking one.
 3. Return the `SENTINEL_ACK` block defined in `AGENTS.md`.
 4. Do not implement production code unless the current task explicitly assigns
-   implementation to Claude (task ownership, not role rank). Claude's **default
-   strength** is a specification precise enough that the slice owner — any peer —
-   does not have to guess.
+   implementation to Claude or Claude holds an eligible coverage claim (not role rank).
+   Claude's **default strength** is a specification precise enough that the slice's
+   current holder — any peer — does not have to guess.
 
 ## Check-in cadence — arm at 55 minutes, never "roughly hourly"
 
@@ -51,8 +75,10 @@ genuinely needs one — take the miss knowingly. What this rule forbids is the a
 
 Claude is the Knowledge Library and Product Specification Architect by default
 strength. Inspecting code is in scope. Claude may also implement, audit, test, or
-independently review when owning or reviewing a slice. Codex, Claude, and Grok are
-peers — none outranks the others. Explicit task ownership controls.
+add peer review observations when assigned or holding an eligible coverage claim.
+Codex, Claude, and Grok are peers — none outranks the others. Explicit assignments
+and named locks control; otherwise `claimed_by` identifies the current task holder.
+Peer observations do not replace the independent acceptance routing above.
 
 If a task would be better served by a different role, say so before starting rather than
 absorbing the work.
@@ -74,8 +100,11 @@ Applies to every deliverable, without exception:
 
 Verified 2026-08-19 on the deploy branch. Re-verify before citing on another branch.
 
-- Package manager is **bun** (`bun.lockb` authoritative — never npm/yarn/pnpm). On
-  Windows, `bun install` fails under OneDrive paths; use a non-OneDrive checkout.
+- Package manager is **bun** (`bun.lock` authoritative; there is no `bun.lockb` — re-verified
+  2026-09-25). Never add or change dependencies with npm/yarn/pnpm. `package-lock.json` is a
+  synchronized compatibility lock kept only until the dated `reviewBy` in
+  `config/dependency-lockfile-transition.json`. On Windows, `bun install` fails under OneDrive
+  paths; use a non-OneDrive checkout.
 - Dev server: `bun run dev` → `http://localhost:8080` (port pinned by the Lovable
   TanStack config, not Vite's 5173 default).
 - Typecheck gate on this branch: `bun run typecheck` (`tsc -p tsconfig.json --noEmit`,
@@ -119,15 +148,15 @@ One-Tent Loop module index, the entitlements API surface) live in
 this repo still says "React + Vite + TypeScript SPA"; treat that as stale wording, and
 prefer what the code shows:
 
-| Concern    | What it actually is                                                                                             |
-| ---------- | --------------------------------------------------------------------------------------------------------------- |
-| Framework  | `@tanstack/react-start` + `@tanstack/react-router`; SSR entry `src/server.ts`, app config `src/start.ts`        |
-| Routing    | File-based under `src/routes/`, compiled into generated `src/routeTree.gen.ts`, consumed by `src/router.tsx`    |
-| Build      | Vite via the `@lovable.dev/vite-tanstack-config` preset; `nitro` for the server output                          |
-| UI         | React, Tailwind v4 (`@tailwindcss/vite`), shadcn/ui over Radix primitives, `lucide-react`, `sonner`             |
-| Data       | `@tanstack/react-query`; hosted Supabase via `@supabase/supabase-js` + `@supabase/ssr`                          |
-| Validation | `zod`                                                                                                           |
-| Platform   | Lovable Cloud (`@lovable.dev/*`) — **Lovable is the production publisher**; see the note below on `vercel.json` |
+| Concern    | What it actually is                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------ |
+| Framework  | `@tanstack/react-start` + `@tanstack/react-router`; SSR entry `src/server.ts`, app config `src/start.ts`     |
+| Routing    | File-based under `src/routes/`, compiled into generated `src/routeTree.gen.ts`, consumed by `src/router.tsx` |
+| Build      | Vite via the `@lovable.dev/vite-tanstack-config` preset; `nitro` for the server output                       |
+| UI         | React, Tailwind v4 (`@tailwindcss/vite`), shadcn/ui over Radix primitives, `lucide-react`, `sonner`          |
+| Data       | `@tanstack/react-query`; hosted Supabase via `@supabase/supabase-js` + `@supabase/ssr`                       |
+| Validation | `zod`                                                                                                        |
+| Platform   | Lovable (`@lovable.dev/*` preset, project sync). **The production publisher is operating state** — see below |
 
 There is **no `App.tsx` and no react-router** — but see the compat shim below, which is
 what almost all component code imports.
@@ -135,13 +164,16 @@ what almost all component code imports.
 `vite.config.ts` is a thin wrapper over the Lovable preset. The preset already supplies
 tanstackStart, viteReact, tailwindcss, tsconfigPaths and the `@` alias; do not re-add them.
 
-**`vercel.json` does not govern production.** Lovable publishes production and does not apply
-Vercel host configuration, so the redirects and headers in that file do not fire there — the
-eight redirect entries in that file return HTTP 200 with no `Location` header, and the destination is
-reached by client rendering instead (`docs/seo/lighting-launch-verification.md`,
-§Non-blocking host mismatch). `CURRENT_STATE_ARCHIVE.md` lists the file as stale pre-SSR
-configuration awaiting retirement. Never reason about production redirect or header behaviour
-from `vercel.json`.
+**Never assume the production publisher, and never reason about `vercel.json` without it.**
+Which platform serves `verdantgrowdiary.com` is operating state. This repository has recorded it
+both ways (Lovable earlier, Vercel's git integration in later measurements), so it lives in
+`docs/agents/CURRENT_STATE.md`, not here. A host configuration file governs production only while
+the measured publisher applies it: `vercel.json`'s redirects and headers fire when Vercel serves the
+apex and are inert under any other host (`docs/seo/lighting-launch-verification.md`,
+§Non-blocking host mismatch, records a period when its redirects returned HTTP 200 with no
+`Location`). Measure the publish trigger, and the deployment behind each production hostname,
+before asserting either (`docs/architecture-contract.md` §14). A merge, or a built production
+deployment, does not mean the apex serves it.
 
 ## Repository map
 
@@ -195,8 +227,9 @@ so you recognise it rather than copy it:
   `publicQuickLogStarterRules.ts`, `sensorDiagnosticsExportRules.ts`). Those modules are not
   deterministic and not time-injectable. Inject the clock and seed in new code; do not cite
   these as precedent.
-- Two `*Rules.ts` import Supabase (`sensorIngestNormalizationRules.ts`,
-  `sensorWebhookIngestRules.ts`).
+- No root-level `*Rules.ts` imports the Supabase client. Two (`sensorIngestNormalizationRules.ts`,
+  `sensorWebhookIngestRules.ts`) import the generated `TablesInsert` type only — a type import,
+  not I/O (re-verified at `2f67a545`, 2026-09-25; contract AC-3.2).
 - 38 of 492 components and 33 of 139 pages import `@/integrations/supabase/client` directly
   instead of going through a hook. (A plain path grep returns 39 and 34; the two extra hits are
   `vi.mock("@/integrations/supabase/client")` in `src/components/QuickLog.test.tsx` and
@@ -363,7 +396,7 @@ pre-resolution SHA do not count. See `docs/agents/merge-queue.md` and
 ---
 
 The only action permitted before this gate is read-only acquisition of
-`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and the assigned role file so the
+`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
 acknowledgment can be truthful. No application-code inspection, network mutation, or
 recommendation is permitted before the acknowledgment.
 
@@ -378,6 +411,7 @@ agent:
 assigned_role:
 sentinel_version:
 files_read:
+open_handoffs_checked:
 current_task:
 scope:
 out_of_scope:

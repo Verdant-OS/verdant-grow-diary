@@ -15,12 +15,23 @@
  *  - fresh live temp/RH/soil rows reach the packet with no raw payload.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render as rtlRender, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import {
+  render as rtlRender,
+  screen,
+  fireEvent,
+  waitFor,
+  cleanup,
+  act,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import type { ReactElement } from "react";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
-import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
+import {
+  buildManualSnapshotTimelineCard,
+  type ManualSnapshotTimelineCard,
+} from "@/lib/manualSensorSnapshotViewModel";
+import { diaryRowToManualSnapshotRecord } from "@/lib/manualSnapshotDiaryAdapter";
 
 function render(ui: ReactElement) {
   const client = new QueryClient({
@@ -85,26 +96,37 @@ const sensorQueryState = vi.hoisted(() => ({
   csvRefetch: vi.fn(async () => undefined),
   currentRows: [] as unknown[],
   currentStatus: "success" as "loading" | "error" | "refresh_error" | "success",
+  manualStatus: null as "loading" | "error" | "refresh_error" | "success" | null,
+  manualRows: null as unknown[] | null,
+  currentReadCalls: [] as Array<{ limit: number; sources: readonly string[] }>,
 }));
 vi.mock("@/hooks/use-sensor-readings", () => ({
-  useSensorReadingsByTents: (tentIds: string[], _limit: number) => {
+  useSensorReadingsByTents: (tentIds: string[], limit: number, sources: readonly string[] = []) => {
+    sensorQueryState.currentReadCalls.push({ limit, sources: [...sources] });
+    const isManualOnly = sources.length === 1 && sources[0] === "manual";
+    const status = isManualOnly
+      ? (sensorQueryState.manualStatus ?? sensorQueryState.currentStatus)
+      : sensorQueryState.currentStatus;
     const byTent: Record<string, unknown[]> = {};
     const statusByTent: Record<string, string> = {};
+    // Model independent, source-filtered bounded API responses. The real
+    // query implementation is covered in use-sensor-readings-by-tents.
+    const responseRows = isManualOnly
+      ? (sensorQueryState.manualRows ?? sensorQueryState.currentRows)
+      : sensorQueryState.currentRows;
+    const scopedRows = responseRows
+      .filter((row) => sources.includes(String((row as { source?: unknown }).source)))
+      .slice(0, limit);
     for (const id of tentIds) {
-      byTent[id] =
-        sensorQueryState.currentStatus === "success" ||
-        sensorQueryState.currentStatus === "refresh_error"
-          ? sensorQueryState.currentRows
-          : [];
-      statusByTent[id] = sensorQueryState.currentStatus;
+      byTent[id] = status === "success" || status === "refresh_error" ? scopedRows : [];
+      statusByTent[id] = status;
     }
     return {
       byTent,
       statusByTent,
-      isLoading: sensorQueryState.currentStatus === "loading",
-      isError:
-        sensorQueryState.currentStatus === "error" ||
-        sensorQueryState.currentStatus === "refresh_error",
+      isLoading: status === "loading",
+      isError: status === "error" || status === "refresh_error",
+      refetch: vi.fn(async () => undefined),
     };
   },
 }));
@@ -123,6 +145,8 @@ vi.mock("@/hooks/useImportedSensorHistory", () => ({
 
 import PlantDetailAiDoctorLiveReview, {
   AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY,
+  AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_NOTE_COPY,
+  AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_RETRY_BLOCK_COPY,
   type PlantDetailAiDoctorLiveReviewProps,
 } from "@/components/PlantDetailAiDoctorLiveReview";
 
@@ -288,6 +312,59 @@ function mount(
   return invoke;
 }
 
+it.each([false, true])(
+  "rechecks expired seven-day context at click time (CSV fallback: %s)",
+  async (historical) => {
+    const now = new Date("2026-09-23T12:00:00Z");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
+    try {
+      itemsRef.current = [];
+      sensorQueryState.csvRows = historical ? historicalCsvRows : [];
+      const capturedAt = new Date(now.getTime() - (7 * 24 * 60 - 1) * 60_000).toISOString();
+      sensorQueryState.currentRows = [
+        {
+          id: "manual-aging",
+          tent_id: TENT_ID,
+          source: "manual",
+          quality: "ok",
+          metric: "temperature_c",
+          value: 24,
+          captured_at: capturedAt,
+          ts: capturedAt,
+          created_at: capturedAt,
+        },
+      ];
+      const invoke = mount();
+      expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+        "data-readiness",
+        "partial",
+      );
+      const start = screen.getByTestId("plant-ai-doctor-live-review-start");
+      expect(start).toBeEnabled();
+      vi.setSystemTime(new Date(now.getTime() + 120_000));
+      fireEvent.click(start);
+      if (historical) {
+        await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+        const body = invoke.mock.calls[0][1].body;
+        expect(body.packet.readiness.state).toBe("insufficient");
+        expect(body.evidence_acceptance?.reviewMode).toBe("historical_review");
+        expect(screen.getByTestId("plant-ai-doctor-live-review-confidence-copy")).toHaveTextContent(
+          AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY,
+        );
+      } else {
+        await waitFor(() =>
+          expect(screen.queryByTestId("plant-ai-doctor-live-review-start")).toBeNull(),
+        );
+        expect(invoke).not.toHaveBeenCalled();
+      }
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  },
+);
+
 beforeEach(() => {
   cleanup();
   itemsRef.current = strongTimeline();
@@ -298,7 +375,282 @@ beforeEach(() => {
   sensorQueryState.csvRefetch.mockResolvedValue(undefined);
   sensorQueryState.currentRows = [];
   sensorQueryState.currentStatus = "success";
+  sensorQueryState.manualStatus = null;
+  sensorQueryState.manualRows = null;
+  sensorQueryState.currentReadCalls = [];
   trackFunnelEvent.mockClear();
+});
+
+describe("accepted standard review visibility across the seven-day cutoff", () => {
+  function expiringManualContext(now: Date) {
+    itemsRef.current = [];
+    sensorQueryState.csvRows = [];
+    const capturedAt = new Date(now.getTime() - (7 * 24 * 60 - 1) * 60_000).toISOString();
+    sensorQueryState.currentRows = [
+      {
+        id: "accepted-manual-aging",
+        tent_id: TENT_ID,
+        source: "manual",
+        quality: "ok",
+        metric: "temperature_c",
+        value: 24,
+        captured_at: capturedAt,
+        ts: capturedAt,
+        created_at: capturedAt,
+      },
+    ];
+  }
+
+  it.each(["loading", "result", "retry"] as const)(
+    "keeps an accepted standard review visible when the cutoff passes during %s",
+    async (phase) => {
+      const now = new Date("2026-09-23T12:00:00Z");
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(now);
+      try {
+        expiringManualContext(now);
+        let resolveInvoke!: (value: Awaited<ReturnType<InvokeFn>>) => void;
+        const response = new Promise<Awaited<ReturnType<InvokeFn>>>((resolve) => {
+          resolveInvoke = resolve;
+        });
+        const success = { data: { ok: true, result: validResult() }, error: null };
+        const invoke = vi.fn<InvokeFn>(() => response);
+        const persist = vi.fn().mockResolvedValue({ ok: true, id: "accepted-standard-session" });
+        const view = render(reviewElement(invoke, TENT_ID, persist));
+        const confidenceCopy = screen.getByTestId(
+          "plant-ai-doctor-live-review-confidence-copy",
+        ).textContent;
+
+        fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+        await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+        expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+          "data-review-mode",
+          "standard",
+        );
+        expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+          "data-status",
+          "loading",
+        );
+        const acceptedBody = invoke.mock.calls[0][1].body;
+        const frozenPacket = JSON.stringify(acceptedBody.packet);
+        expect(acceptedBody.evidence_acceptance?.reviewMode).toBe("standard");
+        expect(acceptedBody.packet.imported_sensor_history).toBeNull();
+        expect(acceptedBody.packet.recentRootZoneObservations ?? []).toEqual([]);
+        expect(acceptedBody.packet.missingLiveSensorReadings).toBe(true);
+
+        if (phase !== "loading") {
+          await act(async () => {
+            resolveInvoke(
+              phase === "result" ? success : { data: { ok: false, reason: "http" }, error: null },
+            );
+          });
+          await screen.findByTestId(
+            phase === "result"
+              ? "plant-ai-doctor-history-saved"
+              : "plant-ai-doctor-live-review-retry",
+          );
+        }
+
+        vi.setSystemTime(new Date(now.getTime() + 120_000));
+        view.rerenderWithProviders(reviewElement(invoke, TENT_ID, persist));
+        expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+          "data-status",
+          phase === "retry" ? "error" : phase,
+        );
+        expect(
+          screen.getByTestId("plant-ai-doctor-live-review-stale-evidence-note"),
+        ).toHaveTextContent(AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_NOTE_COPY);
+        expect(screen.getByTestId("plant-ai-doctor-live-review-confidence-copy").textContent).toBe(
+          confidenceCopy,
+        );
+        expect(screen.queryByTestId("plant-ai-doctor-live-review-start")).toBeNull();
+
+        if (phase === "loading") {
+          await act(async () => resolveInvoke(success));
+        } else if (phase === "retry") {
+          invoke.mockResolvedValue(success);
+          const retry = screen.getByTestId("plant-ai-doctor-live-review-retry");
+          expect(retry).toBeEnabled();
+          fireEvent.click(retry);
+          expect(invoke).toHaveBeenCalledTimes(1);
+          expect(screen.getByTestId("plant-ai-doctor-live-review-failure")).toHaveTextContent(
+            AI_DOCTOR_LIVE_REVIEW_STALE_EVIDENCE_RETRY_BLOCK_COPY,
+          );
+          expect(screen.queryByTestId("plant-ai-doctor-live-review-retry")).toBeNull();
+        }
+
+        if (phase === "retry") {
+          expect(screen.getByTestId("plant-ai-doctor-live-review")).toBeInTheDocument();
+        } else {
+          await screen.findByTestId("plant-ai-doctor-history-saved");
+          expect(screen.getByTestId("plant-ai-doctor-live-review-result-wrap")).toHaveTextContent(
+            validResult().summary,
+          );
+          vi.setSystemTime(new Date(now.getTime() + 240_000));
+          view.rerenderWithProviders(reviewElement(invoke, TENT_ID, persist));
+          expect(screen.getByTestId("plant-ai-doctor-live-review-result-wrap")).toHaveTextContent(
+            validResult().summary,
+          );
+          expect(
+            screen.getByTestId("plant-ai-doctor-live-review-confidence-copy").textContent,
+          ).toBe(confidenceCopy);
+        }
+        expect(JSON.stringify(acceptedBody.packet)).toBe(frozenPacket);
+        expect(invoke).toHaveBeenCalledTimes(1);
+        expect(persist).toHaveBeenCalledTimes(phase === "retry" ? 0 : 1);
+        if (phase === "retry") {
+          expect(trackFunnelEvent).not.toHaveBeenCalledWith(
+            "ai_doctor_result_received",
+            expect.anything(),
+          );
+          expect(trackFunnelEvent).not.toHaveBeenCalledWith(
+            "ai_doctor_session_saved",
+            expect.anything(),
+          );
+        } else {
+          for (const event of ["ai_doctor_result_received", "ai_doctor_session_saved"]) {
+            expect(
+              trackFunnelEvent.mock.calls
+                .filter(([name]) => name === event)
+                .map(([, properties]) => properties),
+            ).toEqual([{ surface: "standard" }]);
+          }
+        }
+      } finally {
+        cleanup();
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each(["manual", "timeline"] as const)(
+    "still hides an accepted standard result when its %s sources are removed",
+    async (source) => {
+      const now = new Date("2026-09-23T12:00:00Z");
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(now);
+      try {
+        if (source === "manual") expiringManualContext(now);
+        else itemsRef.current = strongTimeline();
+        const invoke = vi.fn<InvokeFn>(async () => ({
+          data: { ok: true, result: validResult() },
+          error: null,
+        }));
+        const persist = vi.fn().mockResolvedValue({ ok: true, id: "removed-context-session" });
+        const view = render(reviewElement(invoke, TENT_ID, persist));
+        fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+        await screen.findByTestId("plant-ai-doctor-history-saved");
+        expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+          "data-review-mode",
+          "standard",
+        );
+
+        // Keep the clock fixed: loss of evidence, not aging, must still revoke visibility.
+        itemsRef.current = [];
+        sensorQueryState.currentRows = [];
+        view.rerenderWithProviders(reviewElement(invoke, TENT_ID, persist));
+        expect(screen.queryByTestId("plant-ai-doctor-live-review")).toBeNull();
+        expect(invoke).toHaveBeenCalledTimes(1);
+        expect(persist).toHaveBeenCalledTimes(1);
+      } finally {
+        cleanup();
+        vi.useRealTimers();
+      }
+    },
+  );
+});
+
+describe("unknown frozen evidence freshness", () => {
+  const unknownEvidence = [
+    { label: "no snapshot", snapshot: false, capturedAt: undefined },
+    { label: "missing timestamp", snapshot: true, capturedAt: undefined },
+    { label: "null timestamp", snapshot: true, capturedAt: null },
+    { label: "empty timestamp", snapshot: true, capturedAt: "" },
+    { label: "blank timestamp", snapshot: true, capturedAt: " \t " },
+    { label: "invalid timestamp", snapshot: true, capturedAt: "not-a-date" },
+  ];
+
+  it.each(unknownEvidence)(
+    "does not resend a failed standard review with $label",
+    async ({ snapshot, capturedAt }) => {
+      if (snapshot) {
+        const item = itemsRef.current.find((item) => item.kind === "manual_sensor_snapshot");
+        if (!item || item.kind !== "manual_sensor_snapshot")
+          throw new Error("Missing fixture snapshot");
+        // Keep the valid timeline occurrence: readiness and packet capture time
+        // are separate inputs, as they are in the actual component path.
+        Object.assign(item.card, { capturedAt });
+      } else {
+        itemsRef.current = itemsRef.current.filter(
+          (item) => item.kind !== "manual_sensor_snapshot",
+        );
+      }
+      const invoke = vi.fn<InvokeFn>(async () => ({
+        data: { ok: false, reason: "http" },
+        error: null,
+      }));
+      const persist = vi.fn();
+      render(reviewElement(invoke, TENT_ID, persist));
+      fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+      const retry = await screen.findByTestId("plant-ai-doctor-live-review-retry");
+      const acceptedBody = invoke.mock.calls[0][1].body;
+      const frozenPacket = JSON.stringify(acceptedBody.packet);
+      expect(acceptedBody.evidence_acceptance?.reviewMode).toBe("standard");
+      expect(acceptedBody.packet.recentSensorSnapshot?.capturedAt ?? null).toBe(capturedAt ?? null);
+
+      fireEvent.click(retry);
+      await act(async () => {});
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(persist).not.toHaveBeenCalled();
+      expect(screen.getByTestId("plant-ai-doctor-live-review-failure")).toHaveTextContent(
+        "Evidence freshness could not be established. Capture a fresh reading to retry.",
+      );
+      expect(screen.queryByTestId("plant-ai-doctor-live-review-retry")).toBeNull();
+      expect(screen.queryByTestId("plant-ai-doctor-live-review-stale-evidence-note")).toBeNull();
+      expect(JSON.stringify(acceptedBody.packet)).toBe(frozenPacket);
+    },
+  );
+
+  it.each(["loading", "result"] as const)(
+    "keeps an accepted snapshot-free standard review visible during %s",
+    async (phase) => {
+      itemsRef.current = itemsRef.current.filter((item) => item.kind !== "manual_sensor_snapshot");
+      let resolveInvoke!: (value: Awaited<ReturnType<InvokeFn>>) => void;
+      const response = new Promise<Awaited<ReturnType<InvokeFn>>>((resolve) => {
+        resolveInvoke = resolve;
+      });
+      const invoke = vi.fn<InvokeFn>(() => response);
+      const persist = vi.fn().mockResolvedValue({ ok: true, id: "unknown-freshness-session" });
+      const view = render(reviewElement(invoke, TENT_ID, persist));
+      fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+      await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+      expect(invoke.mock.calls[0][1].body.packet.recentSensorSnapshot).toBeNull();
+      if (phase === "result") {
+        await act(async () =>
+          resolveInvoke({ data: { ok: true, result: validResult() }, error: null }),
+        );
+        await screen.findByTestId("plant-ai-doctor-history-saved");
+      }
+      view.rerenderWithProviders(reviewElement(invoke, TENT_ID, persist));
+      expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+        "data-status",
+        phase,
+      );
+      expect(screen.queryByTestId("plant-ai-doctor-live-review-stale-evidence-note")).toBeNull();
+      if (phase === "result") {
+        expect(screen.getByTestId("plant-ai-doctor-live-review-result-wrap")).toHaveTextContent(
+          validResult().summary,
+        );
+      } else {
+        await act(async () =>
+          resolveInvoke({ data: { ok: true, result: validResult() }, error: null }),
+        );
+        await screen.findByTestId("plant-ai-doctor-history-saved");
+      }
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(persist).toHaveBeenCalledTimes(1);
+    },
+  );
 });
 
 describe("CSV history pending/error gating", () => {
@@ -724,6 +1076,113 @@ describe("CSV history pending/error gating", () => {
     expect(packet.recentSensorSnapshotAnnotation?.source).toBe("manual");
     expect(packet.missingLiveSensorReadings).toBe(true);
     expect(JSON.stringify(packet)).not.toContain('"value":29');
+  });
+
+  it.each(["error", "refresh_error"] as const)(
+    "preserves a 9h temperature-only diary manual when the manual query has %s and stale live fills the mixed cap",
+    async (manualStatus) => {
+      const capturedAt = new Date(Date.now() - 9 * 3600_000).toISOString();
+      const record = diaryRowToManualSnapshotRecord({
+        id: "saved-diary-manual",
+        plant_id: "p1",
+        tent_id: TENT_ID,
+        entry_at: capturedAt,
+        note: "Measured by the grower",
+        details: {
+          manual_sensor_snapshot: { source: "manual", temp_f: 77 },
+        },
+      });
+      expect(record).not.toBeNull();
+      const card = buildManualSnapshotTimelineCard(record!);
+      itemsRef.current = [
+        ...oneRecentNoteTimeline(),
+        { kind: "manual_sensor_snapshot", key: card.id, occurredAt: capturedAt, card },
+      ];
+      sensorQueryState.currentRows = Array.from({ length: 60 }, (_, index) => ({
+        id: `stale-live-${index}`,
+        tent_id: TENT_ID,
+        metric: "temperature_c",
+        value: 30,
+        captured_at: new Date(Date.now() - 16 * 60_000).toISOString(),
+        source: "live",
+        quality: "ok",
+      }));
+      // This cache is independent of the successful mixed API response.
+      sensorQueryState.manualRows = [
+        {
+          id: "cached-manual",
+          tent_id: TENT_ID,
+          metric: "temperature_c",
+          value: 31,
+          captured_at: new Date(Date.now() - 60_000).toISOString(),
+          source: "manual",
+          quality: "ok",
+        },
+      ];
+      sensorQueryState.manualStatus = manualStatus;
+      const invoke = mount();
+
+      expect(sensorQueryState.currentReadCalls).toEqual(
+        expect.arrayContaining([
+          { limit: 50, sources: ["live", "manual"] },
+          { limit: 50, sources: ["manual"] },
+        ]),
+      );
+      fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+      await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+      const packet = invoke.mock.calls[0][1].body.packet;
+      expect(packet.recentSensorSnapshot?.capturedAt).toBe(capturedAt);
+      expect(packet.recentSensorSnapshot?.readings).toEqual(
+        expect.arrayContaining([{ field: "air_temp_c", value: 25, unit: "°C" }]),
+      );
+      expect(packet.recentSensorSnapshotAnnotation).toMatchObject({
+        source: "manual",
+        stale: false,
+        trust: "medium",
+        includesValues: true,
+      });
+      expect(packet.missingLiveSensorReadings).toBe(true);
+      expect(JSON.stringify(packet.recentSensorSnapshot)).not.toContain('"value":31');
+    },
+  );
+
+  it("carries a separately fetched 9h tent manual through a mixed window crowded by 60 stale live rows", async () => {
+    const capturedAt = new Date(Date.now() - 9 * 3600_000).toISOString();
+    itemsRef.current = oneRecentNoteTimeline();
+    sensorQueryState.currentRows = [
+      ...Array.from({ length: 60 }, (_, index) => ({
+        id: `stale-live-${index}`,
+        tent_id: TENT_ID,
+        metric: "temperature_c",
+        value: 30,
+        captured_at: new Date(Date.now() - 16 * 60_000).toISOString(),
+        source: "live",
+        quality: "ok",
+      })),
+      {
+        id: "tent-manual",
+        tent_id: TENT_ID,
+        metric: "temperature_c",
+        value: 25,
+        captured_at: capturedAt,
+        source: "manual",
+        quality: "ok",
+      },
+    ];
+    const invoke = mount();
+
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    const packet = invoke.mock.calls[0][1].body.packet;
+    expect(packet.recentSensorSnapshot?.capturedAt).toBe(capturedAt);
+    expect(packet.recentSensorSnapshot?.readings).toEqual([
+      { field: "temperature_c", value: 25, unit: "°C" },
+    ]);
+    expect(packet.recentSensorSnapshotAnnotation).toMatchObject({
+      source: "manual",
+      stale: false,
+    });
+    expect(packet.missingLiveSensorReadings).toBe(true);
   });
 
   it("a failed current read proceeds without inventing a current snapshot", async () => {

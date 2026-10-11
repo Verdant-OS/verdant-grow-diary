@@ -5,7 +5,7 @@
  *  - pure rules in src/lib/plantTentMovementRules.ts
  *  - static guardrails for AssignTentDialog: writes a movement event to
  *    diary_entries but never to sensor_readings / alerts / action_queue.
- *  - grower-native labels: Move Plant, Current Tent, Previous Tent.
+ *  - grower-native labels: Move Plant, Current Tent, Moving from.
  *  - Add Tent / Add Plant entry points still exist.
  *  - Archive preferred over hard delete on tents/plants UI surfaces.
  *
@@ -145,18 +145,12 @@ describe("AssignTentDialog · movement timeline event", () => {
     expect(DIALOG).toMatch(/invalidateQueries\(\{\s*queryKey:\s*\["diary_entries"\]/);
   });
 
-  it("only updates plants.tent_id (no user_id / grow_id / strain / stage / notes)", () => {
-    const plantUpdates = [
-      ...DIALOG.matchAll(/\.from\(["']plants["']\)\s*\.update\(\s*\{([^}]*)\}\s*\)/g),
-    ];
-    expect(plantUpdates.length).toBe(1);
-    const payload = plantUpdates[0][1];
-    expect(payload).toMatch(/tent_id/);
-    expect(payload).not.toMatch(/\buser_id\b/);
-    expect(payload).not.toMatch(/\bgrow_id\b/);
-    expect(payload).not.toMatch(/\bstrain\b/);
-    expect(payload).not.toMatch(/\bstage\b/);
-    expect(payload).not.toMatch(/\bnotes\b/);
+  it("updates plants.tent_id via a dedicated move payload; untag is a separate write", () => {
+    expect(DIALOG).toMatch(/buildPlantTentMoveUpdate\(/);
+    expect(DIALOG).toMatch(/buildPlantPhenoUntagPayload\(/);
+    expect(DIALOG).toMatch(/\.from\(["']plants["']\)\s*\.update\(\s*movePayload\s*\)/);
+    expect(DIALOG).not.toMatch(/pheno_hunt_id:\s*null[\s\S]{0,120}tent_id/);
+    expect(DIALOG).toMatch(/confirmPhenoUntag/);
   });
 
   it("does NOT write sensor_readings / alerts / action_queue when moving a plant", () => {
@@ -177,10 +171,13 @@ describe("AssignTentDialog · movement timeline event", () => {
     );
   });
 
-  it("uses grower-native labels (Move Plant / Current Tent / Previous Tent)", () => {
+  it("uses grower-native labels (Move Plant / Current Tent / Moving from)", () => {
     expect(DIALOG).toContain("Move Plant");
     expect(DIALOG).toContain("Current Tent");
-    expect(DIALOG).toContain("Previous Tent");
+    // "Previous Tent" named the plant's CURRENT tent (QA 2026-09-24); the
+    // rendered label is asserted in assign-tent-partial-failure-honesty.
+    expect(DIALOG).toContain("{MOVE_PLANT_FROM_LABEL}: {current[0].name}");
+    expect(DIALOG).not.toContain("Previous Tent");
   });
 });
 

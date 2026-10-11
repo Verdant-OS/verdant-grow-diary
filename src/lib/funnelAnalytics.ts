@@ -90,7 +90,7 @@ export const FUNNEL_PARAM_KEYS = [
   "surface",
   /** Plan slug the grower acted on (enum like "pro-monthly"), never input. */
   "plan",
-  /** Signup method (e.g. "email"). */
+  /** Signup method ("email" or "google"). */
   "method",
   /** Privacy-safe Quick Log success enum; never grower content. */
   "event_type",

@@ -11,12 +11,15 @@
  *     Mapping lives in src/lib/alertToActionQueueRules.ts (no JSX duplication).
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AlertReasonText from "@/components/AlertReasonText";
+import { ALERT_MANUAL_RESOLUTION_NOTE } from "@/lib/alertReasonDisplayRules";
 import { Link, useParams } from "@/lib/react-router-compat";
 import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { formatGrowDisplayLabel } from "@/lib/growDisplayLabel";
+import { AlertTargetContext } from "@/components/AlertTargetContext";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 import EvidenceLinkageBadges from "@/components/EvidenceLinkageBadges";
 import { ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY } from "@/lib/originatingTimelineEventRules";
@@ -47,6 +50,9 @@ import {
   type AlertStatusRow,
 } from "@/lib/alerts";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
+import { useAlertTargetNames } from "@/hooks/useAlertTargetNames";
+import { useAlertLinkedTargetEvidence } from "@/hooks/useAlertLinkedTargetEvidence";
+import { buildAlertTargetPresenterInput } from "@/lib/alertTargetContextRules";
 import {
   actionDetailPath,
   aiDoctorSessionDetailPath,
@@ -119,8 +125,13 @@ interface RelatedActionRow {
 
 export default function AlertDetail() {
   const { alertId } = useParams<{ alertId: string }>();
-  const [status, setStatus] = useState<LoadStatus>("idle");
-  const [alert, setAlert] = useState<AlertRow | null>(null);
+  const [storedStatus, setStatus] = useState<LoadStatus>("idle");
+  const [storedAlert, setAlert] = useState<AlertRow | null>(null);
+  const [loadAlertId, setLoadAlertId] = useState<string | null>(null);
+  const loadSequence = useRef(0);
+  // A new route must not expose the previous row or terminal state before effects run.
+  const status = loadAlertId === alertId ? storedStatus : "loading";
+  const alert = loadAlertId === alertId && storedAlert?.id === alertId ? storedAlert : null;
   const [error, setError] = useState<string | null>(null);
   const linkedActionAlertIds = useMemo(() => (alert ? [alert.id] : []), [alert]);
   const linkedActionCounts = useAlertsLinkedActionCounts(linkedActionAlertIds);
@@ -134,11 +145,14 @@ export default function AlertDetail() {
   const [linkedAiDoctorSessionIds, setLinkedAiDoctorSessionIds] = useState<string[]>([]);
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
     if (!alertId) return;
+    setLoadAlertId(alertId);
     setStatus("loading");
     setError(null);
     try {
       const row = await getAlertById(alertId);
+      if (sequence !== loadSequence.current) return;
       if (!row) {
         setAlert(null);
         setStatus("not_found");
@@ -147,6 +161,7 @@ export default function AlertDetail() {
       setAlert(row);
       setStatus("ok");
     } catch (e) {
+      if (sequence !== loadSequence.current) return;
       setError(e instanceof Error ? e.message : String(e));
       setStatus("error");
     }
@@ -154,9 +169,31 @@ export default function AlertDetail() {
 
   useEffect(() => {
     load();
+    return () => {
+      // Also invalidate retries and earlier visits to the same alert on cleanup.
+      loadSequence.current += 1;
+    };
   }, [load]);
 
-  const { events } = useAlertEvents(alertId ?? null, eventsKey);
+  const {
+    events,
+    status: historyStatus,
+    error: historyError,
+    reload: reloadHistory,
+  } = useAlertEvents(alertId ?? null, eventsKey);
+  const targetNames = useAlertTargetNames();
+  const linkedTargets = useAlertLinkedTargetEvidence(alert ? [alert] : []);
+  const targetInput = buildAlertTargetPresenterInput({
+    tentId: alert?.tent_id,
+    plantId: alert?.plant_id,
+    growId: alert?.grow_id,
+    tentNameById: targetNames.tentNameById,
+    plantNameById: targetNames.plantNameById,
+    linkedEvidence: alert ? (linkedTargets.evidenceByAlertId.get(alert.id) ?? []) : [],
+    singleTentIdByGrowId: targetNames.singleTentIdByGrowId,
+    namesLoading: targetNames.status === "loading",
+    idsLoading: linkedTargets.idsLoading,
+  });
 
   const runStatusChange = async (
     event_type: "acknowledged" | "resolved" | "dismissed" | "reopened",
@@ -518,7 +555,7 @@ export default function AlertDetail() {
             <h2 id="alert-detail-title" className="font-display font-semibold text-base">
               {alert.title}
             </h2>
-            <p className="text-sm text-muted-foreground mt-1">{alert.reason}</p>
+            <AlertReasonText reason={alert.reason} className="text-sm text-muted-foreground mt-1" />
 
             <div className="mt-3">
               <AlertWhyContext alert={alert} variant="detailed" />
@@ -548,32 +585,19 @@ export default function AlertDetail() {
                   </Link>
                 </dd>
               </div>
-              {alert.tent_id && (
-                <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
-                  <dt className="uppercase tracking-wider text-muted-foreground">Tent</dt>
-                  <dd className="font-medium">
-                    <Link
-                      to={tentDetailPath(alert.tent_id)}
-                      className="text-primary hover:underline"
-                    >
-                      {alert.tent_id}
-                    </Link>
-                  </dd>
-                </div>
-              )}
-              {alert.plant_id && (
-                <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
-                  <dt className="uppercase tracking-wider text-muted-foreground">Plant</dt>
-                  <dd className="font-medium">
-                    <Link
-                      to={plantDetailPath(alert.plant_id)}
-                      className="text-primary hover:underline"
-                    >
-                      {alert.plant_id}
-                    </Link>
-                  </dd>
-                </div>
-              )}
+              <AlertTargetContext
+                tentId={targetInput.tentId}
+                plantId={targetInput.plantId}
+                tentName={targetInput.tentName}
+                plantName={targetInput.plantName}
+                namesLoading={targetInput.namesLoading}
+                idsLoading={targetInput.idsLoading}
+                linkedEvidence={targetInput.linkedEvidence}
+                singleTentId={targetInput.singleTentId}
+                variant="detailed"
+                tentHref={targetInput.tentId ? tentDetailPath(targetInput.tentId) : null}
+                plantHref={targetInput.plantId ? plantDetailPath(targetInput.plantId) : null}
+              />
               <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
                 <dt className="uppercase tracking-wider text-muted-foreground">First seen</dt>
                 <dd>{fmt(alert.first_seen_at)}</dd>
@@ -604,6 +628,14 @@ export default function AlertDetail() {
               </div>
             </dl>
 
+            {(alert.status === "open" || alert.status === "acknowledged") && (
+              <p
+                className="mt-4 text-xs text-muted-foreground"
+                data-testid="alert-detail-manual-resolution-note"
+              >
+                {ALERT_MANUAL_RESOLUTION_NOTE}
+              </p>
+            )}
             <div
               className="flex flex-wrap gap-2 mt-4"
               role="group"
@@ -881,10 +913,36 @@ export default function AlertDetail() {
             <div className="flex items-center gap-2 mb-2">
               <History className="h-4 w-4 text-muted-foreground" />
               <h2 className="font-display font-semibold text-sm">
-                History <span className="text-xs text-muted-foreground">{events.length}</span>
+                History
+                {historyStatus === "ok" && (
+                  <>
+                    {" "}
+                    <span className="text-xs text-muted-foreground">{events.length}</span>
+                  </>
+                )}
               </h2>
             </div>
-            {events.length === 0 ? (
+            {historyStatus === "unavailable" ? (
+              <div role="alert">
+                <p className="text-xs text-muted-foreground">
+                  Alert history unavailable{historyError ? `: ${historyError}` : "."}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={reloadHistory}
+                  aria-label="Retry loading alert history"
+                >
+                  Retry history
+                </Button>
+              </div>
+            ) : historyStatus !== "ok" ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                Loading history…
+              </p>
+            ) : events.length === 0 ? (
               <p className="text-xs text-muted-foreground">No events yet.</p>
             ) : (
               <ol className="space-y-1 pl-3 border-l border-border/40">

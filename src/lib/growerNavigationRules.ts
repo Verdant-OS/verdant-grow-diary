@@ -1,3 +1,5 @@
+import { breedingProgramsPath, phenoHuntsPath, withGrowId } from "@/lib/routes";
+
 export interface GrowerNavigationDestination {
   id:
     | "phenoHunt"
@@ -32,3 +34,33 @@ export const LABS_NAVIGATION_DESTINATIONS = [
 ] as const satisfies readonly GrowerNavigationDestination[];
 
 export type LabsNavigationDestinationId = (typeof LABS_NAVIGATION_DESTINATIONS)[number]["id"];
+
+/**
+ * Soft-couple only: rewrite Labs Pheno Hunt and Breeding Programs onto
+ * `?growId=` when the caller already has an explicit grow. The Phase-1
+ * static manifest stays byte-for-byte; this helper never invents a growId.
+ */
+export function resolveLabsNavigationDestinations(
+  growId?: string | null,
+): GrowerNavigationDestination[] {
+  const trimmed = typeof growId === "string" ? growId.trim() : "";
+  const scopedGrowId = trimmed || null;
+  return LABS_NAVIGATION_DESTINATIONS.map((item) => {
+    if (item.id === "phenoHunt") return { ...item, to: phenoHuntsPath(scopedGrowId) };
+    if (item.id === "breedingPrograms") {
+      return { ...item, to: breedingProgramsPath(scopedGrowId) };
+    }
+    return { ...item };
+  });
+}
+
+/**
+ * Mobile first-row href. Only the Log tab (`/daily-check`) carries an explicit
+ * grow from the current URL, so a grower logging from a grow keeps its scope.
+ * Every other tab keeps its static route. Never invents a growId.
+ */
+export function resolveMobilePrimaryHref(to: string, growId?: string | null): string {
+  const trimmed = typeof growId === "string" ? growId.trim() : "";
+  if (to !== "/daily-check" || !trimmed) return to;
+  return withGrowId(to, trimmed);
+}

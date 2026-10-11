@@ -211,6 +211,24 @@ describe("useRootZoneObservations confirmed-save refresh", () => {
     expect(mocks.from).not.toHaveBeenCalled();
   });
 
+  it("exposes readStatus and hasData from the TanStack query lifecycle", async () => {
+    const { wrapper } = makeHarness();
+    const { result } = renderHook(() => useRootZoneObservations(scope), { wrapper });
+    expect(result.current.readStatus).toBe("loading");
+    expect(result.current.hasData).toBe(false);
+    await waitFor(() => expect(result.current.readStatus).toBe("success"));
+    expect(result.current.hasData).toBe(true);
+  });
+
+  it("reports unavailable readStatus when the grow_events payload is not an array", async () => {
+    mocks.rows = null as unknown as unknown[];
+    const { wrapper } = makeHarness();
+    const { result } = renderHook(() => useRootZoneObservations(scope), { wrapper });
+    await waitFor(() => expect(result.current.readStatus).toBe("error"));
+    expect(result.current.hasData).toBe(false);
+    expect(result.current.observations).toEqual([]);
+  });
+
   it("does not reuse root-zone observations after an authenticated owner swap", async () => {
     mocks.rows = [wateringRow(250)];
     const { client, wrapper } = makeHarness();

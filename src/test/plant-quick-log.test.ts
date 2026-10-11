@@ -57,6 +57,12 @@ describe("buildManualSensorSnapshot", () => {
       ph: 6.2,
       ec: null,
       source: MANUAL_SENSOR_SOURCE,
+      manual_provenance: {
+        source: "manual",
+        source_identity: "manual_entry",
+        transport: "manual",
+        confidence: null,
+      },
     });
   });
 });
@@ -117,6 +123,12 @@ describe("buildQuickLogInsertDraft", () => {
       ph: 6.2,
       ec: 1.4,
       source: "manual",
+      manual_provenance: {
+        source: "manual",
+        source_identity: "manual_entry",
+        transport: "manual",
+        confidence: null,
+      },
     });
   });
 

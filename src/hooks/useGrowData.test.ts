@@ -12,6 +12,8 @@ vi.mock("@/lib/growRepo", () => ({
 }));
 
 import * as repo from "@/lib/growRepo";
+import { EFFECTIVE_SENSOR_QUERY_VERSION } from "@/lib/effectiveSensorReadings";
+import { buildPrivateGrowQueryKey } from "@/lib/growDataQueryKeyRules";
 import { tents, plants, sensorReadings } from "@/mock";
 import {
   useGrowTents,
@@ -22,12 +24,14 @@ import {
   __growDataFallbacks,
 } from "./useGrowData";
 
-function wrapper(retry: boolean | number = false) {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry, gcTime: 0, staleTime: 0 } },
-  });
+function wrapper(retry: boolean | number = false, client?: QueryClient) {
+  const queryClient =
+    client ??
+    new QueryClient({
+      defaultOptions: { queries: { retry, gcTime: 0, staleTime: 0 } },
+    });
   return ({ children }: { children: React.ReactNode }) =>
-    React.createElement(QueryClientProvider, { client }, children);
+    React.createElement(QueryClientProvider, { client: queryClient }, children);
 }
 
 beforeEach(() => {
@@ -125,6 +129,37 @@ describe("useGrowSensorReadings", () => {
     await Promise.resolve();
     expect(result.current.fetchStatus).toBe("idle");
     expect(result.current.data).toBeUndefined();
+    expect(repo.fetchSensorReadings).not.toHaveBeenCalled();
+  });
+
+  it("does not reuse effective-v1 aggregate cache when scope is explicitly null", () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
+    });
+    client.setQueryData(
+      buildPrivateGrowQueryKey(null, ["sensors", "all", EFFECTIVE_SENSOR_QUERY_VERSION]),
+      [
+        {
+          ts: "2026-01-01T00:00:00Z",
+          tentId: "t1",
+          temp: 22,
+          rh: 50,
+          vpd: 1,
+          co2: 800,
+          soil: 40,
+          source: "live" as const,
+          status: "usable" as const,
+          capturedAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+    );
+
+    const { result } = renderHook(() => useGrowSensorReadings(null), {
+      wrapper: wrapper(false, client),
+    });
+
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.fetchStatus).toBe("idle");
     expect(repo.fetchSensorReadings).not.toHaveBeenCalled();
   });
 

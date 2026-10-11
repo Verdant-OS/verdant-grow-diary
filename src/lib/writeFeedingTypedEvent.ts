@@ -11,8 +11,20 @@
  *   - No direct table writes, service role, alerts, actions, or device control.
  */
 
+import { isUuid } from "@/lib/isUuid";
 import { supabase as defaultSupabase } from "@/integrations/supabase/client";
+import {
+  resolveTypedReceiptReaders,
+  verifyActiveTypedQuickLogEvent,
+  type TypedQuickLogEventReader,
+  type TypedQuickLogChildReader,
+  type TypedReceiptReadClient,
+} from "./quickLogTypedReusedReceiptService";
 import { ROOT_ZONE_PRODUCT_CAP } from "./rootZoneObservationRules";
+import {
+  quickLogSaveRequiresHistoryCheck,
+  type QuickLogHistoryCheckReason,
+} from "./quickLogSaveErrorMessage";
 
 export interface QuickLogFeedingRpcPayload {
   line_id: string;
@@ -48,6 +60,8 @@ export interface FeedingRpcClient {
     fn: "quicklog_save_event",
     args: QuickLogFeedingEventRpcArgs,
   ) => Promise<{ data: unknown; error: unknown }>;
+  /** Reads a reused receipt back; without an injected client the singleton reads. */
+  from?: TypedReceiptReadClient["from"];
 }
 
 export interface FeedingTypedEventInput {
@@ -76,6 +90,7 @@ export type WriteFeedingTypedEventResult =
   { ok: true; eventId: string; reused: boolean } | { ok: false; reason: WriteFeedingFailureReason };
 
 export type WriteFeedingFailureReason =
+  | QuickLogHistoryCheckReason
   | "idempotency_key:invalid"
   | "grow_id:missing"
   | "line_id:missing"
@@ -87,6 +102,8 @@ export type WriteFeedingFailureReason =
   | "numeric:not_finite"
   | "occurred_at:invalid"
   | "rpc:no_event_id"
+  | "rpc:receipt_unverified"
+  | "rpc:invalid_typed_payload"
   | "rpc:rejected"
   | "rpc:error";
 
@@ -229,6 +246,8 @@ export function mapFeedingInputToRpcArgs(
 
 export interface WriteFeedingTypedEventOptions {
   client?: FeedingRpcClient;
+  reusedEventReader?: TypedQuickLogEventReader;
+  reusedChildReader?: TypedQuickLogChildReader;
 }
 
 export async function writeFeedingTypedEvent(
@@ -252,11 +271,41 @@ export async function writeFeedingTypedEvent(
     response.data && typeof response.data === "object"
       ? (response.data as Record<string, unknown>)
       : null;
+  if (envelope?.ok === false && quickLogSaveRequiresHistoryCheck(envelope.reason)) {
+    return { ok: false, reason: envelope.reason };
+  }
+  // The server answered and explicitly rejected the payload during
+  // validation, before any write. Unlike a transport failure or an unknown
+  // rejection, this outcome is definitive: nothing was saved under this key,
+  // so the grower may correct the entry instead of retrying it verbatim.
+  if (envelope && envelope.ok === false && envelope.reason === "invalid_typed_payload") {
+    return { ok: false, reason: "rpc:invalid_typed_payload" };
+  }
   if (!envelope || envelope.ok !== true) {
     return { ok: false, reason: "rpc:rejected" };
   }
   const eventId = trimOrNull(envelope.grow_event_id);
-  if (!eventId) return { ok: false, reason: "rpc:no_event_id" };
+  if (!isUuid(eventId)) return { ok: false, reason: "rpc:no_event_id" };
+
+  // Read the receipt back through the same client the RPC used.
+  const readers = resolveTypedReceiptReaders(options);
+  if (
+    envelope.reused === true &&
+    !(await verifyActiveTypedQuickLogEvent(
+      {
+        id: eventId,
+        eventType: "feeding",
+        growId: mapped.args.p_grow_id,
+        tentId: mapped.args.p_tent_id,
+        plantId: mapped.args.p_plant_id,
+        volumeMl: mapped.args.p_feed.volume_ml,
+        lineId: mapped.args.p_feed.line_id,
+      },
+      readers.eventReader,
+      readers.childReader,
+    ))
+  )
+    return { ok: false, reason: "rpc:receipt_unverified" };
 
   return {
     ok: true,

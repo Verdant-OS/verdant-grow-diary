@@ -79,9 +79,9 @@ Inngest migration scan:
 Install the latest v4 SDK:
 
 ```bash
-npm install inngest@latest
-# or pnpm add inngest@latest
+pnpm add inngest@latest
 # or yarn add inngest@latest
+# or bun add inngest@latest
 ```
 
 If the repo uses v3 realtime, remove `@inngest/realtime`; v4 realtime lives in

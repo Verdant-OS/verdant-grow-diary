@@ -114,15 +114,31 @@ describe("resolveStartYourRoomResume", () => {
         plants: [{ id: "p1", grow_id: "g1", tent_id: "t1" }],
         activeGrowId: "g1",
       }),
-    ).toEqual({ growId: "g1", tentId: "t1", plantId: "p1" });
+    ).toEqual({
+      step: "done",
+      growId: "g1",
+      growName: "",
+      tentId: "t1",
+      tentName: "",
+      plantId: "p1",
+      plantName: "",
+    });
     expect(
       resolveStartYourRoomResume({
-        grows: [{ id: "g1" }],
+        grows: [{ id: "g1", name: "QA Mid" }],
         tents: [],
         plants: [],
         activeGrowId: "g1",
       }),
-    ).toBeNull();
+    ).toMatchObject({ step: "tent", growId: "g1", growName: "QA Mid" });
+    expect(
+      resolveStartYourRoomResume({
+        grows: [{ id: "g1", name: "QA Mid" }],
+        tents: [{ id: "t1", grow_id: "g1", name: "Tent" }],
+        plants: [],
+        activeGrowId: "g1",
+      }),
+    ).toMatchObject({ step: "plant", growId: "g1", tentId: "t1" });
     expect(
       resolveStartYourRoomResume({
         grows: [{ id: "g1" }],
@@ -179,12 +195,29 @@ describe("Start your room resume", () => {
     expect(testState.insert).not.toHaveBeenCalled();
   });
 
-  it("renders the grow step with submit disabled on Free for a grow only", () => {
-    testState.plantsSelectable = false;
-    testState.grows = [{ id: "grow-1", name: "Only grow" }];
+  it("opens the tent step bound to QA Mid after a remount when only that grow exists", async () => {
+    testState.grows = [{ id: "grow-mid", name: "QA Mid" }];
+    testState.plantsResult = { data: [], error: null };
+    const view = renderPage();
+    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    expect(screen.getByTestId("start-room-bound-grow")).toHaveTextContent("Bound to grow: QA Mid");
+    expect(screen.queryByTestId("start-room-grow-submit")).not.toBeInTheDocument();
+    view.unmount();
     renderPage();
-    expect(screen.getByTestId("start-your-room-step-grow")).toBeInTheDocument();
-    expect(screen.getByTestId("start-room-grow-submit")).toBeDisabled();
+    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    expect(screen.getByTestId("start-room-bound-grow")).toHaveTextContent("Bound to grow: QA Mid");
+    expect(testState.insert).not.toHaveBeenCalled();
+  });
+
+  it("opens the plant step when a grow and tent exist and no plant does", async () => {
+    testState.grows = [{ id: "grow-1", name: "QA Mid" }];
+    testState.tents = [{ id: "tent-1", name: "QA Tent", grow_id: "grow-1" }];
+    testState.plantsResult = { data: [], error: null };
+    renderPage();
+    expect(await screen.findByTestId("start-your-room-step-plant")).toBeInTheDocument();
+    expect(screen.getByText(/Bound to grow \+ tent:/)).toHaveTextContent("QA Mid · QA Tent");
+    expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
+    expect(testState.insert).not.toHaveBeenCalled();
   });
 
   it("renders the grow step with submit disabled on Free for a tent only", () => {

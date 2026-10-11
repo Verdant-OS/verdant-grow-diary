@@ -170,17 +170,20 @@ export function plantDetailQuickLogHref(plantId: string): string {
 
 export interface StartYourRoomResumeGrow {
   id: string;
+  name?: string | null;
 }
 
 export interface StartYourRoomResumeTent {
   id: string;
   grow_id?: string | null;
+  name?: string | null;
 }
 
 export interface StartYourRoomResumePlant {
   id: string;
   grow_id?: string | null;
   tent_id?: string | null;
+  name?: string | null;
 }
 
 export interface StartYourRoomResumeInput {
@@ -190,30 +193,72 @@ export interface StartYourRoomResumeInput {
   activeGrowId: string | null | undefined;
 }
 
+export interface StartYourRoomResume {
+  step: "tent" | "plant" | "done";
+  growId: string;
+  growName: string;
+  tentId: string | null;
+  tentName: string;
+  plantId: string | null;
+  plantName: string;
+}
+
 /**
- * Reload lands on done only when the single active grow has exactly one tent
- * and exactly one plant linked to that tent. Anything partial, ambiguous, or
- * unread returns null so the wizard stays on the grow step.
+ * Reload opens the next missing step for the single active grow.
+ * No tent → tent. One tent and no plant → plant. One tent and one plant → done.
+ * Unread, empty, or ambiguous rooms return null so the wizard stays on grow.
  */
 export function resolveStartYourRoomResume(
   input: StartYourRoomResumeInput,
-): { growId: string; tentId: string; plantId: string } | null {
+): StartYourRoomResume | null {
   if (input.plants == null || input.grows == null || input.tents == null) return null;
   if (input.grows.length !== 1) return null;
   const grow = input.grows[0];
   if (!grow?.id) return null;
   if (input.activeGrowId != null && input.activeGrowId !== grow.id) return null;
 
+  const growName = trimName(grow.name);
   const tents = input.tents.filter((tent) => tent.grow_id === grow.id && !!tent.id);
+  if (tents.length === 0) {
+    return {
+      step: "tent",
+      growId: grow.id,
+      growName,
+      tentId: null,
+      tentName: "",
+      plantId: null,
+      plantName: "",
+    };
+  }
   if (tents.length !== 1) return null;
   const tent = tents[0];
+  const tentName = trimName(tent.name);
 
   const plants = input.plants.filter(
     (plant) => plant.grow_id === grow.id && plant.tent_id === tent.id && !!plant.id,
   );
+  if (plants.length === 0) {
+    return {
+      step: "plant",
+      growId: grow.id,
+      growName,
+      tentId: tent.id,
+      tentName,
+      plantId: null,
+      plantName: "",
+    };
+  }
   if (plants.length !== 1) return null;
 
-  return { growId: grow.id, tentId: tent.id, plantId: plants[0].id };
+  return {
+    step: "done",
+    growId: grow.id,
+    growName,
+    tentId: tent.id,
+    tentName,
+    plantId: plants[0].id,
+    plantName: trimName(plants[0].name),
+  };
 }
 
 /**

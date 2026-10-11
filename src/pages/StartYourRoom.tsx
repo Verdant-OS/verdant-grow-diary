@@ -30,6 +30,7 @@ import {
   canProceedPlant,
   canFinish,
   nextStepAfter,
+  stepIndex,
   progressLabel,
   plantDetailQuickLogHref,
   resolveStartYourRoomResume,
@@ -141,20 +142,20 @@ export default function StartYourRoom() {
     };
   }, [plantsReadable, ownerId, activeGrowId, grows]);
 
-  const resumeIds = useMemo(
+  const resume = useMemo(
     () =>
       resolveStartYourRoomResume({
-        grows,
+        grows: grows.map((grow) => ({
+          id: grow.id,
+          name: "name" in grow ? (grow.name as string | null) : null,
+        })),
         tents: tentsQuery.data ?? (tentsQuery.isError ? null : []),
         plants: plantsRead.plants,
         activeGrowId: activeGrowId ?? (grows.length === 1 ? grows[0]?.id : null),
       }),
     [grows, tentsQuery.data, tentsQuery.isError, plantsRead.plants, activeGrowId],
   );
-  const shownStep: StartYourRoomStep = resumeIds ? "done" : step;
-  const shownIds: StartYourRoomIds = resumeIds ?? ids;
   const roomSourcesLoading = growsLoading || tentsQuery.isLoading || plantsRead.loading;
-  const progress = useMemo(() => progressLabel(shownStep), [shownStep]);
   const growCountRequired = entitlement.capabilities.maxActiveGrows != null;
   const tentCountRequired = !entitlement.capabilities.multiTent;
   const creationVerificationLoading =
@@ -182,8 +183,31 @@ export default function StartYourRoom() {
     tentVerificationReady,
   );
   const roomPreflightGate = growGate.allowed ? tentGate : growGate;
-  const currentCreationGate =
-    step === "grow" ? roomPreflightGate : step === "tent" ? tentGate : null;
+  // A paid plan can still start another grow from this page. Partial resume
+  // would hide that choice, so keep the grow step when the gate allows it.
+  // A finished room still opens done.
+  const appliedResume = resume && (resume.step === "done" || !growGate.allowed) ? resume : null;
+  const showingResume = appliedResume != null && stepIndex(step) <= stepIndex(appliedResume.step);
+  const shownStep: StartYourRoomStep = showingResume ? appliedResume.step : step;
+  const shownIds: StartYourRoomIds = showingResume
+    ? {
+        growId: appliedResume.growId,
+        tentId: appliedResume.tentId,
+        plantId: appliedResume.plantId,
+      }
+    : ids;
+  const shownForm: StartYourRoomForm = showingResume
+    ? {
+        ...form,
+        growName: appliedResume.growName || form.growName,
+        tentName: appliedResume.tentName || form.tentName,
+        plantName: appliedResume.plantName || form.plantName,
+      }
+    : form;
+  const stepCreationGate =
+    shownStep === "grow" ? roomPreflightGate : shownStep === "tent" ? tentGate : null;
+  const currentCreationGate = !growGate.allowed ? growGate : stepCreationGate;
+  const progress = useMemo(() => progressLabel(shownStep), [shownStep]);
 
   if (loading) return null;
   if (!user) return <Navigate to="/auth" replace />;
@@ -231,7 +255,7 @@ export default function StartYourRoom() {
       setError(roomPreflightGate.blockedCopy);
       return;
     }
-    const payload = buildStartRoomGrowPayload(form);
+    const payload = buildStartRoomGrowPayload(shownForm);
     if (!payload) {
       setError("Enter a grow name to continue.");
       return;
@@ -283,7 +307,7 @@ export default function StartYourRoom() {
       setError(tentGate.blockedCopy);
       return;
     }
-    const payload = buildStartRoomTentPayload(form, ids);
+    const payload = buildStartRoomTentPayload(shownForm, shownIds);
     if (!payload) {
       setError("Enter a tent name. Grow context is required.");
       return;
@@ -326,7 +350,7 @@ export default function StartYourRoom() {
       setError("Refresh this page before trying to create another room item.");
       return;
     }
-    const payload = buildStartRoomPlantPayload(form, ids);
+    const payload = buildStartRoomPlantPayload(shownForm, shownIds);
     if (!payload) {
       setError("Enter a plant name. Grow and tent must already exist.");
       return;
@@ -458,7 +482,7 @@ export default function StartYourRoom() {
                 <Input
                   id="start-room-grow-name"
                   data-testid="start-room-grow-name"
-                  value={form.growName}
+                  value={shownForm.growName}
                   onChange={(e) => patchForm({ growName: e.target.value })}
                   placeholder="Spring run · Tent A"
                   autoComplete="off"
@@ -472,7 +496,7 @@ export default function StartYourRoom() {
                   busy ||
                   createOutcomeUnknown ||
                   !roomPreflightGate.allowed ||
-                  !canProceedGrow(form)
+                  !canProceedGrow(shownForm)
                 }
                 data-testid="start-room-grow-submit"
               >
@@ -495,14 +519,14 @@ export default function StartYourRoom() {
                 data-testid="start-room-bound-grow"
               >
                 Bound to grow:{" "}
-                <span className="font-medium">{form.growName.trim() || "your grow"}</span>
+                <span className="font-medium">{shownForm.growName.trim() || "your grow"}</span>
               </p>
               <div>
                 <Label htmlFor="start-room-tent-name">Tent name</Label>
                 <Input
                   id="start-room-tent-name"
                   data-testid="start-room-tent-name"
-                  value={form.tentName}
+                  value={shownForm.tentName}
                   onChange={(e) => patchForm({ tentName: e.target.value })}
                   placeholder="4×4 flower"
                   autoComplete="off"
@@ -513,7 +537,10 @@ export default function StartYourRoom() {
                 type="submit"
                 className="w-full gradient-leaf text-primary-foreground"
                 disabled={
-                  busy || createOutcomeUnknown || !tentGate.allowed || !canProceedTent(form, ids)
+                  busy ||
+                  createOutcomeUnknown ||
+                  !tentGate.allowed ||
+                  !canProceedTent(shownForm, shownIds)
                 }
                 data-testid="start-room-tent-submit"
               >
@@ -534,7 +561,7 @@ export default function StartYourRoom() {
               <p className="text-xs rounded-md border border-primary/30 bg-primary/10 px-3 py-2">
                 Bound to grow + tent:{" "}
                 <span className="font-medium">
-                  {form.growName.trim()} · {form.tentName.trim()}
+                  {shownForm.growName.trim()} · {shownForm.tentName.trim()}
                 </span>
               </p>
               <div>
@@ -542,7 +569,7 @@ export default function StartYourRoom() {
                 <Input
                   id="start-room-plant-name"
                   data-testid="start-room-plant-name"
-                  value={form.plantName}
+                  value={shownForm.plantName}
                   onChange={(e) => patchForm({ plantName: e.target.value })}
                   placeholder="Plant A"
                   autoComplete="off"
@@ -555,7 +582,7 @@ export default function StartYourRoom() {
                   id="start-room-plant-stage"
                   data-testid="start-room-plant-stage"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={form.plantStage}
+                  value={shownForm.plantStage}
                   onChange={(e) => patchForm({ plantStage: e.target.value })}
                 >
                   {STAGES.map((s) => (
@@ -568,7 +595,7 @@ export default function StartYourRoom() {
               <Button
                 type="submit"
                 className="w-full gradient-leaf text-primary-foreground"
-                disabled={busy || createOutcomeUnknown || !canProceedPlant(form, ids)}
+                disabled={busy || createOutcomeUnknown || !canProceedPlant(shownForm, shownIds)}
                 data-testid="start-room-plant-submit"
               >
                 {busy ? (
@@ -589,9 +616,9 @@ export default function StartYourRoom() {
             </div>
             <p className="text-xs text-muted-foreground">{START_YOUR_ROOM_COPY.doneHelp}</p>
             <ul className="text-xs space-y-1 text-muted-foreground">
-              <li>Grow: {form.growName.trim()}</li>
-              <li>Tent: {form.tentName.trim()}</li>
-              <li>Plant: {form.plantName.trim()}</li>
+              <li>Grow: {shownForm.growName.trim()}</li>
+              <li>Tent: {shownForm.tentName.trim()}</li>
+              <li>Plant: {shownForm.plantName.trim()}</li>
             </ul>
             <Button
               type="button"

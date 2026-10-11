@@ -122,10 +122,16 @@ describe("Start your room Enter submits", () => {
     testState.grows = [{ id: "grow-existing", name: "Existing" }];
     testState.insert.mockClear();
     renderPage();
-    await user.type(screen.getByTestId("start-room-grow-name"), "Blocked Grow");
+    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    expect(screen.getByTestId("start-room-bound-grow")).toHaveTextContent("Existing");
+    await user.type(screen.getByTestId("start-room-tent-name"), "Bound Tent");
     await user.keyboard("{Enter}");
-    expect(testState.insert).not.toHaveBeenCalled();
-    expect(screen.getByTestId("start-room-grow-submit")).toBeDisabled();
+    expect(testState.insert).not.toHaveBeenCalledWith("grows", expect.anything());
+    expect(testState.insert).toHaveBeenCalledWith(
+      "tents",
+      expect.objectContaining({ name: "Bound Tent", grow_id: "grow-existing" }),
+    );
+    expect(screen.queryByTestId("start-room-grow-submit")).not.toBeInTheDocument();
   });
 
   it("submits the tent once on Enter when allowed, and not when the tent gate blocks it", async () => {

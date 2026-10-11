@@ -187,12 +187,19 @@ Operator Mode for EcoWitt must:
 
 ## Known non-goals (V0)
 
-- Cloud-direct EcoWitt ingest (without local bridge).
 - Multi-vendor unified live ingest beyond EcoWitt + canonical sources.
 - Automatic alerting from raw ingest events.
 - Automatic Action Queue creation from sensor readings.
 - Device control of EcoWitt-attached hardware.
 - Real-time AI Doctor invocation from ingest.
+
+## Cloud-direct ingest (in scope)
+
+Approved by Cheeko, 2026-10-11 1:00 AM CT, relayed by Trowel.
+
+The gateway's "Customized" upload goes to a Cloudflare Worker shim, with no local bridge. The path is: EcoWitt gateway, then a Cloudflare Worker (plain HTTP, its own hostname, token in the path), which validates, logs counts only and returns 200, with no persistence.
+
+The ecowitt-real-ingest persistence gate (bridge-token rotation and live-label approval) remains CLOSED and NOT approved. Cloud-direct rows must not be stored or labeled source="live" until that gate is separately approved. Production Cloudflare changes need Cheeko's own per-item approval.
 
 ## Regression checklist
 

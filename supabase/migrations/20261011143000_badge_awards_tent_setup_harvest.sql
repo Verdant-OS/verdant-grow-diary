@@ -107,6 +107,7 @@ BEGIN
     LIMIT 1;
     tent_id := subject_id;
   ELSE
+    -- The account's earliest harvest, not the earliest harvest that has a photo.
     SELECT harvest.id,
            public.badge_awards_owned_diary_photo_name(harvest.photo_url, uid),
            harvest.grow_id
@@ -116,9 +117,12 @@ BEGIN
       ON grow.id = harvest.grow_id
      AND grow.user_id = uid
     WHERE harvest.user_id = uid
-      AND public.badge_awards_owned_diary_photo_name(harvest.photo_url, uid) IS NOT NULL
     ORDER BY harvest.harvested_at ASC, harvest.id ASC
     LIMIT 1;
+    IF photo_name IS NULL THEN
+      subject_id := NULL;
+      grow_id := NULL;
+    END IF;
     harvest_id := subject_id;
   END IF;
 

@@ -27,8 +27,11 @@ import {
   buildTentUpdatePayload,
   isTentUpdatePayloadValid,
   tentSizeEditValidationMessage,
+  type TentUpdatePayload,
 } from "@/lib/tentManagementRules";
 import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
+import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
+import { uploadOwnerSubjectPhoto } from "@/lib/ownerSubjectPhotoService";
 
 /**
  * Edits an existing tent's user-facing fields. Mirrors EditPlantDialog
@@ -56,6 +59,7 @@ export default function EditTentDialog({ tent, trigger }: Props) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [form, setForm] = useState({
     name: tent.name ?? "",
     brand: tent.brand ?? "",
@@ -87,7 +91,7 @@ export default function EditTentDialog({ tent, trigger }: Props) {
       return;
     }
     if (!hasTrimmedRequiredIdentity(form.name)) return;
-    const payload = buildTentUpdatePayload({
+    const built = buildTentUpdatePayload({
       name: form.name,
       brand: form.brand,
       size: form.size,
@@ -96,6 +100,27 @@ export default function EditTentDialog({ tent, trigger }: Props) {
       light_schedule: form.light_schedule,
       light_wattage: form.light_wattage ? Number(form.light_wattage) : null,
     });
+    const payload: TentUpdatePayload & { photo_url?: string } = { ...built };
+    if (photoFile) {
+      const checked = validatePlantProfilePhotoFile(photoFile);
+      if (!checked.ok) {
+        toast.error(checked.message);
+        return;
+      }
+      try {
+        const uploaded = await uploadOwnerSubjectPhoto({
+          file: photoFile,
+          mime: checked.mime,
+          userId: user.id,
+          kind: "tent",
+          subjectId: tent.id,
+        });
+        payload.photo_url = uploaded.reference;
+      } catch {
+        toast.error("The tent photo was not saved. Tent details were not changed.");
+        return;
+      }
+    }
     // Only a changed size is validated: a size saved before BUG-012 must not
     // block renaming the tent.
     const sizeMessage = tentSizeEditValidationMessage(tent.size, payload.size);
@@ -221,6 +246,19 @@ export default function EditTentDialog({ tent, trigger }: Props) {
               onCheckedChange={(v) => setForm({ ...form, light_on: !!v })}
               data-testid="edit-tent-light-on"
             />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="edit-tent-photo">Photo (optional)</Label>
+            <Input
+              id="edit-tent-photo"
+              data-testid="edit-tent-photo"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+              onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              A photo is optional. Saving without one still updates the tent.
+            </p>
           </div>
           <Button
             disabled={busy || !hasTrimmedRequiredIdentity(form.name)}

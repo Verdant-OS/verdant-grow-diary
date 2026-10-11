@@ -42,6 +42,8 @@ import {
 } from "@/lib/hierarchyCreatePersistence";
 import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
+import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
+import { uploadOwnerSubjectPhoto } from "@/lib/ownerSubjectPhotoService";
 
 export interface CreatedTent {
   id: string;
@@ -89,6 +91,7 @@ export default function CreateTentDialog({
   const [busy, setBusy] = useState(false);
   const createInFlightRef = useRef(false);
   const [form, setForm] = useState(EMPTY_TENT_FORM);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
 
   const runGrowRefresh = useCallback(() => refreshGrows(), [refreshGrows]);
   const growRetry = useCreateBindingRetry(runGrowRefresh);
@@ -129,6 +132,7 @@ export default function CreateTentDialog({
 
   function resetForm() {
     setForm(EMPTY_TENT_FORM);
+    setPhotoFile(null);
   }
 
   function setOpen(next: boolean) {
@@ -196,6 +200,26 @@ export default function CreateTentDialog({
       stage: form.stage,
       grow_id: targetGrowId,
     };
+    if (photoFile) {
+      const checked = validatePlantProfilePhotoFile(photoFile);
+      if (!checked.ok) {
+        toast.error(checked.message);
+        return;
+      }
+      try {
+        const uploaded = await uploadOwnerSubjectPhoto({
+          file: photoFile,
+          mime: checked.mime,
+          userId: user.id,
+          kind: "tent",
+          subjectId: tentId,
+        });
+        payload.photo_url = uploaded.reference;
+      } catch {
+        toast.error("The tent photo was not saved. The tent was not created.");
+        return;
+      }
+    }
     const attempt = {
       entity: "tent" as const,
       rowId: tentId,
@@ -472,6 +496,19 @@ export default function CreateTentDialog({
                 </div>
               </div>
             </details>
+            <div className="space-y-1">
+              <Label htmlFor="create-tent-photo">Photo (optional)</Label>
+              <Input
+                id="create-tent-photo"
+                data-testid="create-tent-photo"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                A photo is optional. Saving without one still creates the tent.
+              </p>
+            </div>
             <Button
               disabled={
                 busy ||

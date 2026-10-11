@@ -2734,6 +2734,7 @@ export type Database = {
           id: string
           medium: string | null
           notes: string | null
+          photo_url: string | null
           user_id: string
           yield_grams: number | null
         }
@@ -2745,6 +2746,7 @@ export type Database = {
           id?: string
           medium?: string | null
           notes?: string | null
+          photo_url?: string | null
           user_id: string
           yield_grams?: number | null
         }
@@ -2756,6 +2758,7 @@ export type Database = {
           id?: string
           medium?: string | null
           notes?: string | null
+          photo_url?: string | null
           user_id?: string
           yield_grams?: number | null
         }
@@ -5413,6 +5416,7 @@ export type Database = {
           light_schedule: string | null
           light_wattage: number | null
           name: string
+          photo_url?: string | null
           schema_version: number
           size: string | null
           stage: string
@@ -5430,6 +5434,7 @@ export type Database = {
           light_schedule?: string | null
           light_wattage?: number | null
           name: string
+          photo_url?: string | null
           schema_version?: number
           size?: string | null
           stage?: string
@@ -5447,6 +5452,7 @@ export type Database = {
           light_schedule?: string | null
           light_wattage?: number | null
           name?: string
+          photo_url?: string | null
           schema_version?: number
           size?: string | null
           stage?: string

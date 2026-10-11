@@ -113,6 +113,7 @@ DECLARE
   v_evidence_entry uuid;
   v_queue int;
   v_stamped timestamptz;
+  v_shape uuid;
 BEGIN
   INSERT INTO auth.users (
     id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
@@ -339,9 +340,49 @@ BEGIN
     SELECT photo_object_name FROM public.badge_evidence WHERE award_id = v_award
   ) = v_photo, 'evidence must store the object name, not the external URL';
 
+  INSERT INTO public.badge_awards (user_id, badge_key)
+  VALUES (v_owner, 'first_tent')
+  RETURNING id INTO v_shape;
+  INSERT INTO public.badge_evidence (award_id, subject_kind, tent_id)
+  VALUES (v_shape, 'tent', gen_random_uuid());
+  BEGIN
+    UPDATE public.badge_evidence
+       SET subject_kind = 'not_a_subject'
+     WHERE award_id = v_shape;
+    RAISE EXCEPTION 'an unknown evidence subject should have failed';
+  EXCEPTION
+    WHEN check_violation THEN
+      NULL;
+  END;
+  BEGIN
+    UPDATE public.badge_evidence
+       SET subject_kind = 'diary_entry',
+           diary_entry_id = NULL,
+           photo_object_name = NULL
+     WHERE award_id = v_shape;
+    RAISE EXCEPTION 'a diary evidence row without a photo should have failed';
+  EXCEPTION
+    WHEN check_violation THEN
+      NULL;
+  END;
+  DELETE FROM public.badge_awards WHERE id = v_shape;
+  ASSERT (
+    SELECT photo_object_name FROM public.badge_evidence WHERE award_id = v_award
+  ) = v_photo, 'the shape probe must leave the diary evidence in place';
+
   PERFORM set_config('role', 'authenticated', true);
   v_result := public.badge_awards_evaluate_owner('not_a_badge');
   ASSERT v_result->>'status' = 'not_in_slice', 'other badge keys must write nothing';
+  v_result := public.badge_awards_evaluate_owner('first_tent');
+  ASSERT v_result->>'status' = 'not_in_slice', 'first_tent must stay outside this slice';
+  v_result := public.badge_awards_evaluate_owner('setup_documented');
+  ASSERT v_result->>'status' = 'not_in_slice', 'setup_documented must stay outside this slice';
+  v_result := public.badge_awards_evaluate_owner('first_recorded_harvest');
+  ASSERT v_result->>'status' = 'not_in_slice', 'first_recorded_harvest must stay outside this slice';
+  SELECT count(*) INTO v_count
+  FROM public.badge_awards
+  WHERE user_id = v_owner AND badge_key <> 'first_diary_entry';
+  ASSERT v_count = 0, 'later badge keys must not be awarded by the evaluator';
   v_result := public.badge_awards_evaluate_owner('first_diary_entry');
   ASSERT v_result->>'status' = 'unchanged', format('second call should be unchanged, got %s', v_result);
   ASSERT (v_result->>'award_id')::uuid = v_award, 'second call must keep the same award id';

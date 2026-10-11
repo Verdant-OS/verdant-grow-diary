@@ -20,6 +20,10 @@
 -- first and writes nothing unless that switch is exactly true. EXECUTE is
 -- service_role only. The pg_cron job badge-awards-reconcile is inserted
 -- inactive when pg_cron is installed. This migration does not enable it.
+--
+-- Evidence can name a diary entry, tent, setup, or harvest. Only
+-- first_diary_entry has a qualification rule. The other keys are stored
+-- shape: the evaluator returns not_in_slice and writes nothing for them.
 
 CREATE TABLE public.badge_award_runtime (
   id smallint PRIMARY KEY CHECK (id = 1),
@@ -33,7 +37,14 @@ VALUES (1, false);
 CREATE TABLE public.badge_awards (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
-  badge_key text NOT NULL CHECK (badge_key = 'first_diary_entry'),
+  badge_key text NOT NULL CHECK (
+    badge_key IN (
+      'first_diary_entry',
+      'first_tent',
+      'setup_documented',
+      'first_recorded_harvest'
+    )
+  ),
   rule_version integer NOT NULL DEFAULT 1,
   first_recognized_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   hidden_at timestamptz,
@@ -47,10 +58,20 @@ CREATE TABLE public.badge_awards (
 CREATE TABLE public.badge_evidence (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   award_id uuid NOT NULL REFERENCES public.badge_awards (id) ON DELETE CASCADE,
-  diary_entry_id uuid NOT NULL,
-  photo_object_name text NOT NULL,
+  subject_kind text NOT NULL DEFAULT 'diary_entry' CHECK (
+    subject_kind IN ('diary_entry', 'tent', 'setup', 'harvest')
+  ),
+  diary_entry_id uuid,
+  photo_object_name text,
+  tent_id uuid,
+  grow_id uuid,
+  plant_id uuid,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (award_id)
+  UNIQUE (award_id),
+  CONSTRAINT badge_evidence_diary_entry_shape CHECK (
+    subject_kind <> 'diary_entry'
+    OR (diary_entry_id IS NOT NULL AND photo_object_name IS NOT NULL)
+  )
 );
 
 ALTER TABLE public.badge_award_runtime ENABLE ROW LEVEL SECURITY;

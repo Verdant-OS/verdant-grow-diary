@@ -28,6 +28,9 @@ describe("badge award display rules", () => {
     expect(migration).toContain(
       "GRANT UPDATE (revoked_at) ON TABLE public.badge_awards TO service_role",
     );
+    expect(migration).toContain("subject_kind IN ('diary_entry', 'tent', 'setup', 'harvest')");
+    expect(migration).toContain("'setup_documented'");
+    expect(migration).toContain("'first_recorded_harvest'");
   });
 
   it("describes documentation and not skill, rank, yield, safety, or verified", () => {

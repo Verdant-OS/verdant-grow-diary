@@ -683,23 +683,35 @@ export type Database = {
         Row: {
           award_id: string
           created_at: string
-          diary_entry_id: string
+          diary_entry_id: string | null
+          grow_id: string | null
           id: string
-          photo_object_name: string
+          photo_object_name: string | null
+          plant_id: string | null
+          subject_kind: string
+          tent_id: string | null
         }
         Insert: {
           award_id: string
           created_at?: string
-          diary_entry_id: string
+          diary_entry_id?: string | null
+          grow_id?: string | null
           id?: string
-          photo_object_name: string
+          photo_object_name?: string | null
+          plant_id?: string | null
+          subject_kind?: string
+          tent_id?: string | null
         }
         Update: {
           award_id?: string
           created_at?: string
-          diary_entry_id?: string
+          diary_entry_id?: string | null
+          grow_id?: string | null
           id?: string
-          photo_object_name?: string
+          photo_object_name?: string | null
+          plant_id?: string | null
+          subject_kind?: string
+          tent_id?: string | null
         }
         Relationships: [
           {

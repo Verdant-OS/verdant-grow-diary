@@ -31,6 +31,262 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-06T22:15 UTC — Strain Reference Library V1.1 (#1827)
+
+Scoped entry, not a restamp. Tip, live, and board below are **not** re-measured here. Supersedes
+this entry's earlier 2026-10-01 versions.
+
+- **Latest (`established fact`, GitHub API, 22:15 UTC; unchanged since 21:27):** head **`706707712`** (31 commits, 0
+  behind `verdant-grow-diary`) adds one CodeRabbit fix: the read model refuses cultivar
+  `thc_pct_*` / `cbd_pct_*` outside 0–100 (4 RED → GREEN; strain suites 134/134; offline strict
+  parity READY 10/10). It is a declared scorer change under `scripts/scorer-lock.mjs`, named in
+  the commit and in the PR body's "Changed checks" section.
+  - Exact head: **Security DB Local `PASS`**, 150 passed and 0 failed (run `37530749047`),
+    under the stricter percentage rule; `Published migration integrity`,
+    `Strain Reference Library V1 Gate`, `Google Analytics E2E` and `Dispatch history e2e`
+    **`PASS`**. **Required contexts 35/35 `PASS`** (`CI` run `37530749076` completed success);
+    `mergeStateStatus: UNSTABLE` (non-required reds only).
+  - Previous head `aa6306ab4`: the `CI` workflow (all 35 required contexts) completed
+    **success**, and Security DB Local passed 150/150.
+  - 46 review threads, all resolved; no approving or changes-requested review. Non-required
+    reds: `Vercel`, both Cloudflare `Workers Builds`, and the two lockfile-advisory audits.
+- **2026-10-06 update (`established fact`, GitHub API, 20:13–20:15 UTC):**
+  - `#1827` head is still `2a2de17dc` (no commits since 2026-10-01): mergeable,
+    `mergeStateStatus: UNSTABLE`; **35/35 required `PASS`**; 103 pass / 1 pending / 14 skipped /
+    **1 failed — `Vercel`** (account block, non-required). `GA E2E (webkit)` re-run (attempt 2)
+    **`PASS`**. 45 review threads, all resolved; no approving or changes-requested review.
+  - **Base merged (owner instruction, 2026-10-06):** `aa6306ab4` merges `verdant-grow-diary` at
+    `cfe09322e` (43 commits; merge committed 20:35:53 UTC) with no conflicts; **0 behind** at 20:50 UTC. No new migration
+    landed, so `20261001160000` still sorts last; published-migration integrity verifier OK against
+    the base. Local checks at `aa6306ab4` (`established fact`, Windows clone): `tsc` 0 diagnostics;
+    14 strain, cultivar and security-lane test files 182/182, including `#1889`'s
+    `cultivar-sample-verification-noindex` and `#1867`'s grant-path lane test; offline strict
+    parity READY 10/10; harness `bun build` OK; `Sentinel-Version` `2026-09-28.3` OK. The merged
+    `test:security-db-local` chain keeps every base harness plus `test:cultivar-reference-db-security`.
+  - **Security DB Local at `aa6306ab4`: `PASS`** — run `37528498605` reported
+    `[cultivar-reference-rls] 150 passed, 0 failed` (observed 20:50 UTC), the first real-database
+    run after the 43-commit base merge.
+  - **Exact-head CI at `aa6306ab4` (`established fact`, 20:47 UTC):** these four **`PASS`**:
+    `Published migration integrity`, `Strain Reference Library V1 Gate`,
+    `Google Analytics E2E` and `Dispatch history e2e`. Required contexts 11 pass / 24 pending at 20:50 UTC, none failed —
+    `NOT_MEASURED` until they finish. The 35/35 PASS belongs to `2a2de17dc`.
+    Non-required reds: `Vercel` (account block), both Cloudflare `Workers Builds` (fail on every
+    PR), and two lockfile-advisory audits — the root `Dependency & Security CI` and the
+    `Cursor SDK local orchestration spike` job "Nested static proofs and production isolation"
+    (`bun audit`: `source-map-js` GHSA-68fv-2mgg-jv7q, high). Lockfile changes are off-limits
+    without Matthew.
+  - **Correction:** this entry's previous revision (`29fcfd40d`) and `50d4b612a`'s log blocks
+    recorded estimated times (20:50 and 20:58 UTC; 15:50 and 15:58 CT) that were later than the
+    clock. They are replaced here with measured times.
+  - **Claims renewed (owner instruction, 2026-10-06):** `claimed_by: Claude, 2026-10-06 20:34 UTC`
+    posted on `#1827` and `#1830` (no competing claim or release on either PR); both
+    `docs/agents/HANDOFF_LOG.md` blocks carry the same claim.
+  - `#1830`'s own CI at `69ded12a4` was cancelled on 2026-10-05 because GitHub-hosted runners
+    were not acquired ("The job was not acquired by Runner of type hosted even after multiple
+    attempts"); failed runs were re-run 2026-10-06 ~20:12 UTC. The CodeQL run could not be
+    retried. `Dependency & Security CI` fails on newly published lockfile advisories (critical:
+    `proxy-addr`, `seroval`, `shell-quote`; high: `@modelcontextprotocol/sdk`, `seroval`,
+    `source-map-js`), observed on other branches too — repository-wide, not this PR's diff;
+    lockfile changes are off-limits without Matthew.
+  - **New integration, `established fact`:** a Cloudflare Workers Builds app
+    (`cloudflare-workers-and-pages`; projects `verdant-grow-diary1` and `verdant-grow-diary2`)
+    now posts checks. Both **pass** on `verdant-grow-diary` at `cfe09322e` (2026-10-06 19:39 UTC)
+    and **fail** on every open PR sampled (`#1830`, `#1901`, `#1904`, `#1919`, `#1920`), so the
+    PR-branch build configuration fails, not these diffs. Its PR comments call the builds
+    "Preview" deployments, which `AGENTS.md` says do not exist; whether Cloudflare now serves
+    `verdantgrowdiary.com` is operating state, `NOT_MEASURED` here. Build logs are only in the
+    Cloudflare dashboard (`BLOCKED` for agents). Neither check is a required context.
+
+The bullets below are the 2026-10-01 record and keep their own observation times.
+
+- **Open (not draft), 35/35 required CI green at the exact head, awaiting Chemdawg pre-check —
+  review not routed:
+  [#1827](https://github.com/Verdant-OS/verdant-grow-diary/pull/1827)**
+  (Claude, `claude/strain-library-v1-1-db-parity-cutover`, head `2a2de17dc`, 29 commits) implements
+  issue `#419` and replaces the closed `#426` delivery shell. `established fact` (GitHub API, 20:00
+  UTC): mergeable, `mergeStateStatus: UNSTABLE` (non-required checks not all green); CI on the exact
+  head — 102 pass / 1 pending / 14 skipped / 2 not green, both non-required: **`Vercel` failed**
+  (account block) and **`GA E2E (webkit)` cancelled** (see below). No approving review.
+  - **Not draft, against `AGENTS.md` (Git and merges: "Open PRs as drafts").** `#1827` and `#1830`
+    were marked ready on the owner's earlier instruction. Two Codex threads on `#1830` ask for
+    both to return to draft; that is awaiting the owner's decision (`NOT_MEASURED`).
+  - Commits since `24ba8e148`: `5b7ea953e` (production-only cutover runbook), `b4e569ea2` (parity
+    receipt pinned to the production project), `d7a753f29` (strain gate also covers that guard)
+    and `2a2de17dc` (read model refuses non-sample verification states and repeated terpenes).
+    No migration change.
+  - `24ba8e148` merges `b15cd0de0` (`#1811`, the twelve-file `Sentinel-Version 2026-09-28.3`
+    governance amendment; no migration, no overlap with this PR's files).
+  - Required contexts (35, `config/required-status-checks.json`) at `2a2de17dc`: **35/35 `PASS`**
+    (observed 20:00 UTC). Also 35/35 at `a73dbfb40` (earlier head).
+  - `GA E2E (webkit)` (non-required) was **cancelled, not failed**: "Install Playwright browser
+    (webkit)" ran 19:21–19:41 UTC and hit the job's 20-minute `timeout-minutes`, so the suite
+    never ran; `GA E2E (chromium)` passed. Same pattern as the earlier dispatch-history cancel.
+    Re-run requested at 20:01 UTC; result `NOT_MEASURED`.
+  - `Dispatch history Playwright` (non-required; runs here because `package.json` changed) — at
+    `2a2de17dc` **`PASS`** (run `36913305947`); at `d7a753f29` **`PASS`** (run `36911964958`); at
+    `a73dbfb40`:
+    - attempt 1 was **cancelled, not failed** — its "Install Chromium only (with deps)" step ran
+      18:03–18:18 UTC and hit the job's 15-minute `timeout-minutes`, so the spec never ran (a
+      `#1793` run of the same workflow was also cancelled);
+    - attempt 2 (re-run requested 18:20 UTC) **`PASS`**: Chromium installed and the spec passed.
+  - The repository-wide Actions backlog that delayed these runs is draining (`established fact`,
+    Actions API): 168 queued / 27 in progress at 17:58, 136 / 30 at 18:06, 48 / 38 at 18:19,
+    73 / 43 at 18:36, 21 / 30 at 19:12, 67 / 27 at 19:23, 90 / 41 at 19:35.
+    Cause `NOT_MEASURED`.
+  - `2d954bda1` merged in `6ed854cee` (`#1835`) and `ebdb1dcd0` merged in `a8af664c5` (`#1742`);
+    neither adds a migration.
+  - `f2be7e722` merged in `25515a8b9` (`#1810`, Quick Log delivery tests; no migration).
+    `24ba8e148` merged in `b15cd0de0` (`#1811`). **2 commits behind** `verdant-grow-diary` at
+    20:00 UTC: `b5d064881` (`#1849`, re-land of `#1793`) and `9dda2742e` (`#1856`, handoff-log
+    template); neither touches this PR's files. Not yet merged into the branch.
+  - `84cb262ad`, `44af6a8ea`, `5c5568a37`, `9b6a6872d`, `a73dbfb40`, `5b7ea953e`, `b4e569ea2`,
+    `d7a753f29` and `2a2de17dc` are review fixes (below).
+- **Base:** `verdant-grow-diary` merged in at `1b66c4f0e` and again at `69f2f5b23` (2026-10-01,
+  no conflicts). The first brought `#1832` (hono pin), which clears the earlier
+  `Dependency & Security CI` red; the second brought `#1836`.
+- **`Published migration integrity` at `2a2de17dc` (exact head): `PASS`** — run `36913306785`
+  (observed 19:23 UTC). Also `PASS` at `d7a753f29` (run `36911965038`).
+  - At `a73dbfb40` (previous head, same migration file): `PASS`, run `36901103681`.
+  - Runs on every head from `2d954bda1` through `9b6a6872d` were cancelled by later pushes.
+  - **`Strain Reference Library V1 Gate` at `2a2de17dc`: `PASS`** — run `36913306512` (observed
+    19:23 UTC). Also `PASS` at `d7a753f29` (run `36911964968`). At `a73dbfb40`: `PASS`, run `36901103554`, including its strict parity
+    audit and both migration fences.
+  - At `358d69c38` (previous head, same migration file): `PASS`, run `36892553063`, including its
+    one-line payload change.
+  - Historical, earlier heads only: the red on `d65094aa9` ran before `#1836` was merged in and
+    read `#1836`'s migration as "deleted". CI then passed on `a7232e1e1` (run `36886278227`),
+    `dac35e4fc` (run `36888190685`) and `9ca178156` (run `36890471647`).
+  - Local verifier at `358d69c38` against `origin/verdant-grow-diary`: also OK.
+- **`Vercel` red is an account block, not code:** status "Account is blocked"; Vercel created **no
+  deployment** for any branch commit since `1b66c4f0e`, while the six before it deployed `READY`.
+  Not a required context. Clearing it is an owner action in the Vercel dashboard
+  (`verdantgrowdiary` team). Cause `NOT_MEASURED`.
+- **Adds a migration:** `supabase/migrations/20261001160000_strain_reference_library_v1_1_parity.sql`
+  (new file; additive columns + `cultivar_profile_sources` with published-only RLS and SELECT-only
+  grant; idempotent content upserts). **Committed is not applied. No APPLY.**
+  - At `358d69c38` its payload changed by one line (breeder slug `gg-strains-llc` → `gg-strains`,
+    matching the row the V1 seed already created; breeders are insert-if-missing). Still unmerged
+    and unapplied.
+  - It was re-dated from `20260930200000` on 2026-10-01 (`a7232e1e1`, content byte-identical), so it
+    sorts after `#1836`'s `20261001140000` migration.
+  - **`HOLD-CHEEK`:** because #1827 adds a migration, its **merge** waits for Matthew
+    (`OWNERSHIP.md` §4.3), not only its production apply. Green checks plus an independent PASS do
+    not by themselves authorize it to land.
+  - The `supabase/` and migration work was built on the owner's direct instruction for issue
+    `#419` (2026-09-30). `OWNERSHIP.md` §2 keeps migrations off-limits without Matthew's explicit
+    approval.
+- **Release state:** `cultivarDatabaseReadsEnabled = false`. `/cultivars` still renders the bundled
+  sample library with no database request. Status language stays "working V1 prototype in
+  pre-release validation" — no "database-backed public reads", "shipped", or "live" claim.
+- **Automated review:** 45 review threads (Codex, CodeRabbit), **all resolved** (20:00 UTC).
+  - Real gaps were fixed, each RED-tested. The read model now fails closed on:
+    - unlinked evidence and an ambiguous latest guide;
+    - non-percent units, out-of-range percentages, and malformed claim `verified_at`;
+    - alias provenance;
+    - malformed guide and section metadata.
+  - With reads on, the database catalog is served only when it still carries every approved
+    profile; otherwise the page falls back visibly (`database_incomplete`).
+  - The strict audit now runs **row-level parity**: every selected column of every published row
+    is compared with the approved rows (natural keys; generated ids dropped; foreign keys mapped).
+    It additionally requires exact set parity for:
+    - sources, section links and support notes;
+    - guide and section metadata;
+    - complete auxiliary-claim provenance;
+    - every rendered claim's `verified_at`;
+    - each guide's base-template link (`cultivar_guide_templates` added to the read surface).
+
+    Expected rows come from the migration's own payload builder.
+
+  - Latest rounds (`84cb262ad` → `a73dbfb40`), each RED-tested except the CI-only harness change:
+    - row-level findings carry their cultivar's slug, and `matchedSlugs` is computed after every
+      check, so a row-only drift can no longer list that cultivar as matched;
+    - rows sharing a natural key are ordered by content before `#2` suffixes (order-independent);
+    - the harness creates its user inside the cleanup `try` and `check()`s every teardown delete;
+    - the static-safety absence scan declares `@source-scan-justified`;
+    - with reads on, a database listing a profile **outside** the approved set also falls back
+      visibly (`database_unapproved`), so `/cultivars` never lists a page whose URL redirects;
+    - every approved profile must also still carry each approved terpene, cannabinoid, dominant
+      terpene, alias, source and section, plus its stored `chemotype` and
+      `reported_dominant_terpenes` claims; a miss falls back as `database_incomplete` (content
+      edits stay allowed);
+    - the harness's update/delete fixtures are now **publicly visible** (published harness
+      cultivar, guide, section and links), and each client must read a fixture before its
+      mutation probe counts — `PASS` in CI at `a73dbfb40` (150/150);
+    - the strain gate now also triggers on `src/lib/featureFlags.ts`;
+    - the cutover runbook and the flag comment are production-only (no sandbox/preview steps), and
+      the `--source=supabase` receipt refuses any target but the pinned production project; the
+      strain gate now also triggers on, and runs the test for, that guard;
+    - the read model accepts only `verification_status = 'sample'` (V1.1 never upgrades the
+      evidence state) and refuses a terpene repeated under consecutive ranks.
+  - The strain gate's safety fence now fails on findings in the V1.1 migration as well as V1.
+  - The harness requires both Supabase endpoints to be loopback. It has valid-payload insert
+    probes, update/delete denial on every table, direct child-row probes, and fail-fast seed and
+    lookup checks. The receipt accepts anon keys only and no longer claims to prove hidden-row
+    denial (that stays with the harness).
+  - One P1 claim ("missing `END;` breaks the migration") was **refuted with CI evidence**.
+- **CI DB evidence (`established fact`):** Security DB Local passed on `de12624a2`, `1b66c4f0e`,
+  `d30ac3293`, `42ad20a74`, `d65094aa9`, `a7232e1e1`, `dac35e4fc` and `358d69c38`.
+  - The expanded harness `test:cultivar-reference-db-security` reported **106 passed, 0 failed**
+    at `42ad20a74`, `d65094aa9`, `a7232e1e1` (run `36886278180`, the re-dated migration) and
+    `dac35e4fc` (run `36888191319`).
+  - Each run used a freshly replayed local database, with strict parity READY and migration
+    re-apply idempotency.
+  - The runs on `0bcb2464d` and `9ca178156` were cancelled by later pushes.
+  - **At `358d69c38` (previous head): `PASS`.** Run `36892553425` reported **113 passed, 0 failed**.
+    It is the first real-database run of the row-level parity check, the base-template link, the
+    template-table write probes and the one-line payload change. Strict parity READY as anon and
+    as authenticated, and migration re-apply idempotent.
+  - Runs on every head from `2d954bda1` through `9b6a6872d` were cancelled by later pushes.
+  - **At `2a2de17dc` (exact head): `PASS`.** Run `36913306205` reported
+    `[cultivar-reference-rls] 150 passed, 0 failed` (observed 19:35 UTC), including strict parity
+    READY as anon and as authenticated under the stricter read model.
+  - At `d7a753f29`: **`PASS`**, run `36911964981`, `[cultivar-reference-rls] 150 passed, 0 failed`.
+    On `b4e569ea2`: **`PASS`**, run `36910725964`, `[cultivar-reference-rls] 150 passed, 0 failed`. Also
+    `PASS` on `5b7ea953e`; the run on `24ba8e148` was cancelled by a later push.
+  - **At `a73dbfb40` (earlier head): `PASS`.** Run `36901103567` reported
+    `[cultivar-reference-rls] 150 passed, 0 failed` (observed 18:19 UTC). It is the first
+    real-database run of the publicly visible mutation fixtures: anon and authenticated each read
+    every public fixture before its update/delete probe, and every probe was denied.
+- **Local evidence (`established fact`, Windows clone):**
+  - at `2a2de17dc`: strain suites 131/131 (4 RED before the rules), `tsc` 0 diagnostics, scoped
+    eslint clean, offline strict parity READY 10/10;
+  - at `d7a753f29`: the strain gate's full targeted list 17 files / 178 tests; at `b4e569ea2`:
+    receipt-target and source-state tests 29/29 (8 RED before the rule), `tsc` 0 diagnostics;
+  - at `24ba8e148`: `check-sentinel-version-parity` OK at `2026-09-28.3`, strain rule and
+    source-state tests 53/53;
+  - at `a73dbfb40`: the five strain test files 110/110, `tsc` 0 diagnostics, scoped eslint clean;
+    at `9b6a6872d` the harness passes `bun build` and a strict (`noImplicitAny`) typecheck;
+    at `44af6a8ea`: contract-test resolution OK, offline strict parity READY 10/10;
+  - offline strict parity READY 10/10 at `358d69c38`;
+  - at `358d69c38`, the PR's tests plus every migration-scanning test: 1,542 passed, with 1 file
+    failing machine-locally (needs Unix psql), identically on base, and 1 load-dependent flake
+    that passes alone;
+  - migration safety scanner and published-migration integrity verifier OK at `358d69c38`;
+  - `tsc` 0 diagnostics;
+  - `bun run build` exit 0 with all postbuild SEO validators OK (measured at `fd75bb832`).
+- **Full suite at `a73dbfb40` (previous head): `PASS`** — the 35 required contexts passed in CI
+  (observed 18:25 UTC): all 32 `Full test suite` shards, `Lint, typecheck, test, build`,
+  `Preflight — edge shared-lib mirror in sync` and `test:legal-seo`.
+- **Full suite at `2a2de17dc` (exact head): `PASS`** — all 35 required contexts (observed 20:00
+  UTC): the 32 `Full test suite` shards, `Lint, typecheck, test, build`,
+  `Preflight — edge shared-lib mirror in sync` and `test:legal-seo`.
+- **`NOT_MEASURED`:** the `GA E2E (webkit)` re-run, the production receipt and production smoke,
+  and the cause of the Vercel block.
+- **Review seat — not satisfied.** No independent review is recorded.
+  - The owner named **Grok** as reviewer on 2026-10-01. Codex is unavailable, and the earlier
+    Copilot stand-in could not review (quota).
+  - Formal routing has **not** happened. Under `OWNERSHIP.md` §2 and §4.3, Chemdawg's pre-check
+    routes the PR by path only after CI settles green. The merge gate needs an exact-head
+    independent PASS from Blue Dream, Durban Poison or Critical Mass.
+  - Grok's review and that PASS are both `NOT_MEASURED`. Claude does not self-merge.
+  - Under `2026-09-28.3` (`#1811`), Claude adds peer observations only and is not the acceptance
+    reviewer. `docs/agents/HANDOFF_LOG.md` carries resumable blocks for both tasks —
+    `CLAUDE-STRAIN-LIBRARY-V1-1-DB-PARITY-419` (`#1827`) and `CLAUDE-CURRENT-STATE-1827-STATUS`
+    (`#1830`) — added on this branch; they reach the deploy branch only when `#1830` merges.
+- **Overlap:** `#1793` was re-landed as `#1849` (`b5d064881`, merged); it touches none of this PR's
+  files, including `.github/workflows/security-db-local.yml`. `#1777` merged first (`569ac94a1`); this entry was rebased above its
+  entries on 2026-10-01 with both preserved.
+
 ## Follow-up observation — 2026-10-02T15:39 UTC
 
 - **BLOCKED, decision D1 widened (GDP):** Codex automated review on #1844 (comment 4167087657, P2) found that a page-body count misses AppShell's chrome triggers. The thread was marked resolved by the shared `cheekhimself` account with no reply or change. Source classes predict (not measured in a browser) that, after the header link goes, a one-tent Dashboard has card `Log` + page `QuickLogV2Fab` + `header-quick-log-trigger` on desktop, and card `Log` + `mobile-quick-log-fab` ("Open Quick Log") on mobile. The spec defines browser-level visible-control checks in E2 (desktop) and E4 (390/320 px) to test actual visibility; they have not run, and splits D1 into two blocking parts plus one non-blocking: D1.1 page FAB (A drop, recommended / B exempt), D1.2 AppShell triggers on Dashboard (A named chrome exemption, recommended / B hide on Dashboard / C card `Log` opens the sheet, separate slice), and D1.3 `Start Check` (non-blocking, unchanged). This supersedes the 15:12 checkpoint's two-option D1. #1833 still blocks; no merge, auto-merge, Publish or production operation.

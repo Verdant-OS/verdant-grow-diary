@@ -1,6 +1,7 @@
 import "./lib/error-capture";
 
 import {
+  healthResponseFor,
   redirectResponseFor,
   withHostHeaders,
   workerRoutingEnv,
@@ -53,6 +54,9 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     const redirect = redirectResponseFor(request, workerRoutingEnv(env));
     if (redirect) return redirect;
+
+    const health = healthResponseFor(request);
+    if (health) return withHostHeaders(request, health);
 
     try {
       const handler = await getServerEntry();

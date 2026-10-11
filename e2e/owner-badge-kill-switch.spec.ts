@@ -7,10 +7,10 @@ const LOCAL_URL = process.env.E2E_LOCAL_SUPABASE_URL?.trim() ?? "";
 const ANON_KEY = process.env.E2E_LOCAL_SUPABASE_ANON_KEY?.trim() ?? "";
 
 function assertLoopback(url: string) {
-  if (url.includes("verdantgrowdiary.com")) {
+  const host = new URL(url).hostname.toLowerCase();
+  if (host === "verdantgrowdiary.com" || host.endsWith(".verdantgrowdiary.com")) {
     throw new Error("refusing production host");
   }
-  const host = new URL(url).hostname;
   if (host !== "127.0.0.1" && host !== "localhost" && host !== "::1") {
     throw new Error(`refusing non-loopback supabase host ${host}`);
   }

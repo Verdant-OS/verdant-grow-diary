@@ -22,10 +22,7 @@ import type {
 } from "@/lib/growHelpToolkitState";
 import NumberField from "./NumberField";
 import ResultBlock from "./ResultBlock";
-import {
-  calculateWhenReady as attempt,
-  isExpenseSummaryReady,
-} from "@/lib/growHelpToolkitReadiness";
+import { calculateWhenReady as attempt } from "@/lib/growHelpToolkitReadiness";
 
 function fmt(value: number, digits = 2): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: digits });

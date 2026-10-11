@@ -176,6 +176,8 @@ function kindForBlockReason(
     case "active_grow_mismatch":
     case "missing_active_grow":
       return "mismatch";
+    case "grow_archived":
+      return "grow_unavailable";
   }
 }
 

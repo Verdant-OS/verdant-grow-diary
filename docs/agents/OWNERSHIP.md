@@ -145,7 +145,7 @@ seats below still apply, and a claim never grants self-acceptance or merge autho
   ```
   [CI]       #N @sha PASS|FAIL                      (webhook)
   [PRECHECK] #N @sha READY | NOT READY (reason) | STALLED   (Chemdawg)
-  [ROUTE]    #N @sha -> Blue Dream | Critical Mass (reason)   (bot / GDP)
+  [ROUTE]    #N @sha -> Blue Dream | Critical Mass | Durban Poison | Codex | Graft (reason)   (bot / GDP)
   [CLAIM]    <reviewer> claims #N @sha
   [VERDICT]  <reviewer>: #N @sha PASS | PASS-with-P2 | FAIL | BLOCKED | NOT_MEASURED
   [MERGE]    #N @sha merged to <branch>             (Chemdawg)
@@ -156,6 +156,7 @@ seats below still apply, and a claim never grants self-acceptance or merge autho
   [ESCALATE] <one line>   (only the four items in section 1)
   ```
 - **Rules.**
+  - `[ROUTE]` names Blue Dream, Critical Mass, Durban Poison, Codex, or Graft. Codex is not that target on a PR Codex authored or repaired (for example #1938). Graft is that target only on a section 2 docs-only or other low-risk PR that Graft did not author or repair.
   - Reply only when it adds something.
   - A new push voids every claim and verdict on the old SHA.
   - No secrets or production data in the channel.
@@ -184,7 +185,7 @@ seats below still apply, and a claim never grants self-acceptance or merge autho
   - If a reviewer is silent for 60 minutes, non-Blue-Dream work moves to the other reviewer. Blue Dream-only work goes to Chemdawg's intake, and then to GDP.
   - If the two reviewers split, FAIL wins until GDP decides.
   - If CI is green but the pre-check says NOT READY, nothing is assigned.
-- **Overrides** (GDP, posted in the channel): `REASSIGN #N to Blue Dream|Critical Mass`, `HOLD #N`, `RELEASE #N`. An override lasts for that SHA unless it says "sticky".
+- **Overrides** (GDP, posted in the channel): `REASSIGN #N to Blue Dream | Critical Mass | Durban Poison | Codex | Graft`, `HOLD #N`, `RELEASE #N`. An override lasts for that SHA unless it says "sticky". Codex is not a `REASSIGN` target on a PR Codex authored or repaired (for example #1938). Graft is a `REASSIGN` target only on a section 2 docs-only or other low-risk PR that Graft did not author or repair.
 - **Next step fires on its own.** An exact-head `[VERDICT]` PASS or PASS-with-P2 (no P1) wakes Chemdawg, who makes the merge call under the section 5 gate (all required checks plus an independent exact-head PASS). A FAIL wakes the slice owner (Copilot or Codex) to push a fix. That new push starts the loop again at 4.1.
 - **Never** assigns PRs on hold (a GDP `HOLD #N` override or HOLD #1250) or untouchable PRs. HOLD-CHEEK is different: it holds only the merge, so those PRs are still assigned.
 

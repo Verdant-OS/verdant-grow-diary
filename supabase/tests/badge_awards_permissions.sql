@@ -1,5 +1,9 @@
 -- Owner badge awards: permissions, kill switch, and First Diary Entry lifecycle.
--- Local or disposable database only. Rolls back every row it creates.
+-- The first plan rolls back every row it creates. The two-session plan
+-- (ok 2) commits, so it runs only on a disposable local database named
+-- badge_pgtap_<12 hex>. It refuses dbname=postgres and any public host.
+-- Loopback, a unix socket, and a local 172.16/12 bridge (the address
+-- Postgres reports for a 127.0.0.1 publish) are the only accepted hosts.
 -- Run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/badge_awards_permissions.sql
 
 \set ON_ERROR_STOP on
@@ -122,6 +126,11 @@ DECLARE
   v_batch_n int;
   v_batch_first int;
   v_batch_second int;
+  v_cursor_max uuid;
+  v_fail_owner uuid;
+  v_next_owner uuid;
+  v_fail_grow uuid;
+  v_next_grow uuid;
 BEGIN
   INSERT INTO auth.users (
     id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
@@ -708,6 +717,120 @@ BEGIN
   ASSERT v_batch_second >= 1 AND v_batch_second <= 25,
     format('the next reconcile call must visit a later batch, got %s', v_batch_second);
 
+  -- One owner raises during reconcile. The cursor still moves, and the next
+  -- owner still receives an award.
+  SELECT owners.user_id
+    INTO v_cursor_max
+  FROM (
+    SELECT entry.user_id
+    FROM public.diary_entries AS entry
+    WHERE entry.user_id IS NOT NULL
+    UNION
+    SELECT award.user_id
+    FROM public.badge_awards AS award
+  ) AS owners
+  ORDER BY owners.user_id DESC
+  LIMIT 1;
+  v_fail_owner := NULL;
+  v_next_owner := NULL;
+  FOR v_batch_n IN 1..1000 LOOP
+    v_batch_user := gen_random_uuid();
+    IF v_cursor_max IS NULL OR v_batch_user > v_cursor_max THEN
+      IF v_fail_owner IS NULL THEN
+        v_fail_owner := v_batch_user;
+      ELSIF v_batch_user <> v_fail_owner THEN
+        v_next_owner := v_batch_user;
+        EXIT;
+      END IF;
+    END IF;
+  END LOOP;
+  ASSERT v_fail_owner IS NOT NULL AND v_next_owner IS NOT NULL,
+    'could not draw two owners past the reconcile cursor';
+  IF v_next_owner < v_fail_owner THEN
+    v_batch_user := v_fail_owner;
+    v_fail_owner := v_next_owner;
+    v_next_owner := v_batch_user;
+  END IF;
+  UPDATE public.badge_award_runtime
+     SET reconcile_after = v_cursor_max
+   WHERE id = 1;
+
+  CREATE TEMP TABLE badge_reconcile_skip (user_id uuid PRIMARY KEY) ON COMMIT DROP;
+  INSERT INTO badge_reconcile_skip (user_id) VALUES (v_fail_owner);
+  EXECUTE $failfn$
+    CREATE OR REPLACE FUNCTION public.badge_reconcile_fail_owner()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $fn$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM pg_temp.badge_reconcile_skip AS skip
+        WHERE skip.user_id = NEW.user_id
+      ) THEN
+        RAISE EXCEPTION 'forced owner reconcile error';
+      END IF;
+      RETURN NEW;
+    END;
+    $fn$;
+  $failfn$;
+  CREATE TRIGGER badge_reconcile_fail_owner
+    BEFORE INSERT ON public.badge_awards
+    FOR EACH ROW
+    EXECUTE FUNCTION public.badge_reconcile_fail_owner();
+
+  v_fail_grow := gen_random_uuid();
+  v_next_grow := gen_random_uuid();
+  INSERT INTO auth.users (
+    id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
+    raw_app_meta_data, raw_user_meta_data, aud, role
+  ) VALUES
+    (
+      v_fail_owner,
+      'badge-reconcile-' || v_fail_owner::text || '@verdant.test',
+      crypt('harness-password', gen_salt('bf')),
+      now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'
+    ),
+    (
+      v_next_owner,
+      'badge-reconcile-' || v_next_owner::text || '@verdant.test',
+      crypt('harness-password', gen_salt('bf')),
+      now(), now(), now(), '{}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'
+    );
+  INSERT INTO public.grows (id, user_id, name) VALUES
+    (v_fail_grow, v_fail_owner, 'badge reconcile grow'),
+    (v_next_grow, v_next_owner, 'badge reconcile grow');
+  INSERT INTO storage.objects (bucket_id, name, owner, owner_id) VALUES
+    (
+      'diary-photos',
+      v_fail_owner::text || '/diary/skip.jpg',
+      v_fail_owner,
+      v_fail_owner::text
+    ),
+    (
+      'diary-photos',
+      v_next_owner::text || '/diary/next.jpg',
+      v_next_owner,
+      v_next_owner::text
+    );
+  INSERT INTO public.diary_entries (user_id, grow_id, note, photo_url, entry_at) VALUES
+    (v_fail_owner, v_fail_grow, '', v_fail_owner::text || '/diary/skip.jpg', now()),
+    (v_next_owner, v_next_grow, '', v_next_owner::text || '/diary/next.jpg', now());
+
+  PERFORM set_config('role', 'service_role', true);
+  v_batch_first := public.badge_awards_reconcile();
+  RESET role;
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_fail_owner;
+  ASSERT v_count = 0, format('a reconcile error must skip that owner, got %s', v_count);
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_next_owner;
+  ASSERT v_count = 1, format('the next owner must still reconcile, got %s', v_count);
+  ASSERT v_batch_first = 1, format('reconcile must count the successful owner only, got %s', v_batch_first);
+
+  DROP TRIGGER badge_reconcile_fail_owner ON public.badge_awards;
+  DROP FUNCTION public.badge_reconcile_fail_owner();
+  DELETE FROM auth.users WHERE id IN (v_fail_owner, v_next_owner);
+
   DELETE FROM auth.users WHERE id = v_owner;
   SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
   ASSERT v_count = 0, 'deleting the account must cascade the award';
@@ -724,8 +847,30 @@ END $$;
 ROLLBACK;
 
 -- Petal test 23: two sessions evaluate the same owner at once.
--- The fixture commits so the second connection can see it, then this
--- session deletes it and turns the kill switch back off.
+-- The fixture commits, so this plan runs only when the connected database
+-- is a disposable local database named badge_pgtap_<12 hex>. It does not
+-- open dbname=postgres and does not commit enabled=true on a shared database.
+-- Local Supabase publishes 127.0.0.1:54322 into a container, so Postgres
+-- reports a 172.16/12 server address for that localhost connection. A
+-- loopback address, a unix socket, or that local bridge pair is accepted.
+-- A public host is refused.
+SELECT CASE
+  WHEN current_database() ~ '^badge_pgtap_[0-9a-f]{12}$'
+   AND current_database() <> 'postgres'
+   AND (
+     inet_server_addr() IS NULL
+     OR host(inet_server_addr()) IN ('127.0.0.1', '::1', 'localhost')
+     OR (
+       host(inet_server_addr())::inet << '172.16.0.0/12'::inet
+       AND host(inet_client_addr())::inet << '172.16.0.0/12'::inet
+     )
+   )
+  THEN 1
+  ELSE 0
+END AS badge_pgtap_disposable
+\gset
+
+\if :badge_pgtap_disposable
 CREATE EXTENSION IF NOT EXISTS dblink;
 
 BEGIN;
@@ -761,12 +906,30 @@ DECLARE
   v_sql text;
   v_count int;
 BEGIN
+  IF current_database() !~ '^badge_pgtap_[0-9a-f]{12}$'
+     OR current_database() = 'postgres' THEN
+    RAISE EXCEPTION 'two-session test refuses database %', current_database();
+  END IF;
+  IF inet_server_addr() IS NOT NULL
+     AND host(inet_server_addr()) NOT IN ('127.0.0.1', '::1', 'localhost')
+     AND NOT (
+       host(inet_server_addr())::inet << '172.16.0.0/12'::inet
+       AND host(inet_client_addr())::inet << '172.16.0.0/12'::inet
+     ) THEN
+    RAISE EXCEPTION 'two-session test refuses host %', host(inet_server_addr());
+  END IF;
   SELECT owner INTO v_owner FROM badge_two_session;
-  SELECT format(
-    'host=%s port=%s dbname=postgres user=postgres password=postgres',
-    host(inet_server_addr()),
-    inet_server_port()
-  ) INTO v_conn;
+  SELECT CASE
+    WHEN inet_server_addr() IS NULL THEN
+      format('dbname=%s user=postgres password=postgres', current_database())
+    ELSE
+      format(
+        'host=%s port=%s dbname=%s user=postgres password=postgres',
+        host(inet_server_addr()),
+        inet_server_port(),
+        current_database()
+      )
+  END INTO v_conn;
   v_sql := format($q$
     SELECT public.badge_awards_evaluate_owner('first_diary_entry')
     FROM (
@@ -816,3 +979,6 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 \echo ok 2 - two simultaneous sessions leave one award
+\else
+\echo ok 2 - two simultaneous sessions leave one award # SKIP disposable local database required
+\endif

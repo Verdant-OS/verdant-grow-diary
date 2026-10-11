@@ -29,10 +29,12 @@
 -- badge_awards_reconcile() is the server sweep. It reads the kill switch
 -- first and writes nothing unless that switch is exactly true. Each call
 -- visits at most 25 owners and stores the cursor in reconcile_after, so
--- one transaction holds at most 25 advisory locks. EXECUTE is service_role
--- only. The pg_cron job badge-awards-reconcile is inserted inactive when
--- pg_cron is installed. When pg_cron is absent the schedule block returns
--- before it reads cron.job. This migration does not enable the job.
+-- one transaction holds at most 25 advisory locks. An error evaluating one
+-- owner is logged and skipped. The cursor still advances, and the rest of
+-- that batch continues. EXECUTE is service_role only. The pg_cron job
+-- badge-awards-reconcile is inserted inactive when pg_cron is installed.
+-- When pg_cron is absent the schedule block returns before it reads
+-- cron.job. This migration does not enable the job.
 --
 -- Cut 001: any photo attached to the owner's own diary entry earns
 -- First Diary Entry. Note text is not a qualification input. A photo
@@ -517,9 +519,10 @@ COMMENT ON FUNCTION public.badge_awards_evaluate_owner(text) IS
 -- before unlock. A procedure that COMMITs each owner would release the xact
 -- lock per iteration, and it would change this call from SELECT to CALL.
 -- This function visits at most 25 owners per call, ordered by user id, and
--- stores the last id in reconcile_after. The next call continues after that
--- id. A short or empty batch clears the cursor. A failure rolls back only
--- that call.
+-- stores the last visited id in reconcile_after. The next call continues
+-- after that id. A short or empty batch clears the cursor. Each owner runs
+-- in its own BEGIN block. WHEN OTHERS logs that owner and continues, so one
+-- error does not abort the batch and does not stop the cursor.
 CREATE OR REPLACE FUNCTION public.badge_awards_reconcile()
 RETURNS integer
 LANGUAGE plpgsql
@@ -532,6 +535,7 @@ DECLARE
   owner uuid;
   last_owner uuid;
   reconciled integer := 0;
+  visited integer := 0;
   batch_limit constant integer := 25;
 BEGIN
   SELECT runtime.enabled, runtime.reconcile_after
@@ -557,17 +561,22 @@ BEGIN
     ORDER BY owners.user_id
     LIMIT batch_limit
   LOOP
-    PERFORM set_config('request.jwt.claim.sub', owner::text, true);
-    PERFORM set_config('request.jwt.claims', json_build_object('sub', owner)::text, true);
-    PERFORM public.badge_awards_evaluate_owner('first_diary_entry');
-    reconciled := reconciled + 1;
+    BEGIN
+      PERFORM set_config('request.jwt.claim.sub', owner::text, true);
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', owner)::text, true);
+      PERFORM public.badge_awards_evaluate_owner('first_diary_entry');
+      reconciled := reconciled + 1;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'badge_awards_reconcile skipped owner %: %', owner, SQLERRM;
+    END;
+    visited := visited + 1;
     last_owner := owner;
   END LOOP;
 
   PERFORM set_config('request.jwt.claim.sub', '', true);
   PERFORM set_config('request.jwt.claims', '{}', true);
 
-  IF reconciled < batch_limit THEN
+  IF visited < batch_limit THEN
     UPDATE public.badge_award_runtime
        SET reconcile_after = NULL
      WHERE id = 1;

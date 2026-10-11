@@ -477,6 +477,7 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(paddleStage).toContain("sandbox-checkout-test-mode-note");
     const noteBeforeRole = paddleStage.slice(0, paddleStage.indexOf("has_role"));
     expect(noteBeforeRole).toContain("sandbox-checkout-test-mode-note");
+    expect(noteBeforeRole).toContain("await expect(checkoutNote).toBeVisible()");
     const operatorBranch = paddleStage.slice(
       paddleStage.indexOf("operatorGranted === true"),
       paddleStage.indexOf("} else if (operatorRoleError == null)"),
@@ -489,6 +490,20 @@ describe("authenticated One-Tent proof covers the production objective", () => {
       paddleStage.indexOf("} else if ((await page.getByTestId"),
     );
     expect(nonOperatorBranch).toContain("toHaveCount(0)");
+    const executablePaddle = EXECUTABLE_SPEC.slice(
+      EXECUTABLE_SPEC.indexOf('await stage("paddle_sandbox_verified"'),
+      EXECUTABLE_SPEC.indexOf("expect(sawPasswordAuth)"),
+    );
+    expect(executablePaddle).toContain("await expect(checkoutNote).toBeVisible()");
+    expect(executablePaddle).toMatch(
+      /if \(operatorRoleError == null && operatorGranted === true\) \{\s*paddleSandboxBranch = "operator";\s*const testModeBanner = page\.getByTestId\("payments-test-mode-banner"\);/,
+    );
+    const errorBranch = executablePaddle.slice(executablePaddle.indexOf("} else {"));
+    expect(errorBranch).toContain('paddleSandboxBranch = "error"');
+    expect(errorBranch).toContain('stageOutcomes["paddle_sandbox_verified"] = "blocked"');
+    expect(errorBranch).toContain('proofBlockerReason ??= "paddle_sandbox_has_role_error"');
+    expect(errorBranch).toContain('throw new Error("paddle_sandbox_has_role_error")');
+    expect(SPEC).toContain("ONE_TENT_PADDLE_SANDBOX_BRANCH=");
     expect(SPEC).toContain("paddle_sandbox_verified");
     expect(SPEC).toContain("payments-test-mode-banner");
     expect(SPEC).toContain('data-payment-env", "sandbox"');

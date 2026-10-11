@@ -261,6 +261,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
     let evidenceSeedStatus: OneTentProofStagedResult["seedStatus"] = "not_started";
     let proofReceiptStatus: "pass" | "blocked" | "fail" = "fail";
     let proofBlockerReason: string | null = null;
+    let paddleSandboxBranch: "operator" | "non_operator" | "error" = "error";
     let proofError: unknown = null;
     let cleanup: OneTentProofStagedResult["cleanup"] = {
       status: "not_run",
@@ -274,6 +275,15 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
         stageOutcomes[name] = "pass";
         return out;
       } catch (err) {
+        if (
+          name === "paddle_sandbox_verified" &&
+          err instanceof Error &&
+          err.message === "paddle_sandbox_has_role_error"
+        ) {
+          stageOutcomes[name] = "blocked";
+          proofBlockerReason ??= "paddle_sandbox_has_role_error";
+          throw err;
+        }
         stageOutcomes[name] = "fail";
         proofBlockerReason ??= `${name}_failed`;
         throw err;
@@ -930,17 +940,20 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
           _role: "operator",
         });
         if (operatorRoleError == null && operatorGranted === true) {
+          paddleSandboxBranch = "operator";
           const testModeBanner = page.getByTestId("payments-test-mode-banner");
           await expect(testModeBanner).toHaveAttribute("data-payment-env", "sandbox");
           await expect(testModeBanner).toContainText(/Paddle sandbox/i);
           await expect(testModeBanner).toContainText(/test mode/i);
           await expect(testModeBanner).toContainText(/No real charges/i);
         } else if (operatorRoleError == null) {
+          paddleSandboxBranch = "non_operator";
           await expect(page.getByTestId("payments-test-mode-banner")).toHaveCount(0);
-        } else if ((await page.getByTestId("payments-test-mode-banner").count()) > 0) {
-          const testModeBanner = page.getByTestId("payments-test-mode-banner");
-          await expect(testModeBanner).toHaveAttribute("data-payment-env", "sandbox");
-          await expect(testModeBanner).toContainText(/No real charges/i);
+        } else {
+          paddleSandboxBranch = "error";
+          stageOutcomes["paddle_sandbox_verified"] = "blocked";
+          proofBlockerReason ??= "paddle_sandbox_has_role_error";
+          throw new Error("paddle_sandbox_has_role_error");
         }
 
         const checkoutTrust = page.getByTestId("pricing-checkout-trust");
@@ -961,8 +974,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
       // Honest receipt annotation
       testInfo.annotations.push({
         type: "one-tent-loop-golden-path",
-        description:
-          "Pending approval suggestion verified; approval control observed but not clicked; no device command sent.",
+        description: `Pending approval suggestion verified; approval control observed but not clicked; no device command sent. paddle_sandbox_branch=${paddleSandboxBranch}`,
       });
     } catch (error) {
       proofError = error;
@@ -1056,6 +1068,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
       },
     });
     console.log(`Authenticated One-Tent Loop Playwright Proof: ${receipt.status.toUpperCase()}`);
+    console.log(`ONE_TENT_PADDLE_SANDBOX_BRANCH=${paddleSandboxBranch}`);
     console.log(renderOneTentBrowserProofReceipt(receipt));
     if (proofError !== null || receipt.status !== "pass") {
       throw new Error(receipt.blocker_reason ?? "proof_failed");

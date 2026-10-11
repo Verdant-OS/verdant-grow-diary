@@ -162,7 +162,7 @@ describe("manual VPD unit toggle pending save", () => {
     fireEvent.click(screen.getByTestId("manual-reading-vpd-unit-hPa"));
     expect(vpdInput().value).toBe("12");
     fireEvent.click(screen.getByTestId("manual-reading-vpd-unit-kPa"));
-    expect(vpdInput().value).toBe("1.2");
+    expect(vpdInput().value).toBe("1.20");
 
     fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
     await screen.findByTestId("manual-reading-saved-confirmation");
@@ -174,6 +174,49 @@ describe("manual VPD unit toggle pending save", () => {
     expect(posts[1]?.captured_at).toBe(posts[0]?.captured_at);
     expect(new Set(posts.map((post) => post.captured_at)).size).toBe(1);
     expect(savedVpd()).toBe(1.2);
+  });
+
+  it.each([
+    ["seven decimal places", "1.2345678"],
+    ["more than seven decimal places", "1.234567890123"],
+  ])("keeps one pending payload when %s round-trips through the units", async (_label, typed) => {
+    resetInserts();
+    failInsertsRemaining = 1;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(FIRST_CAPTURED_AT);
+    renderCard();
+    fireEvent.change(vpdInput(), { target: { value: typed } });
+    await saveUntilUnconfirmed();
+    expect(vpdPosts()).toHaveLength(1);
+
+    vi.setSystemTime(RETRY_CAPTURED_AT);
+    for (const unit of ["hPa", "mbar", "kPa", "hPa", "kPa"]) {
+      fireEvent.click(screen.getByTestId(`manual-reading-vpd-unit-${unit}`));
+    }
+    expect(vpdInput().value).toBe(typed);
+
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+    await screen.findByTestId("manual-reading-saved-confirmation");
+
+    const posts = vpdPosts();
+    expect(posts).toHaveLength(2);
+    expect(posts[1]).toEqual(posts[0]);
+    expect(posts[0]?.value).toBe(Number(typed));
+    expect(posts[1]?.value).toBe(Number(typed));
+    expect(savedVpd()).toBe(Number(typed));
+    expect(new Set(posts.map((post) => post.captured_at)).size).toBe(1);
+  });
+
+  it("saves the originally entered kPa after unit toggles", async () => {
+    resetInserts();
+    renderCard();
+    fireEvent.change(vpdInput(), { target: { value: "1.2345678" } });
+    for (const unit of ["hPa", "mbar", "kPa", "hPa", "kPa"]) {
+      fireEvent.click(screen.getByTestId(`manual-reading-vpd-unit-${unit}`));
+    }
+    expect(vpdInput().value).toBe("1.2345678");
+    await confirmSave();
+    expect(savedVpd()).toBe(Number("1.2345678"));
   });
 
   it("resets the pending snapshot identity when the reading itself changes", async () => {

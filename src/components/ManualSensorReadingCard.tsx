@@ -85,9 +85,8 @@ import {
   displayManualVpdFromCanonical,
   formatEnteredManualVpd,
   MANUAL_VPD_UNITS,
+  manualVpdRangeGateInput,
   relabelManualVpdMessage,
-  reexpressManualVpdInput,
-  sameCanonicalManualVpd,
   type ManualVpdUnit,
 } from "@/lib/manualSensorVpdUnitRules";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
@@ -396,10 +395,10 @@ export default function ManualSensorReadingCard({
     return preset ? normalizeManualSourceNote(preset.label) : null;
   }, [devicePreset, deviceCustom, devicePresets]);
 
-  const validation = useMemo(
-    () => applyManualVpdRangeGate(validateManualEntry(form), vpdText, vpdUnit),
-    [form, vpdText, vpdUnit],
-  );
+  const validation = useMemo(() => {
+    const gate = manualVpdRangeGateInput(formVpd, vpdText, vpdUnit);
+    return applyManualVpdRangeGate(validateManualEntry(form), gate.typed, gate.unit);
+  }, [form, formVpd, vpdText, vpdUnit]);
   const advisor = useMemo(
     () =>
       evaluateManualSnapshotAdvisor({
@@ -531,16 +530,11 @@ export default function ManualSensorReadingCard({
 
   function changeVpdUnit(next: ManualVpdUnit) {
     if (next === vpdUnit) return;
-    const nextText = reexpressManualVpdInput(vpdText, vpdUnit, next);
-    const canonical = canonicalManualVpdInput(nextText, next);
+    // Display only. The stored kPa string is not rewritten, so a pending
+    // snapshot keeps its revision and payload through any number of toggles.
+    lastWrittenVpd.current = formVpd;
     setVpdUnit(next);
-    setVpdText(nextText);
-    // Display-only when the kPa number is unchanged. Rewriting the draft
-    // would drop the pending snapshot and let a retry insert a second reading.
-    if (!sameCanonicalManualVpd(canonical, formVpd)) {
-      lastWrittenVpd.current = canonical;
-      update("vpdKpa", canonical);
-    }
+    setVpdText(displayManualVpdFromCanonical(formVpd, next));
   }
 
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {

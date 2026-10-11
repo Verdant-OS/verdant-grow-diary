@@ -89,6 +89,23 @@ export function sameCanonicalManualVpd(left: string, right: string): boolean {
   return leftNumber === rightNumber;
 }
 
+/**
+ * Input for the VPD range gate. The stored kPa string is the reading.
+ * A unit toggle can round the visible text (6 decimal places). When that
+ * rounded text would convert back to a different kPa, the gate uses the
+ * stored string so save and review keep the original number.
+ */
+export function manualVpdRangeGateInput(
+  canonical: string,
+  typed: string,
+  unit: ManualVpdUnit,
+): { typed: string; unit: ManualVpdUnit } {
+  if (sameCanonicalManualVpd(canonicalManualVpdInput(typed, unit), canonical)) {
+    return { typed, unit };
+  }
+  return { typed: canonical, unit: "kPa" };
+}
+
 /** Reexpress the number the grower is looking at when they change units. */
 export function reexpressManualVpdInput(
   raw: string,

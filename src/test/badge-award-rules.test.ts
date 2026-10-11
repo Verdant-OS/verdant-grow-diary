@@ -4,7 +4,6 @@ import { BADGE_AWARD_COPY } from "@/constants/badgeAwardCopy";
 import { ownerBadgeShelfEnabled } from "@/lib/badgeAwardFlags";
 import { isOwnerBadgeLocalSupabaseHost } from "@/lib/badgeAwardLocalHostRules";
 import {
-  BADGE_AWARD_PLACEHOLDER_NOTE,
   FIRST_DIARY_ENTRY_BADGE_KEY,
   badgeCopyAvoidsRankLanguage,
   selectVisibleOwnerBadgeAwards,
@@ -25,14 +24,16 @@ describe("badge award display rules", () => {
     expect(isOwnerBadgeLocalSupabaseHost("example.com")).toBe(false);
   });
 
-  it("uses the Quick Log placeholder sentence the evaluator compares", () => {
-    expect(BADGE_AWARD_PLACEHOLDER_NOTE).toBe("Photo attached from Quick Log.");
+  it("qualifies any owned diary photo and does not read the note", () => {
     expect(FIRST_DIARY_ENTRY_BADGE_KEY).toBe("first_diary_entry");
+    expect(BADGE_AWARD_COPY.firstDiaryEntry).toBe("You saved a diary entry with a photo attached.");
+    expect(BADGE_AWARD_COPY.firstDiaryEntry.toLowerCase()).not.toContain("relevant photo");
     const migration = readFileSync(
       "supabase/migrations/20261011120000_owner_badge_awards.sql",
       "utf8",
     );
-    expect(migration).toContain("btrim(entry.note) <> 'Photo attached from Quick Log.'");
+    expect(migration).not.toContain("btrim(entry.note)");
+    expect(migration).not.toContain("Photo attached from Quick Log.");
     expect(migration).toContain("grow.user_id = uid");
     expect(migration).toContain("object.owner = badge_awards_owned_diary_photo_name.owner_id");
     expect(migration).toContain("IF revoked_at IS NOT NULL THEN");

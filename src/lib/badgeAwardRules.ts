@@ -5,12 +5,7 @@
  * public.badge_awards_evaluate_owner. This module only decides which
  * already-awarded rows the shelf may show. It does not award anything.
  */
-import { QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE } from "@/lib/quickLogPhotoDiaryEntry";
-
 export const FIRST_DIARY_ENTRY_BADGE_KEY = "first_diary_entry" as const;
-
-/** Same sentence the evaluator compares with btrim(note). */
-export const BADGE_AWARD_PLACEHOLDER_NOTE = QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE;
 
 const FORBIDDEN_BADGE_COPY = /\b(skill|rank|yield|safety|verified)\b/i;
 

@@ -34,6 +34,14 @@
 -- pg_cron is installed. When pg_cron is absent the schedule block returns
 -- before it reads cron.job. This migration does not enable the job.
 --
+-- Cut 001: any photo attached to the owner's own diary entry earns
+-- First Diary Entry. Note text is not a qualification input. The photo
+-- must be on that entry, on that owner's path, and present in
+-- storage.objects for this account. A '..' segment, another user's path,
+-- and an inferred link do not qualify. This migration does not publish
+-- badges. Public visibility is a later slice. Evidence SELECT stays
+-- owner-only, so evidence photos are not granted to other accounts.
+--
 -- Evidence can name a diary entry, tent, setup, or harvest. Only
 -- first_diary_entry has a qualification rule. The other keys are stored
 -- shape: the evaluator returns not_in_slice and writes nothing for them.
@@ -344,8 +352,6 @@ BEGIN
    AND grow.user_id = uid
   WHERE entry.user_id = uid
     AND entry.retracted_at IS NULL
-    AND length(btrim(entry.note)) > 0
-    AND btrim(entry.note) <> 'Photo attached from Quick Log.'
     AND COALESCE(
       public.badge_awards_owned_diary_photo_name(entry.photo_url, uid),
       public.badge_awards_owned_diary_photo_name(entry.details->>'photo_url', uid)
@@ -376,8 +382,6 @@ BEGIN
     WHERE entry.id = prior_entry_id
       AND entry.user_id = uid
       AND entry.retracted_at IS NULL
-      AND length(btrim(entry.note)) > 0
-      AND btrim(entry.note) <> 'Photo attached from Quick Log.'
       AND COALESCE(
         public.badge_awards_owned_diary_photo_name(entry.photo_url, uid),
         public.badge_awards_owned_diary_photo_name(entry.details->>'photo_url', uid)

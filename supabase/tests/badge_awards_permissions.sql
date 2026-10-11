@@ -217,26 +217,6 @@ BEGIN
     'turning the switch on must move updated_at';
 
   UPDATE public.diary_entries
-     SET note = '',
-         photo_url = v_photo,
-         details = '{}'::jsonb
-   WHERE id = v_entry;
-  PERFORM set_config('role', 'authenticated', true);
-  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
-  ASSERT v_result->>'status' = 'unchanged', 'an empty note must not qualify';
-  RESET role;
-  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
-  ASSERT v_count = 0, 'an empty note must not create an award';
-
-  UPDATE public.diary_entries SET note = '   ' WHERE id = v_entry;
-  PERFORM set_config('role', 'authenticated', true);
-  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
-  ASSERT v_result->>'status' = 'unchanged', 'a whitespace-only note must not qualify';
-  RESET role;
-  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
-  ASSERT v_count = 0, 'a whitespace-only note must not create an award';
-
-  UPDATE public.diary_entries
      SET note = 'First real diary note',
          photo_url = NULL,
          details = '{}'::jsonb
@@ -247,17 +227,6 @@ BEGIN
   RESET role;
   SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
   ASSERT v_count = 0, 'a text-only entry must not create an award';
-
-  UPDATE public.diary_entries
-     SET note = 'Photo attached from Quick Log.',
-         photo_url = v_photo
-   WHERE id = v_entry;
-  PERFORM set_config('role', 'authenticated', true);
-  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
-  ASSERT v_result->>'status' = 'unchanged', format('stock photo note must not qualify, got %s', v_result);
-  RESET role;
-  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner;
-  ASSERT v_count = 0, 'stock photo note must not create an award';
 
   UPDATE public.diary_entries
      SET note = 'First real diary note',
@@ -334,13 +303,16 @@ BEGIN
   RESET role;
 
   UPDATE public.diary_entries
-     SET photo_url = 'https://example.invalid/legacy.jpg',
+     SET note = '',
+         photo_url = 'https://example.invalid/legacy.jpg',
          details = jsonb_build_object('photo_url', 'storage://diary-photos/' || v_photo)
    WHERE id = v_entry;
   PERFORM set_config('role', 'authenticated', true);
   v_result := public.badge_awards_evaluate_owner('first_diary_entry');
-  ASSERT v_result->>'status' = 'qualified', format('owned details photo should qualify, got %s', v_result);
+  ASSERT v_result->>'status' = 'qualified', format('a photo plus an empty note should qualify, got %s', v_result);
   RESET role;
+  ASSERT (SELECT note FROM public.diary_entries WHERE id = v_entry) = '',
+    'the earning entry keeps an empty note';
 
   SELECT id, first_recognized_at INTO v_award, v_recognized
   FROM public.badge_awards
@@ -349,6 +321,16 @@ BEGIN
   ASSERT v_recognized > '2020-01-01T00:00:00Z', 'recognition time must be stamped by the server';
   SELECT count(*) INTO v_count FROM public.badge_evidence WHERE award_id = v_award;
   ASSERT v_count = 1, 'qualifying diary must store one evidence row';
+
+  UPDATE public.diary_entries
+     SET note = 'Photo attached from Quick Log.'
+   WHERE id = v_entry;
+  PERFORM set_config('role', 'authenticated', true);
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  ASSERT v_result->>'status' = 'unchanged', format('a placeholder note must keep the one award, got %s', v_result);
+  RESET role;
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE user_id = v_owner AND badge_key = 'first_diary_entry';
+  ASSERT v_count = 1, 'a placeholder note must not create a second award';
 
   PERFORM set_config('role', 'service_role', true);
   v_count := public.badge_awards_reconcile();

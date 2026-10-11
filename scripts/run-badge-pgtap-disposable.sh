@@ -19,6 +19,9 @@
 #
 # BADGE_PGTAP_SCHEMA_FILE, when set, reuses that schema dump instead of
 # running pg_dump again. The database is still created and dropped here.
+# BADGE_PGTAP_DB_NAME forces the database name. The drop target is set
+# only after CREATE DATABASE succeeds, so a collision leaves the existing
+# database in place.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -92,14 +95,20 @@ fi
 CONTAINER="${containers[0]}"
 
 TOKEN="$(openssl rand -hex 32)"
-DB_NAME="badge_pgtap_$(openssl rand -hex 6)"
-if [[ ! "$DB_NAME" =~ ^badge_pgtap_[0-9a-f]{12}$ ]]; then
-  echo "refusing unexpected database name $DB_NAME" >&2
+# DB_NAME is the drop target. It stays empty until CREATE DATABASE
+# succeeds, so a name collision cannot drop a database this run did not create.
+candidate="${BADGE_PGTAP_DB_NAME:-badge_pgtap_$(openssl rand -hex 6)}"
+if [[ ! "$candidate" =~ ^badge_pgtap_[0-9a-f]{12}$ ]]; then
+  echo "refusing unexpected database name $candidate" >&2
   exit 2
 fi
 
-echo "badge pgTAP database ${DB_NAME} mode ${MODE}"
-psql_admin -c "CREATE DATABASE ${DB_NAME} TEMPLATE template0;" >/dev/null
+echo "badge pgTAP database ${candidate} mode ${MODE}"
+if ! psql_admin -c "CREATE DATABASE ${candidate} TEMPLATE template0;" >/dev/null; then
+  echo "CREATE DATABASE ${candidate} failed; leaving any existing database in place" >&2
+  exit 1
+fi
+DB_NAME="$candidate"
 
 if [[ -n "${BADGE_PGTAP_SCHEMA_FILE:-}" ]]; then
   DUMP="$BADGE_PGTAP_SCHEMA_FILE"
@@ -136,11 +145,11 @@ admin_sql "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO postgres;"
 admin_sql "GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO postgres;"
 admin_sql "ALTER TABLE public.badge_awards OWNER TO postgres;"
 
-psql_db -c "SELECT CASE WHEN count(*) = 0 THEN 1 ELSE 0 END AS empty_users FROM auth.users;" | grep -q '1' \
-  || {
-    echo "schema load left auth.users rows" >&2
-    exit 1
-  }
+empty_users="$(psql_db -tAc "SELECT CASE WHEN count(*) = 0 THEN '1' ELSE '0' END FROM auth.users;")"
+[[ "$empty_users" == "1" ]] || {
+  echo "schema load left auth.users rows" >&2
+  exit 1
+}
 psql_db -c "SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = 'badge_awards_reconcile';" \
   | grep -q '1' || {
   echo "badge_awards_reconcile is missing after schema load" >&2

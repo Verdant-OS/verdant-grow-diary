@@ -942,8 +942,6 @@ END AS badge_pgtap_disposable
 \gset
 
 \if :badge_pgtap_disposable
-CREATE EXTENSION IF NOT EXISTS dblink;
-
 DO $$
 DECLARE
   v_token text := NULLIF(btrim(current_setting('badge_pgtap.token', true)), '');
@@ -983,6 +981,8 @@ BEGIN
   END IF;
 END $$;
 
+CREATE EXTENSION IF NOT EXISTS dblink;
+
 BEGIN;
 CREATE TEMP TABLE badge_two_session (owner uuid) ON COMMIT PRESERVE ROWS;
 INSERT INTO badge_two_session VALUES (gen_random_uuid());
@@ -1013,6 +1013,7 @@ DO $$
 DECLARE
   v_owner uuid;
   v_conn text;
+  v_cleanup_conn text;
   v_sql text;
   v_count int;
 BEGIN
@@ -1058,6 +1059,15 @@ BEGIN
   WHERE award.user_id = v_owner;
   ASSERT v_count = 1, 'two sessions must leave one evidence row';
 
+  PERFORM set_config('storage.allow_delete_query', 'true', true);
+  DELETE FROM storage.objects
+  WHERE bucket_id = 'diary-photos'
+    AND name = v_owner::text || '/diary/two.jpg';
+  SELECT count(*) INTO v_count
+  FROM storage.objects
+  WHERE bucket_id = 'diary-photos'
+    AND name = v_owner::text || '/diary/two.jpg';
+  ASSERT v_count = 0, 'two-session cleanup must remove the photo';
   DELETE FROM auth.users WHERE id = v_owner;
   UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1;
   ASSERT (SELECT enabled FROM public.badge_award_runtime WHERE id = 1) IS FALSE,
@@ -1074,18 +1084,44 @@ EXCEPTION WHEN OTHERS THEN
     NULL;
   END;
   -- A RAISE below rolls this handler back. These writes commit in another
-  -- session, so a session-2 failure cannot leave the switch on.
+  -- session, so a session-2 failure cannot leave the switch on or the photo.
+  -- A socket-only connection string cannot reach this database. Cleanup uses
+  -- the same explicit host and port as the session connection, and says so
+  -- when that connection cannot be built or used.
   BEGIN
-    PERFORM dblink_exec(
-      v_conn,
-      'UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1'
+    v_cleanup_conn := format(
+      'host=%s port=%s dbname=%s user=postgres password=postgres',
+      COALESCE(host(inet_server_addr()), '127.0.0.1'),
+      COALESCE(inet_server_port()::text, current_setting('port')),
+      current_database()
     );
-    PERFORM dblink_exec(
-      v_conn,
-      $cleanup$DELETE FROM auth.users WHERE email LIKE 'badge-two-session-%@verdant.test'$cleanup$
-    );
+    IF v_cleanup_conn !~ 'host=\S+' OR v_cleanup_conn !~ 'port=[0-9]+' THEN
+      RAISE NOTICE 'two-session cleanup skipped: connection has no host and port';
+    ELSE
+      PERFORM dblink_exec(
+        v_cleanup_conn,
+        $cleanup$
+          DO $inner$
+          BEGIN
+            PERFORM set_config('storage.allow_delete_query', 'true', true);
+            DELETE FROM storage.objects
+            WHERE bucket_id = 'diary-photos'
+              AND name LIKE '%/diary/two.jpg';
+          END
+          $inner$
+        $cleanup$
+      );
+      PERFORM dblink_exec(
+        v_cleanup_conn,
+        'UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1'
+      );
+      PERFORM dblink_exec(
+        v_cleanup_conn,
+        $cleanup$DELETE FROM auth.users WHERE email LIKE 'badge-two-session-%@verdant.test'$cleanup$
+      );
+    END IF;
   EXCEPTION WHEN OTHERS THEN
-    NULL;
+    RAISE NOTICE 'two-session cleanup skipped: %', SQLERRM;
   END;
   RAISE;
 END $$;

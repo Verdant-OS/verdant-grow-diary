@@ -26,12 +26,11 @@ export function selectVisibleOwnerBadgeAwards<T extends OwnerBadgeAwardView>(
   awards: readonly T[],
   ownerUserId?: string | null,
 ): T[] {
-  if (ownerUserId === "") return [];
+  if (ownerUserId === undefined || ownerUserId === null || ownerUserId === "") return [];
   return awards.filter((award) => {
     if (award.badgeKey !== FIRST_DIARY_ENTRY_BADGE_KEY) return false;
     if (award.hiddenAt !== null) return false;
     if (award.revokedAt != null) return false;
-    if (ownerUserId) return award.userId === ownerUserId;
-    return true;
+    return award.userId === ownerUserId;
   });
 }

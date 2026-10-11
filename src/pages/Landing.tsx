@@ -149,25 +149,27 @@ export default function Landing({
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="px-6 pt-10 pb-16 max-w-5xl mx-auto text-center">
-        <div className="flex justify-center mb-6">
+      {/* Hero. Below sm the stack is shorter so the three CTAs clear the
+          fixed consent banner on a 390×844 first paint. sm+ keeps the
+          previous spacing. */}
+      <section className="mx-auto max-w-5xl px-6 pb-12 pt-4 text-center sm:pb-16 sm:pt-10">
+        <div className="mb-3 flex justify-center sm:mb-6 max-sm:[&_img]:!h-[5.5rem] max-sm:[&_img]:!w-[5.5rem]">
           <BrandLogo size="hero" />
         </div>
-        <p className="text-sm uppercase tracking-[0.2em] text-primary/80 font-medium">
+        <p className="text-xs font-medium uppercase tracking-[0.14em] text-primary/80 sm:text-sm sm:tracking-[0.2em]">
           {VERDANT_HERO.eyebrow}
         </p>
-        <h1 className="mt-4 font-display text-4xl md:text-6xl font-bold tracking-tight leading-tight">
+        <h1 className="mt-2 font-display text-3xl font-bold leading-tight tracking-tight sm:mt-4 sm:text-4xl md:text-6xl">
           See what changed.
           <span className="block text-primary">Decide what to do next.</span>
         </h1>
-        <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+        <p className="mx-auto mt-3 max-w-2xl text-sm leading-tight text-muted-foreground sm:mt-6 sm:text-base sm:leading-relaxed md:text-lg">
           {VERDANT_HERO.subheadline}
         </p>
-        <p className="mt-3 text-sm md:text-base text-foreground/80 font-medium">
+        <p className="mt-2 text-sm font-medium leading-snug text-foreground/80 sm:mt-3 sm:leading-normal md:text-base">
           {VERDANT_HERO.tagline}
         </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:mt-8 sm:gap-3">
           {user ? (
             <Link to="/">
               <Button size="lg" className="font-semibold">
@@ -219,7 +221,7 @@ export default function Landing({
             </Button>
           </a>
         </div>
-        <p className="mt-6 text-xs text-muted-foreground">{VERDANT_HERO.safetyLine}</p>
+        <p className="mt-3 text-xs text-muted-foreground sm:mt-6">{VERDANT_HERO.safetyLine}</p>
         {user && <LandingAuthedOnboardingBridge />}
       </section>
 

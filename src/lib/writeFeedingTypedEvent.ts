@@ -87,7 +87,13 @@ export interface FeedingTypedEventInput {
 }
 
 export type WriteFeedingTypedEventResult =
-  { ok: true; eventId: string; reused: boolean } | { ok: false; reason: WriteFeedingFailureReason };
+  | { ok: true; eventId: string; reused: boolean }
+  | {
+      ok: false;
+      reason: WriteFeedingFailureReason;
+      /** Only with receipt_target_moved: where the reused entry lives now. */
+      reviewTarget?: TypedReusedReviewTarget;
+    };
 
 export type WriteFeedingFailureReason =
   | QuickLogHistoryCheckReason

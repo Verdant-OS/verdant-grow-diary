@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { TYPED_REUSED_RECEIPT_READ_DEADLINE_MS } from "@/lib/quickLogTypedReusedReceiptService";
 import {
   mapWateringInputToRpcArgs,
   writeQuickLogWateringTypedEvent,

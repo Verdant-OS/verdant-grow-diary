@@ -103,7 +103,12 @@ export type WriteWateringFailureReason =
 
 export type WriteWateringTypedEventResult =
   | { ok: true; eventId: string; reused: boolean }
-  | { ok: false; reason: WriteWateringFailureReason };
+  | {
+      ok: false;
+      reason: WriteWateringFailureReason;
+      /** Only with receipt_target_moved: where the reused entry lives now. */
+      reviewTarget?: TypedReusedReviewTarget;
+    };
 
 const NOTE_LIMIT = 500;
 const DETAILS_SERIALIZED_LIMIT = 20_000;

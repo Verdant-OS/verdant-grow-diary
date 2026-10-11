@@ -4,7 +4,8 @@
  * Qualification, photo checks, and the kill switch live in
  * public.badge_awards_evaluate_owner. This module only decides which
  * already-awarded rows the shelf may show. It does not award anything,
- * and it does not show badges on a profile or to other accounts.
+ * and it does not show badges on a profile. Signed-in members can read
+ * active award rows. Evidence photos stay private to the owning account.
  */
 export const FIRST_DIARY_ENTRY_BADGE_KEY = "first_diary_entry" as const;
 

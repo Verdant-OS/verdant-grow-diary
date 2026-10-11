@@ -40,11 +40,12 @@
 -- because the function reads the current photo columns. The photo
 -- must be on that entry, on that owner's path, and present in
 -- storage.objects for this account. A '..' segment, another user's path,
--- and an inferred link do not qualify. This migration does not publish
--- badges. Profile display, signed-in member visibility before community
--- launch, and logged-out refusal are a later slice and are not built
--- here. Evidence SELECT stays owner-only, so evidence photos are not
--- granted to other accounts or to anon.
+-- and an inferred link do not qualify. Signed-in members can SELECT
+-- active badge_awards rows. A hidden or revoked row stays visible to
+-- its owner and hidden from other members. Logged-out visitors (anon)
+-- receive no award rows. Profile display is a later slice and is not
+-- built here. Evidence SELECT stays owner-only, so evidence photos are
+-- not granted to other accounts or to anon.
 --
 -- Evidence can name a diary entry, tent, setup, or harvest. Only
 -- first_diary_entry has a qualification rule. The other keys are stored
@@ -147,6 +148,17 @@ CREATE POLICY badge_awards_owner_select
   FOR SELECT
   TO authenticated
   USING (user_id = auth.uid());
+
+-- Cut 001 (Matthew, 2026-10-11 03:41 CT): until community launch, signed-in
+-- members can see other growers' active badges. Evidence and photos stay
+-- owner-only. Logged-out visitors (anon) never see awards.
+CREATE POLICY badge_awards_member_select ON public.badge_awards
+  FOR SELECT TO authenticated
+  USING (
+    COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
+    AND hidden_at IS NULL
+    AND revoked_at IS NULL
+  );
 
 CREATE POLICY badge_evidence_owner_select
   ON public.badge_evidence

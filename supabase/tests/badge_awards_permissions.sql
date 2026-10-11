@@ -548,9 +548,83 @@ BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_stranger)::text, true);
   PERFORM set_config('role', 'authenticated', true);
   SELECT count(*) INTO v_count FROM public.badge_awards;
-  ASSERT v_count = 0, 'another account must not see this award';
+  ASSERT v_count = 1, format('the second signed-in account sees exactly 1 active award, got %s', v_count);
   SELECT count(*) INTO v_count FROM public.badge_evidence;
   ASSERT v_count = 0, 'another account must not see this evidence';
+  RESET role;
+
+  -- Member-read additions. The assertion above is the active award.
+  -- These checks put hidden_at and revoked_at back before the switch tests.
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  PERFORM set_config('request.jwt.claims', '{}', true);
+  PERFORM set_config('role', 'anon', true);
+  v_count := -1;
+  BEGIN
+    SELECT count(*) INTO v_count FROM public.badge_awards;
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      v_count := 0;
+  END;
+  ASSERT v_count = 0, format('anon must see 0 awards, got %s', v_count);
+  v_count := -1;
+  BEGIN
+    SELECT count(*) INTO v_count FROM public.badge_evidence;
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      v_count := 0;
+  END;
+  ASSERT v_count = 0, format('anon must see 0 evidence rows, got %s', v_count);
+  RESET role;
+
+  UPDATE public.badge_awards
+     SET hidden_at = clock_timestamp()
+   WHERE id = v_award;
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', v_stranger::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_stranger)::text, true);
+  PERFORM set_config('role', 'authenticated', true);
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE id = v_award;
+  ASSERT v_count = 0, 'a signed-in member must not see a hidden award';
+  RESET role;
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_owner)::text, true);
+  PERFORM set_config('role', 'authenticated', true);
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE id = v_award;
+  ASSERT v_count = 1, 'the owner must still see a hidden award';
+  RESET role;
+  UPDATE public.badge_awards SET hidden_at = NULL WHERE id = v_award;
+
+  UPDATE public.badge_awards
+     SET revoked_at = clock_timestamp()
+   WHERE id = v_award;
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', v_stranger::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_stranger)::text, true);
+  PERFORM set_config('role', 'authenticated', true);
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE id = v_award;
+  ASSERT v_count = 0, 'a signed-in member must not see a revoked award';
+  RESET role;
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_owner)::text, true);
+  PERFORM set_config('role', 'authenticated', true);
+  SELECT count(*) INTO v_count FROM public.badge_awards WHERE id = v_award;
+  ASSERT v_count = 1, 'the owner must still see a revoked award';
+  RESET role;
+  UPDATE public.badge_awards SET revoked_at = NULL WHERE id = v_award;
+
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', v_stranger::text, true);
+  PERFORM set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_stranger, 'is_anonymous', true)::text,
+    true
+  );
+  PERFORM set_config('role', 'authenticated', true);
+  SELECT count(*) INTO v_count FROM public.badge_awards;
+  ASSERT v_count = 0, format('an anonymous JWT must see 0 awards, got %s', v_count);
   RESET role;
 
   UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1;

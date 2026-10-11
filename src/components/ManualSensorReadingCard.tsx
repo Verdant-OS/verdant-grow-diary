@@ -78,6 +78,17 @@ import {
   validateManualSensorSnapshotFields,
   VPD_CONFLICT_THRESHOLD_KPA,
 } from "@/lib/manualSensorSnapshotFieldValidation";
+import { manualTentOptionLabels } from "@/lib/manualTentOptionLabelRules";
+import {
+  applyManualVpdRangeGate,
+  canonicalManualVpdInput,
+  displayManualVpdFromCanonical,
+  formatEnteredManualVpd,
+  MANUAL_VPD_UNITS,
+  manualVpdRangeGateInput,
+  relabelManualVpdMessage,
+  type ManualVpdUnit,
+} from "@/lib/manualSensorVpdUnitRules";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
 import { isUuid } from "@/lib/isUuid";
@@ -115,6 +126,8 @@ import {
 interface TentOption {
   id: string;
   name: string;
+  /** Optional grow name used only to disambiguate tents that share a name. */
+  growName?: string | null;
 }
 
 interface Props {
@@ -210,6 +223,20 @@ export default function ManualSensorReadingCard({
   // A restored reading carries its explicit unit; preference resolution must
   // not reinterpret the same numeric string after a protected-shell remount.
   const airTempUnit = values.tempUnitOverride ?? form.airTempUnit ?? preferredUnit;
+  // VPD unit stays in component state. The draft stores canonical kPa, so a
+  // remount does not reinterpret a saved number, and nothing is written to
+  // localStorage.
+  const [vpdUnit, setVpdUnit] = useState<ManualVpdUnit>("kPa");
+  const [vpdText, setVpdText] = useState("");
+  const lastWrittenVpd = useRef<string | null>(null);
+  const formVpd =
+    typeof form.vpdKpa === "string" ? form.vpdKpa : form.vpdKpa == null ? "" : String(form.vpdKpa);
+  useEffect(() => {
+    if (lastWrittenVpd.current === formVpd) return;
+    lastWrittenVpd.current = formVpd;
+    setVpdText(displayManualVpdFromCanonical(formVpd, vpdUnit));
+  }, [formVpd, vpdUnit]);
+  const tentLabels = useMemo(() => manualTentOptionLabels(tents), [tents]);
   const [reviewOpen, setReviewOpen] = useState(false);
   const insertBatch = useInsertSensorReadings();
   const isSaving = correctionSaving || insertBatch.isPending || !!sessionState?.inFlight;
@@ -368,7 +395,10 @@ export default function ManualSensorReadingCard({
     return preset ? normalizeManualSourceNote(preset.label) : null;
   }, [devicePreset, deviceCustom, devicePresets]);
 
-  const validation = useMemo(() => validateManualEntry(form), [form]);
+  const validation = useMemo(() => {
+    const gate = manualVpdRangeGateInput(formVpd, vpdText, vpdUnit);
+    return applyManualVpdRangeGate(validateManualEntry(form), gate.typed, gate.unit);
+  }, [form, formVpd, vpdText, vpdUnit]);
   const advisor = useMemo(
     () =>
       evaluateManualSnapshotAdvisor({
@@ -422,14 +452,24 @@ export default function ManualSensorReadingCard({
     return review({
       tempF: airTempFBridge,
       humidity: form.humidityPct,
-      vpdKpa: form.vpdKpa,
+      vpdKpa: formVpd,
       soilWaterContent: form.soilMoisturePct,
       co2Ppm: form.co2Ppm,
       ppfd: form.ppfd,
       capturedAt: draftCapturedAt ?? new Date().toISOString(),
       tentId: tentId || null,
     });
-  }, [form, airTempFBridge, tentId, draftCapturedAt, isCorrection]);
+  }, [form, formVpd, airTempFBridge, tentId, draftCapturedAt, isCorrection]);
+  const reviewForDisplay = useMemo(() => {
+    if (vpdUnit === "kPa") return snapshotReview;
+    return {
+      ...snapshotReview,
+      findings: snapshotReview.findings.map((finding) => ({
+        ...finding,
+        message: relabelManualVpdMessage(finding.message, vpdUnit),
+      })),
+    };
+  }, [snapshotReview, vpdUnit]);
 
   // Entered VPD vs air-VPD estimate. Uses only sanitized numeric metrics —
   // never relabels source. If the grower entered a VPD that disagrees with
@@ -450,7 +490,7 @@ export default function ManualSensorReadingCard({
       if (m.metric === "temperature_c") fields.temperatureC = m.value;
       else if (m.metric === "humidity_pct") fields.humidityPct = m.value;
     }
-    const rawVpd = typeof form.vpdKpa === "string" ? form.vpdKpa.trim() : "";
+    const rawVpd = formVpd.trim();
     if (rawVpd.length > 0) {
       const n = Number(rawVpd);
       if (Number.isFinite(n)) fields.vpdKpa = n;
@@ -460,7 +500,7 @@ export default function ManualSensorReadingCard({
       capturedAt: draftCapturedAt ?? new Date().toISOString(),
       ...fields,
     });
-  }, [validation.metrics, form.vpdKpa, draftCapturedAt]);
+  }, [validation.metrics, formVpd, draftCapturedAt]);
   const enteredVpd =
     fieldValidation.derivedVpd.kind === "entered" ? fieldValidation.derivedVpd.vpdKpa : null;
   const derivedVpdFromTempRh = useMemo(() => {
@@ -480,6 +520,22 @@ export default function ManualSensorReadingCard({
   const vpdConflictHint = fieldValidation.hints.find(
     (h) => h.field === "vpdKpa" && h.severity === "warn",
   );
+
+  function onVpdChange(typed: string) {
+    setVpdText(typed);
+    const canonical = canonicalManualVpdInput(typed, vpdUnit);
+    lastWrittenVpd.current = canonical;
+    update("vpdKpa", canonical);
+  }
+
+  function changeVpdUnit(next: ManualVpdUnit) {
+    if (next === vpdUnit) return;
+    // Display only. The stored kPa string is not rewritten, so a pending
+    // snapshot keeps its revision and payload through any number of toggles.
+    lastWrittenVpd.current = formVpd;
+    setVpdUnit(next);
+    setVpdText(displayManualVpdFromCanonical(formVpd, next));
+  }
 
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {
     updateValues((current) =>
@@ -811,19 +867,26 @@ export default function ManualSensorReadingCard({
                     <SelectValue placeholder="Select tent" />
                   </SelectTrigger>
                   <SelectContent>
-                    {tents.map((t) => (
-                      <SelectItem
-                        key={t.id}
-                        value={t.id}
-                        data-testid={`manual-reading-tent-option-${t.id}`}
-                      >
-                        {t.name}
-                      </SelectItem>
-                    ))}
+                    {tents.map((t) => {
+                      const label = tentLabels.get(t.id) ?? t.name;
+                      return (
+                        <SelectItem
+                          key={t.id}
+                          value={t.id}
+                          aria-label={label}
+                          data-testid={`manual-reading-tent-option-${t.id}`}
+                        >
+                          {label}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
                 <p className="text-[11px] text-muted-foreground">
-                  Saving to: <strong>{tents.find((t) => t.id === tentId)?.name ?? "—"}</strong>
+                  Saving to:{" "}
+                  <strong>
+                    {tentLabels.get(tentId) ?? tents.find((t) => t.id === tentId)?.name ?? "—"}
+                  </strong>
                 </p>
               </div>
             )}
@@ -931,14 +994,43 @@ export default function ManualSensorReadingCard({
                 onChange={(v) => update("co2Ppm", v)}
                 placeholder="e.g. 800 from EcoWitt WH45 CO₂ Monitor"
               />
-              <Field
-                id="m-vpd"
-                label="VPD"
-                unit="kPa"
-                value={form.vpdKpa as string}
-                onChange={(v) => update("vpdKpa", v)}
-                placeholder="enter measured VPD (optional)"
-              />
+              <div className="space-y-1">
+                <Field
+                  id="m-vpd"
+                  label="VPD"
+                  unit={vpdUnit}
+                  value={vpdText}
+                  onChange={onVpdChange}
+                  placeholder="enter measured VPD (optional)"
+                />
+                <div
+                  className="flex items-center gap-1"
+                  role="group"
+                  aria-label="Vapor pressure deficit entry unit"
+                  data-testid="manual-reading-vpd-unit-toggle"
+                  data-active-unit={vpdUnit}
+                >
+                  {MANUAL_VPD_UNITS.map((unit) => (
+                    <button
+                      key={unit}
+                      type="button"
+                      onClick={() => changeVpdUnit(unit)}
+                      aria-pressed={vpdUnit === unit}
+                      data-testid={`manual-reading-vpd-unit-${unit}`}
+                      className={`min-h-11 min-w-11 rounded-md border px-3 text-xs font-medium transition-colors ${
+                        vpdUnit === unit
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border/60 text-muted-foreground hover:bg-secondary/40"
+                      }`}
+                    >
+                      {unit}
+                    </button>
+                  ))}
+                  <span className="ml-1 text-[10px] text-muted-foreground">
+                    Entered in {vpdUnit} — saved as kPa.
+                  </span>
+                </div>
+              </div>
             </Section>
 
             <Section title="Root zone" testId="manual-reading-section-root">
@@ -1003,7 +1095,7 @@ export default function ManualSensorReadingCard({
                     data-value={enteredVpd ?? ""}
                   >
                     <span className="text-muted-foreground">Entered VPD:</span>{" "}
-                    {enteredVpd !== null ? `${enteredVpd.toFixed(2)} kPa` : "—"}
+                    {enteredVpd !== null ? formatEnteredManualVpd(enteredVpd, vpdUnit) : "—"}
                   </span>
                   <span
                     className="tabular-nums"
@@ -1020,13 +1112,15 @@ export default function ManualSensorReadingCard({
                     data-testid="manual-reading-vpd-conflict-warning"
                   >
                     <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>{vpdConflictHint.message}</span>
+                    <span>{relabelManualVpdMessage(vpdConflictHint.message, vpdUnit)}</span>
                   </p>
                 )}
                 <p className="mt-1 text-[10px] text-muted-foreground">
                   Manual entry — the air estimate is preview-only, is not saved as verified VPD, and
                   never relabels this reading as live. Conflict threshold:{" "}
-                  {VPD_CONFLICT_THRESHOLD_KPA.toFixed(2)} kPa.
+                  {vpdUnit === "kPa"
+                    ? `${VPD_CONFLICT_THRESHOLD_KPA.toFixed(2)} kPa.`
+                    : `${formatEnteredManualVpd(VPD_CONFLICT_THRESHOLD_KPA, vpdUnit)}.`}
                 </p>
               </div>
             )}
@@ -1039,7 +1133,7 @@ export default function ManualSensorReadingCard({
                     className="flex items-start gap-2 text-xs text-amber-600 dark:text-amber-400"
                   >
                     <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>{w}</span>
+                    <span>{relabelManualVpdMessage(w, vpdUnit)}</span>
                   </li>
                 ))}
               </ul>
@@ -1089,7 +1183,7 @@ export default function ManualSensorReadingCard({
                     aria-label="Review manual snapshot before saving"
                     aria-describedby="manual-sensor-review-gate"
                   >
-                    <ManualSensorSnapshotReviewPanel result={snapshotReview} />
+                    <ManualSensorSnapshotReviewPanel result={reviewForDisplay} />
                     <p
                       id="manual-sensor-review-gate"
                       data-testid="manual-sensor-review-gate"

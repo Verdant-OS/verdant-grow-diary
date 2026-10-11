@@ -39,7 +39,6 @@ import { M2_PER_FT2, areaM2, areaM2FromFeet } from "@/lib/unitsCalc";
 import {
   calculateWhenReady as attempt,
   hasCompleteFivePointReading,
-  hasPositiveCanopyDimensions,
 } from "@/lib/growHelpToolkitReadiness";
 import NumberField from "./NumberField";
 import ResultBlock from "./ResultBlock";

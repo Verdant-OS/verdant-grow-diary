@@ -27,6 +27,12 @@ describe("reports hub onboarding plant count", () => {
     expect(cards.map((card) => card.id)).toEqual(["add_sensor_snapshot", "review_action_outcome"]);
   });
 
+  it("hides the add-plant card while the plant count is still unknown", () => {
+    const { visible, cards } = buildReportsHubOnboarding({ ...emptyGrow, plantCount: null });
+    expect(visible).toBe(true);
+    expect(cards.map((card) => card.id)).toEqual(["add_sensor_snapshot", "review_action_outcome"]);
+  });
+
   it("hides the whole section when there is one diary entry", () => {
     const { visible, cards } = buildReportsHubOnboarding({
       ...emptyGrow,

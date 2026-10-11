@@ -19,7 +19,6 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useGrowPlants } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import { useReportsHubData } from "@/hooks/useReportsHubData";
@@ -42,7 +41,6 @@ export default function Reports() {
   const { activeGrow, grows, loading: growsLoading } = useGrows();
   const grow = scopedGrow ?? activeGrow ?? null;
   const data = useReportsHubData(grow?.id ?? null);
-  const plantsQuery = useGrowPlants(undefined, grow?.id);
 
   const summary =
     grow && data.status === "ready"
@@ -91,7 +89,9 @@ export default function Reports() {
     latestSensorCapturedAt: data.latestSensorCapturedAt,
     outcomeTotal: data.outcomeSummary?.total ?? 0,
     alertsOpen: data.alertsOpen,
-    plantCount: plantsQuery.data?.length ?? 0,
+    // Unknown while the hub read is still loading, so the card stays hidden
+    // instead of appearing at 0 and disappearing when the count arrives.
+    plantCount: data.status === "ready" ? (data.plantCount ?? null) : null,
   });
 
   const hasNoGrow = !growsLoading && grows.length === 0;

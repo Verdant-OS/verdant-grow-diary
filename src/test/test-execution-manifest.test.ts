@@ -171,6 +171,16 @@ const EXEMPTIONS: Record<string, { class: string; reason: string }> = {
     reason:
       'Credential-free and mocked (7 page.route). 2 of 9 tests fail deterministically at 320px and 1440px: "/daily-check must not conceal intrinsic horizontal overflow", 11 violations. The other 7 pass. Wiring the file red would block every PR.',
   },
+  "e2e/owner-badge-shelf.spec.ts": {
+    class: EXEMPTION_CLASS.AWAITING_DECISION,
+    reason:
+      "Credential-free chromium-mocked spec: page.route stubs /auth/v1 and /rest/v1, and no workflow names this file. Matthew Cheek, 2026-10-10 5:34 PM CT, approved the First Diary Entry draft and required CI wiring be proposed separately, not built. Adding it to mocked-e2e-unwired-closure.yml is a scorer-locked workflow edit outside that approval. Local run: 1 passed, 0 skipped.",
+  },
+  "e2e/owner-badge-kill-switch.spec.ts": {
+    class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
+    reason:
+      "Playwright request spec. test.skip unless E2E_LOCAL_SUPABASE_URL and E2E_LOCAL_SUPABASE_ANON_KEY are set, and it throws unless the host is loopback and is not verdantgrowdiary.com. A mocked CI job would record a skip. Local run against 127.0.0.1 passed. The required-CI change for this lane is the separate proposal, not this slice.",
+  },
 
   /* ---------------- pgTAP lane ---------------- */
   ...pgTapExemptions(),
@@ -201,6 +211,11 @@ function pgTapExemptions(): Record<string, { class: string; reason: string }> {
   out["supabase/tests/billing_subscriptions_rls.sql"] = {
     class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
     reason: `${blocked} ADDITIONALLY BROKEN: line 59 calls max(user_id) on a uuid column, and max(uuid) does not exist in PostgreSQL — proven on a throwaway PG 16.13 cluster (0 rows in pg_aggregate; "ERROR: function max(uuid) does not exist", with max(text) as a passing control). Note it is not necessarily the FIRST error: without psql variables the file dies earlier at "syntax error at or near \\":\\"". Wiring this lane will not make this suite pass.`,
+  };
+  out["supabase/tests/badge_awards_permissions.sql"] = {
+    class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
+    reason:
+      "Local-only owner-badge pgTAP. irrigation-pgtap-rls-gate.yml executes create_feeding_event.sql and create_watering_event.sql only. Matthew Cheek, 2026-10-10 5:34 PM CT, required the CI wiring for this file be proposed separately and not built in this slice. Local psql and supabase test db both PASS against loopback.",
   };
   return out;
 }
@@ -305,10 +320,10 @@ describe("test execution manifest — every committed test runs, or says why not
       byClass[entry.class] = (byClass[entry.class] ?? 0) + 1;
     }
     expect(byClass).toEqual({
-      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 20,
+      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 22,
       [EXEMPTION_CLASS.NOT_HERMETIC]: 8,
       [EXEMPTION_CLASS.RED_WHEN_RUN]: 2,
-      [EXEMPTION_CLASS.AWAITING_DECISION]: 1,
+      [EXEMPTION_CLASS.AWAITING_DECISION]: 2,
     });
     expect(byClass[EXEMPTION_CLASS.FLAKY] ?? 0).toBe(0);
   });

@@ -104,21 +104,8 @@ export function assessQuickLogWaterSaveGate(input: {
     if (reason) fields[field] = messageFor(reason, field, input.temperatureUnit);
   }
 
-  const fullReason = probeReason(
-    { ...input.form, volumeMl: volumeForAir },
-    {
-      temperatureC: fields.temperature ? "" : input.temperatureC,
-      humidityPct: fields.humidity ? "" : input.humidityPct,
-      vpdKpa: fields.vpd ? "" : input.vpdKpa,
-    },
-  );
   const footerMessage =
-    fields.volume ??
-    fields.temperature ??
-    fields.humidity ??
-    fields.vpd ??
-    (fullReason ? wateringFormReasonToHelper(fullReason) : null);
+    fields.volume ?? fields.temperature ?? fields.humidity ?? fields.vpd ?? null;
 
-  const blocksSave = footerMessage !== null;
-  return { blocksSave, fields, footerMessage };
+  return { blocksSave: footerMessage !== null, fields, footerMessage };
 }

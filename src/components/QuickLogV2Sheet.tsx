@@ -852,25 +852,32 @@ function QuickLogV2SheetForOwner({
     archivedGrowIds,
   });
   const volumeMissing = form.action === "water" && wateringForm.volumeMl.trim() === "";
-  const waterSaveGate =
-    form.action === "water"
-      ? assessQuickLogWaterSaveGate({
-          form: {
-            ...wateringForm,
-            waterTempC: typedTempToCelsiusInput(
-              wateringForm.waterTempC,
-              wateringTempEntryUnitRef.current ?? temperatureUnit,
-            ),
-          },
-          temperatureC: typedTempToCelsiusInput(
-            form.temperatureC,
-            manualTempEntryUnitRef.current ?? temperatureUnit,
-          ),
-          humidityPct: form.humidityPct,
-          vpdKpa: form.vpdKpa,
-          temperatureUnit: manualTempEntryUnitRef.current ?? temperatureUnit,
-        })
-      : null;
+  const manualEntryUnit = manualTempEntryUnitRef.current ?? temperatureUnit;
+  const waterEntryUnit = wateringTempEntryUnitRef.current ?? temperatureUnit;
+  const waterSaveGate = useMemo(
+    () =>
+      form.action === "water"
+        ? assessQuickLogWaterSaveGate({
+            form: {
+              ...wateringForm,
+              waterTempC: typedTempToCelsiusInput(wateringForm.waterTempC, waterEntryUnit),
+            },
+            temperatureC: typedTempToCelsiusInput(form.temperatureC, manualEntryUnit),
+            humidityPct: form.humidityPct,
+            vpdKpa: form.vpdKpa,
+            temperatureUnit: manualEntryUnit,
+          })
+        : null,
+    [
+      form.action,
+      form.temperatureC,
+      form.humidityPct,
+      form.vpdKpa,
+      manualEntryUnit,
+      waterEntryUnit,
+      wateringForm,
+    ],
+  );
   const waterFieldMessage = retryPending ? null : (waterSaveGate?.footerMessage ?? null);
   const criticalContentMissing = isQuickLogV2CriticalContentMissing({
     action: form.action,

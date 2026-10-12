@@ -1,5 +1,3 @@
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   resolveQuickLogSensorSnapshotForAi,
   type QuickLogSensorAcquisitionRow,
@@ -23,6 +21,37 @@ import {
   downloadSignedStorageObject,
   isAllowedSignedPhotoUrl,
 } from "../_shared/geminiInlineImage.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-retry-count",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+};
+
+type AiCoachCreateClient = (
+  url: string,
+  key: string,
+  options?: Record<string, unknown>,
+) => {
+  auth: { getUser(): Promise<{ data: { user: { id: string } | null } | null }> };
+  rpc(
+    name: string,
+    params?: Record<string, unknown>,
+  ): PromiseLike<{ data: unknown; error: unknown }>;
+  from(table: string): unknown;
+};
+
+type AiCoachRuntimeClient = {
+  auth: { getUser(): Promise<{ data: { user: { id: string } | null } | null }> };
+  rpc(name: string, params?: Record<string, unknown>): Promise<{ data: any; error: any }>;
+  from(table: string): any;
+};
+
+export type AiCoachHandlerDeps = {
+  createClient?: AiCoachCreateClient;
+  photoTimeoutMs?: number;
+};
 
 type Mode = "diagnose" | "next_steps";
 interface Body {
@@ -269,7 +298,10 @@ async function settleResultPersistence<T>(operation: PromiseLike<T>): Promise<T>
   }
 }
 
-Deno.serve(async (req) => {
+export async function handleAiCoachRequest(
+  req: Request,
+  deps: AiCoachHandlerDeps = {},
+): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   // After the spend RPC starts, an unexpected error is ambiguous: the ledger
   // may have committed. A same-key replay must resolve it instead of charging
@@ -278,7 +310,14 @@ Deno.serve(async (req) => {
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return json({ error: "unauthorized" }, 401);
-    const supabase = createClient(
+    const createSupabaseClient = (deps.createClient ??
+      (await import("npm:@supabase/supabase-js@2"))
+        .createClient) as unknown as AiCoachCreateClient as unknown as (
+      url: string,
+      key: string,
+      options?: Record<string, unknown>,
+    ) => AiCoachRuntimeClient;
+    const supabase = createSupabaseClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: auth } } },
@@ -312,7 +351,7 @@ Deno.serve(async (req) => {
       return json({ error: "AI not configured" }, 500);
     }
 
-    const creditSupabase = createClient(creditSupabaseUrl, serviceRoleKey, {
+    const creditSupabase = createSupabaseClient(creditSupabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
     const billingEnvironment = billingEnvironmentResolution.environment;
@@ -627,7 +666,10 @@ Rules for diagnosis (structured view, approval-first):
     // the bytes are inlined after the spend id exists.
     if (body.photoUrl) {
       const photoController = new AbortController();
-      const photoTimer = setTimeout(() => photoController.abort(), PROVIDER_TIMEOUT_MS);
+      const photoTimer = setTimeout(
+        () => photoController.abort(),
+        deps.photoTimeoutMs ?? PROVIDER_TIMEOUT_MS,
+      );
       try {
         const downloaded = await downloadSignedStorageObject({
           photoUrl: body.photoUrl,
@@ -758,7 +800,11 @@ Rules for diagnosis (structured view, approval-first):
     console.log("ai-coach status=unexpected");
     return calmFailure(creditSpendMayExist ? "result_pending" : "http");
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve((req) => handleAiCoachRequest(req));
+}
 
 function json(b: unknown, status = 200) {
   return new Response(JSON.stringify(b), {

@@ -174,6 +174,7 @@ Deno.test("refunds when the Gemini response body stalls until abort", async () =
     }
     return Promise.reject(new Error(`unexpected fetch ${url}`));
   }) as typeof fetch;
+  let hangTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     const pending = handleAiCoachRequest(
       new Request(`${SUPABASE_URL}/functions/v1/ai-coach`, {
@@ -192,9 +193,9 @@ Deno.test("refunds when the Gemini response body stalls until abort", async () =
     );
     const winner = await Promise.race([
       pending.then((response) => ({ kind: "response" as const, response })),
-      new Promise<{ kind: "timeout" }>((resolve) =>
-        setTimeout(() => resolve({ kind: "timeout" }), 1000),
-      ),
+      new Promise<{ kind: "timeout" }>((resolve) => {
+        hangTimer = setTimeout(() => resolve({ kind: "timeout" }), 1000);
+      }),
     ]);
     assert(geminiAborted, "abort was not observed");
     assert(winner.kind === "response", "handler exceeded 1s");
@@ -210,6 +211,7 @@ Deno.test("refunds when the Gemini response body stalls until abort", async () =
       `refund params ${JSON.stringify(refunds[0]?.params)}`,
     );
   } finally {
+    if (hangTimer !== undefined) clearTimeout(hangTimer);
     globalThis.fetch = previous;
   }
 });

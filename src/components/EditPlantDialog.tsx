@@ -30,6 +30,10 @@ import {
 } from "@/components/ui/select";
 import { Pencil, Camera, ImagePlus, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  TRIMMED_REQUIRED_IDENTITY_MESSAGE,
+  hasTrimmedRequiredIdentity,
+} from "@/lib/formIdentityFailClosedRules";
 
 import PlantPhoto from "@/components/PlantPhoto";
 import {
@@ -127,6 +131,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [photoErr, setPhotoErr] = useState<string | null>(null);
+  const [nameError, setNameError] = useState(false);
   const [clearPhoto, setClearPhoto] = useState(false);
   const [selected, setSelected] = useState<SelectedPhoto | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -164,8 +169,10 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
         plant_type: plant.plantType ?? "unknown",
       });
       resetLocalPhotoState();
+      setNameError(false);
     } else {
       resetLocalPhotoState();
+      setNameError(false);
     }
     // Also reset when the target plant id changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -195,6 +202,10 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
+    if (!hasTrimmedRequiredIdentity(form.name)) {
+      setNameError(true);
+      return;
+    }
     if (!user) {
       toast.error("Not signed in");
       return;
@@ -500,9 +511,25 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             <Input
               required
               value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onChange={(e) => {
+                const name = e.target.value;
+                setForm({ ...form, name });
+                if (nameError && hasTrimmedRequiredIdentity(name)) setNameError(false);
+              }}
+              aria-invalid={nameError || undefined}
+              aria-describedby={nameError ? "edit-plant-name-error" : undefined}
               data-testid="edit-plant-name"
             />
+            {nameError ? (
+              <p
+                id="edit-plant-name-error"
+                role="alert"
+                className="text-xs text-destructive mt-1"
+                data-testid="edit-plant-name-error"
+              >
+                {TRIMMED_REQUIRED_IDENTITY_MESSAGE}
+              </p>
+            ) : null}
           </div>
           <div>
             <Label>Strain</Label>

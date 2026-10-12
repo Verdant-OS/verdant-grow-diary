@@ -7,6 +7,8 @@
  *
  * Pure: no React, no I/O, no clock.
  */
+export const TRIMMED_REQUIRED_IDENTITY_MESSAGE = "A name is required.";
+
 export function hasTrimmedRequiredIdentity(value: unknown): boolean {
   return typeof value === "string" && value.trim().length > 0;
 }

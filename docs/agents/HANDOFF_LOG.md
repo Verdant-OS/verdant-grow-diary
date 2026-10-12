@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### ISSUE-1997-EDIT-PLANT-BLANK-NAME
+
+```text
+TASK ISSUE-1997-EDIT-PLANT-BLANK-NAME  priority: P1  status: OPEN
+goal: Block Edit Plant save when Name is blank or whitespace-only, with an inline error, before any upload or update. Partial slice of #1997.
+branch: cursor/edit-plant-blank-name-3bf6
+base: verdant-grow-diary
+checkout: git fetch origin cursor/edit-plant-blank-name-3bf6 verdant-grow-diary && git switch cursor/edit-plant-blank-name-3bf6 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: draft against verdant-grow-diary; URL recorded after open
+head_sha: recorded after push
+state: local implementation, tests green for the name slice
+next_action: stay draft. Independent review is Blue Dream (.tsx product, P1). Do not mark ready or merge.
+files: src/components/EditPlantDialog.tsx; src/lib/formIdentityFailClosedRules.ts; src/test/edit-plant-identity-fail-closed.test.tsx
+blockers: none for the repository change. No production write.
+artifacts: new test src/test/edit-plant-identity-fail-closed.test.tsx
+reviewer_seat: Blue Dream
+claimed_by: Grok (Cursor cloud), 2026-10-12 14:45 UTC
+last_updated: 2026-10-12 09:45 CT, by Grok
+```
+
 ### PR-1939-NOT-FOUND-COVERAGE
 
 ```text

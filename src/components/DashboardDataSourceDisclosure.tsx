@@ -7,6 +7,7 @@
  * `getGrowDataMeta` from `useGrowData`. No queries, no writes.
  */
 import { Badge } from "@/components/ui/badge";
+import GrowDataLoadError from "@/components/GrowDataLoadError";
 import { cn } from "@/lib/utils";
 import { combineGrowDataMeta, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
 import { useAuth } from "@/store/auth";
@@ -53,6 +54,8 @@ interface Props {
   hasAnyData: boolean;
   /** True when the account already has a grow, even with no tent or plant yet. */
   hasGrow?: boolean;
+  /** Retries the tent and plant reads after a failed fetch. */
+  onRetry?: () => void;
   /** Test/override hook. When omitted, metadata is read from getGrowDataMeta. */
   metas?: readonly GrowDataSourceMeta[];
   /** Optional sensor snapshot source — when "sim", a simulated-data notice
@@ -65,6 +68,7 @@ export default function DashboardDataSourceDisclosure({
   scopedGrowId,
   hasAnyData,
   hasGrow = false,
+  onRetry,
   metas,
   snapshotSource,
   className,
@@ -82,6 +86,18 @@ export default function DashboardDataSourceDisclosure({
   const isSimulated = snapshotSource === "sim";
   const simulatedNotice =
     "Simulated sensor data shown — for testing/demo only. Not real tent data and not used for persisted alerts.";
+
+  // "unavailable" also covers a failed fetch. That is not an empty tent.
+  const fetchFailed = resolved.some((meta) => meta.sourceReason === "fetch-error");
+  if (fetchFailed) {
+    return (
+      <GrowDataLoadError
+        resource="Dashboard grow data"
+        testId="dashboard-data-source-read-error"
+        onRetry={onRetry}
+      />
+    );
+  }
 
   // A saved grow with no tent yet is a successful empty read, not a missing grow.
   if (!hasAnyData && hasGrow && combined.dataSource === "unavailable") {

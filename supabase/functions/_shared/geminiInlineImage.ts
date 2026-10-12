@@ -197,7 +197,11 @@ export async function downloadSignedStorageObject(args: {
     return { ok: false, reason: "download_failed" };
   }
   if (!response.ok) {
-    await response.body?.cancel();
+    try {
+      await response.body?.cancel();
+    } catch {
+      // Cleanup only. The failed response is still download_failed.
+    }
     return { ok: false, reason: "download_failed" };
   }
   try {

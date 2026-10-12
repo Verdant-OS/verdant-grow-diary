@@ -10,18 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { combineGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
 import InfoPopover from "@/components/InfoPopover";
+import { isSuccessfulEmptyGrowRead } from "@/lib/growDataEmptyReadRules";
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
 
-type Label = "Live" | "Demo" | "Mixed" | "Unavailable";
+export { isSuccessfulEmptyGrowRead };
 
-/**
- * A successful read that returned no rows. Empty is not the same as a
- * failed read. Every meta must say `no-rows`; one fetch error keeps the
- * Unavailable badge.
- */
-export function isSuccessfulEmptyGrowRead(metas: readonly GrowDataSourceMeta[]): boolean {
-  return metas.length > 0 && metas.every((meta) => meta.sourceReason === "no-rows");
-}
+type Label = "Live" | "Demo" | "Mixed" | "Unavailable";
 
 const LABEL_BY_SOURCE: Record<GrowDataSourceMeta["dataSource"], Label> = {
   supabase: "Live",

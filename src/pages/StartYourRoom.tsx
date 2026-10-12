@@ -111,6 +111,7 @@ export default function StartYourRoom() {
 
   const ownerId = user?.id ?? null;
   const plantsFetchKey = useRef<string | null>(null);
+  const [plantReadAttempt, setPlantReadAttempt] = useState(0);
   useEffect(() => {
     if (!plantsReadable || !ownerId || grows.length !== 1) {
       plantsFetchKey.current = null;
@@ -125,8 +126,9 @@ export default function StartYourRoom() {
     const growId = activeGrowId ?? grows[0]?.id ?? null;
     const fetchKey = `${ownerId}:${growId ?? ""}`;
     if (plantsFetchKey.current === fetchKey) return;
-    plantsFetchKey.current = fetchKey;
-    setPlantsRead({ loading: true, plants: null });
+    setPlantsRead((prev) =>
+      prev.loading && prev.plants === null ? prev : { loading: true, plants: null },
+    );
     void (async () => {
       try {
         let query = supabase
@@ -137,21 +139,26 @@ export default function StartYourRoom() {
         const { data, error: plantsError } = await query;
         if (cancelled) return;
         if (plantsError) {
+          plantsFetchKey.current = null;
           setPlantsRead({ loading: false, plants: null });
           return;
         }
+        plantsFetchKey.current = fetchKey;
         setPlantsRead({
           loading: false,
           plants: (data ?? []) as StartYourRoomResumePlant[],
         });
       } catch {
-        if (!cancelled) setPlantsRead({ loading: false, plants: null });
+        if (!cancelled) {
+          plantsFetchKey.current = null;
+          setPlantsRead({ loading: false, plants: null });
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [plantsReadable, ownerId, activeGrowId, grows]);
+  }, [plantsReadable, ownerId, activeGrowId, grows, plantReadAttempt]);
 
   const resume = useMemo(
     () =>
@@ -168,6 +175,8 @@ export default function StartYourRoom() {
   );
   const roomSourcesLoading =
     growsLoading || tentsQuery.isLoading || (grows.length === 1 && plantsRead.loading);
+  const plantReadFailed =
+    plantsReadable && grows.length === 1 && !plantsRead.loading && plantsRead.plants === null;
   const growCountRequired = entitlement.capabilities.maxActiveGrows != null;
   const tentCountRequired = !entitlement.capabilities.multiTent;
   const creationVerificationLoading =
@@ -177,6 +186,7 @@ export default function StartYourRoom() {
     (tentCountRequired && tentsQuery.isLoading);
   const creationVerificationFailed =
     entitlementLookupFailed ||
+    plantReadFailed ||
     (growCountRequired && Boolean(growsError)) ||
     (tentCountRequired && tentsQuery.isError);
   const planVerificationReady = !entitlementLoading && !entitlementLookupFailed;
@@ -198,10 +208,12 @@ export default function StartYourRoom() {
   // A paid plan can still start another grow from this page. Partial resume
   // would hide that choice, so keep the grow step when the gate allows it.
   // A finished room still opens done.
-  const appliedResume = useMemo(
-    () => (resume && (resume.step === "done" || !growGate.allowed) ? resume : null),
-    [resume, growGate.allowed],
-  );
+  const appliedResume = useMemo(() => {
+    if (!resume) return null;
+    if (resume.step === "done") return resume;
+    if (!planVerificationReady || growGate.allowed) return null;
+    return resume;
+  }, [resume, planVerificationReady, growGate.allowed]);
   const showingResume = appliedResume != null && stepIndex(step) <= stepIndex(appliedResume.step);
   const shownStep: StartYourRoomStep = showingResume ? appliedResume.step : step;
   const shownIds: StartYourRoomIds = showingResume
@@ -223,6 +235,7 @@ export default function StartYourRoom() {
     shownStep === "grow" ? roomPreflightGate : shownStep === "tent" ? tentGate : null;
   const currentCreationGate = !growGate.allowed ? growGate : stepCreationGate;
   const progress = useMemo(() => progressLabel(shownStep), [shownStep]);
+  const showRoomLoading = roomSourcesLoading || creationVerificationLoading;
 
   useEffect(() => {
     if (!appliedResume) return;
@@ -272,6 +285,8 @@ export default function StartYourRoom() {
     setVerificationRetrying(true);
     setError(null);
     try {
+      plantsFetchKey.current = null;
+      setPlantReadAttempt((attempt) => attempt + 1);
       await Promise.allSettled([refresh(), tentsQuery.refetch(), refetchEntitlements()]);
     } finally {
       setVerificationRetrying(false);
@@ -538,7 +553,7 @@ export default function StartYourRoom() {
           </p>
         )}
 
-        {!roomSourcesLoading && shownStep === "grow" && (
+        {!showRoomLoading && shownStep === "grow" && (
           <form onSubmit={submitGrowFromForm}>
             <section className="space-y-3" data-testid="start-your-room-step-grow">
               <div className="flex items-center gap-2 text-sm font-medium">
@@ -575,7 +590,7 @@ export default function StartYourRoom() {
           </form>
         )}
 
-        {!roomSourcesLoading && shownStep === "tent" && (
+        {!showRoomLoading && shownStep === "tent" && (
           <form onSubmit={submitTentFromForm}>
             <section className="space-y-3" data-testid="start-your-room-step-tent">
               <div className="flex items-center gap-2 text-sm font-medium">
@@ -619,7 +634,7 @@ export default function StartYourRoom() {
           </form>
         )}
 
-        {!roomSourcesLoading && shownStep === "plant" && (
+        {!showRoomLoading && shownStep === "plant" && (
           <form onSubmit={submitPlantFromForm}>
             <section className="space-y-3" data-testid="start-your-room-step-plant">
               <div className="flex items-center gap-2 text-sm font-medium">
@@ -677,7 +692,7 @@ export default function StartYourRoom() {
           </form>
         )}
 
-        {!roomSourcesLoading && shownStep === "done" && (
+        {!showRoomLoading && shownStep === "done" && (
           <section className="space-y-3" data-testid="start-your-room-step-done">
             <div className="flex items-center gap-2 text-sm font-medium text-emerald-500">
               <CheckCircle2 className="h-4 w-4" aria-hidden />
@@ -709,7 +724,7 @@ export default function StartYourRoom() {
           </section>
         )}
 
-        {roomSourcesLoading ? (
+        {showRoomLoading ? (
           <p role="status" className="text-sm text-muted-foreground">
             {ROOM_LIMITS_LOADING_COPY}
           </p>

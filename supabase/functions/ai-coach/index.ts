@@ -51,6 +51,7 @@ type AiCoachRuntimeClient = {
 export type AiCoachHandlerDeps = {
   createClient?: AiCoachCreateClient;
   photoTimeoutMs?: number;
+  providerTimeoutMs?: number;
 };
 
 type Mode = "diagnose" | "next_steps";
@@ -692,8 +693,11 @@ Rules for diagnosis (structured view, approval-first):
     userContent.push({ type: "text", text });
 
     const providerController = new AbortController();
-    const providerTimer = setTimeout(() => providerController.abort(), PROVIDER_TIMEOUT_MS);
-    let r: Response;
+    const providerTimer = setTimeout(
+      () => providerController.abort(),
+      deps.providerTimeoutMs ?? PROVIDER_TIMEOUT_MS,
+    );
+    let data: unknown;
     try {
       const providerRequest = buildGeminiDirectChatRequest({
         apiKey: geminiKey,
@@ -707,30 +711,32 @@ Rules for diagnosis (structured view, approval-first):
           ],
         },
       });
-      r = await fetch(GATEWAY_URL, providerRequest);
+      const r = await fetch(GATEWAY_URL, providerRequest);
+      if (r.status === 429) {
+        console.log("ai-coach status=upstream_credit_exhausted http=200");
+        return failureAfterRefund(spendId, "upstream_429", "upstream_credit_exhausted");
+      }
+      if (r.status === 402) {
+        console.log("ai-coach status=upstream_credit_exhausted http=200");
+        return failureAfterRefund(spendId, "upstream_402", "upstream_credit_exhausted");
+      }
+      if (!r.ok) {
+        return failureAfterRefund(spendId, `upstream_${r.status}`, "http");
+      }
+      const readProviderBody = r.json.bind(r);
+      r.json = () => readJsonUntilAbort(r, providerController.signal, readProviderBody);
+      try {
+        data = await r.json();
+      } catch {
+        if (providerController.signal.aborted) {
+          return failureAfterRefund(spendId, "upstream_network", "timeout");
+        }
+        return failureAfterRefund(spendId, "upstream_parse", "parse");
+      }
     } catch {
       return failureAfterRefund(spendId, "upstream_network", "timeout");
     } finally {
       clearTimeout(providerTimer);
-    }
-
-    if (r.status === 429) {
-      console.log("ai-coach status=upstream_credit_exhausted http=200");
-      return failureAfterRefund(spendId, "upstream_429", "upstream_credit_exhausted");
-    }
-    if (r.status === 402) {
-      console.log("ai-coach status=upstream_credit_exhausted http=200");
-      return failureAfterRefund(spendId, "upstream_402", "upstream_credit_exhausted");
-    }
-    if (!r.ok) {
-      return failureAfterRefund(spendId, `upstream_${r.status}`, "http");
-    }
-
-    let data: unknown;
-    try {
-      data = await r.json();
-    } catch {
-      return failureAfterRefund(spendId, "upstream_parse", "parse");
     }
 
     const raw = readCoachMessageContent(data);
@@ -804,6 +810,39 @@ Rules for diagnosis (structured view, approval-first):
 
 if (import.meta.main) {
   Deno.serve((req) => handleAiCoachRequest(req));
+}
+
+function providerAbortError(): DOMException {
+  return new DOMException("The operation was aborted.", "AbortError");
+}
+
+function readJsonUntilAbort(
+  response: Response,
+  signal: AbortSignal,
+  read: () => Promise<unknown> = () => response.json(),
+): Promise<unknown> {
+  if (signal.aborted) {
+    response.body?.cancel().catch(() => undefined);
+    return Promise.reject(providerAbortError());
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (settle: () => void) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      settle();
+    };
+    const onAbort = () => {
+      response.body?.cancel().catch(() => undefined);
+      finish(() => reject(providerAbortError()));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    read().then(
+      (value) => finish(() => resolve(value)),
+      (error) => finish(() => reject(error)),
+    );
+  });
 }
 
 function json(b: unknown, status = 200) {

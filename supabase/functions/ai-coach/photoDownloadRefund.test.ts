@@ -116,6 +116,7 @@ Deno.test("refunds when cancelling a failed photo response is rejected", async (
 });
 
 Deno.test("refunds when the in-flight photo fetch aborts", async () => {
+  let abortSeen = false;
   await expectPhotoDownloadRefund(
     (_input, init) =>
       new Promise((_resolve, reject) => {
@@ -124,7 +125,10 @@ Deno.test("refunds when the in-flight photo fetch aborts", async () => {
           reject(new Error("no signal"));
           return;
         }
-        const abort = () => reject(new DOMException("The operation was aborted.", "AbortError"));
+        const abort = () => {
+          abortSeen = true;
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        };
         if (signal.aborted) {
           abort();
           return;
@@ -132,6 +136,82 @@ Deno.test("refunds when the in-flight photo fetch aborts", async () => {
         signal.addEventListener("abort", abort, { once: true });
       }),
   );
+  assert(abortSeen, "abort was not observed");
+});
+
+const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0x00]);
+
+Deno.test("refunds when the Gemini response body stalls until abort", async () => {
+  installEnv();
+  const calls: RpcCall[] = [];
+  const previous = globalThis.fetch;
+  let geminiAborted = false;
+  const started = Date.now();
+  globalThis.fetch = ((input: string, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/storage/v1/object/sign/")) {
+      return Promise.resolve(new Response(JPEG, { status: 200 }));
+    }
+    if (url.includes("generativelanguage.googleapis.com")) {
+      const signal = init?.signal;
+      if (signal) {
+        const mark = () => {
+          geminiAborted = true;
+        };
+        if (signal.aborted) mark();
+        else signal.addEventListener("abort", mark, { once: true });
+      }
+      return Promise.resolve(
+        new Response(
+          new ReadableStream({
+            pull() {
+              return new Promise(() => undefined);
+            },
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    return Promise.reject(new Error(`unexpected fetch ${url}`));
+  }) as typeof fetch;
+  try {
+    const pending = handleAiCoachRequest(
+      new Request(`${SUPABASE_URL}/functions/v1/ai-coach`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer test-jwt",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mode: "diagnose",
+          idempotencyKey: IDEMPOTENCY_KEY,
+          photoUrl: PHOTO_URL,
+        }),
+      }),
+      { createClient: createFakeClient(calls), photoTimeoutMs: 20, providerTimeoutMs: 20 },
+    );
+    const winner = await Promise.race([
+      pending.then((response) => ({ kind: "response" as const, response })),
+      new Promise<{ kind: "timeout" }>((resolve) =>
+        setTimeout(() => resolve({ kind: "timeout" }), 1000),
+      ),
+    ]);
+    assert(geminiAborted, "abort was not observed");
+    assert(winner.kind === "response", "handler exceeded 1s");
+    if (winner.kind !== "response") return;
+    assert(Date.now() - started < 1000, `elapsed ${Date.now() - started}`);
+    assert(winner.response.status === 200, `status ${winner.response.status}`);
+    const body = await winner.response.json();
+    assert(body.ok === false && body.reason === "timeout", `body ${JSON.stringify(body)}`);
+    const refunds = calls.filter((call) => call.name === "ai_credit_refund");
+    assert(refunds.length === 1, `refund count ${refunds.length}`);
+    assert(
+      refunds[0]?.params?.p_reason === "upstream_network",
+      `refund params ${JSON.stringify(refunds[0]?.params)}`,
+    );
+  } finally {
+    globalThis.fetch = previous;
+  }
 });
 
 Deno.test("refunds when the photo response body stalls until abort", async () => {

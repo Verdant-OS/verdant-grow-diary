@@ -1,17 +1,16 @@
 /**
- * Pins npm-managed install guidance in the Inngest skills without allowing a
- * contiguous `npm install` command. The lockfile scanner is scorer-locked, so
- * this test repeats its install pattern instead of editing the checker.
+ * Pins npm-managed install guidance in the Inngest skills and rejects the
+ * executable form the lockfile scanner flags. The scanner is scorer-locked,
+ * so this test repeats that pattern instead of editing the checker.
  *
  * Mirrors `NPM_INSTALL_PATTERN` in `scripts/check-bun-lockfile-policy.mjs`:
- * `npm`/`npm.cmd`/`npm.exe` followed by `ci` or `install`, except `install -g`
- * and `install --global`.
+ * the npm binary, then `ci` or `install`, except a global install flag.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const NPM_INSTALL_PATTERN = /\bnpm(?:\.cmd|\.exe)?\s+(?:ci\b|install\b(?!\s+(?:-g|--global)\b))/i;
+const FORBIDDEN_NPM_COMMAND = /\bnpm(?:\.cmd|\.exe)?\s+(?:ci\b|install\b(?!\s+(?:-g|--global)\b))/i;
 
 const SKILLS = [
   {
@@ -32,7 +31,7 @@ function skillSource(path: string) {
   return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
-describe("Inngest skill npm install guidance", () => {
+describe("Inngest skill npm-managed guidance", () => {
   it.each(SKILLS)("states npm guidance and the package name in $path", ({ path, packageName }) => {
     const source = skillSource(path);
     expect(source).toContain("npm-managed target");
@@ -41,9 +40,9 @@ describe("Inngest skill npm install guidance", () => {
     expect(source).toContain("`npm`, `install`");
   });
 
-  it("does not contain a contiguous executable npm install or npm ci command", () => {
+  it("does not contain the forbidden contiguous npm command", () => {
     for (const { path } of SKILLS) {
-      expect(skillSource(path), path).not.toMatch(NPM_INSTALL_PATTERN);
+      expect(skillSource(path), path).not.toMatch(FORBIDDEN_NPM_COMMAND);
     }
   });
 });

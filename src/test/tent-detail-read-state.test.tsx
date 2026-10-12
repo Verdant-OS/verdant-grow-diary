@@ -156,14 +156,14 @@ describe("Tent Detail read honesty with the real query", () => {
     await act(async () => read.resolve(tent));
     expect(await screen.findByRole("heading", { name: tent.name })).toBeVisible();
   });
-  it("shows empty copy only when the resumed read successfully returns no row", async () => {
+  it("shows Tent not found only when the resumed read successfully returns no row", async () => {
     fixture.fetchTent.mockResolvedValue(null);
     onlineManager.setOnline(false);
     renderPage();
     expectWaiting();
     act(() => onlineManager.setOnline(true));
     expect(await screen.findByText("Tent not found")).toBeVisible();
-    expect(screen.getByText("No real tents yet")).toBeVisible();
+    expect(screen.queryByText("No real tents yet")).not.toBeInTheDocument();
     expect(fixture.fetchTent).toHaveBeenCalledExactlyOnceWith(tent.id);
   });
   it("shows Tent not found for a bad tent id without account-empty copy", async () => {

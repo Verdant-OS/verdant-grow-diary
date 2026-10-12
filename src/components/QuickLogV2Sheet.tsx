@@ -130,6 +130,7 @@ import {
 import { writeFeedingTypedEvent, type FeedingTypedEventInput } from "@/lib/writeFeedingTypedEvent";
 import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
 import QuickLogWateringForm from "@/components/QuickLogWateringForm";
+import { assessQuickLogWaterSaveGate } from "@/lib/quickLogWaterSaveGateRules";
 import {
   EMPTY_QUICKLOG_WATERING_FORM,
   WATERING_SAVE_FAILURE_MESSAGE,
@@ -851,6 +852,26 @@ function QuickLogV2SheetForOwner({
     archivedGrowIds,
   });
   const volumeMissing = form.action === "water" && wateringForm.volumeMl.trim() === "";
+  const waterSaveGate =
+    form.action === "water"
+      ? assessQuickLogWaterSaveGate({
+          form: {
+            ...wateringForm,
+            waterTempC: typedTempToCelsiusInput(
+              wateringForm.waterTempC,
+              wateringTempEntryUnitRef.current ?? temperatureUnit,
+            ),
+          },
+          temperatureC: typedTempToCelsiusInput(
+            form.temperatureC,
+            manualTempEntryUnitRef.current ?? temperatureUnit,
+          ),
+          humidityPct: form.humidityPct,
+          vpdKpa: form.vpdKpa,
+          temperatureUnit: manualTempEntryUnitRef.current ?? temperatureUnit,
+        })
+      : null;
+  const waterFieldMessage = retryPending ? null : (waterSaveGate?.footerMessage ?? null);
   const criticalContentMissing = isQuickLogV2CriticalContentMissing({
     action: form.action,
     note: form.note,
@@ -918,6 +939,7 @@ function QuickLogV2SheetForOwner({
           hasNoTargets,
           selectedTargetMissing,
           volumeMissing,
+          waterFieldMessage,
           criticalContentMissing,
           saving: saving || feedingSaving || wateringSaving,
         });
@@ -2976,6 +2998,7 @@ function QuickLogV2SheetForOwner({
                   setLocalError(null);
                 }}
                 entryTemperatureUnit={wateringTempEntryUnitRef.current ?? temperatureUnit}
+                volumeError={retryPending ? null : (waterSaveGate?.fields.volume ?? null)}
               />
               {wateringRetryPending && (
                 <div
@@ -3222,6 +3245,10 @@ function QuickLogV2SheetForOwner({
                     inputMode="decimal"
                     value={form.temperatureC}
                     disabled={submissionLocked}
+                    aria-invalid={Boolean(waterSaveGate?.fields.temperature) || undefined}
+                    aria-describedby={
+                      waterSaveGate?.fields.temperature ? "qlv2-temp-error" : undefined
+                    }
                     onChange={(e) => {
                       const next = e.target.value;
                       if (form.temperatureC.trim() === "" && next.trim() !== "") {
@@ -3232,6 +3259,16 @@ function QuickLogV2SheetForOwner({
                       setField("temperatureC", next);
                     }}
                   />
+                  {waterSaveGate?.fields.temperature && !retryPending && (
+                    <p
+                      id="qlv2-temp-error"
+                      data-testid="qlv2-temp-error"
+                      className="mt-1 text-sm text-destructive"
+                      role="alert"
+                    >
+                      {waterSaveGate.fields.temperature}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="qlv2-rh">RH (%)</Label>
@@ -3240,8 +3277,20 @@ function QuickLogV2SheetForOwner({
                     inputMode="decimal"
                     value={form.humidityPct}
                     disabled={submissionLocked}
+                    aria-invalid={Boolean(waterSaveGate?.fields.humidity) || undefined}
+                    aria-describedby={waterSaveGate?.fields.humidity ? "qlv2-rh-error" : undefined}
                     onChange={(e) => setField("humidityPct", e.target.value)}
                   />
+                  {waterSaveGate?.fields.humidity && !retryPending && (
+                    <p
+                      id="qlv2-rh-error"
+                      data-testid="qlv2-rh-error"
+                      className="mt-1 text-sm text-destructive"
+                      role="alert"
+                    >
+                      {waterSaveGate.fields.humidity}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="qlv2-vpd">VPD (kPa)</Label>
@@ -3250,8 +3299,20 @@ function QuickLogV2SheetForOwner({
                     inputMode="decimal"
                     value={form.vpdKpa}
                     disabled={submissionLocked}
+                    aria-invalid={Boolean(waterSaveGate?.fields.vpd) || undefined}
+                    aria-describedby={waterSaveGate?.fields.vpd ? "qlv2-vpd-error" : undefined}
                     onChange={(e) => setField("vpdKpa", e.target.value)}
                   />
+                  {waterSaveGate?.fields.vpd && !retryPending && (
+                    <p
+                      id="qlv2-vpd-error"
+                      data-testid="qlv2-vpd-error"
+                      className="mt-1 text-sm text-destructive"
+                      role="alert"
+                    >
+                      {waterSaveGate.fields.vpd}
+                    </p>
+                  )}
                 </div>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -3509,6 +3570,7 @@ function QuickLogV2SheetForOwner({
                       (selectedTargetMissing && !retryPending) ||
                       (selectedTargetStale && !retryPending) ||
                       (criticalContentMissing && !retryPending) ||
+                      (Boolean(waterFieldMessage) && !retryPending) ||
                       Boolean(archivedGrowActionBlock)
                     }
                     aria-describedby="qlv2-save-helper"
@@ -3537,6 +3599,7 @@ function getSaveHelperMessage(input: {
   hasNoTargets: boolean;
   selectedTargetMissing: boolean;
   volumeMissing: boolean;
+  waterFieldMessage: string | null;
   criticalContentMissing: boolean;
   saving: boolean;
 }): string {
@@ -3545,6 +3608,7 @@ function getSaveHelperMessage(input: {
   if (input.hasFetchError) return "Retry loading plants and tents before saving.";
   if (input.hasNoTargets) return "Add a plant or tent before saving a Quick Log.";
   if (input.selectedTargetMissing) return "Choose a plant or tent before saving.";
+  if (input.waterFieldMessage) return input.waterFieldMessage;
   if (input.volumeMissing) return "Watering logs need a volume before they can save.";
   if (input.criticalContentMissing) return QUICK_LOG_V2_EMPTY_CONTENT_HELPER;
   return "Ready to save when this log matches what happened.";

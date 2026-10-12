@@ -83,11 +83,11 @@ Install the latest v4 SDK in the target app, not in this repository. On an npm-m
 pkg_mgr=npm
 "$pkg_mgr" install inngest@latest
 # or
-pnpm add inngest@latest
+bun add inngest@latest
 # or
 yarn add inngest@latest
 # or
-bun add inngest@latest
+pnpm add inngest@latest
 ```
 
 If the repo uses v3 realtime, remove `@inngest/realtime`; v4 realtime lives in

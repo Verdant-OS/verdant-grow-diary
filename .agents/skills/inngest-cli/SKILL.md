@@ -184,11 +184,11 @@ On an npm-managed target, use npm's `install` subcommand with `-D` and the packa
 pkg_mgr=npm
 "$pkg_mgr" install -D @inngest/test
 # or
+bun add -d @inngest/test
+# or
 yarn add -D @inngest/test
 # or
 pnpm add -D @inngest/test
-# or
-bun add -d @inngest/test
 ```
 
 ```typescript

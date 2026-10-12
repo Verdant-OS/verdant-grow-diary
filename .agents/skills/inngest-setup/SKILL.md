@@ -24,11 +24,11 @@ Install the `inngest` package in the target app, not in this repository. On an n
 pkg_mgr=npm
 "$pkg_mgr" install inngest
 # or
+bun add inngest
+# or
 yarn add inngest
 # or
 pnpm add inngest
-# or
-bun add inngest
 ```
 
 ## Step 2: Create an Inngest Client

@@ -166,6 +166,12 @@ describe("Tent Detail read honesty with the real query", () => {
     expect(screen.getByText("No real tents yet")).toBeVisible();
     expect(fixture.fetchTent).toHaveBeenCalledExactlyOnceWith(tent.id);
   });
+  it("shows Tent not found for a bad tent id without account-empty copy", async () => {
+    fixture.fetchTent.mockResolvedValue(null);
+    renderPage({ path: "/tents/not-a-real-tent" });
+    expect(await screen.findByText("Tent not found")).toBeVisible();
+    expect(screen.queryByText("No real tents yet")).not.toBeInTheDocument();
+  });
   it("moves from waiting to loading while the resumed read remains unresolved", async () => {
     const read = deferredTent();
     fixture.fetchTent.mockReturnValue(read.promise);

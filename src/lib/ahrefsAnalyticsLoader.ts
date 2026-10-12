@@ -15,6 +15,22 @@ function findAhrefsScripts(scriptSrc: string): HTMLScriptElement[] {
   return Array.from(document.scripts).filter((script) => script.src === scriptSrc);
 }
 
+let executedTrackerStop: (() => void) | null = null;
+
+/**
+ * Record how to detach an already-executed tracker.
+ * Removing the script element does not prove those listeners stopped.
+ */
+export function bindExecutedAhrefsTracker(stop: () => void): void {
+  executedTrackerStop = stop;
+}
+
+function stopExecutedAhrefsTracker(): void {
+  const stop = executedTrackerStop;
+  executedTrackerStop = null;
+  stop?.();
+}
+
 export function loadAhrefsAnalytics(
   dataKey: string = AHREFS_WEB_ANALYTICS_KEY,
   scriptSrc: string = AHREFS_WEB_ANALYTICS_SCRIPT_SRC,
@@ -43,7 +59,13 @@ export function loadAhrefsAnalytics(
 export function removeAhrefsAnalyticsScript(
   scriptSrc: string = AHREFS_WEB_ANALYTICS_SCRIPT_SRC,
 ): void {
-  findAhrefsScripts(scriptSrc).forEach((script) => script.remove());
+  try {
+    findAhrefsScripts(scriptSrc).forEach((script) => script.remove());
+  } catch {
+    // Element removal failed. That is not evidence the executed tracker stopped.
+  } finally {
+    stopExecutedAhrefsTracker();
+  }
 }
 
 export function isAhrefsAnalyticsLoaded(): boolean {

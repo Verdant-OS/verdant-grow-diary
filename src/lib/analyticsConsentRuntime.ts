@@ -18,6 +18,14 @@ export function applyAnalyticsConsentDecision(
   decision: AnalyticsConsentDecision,
   location: Pick<Location, "pathname" | "search" | "hash">,
 ): boolean {
+  if (isExcludedAnalyticsRoute(location.pathname)) {
+    setGoogleAnalyticsOptOut(true);
+    const tagWasPresent = isAhrefsAnalyticsLoaded();
+    removeAhrefsAnalyticsScript();
+    if (persistedGrantWouldSurviveReload()) return false;
+    return tagWasPresent;
+  }
+
   const granted = decision === "granted";
   setGoogleAnalyticsOptOut(!granted);
 

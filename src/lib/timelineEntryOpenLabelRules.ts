@@ -1,5 +1,16 @@
+import { STAGES } from "@/lib/grow";
+
 const MAX_OPEN_SUBJECT_LENGTH = 80;
 const MAX_OPEN_CONTEXT_LENGTH = 40;
+
+/**
+ * Stage chips are buttons named by these labels. A note that repeats one
+ * would make getByRole("button", { name: /Vegetative/i }) match the Open
+ * control as well as the chip. Skip that excerpt and try the next context.
+ */
+const STAGE_CHIP_LABELS = ["All stages", ...STAGES.map((stage) => stage.label)].map((label) =>
+  label.toLowerCase(),
+);
 
 /**
  * Separates a minute clock label from a legacy entry-id suffix.
@@ -23,6 +34,14 @@ function conciseOpenContext(value: string | null | undefined): string {
   return trimmed.slice(0, MAX_OPEN_CONTEXT_LENGTH).trimEnd();
 }
 
+function openContextExcerpt(value: string | null | undefined): string {
+  const excerpt = conciseOpenContext(value);
+  if (excerpt.length === 0) return "";
+  const haystack = excerpt.toLowerCase();
+  if (STAGE_CHIP_LABELS.some((label) => haystack.includes(label))) return "";
+  return excerpt;
+}
+
 function readTimelineOpenClock(value: string | null | undefined): string {
   if (typeof value !== "string") return "";
   const trimmed = value.replace(/\s+/g, " ").trim();
@@ -33,19 +52,20 @@ function readTimelineOpenClock(value: string | null | undefined): string {
 
 /**
  * One spoken context for an Open control.
- * The grower's note wins. A blank or unusable note falls through to the
- * plant name, then the tent name. Each value is capped to a short excerpt.
+ * The grower's note wins. A blank note, or one that repeats a stage-chip
+ * label, falls through to the plant name, then the tent name. Each value
+ * is capped to a short excerpt.
  */
 export function timelineEntryOpenContext(input: {
   plantName?: string | null;
   tentName?: string | null;
   note?: string | null;
 }): string {
-  const note = conciseOpenContext(input.note);
+  const note = openContextExcerpt(input.note);
   if (note) return note;
-  const plant = conciseOpenContext(input.plantName);
+  const plant = openContextExcerpt(input.plantName);
   if (plant) return plant;
-  return conciseOpenContext(input.tentName);
+  return openContextExcerpt(input.tentName);
 }
 
 /**

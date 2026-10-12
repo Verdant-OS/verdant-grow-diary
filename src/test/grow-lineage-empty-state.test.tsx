@@ -90,6 +90,8 @@ describe("GrowLineageRepair — empty state", () => {
     expect(link.textContent).toBe("Open My Grows");
     const firstStep = screen.getByTestId("grow-lineage-empty-state-first-step").textContent ?? "";
     expect(firstStep).toMatch(/open My Grows/);
-    expect(firstStep).not.toMatch(/Harvest Archive/);
+    const empty = screen.getByTestId("grow-lineage-empty-state").textContent ?? "";
+    expect(empty).toMatch(/from My Grows/);
+    expect(empty).not.toMatch(/Harvest Archive/);
   });
 });

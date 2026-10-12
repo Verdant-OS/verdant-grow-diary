@@ -124,8 +124,7 @@ export default function GrowLineageRepair() {
           <h2 className="font-display font-semibold text-base">No lineage repairs needed</h2>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
             All tents are assigned to grows. Your current tents and grows are already connected. If
-            something looks missing, start by checking the grow and tent records from the Harvest
-            Archive.
+            something looks missing, start by checking the grow and tent records from My Grows.
           </p>
           <p
             className="text-xs text-muted-foreground max-w-md mx-auto"

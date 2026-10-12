@@ -173,7 +173,10 @@ import {
 } from "@/lib/timelinePhotoLightboxRules";
 import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
 import { TimelineEntryOpenButton } from "@/components/TimelineEntryOpenButton";
-import { timelineEntryOpenAccessibleName } from "@/lib/timelineEntryOpenLabelRules";
+import {
+  timelineEntryOpenAccessibleName,
+  timelineEntryOpenContext,
+} from "@/lib/timelineEntryOpenLabelRules";
 import {
   PHOTO_NON_DIAGNOSTIC_LABEL,
   PHOTO_NON_DIAGNOSTIC_TESTID,
@@ -2501,12 +2504,18 @@ export default function Timeline() {
                             ? ""
                             : format(new Date(e.entry_at), "PP");
                           const openDifferentiator = Number.isNaN(new Date(e.entry_at).getTime())
-                            ? ` #${e.id}`
-                            : `${format(new Date(e.entry_at), "p")} #${e.id}`;
+                            ? ""
+                            : format(new Date(e.entry_at), "p");
+                          const openContext = timelineEntryOpenContext({
+                            plantName,
+                            tentName: place.tentName,
+                            note: e.note,
+                          });
                           const openLabel = timelineEntryOpenAccessibleName({
                             title: et.label,
                             occurredAtLabel: openOccurredAt,
                             differentiator: openDifferentiator,
+                            context: openContext,
                           });
                           // Canonical snapshots win, followed by the legacy
                           // `sensor` shape and Plant Quick Log's compatibility

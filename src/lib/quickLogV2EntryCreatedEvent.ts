@@ -24,6 +24,12 @@ export interface QuickLogV2EntryCreatedDetail {
   growEventId: string | null;
   /** Sub-source so listeners can distinguish v2 branches if useful. */
   source: "quick_log_v2" | "quick_log_v2_water" | "quick_log_v2_feed";
+  /**
+   * Activity that was just saved, when the caller knows it (for example
+   * `"photo"`). Optional so existing dispatches stay valid. Listeners that
+   * label a confirmation must treat a missing id as their existing default.
+   */
+  activityId?: string | null;
 }
 
 export function dispatchQuickLogV2EntryCreated(detail: QuickLogV2EntryCreatedDetail): boolean {

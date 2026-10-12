@@ -18,6 +18,10 @@ import {
   readGeminiDirectApiKey,
   resolveGeminiDirectChat,
 } from "../_shared/geminiDirectChat.ts";
+import {
+  buildGeminiInlineImagePart,
+  downloadSignedStorageObject,
+} from "../_shared/geminiInlineImage.ts";
 
 type Mode = "diagnose" | "next_steps";
 interface Body {
@@ -618,8 +622,22 @@ Rules for diagnosis (structured view, approval-first):
 
     const userContent: Array<Record<string, unknown>> = [];
     // parseAiCoachBody already constrained photoUrl to this project's signed
-    // Storage path before any credit spend.
-    if (body.photoUrl) userContent.push({ type: "image_url", image_url: { url: body.photoUrl } });
+    // Storage path before any credit spend. Gemini rejects that HTTPS URL, so
+    // the bytes are inlined after the spend id exists.
+    if (body.photoUrl) {
+      const downloaded = await downloadSignedStorageObject({
+        photoUrl: body.photoUrl,
+        allowedPrefix: `${creditSupabaseUrl}/storage/v1/object/sign/`,
+      });
+      if (!downloaded.ok) {
+        return failureAfterRefund(spendId, `photo_${downloaded.reason}`, "invalid");
+      }
+      const inline = buildGeminiInlineImagePart(downloaded.bytes);
+      if (!inline.ok) {
+        return failureAfterRefund(spendId, `photo_${inline.reason}`, "invalid");
+      }
+      userContent.push(inline.part);
+    }
     const text = (body.question ? `QUESTION: ${body.question}\n\n` : "") + context;
     userContent.push({ type: "text", text });
 
@@ -647,7 +665,8 @@ Rules for diagnosis (structured view, approval-first):
     }
 
     if (r.status === 429) {
-      return failureAfterRefund(spendId, "upstream_429", "http");
+      console.log("ai-coach status=upstream_credit_exhausted http=200");
+      return failureAfterRefund(spendId, "upstream_429", "upstream_credit_exhausted");
     }
     if (r.status === 402) {
       console.log("ai-coach status=upstream_credit_exhausted http=200");

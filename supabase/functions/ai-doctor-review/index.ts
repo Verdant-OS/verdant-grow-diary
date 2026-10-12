@@ -82,7 +82,9 @@ const WIRE_MODEL = doctorRoute.geminiModelId;
 const COMPLETION_WRITE_TIMEOUT_MS = 1_500;
 const RESULT_PERSISTENCE_TIMEOUT_MS = 3_000;
 const TOOL_SCHEMA_VERSION = "ai-doctor-review-tool-v1";
-const PROMPT_CONTRACT_VERSION = "ai-doctor-review-prompt-v1";
+// v2 signs the native Gemini id in WIRE_MODEL. v1 receipts stay historical:
+// they were signed with the provider-prefixed model id under the same field.
+const PROMPT_CONTRACT_VERSION = "ai-doctor-review-prompt-v2";
 const RECEIPT_HMAC_SECRET_ENV = "AI_DOCTOR_RECEIPT_HMAC_KEY";
 const RECEIPT_HMAC_KEY_ID_ENV = "AI_DOCTOR_RECEIPT_HMAC_KEY_ID";
 
@@ -580,6 +582,16 @@ Deno.serve(async (req) => {
         /* ignore */
       }
       return failureAfterRefund(spendId, "upstream_402", "upstream_credit_exhausted");
+    }
+
+    if (upstream.status === 429) {
+      console.log("ai-doctor-review status=upstream_credit_exhausted");
+      try {
+        await upstream.text();
+      } catch {
+        /* ignore */
+      }
+      return failureAfterRefund(spendId, "upstream_429", "upstream_credit_exhausted");
     }
 
     if (!upstream.ok) {

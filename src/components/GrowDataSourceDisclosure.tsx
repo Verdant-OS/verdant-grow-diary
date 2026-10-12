@@ -52,12 +52,14 @@ interface Props {
   className?: string;
   testId?: string;
   /**
-   * What an empty, unavailable read describes. "account" (default) is a
-   * list read: nothing exists yet. "record" is a single-record read (for
-   * example one plant by id): its absence says nothing about the account's
-   * other records, so it must not say "No real plants yet".
+   * What an empty, unavailable read describes. "account" (default) and
+   * "list" are collection reads: nothing exists yet, so a successful
+   * no-rows result hides the Unavailable badge. "record" is a single-record
+   * read (for example one plant by id): its absence says nothing about the
+   * account's other records, so it must not say "No real plants yet", and a
+   * missing record keeps the Unavailable badge.
    */
-  emptyStateScope?: "account" | "record";
+  emptyStateScope?: "account" | "list" | "record";
 }
 
 export default function GrowDataSourceDisclosure({
@@ -113,7 +115,9 @@ export default function GrowDataSourceDisclosure({
 
   // Welcome / empty state — no usable data anywhere.
   if (!hasAnyData && combined.dataSource === "unavailable") {
-    const emptySuccess = isSuccessfulEmptyGrowRead(metas);
+    const emptySuccess =
+      isSuccessfulEmptyGrowRead(metas) &&
+      (emptyStateScope === "account" || emptyStateScope === "list");
     return (
       <section
         data-testid={testId}

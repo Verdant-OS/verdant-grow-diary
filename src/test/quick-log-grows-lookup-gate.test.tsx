@@ -124,7 +124,9 @@ describe("legacy Quick Log grows lookup gate", () => {
     expect(harness.rpc).not.toHaveBeenCalled();
     expect(save).toBeDisabled();
     expect(screen.getByTestId("quick-log-target-grow").textContent).not.toMatch(/Assigned grow/);
-    expect(screen.getByRole("status").textContent).toMatch(/loading grows/i);
+    expect(screen.getByTestId("quick-log-grows-lookup-loading").textContent).toMatch(
+      /loading grows/i,
+    );
   });
 
   it("does not invoke the save mutation while the grows lookup has failed", async () => {
@@ -135,7 +137,9 @@ describe("legacy Quick Log grows lookup gate", () => {
     await submitNote();
     expect(harness.rpc).not.toHaveBeenCalled();
     expect(save).toBeDisabled();
-    expect(screen.getByRole("alert").textContent).toMatch(/couldn't load your grows/i);
+    expect(screen.getByTestId("quick-log-grows-lookup-error").textContent).toMatch(
+      /couldn't load your grows/i,
+    );
     fireEvent.click(screen.getByTestId("quick-log-grows-lookup-retry"));
     expect(harness.refresh).toHaveBeenCalledTimes(1);
   });

@@ -53,9 +53,9 @@ goal: Block Edit Plant save when Name is blank or whitespace-only, with an inlin
 branch: cursor/edit-plant-blank-name-3bf6
 base: verdant-grow-diary
 checkout: git fetch origin cursor/edit-plant-blank-name-3bf6 verdant-grow-diary && git switch cursor/edit-plant-blank-name-3bf6 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: draft against verdant-grow-diary; URL recorded after open
-head_sha: recorded after push
-state: local implementation, tests green for the name slice
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2041 (draft)
+head_sha: 2b3814c6af5716b9373a73817ea5beb8ffefe1fb
+state: pushed draft. Name slice implemented. Stay draft.
 next_action: stay draft. Independent review is Blue Dream (.tsx product, P1). Do not mark ready or merge.
 files: src/components/EditPlantDialog.tsx; src/lib/formIdentityFailClosedRules.ts; src/test/edit-plant-identity-fail-closed.test.tsx
 blockers: none for the repository change. No production write.

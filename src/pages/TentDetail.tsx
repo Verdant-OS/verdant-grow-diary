@@ -293,6 +293,7 @@ export default function TentDetail() {
           resource="tents"
           hasAnyData={false}
           metas={[tentMeta]}
+          emptyStateScope="record"
           testId="tent-detail-data-source-disclosure"
         />
         <EmptyState

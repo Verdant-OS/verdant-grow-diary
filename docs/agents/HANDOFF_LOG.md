@@ -726,8 +726,8 @@ branch: canopy/fix-2033-lockfile-policy-inngest
 base: verdant-grow-diary
 checkout: git fetch origin canopy/fix-2033-lockfile-policy-inngest verdant-grow-diary && git switch canopy/fix-2033-lockfile-policy-inngest && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2034
-head_sha: 5423945595eb4aa4159b55f6987f984069fcaa29
-state: draft. f0408a36 added pkg_mgr shell lines that bypass the lockfile scanner. The next commit removes those lines and restores the 51095ee1 fences: bun add first, yarn and pnpm after, with no shell install command for npm. Graft's advisory PASS at 5078986bdce39a848d254b93f5e011e83ecade44 does not cover later heads. head_sha is that restore commit. A later one-line commit records it here because a commit cannot contain its own SHA.
+head_sha: 19e1d1d8f44c4784b7ad7897556a7779777ffc7e
+state: draft. head_sha is the prose commit 19e1d1d8f44c4784b7ad7897556a7779777ffc7e, which adds the npm wording in the three skill files. This handoff commit only records that SHA. Graft's advisory PASS at 5078986bdce39a848d254b93f5e011e83ecade44 does not cover later heads.
 next_action: required checks at the new head. Stay draft. No ready, merge, or deploy.
 files: .agents/skills/inngest-cli/SKILL.md; .agents/skills/inngest-setup/SKILL.md; .agents/skills/inngest-v3-v4-migration/SKILL.md; .agents/skills/inngest-middleware/SKILL.md; .agents/skills/inngest-middleware/references/built-in-middleware.md; .agents/skills/inngest-realtime/SKILL.md; docs/agents/HANDOFF_LOG.md (this record)
 blockers: none for the repository change. Do not deploy.

@@ -726,15 +726,15 @@ branch: canopy/fix-2033-lockfile-policy-inngest
 base: verdant-grow-diary
 checkout: git fetch origin canopy/fix-2033-lockfile-policy-inngest verdant-grow-diary && git switch canopy/fix-2033-lockfile-policy-inngest && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2034
-head_sha: 19e1d1d8f44c4784b7ad7897556a7779777ffc7e
-state: draft. head_sha is the prose commit 19e1d1d8f44c4784b7ad7897556a7779777ffc7e, which adds the npm wording in the three skill files. This handoff commit only records that SHA. Graft's advisory PASS at 5078986bdce39a848d254b93f5e011e83ecade44 does not cover later heads.
+head_sha: 58d237d208a0f9d673332d0b6927fd52bef55b7f
+state: draft. This block describes the head that contains this change (AGENTS.md: the block records the exact head, and a commit cannot store its own SHA). That head is the commit that updates this block; its parent is head_sha, the contract test that matches the full npm guidance sentence including the package name. npm wording stays in the three skill files. Graft's advisory PASS at 5078986bdce39a848d254b93f5e011e83ecade44 does not cover later heads.
 next_action: required checks at the new head. Stay draft. No ready, merge, or deploy.
-files: .agents/skills/inngest-cli/SKILL.md; .agents/skills/inngest-setup/SKILL.md; .agents/skills/inngest-v3-v4-migration/SKILL.md; .agents/skills/inngest-middleware/SKILL.md; .agents/skills/inngest-middleware/references/built-in-middleware.md; .agents/skills/inngest-realtime/SKILL.md; docs/agents/HANDOFF_LOG.md (this record)
+files: .agents/skills/inngest-cli/SKILL.md; .agents/skills/inngest-setup/SKILL.md; .agents/skills/inngest-v3-v4-migration/SKILL.md; .agents/skills/inngest-middleware/SKILL.md; .agents/skills/inngest-middleware/references/built-in-middleware.md; .agents/skills/inngest-realtime/SKILL.md; src/test/inngest-skill-npm-install-guidance.test.ts; docs/agents/HANDOFF_LOG.md (this record)
 blockers: none for the repository change. Do not deploy.
 artifacts: PR #2034
 reviewer_seat: Critical Mass (docs and tests). Graft's advisory PASS at 5078986b is not the exact-head PASS for the new head.
 claimed_by: Canopy, 2026-10-12 09:09 CT
-last_updated: 2026-10-12 09:29 CT, by Canopy
+last_updated: 2026-10-12 17:02 UTC, by Grok
 ```
 
 ## Closed

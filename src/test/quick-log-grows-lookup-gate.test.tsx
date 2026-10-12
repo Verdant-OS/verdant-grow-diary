@@ -120,8 +120,61 @@ describe("legacy Quick Log grows lookup gate", () => {
     harness.error = null;
     renderLaunched();
     const save = screen.getByTestId("quick-log-save") as HTMLButtonElement;
+    await submitNote();
+    expect(harness.rpc).not.toHaveBeenCalled();
+    expect(save).toBeDisabled();
     expect(screen.getByTestId("quick-log-target-grow").textContent).not.toMatch(/Assigned grow/);
     expect(screen.getByRole("status").textContent).toMatch(/loading grows/i);
+  });
+
+  it("does not invoke the save mutation while the grows lookup has failed", async () => {
+    harness.loading = false;
+    harness.error = "grows lookup failed";
+    renderLaunched();
+    const save = screen.getByTestId("quick-log-save") as HTMLButtonElement;
+    await submitNote();
+    expect(harness.rpc).not.toHaveBeenCalled();
+    expect(save).toBeDisabled();
+    expect(screen.getByRole("alert").textContent).toMatch(/couldn't load your grows/i);
+    fireEvent.click(screen.getByTestId("quick-log-grows-lookup-retry"));
+    expect(harness.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-enables save only after a successful retry and a ready target", async () => {
+    harness.loading = false;
+    harness.error = "grows lookup failed";
+    harness.refresh.mockImplementation(async () => {
+      harness.loading = false;
+      harness.error = null;
+      harness.grows = [GROW];
+    });
+    const view = renderLaunched();
+    fireEvent.click(screen.getByTestId("quick-log-grows-lookup-retry"));
+    expect(harness.refresh).toHaveBeenCalledTimes(1);
+    view.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <QuickLog
+          open
+          onOpenChange={() => {}}
+          prefill={{ plantId: "plant-new", eventType: "observation" }}
+        />
+      </QueryClientProvider>,
+    );
+    const save = screen.getByTestId("quick-log-save") as HTMLButtonElement;
+    expect(save).not.toBeDisabled();
+    await submitNote();
+    expect(harness.rpc).toHaveBeenCalledTimes(1);
+    expect(harness.rpc.mock.calls[0]?.[0]).toBe("quicklog_save_manual");
+  });
+
+  it("shows a zero-grow message when the lookup loaded with no grows", async () => {
+    harness.loading = false;
+    harness.error = null;
+    harness.grows = [];
+    renderLaunched();
+    const save = screen.getByTestId("quick-log-save") as HTMLButtonElement;
+    expect(screen.queryByText(/Choose a plant before saving/i)).toBeNull();
+    expect(screen.getByTestId("quick-log-grows-lookup-empty").textContent).toMatch(/no grows yet/i);
     expect(save).toBeDisabled();
     await submitNote();
     expect(harness.rpc).not.toHaveBeenCalled();

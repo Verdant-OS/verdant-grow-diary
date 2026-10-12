@@ -12,13 +12,18 @@ import {
 } from "@/lib/analyticsConsent";
 import { applyAnalyticsConsentDecision } from "@/lib/analyticsConsentRuntime";
 import { __resetGoogleAnalyticsLoaderForTests } from "@/lib/googleAnalyticsLoader";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 
 describe("analytics consent revocation teardown", () => {
   const landing = { pathname: "/", search: "", hash: "" };
 
   beforeEach(() => {
     document.head.innerHTML = "";
-    window.localStorage.clear();
+    clearLocalStorageForTest();
     __resetAnalyticsConsentForTests();
     __resetAhrefsAnalyticsLoaderForTests();
     __resetGoogleAnalyticsLoaderForTests();
@@ -30,7 +35,7 @@ describe("analytics consent revocation teardown", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     document.head.innerHTML = "";
-    window.localStorage.clear();
+    clearLocalStorageForTest();
     __resetAnalyticsConsentForTests();
     __resetAhrefsAnalyticsLoaderForTests();
     __resetGoogleAnalyticsLoaderForTests();
@@ -42,13 +47,13 @@ describe("analytics consent revocation teardown", () => {
       document.querySelector(`script[src="${AHREFS_WEB_ANALYTICS_SCRIPT_SRC}"]`),
     ).not.toBeNull();
 
-    window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new DOMException("Quota exceeded", "QuotaExceededError");
     });
     writeAnalyticsConsent("denied");
 
-    expect(window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY)).toBe("granted");
+    expect(getLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY)).toBe("granted");
     expect(readAnalyticsConsent()).toBe("denied");
     expect(applyAnalyticsConsentDecision("denied", landing)).toBe(false);
     expect(document.querySelector(`script[src="${AHREFS_WEB_ANALYTICS_SCRIPT_SRC}"]`)).toBeNull();

@@ -560,6 +560,7 @@ export default function Dashboard() {
       <DashboardDataSourceDisclosure
         scopedGrowId={scopedGrowId}
         hasAnyData={tents.length > 0 || plants.length > 0}
+        hasGrow={grows.length > 0}
         snapshotSource={sensorState.status === "ok" ? sensorState.snapshot.source : undefined}
       />
 

@@ -38,6 +38,8 @@ const BADGE_TEXT: Record<Label, string> = {
   Unavailable: "Unavailable",
 };
 
+const GROW_READY_COPY = "Your grow is set up. Add a tent to start tracking.";
+
 const DESCRIPTION: Record<Label, string> = {
   Live: "Loaded from your Verdant account.",
   Demo: "Showing demo data. Connect real tents, plants, and sensors to replace it.",
@@ -49,6 +51,8 @@ interface Props {
   scopedGrowId?: string;
   /** True when at least one tent or plant is visible to the user. */
   hasAnyData: boolean;
+  /** True when the account already has a grow, even with no tent or plant yet. */
+  hasGrow?: boolean;
   /** Test/override hook. When omitted, metadata is read from getGrowDataMeta. */
   metas?: readonly GrowDataSourceMeta[];
   /** Optional sensor snapshot source — when "sim", a simulated-data notice
@@ -60,6 +64,7 @@ interface Props {
 export default function DashboardDataSourceDisclosure({
   scopedGrowId,
   hasAnyData,
+  hasGrow = false,
   metas,
   snapshotSource,
   className,
@@ -77,6 +82,20 @@ export default function DashboardDataSourceDisclosure({
   const isSimulated = snapshotSource === "sim";
   const simulatedNotice =
     "Simulated sensor data shown — for testing/demo only. Not real tent data and not used for persisted alerts.";
+
+  // A saved grow with no tent yet is a successful empty read, not a missing grow.
+  if (!hasAnyData && hasGrow && combined.dataSource === "unavailable") {
+    return (
+      <section
+        data-testid="dashboard-data-source-disclosure"
+        data-source={combined.dataSource}
+        className={cn("glass rounded-2xl p-4 mb-4", className)}
+        aria-label="Grow data source"
+      >
+        <p className="text-sm text-muted-foreground">{GROW_READY_COPY}</p>
+      </section>
+    );
+  }
 
   // Welcome / empty state — no usable data anywhere.
   if (!hasAnyData && combined.dataSource === "unavailable") {

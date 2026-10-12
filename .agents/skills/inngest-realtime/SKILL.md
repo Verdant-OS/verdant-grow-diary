@@ -17,7 +17,7 @@ Stream updates from durable Inngest functions to live UIs. Use channels and topi
 
 ## Prerequisites
 
-- Inngest v4 SDK installed (`npm install inngest`) — see the `inngest-setup` skill
+- Inngest v4 SDK installed (the `inngest` package) — see the `inngest-setup` skill
 - `INNGEST_DEV=1` set in `.env.local` for local development (without it, the SDK demands cloud signing keys and 401s on token requests)
 - Local Inngest dev server running (`npx inngest-cli@latest dev`)
 - Optional: `zod` for schema validation on topics

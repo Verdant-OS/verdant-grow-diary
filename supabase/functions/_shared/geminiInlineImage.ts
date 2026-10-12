@@ -83,7 +83,7 @@ export function buildGeminiInlineImagePart(
   };
 }
 
-function isAllowedSignedPhotoUrl(photoUrl: string, allowedPrefix: string): boolean {
+export function isAllowedSignedPhotoUrl(photoUrl: string, allowedPrefix: string): boolean {
   let photo: URL;
   let prefix: URL;
   try {
@@ -95,13 +95,50 @@ function isAllowedSignedPhotoUrl(photoUrl: string, allowedPrefix: string): boole
   if (photo.protocol !== "https:" || prefix.protocol !== "https:") return false;
   if (photo.username !== "" || photo.password !== "") return false;
   if (photo.origin !== prefix.origin) return false;
-  return photoUrl.startsWith(allowedPrefix);
+  const prefixPath = prefix.pathname.endsWith("/") ? prefix.pathname : `${prefix.pathname}/`;
+  return photo.pathname.startsWith(prefixPath);
+}
+
+function aborted(): DOMException {
+  return new DOMException("The operation was aborted.", "AbortError");
+}
+
+function readChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal?: AbortSignal,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  if (!signal) return reader.read();
+  if (signal.aborted) {
+    return reader.cancel().then(() => {
+      throw aborted();
+    });
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (settle: () => void) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      settle();
+    };
+    const onAbort = () => {
+      reader.cancel().catch(() => undefined);
+      finish(() => reject(aborted()));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    reader.read().then(
+      (result) => finish(() => resolve(result)),
+      (error) => finish(() => reject(error)),
+    );
+  });
 }
 
 async function readBoundedBody(
   response: Response,
   maxBytes: number,
+  signal?: AbortSignal,
 ): Promise<GeminiSignedDownloadResult> {
+  if (signal?.aborted) throw aborted();
   const declared = response.headers.get("content-length");
   if (declared !== null) {
     const length = Number(declared);
@@ -112,6 +149,7 @@ async function readBoundedBody(
   }
   const reader = response.body?.getReader();
   if (!reader) {
+    if (signal?.aborted) throw aborted();
     const buffered = new Uint8Array(await response.arrayBuffer());
     if (buffered.byteLength > maxBytes) return { ok: false, reason: "too_large" };
     return { ok: true, bytes: buffered };
@@ -119,7 +157,7 @@ async function readBoundedBody(
   const chunks: Uint8Array[] = [];
   let total = 0;
   while (true) {
-    const next = await reader.read();
+    const next = await readChunk(reader, signal);
     if (next.done) break;
     total += next.value.byteLength;
     if (total > maxBytes) {
@@ -142,7 +180,11 @@ export async function downloadSignedStorageObject(args: {
   allowedPrefix: string;
   fetchImpl?: GeminiInlineFetch;
   maxBytes?: number;
+  signal?: AbortSignal;
 }): Promise<GeminiSignedDownloadResult> {
+  if (args.signal?.aborted) {
+    return { ok: false, reason: "download_failed" };
+  }
   if (!isAllowedSignedPhotoUrl(args.photoUrl, args.allowedPrefix)) {
     return { ok: false, reason: "rejected_url" };
   }
@@ -150,7 +192,7 @@ export async function downloadSignedStorageObject(args: {
   const fetchImpl = args.fetchImpl ?? fetch;
   let response: Response;
   try {
-    response = await fetchImpl(args.photoUrl, { redirect: "error" });
+    response = await fetchImpl(args.photoUrl, { redirect: "error", signal: args.signal });
   } catch {
     return { ok: false, reason: "download_failed" };
   }
@@ -159,7 +201,7 @@ export async function downloadSignedStorageObject(args: {
     return { ok: false, reason: "download_failed" };
   }
   try {
-    return await readBoundedBody(response, maxBytes);
+    return await readBoundedBody(response, maxBytes, args.signal);
   } catch {
     return { ok: false, reason: "download_failed" };
   }

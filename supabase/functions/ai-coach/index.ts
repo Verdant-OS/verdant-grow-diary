@@ -21,6 +21,7 @@ import {
 import {
   buildGeminiInlineImagePart,
   downloadSignedStorageObject,
+  isAllowedSignedPhotoUrl,
 } from "../_shared/geminiInlineImage.ts";
 
 type Mode = "diagnose" | "next_steps";
@@ -214,7 +215,7 @@ function parseAiCoachBody(value: unknown, supabaseUrl: string): Body | null {
       return null;
     }
     const allowedPhotoPrefix = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/sign/`;
-    if (!raw.photoUrl.startsWith(allowedPhotoPrefix)) return null;
+    if (!isAllowedSignedPhotoUrl(raw.photoUrl, allowedPhotoPrefix)) return null;
     photoUrl = raw.photoUrl;
   }
 
@@ -625,18 +626,25 @@ Rules for diagnosis (structured view, approval-first):
     // Storage path before any credit spend. Gemini rejects that HTTPS URL, so
     // the bytes are inlined after the spend id exists.
     if (body.photoUrl) {
-      const downloaded = await downloadSignedStorageObject({
-        photoUrl: body.photoUrl,
-        allowedPrefix: `${creditSupabaseUrl}/storage/v1/object/sign/`,
-      });
-      if (!downloaded.ok) {
-        return failureAfterRefund(spendId, `photo_${downloaded.reason}`, "invalid");
+      const photoController = new AbortController();
+      const photoTimer = setTimeout(() => photoController.abort(), PROVIDER_TIMEOUT_MS);
+      try {
+        const downloaded = await downloadSignedStorageObject({
+          photoUrl: body.photoUrl,
+          allowedPrefix: `${creditSupabaseUrl}/storage/v1/object/sign/`,
+          signal: photoController.signal,
+        });
+        if (!downloaded.ok) {
+          return failureAfterRefund(spendId, `photo_${downloaded.reason}`, "invalid");
+        }
+        const inline = buildGeminiInlineImagePart(downloaded.bytes);
+        if (!inline.ok) {
+          return failureAfterRefund(spendId, `photo_${inline.reason}`, "invalid");
+        }
+        userContent.push(inline.part);
+      } finally {
+        clearTimeout(photoTimer);
       }
-      const inline = buildGeminiInlineImagePart(downloaded.bytes);
-      if (!inline.ok) {
-        return failureAfterRefund(spendId, `photo_${inline.reason}`, "invalid");
-      }
-      userContent.push(inline.part);
     }
     const text = (body.question ? `QUESTION: ${body.question}\n\n` : "") + context;
     userContent.push({ type: "text", text });

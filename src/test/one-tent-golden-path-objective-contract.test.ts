@@ -478,17 +478,19 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     const noteBeforeRole = paddleStage.slice(0, paddleStage.indexOf("has_role"));
     expect(noteBeforeRole).toContain("sandbox-checkout-test-mode-note");
     expect(noteBeforeRole).toContain("await expect(checkoutNote).toBeVisible()");
-    const operatorBranch = paddleStage.slice(
-      paddleStage.indexOf("operatorGranted === true"),
-      paddleStage.indexOf("} else if (operatorRoleError == null)"),
-    );
+    const operatorStart = paddleStage.indexOf("operatorGranted === true");
+    const operatorEnd = paddleStage.indexOf("} else if (operatorRoleError == null)");
+    expect(operatorStart).toBeGreaterThanOrEqual(0);
+    expect(operatorEnd).toBeGreaterThanOrEqual(0);
+    const operatorBranch = paddleStage.slice(operatorStart, operatorEnd);
     expect(operatorBranch).toContain("payments-test-mode-banner");
     expect(operatorBranch).toContain('data-payment-env", "sandbox"');
     expect(operatorBranch).toContain("No real charges");
-    const nonOperatorBranch = paddleStage.slice(
-      paddleStage.indexOf("} else if (operatorRoleError == null)"),
-      paddleStage.indexOf("} else if ((await page.getByTestId"),
-    );
+    const nonOperatorStart = paddleStage.indexOf("} else if (operatorRoleError == null)");
+    const nonOperatorEnd = paddleStage.indexOf("} else {", nonOperatorStart + 1);
+    expect(nonOperatorStart).toBeGreaterThanOrEqual(0);
+    expect(nonOperatorEnd).toBeGreaterThanOrEqual(0);
+    const nonOperatorBranch = paddleStage.slice(nonOperatorStart, nonOperatorEnd);
     expect(nonOperatorBranch).toContain("toHaveCount(0)");
     const executablePaddle = EXECUTABLE_SPEC.slice(
       EXECUTABLE_SPEC.indexOf('await stage("paddle_sandbox_verified"'),

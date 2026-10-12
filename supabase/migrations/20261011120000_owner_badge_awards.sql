@@ -339,6 +339,8 @@ DECLARE
   was_hidden boolean;
   revoked_at timestamptz;
 BEGIN
+  -- Fast path only. The write barrier is the FOR UPDATE recheck after the
+  -- advisory lock, immediately before any award or evidence mutation.
   SELECT runtime.enabled
     INTO runtime_enabled
   FROM public.badge_award_runtime AS runtime
@@ -432,6 +434,20 @@ BEGIN
 
   IF revoked_at IS NOT NULL THEN
     RETURN jsonb_build_object('status', 'unchanged', 'award_id', found_award);
+  END IF;
+
+  -- Recheck under a row lock after the advisory lock and immediately before
+  -- any award or evidence write, so a committed enabled = false is a write
+  -- barrier. This lock stays after the advisory wait: taking it earlier
+  -- deadlocks a concurrent disable that is waiting to commit.
+  SELECT runtime.enabled
+    INTO runtime_enabled
+  FROM public.badge_award_runtime AS runtime
+  WHERE runtime.id = 1
+  FOR UPDATE;
+
+  IF runtime_enabled IS NOT TRUE THEN
+    RETURN jsonb_build_object('status', 'disabled');
   END IF;
 
   IF entry_id IS NULL THEN
@@ -545,6 +561,8 @@ DECLARE
   visited integer := 0;
   batch_limit constant integer := 25;
 BEGIN
+  -- Fast path only. Each owner is read again before evaluate_owner, and the
+  -- cursor write rechecks under FOR UPDATE after that call returns.
   SELECT runtime.enabled, runtime.reconcile_after
     INTO runtime_enabled, cursor_after
   FROM public.badge_award_runtime AS runtime
@@ -568,6 +586,18 @@ BEGIN
     ORDER BY owners.user_id
     LIMIT batch_limit
   LOOP
+    -- Plain read, once per owner. Do not lock the runtime row across
+    -- evaluate_owner: that call waits on the owner advisory lock, and holding
+    -- the runtime row across that wait deadlocks a concurrent disable.
+    SELECT runtime.enabled
+      INTO runtime_enabled
+    FROM public.badge_award_runtime AS runtime
+    WHERE runtime.id = 1;
+
+    IF runtime_enabled IS NOT TRUE THEN
+      EXIT;
+    END IF;
+
     BEGIN
       PERFORM set_config('request.jwt.claim.sub', owner::text, true);
       PERFORM set_config('request.jwt.claims', json_build_object('sub', owner)::text, true);
@@ -582,6 +612,18 @@ BEGIN
 
   PERFORM set_config('request.jwt.claim.sub', '', true);
   PERFORM set_config('request.jwt.claims', '{}', true);
+
+  -- Same write barrier as the evaluator. Skip the cursor update when the
+  -- switch is off. The row lock is taken only after evaluate_owner returns.
+  SELECT runtime.enabled
+    INTO runtime_enabled
+  FROM public.badge_award_runtime AS runtime
+  WHERE runtime.id = 1
+  FOR UPDATE;
+
+  IF runtime_enabled IS NOT TRUE THEN
+    RETURN reconciled;
+  END IF;
 
   IF visited < batch_limit THEN
     UPDATE public.badge_award_runtime

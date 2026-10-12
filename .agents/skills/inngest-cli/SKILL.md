@@ -177,18 +177,10 @@ The event key in the URL path (`test` above) can be any value locally.
 
 Requires `inngest@>=4.0.0`.
 
-On an npm-managed target, use npm's `install` subcommand with `-D` and the package name `@inngest/test`. The first example selects that package manager in the shell so this file is not a repository npm lock consumer. These examples are for the target app, not this repository's lockfile:
-
 ```bash
-# npm-managed target only — not this repository's lockfile
-pkg_mgr=npm
-"$pkg_mgr" install -D @inngest/test
-# or
 bun add -d @inngest/test
-# or
-yarn add -D @inngest/test
-# or
-pnpm add -D @inngest/test
+# or yarn add -D @inngest/test
+# or pnpm add -D @inngest/test
 ```
 
 ```typescript

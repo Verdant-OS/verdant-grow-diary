@@ -76,18 +76,12 @@ Inngest migration scan:
 
 ## Package and Environment
 
-Install the latest v4 SDK in the target app, not in this repository. On an npm-managed target, use npm's `install` subcommand with the package name `inngest@latest`. The first example selects that package manager in the shell so this file is not a repository npm lock consumer:
+Install the latest v4 SDK:
 
 ```bash
-# npm-managed target only — not this repository's lockfile
-pkg_mgr=npm
-"$pkg_mgr" install inngest@latest
-# or
 bun add inngest@latest
-# or
-yarn add inngest@latest
-# or
-pnpm add inngest@latest
+# or yarn add inngest@latest
+# or pnpm add inngest@latest
 ```
 
 If the repo uses v3 realtime, remove `@inngest/realtime`; v4 realtime lives in

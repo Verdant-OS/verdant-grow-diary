@@ -310,14 +310,14 @@ export async function handleAiCoachRequest(
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return json({ error: "unauthorized" }, 401);
-    const createSupabaseClient = (deps.createClient ??
+    const createClient = (deps.createClient ??
       (await import("npm:@supabase/supabase-js@2"))
         .createClient) as unknown as AiCoachCreateClient as unknown as (
       url: string,
       key: string,
       options?: Record<string, unknown>,
     ) => AiCoachRuntimeClient;
-    const supabase = createSupabaseClient(
+    const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: auth } } },
@@ -351,7 +351,7 @@ export async function handleAiCoachRequest(
       return json({ error: "AI not configured" }, 500);
     }
 
-    const creditSupabase = createSupabaseClient(creditSupabaseUrl, serviceRoleKey, {
+    const creditSupabase = createClient(creditSupabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
     const billingEnvironment = billingEnvironmentResolution.environment;

@@ -37,6 +37,7 @@ import {
 } from "@/lib/quickLogActivityDetailFields";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { PHENO_EVIDENCE_RECEIPT_KIND } from "@/lib/phenoEvidenceCaptureRules";
+import { readDetailsLoggedAt } from "@/lib/quicklogManualDiagnosticsRules";
 
 /**
  * Top-level detail keys that must never render as a raw "key: value" chip,
@@ -49,6 +50,8 @@ export const HIDDEN_DIARY_DETAIL_KEYS: ReadonlySet<string> = new Set([
   "plant_id",
   "plant_name",
   "tent_id",
+  // Shown by the dedicated tent chip. A raw tent_name chip would repeat it.
+  "tent_name",
   "sensor",
   "sensor_snapshot",
   "manual_sensor_snapshot",
@@ -163,11 +166,13 @@ function withGrowerFacingDetailLines(
 ): QuickLogDetailDisplayLine[] {
   const next = [...lines];
   if (typeof record.logged_at === "string" && !next.some((line) => line.key === "logged_at")) {
-    const iso = record.logged_at.trim();
-    const formatted = options.formatTimestamp
-      ? options.formatTimestamp(iso)
-      : formatDiaryDetailTimestamp(iso, options.timeZone);
-    if (formatted) next.push({ key: "logged_at", label: "Logged at", value: formatted });
+    const reading = readDetailsLoggedAt({ logged_at: record.logged_at });
+    if (reading.parseable && reading.value) {
+      const formatted = options.formatTimestamp
+        ? options.formatTimestamp(reading.value)
+        : formatDiaryDetailTimestamp(reading.value, options.timeZone);
+      if (formatted) next.push({ key: "logged_at", label: "Logged at", value: formatted });
+    }
   }
   const attached = friendlyAttachedAction(record.attached_to_action);
   if (attached && !next.some((line) => line.key === "attached_to_action")) {

@@ -1232,6 +1232,7 @@ export default function Timeline() {
     // row the query correctly fetched could be dropped again here by a
     // second, stale UTC-day interpretation.
     timeZone: TIMELINE_LOCAL_TIME_ZONE,
+    plantNamesById,
   };
   const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
 
@@ -1268,6 +1269,7 @@ export default function Timeline() {
     sensorSourceFilter,
     effectiveStartDate,
     effectiveEndDate,
+    plantNamesById,
   ]);
 
   const renderedDiaryAnchorIds = useMemo(

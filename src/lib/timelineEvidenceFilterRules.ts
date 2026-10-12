@@ -59,6 +59,11 @@ export interface TimelineEvidenceFilterInput {
    * `timelineDateRangeRules.ts`.
    */
   timeZone?: string | null;
+  /**
+   * Plant directory used by the card when `details.plant_name` is blank.
+   * Keyword search includes that same resolved name.
+   */
+  plantNamesById?: ReadonlyMap<string, string> | null;
 }
 
 const TIMELINE_FILTER_STALE_MS = LIVE_CURRENT_STATE_STALE_MS;
@@ -141,7 +146,10 @@ function normalize(v: unknown): string {
   return typeof v === "string" ? v.trim().toLowerCase() : "";
 }
 
-function safeRowText(row: TimelineEvidenceRow): string {
+function safeRowText(
+  row: TimelineEvidenceRow,
+  plantNamesById?: ReadonlyMap<string, string> | null,
+): string {
   const parts: string[] = [];
   if (typeof row.note === "string") parts.push(row.note);
   if (typeof row.stage === "string") parts.push(row.stage);
@@ -150,6 +158,12 @@ function safeRowText(row: TimelineEvidenceRow): string {
     const v = details[key];
     if (typeof v === "string") parts.push(v);
   }
+  const resolvedPlant = resolveTimelineCardPlaceLabels({
+    plantId: row.plant_id,
+    details,
+    plantNamesById,
+  }).plantName;
+  if (resolvedPlant) parts.push(resolvedPlant);
   const eventType = details["event_type"];
   if (typeof eventType === "string") parts.push(eventType);
   return parts.join(" \u0001 ").toLowerCase();
@@ -172,7 +186,7 @@ export function timelineEvidenceRowMatches(
 
   const q = normalize(input.query);
   if (q !== "") {
-    if (!safeRowText(row).includes(q)) return false;
+    if (!safeRowText(row, input.plantNamesById).includes(q)) return false;
   }
 
   if (input.plantId && input.plantId.trim() !== "") {

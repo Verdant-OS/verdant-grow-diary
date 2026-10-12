@@ -25,9 +25,7 @@ export function readAnalyticsConsent(): AnalyticsConsentDecision {
   if (typeof window === "undefined") return "unset";
   if (documentDecision !== "unset") return documentDecision;
   try {
-    return parseAnalyticsConsentValue(
-      window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY),
-    );
+    return parseAnalyticsConsentValue(window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY));
   } catch {
     return documentDecision;
   }
@@ -50,6 +48,20 @@ export function writeAnalyticsConsent(decision: Exclude<AnalyticsConsentDecision
 
 export function __resetAnalyticsConsentForTests(): void {
   documentDecision = "unset";
+}
+
+/**
+ * A failed revoke can leave "granted" in storage while this document is denied.
+ * Reloading that document would turn analytics back on.
+ */
+export function persistedGrantWouldSurviveReload(): boolean {
+  if (typeof window === "undefined") return false;
+  if (documentDecision !== "denied") return false;
+  try {
+    return window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY) === "granted";
+  } catch {
+    return false;
+  }
 }
 
 /** Subscribe to decision changes from this tab or another tab. */

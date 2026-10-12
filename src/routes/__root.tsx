@@ -23,7 +23,11 @@ import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
 import { useAnalyticsConsent } from "@/hooks/useAnalyticsConsent";
-import { applyAnalyticsConsentDecision } from "@/lib/analyticsConsentRuntime";
+import { readAnalyticsConsent } from "@/lib/analyticsConsent";
+import {
+  applyAnalyticsConsentDecision,
+  tearDownAnalyticsForExcludedRoute,
+} from "@/lib/analyticsConsentRuntime";
 import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
 import FunnelEventDbSink from "@/components/FunnelEventDbSink";
 import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
@@ -214,9 +218,27 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  const pathname = useRouterState({
-    select: (state) => state.resolvedLocation?.pathname ?? state.location.pathname,
+  const routeLocation = useRouterState({
+    select: (state) => ({
+      pathname: state.resolvedLocation?.pathname ?? state.location.pathname,
+      search: state.location.searchStr,
+      hash: state.location.hash,
+    }),
   });
+  const pathname = routeLocation.pathname;
+
+  useEffect(() => {
+    if (
+      tearDownAnalyticsForExcludedRoute(readAnalyticsConsent(), {
+        pathname: routeLocation.pathname,
+        search: routeLocation.search,
+        hash: routeLocation.hash,
+      })
+    ) {
+      window.location.reload();
+    }
+  }, [routeLocation.hash, routeLocation.pathname, routeLocation.search]);
+
   if (isGrowHelpToolkitPath(pathname)) {
     return (
       <RootDocument>

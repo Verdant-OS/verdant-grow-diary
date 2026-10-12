@@ -640,6 +640,27 @@ BEGIN
   ASSERT v_count = 0, format('an anonymous JWT must see 0 awards, got %s', v_count);
   RESET role;
 
+  PERFORM set_config('request.jwt.claim', '', true);
+  PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
+  PERFORM set_config(
+    'request.jwt.claims',
+    json_build_object('sub', v_owner, 'is_anonymous', true)::text,
+    true
+  );
+  PERFORM set_config('role', 'authenticated', true);
+  SELECT count(*) INTO v_count FROM public.badge_awards;
+  v_result := public.badge_awards_evaluate_owner('first_diary_entry');
+  RESET role;
+  ASSERT v_count = 0
+    AND COALESCE(v_result->>'status', '') = 'not_authenticated'
+    AND (SELECT count(*) FROM public.badge_awards WHERE user_id = v_owner) = 1,
+    format(
+      'anonymous owner JWT must see 0 awards, return not_authenticated, and add no row; visible %s, status %s, rows %s',
+      v_count,
+      v_result->>'status',
+      (SELECT count(*) FROM public.badge_awards WHERE user_id = v_owner)
+    );
+
   UPDATE public.badge_award_runtime SET enabled = false WHERE id = 1;
   PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_owner)::text, true);

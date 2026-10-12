@@ -149,7 +149,10 @@ CREATE POLICY badge_awards_owner_select
   ON public.badge_awards
   FOR SELECT
   TO authenticated
-  USING (user_id = auth.uid());
+  USING (
+    user_id = auth.uid()
+    AND COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
+  );
 
 -- Cut 001 (Matthew, 2026-10-11 03:41 CT): until community launch, signed-in
 -- members can see other growers' active badges. Evidence and photos stay
@@ -347,6 +350,10 @@ BEGIN
 
   uid := auth.uid();
   IF uid IS NULL THEN
+    RETURN jsonb_build_object('status', 'not_authenticated');
+  END IF;
+
+  IF COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) THEN
     RETURN jsonb_build_object('status', 'not_authenticated');
   END IF;
 

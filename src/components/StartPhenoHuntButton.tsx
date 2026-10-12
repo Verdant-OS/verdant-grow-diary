@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canUseFeature } from "@/lib/featureEntitlements";
+import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 
 interface Props {
   growId: string;
@@ -35,10 +36,16 @@ export default function StartPhenoHuntButton({ growId, tentId, className }: Prop
   // returnTo — post-checkout, /checkout/success round-trips the buyer to
   // /pheno-hunts/new with growId/tentId intact.
   const target = `/pheno-hunts/new?${params.toString()}`;
+  // Same sanitizer as PhenoTrackerUpgradeGate. A safe new-hunt path is
+  // forwarded unchanged. A rejected target (backslash smuggle, off-origin)
+  // drops returnTo instead of encoding the raw value. No plan param here.
+  const safeReturnTo = sanitizeCheckoutReturnTo(target);
   const href =
     entitled || loading || lookupFailed
       ? target
-      : `/pricing?returnTo=${encodeURIComponent(target)}`;
+      : safeReturnTo
+        ? `/pricing?returnTo=${encodeURIComponent(safeReturnTo)}`
+        : "/pricing";
   const label = entitled
     ? "Start Pheno Hunt"
     : loading || lookupFailed

@@ -33,8 +33,9 @@ function isAhrefsCollectUrl(input: unknown): boolean {
 }
 
 /**
- * Stop further Ahrefs collection from this document.
- * Removing the script element does not detach listeners an executed tag already installed.
+ * Stop further Ahrefs collection made through the globals after this point.
+ * A tracker that already kept the original sendBeacon or fetch, or that passes
+ * a URL object, is not stopped. Vendor network traffic is not measured here.
  */
 function stopAhrefsCollection(): void {
   collectionStopped = true;
@@ -63,6 +64,7 @@ export function loadAhrefsAnalytics(
   scriptSrc: string = AHREFS_WEB_ANALYTICS_SCRIPT_SRC,
 ): void {
   if (typeof window === "undefined" || typeof document === "undefined") return;
+  collectionStopped = false;
 
   const existing = findAhrefsScripts(scriptSrc)[0];
   if (existing) {

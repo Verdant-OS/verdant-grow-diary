@@ -20,12 +20,34 @@ export function parseAnalyticsConsentValue(
   return "unset";
 }
 
+function readSessionDenial(): boolean {
+  try {
+    return window.sessionStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY) === "denied";
+  } catch {
+    return false;
+  }
+}
+
+function clearSessionDenial(): void {
+  try {
+    window.sessionStorage.removeItem(ANALYTICS_CONSENT_STORAGE_KEY);
+  } catch {
+    // Session storage can be blocked independently of the local decision.
+  }
+}
+
 /** Read the decision, preferring a current-document fallback after a failed write. */
 export function readAnalyticsConsent(): AnalyticsConsentDecision {
   if (typeof window === "undefined") return "unset";
   if (documentDecision !== "unset") return documentDecision;
   try {
-    return parseAnalyticsConsentValue(window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY));
+    const stored = parseAnalyticsConsentValue(
+      window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY),
+    );
+    // A failed revoke can leave "granted" in localStorage. The session record
+    // is what a fresh document in this tab can still read.
+    if (stored !== "denied" && readSessionDenial()) return "denied";
+    return stored;
   } catch {
     return documentDecision;
   }
@@ -39,9 +61,17 @@ export function writeAnalyticsConsent(decision: Exclude<AnalyticsConsentDecision
   try {
     window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, decision);
     documentDecision = "unset";
+    clearSessionDenial();
   } catch {
     // Storage blocked: the decision still applies for this page lifetime.
     documentDecision = decision;
+    if (decision === "denied") {
+      try {
+        window.sessionStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "denied");
+      } catch {
+        // No durable denial. A fresh document will reread the stale grant.
+      }
+    }
   }
   window.dispatchEvent(new CustomEvent(CONSENT_CHANGE_EVENT, { detail: decision }));
 }

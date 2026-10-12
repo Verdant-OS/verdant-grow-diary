@@ -62,6 +62,7 @@ import {
   type AlertSeverityRow,
   type AlertStatusRow,
 } from "@/lib/alerts";
+import { showAlertsOneTentLoopNextStep } from "@/lib/oneTentLoopNavigationRules";
 import { alertDetailPath, alertsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
@@ -256,12 +257,14 @@ export default function Alerts() {
         description="Persistent environment alerts. Read-only insights — no automation."
         icon={<Bell className="h-5 w-5" />}
       />
-      <OneTentLoopNextStepCard
-        current="alert"
-        ids={{ growId: urlGrowId ?? null }}
-        testId="alerts-one-tent-loop-next-step-card"
-        className="mb-3"
-      />
+      {showAlertsOneTentLoopNextStep(grouped.open.length) ? (
+        <OneTentLoopNextStepCard
+          current="alert"
+          ids={{ growId: urlGrowId ?? null }}
+          testId="alerts-one-tent-loop-next-step-card"
+          className="mb-3"
+        />
+      ) : null}
       <p
         className="text-[11px] text-muted-foreground mb-3"
         data-testid="alerts-one-tent-loop-approval-note"

@@ -171,7 +171,10 @@ function AnalyticsShell() {
   });
 
   useEffect(() => {
-    if (applyAnalyticsConsentDecision(decision, location)) window.location.reload();
+    const reload = applyAnalyticsConsentDecision(decision, location);
+    // A granted route change must stay in this document. Reloading here
+    // destroys client-side navigation and can start a second gtag config.
+    if (decision !== "granted" && reload) window.location.reload();
   }, [decision, location]);
 
   useGoogleAnalyticsPageViews();

@@ -8,12 +8,14 @@ import {
 import { applyAnalyticsConsentDecision } from "@/lib/analyticsConsentRuntime";
 import {
   __resetAhrefsAnalyticsLoaderForTests,
-  bindExecutedAhrefsTracker,
   loadAhrefsAnalytics,
 } from "@/lib/ahrefsAnalyticsLoader";
 import { __resetGoogleAnalyticsLoaderForTests } from "@/lib/googleAnalyticsLoader";
-
-const TRACK = "verdant:ahrefs-stub";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 
 describe("executed Ahrefs tracker denial", () => {
   afterEach(() => {
@@ -21,22 +23,25 @@ describe("executed Ahrefs tracker denial", () => {
     __resetAnalyticsConsentForTests();
     __resetGoogleAnalyticsLoaderForTests();
     __resetAhrefsAnalyticsLoaderForTests();
-    window.localStorage.clear();
+    clearLocalStorageForTest();
     document.head.querySelectorAll("script").forEach((node) => node.remove());
   });
 
-  it("keeps denial after a failed consent write and a failed tag removal, without reloading a stale grant", () => {
-    let hits = 0;
-    const listener = () => {
-      hits += 1;
+  it("stops an executed vendor beacon after a failed deny write and a failed tag removal", () => {
+    const calls: string[] = [];
+    navigator.sendBeacon = (url: string | URL) => {
+      calls.push(String(url));
+      return true;
     };
-    window.addEventListener(TRACK, listener);
-    bindExecutedAhrefsTracker(() => window.removeEventListener(TRACK, listener));
     loadAhrefsAnalytics();
-    window.dispatchEvent(new Event(TRACK));
-    expect(hits).toBe(1);
+    const vendor = () => {
+      navigator.sendBeacon("https://analytics.ahrefs.com/collect", "");
+    };
+    window.addEventListener("click", vendor);
+    window.dispatchEvent(new Event("click"));
+    expect(calls).toHaveLength(1);
 
-    window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("storage blocked");
     });
@@ -52,14 +57,12 @@ describe("executed Ahrefs tracker denial", () => {
     });
 
     expect(reload).toBe(false);
-    window.dispatchEvent(new Event(TRACK));
-    expect(hits).toBe(1);
+    window.dispatchEvent(new Event("click"));
+    expect(calls).toHaveLength(1);
 
     __resetAhrefsAnalyticsLoaderForTests();
     expect(readAnalyticsConsent()).toBe("denied");
-    expect(window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY)).toBe("granted");
-    window.dispatchEvent(new Event(TRACK));
-    expect(hits).toBe(1);
-    window.removeEventListener(TRACK, listener);
+    expect(getLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY)).toBe("granted");
+    window.removeEventListener("click", vendor);
   });
 });

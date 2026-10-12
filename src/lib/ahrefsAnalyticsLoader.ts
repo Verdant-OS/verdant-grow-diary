@@ -15,20 +15,47 @@ function findAhrefsScripts(scriptSrc: string): HTMLScriptElement[] {
   return Array.from(document.scripts).filter((script) => script.src === scriptSrc);
 }
 
-let executedTrackerStop: (() => void) | null = null;
+const AHREFS_COLLECT_HOST = "analytics.ahrefs.com";
 
-/**
- * Record how to detach an already-executed tracker.
- * Removing the script element does not prove those listeners stopped.
- */
-export function bindExecutedAhrefsTracker(stop: () => void): void {
-  executedTrackerStop = stop;
+let collectionStopped = false;
+let transportPatched = false;
+let originalSendBeacon: Navigator["sendBeacon"] | null = null;
+let originalFetch: typeof fetch | null = null;
+
+function isAhrefsCollectUrl(input: unknown): boolean {
+  const raw = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+  if (!raw) return false;
+  try {
+    return new URL(raw, window.location.href).hostname === AHREFS_COLLECT_HOST;
+  } catch {
+    return false;
+  }
 }
 
-function stopExecutedAhrefsTracker(): void {
-  const stop = executedTrackerStop;
-  executedTrackerStop = null;
-  stop?.();
+/**
+ * Stop further Ahrefs collection from this document.
+ * Removing the script element does not detach listeners an executed tag already installed.
+ */
+function stopAhrefsCollection(): void {
+  collectionStopped = true;
+  if (typeof window === "undefined" || typeof navigator === "undefined" || transportPatched) return;
+  transportPatched = true;
+  if (typeof navigator.sendBeacon === "function") {
+    originalSendBeacon = navigator.sendBeacon.bind(navigator);
+    navigator.sendBeacon = (url, data) => {
+      if (collectionStopped && isAhrefsCollectUrl(url)) return true;
+      return originalSendBeacon?.(url, data) ?? true;
+    };
+  }
+  if (typeof window.fetch === "function") {
+    originalFetch = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+      if (collectionStopped && isAhrefsCollectUrl(input)) {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      return originalFetch?.(input, init) ?? Promise.reject(new TypeError("fetch unavailable"));
+    };
+  }
 }
 
 export function loadAhrefsAnalytics(
@@ -64,7 +91,7 @@ export function removeAhrefsAnalyticsScript(
   } catch {
     // Element removal failed. That is not evidence the executed tracker stopped.
   } finally {
-    stopExecutedAhrefsTracker();
+    stopAhrefsCollection();
   }
 }
 
@@ -75,5 +102,12 @@ export function isAhrefsAnalyticsLoaded(): boolean {
 }
 
 export function __resetAhrefsAnalyticsLoaderForTests(): void {
+  collectionStopped = false;
+  transportPatched = false;
+  if (originalSendBeacon) navigator.sendBeacon = originalSendBeacon;
+  if (originalFetch) window.fetch = originalFetch;
+  originalSendBeacon = null;
+  originalFetch = null;
   removeAhrefsAnalyticsScript();
+  collectionStopped = false;
 }

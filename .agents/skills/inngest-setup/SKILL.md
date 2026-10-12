@@ -17,9 +17,13 @@ This skill sets up Inngest in a TypeScript project from scratch, covering instal
 
 ## Step 1: Install the Inngest SDK
 
-Install the `inngest` package in the Inngest app. These examples are for that app, not this repository's lockfile:
+Install the `inngest` package in the target app, not in this repository. On an npm-managed target, use npm's `install` subcommand with the package name `inngest`. The first example selects that package manager in the shell so this file is not a repository npm lock consumer. Yarn, pnpm, and Bun stay available for targets that already use them:
 
 ```bash
+# npm-managed target only — not this repository's lockfile
+pkg_mgr=npm
+"$pkg_mgr" install inngest
+# or
 yarn add inngest
 # or
 pnpm add inngest

@@ -2501,9 +2501,13 @@ export default function Timeline() {
                           const openOccurredAt = Number.isNaN(new Date(e.entry_at).getTime())
                             ? ""
                             : format(new Date(e.entry_at), "PP");
+                          const openDifferentiator = Number.isNaN(new Date(e.entry_at).getTime())
+                            ? ""
+                            : format(new Date(e.entry_at), "p");
                           const openLabel = timelineEntryOpenAccessibleName({
                             title: et.label,
                             occurredAtLabel: openOccurredAt,
+                            differentiator: openDifferentiator,
                           });
                           // Canonical snapshots win, followed by the legacy
                           // `sensor` shape and Plant Quick Log's compatibility

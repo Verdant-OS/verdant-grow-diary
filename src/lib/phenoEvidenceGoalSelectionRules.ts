@@ -50,6 +50,21 @@ export function normalizeEvidenceGoalIds(input: unknown): PhenoEvidenceGoalId[] 
   return out;
 }
 
+/**
+ * A stored draft that names an obsolete or unknown goal id did not review the
+ * selection that will actually be restored. The prior goalsReviewed flag must
+ * not unlock Confirmation.
+ */
+export function storedEvidenceGoalsRequireFreshReview(input: unknown): boolean {
+  if (!Array.isArray(input)) return false;
+  for (const raw of input) {
+    if (typeof raw !== "string") continue;
+    const id = raw.trim();
+    if (id.length > 0 && !KNOWN_GOAL_IDS.has(id)) return true;
+  }
+  return false;
+}
+
 /** True when `id` is part of the suggested starting set. */
 export function isSuggestedEvidenceGoal(id: PhenoEvidenceGoalId): boolean {
   return SUGGESTED.has(id);

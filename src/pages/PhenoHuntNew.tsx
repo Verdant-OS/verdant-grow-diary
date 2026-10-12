@@ -32,6 +32,7 @@ import {
   describePhenoEvidenceGoalSelection,
   normalizeEvidenceGoalIds,
   PHENO_EVIDENCE_GOALS_STEP_INTRO,
+  storedEvidenceGoalsRequireFreshReview,
 } from "@/lib/phenoEvidenceGoalSelectionRules";
 import PhenoHuntOnboardingStepper from "@/components/PhenoHuntOnboardingStepper";
 import PhenoEvidenceGoalsSelector from "@/components/PhenoEvidenceGoalsSelector";
@@ -89,7 +90,9 @@ function readHuntDraft(key: string): PhenoHuntSetupDraft | null {
         (PHENO_ONBOARDING_STEP_ORDER as readonly string[]).includes(parsed.currentStep)
           ? (parsed.currentStep as PhenoOnboardingStepId)
           : "basics",
-      goalsReviewed: parsed.goalsReviewed === true,
+      goalsReviewed:
+        parsed.goalsReviewed === true &&
+        !storedEvidenceGoalsRequireFreshReview(parsed.evidenceGoals),
     };
   } catch {
     return null;

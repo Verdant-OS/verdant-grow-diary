@@ -15,10 +15,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import {
-  formatServerBundleProbe,
-  probeServerBundleEntry,
-} from "./lib/serverBundleEntryProbe.mjs";
+import { formatServerBundleProbe, probeServerBundleEntry } from "./lib/serverBundleEntryProbe.mjs";
 
 const distDir = resolve(process.argv[2] ?? "dist");
 // The server bundle location depends on the Nitro/Vite output layout, which has
@@ -77,15 +74,33 @@ if (typeof handler?.fetch !== "function") {
   abort("BLOCKED — server bundle exports no fetch handler.");
 }
 
-
 const ctx = { waitUntil() {}, passThroughOnException() {} };
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const failures = [];
 let written = 0;
 
+// Permanent host redirects (308) answer before SSR. The alias document still
+// has a noindex head the fidelity gate must read, so the capture re-requests
+// that path once with the build-only snapshot header. The Worker ignores the
+// header for the temporary /~oauth hop.
+const SEO_SNAPSHOT_HEADER = "x-verdant-seo-snapshot";
+const SEO_SNAPSHOT_HEADER_VALUE = "1";
+const SEO_SNAPSHOT_ENV = "VERDANT_SEO_SNAPSHOT";
+
+async function renderDocument(path) {
+  const url = `${origin}${path}`;
+  const response = await handler.fetch(new Request(url), {}, ctx);
+  if (response.status !== 308) return response;
+  return handler.fetch(
+    new Request(url, { headers: { [SEO_SNAPSHOT_HEADER]: SEO_SNAPSHOT_HEADER_VALUE } }),
+    { [SEO_SNAPSHOT_ENV]: SEO_SNAPSHOT_HEADER_VALUE },
+    ctx,
+  );
+}
+
 for (const document of manifest.documents) {
   try {
-    const response = await handler.fetch(new Request(`${origin}${document.path}`), {}, ctx);
+    const response = await renderDocument(document.path);
     if (response.status !== 200) {
       failures.push(`${document.path}: HTTP ${response.status}`);
       continue;
@@ -104,6 +119,5 @@ if (failures.length > 0) {
   for (const failure of failures) log(`  - ${failure}`);
   abort(`${failures.length} document(s) failed to render (see list above).`);
 }
-
 
 console.log(`capture-ssr-head-snapshots-with-server: ${written} SSR snapshot(s) -> ${distDir}`);

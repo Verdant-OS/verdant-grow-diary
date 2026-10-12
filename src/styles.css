@@ -229,8 +229,11 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    /* Fixed consent banner publishes this while it is visible. */
+    scroll-padding-bottom: var(--analytics-consent-banner-offset, 0px);
   }
   body {
+    padding-bottom: var(--analytics-consent-banner-offset, 0px);
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;

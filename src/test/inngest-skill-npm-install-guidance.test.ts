@@ -5,6 +5,9 @@
  *
  * Mirrors `NPM_INSTALL_PATTERN` in `scripts/check-bun-lockfile-policy.mjs`:
  * the npm binary, then `ci` or `install`, except a global install flag.
+ *
+ * The package name is asserted inside the npm guidance sentence. A whole-file
+ * search would still pass if that sentence named a different package.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -15,15 +18,18 @@ const FORBIDDEN_NPM_COMMAND = /\bnpm(?:\.cmd|\.exe)?\s+(?:ci\b|install\b(?!\s+(?
 const SKILLS = [
   {
     path: ".agents/skills/inngest-setup/SKILL.md",
-    packageName: "inngest",
+    guidance:
+      "run npm's `install` subcommand with the package name `inngest` (the three words `npm`, `install`, and `inngest`)",
   },
   {
     path: ".agents/skills/inngest-v3-v4-migration/SKILL.md",
-    packageName: "inngest@latest",
+    guidance:
+      "run npm's `install` subcommand with the package name `inngest@latest` (the words `npm`, `install`, and `inngest@latest`)",
   },
   {
     path: ".agents/skills/inngest-cli/SKILL.md",
-    packageName: "@inngest/test",
+    guidance:
+      "run npm's `install` subcommand with `-D` and the package name `@inngest/test` (the words `npm`, `install`, `-D`, and `@inngest/test`)",
   },
 ] as const;
 
@@ -32,12 +38,8 @@ function skillSource(path: string) {
 }
 
 describe("Inngest skill npm-managed guidance", () => {
-  it.each(SKILLS)("states npm guidance and the package name in $path", ({ path, packageName }) => {
-    const source = skillSource(path);
-    expect(source).toContain("npm-managed target");
-    expect(source).toContain("npm's `install` subcommand");
-    expect(source).toContain(packageName);
-    expect(source).toContain("`npm`, `install`");
+  it.each(SKILLS)("binds the npm instruction to its package in $path", ({ path, guidance }) => {
+    expect(skillSource(path)).toContain(guidance);
   });
 
   it("does not contain the forbidden contiguous npm command", () => {

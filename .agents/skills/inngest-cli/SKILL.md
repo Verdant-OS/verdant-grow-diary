@@ -178,9 +178,9 @@ The event key in the URL path (`test` above) can be any value locally.
 Requires `inngest@>=4.0.0`.
 
 ```bash
-yarn add -D @inngest/test
+bun add -d @inngest/test
+# or yarn add -D @inngest/test
 # or pnpm add -D @inngest/test
-# or bun add -d @inngest/test
 ```
 
 ```typescript

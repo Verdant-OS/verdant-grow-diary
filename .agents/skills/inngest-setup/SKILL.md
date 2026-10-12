@@ -20,11 +20,11 @@ This skill sets up Inngest in a TypeScript project from scratch, covering instal
 Install the `inngest` package in the Inngest app. These examples are for that app, not this repository's lockfile:
 
 ```bash
+bun add inngest
+# or
 yarn add inngest
 # or
 pnpm add inngest
-# or
-bun add inngest
 ```
 
 ## Step 2: Create an Inngest Client

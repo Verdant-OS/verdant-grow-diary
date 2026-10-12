@@ -2471,13 +2471,10 @@ export default function Timeline() {
                         </div>
                       )}
                       <div
-                        className="p-4 cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
-                        role="button"
-                        tabIndex={0}
-                        data-testid="timeline-entry-body"
-                        aria-label="Open entry details"
+                        className="p-4"
                         onClick={() => setDetailEntryId(e.id)}
                         onKeyDown={(ev) => {
+                          if (ev.target !== ev.currentTarget) return;
                           if (ev.key === "Enter" || ev.key === " ") {
                             ev.preventDefault();
                             setDetailEntryId(e.id);
@@ -2502,8 +2499,8 @@ export default function Timeline() {
                             ? ""
                             : format(new Date(e.entry_at), "PP");
                           const openDifferentiator = Number.isNaN(new Date(e.entry_at).getTime())
-                            ? ""
-                            : format(new Date(e.entry_at), "p");
+                            ? ` #${e.id}`
+                            : `${format(new Date(e.entry_at), "p")} #${e.id}`;
                           const openLabel = timelineEntryOpenAccessibleName({
                             title: et.label,
                             occurredAtLabel: openOccurredAt,
@@ -2677,7 +2674,21 @@ export default function Timeline() {
                                   </>
                                 ) : null}
                               </div>
-                              <p className="text-sm whitespace-pre-wrap">{e.note}</p>
+                              <p
+                                className="text-sm whitespace-pre-wrap cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
+                                role="button"
+                                tabIndex={0}
+                                data-testid="timeline-entry-body"
+                                aria-label="Open entry details"
+                                onKeyDown={(ev) => {
+                                  if (ev.key === "Enter" || ev.key === " ") {
+                                    ev.preventDefault();
+                                    setDetailEntryId(e.id);
+                                  }
+                                }}
+                              >
+                                {e.note}
+                              </p>
                               {lightingGuideByEntryId.has(e.id) ? (
                                 <div
                                   onClick={(event) => event.stopPropagation()}

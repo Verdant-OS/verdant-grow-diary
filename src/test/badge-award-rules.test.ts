@@ -28,6 +28,8 @@ describe("badge award display rules", () => {
     expect(FIRST_DIARY_ENTRY_BADGE_KEY).toBe("first_diary_entry");
     expect(BADGE_AWARD_COPY.firstDiaryEntry).toBe("You saved a diary entry with a photo attached.");
     expect(BADGE_AWARD_COPY.firstDiaryEntry.toLowerCase()).not.toContain("relevant photo");
+    // @source-scan-justified: the migration SQL has no importable value under Vitest;
+    // this pins the diary-photo qualification text in the committed file.
     const migration = readFileSync(
       "supabase/migrations/20261011120000_owner_badge_awards.sql",
       "utf8",

@@ -14,8 +14,8 @@
  *  - no Supabase write path, no Action Queue, no automation/device
  *    strings, no raw_payload/service_role/token leakage
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within, waitFor, act } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, within, waitFor, act, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import QuickLog from "@/components/QuickLog";
@@ -103,6 +103,18 @@ beforeEach(() => {
   toastError.mockReset();
   toastSuccess.mockReset();
   toastMessage.mockReset();
+});
+
+// Unmounting the open Quick Log dialog makes Radix FocusScope queue a
+// setTimeout(0) that dispatches a CustomEvent. Unmount here and let that
+// timer run while jsdom is still alive; otherwise, on a slow runner, it can
+// fire after the file's environment is torn down and fail the shard with an
+// unhandled "dispatchEvent ... not of type 'Event'" error.
+afterEach(async () => {
+  cleanup();
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 });
 
 function openEnvironmentForm() {

@@ -40,6 +40,7 @@ function createCompletePersistedState(): GrowHelpToolkitState {
     sourceWaterEc: 0.2,
     targetEc: 1.6,
     measuredMixedEc: 1.5,
+    measuredMixedEcSource: "manual",
     ecParts: [{ id: "ec-a", name: "Base", ecPerMlPerL: 0.2, ratio: 2 }],
     elementalTargetsPpm: {
       nitrogen: 150,
@@ -146,6 +147,21 @@ function createFailingStorage(): Storage {
 }
 
 describe("Grow Help Toolkit state", () => {
+  it("round-trips intentionally cleared required planning fields as null", () => {
+    const state = createDefaultGrowHelpToolkitState();
+    state.cycle.vegPhotoperiodHours = null;
+    state.cycle.flowerPhotoperiodHours = null;
+    state.light.fixtureCount = null;
+    state.light.canopyEfficiencyPercent = null;
+    state.expense.amortizationCycles = null;
+
+    expect(saveGrowHelpToolkitState(state)).toBe(true);
+    expect(loadGrowHelpToolkitState()).toMatchObject({
+      cycle: { vegPhotoperiodHours: null, flowerPhotoperiodHours: null },
+      light: { fixtureCount: null, canopyEfficiencyPercent: null },
+      expense: { amortizationCycles: null },
+    });
+  });
   beforeEach(() => {
     clearLocalStorageForTest();
   });

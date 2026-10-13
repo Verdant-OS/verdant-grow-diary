@@ -38,6 +38,7 @@ import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 import type { AiCreditRemainingInput } from "@/lib/aiCreditRemainingBadgeViewModel";
 import { buildLegacyAiSensorEvidence } from "@/lib/growSensorEvidenceRules";
+import { validateAiCoachPhotoFile } from "@/lib/aiCoachPhotoFileRules";
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
 import {
   AI_DOCTOR_PHOTO_PREVIEW_HEIGHT,
@@ -278,6 +279,12 @@ export default function Coach() {
       let photoUrl = selectedRequest.photoUrl;
       if (mode === "diagnose" && photoFile && !photoUrl) {
         const photoValidation = validatePlantProfilePhotoFile(photoFile);
+        const coachPhotoValidation = validateAiCoachPhotoFile(photoFile);
+        if (coachPhotoValidation.ok === false) {
+          setPhotoFile(null);
+          setPhotoPreviewStatus("empty");
+          throw new Error(coachPhotoValidation.message);
+        }
         if (photoValidation.ok === false) {
           setPhotoFile(null);
           setPhotoPreviewStatus("empty");
@@ -389,6 +396,11 @@ export default function Coach() {
   function handleFile(f: File | null) {
     if (!f) return;
     const validation = validatePlantProfilePhotoFile(f);
+    const coachValidation = validateAiCoachPhotoFile(f);
+    if (coachValidation.ok === false) {
+      toast.error(coachValidation.message);
+      return;
+    }
     if (validation.ok === false) {
       toast.error(validation.message);
       return;

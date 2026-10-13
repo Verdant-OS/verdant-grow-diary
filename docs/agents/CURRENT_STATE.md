@@ -33,6 +33,11 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-13T23:13 UTC
+
+- **PASS, #2056 required contexts at `5ebabe2332315330cc09bd955af6a76f549ce0cb`; reviewer still missing.** #2056 has stayed at the conflict-merge head `5ebabe233` since 22:37 UTC, and CI finished there: **35/35 required contexts SUCCESS**, 0 failing; must-be-green 2 success / 2 skipped / 3 not run (docs-only path filters). Mergeable state `unstable` (no conflict). Still draft: no reviews, no requested reviewer, 0 unresolved threads. It is 2 commits behind the tip `0985de5e5` but not conflicting, so no sync was done; a sync would create a new head. Repository-wide the Actions backlog has eased (53 queued, 21 in progress).
+- **Next step, owner gates:** an independent verdict at `5ebabe233` (none routed; Critical Mass is the docs-only default, and whether a Codex verdict counts is Matthew's call), then Matthew's Accept at that exact head and the merge queue. Nothing more should be pushed to #2056 before then, or the checks restart.
+
 ## Follow-up observation — 2026-10-13T22:37 UTC
 
 - **#2056 moved to `5ebabe2332315330cc09bd955af6a76f549ce0cb` to clear a merge conflict; CI restarts there.** #2056 sat at `adb61aca9` from 21:29 UTC until #2058 ("record #1898 release at 5b16f3243") merged into `verdant-grow-diary` and added a block at the top of this file. GitHub then marked #2056 as conflicting. Under Auto-fix, this session merged the tip `6003a20e1` into #2056's branch (no rebase, no force-push). Every block from both sides is kept, newest first by timestamp, with no text changed. Against the base, #2056 still adds only its own blocks (one file, +63 / -0, nothing removed). Docs-safety: 3 scanners PASS; Vitest 77 passed / 0 failed / 0 skipped. The merge is a new head, so CI at `adb61aca9` no longer counts; at 22:37 UTC #2056 is draft, mergeable state `blocked` (CI pending, no review), no reviewer routed. Repository-wide: 157 runs queued, 19 in progress.

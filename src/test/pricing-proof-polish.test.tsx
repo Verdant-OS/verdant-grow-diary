@@ -101,11 +101,10 @@ describe("Pricing — proof polish copy", () => {
     expect(free.textContent).toContain("CSV sensor import");
   });
 
-  it("Founder Lifetime shows $129 and first 100 limit", () => {
+  it("does not show a Founder Lifetime $129 card", () => {
     renderPricing();
-    const founder = screen.getByTestId("pricing-card-founder");
-    expect(founder.textContent).toContain("$129");
-    expect(founder.textContent).toContain("First 100 only");
+    expect(screen.queryByTestId("pricing-card-founder")).toBeNull();
+    expect(screen.queryByText(/\$129/)).toBeNull();
   });
 
   it("CSV proof copy never calls CSV live", () => {

@@ -87,8 +87,6 @@ import Pricing from "@/pages/Pricing";
 const PAID_CTAS: ReadonlyArray<{ testId: string; sku: string }> = [
   { testId: "pricing-cta-pro-annual", sku: "pro_annual" },
   { testId: "pricing-cta-craft-annual", sku: "craft_annual" },
-  { testId: "pricing-cta-founder-lifetime", sku: "founder_lifetime" },
-  { testId: "pricing-cta-founder-highlight", sku: "founder_lifetime" },
   { testId: "pricing-cta-pro-footer", sku: "pro_monthly" },
   // Derived from the same constant the page maps over, so adding a third pack
   // cannot silently escape this guard. Listing only credit_pack_50 by hand is
@@ -102,7 +100,7 @@ const BLOCKED_COPY = /launch list|checkout unavailable|sold out/i;
 
 function renderPricing() {
   return render(
-    <MemoryRouter initialEntries={["/pricing?plan=founder_lifetime"]}>
+    <MemoryRouter initialEntries={["/pricing"]}>
       <Pricing />
     </MemoryRouter>,
   );
@@ -111,7 +109,7 @@ function renderPricing() {
 function rerenderAfterFailure(view: ReturnType<typeof renderPricing>) {
   mocks.checkout.blockedReason = "We couldn't open checkout for that item.";
   view.rerender(
-    <MemoryRouter initialEntries={["/pricing?plan=founder_lifetime"]}>
+    <MemoryRouter initialEntries={["/pricing"]}>
       <Pricing />
     </MemoryRouter>,
   );
@@ -163,6 +161,6 @@ describe("paid CTA label matches behaviour", () => {
     // No click, so the failure is unattributed and fails closed page-wide.
     rerenderAfterFailure(view);
     expect(screen.getByTestId("pricing-cta-pro-footer").textContent).toMatch(BLOCKED_COPY);
-    expect(screen.getByTestId("pricing-cta-founder-highlight").textContent).toMatch(BLOCKED_COPY);
+    expect(screen.getByTestId("pricing-cta-pro-annual").textContent).toMatch(BLOCKED_COPY);
   });
 });

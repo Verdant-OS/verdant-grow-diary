@@ -61,7 +61,7 @@ describe("SubscriberInterestForm", () => {
     );
     expect(screen.getByTestId("subscriber-interest-share-card")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Share Founder Lifetime" })).toBeInTheDocument();
-    expect((screen.getByLabelText("Paid plan share link") as HTMLInputElement).value).toContain(
+    expect((screen.getByLabelText("Paid plan share link") as HTMLInputElement).value).not.toContain(
       "plan=founder_lifetime",
     );
   });

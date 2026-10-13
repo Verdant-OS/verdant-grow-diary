@@ -101,12 +101,12 @@ describe("usePaddleCheckout — Slice D overlay cancel wiring", () => {
       wrapper: wrapperWithReturnTo,
     });
     await act(async () => {
-      await result.current.openCheckout({ priceId: "founder_lifetime" });
+      await result.current.openCheckout({ priceId: "craft_annual" });
     });
 
     act(() => handlePaddleCheckoutEvent({ name: "checkout.closed" }));
     expect(navigateMock).toHaveBeenCalledWith(
-      "/checkout/cancel?plan=founder_lifetime&returnTo=%2Fpheno-hunts%2Fnew",
+      "/checkout/cancel?plan=craft_annual&returnTo=%2Fpheno-hunts%2Fnew",
     );
   });
 
@@ -175,7 +175,7 @@ describe("usePaddleCheckout — Slice D overlay cancel wiring", () => {
       wrapper,
     });
     await act(async () => {
-      await result.current.openCheckout({ priceId: "founder_lifetime" });
+      await result.current.openCheckout({ priceId: "craft_annual" });
     });
 
     unmount();

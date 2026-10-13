@@ -27,6 +27,7 @@ import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { usePlants } from "@/hooks/use-plants";
 import { useGrows } from "@/store/grows";
 import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
+import { manualTentGrowName, manualTentOptionLabels } from "@/lib/manualTentOptionLabelRules";
 import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
 import { mergeSensorsSeriesWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
@@ -358,7 +359,12 @@ export default function Sensors() {
       ? "Waiting for connection to check Quick Log manual history."
       : "Checking Quick Log manual history…";
 
-  const manualTents = tents.map((t) => ({ id: t.id as string, name: t.name as string }));
+  const manualTents = tents.map((t) => ({
+    id: t.id as string,
+    name: t.name as string,
+    growName: manualTentGrowName(t.growId, grows),
+  }));
+  const manualTentLabels = manualTentOptionLabels(manualTents);
   const selectTentByGrower = (nextTentId: string) => {
     if (session) {
       session.selectTent(nextTentId, sensorsTentRouteIntentKey, tents);
@@ -848,7 +854,7 @@ export default function Sensors() {
                   className="rounded-md border border-border bg-secondary/50 px-3 py-1.5 text-xs hover:bg-secondary"
                   onClick={() => selectTentByGrower(tent.id)}
                 >
-                  Choose {tent.name}
+                  Choose {manualTentLabels.get(tent.id) ?? tent.name}
                 </button>
               ))}
             </div>

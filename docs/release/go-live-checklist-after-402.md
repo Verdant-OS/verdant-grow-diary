@@ -101,7 +101,7 @@ anything.
    - **(f)** The owner publishes (promotes) that build. See
      `docs/agents/RUNBOOK_VERCEL_PROMOTE.md`. Promotion is Matthew only. When to lift the
      fence afterwards is Matthew's call, and goes in the receipt.
-2. `https://verdantgrowdiary.com/version.json` reports the chosen SHA from 1(a) and
+2. `https://verdantgrowdiary.com/version.json` reports the chosen SHA from step 0.1(a) and
    `dirty:false` on the apex. Check `www` too, per the runbook's "Verify every production
    hostname" section.
    **Stop** if any hostname serves a different SHA.

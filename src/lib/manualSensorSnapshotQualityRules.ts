@@ -197,8 +197,14 @@ export function evaluateManualSensorSnapshotQuality(
 
   // Stale check — only applies to "current" mode. Historical/timeline
   // surfaces must not mislead growers by marking captured-moment readings
-  // as stale just because time has passed.
+  // as stale just because time has passed. A future timestamp is never
+  // current, in either mode: negative age must not fall through to usable.
   let isStaleByTime = false;
+  let isFutureByTime = false;
+  if (capturedMs != null && capturedMs > nowMs) {
+    isFutureByTime = true;
+    reasons.push("Captured time is in the future.");
+  }
   if (mode === "current" && capturedMs != null) {
     const ageMs = nowMs - capturedMs;
     const staleMs = staleHours * 60 * 60 * 1000;
@@ -248,6 +254,9 @@ export function evaluateManualSensorSnapshotQuality(
     if (sourceLabel === "stale") {
       reasons.unshift("Snapshot labeled stale.");
     }
+  } else if (isFutureByTime) {
+    quality = "needs_review";
+    summary = isHistorical ? "Historical reading needs review" : "Needs review";
   } else {
     quality = "usable";
     summary = isHistorical ? "Historical review reading" : "Usable current reading";

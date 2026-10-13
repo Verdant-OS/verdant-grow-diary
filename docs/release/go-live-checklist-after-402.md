@@ -212,10 +212,14 @@ After it finishes, run step 1's `headSha` check and record it.
 
 This is a write, and the manual check narrows the risk without closing it. `--ref` takes a
 branch, not a SHA, so the branch can still advance between `git ls-remote` and the
-dispatch. If it does, the run makes its two tagged fixture writes from another commit, and
-the `headSha` check only catches that afterwards. In that case the run is not evidence for
-the receipt SHA. Record the run link and both `[smoke …]` records in the receipt, and
-**stop**. Only the fail-closed `expected_sha` input described in step 1 prevents this.
+dispatch. If it does, the job pins `E2E_EXPECTED_SHA` to the newer commit and waits for
+production to serve it ("Wait for the pinned SHA to be live", `quicklog-smoke.yml:621-623`,
+before any fixture or save step). If production still serves only the receipt SHA, the wait
+times out and nothing is written. If production already serves the newer commit, the run
+makes its tagged fixture writes from that commit, and the `headSha` check only catches it
+afterwards. Either way the run is not evidence for the receipt SHA. Record the run link and
+only the `[smoke …]` records that were actually written (none if the wait failed) in the
+receipt, and **stop**. Only the fail-closed `expected_sha` input described in step 1 prevents this.
 Whether to wait for it before step 4 is **Matthew's call**, and goes in the receipt.
 
 The job runs `bun run e2e:fixture-checklist`, `bun run e2e:bootstrap-fixture` (only if

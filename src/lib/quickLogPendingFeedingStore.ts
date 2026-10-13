@@ -1,5 +1,6 @@
 import type { FeedingTypedEventInput } from "./writeFeedingTypedEvent";
 import {
+  copyHistoryReviewTarget,
   historyReviewTargetAllowed,
   type PendingQuickLogHistoryReviewTarget,
 } from "./quickLogHistoryReviewTargetRules";
@@ -214,9 +215,15 @@ export function readPendingQuickLogFeeding(ownerId: string | null | undefined): 
     if (record.historyCheckReason !== undefined) return { status: "pending", record };
     const fallback = readHistoryMarker(ownerId, record.payload.idempotency_key);
     if (fallback.status === "blocked") return fallback;
-    return fallback.status === "marked"
-      ? { status: "pending", record: { ...record, historyCheckReason: fallback.reason } }
-      : { status: "pending", record };
+    if (fallback.status !== "marked") return { status: "pending", record };
+    return {
+      status: "pending",
+      record: {
+        ...record,
+        historyCheckReason: fallback.reason,
+        ...(fallback.reviewTarget ? { historyReviewTarget: fallback.reviewTarget } : {}),
+      },
+    };
   } catch {
     return { status: "blocked" };
   }
@@ -231,6 +238,7 @@ function readHistoryMarker(
   | {
       status: "marked";
       reason: QuickLogHistoryCheckReason | FeedingRejectionHistoryReason;
+      reviewTarget?: PendingQuickLogHistoryReviewTarget;
     }
   | { status: "blocked" } {
   const raw = window.sessionStorage.getItem(historyMarkerKey(ownerId));
@@ -238,15 +246,23 @@ function readHistoryMarker(
   const marker: unknown = JSON.parse(raw);
   if (
     !object(marker) ||
-    !onlyKeys(marker, ["version", "idempotencyKey", "historyCheckReason"]) ||
+    !onlyKeys(marker, ["version", "idempotencyKey", "historyCheckReason", "historyReviewTarget"]) ||
     marker.version !== 1 ||
     !id(marker.idempotencyKey) ||
-    !feedingHistoryCheckReason(marker.historyCheckReason)
+    !feedingHistoryCheckReason(marker.historyCheckReason) ||
+    !historyReviewTargetAllowed(marker.historyCheckReason, marker.historyReviewTarget)
   )
     return { status: "blocked" };
-  return marker.idempotencyKey === idempotencyKey
+  if (marker.idempotencyKey !== idempotencyKey) return { status: "none" };
+  return marker.historyReviewTarget === undefined
     ? { status: "marked", reason: marker.historyCheckReason }
-    : { status: "none" };
+    : {
+        status: "marked",
+        reason: marker.historyCheckReason,
+        reviewTarget: copyHistoryReviewTarget(
+          marker.historyReviewTarget as PendingQuickLogHistoryReviewTarget,
+        ),
+      };
 }
 
 /** Claim synchronously before dispatch; an existing unresolved Feed always wins. */
@@ -295,7 +311,13 @@ export function markPendingQuickLogFeedingHistoryCheck(
     const current = readPendingQuickLogFeeding(record.ownerId);
     if (current.status !== "pending" || !sameRecord(current.record, record))
       return { status: "blocked" };
-    const marked: PendingQuickLogFeeding = { ...current.record, historyCheckReason: reason };
+    const marked: PendingQuickLogFeeding = {
+      ...current.record,
+      historyCheckReason: reason,
+      ...(reviewTarget != null
+        ? { historyReviewTarget: copyHistoryReviewTarget(reviewTarget) }
+        : {}),
+    };
     try {
       window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
     } catch {
@@ -314,6 +336,9 @@ export function markPendingQuickLogFeedingHistoryCheck(
         version: 1,
         idempotencyKey: marked.payload.idempotency_key,
         historyCheckReason: reason,
+        ...(marked.historyReviewTarget !== undefined
+          ? { historyReviewTarget: marked.historyReviewTarget }
+          : {}),
       }),
     );
     const fallback = readPendingQuickLogFeeding(record.ownerId);

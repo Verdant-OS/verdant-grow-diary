@@ -604,4 +604,50 @@ describe("moved-receipt review target on a pending Feed", () => {
     );
     expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "blocked" });
   });
+
+  it.each(["throw", "ignore"] as const)(
+    "keeps the verified destination in the key-scoped fallback marker when the marked write %ss",
+    (mode) => {
+      const original = record();
+      claimPendingQuickLogFeeding(original);
+      const unmarkedRaw = window.sessionStorage.getItem(key());
+      refuseMarkedRecordRewrite(mode);
+      const marked = {
+        ...record(),
+        historyCheckReason: "receipt_target_moved" as const,
+        historyReviewTarget: target,
+      };
+      expect(
+        markPendingQuickLogFeedingHistoryCheck(original, "receipt_target_moved", target),
+      ).toEqual({ status: "marked", record: marked });
+      vi.restoreAllMocks();
+      expect(window.sessionStorage.getItem(key())).toBe(unmarkedRaw);
+      expect(JSON.parse(window.sessionStorage.getItem(historyKey())!)).toEqual({
+        version: 1,
+        idempotencyKey: "feeding-save-12345678",
+        historyCheckReason: "receipt_target_moved",
+        historyReviewTarget: target,
+      });
+      expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "pending", record: marked });
+      expect(clearPendingQuickLogFeeding(marked)).toBe(true);
+      expect(window.sessionStorage.getItem(historyKey())).toBeNull();
+    },
+  );
+
+  it.each([
+    ["a target beside another reason", "idempotency_key_conflict", target],
+    ["a malformed target", "receipt_target_moved", { growId: 42, tentId: null, plantId: null }],
+  ])("fails closed on a fallback marker carrying %s", (_case, reason, historyReviewTarget) => {
+    claimPendingQuickLogFeeding(record());
+    window.sessionStorage.setItem(
+      historyKey(),
+      JSON.stringify({
+        version: 1,
+        idempotencyKey: "feeding-save-12345678",
+        historyCheckReason: reason,
+        historyReviewTarget,
+      }),
+    );
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "blocked" });
+  });
 });

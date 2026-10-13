@@ -1,5 +1,6 @@
 import type { WateringTypedEventInput } from "./writeQuickLogWateringTypedEvent";
 import {
+  copyHistoryReviewTarget,
   historyReviewTargetAllowed,
   type PendingQuickLogHistoryReviewTarget,
 } from "./quickLogHistoryReviewTargetRules";
@@ -255,9 +256,15 @@ export function readPendingQuickLogWatering(
     if (record.historyCheckReason !== undefined) return { status: "pending", record };
     const fallback = readHistoryMarker(ownerId, record.payload.idempotency_key);
     if (fallback.status === "blocked") return fallback;
-    return fallback.status === "marked"
-      ? { status: "pending", record: { ...record, historyCheckReason: fallback.reason } }
-      : { status: "pending", record };
+    if (fallback.status !== "marked") return { status: "pending", record };
+    return {
+      status: "pending",
+      record: {
+        ...record,
+        historyCheckReason: fallback.reason,
+        ...(fallback.reviewTarget ? { historyReviewTarget: fallback.reviewTarget } : {}),
+      },
+    };
   } catch {
     return { status: "blocked" };
   }
@@ -269,22 +276,34 @@ function readHistoryMarker(
   idempotencyKey: string,
 ):
   | { status: "none" }
-  | { status: "marked"; reason: QuickLogHistoryCheckReason }
+  | {
+      status: "marked";
+      reason: QuickLogHistoryCheckReason;
+      reviewTarget?: PendingQuickLogHistoryReviewTarget;
+    }
   | { status: "blocked" } {
   const raw = window.sessionStorage.getItem(typedWaterHistoryMarkerKey(ownerId));
   if (raw === null) return { status: "none" };
   const marker: unknown = JSON.parse(raw);
   if (
     !object(marker) ||
-    !onlyKeys(marker, ["version", "idempotencyKey", "historyCheckReason"]) ||
+    !onlyKeys(marker, ["version", "idempotencyKey", "historyCheckReason", "historyReviewTarget"]) ||
     marker.version !== 1 ||
     !id(marker.idempotencyKey) ||
-    !quickLogSaveRequiresHistoryCheck(marker.historyCheckReason)
+    !quickLogSaveRequiresHistoryCheck(marker.historyCheckReason) ||
+    !historyReviewTargetAllowed(marker.historyCheckReason, marker.historyReviewTarget)
   )
     return { status: "blocked" };
-  return marker.idempotencyKey === idempotencyKey
+  if (marker.idempotencyKey !== idempotencyKey) return { status: "none" };
+  return marker.historyReviewTarget === undefined
     ? { status: "marked", reason: marker.historyCheckReason }
-    : { status: "none" };
+    : {
+        status: "marked",
+        reason: marker.historyCheckReason,
+        reviewTarget: copyHistoryReviewTarget(
+          marker.historyReviewTarget as PendingQuickLogHistoryReviewTarget,
+        ),
+      };
 }
 
 /** A leftover marker names a retired key, so it can never attach to a new Water. */
@@ -346,7 +365,13 @@ export async function markPendingQuickLogWateringHistoryCheck(
       const current = readPendingQuickLogWatering(record.ownerId);
       if (current.status !== "pending" || !sameRecord(current.record, record))
         return { status: "blocked" as const };
-      const marked: PendingQuickLogWatering = { ...current.record, historyCheckReason: reason };
+      const marked: PendingQuickLogWatering = {
+        ...current.record,
+        historyCheckReason: reason,
+        ...(reviewTarget != null
+          ? { historyReviewTarget: copyHistoryReviewTarget(reviewTarget) }
+          : {}),
+      };
       try {
         window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
       } catch {
@@ -365,6 +390,9 @@ export async function markPendingQuickLogWateringHistoryCheck(
           version: 1,
           idempotencyKey: marked.payload.idempotency_key,
           historyCheckReason: reason,
+          ...(marked.historyReviewTarget !== undefined
+            ? { historyReviewTarget: marked.historyReviewTarget }
+            : {}),
         }),
       );
       const fallback = readPendingQuickLogWatering(record.ownerId);

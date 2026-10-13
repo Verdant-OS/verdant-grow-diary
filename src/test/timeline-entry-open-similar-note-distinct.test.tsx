@@ -15,6 +15,7 @@ const harness = vi.hoisted(() => ({
   setActiveGrowId: vi.fn(),
   reloadActionResponseMemory: vi.fn(),
   createSignedUrls: vi.fn(),
+  entries: [] as Array<Record<string, unknown>>,
   growsState: {
     activeGrow: null as Record<string, unknown> | null,
     activeGrowId: null as string | null,
@@ -222,12 +223,28 @@ const ENTRIES = [
   watering(RIGHT_ID, RIGHT_NOTE, "2026-10-12T15:00:50.000Z"),
 ];
 
+const SHARED_FORTY = `Checked runoff before lights out ${"x".repeat(9)}`;
+const CAPPED_BLOCK = "y".repeat(24);
+const APPLE_ID = "similar-open-apple-1a2b3c";
+const BERRY_ID = "similar-open-berry-4d5e6f";
+const CHERRY_ID = "similar-open-cherry-7a8b9c";
+const APPLE_NOTE = `${SHARED_FORTY}${CAPPED_BLOCK}apple`;
+const BERRY_NOTE = `${SHARED_FORTY}${CAPPED_BLOCK}berry`;
+const CHERRY_NOTE = `${SHARED_FORTY}third card diverges early`;
+const LONG_SHARED = `Checked runoff before lights out ${"x".repeat(20)}`;
+const IDENTICAL_NOTE = "identical runoff check";
+const IDENTICAL_IDS = [
+  "similar-open-same-aaa111",
+  "similar-open-same-bbb222",
+  "similar-open-same-ccc333",
+] as const;
+
 describe("timeline similar-note Open labels", () => {
   beforeEach(() => {
     harness.executeQuery.mockReset();
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries") {
-        return { data: ENTRIES, error: null, count: ENTRIES.length };
+        return { data: harness.entries, error: null, count: harness.entries.length };
       }
       return { data: [], error: null };
     });
@@ -236,6 +253,7 @@ describe("timeline similar-note Open labels", () => {
     harness.reloadActionResponseMemory.mockReset();
     harness.createSignedUrls.mockReset();
     harness.createSignedUrls.mockResolvedValue({ data: [], error: null });
+    harness.entries = ENTRIES;
     Object.assign(harness.growsState, {
       activeGrow: GROW_A,
       activeGrowId: GROW_A.id,
@@ -284,4 +302,86 @@ describe("timeline similar-note Open labels", () => {
     expect(right).toBeTruthy();
     expect(left).not.toBe(right);
   });
+
+  it("keeps three long shared prefixes distinct when the difference is inside the suffix cap", async () => {
+    const notes = [`${LONG_SHARED} left`, `${LONG_SHARED} right`, `${LONG_SHARED} center`];
+    expect(notes[0].slice(0, 40)).toBe(notes[1].slice(0, 40));
+    expect(notes[1].slice(0, 40)).toBe(notes[2].slice(0, 40));
+    harness.entries = [
+      watering("similar-open-long-left-aaa", notes[0], "2026-10-12T15:00:05.000Z"),
+      watering("similar-open-long-right-bbb", notes[1], "2026-10-12T15:00:20.000Z"),
+      watering("similar-open-long-center-ccc", notes[2], "2026-10-12T15:00:40.000Z"),
+    ];
+
+    render(
+      <MemoryRouter initialEntries={["/timeline"]}>
+        <Timeline />
+      </MemoryRouter>,
+    );
+
+    const names = await openNames(3);
+    expect(names.find((name) => name.endsWith(" left"))).toBeTruthy();
+    expect(names.find((name) => name.endsWith(" right"))).toBeTruthy();
+    expect(names.find((name) => name.endsWith(" center"))).toBeTruthy();
+    expect(new Set(names).size).toBe(3);
+  });
+
+  it("keeps three Open labels distinct when a sibling shortens the prefix under the 24-character cap", async () => {
+    expect(APPLE_NOTE.slice(0, 40)).toBe(BERRY_NOTE.slice(0, 40));
+    expect(BERRY_NOTE.slice(0, 40)).toBe(CHERRY_NOTE.slice(0, 40));
+    expect(APPLE_NOTE.slice(40, 64)).toBe(BERRY_NOTE.slice(40, 64));
+    expect(APPLE_NOTE.slice(40, 64)).not.toBe(CHERRY_NOTE.slice(40, 64));
+    harness.entries = [
+      watering(APPLE_ID, APPLE_NOTE, "2026-10-12T15:00:05.000Z"),
+      watering(BERRY_ID, BERRY_NOTE, "2026-10-12T15:00:20.000Z"),
+      watering(CHERRY_ID, CHERRY_NOTE, "2026-10-12T15:00:40.000Z"),
+    ];
+
+    render(
+      <MemoryRouter initialEntries={["/timeline"]}>
+        <Timeline />
+      </MemoryRouter>,
+    );
+
+    const names = await openNames(3, [APPLE_ID, BERRY_ID, CHERRY_ID]);
+    expect(names.find((name) => name.endsWith("apple"))).toBeTruthy();
+    expect(names.find((name) => name.endsWith("berry"))).toBeTruthy();
+    expect(names.find((name) => name.includes("diverges"))).toBeTruthy();
+    expect(new Set(names).size).toBe(3);
+  });
+
+  it("gives identical notes a unique Open label without speaking the entry id", async () => {
+    harness.entries = [
+      watering(IDENTICAL_IDS[0], IDENTICAL_NOTE, "2026-10-12T15:00:05.000Z"),
+      watering(IDENTICAL_IDS[1], IDENTICAL_NOTE, "2026-10-12T15:00:20.000Z"),
+      watering(IDENTICAL_IDS[2], IDENTICAL_NOTE, "2026-10-12T15:00:40.000Z"),
+    ];
+
+    render(
+      <MemoryRouter initialEntries={["/timeline"]}>
+        <Timeline />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findAllByText(IDENTICAL_NOTE)).toHaveLength(3);
+    const names = await openNames(3, [...IDENTICAL_IDS]);
+    expect(new Set(names).size).toBe(3);
+    for (const name of names) {
+      expect(name).toContain("identical");
+      expect(name).toMatch(/same note [123]$/);
+    }
+  });
 });
+
+async function openNames(count: number, ids: readonly string[] = []): Promise<string[]> {
+  const names = (await screen.findAllByTestId("timeline-entry-open")).map(
+    (button) => button.getAttribute("aria-label") ?? "",
+  );
+  expect(names).toHaveLength(count);
+  for (const name of names) {
+    expect(name.startsWith("Open ")).toBe(true);
+    expect(name).not.toMatch(/#/);
+    for (const id of ids) expect(name).not.toContain(id);
+  }
+  return names;
+}

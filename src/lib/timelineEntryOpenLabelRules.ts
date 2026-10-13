@@ -88,13 +88,101 @@ function sharedPrefix(values: readonly string[]): string {
   return prefix;
 }
 
+type OpenLabelRow = { id: string; label: string; note?: string | null };
+
+function spokenCollisionSuffix(note: string, prefix: string): string {
+  return note.slice(prefix.length).trim().slice(0, MAX_OPEN_COLLISION_SUFFIX_LENGTH).trimEnd();
+}
+
+function assignSameNoteFallback(
+  indexes: readonly number[],
+  rows: readonly OpenLabelRow[],
+  resolved: Map<string, string>,
+): void {
+  indexes.forEach((index, position) => {
+    const row = rows[index];
+    if (!row) return;
+    resolved.set(row.id, `${row.label} same note ${position + 1}`);
+  });
+}
+
 /**
- * When two rendered Open names match, speak the part of each note that the
- * shared start does not already cover. The 40-character excerpt can hide
- * that difference. Raw entry ids stay unspoken.
+ * Split one colliding set. A 24-character suffix can still match when another
+ * row shortens the shared prefix, so a tied full-length suffix is resolved
+ * again on just those rows. Identical notes get a spoken position.
+ */
+function assignCollisionGroup(
+  indexes: readonly number[],
+  rows: readonly OpenLabelRow[],
+  resolved: Map<string, string>,
+  parentPrefixLength: number,
+): void {
+  const first = rows[indexes[0] ?? -1];
+  if (!first) return;
+  if (indexes.length < 2) {
+    resolved.set(first.id, first.label);
+    return;
+  }
+  const notes = indexes.map((index) => normalizeOpenNote(rows[index]?.note));
+  const prefix = sharedPrefix(notes);
+  if (prefix.length <= parentPrefixLength) {
+    assignSameNoteFallback(indexes, rows, resolved);
+    return;
+  }
+  const spoken = notes.map((note) => spokenCollisionSuffix(note, prefix));
+  const buckets = new Map<string, number[]>();
+  indexes.forEach((index, position) => {
+    const key = spoken[position] ?? "";
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(index);
+    else buckets.set(key, [index]);
+  });
+  const madeProgress = buckets.size > 1 && spoken.some((key) => key.length > 0);
+  if (!madeProgress) {
+    assignSameNoteFallback(indexes, rows, resolved);
+    return;
+  }
+  for (const [key, bucket] of buckets) {
+    if (bucket.length === 1) {
+      const row = rows[bucket[0] ?? -1];
+      if (!row) continue;
+      resolved.set(row.id, key.length > 0 ? `${row.label} ${key}` : row.label);
+      continue;
+    }
+    if (key.length < MAX_OPEN_COLLISION_SUFFIX_LENGTH) {
+      assignSameNoteFallback(bucket, rows, resolved);
+      continue;
+    }
+    assignCollisionGroup(bucket, rows, resolved, prefix.length);
+  }
+}
+
+function ensureUniqueOpenLabels(
+  resolved: Map<string, string>,
+  rows: readonly OpenLabelRow[],
+): void {
+  for (let pass = 0; pass < rows.length; pass += 1) {
+    const indexesByLabel = new Map<string, number[]>();
+    rows.forEach((row, index) => {
+      const label = resolved.get(row.id) ?? row.label;
+      const indexes = indexesByLabel.get(label);
+      if (indexes) indexes.push(index);
+      else indexesByLabel.set(label, [index]);
+    });
+    const collisions = [...indexesByLabel.values()].filter((indexes) => indexes.length > 1);
+    if (collisions.length === 0) return;
+    for (const indexes of collisions) assignSameNoteFallback(indexes, rows, resolved);
+  }
+}
+
+/**
+ * When rendered Open names match, speak the part of each note that the
+ * shared start does not already cover. The 40-character excerpt and the
+ * 24-character suffix can both hide a later difference. Identical notes
+ * get a spoken position. Raw entry ids stay unspoken.
  */
 export function resolveCollidingOpenLabels(
-  rows: readonly { id: string; label: string; note?: string | null }[],
+  rows: readonly OpenLabelRow[],
 ): ReadonlyMap<string, string> {
   const indexesByLabel = new Map<string, number[]>();
   rows.forEach((row, index) => {
@@ -105,21 +193,8 @@ export function resolveCollidingOpenLabels(
 
   const resolved = new Map<string, string>();
   for (const indexes of indexesByLabel.values()) {
-    const first = rows[indexes[0]];
-    if (!first) continue;
-    if (indexes.length < 2) {
-      resolved.set(first.id, first.label);
-      continue;
-    }
-    const notes = indexes.map((index) => normalizeOpenNote(rows[index]?.note));
-    const prefix = sharedPrefix(notes);
-    indexes.forEach((index, position) => {
-      const row = rows[index];
-      if (!row) return;
-      const remainder = (notes[position] ?? "").slice(prefix.length).trim();
-      const spoken = remainder.slice(0, MAX_OPEN_COLLISION_SUFFIX_LENGTH).trimEnd();
-      resolved.set(row.id, spoken.length > 0 ? `${row.label} ${spoken}` : row.label);
-    });
+    assignCollisionGroup(indexes, rows, resolved, -1);
   }
+  ensureUniqueOpenLabels(resolved, rows);
   return resolved;
 }

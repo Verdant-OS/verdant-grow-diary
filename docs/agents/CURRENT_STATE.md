@@ -33,6 +33,11 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-13T22:37 UTC
+
+- **#2056 moved to `5ebabe2332315330cc09bd955af6a76f549ce0cb` to clear a merge conflict; CI restarts there.** #2056 sat at `adb61aca9` from 21:29 UTC until #2058 ("record #1898 release at 5b16f3243") merged into `verdant-grow-diary` and added a block at the top of this file. GitHub then marked #2056 as conflicting. Under Auto-fix, this session merged the tip `6003a20e1` into #2056's branch (no rebase, no force-push). Every block from both sides is kept, newest first by timestamp, with no text changed. Against the base, #2056 still adds only its own blocks (one file, +63 / -0, nothing removed). Docs-safety: 3 scanners PASS; Vitest 77 passed / 0 failed / 0 skipped. The merge is a new head, so CI at `adb61aca9` no longer counts; at 22:37 UTC #2056 is draft, mergeable state `blocked` (CI pending, no review), no reviewer routed. Repository-wide: 157 runs queued, 19 in progress.
+- **This PR (#2063) took the same tip merge** for the same conflict. Both status PRs add blocks at the top of `CURRENT_STATE.md`, so each new block merged to the base will conflict with whichever of them is still open. Next step for #2056 is unchanged: 35/35 at an exact head, an independent reviewer, then Matthew's Accept.
+
 ## Follow-up observation — 2026-10-13T21:42 UTC
 
 - **NOT_MEASURED, #2056: unchanged at `adb61aca9`, CI still queued.** #2056's head is still `adb61aca925f4163b5fca9cf0e1c46521bd0c6c6`; no commit has been added since the 21:35 UTC block, so its CI is no longer being restarted. At 21:42 UTC: required contexts 34 queued / 1 not yet reported, 0 failing; must-be-green 2 queued / 5 not reported; draft, mergeable state `blocked`, no reviews, no requested reviewer, 0 unresolved threads; 5 commits behind the tip `3b984887c`, not synced. Repository-wide: 263 runs queued, 13 in progress, so the wait is the shared Actions queue. Next step unchanged: 35/35 at `adb61aca9`, an independent reviewer, then Matthew's Accept.

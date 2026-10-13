@@ -229,3 +229,80 @@ Deno.test("refunds when the photo response body stalls until abort", async () =>
       ),
   );
 });
+
+Deno.test("a stalled photo download refunds inside the photo deadline", async () => {
+  installEnv();
+  const calls: RpcCall[] = [];
+  const previous = globalThis.fetch;
+  const started = Date.now();
+  let geminiSeen = false;
+  let watchdog: ReturnType<typeof setTimeout> | undefined;
+  globalThis.fetch = ((input: string, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/storage/v1/object/sign/")) {
+      return new Promise((_resolve, reject) => {
+        const signal = init?.signal;
+        const abort = () => reject(new DOMException("The operation was aborted.", "AbortError"));
+        if (!signal) {
+          reject(new Error("no signal"));
+          return;
+        }
+        if (signal.aborted) {
+          abort();
+          return;
+        }
+        signal.addEventListener("abort", abort, { once: true });
+      });
+    }
+    geminiSeen = true;
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  }) as typeof fetch;
+  const hang = new Promise<never>((_resolve, reject) => {
+    watchdog = setTimeout(() => reject(new Error("photo deadline missed")), 1_000);
+  });
+  try {
+    const response = await Promise.race([
+      handleAiCoachRequest(
+        new Request(`${SUPABASE_URL}/functions/v1/ai-coach`, {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer test-jwt",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            mode: "diagnose",
+            idempotencyKey: IDEMPOTENCY_KEY,
+            photoUrl: PHOTO_URL,
+          }),
+        }),
+        { createClient: createFakeClient(calls), photoTimeoutMs: 20 },
+      ),
+      hang,
+    ]);
+    assert(Date.now() - started < 1_000, "elapsed past the photo deadline");
+    assert(geminiSeen === false, "provider fetch ran during a photo stall");
+    const body = await response.json();
+    assert(body.ok === false && body.reason === "invalid", `body ${JSON.stringify(body)}`);
+    const refunds = calls.filter((call) => call.name === "ai_credit_refund");
+    assert(refunds.length === 1, `refund count ${refunds.length}`);
+    assert(refunds[0]?.params?.p_reason === "photo_download_failed", "refund reason");
+  } finally {
+    if (watchdog !== undefined) clearTimeout(watchdog);
+    globalThis.fetch = previous;
+  }
+});
+
+Deno.test("refunds when the photo response body stalls until the photo deadline", async () => {
+  await expectPhotoDownloadRefund((_input, _init) =>
+    Promise.resolve(
+      new Response(
+        new ReadableStream({
+          pull() {
+            return new Promise(() => undefined);
+          },
+        }),
+        { status: 200 },
+      ),
+    ),
+  );
+});

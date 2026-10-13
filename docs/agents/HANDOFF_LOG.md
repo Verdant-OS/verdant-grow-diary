@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SEARCH-PREVIEW-BLANK-QUERY-FOLLOWUP
+
+```text
+TASK SEARCH-PREVIEW-BLANK-QUERY-FOLLOWUP  priority: P2  status: OPEN
+goal: Omit the search-preview metadata wrapper for empty or whitespace-only queries; preserve nonblank query text, test hook, diagnostic attributes and the human preview label.
+branch: codex/search-preview-blank-query-followup
+base: verdant-grow-diary at 97777bd88e526587b01b756c9376295f064affac; normal merge from reviewed 3004b615204954196b9d220032f88236e7e790ca (#2012) includes unrelated #1970 with no governance or search-preview delta
+checkout: git fetch origin codex/search-preview-blank-query-followup verdant-grow-diary && git switch codex/search-preview-blank-query-followup && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2054 (draft)
+head_sha: 7c74e213d8a73c4fd26a3890b1840c0144b21690, bootstrap remote observed 2026-10-13 16:20 UTC; this implementation checkpoint advances it, so read current PR metadata and body for the resulting exact head
+state: Local implementation validated: final new rendered test RED 2 failed / 1 passed with the component unchanged, then GREEN 3 passed; related search suite 9 files / 85 passed / 0 failed / 0 skipped, all 8 existing files unchanged. Scoped lint and 3-file format PASS; strict scorer-lock PASS with no tracked scorer changed. Canonical bun run typecheck PASS; bunx vite build PASS (client, SSR and Nitro output). Resulting exact-head hosted CI tracked in the PR body; full local suite, package prebuild/postbuild and production behavior NOT_MEASURED. Matthew approved this deferred slice in Sentinel_e5703b64ad7c8191977839eb8b36991c at 2026-10-13 16:01 UTC. Original Linear VER-107 is not a verified new follow-up record.
+next_action: Normal-push validated implementation; monitor resulting exact-head CI to terminal, then hand the full head and gate results to Blue Dream. Keep draft; no queue, merge or production action.
+files: src/components/GlobalSearchResultPreview.tsx; NEW src/test/global-search-preview-blank-query.test.tsx; docs/agents/HANDOFF_LOG.md (only this distinct block)
+blockers: Independent acceptance must come from another eligible reviewer; Codex authored this work and cannot accept it. No scorer unlock or additional production scope is authorized.
+artifacts: PR body holds current full head and validation receipts; local evidence in C:/Users/G8/AppData/Local/Temp/verdant-search-preview-task3. All 86 open PR file lists checked 2026-10-13 16:15 UTC; refreshed 16:22 UTC after #1970 merged and own #2054 opened: no competing implementation-path overlap or follow-up claim.
+reviewer_seat: Blue Dream (product .tsx); other eligible independently assigned reviewer may accept, never the author
+claimed_by: Codex-search-preview-task3, 2026-10-13 16:20 UTC; claim https://github.com/Verdant-OS/verdant-grow-diary/pull/2054#issuecomment-6150080834, re-read and effective
+last_updated: 2026-10-13 16:29 UTC, by Codex-search-preview-task3
+```
+
 ### PR-1939-NOT-FOUND-COVERAGE
 
 ```text
@@ -715,6 +735,26 @@ artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/1760; C:/Users/
 reviewer_seat: Blue Dream (P1 / .tsx)
 claimed_by: Codex, 2026-09-28 23:41 CT (implementation/integration continuation)
 last_updated: 2026-09-28 23:53 CT, by Codex
+```
+
+### FIX-2033-LOCKFILE-POLICY-INNGEST
+
+```text
+TASK FIX-2033-LOCKFILE-POLICY-INNGEST  priority: other  status: OPEN
+goal: Keep check:lockfile green after #1945. Vendored Inngest skill docs under .agents/skills/inngest-* were edited locally so they are not scanned as npm lock consumers (#2033, draft #2034). A refresh of those upstream skills must not silently restore the removed local install commands, and the three install examples lead with bun add because yarn and pnpm would write lockfiles this repo forbids.
+branch: canopy/fix-2033-lockfile-policy-inngest
+base: verdant-grow-diary
+checkout: git fetch origin canopy/fix-2033-lockfile-policy-inngest verdant-grow-diary && git switch canopy/fix-2033-lockfile-policy-inngest && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2034
+head_sha: 58d237d208a0f9d673332d0b6927fd52bef55b7f
+state: draft. This block describes the head that contains this change (AGENTS.md: the block records the exact head, and a commit cannot store its own SHA). That head is the commit that updates this block; its parent is head_sha, the contract test that matches the full npm guidance sentence including the package name. npm wording stays in the three skill files. Graft's advisory PASS at 5078986bdce39a848d254b93f5e011e83ecade44 does not cover later heads.
+next_action: required checks at the new head. Stay draft. No ready, merge, or deploy.
+files: .agents/skills/inngest-cli/SKILL.md; .agents/skills/inngest-setup/SKILL.md; .agents/skills/inngest-v3-v4-migration/SKILL.md; .agents/skills/inngest-middleware/SKILL.md; .agents/skills/inngest-middleware/references/built-in-middleware.md; .agents/skills/inngest-realtime/SKILL.md; src/test/inngest-skill-npm-install-guidance.test.ts; docs/agents/HANDOFF_LOG.md (this record)
+blockers: none for the repository change. Do not deploy.
+artifacts: PR #2034
+reviewer_seat: Critical Mass (docs and tests). Graft's advisory PASS at 5078986b is not the exact-head PASS for the new head.
+claimed_by: Canopy, 2026-10-12 09:09 CT
+last_updated: 2026-10-12 17:02 UTC, by Grok
 ```
 
 ## Closed

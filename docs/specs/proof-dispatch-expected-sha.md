@@ -42,10 +42,25 @@ The `one_tent_proof` job already does this correctly, before any secret is avail
 
 1. requires `inputs.expected_sha` to match `^[0-9a-f]{40}$`;
 2. requires it to equal `github.sha`;
-3. checks out `inputs.expected_sha` and requires `git rev-parse HEAD` to equal it.
+3. requires `github.actor` to be `cheekhimself`;
+4. requires `github.triggering_actor` to be `cheekhimself`;
+5. requires `github.run_attempt` to be `1`, so a re-run never counts as the proof;
+6. requires `github.ref` to be `refs/heads/verdant-grow-diary`;
+7. checks out `inputs.expected_sha` and requires `git rev-parse HEAD` to equal it.
 
-`src/test/one-tent-authenticated-proof-workflow.test.ts:216-251` pins that order. The
-change below applies the same contract to the four jobs the checklist dispatches.
+Checks 1-6 are one step, "Verify immutable dispatch identity" (`:150-166`).
+`src/test/one-tent-authenticated-proof-workflow.test.ts:216-251` pins that order and each
+assertion. The change below applies checks 1-6 to the four jobs the checklist dispatches.
+Check 7 is replaced by §3.3: once check 2 passes, checking out `github.sha` is checking out
+the expected SHA.
+
+The four jobs already require checks 3-6 in their job-level `if:` (`established fact`:
+`actions-readonly-proof.yml:59`, `settings-account-consent-proof.yml:59`,
+`signed-in-readonly-performance.yml:58`, and `quicklog-smoke.yml`'s `quicklog_smoke` job,
+which waives the actor checks only for `schedule`). A failed `if:` skips the job, and a
+skipped proof is not a PASS. The step in §3.2 repeats them anyway, as the precedent does,
+so the gate before any secret doesn't depend on a separate `if:` that a later edit could
+widen.
 
 ## 3. The change
 
@@ -72,7 +87,10 @@ Add a step named exactly **`Verify dispatch SHA`**:
   secret-bearing step is "Verify production fixture configuration" in the three
   read-only proofs and "Verify required configuration" in `quicklog-smoke`.
 - **Env:** `EVENT_NAME: ${{ github.event_name }}`, `INPUT_SHA: ${{ inputs.expected_sha }}`,
-  `GITHUB_CONTEXT_SHA: ${{ github.sha }}`. No secrets.
+  `GITHUB_CONTEXT_SHA: ${{ github.sha }}`, `GITHUB_ACTOR: ${{ github.actor }}`,
+  `GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}`,
+  `GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}`, `GITHUB_REF: ${{ github.ref }}`. No
+  secrets.
 
 Rules:
 
@@ -83,6 +101,13 @@ Rules:
 | `workflow_dispatch`  | not `^[0-9a-f]{40}$` (uppercase, short, whitespace) | FAIL: `BLOCKED: expected_sha must be 40 lowercase hex`                              |
 | `workflow_dispatch`  | valid but different from `github.sha`               | FAIL: `BLOCKED: verdant-grow-diary advanced past expected_sha; re-select the build` |
 | `push` or `schedule` | any (inputs are not set on these events)            | PASS, no check. The job keeps today's `github.sha` behaviour                        |
+
+On `workflow_dispatch`, the step also fails closed unless `GITHUB_ACTOR` and
+`GITHUB_TRIGGERING_ACTOR` are both `cheekhimself`, `GITHUB_RUN_ATTEMPT` is `1` and
+`GITHUB_REF` is `refs/heads/verdant-grow-diary` (precedent checks 3-6), each with its own
+`BLOCKED:` reason. These run before the SHA rows above, so a re-run or another actor's
+dispatch is refused even when its SHA matches. On `push` and `schedule` the job-level `if:`
+keeps deciding, unchanged.
 
 The event name decides which rule applies; the input's value never does. A push run must
 not become a FAIL because an input is unexpectedly set, and a dispatch must never fall
@@ -104,7 +129,7 @@ build is simpler and honest.
 ### 3.4 Where the logic lives
 
 Write the rules as a pure function in a new `scripts/lib/dispatchShaRules.mjs`:
-`resolveDispatchSha({ eventName, inputSha, githubSha }) → { status: "PASS" | "BLOCKED", reason }`.
+`resolveDispatchSha({ eventName, inputSha, githubSha, actor, triggeringActor, runAttempt, ref }) → { status: "PASS" | "BLOCKED", reason }`.
 A thin `scripts/verify-dispatch-sha.mjs` reads the env, prints the reason and exits 1 on
 `BLOCKED`. All four jobs call the script, so the rule is written once and unit-testable,
 not copied as inline bash four times.
@@ -147,9 +172,12 @@ regex the source (`AGENTS.md`, contract-test rule).
 **A. Unit tests: `src/test/dispatch-sha-rules.test.ts` (new)**
 
 1. Each row of §3.2 returns the stated status and reason.
-2. `workflow_dispatch` never falls back to `githubSha`, whatever the input.
-3. `push` and `schedule` pass whatever the input is.
-4. The function is deterministic and has no I/O.
+2. On `workflow_dispatch`, another `actor`, another `triggeringActor`, a `runAttempt` other
+   than `1` and a `ref` other than `refs/heads/verdant-grow-diary` each return `BLOCKED`,
+   even with a valid matching SHA.
+3. `workflow_dispatch` never falls back to `githubSha`, whatever the input.
+4. `push` and `schedule` pass whatever the input is.
+5. The function is deterministic and has no I/O.
 
 **B. Workflow contract tests: extend the existing suites**
 
@@ -161,7 +189,8 @@ in `src/test/signed-in-readonly-proof.test.ts:507-556` and
 1. Each of the three read-only proofs declares `inputs.expected_sha` with
    `type: string, required: true`. The `quicklog-smoke` input stays `required: false`.
 2. In each of the four jobs, `Verify dispatch SHA` exists. Its `env` carries no
-   `secrets.*` and maps `inputs.expected_sha` and `github.sha`. Its index is lower than
+   `secrets.*` and maps `inputs.expected_sha`, `github.sha`, `github.actor`,
+   `github.triggering_actor`, `github.run_attempt` and `github.ref`. Its index is lower than
    every step whose `env` references a secret, and every step before it is a checkout
    with `persist-credentials: false`.
 3. The existing pin assertions still hold: checkout `ref` is `${{ github.sha }}`, and the

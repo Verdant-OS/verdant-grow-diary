@@ -149,10 +149,17 @@ Deno.test("refunds when the Gemini response body stalls until abort", async () =
   const started = Date.now();
   globalThis.fetch = ((input: string, init?: RequestInit) => {
     const url = String(input);
+    const parsedUrl = (() => {
+      try {
+        return new URL(url);
+      } catch {
+        return new URL(url, SUPABASE_URL);
+      }
+    })();
     if (url.includes("/storage/v1/object/sign/")) {
       return Promise.resolve(new Response(JPEG, { status: 200 }));
     }
-    if (url.includes("generativelanguage.googleapis.com")) {
+    if (parsedUrl.hostname === "generativelanguage.googleapis.com") {
       const signal = init?.signal;
       if (signal) {
         const mark = () => {

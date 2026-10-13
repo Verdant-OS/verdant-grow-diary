@@ -163,17 +163,17 @@ export default function GlobalSearchResultPreview({
         ) : null}
       </div>
 
-      <div
-        className="flex flex-wrap items-center gap-1.5 text-[10px] tracking-wide text-muted-foreground"
-        data-testid="global-search-preview-match-kind"
-        data-match-kind={row.match_kind}
-        data-rank={row.rank}
-        data-score={row.score.toFixed(2)}
-      >
-        {query.trim().length > 0 ? (
+      {query.trim().length > 0 ? (
+        <div
+          className="flex flex-wrap items-center gap-1.5 text-[10px] tracking-wide text-muted-foreground"
+          data-testid="global-search-preview-match-kind"
+          data-match-kind={row.match_kind}
+          data-rank={row.rank}
+          data-score={row.score.toFixed(2)}
+        >
           <span className="text-muted-foreground">for “{query.trim()}”</span>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <p
         className="text-xs leading-snug text-muted-foreground"

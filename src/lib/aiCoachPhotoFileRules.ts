@@ -65,6 +65,8 @@ function isHeifFtyp(bytes: Uint8Array, fileSize: number): boolean {
   if (ascii(bytes, 4, 4) !== "ftyp") return false;
   if (HEIF_FTYP_BRANDS.has(ascii(bytes, 8, 4).toLowerCase())) return true;
   const declared = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0);
+  // Size 1 is the 64-bit largesize flag. Its brand fields are not at these offsets.
+  if (declared === 1) return true;
   // Size 0 means the box runs to EOF. Reject unless this read holds the whole file.
   const exceedsRead = declared === 0 ? fileSize > bytes.length : declared > bytes.length;
   if (exceedsRead) return true;

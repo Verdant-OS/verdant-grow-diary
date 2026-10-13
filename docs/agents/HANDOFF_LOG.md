@@ -70,7 +70,8 @@ state: CI at a4c30977: 34/35 required SUCCESS. Required "Full test suite (shard 
   "native save/retrieve (local backend)" failed once at b7481653d on a retraction-reason chip
   click (manual path, outside this change) and passed on re-run (attempt 2).
 next_action: Once Matthew names the action (migration gate), rename the migration to a version after
-  the newest merged migration and update UTC_HASH_MIGRATION in the harness, the workflow path
+  the newest merged migration (not 20261013180000, which #1841 is taking) and update
+  UTC_HASH_MIGRATION in the harness, the workflow path
   filter and the spec. The file bytes, the sha256 pin and the wrapper md5 pins do not change. Then
   re-run the hosted PG15 job.
 files: supabase/migrations/20261001190000_quicklog_event_request_hash_utc.sql;

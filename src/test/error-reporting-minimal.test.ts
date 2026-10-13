@@ -1,0 +1,408 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  __resetErrorReporterForTests,
+  getErrorReporterStatus,
+  initErrorReporter,
+} from "@/lib/errorReporter";
+import { KNOWN_THIRD_PARTY_ORIGINS } from "@/lib/securityHeadersRules";
+import {
+  ERROR_REPORTING_DATA_COLLECTION,
+  LABELED_NON_HTTP_SCHEMES,
+  REDACTED,
+  SEND_DEFAULT_PII,
+  TRACES_SAMPLE_RATE,
+  isValidSentryDsn,
+  resolveErrorReportingConfig,
+  scrubEvent,
+  scrubUrl,
+} from "@/lib/errorReportingRules";
+
+const TEST_DSN = "https://0123456789abcdef0123456789abcdef@o000000.ingest.us.sentry.io/1";
+
+function setHostname(hostname: string) {
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    value: { ...window.location, hostname, pathname: "/plants/1" },
+  });
+}
+
+describe("resolveErrorReportingConfig", () => {
+  it("stays off without a DSN, in non-production builds, and off production hosts", () => {
+    expect(
+      resolveErrorReportingConfig({
+        dsn: "",
+        hostname: "verdantgrowdiary.com",
+        mode: "production",
+      }),
+    ).toEqual({
+      enabled: false,
+      reason: "no_dsn",
+    });
+    expect(
+      resolveErrorReportingConfig({
+        dsn: TEST_DSN,
+        hostname: "verdantgrowdiary.com",
+        mode: "development",
+      }),
+    ).toEqual({ enabled: false, reason: "not_production_build" });
+    expect(
+      resolveErrorReportingConfig({
+        dsn: TEST_DSN,
+        hostname: "localhost",
+        mode: "production",
+      }),
+    ).toEqual({ enabled: false, reason: "local_host" });
+    expect(
+      resolveErrorReportingConfig({
+        dsn: TEST_DSN,
+        hostname: "preview.workers.dev",
+        mode: "production",
+      }),
+    ).toEqual({ enabled: false, reason: "non_production_host" });
+    expect(
+      resolveErrorReportingConfig({
+        dsn: "https://evil.example/dsn",
+        hostname: "verdantgrowdiary.com",
+        mode: "production",
+      }),
+    ).toEqual({ enabled: false, reason: "invalid_dsn" });
+    expect(
+      resolveErrorReportingConfig({
+        dsn: "https://0123456789abcdef0123456789abcdef@o000000.sentry.io/1",
+        hostname: "verdantgrowdiary.com",
+        mode: "production",
+      }),
+    ).toEqual({ enabled: false, reason: "invalid_dsn" });
+  });
+
+  it("does not enable when build mode is missing or unknown", () => {
+    expect(
+      resolveErrorReportingConfig({
+        dsn: TEST_DSN,
+        hostname: "verdantgrowdiary.com",
+      }),
+    ).toEqual({ enabled: false, reason: "not_production_build" });
+    expect(
+      resolveErrorReportingConfig({
+        dsn: TEST_DSN,
+        hostname: "verdantgrowdiary.com",
+        mode: "",
+      }),
+    ).toEqual({ enabled: false, reason: "not_production_build" });
+    expect(
+      resolveErrorReportingConfig({
+        dsn: TEST_DSN,
+        hostname: "verdantgrowdiary.com",
+        mode: "staging",
+      }),
+    ).toEqual({ enabled: false, reason: "not_production_build" });
+  });
+
+  it("accepts only DSN hosts from the CSP sentry ingest list", () => {
+    for (const origin of KNOWN_THIRD_PARTY_ORIGINS.sentryIngest) {
+      const host = origin.replace("https://*.", "o000000.");
+      expect(isValidSentryDsn(`https://0123456789abcdef0123456789abcdef@${host}/1`)).toBe(true);
+    }
+    expect(isValidSentryDsn(TEST_DSN)).toBe(true);
+    expect(isValidSentryDsn("https://0123456789abcdef0123456789abcdef@o000000.sentry.io/1")).toBe(
+      false,
+    );
+    expect(isValidSentryDsn("https://0123456789abcdef0123456789abcdef@ingest.sentry.io/1")).toBe(
+      false,
+    );
+    expect(isValidSentryDsn("https://evil.example/1")).toBe(false);
+  });
+
+  it("enables only on a production hostname with a hosted DSN and a release", () => {
+    expect(
+      resolveErrorReportingConfig({
+        dsn: TEST_DSN,
+        hostname: "www.verdantgrowdiary.com",
+        mode: "production",
+        release: "0.0.0+abc",
+      }),
+    ).toEqual({
+      enabled: true,
+      dsn: TEST_DSN,
+      environment: "production",
+      release: "0.0.0+abc",
+    });
+  });
+});
+
+describe("scrubUrl", () => {
+  it("rejects vbscript and other non-http schemes and strips query strings", () => {
+    expect(LABELED_NON_HTTP_SCHEMES).toContain("vbscript:");
+    expect(scrubUrl("vbscript:alert(1)")).toBe(`vbscript:${REDACTED}`);
+    expect(scrubUrl("VBSCRIPT:MsgBox(1)")).toBe(`vbscript:${REDACTED}`);
+    expect(scrubUrl("javascript:alert(document.cookie)")).toBe(`javascript:${REDACTED}`);
+    expect(scrubUrl("custom:secret-token")).toBe(REDACTED);
+    expect(scrubUrl("https://verdantgrowdiary.com/plants/a?token=secret#frag")).toBe(
+      "https://verdantgrowdiary.com/plants/a",
+    );
+    expect(scrubUrl("/grows/1?note=secret#x")).toBe("/grows/1");
+  });
+
+  it("replaces UUID and long path segments with :id", () => {
+    const uuid = "01234567-89ab-4cde-8fab-0123456789ab";
+    const longToken = "abcdefghijklmnopqrstuvwx";
+    expect(longToken.length).toBe(24);
+    expect(scrubUrl(`https://verdantgrowdiary.com/plants/${uuid}/notes?token=secret`)).toBe(
+      "https://verdantgrowdiary.com/plants/:id/notes",
+    );
+    expect(scrubUrl(`https://verdantgrowdiary.com/assets/${longToken}.js`)).toBe(
+      "https://verdantgrowdiary.com/assets/:id",
+    );
+    expect(scrubUrl(`/grows/${uuid}/plants/${longToken}`)).toBe("/grows/:id/plants/:id");
+    expect(scrubUrl("/grows/abcdefghijklmnopqrstuvw")).toBe("/grows/abcdefghijklmnopqrstuvw");
+  });
+
+  it("redacts path segments that contain @ or %", () => {
+    expect(scrubUrl("https://verdantgrowdiary.com/plants/grower@example.com/notes")).toBe(
+      "https://verdantgrowdiary.com/plants/:id/notes",
+    );
+    expect(scrubUrl("https://verdantgrowdiary.com/plants/a%20b")).toBe(
+      "https://verdantgrowdiary.com/plants/:id",
+    );
+    expect(scrubUrl("/grows/user%40example.com")).toBe("/grows/:id");
+    expect(scrubUrl("/grows/plant-1")).toBe("/grows/plant-1");
+  });
+});
+
+describe("scrubEvent", () => {
+  it("drops user, IP, request bodies, query strings, and content breadcrumbs", () => {
+    const scrubbed = scrubEvent({
+      message: "Blue Dream looks wilted",
+      user: { id: "grower-1", email: "grower@example.com", ip_address: "203.0.113.5" },
+      extra: { note: "private diary text" },
+      request: {
+        url: "https://verdantgrowdiary.com/plants/a?token=secret",
+        data: "body=secret",
+        cookies: "session=abc",
+        headers: { Authorization: "Bearer secret" },
+        query_string: "token=secret",
+        method: "POST",
+      },
+      exception: {
+        values: [
+          {
+            type: "Error",
+            value: "grower wrote this",
+            stacktrace: {
+              frames: [
+                {
+                  filename: "vbscript:alert(1)",
+                  abs_path: "https://verdantgrowdiary.com/assets/app.js?x=1",
+                  vars: { password: "secret" },
+                  lineno: 4,
+                },
+              ],
+            },
+          },
+        ],
+      },
+      breadcrumbs: [
+        { category: "console", message: "diary note" },
+        { category: "ui.click", data: { title: "Blue Dream" } },
+        { category: "navigation" },
+      ],
+    });
+
+    expect(scrubbed.user).toBeUndefined();
+    expect(scrubbed.extra).toBeUndefined();
+    expect(scrubbed.message).toBe(REDACTED);
+    expect(scrubbed.request).toEqual({
+      url: "https://verdantgrowdiary.com/plants/a",
+      method: "POST",
+    });
+    expect(JSON.stringify(scrubbed)).not.toContain("secret");
+    expect(JSON.stringify(scrubbed)).not.toContain("grower");
+    expect(JSON.stringify(scrubbed)).not.toContain("Blue Dream");
+    expect(JSON.stringify(scrubbed)).not.toContain("203.0.113.5");
+    expect(scrubbed.exception?.values?.[0]?.value).toBe(REDACTED);
+    expect(scrubbed.exception?.values?.[0]?.stacktrace?.frames?.[0]).toEqual({
+      filename: `vbscript:${REDACTED}`,
+      abs_path: "https://verdantgrowdiary.com/assets/app.js",
+      lineno: 4,
+    });
+    expect(scrubbed.breadcrumbs).toEqual([{ category: "navigation" }]);
+    expect(scrubEvent(null)).toBeNull();
+  });
+
+  it("drops Blue Dream from every non-allowlisted event field", async () => {
+    const probe = "Blue Dream";
+    const event = {
+      message: probe,
+      logentry: { message: probe, params: [probe] },
+      transaction: probe,
+      contexts: { grow: { cultivar: probe } },
+      tags: {
+        cultivar: probe,
+        source: probe,
+        route: probe,
+        handled: probe,
+      },
+      exception: {
+        values: [
+          {
+            type: probe,
+            value: probe,
+            mechanism: { type: probe, handled: false, data: { cultivar: probe, note: probe } },
+            stacktrace: {
+              frames: [
+                {
+                  function: probe,
+                  module: probe,
+                  filename: "https://verdantgrowdiary.com/assets/app.js?q=1",
+                  abs_path: "https://verdantgrowdiary.com/assets/app.js",
+                  vars: { name: probe },
+                  context_line: probe,
+                  pre_context: [probe],
+                  post_context: [probe],
+                  lineno: 12,
+                  colno: 3,
+                  in_app: true,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    };
+    const scrubbed = scrubEvent(event);
+
+    expect(JSON.stringify(scrubbed)).not.toContain(probe);
+    expect(scrubbed.contexts).toBeUndefined();
+    expect(scrubbed.transaction).toBeUndefined();
+    expect(scrubbed.tags).toBeUndefined();
+    expect(scrubbed.exception?.values?.[0]?.type).toBeUndefined();
+    expect(scrubbed.exception?.values?.[0]?.mechanism).toEqual({ handled: false });
+    expect(scrubbed.exception?.values?.[0]?.stacktrace?.frames?.[0]).toEqual({
+      filename: "https://verdantgrowdiary.com/assets/app.js",
+      abs_path: "https://verdantgrowdiary.com/assets/app.js",
+      lineno: 12,
+      colno: 3,
+      in_app: true,
+    });
+
+    vi.stubEnv("VITE_SENTRY_DSN", TEST_DSN);
+    vi.stubEnv("MODE", "production");
+    setHostname("verdantgrowdiary.com");
+    __resetErrorReporterForTests();
+    const sdk = { init: vi.fn(), captureException: vi.fn() };
+    void initErrorReporter((async () => sdk) as never);
+    await vi.waitFor(() => expect(getErrorReporterStatus()).toBe("ready"));
+    const beforeSend = sdk.init.mock.calls[0]?.[0].beforeSend as (
+      value: typeof event,
+    ) => typeof event;
+    expect(JSON.stringify(beforeSend(event))).not.toContain(probe);
+    __resetErrorReporterForTests();
+    vi.unstubAllEnvs();
+  });
+});
+
+describe("initErrorReporter", () => {
+  const originalLocation = window.location;
+
+  beforeEach(() => {
+    __resetErrorReporterForTests();
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
+    __resetErrorReporterForTests();
+  });
+
+  it("does not load the SDK without a DSN", () => {
+    vi.stubEnv("VITE_SENTRY_DSN", "");
+    vi.stubEnv("MODE", "production");
+    setHostname("verdantgrowdiary.com");
+    const loader = vi.fn();
+    void initErrorReporter(loader as never);
+    expect(loader).not.toHaveBeenCalled();
+    expect(getErrorReporterStatus()).toBe("disabled");
+  });
+
+  it("does not load the SDK in a non-production build", () => {
+    vi.stubEnv("VITE_SENTRY_DSN", TEST_DSN);
+    vi.stubEnv("MODE", "development");
+    setHostname("verdantgrowdiary.com");
+    const loader = vi.fn();
+    void initErrorReporter(loader as never);
+    expect(loader).not.toHaveBeenCalled();
+    expect(getErrorReporterStatus()).toBe("disabled");
+  });
+
+  it("does not load the SDK when build mode is missing or unknown", () => {
+    vi.stubEnv("VITE_SENTRY_DSN", TEST_DSN);
+    vi.stubEnv("MODE", "");
+    setHostname("verdantgrowdiary.com");
+    const missing = vi.fn();
+    void initErrorReporter(missing as never);
+    expect(missing).not.toHaveBeenCalled();
+    expect(getErrorReporterStatus()).toBe("disabled");
+
+    __resetErrorReporterForTests();
+    vi.stubEnv("VITE_SENTRY_DSN", TEST_DSN);
+    vi.stubEnv("MODE", "staging");
+    const unknown = vi.fn();
+    void initErrorReporter(unknown as never);
+    expect(unknown).not.toHaveBeenCalled();
+    expect(getErrorReporterStatus()).toBe("disabled");
+  });
+
+  it("does not load the SDK on a non-production host", () => {
+    vi.stubEnv("VITE_SENTRY_DSN", TEST_DSN);
+    vi.stubEnv("MODE", "production");
+    setHostname("localhost");
+    const loader = vi.fn();
+    void initErrorReporter(loader as never);
+    expect(loader).not.toHaveBeenCalled();
+    expect(getErrorReporterStatus()).toBe("disabled");
+  });
+
+  it("initialises once with PII off, tracing off, and a scrubbing beforeSend", async () => {
+    vi.stubEnv("VITE_SENTRY_DSN", TEST_DSN);
+    vi.stubEnv("MODE", "production");
+    setHostname("verdantgrowdiary.com");
+    const sdk = { init: vi.fn(), captureException: vi.fn() };
+    const loader = vi.fn(async () => sdk);
+    void initErrorReporter(loader as never);
+    await vi.waitFor(() => expect(getErrorReporterStatus()).toBe("ready"));
+    expect(loader).toHaveBeenCalledTimes(1);
+    const options = sdk.init.mock.calls[0]?.[0] as {
+      sendDefaultPii: boolean;
+      tracesSampleRate: number;
+      dataCollection: typeof ERROR_REPORTING_DATA_COLLECTION;
+      dsn: string;
+      integrations: (defaults: Array<{ name: string }>) => Array<{ name: string }>;
+      beforeSend: (event: Record<string, unknown>) => Record<string, unknown>;
+    };
+    expect(options.dsn).toBe(TEST_DSN);
+    expect(options.sendDefaultPii).toBe(SEND_DEFAULT_PII);
+    expect(options.sendDefaultPii).toBe(false);
+    expect(options.tracesSampleRate).toBe(TRACES_SAMPLE_RATE);
+    expect(options.dataCollection).toEqual(ERROR_REPORTING_DATA_COLLECTION);
+    expect(options.dataCollection.userInfo).toBe(false);
+    expect(options.dataCollection.httpBodies).toEqual([]);
+    const kept = options.integrations([
+      { name: "GlobalHandlers" },
+      { name: "Replay" },
+      { name: "BrowserTracing" },
+      { name: "BrowserSession" },
+      { name: "BrowserProfiling" },
+    ]);
+    expect(kept.map((integration) => integration.name)).toEqual(["GlobalHandlers"]);
+    const sent = options.beforeSend({
+      user: { ip_address: "203.0.113.9" },
+      request: { url: "vbscript:alert(1)", data: "secret" },
+      message: "grower text",
+    });
+    expect(sent.user).toBeUndefined();
+    expect(sent.message).toBe(REDACTED);
+    expect(sent.request).toEqual({ url: `vbscript:${REDACTED}` });
+  });
+});

@@ -141,7 +141,9 @@ gh run view <run-id> -R Verdant-OS/verdant-grow-diary --json headSha --jq .headS
 **Stop** if either differs from the receipt SHA: that run is not evidence for the chosen
 build. Record each run's `headSha` in the receipt. A required `expected_sha` workflow input
 that fails closed on a mismatch would replace this manual check. It is a workflow change,
-so it needs its own assigned slice.
+so it needs its own assigned slice. Until it exists, these checks detect a run at the wrong
+commit; they can't prevent one, because the branch can advance between `git ls-remote` and
+the dispatch.
 
 **Stop conditions:** any job is red or cancelled; a run's `headSha` isn't the receipt SHA;
 wait-for-deployed-sha times out (the build isn't live); the receipt shows a read outside the fixture's own scope; or the Actions
@@ -199,11 +201,22 @@ frontend broke a read". The same stop conditions apply.
 If step 0.0 chose (a), the owner re-enables `quicklog-smoke.yml` first (see step 0.0). A
 dispatch on the disabled workflow fails with 422.
 
+**Before dispatching**, run step 1's `git ls-remote` check. **Stop** if the branch tip
+isn't the receipt SHA. Then dispatch right away:
+
 ```bash
 gh workflow run quicklog-smoke.yml -R Verdant-OS/verdant-grow-diary --ref verdant-grow-diary -f run_mode=quicklog_smoke
 ```
 
-Bind this run to the receipt SHA exactly as in step 1, before and after dispatch.
+After it finishes, run step 1's `headSha` check and record it.
+
+This is a write, and the manual check narrows the risk without closing it. `--ref` takes a
+branch, not a SHA, so the branch can still advance between `git ls-remote` and the
+dispatch. If it does, the run makes its two tagged fixture writes from another commit, and
+the `headSha` check only catches that afterwards. In that case the run is not evidence for
+the receipt SHA. Record the run link and both `[smoke …]` records in the receipt, and
+**stop**. Only the fail-closed `expected_sha` input described in step 1 prevents this.
+Whether to wait for it before step 4 is **Matthew's call**, and goes in the receipt.
 
 The job runs `bun run e2e:fixture-checklist`, `bun run e2e:bootstrap-fixture` (only if
 `E2E_ALLOW_FIXTURE_BOOTSTRAP` allows it), `bun run e2e:verify-fixture`, then

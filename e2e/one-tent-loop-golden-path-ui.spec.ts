@@ -261,7 +261,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
     let evidenceSeedStatus: OneTentProofStagedResult["seedStatus"] = "not_started";
     let proofReceiptStatus: "pass" | "blocked" | "fail" = "fail";
     let proofBlockerReason: string | null = null;
-    let paddleSandboxBranch: "operator" | "non_operator" | "error" = "error";
+    let paddleSandboxBranch: "operator" | "non_operator" | "error" | "not_run" = "not_run";
     let proofError: unknown = null;
     let cleanup: OneTentProofStagedResult["cleanup"] = {
       status: "not_run",
@@ -275,15 +275,6 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
         stageOutcomes[name] = "pass";
         return out;
       } catch (err) {
-        if (
-          name === "paddle_sandbox_verified" &&
-          err instanceof Error &&
-          err.message === "paddle_sandbox_has_role_error"
-        ) {
-          stageOutcomes[name] = "blocked";
-          proofBlockerReason ??= "paddle_sandbox_has_role_error";
-          throw err;
-        }
         stageOutcomes[name] = "fail";
         proofBlockerReason ??= `${name}_failed`;
         throw err;
@@ -951,8 +942,6 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
           await expect(page.getByTestId("payments-test-mode-banner")).toHaveCount(0);
         } else {
           paddleSandboxBranch = "error";
-          stageOutcomes["paddle_sandbox_verified"] = "blocked";
-          proofBlockerReason ??= "paddle_sandbox_has_role_error";
           throw new Error("paddle_sandbox_has_role_error");
         }
 

@@ -502,9 +502,11 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     );
     const errorBranch = executablePaddle.slice(executablePaddle.indexOf("} else {"));
     expect(errorBranch).toContain('paddleSandboxBranch = "error"');
-    expect(errorBranch).toContain('stageOutcomes["paddle_sandbox_verified"] = "blocked"');
-    expect(errorBranch).toContain('proofBlockerReason ??= "paddle_sandbox_has_role_error"');
-    expect(errorBranch).toContain('throw new Error("paddle_sandbox_has_role_error")');
+    expect(errorBranch).not.toContain('stageOutcomes["paddle_sandbox_verified"] = "blocked"');
+    expect(errorBranch).not.toContain('proofBlockerReason ??= "paddle_sandbox_has_role_error"');
+    expect(EXECUTABLE_SPEC).toContain(
+      'let paddleSandboxBranch: "operator" | "non_operator" | "error" | "not_run" = "not_run";',
+    );
     expect(SPEC).toContain("ONE_TENT_PADDLE_SANDBOX_BRANCH=");
     expect(SPEC).toContain("paddle_sandbox_verified");
     expect(SPEC).toContain("payments-test-mode-banner");
@@ -513,6 +515,29 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(SPEC).toContain("pricing-checkout-trust");
     expect(SPEC).toContain('data-checkout-state", "sandbox"');
     expect(SPEC).not.toMatch(/pricing-(?:founder|pro)-(?:lifetime|monthly|annual)-cta"\)\.click/);
+  });
+
+  it("leaves an unreached paddle stage not_run and fails a role-check error as the stage failure", () => {
+    expect(EXECUTABLE_SPEC).toContain(
+      'let paddleSandboxBranch: "operator" | "non_operator" | "error" | "not_run" = "not_run";',
+    );
+    const stageFn = EXECUTABLE_SPEC.slice(
+      EXECUTABLE_SPEC.indexOf("async function stage"),
+      EXECUTABLE_SPEC.indexOf('page.on("request"'),
+    );
+    expect(stageFn).not.toContain("paddle_sandbox_has_role_error");
+    expect(stageFn).toContain('stageOutcomes[name] = "fail"');
+    expect(stageFn).toContain("proofBlockerReason ??= `${name}_failed`");
+
+    const paddleStage = EXECUTABLE_SPEC.slice(
+      EXECUTABLE_SPEC.indexOf('await stage("paddle_sandbox_verified"'),
+      EXECUTABLE_SPEC.indexOf("expect(sawPasswordAuth)"),
+    );
+    const roleError = paddleStage.slice(paddleStage.indexOf("} else {"));
+    expect(roleError).toContain('paddleSandboxBranch = "error"');
+    expect(roleError).toContain('throw new Error("paddle_sandbox_has_role_error")');
+    expect(roleError).not.toContain('stageOutcomes["paddle_sandbox_verified"] = "blocked"');
+    expect(roleError).not.toContain('proofBlockerReason ??= "paddle_sandbox_has_role_error"');
   });
 
   it("receipt cannot report PASS without every new objective stage", () => {

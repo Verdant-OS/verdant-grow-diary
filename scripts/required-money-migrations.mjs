@@ -60,6 +60,11 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   "20260914212330_founder_refund_subscription_reference.sql",
   // Founder grant/refund serialization and authoritative refund recheck.
   "20260915193000_founder_refund_grant_serialization.sql",
+  // Credit-pack refund/chargeback clawback and refund-before-purchase
+  // refusal (grant-path audit 2026-10-03). payments-webhook calls
+  // clawback_lovable_credit_pack on every approved refund, so production
+  // must carry this before that function ships.
+  "20261003010000_credit_pack_refund_clawback.sql",
 ];
 
 /**

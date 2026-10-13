@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { buildAiDoctorPromptMessages } from "../../supabase/functions/_shared/aiDoctorPromptAssembly.ts";
 import { lookupGeminiDirectRoute } from "../../supabase/functions/_shared/geminiDirectChat.ts";
 
 const ROOT = resolve(__dirname, "../..");
@@ -68,6 +69,9 @@ function createFakeClient(calls: RpcCall[], feature: string) {
       }
       if (name === "ai_credit_refund") {
         return Promise.resolve({ data: { ok: true, status: "refunded" }, error: null });
+      }
+      if (name === "ai_doctor_finalize_review") {
+        return Promise.resolve({ data: { ok: true, status: "recorded" }, error: null });
       }
       return Promise.resolve({ data: null, error: { message: "unexpected rpc" } });
     },
@@ -153,6 +157,80 @@ describe("AI Doctor HMAC frame version", () => {
     ).join("");
     expect(signed).not.toBe(`hmac-sha256:${v1Hex}`);
   });
+
+  it("finalizes a successful review with the real HMAC and v2 contract", async () => {
+    const { handleAiDoctorReviewRequest, signAiDoctorPrompt } = await loadDoctor();
+    const calls: RpcCall[] = [];
+    const restoreEnv = installDenoEnv({
+      SUPABASE_URL: "https://project.supabase.co",
+      SUPABASE_ANON_KEY: "test-anon-key",
+      SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
+      PAYMENTS_ENVIRONMENT: "live",
+      GEMINI_API_KEY: "test-gemini-key-not-a-secret",
+      AI_DOCTOR_RECEIPT_HMAC_KEY: HMAC_SECRET,
+      AI_DOCTOR_RECEIPT_HMAC_KEY_ID: "test-key",
+    });
+    const review = {
+      summary: "The available context supports a cautious observation-only review.",
+      likely_issue: "A possible stress pattern needs follow-up evidence.",
+      confidence: "medium",
+      evidence: ["Humidity is 50 percent in the current snapshot."],
+      missing_information: [],
+      possible_causes: ["Normal variation remains possible."],
+      immediate_action: "Observe the plant and add a follow-up note if its condition changes.",
+      what_not_to_do: "Do not make abrupt equipment changes from this review.",
+      twenty_four_hour_follow_up:
+        "Recheck the plant and record any visible change within 24 hours.",
+      three_day_recovery_plan:
+        "Keep observations consistent and review the trend after three days.",
+      risk_level: "watch",
+    };
+    const previous = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                tool_calls: [{ function: { arguments: JSON.stringify(review) } }],
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      )) as typeof fetch;
+    try {
+      const response = await handleAiDoctorReviewRequest(
+        new Request("https://project.supabase.co/functions/v1/ai-doctor-review", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer test-jwt",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            packet: doctorPacket(),
+            idempotencyKey: IDEMPOTENCY_KEY,
+          }),
+        }),
+        { createClient: createFakeClient(calls, "ai_doctor_review") },
+      );
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { ok?: boolean; reason?: string };
+      expect(body.ok).toBe(true);
+      const finalized = calls.filter((call) => call.name === "ai_doctor_finalize_review");
+      expect(finalized).toHaveLength(1);
+      const expectedHmac = await signAiDoctorPrompt(
+        buildAiDoctorPromptMessages(doctorPacket()),
+        HMAC_SECRET,
+      );
+      expect(finalized[0]?.params?.p_prompt_hmac_sha256).toBe(expectedHmac);
+      expect(expectedHmac.startsWith("hmac-sha256:")).toBe(true);
+      expect(finalized[0]?.params?.p_prompt_contract_version).toBe("ai-doctor-review-prompt-v2");
+    } finally {
+      globalThis.fetch = previous;
+      restoreEnv();
+    }
+  });
 });
 
 describe("Gemini 429 quota outcome", () => {
@@ -217,14 +295,20 @@ describe("Gemini 429 quota outcome", () => {
       GEMINI_API_KEY: "test-gemini-key-not-a-secret",
     });
     const previous = globalThis.fetch;
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
-      const parsed = new URL(String(input));
+    const storageUrls: string[] = [];
+    const geminiBodies: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const parsed = new URL(url);
       if (
         parsed.origin === "https://generativelanguage.googleapis.com" &&
         parsed.pathname === "/v1beta/openai/chat/completions"
       ) {
+        geminiBodies.push(typeof init?.body === "string" ? init.body : "");
         return new Response("quota", { status: 429 });
       }
+      storageUrls.push(url);
+      if (url !== photoUrl) return new Response("missing", { status: 404 });
       return new Response(JPEG, { status: 200 });
     }) as typeof fetch;
     try {
@@ -243,6 +327,10 @@ describe("Gemini 429 quota outcome", () => {
         }),
         { createClient: createFakeClient(calls, "ai_coach") },
       );
+      expect(storageUrls).toEqual([photoUrl]);
+      const storage = new URL(storageUrls[0] ?? "");
+      expect(storage.origin).toBe("https://project.supabase.co");
+      expect(storage.pathname).toBe("/storage/v1/object/sign/diary-photos/leaf.jpg");
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         ok: false,
@@ -253,6 +341,16 @@ describe("Gemini 429 quota outcome", () => {
       expect(refunds[0]?.params).toMatchObject({
         p_reason: "upstream_429",
       });
+      expect(geminiBodies).toHaveLength(1);
+      const payload = JSON.parse(geminiBodies[0] ?? "{}") as {
+        messages?: Array<{ role?: string; content?: Array<Record<string, unknown>> }>;
+      };
+      const user = payload.messages?.find((message) => message.role === "user");
+      const image = user?.content?.find((part) => part.type === "image_url") as
+        { image_url?: { url?: string } } | undefined;
+      const jpegDataUrl = `data:image/jpeg;base64,${btoa(String.fromCharCode(...JPEG))}`;
+      expect(image?.image_url?.url).toBe(jpegDataUrl);
+      expect(geminiBodies[0]).not.toContain(photoUrl);
     } finally {
       globalThis.fetch = previous;
       restoreEnv();

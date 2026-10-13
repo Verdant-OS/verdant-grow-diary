@@ -171,9 +171,7 @@ Beyond `dependencyInjectionMiddleware` (built-in, shown above), Inngest provides
 
 ### Encryption Middleware
 
-```bash
-npm install @inngest/middleware-encryption
-```
+Install `@inngest/middleware-encryption` in the Inngest app with that app's package manager.
 
 ```typescript
 import { encryptionMiddleware } from "@inngest/middleware-encryption";
@@ -192,9 +190,7 @@ Automatically encrypts all step data, function output, and event `data.encrypted
 
 ### Sentry Error Tracking
 
-```bash
-npm install @inngest/middleware-sentry
-```
+Install `@inngest/middleware-sentry` in the Inngest app with that app's package manager.
 
 ```typescript
 import * as Sentry from "@sentry/node";

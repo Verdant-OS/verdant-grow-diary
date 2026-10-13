@@ -101,6 +101,7 @@ Rules:
 | `workflow_dispatch`  | not `^[0-9a-f]{40}$` (uppercase, short, whitespace) | FAIL: `BLOCKED: expected_sha must be 40 lowercase hex`                              |
 | `workflow_dispatch`  | valid but different from `github.sha`               | FAIL: `BLOCKED: verdant-grow-diary advanced past expected_sha; re-select the build` |
 | `push` or `schedule` | any (inputs are not set on these events)            | PASS, no check. The job keeps today's `github.sha` behaviour                        |
+| anything else        | any (empty, misspelled or a future event name)      | FAIL: `BLOCKED: unrecognized event <name>`                                          |
 
 On `workflow_dispatch`, the step also fails closed unless `GITHUB_ACTOR` and
 `GITHUB_TRIGGERING_ACTOR` are both `cheekhimself`, `GITHUB_RUN_ATTEMPT` is `1` and
@@ -109,9 +110,11 @@ On `workflow_dispatch`, the step also fails closed unless `GITHUB_ACTOR` and
 dispatch is refused even when its SHA matches. On `push` and `schedule` the job-level `if:`
 keeps deciding, unchanged.
 
-The event name decides which rule applies; the input's value never does. A push run must
-not become a FAIL because an input is unexpectedly set, and a dispatch must never fall
-back to `github.sha`.
+The event name decides which rule applies; the input's value never does. Only
+`workflow_dispatch`, `push` and `schedule` are recognized; every other value, including an
+empty one, fails closed, so widening a job's triggers later can't open the gate by default.
+A push run must not become a FAIL because an input is unexpectedly set, and a dispatch must
+never fall back to `github.sha`.
 
 ### 3.3 Leave the existing pin as it is
 
@@ -176,16 +179,21 @@ regex the source (`AGENTS.md`, contract-test rule).
    than `1` and a `ref` other than `refs/heads/verdant-grow-diary` each return `BLOCKED`,
    even with a valid matching SHA.
 3. `workflow_dispatch` never falls back to `githubSha`, whatever the input.
-4. `push` and `schedule` pass whatever the input is.
+4. `push` and `schedule` pass whatever the input is. An empty event name, a misspelling
+   (`Push`, `workflow-dispatch`) and an unlisted event (`pull_request`, `repository_dispatch`)
+   each return `BLOCKED`.
 5. The function is deterministic and has no I/O.
 
 **A2. Runner tests: `src/test/verify-dispatch-sha-runner.test.ts` (new)**
 
-Spawn `node scripts/verify-dispatch-sha.mjs` with only the §3.2 env names set (no other
-environment inherited that could mask a misread name):
+Spawn `scripts/verify-dispatch-sha.mjs` with `process.execPath` as the executable (not a
+bare `node`, which needs `PATH` and fails with `ENOENT` once the environment is restricted)
+and only the §3.2 env names set (no other environment inherited that could mask a misread
+name):
 
 1. A PASS case exits `0`.
-2. Each `BLOCKED` case from A.1 and A.2 exits non-zero and prints its `BLOCKED:` reason.
+2. Each `BLOCKED` case from A.1, A.2 and A.4 exits non-zero and prints its `BLOCKED:`
+   reason, including an unrecognized `EVENT_NAME`.
 3. An env name the runner doesn't read (for example `EXPECTED_SHA` instead of `INPUT_SHA`)
    leaves the input empty, so a dispatch exits non-zero. This proves the runner reads the
    §3.2 names, not near-misses.
@@ -202,9 +210,10 @@ in `src/test/signed-in-readonly-proof.test.ts:507-556` and
 2. In each of the four jobs, `Verify dispatch SHA` exists. Its `env` carries no
    `secrets.*` and maps `inputs.expected_sha`, `github.sha`, `github.actor`,
    `github.triggering_actor`, `github.run_attempt` and `github.ref`. Its `run` is exactly
-   `node scripts/verify-dispatch-sha.mjs`, with no `continue-on-error` and no `if:`. Its index is lower than
-   every step whose `env` references a secret, and every step before it is a checkout
-   with `persist-credentials: false`.
+   `node scripts/verify-dispatch-sha.mjs`, with no `continue-on-error` and no `if:`. Its
+   index is lower than every step whose `env` references a secret. At least one step
+   before it is a checkout of `${{ github.sha }}` with `persist-credentials: false` (the
+   runner must exist on disk), and every step before it is such a checkout.
 3. The existing pin assertions still hold: checkout `ref` is `${{ github.sha }}`, and the
    pin compares against `GITHUB_SHA` and writes `E2E_EXPECTED_SHA`.
 4. The existing `if:` gate matrices (`signed-in-readonly-proof.test.ts:540-556` and the

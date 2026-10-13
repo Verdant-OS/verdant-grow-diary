@@ -8,7 +8,9 @@ Read this section first. It doesn't replace the observation log below.
 - **Roles:**
   - Grok 91: merge-queue owner. Routes PRs to reviewers, sends findings back, and merges under the rule below.
   - Blue Dream and Durban Poison: code reviewers (peers) for `.tsx`/UI, auth, RLS, DB and Edge.
-  - Critical Mass: reviewer for lib and logic, tests, docs-only, QA, accessibility, search and content (OWNERSHIP.md line 74). Until OWNERSHIP.md assigns it, Critical Mass also gives the independent verdict on CI, build and dependency PRs; line 75 gives Codex only _technical_ CI/build review.
+  - Critical Mass: reviewer for lib and logic, tests, docs-only, QA, accessibility, search and content (OWNERSHIP.md section 2).
+  - Codex: an accepted outside reviewer, except on a PR Codex authored or repaired (for example #1938). That exact-head review is the independent PASS when Codex is the chosen seat and did not author or repair the PR.
+  - Graft: Graft's exact-head PASS counts as the outside review on a docs-only or other low-risk PR that Graft did not author or repair (OWNERSHIP.md section 2).
   - Claude, Codex and Grok 91: authors.
   - Nobody reviews their own work.
 - **Review loop:** [`.agents/skills/verdant-exact-sha-review/SKILL.md`](../../.agents/skills/verdant-exact-sha-review/SKILL.md).

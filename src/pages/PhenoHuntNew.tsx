@@ -64,6 +64,8 @@ interface PhenoHuntSetupDraft {
   evidenceGoals: PhenoEvidenceGoalId[];
   /** True when the saved draft included an evidenceGoals array, including []. */
   evidenceGoalsSpecified?: boolean;
+  /** True when evidenceGoals was saved as a non-list. Absent key stays legacy. */
+  evidenceGoalsMalformed?: boolean;
   currentStep: PhenoOnboardingStepId;
   /** Evidence goals step opened in this draft (#573). Absent → false. */
   goalsReviewed: boolean;
@@ -79,6 +81,10 @@ function readHuntDraft(key: string): PhenoHuntSetupDraft | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PhenoHuntSetupDraft>;
     if (!parsed || typeof parsed !== "object") return null;
+    const evidenceGoalsIsList = Array.isArray(parsed.evidenceGoals);
+    // A missing field keeps the fresh suggested defaults. A present non-list does not.
+    const evidenceGoalsMalformed =
+      Object.prototype.hasOwnProperty.call(parsed, "evidenceGoals") && !evidenceGoalsIsList;
     return {
       name: typeof parsed.name === "string" ? parsed.name : "",
       notes: typeof parsed.notes === "string" ? parsed.notes : "",
@@ -87,8 +93,8 @@ function readHuntDraft(key: string): PhenoHuntSetupDraft | null {
         : [],
       // Unknown/removed ids are dropped so readiness and the summary agree.
       // A present array that normalizes to [] is an explicit empty selection.
-      // A missing field keeps the fresh suggested defaults.
-      evidenceGoalsSpecified: Array.isArray(parsed.evidenceGoals),
+      evidenceGoalsSpecified: evidenceGoalsIsList,
+      evidenceGoalsMalformed,
       evidenceGoals: normalizeEvidenceGoalIds(parsed.evidenceGoals),
       currentStep:
         typeof parsed.currentStep === "string" &&
@@ -97,6 +103,7 @@ function readHuntDraft(key: string): PhenoHuntSetupDraft | null {
           : "basics",
       goalsReviewed:
         parsed.goalsReviewed === true &&
+        !evidenceGoalsMalformed &&
         !storedEvidenceGoalsRequireFreshReview(parsed.evidenceGoals),
     };
   } catch {
@@ -166,9 +173,11 @@ export default function PhenoHuntNew() {
     setName((prev) => (prev.trim() !== "" ? prev : draft.name));
     setNotes((prev) => (prev.trim() !== "" ? prev : draft.notes));
     setSelected((prev) => (prev.size > 0 ? prev : new Set(draft.selected)));
-    if (draft.evidenceGoalsSpecified) setEvidenceGoals(draft.evidenceGoals);
+    if (draft.evidenceGoalsMalformed) setEvidenceGoals([]);
+    else if (draft.evidenceGoalsSpecified) setEvidenceGoals(draft.evidenceGoals);
     const emptySavedSelection =
-      draft.evidenceGoalsSpecified === true && draft.evidenceGoals.length === 0;
+      draft.evidenceGoalsMalformed === true ||
+      (draft.evidenceGoalsSpecified === true && draft.evidenceGoals.length === 0);
     const goalsReviewedForResume = draft.goalsReviewed && !emptySavedSelection;
     setGoalsReviewed(goalsReviewedForResume);
     // A draft saved on a locked confirmation step reopens on Goals instead.

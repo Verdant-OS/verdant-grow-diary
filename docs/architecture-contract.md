@@ -1105,15 +1105,16 @@ dated review.**
 `bun.lock`, a text lockfile, is authoritative. `package-lock.json` is required and must stay
 synchronized while the npm consumers declared in `config/dependency-lockfile-transition.json` exist;
 it is never the source of truth. That config carries `reviewBy` `2026-10-17` (moved from `2026-10-10` by
-a dated fallback while the retirement PRs stay open), and the checker fails an overdue review from
-2026-10-18 UTC. `bun.lockb`, `yarn.lock` and `pnpm-lock.yaml` are forbidden.
+the dated 2026-10-10 fallback review), and the checker fails an overdue review from 2026-10-18 UTC. `bun.lockb`, `yarn.lock` and `pnpm-lock.yaml` are forbidden.
 **There is no `bun.lockb`.** Governance prose that calls `bun.lockb` authoritative is stale.
 _Source:_ `scripts/check-bun-lockfile-policy.mjs:3-7` ("Bun and bun.lock are canonical.
 package-lock.json remains a synchronized compatibility lock only while…"), `:22`
 (`REQUIRED_LOCKFILES`, both files), `:76` (`FORBIDDEN_LOCKFILES`), `:193-205` (the schema-1 transition
 config check; the canonical check and throw at `:197-205`), `:395-399` (overdue review);
 `config/dependency-lockfile-transition.json`; `bunfig.toml`;
-`docs/dependency-lockfile-transition-review-2026-10-03.md`. `established fact`.
+`docs/dependency-lockfile-transition-review-2026-10-10.md` (sets `2026-10-17` and the 2026-10-18
+failure; the earlier `docs/dependency-lockfile-transition-review-2026-10-03.md` set `2026-10-10`).
+`established fact`.
 _Enforcement:_ **gated for presence and canonical config; the date is not gated by a required
 check.** `src/test/check-bun-lockfile-policy.test.ts:528` runs the checker against the repository in
 the required test shards, but with `today` pinned to `2026-07-25` (`:530`), so the shards never see

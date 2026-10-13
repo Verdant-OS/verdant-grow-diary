@@ -33,6 +33,11 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-13T21:29 UTC
+
+- **NOT_MEASURED, #2056 (this status PR): CI restarted by the previous update and has not reported.** Measured at `3b1dcea16dc3654d9267122a41f7d837b2c94b33`, the head before this commit (committed 21:28:31 UTC; a commit cannot name its own SHA, so read the current head from the PR). At 21:29 UTC none of the 35 required contexts had reported there. 31 workflow runs exist at that head: 13 `pull_request` runs completed (path-filtered lanes), 13 queued, 2 pending, plus 1 `push` and 2 CodeQL runs queued. Repository-wide: 259 runs queued, 25 in progress. Still draft, mergeable state `blocked`, no reviews, no requested reviewer, 0 unresolved threads; 5 commits behind the tip `3b984887c`, not synced. This commit restarts CI again.
+- **Observation:** each status block written into #2056 is itself a new commit, so #2056's required checks have not stayed finished at any head long enough for review: at 21:26 UTC they were 29/35 green at `3f4b51af0` when the next block replaced that head. Next step is unchanged: 35/35 at an exact head, an independent reviewer, then Matthew's Accept.
+
 ## Follow-up observation — 2026-10-13T21:26 UTC
 
 - **NOT_MEASURED, #2056 (this status PR): CI nearly done at the previous head, still no reviewer.** Measured at `3f4b51af0441449e67fb374016ab37fef43b3a63`, the head before this commit (a commit cannot name its own SHA; read the current head from the PR). Required contexts: **29 SUCCESS, 6 in progress, 0 failing** (up from 34 queued at 20:55 UTC). Mergeable state `blocked` (CI pending, no review). No reviews, no requested reviewer, 0 unresolved threads; still draft. The branch is now 4 commits behind the tip `ad79ebc64`. GitHub has not required a base sync, and one is not done here, because it would create another head. This commit restarts CI at the new head.

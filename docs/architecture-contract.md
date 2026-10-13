@@ -858,8 +858,9 @@ blank, both functions fail closed **before any credit spend**: `ai-doctor-review
 `config` failure and `ai-coach` returns `AI not configured`. `ai-coach` downloads an attached photo
 from the project's signed Storage path only after the spend exists, and sends it as a base64
 inline image of at most 7 MiB, because Gemini rejects the signed HTTPS URL. A failed download or an
-oversized or unsupported image is refunded. A photo attached in Coach therefore reaches Google as
-bytes, not as a link.
+oversized or unsupported image triggers a refund attempt (`ai-coach/index.ts:682,686`); when the
+refund is not confirmed, the response is `result_pending`, not a confirmed reversal (`:384-415`). A
+photo attached in Coach therefore reaches Google as bytes, not as a link.
 
 `ai-cultivar-qa` still calls the Lovable AI gateway (`https://ai.gateway.lovable.dev/v1/chat/completions`)
 with `LOVABLE_API_KEY`. No other function calls a chat-completions provider. No non-test file under

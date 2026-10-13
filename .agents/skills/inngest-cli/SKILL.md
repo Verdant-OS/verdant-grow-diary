@@ -175,10 +175,12 @@ The event key in the URL path (`test` above) can be any value locally.
 
 ### Unit Testing with `@inngest/test`
 
-Requires `inngest@>=4.0.0`.
+Requires `inngest@>=4.0.0`. On an npm-managed target, run npm's `install` subcommand with `-D` and the package name `@inngest/test` (the words `npm`, `install`, `-D`, and `@inngest/test`). These examples are for the target app, not this repository. The fenced examples are for targets that already use Bun, Yarn, or pnpm:
 
 ```bash
-npm install -D @inngest/test
+bun add -d @inngest/test
+# or yarn add -D @inngest/test
+# or pnpm add -D @inngest/test
 ```
 
 ```typescript

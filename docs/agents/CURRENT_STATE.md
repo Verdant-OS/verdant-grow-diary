@@ -33,6 +33,11 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-13T20:55 UTC
+
+- **NOT_MEASURED, #2056 (this status PR).** Owner Claude; draft; base `verdant-grow-diary`; up to date with the tip `fb5a921ec` (0 commits behind). It adds only dated blocks to `docs/agents/CURRENT_STATE.md`: nine before this one (17:58 through 20:51 UTC), recording #1858's path from "ready for acceptance" to merged. This commit cannot name its own SHA; read the current head from the PR. Measured at the previous head `f6f98dc3e8a2db7aa1319f13da3f86c7e981603d`: required contexts 34 queued / 1 not yet reported, 0 failing; mergeable state `blocked` (CI pending, no review); 0 unresolved review threads; no reviews, no assignee, no requested reviewer. CodeRabbit skipped it as a draft. The deployment-preview bot's "CI build did not complete" comment (18:45 UTC) refers to an earlier, superseded head; two of that head's `pull_request` runs were cancelled when later pushes replaced them. This commit restarts CI at the new head.
+- **Next step, owner gates:** 35/35 required at the exact head, an independent reviewer routed (none yet; Critical Mass is the docs-only default, and whether a Codex verdict counts is Matthew's call), then Matthew's Accept and the merge queue. The PR stays draft until merge.
+
 ## Follow-up observation — 2026-10-13T20:51 UTC
 
 - **PASS, #1858 merged.** #1858 merged into `verdant-grow-diary` at **2026-10-13T20:30:54 UTC** as `fb5a921ec0bca2e4e94fa629783c9defacf74797` through the merge queue (enqueued 19:54:16 UTC at the accepted head `f87850bedf94c99daaf46c6c32af8851b167c091`; `merged` and `removed_from_merge_queue` by `github-merge-queue[bot]` both at 20:30:54 UTC). The merge commit has a single parent (`ff26d7d3f`), i.e. a squash, and changes one file, `docs/agents/CURRENT_STATE.md`, +90 / -0 — the same 90 added lines Codex passed at `74c4f701e` and that were unchanged at `f87850bed`. Gates met: Matthew's Accept at `f87850bed` (18:25 UTC), 35/35 required contexts green from the `pull_request` `ci.yml` run `38453065029`, queue CI green. #1858's branch `claude/current-state-1857-status` was deleted on GitHub after the merge, and this session removed its local worktree.

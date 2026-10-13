@@ -8,7 +8,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { buildAiDoctorPromptMessages } from "../../supabase/functions/_shared/aiDoctorPromptAssembly.ts";
 import { lookupGeminiDirectRoute } from "../../supabase/functions/_shared/geminiDirectChat.ts";
 
 const ROOT = resolve(__dirname, "../..");
@@ -159,7 +158,7 @@ describe("AI Doctor HMAC frame version", () => {
   });
 
   it("finalizes a successful review with the real HMAC and v2 contract", async () => {
-    const { handleAiDoctorReviewRequest, signAiDoctorPrompt } = await loadDoctor();
+    const { handleAiDoctorReviewRequest } = await loadDoctor();
     const calls: RpcCall[] = [];
     const restoreEnv = installDenoEnv({
       SUPABASE_URL: "https://project.supabase.co",
@@ -185,9 +184,17 @@ describe("AI Doctor HMAC frame version", () => {
         "Keep observations consistent and review the trend after three days.",
       risk_level: "watch",
     };
+    const capturedBodies: string[] = [];
     const previous = globalThis.fetch;
-    globalThis.fetch = (async () =>
-      new Response(
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (
+        url === "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" &&
+        typeof init?.body === "string"
+      ) {
+        capturedBodies.push(init.body);
+      }
+      return new Response(
         JSON.stringify({
           choices: [
             {
@@ -198,7 +205,8 @@ describe("AI Doctor HMAC frame version", () => {
           ],
         }),
         { status: 200, headers: { "content-type": "application/json" } },
-      )) as typeof fetch;
+      );
+    }) as typeof fetch;
     try {
       const response = await handleAiDoctorReviewRequest(
         new Request("https://project.supabase.co/functions/v1/ai-doctor-review", {
@@ -219,12 +227,33 @@ describe("AI Doctor HMAC frame version", () => {
       expect(body.ok).toBe(true);
       const finalized = calls.filter((call) => call.name === "ai_doctor_finalize_review");
       expect(finalized).toHaveLength(1);
-      const expectedHmac = await signAiDoctorPrompt(
-        buildAiDoctorPromptMessages(doctorPacket()),
-        HMAC_SECRET,
+      expect(capturedBodies).toHaveLength(1);
+      const outbound = JSON.parse(capturedBodies[0] ?? "") as {
+        model?: unknown;
+        messages?: unknown;
+        tools?: unknown;
+        tool_choice?: unknown;
+      };
+      const frame = JSON.stringify({
+        version: "ai-doctor-review-prompt-v2",
+        model: outbound.model,
+        messages: outbound.messages,
+        tools: outbound.tools,
+        tool_choice: outbound.tool_choice,
+      });
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(HMAC_SECRET),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"],
       );
-      expect(finalized[0]?.params?.p_prompt_hmac_sha256).toBe(expectedHmac);
-      expect(expectedHmac.startsWith("hmac-sha256:")).toBe(true);
+      const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(frame));
+      const hex = Array.from(new Uint8Array(signature), (byte) =>
+        byte.toString(16).padStart(2, "0"),
+      ).join("");
+      expect(finalized[0]?.params?.p_prompt_hmac_sha256).toBe(`hmac-sha256:${hex}`);
       expect(finalized[0]?.params?.p_prompt_contract_version).toBe("ai-doctor-review-prompt-v2");
     } finally {
       globalThis.fetch = previous;

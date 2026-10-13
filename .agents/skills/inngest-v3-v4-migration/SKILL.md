@@ -76,12 +76,12 @@ Inngest migration scan:
 
 ## Package and Environment
 
-Install the latest v4 SDK:
+Install the latest v4 SDK in the target app, not in this repository. On an npm-managed target, run npm's `install` subcommand with the package name `inngest@latest` (the words `npm`, `install`, and `inngest@latest`). The fenced examples are for targets that already use Bun, Yarn, or pnpm:
 
 ```bash
-npm install inngest@latest
-# or pnpm add inngest@latest
+bun add inngest@latest
 # or yarn add inngest@latest
+# or pnpm add inngest@latest
 ```
 
 If the repo uses v3 realtime, remove `@inngest/realtime`; v4 realtime lives in

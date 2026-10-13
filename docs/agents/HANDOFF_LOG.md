@@ -757,6 +757,26 @@ claimed_by: Canopy, 2026-10-12 09:09 CT
 last_updated: 2026-10-12 17:02 UTC, by Grok
 ```
 
+### CLAUDE-GITIGNORE-ANCHOR-001
+
+```text
+TASK CLAUDE-GITIGNORE-ANCHOR-001  priority: other  status: OPEN
+goal: Ignore .anchor/, the local session-state directory an agent plugin (anchor-memory hook) writes into the checkout, so it never shows up as untracked or gets committed. Matthew asked for it in session 2026-10-13.
+branch: claude/dreamy-hawking-jjrrp4
+base: verdant-grow-diary; normal merge of origin/verdant-grow-diary at d66cc26b5 (#2054) into the branch, no rebase or force-push
+checkout: git fetch origin claude/dreamy-hawking-jjrrp4 verdant-grow-diary && git switch claude/dreamy-hawking-jjrrp4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED. No PR yet. Matthew handed opening it to Codex (OWNERSHIP.md: Codex opens PRs, as drafts). Until a PR exists this block is not eligible for coverage.
+head_sha: 64b9a58ad08243b5d84d6792ce1278755996deae is the pushed .gitignore commit (remote observed 2026-10-13 17:58 UTC). The head that carries this block is its descendant: the base merge 2baff57 and then the commit adding this block. A commit cannot store its own SHA, so read the exact head with git ls-remote.
+state: pushed, no PR. git check-ignore matches .anchor/session-state.md at .gitignore:71. No tests ran locally (vitest is not installed in this container); a .gitignore-only change cannot affect them. CI NOT_MEASURED until a PR runs it.
+next_action: Codex opens a draft PR from claude/dreamy-hawking-jjrrp4 into verdant-grow-diary at the current exact head. Stay draft; no merge until 35/35 required checks are green and there is an independent exact-head PASS.
+files: .gitignore (3 lines added after the scorer-unlock entry); docs/agents/HANDOFF_LOG.md (this block only)
+blockers: PR not opened (Codex). No owner lock or named hold applies; .gitignore is not a scorer-lock protected path and not a governance file.
+artifacts: commit 64b9a58 on origin/claude/dreamy-hawking-jjrrp4
+reviewer_seat: Graft (docs-only, low-risk lane) or Critical Mass. Claude authored this, so Claude cannot give the PASS.
+claimed_by: Claude, 2026-10-13 12:59 CT (owner instruction in session)
+last_updated: 2026-10-13 12:59 CT, by Claude
+```
+
 ## Closed
 
 ### CLAUDE-LOOP-ENGINEERING-001

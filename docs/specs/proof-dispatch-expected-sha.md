@@ -179,6 +179,17 @@ regex the source (`AGENTS.md`, contract-test rule).
 4. `push` and `schedule` pass whatever the input is.
 5. The function is deterministic and has no I/O.
 
+**A2. Runner tests: `src/test/verify-dispatch-sha-runner.test.ts` (new)**
+
+Spawn `node scripts/verify-dispatch-sha.mjs` with only the §3.2 env names set (no other
+environment inherited that could mask a misread name):
+
+1. A PASS case exits `0`.
+2. Each `BLOCKED` case from A.1 and A.2 exits non-zero and prints its `BLOCKED:` reason.
+3. An env name the runner doesn't read (for example `EXPECTED_SHA` instead of `INPUT_SHA`)
+   leaves the input empty, so a dispatch exits non-zero. This proves the runner reads the
+   §3.2 names, not near-misses.
+
 **B. Workflow contract tests: extend the existing suites**
 
 Extend `src/test/actions-production-readonly-proof.test.ts`,
@@ -190,7 +201,8 @@ in `src/test/signed-in-readonly-proof.test.ts:507-556` and
    `type: string, required: true`. The `quicklog-smoke` input stays `required: false`.
 2. In each of the four jobs, `Verify dispatch SHA` exists. Its `env` carries no
    `secrets.*` and maps `inputs.expected_sha`, `github.sha`, `github.actor`,
-   `github.triggering_actor`, `github.run_attempt` and `github.ref`. Its index is lower than
+   `github.triggering_actor`, `github.run_attempt` and `github.ref`. Its `run` is exactly
+   `node scripts/verify-dispatch-sha.mjs`, with no `continue-on-error` and no `if:`. Its index is lower than
    every step whose `env` references a secret, and every step before it is a checkout
    with `persist-credentials: false`.
 3. The existing pin assertions still hold: checkout `ref` is `${{ github.sha }}`, and the
@@ -200,14 +212,15 @@ in `src/test/signed-in-readonly-proof.test.ts:507-556` and
 
 **C. RED proof**
 
-Run suites A and B against the base without the change and record the failing count in
+Run suites A, A2 and B against the base without the change and record the failing count in
 the PR body, as `CLAUDE.md` requires. Running them with the change restored must show
 0 failures.
 
 **D. Validation commands**
 
 ```bash
-bunx vitest run src/test/dispatch-sha-rules.test.ts src/test/actions-production-readonly-proof.test.ts \
+bunx vitest run src/test/dispatch-sha-rules.test.ts src/test/verify-dispatch-sha-runner.test.ts \
+  src/test/actions-production-readonly-proof.test.ts \
   src/test/settings-account-production-proof.test.ts src/test/signed-in-readonly-proof.test.ts \
   src/test/one-tent-authenticated-proof-workflow.test.ts --reporter=dot
 bun run typecheck
@@ -241,6 +254,7 @@ Verdict: **safe to implement**, as a tightening that only removes false-PASS pat
 | `.github/workflows/signed-in-readonly-performance.yml`                                        | same                                                       | yes                                                     |
 | `.github/workflows/quicklog-smoke.yml`                                                        | input description + first step in the `quicklog-smoke` job | yes                                                     |
 | `src/test/dispatch-sha-rules.test.ts`                                                         | new                                                        | yes                                                     |
+| `src/test/verify-dispatch-sha-runner.test.ts`                                                 | new (§5 A2)                                                | yes (`established fact`: `isScorerPath` returns `true`) |
 | the four existing test files in §5.B                                                          | extend                                                     | yes                                                     |
 | `docs/release/go-live-checklist-after-402.md`, `docs/specs/release-topology-specification.md` | §3.5                                                       | no                                                      |
 

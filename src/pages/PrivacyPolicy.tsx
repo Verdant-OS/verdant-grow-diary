@@ -87,6 +87,20 @@ export default function PrivacyPolicy() {
           usage. See "Cookies" below.
         </li>
         <li>
+          <strong>Error reporting — Sentry (Functional Software, Inc.)</strong> — on our production
+          website, when the app hits an unexpected error, the error report is sent to Sentry so we
+          can fix bugs. Error reporting is separate from analytics and runs whether or not you
+          accept analytics. Before a report leaves your browser we remove user details, cookies,
+          request headers and bodies, URL query strings, and error message text. We replace IDs in
+          page addresses, keep only the file name and line or column number of each stack frame, and
+          drop activity trail entries that contain text or data. A report can still include the
+          cleaned page path, the error type, the app version, and basic technical details about the
+          error. Like any request from your browser, Sentry receives your IP address in transit. We
+          do not add it to the report. How long Sentry keeps error reports and whether it stores IP
+          addresses depend on Sentry project settings we have not yet confirmed. We will update this
+          policy once they are confirmed.
+        </li>
+        <li>
           <strong>Professional advisers</strong> — legal, accounting, or insurance advisers where
           necessary.
         </li>
@@ -112,6 +126,8 @@ export default function PrivacyPolicy() {
         We retain personal data for as long as your account is active and for a reasonable period
         afterwards to meet legal, tax, and audit obligations. When data is no longer needed we
         delete or anonymize it. You can request export or deletion of your grow content at any time.
+        Error reports sent to Sentry are covered in section 4; their retention period is not yet
+        confirmed.
       </p>
 
       <h2>7. Your rights</h2>

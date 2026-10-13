@@ -20,6 +20,7 @@ import {
   type TypedQuickLogChildReader,
   type TypedReceiptReadClient,
 } from "./quickLogTypedReusedReceiptService";
+import type { TypedReusedReviewTarget } from "./quickLogTypedReusedReceiptRules";
 import {
   quickLogSaveRequiresHistoryCheck,
   type QuickLogHistoryCheckReason,
@@ -103,7 +104,12 @@ export type WriteWateringFailureReason =
 
 export type WriteWateringTypedEventResult =
   | { ok: true; eventId: string; reused: boolean }
-  | { ok: false; reason: WriteWateringFailureReason };
+  | {
+      ok: false;
+      reason: WriteWateringFailureReason;
+      /** Only with receipt_target_moved: where the reused entry lives now. */
+      reviewTarget?: TypedReusedReviewTarget;
+    };
 
 const NOTE_LIMIT = 500;
 const DETAILS_SERIALIZED_LIMIT = 20_000;
@@ -303,9 +309,8 @@ export async function writeQuickLogWateringTypedEvent(
 
   // Read the receipt back through the same client the RPC used.
   const readers = resolveTypedReceiptReaders(options);
-  if (
-    envelope.reused === true &&
-    !(await verifyActiveTypedQuickLogEvent(
+  if (envelope.reused === true) {
+    const receipt = await verifyActiveTypedQuickLogEvent(
       {
         id: eventId,
         eventType: "watering",
@@ -316,9 +321,15 @@ export async function writeQuickLogWateringTypedEvent(
       },
       readers.eventReader,
       readers.childReader,
-    ))
-  )
-    return { ok: false, reason: "rpc:receipt_unverified" };
+    );
+    // A read failure stays retryable with the same key; a confirmed mismatch is
+    // returned again by every same-key Retry, so it goes to history review.
+    if (receipt.status === "unavailable") return { ok: false, reason: "rpc:receipt_unverified" };
+    if (receipt.status === "refused")
+      return receipt.reviewTarget
+        ? { ok: false, reason: receipt.reason, reviewTarget: receipt.reviewTarget }
+        : { ok: false, reason: receipt.reason };
+  }
 
   return { ok: true, eventId, reused: envelope.reused === true };
 }

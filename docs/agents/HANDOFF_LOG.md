@@ -45,6 +45,28 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CODEX-2018-PLANT-QUICK-LOG-ACTION-TOGGLE
+
+```text
+TASK CODEX-2018-PLANT-QUICK-LOG-ACTION-TOGGLE  priority: P1  status: OPEN
+goal: Make PlantQuickLog action chips visibly independent toggles; remove only matching standalone action lines, preserving grower prose and response context. Persistence remains action: note.
+branch: codex/2018-plant-quick-log-action-toggle
+base: verdant-grow-diary at 6dc2f0e04491fe8683e06de14ec0ce205ecbf018
+checkout: git fetch origin codex/2018-plant-quick-log-action-toggle verdant-grow-diary; verify the PR full SHA against the fetched branch, then git switch codex/2018-plant-quick-log-action-toggle and git merge --ff-only <verified-full-sha>
+pr: NOT_MEASURED; authorized stay-draft bootstrap before implementation
+head_sha: 6dc2f0e04491fe8683e06de14ec0ce205ecbf018 is the verified base; bootstrap commit cannot name itself, read the draft PR after publication
+state: Claim bootstrap only; no production code or tests changed yet
+next_action: Publish this bounded draft and claim on its PR, re-read claims, then prove rendered red tests before implementation
+files: src/components/PlantQuickLog.tsx; src/lib/tenSecondQuickCheckRules.ts; new src/test/plant-quick-log-action-toggle.test.tsx; new src/test/plant-quick-log-action-toggle-rules.test.ts; docs/agents/HANDOFF_LOG.md (this distinct block only)
+blockers: Independent acceptance required by Blue Dream or another eligible assigned outside reviewer; Codex authored this repair and cannot accept it. Live fleet-lock file is unavailable on this desktop; available GitHub claims and collisions must be refreshed.
+artifacts: Issue https://github.com/Verdant-OS/verdant-grow-diary/issues/2018; red/green and validation receipts will be in the draft PR body and local Temp evidence
+reviewer_seat: Blue Dream by UI/P1 routing; pending outside assignment/acceptance
+claimed_by: Codex, Matthew's explicit #2018 assignment on 2026-10-13; effective PR claim pending bootstrap
+last_updated: 2026-10-13 UTC, by Codex
+limits: Stay draft; no ready, merge, auto-merge, production records, deployment, credentials, migrations, dependencies, existing tracked-test changes or scorer unlock. Preserve all team-retained writers and the dirty desktop CURRENT_STATE. Do not interfere with #2012.
+```
+
+
 ### PR-1939-NOT-FOUND-COVERAGE
 
 ```text

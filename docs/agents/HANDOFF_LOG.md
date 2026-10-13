@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CODEX-1938-TELEMETRY-PRIVACY
+
+```text
+TASK CODEX-1938-TELEMETRY-PRIVACY  priority: P1  status: OPEN
+goal: Prevent grower text and identifiers from leaving in SDK stack frames, URLs or arbitrary metadata; preserve bounded diagnostics.
+branch: fix/production-error-reporting
+base: verdant-grow-diary at eaf0b092257af57acb724dfe9f817d6c8881943b (normally merged before repair)
+checkout: git fetch origin fix/production-error-reporting verdant-grow-diary && git switch fix/production-error-reporting && git merge --ff-only origin/fix/production-error-reporting && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1938 (ready)
+head_sha: adabea667ffde15ab9b01b00eb918a2b0e870fe9 at the Canopy claim (2026-10-10 01:16 UTC). The slim commit cannot name itself; read the PR head after push.
+state: Graft PASS at 5d94472555c4b03a7f1b2e2767d5ba57a655ebf8. Cleanup removes the dead token initializer in redactPathSegment (github-code-quality thread r4236186800) and redacts any path segment that contains @ or %. The cleanup commit cannot name itself; read the PR head after push. Awaiting Matthew's merge yes. Canopy touched the slice and cannot give acceptance. Stay ready. No merge from this session.
+next_action: Await Matthew's merge yes at the cleanup head. Blue Dream reviews that exact head after its own CI receipt, including test:security-regression. Do not inherit CI from 5d944725, bc2d493, ae50b54, or adabea667.
+files: .env.example (privacy wording only); src/lib/errorReportingRules.ts; src/lib/errorReporter.ts; src/test/error-reporting-minimal.test.ts; docs/agents/HANDOFF_LOG.md (this block only). The three elaborate suites (error-reporting-rules, error-reporter, error-reporter-init-and-privacy) are removed with the scrubber they pinned.
+blockers: A later head requires its own CI receipt. No auth, SQL, Edge, Supabase, Action Queue, device, credential, Cloudflare or DSN edits. Lockfiles stay as they were for @sentry/browser 11.4.0. Older review threads stay available pending independent assessment; no author acceptance.
+artifacts: PR #1938; claim issuecomment-6092080728; historical receipts issuecomment-6071121823 and issuecomment-6071320327 describe ae50b54, not the slimmed head.
+reviewer_seat: Blue Dream (P1 privacy; Canopy and Codex touched the slice and cannot give acceptance)
+claimed_by: Canopy (Cursor cloud agent), 2026-10-10 01:16 UTC (issuecomment-6092080728)
+last_updated: 2026-10-09 23:50 CT, by Canopy
+```
+
 ### SEARCH-PREVIEW-BLANK-QUERY-FOLLOWUP
 
 ```text
@@ -759,46 +779,25 @@ last_updated: 2026-10-12 17:02 UTC, by Grok
 
 ## Closed
 
-### CODEX-1730-TYPED-REUSED-RECEIPT
+### CLAUDE-1930-TYPED-RECEIPT-DEADLINE-MISMATCH
 
 ```text
-TASK CODEX-1730-TYPED-REUSED-RECEIPT  priority: P2  status: CLOSED
-goal: Verify a reused typed Water or Feed receipt against its active grow event and typed child before reporting the save as confirmed. Fail closed with rpc:receipt_unverified otherwise.
-branch: codex/typed-reused-receipt-active-check-20260926
-base: verdant-grow-diary
-checkout: None; closed (merged). Historical: git switch codex/typed-reused-receipt-active-check-20260926 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1730 (merged)
-head_sha: 67cd417a0c4351e123808fc24e6ea00a61917aab, the pre-merge head, re-observed 2026-10-09T19:28Z. It merges deploy 1209caab and clears Blue Dream's three P2s from a3ed0541 (injected-client readback, unverifiable-receipt tests, rename to quickLogTypedReusedReceiptService.ts).
-state: CLOSED. Merged 2026-10-10T01:29:01Z. Historical required checks 35/35 success at the pre-merge head 67cd417a0c4351e123808fc24e6ea00a61917aab, measured 2026-10-10T00:31:19Z (2026-10-09 19:31 CT) from that commit's check runs against the 35 names in config/required-status-checks.json (0 missing, 0 other). That CI does not carry to the merge commit. CodeRabbit's two Minor threads were acknowledged and resolved; their fixes live in #1930.
+TASK CLAUDE-1930-TYPED-RECEIPT-DEADLINE-MISMATCH  priority: P2  status: CLOSED
+goal: CodeRabbit's two Minor follow-ups on #1730 (owner-approved): bound the typed reused-receipt readback with one 10 s deadline, route a confirmed mismatch to history review instead of a same-key Retry that cannot succeed, and keep a moved receipt's verified destination through reload, including through #1921's key-scoped fallback marker.
+branch: claude/typed-receipt-deadline-mismatch-review
+base: verdant-grow-diary (originally stacked on #1730, which merged 2026-10-10)
+checkout: None; closed (merged). Historical: git fetch origin claude/typed-receipt-deadline-mismatch-review verdant-grow-diary && git switch claude/typed-receipt-deadline-mismatch-review && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1930 (merged)
+head_sha: f9dc4dd7d0a4e1ee6b36255eedf44f8d6add902a, the final head, squash-merged as 0e26e239766ecacc74f55cc8118e380e81fa9217 (parent 5b16f32435, #1898).
+state: CLOSED. Merged 2026-10-13T19:20:17Z through the merge queue. Required checks 35/35 success at f9dc4dd7d0 against config/required-status-checks.json, measured 2026-10-13 18:59 UTC; CI on the merge-queue group itself NOT_MEASURED from this seat. Merged does not mean live: production delivery NOT_MEASURED.
 next_action: None; closed.
-files: src/lib/quickLogTypedReusedReceiptService.ts (was quickLogTypedReusedReceipt.ts); src/lib/quickLogTypedReusedReceiptRules.ts; src/lib/writeFeedingTypedEvent.ts; src/lib/writeQuickLogWateringTypedEvent.ts and their tests (own delta 94f4e3a1..565ba33a, 10 files)
-blockers: none. Non-required reds recorded on 2026-10-07, not re-measured on 2026-10-09 (NOT_MEASURED): the dependency audit, the nested dependency audit, and Vercel "Account is blocked."
-artifacts: handoff comment https://github.com/Verdant-OS/verdant-grow-diary/pull/1730#issuecomment-6026157552
-reviewer_seat: Blue Dream, which already reviewed this PR and posted the P2s cleared in 67cd417a. The delta is src/lib modules and tests only, so routing by path alone would give Critical Mass; Chemdawg confirms the seat.
-claimed_by: Claude, 2026-10-09 19:38:34 UTC (2026-10-09 14:38 CT), PR #1730 comment 6087961307, renewing comment 6027013408. No released_by after it, read 2026-10-10T00:31:19Z. Historical claim; the PR is merged.
-last_updated: 2026-10-10 01:55 CT, by Canopy
-closure: Merged 2026-10-10T01:29:01Z as 5ae5931cade6cd815d4871d5be05a549f259fb43 from head 67cd417a0c4351e123808fc24e6ea00a61917aab.
-```
-
-### CODEX-1731-REUSED-NOTE-ACTIVITY-RECEIPT
-
-```text
-TASK CODEX-1731-REUSED-NOTE-ACTIVITY-RECEIPT  priority: P2  status: CLOSED
-goal: Verify reused Note and Activity receipts against owner-visible active records before reporting them as saved. Stacked on #1730.
-branch: codex/quick-log-reused-note-activity-active-20260926
-base: verdant-grow-diary
-checkout: None; closed (merged). Historical: git switch codex/quick-log-reused-note-activity-active-20260926 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/codex/typed-reused-receipt-active-check-20260926
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1731 (merged)
-head_sha: 4dedad2cd91105e12be8724832790a050a09990e, the pre-merge head, observed 2026-10-09T19:28Z. 4dedad2cd is a descendant of the previous logged head 1686519b13c6f69ba4e0e89ef6003e074b7ecde0 (2026-10-06T21:52Z). Its subject is a merge of origin/codex/typed-reused-receipt-active-check-20260926, and that history includes #1730's 67cd417a0. Whether the tree is still byte-identical to a89033559 was not re-measured (NOT_MEASURED).
-state: CLOSED. Merged 2026-10-10T01:29:01Z. That merge commit was the deploy tip at the 2026-10-10 01:55 CT log edit. Historical required checks 35/35 success at the pre-merge head 4dedad2cd91105e12be8724832790a050a09990e, measured 2026-10-10T00:31:19Z (2026-10-09 19:31 CT). That CI does not carry to the merge commit. Historical, for the old head only: 34/35 with 2 pending at 1686519b on 2026-10-06T21:52Z, and a later read of 35/35 at 1686519b on 2026-10-07T03:10Z. Blue Dream returned BLOCKED at a89033559 only because the head moved; its provisional findings clear both P2s. P2-1 owner decision: leave the code as is (?? null sent to the RPC, || null in verification, matching SQL NULLIF(p_note, '')). P2-2 is fixed in the PR body.
-next_action: None; closed.
-files: own delta 565ba33a..9f34cbce (15 files), plus the tests-only a89033559 (src/test/quick-log-activity-receipt-audit.test.tsx and src/test/quick-log-pending-activity-receipt.test.ts)
-blockers: none. Dependency-audit and Vercel reds were not re-measured on 2026-10-09 (NOT_MEASURED).
-artifacts: handoff comment https://github.com/Verdant-OS/verdant-grow-diary/pull/1731#issuecomment-6026169167
-reviewer_seat: Blue Dream (the delta includes src/components/QuickLogAllActivitiesSection.tsx)
-claimed_by: Claude, 2026-10-09 19:38:35 UTC (2026-10-09 14:38 CT), PR #1731 comment 6087961553, renewing comment 6047877339. No released_by after it, read 2026-10-10T00:31:19Z. Historical claim; the PR is merged.
-last_updated: 2026-10-10 01:55 CT, by Canopy
-closure: Merged 2026-10-10T01:29:01Z as 15525dca48f4986bbd01560cc3b68516a51d4d46 from head 4dedad2cd91105e12be8724832790a050a09990e. That merge commit was origin/verdant-grow-diary at the 2026-10-10 01:55 CT log edit. The tip has since moved.
+files: src/components/QuickLogV2Sheet.tsx; src/lib/quickLogHistoryReviewTargetRules.ts (new); src/lib/quickLogPendingFeedingStore.ts; src/lib/quickLogPendingWateringStore.ts; src/lib/quickLogTypedReusedReceiptRules.ts; src/lib/quickLogTypedReusedReceiptService.ts; src/lib/writeFeedingTypedEvent.ts; src/lib/writeQuickLogWateringTypedEvent.ts; eight scorer-locked tests (quick-log-feeding-reload-recovery, quick-log-pending-feeding-store, quick-log-pending-watering-store, quick-log-typed-reused-receipt-rules, quick-log-v2-exact-recovery, quick-log-v2-sheet-watering, write-feeding-typed-event, write-quick-log-watering-typed-event).
+blockers: None for this closed task. Historical: base merges from 2026-10-10 to 2026-10-13 dropped the PR's logic (5 tsc errors at 28790c2a); Canopy stopped on the scorer lock (comment 6094798877); f9dc4dd7d0 re-applied 67cd417a..3a94982d onto the tip under an owner-authorized scorer unlock.
+artifacts: PR #1930 body and comments 6151910268 (claim), 6152084830 (repair receipt), 6152893692 (owner approval receipt for the eight scorer edits).
+reviewer_seat: Codex, reassigned by Matthew from Blue Dream on 2026-10-13 18:20 UTC; review at f9dc4dd7d0 (comment 6152375030) found no major issues. The author, Claude, was not eligible.
+claimed_by: Claude, 2026-10-13 18:01 UTC (owner reassignment from Canopy's 2026-10-10 takeover)
+last_updated: 2026-10-13 14:25 CT, by Claude
+closure: Squash-merged via the merge queue as 0e26e239766ecacc74f55cc8118e380e81fa9217 at 2026-10-13 14:20 CT, merge authorized by Matthew in session (Chemdawg unavailable). No deploy, SQL or production write. Added directly to Closed: no open block for this task existed on the deploy tip.
 ```
 
 ### CLAUDE-LOOP-ENGINEERING-001

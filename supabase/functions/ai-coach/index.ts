@@ -311,8 +311,9 @@ export async function handleAiCoachRequest(
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return json({ error: "unauthorized" }, 401);
+    const supabaseSpecifier = "npm:@supabase/supabase-js@2";
     const createClient = (deps.createClient ??
-      (await import("npm:@supabase/supabase-js@2"))
+      (await import(/* @vite-ignore */ supabaseSpecifier))
         .createClient) as unknown as AiCoachCreateClient as unknown as (
       url: string,
       key: string,

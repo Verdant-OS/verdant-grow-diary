@@ -1,17 +1,104 @@
 /**
  * Regression coverage for the Gemini-direct review threads on #1982:
- * inline coach photos, version the doctor HMAC frame, and map Gemini 429
- * to the existing quota outcome. These tests import the new helper and
- * read the two function sources. They do not edit locked pins.
+ * inline coach photos, the doctor HMAC frame, and Gemini 429 quota refunds.
+ * HMAC and quota cases call the handlers and the signing helper. The inline
+ * photo cases still read the coach source for the URL fence and execute the
+ * download helper.
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { lookupGeminiDirectRoute } from "../../supabase/functions/_shared/geminiDirectChat.ts";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
-const DOCTOR = read("supabase/functions/ai-doctor-review/index.ts");
 const COACH = read("supabase/functions/ai-coach/index.ts");
+
+const USER_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const SPEND_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const IDEMPOTENCY_KEY = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const HMAC_SECRET = "0123456789abcdef0123456789abcdef";
+
+type RpcCall = { name: string; params?: Record<string, unknown> };
+
+async function loadDoctor() {
+  const specifier = "../../supabase/functions/ai-doctor-review/index.ts";
+  return import(/* @vite-ignore */ specifier);
+}
+
+async function loadCoach() {
+  const specifier = "../../supabase/functions/ai-coach/index.ts";
+  return import(/* @vite-ignore */ specifier);
+}
+
+function installDenoEnv(values: Record<string, string>): () => void {
+  const host = globalThis as { Deno?: { env: { get(name: string): string | undefined } } };
+  const previous = host.Deno;
+  host.Deno = {
+    env: {
+      get(name: string) {
+        return values[name];
+      },
+    },
+  };
+  return () => {
+    host.Deno = previous;
+  };
+}
+
+function createFakeClient(calls: RpcCall[], feature: string) {
+  return () => ({
+    auth: {
+      getUser: () => Promise.resolve({ data: { user: { id: USER_ID } } }),
+    },
+    rpc: (name: string, params?: Record<string, unknown>) => {
+      calls.push({ name, params });
+      if (name === "ai_credit_spend") {
+        return Promise.resolve({
+          data: {
+            ok: true,
+            status: "spent",
+            spend_id: SPEND_ID,
+            feature,
+            model_tier: "standard",
+            grow_id: null,
+          },
+          error: null,
+        });
+      }
+      if (name === "ai_credit_refund") {
+        return Promise.resolve({ data: { ok: true, status: "refunded" }, error: null });
+      }
+      return Promise.resolve({ data: null, error: { message: "unexpected rpc" } });
+    },
+    from: () => {
+      throw new Error("table read was not expected");
+    },
+  });
+}
+
+function doctorPacket() {
+  return {
+    schemaVersion: 1,
+    plant: { strain: "Northern Lights", stage: "flower", medium: "coco", potSize: "11 L" },
+    readiness: { state: "strong", evidence: ["sensor-snapshot"], missing: [] },
+    recentEvents: [],
+    recentSensorSnapshot: {
+      capturedAt: "2026-09-25T12:05:00.000Z",
+      severity: "ok",
+      readings: [{ field: "humidity_pct", value: 50, unit: "%" }],
+    },
+    recentSensorSnapshotAnnotation: {
+      line: "[source=manual, trust=medium] humidity_pct=50 %",
+      source: "manual",
+      stale: false,
+      trust: "medium",
+      includesValues: true,
+      safetyNotes: [],
+      missingInformationHints: [],
+    },
+  };
+}
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0x00]);
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -28,40 +115,148 @@ async function loadInline() {
 }
 
 describe("AI Doctor HMAC frame version", () => {
-  it("signs new receipts as prompt contract v2 while p_model_id stays the gateway id", () => {
-    expect(DOCTOR).toContain('const PROMPT_CONTRACT_VERSION = "ai-doctor-review-prompt-v2"');
-    expect(DOCTOR).toContain("version: PROMPT_CONTRACT_VERSION");
-    expect(DOCTOR).toContain("model: WIRE_MODEL");
-    expect(DOCTOR).toContain("p_model_id: MODEL");
-    expect(DOCTOR).toContain("p_prompt_contract_version: PROMPT_CONTRACT_VERSION");
-    expect(DOCTOR).not.toMatch(/const PROMPT_CONTRACT_VERSION = "ai-doctor-review-prompt-v1"/);
+  it("signs the resolved v2 frame with the wire model", async () => {
+    const { buildAiDoctorSigningFrame, signAiDoctorPrompt } = await loadDoctor();
+    const route = lookupGeminiDirectRoute("ai_doctor_review", "standard");
+    expect(route.ok).toBe(true);
+    if (!route.ok) return;
+    const prompt = {
+      system: "system text",
+      user: "user text",
+      guidance: [],
+      importedHistoryBlock: null,
+      missingLiveReadingsBlock: null,
+    };
+    const frame = buildAiDoctorSigningFrame(prompt);
+    const parsed = JSON.parse(frame) as { version: string; model: string };
+    expect(parsed.version).toBe("ai-doctor-review-prompt-v2");
+    expect(parsed.model).toBe(route.geminiModelId);
+    expect(parsed.model).not.toBe(route.recordedModelId);
+    const signed = await signAiDoctorPrompt(prompt, HMAC_SECRET);
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(HMAC_SECRET),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(frame));
+    const hex = Array.from(new Uint8Array(signature), (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
+    expect(signed).toBe(`hmac-sha256:${hex}`);
+    const v1 = frame.replace("ai-doctor-review-prompt-v2", "ai-doctor-review-prompt-v1");
+    const v1Signature = await crypto.subtle.sign("HMAC", key, encoder.encode(v1));
+    const v1Hex = Array.from(new Uint8Array(v1Signature), (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
+    expect(signed).not.toBe(`hmac-sha256:${v1Hex}`);
   });
 });
 
 describe("Gemini 429 quota outcome", () => {
-  it("AI Doctor maps 429 to upstream_credit_exhausted before the generic http failure", () => {
-    const quota = DOCTOR.indexOf("upstream.status === 429");
-    const generic = DOCTOR.indexOf("if (!upstream.ok)");
-    expect(quota).toBeGreaterThan(-1);
-    expect(generic).toBeGreaterThan(quota);
-    const block = DOCTOR.slice(quota, generic);
-    expect(block).toContain(
-      'failureAfterRefund(spendId, "upstream_429", "upstream_credit_exhausted")',
-    );
-    expect(block).toContain("ai-doctor-review status=upstream_credit_exhausted");
+  it("AI Doctor maps an injected 429 to a confirmed upstream_429 refund", async () => {
+    const { handleAiDoctorReviewRequest } = await loadDoctor();
+    const calls: RpcCall[] = [];
+    const restoreEnv = installDenoEnv({
+      SUPABASE_URL: "https://project.supabase.co",
+      SUPABASE_ANON_KEY: "test-anon-key",
+      SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
+      PAYMENTS_ENVIRONMENT: "live",
+      GEMINI_API_KEY: "test-gemini-key-not-a-secret",
+      AI_DOCTOR_RECEIPT_HMAC_KEY: HMAC_SECRET,
+      AI_DOCTOR_RECEIPT_HMAC_KEY_ID: "test-key",
+    });
+    const previous = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("quota", { status: 429 })) as typeof fetch;
+    try {
+      const response = await handleAiDoctorReviewRequest(
+        new Request("https://project.supabase.co/functions/v1/ai-doctor-review", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer test-jwt",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            packet: doctorPacket(),
+            idempotencyKey: IDEMPOTENCY_KEY,
+          }),
+        }),
+        { createClient: createFakeClient(calls, "ai_doctor_review") },
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        ok: false,
+        reason: "upstream_credit_exhausted",
+      });
+      const refunds = calls.filter((call) => call.name === "ai_credit_refund");
+      expect(refunds).toHaveLength(1);
+      expect(refunds[0]?.params).toMatchObject({
+        p_expected_user_id: USER_ID,
+        p_spend_id: SPEND_ID,
+        p_idempotency_key: `refund:${SPEND_ID}`,
+        p_reason: "upstream_429",
+      });
+    } finally {
+      globalThis.fetch = previous;
+      restoreEnv();
+    }
   });
 
-  it("AI Coach maps 429 to upstream_credit_exhausted and no longer treats it as http", () => {
-    const quota = COACH.indexOf("r.status === 429");
-    const payment = COACH.indexOf("r.status === 402", quota);
-    expect(quota).toBeGreaterThan(-1);
-    expect(payment).toBeGreaterThan(quota);
-    const block = COACH.slice(quota, payment);
-    expect(block).toContain(
-      'failureAfterRefund(spendId, "upstream_429", "upstream_credit_exhausted")',
-    );
-    expect(block).not.toContain('"http"');
-    expect(block).toContain("ai-coach status=upstream_credit_exhausted http=200");
+  it("AI Coach maps an injected 429 to a confirmed upstream_429 refund", async () => {
+    const { handleAiCoachRequest } = await loadCoach();
+    const calls: RpcCall[] = [];
+    const supabaseUrl = "https://project.supabase.co";
+    const photoUrl = `${supabaseUrl}/storage/v1/object/sign/diary-photos/leaf.jpg?token=t`;
+    const restoreEnv = installDenoEnv({
+      SUPABASE_URL: supabaseUrl,
+      SUPABASE_ANON_KEY: "test-anon-key",
+      SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
+      PAYMENTS_ENVIRONMENT: "live",
+      GEMINI_API_KEY: "test-gemini-key-not-a-secret",
+    });
+    const previous = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const parsed = new URL(String(input));
+      if (
+        parsed.origin === "https://generativelanguage.googleapis.com" &&
+        parsed.pathname === "/v1beta/openai/chat/completions"
+      ) {
+        return new Response("quota", { status: 429 });
+      }
+      return new Response(JPEG, { status: 200 });
+    }) as typeof fetch;
+    try {
+      const response = await handleAiCoachRequest(
+        new Request("https://project.supabase.co/functions/v1/ai-coach", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer test-jwt",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            mode: "diagnose",
+            idempotencyKey: IDEMPOTENCY_KEY,
+            photoUrl,
+          }),
+        }),
+        { createClient: createFakeClient(calls, "ai_coach") },
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        ok: false,
+        reason: "upstream_credit_exhausted",
+      });
+      const refunds = calls.filter((call) => call.name === "ai_credit_refund");
+      expect(refunds).toHaveLength(1);
+      expect(refunds[0]?.params).toMatchObject({
+        p_reason: "upstream_429",
+      });
+    } finally {
+      globalThis.fetch = previous;
+      restoreEnv();
+    }
   });
 });
 

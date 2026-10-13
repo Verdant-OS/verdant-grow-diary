@@ -30,8 +30,6 @@
 // idempotency does not bind the old packet. A future receipt/cache schema
 // marker is required before legacy cache rows can be distinguished as grounded.
 
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateAiDoctorReviewResult } from "./contract.ts";
 // All src/lib touch-points routed through _shared/ shims. See
 // _shared/unionEntitlementLookup.ts for the re-export convention: this
@@ -67,6 +65,36 @@ import {
   readGeminiDirectApiKey,
   resolveGeminiDirectChat,
 } from "../_shared/geminiDirectChat.ts";
+
+const SUPABASE_JS_SPECIFIER = "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-retry-count",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+};
+
+type AiDoctorCreateClient = (
+  url: string,
+  key: string,
+  options?: Record<string, unknown>,
+) => {
+  auth: { getUser(): Promise<{ data: { user: { id: string } | null } | null }> };
+  rpc(
+    name: string,
+    params?: Record<string, unknown>,
+  ): PromiseLike<{ data: unknown; error: { message?: string } | null }>;
+};
+
+export type AiDoctorHandlerDeps = {
+  createClient?: AiDoctorCreateClient;
+};
+
+async function loadSupabaseClientFactory(): Promise<AiDoctorCreateClient> {
+  const mod = await import(/* @vite-ignore */ SUPABASE_JS_SPECIFIER);
+  return mod.createClient as AiDoctorCreateClient;
+}
 
 const TIMEOUT_MS = 25_000;
 // S2: server-pinned tier/feature. Escalation is deferred.
@@ -179,11 +207,10 @@ function isReceiptHmacKeyId(value: unknown): value is string {
  * Neither the prompt text nor the HMAC secret is returned, stored in browser
  * rows, or logged. The HMAC is not used to authorize, price, or select a model.
  */
-async function signAiDoctorPrompt(
+export function buildAiDoctorSigningFrame(
   prompt: ReturnType<typeof buildAiDoctorPromptMessages>,
-  secret: string,
-): Promise<string> {
-  const frame = JSON.stringify({
+): string {
+  return JSON.stringify({
     version: PROMPT_CONTRACT_VERSION,
     model: WIRE_MODEL,
     messages: [
@@ -193,6 +220,13 @@ async function signAiDoctorPrompt(
     tools: [TOOL_SCHEMA],
     tool_choice: { type: "function", function: { name: "submit_ai_doctor_review" } },
   });
+}
+
+export async function signAiDoctorPrompt(
+  prompt: ReturnType<typeof buildAiDoctorPromptMessages>,
+  secret: string,
+): Promise<string> {
+  const frame = buildAiDoctorSigningFrame(prompt);
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -238,7 +272,7 @@ async function recordFreshAiDoctorReviewCompletion(userId: string, spendId: stri
   }
 
   try {
-    const serviceSupabase = createClient(supabaseUrl, serviceRoleKey, {
+    const serviceSupabase = (await loadSupabaseClientFactory())(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -273,7 +307,14 @@ async function recordFreshAiDoctorReviewCompletion(userId: string, spendId: stri
   }
 }
 
-Deno.serve(async (req) => {
+if (import.meta.main) {
+  Deno.serve((req) => handleAiDoctorReviewRequest(req));
+}
+
+export async function handleAiDoctorReviewRequest(
+  req: Request,
+  deps: AiDoctorHandlerDeps = {},
+): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -288,6 +329,7 @@ Deno.serve(async (req) => {
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return calmFailure("http");
+    const createClient = deps.createClient ?? (await loadSupabaseClientFactory());
     // createClient throws on a missing URL or key, which would surface as an
     // unexpected failure instead of the configuration outage it is.
     const authSupabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -692,7 +734,7 @@ Deno.serve(async (req) => {
     console.log("ai-doctor-review status=unexpected");
     return calmFailure(creditSpendMayExist ? "result_pending" : "http");
   }
-});
+}
 
 function readToolArguments(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;

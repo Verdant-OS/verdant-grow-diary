@@ -103,15 +103,49 @@ function aborted(): DOMException {
   return new DOMException("The operation was aborted.", "AbortError");
 }
 
+/**
+ * Best-effort stream close. A cancel that never settles must not outlive the
+ * photo abort signal, or the coach never reaches the credit refund.
+ */
+function cancelUntilAbort(
+  signal: AbortSignal | undefined,
+  start: () => Promise<void> | undefined,
+): Promise<void> {
+  let pending: Promise<void> | undefined;
+  try {
+    const started = start();
+    pending = started
+      ? Promise.resolve(started).then(
+          () => undefined,
+          () => undefined,
+        )
+      : undefined;
+  } catch {
+    return Promise.resolve();
+  }
+  if (!pending) return Promise.resolve();
+  if (!signal || signal.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", finish);
+      resolve();
+    };
+    signal.addEventListener("abort", finish, { once: true });
+    pending.then(finish, finish);
+  });
+}
+
 function readChunk(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   signal?: AbortSignal,
 ): Promise<ReadableStreamReadResult<Uint8Array>> {
   if (!signal) return reader.read();
   if (signal.aborted) {
-    return reader.cancel().then(() => {
-      throw aborted();
-    });
+    void cancelUntilAbort(signal, () => reader.cancel());
+    return Promise.reject(aborted());
   }
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -143,7 +177,7 @@ async function readBoundedBody(
   if (declared !== null) {
     const length = Number(declared);
     if (!Number.isFinite(length) || length < 0 || length > maxBytes) {
-      await response.body?.cancel();
+      await cancelUntilAbort(signal, () => response.body?.cancel());
       return { ok: false, reason: "too_large" };
     }
   }
@@ -161,7 +195,7 @@ async function readBoundedBody(
     if (next.done) break;
     total += next.value.byteLength;
     if (total > maxBytes) {
-      await reader.cancel();
+      await cancelUntilAbort(signal, () => reader.cancel());
       return { ok: false, reason: "too_large" };
     }
     chunks.push(next.value);
@@ -197,11 +231,7 @@ export async function downloadSignedStorageObject(args: {
     return { ok: false, reason: "download_failed" };
   }
   if (!response.ok) {
-    try {
-      await response.body?.cancel();
-    } catch {
-      // Cleanup only. The failed response is still download_failed.
-    }
+    await cancelUntilAbort(args.signal, () => response.body?.cancel());
     return { ok: false, reason: "download_failed" };
   }
   try {

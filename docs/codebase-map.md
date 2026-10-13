@@ -10,7 +10,7 @@ claim about production, deployment, indexing, or which migrations are applied �
 axes belong to [`docs/agents/CURRENT_STATE.md`](agents/CURRENT_STATE.md) and keep their
 `BLOCKED` / `NOT_MEASURED` labels there.
 
-This file is **not** one of the twelve versioned governance files. It carries no
+This file is **not** one of the eighteen versioned governance files. It carries no
 `Sentinel-Version` and editing it does not trigger the parity gate.
 
 ---
@@ -83,6 +83,8 @@ table's shape — the manifest records that a path redirects, not where.
 
 Several legal/marketing duplicates exist as routes **and** as redirect entries in
 `vercel.json` (`/strains → /cultivars`, `/features → /welcome`, `/terms-of-service → /terms`,
+Historical as of 2026-10-10 (Matthew Cheek): production runs on Cloudflare Workers at
+https://verdantgrowdiary.com. `vercel.json` is not that host's configuration.
 `/privacy-policy → /privacy`, `/refunds` and `/refund-policy → /refund`, `/demo → /welcome`).
 **Whether those redirects fire is a topology measurement, not a property of the file**: a host
 file governs only when the measured publisher applies it (rule D-RT-5 of

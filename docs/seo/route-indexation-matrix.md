@@ -12,7 +12,7 @@
 - **Root shell** is `src/routes/__root.tsx`: `robots` `index, follow`, no canonical link, and sitewide Organization, WebSite, and SoftwareApplication JSON-LD. A route with no `head()` keeps that shell until a client head replaces it.
 - **Sitemap** means a concrete `<loc>` in `public/sitemap.xml` (52 URLs, all on `https://verdantgrowdiary.com`). Pattern routes are not sitemap URLs.
 - **robots.txt** crawl rules are separate from meta robots. `src/test/robots-private-route-coverage.test.ts` treats a rule as matching when the path equals it or starts with it. Whether a live crawler fetches a URL is **NOT_MEASURED**.
-- `vercel.json` redirects and the `/unsubscribe` `X-Robots-Tag` header are repository configuration. Whether the live host applies that file is **NOT_MEASURED**.
+- Production runs on Cloudflare Workers at https://verdantgrowdiary.com (Matthew Cheek, 2026-10-10). `vercel.json` redirects and the `/unsubscribe` `X-Robots-Tag` header are historical repository configuration from an earlier host. They are not the live host's configuration. Whether the Cloudflare host serves the same redirects and headers is **NOT_MEASURED** in this file.
 
 `SITEMAP_ONLY_ROUTES` in `scripts/public-route-parity.config.mjs` still names `/`. `/` also has a static document and `staticRouteHead` in `src/routes/index.tsx`. `STATIC_ONLY_ROUTES` names only `/breeder-beta`.
 
@@ -124,7 +124,7 @@ These manifest paths are public and are not in `STATIC_PUBLIC_OUTPUT_DOCUMENTS`.
 | `/.lovable/oauth/consent`                    | `src/routes/[.]lovable.oauth.consent.tsx` has no `head()`. | `src/pages/OAuthConsent.tsx` does not call `usePageSeo`.                                                  | No      | `Disallow: /.lovable/`                                                                                                                                        |
 | `/auth`                                      | No route `head()`.                                         | `src/pages/Auth.tsx` sets `noindex: true`.                                                                | No      | `Disallow: /auth`                                                                                                                                             |
 | `/reset-password`                            | No route `head()`.                                         | `src/pages/ResetPassword.tsx` sets `noindex: true`.                                                       | No      | `Disallow: /reset-password`                                                                                                                                   |
-| `/unsubscribe`                               | No route `head()`.                                         | `src/pages/Unsubscribe.tsx` sets `noindex: true`.                                                         | No      | `Disallow: /unsubscribe`. `vercel.json` also sets `X-Robots-Tag` to `noindex, nofollow, noarchive` for this path. Live response headers are **NOT_MEASURED**. |
+| `/unsubscribe`                               | No route `head()`.                                         | `src/pages/Unsubscribe.tsx` sets `noindex: true`.                                                         | No      | `Disallow: /unsubscribe`. Historical `vercel.json` (earlier host, not the live Cloudflare configuration) also sets `X-Robots-Tag` to `noindex, nofollow, noarchive` for this path. Live response headers are **NOT_MEASURED**. |
 | `/partners/csv-preview`                      | No route `head()`.                                         | `src/pages/PartnerCsvPreviewLanding.tsx` sets `noindex: true` and path `/partners/csv-preview`.           | No      | Allowed by `Allow: /`.                                                                                                                                        |
 | `/sensors/csv-preview`                       | No route `head()`.                                         | `src/pages/SensorCsvPreview.tsx` sets `noindex: true` and path `/sensors/csv-preview`.                    | No      | `Allow: /sensors/csv-preview` before `Disallow: /sensors`.                                                                                                    |
 | `/pheno-hunts/:id/compare`                   | `src/routes/pheno-hunts.$id.compare.tsx` has no `head()`.  | `src/pages/PhenoHuntCompare.tsx` does not call `usePageSeo`.                                              | No      | `Disallow: /pheno-hunts`                                                                                                                                      |
@@ -195,7 +195,7 @@ Manifest paths (`access: "internal"`, 6):
 
 These 18 manifest paths are `access: "redirect"`. They are not sitemap `<loc>` values. They have no independent index document except the strain aliases in the inventory, which are `noindex, follow` and canonical to the cultivar URL.
 
-Permanent `vercel.json` redirects (repository config; live application **NOT_MEASURED**):
+Permanent `vercel.json` redirects (historical repository config from the earlier Vercel host; production is Cloudflare Workers at https://verdantgrowdiary.com; live application **NOT_MEASURED**):
 
 - `/features` and `/demo` to `/welcome`
 - `/refunds` and `/refund-policy` to `/refund`

@@ -3,7 +3,7 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-10-10.3**
+**Sentinel-Version: 2026-10-10.4**
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
 publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
@@ -12,6 +12,8 @@ exact-head reviewer, except on a PR Codex authored or repaired (for example #193
 Claude may add peer observations but is not the acceptance reviewer.
 Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
 Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
+Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge actor under
+the same gates.
 **Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
 PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
 tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments or
@@ -163,7 +165,7 @@ prefer what the code shows:
 | UI         | React, Tailwind v4 (`@tailwindcss/vite`), shadcn/ui over Radix primitives, `lucide-react`, `sonner`          |
 | Data       | `@tanstack/react-query`; hosted Supabase via `@supabase/supabase-js` + `@supabase/ssr`                       |
 | Validation | `zod`                                                                                                        |
-| Platform   | Lovable (`@lovable.dev/*` preset, project sync). **The production publisher is operating state** — see below |
+| Platform   | Production runs on Cloudflare Workers. Lovable (`@lovable.dev/*` preset, project sync) is no longer the production publisher and is no longer an active agent (Matthew Cheek, 2026-10-10). |
 
 There is **no `App.tsx` and no react-router** — but see the compat shim below, which is
 what almost all component code imports.
@@ -171,12 +173,9 @@ what almost all component code imports.
 `vite.config.ts` is a thin wrapper over the Lovable preset. The preset already supplies
 tanstackStart, viteReact, tailwindcss, tsconfigPaths and the `@` alias; do not re-add them.
 
-**Never assume the production publisher, and never reason about `vercel.json` without it.**
-Which platform serves `verdantgrowdiary.com` is operating state. This repository has recorded it
-both ways (Lovable earlier, Vercel's git integration in later measurements), so it lives in
-`docs/agents/CURRENT_STATE.md`, not here. A host configuration file governs production only while
+**Production runs on Cloudflare Workers.** Lovable is no longer the production publisher and is no longer an active agent (Matthew Cheek, 2026-10-10). Vercel statuses on PRs and commits are not evidence of a production release, and a Vercel failure is not a production failure. Release evidence is live `/version.json` reporting the target SHA. A host configuration file governs production only while
 the measured publisher applies it: `vercel.json`'s redirects and headers fire when Vercel serves the
-apex and are inert under any other host (`docs/seo/lighting-launch-verification.md`,
+apex and are inert under Cloudflare Workers (`docs/seo/lighting-launch-verification.md`,
 §Non-blocking host mismatch, records a period when its redirects returned HTTP 200 with no
 `Location`). Measure the publish trigger, and the deployment behind each production hostname,
 before asserting either (`docs/architecture-contract.md` §14). A merge, or a built production
@@ -364,9 +363,11 @@ Environment and install gotchas are owned by
 - `src/integrations/supabase/client.ts` is header-marked "generated, do not edit" but carries
   a deliberate hardening — `storage: window.sessionStorage`, not `localStorage`. If you
   regenerate it, re-apply that line.
-- **Editing any of the twelve governance files bumps all twelve.** `AGENTS.md`, `CLAUDE.md`,
+- **Editing any of the eighteen governance files bumps all eighteen.** `AGENTS.md`, `CLAUDE.md`,
   `GEMINI.md`, `.grok/rules/verdant-grok-role.md`, `docs/agents/README.md`,
-  `docs/agents/HANDOFF_PROTOCOL.md` and the six `docs/agents/roles/*.md` must share one
+  `docs/agents/HANDOFF_PROTOCOL.md` and the twelve `docs/agents/roles/*.md`
+  (`grok`, `claude`, `codex`, `gemini`, `canopy`, `graft`, `root-cause`, `trellis`,
+  `verdante`, `chemdawg`, `golden-toad`, `harvest`) must share one
   `Sentinel-Version`, and `GEMINI.md`'s `SENTINEL-CORE` block must stay byte-equivalent to
   `AGENTS.md`. Do it with `node scripts/sync-sentinel-mirror.mjs --set-version=YYYY-MM-DD.N`,
   then verify with `node scripts/check-sentinel-version-parity.mjs <base>`.

@@ -1,6 +1,6 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-10-10.3**
+**Sentinel-Version: 2026-10-10.4**
 
 Operating order is sequential for a given slice. Parallel implementation of the **same**
 slice by multiple agents is the failure this protocol exists to prevent.
@@ -44,6 +44,8 @@ exact-head reviewer, except on a PR Codex authored or repaired (for example #193
 Claude may add peer observations but is not the acceptance reviewer.
 Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
 Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
+Chemdawg merges; while Chemdawg is unavailable, Harvest is the backup merge actor under
+the same gates.
 **Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
 PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
 tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments or
@@ -182,4 +184,4 @@ Conflicts between this protocol, a role file, and `AGENTS.md` resolve in that or
 `AGENTS.md` wins, then the role file, then this protocol. Report the conflict; do not
 silently pick one.
 
-Only Cheek approves what ships. The Council Chair recommends; it does not release.
+Only Cheek approves what ships. There is no Council Chair role and no Security role (Matthew Cheek, 2026-10-10).

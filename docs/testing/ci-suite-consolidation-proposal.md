@@ -2,6 +2,8 @@
 
 Status: proposal only. This change deletes no workflow, disables no job and changes
 no required context. It follows Matthew's 2026-09-28 operating update, Job B.4.
+Historical note (2026-10-10): production runs on Cloudflare Workers at
+https://verdantgrowdiary.com. Vercel check-selection notes below are a dated record.
 
 ## Measured baseline
 

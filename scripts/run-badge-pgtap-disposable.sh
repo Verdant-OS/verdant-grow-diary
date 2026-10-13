@@ -12,10 +12,14 @@
 #
 # Usage:
 #   scripts/run-badge-pgtap-disposable.sh
-#   scripts/run-badge-pgtap-disposable.sh --wrong-token
-#   scripts/run-badge-pgtap-disposable.sh --missing-token
-#   scripts/run-badge-pgtap-disposable.sh --seed-nonempty
-#   scripts/run-badge-pgtap-disposable.sh --force-session2-failure
+#   scripts/run-badge-pgtap-disposable.sh --sql supabase/tests/badge_awards_permissions.sql
+#   scripts/run-badge-pgtap-disposable.sh --sql supabase/tests/badge_awards_permissions.sql --wrong-token
+#   scripts/run-badge-pgtap-disposable.sh --sql supabase/tests/badge_awards_permissions.sql --missing-token
+#   scripts/run-badge-pgtap-disposable.sh --sql supabase/tests/badge_awards_permissions.sql --seed-nonempty
+#   scripts/run-badge-pgtap-disposable.sh --sql supabase/tests/badge_awards_permissions.sql --force-session2-failure
+#
+# --sql accepts only supabase/tests/badge_awards_permissions.sql. Any other
+# path exits 2. Omitting --sql still runs that same file.
 #
 # BADGE_PGTAP_SCHEMA_FILE, when set, reuses that schema dump instead of
 # running pg_dump again. The database is still created and dropped here.
@@ -25,7 +29,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SQL_FILE="$ROOT/supabase/tests/badge_awards_permissions.sql"
+SQL_REL="supabase/tests/badge_awards_permissions.sql"
+SQL_FILE="$ROOT/$SQL_REL"
 HOST="${PGHOST:-127.0.0.1}"
 PORT="${PGPORT:-54322}"
 PGUSER="${PGUSER:-postgres}"
@@ -43,17 +48,29 @@ case "$HOST" in
     ;;
 esac
 
-case "${1:-}" in
-  "") MODE="happy" ;;
-  --wrong-token) MODE="wrong-token" ;;
-  --missing-token) MODE="missing-token" ;;
-  --seed-nonempty) MODE="seed-nonempty" ;;
-  --force-session2-failure) MODE="force-session2-failure" ;;
-  *)
-    echo "unknown mode: $1" >&2
-    exit 2
-    ;;
-esac
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --sql)
+      if [[ $# -lt 2 ]]; then
+        echo "missing path after --sql" >&2
+        exit 2
+      fi
+      if [[ "$2" != "$SQL_REL" ]]; then
+        echo "refusing sql path $2" >&2
+        exit 2
+      fi
+      shift 2
+      ;;
+    --wrong-token) MODE="wrong-token"; shift ;;
+    --missing-token) MODE="missing-token"; shift ;;
+    --seed-nonempty) MODE="seed-nonempty"; shift ;;
+    --force-session2-failure) MODE="force-session2-failure"; shift ;;
+    *)
+      echo "unknown mode: $1" >&2
+      exit 2
+      ;;
+  esac
+done
 
 psql_admin() {
   psql -h "$HOST" -p "$PORT" -U "$PGUSER" -d postgres -v ON_ERROR_STOP=1 "$@"

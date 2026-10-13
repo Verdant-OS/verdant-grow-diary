@@ -1,6 +1,11 @@
 /**
  * flowerWindowCalendarRules — derive plant-day / flower-day labels and a
- * UTC flower-window band for the read-only cultivation calendar.
+ * flower-window band for the read-only cultivation calendar.
+ *
+ * The band starts on the flower-flip civil date: a bare date or a
+ * UTC-midnight save stays that day, and any other instant uses the viewer's
+ * local day. Once that start key is chosen, the band steps by civil dates
+ * so a DST transition cannot skip a calendar day.
  *
  * Pure: no React, no I/O, no ambient clock, no writes. Flower age always
  * comes from `flowerFlipAt`, never from `plantStartedAt`. Duration is only
@@ -8,6 +13,7 @@
  * module never silently treats the flower preset 45–75 range as a grower
  * schedule.
  */
+import { calendarStartDateDayKey } from "@/lib/calendarLocalDayRules";
 import {
   calculatePlantRelativeDay,
   calculateStageRelativeDay,
@@ -57,20 +63,6 @@ export interface FlowerWindowCalendar {
 const DATE_KEY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function toEpoch(value: string | number | Date | null | undefined): number | null {
-  if (value == null) return null;
-  if (value instanceof Date) {
-    const timestamp = value.getTime();
-    return Number.isFinite(timestamp) ? timestamp : null;
-  }
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (typeof value === "string") {
-    const timestamp = Date.parse(value);
-    return Number.isFinite(timestamp) ? timestamp : null;
-  }
-  return null;
-}
-
 function formatUtcDateKey(date: Date): string | null {
   const timestamp = date.getTime();
   if (!Number.isFinite(timestamp)) return null;
@@ -79,23 +71,6 @@ function formatUtcDateKey(date: Date): string | null {
   const day = date.getUTCDate();
   if (year < 1000 || year > 9999) return null;
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-function utcDateKeyFromInstant(value: string | number | Date | null | undefined): string | null {
-  if (typeof value === "string") {
-    const match = DATE_KEY_PATTERN.exec(value.trim());
-    if (match) {
-      const year = Number(match[1]);
-      const month = Number(match[2]);
-      const day = Number(match[3]);
-      const date = new Date(Date.UTC(year, month - 1, day));
-      const normalized = formatUtcDateKey(date);
-      return normalized === value.trim() ? normalized : null;
-    }
-  }
-  const epoch = toEpoch(value);
-  if (epoch == null) return null;
-  return formatUtcDateKey(new Date(epoch));
 }
 
 function normalizeDurationDays(value: unknown): number | null {
@@ -141,7 +116,7 @@ function emptyWindow(durationSource: FlowerWindowDurationSource): FlowerWindowCa
 }
 
 /**
- * Derive plant-day N, flower-day N of D, and the inclusive UTC flower band.
+ * Derive plant-day N, flower-day N of D, and the inclusive flower band.
  * Invalid flip or duration fails closed to an empty band. Missing plant start
  * yields a null plant day, never a fabricated Day 0.
  */
@@ -169,7 +144,7 @@ export function deriveFlowerWindowCalendar(
     eventAt: input.now,
   });
 
-  const flipKey = utcDateKeyFromInstant(input.flowerFlipAt);
+  const flipKey = calendarStartDateDayKey(input.flowerFlipAt);
   const bandDateKeys =
     flipKey && durationDays != null ? buildBandDateKeys(flipKey, durationDays) : [];
   const bandDerived = bandDateKeys.length > 0;

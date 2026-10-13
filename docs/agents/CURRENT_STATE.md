@@ -33,6 +33,10 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-13T18:47 UTC
+
+- **NOT_MEASURED, #1858 required checks at `f87850bed`: still waiting in the Actions queue, which is draining.** #1858 is unchanged: head `f87850bedf94c99daaf46c6c32af8851b167c091`, open, not merged, not in the merge queue. The dispatched runs `ci.yml` (`38446701958`) and `security-db-local.yml` (`38446760442`) are still `queued`, not started, 21 minutes after dispatch (last update 18:26 UTC). Required contexts: 34 queued / 1 not yet reported; `test:security-db-local` queued; nothing failing. Repository-wide at 18:47 UTC: **120 runs queued, 32 in progress** (down from 276 queued / 21 in progress at 18:29 UTC). Queueing #1858 still waits on 35/35 SUCCESS at this exact head.
+
 ## Follow-up observation — 2026-10-13T18:29 UTC
 
 - **NOT_MEASURED, #1858 required checks at `f87850bed`: still queued behind a repository-wide Actions backlog.** #1858 is unchanged since the 18:27 UTC block: head `f87850bedf94c99daaf46c6c32af8851b167c091`, open, not merged, not in the merge queue. Both dispatched runs, `ci.yml` (`38446701958`) and `security-db-local.yml` (`38446760442`), are still `queued` and have not started (no update since 18:26 UTC). Required contexts: 34 queued / 1 not yet reported; `test:security-db-local` queued; nothing failing. `established fact`: at 18:29 UTC the repository had **276 workflow runs queued and 21 in progress**, so the wait is the shared Actions queue, not anything in #1858. Queueing #1858 still waits on 35/35 SUCCESS at this exact head.

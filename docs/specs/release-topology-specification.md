@@ -422,6 +422,28 @@ every appendix stays as dated.
 - **Pointer.** §2.7 said `#1857`'s review history is in the architecture contract. `#1899` proposes removing
   PR status from the contract, and is still open, so §2.7 now points at `#1857` itself.
 
+### 2.9 Review follow-up — 2026-10-13
+
+`#1944` merged on 2026-10-11 as `9bd31166` with two findings unanswered, both posted on its head `d765bfb4`. This note
+answers them. No measurement is re-taken; every cite and every appendix stays as dated.
+
+- **P2, a lookup result read as a hostname response (D-RT-15).** D-RT-15 said apex and `www`
+  "returned `404`". That `404 not_found` came from Vercel's `get_deployment` lookup (E.3). The
+  public reads of both hostnames were refused by the session proxy with `403` (E.1), so what the
+  hostnames returned is `BLOCKED`. D-RT-15 now says the lookup found no deployment for either
+  hostname, and that the hostname response was `BLOCKED`.
+- **P2, proof runs not bound to the receipt SHA (§2.8, checklist steps 1, 3 and 4).** §2.8 says the
+  checklist's later runs pin the deploy tip. They pin whatever SHA `verdant-grow-diary` points at
+  when each one is dispatched (`github.sha`, read back by `git rev-parse HEAD` in each job), not the
+  SHA the owner recorded in step 0.1(a). None of those jobs reads an expected-SHA input:
+  `quicklog-smoke.yml` declares `expected_sha`, but only its `one_tent_proof` job uses it, not the
+  `quicklog_smoke` job step 4 runs. If the branch advances, a run measures a different commit. So a
+  run is evidence for the chosen build only when its `headSha` equals the receipt SHA. Checklist
+  step 1 now has the owner check the branch tip before each dispatch and the run's `headSha` after
+  it, stop on a mismatch, and record each `headSha` in the receipt. Steps 3 and 4 carry the same
+  check. A required `expected_sha` input that fails closed would replace the manual check. That is
+  a workflow change, outside this document, and needs its own assigned slice.
+
 ---
 
 ## 3. The topology model — six axes, one owner each
@@ -954,8 +976,9 @@ Durable. Each is a rule a future slice can be held to; none carries a date.
   convention only.
 - **D-RT-15 — The publisher's account state is part of the topology.** A blocked, suspended or unpaid publisher account can stop every path of §5.7 at once: no Git build, no promote, no rollout, no rollback. What is observed is the correlation: no Vercel build since 2026-10-01 while every tip carries the block status (D.2). That the block caused it, and its effect on the other paths, are `inference`. The platform's domain bindings and rolling-release record **may** keep their last values
   (Appendix D: at 21:02 UTC on 2026-10-06 apex, `www` and the project alias were still bound to the
-  2026-10-01 build) **or may not** (Appendix E.3: that deployment was no longer listed, apex and
-  `www` returned `404`, and M10 was a `BLOCKED` partial run). So M10 is re-run at every stamp, never
+  2026-10-01 build) **or may not** (Appendix E.3: that deployment was no longer listed, Vercel's
+  `get_deployment` lookup found no deployment for apex or `www` (`404 not_found`), and M10 was a
+  `BLOCKED` partial run; what the hostnames themselves returned was `BLOCKED`, E.1). So M10 is re-run at every stamp, never
   carried forward. A value it does return is recorded with its read time and describes the binding,
   not what the hostname returns; a binding not re-read is not measured topology. While the account state is not `active` (or the platform's equivalent), what the
   hostnames serve is answered only by M1 and the per-hostname `/version.json` and status reads, and

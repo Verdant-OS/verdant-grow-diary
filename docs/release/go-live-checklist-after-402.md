@@ -124,8 +124,27 @@ gh workflow run signed-in-readonly-performance.yml -R Verdant-OS/verdant-grow-di
 Each job runs `bunx playwright test <spec> --project=chromium-authed --workers=1 --retries=0 --reporter=list`
 after its offline contract tests.
 
-**Stop conditions:** any job is red or cancelled; wait-for-deployed-sha times out (the
-build isn't live); the receipt shows a read outside the fixture's own scope; or the Actions
+**Bind every run to the receipt SHA.** None of the jobs dispatched in steps 1, 3 and 4 reads
+an expected-SHA input (`quicklog-smoke.yml`'s `expected_sha` is used only by its
+`one_tent_proof` job, not the `quicklog_smoke` job step 4 runs). Each one pins
+`E2E_EXPECTED_SHA` to its own `github.sha`, which is whatever `verdant-grow-diary` points at
+when it is dispatched, not necessarily the SHA chosen in step 0.1(a). If the branch advances,
+a run measures a different commit. So, for every dispatch in steps 1, 3 and 4:
+
+```bash
+# before dispatching: the branch tip must still be the receipt SHA
+git ls-remote https://github.com/Verdant-OS/verdant-grow-diary refs/heads/verdant-grow-diary
+# after it finishes: the run's own commit must be the receipt SHA
+gh run view <run-id> -R Verdant-OS/verdant-grow-diary --json headSha --jq .headSha
+```
+
+**Stop** if either differs from the receipt SHA: that run is not evidence for the chosen
+build. Record each run's `headSha` in the receipt. A required `expected_sha` workflow input
+that fails closed on a mismatch would replace this manual check. It is a workflow change,
+so it needs its own assigned slice.
+
+**Stop conditions:** any job is red or cancelled; a run's `headSha` isn't the receipt SHA;
+wait-for-deployed-sha times out (the build isn't live); the receipt shows a read outside the fixture's own scope; or the Actions
 proof shows any approval-free framing.
 
 ### Step 2: publish the merged server changes, in #1894's order
@@ -172,7 +191,7 @@ continue to the write steps with a partially applied server.
 
 ### Step 3: re-run the read-only proofs
 
-Repeat step 1 after step 2. This separates "server publish broke a read" from "new
+Repeat step 1 after step 2, including its receipt-SHA binding. This separates "server publish broke a read" from "new
 frontend broke a read". The same stop conditions apply.
 
 ### Step 4: Quick Log save + readback (#1849), the first deliberate write
@@ -183,6 +202,8 @@ dispatch on the disabled workflow fails with 422.
 ```bash
 gh workflow run quicklog-smoke.yml -R Verdant-OS/verdant-grow-diary --ref verdant-grow-diary -f run_mode=quicklog_smoke
 ```
+
+Bind this run to the receipt SHA exactly as in step 1, before and after dispatch.
 
 The job runs `bun run e2e:fixture-checklist`, `bun run e2e:bootstrap-fixture` (only if
 `E2E_ALLOW_FIXTURE_BOOTSTRAP` allows it), `bun run e2e:verify-fixture`, then

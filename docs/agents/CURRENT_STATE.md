@@ -33,6 +33,11 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-13T21:26 UTC
+
+- **NOT_MEASURED, #2056 (this status PR): CI nearly done at the previous head, still no reviewer.** Measured at `3f4b51af0441449e67fb374016ab37fef43b3a63`, the head before this commit (a commit cannot name its own SHA; read the current head from the PR). Required contexts: **29 SUCCESS, 6 in progress, 0 failing** (up from 34 queued at 20:55 UTC). Mergeable state `blocked` (CI pending, no review). No reviews, no requested reviewer, 0 unresolved threads; still draft. The branch is now 4 commits behind the tip `ad79ebc64`. GitHub has not required a base sync, and one is not done here, because it would create another head. This commit restarts CI at the new head.
+- **Next step, owner gates (unchanged):** 35/35 required at the exact head, an independent reviewer (none routed; Critical Mass is the docs-only default, and whether a Codex verdict counts is Matthew's call), then Matthew's Accept and the merge queue.
+
 ## Follow-up observation — 2026-10-13T20:55 UTC
 
 - **NOT_MEASURED, #2056 (this status PR).** Owner Claude; draft; base `verdant-grow-diary`; up to date with the tip `fb5a921ec` (0 commits behind). It adds only dated blocks to `docs/agents/CURRENT_STATE.md`: nine before this one (17:58 through 20:51 UTC), recording #1858's path from "ready for acceptance" to merged. This commit cannot name its own SHA; read the current head from the PR. Measured at the previous head `f6f98dc3e8a2db7aa1319f13da3f86c7e981603d`: required contexts 34 queued / 1 not yet reported, 0 failing; mergeable state `blocked` (CI pending, no review); 0 unresolved review threads; no reviews, no assignee, no requested reviewer. CodeRabbit skipped it as a draft. The deployment-preview bot's "CI build did not complete" comment (18:45 UTC) refers to an earlier, superseded head; two of that head's `pull_request` runs were cancelled when later pushes replaced them. This commit restarts CI at the new head.

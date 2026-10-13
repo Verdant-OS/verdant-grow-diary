@@ -904,8 +904,9 @@ client cannot set model, tier, weight, plan, or `user_id`, and therefore cannot 
 up once at module load from the two server constants; an unresolved route throws at load, so the
 function cannot start without one. At the stamped SHA `ai-doctor-review` pins `FEATURE =
 "ai_doctor_review"`, `MODEL_TIER = "standard"`, a wire model `WIRE_MODEL = "gemini-3-flash-preview"`
-(sent to Gemini) and a recorded model `MODEL = "google/gemini-3-flash-preview"` (written to the
-result and receipt as `p_model_id`, the id it carried on the gateway). `ai-coach` pins `ai_coach`,
+(sent to Gemini) and a recorded model `MODEL = "google/gemini-3-flash-preview"` (passed only as
+`p_model_id` to `ai_doctor_finalize_review` at `:702`, the id it carried on the gateway; the response body
+`v.result` at `:732` carries no model id). `ai-coach` pins `ai_coach`,
 `standard` and `gemini-2.5-flash`, and records no model id. Those values are dated evidence. The
 invariant is that they are server constants, and changing the provider or the model is an owner
 decision outside this contract (`#1982` was approved as one).

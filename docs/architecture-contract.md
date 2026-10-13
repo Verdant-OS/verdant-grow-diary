@@ -1,39 +1,46 @@
 # Verdant — Current Architecture Contract
 
 **Scope:** the permanent architectural invariants of the Verdant Grow OS application.
-**Verified from source at:** `2ffe78cc1a5814ba2c8f0c380270bcfc622b960f` (deploy branch
-`verdant-grow-diary`, `#1896`), 2026-10-04, by Claude (§15 re-verification and the seven-claim stack
-check; see §15.1). **Every clause describes that tree.** §15.2 records which evidence was
-re-read at the later deploy tip `e0bb3930` (2026-10-07) and which is inherited from this stamp; it
-does not move the stamp. The npm lockfile retirement (`#1873`) is not
-on it, so AC-8.1 and AC-1.8 state the two-lockfile rule that is in force there. **This stamp re-read
-every citation into a file that changed between `66ea7bd3` and the stamped SHA, and carried the rest
-by file identity.** `git diff --name-only 66ea7bd3 2ffe78cc1` names 566 files across 120
-first-parent merges (first `#1733`, last `#1896`), 212 of them under `src/test/` and 6 new
-migrations; intersected with every path and basename this file cites, 51 cited files changed, and
-every cite into them was re-read. Line moves only: `.github/workflows/ci.yml:26`, `:46`, `:56` →
-`:31`, `:51`, `:61`; `package.json:20-21` → `:21-22`, `:65` → `:66`, `:218` → `:224`, `:317` →
-`:323`, `:318` → `:324`, `:361` → `:369` (`prebuild` at `:9` now also ends with
-`verify-publish-provenance.mjs`); `required-money-migrations.yml:124`, `:201` → `:133`, `:210`; the
-three sensor-safety workflow steps `:39`, `:42`, `:60` → `:46`, `:49`, `:67`;
-`published-migration-integrity.yml` job `:30-31` → `:34-35` and gate `:67-73` → `:72-78`;
-`src/pages/Pricing.tsx:304` → `:309`; `unionEntitlementLookup.ts:127` → `:143`;
-`check-bun-lockfile-policy.mjs:186-191` → `:185-197` and its repository test `:492` → `:528`;
-`quicklog_save_manual`'s latest `CREATE` moved to
-`20260928183000_quicklog_manual_replay_metadata_lock.sql:32,48,52`. `scripts/lib/tree-hash.mjs:43-70`
-holds. Claims that changed are listed in the §15.1 row for this stamp, with the PASS/FAIL verdict
-for each of the seven stack claims. `config/required-status-checks.json` still lists 35 `required`
-and 7 `mustBeGreen` contexts, with `Published migration integrity` in neither, `capturedAt`
-2026-08-10. The counts in §3, §4 and §10 were re-measured: AC-3.2 542 `*Rules.ts` files with every
-drift row unchanged (55/7 raw matches, 44/6 executable, 0 client importers, 2 type-only); AC-3.4
-773 shim import statements in 772 files; AC-4.3's single-line figures (76 in 66, 69 in 60, 105 in 85) reproduced exactly by the overlapping adjacent-pair scan recorded there; AC-10.2's zero hits
-hold over `src/`, `supabase/`, `scripts/`, `e2e/`, `tools/`, `plugins/` and `spikes/`.
-Package-internal cites in AC-1.4, AC-1.5 and §14 are carried: `node_modules` was not available to
-re-read them, and the pinned versions they name still match `bun.lock`. The AC-4.3 multi-line
-figure stays a `source claim`. The cites inside §15.1 name superseded lines by design and were not
-re-read. Dated runtime results and history about which PR introduced a behaviour keep their own
-labels and dates. Production behaviour (what is deployed, applied or live) is `NOT_MEASURED` by this
-stamp. First
+**Verified from source at:** `7e024f9362d4f57c1d5cb8252bf0104a2626b46a` (deploy branch
+`verdant-grow-diary`, `#1978`), 2026-10-13, by Claude (§15 re-verification and the seven-claim stack
+check; see §15.1). **Every clause describes that tree.** It supersedes the `2ffe78cc1` stamp and the
+`e0bb3930` evidence note in §15.2, which stay as dated history. The npm lockfile retirement
+(`#1873`) is not on it, so AC-8.1 and AC-1.8 state the two-lockfile rule that is in force there.
+**This stamp re-read every citation into a file that changed between `2ffe78cc1` and the stamped
+SHA, and carried the rest by file identity.** `git diff --name-only 2ffe78cc1 7e024f93` names 296
+files across 44 first-parent merges (first `#1897`, last `#1978`), 96 of them under `src/test/` and
+one new migration (`20261010120000_sensor_readings_notes_and_unit_unconfirmed.sql`, additive
+columns, no RLS change). Intersected with every path and basename this file cites, 24 cited files
+changed, and every line cite into them was re-read by script against both trees. Two are cited
+by name only (`guidedChecklistEvidenceRules.ts`, `tentScopedSensorReadingsRules.ts`, AC-3.2) and
+still import neither React nor Supabase and call neither `Date.now()` nor `Math.random()`. Line moves only:
+`src/server.ts:14` → `:20`, `:23-36` → `:29-42`, `:38-45` → `:44-51`;
+`src/lib/appRouteManifest.ts:38`, `:49`, `:52`, `:69-88` → `:44`, `:55`, `:58`, `:75-94`;
+`src/pages/Dashboard.tsx:952` → `:950`; `src/pages/Pricing.tsx:309` → `:310`; `package.json:224`,
+`:323`, `:324`, `:369` → `:225`, `:324`, `:325`, `:370`; `check-bun-lockfile-policy.mjs:68`,
+`:185-197`, `:189-197`, `:387-391` → `:76`, `:193-205`, `:197-205`, `:395-399`;
+`release-topology-specification.md:671` → `:831`. Changed in substance, with the clauses amended:
+`src/server.ts`'s default export now routes hosts before SSR (`#1943`) and is held by a runtime test
+(AC-1.1, AC-1.6); `config/dependency-lockfile-transition.json` moved `reviewBy` to `2026-10-17`
+(AC-8.1); `src/lib/quick-log/createQuickLogEvent.ts` is gone (§13 Quick Log note).
+`config/required-status-checks.json` is byte-identical: 35 `required` and 7 `mustBeGreen` contexts,
+with `Published migration integrity` in neither, `capturedAt` 2026-08-10. The counts in §3, §4 and
+§10 were re-measured by script, and the same script reproduced the `2ffe78cc1` figures exactly
+before it was run at this stamp: AC-3.2 555 `*Rules.ts` files with every drift row unchanged (55/7
+raw matches, 44/6 executable, 0 client importers, 2 type-only); AC-3.4 784 shim import statements in
+783 files; AC-4.3's single-line figures unchanged (76 in 66, 69 in 60, 105 in 85); AC-10.2's zero
+hits hold over `src/`, `supabase/`, `scripts/`, `e2e/`, `tools/`, `plugins/` and `spikes/`. Every
+file the seven stack claims rest on (`src/start.ts`, `src/router.tsx`, `src/integrations/supabase/`,
+`supabase/functions/ai-doctor-review/`, `supabase/functions/ai-coach/`, `src/pages/Coach.tsx`,
+`src/lib/sensor/sensorSourceRules.ts`, `src/lib/sensorSourceLabelRules.ts`,
+`src/lib/vpdDriftRules.ts`, `bunfig.toml`, `tsconfig.json`) is byte-identical to `2ffe78cc1`, and
+`bun.lock` still resolves React 19.2.8, Tailwind 4.3.3, TanStack Query 5.101.4, supabase-js 2.111.0,
+Vite 8.2.0 and Nitro `3.0.260603-beta`. Package-internal cites in AC-1.4, AC-1.5 and §14 are
+carried: `node_modules` was not available to re-read them, and the pinned versions they name still
+match `bun.lock`. The AC-4.3 multi-line figure stays a `source claim`. The cites inside §15.1 and
+§15.2 name superseded lines by design and were not re-read. Dated runtime results and history about
+which PR introduced a behaviour keep their own labels and dates. Production behaviour (what is
+deployed, applied or live) is `NOT_MEASURED` by this stamp. First
 verified at `7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05 by Grok (PR #1281).
 **Carries no `Sentinel-Version`.** This is not one of the twelve governance files; editing it does
 not require a parity bump. See §15 for how it is amended.
@@ -81,8 +88,17 @@ reasoning over it; `source claim` is carried from another document and not re-me
 The SSR entry `src/server.ts` wraps `@tanstack/react-start/server-entry`; `src/start.ts` calls
 `createStart`; `src/router.tsx` calls `createRouter` over the generated route tree. Any document or
 comment describing Verdant as a "React + Vite SPA" is stale wording, not a description of the code.
-_Source:_ `src/server.ts:14,47-61`, `src/start.ts:28`, `src/router.tsx:2,8-9`. `established fact`.
+_Source:_ `src/server.ts:20,53-76`, `src/start.ts:28`, `src/router.tsx:2,8-9`. `established fact`.
 _Enforcement:_ build and typecheck — the app does not start without these entries.
+
+The default export's `fetch` now does host routing before SSR: it answers redirects
+(`redirectResponseFor`) and the health path (`healthResponseFor`) first, then wraps every response
+with `withHostHeaders` (`src/server.ts:55-64`), all from `src/lib/cloudflareHostRoutingRules.ts`.
+That module ports `vercel.json`'s redirects and headers into the Worker (`#1943`), and its header
+comment says why (`src/lib/cloudflareHostRoutingRules.ts:7-17`). This is source fact about the
+handler. It is not publisher evidence. Which host serves the apex, and whether this handler or
+`vercel.json` is what applies there, stays unsettled here (§14, §12 `vercel.json` row).
+`established fact` for the code; production `NOT_MEASURED`.
 
 **AC-1.2 — Machine-produced files are never hand-authored.**
 Routes live under `src/routes/` and compile into `src/routeTree.gen.ts`. That file, together with
@@ -116,9 +132,9 @@ route until every entry's `access` matches the TanStack layout that actually mou
 behaviour; the manifest is the intended policy table. A route guard is a convenience for the grower,
 never an authorization control — **RLS is the boundary** (see AC-2.2). Adding a route without a
 manifest entry is still drift of the declared set.
-_Source:_ `src/lib/appRouteManifest.ts:38` (the `AppRouteAccess` union), `:52` (the field), `:69-88`
+_Source:_ `src/lib/appRouteManifest.ts:44` (the `AppRouteAccess` union), `:58` (the field), `:75-94`
 (the start of `APP_ROUTES`); `src/routes/_app.tsx`; `src/routes/_app/_operator.tsx`.
-`established fact`. The doc comments inside `appRouteManifest.ts` (for example `:49`) still describe
+`established fact`. The doc comments inside `appRouteManifest.ts` (for example `:55`) still describe
 the pre-SSR `App.tsx` mount. That is stale wording in the cited file, not a description of the code.
 _Enforcement:_ **partial**, and narrower in its gap than first recorded. What is tested:
 
@@ -229,9 +245,12 @@ h3 swallows in-handler throws into a normal `500` carrying
 `{"unhandled":true,"message":"HTTPError"}`, which no `try`/`catch` ever sees. `src/server.ts`
 detects that body shape and substitutes a rendered error page. A refactor that trusts `try`/`catch`
 alone reintroduces a JSON blob as the user-visible error.
-_Source:_ `src/server.ts:23-36` (`normalizeCatastrophicSsrResponse`), `:38-45`
-(`isH3SwallowedErrorBody`), `:52` (where it is applied). `established fact`.
-_Enforcement:_ `convention only`. No test references `src/server.ts`.
+_Source:_ `src/server.ts:29-42` (`normalizeCatastrophicSsrResponse`), `:44-51`
+(`isH3SwallowedErrorBody`), `:64` (where it is applied). `established fact`.
+_Enforcement:_ **gated** since `#1937`. `src/test/server-security-headers-runtime.test.ts:94-105`
+imports the Worker, feeds it the swallowed `{"unhandled":true,"message":"HTTPError"}` body, and
+asserts a `text/html` 500. It runs in the required shards. An earlier stamp recorded this clause as
+`convention only` with no test touching `src/server.ts`; that no longer holds.
 
 **AC-1.7 — Provider order in `src/routes/__root.tsx` is load-bearing.**
 `AnalyticsShell` and `FunnelEventDbSink` must precede `<Outlet/>` in JSX order. React fires sibling
@@ -291,7 +310,7 @@ boundary in two different ways:
 
 Treating edge functions as the only trusted server layer would steer new work away from half of the
 boundary that already exists.
-_Source:_ `package.json:369` (`@supabase/ssr` declared); `src/test/auth-hardening-static-safety.test.ts:101-108`
+_Source:_ `package.json:370` (`@supabase/ssr` declared); `src/test/auth-hardening-static-safety.test.ts:101-108`
 (forbids the import); clients at `src/integrations/supabase/client.ts`, `client.server.ts` and
 `auth-middleware.ts`. `quicklog_save_manual`:
 `supabase/migrations/20260928183000_quicklog_manual_replay_metadata_lock.sql:32,48,52` (latest
@@ -349,13 +368,13 @@ clock, no randomness. Time is injected.**
 This is the contract for **new** code, not a description of every existing file. Re-measured at the
 stamped SHA, over the root-level `src/lib/*Rules.ts` glob:
 
-| Measure                                                       | Count | Files                                                                                                                                                                      |
-| ------------------------------------------------------------- | ----: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `*Rules.ts` files                                             |   542 | —                                                                                                                                                                          |
-| contain a direct `Date.now()` call                            |    55 | raw-text match over the root-level glob, re-measured at `dccaf732`, `66ea7bd3` and `2ffe78cc1`: 44 of the 55 call it on an executable line, 11 mention it in comments only |
-| contain a direct `Math.random()` call                         |     7 | the seven named in `CLAUDE.md` "Layering, as actually practised"; 6 call it on an executable line, 1 mentions it in a comment only                                         |
-| import the Supabase client at runtime                         |     0 | —                                                                                                                                                                          |
-| type-only import from generated `integrations/supabase/types` |     2 | `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`                                                                                                         |
+| Measure                                                       | Count | Files                                                                                                                                                                       |
+| ------------------------------------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `*Rules.ts` files                                             |   555 | —                                                                                                                                                                           |
+| contain a direct `Date.now()` call                            |    55 | raw-text match over the root-level glob, re-measured at `dccaf732`, `66ea7bd3`, `2ffe78cc1` and `7e024f93`: 44 of the 55 call it on an executable line, 11 in comments only |
+| contain a direct `Math.random()` call                         |     7 | the seven named in `CLAUDE.md` "Layering, as actually practised"; 6 call it on an executable line, 1 mentions it in a comment only                                          |
+| import the Supabase client at runtime                         |     0 | —                                                                                                                                                                           |
+| type-only import from generated `integrations/supabase/types` |     2 | `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`                                                                                                          |
 
 The clock, randomness and type-import files are legacy, not precedent. Do not cite them, and do not
 extend the pattern. The file added since `9b06be3f` is `src/lib/blueprintEvidenceRules.ts` (#1657);
@@ -375,6 +394,16 @@ The nine added since `66ea7bd3` (`assignTentListingReadRules.ts`, `dailyCheckGro
 `oauthSignupFunnelRules.ts` (`#1887`) imports nothing and calls neither, so the counts do not move;
 it does read `window.sessionStorage` and keeps module-level mutable state (`emittedUserIds`). That
 is ambient state the drift rows do not count, and it is drift, not precedent (`inference`).
+The thirteen added since `2ffe78cc1` (`archivedGrowQuickLogRules.ts`, `cloudflareHostRoutingRules.ts`,
+`paymentTestModeBannerVisibilityRules.ts`, `phenoDocumentationBackupRules.ts`,
+`phenoHuntRenameRules.ts`, `phenoHuntsIndexCardRules.ts`, `quickLogFeedingRejectionRules.ts`,
+`quickLogReusedActivityReceiptRules.ts`, `quickLogTypedReusedReceiptRules.ts`,
+`sandboxCheckoutTestModeNoteRules.ts`, `securityHeadersRules.ts`, `timelineQueryOrderRules.ts`,
+`timingSafeCompareRules.ts`) import neither React nor the Supabase client and call neither
+`Date.now()` nor `Math.random()`, so every drift row holds at `7e024f93`. Two import a type only
+from a non-pure module: `quickLogFeedingRejectionRules.ts:1` from `writeFeedingTypedEvent.ts`, which
+does import the Supabase client, and `sandboxCheckoutTestModeNoteRules.ts:1` from
+`paddleEnvironment.ts`. A type import is erased at build, so neither is I/O.
 
 **Corrected: no root-level `*Rules.ts` imports the Supabase client, and neither named file ever
 did.** Every earlier version of this clause counted the two files as importing Supabase, and since
@@ -421,8 +450,8 @@ _Source:_ `src/constants/`; `src/pages/GuidesIndex.tsx:60,63`; `src/constants/ve
 **AC-3.4 — Component code routes through the react-router compat shim, not TanStack Router
 directly.**
 `src/lib/react-router-compat.tsx` re-implements the react-router-dom v6 surface on TanStack Router.
-Measured at the stamped SHA, **773** static import statements in **772** files import the shim;
-`src/pages/PlantDetail.tsx` imports it twice. By directory: 539 under `src/test`, 132 under
+Measured at the stamped SHA, **784** static import statements in **783** files import the shim;
+`src/pages/PlantDetail.tsx` imports it twice. By directory: 549 under `src/test`, 133 under
 `src/components`, 94 statements in 93 files elsewhere under `src/pages`, 1 under
 `src/pages/support/__tests__`, and 7 under `src/hooks`. **Zero** files under
 `src/components/` or `src/pages/` mention `@tanstack/react-router` at all. Vitest aliases the shim to
@@ -436,7 +465,9 @@ statements, not files, and its "512 under `src/test`" included the one
 the one statement added since is in the new `src/test/sensors-idle-freshness.test.tsx` (#1677).
 `7266acd6` gave 751 in 750; the ten added since are all in new `src/test/` files from `#1683`:
 761 in 760 at `dccaf732`, unchanged at `66ea7bd3`; 773 in 772 at `2ffe78cc1`, eleven of the twelve
-added in `src/test/` and one in `src/components/TonightTentHomeCard.tsx`. The
+added in `src/test/` and one in `src/components/TonightTentHomeCard.tsx`; 784 in 783 at `7e024f93`,
+ten of the eleven added under `src/test/` (nine in new files) and one in the existing
+`src/components/PhenoCandidateEvidenceCoverage.tsx`. The
 shim's `useNavigate` now returns the navigate promise, which does not affect this clause.
 `established fact`.
 _Enforcement:_ `convention only`, plus the test-time alias.
@@ -563,7 +594,7 @@ must not appear as the Source label. **Known gap, recorded rather than fixed her
 `resolveSensorSourceLabel` relabels a `live` reading whose vendor is `ecowitt` as `"Ecowitt"`
 (`src/lib/sensorSourceLabelRules.ts:80-81`, `vendorPromoted: true`), and
 `src/lib/dashboardEnvironmentSnapshotViewModel.ts:217,246` feeds that label to the Dashboard Source
-line (`src/pages/Dashboard.tsx:952`). Trust is not widened, because only `live` is relabelled, but a
+line (`src/pages/Dashboard.tsx:950`). Trust is not widened, because only `live` is relabelled, but a
 vendor name does appear as the Source label there. What a rendered Dashboard shows is
 `NOT_MEASURED`. The display module does not widen the canonical set, change
 ingest write paths, or alter trust-live membership. Collapsing a vendor name into Source would be
@@ -586,10 +617,17 @@ source `trust = "high"` and forwards its values to the model
 conflicts with the Sensor Truth rule that unverified telemetry is never treated as healthy live
 data. This contract records the gap and does not correct it: the fix is in an edge function and a
 rules module, which a docs slice may not touch, and it belongs to the resolver's owner (`#1857` or a
-successor). `#1857` would change this path. Neither `2ffe78cc` nor `e0bb3930` contains it, so
-nothing in `#1857` is a property of the stamped tree (§15.2).
-`established fact` at `2ffe78cc` and at `e0bb3930`; the two files are byte-identical between those
-trees.
+successor). `#1857` would change this path. None of `2ffe78cc`, `e0bb3930` and `7e024f93` contains
+it, so nothing in `#1857` is a property of the stamped tree (§15.2).
+The AI Doctor review boundary admits the same token. The request-packet validator and the
+evidence-receipt rules each declare a seven-member snapshot source list, the six plus `"unknown"`
+(`src/lib/aiDoctorReviewRequestPacketValidationRules.ts:67`,
+`src/lib/aiDoctorReviewEvidenceReceiptRules.ts:35`), and check trust separately against
+`low | medium | high` (`:68` and `:36` respectively). So `unknown` is schema-valid there, and the token alone does not
+decide trust. Whether an `unknown` snapshot is ever graded above `low` on that path was not traced
+(`missing evidence`).
+`established fact` at `2ffe78cc`, `e0bb3930` and `7e024f93`; every file named in this paragraph is
+byte-identical across those trees.
 
 **A second provenance envelope exists, and its tokens do not match the registry.** Manual rows now
 carry `raw_payload.manual_provenance = { source: "manual", source_identity: "manual_entry",
@@ -649,8 +687,8 @@ shrink but not grow. **Edge functions are out of this import rule** — they can
 own mirrored or local vocabulary, not a forbidden cross-import.
 **"Roughly ninety", measured as text.** Single-line union literals outside tests, counted as lines
 where two quoted canonical labels sit either side of one `|` (`"a" | "b"`, single or double
-quotes). The three single-line counts are the same at the first stamp `7c46855b` and at this stamp,
-so none has grown.
+quotes). The three single-line counts are the same at the first stamp `7c46855b`, at `2ffe78cc1`
+and at this stamp `7e024f93`, so none has grown.
 The pattern was never recorded. It is reconstructed as a quoted pair of the six labels either side
 of one `|`, over `.ts`, `.tsx`, `.js` and `.mjs` files in `src/`, excluding any `test/` or
 `__tests__/` directory and `*.test.*` / `*.spec.*` files, with **every adjacent pair** on a line
@@ -676,7 +714,7 @@ unrelated one. The sensor-source count is T3's to settle.
 _Source:_ `src/lib/sensor/sensorSourceRules.ts:16`; `src/constants/sensorIngestProvenance.ts:15`;
 `src/lib/ai/types.ts:15`; `src/lib/aiDoctorEngine.ts:151,266-276,291,389-397`; counts by an
 overlapping adjacent-pair scan over `src/**/*.{ts,tsx,js,mjs}`, excluding `test/` and `__tests__/`
-directories and `*.test.*` / `*.spec.*` files, re-reproduced at `2ffe78cc1`. `established fact` for the
+directories and `*.test.*` / `*.spec.*` files, re-reproduced at `2ffe78cc1` and `7e024f93`. `established fact` for the
 declarations, the two drifts and the unreachable promotion; `inference` for the risk assessment.
 _Enforcement:_ **none today.** T3 in §11 is the proposed gate.
 
@@ -757,10 +795,10 @@ every required context, so a violation cannot block a merge by that route. It ru
   checker runs only when the script's Vitest suite and the job's earlier steps pass:
   - `.github/workflows/ai-doctor-golden-cases.yml:5-7` (`pull_request:`), whose step at
     `.github/workflows/ai-doctor-golden-cases.yml:46` (`bun run test:ai-doctor-phase1`) runs
-    `package.json:323` (`&& node scripts/sensor-safety-check.mjs`);
+    `package.json:324` (`&& node scripts/sensor-safety-check.mjs`);
   - `.github/workflows/ai-doctor-readiness-ui.yml:5-7` (`pull_request:`), whose step at
     `.github/workflows/ai-doctor-readiness-ui.yml:49` (`bun run test:ai-doctor-readiness-ui`) runs
-    `package.json:324` (`&& node scripts/sensor-safety-check.mjs`);
+    `package.json:325` (`&& node scripts/sensor-safety-check.mjs`);
   - `.github/workflows/contextual-pheno-comparison-v0.yml:6-8` (`pull_request:`), whose step at
     `.github/workflows/contextual-pheno-comparison-v0.yml:67`
     (`bun run test:contextual-pheno-comparison-v0`) runs `package.json:66`
@@ -994,7 +1032,7 @@ Prefer `canUseCapability(entitlement, "advancedExports")` over `if (plan === "pr
 not belong in JSX.
 _Source:_ `src/lib/entitlements/capabilities.ts`, `src/lib/entitlements/capabilityAccess.ts:13-18`
 (`canUseCapability`), `src/lib/entitlements/planCatalog.ts`. `established fact`. Two display-only
-plan-id comparisons exist in pages (`src/pages/Pricing.tsx:309`, `src/pages/Settings.tsx:324`). Both
+plan-id comparisons exist in pages (`src/pages/Pricing.tsx:310`, `src/pages/Settings.tsx:324`). Both
 predate the first stamp, and neither is a capability gate. They are drift, not precedent.
 
 **AC-6.3 — `resolveEntitlements` is pure and takes `now` as a parameter.**
@@ -1066,13 +1104,14 @@ and `supabase/functions/ai-cultivar-qa/index.ts:14` (no queue writes);
 dated review.**
 `bun.lock`, a text lockfile, is authoritative. `package-lock.json` is required and must stay
 synchronized while the npm consumers declared in `config/dependency-lockfile-transition.json` exist;
-it is never the source of truth. That config carries `reviewBy` `2026-10-10`, and the checker fails
-an overdue review from 2026-10-11 UTC. `bun.lockb`, `yarn.lock` and `pnpm-lock.yaml` are forbidden.
+it is never the source of truth. That config carries `reviewBy` `2026-10-17` (moved from `2026-10-10` by
+a dated fallback while the retirement PRs stay open), and the checker fails an overdue review from
+2026-10-18 UTC. `bun.lockb`, `yarn.lock` and `pnpm-lock.yaml` are forbidden.
 **There is no `bun.lockb`.** Governance prose that calls `bun.lockb` authoritative is stale.
 _Source:_ `scripts/check-bun-lockfile-policy.mjs:3-7` ("Bun and bun.lock are canonical.
 package-lock.json remains a synchronized compatibility lock only while…"), `:22`
-(`REQUIRED_LOCKFILES`, both files), `:68` (`FORBIDDEN_LOCKFILES`), `:185-197` (the schema-1 transition
-config check; the canonical check and throw at `:189-197`), `:387-391` (overdue review);
+(`REQUIRED_LOCKFILES`, both files), `:76` (`FORBIDDEN_LOCKFILES`), `:193-205` (the schema-1 transition
+config check; the canonical check and throw at `:197-205`), `:395-399` (overdue review);
 `config/dependency-lockfile-transition.json`; `bunfig.toml`;
 `docs/dependency-lockfile-transition-review-2026-10-03.md`. `established fact`.
 _Enforcement:_ **gated for presence and canonical config; the date is not gated by a required
@@ -1166,7 +1205,7 @@ its appendices hold dated results, later `docs/agents/CURRENT_STATE.md` stamps r
 An earlier draft said publishing "ships frontend and edge functions". No repository evidence supports
 an automatic joint ship, and a release operator relying on it could publish a frontend expecting
 newer edge code while the backend stays stale.
-_Source:_ `package.json:21-22` (`deploy:functions`, `deploy:functions:all`) and `:224`
+_Source:_ `package.json:21-22` (`deploy:functions`, `deploy:functions:all`) and `:225`
 (`sb:functions:deploy`). The Actions absence was established by grep over `.github/workflows/` at the
 stamped SHA for `functions deploy`, `supabase functions`, `supabase link` and `db push`: only comments
 and help text match. The eight workflows that install the Supabase CLI run local stacks only.
@@ -1206,9 +1245,9 @@ is proposed as **T6** in §11.
 described as implemented.**
 Case-insensitive search across `src/` and `supabase/` at the stamped SHA returns **zero** hits for
 `nelson`, `modified z`, `modifiedZ`, `median absolute deviation`, `\bMAD\b`, `z-?score`, `zscore`
-or `robust ?z`, and the same at `2ffe78cc1` over `scripts/`, `e2e/`, `tools/`, `plugins/` and
+or `robust ?z`, and the same at `2ffe78cc1` and `7e024f93` over `scripts/`, `e2e/`, `tools/`, `plugins/` and
 `spikes/`. Outside this contract, Nelson is mentioned only as not-implemented guidance: the
-2026-08-21 adjudication, `docs/specs/release-topology-specification.md:671` and the review rule at
+2026-08-21 adjudication, `docs/specs/release-topology-specification.md:831` and the review rule at
 `.coderabbit.yaml:206-207`.
 _Source:_ measured at the stamped SHA; `docs/audits/architecture-audit-adjudication-2026-08-21.md`
 §4.1. `established fact`.
@@ -1230,7 +1269,7 @@ true; a clause missing from this table would be an unstated gap.
 | AC-1.3  | URL-set parity, `/operator/` shape, operator/internal ↔ `_operator` layout, `/sensors/*` both ways; general auth ↔ `_app` parity unenforced (T7)                  | **partially gated**  |
 | AC-1.4  | `vite-dev-server-binding.test.ts` pins the ESM import path; no-duplicate-plugin rule by review                                                                    | **partially gated**  |
 | AC-1.5  | comment and review — explicit CSRF registration; Start's default applies only without a start instance; non-prod warning; T8 proposed                             | `convention only`    |
-| AC-1.6  | comment and review                                                                                                                                                | `convention only`    |
+| AC-1.6  | `server-security-headers-runtime.test.ts` runs the Worker on an h3-swallowed JSON 500 and asserts the `text/html` error page (`#1937`)                            | **gated**            |
 | AC-1.7  | `funnel-event-db-sink.test.tsx` source-scan pins sink-before-Outlet order                                                                                         | **gated**            |
 | AC-1.8  | lockfile + 24 h release-age guard (AC-8.2); major-line moves by review                                                                                            | `convention only`    |
 | AC-2.1  | shape of the code as written                                                                                                                                      | structural           |
@@ -1320,8 +1359,8 @@ importing it (`CONFIG_FILES = ["playwright.config", "vitest.config"]`, `:53`), a
 one that reads `package.json` as raw text and asserts on that text instead of the parsed object
 (`JSON_CONFIG_FILES = ["package.json"]`, `:68`). T2–T8 read no config, so neither shape is any
 of them. T1 is the one exception: it opens every cited file and matches a snippet on the named
-line, and this document cites `package.json` at seven places (`:9`, `:21-22`, `:66`, `:224`,
-`:323`, `:324`, `:369`). That is citation integrity, not verification of effective configuration,
+line, and this document cites `package.json` at seven places (`:9`, `:21-22`, `:66`, `:225`,
+`:324`, `:325`, `:370`). That is citation integrity, not verification of effective configuration,
 which is the only thing the checker guards; it is the "proving a string is present or absent" use
 `AGENTS.md` keeps for source scans. A T1 runner placed anywhere the checker scans therefore
 declares `@source-scan-justified: citation integrity` rather than importing `package.json`. Citing
@@ -1385,9 +1424,9 @@ merged or mergeable is operating state, and it lives in `docs/agents/CURRENT_STA
   - `quicklog_save_manual`: `src/hooks/useQuickLogV2Save.ts`, `src/hooks/useQuickLogActivitySave.ts`
     and `src/hooks/useSaveAiDoctorPhase1TimelineEvidence.ts`;
   - `quicklog_save_event`: `src/hooks/useQuickLogActivitySave.ts`,
-    `src/lib/writeQuickLogWateringTypedEvent.ts`, `src/lib/writeFeedingTypedEvent.ts` and
-    `src/lib/quick-log/createQuickLogEvent.ts`. (Update, #593: `createQuickLogEvent.ts` had no
-    reachable caller and was removed; the live `quicklog_save_event` callers are the other three.)
+    `src/lib/writeQuickLogWateringTypedEvent.ts` and `src/lib/writeFeedingTypedEvent.ts`.
+    (`src/lib/quick-log/createQuickLogEvent.ts`, a fourth caller at earlier stamps, had no reachable
+    caller and was removed by `#1839`. It is absent from the stamped tree.)
 
   Photo and video entries insert into `diary_entries` directly from
   `src/lib/quickLogPhotoDiaryEntry.ts` and `src/lib/quickLogVideoDiaryEntry.ts`, and
@@ -1490,8 +1529,12 @@ stale every time the operating picture moved. Only the durable rules stay:
 | 2026-10-04 | `2ffe78cc1a5814ba2c8f0c380270bcfc622b960f` | Claude | §15 re-verification at the deploy tip (`#1896`), split from the unmerged lockfile stack on the owner's instruction (#1878 keeps only the post-`#1873` AC-8.1 wording). 566 files changed since `66ea7bd3` (120 merges); 51 cited files changed and every cite into them was re-read. **Seven stack claims, clause by clause:** (1) TanStack Start SSR, Router, Vite, Nitro: PASS (Vite and Nitro are also direct devDependencies; AC-1.8 corrected). (2) React 19, Tailwind 4, shadcn/Radix, TanStack Query: PASS (upstream-latest NOT_MEASURED). (3) Supabase Postgres/Auth/RLS/RPC/Edge Functions: PASS in the repository; production NOT_MEASURED. (4) Bun canonical, npm compatibility remains: PASS; AC-8.1 corrected to say the required shards pin the date, so `reviewBy` is enforced only by a non-required lane. (5) AI Doctor via the Lovable gateway with a server-pinned model, validated tool output, credit and idempotency controls, evidence receipts and no direct Action Queue or device writes: PASS for `ai-doctor-review`; FAIL as a statement about every AI Doctor surface, because `/coach` (titled AI Doctor) calls `ai-coach`, which has no forced tool output and no receipt, and grower-clicked paths create `pending_approval` queue rows. AC-5.3 and AC-5.5 re-scoped; AC-5.2, AC-5.4 and AC-5.8 gain cites; AC-5.4's `:624` was the finalizer, not a credit site. (6) Canonical sources live/manual/csv/demo/stale/invalid with vendor and transport as provenance: PASS for the set and for storage; FAIL for display, because `resolveSensorSourceLabel` shows `Ecowitt` as the Dashboard Source for live EcoWitt rows. AC-4.2 records the gap and a third storage path (`ecowitt-ingest`). (7) VPD EWMA exists, MAD and Nelson not implemented: PASS; AC-10.1 adds that no product path computes the EWMA, and AC-10.2's "only mention of Nelson" sentence was wrong. Counts: AC-3.2 542 (`#1887` adds `oauthSignupFunnelRules.ts`), AC-3.4 773 in 772, AC-4.3 76/66, 69/60, 105/85 reproduced; 35/7 required/mustBeGreen unchanged. §13 `#1175` merged. Line moves are listed in the header                                                                                                                                                                                                                                                                                            |
 | 2026-10-07 | `e0bb39304a44dc72dfef83734e651034598b5454` | Claude | Evidence-status note at the later deploy tip, on the owner's instruction to update this PR in place and to label inherited claims. **The stamp does not move:** every clause still describes `2ffe78cc`. New §15.2 labels each of the seven stack claims VERIFIED (re-read at `e0bb3930` this session) or INHERITED (the `2ffe78cc` verdict, not re-read), lists the ten cited files that changed between the trees and the cites that moved, and records `#1857`'s exact-SHA review history, ending in a Codex **FAIL** at `4ee43c6e`. AC-4.2 gains the AI-context-path gap (the resolver emits `unknown`), verified at both trees, whose two files are byte-identical. No other clause statement changed. Docs-only; no `CURRENT_STATE.md` restamp.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 2026-10-08 | `e0bb39304a44dc72dfef83734e651034598b5454` | Claude | Review follow-up, stamp unchanged. §15.2 and AC-4.2 no longer carry `#1857`'s review verdicts, merge state, ahead/behind counts or ownership; those are operating state, recorded in the PR's own comments, and belong in `CURRENT_STATE.md` / `HANDOFF_LOG.md` rather than here. Every remaining `#1857` / `#1873` mention is stated against a fixed SHA (`2ffe78cc`, `e0bb3930`) rather than as PR status, so it cannot go stale. The durable rule stays: nothing on an unmerged branch is a property of the stamped tree, and AC-4.2 is amended against the merged tree when `#1857` or a successor lands. No clause statement changed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 2026-10-13 | `7e024f9362d4f57c1d5cb8252bf0104a2626b46a` | Claude | §15 re-verification at the deploy tip (`#1978`), on the owner's instruction to refresh #1899 at the current tip. Supersedes the `2ffe78cc1` stamp and the §15.2 note. 296 files changed since `2ffe78cc1` (44 merges, 96 in `src/test/`, one additive migration); 24 cited files changed and every line cite into them was re-read by script against both trees. Line moves are listed in the header. Substance: AC-1.1 records that `src/server.ts`'s `fetch` does host redirects, the health path and host headers before SSR (`#1943`), as code fact and not publisher evidence; AC-1.6 moves from `convention only` to **gated** (`src/test/server-security-headers-runtime.test.ts:94-105`, `#1937`); AC-8.1's `reviewBy` is `2026-10-17` and the overdue failure starts 2026-10-18 UTC; §13's Quick Log `quicklog_save_event` callers drop `createQuickLogEvent.ts` (removed by `#1839`); AC-4.2's AI-path paragraph adds that the AI Doctor request-packet and receipt validators admit `"unknown"` as a seventh snapshot source token and check trust separately. Counts: AC-3.2 555 files (13 added, all pure; drift rows unchanged), AC-3.4 784 in 783, AC-4.3 and AC-10.2 unchanged. Seven stack claims: verdicts unchanged from `2ffe78cc1` (1–4 and 7 PASS; 5 PASS for `ai-doctor-review`, FAIL as a claim about every AI Doctor surface; 6 PASS for set and storage, FAIL for display and the AI path), because every file they rest on is byte-identical. `#1857` and `#1982` are not on this tree. Production `NOT_MEASURED`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ### 15.2 Evidence status at deploy tip `e0bb3930` — 2026-10-07, dated
+
+> **Superseded by the `7e024f93` restamp (header and §15.1, 2026-10-13).** Kept as dated history.
+> Every `INHERITED` verdict below was re-read or re-carried by that restamp; read the header first.
 
 **Why this section exists.** The owner asked for this PR's evidence to be brought up to date in
 place, with inherited claims labelled. A full §15 restamp would re-point every cite to a new tree.

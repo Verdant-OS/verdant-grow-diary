@@ -65,6 +65,10 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   // clawback_lovable_credit_pack on every approved refund, so production
   // must carry this before that function ships.
   "20261003010000_credit_pack_refund_clawback.sql",
+  // Referrer reward cap: 10 rewarded conversions per UTC month per
+  // environment (grant-path audit 2026-10-03). Absence silently restores
+  // unbounded referral credit farming.
+  "20261003020000_referral_referrer_monthly_cap.sql",
 ];
 
 /**

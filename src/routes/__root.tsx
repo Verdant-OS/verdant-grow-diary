@@ -23,7 +23,11 @@ import { SitePaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
 import { useAnalyticsConsent } from "@/hooks/useAnalyticsConsent";
-import { loadGoogleAnalytics } from "@/lib/googleAnalyticsLoader";
+import { readAnalyticsConsent } from "@/lib/analyticsConsent";
+import {
+  applyAnalyticsConsentDecision,
+  tearDownAnalyticsForExcludedRoute,
+} from "@/lib/analyticsConsentRuntime";
 import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
 import FunnelEventDbSink from "@/components/FunnelEventDbSink";
 import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
@@ -171,10 +175,20 @@ function useClearQueryCacheBeforeAuthIdentityChange() {
 
 function AnalyticsShell() {
   const { decision } = useAnalyticsConsent();
+  const location = useRouterState({
+    select: (state) => ({
+      pathname: state.location.pathname,
+      search: state.location.searchStr,
+      hash: state.location.hash,
+    }),
+  });
 
   useEffect(() => {
-    if (decision === "granted") loadGoogleAnalytics();
-  }, [decision]);
+    const reload = applyAnalyticsConsentDecision(decision, location);
+    // A granted route change must stay in this document. Reloading here
+    // destroys client-side navigation and can start a second gtag config.
+    if (decision !== "granted" && reload) window.location.reload();
+  }, [decision, location]);
 
   useGoogleAnalyticsPageViews();
   return <AnalyticsConsentBanner />;
@@ -220,9 +234,27 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  const pathname = useRouterState({
-    select: (state) => state.resolvedLocation?.pathname ?? state.location.pathname,
+  const routeLocation = useRouterState({
+    select: (state) => ({
+      pathname: state.resolvedLocation?.pathname ?? state.location.pathname,
+      search: state.location.searchStr,
+      hash: state.location.hash,
+    }),
   });
+  const pathname = routeLocation.pathname;
+
+  useEffect(() => {
+    if (
+      tearDownAnalyticsForExcludedRoute(readAnalyticsConsent(), {
+        pathname: routeLocation.pathname,
+        search: routeLocation.search,
+        hash: routeLocation.hash,
+      })
+    ) {
+      window.location.reload();
+    }
+  }, [routeLocation.hash, routeLocation.pathname, routeLocation.search]);
+
   if (isGrowHelpToolkitPath(pathname)) {
     return (
       <RootDocument>

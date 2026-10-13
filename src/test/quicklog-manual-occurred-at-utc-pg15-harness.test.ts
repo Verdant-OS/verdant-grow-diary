@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  UTC_HASH_MIGRATION,
   UTC_HASH_WRAPPER_MD5,
   pinnedUtcHashSql,
   runManualOccurredAtUtcHarness,
@@ -20,6 +21,15 @@ function wrapperBody(sql: string): string {
 }
 
 describe("Quick Log manual occurred_at UTC hash PostgreSQL 15 proof", () => {
+  it("is versioned after every other migration, so a version-ordered push never sees it out of order", () => {
+    const version = UTC_HASH_MIGRATION.slice(0, 14);
+    const later = readdirSync(resolve("supabase/migrations")).filter(
+      (name) =>
+        name.endsWith(".sql") && name !== UTC_HASH_MIGRATION && name.slice(0, 14) >= version,
+    );
+    expect(later).toEqual([]);
+  });
+
   it.each([
     null,
     "postgresql://postgres:secret@db.example.test:5432/verdant_quicklog_delegate_repair",
@@ -102,7 +112,7 @@ describe("Quick Log manual occurred_at UTC hash PostgreSQL 15 proof", () => {
       resolve(".github/workflows/quicklog-manual-reuse-fence-pg15.yml"),
       "utf8",
     );
-    expect(workflow).toContain("20261001180000_quicklog_manual_occurred_at_utc_hash.sql");
+    expect(workflow).toContain("20261013180000_quicklog_manual_occurred_at_utc_hash.sql");
     expect(workflow).toContain("scripts/run-quicklog-manual-occurred-at-utc-pg15-harness.mjs");
     expect(workflow).toContain("src/test/quicklog-manual-occurred-at-utc-pg15-harness.test.ts");
     expect(workflow).toContain(

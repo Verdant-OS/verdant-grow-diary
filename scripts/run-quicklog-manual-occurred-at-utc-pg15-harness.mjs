@@ -23,7 +23,7 @@ import {
 } from "./run-quicklog-manual-reuse-lock-pg15-harness.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-export const UTC_HASH_MIGRATION = "20261001180000_quicklog_manual_occurred_at_utc_hash.sql";
+export const UTC_HASH_MIGRATION = "20261013180000_quicklog_manual_occurred_at_utc_hash.sql";
 export const UTC_HASH_SHA256 = "1fcb23dd5c1285c036e8a498ab4539d5a37a706a614dca26643f036973ba2f5a";
 export const UTC_HASH_WRAPPER_MD5 = "f587dc4669f65580eed2d5097caac806";
 const owner = "11111111-1111-4111-8111-111111111111";

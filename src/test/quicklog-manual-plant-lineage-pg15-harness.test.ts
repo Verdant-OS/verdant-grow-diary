@@ -31,7 +31,7 @@ const harness = readFileSync(
 describe("Quick Log manual plant/tent lineage fence", () => {
   it("accepts only the deterministic full order without mutating the caller's input", () => {
     const order = [...MANUAL_DELIVERY_ORDER];
-    expect(order).toEqual(["20260927002000", "20260927160000", "20260928183000", "20261001180000"]);
+    expect(order).toEqual(["20260927002000", "20260927160000", "20260928183000", "20261013180000"]);
     expect(validManualDeliveryOrder(order)).toBe(true);
     expect(validManualDeliveryOrder(order)).toBe(true);
     expect(order).toEqual(MANUAL_DELIVERY_ORDER);
@@ -94,7 +94,7 @@ describe("Quick Log manual plant/tent lineage fence", () => {
       "20260927002000_quicklog_manual_reuse_fence.sql",
       "20260927160000_quicklog_manual_plant_tent_lineage.sql",
       "20260928183000_quicklog_manual_replay_metadata_lock.sql",
-      "20261001180000_quicklog_manual_occurred_at_utc_hash.sql",
+      "20261013180000_quicklog_manual_occurred_at_utc_hash.sql",
     ];
     try {
       for (const [index, file] of filenames.entries()) {
@@ -234,7 +234,7 @@ describe("Quick Log manual plant/tent lineage fence", () => {
             ),
           ).toHaveLength(54);
           expect(write).toHaveBeenCalledWith(
-            expect.stringContaining("full chain 002000 -> 160000 -> 183000 -> 20261001180000"),
+            expect.stringContaining("full chain 002000 -> 160000 -> 183000 -> 20261013180000"),
           );
         }
       } finally {
@@ -251,7 +251,7 @@ describe("Quick Log manual plant/tent lineage fence", () => {
       ["20260928183000", "20260927160000", "20260927002000"],
       ["20260927002000", "20260927002000", "20260928183000"],
       ["20260927002000", "20260927160000", "20260928183000"],
-      ["20260927002000", "20260927160000", "20261001180000", "20260928183000"],
+      ["20260927002000", "20260927160000", "20261013180000", "20260928183000"],
       [],
       null,
     ].map((deliveryOrder) => [deliveryOrder]),

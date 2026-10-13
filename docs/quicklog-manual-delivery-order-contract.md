@@ -9,7 +9,7 @@ The only accepted sequence is:
 1. `20260927002000_quicklog_manual_reuse_fence.sql`
 2. `20260927160000_quicklog_manual_plant_tent_lineage.sql`
 3. `20260928183000_quicklog_manual_replay_metadata_lock.sql`
-4. `20261001180000_quicklog_manual_occurred_at_utc_hash.sql` (#1841)
+4. `20261013180000_quicklog_manual_occurred_at_utc_hash.sql` (#1841)
 
 `scripts/lib/quicklogManualDeliveryOrder.mjs` rejects any other plan and any step
 whose completed prefix differs from that exact order. The PG15 delivery adapter
@@ -96,7 +96,7 @@ caller-supplied completed prefix can replace these checks. In particular,
 only the `002000` wrapper. The PG15 proof now also tries `183000` after `002000`
 with a fabricated completed prefix and verifies unchanged catalog and data.
 
-Step 4 (`20261001180000`, #1841) changes only how the wrapper hashes `p_occurred_at`.
+Step 4 (`20261013180000`, #1841) changes only how the wrapper hashes `p_occurred_at`.
 Its gate requires the wrapper source `183000` writes (`1875cf01…`) and the
 unchanged `160000` delegate (`ccd841f1…`); its own migration preflight pins the
 same wrapper source. The PG15 proof also tries step 4 right after `160000`, with

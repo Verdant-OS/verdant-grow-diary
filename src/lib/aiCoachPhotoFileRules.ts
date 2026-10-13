@@ -60,12 +60,15 @@ function ascii(bytes: Uint8Array, offset: number, length: number): string {
   return out;
 }
 
-function isHeifFtyp(bytes: Uint8Array): boolean {
+function isHeifFtyp(bytes: Uint8Array, fileSize: number): boolean {
   if (bytes.length < 12) return false;
   if (ascii(bytes, 4, 4) !== "ftyp") return false;
   if (HEIF_FTYP_BRANDS.has(ascii(bytes, 8, 4).toLowerCase())) return true;
   const declared = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0);
-  const end = declared === 0 ? bytes.length : Math.min(declared, bytes.length);
+  // Size 0 means the box runs to EOF. Reject unless this read holds the whole file.
+  const exceedsRead = declared === 0 ? fileSize > bytes.length : declared > bytes.length;
+  if (exceedsRead) return true;
+  const end = declared === 0 ? bytes.length : declared;
   for (let offset = 16; offset + 4 <= end; offset += 4) {
     if (HEIF_FTYP_BRANDS.has(ascii(bytes, offset, 4).toLowerCase())) return true;
   }
@@ -120,7 +123,7 @@ export async function validateAiCoachPhotoFile(
       return { ok: false, reason: "too-large", message: TOO_LARGE_MESSAGE };
     }
     const header = await readHeader(file);
-    if (!header || !isGifSignature(header) || isHeifFtyp(header)) {
+    if (!header || !isGifSignature(header) || isHeifFtyp(header, file.size)) {
       return { ok: false, reason: "unsupported-type", message: UNSUPPORTED_MESSAGE };
     }
     return { ok: true, mime: "image/gif", extension: "gif", size: file.size };
@@ -140,7 +143,7 @@ export async function validateAiCoachPhotoFile(
     return { ok: false, reason: "too-large", message: TOO_LARGE_MESSAGE };
   }
   const header = await readHeader(file);
-  if (!header || isHeifFtyp(header)) {
+  if (!header || isHeifFtyp(header, file.size)) {
     return { ok: false, reason: "unsupported-type", message: UNSUPPORTED_MESSAGE };
   }
   return validated;

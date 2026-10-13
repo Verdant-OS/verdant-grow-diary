@@ -33,6 +33,10 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-13T19:27 UTC
+
+- **NOT_MEASURED, #1858 pull-request CI at `f87850bed`: most lanes done, the required-check run still waiting.** #1858 is unchanged: head `f87850bedf94c99daaf46c6c32af8851b167c091`, open, not draft, not merged, not in the merge queue, auto-merge off. Of the 26 `pull_request` runs the 19:12 UTC reopen started: **20 success, 1 skipped, 3 in progress, 2 queued, 0 failed** (up from 5 success at 19:21 UTC). The run that produces the 35 required contexts, `ci.yml` `38453065029`, is one of the two still queued (no update since 19:12:57 UTC). Repository-wide: 204 runs queued, 31 in progress. Enqueueing still waits on that run finishing green at an unchanged head.
+
 ## Follow-up observation — 2026-10-13T19:21 UTC
 
 - **BLOCKED → retrying, #1858 enqueue at the accepted head `f87850bed`.** Both hand-dispatched runs finished **success** at `f87850bed` around 19:10 UTC (`ci.yml` `38446701958`, `security-db-local.yml` `38446760442`), and every one of the 35 required contexts then read SUCCESS on the commit. Even so, the merge queue refused #1858 at 19:11 UTC: `enqueuePullRequest` with `expectedHeadOid` = `f87850bed` returned "35 of 35 required status checks are expected". `inference`: the ruleset does not count required contexts produced by `workflow_dispatch` runs. That matches the earlier handoff note that #1932's required checks "come from a manual ci.yml run and aren't measured". Side effect: when the queue refused, `gh pr merge --squash --match-head-commit` enabled auto-merge instead (event `auto_merge_enabled`, 19:11:17 UTC). Matthew had not asked for that, so it was disabled right away; `autoMergeRequest` reads null.

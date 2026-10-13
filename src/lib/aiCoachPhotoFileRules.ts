@@ -20,8 +20,8 @@ export const AI_COACH_INLINE_PHOTO_MAX_BYTES = 7 * 1024 * 1024;
 const COACH_REJECTED_MIME = new Set(["image/heic", "image/heif"]);
 
 /**
- * ISO BMFF major brands for HEIC and HEIF. A file labelled image/jpeg
- * still carries `ftyp` plus one of these at bytes 4–11.
+ * ISO BMFF brands for HEIC and HEIF. A file labelled image/jpeg can
+ * carry one of these as the ftyp major brand or as a compatible brand.
  */
 const HEIF_FTYP_BRANDS = new Set([
   "heic",
@@ -37,6 +37,9 @@ const HEIF_FTYP_BRANDS = new Set([
   "msf1",
 ]);
 
+/** Bound for one ftyp box. Compatible brands sit after the 16-byte prefix. */
+const FTYP_HEADER_READ_CAP = 256;
+
 const TOO_LARGE_MESSAGE = "Choose a photo smaller than 7 MB.";
 const UNSUPPORTED_MESSAGE = "That file type is not supported.";
 const EMPTY_MESSAGE = "The selected file is empty.";
@@ -51,12 +54,22 @@ type HeaderFile = PlantProfilePhotoFileLike & {
   slice?: (start?: number, end?: number) => Blob;
 };
 
+function ascii(bytes: Uint8Array, offset: number, length: number): string {
+  let out = "";
+  for (let i = 0; i < length; i += 1) out += String.fromCharCode(bytes[offset + i] ?? 0);
+  return out;
+}
+
 function isHeifFtyp(bytes: Uint8Array): boolean {
   if (bytes.length < 12) return false;
-  const box = String.fromCharCode(bytes[4], bytes[5], bytes[6], bytes[7]);
-  if (box !== "ftyp") return false;
-  const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]).toLowerCase();
-  return HEIF_FTYP_BRANDS.has(brand);
+  if (ascii(bytes, 4, 4) !== "ftyp") return false;
+  if (HEIF_FTYP_BRANDS.has(ascii(bytes, 8, 4).toLowerCase())) return true;
+  const declared = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0);
+  const end = declared === 0 ? bytes.length : Math.min(declared, bytes.length);
+  for (let offset = 16; offset + 4 <= end; offset += 4) {
+    if (HEIF_FTYP_BRANDS.has(ascii(bytes, offset, 4).toLowerCase())) return true;
+  }
+  return false;
 }
 
 function isGifSignature(bytes: Uint8Array): boolean {
@@ -67,10 +80,14 @@ function isGifSignature(bytes: Uint8Array): boolean {
 
 async function readHeader(file: HeaderFile): Promise<Uint8Array | null> {
   if (typeof file.slice !== "function") return null;
-  const blob = file.slice(0, 12);
+  const blob = file.slice(0, FTYP_HEADER_READ_CAP);
   const readable = blob as Blob & { arrayBuffer?: () => Promise<ArrayBuffer> };
   if (typeof readable.arrayBuffer === "function") {
-    return new Uint8Array(await readable.arrayBuffer());
+    try {
+      return new Uint8Array(await readable.arrayBuffer());
+    } catch {
+      return null;
+    }
   }
   if (typeof FileReader === "undefined") return null;
   return new Promise((resolve) => {

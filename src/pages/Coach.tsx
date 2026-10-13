@@ -102,6 +102,7 @@ export default function Coach() {
   const [creditDenial, setCreditDenial] = useState<AiCreditDenial | null>(null);
   const [upstreamCreditExhausted, setUpstreamCreditExhausted] = useState(false);
   const diagnosisSeqRef = useRef(0);
+  const fileSelectSeqRef = useRef(0);
   const pendingCoachRequestRef = useRef<PendingAiCoachRequest | null>(null);
 
   // --- Real grow context for AI sufficiency evaluation (presenter only) ---
@@ -415,8 +416,10 @@ export default function Coach() {
 
   async function handleFile(f: File | null) {
     if (!f) return;
+    const seq = ++fileSelectSeqRef.current;
     const validation = validatePlantProfilePhotoFile(f);
     const coachValidation = await validateAiCoachPhotoFile(f);
+    if (seq !== fileSelectSeqRef.current) return;
     if (coachValidation.ok === false) {
       toast.error(coachValidation.message);
       return;

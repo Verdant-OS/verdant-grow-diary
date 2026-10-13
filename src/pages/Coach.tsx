@@ -279,29 +279,49 @@ export default function Coach() {
       let photoUrl = selectedRequest.photoUrl;
       if (mode === "diagnose" && photoFile && !photoUrl) {
         const photoValidation = validatePlantProfilePhotoFile(photoFile);
-        const coachPhotoValidation = validateAiCoachPhotoFile(photoFile);
+        const coachPhotoValidation = await validateAiCoachPhotoFile(photoFile);
         if (coachPhotoValidation.ok === false) {
           setPhotoFile(null);
           setPhotoPreviewStatus("empty");
           throw new Error(coachPhotoValidation.message);
         }
-        if (photoValidation.ok === false) {
+        const publishPhoto = async (path: string, contentType: string) => {
+          const { error } = await supabase.storage
+            .from("diary-photos")
+            .upload(path, photoFile, { contentType });
+          if (error) throw error;
+          const { data: signed, error: sErr } = await supabase.storage
+            .from("diary-photos")
+            .createSignedUrl(path, 600);
+          if (sErr) throw sErr;
+          photoUrl = signed.signedUrl;
+          if (pendingCoachRequestRef.current?.idempotencyKey === idempotencyKey) {
+            pendingCoachRequestRef.current = { ...selectedRequest, photoUrl };
+          }
+        };
+        if (coachPhotoValidation.mime === "image/gif") {
+          await publishPhoto(
+            `${user.id}/coach/${Date.now()}.${coachPhotoValidation.extension}`,
+            coachPhotoValidation.mime,
+          );
+        } else if (photoValidation.ok === false) {
           setPhotoFile(null);
           setPhotoPreviewStatus("empty");
           throw new Error(photoValidation.message);
-        }
-        const path = `${user.id}/coach/${Date.now()}.${photoValidation.extension}`;
-        const { error } = await supabase.storage
-          .from("diary-photos")
-          .upload(path, photoFile, { contentType: photoValidation.mime });
-        if (error) throw error;
-        const { data: signed, error: sErr } = await supabase.storage
-          .from("diary-photos")
-          .createSignedUrl(path, 600);
-        if (sErr) throw sErr;
-        photoUrl = signed.signedUrl;
-        if (pendingCoachRequestRef.current?.idempotencyKey === idempotencyKey) {
-          pendingCoachRequestRef.current = { ...selectedRequest, photoUrl };
+        } else {
+          const path = `${user.id}/coach/${Date.now()}.${photoValidation.extension}`;
+          const { error } = await supabase.storage
+            .from("diary-photos")
+            .upload(path, photoFile, { contentType: photoValidation.mime });
+          if (error) throw error;
+          const { data: signed, error: sErr } = await supabase.storage
+            .from("diary-photos")
+            .createSignedUrl(path, 600);
+          if (sErr) throw sErr;
+          photoUrl = signed.signedUrl;
+          if (pendingCoachRequestRef.current?.idempotencyKey === idempotencyKey) {
+            pendingCoachRequestRef.current = { ...selectedRequest, photoUrl };
+          }
         }
       }
       invocationStarted = true;
@@ -393,15 +413,15 @@ export default function Coach() {
     }
   }
 
-  function handleFile(f: File | null) {
+  async function handleFile(f: File | null) {
     if (!f) return;
     const validation = validatePlantProfilePhotoFile(f);
-    const coachValidation = validateAiCoachPhotoFile(f);
+    const coachValidation = await validateAiCoachPhotoFile(f);
     if (coachValidation.ok === false) {
       toast.error(coachValidation.message);
       return;
     }
-    if (validation.ok === false) {
+    if (validation.ok === false && coachValidation.mime !== "image/gif") {
       toast.error(validation.message);
       return;
     }

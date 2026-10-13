@@ -167,9 +167,12 @@ export default function PhenoHuntNew() {
     setNotes((prev) => (prev.trim() !== "" ? prev : draft.notes));
     setSelected((prev) => (prev.size > 0 ? prev : new Set(draft.selected)));
     if (draft.evidenceGoalsSpecified) setEvidenceGoals(draft.evidenceGoals);
-    setGoalsReviewed(draft.goalsReviewed);
+    const emptySavedSelection =
+      draft.evidenceGoalsSpecified === true && draft.evidenceGoals.length === 0;
+    const goalsReviewedForResume = draft.goalsReviewed && !emptySavedSelection;
+    setGoalsReviewed(goalsReviewedForResume);
     // A draft saved on a locked confirmation step reopens on Goals instead.
-    setCurrentStep(resolvePhenoOnboardingResumeStep(draft.currentStep, draft.goalsReviewed));
+    setCurrentStep(resolvePhenoOnboardingResumeStep(draft.currentStep, goalsReviewedForResume));
     setDraftRestored(true);
   }, [draftKey]);
 

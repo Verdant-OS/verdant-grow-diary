@@ -33,6 +33,10 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-13T18:29 UTC
+
+- **NOT_MEASURED, #1858 required checks at `f87850bed`: still queued behind a repository-wide Actions backlog.** #1858 is unchanged since the 18:27 UTC block: head `f87850bedf94c99daaf46c6c32af8851b167c091`, open, not merged, not in the merge queue. Both dispatched runs, `ci.yml` (`38446701958`) and `security-db-local.yml` (`38446760442`), are still `queued` and have not started (no update since 18:26 UTC). Required contexts: 34 queued / 1 not yet reported; `test:security-db-local` queued; nothing failing. `established fact`: at 18:29 UTC the repository had **276 workflow runs queued and 21 in progress**, so the wait is the shared Actions queue, not anything in #1858. Queueing #1858 still waits on 35/35 SUCCESS at this exact head.
+
 ## Follow-up observation — 2026-10-13T18:27 UTC
 
 - **Accept renewed at #1858's current head; queueing waits on required checks.** Matthew, in this Claude session at ~18:25 UTC: "Accept #1858 f87850bedf94c99daaf46c6c32af8851b167c091". The head is still `f87850bed` (base merge by another Claude session; #1858's own 90 added lines unchanged, per the 18:23 UTC block), the PR is open, not draft, not merged and not queued, with no labels. `established fact`: no `pull_request` CI ran for that commit (only the `push` workflows `google-analytics-e2e.yml` and `typecheck-build-push.yml`, plus CodeQL), so none of the 35 required contexts existed there at 18:25 UTC. The merge rule needs 35/35 green at the exact head, so this session dispatched `ci.yml` (`workflow_dispatch`, run `38446701958`) and the must-be-green lane `security-db-local.yml` (run `38446760442`) on `claude/current-state-1857-status` at 18:26 UTC; neither changes the head. At 18:27 UTC: required contexts 34 queued / 1 not yet reported, `test:security-db-local` queued, nothing failing. `NOT_MEASURED`: the results.

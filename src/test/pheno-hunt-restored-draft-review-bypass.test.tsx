@@ -147,6 +147,9 @@ describe("restored draft with obsolete goal ids", () => {
 
     expect(screen.queryByTestId("pheno-step-confirmation")).toBeNull();
     expect(screen.getByTestId("pheno-evidence-goals")).toBeDefined();
+    expect(screen.getByTestId("pheno-evidence-goals-summary").textContent).toBe(
+      "None selected yet — choose at least one goal",
+    );
 
     const save = screen.getByTestId("ph-save-btn") as HTMLButtonElement;
     expect(save.disabled).toBe(true);
@@ -154,6 +157,10 @@ describe("restored draft with obsolete goal ids", () => {
     expect(createPhenoHuntMock).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-goals"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-confirmation"));
+    expect(screen.queryByTestId("pheno-step-confirmation")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("pheno-evidence-goals-toggle-structure"));
     fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-confirmation"));
     expect(screen.getByTestId("pheno-step-confirmation")).toBeDefined();
     expect(save.disabled).toBe(true);

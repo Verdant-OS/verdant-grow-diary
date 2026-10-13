@@ -62,6 +62,8 @@ interface PhenoHuntSetupDraft {
   notes: string;
   selected: string[];
   evidenceGoals: PhenoEvidenceGoalId[];
+  /** True when the saved draft included an evidenceGoals array, including []. */
+  evidenceGoalsSpecified?: boolean;
   currentStep: PhenoOnboardingStepId;
   /** Evidence goals step opened in this draft (#573). Absent → false. */
   goalsReviewed: boolean;
@@ -84,6 +86,9 @@ function readHuntDraft(key: string): PhenoHuntSetupDraft | null {
         ? parsed.selected.filter((v): v is string => typeof v === "string")
         : [],
       // Unknown/removed ids are dropped so readiness and the summary agree.
+      // A present array that normalizes to [] is an explicit empty selection.
+      // A missing field keeps the fresh suggested defaults.
+      evidenceGoalsSpecified: Array.isArray(parsed.evidenceGoals),
       evidenceGoals: normalizeEvidenceGoalIds(parsed.evidenceGoals),
       currentStep:
         typeof parsed.currentStep === "string" &&
@@ -161,7 +166,7 @@ export default function PhenoHuntNew() {
     setName((prev) => (prev.trim() !== "" ? prev : draft.name));
     setNotes((prev) => (prev.trim() !== "" ? prev : draft.notes));
     setSelected((prev) => (prev.size > 0 ? prev : new Set(draft.selected)));
-    if (draft.evidenceGoals.length > 0) setEvidenceGoals(draft.evidenceGoals);
+    if (draft.evidenceGoalsSpecified) setEvidenceGoals(draft.evidenceGoals);
     setGoalsReviewed(draft.goalsReviewed);
     // A draft saved on a locked confirmation step reopens on Goals instead.
     setCurrentStep(resolvePhenoOnboardingResumeStep(draft.currentStep, draft.goalsReviewed));
@@ -288,7 +293,7 @@ export default function PhenoHuntNew() {
         candidateIds,
         evidenceGoals: normalizeEvidenceGoalIds(evidenceGoals),
         setupCompleted: setupConfirmed,
-        goalsReviewed,
+        goalsReviewed: goalsReviewed && evidenceGoals.length > 0,
       }),
     [name, growId, tentId, notes, candidateIds, evidenceGoals, setupConfirmed, goalsReviewed],
   );

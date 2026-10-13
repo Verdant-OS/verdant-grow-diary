@@ -155,6 +155,9 @@ describe("restored draft with null or blank goal entries", () => {
 
     fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-goals"));
     fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-confirmation"));
+    expect(screen.queryByTestId("pheno-step-confirmation")).toBeNull();
+    fireEvent.click(screen.getByTestId("pheno-evidence-goals-toggle-structure"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-confirmation"));
     expect(screen.getByTestId("pheno-step-confirmation")).toBeDefined();
     expect(save.disabled).toBe(true);
     fireEvent.click(save);

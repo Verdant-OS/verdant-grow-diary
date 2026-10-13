@@ -340,9 +340,9 @@ describe("PhenoHuntNew onboarding flow", () => {
     );
   });
 
-  // Codex on #1843: a restored draft holding only unknown goal ids must not
-  // read "None selected" while readiness still treats goals as chosen.
-  it("a restored draft with only unknown goal ids falls back to the suggested set consistently", async () => {
+  // t205u: a restored draft whose stored goal ids all drop out stays empty.
+  // Fresh defaults remain only when the draft omits evidenceGoals.
+  it("a restored draft with only unknown goal ids stays empty until the grower chooses", async () => {
     entMode.current = "pro";
     setLocalStorageItemForTest(
       "verdant:pheno-hunt-draft:u1:grow-1:all",
@@ -358,11 +358,11 @@ describe("PhenoHuntNew onboarding flow", () => {
       renderPage();
       await waitFor(() => screen.getByTestId("ph-draft-restored"));
       expect(screen.getByTestId("pheno-evidence-goals-summary").textContent).toBe(
-        "8 of 12 selected — the suggested starting set",
+        "None selected yet — choose at least one goal",
       );
       expect(
         screen.getByTestId("pheno-onboarding-stepper-step-goals").getAttribute("data-complete"),
-      ).toBe("true");
+      ).toBe("false");
     } finally {
       clearLocalStorageForTest();
     }

@@ -1,5 +1,6 @@
+// @source-scan-justified: the migration bytes and the workflow path filter are the artifacts under test; the harness proves runtime behaviour.
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -21,13 +22,19 @@ function wrapperBody(sql: string): string {
 }
 
 describe("Quick Log manual occurred_at UTC hash PostgreSQL 15 proof", () => {
-  it("is versioned after every other migration, so a version-ordered push never sees it out of order", () => {
+  it("sorts after the manual-chain predecessors and the newest migration it was renumbered past", () => {
+    // Fixed, durable bounds: later migrations keep this passing. 20261010120000 is
+    // #1961's migration, merged before the renumber; a lower version would sort before it.
     const version = UTC_HASH_MIGRATION.slice(0, 14);
-    const later = readdirSync(resolve("supabase/migrations")).filter(
-      (name) =>
-        name.endsWith(".sql") && name !== UTC_HASH_MIGRATION && name.slice(0, 14) >= version,
-    );
-    expect(later).toEqual([]);
+    for (const predecessor of [
+      "20260927002000",
+      "20260927160000",
+      "20260928183000",
+      "20261001140000",
+      "20261010120000",
+    ]) {
+      expect(version > predecessor).toBe(true);
+    }
   });
 
   it.each([

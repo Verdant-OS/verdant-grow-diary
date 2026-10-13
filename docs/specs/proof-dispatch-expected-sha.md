@@ -219,7 +219,7 @@ Verdict: **safe to implement**, as a tightening that only removes false-PASS pat
   holder. Claude does not implement this here.
 - **Scorer unlock:** Matthew, via `node scripts/scorer-lock.mjs --unlock …`, naming every
   renegotiated check in the PR body.
-- **Independent acceptance:** Critical Mass (non-`.tsx` scope), PASS at the exact head.
+- **Independent acceptance:** Graft (Matthew's routing, 2026-10-13), PASS at the exact head.
   Merge by Chemdawg after 35/35.
 
 ## 8. Known unknowns

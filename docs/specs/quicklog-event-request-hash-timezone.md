@@ -55,7 +55,7 @@ which the delegate renders it.
 
 ## 4. Fix (one additive migration, wrapper only)
 
-File: `supabase/migrations/20261001190000_quicklog_event_request_hash_utc.sql` (sha256
+File: `supabase/migrations/20261013190000_quicklog_event_request_hash_utc.sql` (sha256
 `d8cccdcc…a352`). The version is after #1841's `180000`. The two do not depend on each other.
 
 1. **Preflight** (P0001 `quicklog_event_request_hash_utc_preflight_unrecognized` otherwise):

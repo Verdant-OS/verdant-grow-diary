@@ -27,7 +27,7 @@ import {
 } from "./run-quicklog-event-replay-lock-pg15-harness.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-export const UTC_HASH_MIGRATION = "20261001190000_quicklog_event_request_hash_utc.sql";
+export const UTC_HASH_MIGRATION = "20261013190000_quicklog_event_request_hash_utc.sql";
 export const UTC_HASH_SHA256 = "d8cccdcc4141d3e91d94f56204115b08189e7b97b49aae61ff80aa8d8005a352";
 export const UTC_HASH_WRAPPER_MD5 = "834408e54794ac4980757f86699ce45c";
 const foundation = "20260725024026_quicklog_dual_timestamp_foundation.sql";

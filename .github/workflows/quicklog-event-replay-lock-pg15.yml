@@ -6,7 +6,7 @@ on:
     paths: &event_replay_lock_paths
       - "supabase/migrations/20260927012000_quicklog_event_replay_active_receipt.sql"
       - "supabase/migrations/20261001140000_quicklog_event_replay_mirrorless_legacy.sql"
-      - "supabase/migrations/20261001190000_quicklog_event_request_hash_utc.sql"
+      - "supabase/migrations/20261013190000_quicklog_event_request_hash_utc.sql"
       - "supabase/migrations/20260725023000_core_schema_forward_repair.sql"
       - "supabase/migrations/20260725024026_quicklog_dual_timestamp_foundation.sql"
       - "supabase/migrations/20260811090000_quicklog_corrections_retractions.sql"

@@ -45,6 +45,49 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### QUICKLOG-EVENT-REQUEST-HASH-UTC
+
+```text
+TASK QUICKLOG-EVENT-REQUEST-HASH-UTC  priority: P2  status: OPEN
+goal: Hash Quick Log event replays independently of the session TimeZone. One additive,
+  wrapper-only migration runs the frozen delegate under UTC, keeps same-offset acceptance of
+  pre-repair non-UTC hashes and restores the caller's zone. Event-path companion to #1841
+  (manual path). Spec: docs/specs/quicklog-event-request-hash-timezone.md
+branch: claude/quicklog-event-occurred-at-utc-hash
+base: verdant-grow-diary; the owner force-pushed the branch on 2026-10-12 18:56 UTC as one squashed
+  commit on 8e1ffe395. Earlier heads (18d610f1b, edb41c88f, b7481653d) are superseded.
+checkout: git fetch origin claude/quicklog-event-occurred-at-utc-hash verdant-grow-diary && git switch claude/quicklog-event-occurred-at-utc-hash && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1846 (ready for review; the owner
+  marked it ready 2026-10-12 18:56 UTC)
+head_sha: a4c309777226252d7cfa27f052785e60d9f5dbd7, remote observed 2026-10-13 17:52 UTC
+state: CI at a4c30977: 34/35 required SUCCESS. Required "Full test suite (shard 11/32)" FAILS in
+  src/test/quicklog-event-request-hash-utc-pg15-harness.test.ts ("is versioned after its predecessor
+  and every merged migration"): 20261010120000_sensor_readings_notes_and_unit_unconfirmed.sql
+  (#1961) merged after this migration's version, 20261001190000. That is a real ordering defect,
+  not a flake: Supabase does not apply a migration older than recorded history. The non-required
+  "Browser census" job also fails; NOT_MEASURED here. Hosted PG15 harness 13/0 and the
+  lock harness 10/0 passed at an earlier head with byte-identical migration content.
+  "native save/retrieve (local backend)" failed once at b7481653d on a retraction-reason chip
+  click (manual path, outside this change) and passed on re-run (attempt 2).
+next_action: Once Matthew names the action (migration gate), rename the migration to a version after
+  the newest merged migration and update UTC_HASH_MIGRATION in the harness, the workflow path
+  filter and the spec. The file bytes, the sha256 pin and the wrapper md5 pins do not change. Then
+  re-run the hosted PG15 job.
+files: supabase/migrations/20261001190000_quicklog_event_request_hash_utc.sql;
+  scripts/run-quicklog-event-request-hash-utc-pg15-harness.mjs;
+  src/test/quicklog-event-request-hash-utc-pg15-harness.test.ts;
+  .github/workflows/quicklog-event-replay-lock-pg15.yml;
+  docs/specs/quicklog-event-request-hash-timezone.md
+blockers: Matthew: any migration change, and any ship/merge (migration PRs are held for him).
+  Independent review not yet performed.
+artifacts: PR #1846 body (RED/GREEN, local and hosted evidence); hosted PG15 run 36894367680;
+  shard 11 failure run 38294348060
+reviewer_seat: Blue Dream or Durban Poison (DB), per CURRENT_STATE "Start here"; Grok 91 routes
+claimed_by: empty. No PR claim comment has been posted, because GitHub comments need
+  Matthew's approval. Author: Claude.
+last_updated: 2026-10-13 12:54 CT, by Claude
+```
+
 ### SEARCH-PREVIEW-BLANK-QUERY-FOLLOWUP
 
 ```text

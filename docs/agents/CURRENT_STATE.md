@@ -33,6 +33,10 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-13T21:42 UTC
+
+- **NOT_MEASURED, #2056: unchanged at `adb61aca9`, CI still queued.** #2056's head is still `adb61aca925f4163b5fca9cf0e1c46521bd0c6c6`; no commit has been added since the 21:35 UTC block, so its CI is no longer being restarted. At 21:42 UTC: required contexts 34 queued / 1 not yet reported, 0 failing; must-be-green 2 queued / 5 not reported; draft, mergeable state `blocked`, no reviews, no requested reviewer, 0 unresolved threads; 5 commits behind the tip `3b984887c`, not synced. Repository-wide: 263 runs queued, 13 in progress, so the wait is the shared Actions queue. Next step unchanged: 35/35 at `adb61aca9`, an independent reviewer, then Matthew's Accept.
+
 ## Follow-up observation — 2026-10-13T21:35 UTC
 
 - **NOT_MEASURED, #2056 (the 2026-10-13 CURRENT_STATE status PR for #1858): CI pending at a head that will now stay put.** #2056's head is `adb61aca925f4163b5fca9cf0e1c46521bd0c6c6`. Owner Claude; draft; mergeable state `blocked` (CI pending, no review). At 21:35 UTC: required contexts 34 queued / 1 not yet reported, 0 failing; no reviews, no requested reviewer, 0 unresolved threads. It is 5 commits behind the tip `3b984887c` and has not been synced, because a sync would create another head. It adds twelve dated blocks (17:58–21:29 UTC) recording #1858's path to merge (#1858 merged 20:30:54 UTC as `fb5a921ec`) and #2056's own status. Repository-wide: 212 runs queued, 12 in progress.

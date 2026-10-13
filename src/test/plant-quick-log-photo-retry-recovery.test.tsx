@@ -56,6 +56,9 @@ vi.mock("@/integrations/supabase/client", () => ({
         const id = "22222222-2222-4222-8222-" + String(state.events.size + 1).padStart(12, "0");
         state.events.set(key, {
           id,
+          event_type: "observation",
+          source: "manual",
+          is_deleted: false,
           note: payload.p_note,
           plant_id: payload.p_target_id,
           tent_id: "tent-1",

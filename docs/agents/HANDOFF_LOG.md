@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SEARCH-PREVIEW-BLANK-QUERY-FOLLOWUP
+
+```text
+TASK SEARCH-PREVIEW-BLANK-QUERY-FOLLOWUP  priority: P2  status: OPEN
+goal: Omit the search-preview metadata wrapper for empty or whitespace-only queries; preserve nonblank query text, test hook, diagnostic attributes and the human preview label.
+branch: codex/search-preview-blank-query-followup
+base: verdant-grow-diary at 3004b615204954196b9d220032f88236e7e790ca (#2012 merged)
+checkout: git fetch origin codex/search-preview-blank-query-followup verdant-grow-diary && git switch codex/search-preview-blank-query-followup && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED until bootstrap draft opens; use the branch's current draft metadata
+head_sha: 3004b615204954196b9d220032f88236e7e790ca, base observed 2026-10-13 16:07 UTC; this bootstrap commit cannot name itself
+state: Bootstrap only; no application or test edits yet. Matthew approved this deferred slice in Sentinel_e5703b64ad7c8191977839eb8b36991c at 2026-10-13 16:01 UTC. Original Linear VER-107 is not a verified new follow-up record.
+next_action: Open and claim the draft, re-read claims, then add one direct rendered-component regression test and demonstrate RED before the wrapper fix. Keep draft.
+files: src/components/GlobalSearchResultPreview.tsx; NEW src/test/global-search-preview-blank-query.test.tsx; docs/agents/HANDOFF_LOG.md (only this distinct block)
+blockers: Independent acceptance must come from another eligible reviewer; Codex authored this work and cannot accept it. No scorer unlock or additional production scope is authorized.
+artifacts: PR body will hold full current head and validation receipts; local evidence in C:/Users/G8/AppData/Local/Temp/verdant-search-preview-task3. All 86 open PR file lists checked 2026-10-13 16:15 UTC: no implementation-path overlaps.
+reviewer_seat: Blue Dream (product .tsx); other eligible independently assigned reviewer may accept, never the author
+claimed_by: Codex-search-preview-task3, 2026-10-13 16:16 UTC; pending PR claim comment
+last_updated: 2026-10-13 16:16 UTC, by Codex-search-preview-task3
+```
+
 ### PR-1939-NOT-FOUND-COVERAGE
 
 ```text

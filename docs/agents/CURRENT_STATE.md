@@ -33,6 +33,11 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-13T19:54 UTC
+
+- **PASS, #1858 in the merge queue at the accepted head `f87850bed`.** The `pull_request` `ci.yml` run `38453065029` (started by the 19:12 UTC reopen) finished **success** at `f87850bedf94c99daaf46c6c32af8851b167c091` around 19:53 UTC. Of the 26 `pull_request` runs at that commit: 24 success, 1 skipped, 1 still queued, 0 failed. Re-checked before enqueueing: head unchanged, not draft, no labels, auto-merge off. This session enqueued #1858 at 19:54:16 UTC with the GraphQL `enqueuePullRequest` mutation, `expectedHeadOid` = `f87850bed`. It used the direct mutation, not `gh pr merge`, so a refusal could not fall back to enabling auto-merge. GitHub accepted it: the queue entry reads **QUEUED → AWAITING_CHECKS, position 4**, auto-merge still off, not merged. The queue entry does not expose its head commit; `expectedHeadOid` made GitHub check the head at enqueue time. This supports the 19:21 UTC `inference`: the earlier refusal came from the required contexts being produced by `workflow_dispatch` runs, not from a missing check.
+- **Next step:** the merge queue's own `merge_group` CI, then the merge. If #1858 merges, delete `claude/current-state-1857-status` and its local worktree. If the queue drops it, report rather than push. Deploy tip at 19:54 UTC: `0e26e2397` (#1930, 18:59 UTC).
+
 ## Follow-up observation — 2026-10-13T19:27 UTC
 
 - **NOT_MEASURED, #1858 pull-request CI at `f87850bed`: most lanes done, the required-check run still waiting.** #1858 is unchanged: head `f87850bedf94c99daaf46c6c32af8851b167c091`, open, not draft, not merged, not in the merge queue, auto-merge off. Of the 26 `pull_request` runs the 19:12 UTC reopen started: **20 success, 1 skipped, 3 in progress, 2 queued, 0 failed** (up from 5 success at 19:21 UTC). The run that produces the 35 required contexts, `ci.yml` `38453065029`, is one of the two still queued (no update since 19:12:57 UTC). Repository-wide: 204 runs queued, 31 in progress. Enqueueing still waits on that run finishing green at an unchanged head.

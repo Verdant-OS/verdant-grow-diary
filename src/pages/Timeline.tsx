@@ -174,6 +174,7 @@ import {
 import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
 import { TimelineEntryOpenButton } from "@/components/TimelineEntryOpenButton";
 import {
+  resolveCollidingOpenLabels,
   timelineEntryOpenAccessibleName,
   timelineEntryOpenContext,
 } from "@/lib/timelineEntryOpenLabelRules";
@@ -1274,6 +1275,44 @@ export default function Timeline() {
     effectiveEndDate,
     plantNamesById,
   ]);
+
+  const openLabelsById = useMemo(() => {
+    const rows = filtered.map((e) => {
+      const effectiveCareType = resolveEffectiveQuickLogCareType({
+        details: e.details,
+      });
+      const et = getEventType(effectiveCareType);
+      const place = resolveTimelineCardPlaceLabels({
+        plantId: e.plant_id,
+        tentId: e.tent_id,
+        details: e.details,
+        plantNamesById,
+        tentNamesById,
+      });
+      const openOccurredAt = Number.isNaN(new Date(e.entry_at).getTime())
+        ? ""
+        : format(new Date(e.entry_at), "PP");
+      const openDifferentiator = Number.isNaN(new Date(e.entry_at).getTime())
+        ? ""
+        : format(new Date(e.entry_at), "p");
+      const openContext = timelineEntryOpenContext({
+        plantName: place.plantName ?? undefined,
+        tentName: place.tentName,
+        note: e.note,
+      });
+      return {
+        id: e.id,
+        note: e.note,
+        label: timelineEntryOpenAccessibleName({
+          title: et.label,
+          occurredAtLabel: openOccurredAt,
+          differentiator: openDifferentiator,
+          context: openContext,
+        }),
+      };
+    });
+    return resolveCollidingOpenLabels(rows);
+  }, [filtered, plantNamesById, tentNamesById]);
 
   const renderedDiaryAnchorIds = useMemo(
     () => buildRenderedDiaryTimelineAnchorIds(filtered),
@@ -2511,12 +2550,14 @@ export default function Timeline() {
                             tentName: place.tentName,
                             note: e.note,
                           });
-                          const openLabel = timelineEntryOpenAccessibleName({
-                            title: et.label,
-                            occurredAtLabel: openOccurredAt,
-                            differentiator: openDifferentiator,
-                            context: openContext,
-                          });
+                          const openLabel =
+                            openLabelsById.get(e.id) ??
+                            timelineEntryOpenAccessibleName({
+                              title: et.label,
+                              occurredAtLabel: openOccurredAt,
+                              differentiator: openDifferentiator,
+                              context: openContext,
+                            });
                           // Canonical snapshots win, followed by the legacy
                           // `sensor` shape and Plant Quick Log's compatibility
                           // envelope. No persisted row is rewritten.

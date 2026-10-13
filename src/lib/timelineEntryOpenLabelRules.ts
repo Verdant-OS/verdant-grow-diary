@@ -1,5 +1,6 @@
 const MAX_OPEN_SUBJECT_LENGTH = 80;
 const MAX_OPEN_CONTEXT_LENGTH = 40;
+const MAX_OPEN_COLLISION_SUFFIX_LENGTH = 24;
 
 /**
  * Separates a minute clock label from a legacy entry-id suffix.
@@ -66,4 +67,59 @@ export function timelineEntryOpenAccessibleName(input: {
   const context = conciseOpenContext(input.context);
   const subject = [title, when, clock, context].filter((part) => part.length > 0).join(" ");
   return subject.length > 0 ? `Open ${subject}` : "Open entry";
+}
+
+function normalizeOpenNote(value: string | null | undefined): string {
+  if (typeof value !== "string") return "";
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function sharedPrefix(values: readonly string[]): string {
+  if (values.length === 0) return "";
+  let prefix = values[0] ?? "";
+  for (let index = 1; index < values.length; index += 1) {
+    const value = values[index] ?? "";
+    const limit = Math.min(prefix.length, value.length);
+    let length = 0;
+    while (length < limit && prefix[length] === value[length]) length += 1;
+    prefix = prefix.slice(0, length);
+    if (prefix.length === 0) return "";
+  }
+  return prefix;
+}
+
+/**
+ * When two rendered Open names match, speak the part of each note that the
+ * shared start does not already cover. The 40-character excerpt can hide
+ * that difference. Raw entry ids stay unspoken.
+ */
+export function resolveCollidingOpenLabels(
+  rows: readonly { id: string; label: string; note?: string | null }[],
+): ReadonlyMap<string, string> {
+  const indexesByLabel = new Map<string, number[]>();
+  rows.forEach((row, index) => {
+    const indexes = indexesByLabel.get(row.label);
+    if (indexes) indexes.push(index);
+    else indexesByLabel.set(row.label, [index]);
+  });
+
+  const resolved = new Map<string, string>();
+  for (const indexes of indexesByLabel.values()) {
+    const first = rows[indexes[0]];
+    if (!first) continue;
+    if (indexes.length < 2) {
+      resolved.set(first.id, first.label);
+      continue;
+    }
+    const notes = indexes.map((index) => normalizeOpenNote(rows[index]?.note));
+    const prefix = sharedPrefix(notes);
+    indexes.forEach((index, position) => {
+      const row = rows[index];
+      if (!row) return;
+      const remainder = (notes[position] ?? "").slice(prefix.length).trim();
+      const spoken = remainder.slice(0, MAX_OPEN_COLLISION_SUFFIX_LENGTH).trimEnd();
+      resolved.set(row.id, spoken.length > 0 ? `${row.label} ${spoken}` : row.label);
+    });
+  }
+  return resolved;
 }

@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### QUICKLOG-LOCAL-TIMEZONE
+
+```text
+TASK QUICKLOG-LOCAL-TIMEZONE  priority: other  status: OPEN
+goal: Quick Log timeline clocks and the days they group under use the viewer's local timezone. Stored ISO values stay UTC. Issues #1946 and #1948 are referenced; #1946's merged subject is archived-grow notes, and this slice is the display clock those notes still render through.
+branch: cursor/quicklog-local-timezone-ec09
+base: verdant-grow-diary
+checkout: git fetch origin cursor/quicklog-local-timezone-ec09 verdant-grow-diary && git switch cursor/quicklog-local-timezone-ec09 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1949 (draft)
+head_sha: confirm origin/cursor/quicklog-local-timezone-ec09 after the review follow-up push. Earlier implementation commit 68da34dbfd51b2e87426b6500d9027c45685f0c9.
+state: review follow-up on the draft. Stay draft. No ready, merge, or Publish.
+next_action: required CI at the new head. Stay draft.
+files: src/lib/quickLogGroupedTimelineFilterViewModel.ts; src/components/QuickLogGroupedTimelineSection.tsx; src/lib/aiDoctorPhase1TimelineEvidenceViewModel.ts; src/test/quick-log-timeline-local-timezone.test.ts; src/test/quick-log-timeline-day-heading.test.tsx; src/test/plant-timeline-quick-log-ui-accessibility.test.tsx; src/test/plant-timeline-quick-log-ui-hardening.test.tsx; src/test/quick-log-grouped-review-panel.test.tsx
+blockers: none on the scorer pins. Cheeko (Matthew Cheek) approved them at 2026-10-09T14:27:00-05:00. The review panel pin is the exact UTC string May 6, 2026, 10:00 AM. No production data, schema, auth, or RLS change.
+artifacts: scorer report on the PR: 3 changed scorers, 0 still locked.
+reviewer_seat: Blue Dream (QuickLogGroupedTimelineSection.tsx); Critical Mass (rules and tests)
+claimed_by:
+last_updated: 2026-10-09 14:33 CT, by Grok
+```
+
 ### PR-1939-NOT-FOUND-COVERAGE
 
 ```text

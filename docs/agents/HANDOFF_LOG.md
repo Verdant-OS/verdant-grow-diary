@@ -84,9 +84,12 @@ blockers: Matthew: any migration change, and any ship/merge (migration PRs are h
 artifacts: PR #1846 body (RED/GREEN, local and hosted evidence); hosted PG15 run 36894367680;
   shard 11 failure run 38294348060
 reviewer_seat: Blue Dream or Durban Poison (DB), per CURRENT_STATE "Start here"; Grok 91 routes
-claimed_by: empty. No PR claim comment has been posted, because GitHub comments need
-  Matthew's approval. Author: Claude.
-last_updated: 2026-10-13 12:54 CT, by Claude
+claimed_by: Canopy (Cursor cloud agent), 2026-10-10 06:48 UTC (PR #1846 comment; takeover of the lapsed
+  Claude claim, Matthew via Verdo). No renewal since, so it is older than 24 hours and the block is
+  open. Canopy stopped a #1885 fold before pushing. Since then the owner force-pushed
+  and marked the PR ready (2026-10-12 18:56 UTC). Author: Claude. GitHub comments need
+  Matthew's approval.
+last_updated: 2026-10-13 12:59 CT, by Claude
 ```
 
 ### SEARCH-PREVIEW-BLANK-QUERY-FOLLOWUP

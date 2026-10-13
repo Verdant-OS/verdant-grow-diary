@@ -1,5 +1,6 @@
 /**
- * RewardedReferralCard — "refer a friend, you both get 10 AI Doctor credits".
+ * RewardedReferralCard — "refer a friend": the friend gets 10 AI Doctor credits, and the
+ * referrer gets 10 for each friend, up to a monthly (UTC) cap.
  *
  * A NEW rewarded surface, deliberately separate from the reward-free /invite
  * share card (that surface is test-fenced against referral rewards). Mirrors
@@ -21,6 +22,7 @@ import {
   loadOwnReferralCode,
   REFERRAL_GET_CREDITS,
   REFERRAL_GIVE_CREDITS,
+  REFERRAL_GIVE_MONTHLY_CAP,
   type ReferralCodeClient,
   type ReferralShareData,
 } from "@/lib/referralShareRules";
@@ -102,8 +104,9 @@ export default function RewardedReferralCard() {
   return (
     <div data-testid="rewarded-referral-card">
       <p className="text-sm leading-6 text-muted-foreground">
-        Share your link. When a friend signs up and confirms their email, you get{" "}
-        {REFERRAL_GIVE_CREDITS} AI Doctor credits and they get {REFERRAL_GET_CREDITS}.
+        Share your link. When a friend signs up and confirms their email, they get{" "}
+        {REFERRAL_GET_CREDITS} AI Doctor credits. You get {REFERRAL_GIVE_CREDITS} for each one, up
+        to {REFERRAL_GIVE_MONTHLY_CAP} friends per calendar month (UTC).
       </p>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         <Input

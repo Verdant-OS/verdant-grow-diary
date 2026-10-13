@@ -286,10 +286,10 @@ export default function Coach() {
           setPhotoPreviewStatus("empty");
           throw new Error(coachPhotoValidation.message);
         }
-        const publishPhoto = async (path: string, contentType: string) => {
+        const publishPhoto = async (path: string, options: { contentType: string }) => {
           const { error } = await supabase.storage
             .from("diary-photos")
-            .upload(path, photoFile, { contentType });
+            .upload(path, photoFile, options);
           if (error) throw error;
           const { data: signed, error: sErr } = await supabase.storage
             .from("diary-photos")
@@ -301,28 +301,17 @@ export default function Coach() {
           }
         };
         if (coachPhotoValidation.mime === "image/gif") {
-          await publishPhoto(
-            `${user.id}/coach/${Date.now()}.${coachPhotoValidation.extension}`,
-            coachPhotoValidation.mime,
-          );
+          await publishPhoto(`${user.id}/coach/${Date.now()}.${coachPhotoValidation.extension}`, {
+            contentType: coachPhotoValidation.mime,
+          });
         } else if (photoValidation.ok === false) {
           setPhotoFile(null);
           setPhotoPreviewStatus("empty");
           throw new Error(photoValidation.message);
         } else {
-          const path = `${user.id}/coach/${Date.now()}.${photoValidation.extension}`;
-          const { error } = await supabase.storage
-            .from("diary-photos")
-            .upload(path, photoFile, { contentType: photoValidation.mime });
-          if (error) throw error;
-          const { data: signed, error: sErr } = await supabase.storage
-            .from("diary-photos")
-            .createSignedUrl(path, 600);
-          if (sErr) throw sErr;
-          photoUrl = signed.signedUrl;
-          if (pendingCoachRequestRef.current?.idempotencyKey === idempotencyKey) {
-            pendingCoachRequestRef.current = { ...selectedRequest, photoUrl };
-          }
+          await publishPhoto(`${user.id}/coach/${Date.now()}.${photoValidation.extension}`, {
+            contentType: photoValidation.mime,
+          });
         }
       }
       invocationStarted = true;

@@ -16,6 +16,8 @@
  *    future / pen-entered snapshots benefit without a schema change.
  */
 
+import { extractManualDeviceNote } from "@/lib/manualSensorSourceLabel";
+import { PPFD_LABEL, PPFD_UNIT_LONG } from "@/lib/ppfdRules";
 import { classifyManualMetric } from "@/lib/sensorTruthRules";
 
 export type ChangeContextMetric =
@@ -24,6 +26,7 @@ export type ChangeContextMetric =
   | "vpd_kpa"
   | "co2_ppm"
   | "soil_moisture_pct"
+  | "ppfd"
   | "soil_ec_ms_cm"
   | "reservoir_ph";
 
@@ -33,11 +36,18 @@ export interface ChangeContextReading {
   value: number | null | undefined;
   source?: string | null;
   tent_id?: string | null;
+  /** Stored `sensor_readings.device_id`, including the `manual:` prefix. */
+  device_id?: string | null;
 }
 
 export interface ChangeContextSnapshot {
   ts: string;
   metrics: Partial<Record<ChangeContextMetric, number>>;
+  /**
+   * Optional device label for this snapshot, with the `manual:` prefix
+   * already removed. Null when the rows carried no manual device note.
+   */
+  deviceNote?: string | null;
 }
 
 export interface ChangeContextDelta {
@@ -79,6 +89,7 @@ const DISPLAY_ORDER: ChangeContextMetric[] = [
   "vpd_kpa",
   "co2_ppm",
   "soil_moisture_pct",
+  "ppfd",
   "soil_ec_ms_cm",
   "reservoir_ph",
 ];
@@ -89,6 +100,7 @@ const METRIC_LABEL: Record<ChangeContextMetric, string> = {
   vpd_kpa: "VPD",
   co2_ppm: "CO₂",
   soil_moisture_pct: "Soil",
+  ppfd: PPFD_LABEL,
   soil_ec_ms_cm: "Soil EC",
   reservoir_ph: "pH",
 };
@@ -139,6 +151,8 @@ export function groupManualReadingsToSnapshots(
     if (snap.metrics[r.metric as ChangeContextMetric] === undefined) {
       snap.metrics[r.metric as ChangeContextMetric] = v;
     }
+    const note = extractManualDeviceNote(r.device_id);
+    if (note && !snap.deviceNote) snap.deviceNote = note;
     buckets.set(key, snap);
   }
   return [...buckets.values()].sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
@@ -195,6 +209,12 @@ function formatDelta(
       delta = Math.round((latest - previous) * 100) / 100;
       label = "pH";
       formatted = `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}`;
+      break;
+    }
+    case "ppfd": {
+      delta = Math.round(latest - previous);
+      label = PPFD_LABEL;
+      formatted = `${delta >= 0 ? "+" : ""}${delta} ${PPFD_UNIT_LONG}`;
       break;
     }
   }

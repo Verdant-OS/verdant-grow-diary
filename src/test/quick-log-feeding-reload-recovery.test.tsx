@@ -4,12 +4,53 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import type { QuickLogFeedingEventRpcArgs } from "@/lib/writeFeedingTypedEvent";
 import { claimPendingQuickLogNote } from "@/lib/quickLogPendingNoteStore";
+import { readPendingQuickLogFeeding } from "@/lib/quickLogPendingFeedingStore";
 
 const owner = vi.hoisted(() => ({ id: "owner-a" }));
+// Readback faults for the reused-receipt check; both off by default.
+const readback = vi.hoisted(() => ({ missingChild: false, error: false }));
 const rpc = vi.fn();
 const toastSuccess = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { rpc: (...args: unknown[]) => rpc(...args) },
+  supabase: {
+    rpc: (...args: unknown[]) => rpc(...args),
+    from: (table: string) => {
+      if (table !== "grow_events" && table !== "feeding_events")
+        throw new Error(`Unexpected table ${table}`);
+      return {
+        select: () => ({
+          eq: (_column: string, id: string) => ({
+            maybeSingle: async () => {
+              if (readback.error) return { data: null, error: new Error("read failed") };
+              if (readback.missingChild && table === "feeding_events")
+                return { data: null, error: null };
+              const args = rpc.mock.calls.at(-1)?.[1] as QuickLogFeedingEventRpcArgs | undefined;
+              return {
+                data: args
+                  ? table === "grow_events"
+                    ? {
+                        id,
+                        event_type: args.p_event_type,
+                        source: "manual",
+                        is_deleted: false,
+                        grow_id: args.p_grow_id,
+                        tent_id: args.p_tent_id,
+                        plant_id: args.p_plant_id,
+                      }
+                    : {
+                        event_id: id,
+                        volume_ml: args.p_feed.volume_ml,
+                        line_id: args.p_feed.line_id,
+                      }
+                  : null,
+                error: null,
+              };
+            },
+          }),
+        }),
+      };
+    },
+  },
 }));
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: owner.id } }) }));
 vi.mock("@/hooks/use-plants", () => ({
@@ -86,6 +127,8 @@ function acceptedThenLost() {
 }
 beforeEach(() => {
   owner.id = "owner-a";
+  readback.missingChild = false;
+  readback.error = false;
   window.sessionStorage.clear();
   rpc.mockReset();
   toastSuccess.mockReset();
@@ -580,4 +623,41 @@ it("keeps a malformed receipt unresolved across a target-changing remount and re
   expect(rpc.mock.calls[1][1]).toEqual(original);
   expect(original).toMatchObject({ p_plant_id: "plant-a", p_grow_id: "grow-a" });
   expect(window.sessionStorage.getItem(storageKey())).toBeNull();
+});
+
+describe("Feed reused receipt that cannot be verified", () => {
+  it.each([
+    ["a missing feeding child", () => (readback.missingChild = true)],
+    ["a readback error", () => (readback.error = true)],
+  ])("keeps the key and claim after %s, and Retry reuses that key", async (_label, fault) => {
+    fault();
+    rpc.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+      error: null,
+    });
+    sheet();
+    fill();
+    await uncertain();
+    const original = rpc.mock.calls[0][1];
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(screen.getByTestId("qlv2-save-retry")).toBeEnabled();
+    expect(screen.queryByTestId("qlv2-history-review-link")).toBeNull();
+    const pending = readPendingQuickLogFeeding("owner-a");
+    expect(pending.status).toBe("pending");
+    if (pending.status !== "pending") throw new Error("claim was released");
+    expect(pending.record.payload.idempotency_key).toBe(original.p_idempotency_key);
+    expect(pending.record.historyCheckReason).toBeUndefined();
+
+    readback.missingChild = false;
+    readback.error = false;
+    rpc.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+      error: null,
+    });
+    fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+    await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc.mock.calls[1][1]).toEqual(original);
+    expect(readPendingQuickLogFeeding("owner-a").status).toBe("empty");
+  });
 });

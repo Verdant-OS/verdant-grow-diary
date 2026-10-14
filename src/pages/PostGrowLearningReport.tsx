@@ -237,7 +237,7 @@ export default function PostGrowLearningReport() {
 
   if (showLocked) {
     const paywallVm = buildPaywallCtaViewModel({
-      featureTitle: "Unlock the Post-Grow Learning Report",
+      featureTitle: "The Post-Grow Learning Report",
       requiredPlanLabel: "Pro",
     });
     return (

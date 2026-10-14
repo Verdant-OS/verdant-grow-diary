@@ -221,6 +221,11 @@ function deps(): Deps {
         ),
       );
     },
+    async clawbackCreditPack() {
+      // This cluster loads no credit-pack ledger; every refund here is a
+      // founder purchase. credit-pack-refund-clawback-db.test.ts covers packs.
+      return { ok: true, reason: "no_grant" };
+    },
     async revokeFounderLifetime(input) {
       const result = JSON.parse(
         serviceSql(

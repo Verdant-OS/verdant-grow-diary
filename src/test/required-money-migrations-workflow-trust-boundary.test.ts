@@ -165,7 +165,7 @@ function jobEnvironment(job: string): string {
 }
 
 const TRUSTED_SANDBOX_CONDITION =
-  "${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox') }}";
+  "${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox' }}";
 const TRUSTED_LIVE_CONDITION =
   "${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' }}";
 const TRUSTED_REMOTE_JOB_CONDITIONS = new Map([
@@ -237,12 +237,14 @@ describe("required-money-migrations workflow trust boundary", () => {
     expect(REQUIRED_WORKFLOW).not.toContain("SUPABASE_PROJECT_REF");
   });
 
-  it("allows sandbox DB access only on trusted pushes or trusted manual dispatch", () => {
+  // AGENTS.md "CI probes production or nothing": no push-triggered job may probe a
+  // non-production database, so the sandbox probe is manual dispatch only.
+  it("allows sandbox DB access only on trusted manual dispatch, never on push", () => {
     expect(SANDBOX_JOB).toContain("environment: verdant-sandbox");
-    expect(SANDBOX_JOB).toContain("github.event_name == 'push'");
+    expect(SANDBOX_JOB).not.toContain("github.event_name == 'push'");
     expect(SANDBOX_JOB).toContain("github.event_name == 'workflow_dispatch'");
     expect(SANDBOX_JOB).toContain("inputs.target_env == 'sandbox'");
-    expect(SANDBOX_JOB.match(/github\.ref == 'refs\/heads\/verdant-grow-diary'/g)).toHaveLength(2);
+    expect(SANDBOX_JOB.match(/github\.ref == 'refs\/heads\/verdant-grow-diary'/g)).toHaveLength(1);
     expect(SANDBOX_JOB).not.toContain("pull_request");
     expect(SANDBOX_JOB).not.toContain("SUPABASE_DB_URL_LIVE");
     expect(SANDBOX_JOB).toContain("secrets.SUPABASE_DB_URL_SANDBOX");
@@ -312,14 +314,14 @@ describe("prefix-diff-sarif workflow trust boundary", () => {
     expect(hasOnlinePrefixDiffInvocation(PREFIX_OFFLINE_JOB)).toBe(false);
   });
 
-  it("gates sandbox DB evidence to trusted push/manual events and verdant-sandbox", () => {
+  it("gates sandbox DB evidence to trusted manual events and verdant-sandbox, never push", () => {
     expect(PREFIX_SANDBOX_JOB).toContain("environment: verdant-sandbox");
-    expect(PREFIX_SANDBOX_JOB).toContain("github.event_name == 'push'");
+    expect(PREFIX_SANDBOX_JOB).not.toContain("github.event_name == 'push'");
     expect(PREFIX_SANDBOX_JOB).toContain("github.event_name == 'workflow_dispatch'");
     expect(PREFIX_SANDBOX_JOB).toContain("inputs.target_env == 'sandbox'");
     expect(
       PREFIX_SANDBOX_JOB.match(/github\.ref == 'refs\/heads\/verdant-grow-diary'/g),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(PREFIX_SANDBOX_JOB).toContain("secrets.SUPABASE_DB_URL_SANDBOX");
     expect(PREFIX_SANDBOX_JOB).not.toContain("SUPABASE_DB_URL_LIVE");
     expect(PREFIX_SANDBOX_JOB).not.toContain("pull_request");
@@ -346,12 +348,8 @@ describe("prefix-diff-sarif workflow trust boundary", () => {
     expect(PREFIX_LIVE_JOB).toContain("Block on live tooling error");
     expect(PREFIX_LIVE_JOB).toMatch(/if:.*diff-json\.outputs\.exit == '2'/);
     // The live job must NOT hard-fail on `!= '0'` (which would conflate exit 1 and 2).
-    expect(PREFIX_LIVE_JOB).not.toMatch(
-      /if:\s*steps\.diff-json\.outputs\.exit != '0'/,
-    );
-    expect(PREFIX_LIVE_JOB).not.toMatch(
-      /if:\s*steps\.diff-sarif\.outputs\.exit != '0'/,
-    );
+    expect(PREFIX_LIVE_JOB).not.toMatch(/if:\s*steps\.diff-json\.outputs\.exit != '0'/);
+    expect(PREFIX_LIVE_JOB).not.toMatch(/if:\s*steps\.diff-sarif\.outputs\.exit != '0'/);
   });
 
   it("has no combined or cross-environment secret fallback", () => {

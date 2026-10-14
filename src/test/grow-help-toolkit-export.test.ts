@@ -95,6 +95,51 @@ function createCompleteExportState(includeDriedWeight = true): GrowHelpToolkitSt
 }
 
 describe("Grow Help Toolkit export snapshot", () => {
+  it.each([
+    ["fixture count", (state: GrowHelpToolkitState) => (state.light.fixtureCount = null)],
+    [
+      "canopy efficiency",
+      (state: GrowHelpToolkitState) => (state.light.canopyEfficiencyPercent = null),
+    ],
+  ])("omits planning-light results when %s is cleared", (_label, clearRequiredInput) => {
+    const state = createCompleteExportState();
+    clearRequiredInput(state);
+
+    const items = createGrowHelpExportSnapshot(state, "Fixed label").rows.map((row) => row.item);
+    expect(items).not.toContain("Planning average PPFD");
+    expect(items).not.toContain("Planning DLI");
+  });
+
+  it("omits DLI, light energy, and cost results when shared photoperiod is cleared", () => {
+    const state = createCompleteExportState();
+    state.cycle.flowerPhotoperiodHours = null;
+
+    const rows = createGrowHelpExportSnapshot(state, "Fixed label").rows;
+    expect(rows).toContainEqual({
+      section: "Cycle",
+      item: "Flower photoperiod",
+      value: "Not entered",
+      unit: "h/day",
+      formula: "shared Cycle bar",
+    });
+    expect(rows.map((row) => row.item)).not.toEqual(
+      expect.arrayContaining([
+        "Planning DLI",
+        "Fixture cycle energy",
+        "Fixture cycle electricity",
+        "Cycle total",
+      ]),
+    );
+  });
+
+  it("omits expense totals when required amortization cycles are cleared", () => {
+    const state = createCompleteExportState();
+    state.expense.amortizationCycles = null;
+
+    const items = createGrowHelpExportSnapshot(state, "Fixed label").rows.map((row) => row.item);
+    expect(items).not.toContain("First-cycle total");
+    expect(items).not.toContain("Operating-only amortized cost per gram");
+  });
   it("builds all populated sections with visible values, units, and formulas", () => {
     const snapshot = createGrowHelpExportSnapshot(
       createCompleteExportState(),

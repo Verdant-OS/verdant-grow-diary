@@ -24,9 +24,10 @@ Grow → Tent → Plant → Diary/Logs → Photo → Sensor Snapshot → AI Doct
 ## Grow Help Toolkit
 
 `/tools/grow-help-toolkit` is a client-side nutrient, grow-light, and expense
-planner. It uses no account, backend, analytics, device control, or live sensor
-data. The last inputs are stored only in browser `localStorage`; CSV and print
-exports are also generated in the browser.
+planner. It requires no account or Toolkit backend, sends no calculator inputs
+to analytics, and uses no device control or live sensor data. The last inputs
+are stored only in browser `localStorage`; CSV and print exports are also
+generated in the browser.
 
 Core formulas:
 
@@ -55,6 +56,12 @@ not measured PAR maps. Nutrient EC/PPM ranges are typical starting references,
 not guarantees. Cost-per-weight accepts dried saleable weight only and never
 prefills a yield or market price. Optional N/P/K ppm entries are grower-entered
 planning notes only; they do not infer a dose without product elemental analysis.
+
+The in-app About panel keeps the reviewed capability sources beside a short note
+explaining what each reference informed. It also links bidirectionally with the
+public VPD calculator (`/tools/vpd-calculator`), grow-stage target bands
+(`/tools/blueprint-targets`), and grow guides (`/guides`). Those pages are separate
+references: calculator inputs are never placed in a URL or transferred between tools.
 
 ## Local setup
 

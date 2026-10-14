@@ -37,8 +37,6 @@ const INTENTIONALLY_DORMANT: Record<string, string> = {
   // #581 disposition sweep, 2026-07-30; keep alphabetized.
   "datadog-synthetics.yml":
     "monitors deployed production synthetics (needs DD_API_KEY/DD_APP_KEY); per-merge default-branch runs are a separate decision",
-  "gamification-staging-smoke.yml":
-    "needs staging Supabase secrets; payload steps have a broken env-scope gate and have never executed — fix gating before retargeting",
   "pheno-disabled-compare-e2e.yml":
     "needs Playwright browsers, E2E account secrets, and a deployed E2E_BASE_URL; run via workflow_dispatch against a configured environment",
   "release-receipt-ci.yml":

@@ -10,6 +10,8 @@ import {
   readGeminiDirectApiKey,
   resolveGeminiDirectChat,
 } from "./geminiDirectChat.ts";
+import { handleAiDoctorReviewRequest } from "../ai-doctor-review/index.ts";
+import { handleAiCoachRequest } from "../ai-coach/index.ts";
 
 const DOCTOR_KEY = "test-doctor-key-not-a-secret";
 const COACH_KEY = "test-coach-key-not-a-secret";
@@ -237,4 +239,119 @@ Deno.test("the key-before-spend check fails when the key read moves below the sp
     assertEquals(keyCheckPrecedesSpend(src.replace(KEY_READ_CALL, "null"), spendMarker), false);
     assertEquals(keyCheckPrecedesSpend(`${src}\n${KEY_READ_CALL};`, spendMarker), false);
   }
+});
+
+// Behavioural check (Codex review on #2070): the source scans above can be fooled by
+// an inactive token, so drive both handlers. With every other precondition met, a
+// request with GEMINI_API_KEY set reaches ai_credit_spend once; the same request with
+// the key unset must fail closed with zero spend calls. fetch is stubbed throughout.
+const PROBE_URL = "https://project.supabase.co";
+const PROBE_USER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+type ProbeHandler = (
+  req: Request,
+  deps: { createClient: (url: string, key: string, options?: Record<string, unknown>) => unknown },
+) => Promise<Response>;
+
+function probePacket() {
+  return {
+    schemaVersion: 1,
+    plant: { strain: "Northern Lights", stage: "flower", medium: "coco", potSize: "11 L" },
+    readiness: { state: "strong", evidence: ["sensor-snapshot"], missing: [] },
+    recentEvents: [],
+    recentSensorSnapshot: {
+      capturedAt: "2026-09-25T12:05:00.000Z",
+      severity: "ok",
+      readings: [{ field: "humidity_pct", value: 50, unit: "%" }],
+    },
+    recentSensorSnapshotAnnotation: {
+      line: "[source=manual, trust=medium] humidity_pct=50 %",
+      source: "manual",
+      stale: false,
+      trust: "medium",
+      includesValues: true,
+      safetyNotes: [],
+      missingInformationHints: [],
+    },
+  };
+}
+
+async function countSpendCalls(
+  handler: ProbeHandler,
+  path: string,
+  body: Record<string, unknown>,
+  withKey: boolean,
+): Promise<{ spends: number; status: number; body: unknown }> {
+  const env: Record<string, string> = {
+    SUPABASE_URL: PROBE_URL,
+    SUPABASE_ANON_KEY: "test-anon-key",
+    SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
+    PAYMENTS_ENVIRONMENT: "live",
+    AI_DOCTOR_RECEIPT_HMAC_KEY: "test-receipt-hmac-key-0123456789abcdef",
+    AI_DOCTOR_RECEIPT_HMAC_KEY_ID: "test-key-1",
+  };
+  const touched = [...Object.keys(env), GEMINI_API_KEY_ENV];
+  const previousEnv = new Map(touched.map((name) => [name, Deno.env.get(name)]));
+  for (const [name, value] of Object.entries(env)) Deno.env.set(name, value);
+  if (withKey) Deno.env.set(GEMINI_API_KEY_ENV, "test-gemini-key-not-a-secret");
+  else Deno.env.delete(GEMINI_API_KEY_ENV);
+
+  let spends = 0;
+  const createClient = () => ({
+    auth: { getUser: () => Promise.resolve({ data: { user: { id: PROBE_USER } } }) },
+    rpc: (name: string) => {
+      if (name === "ai_credit_spend") spends += 1;
+      // A denied spend ends the request right after the call this probe counts.
+      return Promise.resolve({ data: { ok: false, status: "denied" }, error: null });
+    },
+    from: () => {
+      throw new Error("table read was not expected");
+    },
+  });
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = (() => Promise.reject(new Error("network is not available"))) as typeof fetch;
+  try {
+    const response = await handler(
+      new Request(`${PROBE_URL}/functions/v1/${path}`, {
+        method: "POST",
+        headers: { Authorization: "Bearer test-jwt", "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      { createClient },
+    );
+    return { spends, status: response.status, body: await response.json() };
+  } finally {
+    globalThis.fetch = previousFetch;
+    for (const [name, value] of previousEnv) {
+      if (value === undefined) Deno.env.delete(name);
+      else Deno.env.set(name, value);
+    }
+  }
+}
+
+Deno.test("AI Doctor spends no credit when GEMINI_API_KEY is missing", async () => {
+  const handler = handleAiDoctorReviewRequest as unknown as ProbeHandler;
+  const body = {
+    packet: probePacket(),
+    growId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    idempotencyKey: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  };
+  const control = await countSpendCalls(handler, "ai-doctor-review", body, true);
+  assertEquals(control.spends, 1, `control ${JSON.stringify(control.body)}`);
+
+  const missing = await countSpendCalls(handler, "ai-doctor-review", body, false);
+  assertEquals(missing.spends, 0);
+  assertEquals(missing.body, { ok: false, reason: "config" });
+});
+
+Deno.test("AI Coach spends no credit when GEMINI_API_KEY is missing", async () => {
+  const handler = handleAiCoachRequest as unknown as ProbeHandler;
+  const body = { mode: "next_steps", idempotencyKey: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab" };
+  const control = await countSpendCalls(handler, "ai-coach", body, true);
+  assertEquals(control.spends, 1, `control ${JSON.stringify(control.body)}`);
+
+  const missing = await countSpendCalls(handler, "ai-coach", body, false);
+  assertEquals(missing.spends, 0);
+  assertEquals(missing.status, 500);
+  assertEquals(missing.body, { error: "AI not configured" });
 });

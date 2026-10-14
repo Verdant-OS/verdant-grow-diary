@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 
 const mocks = vi.hoisted(() => ({
@@ -8,7 +9,18 @@ const mocks = vi.hoisted(() => ({
   upsert: vi.fn(),
   toast: vi.fn(),
   user: { id: "fixture-user" },
+  forceEnabled: false,
 }));
+
+vi.mock("@/components/ui/button", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/components/ui/button")>();
+  return {
+    ...original,
+    Button: (props: ComponentProps<typeof original.Button>) => (
+      <original.Button {...props} disabled={mocks.forceEnabled ? false : props.disabled} />
+    ),
+  };
+});
 
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: mocks.user }) }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: mocks.toast }) }));
@@ -44,6 +56,7 @@ describe("GrowTargetsEditor validation and persistence (#2016)", () => {
   beforeEach(() => {
     mocks.unit = "fahrenheit";
     mocks.row = null;
+    mocks.forceEnabled = false;
     mocks.upsert.mockReset().mockResolvedValue({ error: null });
     mocks.toast.mockReset();
   });
@@ -88,6 +101,17 @@ describe("GrowTargetsEditor validation and persistence (#2016)", () => {
       expect(screen.getByLabelText(`${label} max`)).toHaveAttribute("aria-invalid", "true");
     }
     expect(screen.getByRole("button", { name: "Save targets" })).toBeDisabled();
+  });
+
+  it("rejects an invalid save in the handler even if button disabling is bypassed", async () => {
+    mocks.forceEnabled = true;
+    const callbacks = await openEditor();
+    enter("Humidity min", "120");
+    fireEvent.click(screen.getByRole("button", { name: "Save targets" }));
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Check ranges" }));
+    expect(mocks.upsert).not.toHaveBeenCalled();
+    expect(callbacks.onSaved).not.toHaveBeenCalled();
+    expect(callbacks.onOpenChange).not.toHaveBeenCalled();
   });
 
   it("blocks an unfinished native number instead of treating it as a blank bound", async () => {

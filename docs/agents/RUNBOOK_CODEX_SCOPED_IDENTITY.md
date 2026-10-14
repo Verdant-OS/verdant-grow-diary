@@ -64,7 +64,7 @@ Held PRs and files remain off-limits even if an actor technically can bypass.
 ## Deploy-branch PR and owner gates
 
 Add an explicit **Require a pull request before merging** rule to the deploy
-ruleset. Keep its 35 required contexts, strict checks, merge queue, force-push and
+ruleset. Keep its 36 required contexts, strict checks, merge queue, force-push and
 deletion protections. Configure zero general approvals and **Require review from
 Code Owners**. A skipped, absent or red required check cannot authorize merge.
 Codex must not bypass the queue or a code-owner requirement.

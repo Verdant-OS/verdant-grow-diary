@@ -133,7 +133,9 @@ jobs:
   prefix-diff-sandbox:
     name: Prefix diff against SANDBOX
     needs: prefix-diff-offline
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox') }}
+    # Manual dispatch only: AGENTS.md ("CI probes production or nothing") bars push-triggered
+    # jobs from probing a non-production database.
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox' }}
     environment: verdant-sandbox
     runs-on: ubuntu-latest
     timeout-minutes: 10

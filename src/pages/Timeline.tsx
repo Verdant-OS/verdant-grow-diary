@@ -28,6 +28,7 @@ import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { STAGES, stageLabel } from "@/lib/grow";
+import { TimelineGrowDayLabel } from "@/components/TimelineGrowDayLabel";
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { format, formatDistanceToNow } from "date-fns";
 import {
@@ -149,10 +150,12 @@ import {
   filterTimelineEvidenceRows,
   isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
+  timelineClearFiltersEnabled,
   resolveTimelineCardPlaceLabels,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
   withResolvedTimelinePlaceDetails,
 } from "@/lib/timelineEvidenceFilterRules";
+import { timelineDateParamsAfterSync } from "@/lib/timelineDateSearchParamRules";
 import {
   buildMissingActionCopy,
   findNewestEntryIdForCategory,
@@ -577,12 +580,7 @@ export default function Timeline() {
     const urlStart = searchParams.get(TIMELINE_START_DATE_PARAM) ?? "";
     const urlEnd = searchParams.get(TIMELINE_END_DATE_PARAM) ?? "";
     if (urlStart === startDateFilter && urlEnd === endDateFilter) return;
-    const next = new URLSearchParams(searchParams);
-    if (isTimelineDateFilterValue(startDateFilter))
-      next.set(TIMELINE_START_DATE_PARAM, startDateFilter);
-    else next.delete(TIMELINE_START_DATE_PARAM);
-    if (isTimelineDateFilterValue(endDateFilter)) next.set(TIMELINE_END_DATE_PARAM, endDateFilter);
-    else next.delete(TIMELINE_END_DATE_PARAM);
+    const next = timelineDateParamsAfterSync(searchParams, startDateFilter, endDateFilter);
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDateFilter, endDateFilter]);
@@ -1353,7 +1351,12 @@ export default function Timeline() {
   }
 
   const chipFiltersActive = stageFilter !== "all" || eventFilter !== "all";
-  const anyFilterActive = evidenceActive || chipFiltersActive;
+  const anyFilterActive = timelineClearFiltersEnabled({
+    evidenceActive,
+    chipFiltersActive,
+    enteredStartDate: startDateFilter,
+    enteredEndDate: endDateFilter,
+  });
 
   // "Next missing action": infer per-category logging rhythm from the
   // merged diary + Quick Log rows and surface the category most behind
@@ -1802,15 +1805,7 @@ export default function Timeline() {
           title={activeGrow.name}
           description="Trace observations, evidence, and decisions across this grow."
           icon={<Sprout className="size-5" aria-hidden="true" />}
-          meta={
-            <span className="text-sm text-muted-foreground">
-              {stageLabel(activeGrow.stage)} · day{" "}
-              {Math.max(
-                1,
-                Math.floor((Date.now() - new Date(activeGrow.started_at).getTime()) / 86400000),
-              )}
-            </span>
-          }
+          meta={<TimelineGrowDayLabel startedAt={activeGrow.started_at} stage={activeGrow.stage} />}
         />
       )}
 

@@ -147,6 +147,7 @@ import {
   deriveTimelineRowSensorSource,
   deriveTimelineTentOptions,
   filterTimelineEvidenceRows,
+  isTimelineDateFilterEntered,
   isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
   resolveTimelineCardPlaceLabels,
@@ -1344,7 +1345,12 @@ export default function Timeline() {
   }
 
   const chipFiltersActive = stageFilter !== "all" || eventFilter !== "all";
-  const anyFilterActive = evidenceActive || chipFiltersActive;
+  // An inverted date range is not applied (evidenceActive ignores it), but the
+  // grower still entered it, so Clear filters must stay enabled to reset it.
+  const anyFilterActive =
+    evidenceActive ||
+    chipFiltersActive ||
+    isTimelineDateFilterEntered(startDateFilter, endDateFilter);
 
   // "Next missing action": infer per-category logging rhythm from the
   // merged diary + Quick Log rows and surface the category most behind

@@ -478,6 +478,21 @@ export function isTimelineEvidenceFilterActive(input: TimelineEvidenceFilterInpu
   return false;
 }
 
+/**
+ * True when the grower has entered any start or end date, valid or not.
+ * An inverted range is not applied, but it is still something the grower
+ * set and needs to clear, so "Clear filters" must stay enabled for it.
+ */
+export function isTimelineDateFilterEntered(
+  startDate: string | null | undefined,
+  endDate: string | null | undefined,
+): boolean {
+  return (
+    (typeof startDate === "string" && startDate.trim() !== "") ||
+    (typeof endDate === "string" && endDate.trim() !== "")
+  );
+}
+
 export const TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER = "Search timeline";
 export const TIMELINE_EVIDENCE_EMPTY_TITLE = "No matches";
 export const TIMELINE_EVIDENCE_EMPTY_DESC = "No timeline entries match these filters.";

@@ -13,6 +13,7 @@ import {
   deriveTimelinePlantOptions,
   deriveTimelineTentOptions,
   filterTimelineEvidenceRows,
+  isTimelineDateFilterEntered,
   isTimelineEvidenceFilterActive,
   timelineEvidenceRowMatches,
   TIMELINE_EVIDENCE_EMPTY_DESC,
@@ -462,5 +463,26 @@ describe("exported copy", () => {
   it("placeholder and empty copy are stable", () => {
     expect(TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER).toBe("Search timeline");
     expect(TIMELINE_EVIDENCE_EMPTY_DESC).toBe("No timeline entries match these filters.");
+  });
+});
+
+describe("isTimelineDateFilterEntered", () => {
+  it("counts an inverted range as entered, so it can be cleared", () => {
+    expect(isTimelineDateFilterEntered("2026-10-20", "2026-10-01")).toBe(true);
+  });
+
+  it("counts either side alone", () => {
+    expect(isTimelineDateFilterEntered("2026-10-20", "")).toBe(true);
+    expect(isTimelineDateFilterEntered("", "2026-10-01")).toBe(true);
+  });
+
+  it("counts a non-empty value even when it is not a valid date", () => {
+    expect(isTimelineDateFilterEntered("2026-02-30", null)).toBe(true);
+  });
+
+  it("is false when both sides are empty, blank, null or undefined", () => {
+    expect(isTimelineDateFilterEntered("", "")).toBe(false);
+    expect(isTimelineDateFilterEntered("  ", " ")).toBe(false);
+    expect(isTimelineDateFilterEntered(null, undefined)).toBe(false);
   });
 });

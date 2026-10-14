@@ -453,6 +453,27 @@ describe("Timeline local-day query integration (America/Chicago)", () => {
     expect(await screen.findByTestId("timeline-date-range-error")).toBeInTheDocument();
   });
 
+  it("an inverted range alone keeps Clear filters enabled, and one click clears the inputs and the URL", async () => {
+    renderTimeline("/timeline?start=2026-10-20&end=2026-10-01");
+    expect(await screen.findByTestId("timeline-date-range-error")).toBeInTheDocument();
+
+    const clear = screen.getByTestId("timeline-clear-filters");
+    expect(clear).toBeEnabled();
+    fireEvent.click(clear);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("timeline-date-range-error")).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId("timeline-start-date")).toHaveValue("");
+    expect(screen.getByTestId("timeline-end-date")).toHaveValue("");
+    await waitFor(() => {
+      const search = screen.getByTestId("probe-location-search").textContent ?? "";
+      expect(search).not.toContain("start=");
+      expect(search).not.toContain("end=");
+    });
+    expect(screen.getByTestId("timeline-clear-filters")).toBeDisabled();
+  });
+
   it("never calls a Supabase mutation method", async () => {
     harness.executeQuery.mockImplementation((spec) => {
       if (spec.table === "diary_entries") {

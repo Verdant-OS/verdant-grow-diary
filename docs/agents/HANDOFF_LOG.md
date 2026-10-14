@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CLAUDE-TIMELINE-CLEAR-FILTERS-INVALID-RANGE
+
+```text
+TASK CLAUDE-TIMELINE-CLEAR-FILTERS-INVALID-RANGE  priority: P2  status: OPEN
+goal: Timeline "Clear filters" stays enabled when only an inverted date range is set, and one click clears both inputs and the start/end URL params.
+branch: claude/timeline-clear-filters-invalid-range
+base: verdant-grow-diary
+checkout: git switch claude/timeline-clear-filters-invalid-range && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: the draft PR from this branch (number not known when this block was written; read it from GitHub)
+head_sha: read from the PR (a commit cannot contain its own SHA)
+state: pushed draft
+next_action: CI at the PR head, then Blue Dream review (Timeline.tsx is a .tsx product file)
+files: src/lib/timelineEvidenceFilterRules.ts (isTimelineDateFilterEntered); src/pages/Timeline.tsx (anyFilterActive); src/test/timeline-local-day-query-integration.test.tsx; src/test/timeline-evidence-filter-rules.test.ts; this block
+blockers: none
+artifacts: the PR body (RED 1 failed / 11 passed before the fix; set-aside gate)
+reviewer_seat: Blue Dream
+claimed_by: Claude (Matthew's assignment in session), 2026-10-14 15:46 UTC
+last_updated: 2026-10-14 10:46 CT, by Claude
+```
+
 ### CLAUDE-CODE-ACTION-002
 
 ```text

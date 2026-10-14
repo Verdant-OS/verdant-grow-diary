@@ -73,6 +73,8 @@ export const HIDDEN_DIARY_DETAIL_KEYS: ReadonlySet<string> = new Set([
   // "Attached to", never the raw snake_case chip.
   "logged_at",
   "attached_to_action",
+  // Operator attestation blob. Never a grower-facing chip.
+  "manual_provenance",
 ]);
 
 /**
@@ -159,6 +161,78 @@ function friendlyAttachedAction(value: unknown): string | null {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
+const TYPED_ACTIVITY_ENVELOPES = ["watering", "feeding"] as const;
+
+const TYPED_ACTIVITY_FIELD_LABELS: Record<string, string> = {
+  volume_ml: "Volume",
+  ph: "pH",
+  ec_ms_cm: "EC",
+  ec_in: "EC in",
+  ec_out: "EC out",
+  runoff_ml: "Runoff",
+  runoff_ph: "Runoff pH",
+  runoff_ec: "Runoff EC",
+  water_temp_c: "Water temperature",
+};
+
+function typedActivityScalar(key: string, value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    if (key === "volume_ml" || key === "runoff_ml") return `${value} ml`;
+    if (key === "water_temp_c") return `${value} °C`;
+    return String(value);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "" || trimmed === "default") return null;
+    return trimmed;
+  }
+  return null;
+}
+
+function typedProductText(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const name = typeof record.name === "string" ? record.name.trim() : "";
+  const brand =
+    typeof record.brand === "string"
+      ? record.brand.trim()
+      : typeof record.nutrient_brand === "string"
+        ? record.nutrient_brand.trim()
+        : "";
+  if (name && brand) return `${name} (${brand})`;
+  return name || brand || null;
+}
+
+function typedActivityEnvelopeLines(
+  envelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number],
+  value: unknown,
+): QuickLogDetailDisplayLine[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const record = value as Record<string, unknown>;
+  const lines: QuickLogDetailDisplayLine[] = [];
+  for (const [key, child] of Object.entries(record)) {
+    if (key === "products" || key === "nutrients") {
+      const items = Array.isArray(child) ? child : [child];
+      const texts = items
+        .map((item) => typedProductText(item))
+        .filter((item): item is string => item != null);
+      if (texts.length > 0) {
+        lines.push({ key: `${envelope}.${key}`, label: "Products", value: texts.join(", ") });
+      }
+      continue;
+    }
+    const label = TYPED_ACTIVITY_FIELD_LABELS[key];
+    const text = typedActivityScalar(key, child);
+    if (!label || !text) continue;
+    lines.push({ key: `${envelope}.${key}`, label, value: text });
+  }
+  return lines;
+}
+
 function withGrowerFacingDetailLines(
   record: Record<string, unknown>,
   lines: readonly QuickLogDetailDisplayLine[],
@@ -194,10 +268,17 @@ export function presentTimelineDiaryEntryDetails(
     describeQuickLogDetailsFromExtras(details, tempUnit),
     options,
   );
+  for (const envelope of TYPED_ACTIVITY_ENVELOPES) {
+    detailLines.push(...typedActivityEnvelopeLines(envelope, record[envelope]));
+  }
   const extra = Object.entries(record)
     .filter(
       ([k, v]) =>
-        v != null && !HIDDEN_DIARY_DETAIL_KEYS.has(k) && !QUICK_LOG_DETAIL_FIELD_KEYS.has(k),
+        v != null &&
+        !HIDDEN_DIARY_DETAIL_KEYS.has(k) &&
+        !QUICK_LOG_DETAIL_FIELD_KEYS.has(k) &&
+        !TYPED_ACTIVITY_ENVELOPES.includes(k as (typeof TYPED_ACTIVITY_ENVELOPES)[number]) &&
+        (typeof v === "string" || typeof v === "number" || typeof v === "boolean"),
     )
     .map(([k, v]) => [k, String(v)] as const);
 

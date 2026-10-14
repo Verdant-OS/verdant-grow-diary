@@ -254,6 +254,8 @@ interface LockedManualSubmission {
   videoMeta: QuickLogVideoMeta | null;
   note: string;
   action: "note";
+  /** Storage path of the photo already uploaded for this exact submission. */
+  uploadedPath?: string | null;
 }
 
 interface LockedFeedingSubmission {
@@ -1942,8 +1944,10 @@ function QuickLogV2SheetForOwner({
     const submissionNote = exactSubmission?.note ?? form.note;
     const submissionAction: QuickLogV2Action = exactSubmission?.action ?? form.action;
 
-    let uploadedPath: string | null = null;
-    if (submissionPhotoFile) {
+    // An exact retry reuses its first upload: the replayed key returns the
+    // original event, whose details.photo_url names that path.
+    let uploadedPath: string | null = exactManualSubmission?.uploadedPath ?? null;
+    if (submissionPhotoFile && !uploadedPath) {
       if (!resolved.growId) {
         await releaseUnsentWatering();
         releaseUnsentNote();
@@ -1972,6 +1976,21 @@ function QuickLogV2SheetForOwner({
       }
       if (exactWateringSubmission) setFailedWaterPhotoUpload(false);
       uploadedPath = upload.path;
+    }
+    if (uploadedPath && exactManualSubmission) {
+      // The photo travels inside the single quicklog_save_manual write, so
+      // its diary mirror is the only row (production QA 2026-10-14 saw the
+      // mirror plus a second "Photo attached" companion insert).
+      if (exactManualSubmission.payload.p_details?.photo_url !== uploadedPath) {
+        exactManualSubmission.payload = {
+          ...exactManualSubmission.payload,
+          p_details: {
+            ...(exactManualSubmission.payload.p_details ?? {}),
+            photo_url: uploadedPath,
+          },
+        };
+      }
+      exactManualSubmission.uploadedPath = uploadedPath;
     }
 
     let res: Awaited<ReturnType<typeof save>>;
@@ -2119,7 +2138,9 @@ function QuickLogV2SheetForOwner({
       setExactRetryPending(unresolved);
       keepSubmissionLockedRef.current = unresolved;
       if (!unresolved) manualRetrySubmissionRef.current = null;
-      if (uploadedPath) {
+      // An unresolved note keeps its upload: the exact retry replays the same
+      // payload, whose details.photo_url names this path.
+      if (uploadedPath && !(unresolved && exactManualSubmission)) {
         await supabase.storage
           .from("diary-photos")
           .remove([uploadedPath])
@@ -2204,7 +2225,27 @@ function QuickLogV2SheetForOwner({
     let photoAttached = false;
     let videoAttached = false;
 
-    if (uploadedPath && confirmedScope.growId) {
+    if (uploadedPath && confirmedScope.growId && exactManualSubmission) {
+      // quicklog_save_manual already mirrored details.photo_url. This only
+      // fills the legacy top-level column through the client write fence;
+      // Timeline falls back to details.photo_url if the patch does not apply.
+      photoAttached = true;
+      if (res.growEventId) {
+        try {
+          const { data: patched, error: photoErr } = await supabase
+            .from("diary_entries")
+            .update({ photo_url: uploadedPath })
+            .filter("details->>linked_grow_event_id", "eq", res.growEventId)
+            .select("id");
+          if (photoErr || !Array.isArray(patched) || patched.length !== 1) {
+            console.warn("Quick Log companion photo_url normalization did not complete");
+          }
+        } catch (photoErr) {
+          console.warn("Quick Log companion photo_url normalization did not complete", photoErr);
+        }
+        if (exactSubmission && !canContinueNote()) return;
+      }
+    } else if (uploadedPath && confirmedScope.growId) {
       const photoEntry = await createPhotoDiaryEntry({
         growId: confirmedScope.growId,
         tentId: confirmedScope.tentId,

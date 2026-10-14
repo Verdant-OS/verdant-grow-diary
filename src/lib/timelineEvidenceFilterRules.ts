@@ -101,38 +101,6 @@ export function deriveTimelineRowSensorSource(
 
 const SAFE_DETAIL_TEXT_KEYS = ["plant_name", "stage"] as const;
 
-/** Public nutrient/product strings. Not a walk of arbitrary detail payloads. */
-const PUBLIC_FEED_SEARCH_KEYS = new Set([
-  "name",
-  "brand",
-  "nutrient_brand",
-  "product",
-  "product_name",
-  "line_id",
-  "recipe",
-  "products",
-  "nutrients",
-]);
-
-const PUBLIC_FEED_SEARCH_ROOTS = ["feeding", "watering", "products", "nutrients"] as const;
-
-function appendPublicFeedSearchText(parts: string[], value: unknown, depth: number): void {
-  if (depth > 4 || value == null) return;
-  if (typeof value === "string") {
-    parts.push(value);
-    return;
-  }
-  if (Array.isArray(value)) {
-    for (const item of value) appendPublicFeedSearchText(parts, item, depth + 1);
-    return;
-  }
-  if (typeof value !== "object") return;
-  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    if (!PUBLIC_FEED_SEARCH_KEYS.has(key)) continue;
-    appendPublicFeedSearchText(parts, child, depth + 1);
-  }
-}
-
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
@@ -178,6 +146,25 @@ function normalize(v: unknown): string {
   return typeof v === "string" ? v.trim().toLowerCase() : "";
 }
 
+/**
+ * Nutrient product names from a Quick Log feeding envelope
+ * (`details.feeding.products[].name`). Only these grower-typed names are
+ * searchable; no other nested detail value is read.
+ */
+function feedingProductNames(details: Record<string, unknown>): string[] {
+  const feeding = details["feeding"];
+  if (!feeding || typeof feeding !== "object" || Array.isArray(feeding)) return [];
+  const products = (feeding as Record<string, unknown>)["products"];
+  if (!Array.isArray(products)) return [];
+  const names: string[] = [];
+  for (const product of products) {
+    if (!product || typeof product !== "object" || Array.isArray(product)) continue;
+    const name = (product as Record<string, unknown>)["name"];
+    if (typeof name === "string" && name.trim() !== "") names.push(name.trim());
+  }
+  return names;
+}
+
 function safeRowText(
   row: TimelineEvidenceRow,
   plantNamesById?: ReadonlyMap<string, string> | null,
@@ -190,12 +177,6 @@ function safeRowText(
     const v = details[key];
     if (typeof v === "string") parts.push(v);
   }
-  for (const key of PUBLIC_FEED_SEARCH_ROOTS) {
-    appendPublicFeedSearchText(parts, details[key], 0);
-  }
-  for (const key of ["nutrient_brand", "brand", "recipe"] as const) {
-    appendPublicFeedSearchText(parts, details[key], 0);
-  }
   const resolvedPlant = resolveTimelineCardPlaceLabels({
     plantId: row.plant_id,
     details,
@@ -204,6 +185,7 @@ function safeRowText(
   if (resolvedPlant) parts.push(resolvedPlant);
   const eventType = details["event_type"];
   if (typeof eventType === "string") parts.push(eventType);
+  parts.push(...feedingProductNames(details));
   return parts.join(" \u0001 ").toLowerCase();
 }
 
@@ -515,27 +497,6 @@ export function isTimelineEvidenceFilterActive(input: TimelineEvidenceFilterInpu
   if (isTimelineDateFilterValue(input.endDate)) return true;
   return false;
 }
-
-/** Any non-empty date field, including an inverted or otherwise unapplied value. */
-export function timelineEnteredDateKeepsClearEnabled(value: string | null | undefined): boolean {
-  return typeof value === "string" && value.trim() !== "";
-}
-
-export function timelineClearFiltersEnabled(input: {
-  evidenceActive: boolean;
-  chipFiltersActive: boolean;
-  enteredStartDate: string | null | undefined;
-  enteredEndDate: string | null | undefined;
-}): boolean {
-  return (
-    input.evidenceActive ||
-    input.chipFiltersActive ||
-    timelineEnteredDateKeepsClearEnabled(input.enteredStartDate) ||
-    timelineEnteredDateKeepsClearEnabled(input.enteredEndDate)
-  );
-}
-
-export { timelineDateParamsAfterSync } from "@/lib/timelineDateSearchParamRules";
 
 export const TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER = "Search timeline";
 export const TIMELINE_EVIDENCE_EMPTY_TITLE = "No matches";

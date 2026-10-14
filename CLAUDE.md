@@ -3,14 +3,14 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-10-14.1**
+**Sentinel-Version: 2026-10-14.2**
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
 publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
 may supply an independently assigned acceptance. **Codex** is an equal independent
 exact-head reviewer, except on a PR Codex authored or repaired (for example #1938).
 Claude may add peer observations but is not the acceptance reviewer.
-Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
+Chemdawg owns merge only after **36/36 required checks** succeed and Blue Dream,
 Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
 **Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
 PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
@@ -191,7 +191,7 @@ deployment, does not mean the apex serves it.
 | `supabase/migrations/`                                     | 272 `.sql`     | Append-only migration history — **immutable once merged**                         |
 | `supabase/functions/`                                      | 34 + `_shared` | Deno edge functions                                                               |
 | `scripts/`                                                 | 268 entries    | Gates, harnesses, probes, release tooling (`.mjs` and `.ts`)                      |
-| `.github/workflows/`                                       | 107            | CI; `ci.yml` supplies every ruleset-required check                                |
+| `.github/workflows/`                                       | 107            | CI; `ci.yml` supplies 35 of the 36 ruleset-required checks                        |
 | `e2e/`                                                     | 59 specs       | Playwright                                                                        |
 | `docs/`                                                    | 397 files      | Governance, specs, runbooks, knowledge library, SEO                               |
 | `config/`                                                  | 10             | Pinned JSON contracts (required checks, replay compat, allowlists)                |
@@ -378,9 +378,10 @@ Environment and install gotchas are owned by
 
 ## Merge path
 
-Thirty-five contexts are required by the `verdant-grow-diary` ruleset, all produced by
+Thirty-six contexts are required by the `verdant-grow-diary` ruleset. Thirty-five come from
 `ci.yml`: `Full test suite (shard 1/32)` … `(shard 32/32)`, `Lint, typecheck, test, build`,
-`Preflight — edge shared-lib mirror in sync`, and `test:legal-seo`. The pinned mirror is
+`Preflight — edge shared-lib mirror in sync`, and `test:legal-seo`. The thirty-sixth,
+`test:security-regression`, comes from `security-regression.yml`. The pinned mirror is
 `config/required-status-checks.json`.
 
 Cheek approves; merges go through the merge queue as squash. Green checks from a

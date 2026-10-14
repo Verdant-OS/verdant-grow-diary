@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -473,7 +474,15 @@ export default function Coach() {
             crop.targetWidth,
             crop.targetHeight,
           );
-          setPhotoPreviewStatus("ready");
+          // The cover crop is already on the canvas. Commit "ready" before this
+          // promise yields so aria-hidden flips in the same turn as the pixels.
+          // A deferred setState leaves the drawn canvas hidden until a later
+          // React flush, which is the race the preview runtime test hits.
+          if (!cancelled) {
+            flushSync(() => {
+              setPhotoPreviewStatus("ready");
+            });
+          }
         } finally {
           bitmap.close();
         }

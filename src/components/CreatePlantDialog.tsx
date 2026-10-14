@@ -58,6 +58,8 @@ import {
   evaluateSuppliedTentBinding,
   evaluateTentGrowCompatibility,
   plantCreateAllowsTentless,
+  plantCreateNoTentsHintVisible,
+  selectCreatePlantTents,
   resolveInitialPlantTentId,
   resolveSetupName,
   suppliedTentBlocksWrite,
@@ -208,14 +210,12 @@ export default function CreatePlantDialog({
   const requireTentForWrite =
     requireTent || !!defaultTentId || suppliedTent.requireCompatibleTentSelection;
 
-  const tents = targetGrowId
-    ? tentRows.filter(
-        (tent, _index, rows) =>
-          tent.grow_id === targetGrowId &&
-          tent.id.trim().length > 0 &&
-          rows.filter((candidate) => candidate.id === tent.id).length === 1,
-      )
-    : [];
+  const tents = selectCreatePlantTents(tentRows, targetGrowId);
+  const showNoTentsHint = plantCreateNoTentsHintVisible({
+    selectableTentCount: tents.length,
+    tentsSettled: tentsLoaded,
+    tentsReadFailed: tentsError,
+  });
 
   const initialTentId = resolveInitialPlantTentId({
     defaultTentId,
@@ -905,8 +905,11 @@ export default function CreatePlantDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {tents.length === 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
+              {showNoTentsHint && (
+                <p
+                  className="text-xs text-muted-foreground mt-1"
+                  data-testid="create-plant-no-tents-hint"
+                >
                   No tents yet. Create a tent first.
                 </p>
               )}

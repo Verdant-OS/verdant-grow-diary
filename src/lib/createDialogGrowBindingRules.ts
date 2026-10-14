@@ -580,6 +580,46 @@ export function resolveInitialPlantTentId(input: {
   return supplied.kind === "ready" ? tentId : "none";
 }
 
+export interface CreatePlantTentOption {
+  id: string;
+  grow_id?: string | null;
+}
+
+/**
+ * Tents offered in New plant. Grow ids are compared case-insensitively:
+ * Postgres uuid equality is case-insensitive, and the Plants page loads tents
+ * with that equality, so a case-only mismatch must not drop a tent the page
+ * already shows. Duplicate ids stay omitted.
+ */
+export function selectCreatePlantTents<T extends CreatePlantTentOption>(
+  rows: readonly T[],
+  targetGrowId: string | null | undefined,
+): T[] {
+  const target = trimId(targetGrowId)?.toLowerCase() ?? null;
+  if (!target) return [];
+  return rows.filter((tent) => {
+    const id = tent.id.trim().toLowerCase();
+    if (!id) return false;
+    const grow = trimId(tent.grow_id)?.toLowerCase() ?? null;
+    if (grow !== target) return false;
+    return rows.filter((candidate) => candidate.id.trim().toLowerCase() === id).length === 1;
+  });
+}
+
+/**
+ * "No tents yet" is a claim that the settled read found zero tents for this
+ * setup. An in-flight or failed read, or a dropdown that already lists a tent,
+ * must not say the grower still has to create one.
+ */
+export function plantCreateNoTentsHintVisible(input: {
+  selectableTentCount: number;
+  tentsSettled: boolean;
+  tentsReadFailed: boolean;
+}): boolean {
+  if (!input.tentsSettled || input.tentsReadFailed) return false;
+  return input.selectableTentCount === 0;
+}
+
 export function plantCreateAllowsTentless(input: {
   suppliedTentId?: string | null;
   requireTent?: boolean;

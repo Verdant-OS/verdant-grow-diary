@@ -31,7 +31,8 @@ describe("assessQuickLogWaterSaveGate", () => {
       ...blankAir,
       temperatureUnit: "celsius",
     });
-    expect(huge.fields.volume).toBe("Applied volume must be a positive number of milliliters.");
+    expect(huge.blocksSave).toBe(true);
+    expect(huge.fields.volume).toMatch(/too large \(max 50,000 ml\)/);
   });
 
   it("reports each bad air reading even when volume is also bad", () => {

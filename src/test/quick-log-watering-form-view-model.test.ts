@@ -275,7 +275,8 @@ describe("buildWateringFormPayload — validation", () => {
     ["not-a-number", "volume_ml:invalid"],
     ["0", "volume_ml:invalid"],
     ["-1", "volume_ml:invalid"],
-    ["1000001", "volume_ml:invalid"],
+    ["50001", "volume_ml:too_large"],
+    ["1000001", "volume_ml:too_large"],
   ])("rejects applied volume %j as %s", (volumeMl, reason) => {
     expect(buildPayload({ growId: "grow-1", form: withForm({ volumeMl }) })).toEqual({
       ok: false,

@@ -6,6 +6,7 @@ import {
   type TemperatureUnitPreference,
 } from "./temperatureUnitPreference";
 
+import { QUICK_LOG_WATER_VOLUME_MAX_ML } from "./quickLogWateringFormViewModel";
 export const WATERING_REVIEW_TITLE = "Review watering record" as const;
 export const WATERING_REVIEW_NEEDS_INPUT =
   "Add the applied volume to preview the watering record." as const;
@@ -54,7 +55,8 @@ export function buildWateringReview(
 ): WateringReviewModel {
   const volumeRaw = form.volumeMl.trim();
   const volume = /^\+?(?:\d+(?:\.\d*)?|\.\d+)$/.test(volumeRaw) ? Number(volumeRaw) : Number.NaN;
-  const needsInput = !Number.isFinite(volume) || volume <= 0 || volume > 1_000_000;
+  const needsInput =
+    !Number.isFinite(volume) || volume <= 0 || volume > QUICK_LOG_WATER_VOLUME_MAX_ML;
   const measurements: WateringReviewItem[] = [];
   pushIfPresent(measurements, "Applied volume (ml)", form.volumeMl);
   pushIfPresent(measurements, "Input pH", form.ph);

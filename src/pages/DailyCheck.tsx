@@ -300,8 +300,9 @@ export default function DailyCheck() {
     if (routeIdentityPending) return;
     if (!plantId) return;
     const match = selectablePlants.find((p) => p.id === plantId);
-    setTentId(resolveCompatibleAssignedTentId(match, selectableTents));
-  }, [plantId, routeIdentityPending, selectablePlants, selectableTents]);
+    const nextTent = resolveCompatibleAssignedTentId(match, selectableTents);
+    if (nextTent !== tentId) setTentId(nextTent);
+  }, [plantId, routeIdentityPending, selectablePlants, selectableTents, tentId]);
 
   // Default tent to first if none selected and no plant chosen
   useEffect(() => {
@@ -606,7 +607,9 @@ export default function DailyCheck() {
           QUICK_LOG_ACTIVITY_DEFINITIONS via QuickLogActivityPicker and
           routes saves through useQuickLogActivitySave. Harvest is available
           only for eligible selected-plant stages and fails closed otherwise. */}
-      <div className="mb-4 w-full min-w-0">
+      <div
+        className={`mb-4 w-full min-w-0${renderedStep === "select" && guard.ok ? " pb-16" : ""}`}
+      >
         <QuickLogAllActivitiesSection
           growId={growId}
           tentId={activityTarget.tentId}
@@ -1217,7 +1220,15 @@ export default function DailyCheck() {
                 tentName={selectedTent?.name ?? null}
                 growId={growId}
               />
-              <div className="mt-3 grid min-w-0 grid-cols-2 gap-2">
+              <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
+                <Button
+                  variant="outline"
+                  className="min-h-11 min-w-0 whitespace-normal"
+                  onClick={() => setStep(previousStep(renderedStep))}
+                  data-testid="daily-grow-check-review-back"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </Button>
                 <Button
                   variant="outline"
                   className="min-h-11 min-w-0 whitespace-normal"

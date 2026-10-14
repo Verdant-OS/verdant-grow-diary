@@ -823,7 +823,7 @@ confirm all four:
 - [ ] The run was triggered by `push` or `pull_request` on a branch you
       have permission to see (not a fork PR).
 - [ ] `upload-sarif` step logs `SARIF upload complete` (not `Resource
-  not accessible` or `Invalid SARIF file`).
+not accessible` or `Invalid SARIF file`).
 
 If all four are true and findings still don't show, jump to the
 _Security tab looks empty (GitHub UI gotchas)_ table below — the cause
@@ -1249,7 +1249,8 @@ this order:
   `Invalid SARIF file` or `Path does not exist`, the file wasn't
   generated — jump to the `--sarif` troubleshooting table above.
 - On the run summary page, the **Artifacts** section should list
-  `money-migration-audit-sandbox` (or `-live`) containing `diff.sarif`.
+  `money-migration-audit-live` containing `diff.sarif`. (There is no
+  sandbox lane: the workflow is manual dispatch against LIVE only.)
   Download it and re-check locally with the `jq -e` self-check from the
   "Sample SARIF output" section.
 
@@ -1260,7 +1261,7 @@ this order:
   - **Tool:** `diff-money-migration-prefixes`
   - **Branch:** the branch the workflow ran on (defaults to the default branch)
   - **Category:** `money-migration-drift` (or whatever `category:` you
-    passed to `upload-sarif`; sandbox and live should be distinct)
+    passed to `upload-sarif`)
   - **Rule:** optional — filter to `money-migration-drift`,
     `money-migration-malformed`, or `money-migration-tooling`
 - Each row shows the migration file, the rule ID, and severity **Error**.
@@ -1321,7 +1322,7 @@ Via the GitHub UI:
 
 - Repo → **Actions** → the failed/passing run → scroll to **Artifacts**
   at the bottom of the summary page.
-- Click `money-migration-audit-sandbox` (or `-live`) to download a
+- Click `money-migration-audit-live` to download a
   `.zip`. The bundle contains at least:
   ```
   diff.sarif                    # SARIF uploaded to Code scanning
@@ -1342,8 +1343,8 @@ gh run list --workflow required-money-migrations.yml --limit 5
 # Download every artifact from a specific run into ./artifacts/
 gh run download <run-id> --dir artifacts/
 
-# Or just the sandbox bundle
-gh run download <run-id> --name money-migration-audit-sandbox --dir artifacts/
+# Or just the live bundle
+gh run download <run-id> --name money-migration-audit-live --dir artifacts/
 ```
 
 If the run was on a PR from a fork, `gh run download` requires
@@ -1356,8 +1357,8 @@ Use the same `TARGET_ENV` and DB URL the failing job used (check the
 job's `env:` block) so the comparison is apples-to-apples:
 
 ```bash
-TARGET_ENV=sandbox \
-SUPABASE_DB_URL_SANDBOX="$SUPABASE_DB_URL_SANDBOX" \
+TARGET_ENV=live \
+SUPABASE_DB_URL="$SUPABASE_DB_URL" \
   node scripts/diff-money-migration-prefixes.mjs \
     --sarif --sarif-out=local-diff.sarif
 ```
@@ -1374,7 +1375,7 @@ jq -S 'del(
     .runs[].invocations,
     .runs[].tool.driver.semanticVersion,
     .runs[].results[].locations[].physicalLocation.artifactLocation.uriBaseId
-  )' artifacts/money-migration-audit-sandbox/diff.sarif > /tmp/ci.norm.json
+  )' artifacts/money-migration-audit-live/diff.sarif > /tmp/ci.norm.json
 
 jq -S 'del(
     .runs[].invocations,
@@ -1387,7 +1388,7 @@ diff -u /tmp/ci.norm.json /tmp/local.norm.json
 
 Zero diff = your local environment reproduces the CI finding exactly.
 Any diff is real drift between environments (usually a migration
-applied locally but not in sandbox, or vice versa).
+applied locally but not in production, or vice versa).
 
 **Step 4 — Compare just the findings.**
 
@@ -1403,7 +1404,7 @@ extract_fps() {
     | @tsv' "$1" | sort
 }
 
-diff <(extract_fps artifacts/money-migration-audit-sandbox/diff.sarif) \
+diff <(extract_fps artifacts/money-migration-audit-live/diff.sarif) \
      <(extract_fps local-diff.sarif)
 ```
 
@@ -1418,8 +1419,8 @@ in the **JSON schema** section above. Sanity-check the counts match the
 SARIF:
 
 ```bash
-jq '.summary' artifacts/money-migration-audit-sandbox/prefix-diff-cli.json
-jq '.runs[0].results | length' artifacts/money-migration-audit-sandbox/diff.sarif
+jq '.summary' artifacts/money-migration-audit-live/prefix-diff-cli.json
+jq '.runs[0].results | length' artifacts/money-migration-audit-live/diff.sarif
 ```
 
 `summary.driftCount + summary.malformedCount + summary.toolingCount`

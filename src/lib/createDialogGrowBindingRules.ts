@@ -35,6 +35,16 @@ function trimId(value: unknown): string | null {
   return t.length > 0 ? t : null;
 }
 
+/** Postgres uuid equality is case-insensitive. This path matches that. */
+export function createGrowIdsEqual(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
+  const a = trimId(left)?.toLowerCase() ?? null;
+  const b = trimId(right)?.toLowerCase() ?? null;
+  return a !== null && a === b;
+}
+
 const UUID_LIKE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 function exactlyOneById<T extends { id: string }>(id: string, rows: readonly T[]): T | null {
@@ -386,7 +396,7 @@ export function evaluateSuppliedTentBinding(input: {
     };
   }
 
-  if (tentGrow !== target) {
+  if (!createGrowIdsEqual(tentGrow, target)) {
     return {
       kind: "mismatch",
       tentId: supplied,
@@ -527,7 +537,7 @@ export function evaluateTentGrowCompatibility(input: {
     };
   }
 
-  if (tentGrow !== target) {
+  if (!createGrowIdsEqual(tentGrow, target)) {
     return {
       kind: "mismatch",
       compatible: false,

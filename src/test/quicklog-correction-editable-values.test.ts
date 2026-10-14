@@ -61,10 +61,10 @@ describe("Quick Log correction editable values", () => {
 
   it("pins quicklog_correct_entry to the body that records the original measured values", () => {
     expect(EDITABLE_VALUES_CORRECT_ENTRY_FINGERPRINT).toEqual({
-      md5: "9a56ac0fe7282bffe52ef4c9dc858562",
-      bytes: 14925,
-      prosrcMd5: "b714a3e4f9afa75cf4dea123e59684ed",
-      prosrcBytes: 14594,
+      md5: "cfe3579a69f92da8054cfffbf2b94149",
+      bytes: 15074,
+      prosrcMd5: "72903b94d24549c26492fb9cda0cce98",
+      prosrcBytes: 14743,
     });
   });
 

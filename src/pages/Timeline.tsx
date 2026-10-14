@@ -124,6 +124,7 @@ import {
   TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
   timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
+import { dropBlankQuickLogPlaceholderRows } from "@/lib/timelineQuickLogPlaceholderDedupeRules";
 import {
   effectiveSensorReadingsQuery,
   requireEffectiveSensorReadings,
@@ -1128,7 +1129,10 @@ export default function Timeline() {
   );
 
   const displayEntries = useMemo(
-    () => mergeTimelineMeasurementDisplayEntries(entries, manualSensorMeasurementEntries),
+    () =>
+      dropBlankQuickLogPlaceholderRows(
+        mergeTimelineMeasurementDisplayEntries(entries, manualSensorMeasurementEntries),
+      ),
     [entries, manualSensorMeasurementEntries],
   );
 

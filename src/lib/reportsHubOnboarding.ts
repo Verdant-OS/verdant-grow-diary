@@ -33,6 +33,12 @@ export interface ReportsHubOnboardingInput {
   latestSensorCapturedAt: string | null;
   outcomeTotal: number;
   alertsOpen: number;
+  /**
+   * Active plants on the scoped or active grow.
+   * Omit or 0 keeps the add-plant card (existing callers).
+   * null means the count is still unknown: hide the card so it cannot flash on, then off.
+   */
+  plantCount?: number | null;
 }
 
 export interface ReportsHubOnboarding {
@@ -99,5 +105,9 @@ export function buildReportsHubOnboarding(input: ReportsHubOnboardingInput): Rep
       hrefLabel: "Open actions",
     },
   ];
-  return { visible: true, cards };
+  const plantCount = input.plantCount;
+  const hideAddPlant =
+    plantCount === null || (typeof plantCount === "number" && safeInt(plantCount) >= 1);
+  const visibleCards = hideAddPlant ? cards.filter((card) => card.id !== "add_plant") : cards;
+  return { visible: true, cards: visibleCards };
 }

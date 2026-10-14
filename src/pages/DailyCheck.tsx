@@ -75,6 +75,7 @@ import {
 } from "@/lib/dailyGrowCheckRules";
 import {
   DAILY_CHECK_WHAT_COUNTS_HINT,
+  defaultDailyCheckPlantId,
   resolveDailyCheckPlantSelection,
   type DailyCheckPlantResolution,
 } from "@/lib/dailyCheckPlantSelectionRules";
@@ -239,7 +240,12 @@ export default function DailyCheck() {
         : "select";
   const requestedActivityId = dailyCheckMethodToActivityId(methodHint);
   const routeIdentityPending = appliedRouteIdentity !== routeIdentity;
-  const renderedPlantId = routeIdentityPending ? routePlantId : plantId;
+  const fallbackPlantId = defaultDailyCheckPlantId({
+    routePlantId,
+    resolutionStatus: plantResolution.status,
+    selectablePlantIds: selectablePlants.map((plant) => plant.id),
+  });
+  const renderedPlantId = routeIdentityPending ? fallbackPlantId : plantId;
 
   const selectedPlant = useMemo(
     () => selectablePlants.find((plant) => plant.id === renderedPlantId) ?? null,
@@ -271,7 +277,7 @@ export default function DailyCheck() {
   // effect resets the local guided-flow state.
   useEffect(() => {
     if (tentsLoading || plantsLoading || !routeIdentityPending) return;
-    setPlantId(routePlantId);
+    setPlantId(fallbackPlantId);
     setTentId(routeTentId);
     setStep(routeStep);
     setQuickLogOpen(routeStep === "quicklog");
@@ -282,8 +288,8 @@ export default function DailyCheck() {
   }, [
     plantsLoading,
     routeIdentity,
+    fallbackPlantId,
     routeIdentityPending,
-    routePlantId,
     routeStep,
     routeTentId,
     tentsLoading,

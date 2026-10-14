@@ -19,9 +19,9 @@
  *                      consistent with quickLogPlantOptionRules and
  *                      plantDropdownEligibilityRules.
  *
- * Never coerces an invalid plantId to a different plant. Never auto-picks
- * "the first plant" — the caller should render the picker for `missing` and
- * a rejection banner for `unknown` / `out-of-scope`.
+ * Never coerces an invalid plantId to a different plant. A missing URL
+ * plant does not pick among several plants. The one exception is a missing
+ * URL plant when exactly one plant is in scope (`defaultDailyCheckPlantId`).
  */
 
 export interface DailyCheckPlantLike {
@@ -112,6 +112,21 @@ export function resolveDailyCheckPlantSelection(
     requestedPlantId,
     message: null,
   };
+}
+
+/**
+ * Plant id to show when the route has not named a valid plant.
+ * Exactly one in-scope plant is selected. Several plants, or a rejected
+ * plant id, stay unselected so the grower chooses.
+ */
+export function defaultDailyCheckPlantId(input: {
+  routePlantId: string;
+  resolutionStatus: DailyCheckPlantResolutionStatus;
+  selectablePlantIds: readonly string[];
+}): string {
+  if (input.routePlantId) return input.routePlantId;
+  if (input.resolutionStatus !== "missing") return "";
+  return input.selectablePlantIds.length === 1 ? input.selectablePlantIds[0] : "";
 }
 
 /**

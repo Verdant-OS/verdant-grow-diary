@@ -87,11 +87,13 @@ describe("buildDailyMethodBreakdown — pure rule", () => {
     expect(formatDailyMethodBreakdownLabel(today.method)).toBe("Both");
   });
 
-  it("classifies a day with neither as 'missed'", () => {
+  it("classifies today with neither as pending, and a finished empty day as missed", () => {
     const s = summaryFor({});
-    const today = buildDailyMethodBreakdown(s, "newest-first")[0];
-    expect(today.method).toBe("missed");
-    expect(formatDailyMethodBreakdownLabel(today.method)).toBe("Missed");
+    const days = buildDailyMethodBreakdown(s, "newest-first");
+    expect(days[0].method).toBe("pending");
+    expect(formatDailyMethodBreakdownLabel(days[0].method)).toBe("Not yet");
+    expect(days[1].method).toBe("missed");
+    expect(formatDailyMethodBreakdownLabel(days[1].method)).toBe("Missed");
   });
 
   it("ignores manual snapshots from a different tent", () => {
@@ -99,7 +101,7 @@ describe("buildDailyMethodBreakdown — pure rule", () => {
       manualReadings: [{ ts: iso(2026, 4, 24, 11), id: "m1", tent_id: "other-tent" }],
     });
     const today = buildDailyMethodBreakdown(s, "newest-first")[0];
-    expect(today.method).toBe("missed");
+    expect(today.method).toBe("pending");
   });
 });
 
@@ -169,7 +171,9 @@ describe("PlantDailyGrowCheckConsistencyCard — 7-day method breakdown", () => 
     const days = within(region).getAllByTestId("plant-daily-grow-check-method-breakdown-day");
     expect(days).toHaveLength(7);
     const methods = days.map((d) => d.getAttribute("data-method"));
-    expect(methods.every((m) => ["note", "sensor", "both", "missed"].includes(m!))).toBe(true);
+    expect(methods.every((m) => ["note", "sensor", "both", "missed", "pending"].includes(m!))).toBe(
+      true,
+    );
     // Today (last cell in oldest-first) has the manual snapshot → sensor.
     expect(days[6].getAttribute("data-method")).toBe("sensor");
     // Yesterday had a QuickLog → note.

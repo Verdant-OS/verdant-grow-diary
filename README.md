@@ -1108,13 +1108,23 @@ against **this** commit. If the verification step doesn't see the
 analysis or the expected number of results, the job fails — so silent
 upload regressions can't slip through as green.
 
+It reads the production database, so it keeps the same guards as the
+canonical `.github/workflows/prefix-diff-sarif.yml`: manual dispatch only,
+from the deploy branch, with a typed `LIVE` confirmation, in the protected
+`verdant-production` environment. Never add a `pull_request` or `push`
+trigger to a job that holds the production DB secret.
+
 ```yaml
 # .github/workflows/prefix-diff-sarif-verify.yml
 name: prefix-diff-sarif-verify
 
 on:
-  pull_request:
   workflow_dispatch:
+    inputs:
+      confirm_live:
+        description: "Type LIVE to run the read-only check against the production database"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -1123,6 +1133,8 @@ permissions:
 
 jobs:
   sarif:
+    if: ${{ github.ref == 'refs/heads/verdant-grow-diary' && inputs.confirm_live == 'LIVE' }}
+    environment: verdant-production
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -1164,7 +1176,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          SHA: ${{ github.sha }}
           CATEGORY: prefix-diff-${{ env.TARGET_ENV || 'live' }}
         run: |
           set -euo pipefail
@@ -1179,7 +1191,7 @@ jobs:
           # 4a. Analysis for this sha + category must exist.
           echo "Looking up analysis for sha=$SHA category=$CATEGORY ..."
           analysis=$(curl -sS "${AUTH[@]}" \
-            "https://api.github.com/repos/$REPO/code-scanning/analyses?ref=refs/pull/${{ github.event.pull_request.number }}/head&sarif_id=${{ steps.upload.outputs.sarif-id }}")
+            "https://api.github.com/repos/$REPO/code-scanning/analyses?ref=${{ github.ref }}&sarif_id=${{ steps.upload.outputs.sarif-id }}")
           echo "$analysis" | jq '.[0] // "NONE"'
           test "$(echo "$analysis" | jq 'length')" -gt 0
 
@@ -1208,13 +1220,13 @@ jobs:
 
 **What each step guarantees.**
 
-| Step                     | Fails when                                                                 |
-| ------------------------ | -------------------------------------------------------------------------- |
-| Run prefix-diff (SARIF)  | The tool crashed _before_ writing SARIF (test `-s` catches empty files).   |
-| Validate SARIF structure | Missing `partialFingerprints`, empty rule catalog, malformed `version`.    |
-| Upload SARIF             | Missing `security-events: write`, invalid SARIF, or fork PR upload denied. |
-| Verify alerts landed     | No analysis exists for this sha, or the alert count ≠ SARIF result count.  |
-| Upload artifacts         | Never — runs under `if: always()` so failures still ship the SARIF.        |
+| Step                     | Fails when                                                                |
+| ------------------------ | ------------------------------------------------------------------------- |
+| Run prefix-diff (SARIF)  | The tool crashed _before_ writing SARIF (test `-s` catches empty files).  |
+| Validate SARIF structure | Missing `partialFingerprints`, empty rule catalog, malformed `version`.   |
+| Upload SARIF             | Missing `security-events: write`, or invalid SARIF.                       |
+| Verify alerts landed     | No analysis exists for this sha, or the alert count ≠ SARIF result count. |
+| Upload artifacts         | Never — runs under `if: always()` so failures still ship the SARIF.       |
 
 **Notes.**
 
@@ -1224,12 +1236,11 @@ jobs:
 - Use `${{ steps.upload.outputs.sarif-id }}` to scope the analysis
   lookup to _this_ upload; otherwise a concurrent workflow on the same
   sha can mask a failure.
-- For fork PRs, step 3 is skipped by GitHub. Guard step 4 with
-  `if: github.event.pull_request.head.repo.full_name == github.repository`
-  if you accept fork contributions.
-- The alert-count assertion is deliberately strict. If your workflow
-  runs on both `push` and `pull_request`, dedupe by scoping the API
-  query to the exact `sarif_id`, not `ref` alone.
+- The job only runs on manual dispatch from the deploy branch, so fork PRs
+  never reach it and it never holds the production secret on untrusted code.
+- The alert-count assertion is deliberately strict. If several dispatches
+  run on the same ref, dedupe by scoping the API query to the exact
+  `sarif_id`, not `ref` alone.
 
 ##### Verifying uploaded findings in GitHub code scanning
 
@@ -2641,7 +2652,10 @@ TARGET_ENV=live bun run prefix-diff:annotations
 2. The **PR "Files changed" tab**, as red gutter markers on the exact
    `supabase/migrations/<file>.sql` (or manifest) referenced by `file=`.
 
-Minimal step:
+Minimal step. It holds the production DB secret, so put it only in a job
+guarded like the canonical `prefix-diff-sarif.yml`: manual dispatch from the
+deploy branch, `inputs.confirm_live == 'LIVE'`, and
+`environment: verdant-production`. Never in a `pull_request` or `push` job.
 
 ```yaml
 - name: Prefix diff (annotations)

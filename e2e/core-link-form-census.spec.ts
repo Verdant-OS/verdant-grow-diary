@@ -1832,8 +1832,10 @@ async function runLaneCensus(
         await assertMeaningfulPage(page, route.path);
         await assertExpectedRouteContent(page, route);
       }
-      await settleRouteReadsBeforeLinkAudit(page, route.path);
-      const links = await visibleLinkAudits(page, route.path);
+      // A route with an expectedPathname lands elsewhere (#2045: signed-in
+      // /onboarding → /), so settle and record links against where it landed.
+      await settleRouteReadsBeforeLinkAudit(page, finalPath);
+      const links = await visibleLinkAudits(page, finalPath);
       report.fieldAudits.push(...fields);
       report.linkAudits.push(...links);
       report.routeAudits.push({

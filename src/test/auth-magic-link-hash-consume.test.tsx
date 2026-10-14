@@ -20,17 +20,13 @@ import {
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AUTH_LAST_RESOLVED_IDENTITY_STORAGE_KEY, AuthProvider, useAuth } from "@/store/auth";
+import { AuthProvider, useAuth } from "@/store/auth";
 import OAuthPostAuthRedirect from "@/components/OAuthPostAuthRedirect";
 import { useLocation } from "@/lib/react-router-compat";
 import {
   clearOAuthReturnHashRetention,
   OAUTH_RETURN_HASH_STASH_KEY,
 } from "@/lib/oauthHashSessionConsumeRules";
-import {
-  OAUTH_POST_AUTH_REDIRECT_STORAGE_KEY,
-  savePendingOAuthPostAuthRedirect,
-} from "@/lib/oauthPostAuthRedirectRules";
 
 const fixture = vi.hoisted(() => ({ client: null as unknown as SupabaseClient }));
 vi.mock("@/integrations/supabase/client", () => ({

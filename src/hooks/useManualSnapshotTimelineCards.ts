@@ -22,6 +22,8 @@ import {
   selectManualSnapshotsForTimeline,
   type ManualSnapshotTimelineCard,
 } from "@/lib/manualSensorSnapshotViewModel";
+import { fetchTentManualEnvironmentEvents } from "@/hooks/useTentManualEnvironmentEvents";
+import { manualEnvironmentEventsToSnapshotRecords } from "@/lib/tentManualEnvironmentEventRules";
 import {
   normalizeTentManualSnapshotIds,
   scanLatestTentManualSnapshots,
@@ -96,14 +98,21 @@ export function useManualSnapshotTimelineCards(
     enabled,
     queryFn: async (): Promise<ManualSnapshotTimelineCard[]> => {
       if (!scope) return [];
-      const rows =
-        scope.kind === "plant"
-          ? await fetchPlantManualSnapshotRows(scope.plantId, limit)
-          : await fetchTentManualSnapshotRows(scope.tentId, limit);
-      const records = diaryRowsToManualSnapshotRecords(rows);
       if (scope.kind === "plant") {
+        const rows = await fetchPlantManualSnapshotRows(scope.plantId, limit);
+        const records = diaryRowsToManualSnapshotRecords(rows);
         return selectManualSnapshotsForTimeline({ records, plantId: scope.plantId });
       }
+      // Quick Log V2 snapshots live only in grow_events + environment_events,
+      // so the tent timeline reads both shapes (production QA 2026-10-14).
+      const [rows, events] = await Promise.all([
+        fetchTentManualSnapshotRows(scope.tentId, limit),
+        fetchTentManualEnvironmentEvents(scope.tentId, limit),
+      ]);
+      const records = [
+        ...diaryRowsToManualSnapshotRecords(rows),
+        ...manualEnvironmentEventsToSnapshotRecords(events),
+      ];
       return selectManualSnapshotsForTimeline({ records, tentId: scope.tentId });
     },
   });

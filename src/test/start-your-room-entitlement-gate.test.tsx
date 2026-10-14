@@ -124,18 +124,22 @@ describe("StartYourRoom entitlement creation gates", () => {
     testState.invalidateQueries.mockClear();
   });
 
-  it("does not insert another grow when a Free account already has one active grow", () => {
+  it("does not insert another grow when a Free account already has one active grow", async () => {
     testState.grows = [{ id: "grow-existing", name: "Existing Grow" }];
     renderPage();
 
-    fireEvent.change(screen.getByTestId("start-room-grow-name"), {
-      target: { value: "Bypass Grow" },
-    });
-
-    const submit = screen.getByTestId("start-room-grow-submit");
-    expect(submit).toBeDisabled();
-    fireEvent.click(submit);
+    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
+    expect(screen.getByTestId("start-room-bound-grow")).toHaveTextContent(
+      "Bound to grow: Existing Grow",
+    );
+    expect(screen.queryByTestId("start-your-room-step-grow")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("start-room-grow-name")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("start-room-grow-submit")).not.toBeInTheDocument();
+    expect(screen.getByTestId("start-room-creation-upgrade")).toHaveAttribute("href", "/pricing");
+    fireEvent.click(screen.getByTestId("start-room-tent-submit"));
+    fireEvent.click(screen.getByTestId("start-your-room-skip-start-screen"));
     expect(testState.insert).not.toHaveBeenCalled();
+    expect(testState.insert).not.toHaveBeenCalledWith("grows", expect.anything());
   });
 
   it("does not begin the room when a Free account already has one active tent", () => {
@@ -187,10 +191,11 @@ describe("StartYourRoom entitlement creation gates", () => {
     expect(testState.insert).not.toHaveBeenCalled();
   });
 
-  it("shows the upgrade path instead of Retry for a verified Free limit", () => {
+  it("shows the upgrade path instead of Retry for a verified Free limit", async () => {
     testState.grows = [{ id: "grow-existing", name: "Existing Grow" }];
     renderPage();
 
+    expect(await screen.findByTestId("start-your-room-step-tent")).toBeInTheDocument();
     expect(screen.getByTestId("start-room-creation-upgrade")).toHaveAttribute("href", "/pricing");
     expect(screen.queryByTestId("start-room-creation-retry")).not.toBeInTheDocument();
   });
@@ -200,6 +205,7 @@ describe("StartYourRoom entitlement creation gates", () => {
     testState.capabilities = PLAN_CATALOG.pro_monthly;
     renderPage();
 
+    expect(screen.getByTestId("start-your-room-step-grow")).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("start-room-grow-name"), {
       target: { value: "Paid Grow" },
     });

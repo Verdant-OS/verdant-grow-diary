@@ -135,8 +135,10 @@ from askrubberduck; treat the rest as reference only or not applicable.**
 Decisions by plugin:
 
 - **askrubberduck 3.12.4, MIT, `1401fce6f8ec`:** **Adapt selected procedures**, written from scratch
-  or pinned: `duck-why` (cause before fix), `duck-split` (one PR, one purpose), `duck-scan`
-  (read-only next work), `duck-race` (two model families, evidence decides). `duck-land` and
+  or pinned. `duck-split` is **adapted** as `.claude/skills/verdant-scope-split/SKILL.md` and
+  `duck-why` as `.claude/skills/verdant-root-cause/SKILL.md`; both were written from scratch from
+  the concept, copy no text, and have no hooks or scripts. `duck-scan` (read-only next work) and
+  `duck-race` (two model families, evidence decides) remain candidates. `duck-land` and
   `duck-sweep` are **rejected**: merging and branch cleanup belong to the merge seat and the holder.
   `duck-proof` overlaps `verdant-doubt-check`.
 - **claude-context-optimizer 4.12.1, MIT, `4dbab2e2fd2f`:** **Reports deferred** (`cco-overhead`,
@@ -167,8 +169,7 @@ Decisions by plugin:
   hosted MCP that needs an account; outside the One-Tent Loop.
 
 **Smallest next step, if wanted.** Matthew disables the AgentOne and simple-workflow hooks in
-the plugin settings. Separately, a small draft PR adds a Verdant `duck-split`/`duck-why`
-procedure written from scratch, with no hooks and no copied text.
+the plugin settings.
 
 ## Adding an entry
 

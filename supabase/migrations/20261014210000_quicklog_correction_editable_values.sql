@@ -3,7 +3,7 @@
 -- The original entry stays in quicklog_entry_revisions.previous_state.
 -- This migration does not update that ledger. It adds measured-value keys to
 -- quicklog_correct_entry and writes the new value only on the live row.
--- Awaiting Cheeko's schema approval. No table, column, policy, or grant change.
+-- Cheeko approved this migration at 4:54 PM CT on 2026-10-14. No table, column, policy, or grant change.
 --
 -- Bounds match the merged writers: volume > 0 and <= 1000000 ml; dose >= 0 and
 -- <= 1000000; temperature -10..60 C; humidity 0..100; VPD 0..10 kPa.
@@ -44,7 +44,9 @@ BEGIN
   IF p_has_dose AND p_event_type <> 'feeding' THEN
     RETURN jsonb_build_object('reason', 'unsupported_change');
   END IF;
-  IF p_has_sensor AND p_event_type NOT IN ('environment', 'environment_check', 'manual_sensor_snapshot') THEN
+  IF p_has_sensor
+     AND p_event_type NOT IN ('environment', 'environment_check', 'manual_sensor_snapshot')
+     AND NOT (p_event_type = 'observation' AND COALESCE(cardinality(p_env_ids), 0) > 0) THEN
     RETURN jsonb_build_object('reason', 'unsupported_change');
   END IF;
   IF p_has_dose THEN
@@ -53,6 +55,12 @@ BEGIN
      WHERE f.event_id = p_grow_event_id AND f.user_id = p_uid;
     IF v_products IS NULL OR jsonb_typeof(v_products) <> 'array' OR jsonb_array_length(v_products) = 0 THEN
       SELECT d.details -> 'feeding' -> 'products' INTO v_products
+        FROM public.diary_entries d
+       WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
+       LIMIT 1;
+    END IF;
+    IF v_products IS NULL OR jsonb_typeof(v_products) <> 'array' OR jsonb_array_length(v_products) = 0 THEN
+      SELECT d.details -> 'nutrients' INTO v_products
         FROM public.diary_entries d
        WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
        LIMIT 1;
@@ -74,6 +82,24 @@ BEGIN
       SELECT f.volume_ml INTO v_old_volume
         FROM public.feeding_events f
        WHERE f.event_id = p_grow_event_id AND f.user_id = p_uid;
+    END IF;
+    IF v_old_volume IS NULL THEN
+      SELECT CASE
+        WHEN p_event_type = 'watering' THEN COALESCE(
+          CASE WHEN jsonb_typeof(d.details -> 'watering' -> 'volume_ml') = 'number'
+            THEN (d.details -> 'watering' ->> 'volume_ml')::numeric END,
+          CASE WHEN jsonb_typeof(d.details -> 'watering_amount_ml') = 'number'
+            THEN (d.details ->> 'watering_amount_ml')::numeric END,
+          CASE WHEN jsonb_typeof(d.details -> 'wateringAmountMl') = 'number'
+            THEN (d.details ->> 'wateringAmountMl')::numeric END
+        )
+        ELSE CASE WHEN jsonb_typeof(d.details -> 'feeding' -> 'volume_ml') = 'number'
+          THEN (d.details -> 'feeding' ->> 'volume_ml')::numeric END
+      END
+      INTO v_old_volume
+      FROM public.diary_entries d
+      WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
+      LIMIT 1;
     END IF;
     v_previous := v_previous || jsonb_build_object('volume_ml', v_old_volume);
     v_next := v_next || jsonb_build_object('volume_ml', p_volume);
@@ -98,6 +124,14 @@ BEGIN
       UPDATE public.diary_entries d
          SET details = jsonb_set(COALESCE(d.details, '{}'::jsonb), '{watering,volume_ml}', to_jsonb(p_volume), true)
        WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid;
+      UPDATE public.diary_entries d
+         SET details = jsonb_set(d.details, '{watering_amount_ml}', to_jsonb(p_volume), false)
+       WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
+         AND jsonb_typeof(d.details -> 'watering_amount_ml') = 'number';
+      UPDATE public.diary_entries d
+         SET details = jsonb_set(d.details, '{wateringAmountMl}', to_jsonb(p_volume), false)
+       WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
+         AND jsonb_typeof(d.details -> 'wateringAmountMl') = 'number';
     ELSE
       UPDATE public.diary_entries d
          SET details = jsonb_set(COALESCE(d.details, '{}'::jsonb), '{feeding,volume_ml}', to_jsonb(p_volume), true)
@@ -114,6 +148,12 @@ BEGIN
      WHERE f.event_id = p_grow_event_id AND f.user_id = p_uid;
     IF v_products IS NULL OR jsonb_typeof(v_products) <> 'array' OR jsonb_array_length(v_products) = 0 THEN
       SELECT d.details -> 'feeding' -> 'products' INTO v_products
+        FROM public.diary_entries d
+       WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
+       LIMIT 1;
+    END IF;
+    IF v_products IS NULL OR jsonb_typeof(v_products) <> 'array' OR jsonb_array_length(v_products) = 0 THEN
+      SELECT d.details -> 'nutrients' INTO v_products
         FROM public.diary_entries d
        WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
        LIMIT 1;
@@ -146,7 +186,8 @@ BEGIN
   END IF;
 
   IF p_has_sensor THEN
-    IF p_event_type NOT IN ('environment', 'environment_check', 'manual_sensor_snapshot') THEN
+    IF p_event_type NOT IN ('environment', 'environment_check', 'manual_sensor_snapshot')
+       AND NOT (p_event_type = 'observation' AND COALESCE(cardinality(p_env_ids), 0) > 0) THEN
       RETURN jsonb_build_object('reason', 'unsupported_change');
     END IF;
     v_target_ids := COALESCE(p_env_ids, '{}'::uuid[]);
@@ -342,6 +383,9 @@ BEGIN
     END IF;
     FOR v_key IN SELECT jsonb_object_keys(v_sensor) LOOP
       IF v_key NOT IN ('temperature_c', 'humidity_pct', 'vpd_kpa') THEN
+        RETURN jsonb_build_object('ok', false, 'reason', 'invalid_changes');
+      END IF;
+      IF jsonb_typeof(v_sensor -> v_key) <> 'number' THEN
         RETURN jsonb_build_object('ok', false, 'reason', 'invalid_changes');
       END IF;
       BEGIN

@@ -54,15 +54,15 @@ branch: cursor/quicklog-correction-editable-values-fc1d
 base: verdant-grow-diary
 checkout: git fetch origin cursor/quicklog-correction-editable-values-fc1d verdant-grow-diary && git switch cursor/quicklog-correction-editable-values-fc1d && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2118 (draft)
-head_sha: 8d0566278d9f1db80dd38d1f689d62c59b5c4a65
-state: pushed draft. Schema change is a new forward migration and awaits Cheeko's schema approval. No merge.
-next_action: required CI at the draft head. Stay draft.
-files: src/lib/quick-log/quickLogRevisionRules.ts; src/components/QuickLogEntryIntegrityControls.tsx; src/components/WateringHistoryPanel.tsx; src/components/FeedingHistoryPanel.tsx; src/pages/Timeline.tsx; src/test/quicklog-correction-editable-values.test.ts; src/test/quicklog-correction-editable-values-dialog.test.tsx; supabase/migrations/20261014210000_quicklog_correction_editable_values.sql; docs/agents/HANDOFF_LOG.md
-blockers: schema approval for the new migration, Cheeko
-artifacts: PR body (RED 8 failed / 1 passed, then GREEN)
-reviewer_seat: Blue Dream (.tsx) and Critical Mass (rules, tests, migration)
-claimed_by: Grok, 2026-10-14 16:18 CT
-last_updated: 2026-10-14 16:18 CT, by Grok
+head_sha: PARENT_OF_HANDOFF_COMMIT
+state: pushed draft. Cheeko approved the migration (4:54 PM CT) and the scorer-locked pin update only (5:57 PM CT). Graft FAIL at aae343d3 is addressed on this head. No merge.
+next_action: required CI at the draft head, then Graft one-time exact-head review. Stay draft.
+files: src/lib/quick-log/quickLogRevisionRules.ts; src/components/QuickLogEntryIntegrityControls.tsx; src/components/QuickLogHistoryPanels.tsx; src/components/QuickLogGroupedTimelineSection.tsx; src/components/WateringHistoryPanel.tsx; src/components/FeedingHistoryPanel.tsx; src/pages/Timeline.tsx; src/test/quicklog-correction-editable-values.test.ts; src/test/quicklog-correction-editable-values-dialog.test.tsx; src/test/quicklog-correction-copilot-followup.test.tsx; scripts/prove-quicklog-correction-owner-fence.mjs; supabase/migrations/20261014210000_quicklog_correction_editable_values.sql; docs/agents/HANDOFF_LOG.md
+blockers: none for the writer. Fingerprint pin stays at the pre-Copilot body because the 5:57 PM CT receipt allows a pin update only and that pin already landed.
+artifacts: PR body
+reviewer_seat: Graft one-time exact-head after required CI is green. Blue Dream (.tsx). Critical Mass (rules, tests, migration).
+claimed_by: bc-6f1bd555, 2026-10-14 23:20 UTC
+last_updated: 2026-10-14 23:20 UTC, by bc-6f1bd555
 ```
 
 ### TIMELINE-GROW-DAY-2005

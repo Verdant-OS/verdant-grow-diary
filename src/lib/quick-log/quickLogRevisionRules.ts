@@ -386,6 +386,28 @@ function sensorFromDetails(
  * Which value the correction dialog can edit for one saved Quick Log entry.
  * Returns null for notes, photos, and any other entry type.
  */
+export function correctionValuesForTimelineAction(
+  action: { kind: string; volumeMl?: number | null },
+  readings?: ReadonlyArray<{ field: string; value: number }>,
+): QuickLogCorrectionValueContext | null {
+  if (action.kind === "water") {
+    return {
+      kind: "watering",
+      volumeMl:
+        typeof action.volumeMl === "number" && Number.isFinite(action.volumeMl)
+          ? action.volumeMl
+          : null,
+    };
+  }
+  const sensor: QuickLogCorrectionSensorValues = {};
+  for (const reading of readings ?? []) {
+    if (reading.field === "air_temp_c") sensor.temperature_c = reading.value;
+    if (reading.field === "humidity_pct") sensor.humidity_pct = reading.value;
+    if (reading.field === "vpd_kpa") sensor.vpd_kpa = reading.value;
+  }
+  return Object.keys(sensor).length > 0 ? { kind: "sensor", sensor } : null;
+}
+
 export function correctionValuePropsFromDiaryDetails(
   details: unknown,
 ): QuickLogCorrectionValueContext | null {
@@ -393,7 +415,9 @@ export function correctionValuePropsFromDiaryDetails(
   const eventType = typeof details.event_type === "string" ? details.event_type : "";
   if (eventType === "watering") {
     const watering = isPlainObject(details.watering) ? details.watering : null;
-    return { kind: "watering", volumeMl: finiteOrNull(watering?.volume_ml) };
+    const structured = finiteOrNull(watering?.volume_ml);
+    const flat = finiteOrNull(details.watering_amount_ml) ?? finiteOrNull(details.wateringAmountMl);
+    return { kind: "watering", volumeMl: structured ?? flat };
   }
   if (eventType === "feeding") {
     return { kind: "feeding", doseAmount: doseFromDetails(details) };
@@ -404,6 +428,13 @@ export function correctionValuePropsFromDiaryDetails(
     eventType === "manual_sensor_snapshot"
   ) {
     return { kind: "sensor", sensor: sensorFromDetails(details) };
+  }
+  // V2 Fast Check stores the action as an observation and the measurements
+  // on the environment companion. Timeline merge keeps those metrics on the
+  // same details object while the spine event_type stays observation.
+  if (eventType === "observation") {
+    const sensor = sensorFromDetails(details);
+    if (sensor) return { kind: "sensor", sensor };
   }
   return null;
 }

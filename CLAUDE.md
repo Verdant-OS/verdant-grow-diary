@@ -3,7 +3,7 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-10-13.1**
+**Sentinel-Version: 2026-10-14.1**
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
 publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
@@ -108,9 +108,9 @@ Applies to every deliverable, without exception:
 Verified 2026-08-19 on the deploy branch. Re-verify before citing on another branch.
 
 - Package manager is **bun** (`bun.lock` authoritative; there is no `bun.lockb` — re-verified
-  2026-09-25). Never add or change dependencies with npm/yarn/pnpm. `package-lock.json` is a
-  synchronized compatibility lock kept only until the dated `reviewBy` in
-  `config/dependency-lockfile-transition.json`. On Windows, `bun install` fails under OneDrive
+  2026-09-25). Never add or change dependencies with npm/yarn/pnpm. `package-lock.json` was
+  retired in #1873 and is forbidden; `bun.lock` is the only lockfile
+  (`config/dependency-lockfile-transition.json`). On Windows, `bun install` fails under OneDrive
   paths; use a non-OneDrive checkout.
 - Dev server: `bun run dev` → `http://localhost:8080` (port pinned by the Lovable
   TanStack config, not Vite's 5173 default).
@@ -139,13 +139,14 @@ Verified 2026-08-19 on the deploy branch. Re-verify before citing on another bra
 # Codebase orientation
 
 Everything below is `established fact`, measured at `f25f9ed` (#1020) on 2026-08-21;
-current deploy tip is `28c01a01` (#1078). Counts were not re-taken at the later tip. It
+current deploy tip is `28c01a01` (#1078). The `scripts/` and `.github/workflows/` counts were
+re-taken at `24864e7` on 2026-10-14; other counts were not re-taken at a later tip. It
 describes **structure, tooling, and conventions** only.
 It makes no claim about production, GA4/GSC, or which migrations are applied — those axes
 belong to `docs/agents/CURRENT_STATE.md` and keep their `BLOCKED` / `NOT_MEASURED` labels
 there.
 
-Exhaustive inventories (full route table, all 34 edge functions, all 86 workflows, the
+Exhaustive inventories (full route table, all 34 edge functions, every workflow, the
 One-Tent Loop module index, the entitlements API surface) live in
 [`docs/codebase-map.md`](docs/codebase-map.md) so they do not load into every session.
 
@@ -189,8 +190,8 @@ deployment, does not mean the apex serves it.
 | `src/`                                                     | 4,921 ts/tsx   | The application (see below)                                                       |
 | `supabase/migrations/`                                     | 272 `.sql`     | Append-only migration history — **immutable once merged**                         |
 | `supabase/functions/`                                      | 34 + `_shared` | Deno edge functions                                                               |
-| `scripts/`                                                 | 236 entries    | Gates, harnesses, probes, release tooling (`.mjs` and `.ts`)                      |
-| `.github/workflows/`                                       | 86             | CI; `ci.yml` supplies every ruleset-required check                                |
+| `scripts/`                                                 | 268 entries    | Gates, harnesses, probes, release tooling (`.mjs` and `.ts`)                      |
+| `.github/workflows/`                                       | 107            | CI; `ci.yml` supplies every ruleset-required check                                |
 | `e2e/`                                                     | 59 specs       | Playwright                                                                        |
 | `docs/`                                                    | 397 files      | Governance, specs, runbooks, knowledge library, SEO                               |
 | `config/`                                                  | 10             | Pinned JSON contracts (required checks, replay compat, allowlists)                |
@@ -288,9 +289,9 @@ component is the most common way to produce code that looks correct and fails in
 
 ## Daily commands
 
-Bun is canonical (`bun.lock`, `bunfig.toml`); `package-lock.json` is a synchronized
-compatibility lock only. `package.json` carries **320** scripts — these are the ones you
-actually run:
+Bun is canonical (`bun.lock`, `bunfig.toml`); `bun.lock` is the only lockfile
+(`package-lock.json` was retired in #1873). `package.json` carries **320** scripts — these are
+the ones you actually run:
 
 ```bash
 bun run dev -- --host 127.0.0.1 --port 8080   # IPv4 and 8080 explicitly; see traps below

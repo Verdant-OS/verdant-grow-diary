@@ -21,9 +21,10 @@ export function installSameRealmEventDispatch(): void {
       return native.call(this, event);
     } catch (error) {
       // jsdom throws its own realm's TypeError, which fails `instanceof Error` here.
-      const message = typeof error === "object" && error !== null && "message" in error
-        ? String((error as { message: unknown }).message)
-        : String(error);
+      const message =
+        typeof error === "object" && error !== null && "message" in error
+          ? String((error as { message: unknown }).message)
+          : String(error);
       if (!message.includes("parameter 1 is not of type 'Event'")) throw error;
       const ownerDocument = (this as { ownerDocument?: Document | null }).ownerDocument;
       const view = ownerDocument?.defaultView ?? null;

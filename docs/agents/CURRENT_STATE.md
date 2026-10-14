@@ -33,6 +33,10 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-14T18:25 UTC
+
+- **#2056 merged (supersedes the 01:06 UTC block, which left it queued).** #2056 merged into `verdant-grow-diary` at **2026-10-14T01:20:30 UTC** as `06b6266ca6d668d103c2100fe747938d17b942e4` through the merge queue. It was enqueued 01:00:57 UTC at `1802e539483be0eec0248e50d0c0b4b4af8009df`; `merged` and `removed_from_merge_queue` by `github-merge-queue[bot]` were both at 01:20:30 UTC, and its branch was deleted at 01:20:32 UTC. The merge commit has a single parent (`3700d1eea`), i.e. a squash, and changes one file, `docs/agents/CURRENT_STATE.md`, +63 / -0. Gates: 35/35 required at `1802e5394` and queue CI green. **No independent exact-head PASS**: it merged on Matthew's owner waiver ("Accept all" → "Queue both, waive review", 01:00 UTC), not on the documented exact-head review gate.
+
 ## Follow-up observation — 2026-10-14T01:06 UTC
 
 - **Owner waiver: #2056 queued at `1802e539483be0eec0248e50d0c0b4b4af8009df` without an independent exact-head PASS.** Matthew answered "Accept all" in the Claude session (~01:00 UTC). Asked how to proceed, he chose **"Queue both, waive review"**: queue #2056 and #2063 at their current heads without the independent exact-head PASS that the documented merge rule requires (CURRENT_STATE "Merge rule"; AGENTS.md "Git and merges"). This is an owner override of that gate for these two PRs. It is not a change to the rule. Before queueing, #2056 was re-checked at that head: 35/35 required SUCCESS, mergeable, not draft, no labels, auto-merge off. It was enqueued at 01:00:57 UTC through `enqueuePullRequest` with `expectedHeadOid` = `1802e539…`. At 01:06 UTC: merge-queue entry **AWAITING_CHECKS, position 1**, auto-merge off, not merged. Deploy tip `3700d1eea` (#1873, 00:45 UTC). The waiver was also written into #2056's and #2063's descriptions at 01:00 UTC.

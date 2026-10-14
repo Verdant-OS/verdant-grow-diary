@@ -40,12 +40,15 @@ export const QUICKLOG_REVISION_REASON_LABELS: Record<QuickLogRevisionReasonCode,
   other: "Other",
 };
 
-/** Chips offered when correcting an entry. */
+/**
+ * Chips offered when correcting an entry. The dialog edits note, time and
+ * plant only, so "wrong_value" is not offered until value editing exists;
+ * the code stays valid for legacy revision rows.
+ */
 export const QUICKLOG_CORRECTION_REASON_CHIPS: QuickLogRevisionReasonCode[] = [
   "wrong_plant",
   "typo",
   "wrong_time",
-  "wrong_value",
   "other",
 ];
 

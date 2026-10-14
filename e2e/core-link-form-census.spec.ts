@@ -1832,10 +1832,13 @@ async function runLaneCensus(
         await assertMeaningfulPage(page, route.path);
         await assertExpectedRouteContent(page, route);
       }
-      // A route with an expectedPathname lands elsewhere (#2045: signed-in
-      // /onboarding → /), so settle and record links against where it landed.
-      await settleRouteReadsBeforeLinkAudit(page, finalPath);
-      const links = await visibleLinkAudits(page, finalPath);
+      // A route that redirects (#2045: signed-in /onboarding → /) settles and
+      // records its links where it landed. A route that stays on its own
+      // pathname keeps route.path, because its query is part of the revisit.
+      const linkSourcePath =
+        finalPath === new URL(route.path, APP_ORIGIN).pathname ? route.path : finalPath;
+      await settleRouteReadsBeforeLinkAudit(page, linkSourcePath);
+      const links = await visibleLinkAudits(page, linkSourcePath);
       report.fieldAudits.push(...fields);
       report.linkAudits.push(...links);
       report.routeAudits.push({

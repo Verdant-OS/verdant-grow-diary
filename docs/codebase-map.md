@@ -319,7 +319,7 @@ immutable workspace, then runs the individual RLS lanes), `security-regression`,
 `one-tent-loop-proof-never-healthy`, `one-tent-loop-smoke-test`,
 `demo-proof-walkthrough-readonly`, `dispatch-history-e2e`, `symptom-check-branch-e2e`,
 `genetics-traceability-smoke`, `irrigation-overflow-smoke`, `agent-integrations-smoke`,
-`gamification-staging-smoke`, `pi-ingest-smoke`, `e2e-fixture-garden-rotation`,
+`pi-ingest-smoke`, `e2e-fixture-garden-rotation`,
 the `ai-doctor-*` trio, the `pheno-*` set, `contextual-pheno-comparison-v0`.
 
 ### SEO / performance

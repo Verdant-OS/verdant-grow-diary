@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### FIX-2004-APP-DOCUMENT-TITLES
+
+```text
+TASK FIX-2004-APP-DOCUMENT-TITLES  priority: other  status: OPEN
+goal: Give the signed-in routes named in #2004 a page-specific document title without usePageSeo canonical/OG/robots tags, and reapply that title after usePageSeo's unmount reset.
+branch: cursor/app-page-document-titles-89ef
+base: verdant-grow-diary
+checkout: git fetch origin cursor/app-page-document-titles-89ef verdant-grow-diary && git switch cursor/app-page-document-titles-89ef && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2082 (draft)
+head_sha: df7da15c4a2712ee20771926f3fcdcec79abe9c1 (parent of the commit that records this URL)
+state: pushed draft
+next_action: required checks and independent review. Stay draft. No ready, merge, or deploy.
+files: src/lib/appDocumentTitleRules.ts; src/components/AppDocumentTitle.tsx; src/routes/_app.tsx; src/test/app-document-title.test.tsx
+blockers: none for the repository change
+artifacts: PR body
+reviewer_seat: Blue Dream (route layout .tsx) and Critical Mass (rules and tests)
+claimed_by: cursor cloud agent, 2026-10-14
+last_updated: 2026-10-14 01:10 CT, by Grok
+```
+
 ### QUICKLOG-EVENT-REQUEST-HASH-UTC
 
 ```text
@@ -130,27 +150,48 @@ claimed_by: Claude, 2026-10-06 20:47 UTC (PR #1844 comment)
 last_updated: 2026-10-06 16:05 CT, by Claude
 ```
 
+## Closed
+
 ### FIX-2033-LOCKFILE-POLICY-INNGEST
 
 ```text
-TASK FIX-2033-LOCKFILE-POLICY-INNGEST  priority: other  status: OPEN
-goal: Keep check:lockfile green after #1945. Vendored Inngest skill docs under .agents/skills/inngest-* were edited locally so they are not scanned as npm lock consumers (#2033, draft #2034). A refresh of those upstream skills must not silently restore the removed local install commands, and the three install examples lead with bun add because yarn and pnpm would write lockfiles this repo forbids.
+TASK FIX-2033-LOCKFILE-POLICY-INNGEST  priority: other  status: CLOSED
+goal: Keep check:lockfile green after #1945. Vendored Inngest skill docs under .agents/skills/inngest-* were edited locally so they are not scanned as npm lock consumers (#2033, #2034). A refresh of those upstream skills must not silently restore the removed local install commands, and the three install examples lead with bun add because yarn and pnpm would write lockfiles this repo forbids.
 branch: canopy/fix-2033-lockfile-policy-inngest
 base: verdant-grow-diary
-checkout: git fetch origin canopy/fix-2033-lockfile-policy-inngest verdant-grow-diary && git switch canopy/fix-2033-lockfile-policy-inngest && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+checkout: none; merged. Start new work from origin/verdant-grow-diary.
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2034
-head_sha: 58d237d208a0f9d673332d0b6927fd52bef55b7f
-state: draft. This block describes the head that contains this change (AGENTS.md: the block records the exact head, and a commit cannot store its own SHA). That head is the commit that updates this block; its parent is head_sha, the contract test that matches the full npm guidance sentence including the package name. npm wording stays in the three skill files. Graft's advisory PASS at 5078986bdce39a848d254b93f5e011e83ecade44 does not cover later heads.
-next_action: required checks at the new head. Stay draft. No ready, merge, or deploy.
+head_sha: 4af5a5e399dc7090bc154bcebc37e0ac1a72047f, the pinned final head of #2034 (observed 2026-10-14 03:55 CT via the GitHub API: PR head, merge commit and merged_at all match). Per the parent-SHA convention it is the commit that updated this block, and its parent 58d237d208a0f9d673332d0b6927fd52bef55b7f is the contract-test commit the previous block named as head_sha.
+state: #2034 squash-merged at 2026-10-12 13:01 CT from unchanged pinned head 4af5a5e399dc7090bc154bcebc37e0ac1a72047f as 8e1ffe39594c8b56744c348bd65ee213a0e7f4bc on verdant-grow-diary (sole parent 161f2023b0737867c62d26adf6515fe528c3d104). NOT deployed: deploy needs its own separate approval. Production acceptance NOT_MEASURED.
+next_action: CLOSED for the repository change. Dependent branches take the fix by base sync without force-push and rerun shard 23. Deploy only on a separate explicit yes.
 files: .agents/skills/inngest-cli/SKILL.md; .agents/skills/inngest-setup/SKILL.md; .agents/skills/inngest-v3-v4-migration/SKILL.md; .agents/skills/inngest-middleware/SKILL.md; .agents/skills/inngest-middleware/references/built-in-middleware.md; .agents/skills/inngest-realtime/SKILL.md; src/test/inngest-skill-npm-install-guidance.test.ts; docs/agents/HANDOFF_LOG.md (this record)
-blockers: none for the repository change. Do not deploy.
-artifacts: PR #2034
-reviewer_seat: Critical Mass (docs and tests). Graft's advisory PASS at 5078986b is not the exact-head PASS for the new head.
+blockers: none for the merged change. Deploy not approved.
+artifacts: PR #2034; merge commit 8e1ffe39594c8b56744c348bd65ee213a0e7f4bc
+reviewer_seat: Critical Mass (docs and tests). Graft's advisory PASS at 5078986b is not the exact-head PASS for the merged head.
 claimed_by: Canopy, 2026-10-12 09:09 CT
-last_updated: 2026-10-12 17:02 UTC, by Grok
+last_updated: 2026-10-14 03:55 CT, by Claude (log maintenance via #2049, coverage claim on #2049 only; block closed by Grok for Canopy at 2026-10-12 13:10 CT)
 ```
 
-## Closed
+### CLAUDE-1872-REFERRAL-REFERRER-MONTHLY-CAP
+
+```text
+TASK CLAUDE-1872-REFERRAL-REFERRER-MONTHLY-CAP  priority: P1  status: CLOSED
+goal: Cap referrer rewards at 10 rewarded conversions per UTC calendar month per environment in convert_referral (grant-path audit 2026-10-03); the referee's 10 credits are never capped. Enforces the cap that #1891's referral copy already states.
+branch: claude/referral-reward-cap
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical: git fetch origin claude/referral-reward-cap verdant-grow-diary && git switch claude/referral-reward-cap && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1872 (merged)
+head_sha: 323b1e5322c8dafe8fb89a82726485b094780bac, the final head (a base merge resolving the scripts/required-money-migrations.mjs conflict with #1871 by keeping both entries in timestamp order), squash-merged as fe9e3061cdee53b76248713e7123060656fbdda5.
+state: CLOSED. Merged 2026-10-13T23:29:28Z through the merge queue, after an owner-account removal at 22:56 UTC and a re-queue on Matthew's instruction at 22:59 UTC. Required checks 35/35 success at the merge commit fe9e3061cd against config/required-status-checks.json, measured 2026-10-13 23:38 UTC. Non-required red at the merge commit: Assert money migrations applied in SANDBOX and Prefix diff against SANDBOX (the push-triggered sandbox probe in required-money-migrations.yml, armed by this PR's REQUIRED_MONEY_MIGRATIONS entry as its body's Risk section anticipated; a CI defect class per AGENTS.md, not a production schema verdict), plus the long-standing Supabase Preview. Merged does not mean live: migration 20261003020000_referral_referrer_monthly_cap.sql applied in production NOT_MEASURED; production delivery NOT_MEASURED.
+next_action: None; closed. The migration is Matthew's to apply through his own path; the release packet lists it.
+files: supabase/migrations/20261003020000_referral_referrer_monthly_cap.sql (new); src/test/referral-reward-cap-db.test.ts (new); scripts/required-money-migrations.mjs; docs/credit-packs-referral-deploy-runbook.md.
+blockers: None for this closed task.
+artifacts: PR #1872 body (real-PostgreSQL suite 8/8 on 3 runs; RED with the migration removed: 6 fail, 2 pass).
+reviewer_seat: Blue Dream (P1 billing / credits) named; no independent exact-head PASS was given. Merged on Matthew's explicit instruction in session. The author, Claude, was not eligible.
+claimed_by: Claude (author)
+last_updated: 2026-10-13 18:45 CT, by Claude
+closure: Squash-merged via the merge queue as fe9e3061cdee53b76248713e7123060656fbdda5 at 2026-10-13 18:29 CT (23:29:28 UTC) from final head 323b1e5322c8dafe8fb89a82726485b094780bac, merge authorized by Matthew in session. No deploy, SQL or production write. Added directly to Closed: no open block for this task existed on the deploy tip (checked 2026-10-13 23:05 UTC).
+```
 
 ### CLAUDE-1930-TYPED-RECEIPT-DEADLINE-MISMATCH
 

@@ -18,6 +18,8 @@ export const GENERIC_RESET_REQUEST_SUCCESS =
 export const SIGN_IN_FRIENDLY_ERROR =
   "We couldn't sign you in. Check your email and password, then try again.";
 
+export const SIGN_IN_PASSWORD_REQUIRED = "Enter your password.";
+
 export const SIGN_UP_FRIENDLY_ERROR =
   "We couldn't create that account. Check the email and password, then try again.";
 

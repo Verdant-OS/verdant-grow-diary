@@ -1,3 +1,21 @@
+/**
+ * Postgres `numeric` (watering_events.volume_ml, feeding_events.volume_ml)
+ * comes back from PostgREST as a decimal string. A reused receipt must treat
+ * "750" and "750.0" as the submitted number 750, and must not coerce junk.
+ */
+const STORED_VOLUME_TEXT = /^-?(?:\d+(?:\.\d*)?|\.\d+)$/;
+
+export function storedQuickLogVolumeMatches(stored: unknown, expected: number | null): boolean {
+  if (expected === null) return stored === null;
+  if (typeof expected !== "number" || !Number.isFinite(expected)) return false;
+  if (typeof stored === "number") return Number.isFinite(stored) && stored === expected;
+  if (typeof stored !== "string") return false;
+  const text = stored.trim();
+  if (!STORED_VOLUME_TEXT.test(text)) return false;
+  const actual = Number(text);
+  return Number.isFinite(actual) && actual === expected;
+}
+
 export type TypedQuickLogEventType = "watering" | "feeding";
 
 export interface ExpectedTypedQuickLogEvent {
@@ -19,7 +37,7 @@ export function matchesTypedQuickLogChild(
   const child = value as Record<string, unknown>;
   return (
     child.event_id === expected.id &&
-    child.volume_ml === expected.volumeMl &&
+    storedQuickLogVolumeMatches(child.volume_ml, expected.volumeMl) &&
     (expected.eventType === "watering" ||
       (typeof expected.lineId === "string" &&
         expected.lineId.length > 0 &&

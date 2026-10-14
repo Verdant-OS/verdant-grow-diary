@@ -307,7 +307,7 @@ function checkProductionOps(rawTokens: string[], whole: string): string | null {
       return PROD_MSG;
   }
   if (cmd === "gh" && a === "pr" && (b === "merge" || b === "ready")) {
-    return "Merging and marking PRs ready belong to Chemdawg after 35/35 required checks plus an independent exact-head PASS (AGENTS.md). Drafts remain draft.";
+    return "Merging and marking PRs ready belong to Chemdawg after 36/36 required checks plus an independent exact-head PASS (AGENTS.md). Drafts remain draft.";
   }
   if (
     (cmd === "psql" || cmd === "pg_dump" || cmd === "pg_restore") &&
@@ -425,7 +425,7 @@ export function checkMcp(tool: string, input: Record<string, unknown>): string |
   const key = mcpServiceTool(tool);
   const kind = key ? MCP_DENY[key] : undefined;
   if (kind === "merge") {
-    return "Merging belongs to Chemdawg after 35/35 required checks plus an independent exact-head PASS (AGENTS.md).";
+    return "Merging belongs to Chemdawg after 36/36 required checks plus an independent exact-head PASS (AGENTS.md).";
   }
   if (kind === "prod") return PROD_MSG;
   if (key === "github__update_pull_request" && input.draft === false) {

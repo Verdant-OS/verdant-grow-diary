@@ -126,8 +126,10 @@ describe("resolved PR workflow concurrency", () => {
           )
         : [job.name],
     );
-    expect(required).toHaveLength(35);
-    expect(reported).toHaveLength(35);
+    // security-regression.yml is the one required context outside ci.yml.
+    reported.push(readWorkflow("security-regression.yml").jobs["test-security-regression"].name);
+    expect(required).toHaveLength(36);
+    expect(reported).toHaveLength(36);
     expect([...reported].sort()).toEqual([...required].sort());
   });
 });

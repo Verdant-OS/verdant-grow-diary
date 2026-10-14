@@ -1237,6 +1237,7 @@ export default function Timeline() {
     // second, stale UTC-day interpretation.
     timeZone: TIMELINE_LOCAL_TIME_ZONE,
     plantNamesById,
+    tentNamesById,
   };
   const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
 

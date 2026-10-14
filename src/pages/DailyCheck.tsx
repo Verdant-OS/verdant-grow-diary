@@ -110,6 +110,7 @@ import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { useAuth } from "@/store/auth";
 import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChangeContextRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 import { plantDetailPath, plantsPath, sensorsPath, tentsPath, timelinePath } from "@/lib/routes";
 import {
@@ -454,9 +455,11 @@ export default function DailyCheck() {
   // compact "Changed since last snapshot" panel after a sensor save.
   // Read-only — no writes, no ingestion changes.
   const { data: tentReadings = [] } = useSensorReadings(effectiveTentId || null, 50);
+  const temperatureUnit = useTemperatureUnitPreference();
   const changeContext = useMemo(
-    () => deriveChangeContextFromReadings(tentReadings, { tentId: effectiveTentId }),
-    [effectiveTentId, tentReadings],
+    () =>
+      deriveChangeContextFromReadings(tentReadings, { tentId: effectiveTentId, temperatureUnit }),
+    [effectiveTentId, tentReadings, temperatureUnit],
   );
 
   const progress = stepProgress(renderedStep);
@@ -607,8 +610,6 @@ export default function DailyCheck() {
           plantId={activityTarget.plantId}
           plantStage={(selectedPlant as { stage?: unknown } | null)?.stage ?? null}
           testIdPrefix="daily-check-all-activities"
-          openStructuredFeeding
-          onOpenManualSensorReading={() => setStep("manual")}
           requestedActivityId={requestedActivityId}
           // D5: Daily Check is a real plant-scoped save surface. Without this
           // the remembered target goes stale here, so an unscoped Quick Log

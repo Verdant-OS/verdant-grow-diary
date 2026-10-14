@@ -268,7 +268,13 @@ export default function Dashboard() {
 
   // First-run activation is relationship-aware. Independent grow/tent/plant
   // counts cannot prove that a usable One-Tent chain exists.
-  const { grows, activeGrowId, loading: growsLoading, error: growsError } = useGrows();
+  const {
+    grows,
+    activeGrowId,
+    loading: growsLoading,
+    error: growsError,
+    refresh: refreshGrows,
+  } = useGrows();
   const activationGraph = selectConnectedOneTentGraph({
     grows,
     tents,
@@ -420,7 +426,7 @@ export default function Dashboard() {
   const recentAlerts =
     openAlertsView.kind === "known" ? persistedAlertsState.alerts.slice(0, 3) : [];
 
-  if (tentsQuery.isError || plantsQuery.isError) {
+  if (tentsQuery.isError || plantsQuery.isError || growsError) {
     return (
       <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
         <GrowBreadcrumbs
@@ -439,6 +445,7 @@ export default function Dashboard() {
           testId="dashboard-grow-data-error"
           onRetry={() => {
             void Promise.all([tentsQuery.refetch(), plantsQuery.refetch()]);
+            if (growsError) void refreshGrows();
           }}
         />
       </div>
@@ -446,6 +453,7 @@ export default function Dashboard() {
   }
 
   if (
+    growsLoading ||
     tentsQuery.isPending ||
     plantsQuery.isPending ||
     tentsQuery.isLoading ||
@@ -560,6 +568,10 @@ export default function Dashboard() {
       <DashboardDataSourceDisclosure
         scopedGrowId={scopedGrowId}
         hasAnyData={tents.length > 0 || plants.length > 0}
+        hasGrow={grows.length > 0}
+        onRetry={() => {
+          void Promise.all([tentsQuery.refetch(), plantsQuery.refetch()]);
+        }}
         snapshotSource={sensorState.status === "ok" ? sensorState.snapshot.source : undefined}
       />
 

@@ -53,6 +53,10 @@ on:
         type: choice
         options:
           - live
+      confirm_live:
+        description: "Type LIVE to run the read-only check against the production database"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -131,7 +135,7 @@ jobs:
   prefix-diff-live:
     name: Prefix diff against LIVE
     needs: prefix-diff-offline
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' && inputs.confirm_live == 'LIVE' }}
     environment: verdant-production
     runs-on: ubuntu-latest
     timeout-minutes: 10

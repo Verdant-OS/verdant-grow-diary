@@ -39,6 +39,10 @@ on:
         type: choice
         options:
           - live
+      confirm_live:
+        description: "Type LIVE to run the read-only check against the production database"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -104,7 +108,7 @@ jobs:
     name: Assert money migrations applied in LIVE (pre-deploy gate)
     needs: assert-required-money-migrations
     # Production verification is always a protected, manual run from the trusted base branch.
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' && inputs.confirm_live == 'LIVE' }}
     environment: verdant-production
     runs-on: ubuntu-latest
     env:

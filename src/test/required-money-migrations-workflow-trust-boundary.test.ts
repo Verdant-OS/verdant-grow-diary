@@ -165,7 +165,7 @@ function jobEnvironment(job: string): string {
 }
 
 const TRUSTED_LIVE_CONDITION =
-  "${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' }}";
+  "${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' && inputs.confirm_live == 'LIVE' }}";
 const TRUSTED_REMOTE_JOB_CONDITIONS = new Map([
   [TRUSTED_LIVE_CONDITION, { environment: "verdant-production", targetEnv: "live" }],
 ]);
@@ -191,6 +191,12 @@ describe("required-money-migrations workflow trust boundary", () => {
     expect(TRIGGERS).toMatch(/target_env:[\s\S]*type:\s*choice/);
     expect(TRIGGERS).toMatch(/options:\s*\n\s+- live\s*\n/);
     expect(TRIGGERS).not.toMatch(/- sandbox/);
+  });
+
+  it("requires a typed LIVE confirmation before a dispatch can reach production", () => {
+    for (const triggers of [TRIGGERS, PREFIX_TRIGGERS]) {
+      expect(triggers).toMatch(/confirm_live:\s*\n[\s\S]*?required:\s*true\s*\n\s+type:\s*string/);
+    }
   });
 
   it("reruns when either shared target-binding layer or its regression test changes", () => {
@@ -247,6 +253,7 @@ describe("required-money-migrations workflow trust boundary", () => {
     expect(LIVE_JOB).toContain("github.event_name == 'workflow_dispatch'");
     expect(LIVE_JOB).toContain("github.ref == 'refs/heads/verdant-grow-diary'");
     expect(LIVE_JOB).toContain("inputs.target_env == 'live'");
+    expect(LIVE_JOB).toContain("inputs.confirm_live == 'LIVE'");
     expect(LIVE_JOB).not.toContain("github.event_name == 'push'");
     expect(LIVE_JOB).not.toContain("pull_request");
     expect(LIVE_JOB).not.toContain("SUPABASE_DB_URL_SANDBOX");
@@ -318,6 +325,7 @@ describe("prefix-diff-sarif workflow trust boundary", () => {
     expect(PREFIX_LIVE_JOB).toContain("github.event_name == 'workflow_dispatch'");
     expect(PREFIX_LIVE_JOB).toContain("github.ref == 'refs/heads/verdant-grow-diary'");
     expect(PREFIX_LIVE_JOB).toContain("inputs.target_env == 'live'");
+    expect(PREFIX_LIVE_JOB).toContain("inputs.confirm_live == 'LIVE'");
     expect(PREFIX_LIVE_JOB).not.toContain("SUPABASE_DB_URL_LIVE");
     expect(PREFIX_LIVE_JOB.match(/secrets\.SUPABASE_DB_URL\b/g)).toHaveLength(3);
     expect(PREFIX_LIVE_JOB).not.toContain("SUPABASE_DB_URL_SANDBOX");

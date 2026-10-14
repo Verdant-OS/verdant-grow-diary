@@ -401,10 +401,10 @@ required migration exists on disk but has not been applied to the target
 environment.
 
 The `.github/workflows/required-money-migrations.yml` workflow runs this
-check against both sandbox and live. It reads each DB connection string
-from its protected GitHub environment:
+check against live only, by manual dispatch from the deploy branch with a
+typed `LIVE` confirmation. Verdant has no sandbox database lane. It reads
+the DB connection string from its protected GitHub environment:
 
-- `verdant-sandbox` → `SUPABASE_DB_URL_SANDBOX`
 - `verdant-production` → `SUPABASE_DB_URL`
 
 ### Setting the GitHub secrets
@@ -414,14 +414,13 @@ from its protected GitHub environment:
    URI format). It looks like
    `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`.
    The password is the database password, not the anon or service-role key.
-2. In GitHub, open **Settings → Environments → verdant-sandbox** and create
-   `SUPABASE_DB_URL_SANDBOX` with the sandbox project's URL.
-3. Open **Settings → Environments → verdant-production** and create
+2. In GitHub, open **Settings → Environments → verdant-production** and create
    `SUPABASE_DB_URL` with the live project's URL.
-4. Re-run the `required-money-migrations` workflow to confirm both jobs
-   go green. If a job errors with exit code `2`, the URL is wrong or the
-   pooler is unreachable; exit code `1` means a required migration is
-   missing from that environment and must be applied before deploying.
+3. Dispatch the `required-money-migrations` workflow with `target_env=live`
+   and `confirm_live=LIVE` to confirm the job goes green. If it errors with
+   exit code `2`, the URL is wrong or the pooler is unreachable; exit code
+   `1` means a required migration is missing from production and must be
+   applied before deploying.
 
 Rotate these secrets whenever the database password is rotated.
 
@@ -431,12 +430,7 @@ Requires `psql` on `PATH` (`brew install libpq` on macOS,
 `sudo apt-get install postgresql-client` on Debian/Ubuntu).
 
 ```bash
-# Sandbox
-SUPABASE_DB_URL='postgresql://postgres.<sandbox-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres' \
-  TARGET_ENV=sandbox \
-  node scripts/assert-required-money-migrations-applied.mjs
-
-# Live
+# Live (Verdant has no sandbox database)
 SUPABASE_DB_URL='postgresql://postgres.<live-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres' \
   TARGET_ENV=live \
   node scripts/assert-required-money-migrations-applied.mjs
@@ -823,7 +817,7 @@ confirm all four:
 - [ ] The run was triggered by `push` or `pull_request` on a branch you
       have permission to see (not a fork PR).
 - [ ] `upload-sarif` step logs `SARIF upload complete` (not `Resource
-  not accessible` or `Invalid SARIF file`).
+not accessible` or `Invalid SARIF file`).
 
 If all four are true and findings still don't show, jump to the
 _Security tab looks empty (GitHub UI gotchas)_ table below — the cause
@@ -1249,7 +1243,9 @@ this order:
   `Invalid SARIF file` or `Path does not exist`, the file wasn't
   generated — jump to the `--sarif` troubleshooting table above.
 - On the run summary page, the **Artifacts** section should list
-  `money-migration-audit-sandbox` (or `-live`) containing `diff.sarif`.
+  `prefix-diff-sarif-live` containing `prefix-diff-live.sarif` and
+  `prefix-diff-live.json`. (There is no sandbox lane: the workflow is
+  manual dispatch against LIVE only.)
   Download it and re-check locally with the `jq -e` self-check from the
   "Sample SARIF output" section.
 
@@ -1260,7 +1256,7 @@ this order:
   - **Tool:** `diff-money-migration-prefixes`
   - **Branch:** the branch the workflow ran on (defaults to the default branch)
   - **Category:** `money-migration-drift` (or whatever `category:` you
-    passed to `upload-sarif`; sandbox and live should be distinct)
+    passed to `upload-sarif`)
   - **Rule:** optional — filter to `money-migration-drift`,
     `money-migration-malformed`, or `money-migration-tooling`
 - Each row shows the migration file, the rule ID, and severity **Error**.
@@ -1321,7 +1317,7 @@ Via the GitHub UI:
 
 - Repo → **Actions** → the failed/passing run → scroll to **Artifacts**
   at the bottom of the summary page.
-- Click `money-migration-audit-sandbox` (or `-live`) to download a
+- Click `money-migration-audit-live` to download a
   `.zip`. The bundle contains at least:
   ```
   diff.sarif                    # SARIF uploaded to Code scanning
@@ -1342,8 +1338,8 @@ gh run list --workflow required-money-migrations.yml --limit 5
 # Download every artifact from a specific run into ./artifacts/
 gh run download <run-id> --dir artifacts/
 
-# Or just the sandbox bundle
-gh run download <run-id> --name money-migration-audit-sandbox --dir artifacts/
+# Or just the live bundle
+gh run download <run-id> --name money-migration-audit-live --dir artifacts/
 ```
 
 If the run was on a PR from a fork, `gh run download` requires
@@ -1356,8 +1352,8 @@ Use the same `TARGET_ENV` and DB URL the failing job used (check the
 job's `env:` block) so the comparison is apples-to-apples:
 
 ```bash
-TARGET_ENV=sandbox \
-SUPABASE_DB_URL_SANDBOX="$SUPABASE_DB_URL_SANDBOX" \
+TARGET_ENV=live \
+SUPABASE_DB_URL="$SUPABASE_DB_URL" \
   node scripts/diff-money-migration-prefixes.mjs \
     --sarif --sarif-out=local-diff.sarif
 ```
@@ -1374,7 +1370,7 @@ jq -S 'del(
     .runs[].invocations,
     .runs[].tool.driver.semanticVersion,
     .runs[].results[].locations[].physicalLocation.artifactLocation.uriBaseId
-  )' artifacts/money-migration-audit-sandbox/diff.sarif > /tmp/ci.norm.json
+  )' artifacts/money-migration-audit-live/diff.sarif > /tmp/ci.norm.json
 
 jq -S 'del(
     .runs[].invocations,
@@ -1387,7 +1383,7 @@ diff -u /tmp/ci.norm.json /tmp/local.norm.json
 
 Zero diff = your local environment reproduces the CI finding exactly.
 Any diff is real drift between environments (usually a migration
-applied locally but not in sandbox, or vice versa).
+applied locally but not in production, or vice versa).
 
 **Step 4 — Compare just the findings.**
 
@@ -1403,7 +1399,7 @@ extract_fps() {
     | @tsv' "$1" | sort
 }
 
-diff <(extract_fps artifacts/money-migration-audit-sandbox/diff.sarif) \
+diff <(extract_fps artifacts/money-migration-audit-live/diff.sarif) \
      <(extract_fps local-diff.sarif)
 ```
 
@@ -1418,8 +1414,8 @@ in the **JSON schema** section above. Sanity-check the counts match the
 SARIF:
 
 ```bash
-jq '.summary' artifacts/money-migration-audit-sandbox/prefix-diff-cli.json
-jq '.runs[0].results | length' artifacts/money-migration-audit-sandbox/diff.sarif
+jq '.summary' artifacts/money-migration-audit-live/prefix-diff-cli.json
+jq '.runs[0].results | length' artifacts/money-migration-audit-live/diff.sarif
 ```
 
 `summary.driftCount + summary.malformedCount + summary.toolingCount`

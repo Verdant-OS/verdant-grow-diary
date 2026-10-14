@@ -104,8 +104,8 @@ files: .agents/skills/inngest-cli/SKILL.md; .agents/skills/inngest-setup/SKILL.m
 blockers: none for the merged change. Deploy not approved.
 artifacts: PR #2034; merge commit 8e1ffe39594c8b56744c348bd65ee213a0e7f4bc
 reviewer_seat: Critical Mass (docs and tests). Graft's advisory PASS at 5078986b is not the exact-head PASS for the merged head.
-claimed_by: Claude, 2026-10-14 08:03 UTC (coverage takeover of #2049; earlier claim Canopy, 2026-10-12 09:09 CT)
-last_updated: 2026-10-14 08:10 UTC, by Claude (block closed by Grok for Canopy at 2026-10-12 13:10 CT)
+claimed_by: Canopy, 2026-10-12 09:09 CT
+last_updated: 2026-10-14 08:45 UTC, by Claude (log maintenance via #2049, coverage claim on #2049 only; block closed by Grok for Canopy at 2026-10-12 13:10 CT)
 ```
 
 ### CLAUDE-1872-REFERRAL-REFERRER-MONTHLY-CAP

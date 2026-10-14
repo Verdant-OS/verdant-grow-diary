@@ -1,4 +1,9 @@
 import type { WateringTypedEventInput } from "./writeQuickLogWateringTypedEvent";
+import {
+  copyHistoryReviewTarget,
+  historyReviewTargetAllowed,
+  type PendingQuickLogHistoryReviewTarget,
+} from "./quickLogHistoryReviewTargetRules";
 import type { ResolvedQuickLogV2Target } from "./quickLogV2Rules";
 import { projectRootZoneManualObservationFromDetails } from "./rootZoneManualObservationRules";
 import { isUuid } from "./isUuid";
@@ -24,6 +29,8 @@ export interface PendingQuickLogWatering {
   // Set when the server refuses this key in a way no exact retry can resolve.
   // The draft then waits for Timeline review and an explicit discard.
   historyCheckReason?: QuickLogHistoryCheckReason;
+  /** Only with receipt_target_moved: where the original entry lives now. */
+  historyReviewTarget?: PendingQuickLogHistoryReviewTarget;
 }
 
 export const WATERING_RECOVERY_UNAVAILABLE =
@@ -146,6 +153,7 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogW
       "resolved",
       "attachments",
       "historyCheckReason",
+      "historyReviewTarget",
     ])
   )
     return false;
@@ -153,6 +161,8 @@ function validRecord(value: unknown, ownerId: string): value is PendingQuickLogW
     value.historyCheckReason !== undefined &&
     !quickLogSaveRequiresHistoryCheck(value.historyCheckReason)
   )
+    return false;
+  if (!historyReviewTargetAllowed(value.historyCheckReason, value.historyReviewTarget))
     return false;
   if (
     value.version !== 1 ||
@@ -246,9 +256,15 @@ export function readPendingQuickLogWatering(
     if (record.historyCheckReason !== undefined) return { status: "pending", record };
     const fallback = readHistoryMarker(ownerId, record.payload.idempotency_key);
     if (fallback.status === "blocked") return fallback;
-    return fallback.status === "marked"
-      ? { status: "pending", record: { ...record, historyCheckReason: fallback.reason } }
-      : { status: "pending", record };
+    if (fallback.status !== "marked") return { status: "pending", record };
+    return {
+      status: "pending",
+      record: {
+        ...record,
+        historyCheckReason: fallback.reason,
+        ...(fallback.reviewTarget ? { historyReviewTarget: fallback.reviewTarget } : {}),
+      },
+    };
   } catch {
     return { status: "blocked" };
   }
@@ -260,22 +276,34 @@ function readHistoryMarker(
   idempotencyKey: string,
 ):
   | { status: "none" }
-  | { status: "marked"; reason: QuickLogHistoryCheckReason }
+  | {
+      status: "marked";
+      reason: QuickLogHistoryCheckReason;
+      reviewTarget?: PendingQuickLogHistoryReviewTarget;
+    }
   | { status: "blocked" } {
   const raw = window.sessionStorage.getItem(typedWaterHistoryMarkerKey(ownerId));
   if (raw === null) return { status: "none" };
   const marker: unknown = JSON.parse(raw);
   if (
     !object(marker) ||
-    !onlyKeys(marker, ["version", "idempotencyKey", "historyCheckReason"]) ||
+    !onlyKeys(marker, ["version", "idempotencyKey", "historyCheckReason", "historyReviewTarget"]) ||
     marker.version !== 1 ||
     !id(marker.idempotencyKey) ||
-    !quickLogSaveRequiresHistoryCheck(marker.historyCheckReason)
+    !quickLogSaveRequiresHistoryCheck(marker.historyCheckReason) ||
+    !historyReviewTargetAllowed(marker.historyCheckReason, marker.historyReviewTarget)
   )
     return { status: "blocked" };
-  return marker.idempotencyKey === idempotencyKey
+  if (marker.idempotencyKey !== idempotencyKey) return { status: "none" };
+  return marker.historyReviewTarget === undefined
     ? { status: "marked", reason: marker.historyCheckReason }
-    : { status: "none" };
+    : {
+        status: "marked",
+        reason: marker.historyCheckReason,
+        reviewTarget: copyHistoryReviewTarget(
+          marker.historyReviewTarget as PendingQuickLogHistoryReviewTarget,
+        ),
+      };
 }
 
 /** A leftover marker names a retired key, so it can never attach to a new Water. */
@@ -320,12 +348,15 @@ export async function claimPendingQuickLogWatering(
 export async function markPendingQuickLogWateringHistoryCheck(
   record: PendingQuickLogWatering | null | undefined,
   reason: unknown,
+  reviewTarget?: PendingQuickLogHistoryReviewTarget | null,
 ): Promise<{ status: "marked"; record: PendingQuickLogWatering } | { status: "blocked" }> {
   try {
     if (
       !record ||
       !validRecord(record, record.ownerId) ||
-      !quickLogSaveRequiresHistoryCheck(reason)
+      !quickLogSaveRequiresHistoryCheck(reason) ||
+      // Only a moved receipt carries a review target, and it must be well formed.
+      (reviewTarget != null && !historyReviewTargetAllowed(reason, reviewTarget))
     )
       return { status: "blocked" };
     const locks = window.navigator.locks;
@@ -334,7 +365,13 @@ export async function markPendingQuickLogWateringHistoryCheck(
       const current = readPendingQuickLogWatering(record.ownerId);
       if (current.status !== "pending" || !sameRecord(current.record, record))
         return { status: "blocked" as const };
-      const marked: PendingQuickLogWatering = { ...current.record, historyCheckReason: reason };
+      const marked: PendingQuickLogWatering = {
+        ...current.record,
+        historyCheckReason: reason,
+        ...(reviewTarget != null
+          ? { historyReviewTarget: copyHistoryReviewTarget(reviewTarget) }
+          : {}),
+      };
       try {
         window.sessionStorage.setItem(storageKey(record.ownerId), JSON.stringify(marked));
       } catch {
@@ -353,6 +390,9 @@ export async function markPendingQuickLogWateringHistoryCheck(
           version: 1,
           idempotencyKey: marked.payload.idempotency_key,
           historyCheckReason: reason,
+          ...(marked.historyReviewTarget !== undefined
+            ? { historyReviewTarget: marked.historyReviewTarget }
+            : {}),
         }),
       );
       const fallback = readPendingQuickLogWatering(record.ownerId);
@@ -405,8 +445,8 @@ function sameClaimIgnoringHistoryMarker(
   a: PendingQuickLogWatering,
   b: PendingQuickLogWatering,
 ): boolean {
-  const { historyCheckReason: _a, ...restA } = a;
-  const { historyCheckReason: _b, ...restB } = b;
+  const { historyCheckReason: _a, historyReviewTarget: _ta, ...restA } = a;
+  const { historyCheckReason: _b, historyReviewTarget: _tb, ...restB } = b;
   return JSON.stringify(restA) === JSON.stringify(restB);
 }
 

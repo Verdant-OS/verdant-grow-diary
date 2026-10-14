@@ -43,6 +43,11 @@ import {
   isQuickLogV2OpenIntent,
   type QuickLogV2OpenIntent,
 } from "@/lib/quickLogV2OpenIntent";
+import {
+  QUICK_LOG_V2_FEED_OPEN_EVENT,
+  isQuickLogV2FeedOpenIntent,
+  type QuickLogV2FeedOpenIntent,
+} from "@/lib/quickLogV2FeedOpenIntent";
 
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading, isSignOutNavigationPending } = useAuth();
@@ -97,9 +102,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const [mobileLaunchTargetKey, setMobileLaunchTargetKey] = useState<string | null>(null);
   const [tentQuickLogTargetEvidence, setTentQuickLogTargetEvidence] =
     useState<TentQuickLogTargetEvidence | null>(null);
-  const [structuredOpenIntent, setStructuredOpenIntent] = useState<QuickLogV2OpenIntent | null>(
-    null,
-  );
+  const [structuredOpenIntent, setStructuredOpenIntent] = useState<
+    QuickLogV2OpenIntent | QuickLogV2FeedOpenIntent | null
+  >(null);
   const [legacyQuickLogSession, setLegacyQuickLogSession] = useState(0);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -189,7 +194,21 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       setOpenScopedLog(true);
     }
     window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
-    return () => window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
+    function onOpenFeed(event: Event) {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (!isQuickLogV2FeedOpenIntent(detail)) return;
+      setOpenLog(false);
+      setPrefill(null);
+      setLegacyQuickLogSession((session) => session + 1);
+      setMobileLaunchTargetKey(null);
+      setStructuredOpenIntent(detail);
+      setOpenScopedLog(true);
+    }
+    window.addEventListener(QUICK_LOG_V2_FEED_OPEN_EVENT, onOpenFeed as EventListener);
+    return () => {
+      window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
+      window.removeEventListener(QUICK_LOG_V2_FEED_OPEN_EVENT, onOpenFeed as EventListener);
+    };
   }, []);
 
   useEffect(() => {

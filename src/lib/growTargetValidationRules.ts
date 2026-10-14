@@ -35,10 +35,12 @@ export interface GrowTargetValidation {
  * Temperature limits follow the display unit; storage conversion remains in the editor.
  * Empty/absent and one-sided bounds are allowed, as are equal min/max values.
  * Non-empty invalid/non-finite input must never become an optional null bound.
+ * Native bad-input flags block even when the browser exposes an empty value.
  */
 export function validateGrowTargetForm(
   form: Readonly<Partial<Record<GrowTargetBound, string>>>,
   temperatureUnit: TemperatureUnitPreference,
+  badInputs: Readonly<Partial<Record<GrowTargetBound, boolean>>> = {},
 ): GrowTargetValidation {
   const errors: GrowTargetValidation["errors"] = {};
   for (const field of Object.keys(RANGES) as GrowTargetField[]) {
@@ -52,6 +54,10 @@ export function validateGrowTargetForm(
 
     for (const bound of ["min", "max"] as const) {
       const key = `${field}_${bound}` as GrowTargetBound;
+      if (badInputs[key]) {
+        errors[key] = "Enter a finite number.";
+        continue;
+      }
       const raw = form[key]?.trim() ?? "";
       if (raw === "") continue;
       const value = Number(raw);

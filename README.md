@@ -1249,8 +1249,9 @@ this order:
   `Invalid SARIF file` or `Path does not exist`, the file wasn't
   generated — jump to the `--sarif` troubleshooting table above.
 - On the run summary page, the **Artifacts** section should list
-  `money-migration-audit-live` containing `diff.sarif`. (There is no
-  sandbox lane: the workflow is manual dispatch against LIVE only.)
+  `prefix-diff-sarif-live` containing `prefix-diff-live.sarif` and
+  `prefix-diff-live.json`. (There is no sandbox lane: the workflow is
+  manual dispatch against LIVE only.)
   Download it and re-check locally with the `jq -e` self-check from the
   "Sample SARIF output" section.
 

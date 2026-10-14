@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { load as loadYaml } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 const ROOT = resolve(__dirname, "..", "..");
@@ -7,6 +8,21 @@ const WORKFLOWS_DIR = resolve(ROOT, ".github/workflows");
 
 function readWorkflow(fileName: string): string {
   return readFileSync(resolve(WORKFLOWS_DIR, fileName), "utf8").replace(/\r\n/g, "\n");
+}
+
+interface DispatchInput {
+  default?: string;
+  options?: string[];
+  required?: boolean;
+  type?: string;
+}
+
+/** Resolves a workflow's `workflow_dispatch.inputs` from the parsed YAML, not its source text. */
+function dispatchInputs(workflow: string): Record<string, DispatchInput> {
+  const document = loadYaml(workflow) as {
+    on?: { workflow_dispatch?: { inputs?: Record<string, DispatchInput> } };
+  };
+  return document.on?.workflow_dispatch?.inputs ?? {};
 }
 
 interface MappingEntry {
@@ -188,14 +204,22 @@ describe("required-money-migrations workflow trust boundary", () => {
   });
 
   it("constrains manual dispatch to the live-only choice", () => {
-    expect(TRIGGERS).toMatch(/target_env:[\s\S]*type:\s*choice/);
-    expect(TRIGGERS).toMatch(/options:\s*\n\s+- live\s*\n/);
-    expect(TRIGGERS).not.toMatch(/- sandbox/);
+    for (const workflow of [REQUIRED_WORKFLOW, PREFIX_WORKFLOW]) {
+      expect(dispatchInputs(workflow).target_env).toMatchObject({
+        default: "live",
+        required: true,
+        type: "choice",
+        options: ["live"],
+      });
+    }
   });
 
   it("requires a typed LIVE confirmation before a dispatch can reach production", () => {
-    for (const triggers of [TRIGGERS, PREFIX_TRIGGERS]) {
-      expect(triggers).toMatch(/confirm_live:\s*\n[\s\S]*?required:\s*true\s*\n\s+type:\s*string/);
+    for (const workflow of [REQUIRED_WORKFLOW, PREFIX_WORKFLOW]) {
+      expect(dispatchInputs(workflow).confirm_live).toMatchObject({
+        required: true,
+        type: "string",
+      });
     }
   });
 

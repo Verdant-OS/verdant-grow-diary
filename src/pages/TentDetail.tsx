@@ -6,7 +6,7 @@ import DrybackMonitoringStrip from "@/components/DrybackMonitoringStrip";
 import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useParams, Link, useSearchParams } from "@/lib/react-router-compat";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useAuth } from "@/store/auth";
 import { useNowTick } from "@/hooks/useNowTick";
 import { formatDistanceToNow } from "date-fns";
@@ -27,7 +27,11 @@ import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import PlantPhoto from "@/components/PlantPhoto";
 import TentManualSnapshotChangeContext from "@/components/TentManualSnapshotChangeContext";
-import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
+import TentManualSnapshotHistoryList, {
+  type ManualSnapshotHistoryReading,
+} from "@/components/TentManualSnapshotHistoryList";
+import { useTentManualEnvironmentEvents } from "@/hooks/useTentManualEnvironmentEvents";
+import { manualEnvironmentEventsToChangeContextRows } from "@/lib/tentManualEnvironmentEventRules";
 import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
 import TimelineMemorySection from "@/components/TimelineMemorySection";
 import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
@@ -170,6 +174,12 @@ export default function TentDetail() {
   const allPlants = plantListRead.plants;
   const sensorReadings = useSensorReadings(id);
   const { data: readings = [] } = sensorReadings;
+  // Quick Log V2 manual snapshots are grow_events, never sensor_readings.
+  const manualEvents = useTentManualEnvironmentEvents(id);
+  const manualHistoryReadings = useMemo<ManualSnapshotHistoryReading[]>(
+    () => [...readings, ...manualEnvironmentEventsToChangeContextRows(manualEvents.data ?? [])],
+    [readings, manualEvents.data],
+  );
   const importedHistory = useImportedSensorHistory(id);
   const series = buildTentSensorChartSeries(readings);
   const nowMs = useNowTick();
@@ -539,7 +549,7 @@ export default function TentDetail() {
 
       <TentManualSnapshotHistoryList
         tentId={id ?? null}
-        readings={readings}
+        readings={manualHistoryReadings}
         readStatus={sensorReadings.status}
         isFetching={sensorReadings.isFetching}
         onRetry={() => {

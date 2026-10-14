@@ -35,7 +35,11 @@ import {
   QUICK_LOG_DETAIL_FIELD_KEYS,
   type QuickLogDetailDisplayLine,
 } from "@/lib/quickLogActivityDetailFields";
-import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import {
+  celsiusToFahrenheit,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+import { feedingProductUnitDisplay } from "@/lib/quickLogFeedingFormViewModel";
 import { PHENO_EVIDENCE_RECEIPT_KIND } from "@/lib/phenoEvidenceCaptureRules";
 import { readDetailsLoggedAt } from "@/lib/quicklogManualDiagnosticsRules";
 
@@ -175,10 +179,23 @@ const TYPED_ACTIVITY_FIELD_LABELS: Record<string, string> = {
   water_temp_c: "Water temperature",
 };
 
-function typedActivityScalar(key: string, value: unknown): string | null {
+function formatFiniteNumber(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+function typedActivityScalar(
+  key: string,
+  value: unknown,
+  tempUnit: TemperatureUnitPreference,
+): string | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     if (key === "volume_ml" || key === "runoff_ml") return `${value} ml`;
-    if (key === "water_temp_c") return `${value} °C`;
+    if (key === "water_temp_c") {
+      // Stored Celsius, shown in the grower's unit (#2101 review finding).
+      return tempUnit === "fahrenheit"
+        ? `${formatFiniteNumber(celsiusToFahrenheit(value))} °F`
+        : `${value} °C`;
+    }
     return String(value);
   }
   if (typeof value === "string") {
@@ -203,13 +220,21 @@ function typedProductText(value: unknown): string | null {
       : typeof record.nutrient_brand === "string"
         ? record.nutrient_brand.trim()
         : "";
-  if (name && brand) return `${name} (${brand})`;
-  return name || brand || null;
+  const label = name && brand ? `${name} (${brand})` : name || brand;
+  if (!label) return null;
+  // Persisted feeding products carry { amount, unit }; the dose is the most
+  // actionable part of the record (#2101 review finding).
+  const amount =
+    typeof record.amount === "number" && Number.isFinite(record.amount) ? record.amount : null;
+  const unit = typeof record.unit === "string" ? feedingProductUnitDisplay(record.unit).trim() : "";
+  if (amount === null) return label;
+  return unit ? `${label} ${amount} ${unit}` : `${label} ${amount}`;
 }
 
 function typedActivityEnvelopeLines(
   envelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number],
   value: unknown,
+  tempUnit: TemperatureUnitPreference,
 ): QuickLogDetailDisplayLine[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
   const record = value as Record<string, unknown>;
@@ -226,13 +251,67 @@ function typedActivityEnvelopeLines(
       continue;
     }
     const label = TYPED_ACTIVITY_FIELD_LABELS[key];
-    const text = typedActivityScalar(key, child);
+    const text = typedActivityScalar(key, child, tempUnit);
     if (!label || !text) continue;
     lines.push({ key: `${envelope}.${key}`, label, value: text });
   }
   return lines;
 }
 
+const TYPED_ACTIVITY_LABEL_PREFIX: Record<(typeof TYPED_ACTIVITY_ENVELOPES)[number], string> = {
+  watering: "Watering",
+  feeding: "Feeding",
+};
+/**
+ * A combined entry carries both envelopes; a label both supply (Volume, pH)
+ * is qualified by its activity so the grower can tell the amounts apart
+ * (#2101 review finding). A label only one envelope supplies stays plain.
+ */
+function typedActivityLinesWithDistinctLabels(
+  record: Record<string, unknown>,
+  tempUnit: TemperatureUnitPreference,
+): QuickLogDetailDisplayLine[] {
+  const perEnvelope = TYPED_ACTIVITY_ENVELOPES.map((envelope) => ({
+    envelope,
+    lines: typedActivityEnvelopeLines(envelope, record[envelope], tempUnit),
+  }));
+  const labelOwners = new Map<string, Set<string>>();
+  for (const { envelope, lines } of perEnvelope) {
+    for (const line of lines) {
+      const owners = labelOwners.get(line.label) ?? new Set<string>();
+      owners.add(envelope);
+      labelOwners.set(line.label, owners);
+    }
+  }
+  const out: QuickLogDetailDisplayLine[] = [];
+  for (const { envelope, lines } of perEnvelope) {
+    for (const line of lines) {
+      if ((labelOwners.get(line.label)?.size ?? 0) < 2) {
+        out.push(line);
+        continue;
+      }
+      const label = /^[A-Z][a-z]+$/.test(line.label)
+        ? line.label.charAt(0).toLowerCase() + line.label.slice(1)
+        : line.label;
+      out.push({ ...line, label: `${TYPED_ACTIVITY_LABEL_PREFIX[envelope]} ${label}` });
+    }
+  }
+  return out;
+}
+/** Legacy raw chips: scalars as before; scalar arrays joined; objects suppressed. */
+function legacyDetailText(value: unknown): string | null {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    const scalars = value.filter(
+      (item): item is string | number | boolean =>
+        typeof item === "string" || typeof item === "number" || typeof item === "boolean",
+    );
+    return scalars.length > 0 ? scalars.map(String).join(", ") : null;
+  }
+  return null;
+}
 function withGrowerFacingDetailLines(
   record: Record<string, unknown>,
   lines: readonly QuickLogDetailDisplayLine[],
@@ -268,19 +347,17 @@ export function presentTimelineDiaryEntryDetails(
     describeQuickLogDetailsFromExtras(details, tempUnit),
     options,
   );
-  for (const envelope of TYPED_ACTIVITY_ENVELOPES) {
-    detailLines.push(...typedActivityEnvelopeLines(envelope, record[envelope]));
-  }
+  detailLines.push(...typedActivityLinesWithDistinctLabels(record, tempUnit));
   const extra = Object.entries(record)
     .filter(
       ([k, v]) =>
         v != null &&
         !HIDDEN_DIARY_DETAIL_KEYS.has(k) &&
         !QUICK_LOG_DETAIL_FIELD_KEYS.has(k) &&
-        !TYPED_ACTIVITY_ENVELOPES.includes(k as (typeof TYPED_ACTIVITY_ENVELOPES)[number]) &&
-        (typeof v === "string" || typeof v === "number" || typeof v === "boolean"),
+        !TYPED_ACTIVITY_ENVELOPES.includes(k as (typeof TYPED_ACTIVITY_ENVELOPES)[number]),
     )
-    .map(([k, v]) => [k, String(v)] as const);
+    .map(([k, v]) => [k, legacyDetailText(v)] as const)
+    .filter((entry): entry is readonly [string, string] => entry[1] !== null);
 
   return { detailLines, extra };
 }

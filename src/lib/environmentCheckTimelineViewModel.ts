@@ -112,6 +112,14 @@ export function resolveEffectiveQuickLogCareType(
     return ENV_KIND_ALIASES.has(detailKind) ? "environment" : detailKind;
   }
 
+  // Quick Log water/feed rows can carry a note-spine event_type while their
+  // real kind lives in the envelope. A feed also carries a water volume, so
+  // feeding is checked first.
+  const isFilledEnvelope = (v: unknown) =>
+    !!v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).length > 0;
+  if (isFilledEnvelope(details?.feeding)) return "feeding";
+  if (isFilledEnvelope(details?.watering)) return "watering";
+
   const environmentEnvelope = details?.environment_check;
   if (
     environmentEnvelope &&

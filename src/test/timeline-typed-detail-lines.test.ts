@@ -24,7 +24,9 @@ describe("typed diary detail lines", () => {
   it("renders watering and feeding objects as readable lines", () => {
     const result = presentTimelineDiaryEntryDetails(waterFeedCheck, "celsius");
     const rendered = [...result.detailLines.map((line) => `${line.label}: ${line.value}`)];
-    expect(rendered.join(" | ")).toContain("Volume: 500 ml");
+    // Both envelopes carry a volume, so each is labelled by its activity.
+    expect(rendered.join(" | ")).toContain("Watering volume: 500 ml");
+    expect(rendered.join(" | ")).toContain("Feeding volume: 1000 ml");
     expect(rendered.join(" | ")).toContain("pH: 6.2");
     expect(rendered.join(" | ")).toContain("FloraGro");
     expect(rendered.join(" | ")).toContain("General Hydroponics");

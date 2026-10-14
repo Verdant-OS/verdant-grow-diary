@@ -106,7 +106,7 @@ positives and missed known issues. Stop there; any adoption is a separate small 
 ### Ten owner-uploaded Claude Code plugins (reviewed 2026-10-14 UTC)
 
 **Verdict: install none as a pack. Disable the two active hooks below. Adapt a few procedures
-from askrubberduck; treat the rest as reference only or not applicable.**
+from askrubberduck and frontier-simplify; treat the rest as reference only or not applicable.**
 
 - **Source:** ten owner-supplied plugin zips shared in Claude session
   `session_01JSec9FtV5reKb9tgk6gFur`. Each `plugin.json` names an upstream repository, but no
@@ -146,8 +146,10 @@ Decisions by plugin:
   `cco-claudemd`) to a manual read-only trial. **Hooks rejected:** `src/read-cache.js` returns
   `decision: block` on re-reads and on `.contextignore` matches, which stops an agent re-reading a
   file it must re-verify.
-- **frontier-simplify 2.1.0, MIT, `2dcabf4d6c32`:** **Reference only.** `frontier-simplify-audit`
-  may be run once for Matthew as a diagnostic; it never removes an owner-set gate.
+- **frontier-simplify 2.1.0, MIT, `2dcabf4d6c32`:** `frontier-simplify-audit` is **adapted** as
+  `.claude/skills/verdant-process-audit/SKILL.md`, a read-only diagnostic that reports to
+  Matthew. It was written from scratch from the concept, copies no text, has no hooks or
+  scripts, and never edits or removes an owner-set gate. The rest of the plugin is reference only.
 - **Advise Project Approach 0.7.2, MIT, `6612280f04e3`:** **Adopted as an idea** for specification
   work: research comparable projects and failure conditions before build advice, with Verdant's
   claim labels.

@@ -478,6 +478,42 @@ export function isTimelineEvidenceFilterActive(input: TimelineEvidenceFilterInpu
   return false;
 }
 
+export const TIMELINE_DATE_START_PARAM = "start";
+export const TIMELINE_DATE_END_PARAM = "end";
+
+/** Any non-empty date field, including an inverted or otherwise unapplied value. */
+export function timelineEnteredDateKeepsClearEnabled(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+export function timelineClearFiltersEnabled(input: {
+  evidenceActive: boolean;
+  chipFiltersActive: boolean;
+  enteredStartDate: string | null | undefined;
+  enteredEndDate: string | null | undefined;
+}): boolean {
+  return (
+    input.evidenceActive ||
+    input.chipFiltersActive ||
+    timelineEnteredDateKeepsClearEnabled(input.enteredStartDate) ||
+    timelineEnteredDateKeepsClearEnabled(input.enteredEndDate)
+  );
+}
+
+/** Mirror the date inputs into start/end params. Blank or non-ISO values are removed. */
+export function timelineDateParamsAfterSync(
+  params: URLSearchParams,
+  start: string,
+  end: string,
+): URLSearchParams {
+  const next = new URLSearchParams(params);
+  if (isTimelineDateFilterValue(start)) next.set(TIMELINE_DATE_START_PARAM, start);
+  else next.delete(TIMELINE_DATE_START_PARAM);
+  if (isTimelineDateFilterValue(end)) next.set(TIMELINE_DATE_END_PARAM, end);
+  else next.delete(TIMELINE_DATE_END_PARAM);
+  return next;
+}
+
 export const TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER = "Search timeline";
 export const TIMELINE_EVIDENCE_EMPTY_TITLE = "No matches";
 export const TIMELINE_EVIDENCE_EMPTY_DESC = "No timeline entries match these filters.";

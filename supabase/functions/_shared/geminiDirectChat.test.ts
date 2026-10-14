@@ -187,13 +187,13 @@ Deno.test("both functions call the helper and keep the key check before credit s
     assert(!src.includes('Deno.env.get("GEMINI_API_KEY")'));
   }
 
-  assert(keyCheckPrecedesSpend(doctor, DOCTOR_SPEND));
+  assert(keyCheckPrecedesSpend(doctor, SPEND_RPC));
   assert(doctor.includes("p_model_id: MODEL"));
   assert(doctor.includes("const MODEL = doctorRoute.recordedModelId"));
   assert(doctor.includes("model: WIRE_MODEL"));
   assert(doctor.includes('return calmFailure("config")'));
 
-  assert(keyCheckPrecedesSpend(coach, COACH_SPEND));
+  assert(keyCheckPrecedesSpend(coach, SPEND_RPC));
   assert(coach.includes('return json({ error: "AI not configured" }, 500)'));
   assert(coach.includes('response_format: { type: "json_object" }'));
   assert(!coach.includes("p_model_id"));
@@ -203,8 +203,9 @@ Deno.test("both functions call the helper and keep the key check before credit s
 // import at the top of each file, which is always ahead of the spend, so a check
 // on the name alone stays green when the call moves below the spend.
 const KEY_READ_CALL = "readGeminiDirectApiKey(Deno.env)";
-const DOCTOR_SPEND = "creditSpendMayExist = true";
-const COACH_SPEND = 'creditSupabase.rpc("ai_credit_spend"';
+// Both functions spend through this RPC. AI Doctor sets its creditSpendMayExist flag one
+// line earlier, so the flag is not the spend and is not used as the marker.
+const SPEND_RPC = 'creditSupabase.rpc("ai_credit_spend"';
 
 function keyCheckPrecedesSpend(src: string, spendMarker: string): boolean {
   const call = src.indexOf(KEY_READ_CALL);
@@ -215,8 +216,8 @@ function keyCheckPrecedesSpend(src: string, spendMarker: string): boolean {
 
 Deno.test("the key-before-spend check fails when the key read moves below the spend", () => {
   const sources: Array<[string, string]> = [
-    [Deno.readTextFileSync(new URL("../ai-doctor-review/index.ts", import.meta.url)), DOCTOR_SPEND],
-    [Deno.readTextFileSync(new URL("../ai-coach/index.ts", import.meta.url)), COACH_SPEND],
+    [Deno.readTextFileSync(new URL("../ai-doctor-review/index.ts", import.meta.url)), SPEND_RPC],
+    [Deno.readTextFileSync(new URL("../ai-coach/index.ts", import.meta.url)), SPEND_RPC],
   ];
   for (const [src, spendMarker] of sources) {
     const lines = src.split("\n");
@@ -228,6 +229,7 @@ Deno.test("the key-before-spend check fails when the key read moves below the sp
     const [call] = moved.splice(callLine, 1);
     moved.splice(spendLine, 0, call);
     const movedSrc = moved.join("\n");
+    assert(movedSrc.indexOf(KEY_READ_CALL) > movedSrc.indexOf(spendMarker));
     // The import still sits above the spend, so a name-only check cannot see the move.
     assert(movedSrc.indexOf("readGeminiDirectApiKey") < movedSrc.indexOf(spendMarker));
     assertEquals(keyCheckPrecedesSpend(movedSrc, spendMarker), false);

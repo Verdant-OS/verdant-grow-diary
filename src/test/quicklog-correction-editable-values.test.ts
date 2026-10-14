@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   QUICKLOG_CORRECTION_REASON_CHIPS,
   correctionValuePropsFromDiaryDetails,
-  recordQuickLogCorrectionOriginal,
   validateQuickLogCorrection,
 } from "@/lib/quick-log/quickLogRevisionRules";
+import { EDITABLE_VALUES_CORRECT_ENTRY_FINGERPRINT } from "../../scripts/assert-required-core-migrations-applied.mjs";
 import {
   isHumidityValid,
   isTemperatureValid,
@@ -59,11 +59,13 @@ describe("Quick Log correction editable values", () => {
     );
   });
 
-  it("keeps the original value when the correction is recorded", () => {
-    const original = { volume_ml: 500, dose_amount: 2, temperature_c: 24 };
-    const recorded = recordQuickLogCorrectionOriginal(original);
-    original.volume_ml = 999;
-    expect(recorded).toEqual({ volume_ml: 500, dose_amount: 2, temperature_c: 24 });
+  it("pins quicklog_correct_entry to the body that records the original measured values", () => {
+    expect(EDITABLE_VALUES_CORRECT_ENTRY_FINGERPRINT).toEqual({
+      md5: "9a56ac0fe7282bffe52ef4c9dc858562",
+      bytes: 14925,
+      prosrcMd5: "b714a3e4f9afa75cf4dea123e59684ed",
+      prosrcBytes: 14594,
+    });
   });
 
   it("reads volume, dose, and sensor values from the saved diary details", () => {

@@ -15,6 +15,7 @@ import {
   validatePinnedMigrationFile,
 } from "./apply-quicklog-corrections-retractions.mjs";
 import {
+  EDITABLE_VALUES_CORRECT_ENTRY_FINGERPRINT,
   parseQuickLogCatalogContract,
   QUICKLOG_CORRECTIONS_CATALOG_SQL,
 } from "./assert-required-core-migrations-applied.mjs";
@@ -351,6 +352,135 @@ function applyKeyedOverloadMigration(env, spawnImpl) {
   executeSql(migration.text, env, { stage: "keyed_overload_apply", spawnImpl });
 }
 
+function applyEditableValuesMigration(env, spawnImpl) {
+  const text = readFileSync(
+    resolve(repoRoot, "supabase/migrations/20261014210000_quicklog_correction_editable_values.sql"),
+    "utf8",
+  );
+  executeSql(text, env, { stage: "editable_values_apply", spawnImpl });
+}
+
+function proveEditableCorrectEntryFingerprint(env, spawnImpl) {
+  const pin = EDITABLE_VALUES_CORRECT_ENTRY_FINGERPRINT;
+  const row = executeSql(
+    `select md5(pg_get_functiondef(p.oid))||'|'||octet_length(pg_get_functiondef(p.oid))||'|'||md5(p.prosrc)||'|'||octet_length(p.prosrc)
+       from pg_proc p
+       join pg_namespace n on n.oid = p.pronamespace
+      where p.oid = to_regprocedure('public.quicklog_correct_entry(text,jsonb,uuid,uuid,text)');`,
+    env,
+    { stage: "editable_values_fingerprint", spawnImpl },
+  );
+  const expected = `${pin.md5}|${pin.bytes}|${pin.prosrcMd5}|${pin.prosrcBytes}`;
+  if (row !== expected) throw new Error("editable_values_fingerprint:mismatch");
+}
+
+const MEASURED_CORRECTION_PROOF_SQL = `
+begin;
+create or replace function auth.uid() returns uuid language sql stable as $$
+  select '11111111-1111-4111-8111-111111111111'::uuid
+$$;
+create table if not exists public.watering_events (
+  event_id uuid primary key, user_id uuid not null, volume_ml numeric
+);
+create table if not exists public.feeding_events (
+  event_id uuid primary key, user_id uuid not null, volume_ml numeric, products jsonb not null
+);
+create table if not exists public.environment_events (
+  event_id uuid primary key, user_id uuid not null,
+  temperature_c numeric, humidity_pct numeric, vpd_kpa numeric
+);
+insert into auth.users(id) values ('11111111-1111-4111-8111-111111111111') on conflict do nothing;
+insert into public.grow_events(id, user_id, event_type, source, note)
+values
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', '11111111-1111-4111-8111-111111111111', 'watering', 'manual', 'water'),
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', '11111111-1111-4111-8111-111111111111', 'feeding', 'manual', 'feed'),
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3', '11111111-1111-4111-8111-111111111111', 'environment', 'manual', 'sensor');
+insert into public.diary_entries(id, user_id, note, details)
+values
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1', '11111111-1111-4111-8111-111111111111', 'water',
+    '{"event_type":"watering","linked_grow_event_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1","watering":{"volume_ml":500}}'),
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2', '11111111-1111-4111-8111-111111111111', 'feed',
+    '{"event_type":"feeding","linked_grow_event_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2","feeding":{"volume_ml":200,"products":[{"name":"Grow","amount":2,"unit":"ml"}]}}'),
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3', '11111111-1111-4111-8111-111111111111', 'sensor',
+    '{"event_type":"environment","linked_grow_event_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3","sensor_snapshot":{"metrics":{"temperature_c":24,"humidity_pct":55,"vpd_kpa":1.2}}}');
+insert into public.watering_events(event_id, user_id, volume_ml)
+values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', '11111111-1111-4111-8111-111111111111', 500);
+insert into public.feeding_events(event_id, user_id, volume_ml, products)
+values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', '11111111-1111-4111-8111-111111111111', 200, '[{"name":"Grow","amount":2,"unit":"ml"}]');
+insert into public.environment_events(event_id, user_id, temperature_c, humidity_pct, vpd_kpa)
+values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3', '11111111-1111-4111-8111-111111111111', 24, 55, 1.2);
+
+do $proof$
+declare
+  v_water jsonb;
+  v_feed jsonb;
+  v_sensor jsonb;
+  v_prev jsonb;
+  v_feed_details jsonb;
+begin
+  v_water := public.quicklog_correct_entry(
+    'wrong_value', '{"volume_ml":750}'::jsonb,
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', null, null);
+  if coalesce(v_water ->> 'ok', '') <> 'true' then
+    raise exception 'watering correction failed: %', v_water;
+  end if;
+  if (select volume_ml from public.watering_events where event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1') <> 750 then
+    raise exception 'watering volume was not updated';
+  end if;
+  select previous_state into v_prev from public.quicklog_entry_revisions
+   where grow_event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  if (v_prev ->> 'volume_ml')::numeric <> 500 then
+    raise exception 'watering history lost the original volume: %', v_prev;
+  end if;
+
+  v_feed := public.quicklog_correct_entry(
+    'wrong_value', '{"volume_ml":300,"dose_amount":4}'::jsonb,
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', null, null);
+  if coalesce(v_feed ->> 'ok', '') <> 'true' then
+    raise exception 'feeding correction failed: %', v_feed;
+  end if;
+  select details into v_feed_details from public.diary_entries where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+  if (v_feed_details #>> '{feeding,volume_ml}')::numeric <> 300 then
+    raise exception 'feeding volume missing from feeding details: %', v_feed_details;
+  end if;
+  if v_feed_details #> '{watering,volume_ml}' is not null then
+    raise exception 'feeding volume wrote watering details: %', v_feed_details;
+  end if;
+  if (v_feed_details #>> '{feeding,products,0,amount}')::numeric <> 4 then
+    raise exception 'feeding dose was not updated: %', v_feed_details;
+  end if;
+  select previous_state into v_prev from public.quicklog_entry_revisions
+   where grow_event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+  if (v_prev ->> 'volume_ml')::numeric <> 200 or (v_prev ->> 'dose_amount')::numeric <> 2 then
+    raise exception 'feeding history lost the original values: %', v_prev;
+  end if;
+
+  v_sensor := public.quicklog_correct_entry(
+    'wrong_value', '{"sensor_values":{"temperature_c":26,"humidity_pct":60,"vpd_kpa":1.4}}'::jsonb,
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3', null, null);
+  if coalesce(v_sensor ->> 'ok', '') <> 'true' then
+    raise exception 'sensor correction failed: %', v_sensor;
+  end if;
+  if (select temperature_c from public.environment_events where event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3') <> 26 then
+    raise exception 'sensor temperature was not updated';
+  end if;
+  select previous_state into v_prev from public.quicklog_entry_revisions
+   where grow_event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+  if (v_prev #>> '{environment_events,0,temperature_c}')::numeric <> 24 then
+    raise exception 'sensor history lost the original temperature: %', v_prev;
+  end if;
+end
+$proof$;
+rollback;
+`;
+
+function proveMeasuredValueCorrections(env, spawnImpl) {
+  executeSql(MEASURED_CORRECTION_PROOF_SQL, env, {
+    stage: "measured_correction_proof",
+    spawnImpl,
+  });
+}
+
 function requireGuardedRollback(label, env, spawnImpl, mutations, expectedMessage) {
   resetScaffold(env, spawnImpl);
   const result = applyPinnedMigration(env, spawnImpl, {
@@ -427,8 +557,15 @@ function proveCatalogDrift(env, spawnImpl) {
   executeSql(HOSTILE_OVERLOAD_RESTORE_SQL, env, { stage: "catalog_restore", spawnImpl });
   requireStatus("catalog_restored", readPreflight(env, spawnImpl), "verify_only");
 
-  // The required-core gate is measured on the seven-function catalog it requires.
+  // The required-core gate is measured on the seven-function catalog it requires,
+  // after the editable-values migration replaces quicklog_correct_entry.
   applyKeyedOverloadMigration(env, spawnImpl);
+  applyEditableValuesMigration(env, spawnImpl);
+  proveEditableCorrectEntryFingerprint(env, spawnImpl);
+  proveMeasuredValueCorrections(env, spawnImpl);
+  if (readRequiredCoreCatalog(env, spawnImpl).target_functions_contract !== true) {
+    throw new Error("catalog_drift:editable_values_fingerprint");
+  }
   if (readRequiredCoreCatalog(env, spawnImpl).target_function_overloads_contract !== true) {
     throw new Error("catalog_drift:required_core_baseline");
   }

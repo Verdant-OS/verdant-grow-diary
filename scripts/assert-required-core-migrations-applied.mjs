@@ -94,10 +94,20 @@ const QUICKLOG_CLIENT_FUNCTION_SIGNATURES = Object.freeze([
   QUICKLOG_REVISION_REPLAY_SIGNATURES.keyedCorrect,
 ]);
 
+/** Body of quicklog_correct_entry after 20261014210000 replaces the 20260811 definition. */
+export const EDITABLE_VALUES_CORRECT_ENTRY_FINGERPRINT = Object.freeze({
+  md5: "9a56ac0fe7282bffe52ef4c9dc858562",
+  bytes: 14925,
+  prosrcMd5: "b714a3e4f9afa75cf4dea123e59684ed",
+  prosrcBytes: 14594,
+});
+
 const quickLogFunctionFingerprintValues = Object.entries(EXPECTED_FUNCTION_DEFINITION_FINGERPRINTS)
   .map(([name, value]) => {
     const signature = LEGACY_QUICKLOG_SIGNATURES[name];
-    return `('${signature}', '${name}', '${value.md5}', ${value.bytes}, '${value.prosrcMd5}', ${value.prosrcBytes})`;
+    const pin =
+      name === "quicklog_correct_entry" ? EDITABLE_VALUES_CORRECT_ENTRY_FINGERPRINT : value;
+    return `('${signature}', '${name}', '${pin.md5}', ${pin.bytes}, '${pin.prosrcMd5}', ${pin.prosrcBytes})`;
   })
   .join(",\n      ");
 

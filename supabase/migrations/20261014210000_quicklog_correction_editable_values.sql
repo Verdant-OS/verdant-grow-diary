@@ -94,9 +94,15 @@ BEGIN
         RETURN jsonb_build_object('reason', 'unsupported_change');
       END IF;
     END IF;
-    UPDATE public.diary_entries d
-       SET details = jsonb_set(COALESCE(d.details, '{}'::jsonb), '{watering,volume_ml}', to_jsonb(p_volume), true)
-     WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid;
+    IF p_event_type = 'watering' THEN
+      UPDATE public.diary_entries d
+         SET details = jsonb_set(COALESCE(d.details, '{}'::jsonb), '{watering,volume_ml}', to_jsonb(p_volume), true)
+       WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid;
+    ELSE
+      UPDATE public.diary_entries d
+         SET details = jsonb_set(COALESCE(d.details, '{}'::jsonb), '{feeding,volume_ml}', to_jsonb(p_volume), true)
+       WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid;
+    END IF;
   END IF;
 
   IF p_has_dose THEN

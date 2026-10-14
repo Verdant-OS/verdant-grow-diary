@@ -345,14 +345,6 @@ function normalizeCorrectionSensorValues(
   return Object.keys(next).length > 0 ? next : null;
 }
 
-/** Copy the values that were already saved. Later edits of the input do not change the copy. */
-export function recordQuickLogCorrectionOriginal(
-  previous: Record<string, unknown> | null | undefined,
-): Record<string, unknown> {
-  if (!previous) return {};
-  return { ...previous };
-}
-
 function finiteOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }

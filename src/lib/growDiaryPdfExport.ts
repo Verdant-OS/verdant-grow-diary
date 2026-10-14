@@ -105,8 +105,24 @@ function pad(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
-function isoDate(d: Date): string {
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+function zoneLabel(d: Date): string {
+  try {
+    const short = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
+      .formatToParts(d)
+      .find((part) => part.type === "timeZoneName")?.value;
+    if (short && short.trim()) return short;
+  } catch {
+    /* fall through to a fixed label */
+  }
+  return "local";
+}
+
+function localDate(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function localStamp(d: Date): string {
+  return `${localDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())} ${zoneLabel(d)}`;
 }
 
 function safeSlug(s: string): string {
@@ -120,7 +136,7 @@ function safeSlug(s: string): string {
 }
 
 export function buildGrowDiaryReportFilename(growName: string, now: Date): string {
-  return `verdant-grow-diary-${safeSlug(growName)}-${isoDate(now)}.pdf`;
+  return `verdant-grow-diary-${safeSlug(growName)}-${localDate(now)}.pdf`;
 }
 
 export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): GrowDiaryPdfModel {
@@ -135,7 +151,9 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
   }
 
   const startedIso = input.grow.startedAt ? tryDateLabel(input.grow.startedAt) : null;
-  const dateRangeLabel = startedIso ? `${startedIso} → ${isoDate(now)}` : `Through ${isoDate(now)}`;
+  const dateRangeLabel = startedIso
+    ? `${startedIso} → ${localDate(now)} ${zoneLabel(now)}`
+    : `Through ${localDate(now)} ${zoneLabel(now)}`;
 
   const countsRows = [
     { label: "Diary entries", value: countText(input.counts.diary) },
@@ -196,7 +214,7 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
   return {
     title: `Grow Diary Summary — ${input.grow.name}`,
     filename: buildGrowDiaryReportFilename(input.grow.name, now),
-    generatedAtLabel: now.toISOString(),
+    generatedAtLabel: localStamp(now),
     scopeLabel: scopeParts.join(" · "),
     dateRangeLabel,
     countsRows,
@@ -213,7 +231,7 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
 function tryDateLabel(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso ?? "";
-  return d.toISOString().replace("T", " ").slice(0, 16) + "Z";
+  return localStamp(d);
 }
 
 function esc(v: string): string {
@@ -287,7 +305,8 @@ export function buildGrowDiaryReportHtml(model: GrowDiaryPdfModel): string {
   .sources{list-style:none;padding-left:0}
   .callout{border:1px dashed #aaa;border-radius:8px;background:#fafafa;padding:10px 12px;margin-top:8px}
   .safety{margin-top:24px;padding:10px 12px;border:1px solid #999;border-radius:8px;background:#f9f9f9;font-size:12px}
-  @media print{body{padding:0}.no-print{display:none}}
+  @page{margin:0}
+  @media print{body{padding:32px}.no-print{display:none}}
 </style>
 </head>
 <body data-testid="grow-diary-pdf-document">
@@ -299,7 +318,7 @@ export function buildGrowDiaryReportHtml(model: GrowDiaryPdfModel): string {
 
   ${emptyBanner}
 
-  <section><h2>Summary totals</h2><table><tbody>${countsRows}</tbody></table></section>
+  <section><h2>Summary totals</h2><table><tbody>${countsRows}</tbody></table><p class="muted" data-testid="grow-diary-pdf-omitted-count-legend">0 is a recorded count. — = not included in this export.</p></section>
 
   <section><h2>Charts</h2>${chartsBlock}</section>
 

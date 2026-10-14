@@ -54,6 +54,7 @@ import {
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
 import { SandboxCheckoutTestModeNote } from "@/components/SandboxCheckoutTestModeNote";
+import { CHECKOUT_LIVE_FAQ_ID } from "@/lib/sandboxCheckoutTestModeNoteRules";
 import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -1374,7 +1375,11 @@ export default function Pricing() {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="checkout-status" data-testid="pricing-faq-checkout-status">
+          <AccordionItem
+            id={CHECKOUT_LIVE_FAQ_ID}
+            value="checkout-status"
+            data-testid="pricing-faq-checkout-status"
+          >
             <AccordionTrigger>{checkoutTrustCopy.faqQuestion}</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
               {checkoutTrustCopy.faqAnswer}

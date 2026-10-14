@@ -35,7 +35,10 @@ import {
   QUICK_LOG_DETAIL_FIELD_KEYS,
   type QuickLogDetailDisplayLine,
 } from "@/lib/quickLogActivityDetailFields";
-import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import {
+  celsiusToFahrenheit,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 import { PHENO_EVIDENCE_RECEIPT_KIND } from "@/lib/phenoEvidenceCaptureRules";
 import { readDetailsLoggedAt } from "@/lib/quicklogManualDiagnosticsRules";
 
@@ -164,7 +167,6 @@ function friendlyAttachedAction(value: unknown): string | null {
 const TYPED_ACTIVITY_ENVELOPES = ["watering", "feeding"] as const;
 
 const TYPED_ACTIVITY_FIELD_LABELS: Record<string, string> = {
-  volume_ml: "Volume",
   ph: "pH",
   ec_ms_cm: "EC",
   ec_in: "EC in",
@@ -175,10 +177,18 @@ const TYPED_ACTIVITY_FIELD_LABELS: Record<string, string> = {
   water_temp_c: "Water temperature",
 };
 
-function typedActivityScalar(key: string, value: unknown): string | null {
+function typedActivityScalar(
+  key: string,
+  value: unknown,
+  tempUnit: TemperatureUnitPreference,
+): string | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     if (key === "volume_ml" || key === "runoff_ml") return `${value} ml`;
-    if (key === "water_temp_c") return `${value} °C`;
+    if (key === "water_temp_c") {
+      const displayed = tempUnit === "fahrenheit" ? celsiusToFahrenheit(value) : value;
+      const shown = String(Math.round(displayed * 10) / 10);
+      return `${shown} ${tempUnit === "fahrenheit" ? "°F" : "°C"}`;
+    }
     return String(value);
   }
   if (typeof value === "string") {
@@ -203,13 +213,45 @@ function typedProductText(value: unknown): string | null {
       : typeof record.nutrient_brand === "string"
         ? record.nutrient_brand.trim()
         : "";
-  if (name && brand) return `${name} (${brand})`;
-  return name || brand || null;
+  const identity = name && brand ? `${name} (${brand})` : name || brand;
+  if (!identity) return null;
+  const amount =
+    typeof record.amount === "number" && Number.isFinite(record.amount) ? record.amount : null;
+  const unit = typeof record.unit === "string" ? record.unit.trim() : "";
+  if (amount != null && unit) return `${identity} ${amount} ${unit}`;
+  return identity;
+}
+
+function plainDetailValue(value: unknown): string | null {
+  if (typeof value === "string" || typeof value === "boolean") return String(value);
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const parts: string[] = [];
+  for (const item of value) {
+    if (typeof item === "string") {
+      const trimmed = item.trim();
+      if (trimmed === "") return null;
+      parts.push(trimmed);
+    } else if (typeof item === "number") {
+      if (!Number.isFinite(item)) return null;
+      parts.push(String(item));
+    } else if (typeof item === "boolean") {
+      parts.push(String(item));
+    } else {
+      return null;
+    }
+  }
+  return parts.join(", ");
+}
+
+function typedVolumeLabel(envelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number]): string {
+  return envelope === "watering" ? "Water Volume" : "Feed Volume";
 }
 
 function typedActivityEnvelopeLines(
   envelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number],
   value: unknown,
+  tempUnit: TemperatureUnitPreference,
 ): QuickLogDetailDisplayLine[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
   const record = value as Record<string, unknown>;
@@ -225,8 +267,9 @@ function typedActivityEnvelopeLines(
       }
       continue;
     }
-    const label = TYPED_ACTIVITY_FIELD_LABELS[key];
-    const text = typedActivityScalar(key, child);
+    const label =
+      key === "volume_ml" ? typedVolumeLabel(envelope) : TYPED_ACTIVITY_FIELD_LABELS[key];
+    const text = typedActivityScalar(key, child, tempUnit);
     if (!label || !text) continue;
     lines.push({ key: `${envelope}.${key}`, label, value: text });
   }
@@ -269,18 +312,20 @@ export function presentTimelineDiaryEntryDetails(
     options,
   );
   for (const envelope of TYPED_ACTIVITY_ENVELOPES) {
-    detailLines.push(...typedActivityEnvelopeLines(envelope, record[envelope]));
+    detailLines.push(...typedActivityEnvelopeLines(envelope, record[envelope], tempUnit));
   }
   const extra = Object.entries(record)
     .filter(
-      ([k, v]) =>
-        v != null &&
+      ([k]) =>
         !HIDDEN_DIARY_DETAIL_KEYS.has(k) &&
         !QUICK_LOG_DETAIL_FIELD_KEYS.has(k) &&
-        !TYPED_ACTIVITY_ENVELOPES.includes(k as (typeof TYPED_ACTIVITY_ENVELOPES)[number]) &&
-        (typeof v === "string" || typeof v === "number" || typeof v === "boolean"),
+        !TYPED_ACTIVITY_ENVELOPES.includes(k as (typeof TYPED_ACTIVITY_ENVELOPES)[number]),
     )
-    .map(([k, v]) => [k, String(v)] as const);
+    .map(([k, v]) => {
+      const text = plainDetailValue(v);
+      return text == null ? null : ([k, text] as const);
+    })
+    .filter((entry): entry is readonly [string, string] => entry != null);
 
   return { detailLines, extra };
 }

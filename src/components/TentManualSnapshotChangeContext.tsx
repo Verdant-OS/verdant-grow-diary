@@ -11,6 +11,7 @@
  */
 import { Gauge } from "lucide-react";
 import type { SensorReadingRow } from "@/lib/db";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
   deriveChangeContextFromReadings,
   type ChangeContextReading,
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export default function TentManualSnapshotChangeContext({ tentId, readings }: Props) {
+  const temperatureUnit = useTemperatureUnitPreference();
   if (!tentId) return null;
 
   const rows: ChangeContextReading[] = readings.map((r) => ({
@@ -36,7 +38,7 @@ export default function TentManualSnapshotChangeContext({ tentId, readings }: Pr
   const hasAnyManual = rows.some((r) => r.source === "manual" && r.tent_id === tentId);
   if (!hasAnyManual) return null;
 
-  const ctx = deriveChangeContextFromReadings(rows, { tentId });
+  const ctx = deriveChangeContextFromReadings(rows, { tentId, temperatureUnit });
 
   if (ctx.firstSnapshot) {
     return (

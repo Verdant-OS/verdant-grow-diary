@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "@/lib/react-router-compat";
 import { Search } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
+import SearchShortcutHint from "@/components/SearchShortcutHint";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
@@ -152,7 +153,7 @@ export default function CultivarsIndex() {
               Search cultivars, your grows, tents, and plants…
             </span>
             <kbd className="hidden shrink-0 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline">
-              ⌘K
+              <SearchShortcutHint />
             </kbd>
           </button>
           {query ? (

@@ -46,6 +46,7 @@ import {
 } from "@/lib/quickLogPendingFeedingStore";
 import { buildFeedingRecoveryForm } from "@/lib/quickLogFeedingRecoveryViewModel";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useDialogOpenerRestore } from "@/hooks/useDialogOpenerRestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -355,6 +356,7 @@ function QuickLogV2SheetForOwner({
   defaultTargetKey,
   defaultAction = "note",
 }: Props) {
+  const restoreOpenerFocus = useDialogOpenerRestore(open);
   const { user } = useAuth();
   const [initialRecovery] = useState(() => readPendingQuickLogNote(user?.id ?? null));
   const initialNote = initialRecovery.status === "pending" ? initialRecovery.record : null;
@@ -2579,6 +2581,7 @@ function QuickLogV2SheetForOwner({
         side="bottom"
         className="max-h-[92vh] overflow-y-auto text-base"
         aria-describedby="qlv2-sheet-description"
+        onCloseAutoFocus={restoreOpenerFocus}
       >
         <SheetHeader>
           <SheetTitle>Quick Log</SheetTitle>

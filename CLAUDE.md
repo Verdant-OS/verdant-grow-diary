@@ -3,14 +3,21 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-09-28.3**
+**Sentinel-Version: 2026-10-13.1**
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
 publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
-may supply an independently assigned acceptance. Codex cannot give its own work an
-independent PASS. Claude may add peer observations but is not the acceptance reviewer.
+may supply an independently assigned acceptance. **Codex** is an equal independent
+exact-head reviewer, except on a PR Codex authored or repaired (for example #1938).
+Claude may add peer observations but is not the acceptance reviewer.
 Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
-Durban Poison or Critical Mass gives an independent **PASS at the exact head SHA**.
+Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
+**Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
+PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
+tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments or
+billing, `.github` workflows, security or auth, and dependency or lockfile changes
+still need Codex (not on a PR Codex authored or repaired), or Blue Dream, Critical
+Mass, or Durban Poison.
 Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
 Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
 
@@ -392,6 +399,7 @@ pre-resolution SHA do not count. See `docs/agents/merge-queue.md` and
 | What is live, blocked, or approved right now                       | `docs/agents/CURRENT_STATE.md`                   |
 | Running, screenshotting, driving the app                           | `.claude/skills/run-verdant-grow-diary/SKILL.md` |
 | Writing a migration                                                | `docs/contributing-supabase-migrations.md`       |
+| Before installing or enabling an outside agent skill or hook       | `docs/agents/third-party-agent-skills.md`        |
 
 ---
 

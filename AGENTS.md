@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-09-28.3**
+**Sentinel-Version: 2026-10-13.1**
 
 _Amended 2026-09-28 (Matthew Cheek): added Release and Environment Rules and Agent
 Handoff / Coverage; open tasks are resumable by any agent from `docs/agents/HANDOFF_LOG.md`._
@@ -92,8 +92,14 @@ Use small, scoped changes. Avoid broad rewrites.
   or rewrite history. Update branches by merging from base. Open PRs as drafts.
   Codex uses normal PR-branch pushes only: no force-push, merge, Publish, SQL apply,
   or production Supabase writes. Drafts remain draft. Chemdawg owns merge only after
-  **35/35 required checks** succeed and Blue Dream, Durban Poison or Critical Mass
-  gives an independent **PASS at the exact head SHA**. A skipped, missing, pending
+  **35/35 required checks** succeed and Blue Dream, Durban Poison, Critical Mass or
+  Codex gives an independent **PASS at the exact head SHA**. Codex cannot be that
+  reviewer on a PR Codex authored or repaired (for example #1938). Graft's exact-head
+  PASS counts as the outside review on docs-only and low-risk PRs Graft did not author
+  or repair (OWNERSHIP.md allowlist). Migrations, payments or billing, `.github`
+  workflows, security or auth, and dependency or lockfile changes still need Codex
+  (not on a PR Codex authored or repaired), or Blue Dream, Critical Mass, or Durban
+  Poison. A skipped, missing, pending
   or failed required check is not green. There is no author-integration exception.
   Off-limits paths and named holds still require explicit reassignment before editing.
   Production database changes, spend, publish gates and the publish decision remain
@@ -737,10 +743,17 @@ review and acceptance fences.
 
 Independent acceptance routing: **Blue Dream** reviews .tsx product files, P1s and
 publish gates; **Critical Mass** reviews other assigned scopes. **Durban Poison**
-may supply an independently assigned acceptance. Codex cannot give its own work an
-independent PASS. Claude may add peer observations but is not the acceptance reviewer.
+may supply an independently assigned acceptance. **Codex** is an equal independent
+exact-head reviewer, except on a PR Codex authored or repaired (for example #1938).
+Claude may add peer observations but is not the acceptance reviewer.
 Chemdawg owns merge only after **35/35 required checks** succeed and Blue Dream,
-Durban Poison or Critical Mass gives an independent **PASS at the exact head SHA**.
+Durban Poison, Critical Mass or Codex gives an independent **PASS at the exact head SHA**.
+**Graft**'s exact-head PASS counts as that outside review on docs-only and low-risk
+PRs Graft did not author or repair (the OWNERSHIP.md allowlist: ordinary docs, new
+tests, HANDOFF_LOG). The PASS is void once the head moves. Migrations, payments or
+billing, `.github` workflows, security or auth, and dependency or lockfile changes
+still need Codex (not on a PR Codex authored or repaired), or Blue Dream, Critical
+Mass, or Durban Poison.
 Codex uses normal pushes only: no force-push, merge, Publish, SQL apply or production
 Supabase writes. Drafts remain draft. Historical receipts keep their original reviewer.
 
@@ -828,9 +841,8 @@ snapshots can differ.
   scripts run under **`bun`** in both observed snapshots. Per
   `.claude/skills/run-verdant-grow-diary/SKILL.md`: if `node_modules` already exists
   (managed environments pre-provision it), use it as-is — do not reinstall. If it's
-  absent, do **not** reach for `bun install --frozen-lockfile` first; go straight to the
-  SKILL's verified npm public-registry-override bootstrap. Install behavior has differed
-  across sessions, which is why the SKILL doesn't recommend trying bun first:
+  absent, use `bun install --frozen-lockfile` as the SKILL's supported setup path.
+  Historical install observations below do not authorize an unpinned npm fallback:
   - One session found `bun install --frozen-lockfile` worked fine against the public
     registry, and the VM startup script already ran it — no reinstall needed unless a
     run failed on a missing/updated package. `bun` was symlinked at `/usr/local/bin/bun`
@@ -842,9 +854,8 @@ snapshots can differ.
     override** instead, and `bun` itself was a pre-baked system dependency under
     `~/.bun` (`BUN_INSTALL` on `PATH` via `~/.bashrc`), not reinstalled by the update
     script.
-  - Don't assume either session's behavior carries over to a new one — check
-    `node_modules` first, and if an install is actually needed, prefer the SKILL's
-    verified bootstrap over guessing.
+  - Check `node_modules` first. If the frozen install fails, report the exact blocker
+    as `BLOCKED`; do not install an unpinned npm tree or regenerate the lockfile.
 - **Dev server.** `bun run dev -- --host 127.0.0.1 --port 8080`, then browse
   `http://127.0.0.1:8080`. Bind IPv4 (**`127.0.0.1`, not `localhost`**) and **port 8080,
   not 5173** explicitly — Vite's default host `::` is unreliable in this container.

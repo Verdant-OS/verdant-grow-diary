@@ -1,11 +1,13 @@
 import { PHENO_EVIDENCE_GOALS, type PhenoEvidenceGoalId } from "@/lib/phenoEvidenceGoals";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { isSuggestedEvidenceGoal } from "@/lib/phenoEvidenceGoalSelectionRules";
 
 /**
  * PhenoEvidenceGoalsSelector — presenter-only picker for the evidence goals
  * the grower plans to track. Pure UX; nothing is written to the DB here.
- * The selection lives in local onboarding state.
+ * The selection lives in local onboarding state. Goals in the suggested
+ * starting set carry a "Suggested" badge so the preset is visible (#574).
  */
 export interface PhenoEvidenceGoalsSelectorProps {
   selected: ReadonlyArray<PhenoEvidenceGoalId>;
@@ -35,6 +37,15 @@ export default function PhenoEvidenceGoalsSelector({
             <label htmlFor={`goal-${g.id}`} className="flex-1 min-w-0 cursor-pointer">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">{g.label}</span>
+                {isSuggestedEvidenceGoal(g.id) ? (
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] uppercase tracking-wide"
+                    data-testid={`${testId}-suggested-${g.id}`}
+                  >
+                    Suggested
+                  </Badge>
+                ) : null}
                 {g.startsPending ? (
                   <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
                     Pending until recorded

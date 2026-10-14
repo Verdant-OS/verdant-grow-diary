@@ -1,5 +1,10 @@
 # Sandbox DB gate connectivity (core schema + money migrations)
 
+> **Superseded (2026-10-14):** no workflow runs these sandbox jobs any more. The money
+> and prefix-diff sandbox lanes were removed by #2071, and the core-schema lane by the
+> sandbox-lane retirement follow-up. Verdant has no sandbox (AGENTS.md); see
+> `docs/production-only-verification-runbook.md`. The rest of this page is history.
+
 **Status (2026-08-08):** Both remote sandbox gates fail after identity proof with
 `psql` exit status **2**. This is **not** app-code schema drift and cannot be
 fixed by dependency overrides.

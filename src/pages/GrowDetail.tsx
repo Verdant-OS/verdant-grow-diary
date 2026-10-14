@@ -240,6 +240,7 @@ export default function GrowDetail() {
           description="Manage plants in this grow."
           count={counts.plants}
           countLabel="plants"
+          singularLabel="plant"
         />
         <HubLink
           to={tentsPath(growId)}
@@ -248,6 +249,7 @@ export default function GrowDetail() {
           description="Tents linked to this grow."
           count={counts.tents}
           countLabel="tents"
+          singularLabel="tent"
         />
         <HubLink
           to={actionsPath(growId)}
@@ -270,8 +272,6 @@ export default function GrowDetail() {
           icon={<Sparkles className="h-4 w-4" />}
           title="Dashboard"
           description="Open the dashboard scoped to this grow."
-          count="unavailable"
-          countLabel="dashboard"
         />
         {showPostGrowReport && (
           <HubLink
@@ -288,8 +288,6 @@ export default function GrowDetail() {
           icon={<GraduationCap className="h-4 w-4" />}
           title="Learning review"
           description="Completed actions, grower-recorded outcomes, and next-run decisions."
-          count="unavailable"
-          countLabel="learning review"
         />
       </section>
 
@@ -493,23 +491,30 @@ function HubLink({
   description,
   count,
   countLabel,
+  singularLabel,
 }: {
   to: string;
   icon: React.ReactNode;
   title: string;
   description: string;
-  count: CountValue;
-  countLabel: string;
+  count?: CountValue;
+  countLabel?: string;
+  singularLabel?: string;
 }) {
+  const label = count === 1 && singularLabel ? singularLabel : countLabel;
   return (
     <Link to={to} className="glass rounded-2xl p-4 hover:bg-secondary/20 transition-colors block">
       <div className="flex items-center gap-2 mb-1 text-sm font-semibold">
         {icon}
         {title}
-        <span className="ml-auto text-xs font-normal text-muted-foreground">
-          <span data-testid={`count-${countLabel.replace(/\s+/g, "-")}`}>{formatCount(count)}</span>{" "}
-          {countLabel}
-        </span>
+        {count !== undefined && countLabel ? (
+          <span className="ml-auto text-xs font-normal text-muted-foreground">
+            <span data-testid={`count-${countLabel.replace(/\s+/g, "-")}`}>
+              {formatCount(count)}
+            </span>{" "}
+            {label}
+          </span>
+        ) : null}
       </div>
       <p className="text-xs text-muted-foreground">{description}</p>
     </Link>

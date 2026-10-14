@@ -79,7 +79,6 @@ reviews:
     # Lockfiles and generated code
     - "!bun.lock"
     - "!bun.lockb"
-    - "!package-lock.json"
     - "!**/*.lock"
     - "!src/integrations/supabase/types.ts"
     - "!src/routeTree.gen.ts"

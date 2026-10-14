@@ -3,7 +3,7 @@ import { loadManualDeliverySql } from "../../scripts/run-quicklog-manual-plant-l
 import * as gate from "../../scripts/lib/quicklogManualDeliveryOrder.mjs";
 
 describe("database-enforced Quick Log manual delivery", () => {
-  it.each([0, 1, 2])("checks the actual predecessor catalog before step %i", (position) => {
+  it.each([0, 1, 2, 3])("checks the actual predecessor catalog before step %i", (position) => {
     const sql = loadManualDeliverySql()[position];
     const script = gate.buildManualDeliveryStepSql({
       order: gate.MANUAL_DELIVERY_ORDER,
@@ -14,6 +14,7 @@ describe("database-enforced Quick Log manual delivery", () => {
       ["0d3098b81787fa90898da921345c0dbc", "7ec296e422f7f47c8b2793b051840798"],
       ["85e40fcd47d1e38dca8f057fee2d905a", "7ec296e422f7f47c8b2793b051840798"],
       ["85e40fcd47d1e38dca8f057fee2d905a", "ccd841f1af11a03bfca191cf9989c3fd"],
+      ["1875cf01f7d1aa843d4b8ad080f9bcb2", "ccd841f1af11a03bfca191cf9989c3fd"],
     ][position];
     expect(script).toContain(predecessor[0]);
     expect(script).toContain(predecessor[1]);
@@ -41,7 +42,7 @@ describe("database-enforced Quick Log manual delivery", () => {
     ).toBe(script);
   });
 
-  it.each([0, 1, 2])("rejects changed migration bytes at step %i", (position) => {
+  it.each([0, 1, 2, 3])("rejects changed migration bytes at step %i", (position) => {
     expect(() =>
       gate.buildManualDeliveryStepSql({
         order: gate.MANUAL_DELIVERY_ORDER,
@@ -51,7 +52,7 @@ describe("database-enforced Quick Log manual delivery", () => {
     ).toThrow("migration_fingerprint_mismatch");
   });
 
-  it.each([0, 1, 2])("pins the protected runner role at step %i", (position) => {
+  it.each([0, 1, 2, 3])("pins the protected runner role at step %i", (position) => {
     const script = gate.buildManualDeliveryStepSql({
       order: gate.MANUAL_DELIVERY_ORDER,
       version: gate.MANUAL_DELIVERY_ORDER[position],
@@ -63,7 +64,7 @@ describe("database-enforced Quick Log manual delivery", () => {
     expect(generatedGate).toContain("IF current_user <> 'postgres' OR v_wrapper IS NULL");
   });
 
-  it.each([0, 1, 2])("requires the exact wrapper ACL at step %i", (position) => {
+  it.each([0, 1, 2, 3])("requires the exact wrapper ACL at step %i", (position) => {
     const script = gate.buildManualDeliveryStepSql({
       order: gate.MANUAL_DELIVERY_ORDER,
       version: gate.MANUAL_DELIVERY_ORDER[position],
@@ -78,7 +79,7 @@ describe("database-enforced Quick Log manual delivery", () => {
     expect(wrapperGate).toContain("),false)");
   });
 
-  it.each([0, 1, 2])("requires the exact private-delegate ACL at step %i", (position) => {
+  it.each([0, 1, 2, 3])("requires the exact private-delegate ACL at step %i", (position) => {
     const script = gate.buildManualDeliveryStepSql({
       order: gate.MANUAL_DELIVERY_ORDER,
       version: gate.MANUAL_DELIVERY_ORDER[position],
@@ -93,7 +94,7 @@ describe("database-enforced Quick Log manual delivery", () => {
     expect(delegateGate).toContain("),false)");
   });
 
-  it.each([0, 1, 2])(
+  it.each([0, 1, 2, 3])(
     "pins service-role exclusion from the private delegate at step %i",
     (position) => {
       const script = gate.buildManualDeliveryStepSql({
@@ -109,6 +110,16 @@ describe("database-enforced Quick Log manual delivery", () => {
       );
     },
   );
+
+  it("cannot substitute the UTC-hash repair for the lock repair", () => {
+    expect(() =>
+      gate.buildManualDeliveryStepSql({
+        order: gate.MANUAL_DELIVERY_ORDER,
+        version: gate.MANUAL_DELIVERY_ORDER[2],
+        sql: loadManualDeliverySql()[3],
+      }),
+    ).toThrow("migration_fingerprint_mismatch");
+  });
 
   it("cannot substitute the lock repair for the lineage migration", () => {
     expect(() =>

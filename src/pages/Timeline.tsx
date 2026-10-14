@@ -150,11 +150,11 @@ import {
   isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
   timelineClearFiltersEnabled,
-  timelineDateParamsAfterSync,
   resolveTimelineCardPlaceLabels,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
   withResolvedTimelinePlaceDetails,
 } from "@/lib/timelineEvidenceFilterRules";
+import { timelineDateParamsAfterSync } from "@/lib/timelineDateSearchParamRules";
 import {
   buildMissingActionCopy,
   findNewestEntryIdForCategory,

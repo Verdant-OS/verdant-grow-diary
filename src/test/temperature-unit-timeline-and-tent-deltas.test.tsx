@@ -9,6 +9,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 import { manualSensorReadingsToTimelineEntries } from "@/lib/timelineManualSensorMeasurementRules";
 import {
   buildManualSnapshotChangeContext,
@@ -52,7 +53,7 @@ const rows = [
 
 afterEach(() => {
   cleanup();
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 describe("Timeline manual snapshot receipt note follows the temperature unit", () => {

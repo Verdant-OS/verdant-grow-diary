@@ -401,10 +401,10 @@ required migration exists on disk but has not been applied to the target
 environment.
 
 The `.github/workflows/required-money-migrations.yml` workflow runs this
-check against both sandbox and live. It reads each DB connection string
-from its protected GitHub environment:
+check against live only, by manual dispatch from the deploy branch with a
+typed `LIVE` confirmation. Verdant has no sandbox database lane. It reads
+the DB connection string from its protected GitHub environment:
 
-- `verdant-sandbox` → `SUPABASE_DB_URL_SANDBOX`
 - `verdant-production` → `SUPABASE_DB_URL`
 
 ### Setting the GitHub secrets
@@ -414,14 +414,13 @@ from its protected GitHub environment:
    URI format). It looks like
    `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`.
    The password is the database password, not the anon or service-role key.
-2. In GitHub, open **Settings → Environments → verdant-sandbox** and create
-   `SUPABASE_DB_URL_SANDBOX` with the sandbox project's URL.
-3. Open **Settings → Environments → verdant-production** and create
+2. In GitHub, open **Settings → Environments → verdant-production** and create
    `SUPABASE_DB_URL` with the live project's URL.
-4. Re-run the `required-money-migrations` workflow to confirm both jobs
-   go green. If a job errors with exit code `2`, the URL is wrong or the
-   pooler is unreachable; exit code `1` means a required migration is
-   missing from that environment and must be applied before deploying.
+3. Dispatch the `required-money-migrations` workflow with `target_env=live`
+   and `confirm_live=LIVE` to confirm the job goes green. If it errors with
+   exit code `2`, the URL is wrong or the pooler is unreachable; exit code
+   `1` means a required migration is missing from production and must be
+   applied before deploying.
 
 Rotate these secrets whenever the database password is rotated.
 
@@ -431,12 +430,7 @@ Requires `psql` on `PATH` (`brew install libpq` on macOS,
 `sudo apt-get install postgresql-client` on Debian/Ubuntu).
 
 ```bash
-# Sandbox
-SUPABASE_DB_URL='postgresql://postgres.<sandbox-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres' \
-  TARGET_ENV=sandbox \
-  node scripts/assert-required-money-migrations-applied.mjs
-
-# Live
+# Live (Verdant has no sandbox database)
 SUPABASE_DB_URL='postgresql://postgres.<live-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres' \
   TARGET_ENV=live \
   node scripts/assert-required-money-migrations-applied.mjs

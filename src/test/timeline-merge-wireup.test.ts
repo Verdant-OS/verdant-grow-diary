@@ -125,7 +125,7 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     expect(TIMELINE_SRC).toMatch(/if\s*\(\s*directoryGrowId\s*\)\s*\{/);
     expect(TIMELINE_SRC).toMatch(/\.eq\(\s*["']grow_id["']\s*,\s*directoryGrowId\s*\)/);
     expect(TIMELINE_SRC).toMatch(
-      /\[activeGrowId,\s*activeReadKey,\s*directoryGrowId,\s*timelineDateRangeBounds,\s*user\]/,
+      /\[\s*activeGrowId,\s*activeReadKey,\s*directoryGrowId,\s*timelineDateRangeBounds,\s*user,\s*temperatureUnit,?\s*\]/,
     );
   });
 

@@ -141,13 +141,22 @@ export function resolvePlantAge(iso: string | null | undefined, now: Date): Plan
 }
 
 /**
- * Timeline header "day N". Matches `resolvePlantAge` local calendar days,
- * including day 0 on the start's local date. Null when the start cannot be
- * read or is still in the future.
+ * Timeline header "day N". Local calendar days of the grow-start instant,
+ * including day 0 on that instant's local date. Grow starts are timestamptz
+ * values, so UTC midnight is that instant's local date, not a plant
+ * date-only value. Null when the start cannot be read or is still in the future.
  */
 export function resolveTimelineGrowDay(iso: string | null | undefined, now: Date): number | null {
-  const age = resolvePlantAge(iso, now);
-  return age.kind === "age" ? age.days : null;
+  if (typeof iso !== "string" || iso.trim() === "") return null;
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return null;
+  const days = calendarDaysBetween(localCalendarDate(new Date(ms)), localCalendarDate(now));
+  return days < 0 ? null : days;
+}
+
+/** Next local calendar midnight after `now`. Local fields keep a 23- or 25-hour DST day. */
+export function nextLocalMidnight(now: Date): Date {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
 }
 
 export function formatPlantAge(age: PlantAge): string {

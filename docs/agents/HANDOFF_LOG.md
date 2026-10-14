@@ -53,8 +53,8 @@ goal: Give the signed-in routes named in #2004 a page-specific document title wi
 branch: cursor/app-page-document-titles-89ef
 base: verdant-grow-diary
 checkout: git fetch origin cursor/app-page-document-titles-89ef verdant-grow-diary && git switch cursor/app-page-document-titles-89ef && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: draft PR opened for this branch
-head_sha: read from the PR after push
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2082 (draft)
+head_sha: df7da15c4a2712ee20771926f3fcdcec79abe9c1 (parent of the commit that records this URL)
 state: pushed draft
 next_action: required checks and independent review. Stay draft. No ready, merge, or deploy.
 files: src/lib/appDocumentTitleRules.ts; src/components/AppDocumentTitle.tsx; src/routes/_app.tsx; src/test/app-document-title.test.tsx

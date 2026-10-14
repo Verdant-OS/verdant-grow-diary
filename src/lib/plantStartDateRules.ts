@@ -140,6 +140,16 @@ export function resolvePlantAge(iso: string | null | undefined, now: Date): Plan
   return days < 0 ? { kind: "future", daysUntil: -days } : { kind: "age", days };
 }
 
+/**
+ * Timeline header "day N". Matches `resolvePlantAge` local calendar days,
+ * including day 0 on the start's local date. Null when the start cannot be
+ * read or is still in the future.
+ */
+export function resolveTimelineGrowDay(iso: string | null | undefined, now: Date): number | null {
+  const age = resolvePlantAge(iso, now);
+  return age.kind === "age" ? age.days : null;
+}
+
 export function formatPlantAge(age: PlantAge): string {
   if (age.kind === "unknown") return "Unknown";
   if (age.kind === "future") {

@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### TIMELINE-GROW-DAY-2005
+
+```text
+TASK TIMELINE-GROW-DAY-2005  priority: P2  status: OPEN
+goal: Timeline header grow day uses local calendar days (same count as resolvePlantAge, including day 0), not 24-hour periods clamped to 1. Fixes #2005.
+branch: cursor/timeline-local-grow-day-d474
+base: verdant-grow-diary
+checkout: git fetch origin cursor/timeline-local-grow-day-d474 verdant-grow-diary && git switch cursor/timeline-local-grow-day-d474 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: draft PR opened from this branch
+head_sha: read from the PR after push
+state: local implementation, tests green, draft PR next
+next_action: stay draft. No ready, merge, or deploy. Independent review is Critical Mass (logic and tests; Timeline.tsx also touches a product file, so Blue Dream if the seat routes .tsx).
+files: src/lib/plantStartDateRules.ts; src/pages/Timeline.tsx; src/test/timeline-grow-day.test.ts
+blockers: none for the repository change
+artifacts: src/test/timeline-grow-day.test.ts (RED 3 failed / 0 passed before the helper used calendar days; GREEN 3 passed / 0 failed after)
+reviewer_seat: Critical Mass for the rules and test; Blue Dream if the .tsx header is in that seat's scope
+claimed_by: Cursor cloud agent, 2026-10-14 01:10 CT
+last_updated: 2026-10-14 01:10 CT, by Cursor cloud agent
+```
+
 ### CLAUDE-CODE-ACTION-002
 
 ```text

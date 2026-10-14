@@ -28,6 +28,7 @@ import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { STAGES, stageLabel } from "@/lib/grow";
+import { resolveTimelineGrowDay } from "@/lib/plantStartDateRules";
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { format, formatDistanceToNow } from "date-fns";
 import {
@@ -1535,6 +1536,9 @@ export default function Timeline() {
 
   const currentStage = normalizeQuickLogStage(activeGrow?.stage);
   const currentStageIdx = STAGES.findIndex((s) => s.value === currentStage);
+  const timelineGrowDay = activeGrow
+    ? resolveTimelineGrowDay(activeGrow.started_at, new Date())
+    : null;
   const pageReadView = buildTimelinePageReadView({
     growsLoading,
     growsError,
@@ -1729,12 +1733,9 @@ export default function Timeline() {
           description="Trace observations, evidence, and decisions across this grow."
           icon={<Sprout className="size-5" aria-hidden="true" />}
           meta={
-            <span className="text-sm text-muted-foreground">
-              {stageLabel(activeGrow.stage)} · day{" "}
-              {Math.max(
-                1,
-                Math.floor((Date.now() - new Date(activeGrow.started_at).getTime()) / 86400000),
-              )}
+            <span className="text-sm text-muted-foreground" data-testid="timeline-grow-day">
+              {stageLabel(activeGrow.stage)}
+              {timelineGrowDay === null ? "" : ` · day ${timelineGrowDay}`}
             </span>
           }
         />

@@ -187,18 +187,52 @@ Deno.test("both functions call the helper and keep the key check before credit s
     assert(!src.includes('Deno.env.get("GEMINI_API_KEY")'));
   }
 
-  const doctorKey = doctor.indexOf("readGeminiDirectApiKey");
-  const doctorSpend = doctor.indexOf("creditSpendMayExist = true");
-  assert(doctorKey >= 0 && doctorSpend > doctorKey);
+  assert(keyCheckPrecedesSpend(doctor, DOCTOR_SPEND));
   assert(doctor.includes("p_model_id: MODEL"));
   assert(doctor.includes("const MODEL = doctorRoute.recordedModelId"));
   assert(doctor.includes("model: WIRE_MODEL"));
   assert(doctor.includes('return calmFailure("config")'));
 
-  const coachKey = coach.indexOf("readGeminiDirectApiKey");
-  const coachSpend = coach.indexOf('creditSupabase.rpc("ai_credit_spend"');
-  assert(coachKey >= 0 && coachSpend > coachKey);
+  assert(keyCheckPrecedesSpend(coach, COACH_SPEND));
   assert(coach.includes('return json({ error: "AI not configured" }, 500)'));
   assert(coach.includes('response_format: { type: "json_object" }'));
   assert(!coach.includes("p_model_id"));
+});
+
+// The order check must find the key read itself. The bare name also matches the
+// import at the top of each file, which is always ahead of the spend, so a check
+// on the name alone stays green when the call moves below the spend.
+const KEY_READ_CALL = "readGeminiDirectApiKey(Deno.env)";
+const DOCTOR_SPEND = "creditSpendMayExist = true";
+const COACH_SPEND = 'creditSupabase.rpc("ai_credit_spend"';
+
+function keyCheckPrecedesSpend(src: string, spendMarker: string): boolean {
+  const call = src.indexOf(KEY_READ_CALL);
+  if (call < 0 || src.indexOf(KEY_READ_CALL, call + 1) >= 0) return false;
+  const spend = src.indexOf(spendMarker);
+  return spend >= 0 && call < spend;
+}
+
+Deno.test("the key-before-spend check fails when the key read moves below the spend", () => {
+  const sources: Array<[string, string]> = [
+    [Deno.readTextFileSync(new URL("../ai-doctor-review/index.ts", import.meta.url)), DOCTOR_SPEND],
+    [Deno.readTextFileSync(new URL("../ai-coach/index.ts", import.meta.url)), COACH_SPEND],
+  ];
+  for (const [src, spendMarker] of sources) {
+    const lines = src.split("\n");
+    const callLine = lines.findIndex((line) => line.includes(KEY_READ_CALL));
+    const spendLine = lines.findIndex((line) => line.includes(spendMarker));
+    assert(callLine >= 0 && spendLine > callLine);
+
+    const moved = [...lines];
+    const [call] = moved.splice(callLine, 1);
+    moved.splice(spendLine, 0, call);
+    const movedSrc = moved.join("\n");
+    // The import still sits above the spend, so a name-only check cannot see the move.
+    assert(movedSrc.indexOf("readGeminiDirectApiKey") < movedSrc.indexOf(spendMarker));
+    assertEquals(keyCheckPrecedesSpend(movedSrc, spendMarker), false);
+
+    assertEquals(keyCheckPrecedesSpend(src.replace(KEY_READ_CALL, "null"), spendMarker), false);
+    assertEquals(keyCheckPrecedesSpend(`${src}\n${KEY_READ_CALL};`, spendMarker), false);
+  }
 });

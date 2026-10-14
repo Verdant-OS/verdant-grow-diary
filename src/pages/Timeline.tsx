@@ -149,10 +149,12 @@ import {
   filterTimelineEvidenceRows,
   isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
+  timelineClearFiltersEnabled,
   resolveTimelineCardPlaceLabels,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
   withResolvedTimelinePlaceDetails,
 } from "@/lib/timelineEvidenceFilterRules";
+import { timelineDateParamsAfterSync } from "@/lib/timelineDateSearchParamRules";
 import {
   buildMissingActionCopy,
   findNewestEntryIdForCategory,
@@ -577,12 +579,7 @@ export default function Timeline() {
     const urlStart = searchParams.get(TIMELINE_START_DATE_PARAM) ?? "";
     const urlEnd = searchParams.get(TIMELINE_END_DATE_PARAM) ?? "";
     if (urlStart === startDateFilter && urlEnd === endDateFilter) return;
-    const next = new URLSearchParams(searchParams);
-    if (isTimelineDateFilterValue(startDateFilter))
-      next.set(TIMELINE_START_DATE_PARAM, startDateFilter);
-    else next.delete(TIMELINE_START_DATE_PARAM);
-    if (isTimelineDateFilterValue(endDateFilter)) next.set(TIMELINE_END_DATE_PARAM, endDateFilter);
-    else next.delete(TIMELINE_END_DATE_PARAM);
+    const next = timelineDateParamsAfterSync(searchParams, startDateFilter, endDateFilter);
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDateFilter, endDateFilter]);
@@ -1344,7 +1341,12 @@ export default function Timeline() {
   }
 
   const chipFiltersActive = stageFilter !== "all" || eventFilter !== "all";
-  const anyFilterActive = evidenceActive || chipFiltersActive;
+  const anyFilterActive = timelineClearFiltersEnabled({
+    evidenceActive,
+    chipFiltersActive,
+    enteredStartDate: startDateFilter,
+    enteredEndDate: endDateFilter,
+  });
 
   // "Next missing action": infer per-category logging rhythm from the
   // merged diary + Quick Log rows and surface the category most behind

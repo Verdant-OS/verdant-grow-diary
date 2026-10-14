@@ -145,7 +145,7 @@ describe("AI credit replay provider boundary", () => {
   it("AI Coach rejects cross-scope spends and resolves every replay before its single provider call", () => {
     const decisionIndex = COACH.indexOf("const spendDecision = classifyAiDoctorCreditSpend");
     const scopeIndex = COACH.indexOf("spendObj.feature !== FEATURE");
-    const providerIndex = COACH.indexOf('fetch("https://ai.gateway.lovable.dev');
+    const providerIndex = COACH.indexOf("fetch(GATEWAY_URL");
     expect(decisionIndex).toBeGreaterThan(-1);
     expect(scopeIndex).toBeGreaterThan(-1);
     expect(scopeIndex).toBeGreaterThan(decisionIndex);
@@ -155,7 +155,8 @@ describe("AI credit replay provider boundary", () => {
     expect(replayBlock).toContain('spendDecision.kind === "stale"');
     expect(replayBlock).toContain('spendDecision.kind === "cached"');
     expect(replayBlock).toContain("return safeOk(cached.result");
-    expect(COACH.match(/fetch\("https:\/\/ai\.gateway\.lovable\.dev/g) ?? []).toHaveLength(1);
+    expect(COACH.match(/fetch\(GATEWAY_URL/g) ?? []).toHaveLength(1);
+    expect(COACH).not.toContain("ai.gateway.lovable.dev");
   });
 
   it("production spend calls persist no mutable cached result", () => {

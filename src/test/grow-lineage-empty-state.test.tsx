@@ -51,7 +51,7 @@ describe("GrowLineageRepair — empty state", () => {
     const empty = await waitFor(() => screen.getByTestId("grow-lineage-empty-state"));
     expect(empty.textContent).toMatch(/No lineage repairs needed/i);
     const firstStep = screen.getByTestId("grow-lineage-empty-state-first-step").textContent ?? "";
-    expect(firstStep).toMatch(/Harvest Archive/);
+    expect(firstStep).toMatch(/My Grows/);
     expect(firstStep).toMatch(/approval/i);
   });
 
@@ -77,5 +77,21 @@ describe("GrowLineageRepair — empty state", () => {
     const txt = (empty.textContent ?? "").toLowerCase();
     expect(txt).not.toMatch(/automatically (fix|repair|reconnect)/);
     expect(txt).toMatch(/never changes lineage automatically/);
+  });
+
+  it("names My Grows on the empty-state link that opens /grows", async () => {
+    render(
+      <MemoryRouter>
+        <GrowLineageRepair />
+      </MemoryRouter>,
+    );
+    const link = await waitFor(() => screen.getByTestId("grow-lineage-empty-state-archive-link"));
+    expect(link).toHaveAttribute("href", "/grows");
+    expect(link.textContent).toBe("Open My Grows");
+    const firstStep = screen.getByTestId("grow-lineage-empty-state-first-step").textContent ?? "";
+    expect(firstStep).toMatch(/open My Grows/);
+    const empty = screen.getByTestId("grow-lineage-empty-state").textContent ?? "";
+    expect(empty).toMatch(/from My Grows/);
+    expect(empty).not.toMatch(/Harvest Archive/);
   });
 });

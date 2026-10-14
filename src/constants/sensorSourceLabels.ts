@@ -18,6 +18,24 @@ export const SENSOR_SOURCE_KINDS: readonly TimelineSensorSourceKind[] = [
   "invalid",
 ];
 
+/**
+ * Timeline filter chips shown to the grower. `demo` stays in the canonical
+ * kind list, and is omitted from the chips unless demo rows are loaded, the
+ * caller is in demo mode, or demo is already selected (so a stuck filter
+ * stays reachable).
+ */
+export function timelineSensorSourceFilterKinds(input: {
+  demoDataPresent: boolean;
+  demoMode?: boolean;
+  selected?: readonly string[] | null;
+}): readonly TimelineSensorSourceKind[] {
+  const selectedDemo = Array.isArray(input.selected) && input.selected.includes("demo");
+  if (input.demoMode === true || input.demoDataPresent === true || selectedDemo) {
+    return SENSOR_SOURCE_KINDS;
+  }
+  return SENSOR_SOURCE_KINDS.filter((kind) => kind !== "demo");
+}
+
 export const SENSOR_SOURCE_SHORT_LABEL: Record<TimelineSensorSourceKind, string> = {
   live: "Live",
   manual: "Manual",

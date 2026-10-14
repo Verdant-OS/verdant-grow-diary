@@ -1,5 +1,8 @@
 import type { PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
-import { sandboxCheckoutTestModeNote } from "@/lib/sandboxCheckoutTestModeNoteRules";
+import {
+  CHECKOUT_LIVE_FAQ_ID,
+  sandboxCheckoutTestModeNote,
+} from "@/lib/sandboxCheckoutTestModeNoteRules";
 
 export function SandboxCheckoutTestModeNote({
   environment,
@@ -13,7 +16,10 @@ export function SandboxCheckoutTestModeNote({
       data-testid="sandbox-checkout-test-mode-note"
       className="mb-3 text-sm leading-relaxed text-muted-foreground"
     >
-      {note}
+      {note}{" "}
+      <a href={`#${CHECKOUT_LIVE_FAQ_ID}`} className="underline underline-offset-2">
+        Is checkout live?
+      </a>
     </p>
   );
 }

@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### QUICKLOG-CORRECTION-EDITABLE-VALUES
+
+```text
+TASK QUICKLOG-CORRECTION-EDITABLE-VALUES  priority: P2  status: OPEN
+goal: Make the Correct this Quick Log dialog edit volume, dose, or sensor values for that entry type, and keep the original value in the correction history. Keep the Wrong value reason. Do not follow closed #2116.
+branch: cursor/quicklog-correction-editable-values-fc1d
+base: verdant-grow-diary
+checkout: git fetch origin cursor/quicklog-correction-editable-values-fc1d verdant-grow-diary && git switch cursor/quicklog-correction-editable-values-fc1d && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: recorded on the draft PR opened for this branch
+head_sha: parent of the commit that records this line
+state: pushed draft. Schema change is a new forward migration and awaits Cheeko's schema approval. No merge.
+next_action: required CI at the draft head. Stay draft.
+files: src/lib/quick-log/quickLogRevisionRules.ts; src/components/QuickLogEntryIntegrityControls.tsx; src/components/WateringHistoryPanel.tsx; src/components/FeedingHistoryPanel.tsx; src/pages/Timeline.tsx; src/test/quicklog-correction-editable-values.test.ts; src/test/quicklog-correction-editable-values-dialog.test.tsx; supabase/migrations/20261014210000_quicklog_correction_editable_values.sql; docs/agents/HANDOFF_LOG.md
+blockers: schema approval for the new migration, Cheeko
+artifacts: PR body (RED 8 failed / 1 passed, then GREEN)
+reviewer_seat: Blue Dream (.tsx) and Critical Mass (rules, tests, migration)
+claimed_by: Grok, 2026-10-14 16:18 CT
+last_updated: 2026-10-14 16:18 CT, by Grok
+```
+
 ### TIMELINE-GROW-DAY-2005
 
 ```text

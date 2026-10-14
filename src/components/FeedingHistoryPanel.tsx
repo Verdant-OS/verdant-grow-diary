@@ -111,6 +111,7 @@ function Row({
             currentNote={currentNote ?? null}
             currentOccurredAt={row.occurredAt}
             currentPlantId={row.plantId}
+            correctionValues={{ kind: "feeding", doseAmount: row.nutrients[0]?.amount ?? null }}
             plantId={row.plantId}
             tentId={row.tentId}
             onChanged={onEntryChanged}

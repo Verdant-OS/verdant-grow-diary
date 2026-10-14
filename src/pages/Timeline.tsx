@@ -149,12 +149,10 @@ import {
   filterTimelineEvidenceRows,
   isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
-  timelineClearFiltersEnabled,
   resolveTimelineCardPlaceLabels,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
   withResolvedTimelinePlaceDetails,
 } from "@/lib/timelineEvidenceFilterRules";
-import { timelineDateParamsAfterSync } from "@/lib/timelineDateSearchParamRules";
 import {
   buildMissingActionCopy,
   findNewestEntryIdForCategory,
@@ -579,7 +577,12 @@ export default function Timeline() {
     const urlStart = searchParams.get(TIMELINE_START_DATE_PARAM) ?? "";
     const urlEnd = searchParams.get(TIMELINE_END_DATE_PARAM) ?? "";
     if (urlStart === startDateFilter && urlEnd === endDateFilter) return;
-    const next = timelineDateParamsAfterSync(searchParams, startDateFilter, endDateFilter);
+    const next = new URLSearchParams(searchParams);
+    if (isTimelineDateFilterValue(startDateFilter))
+      next.set(TIMELINE_START_DATE_PARAM, startDateFilter);
+    else next.delete(TIMELINE_START_DATE_PARAM);
+    if (isTimelineDateFilterValue(endDateFilter)) next.set(TIMELINE_END_DATE_PARAM, endDateFilter);
+    else next.delete(TIMELINE_END_DATE_PARAM);
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDateFilter, endDateFilter]);
@@ -944,7 +947,9 @@ export default function Timeline() {
                 ...requireEffectiveSensorReadings(capturedResult.data),
                 ...requireEffectiveSensorReadings(legacyResult.data),
               ]);
-              let receipts = manualSensorReadingsToTimelineEntries(manualPage.rows, new Date());
+              let receipts = manualSensorReadingsToTimelineEntries(manualPage.rows, new Date(), {
+                temperatureUnit,
+              });
               if (timelineDateRangeBounds.startIso) {
                 receipts = receipts.filter(
                   (row) => row.entry_at >= timelineDateRangeBounds.startIso!,
@@ -976,7 +981,14 @@ export default function Timeline() {
       setCoreRead({ status: "error", readKey: requestedReadKey });
       setLoading(false);
     }
-  }, [activeGrowId, activeReadKey, directoryGrowId, timelineDateRangeBounds, user]);
+  }, [
+    activeGrowId,
+    activeReadKey,
+    directoryGrowId,
+    timelineDateRangeBounds,
+    user,
+    temperatureUnit,
+  ]);
 
   /**
    * Keyset "Load older" — fetches the next page strictly before the oldest
@@ -1341,12 +1353,7 @@ export default function Timeline() {
   }
 
   const chipFiltersActive = stageFilter !== "all" || eventFilter !== "all";
-  const anyFilterActive = timelineClearFiltersEnabled({
-    evidenceActive,
-    chipFiltersActive,
-    enteredStartDate: startDateFilter,
-    enteredEndDate: endDateFilter,
-  });
+  const anyFilterActive = evidenceActive || chipFiltersActive;
 
   // "Next missing action": infer per-category logging rhythm from the
   // merged diary + Quick Log rows and surface the category most behind
@@ -2570,7 +2577,7 @@ export default function Timeline() {
                           const { sensorViewModel, reviewMessage, warningMessage } =
                             buildTimelineCardSensorSnapshotViewModel(
                               { sensor, useManualValidation },
-                              { validateManualCompatibility: true },
+                              { validateManualCompatibility: true, temperatureUnit },
                             );
                           const rawSource =
                             typeof sensor?.source === "string" && sensor.source.trim().length > 0

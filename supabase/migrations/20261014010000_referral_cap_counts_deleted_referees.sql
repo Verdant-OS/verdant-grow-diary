@@ -127,6 +127,10 @@ BEGIN
 
   UPDATE public.referrals
      SET status = 'converted',
+         -- Capture may have stored a different environment (pending signup
+         -- defaults to live). The cap and later counts use this conversion
+         -- environment, which is also the environment on the grant rows.
+         environment = p_environment,
          referrer_credits = v_give_referrer,
          referee_credits = v_give_referee,
          converted_at = now(),

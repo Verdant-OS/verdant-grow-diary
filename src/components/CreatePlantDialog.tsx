@@ -210,7 +210,13 @@ export default function CreatePlantDialog({
   const requireTentForWrite =
     requireTent || !!defaultTentId || suppliedTent.requireCompatibleTentSelection;
 
-  const tents = selectCreatePlantTents(tentRows, targetGrowId);
+  const tents = targetGrowId
+    ? selectCreatePlantTents(tentRows, targetGrowId).filter(
+        (t) =>
+          t.grow_id === targetGrowId ||
+          t.grow_id?.trim().toLowerCase() === targetGrowId.trim().toLowerCase(),
+      )
+    : [];
   const showNoTentsHint = plantCreateNoTentsHintVisible({
     selectableTentCount: tents.length,
     tentsSettled: tentsLoaded,

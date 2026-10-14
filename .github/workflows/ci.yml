@@ -395,8 +395,8 @@ jobs:
 
       # Legacy gamification setup is not production acceptance and stays out
       # of PR-default jobs. Current hosted verification is verdantgrowdiary.com.
-      # The dormant gamification-staging-smoke.yml needs separate fixture-safety
-      # and effective-gating review; never repoint privileged setup to production.
+      # The dormant gamification-staging-smoke.yml was retired; never repoint
+      # privileged setup to production.
       # This comment changes no job, trigger or credential binding.
 
       # Stop-ship: every Shelly H&T edge function declared in

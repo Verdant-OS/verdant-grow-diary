@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### PR2072-M7-SERVED-REVISION
+
+```text
+TASK PR2072-M7-SERVED-REVISION  priority: P2  status: OPEN
+goal: Fix the private-review P2 in #2072: M7 must verify the served revision includes #1939 before attributing an unmatched-path 200 to a host rewrite; older or unknown builds stay NOT_MEASURED. Docs only.
+branch: claude/release-topology-worker-routing
+base: verdant-grow-diary
+checkout: git fetch origin claude/release-topology-worker-routing verdant-grow-diary && git switch claude/release-topology-worker-routing && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2072
+head_sha: 9c463303298cb26278c3acdbf3310b2d67675a39, observed on the PR and origin/claude/release-topology-worker-routing at 2026-10-14 22:00 UTC, before this repair commit. Read the current PR head before resuming.
+state: Docs-only repair adds the same-host M1 stamp, #1939 ancestry and catch-all source prerequisites to M7, and aligns AT-17, the known unknown and the follow-up. No live measurement was taken.
+next_action: Verify required checks at the current head, then obtain Graft or Critical Mass independent exact-head review. No merge or publish from this repair session.
+files: docs/specs/release-topology-specification.md; docs/agents/HANDOFF_LOG.md
+blockers: Independent exact-head acceptance and current-head CI are NOT_MEASURED until obtained. M7 live measurement remains NOT_MEASURED; this docs repair does not run it.
+artifacts: PR #2072; private Code Review run 7393cee4-a459-4d17-8848-2d3312c1245e identified the P2 at head 9c463303. Writable repair checkout: C:/Users/G8/verdant-work/vgd-pr2072-m7; original app checkout's linked Git metadata refused FETCH_HEAD writes.
+reviewer_seat: Graft or Critical Mass; Codex repaired this PR and cannot give independent acceptance.
+claimed_by: Codex, 2026-10-14 22:00 UTC (issuecomment-6179419049); Matthew directly assigned this repair in chat, superseding the prior Claude sole-writer instruction for this scope.
+last_updated: 2026-10-14 17:06 CT, by Codex
+```
+
 ### TIMELINE-GROW-DAY-2005
 
 ```text

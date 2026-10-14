@@ -19,15 +19,20 @@ import { AuthProvider } from "@/store/auth";
 import { GrowsProvider } from "@/store/grows";
 import RootErrorBoundary from "@/components/RootErrorBoundary";
 import OAuthPostAuthRedirect from "@/components/OAuthPostAuthRedirect";
-import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
+import { SitePaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
 import { useAnalyticsConsent } from "@/hooks/useAnalyticsConsent";
-import { loadGoogleAnalytics } from "@/lib/googleAnalyticsLoader";
+import { readAnalyticsConsent } from "@/lib/analyticsConsent";
+import {
+  applyAnalyticsConsentDecision,
+  tearDownAnalyticsForExcludedRoute,
+} from "@/lib/analyticsConsentRuntime";
 import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
 import FunnelEventDbSink from "@/components/FunnelEventDbSink";
 import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
+import { initErrorReporter, reportErrorWhenReady } from "@/lib/errorReporter";
 import { renderErrorPage } from "@/lib/error-page";
 import appCss from "@/styles.css?url";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "@/lib/build/siteSoftwareApplicationJsonLd";
@@ -129,9 +134,21 @@ function RootErrorComponent({ error }: { error: Error }) {
   const pathname = useRouterState({
     select: (state) => state.resolvedLocation?.pathname ?? state.location.pathname,
   });
-  if (!isGrowHelpToolkitPath(pathname)) {
+  const isToolkit = isGrowHelpToolkitPath(pathname);
+  if (!isToolkit) {
     reportLovableError(error);
   }
+  // A root-route error renders this component instead of ApplicationRootComponent,
+  // so the root effect that starts the reporter may never run. Report from an
+  // effect (once per error, not on every re-render) after starting it here.
+  useEffect(() => {
+    if (isToolkit) return;
+    void reportErrorWhenReady(error, {
+      source: "route_error_component",
+      route: pathname,
+      handled: false,
+    });
+  }, [error, isToolkit, pathname]);
   return (
     <RootDocument>
       <div
@@ -158,10 +175,20 @@ function useClearQueryCacheBeforeAuthIdentityChange() {
 
 function AnalyticsShell() {
   const { decision } = useAnalyticsConsent();
+  const location = useRouterState({
+    select: (state) => ({
+      pathname: state.location.pathname,
+      search: state.location.searchStr,
+      hash: state.location.hash,
+    }),
+  });
 
   useEffect(() => {
-    if (decision === "granted") loadGoogleAnalytics();
-  }, [decision]);
+    const reload = applyAnalyticsConsentDecision(decision, location);
+    // A granted route change must stay in this document. Reloading here
+    // destroys client-side navigation and can start a second gtag config.
+    if (decision !== "granted" && reload) window.location.reload();
+  }, [decision, location]);
 
   useGoogleAnalyticsPageViews();
   return <AnalyticsConsentBanner />;
@@ -207,9 +234,27 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  const pathname = useRouterState({
-    select: (state) => state.resolvedLocation?.pathname ?? state.location.pathname,
+  const routeLocation = useRouterState({
+    select: (state) => ({
+      pathname: state.resolvedLocation?.pathname ?? state.location.pathname,
+      search: state.location.searchStr,
+      hash: state.location.hash,
+    }),
   });
+  const pathname = routeLocation.pathname;
+
+  useEffect(() => {
+    if (
+      tearDownAnalyticsForExcludedRoute(readAnalyticsConsent(), {
+        pathname: routeLocation.pathname,
+        search: routeLocation.search,
+        hash: routeLocation.hash,
+      })
+    ) {
+      window.location.reload();
+    }
+  }, [routeLocation.hash, routeLocation.pathname, routeLocation.search]);
+
   if (isGrowHelpToolkitPath(pathname)) {
     return (
       <RootDocument>
@@ -228,6 +273,11 @@ function RootComponent() {
 function ApplicationRootComponent() {
   const { queryClient } = Route.useRouteContext();
   const onBeforeAuthIdentityChange = useClearQueryCacheBeforeAuthIdentityChange();
+  // Client-only. Inert unless VITE_SENTRY_DSN is set at build time and the
+  // rules in errorReportingRules.ts allow this host.
+  useEffect(() => {
+    void initErrorReporter();
+  }, []);
   return (
     <RootDocument>
       <RootErrorBoundary>
@@ -238,7 +288,7 @@ function ApplicationRootComponent() {
             <AuthProvider onBeforeAuthIdentityChange={onBeforeAuthIdentityChange}>
               <OAuthPostAuthRedirect />
               <GrowsProvider>
-                <PaymentTestModeBanner />
+                <SitePaymentTestModeBanner />
                 <AgreementReconsentGate />
                 <Suspense fallback={<PageLoader />}>
                   {/*

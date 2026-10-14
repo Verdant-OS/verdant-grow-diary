@@ -74,7 +74,8 @@ const KNOWN_SOURCES: ReadonlySet<AiSensorSnapshotSource> = new Set([
   "unknown",
 ]);
 
-const READING_KEYS = [
+/** Flat reading keys forwarded to the model; the Quick Log resolver allowlist must match. */
+export const READING_KEYS = [
   "temperature_c",
   "temperature_f",
   "humidity",
@@ -201,7 +202,10 @@ function formatReadingsForLine(snap: Record<string, unknown>): string {
   }
   if (typeof snap.soil_moisture === "number" && Number.isFinite(snap.soil_moisture)) {
     parts.push(`soil_moisture=${fmtNum(snap.soil_moisture)}%`);
-  } else if (typeof snap.soil_moisture_pct === "number" && Number.isFinite(snap.soil_moisture_pct)) {
+  } else if (
+    typeof snap.soil_moisture_pct === "number" &&
+    Number.isFinite(snap.soil_moisture_pct)
+  ) {
     parts.push(`soil_moisture=${fmtNum(snap.soil_moisture_pct)}%`);
   }
   if (typeof snap.soil_ec === "number" && Number.isFinite(snap.soil_ec)) {

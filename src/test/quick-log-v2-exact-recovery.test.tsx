@@ -233,7 +233,13 @@ beforeEach(() => {
   ];
   fromMock.mockImplementation(() => ({ select: selectMock }));
   selectMock.mockImplementation(() => ({ eq: eqMock }));
-  eqMock.mockImplementation(() => ({ maybeSingle: readbackMock }));
+  // Mirrors the real builder: the receipt readback passes its deadline signal.
+  eqMock.mockImplementation(() => ({
+    maybeSingle: readbackMock,
+    abortSignal() {
+      return this;
+    },
+  }));
   readbackMock.mockImplementation(async () => ({
     data: [...committed.values()][0] ?? null,
     error: null,

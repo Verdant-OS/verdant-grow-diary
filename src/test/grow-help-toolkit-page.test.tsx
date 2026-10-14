@@ -162,6 +162,95 @@ describe("Grow Help Toolkit page coordination", () => {
     expect(screen.getByLabelText("Reservoir unit")).toHaveValue("L");
   });
 
+  it("keeps cleared required planning inputs empty instead of silently restoring defaults", () => {
+    render(
+      <MemoryRouter initialEntries={["/tools/grow-help-toolkit"]}>
+        <GrowHelpToolkit />
+      </MemoryRouter>,
+    );
+
+    const vegLight = screen.getByLabelText("Veg light") as HTMLInputElement;
+    fireEvent.change(vegLight, { target: { value: "" } });
+    fireEvent.blur(vegLight);
+    expect(vegLight).toHaveValue(null);
+
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Light" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    for (const label of ["Fixture count", "Canopy efficiency"]) {
+      const input = screen.getByLabelText(label) as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "" } });
+      fireEvent.blur(input);
+      expect(input).toHaveValue(null);
+    }
+
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Expense" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    const amortization = screen.getByLabelText("Setup amortization") as HTMLInputElement;
+    fireEvent.change(amortization, { target: { value: "" } });
+    fireEvent.blur(amortization);
+    expect(amortization).toHaveValue(null);
+  });
+
+  it("labels the optional mixed EC comparison as manual browser-only evidence", () => {
+    render(
+      <MemoryRouter initialEntries={["/tools/grow-help-toolkit"]}>
+        <GrowHelpToolkit />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "EC target" }));
+    expect(screen.getByText(/Source:/)).toHaveTextContent(
+      "Source: Manual entry. This is not a live sensor reading and is stored only in this browser.",
+    );
+  });
+
+  it("renders contextual source notes and public related-resource backlinks", () => {
+    render(
+      <MemoryRouter initialEntries={["/tools/grow-help-toolkit"]}>
+        <GrowHelpToolkit />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByText("Sources and method notes"));
+    expect(
+      screen.getByText("No account · grow inputs stay local · no grow-data upload"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("grow-help-about-panel")).toHaveTextContent(
+      "Calculator inputs are not sent to analytics.",
+    );
+    const sourceList = screen.getByTestId("grow-help-source-list");
+    expect(sourceList).toHaveTextContent(
+      "Working-volume dose scaling and EC-to-PPM conversion cross-check.",
+    );
+    const externalLinks = within(sourceList).getAllByRole("link");
+    expect(externalLinks).toHaveLength(18);
+    expect(
+      externalLinks.every(
+        (link) =>
+          link.getAttribute("target") === "_blank" &&
+          link.getAttribute("rel") === "noopener noreferrer",
+      ),
+    ).toBe(true);
+    const related = screen.getByTestId("grow-help-related-resources");
+    expect(within(related).getByRole("link", { name: "Manual VPD calculator" })).toHaveAttribute(
+      "href",
+      "/tools/vpd-calculator",
+    );
+    expect(within(related).getByRole("link", { name: "Grow stage target bands" })).toHaveAttribute(
+      "href",
+      "/tools/blueprint-targets",
+    );
+    expect(within(related).getByRole("link", { name: "Grow guides" })).toHaveAttribute(
+      "href",
+      "/guides",
+    );
+    expect(related).toHaveTextContent("do not receive or change this browser-local plan");
+  });
+
   it("updates Expense water labels to the converted global unit basis", () => {
     const state = createDefaultGrowHelpToolkitState();
     const view = render(

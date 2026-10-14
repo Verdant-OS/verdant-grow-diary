@@ -38,6 +38,7 @@ import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 import type { AiCreditRemainingInput } from "@/lib/aiCreditRemainingBadgeViewModel";
 import { buildLegacyAiSensorEvidence } from "@/lib/growSensorEvidenceRules";
+import { validateAiCoachPhotoFile } from "@/lib/aiCoachPhotoFileRules";
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
 import {
   AI_DOCTOR_PHOTO_PREVIEW_HEIGHT,
@@ -101,6 +102,7 @@ export default function Coach() {
   const [creditDenial, setCreditDenial] = useState<AiCreditDenial | null>(null);
   const [upstreamCreditExhausted, setUpstreamCreditExhausted] = useState(false);
   const diagnosisSeqRef = useRef(0);
+  const fileSelectSeqRef = useRef(0);
   const pendingCoachRequestRef = useRef<PendingAiCoachRequest | null>(null);
 
   // --- Real grow context for AI sufficiency evaluation (presenter only) ---
@@ -277,24 +279,43 @@ export default function Coach() {
       // URL. A changed grow, question, mode, or photo receives a fresh key.
       let photoUrl = selectedRequest.photoUrl;
       if (mode === "diagnose" && photoFile && !photoUrl) {
+        const photoSeq = fileSelectSeqRef.current;
         const photoValidation = validatePlantProfilePhotoFile(photoFile);
-        if (photoValidation.ok === false) {
+        const coachPhotoValidation = await validateAiCoachPhotoFile(photoFile);
+        const clearPhotoIfUnchanged = () => {
+          if (photoSeq !== fileSelectSeqRef.current) return;
           setPhotoFile(null);
           setPhotoPreviewStatus("empty");
-          throw new Error(photoValidation.message);
+        };
+        if (coachPhotoValidation.ok === false) {
+          clearPhotoIfUnchanged();
+          throw new Error(coachPhotoValidation.message);
         }
-        const path = `${user.id}/coach/${Date.now()}.${photoValidation.extension}`;
-        const { error } = await supabase.storage
-          .from("diary-photos")
-          .upload(path, photoFile, { contentType: photoValidation.mime });
-        if (error) throw error;
-        const { data: signed, error: sErr } = await supabase.storage
-          .from("diary-photos")
-          .createSignedUrl(path, 600);
-        if (sErr) throw sErr;
-        photoUrl = signed.signedUrl;
-        if (pendingCoachRequestRef.current?.idempotencyKey === idempotencyKey) {
-          pendingCoachRequestRef.current = { ...selectedRequest, photoUrl };
+        const publishPhoto = async (path: string, options: { contentType: string }) => {
+          const { error } = await supabase.storage
+            .from("diary-photos")
+            .upload(path, photoFile, options);
+          if (error) throw error;
+          const { data: signed, error: sErr } = await supabase.storage
+            .from("diary-photos")
+            .createSignedUrl(path, 600);
+          if (sErr) throw sErr;
+          photoUrl = signed.signedUrl;
+          if (pendingCoachRequestRef.current?.idempotencyKey === idempotencyKey) {
+            pendingCoachRequestRef.current = { ...selectedRequest, photoUrl };
+          }
+        };
+        if (coachPhotoValidation.mime === "image/gif") {
+          await publishPhoto(`${user.id}/coach/${Date.now()}.${coachPhotoValidation.extension}`, {
+            contentType: coachPhotoValidation.mime,
+          });
+        } else if (photoValidation.ok === false) {
+          clearPhotoIfUnchanged();
+          throw new Error(photoValidation.message);
+        } else {
+          await publishPhoto(`${user.id}/coach/${Date.now()}.${photoValidation.extension}`, {
+            contentType: photoValidation.mime,
+          });
         }
       }
       invocationStarted = true;
@@ -386,10 +407,17 @@ export default function Coach() {
     }
   }
 
-  function handleFile(f: File | null) {
+  async function handleFile(f: File | null) {
     if (!f) return;
+    const seq = ++fileSelectSeqRef.current;
     const validation = validatePlantProfilePhotoFile(f);
-    if (validation.ok === false) {
+    const coachValidation = await validateAiCoachPhotoFile(f);
+    if (seq !== fileSelectSeqRef.current) return;
+    if (coachValidation.ok === false) {
+      toast.error(coachValidation.message);
+      return;
+    }
+    if (validation.ok === false && coachValidation.mime !== "image/gif") {
       toast.error(validation.message);
       return;
     }

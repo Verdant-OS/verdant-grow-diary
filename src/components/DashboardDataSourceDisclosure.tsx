@@ -7,8 +7,10 @@
  * `getGrowDataMeta` from `useGrowData`. No queries, no writes.
  */
 import { Badge } from "@/components/ui/badge";
+import GrowDataLoadError from "@/components/GrowDataLoadError";
 import { cn } from "@/lib/utils";
 import { combineGrowDataMeta, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
+import { isSuccessfulEmptyGrowRead } from "@/lib/growDataEmptyReadRules";
 import { useAuth } from "@/store/auth";
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
 
@@ -38,6 +40,8 @@ const BADGE_TEXT: Record<Label, string> = {
   Unavailable: "Unavailable",
 };
 
+const GROW_READY_COPY = "Your grow is set up. Add a tent to start tracking.";
+
 const DESCRIPTION: Record<Label, string> = {
   Live: "Loaded from your Verdant account.",
   Demo: "Showing demo data. Connect real tents, plants, and sensors to replace it.",
@@ -49,6 +53,10 @@ interface Props {
   scopedGrowId?: string;
   /** True when at least one tent or plant is visible to the user. */
   hasAnyData: boolean;
+  /** True when the account already has a grow, even with no tent or plant yet. */
+  hasGrow?: boolean;
+  /** Retries the tent and plant reads after a failed fetch. */
+  onRetry?: () => void;
   /** Test/override hook. When omitted, metadata is read from getGrowDataMeta. */
   metas?: readonly GrowDataSourceMeta[];
   /** Optional sensor snapshot source — when "sim", a simulated-data notice
@@ -60,6 +68,8 @@ interface Props {
 export default function DashboardDataSourceDisclosure({
   scopedGrowId,
   hasAnyData,
+  hasGrow = false,
+  onRetry,
   metas,
   snapshotSource,
   className,
@@ -78,8 +88,20 @@ export default function DashboardDataSourceDisclosure({
   const simulatedNotice =
     "Simulated sensor data shown — for testing/demo only. Not real tent data and not used for persisted alerts.";
 
-  // Welcome / empty state — no usable data anywhere.
-  if (!hasAnyData && combined.dataSource === "unavailable") {
+  // "unavailable" also covers a failed fetch. That is not an empty tent.
+  const fetchFailed = resolved.some((meta) => meta.sourceReason === "fetch-error");
+  if (fetchFailed) {
+    return (
+      <GrowDataLoadError
+        resource="Dashboard grow data"
+        testId="dashboard-data-source-read-error"
+        onRetry={onRetry}
+      />
+    );
+  }
+
+  // A saved grow with no tent yet is a successful empty read, not a missing grow.
+  if (!hasAnyData && hasGrow && combined.dataSource === "unavailable") {
     return (
       <section
         data-testid="dashboard-data-source-disclosure"
@@ -87,16 +109,36 @@ export default function DashboardDataSourceDisclosure({
         className={cn("glass rounded-2xl p-4 mb-4", className)}
         aria-label="Grow data source"
       >
-        <div className="flex items-center gap-2 mb-2">
-          <Badge
-            variant="destructive"
-            data-testid="dashboard-data-source-badge"
-            data-label="Unavailable"
-            className="text-[10px] uppercase tracking-wide"
-          >
-            Unavailable
-          </Badge>
-        </div>
+        <p className="text-sm text-muted-foreground">{GROW_READY_COPY}</p>
+      </section>
+    );
+  }
+
+  // Welcome / empty state — no usable data anywhere.
+  // A successful empty read (no-rows) is not a failed fetch. Same rule as
+  // GrowDataSourceDisclosure after #1969.
+  if (!hasAnyData && combined.dataSource === "unavailable") {
+    const emptySuccess = isSuccessfulEmptyGrowRead(resolved);
+    return (
+      <section
+        data-testid="dashboard-data-source-disclosure"
+        data-source={combined.dataSource}
+        data-empty-reason={emptySuccess ? "no-rows" : "unavailable"}
+        className={cn("glass rounded-2xl p-4 mb-4", className)}
+        aria-label="Grow data source"
+      >
+        {!emptySuccess && (
+          <div className="flex items-center gap-2 mb-2">
+            <Badge
+              variant="destructive"
+              data-testid="dashboard-data-source-badge"
+              data-label="Unavailable"
+              className="text-[10px] uppercase tracking-wide"
+            >
+              Unavailable
+            </Badge>
+          </div>
+        )}
         <h2 className="font-display font-semibold">Welcome to Verdant Grow OS</h2>
         <p className="text-sm text-muted-foreground mt-1">
           No real grow, tent, plant, or sensor data yet. Create your first grow to get started.

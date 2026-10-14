@@ -136,9 +136,10 @@ Decisions by plugin:
 
 - **askrubberduck 3.12.4, MIT, `1401fce6f8ec`:** **Adapt selected procedures**, written from scratch
   or pinned. `duck-split` is **adapted** as `.claude/skills/verdant-scope-split/SKILL.md` and
-  `duck-why` as `.claude/skills/verdant-root-cause/SKILL.md`; both were written from scratch from
-  the concept, copy no text, and have no hooks or scripts. `duck-scan` (read-only next work) and
-  `duck-race` (two model families, evidence decides) remain candidates. `duck-land` and
+  `duck-why` as `.claude/skills/verdant-root-cause/SKILL.md`, `duck-scan` as
+  `.claude/skills/verdant-work-scan/SKILL.md` and `duck-race` as
+  `.claude/skills/verdant-model-race/SKILL.md`. All four were written from scratch from the
+  concept, copy no text, and have no hooks or scripts. `duck-land` and
   `duck-sweep` are **rejected**: merging and branch cleanup belong to the merge seat and the holder.
   `duck-proof` overlaps `verdant-doubt-check`.
 - **claude-context-optimizer 4.12.1, MIT, `4dbab2e2fd2f`:** **Reports deferred** (`cco-overhead`,

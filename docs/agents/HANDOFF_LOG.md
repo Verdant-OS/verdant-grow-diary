@@ -53,8 +53,8 @@ goal: Make the Correct this Quick Log dialog edit volume, dose, or sensor values
 branch: cursor/quicklog-correction-editable-values-fc1d
 base: verdant-grow-diary
 checkout: git fetch origin cursor/quicklog-correction-editable-values-fc1d verdant-grow-diary && git switch cursor/quicklog-correction-editable-values-fc1d && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: recorded on the draft PR opened for this branch
-head_sha: parent of the commit that records this line
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2118 (draft)
+head_sha: 8d0566278d9f1db80dd38d1f689d62c59b5c4a65
 state: pushed draft. Schema change is a new forward migration and awaits Cheeko's schema approval. No merge.
 next_action: required CI at the draft head. Stay draft.
 files: src/lib/quick-log/quickLogRevisionRules.ts; src/components/QuickLogEntryIntegrityControls.tsx; src/components/WateringHistoryPanel.tsx; src/components/FeedingHistoryPanel.tsx; src/pages/Timeline.tsx; src/test/quicklog-correction-editable-values.test.ts; src/test/quicklog-correction-editable-values-dialog.test.tsx; supabase/migrations/20261014210000_quicklog_correction_editable_values.sql; docs/agents/HANDOFF_LOG.md

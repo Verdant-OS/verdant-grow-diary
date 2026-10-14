@@ -56,9 +56,11 @@ Matthew. Historical receipts keep their original reviewer.
 
 ## Existing non-production dependencies — separate CI slices
 
-These are source bindings, not successful target inspection. No job, trigger,
-environment, secret reference, script or protection changes here. Do not
-substitute a production URL into a legacy mutation harness.
+These are source bindings, not successful target inspection. Rows marked RETIRED
+had their sandbox jobs, dispatch options or workflows removed (#2071 and #2075);
+every other row's job, trigger, environment, secret reference, script and
+protection are unchanged. Do not substitute a production URL into a legacy
+mutation harness.
 
 | Existing lane                              | Existing source binding                                                                  | Separate follow-up / status                                                                                                                             |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |

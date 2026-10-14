@@ -430,12 +430,7 @@ Requires `psql` on `PATH` (`brew install libpq` on macOS,
 `sudo apt-get install postgresql-client` on Debian/Ubuntu).
 
 ```bash
-# Sandbox
-SUPABASE_DB_URL='postgresql://postgres.<sandbox-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres' \
-  TARGET_ENV=sandbox \
-  node scripts/assert-required-money-migrations-applied.mjs
-
-# Live
+# Live (Verdant has no sandbox database)
 SUPABASE_DB_URL='postgresql://postgres.<live-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres' \
   TARGET_ENV=live \
   node scripts/assert-required-money-migrations-applied.mjs

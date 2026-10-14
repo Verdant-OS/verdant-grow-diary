@@ -53,9 +53,9 @@ goal: Timeline header grow day uses local calendar days (same count as resolvePl
 branch: cursor/timeline-local-grow-day-d474
 base: verdant-grow-diary
 checkout: git fetch origin cursor/timeline-local-grow-day-d474 verdant-grow-diary && git switch cursor/timeline-local-grow-day-d474 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: draft PR opened from this branch
-head_sha: read from the PR after push
-state: local implementation, tests green, draft PR next
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2079 (draft)
+head_sha: 6a8b0404b0adc9294bbe5143b7178e022d8c20e4 until the commit that records this line; read the PR head after that commit
+state: pushed draft
 next_action: stay draft. No ready, merge, or deploy. Independent review is Critical Mass (logic and tests; Timeline.tsx also touches a product file, so Blue Dream if the seat routes .tsx).
 files: src/lib/plantStartDateRules.ts; src/pages/Timeline.tsx; src/test/timeline-grow-day.test.ts
 blockers: none for the repository change

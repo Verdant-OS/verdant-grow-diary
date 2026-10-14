@@ -49,7 +49,7 @@ once the head moves. Migrations, payments or billing, `.github` workflows, secur
 or auth, and dependency or lockfile changes still need Codex (not on a PR Codex
 authored or repaired), or Blue Dream, Critical Mass, or Durban Poison. Claude may
 add peer observations but is not the acceptance reviewer. Codex opens repairs as
-drafts and uses normal pushes only. **Chemdawg** alone owns merge after all 35
+drafts and uses normal pushes only. **Chemdawg** alone owns merge after all 36
 required checks are SUCCESS and an independent PASS covers the exact head. Earlier
 self-integration phases grant no current authority. Publish gates remain with
 Matthew. Historical receipts keep their original reviewer.

@@ -279,11 +279,16 @@ export default function Coach() {
       // URL. A changed grow, question, mode, or photo receives a fresh key.
       let photoUrl = selectedRequest.photoUrl;
       if (mode === "diagnose" && photoFile && !photoUrl) {
+        const photoSeq = fileSelectSeqRef.current;
         const photoValidation = validatePlantProfilePhotoFile(photoFile);
         const coachPhotoValidation = await validateAiCoachPhotoFile(photoFile);
-        if (coachPhotoValidation.ok === false) {
+        const clearPhotoIfUnchanged = () => {
+          if (photoSeq !== fileSelectSeqRef.current) return;
           setPhotoFile(null);
           setPhotoPreviewStatus("empty");
+        };
+        if (coachPhotoValidation.ok === false) {
+          clearPhotoIfUnchanged();
           throw new Error(coachPhotoValidation.message);
         }
         const publishPhoto = async (path: string, options: { contentType: string }) => {
@@ -305,8 +310,7 @@ export default function Coach() {
             contentType: coachPhotoValidation.mime,
           });
         } else if (photoValidation.ok === false) {
-          setPhotoFile(null);
-          setPhotoPreviewStatus("empty");
+          clearPhotoIfUnchanged();
           throw new Error(photoValidation.message);
         } else {
           await publishPhoto(`${user.id}/coach/${Date.now()}.${photoValidation.extension}`, {

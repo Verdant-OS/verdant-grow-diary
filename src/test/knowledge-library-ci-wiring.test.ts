@@ -93,7 +93,6 @@ describe("Knowledge Library required CI wiring", () => {
       "scripts/knowledge/**",
       "package.json",
       "bun.lock",
-      "package-lock.json",
     ]) {
       expect(triggers).toContain(coveredPath);
     }

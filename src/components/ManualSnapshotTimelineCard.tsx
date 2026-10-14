@@ -11,6 +11,8 @@
  *  - No reads, no writes, no Supabase, no automation.
  */
 import { useMemo } from "react";
+import { useNowTick } from "@/hooks/useNowTick";
+import { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS } from "@/constants/sensorTiming";
 import { Link } from "@/lib/react-router-compat";
 import { Gauge, AlertTriangle, XCircle, History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -115,6 +117,17 @@ export default function ManualSnapshotTimelineCard({
     });
   }, [card.source, card.readings, card.capturedAt, card.tentId, originalReadingIds]);
 
+  // A snapshot inside the current window (24 h) is a current reading; only
+  // older ones are historical review (production QA 2026-10-14: a snapshot
+  // saved seconds earlier read "Historical review reading").
+  const nowMs = useNowTick();
+  const isCurrentWindow = useMemo(() => {
+    const capturedMs = Date.parse(card.capturedAt);
+    if (!Number.isFinite(capturedMs)) return false;
+    const ageMs = nowMs - capturedMs;
+    return ageMs >= 0 && ageMs <= MANUAL_SNAPSHOT_CURRENT_STALE_HOURS * 3_600_000;
+  }, [card.capturedAt, nowMs]);
+
   const quality = useMemo(() => {
     const fields: Record<string, number> = {};
     for (const r of card.readings) {
@@ -129,8 +142,10 @@ export default function ManualSnapshotTimelineCard({
       captured_at: card.capturedAt,
       ...fields,
     };
-    return evaluateManualSensorSnapshotQuality(snap, { mode: "historical" });
-  }, [card.readings, card.source, card.capturedAt]);
+    return evaluateManualSensorSnapshotQuality(snap, {
+      mode: isCurrentWindow ? "current" : "historical",
+    });
+  }, [card.readings, card.source, card.capturedAt, isCurrentWindow]);
 
   const provenanceLabels = buildManualSensorProvenanceLabels(card.source);
 
@@ -224,7 +239,9 @@ export default function ManualSnapshotTimelineCard({
             ))}
           </ul>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Historical reading — quality reflects captured values; not current-room guidance.
+            {isCurrentWindow
+              ? "Current reading — saved within the last 24 hours."
+              : "Historical reading — quality reflects captured values; not current-room guidance."}
           </p>
           {(quality.quality === "invalid" || quality.quality === "needs_review") && (
             <p

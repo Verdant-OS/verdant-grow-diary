@@ -54,7 +54,7 @@ branch: cursor/quicklog-correction-editable-values-fc1d
 base: verdant-grow-diary
 checkout: git fetch origin cursor/quicklog-correction-editable-values-fc1d verdant-grow-diary && git switch cursor/quicklog-correction-editable-values-fc1d && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2118 (draft)
-head_sha: 5bfa2b9c990a6d687beb0bd4b64fd64d9276a5e9
+head_sha: b6a6c3f7742d9c1ce0d3d98a3ee6c5675b1c0b33
 state: pushed draft. Cheeko approved the migration (4:54 PM CT) and the scorer-locked pin update only (5:57 PM CT). Graft FAIL at aae343d3 is addressed on this head. No merge.
 next_action: required CI at the draft head, then Graft one-time exact-head review. Stay draft.
 files: src/lib/quick-log/quickLogRevisionRules.ts; src/components/QuickLogEntryIntegrityControls.tsx; src/components/QuickLogHistoryPanels.tsx; src/components/QuickLogGroupedTimelineSection.tsx; src/components/WateringHistoryPanel.tsx; src/components/FeedingHistoryPanel.tsx; src/pages/Timeline.tsx; src/test/quicklog-correction-editable-values.test.ts; src/test/quicklog-correction-editable-values-dialog.test.tsx; src/test/quicklog-correction-copilot-followup.test.tsx; scripts/prove-quicklog-correction-owner-fence.mjs; supabase/migrations/20261014210000_quicklog_correction_editable_values.sql; docs/agents/HANDOFF_LOG.md

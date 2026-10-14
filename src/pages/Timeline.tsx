@@ -28,6 +28,7 @@ import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { STAGES, stageLabel } from "@/lib/grow";
+import { TimelineGrowDayLabel } from "@/components/TimelineGrowDayLabel";
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { format, formatDistanceToNow } from "date-fns";
 import {
@@ -1795,15 +1796,7 @@ export default function Timeline() {
           title={activeGrow.name}
           description="Trace observations, evidence, and decisions across this grow."
           icon={<Sprout className="size-5" aria-hidden="true" />}
-          meta={
-            <span className="text-sm text-muted-foreground">
-              {stageLabel(activeGrow.stage)} · day{" "}
-              {Math.max(
-                1,
-                Math.floor((Date.now() - new Date(activeGrow.started_at).getTime()) / 86400000),
-              )}
-            </span>
-          }
+          meta={<TimelineGrowDayLabel startedAt={activeGrow.started_at} stage={activeGrow.stage} />}
         />
       )}
 

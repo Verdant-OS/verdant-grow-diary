@@ -56,9 +56,9 @@ Return exactly one:
 - `PASS-with-P2` and `FAIL` both go back to the author. The author pushes a new commit with a normal push (hooks on, no `--no-verify`, no force-push of reviewed history).
 - The new head gets a **full re-review**, not a diff-only skim. Earlier verdicts don't carry over.
 - A PR stays **draft** until it merges.
-- Before merge, **all 35 required checks must be green at the merge head** (`gh pr checks <N> --required`). Checks from an older head don't count. The Vercel "Account is blocked." status (and "Vercel Deployments") is not a required check and doesn't block.
+- Before merge, **all 36 required checks must be green at the merge head** (`gh pr checks <N> --required`). Checks from an older head don't count. The Vercel "Account is blocked." status (and "Vercel Deployments") is not a required check and doesn't block.
 - **The merge queue is the rule.** **Matthew's decision (2026-10-03, 10:53 PM CT):** all merges go through the merge queue, and the `--admin` bypass is emergency-only, at his call. The `verdant-grow-diary merge queue` ruleset (id 20421416) was active when read on 2026-10-03: squash, all-green grouping, the 35 required checks, linear history, with a bypass for the repository admin role.
-- **Matthew's standing merge-when-green rule covers non-migration PRs:** once a non-migration PR has a clean `PASS` at its exact head SHA and 35/35 required checks are green at that same SHA, the merge-queue owner marks it ready and enqueues it at that SHA with `gh pr merge <N> --squash --auto --match-head-commit <SHA>`. On this branch a plain `gh pr merge <N>` also joins the queue rather than merging directly. The queue re-runs the required checks against the latest tip before the PR lands (see [docs/agents/merge-queue.md](../../../docs/agents/merge-queue.md)). There is no extra wait for a go-ahead. If the head moves first, the PASS no longer applies.
+- **Matthew's standing merge-when-green rule covers non-migration PRs:** once a non-migration PR has a clean `PASS` at its exact head SHA and 36/36 required checks are green at that same SHA, the merge-queue owner marks it ready and enqueues it at that SHA with `gh pr merge <N> --squash --auto --match-head-commit <SHA>`. On this branch a plain `gh pr merge <N>` also joins the queue rather than merging directly. The queue re-runs the required checks against the latest tip before the PR lands (see [docs/agents/merge-queue.md](../../../docs/agents/merge-queue.md)). There is no extra wait for a go-ahead. If the head moves first, the PASS no longer applies.
 - **Bypass:** Skipping the queue takes the repository-admin bypass. In gh that is `gh pr merge --admin`; because the bypass belongs to the admin role, any admin merge path (the UI bypass option, or a REST or MCP merge by an admin) likely skips the queue too (untested). merge-queue.md line 9 calls that emergency-only, and whether a bypass on green is ever allowed is Matthew's call.
 - Dated note (2026-10-03): #1867, #1869, #1887, #1888 and #1890 merged 5–28 s after being marked ready; #1889 (ready since 2026-10-03 11:13 UTC) merged 53 s after #1890. None has a merge-queue event, so (an inference from the GitHub events, not measured directly) they used the admin bypass. All six merged before the 10:53 PM CT decision above.
 - **Migration PRs need Matthew's explicit decision** (section 6), even after a clean PASS.
@@ -97,7 +97,7 @@ These stand until Matthew lifts them. The live list is kept on the agents' share
 ## Verdict template
 
 ```text
-[VERDICT] <reviewer>: #<N> @ <full SHA>: <PASS|PASS-with-P2|FAIL|BLOCKED|NOT_MEASURED>, <n> P1, <n> P2. Required checks <x>/35. Head unchanged start and end; draft=<true|false>.
+[VERDICT] <reviewer>: #<N> @ <full SHA>: <PASS|PASS-with-P2|FAIL|BLOCKED|NOT_MEASURED>, <n> P1, <n> P2. Required checks <x>/36. Head unchanged start and end; draft=<true|false>.
 P1: <file:line> <evidence> <fix>
 P2-1: <file:line> <evidence> <fix>
 Re-review triggers: <list>

@@ -1832,13 +1832,13 @@ async function runLaneCensus(
         await assertMeaningfulPage(page, route.path);
         await assertExpectedRouteContent(page, route);
       }
-      // A route that redirects (#2045: signed-in /onboarding → /) settles and
-      // records its links where it landed. A route that stays on its own
-      // pathname keeps route.path, because its query is part of the revisit.
-      const linkSourcePath =
-        finalPath === new URL(route.path, APP_ORIGIN).pathname ? route.path : finalPath;
-      await settleRouteReadsBeforeLinkAudit(page, linkSourcePath);
-      const links = await visibleLinkAudits(page, linkSourcePath);
+      // A route that redirects (#2045: signed-in /onboarding → /) is audited
+      // for the redirect only: its landing page's links belong to that page's
+      // own route. A route that stays on its own pathname keeps route.path,
+      // because its query is part of the revisit.
+      const redirected = finalPath !== new URL(route.path, APP_ORIGIN).pathname;
+      await settleRouteReadsBeforeLinkAudit(page, redirected ? finalPath : route.path);
+      const links = redirected ? [] : await visibleLinkAudits(page, route.path);
       report.fieldAudits.push(...fields);
       report.linkAudits.push(...links);
       report.routeAudits.push({

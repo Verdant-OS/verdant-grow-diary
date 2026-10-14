@@ -1,9 +1,12 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   classifyStabilizationPrFiles,
   isAllowedStabilizationPath,
   isBlockedStabilizationPath,
 } from "../../scripts/verify-stabilization-pr-scope.mjs";
+import { FORBIDDEN_LOCKFILES } from "../../scripts/check-bun-lockfile-policy.mjs";
 
 describe("isAllowedStabilizationPath", () => {
   it("allows harness files", () => {
@@ -12,7 +15,7 @@ describe("isAllowedStabilizationPath", () => {
     expect(isAllowedStabilizationPath("scripts/sensor-safety-check.mjs")).toBe(true);
     expect(isAllowedStabilizationPath("tests/foo.spec.ts")).toBe(true);
     expect(isAllowedStabilizationPath("package.json")).toBe(true);
-    expect(isAllowedStabilizationPath("bun.lockb")).toBe(true);
+    expect(isAllowedStabilizationPath("bun.lock")).toBe(true);
     expect(isAllowedStabilizationPath("playwright.config.ts")).toBe(true);
   });
 
@@ -148,19 +151,60 @@ describe("classifyStabilizationPrFiles — staged-mode file lists", () => {
 });
 
 describe("classifyStabilizationPrFiles — lockfile allowlist", () => {
-  it.each(["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb"])(
-    "allows lockfile %s on its own",
+  it.each(
+    FORBIDDEN_LOCKFILES.flatMap((name: string) => [
+      [`scripts/${name}`],
+      [`tests/${name}`],
+      [`src/test/fixtures/${name}`],
+      // Windows separators and a trailing separator must not hide the basename.
+      [`scripts\\${name}`],
+      [`scripts/${name}/`],
+      [`tests\\nested\\${name}\\`],
+    ]) as Array<[string]>,
+  )("refuses %s below an allowed directory", (path) => {
+    expect(isAllowedStabilizationPath(path)).toBe(false);
+    expect(isBlockedStabilizationPath(path)).toBe(true);
+    expect(classifyStabilizationPrFiles([path]).verdict).toBe("stop-ship");
+  });
+
+  it("allows bun.lock, the only lockfile the repository keeps, on its own", () => {
+    const r = classifyStabilizationPrFiles(["bun.lock"]);
+    expect(r.verdict).toBe("pass");
+    expect(r.allowed).toEqual(["bun.lock"]);
+  });
+
+  it.each(FORBIDDEN_LOCKFILES.map((name: string) => [name]) as Array<[string]>)(
+    "refuses %s, which the lockfile policy forbids",
     (lock) => {
       const r = classifyStabilizationPrFiles([lock]);
-      expect(r.verdict).toBe("pass");
-      expect(r.allowed).toEqual([lock]);
+      expect(r.verdict).toBe("stop-ship");
+      expect(r.blocked).toEqual([lock]);
     },
   );
 
+  it("keeps the runbook's lockfile allowlist to bun.lock", () => {
+    // Absence scan over documentation prose, not resolved config.
+    const runbook = readFileSync(resolve("docs/test-stabilization-pr-runbook.md"), "utf8");
+    const section = runbook.slice(runbook.indexOf("### Lockfile handling"));
+    const end = section.indexOf("allowed **only**");
+    expect(end).toBeGreaterThan(0);
+    const allowlist = section.slice(0, end);
+    expect(allowlist).toContain("`bun.lock`");
+    for (const forbidden of FORBIDDEN_LOCKFILES) expect(allowlist).not.toContain(forbidden);
+    expect(section).toMatch(/`package-lock\.json` was retired on 2026-10-03/);
+  });
+
+  it("rejects the retired npm lockfile", () => {
+    const result = classifyStabilizationPrFiles(["package-lock.json"]);
+    expect(result.verdict).toBe("stop-ship");
+    expect(result.allowed).toEqual([]);
+    expect(result.blocked).toEqual(["package-lock.json"]);
+  });
+
   it("blocks overall when a product file rides along with a lockfile", () => {
-    const r = classifyStabilizationPrFiles(["package-lock.json", "src/lib/harvestWatchRules.ts"]);
+    const r = classifyStabilizationPrFiles(["bun.lock", "src/lib/harvestWatchRules.ts"]);
     expect(r.verdict).toBe("stop-ship");
-    expect(r.allowed).toEqual(["package-lock.json"]);
+    expect(r.allowed).toEqual(["bun.lock"]);
     expect(r.blocked).toEqual(["src/lib/harvestWatchRules.ts"]);
   });
 });

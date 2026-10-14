@@ -1,52 +1,54 @@
 # Verdant — Current Architecture Contract
 
 **Scope:** the permanent architectural invariants of the Verdant Grow OS application.
-**Verified from source at:** `7e024f9362d4f57c1d5cb8252bf0104a2626b46a` (deploy branch
-`verdant-grow-diary`, `#1978`), 2026-10-13, by Claude (§15 re-verification and the seven-claim stack
-check; see §15.1). **Every clause describes that tree.** It supersedes the `2ffe78cc1` stamp and the
-`e0bb3930` evidence note in §15.2, which stay as dated history. The npm lockfile retirement
-(`#1873`) is not on it, so AC-8.1 and AC-1.8 state the two-lockfile rule that is in force there.
-**This stamp re-read every citation into a file that changed between `2ffe78cc1` and the stamped
-SHA, and carried the rest by file identity.** `git diff --name-only 2ffe78cc1 7e024f93` names 296
-files across 44 first-parent merges (first `#1897`, last `#1978`), 96 of them under `src/test/` and
-one new migration (`20261010120000_sensor_readings_notes_and_unit_unconfirmed.sql`, additive
-columns, no RLS change). Intersected with every path and basename this file cites, 24 cited files
-changed, and every line cite into them was re-read by script against both trees. Two are cited
-by name only (`guidedChecklistEvidenceRules.ts`, `tentScopedSensorReadingsRules.ts`, AC-3.2) and
-still import neither React nor Supabase and call neither `Date.now()` nor `Math.random()`. Line moves only:
-`src/server.ts:14` → `:20`, `:23-36` → `:29-42`, `:38-45` → `:44-51`;
-`src/lib/appRouteManifest.ts:38`, `:49`, `:52`, `:69-88` → `:44`, `:55`, `:58`, `:75-94`;
-`src/pages/Dashboard.tsx:952` → `:950`; `src/pages/Pricing.tsx:309` → `:310`; `package.json:224`,
-`:323`, `:324`, `:369` → `:225`, `:324`, `:325`, `:370`; `check-bun-lockfile-policy.mjs:68`,
-`:185-197`, `:189-197`, `:387-391` → `:76`, `:193-205`, `:197-205`, `:395-399`;
-`release-topology-specification.md:671` → `:831`. Changed in substance, with the clauses amended:
-`src/server.ts`'s default export now routes hosts before SSR (`#1943`) and is held by a runtime test
-(AC-1.1, AC-1.6); `config/dependency-lockfile-transition.json` moved `reviewBy` to `2026-10-17`
-(AC-8.1); `src/lib/quick-log/createQuickLogEvent.ts` is gone (§13 Quick Log note).
-`config/required-status-checks.json` is byte-identical: 35 `required` and 7 `mustBeGreen` contexts,
-with `Published migration integrity` in neither, `capturedAt` 2026-08-10. The counts in §3, §4 and
-§10 were re-measured by script, and the same script reproduced the `2ffe78cc1` figures exactly
-before it was run at this stamp: AC-3.2 555 `*Rules.ts` files with every drift row unchanged (55/7
-raw matches, 44/6 executable, 0 client importers, 2 type-only); AC-3.4 784 shim import statements in
-783 files; AC-4.3's single-line figures unchanged (76 in 66, 69 in 60, 105 in 85); AC-10.2's zero
-hits hold over `src/`, `supabase/`, `scripts/`, `e2e/`, `tools/`, `plugins/` and `spikes/`. Of the
-evidence the seven stack claims rest on, this subset is byte-identical to `2ffe78cc1`: `src/start.ts`,
-`src/router.tsx`, `src/integrations/supabase/`, `supabase/functions/ai-doctor-review/`,
-`supabase/functions/ai-coach/`, `src/pages/Coach.tsx`, `src/lib/sensor/sensorSourceRules.ts`,
-`src/lib/sensorSourceLabelRules.ts`, `src/lib/vpdDriftRules.ts`, `bunfig.toml` and `tsconfig.json`.
-The rest changed and was re-read: `src/server.ts` (claim 1; it still wraps
-`@tanstack/react-start/server-entry`, with host routing added, AC-1.1); `package.json` and `bun.lock`
-(claims 1, 2 and 4; the declared ranges and the resolved versions of React, React DOM, Tailwind,
-TanStack Start, Router and Query, supabase-js, `@supabase/ssr`, Vite, Nitro and the Lovable preset
-are unchanged, so `bun.lock` still resolves React 19.2.8, Tailwind 4.3.3, TanStack Query 5.101.4,
-supabase-js 2.111.0, Vite 8.2.0 and Nitro `3.0.260603-beta`); and the new migration (claim 3;
-additive `sensor_readings` columns and a view refresh, with no RLS, grant or RPC change).
+**Verified from source at:** `22f8dfe8d46386bc4044d9312036b5fbd63c494f` (deploy branch
+`verdant-grow-diary`, `#1870`), 2026-10-13, by Claude (§15 re-verification after `#1982` moved AI
+Doctor and AI Coach onto the Gemini API; see §15.1). **Every clause describes that tree.** It
+supersedes the `7e024f93` stamp, whose record stays in §15.1. AC-8.1 and AC-1.8 alone
+were amended after the stamp, on the `#1873` branch that retires the npm lockfile (§15.1, 2026-10-14
+row); on a tree without that change they still describe the two-lockfile rule.
+**This stamp re-read every citation into a file that changed between `7e024f93` and the stamped
+SHA, and carried the rest by file identity.** `git diff --name-only 7e024f93 22f8dfe8` names 101
+files across 15 first-parent merges (first `#2054`, last `#1870`), 35 of them under `src/test/`,
+and two new migrations. `20261003010000_credit_pack_refund_clawback.sql` (`#1871`) adds
+`clawback_lovable_credit_pack` and replaces `grant_lovable_credit_pack`, both revoked from `anon`
+and `authenticated` and granted to `service_role` only; its timestamp sorts before
+`20261010120000`, which was already on the tree. `20261013180000_quicklog_manual_occurred_at_utc_hash.sql`
+(`#1841`) replaces `quicklog_save_manual` with no table, policy or grant change. Seventeen cited files
+changed, and every line cite into them was re-read against both trees. Changed in substance, with
+the clauses amended: `ai-doctor-review` and `ai-coach` call the Gemini API through
+`_shared/geminiDirectChat.ts` (`#1982`; AC-5.1 rewritten, AC-5.2 and AC-5.8 amended, and the §11 rows
+for AC-5.1 and AC-5.2); `quicklog_save_manual`'s latest definition is the `#1841` migration (AC-2.1).
+Line moves only: `src/routes/__root.tsx:243-256` → `:261-274` (AC-1.7; `#1938`);
+`package.json:370` → `:371` (`#1938` adds `@sentry/browser`); `check-bun-lockfile-policy.mjs:76`,
+`:193-205`, `:197-205`, `:395-399` → `:78`, `:195-207`, `:199-207`, `:397-401` (`#1931` adds a
+security floor); and every `ai-doctor-review/index.ts`, `ai-coach/index.ts` and `src/pages/Coach.tsx`
+cite in AC-4.2 and AC-5.2 to AC-5.8. The other changed cited files hold, because they are cited by
+name or their cited lines are unchanged: `AGENTS.md`, `CLAUDE.md`, `docs/agents/CURRENT_STATE.md`,
+`bun.lock`, `package-lock.json`, `.github/workflows/ci.yml`, `quickLogTypedReusedReceiptRules.ts`
+(still pure, AC-3.2), the two typed writers in §13 (they still call `quicklog_save_event`), and
+`config/dependency-lockfile-transition.json` with its 2026-10-10 review (`#1870` moved the SEO
+workflow to a frozen Bun install and dropped it from `consumerContracts`; `reviewBy` is still
+`2026-10-17`, so AC-8.1 holds). `config/required-status-checks.json` is byte-identical: 35
+`required` and 7 `mustBeGreen` contexts. The counts in §3, §4 and §10 were re-measured by script,
+and the same script reproduced the `7e024f93` figures exactly first: AC-3.2 559 `*Rules.ts` files
+with every drift row unchanged (55/7 raw matches, 44/6 executable, 0 client importers, 2
+type-only); AC-3.4 791 shim import statements in 790 files; AC-4.3's single-line figures unchanged
+(76 in 66, 69 in 60, 105 in 85); AC-10.2's zero hits hold over `src/`, `supabase/`, `scripts/`,
+`e2e/`, `tools/`, `plugins/` and `spikes/`. `bun.lock` adds `@sentry/browser` 11.4.0 with its
+dependencies and pins `postcss-selector-parser` 7.1.6. It still resolves React 19.2.8, Tailwind
+4.3.3, TanStack Query 5.101.4, supabase-js 2.111.0, Vite 8.2.0 and Nitro `3.0.260603-beta`, so the
+seven stack claims stand except claim 5, which `#1982` changes (AC-5.1). `@sentry/browser` is a
+client error reporter that stays off unless `VITE_SENTRY_DSN` is set at build (`source claim`,
+`.env.example`). No clause covers client telemetry egress, so it amends none.
 Package-internal cites in AC-1.4, AC-1.5 and §14 are carried, not re-read: the only `node_modules`
 available to this session was resolved by npm against the public registry, not from `bun.lock`, so it
-is not the tree those cites describe. The pinned versions they name still match `bun.lock`. The AC-4.3 multi-line figure stays a `source claim`. The cites inside §15.1 and
-§15.2 name superseded lines by design and were not re-read. Dated runtime results and history about
-which PR introduced a behaviour keep their own labels and dates. Production behaviour (what is
-deployed, applied or live) is `NOT_MEASURED` by this stamp. First
+is not the tree those cites describe. The pinned versions they name still match `bun.lock`. The AC-4.3
+multi-line figure stays a `source claim`. The cites inside §15.1 and §15.2 name superseded lines by
+design and were not re-read. Dated runtime results and history about which PR introduced a
+behaviour keep their own labels and dates. Production behaviour (what is deployed, applied or live)
+is `NOT_MEASURED` by this stamp. That includes whether production runs the Gemini-direct build of
+either function and whether `GEMINI_API_KEY` is set there. First
 verified at `7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05 by Grok (PR #1281).
 **Carries no `Sentinel-Version`.** This is not one of the twelve governance files; editing it does
 not require a parity bump. See §15 for how it is amended.
@@ -266,8 +268,8 @@ asserts a `text/html` 500. It runs in the required shards. An earlier stamp reco
 mount effects in JSX order and `Outlet`'s content is a sibling, not a descendant — placing the sink
 later loses mount-effect funnel events on cold loads. The reason is committed as a comment beside
 the code.
-_Source:_ `src/routes/__root.tsx:243-256`: the comment is at `:244-253`, followed by
-`<AnalyticsShell />` `:254`, `<FunnelEventDbSink />` `:255`, `<Outlet />` `:256`. `established fact`.
+_Source:_ `src/routes/__root.tsx:261-274`: the comment is at `:262-271`, followed by
+`<AnalyticsShell />` `:272`, `<FunnelEventDbSink />` `:273`, `<Outlet />` `:274`. `established fact`.
 _Enforcement:_ **gated, by source scan.** `src/test/funnel-event-db-sink.test.tsx:132-135` pins
 `AnalyticsShell` immediately followed by the sink, and `:144-150` asserts the sink precedes
 `<Outlet />`. This is ordering structure, which a scan can prove.
@@ -294,8 +296,8 @@ major is an architecture change that needs its own reviewed slice, not a depende
 - Validation is `zod` 3 (`^3.24.2`, resolved 3.25.76). The lockfile also carries a zod 4 copy, pulled
   in only by build tooling and the MCP SDK. No non-test file under `src/` imports `zod/v4`.
 
-_Source:_ `package.json` (declared versions); `bun.lock` (resolved versions; `package-lock.json`, the
-synchronized compatibility lock of AC-8.1, agrees on every row); `components.json`; `src/styles.css:1`. `established fact` at the stamped SHA.
+_Source:_ `package.json` (declared versions); `bun.lock` (resolved versions; the only lockfile,
+AC-8.1); `components.json`; `src/styles.css:1`. `established fact` at the stamped SHA.
 Exact patch versions are dated evidence, not invariants. The major lines are the contract.
 _Enforcement:_ `convention only`, apart from the 24-hour release-age guard on new versions (AC-8.2).
 
@@ -319,11 +321,12 @@ boundary in two different ways:
 
 Treating edge functions as the only trusted server layer would steer new work away from half of the
 boundary that already exists.
-_Source:_ `package.json:370` (`@supabase/ssr` declared); `src/test/auth-hardening-static-safety.test.ts:101-108`
+_Source:_ `package.json:371` (`@supabase/ssr` declared); `src/test/auth-hardening-static-safety.test.ts:101-108`
 (forbids the import); clients at `src/integrations/supabase/client.ts`, `client.server.ts` and
 `auth-middleware.ts`. `quicklog_save_manual`:
-`supabase/migrations/20260928183000_quicklog_manual_replay_metadata_lock.sql:32,48,52` (latest
-`CREATE OR REPLACE`; the first `CREATE` is
+`supabase/migrations/20261013180000_quicklog_manual_occurred_at_utc_hash.sql:35,51,55` (latest
+`CREATE OR REPLACE`, `#1841`; the one before it is
+`20260928183000_quicklog_manual_replay_metadata_lock.sql:32,48,52`; the first `CREATE` is
 `20260725024026_quicklog_dual_timestamp_foundation.sql:762,778,782`). `action_queue_create`:
 `supabase/migrations/20260807140000_action_queue_create_allow_ai_coach.sql:13,29,33`. `ai_credit_spend`:
 `supabase/migrations/20260728090736_ai_credit_pack_portability.sql:31-42,385-390`. There are 34 edge
@@ -377,13 +380,13 @@ clock, no randomness. Time is injected.**
 This is the contract for **new** code, not a description of every existing file. Re-measured at the
 stamped SHA, over the root-level `src/lib/*Rules.ts` glob:
 
-| Measure                                                       | Count | Files                                                                                                                                                                       |
-| ------------------------------------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `*Rules.ts` files                                             |   555 | —                                                                                                                                                                           |
-| contain a direct `Date.now()` call                            |    55 | raw-text match over the root-level glob, re-measured at `dccaf732`, `66ea7bd3`, `2ffe78cc1` and `7e024f93`: 44 of the 55 call it on an executable line, 11 in comments only |
-| contain a direct `Math.random()` call                         |     7 | the seven named in `CLAUDE.md` "Layering, as actually practised"; 6 call it on an executable line, 1 mentions it in a comment only                                          |
-| import the Supabase client at runtime                         |     0 | —                                                                                                                                                                           |
-| type-only import from generated `integrations/supabase/types` |     2 | `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`                                                                                                          |
+| Measure                                                       | Count | Files                                                                                                                                                                                   |
+| ------------------------------------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `*Rules.ts` files                                             |   559 | —                                                                                                                                                                                       |
+| contain a direct `Date.now()` call                            |    55 | raw-text match over the root-level glob, re-measured at `dccaf732`, `66ea7bd3`, `2ffe78cc1`, `7e024f93` and `22f8dfe8`: 44 of the 55 call it on an executable line, 11 in comments only |
+| contain a direct `Math.random()` call                         |     7 | the seven named in `CLAUDE.md` "Layering, as actually practised"; 6 call it on an executable line, 1 mentions it in a comment only                                                      |
+| import the Supabase client at runtime                         |     0 | —                                                                                                                                                                                       |
+| type-only import from generated `integrations/supabase/types` |     2 | `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`                                                                                                                      |
 
 The clock, randomness and type-import files are legacy, not precedent. Do not cite them, and do not
 extend the pattern. The file added since `9b06be3f` is `src/lib/blueprintEvidenceRules.ts` (#1657);
@@ -413,6 +416,11 @@ The thirteen added since `2ffe78cc1` (`archivedGrowQuickLogRules.ts`, `cloudflar
 from a non-pure module: `quickLogFeedingRejectionRules.ts:1` from `writeFeedingTypedEvent.ts`, which
 does import the Supabase client, and `sandboxCheckoutTestModeNoteRules.ts:1` from
 `paddleEnvironment.ts`. A type import is erased at build, so neither is I/O.
+The four added since `7e024f93` (`aiCoachPhotoFileRules.ts`, `errorReportingRules.ts`,
+`phenoEvidenceGoalSelectionRules.ts`, `quickLogHistoryReviewTargetRules.ts`) import only other pure
+`src/lib` modules, or nothing, and call neither `Date.now()` nor `Math.random()`, so every drift row
+holds at `22f8dfe8`. The two that changed (`quickLogTypedReusedReceiptRules.ts`,
+`referralShareRules.ts`) still import neither React nor the Supabase client.
 
 **Corrected: no root-level `*Rules.ts` imports the Supabase client, and neither named file ever
 did.** Every earlier version of this clause counted the two files as importing Supabase, and since
@@ -459,8 +467,8 @@ _Source:_ `src/constants/`; `src/pages/GuidesIndex.tsx:60,63`; `src/constants/ve
 **AC-3.4 — Component code routes through the react-router compat shim, not TanStack Router
 directly.**
 `src/lib/react-router-compat.tsx` re-implements the react-router-dom v6 surface on TanStack Router.
-Measured at the stamped SHA, **784** static import statements in **783** files import the shim;
-`src/pages/PlantDetail.tsx` imports it twice. By directory: 549 under `src/test`, 133 under
+Measured at the stamped SHA, **791** static import statements in **790** files import the shim;
+`src/pages/PlantDetail.tsx` imports it twice. By directory: 556 under `src/test`, 133 under
 `src/components`, 94 statements in 93 files elsewhere under `src/pages`, 1 under
 `src/pages/support/__tests__`, and 7 under `src/hooks`. **Zero** files under
 `src/components/` or `src/pages/` mention `@tanstack/react-router` at all. Vitest aliases the shim to
@@ -476,7 +484,8 @@ the one statement added since is in the new `src/test/sensors-idle-freshness.tes
 761 in 760 at `dccaf732`, unchanged at `66ea7bd3`; 773 in 772 at `2ffe78cc1`, eleven of the twelve
 added in `src/test/` and one in `src/components/TonightTentHomeCard.tsx`; 784 in 783 at `7e024f93`,
 ten of the eleven added under `src/test/` (nine in new files) and one in the existing
-`src/components/PhenoCandidateEvidenceCoverage.tsx`. The
+`src/components/PhenoCandidateEvidenceCoverage.tsx`; 791 in 790 at `22f8dfe8`, all seven added in new
+`src/test/` files. The
 shim's `useNavigate` now returns the navigate promise, which does not affect this clause.
 `established fact`.
 _Enforcement:_ `convention only`, plus the test-time alias.
@@ -611,7 +620,7 @@ the same AC-4.2 failure as collapsing it into stored trust state.
 
 **Known gap on the AI context path, recorded rather than fixed here.** `ai-coach` resolves a diary
 `sensor_snapshot` through `resolveQuickLogSensorSnapshotForAi`
-(`supabase/functions/ai-coach/index.ts:481-484`). In that resolver, a nested `live` snapshot that
+(`supabase/functions/ai-coach/index.ts:546-549`). In that resolver, a nested `live` snapshot that
 provenance rows do not corroborate resolves to `source: "demo"` when diagnostic rows were omitted
 (`src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts:211-213`) and otherwise to
 `source: "unknown"` (`:215`), a token outside the six. A snapshot that is itself a diagnostic
@@ -619,9 +628,9 @@ provenance row resolves to `demo` before any of this (`:196-198`). A
 snapshot with no `metrics` object is returned unchanged (`:201`), and a non-`live` nested snapshot
 keeps its stored `source` (`:170`, `:204`). The unchanged return is a trust gap, not only a
 labelling one. `ai-coach` queries provenance rows only for a nested, declared-`live` snapshot
-(`supabase/functions/ai-coach/index.ts:458-461`), so a legacy flat snapshot (no `metrics` object)
+(`supabase/functions/ai-coach/index.ts:523-526`), so a legacy flat snapshot (no `metrics` object)
 with `source: "live"`, a fresh `captured_at` and top-level readings is never corroborated. It
-reaches `buildAiSensorSnapshotContext` (`:505`) as stored, and the annotator gives a fresh `live`
+reaches `buildAiSensorSnapshotContext` (`:570`) as stored, and the annotator gives a fresh `live`
 source `trust = "high"` and forwards its values to the model
 (`src/lib/aiSensorSnapshotContextRules.ts:415-418`; `valuesForModel` and `isTrustedForAi` at
 `:426-428`). Uncorroborated flat values can therefore reach the model as trusted live evidence. That
@@ -840,39 +849,85 @@ every required context, so a violation cannot block a merge by that route. It ru
 
 ## 5. AI Doctor
 
-**AC-5.1 — Inference is reached through the Lovable AI gateway.**
-`https://ai.gateway.lovable.dev/v1/chat/completions`, credentialed by a server-side-only
-`LOVABLE_API_KEY`. Three functions call the gateway for inference: `ai-doctor-review`, `ai-coach`,
-`ai-cultivar-qa`. No other function calls a chat-completions provider. No non-test file under `src/`
-references the gateway URL or the key.
+**AC-5.1 — AI Doctor and AI Coach reach Google's Gemini API directly, from the server only,
+through one pinned helper.**
+`ai-doctor-review` and `ai-coach` post to Gemini's OpenAI-compatible endpoint,
+`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`, through
+`supabase/functions/_shared/geminiDirectChat.ts` (`#1982`). The credential is a server-only
+`GEMINI_API_KEY`, read with `Deno.env` through `readGeminiDirectApiKey`. When the key is missing or
+blank, both functions fail closed **before any credit spend**: `ai-doctor-review` returns its calm
+`config` failure and `ai-coach` returns `AI not configured`. `ai-coach` downloads an attached photo
+from the project's signed Storage path only after the spend exists, and sends it as a base64
+inline image of at most 7 MiB, because Gemini rejects the signed HTTPS URL. A failed download or an
+oversized or unsupported image triggers a refund attempt (`ai-coach/index.ts:682,686`); when the
+refund is not confirmed, the response is `result_pending`, not a confirmed reversal (`:384-415`). A
+photo attached in Coach therefore reaches Google as bytes, not as a link.
 
-**The key is not AI-specific.** `LOVABLE_API_KEY` is also read by the email functions
-(`auth-email-hook`, `handle-email-suppression`, `preview-transactional-email`,
-`process-email-queue`) and by the Paddle connector in `_shared/paddle.ts`. So "who holds
-`LOVABLE_API_KEY`" is a wider question than "who reaches the AI gateway". Rotating or scoping the key
-touches billing and email too.
-_Source:_ `supabase/functions/ai-doctor-review/index.ts:66` (`GATEWAY_URL`), `:330` (key read),
-`:531` (fetch); `ai-coach/index.ts:288,611`; `ai-cultivar-qa/index.ts:73,91`; wider key readers
-found by grep over `supabase/functions/`. `established fact`.
+`ai-cultivar-qa` still calls the Lovable AI gateway (`https://ai.gateway.lovable.dev/v1/chat/completions`)
+with `LOVABLE_API_KEY`. No other function calls a chat-completions provider. No non-test file under
+`src/` references either endpoint or either key.
+
+**`LOVABLE_API_KEY` is not retired, and it is not AI-specific.** Besides `ai-cultivar-qa`, it is read
+by the email functions (`auth-email-hook`, `handle-email-suppression`, `preview-transactional-email`,
+`process-email-queue`) and by the Paddle connector in `_shared/paddle.ts`. `#1982` removed it from
+the two AI Doctor functions only. The owner's correction that PR records keeps the key until every
+remaining consumer and every rollback dependency is migrated and verified (`source claim`, from the
+`#1982` description). Rotating or scoping the key still touches billing and email.
+
+**This clause describes the repository, not production.** `#1982` deployed no edge function and set
+no secret. Which build of each function production runs, and whether `GEMINI_API_KEY` is set there,
+are `NOT_MEASURED`; they belong to `docs/agents/CURRENT_STATE.md`.
+_Source:_ `supabase/functions/_shared/geminiDirectChat.ts:20-21` (endpoint), `:43-60` (the two
+standard routes), `:67-71` (key read), `:87-98` (fail-closed resolution);
+`supabase/functions/ai-doctor-review/index.ts:62-67` (import), `:385-397` (key check, before the
+spend at `:474-475`), `:595-611` (request and fetch); `supabase/functions/ai-coach/index.ts:13-23`
+(imports), `:346-354` (key check, before the spend at `:365-366`), `:669-692` (inline photo),
+`:703-715` (request and fetch); `supabase/functions/_shared/geminiInlineImage.ts:8`
+(`GEMINI_INLINE_IMAGE_MAX_BYTES`); `supabase/functions/ai-cultivar-qa/index.ts:73,91`; the wider
+key readers by grep over `supabase/functions/`. `established fact`.
+_Enforcement:_ **partially gated**, in the required `Lint, typecheck, test, build` job
+(`.github/workflows/ci.yml:437-438`). `supabase/functions/_shared/geminiDirectChat.test.ts:25-43`
+resolves both routes and asserts the provider, endpoint and model ids on the returned objects;
+`:60-98` asserts that a missing or blank key fails closed without calling `fetch`; `:175-204` scans
+both function sources for the helper call and for the absence of the gateway URL and of
+`LOVABLE_API_KEY`. That source scan is the right tool for proving absence. **Fail-before-spend is
+not gated:** the scan's order check (`:190-192`, `:198-200`) takes the first `readGeminiDirectApiKey`
+in each file, which is the import (`ai-doctor-review/index.ts:65`, `ai-coach/index.ts:16`), not the
+call (`:385`, `:346`), so moving the call below the spend would leave it green. The order holds in
+source today and is unenforced. `ai-cultivar-qa` is held by nothing.
+
+> Before `#1982` this clause read "Inference is reached through the Lovable AI gateway": all three
+> AI functions called the gateway with `LOVABLE_API_KEY`.
 
 **AC-5.2 — Model and tier are server constants. The client cannot influence either.**
-`MODEL` and `MODEL_TIER` are module-level constants, not request-derived; the client cannot set
-model, tier, weight, plan, or `user_id`, and therefore cannot self-discount. `user_id` comes from
-`auth.getUser()`. At the stamped SHA the pinned values are `MODEL = "google/gemini-3-flash-preview"`,
-`FEATURE = "ai_doctor_review"` and `MODEL_TIER = "standard"`. Those values are dated evidence. The
-invariant is that they are server constants, and changing the model is a provider decision outside
-this contract.
+`FEATURE`, `MODEL_TIER` and the model ids are module-level constants, not request-derived; the
+client cannot set model, tier, weight, plan, or `user_id`, and therefore cannot self-discount.
+`user_id` comes from `auth.getUser()`. The model ids come from the helper's fixed route table, looked
+up once at module load from the two server constants; an unresolved route throws at load, so the
+function cannot start without one. At the stamped SHA `ai-doctor-review` pins `FEATURE =
+"ai_doctor_review"`, `MODEL_TIER = "standard"`, a wire model `WIRE_MODEL = "gemini-3-flash-preview"`
+(sent to Gemini) and a recorded model `MODEL = "google/gemini-3-flash-preview"` (passed only as
+`p_model_id` to `ai_doctor_finalize_review` at `:702`, the id it carried on the gateway; the response body
+`v.result` at `:732` carries no model id). `ai-coach` pins `ai_coach`,
+`standard` and `gemini-2.5-flash`, and records no model id. Those values are dated evidence. The
+invariant is that they are server constants, and changing the provider or the model is an owner
+decision outside this contract (`#1982` was approved as one).
 _Source:_ `supabase/functions/ai-doctor-review/index.ts:13` (the "decided SERVER-SIDE" comment),
-`:67-70` (constants), `:290-292` (`auth.getUser()`). `established fact`.
+`:101-109` (constants and route lookup), `:345-347` (`auth.getUser()`);
+`supabase/functions/_shared/geminiDirectChat.ts:43-60` (route table), `:73-85` (lookup);
+`supabase/functions/ai-coach/index.ts:189-196`. `established fact`.
 Request-body model or tier fields are ignored, not rejected: the envelope parser reads only `packet`
 and four transport fields, each accepted under a snake-case or a camel-case name (`grow_id` /
 `growId`, `idempotency_key` / `idempotencyKey`, `session_id` / `sessionId`, `evidence_acceptance`
-/ `evidenceAcceptance`, through `readAliasedTransportValue` at `:229`); both forms are live inputs.
+/ `evidenceAcceptance`, through `readAliasedTransportValue` at
+`src/lib/aiDoctorReviewRequestTransportRules.ts:229`); both forms are live inputs.
 The packet is rebuilt with unknown keys dropped, and the credit weight is derived in the database
 from the server tier.
 _Source (ignoring):_ `src/lib/aiDoctorReviewRequestTransportRules.ts:251-258`;
-`ai-doctor-review/index.ts:346-349`; `supabase/migrations/20260728090736_ai_credit_pack_portability.sql:90`.
-_Enforcement:_ structural — there is no code path from the request body to either constant.
+`ai-doctor-review/index.ts:410-413`; `supabase/migrations/20260728090736_ai_credit_pack_portability.sql:90`.
+_Enforcement:_ structural — there is no code path from the request body to any of the constants.
+The route values themselves are pinned by `supabase/functions/_shared/geminiDirectChat.test.ts:25-58`
+in a required check (AC-5.1).
 
 **AC-5.3 — Model output is structured and validated, never free text.**
 The call forces a single tool (`tool_choice: {type: "function", function: {name:
@@ -882,19 +937,20 @@ logged; logs carry safe status and reason codes only.
 _Source:_ `supabase/functions/ai-doctor-review/index.ts`:
 
 - `:2` ("Never returns raw model text") and `:14` (the safe-log rule);
-- `:82` (`TOOL_SCHEMA`) and `:544-548` (the live `tools` and `tool_choice`);
-- `:604` (`JSON.parse`), `:610` (`validateAiDoctorReviewResult`), `:615` (the grounding check);
-- `:668-678` (`readToolArguments`).
+- `:123` (`TOOL_SCHEMA`) and `:604-608` (the live `tools` and `tool_choice`, passed to the Gemini
+  helper, which adds only `model` to the body);
+- `:675` (`JSON.parse`), `:681` (`validateAiDoctorReviewResult`), `:686` (the grounding check);
+- `:739-749` (`readToolArguments`).
 
-`:180-181` repeat `tools` / `tool_choice` inside the HMAC signing frame, not the live request.
+`:220-221` repeat `tools` / `tool_choice` inside the HMAC signing frame, not the live request.
 Invalid, empty or unparseable output, and output that fails grounding, is refunded and returns a
-calm failure (`:597-618`). The validator is hand-written, not zod
+calm failure (`:668-689`). The validator is hand-written, not zod
 (`supabase/functions/ai-doctor-review/contract.ts:124-182`). `TOOL_SCHEMA` is closed
 (`additionalProperties: false`) and has no `action_queue_suggestion` property, while the validator
 accepts one as optional (`contract.ts:162`); the two disagree harmlessly.
 **Scope: this clause covers `ai-doctor-review` only.** The `/coach` page is also titled "AI Doctor"
-(`src/pages/Coach.tsx:469`) and calls `ai-coach` (`:301`), which requests
-`response_format: { type: "json_object" }` (`supabase/functions/ai-coach/index.ts:617`) with no
+(`src/pages/Coach.tsx:481`) and calls `ai-coach` (`:308`), which requests
+`response_format: { type: "json_object" }` (`supabase/functions/ai-coach/index.ts:708`) with no
 forced tool and only a shape check. "AI Doctor output is tool-forced and validated" is true of the
 review function, not of every surface named AI Doctor.
 `established fact`.
@@ -905,8 +961,8 @@ failure.**
 call reverses through `ai_credit_refund` with its own key. Reversals are append-only.
 
 **`idempotencyKey` has a request-body path.** The edge function validates
-`request.idempotencyKey` as a UUID (`ai-doctor-review/index.ts:364-367`) and passes it to
-`p_idempotency_key` (`:417`). Protection is **not** structural absence of a client field — it is
+`request.idempotencyKey` as a UUID (`ai-doctor-review/index.ts:428-431`) and passes it to
+`p_idempotency_key` (`:481`). Protection is **not** structural absence of a client field — it is
 **RPC / runtime enforcement**: atomic spend semantics, conflict detection, and append-only refunds
 in the database functions (exercised by `scripts/run-ai-credits-rls-harness.ts`).
 
@@ -915,7 +971,7 @@ in the database functions (exercised by `scripts/run-ai-credits-rls-harness.ts`)
 **`stale`**; only an _incompatible_ reuse — the RPC returning `reason === "idempotency_key_conflict"`
 — takes the **`conflict`** branch. Reserve the conflict label for that incompatible case alone.
 Retry protocols must be written against those four outcomes.
-_Source:_ `supabase/functions/ai-doctor-review/index.ts:364-367,411-419,429-451,471-474`;
+_Source:_ `supabase/functions/ai-doctor-review/index.ts:428-431,475-483,493-515,535-538`;
 `src/lib/aiDoctorCreditReplayRules.ts:18-23,63,70,84,89,92`. Database dedupe:
 `supabase/migrations/20260605230401_45a4c0c5-1c7f-4d79-8490-d2649114ed83.sql:28-29`
 (`ai_credit_spends_user_idem_uq` on `(user_id, idempotency_key)`); conflict reason
@@ -935,13 +991,13 @@ finalizes results and evidence receipts (`ai_doctor_finalize_review`), and recor
 (`record_ai_doctor_review_completion`).
 **The prohibition is the function's, not every AI Doctor surface's.** A grower can turn an AI Doctor
 suggestion into an Action Queue row by clicking: `src/hooks/useAddAiDoctorSessionSuggestionToActionQueue.ts:97`
-and `src/pages/Coach.tsx:204-211` call `action_queue_create` with `source` `ai_doctor` and status
+and `src/pages/Coach.tsx:205-212` call `action_queue_create` with `source` `ai_doctor` and status
 `pending_approval`. That is grower-initiated and approval-required (AC-7.1), not automatic. The
 `/coach` page also persists `ai_doctor_sessions` (the `persistAiDoctorSession(...)` call at
-`src/pages/Coach.tsx:355-366`). The function's
+`src/pages/Coach.tsx:362-373`). The function's
 validator rejects device-command phrasing in model output (`ai-doctor-review/contract.ts:60-61`).
 _Source:_ `supabase/functions/ai-doctor-review/index.ts:8-9` for the prohibition;
-`:234,411,434,624` for the writes it does perform. `established fact`.
+`:281,475,498,695` for the writes it does perform. `established fact`.
 
 **AC-5.6 — Sensor readings reaching model context keep their trust labels. Once a row carries an
 explicit quality, only `ok` contributes current values.**
@@ -1005,10 +1061,18 @@ HMAC-SHA256 of the exact outbound request frame with its key id, the model id an
 prompt-contract versions. The service-role-only `ai_doctor_finalize_review` writes it together with
 the result cache, and clients have no table access. `ai-coach` writes no receipt. Whether production
 has the table or the HMAC key configured is `NOT_MEASURED`.
+
+**Since `#1982` the signed model id and the recorded one differ.** The HMAC frame is prompt contract
+`ai-doctor-review-prompt-v2` and signs the wire model, `gemini-3-flash-preview`. The receipt's
+`p_model_id` is the recorded model, `google/gemini-3-flash-preview`, the id the gateway used. So a
+receipt's model id is not the string the HMAC covers. The prompt-contract version tells the two eras
+apart: `v1` receipts were signed over the provider-prefixed id. A verifier that recomputes an HMAC
+must take the model from the version, not from `p_model_id` (`inference`).
 _Source (contents):_ `supabase/migrations/20260719180000_ai_doctor_review_evidence_receipts.sql:10-32,48-52`;
-`ai-doctor-review/index.ts:169-196,621-635`.
+`ai-doctor-review/index.ts:210-243` (frame and signer), `:692-706` (finalization);
+`:108-109` (`MODEL`, `WIRE_MODEL`), `:113-115` (the v2 note).
 _Source:_ `supabase/functions/_shared/lib/lib/aiDoctorReviewEvidenceReceiptRules.ts:265`;
-`supabase/functions/ai-doctor-review/index.ts:167`. `established fact`.
+`supabase/functions/ai-doctor-review/index.ts:208`. `established fact`.
 
 ---
 
@@ -1111,29 +1175,25 @@ and `supabase/functions/ai-cultivar-qa/index.ts:14` (no queue writes);
 
 ## 8. Toolchain and dependency management
 
-**AC-8.1 — Bun is canonical; `package-lock.json` is a synchronized compatibility artifact under a
-dated review.**
-`bun.lock`, a text lockfile, is authoritative. `package-lock.json` is required and must stay
-synchronized while the npm consumers declared in `config/dependency-lockfile-transition.json` exist;
-it is never the source of truth. That config carries `reviewBy` `2026-10-17` (moved from `2026-10-10` by
-the dated 2026-10-10 fallback review), and the checker fails an overdue review from 2026-10-18 UTC. `bun.lockb`, `yarn.lock` and `pnpm-lock.yaml` are forbidden.
-**There is no `bun.lockb`.** Governance prose that calls `bun.lockb` authoritative is stale.
-_Source:_ `scripts/check-bun-lockfile-policy.mjs:3-7` ("Bun and bun.lock are canonical.
-package-lock.json remains a synchronized compatibility lock only while…"), `:22`
-(`REQUIRED_LOCKFILES`, both files), `:76` (`FORBIDDEN_LOCKFILES`), `:193-205` (the schema-1 transition
-config check; the canonical check and throw at `:197-205`), `:395-399` (overdue review);
+**AC-8.1 — Bun is canonical; `bun.lock` is the only lockfile.**
+`bun.lock`, a text lockfile, is authoritative and is the only lockfile. The npm compatibility lock,
+`package-lock.json`, is retired by `#1873` (approved by Matthew on 2026-10-04); it, `bun.lockb`,
+`yarn.lock` and `pnpm-lock.yaml` are forbidden. **There is no `bun.lockb`.** Governance prose that
+calls `bun.lockb` authoritative, or `package-lock.json` a synchronized compatibility lock, is stale.
+_Source:_ `scripts/check-bun-lockfile-policy.mjs:5` ("Bun and bun.lock are canonical, and bun.lock
+is the only lockfile"), `:24` (`REQUIRED_LOCKFILES`), `:67-72` (`FORBIDDEN_LOCKFILES`), `:180-191`
+(the schema-2 transition config check; the canonical check and throw at `:186-187`);
 `config/dependency-lockfile-transition.json`; `bunfig.toml`;
-`docs/dependency-lockfile-transition-review-2026-10-10.md` (sets `2026-10-17` and the 2026-10-18
-failure; the earlier `docs/dependency-lockfile-transition-review-2026-10-03.md` set `2026-10-10`).
-`established fact`.
-_Enforcement:_ **gated for presence and canonical config; the date is not gated by a required
-check.** `src/test/check-bun-lockfile-policy.test.ts:528` runs the checker against the repository in
-the required test shards, but with `today` pinned to `2026-07-25` (`:530`), so the shards never see
-the real `reviewBy`. The real-date check runs only in the non-required `dependency-security-ci.yml`
-(`:48-49`).
+`docs/dependency-lockfile-transition-review-2026-10-03.md`. `established fact` on the `#1873` tree.
+_Enforcement:_ **gated.** `src/test/check-bun-lockfile-policy.test.ts:537` runs the checker against
+the repository in the required test shards. It requires `bun.lock`, rejects every forbidden
+lockfile, and rejects a transition config that does not keep Bun canonical or that still declares a
+compatibility lockfile or review date, so there is no date left to pin. The non-required
+`dependency-security-ci.yml` also runs it (`:48-49`).
 
-> The npm lock's retirement (`#1873`) is not on the stamped tree. The first stamp whose tree contains
-> it amends this clause, or the change that lands it does (`#1878`).
+> Before `#1873` this clause read "`package-lock.json` is a synchronized compatibility artifact
+> under a dated review": the checker required both files, and the transition config carried a
+> `reviewBy` (last `2026-10-17`) that failed closed from the day after.
 
 **AC-8.2 — New dependency versions wait 24 hours.**
 `bunfig.toml` sets `minimumReleaseAge = 86400` as a supply-chain guard. Each entry in
@@ -1274,63 +1334,63 @@ Honest accounting of which clauses are held by a gate and which by convention. *
 are classified below** (no omissions). §0.2 promises each clause names the mechanism that keeps it
 true; a clause missing from this table would be an unstated gap.
 
-| Clause  | Enforcement                                                                                                                                                       | Kind                 |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| AC-1.1  | build / regeneration                                                                                                                                              | structural           |
-| AC-1.2  | regeneration overwrite (route tree, `_shared`); MCP bundle and `types.ts` by convention (`TREE_HASH_ROOTS` records a change, does not reject one)                 | **partially gated**  |
-| AC-1.3  | URL-set parity, `/operator/` shape, operator/internal ↔ `_operator` layout, `/sensors/*` both ways; general auth ↔ `_app` parity unenforced (T7)                  | **partially gated**  |
-| AC-1.4  | `vite-dev-server-binding.test.ts` pins the ESM import path; no-duplicate-plugin rule by review                                                                    | **partially gated**  |
-| AC-1.5  | comment and review — explicit CSRF registration; Start's default applies only without a start instance; non-prod warning; T8 proposed                             | `convention only`    |
-| AC-1.6  | `server-security-headers-runtime.test.ts` runs the Worker on an h3-swallowed JSON 500 and asserts the `text/html` error page (`#1937`)                            | **gated**            |
-| AC-1.7  | `funnel-event-db-sink.test.tsx` source-scan pins sink-before-Outlet order                                                                                         | **gated**            |
-| AC-1.8  | lockfile + 24 h release-age guard (AC-8.2); major-line moves by review                                                                                            | `convention only`    |
-| AC-2.1  | shape of the code as written                                                                                                                                      | structural           |
-| AC-2.2  | RLS and server-side checks at runtime                                                                                                                             | runtime boundary     |
-| AC-2.3  | required `Preflight — edge shared-lib mirror in sync` (`--check-only`); local prebuild auto-repairs instead of failing                                            | **gated**            |
-| AC-2.4  | `auth-hardening-static-safety.test.ts` source-scan requires `sessionStorage`, forbids `localStorage`                                                              | **gated**            |
-| AC-3.1  | comment and review                                                                                                                                                | `convention only`    |
-| AC-3.2  | comment and review                                                                                                                                                | `convention only`    |
-| AC-3.3  | comment and review — pinned/reused/safety copy in constants; inline JSX prose allowed                                                                             | `convention only`    |
-| AC-3.4  | comment and review                                                                                                                                                | `convention only`    |
-| AC-4.1  | no gate proves resolved vocabulary is not widened; schema width is measured fact; T2/T3 proposed                                                                  | **unenforced**       |
-| AC-4.2  | display split gated by `sensor-source-display-canon.test.ts` (#1088); `isRejectedSourceAlias` has zero non-test callers, so no ingest gate                        | **partially gated**  |
-| AC-4.3  | comment and review; T3 proposed                                                                                                                                   | `convention only`    |
-| AC-4.4  | comment and review — deliberate Pi exception                                                                                                                      | `convention only`    |
-| AC-4.5  | one-directional only                                                                                                                                              | `convention only`    |
-| AC-4.6  | `scripts/sensor-safety-check.mjs` — wording heuristic, 5 files; 3 non-required lanes on PRs to `main`/`verdant-grow-diary`, once suites pass                      | **partially gated**  |
-| AC-5.1  | shape of the code as written                                                                                                                                      | structural           |
-| AC-5.2  | no code path from the request body to the model constants                                                                                                         | structural           |
-| AC-5.3  | shape of the code as written                                                                                                                                      | structural           |
-| AC-5.4  | UUID syntax check plus **atomic RPC** spend/refund/conflict; `scripts/run-ai-credits-rls-harness.ts`                                                              | runtime boundary     |
-| AC-5.5  | product-safety commitment held by review and by absence of cultivation/queue writes                                                                               | **unenforced**       |
-| AC-5.6  | shape of the code as written — null/missing quality still contributes                                                                                             | structural           |
-| AC-5.7  | output **shape** enforced by tool schema + grounding validator; **one-photo ceiling convention-only**                                                             | **partially gated**  |
-| AC-5.8  | shape of the code as written                                                                                                                                      | structural           |
-| AC-6.1  | RLS and server-side checks at runtime                                                                                                                             | runtime boundary     |
-| AC-6.2  | comment and review                                                                                                                                                | `convention only`    |
-| AC-6.3  | shape of the code as written                                                                                                                                      | structural           |
-| AC-6.4  | RLS and server-side checks at runtime                                                                                                                             | runtime boundary     |
-| AC-6.5  | `ai_credit_allowance` + `ai_credit_spend` cap founder at 100/month                                                                                                | runtime boundary     |
-| AC-7.1  | product-safety commitment held by review                                                                                                                          | **unenforced**       |
-| AC-7.2  | product-safety commitment held by review                                                                                                                          | **unenforced**       |
-| AC-7.3  | product-safety commitment held by review                                                                                                                          | **unenforced**       |
-| AC-8.1  | `scripts/check-bun-lockfile-policy.mjs` via `check-bun-lockfile-policy.test.ts` in the required shards (date pinned; real `reviewBy` only in a non-required lane) | **gated** (presence) |
-| AC-8.2  | comment and review                                                                                                                                                | `convention only`    |
-| AC-8.3  | comment and review                                                                                                                                                | `convention only`    |
-| AC-8.4  | ESLint                                                                                                                                                            | **gated**            |
-| AC-9.1  | `Published migration integrity` runs on migration PRs; not a required context per the 2026-08-10 mirror                                                           | **partially gated**  |
-| AC-9.2  | comment and review                                                                                                                                                | `convention only`    |
-| AC-9.3  | comment and review — edge trigger identity `NOT_MEASURED`                                                                                                         | `convention only`    |
-| AC-10.1 | comment and review — α is documented here but not pinned (`src/test/vpd-drift-ewma.test.ts` does not assert it); T6 is the proposed pin                           | `convention only`    |
-| AC-10.2 | absence of Nelson / MAD implementations; T5 proposed                                                                                                              | **unenforced**       |
-| AC-10.3 | product decision recorded in §12                                                                                                                                  | **unenforced**       |
+| Clause  | Enforcement                                                                                                                                          | Kind                |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| AC-1.1  | build / regeneration                                                                                                                                 | structural          |
+| AC-1.2  | regeneration overwrite (route tree, `_shared`); MCP bundle and `types.ts` by convention (`TREE_HASH_ROOTS` records a change, does not reject one)    | **partially gated** |
+| AC-1.3  | URL-set parity, `/operator/` shape, operator/internal ↔ `_operator` layout, `/sensors/*` both ways; general auth ↔ `_app` parity unenforced (T7)     | **partially gated** |
+| AC-1.4  | `vite-dev-server-binding.test.ts` pins the ESM import path; no-duplicate-plugin rule by review                                                       | **partially gated** |
+| AC-1.5  | comment and review — explicit CSRF registration; Start's default applies only without a start instance; non-prod warning; T8 proposed                | `convention only`   |
+| AC-1.6  | `server-security-headers-runtime.test.ts` runs the Worker on an h3-swallowed JSON 500 and asserts the `text/html` error page (`#1937`)               | **gated**           |
+| AC-1.7  | `funnel-event-db-sink.test.tsx` source-scan pins sink-before-Outlet order                                                                            | **gated**           |
+| AC-1.8  | lockfile + 24 h release-age guard (AC-8.2); major-line moves by review                                                                               | `convention only`   |
+| AC-2.1  | shape of the code as written                                                                                                                         | structural          |
+| AC-2.2  | RLS and server-side checks at runtime                                                                                                                | runtime boundary    |
+| AC-2.3  | required `Preflight — edge shared-lib mirror in sync` (`--check-only`); local prebuild auto-repairs instead of failing                               | **gated**           |
+| AC-2.4  | `auth-hardening-static-safety.test.ts` source-scan requires `sessionStorage`, forbids `localStorage`                                                 | **gated**           |
+| AC-3.1  | comment and review                                                                                                                                   | `convention only`   |
+| AC-3.2  | comment and review                                                                                                                                   | `convention only`   |
+| AC-3.3  | comment and review — pinned/reused/safety copy in constants; inline JSX prose allowed                                                                | `convention only`   |
+| AC-3.4  | comment and review                                                                                                                                   | `convention only`   |
+| AC-4.1  | no gate proves resolved vocabulary is not widened; schema width is measured fact; T2/T3 proposed                                                     | **unenforced**      |
+| AC-4.2  | display split gated by `sensor-source-display-canon.test.ts` (#1088); `isRejectedSourceAlias` has zero non-test callers, so no ingest gate           | **partially gated** |
+| AC-4.3  | comment and review; T3 proposed                                                                                                                      | `convention only`   |
+| AC-4.4  | comment and review — deliberate Pi exception                                                                                                         | `convention only`   |
+| AC-4.5  | one-directional only                                                                                                                                 | `convention only`   |
+| AC-4.6  | `scripts/sensor-safety-check.mjs` — wording heuristic, 5 files; 3 non-required lanes on PRs to `main`/`verdant-grow-diary`, once suites pass         | **partially gated** |
+| AC-5.1  | `geminiDirectChat.test.ts` in a required job pins both routes and scans both call sites; `ai-cultivar-qa` unenforced                                 | **partially gated** |
+| AC-5.2  | no code path from the request body to the model constants; route values pinned by `geminiDirectChat.test.ts` (AC-5.1)                                | structural          |
+| AC-5.3  | shape of the code as written                                                                                                                         | structural          |
+| AC-5.4  | UUID syntax check plus **atomic RPC** spend/refund/conflict; `scripts/run-ai-credits-rls-harness.ts`                                                 | runtime boundary    |
+| AC-5.5  | product-safety commitment held by review and by absence of cultivation/queue writes                                                                  | **unenforced**      |
+| AC-5.6  | shape of the code as written — null/missing quality still contributes                                                                                | structural          |
+| AC-5.7  | output **shape** enforced by tool schema + grounding validator; **one-photo ceiling convention-only**                                                | **partially gated** |
+| AC-5.8  | shape of the code as written                                                                                                                         | structural          |
+| AC-6.1  | RLS and server-side checks at runtime                                                                                                                | runtime boundary    |
+| AC-6.2  | comment and review                                                                                                                                   | `convention only`   |
+| AC-6.3  | shape of the code as written                                                                                                                         | structural          |
+| AC-6.4  | RLS and server-side checks at runtime                                                                                                                | runtime boundary    |
+| AC-6.5  | `ai_credit_allowance` + `ai_credit_spend` cap founder at 100/month                                                                                   | runtime boundary    |
+| AC-7.1  | product-safety commitment held by review                                                                                                             | **unenforced**      |
+| AC-7.2  | product-safety commitment held by review                                                                                                             | **unenforced**      |
+| AC-7.3  | product-safety commitment held by review                                                                                                             | **unenforced**      |
+| AC-8.1  | `scripts/check-bun-lockfile-policy.mjs` via `check-bun-lockfile-policy.test.ts` in the required shards (forbids `package-lock.json`; no review date) | **gated**           |
+| AC-8.2  | comment and review                                                                                                                                   | `convention only`   |
+| AC-8.3  | comment and review                                                                                                                                   | `convention only`   |
+| AC-8.4  | ESLint                                                                                                                                               | **gated**           |
+| AC-9.1  | `Published migration integrity` runs on migration PRs; not a required context per the 2026-08-10 mirror                                              | **partially gated** |
+| AC-9.2  | comment and review                                                                                                                                   | `convention only`   |
+| AC-9.3  | comment and review — edge trigger identity `NOT_MEASURED`                                                                                            | `convention only`   |
+| AC-10.1 | comment and review — α is documented here but not pinned (`src/test/vpd-drift-ewma.test.ts` does not assert it); T6 is the proposed pin              | `convention only`   |
+| AC-10.2 | absence of Nelson / MAD implementations; T5 proposed                                                                                                 | **unenforced**      |
+| AC-10.3 | product decision recorded in §12                                                                                                                     | **unenforced**      |
 
 **Count check:** 48 rows above = 48 clauses (AC-1.8 added in the 2026-09-22 amendment). Kinds used: **gated**, **partially gated**,
 structural, runtime boundary, `convention only`, **unenforced**.
 
 **On AC-5.4, corrected.** An earlier draft grouped it with AC-5.2 as "no code path from request body
 to constant or key". That is wrong: `idempotencyKey` **does** come from the request
-(`ai-doctor-review/index.ts:364-367` validates `request.idempotencyKey` as a UUID, and `:417` passes
+(`ai-doctor-review/index.ts:428-431` validates `request.idempotencyKey` as a UUID, and `:481` passes
 it to `p_idempotency_key`). UUID validation is only syntax. Double-spend prevention, replay
 classification, and append-only refunds are **RPC/runtime**. AC-5.2's boundary is structural;
 AC-5.4's is a runtime boundary. Conflating them records the wrong trust boundary.
@@ -1372,7 +1432,7 @@ one that reads `package.json` as raw text and asserts on that text instead of th
 (`JSON_CONFIG_FILES = ["package.json"]`, `:68`). T2–T8 read no config, so neither shape is any
 of them. T1 is the one exception: it opens every cited file and matches a snippet on the named
 line, and this document cites `package.json` at seven places (`:9`, `:21-22`, `:66`, `:225`,
-`:324`, `:325`, `:370`). That is citation integrity, not verification of effective configuration,
+`:324`, `:325`, `:371`). That is citation integrity, not verification of effective configuration,
 which is the only thing the checker guards; it is the "proving a string is present or absent" use
 `AGENTS.md` keeps for source scans. A T1 runner placed anywhere the checker scans therefore
 declares `@source-scan-justified: citation integrity` rather than importing `package.json`. Citing
@@ -1542,6 +1602,9 @@ stale every time the operating picture moved. Only the durable rules stay:
 | 2026-10-07 | `e0bb39304a44dc72dfef83734e651034598b5454` | Claude | Evidence-status note at the later deploy tip, on the owner's instruction to update this PR in place and to label inherited claims. **The stamp does not move:** every clause still describes `2ffe78cc`. New §15.2 labels each of the seven stack claims VERIFIED (re-read at `e0bb3930` this session) or INHERITED (the `2ffe78cc` verdict, not re-read), lists the ten cited files that changed between the trees and the cites that moved, and records `#1857`'s exact-SHA review history, ending in a Codex **FAIL** at `4ee43c6e`. AC-4.2 gains the AI-context-path gap (the resolver emits `unknown`), verified at both trees, whose two files are byte-identical. No other clause statement changed. Docs-only; no `CURRENT_STATE.md` restamp.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 2026-10-08 | `e0bb39304a44dc72dfef83734e651034598b5454` | Claude | Review follow-up, stamp unchanged. §15.2 and AC-4.2 no longer carry `#1857`'s review verdicts, merge state, ahead/behind counts or ownership; those are operating state, recorded in the PR's own comments, and belong in `CURRENT_STATE.md` / `HANDOFF_LOG.md` rather than here. Every remaining `#1857` / `#1873` mention is stated against a fixed SHA (`2ffe78cc`, `e0bb3930`) rather than as PR status, so it cannot go stale. The durable rule stays: nothing on an unmerged branch is a property of the stamped tree, and AC-4.2 is amended against the merged tree when `#1857` or a successor lands. No clause statement changed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 2026-10-13 | `7e024f9362d4f57c1d5cb8252bf0104a2626b46a` | Claude | §15 re-verification at the deploy tip (`#1978`), on the owner's instruction to refresh #1899 at the current tip. Supersedes the `2ffe78cc1` stamp and the §15.2 note. 296 files changed since `2ffe78cc1` (44 merges, 96 in `src/test/`, one additive migration); 24 cited files changed and every line cite into them was re-read by script against both trees. Line moves are listed in the header. Substance: AC-1.1 records that `src/server.ts`'s `fetch` does host redirects, the health path and host headers before SSR (`#1943`), as code fact and not publisher evidence; AC-1.6 moves from `convention only` to **gated** (`src/test/server-security-headers-runtime.test.ts:94-105`, `#1937`); AC-8.1's `reviewBy` is `2026-10-17` and the overdue failure starts 2026-10-18 UTC; §13's Quick Log `quicklog_save_event` callers drop `createQuickLogEvent.ts` (removed by `#1839`); AC-4.2's AI-path paragraph adds that the AI Doctor request-packet and receipt validators admit `"unknown"` as a seventh snapshot source token and check trust separately. Counts: AC-3.2 555 files (13 added, all pure; drift rows unchanged), AC-3.4 784 in 783, AC-4.3 and AC-10.2 unchanged. Seven stack claims: verdicts unchanged from `2ffe78cc1` (1–4 and 7 PASS; 5 PASS for `ai-doctor-review`, FAIL as a claim about every AI Doctor surface; 6 PASS for set and storage, FAIL for display and the AI path), because the unchanged evidence is byte-identical and the changed evidence (`src/server.ts`, `package.json`, `bun.lock`, the new migration) was re-read and still supports them. `#1857` and `#1982` are not on this tree. Production `NOT_MEASURED`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 2026-10-13 | `22f8dfe8d46386bc4044d9312036b5fbd63c494f` | Claude | §15 re-verification at the deploy tip (`#1870`), on the owner's instruction to restamp for `#1982`. Supersedes the `7e024f93` stamp. 101 files across 15 merges since `7e024f93`; 17 cited files changed, and every cite into them was re-read. **Claim 5 is now FAIL for its gateway part:** `#1982` moved `ai-doctor-review` and `ai-coach` to Google's OpenAI-compatible Gemini endpoint through `_shared/geminiDirectChat.ts`, keyed by a server-only `GEMINI_API_KEY` that fails closed before any credit spend. The rest of claim 5 holds: server-pinned models (`gemini-3-flash-preview`, `gemini-2.5-flash`), tool-forced and validated output for the review function, credit and idempotency controls, evidence receipts, and no direct Action Queue or device writes. AC-5.1 rewritten: `ai-cultivar-qa` stays on the gateway; `LOVABLE_API_KEY` stays for it, for email and for Paddle; production deployment and the key are `NOT_MEASURED`. AC-5.1 reclassified **partially gated** by `geminiDirectChat.test.ts` in the required `Lint, typecheck, test, build` job; its key-before-spend order check matches the import, not the call, so that order is unenforced (Codex on `#2065`). AC-5.2 records the route table and the wire/recorded model split. AC-5.8 records that v2 receipts sign the wire model while `p_model_id` keeps the gateway-era id. AC-2.1's `quicklog_save_manual` cite moves to the `#1841` migration. Line moves are listed in the header. Counts: AC-3.2 559 (four new pure `*Rules.ts`), AC-3.4 791 in 790, AC-4.3 and AC-10.2 unchanged; 35/7 required/mustBeGreen unchanged. Claims 1–4, 6 and 7 unchanged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 2026-10-13 | `7e024f9362d4f57c1d5cb8252bf0104a2626b46a` | Claude | Merge of the deploy tip (`ad79ebc6`, carrying `#1899`'s restamp) into `claude/remove-package-lock` (`#1873`), stamp unchanged. AC-8.1, AC-1.8's lockfile note, the §14 AC-8.1 row and the opening stamp note now state the bun-only rule this branch enforces; every other clause is `#1899`'s text. AC-8.1's cites were re-read on the merged tree: `check-bun-lockfile-policy.mjs:5`, `:24`, `:66-71`, `:179-190` (`:185-186`), `check-bun-lockfile-policy.test.ts:537`, `dependency-security-ci.yml:48-49`. This supersedes the 2026-10-10 Canopy stamp the branch carried (`ba991f60`), which read an older tree.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 2026-10-14 | `22f8dfe8d46386bc4044d9312036b5fbd63c494f` | Claude | Merge of the deploy tip (`ad399831`, carrying `#2065`'s restamp at `22f8dfe8`) into `claude/remove-package-lock` (`#1873`), stamp unchanged. AC-8.1, AC-1.8's lockfile note, the §14 AC-8.1 row and the opening stamp note again state the bun-only rule this branch enforces; every other clause is `#2065`'s text. `#1931` added the `postcss-selector-parser` 7.1.6 floor to `BUN_LOCK_SECURITY_FLOORS`, which moves AC-8.1's cites down one line: `check-bun-lockfile-policy.mjs:5`, `:24`, `:67-72`, `:180-191` (`:186-187`); `check-bun-lockfile-policy.test.ts:537` and `dependency-security-ci.yml:48-49` hold. All re-read on the merged tree.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ### 15.2 Evidence status at deploy tip `e0bb3930` — 2026-10-07, dated
 

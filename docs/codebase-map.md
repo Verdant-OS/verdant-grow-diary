@@ -305,7 +305,7 @@ Ten `workflow_dispatch`-only appliers: `apply-pinned-production-migrations`,
 `security-db-local` (opt-in lane, spins a local Supabase and replays migrations into an
 immutable workspace, then runs the individual RLS lanes), `security-regression`,
 `dependency-security-ci`, `mcp-local-rls-integration`, `irrigation-pgtap-rls-gate`,
-`irrigation-evidence-gate`, `sandbox-credit-packs-smoke`.
+`irrigation-evidence-gate`.
 
 ### Test runners
 

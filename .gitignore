@@ -12,8 +12,10 @@ dist
 dist-ssr
 *.local
 
-# bun.lock is canonical; package-lock.json remains tracked under the dated npm-consumer transition.
+# bun.lock is canonical and the only lockfile. package-lock.json was retired on
+# 2026-10-03; ignoring it keeps a local npm bootstrap from committing one.
 bun.lockb
+package-lock.json
 yarn.lock
 pnpm-lock.yaml
 

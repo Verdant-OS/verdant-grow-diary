@@ -516,6 +516,27 @@ export function isTimelineEvidenceFilterActive(input: TimelineEvidenceFilterInpu
   return false;
 }
 
+/** Any non-empty date field, including an inverted or otherwise unapplied value. */
+export function timelineEnteredDateKeepsClearEnabled(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+export function timelineClearFiltersEnabled(input: {
+  evidenceActive: boolean;
+  chipFiltersActive: boolean;
+  enteredStartDate: string | null | undefined;
+  enteredEndDate: string | null | undefined;
+}): boolean {
+  return (
+    input.evidenceActive ||
+    input.chipFiltersActive ||
+    timelineEnteredDateKeepsClearEnabled(input.enteredStartDate) ||
+    timelineEnteredDateKeepsClearEnabled(input.enteredEndDate)
+  );
+}
+
+export { timelineDateParamsAfterSync } from "@/lib/timelineDateSearchParamRules";
+
 export const TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER = "Search timeline";
 export const TIMELINE_EVIDENCE_EMPTY_TITLE = "No matches";
 export const TIMELINE_EVIDENCE_EMPTY_DESC = "No timeline entries match these filters.";

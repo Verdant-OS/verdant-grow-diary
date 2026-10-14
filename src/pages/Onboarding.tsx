@@ -82,6 +82,7 @@ export default function Onboarding() {
 
   if (loading || growsLoading) return null;
   if (!user) return <Navigate to="/auth" replace />;
+  if (grows.length >= 1) return <Navigate to={routeForStartScreen("dashboard")} replace />;
 
   function go(c: StartScreenChoice, save: boolean) {
     if (save && user) setStartScreenChoice(user.id, c);

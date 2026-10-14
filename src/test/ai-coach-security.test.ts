@@ -47,7 +47,7 @@ describe("ai-coach edge function — security shape", () => {
   it("rejects scope mismatches and resolves every replay before the provider call", () => {
     const decisionIndex = CODE.indexOf("const spendDecision = classifyAiDoctorCreditSpend");
     const scopeIndex = CODE.indexOf("spendObj.feature !== FEATURE");
-    const providerIndex = CODE.indexOf('fetch("https://ai.gateway.lovable.dev');
+    const providerIndex = CODE.indexOf("fetch(GATEWAY_URL");
     expect(decisionIndex).toBeGreaterThan(-1);
     expect(scopeIndex).toBeGreaterThan(-1);
     expect(scopeIndex).toBeGreaterThan(decisionIndex);
@@ -140,7 +140,7 @@ describe("ai-coach edge function — security shape", () => {
     const emptyIdx = CODE.search(
       /if\s*\(\s*empty[\s\S]*?return\s+safeOk\(\s*\{\s*analysis:\s*EMPTY_ANALYSIS/,
     );
-    const fetchIdx = CODE.search(/fetch\(\s*["']https:\/\/ai\.gateway\.lovable\.dev/);
+    const fetchIdx = CODE.search(/fetch\(GATEWAY_URL/);
     expect(emptyIdx).toBeGreaterThan(-1);
     expect(fetchIdx).toBeGreaterThan(-1);
     expect(emptyIdx).toBeLessThan(fetchIdx);

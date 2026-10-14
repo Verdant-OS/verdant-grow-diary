@@ -9,8 +9,10 @@ import { TimelineGrowDayLabel } from "@/components/TimelineGrowDayLabel";
 import { nextLocalMidnight } from "@/lib/plantStartDateRules";
 
 describe("nextLocalMidnight", () => {
+  const previousTz = process.env.TZ;
   afterEach(() => {
-    delete process.env.TZ;
+    if (previousTz === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTz;
   });
 
   it("is local midnight of the next calendar day across a spring-forward", () => {

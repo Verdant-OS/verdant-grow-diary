@@ -54,15 +54,15 @@ branch: cursor/timeline-local-grow-day-d474
 base: verdant-grow-diary
 checkout: git fetch origin cursor/timeline-local-grow-day-d474 verdant-grow-diary && git switch cursor/timeline-local-grow-day-d474 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2079 (draft)
-head_sha: parent of the commit that records this line. Observed remote head before this log commit: 993fb9ac3c80683e0afffca9657699c2e4bccb43 at 2026-10-14 12:56 CT (origin/cursor/timeline-local-grow-day-d474). That SHA is the parent, not this commit.
-state: pushed draft. UTC-midnight grow starts and local-midnight header refresh are in the parent above.
-next_action: stay draft. No ready, merge, or deploy. Graft re-reviews once required CI is green at the new head.
-files: src/lib/plantStartDateRules.ts; src/pages/Timeline.tsx; src/components/TimelineGrowDayLabel.tsx; src/hooks/useTimelineGrowDayNow.ts; src/test/timeline-grow-day.test.ts; src/test/timeline-grow-day-utc-midnight.test.ts; src/test/timeline-grow-day-midnight.test.tsx
+head_sha: parent of the commit that records this line. Observed remote head before this update: 4a33b26a3254773d2385536aa0c728e70a994022 at 2026-10-14 13:18 CT (origin/cursor/timeline-local-grow-day-d474). That SHA is the parent, not this commit.
+state: pushed. Same-day future starts return null. Midnight test restores the saved TZ.
+next_action: Graft re-reviews the new head. No merge from this writer.
+files: src/lib/plantStartDateRules.ts; src/pages/Timeline.tsx; src/components/TimelineGrowDayLabel.tsx; src/hooks/useTimelineGrowDayNow.ts; src/test/timeline-grow-day.test.ts; src/test/timeline-grow-day-utc-midnight.test.ts; src/test/timeline-grow-day-later-today.test.ts; src/test/timeline-grow-day-midnight.test.tsx
 blockers: none for the repository change
-artifacts: src/test/timeline-grow-day.test.ts (RED 3 failed / 0 passed before the helper used calendar days; GREEN 3 passed / 0 failed after). P2 UTC midnight: RED 1 failed / 0 passed in timeline-grow-day-utc-midnight.test.ts (null, expected 0). P2 midnight rollover: RED 1 failed / 1 passed in timeline-grow-day-midnight.test.tsx before the timer (header stayed day 0). GREEN after both fixes: 7 passed / 0 failed across the three grow-day files.
-reviewer_seat: Critical Mass for the rules and test; Blue Dream if the .tsx header is in that seat's scope. Cheeko named Graft to re-review once CI is green.
-claimed_by: Grok, 2026-10-14 12:56 CT (sole writer for the three P2s; previous writer bc-882b2f06)
-last_updated: 2026-10-14 12:56 CT, by Grok
+artifacts: later-today RED 1 failed / 0 passed (received 0, expected null) before the instant check; GREEN after. Midnight TZ restore does not change assertions. Renegotiated pin: src/test/timeline-grow-day-midnight.test.tsx (cleanup only).
+reviewer_seat: Graft, named by Cheeko 2026-10-14 1:15 PM CT
+claimed_by: bc-9958d146, 2026-10-14 13:18 CT
+last_updated: 2026-10-14 13:18 CT, by bc-9958d146
 ```
 
 ### FIX-2004-APP-DOCUMENT-TITLES

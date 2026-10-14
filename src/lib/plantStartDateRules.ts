@@ -150,6 +150,7 @@ export function resolveTimelineGrowDay(iso: string | null | undefined, now: Date
   if (typeof iso !== "string" || iso.trim() === "") return null;
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return null;
+  if (ms > now.getTime()) return null;
   const days = calendarDaysBetween(localCalendarDate(new Date(ms)), localCalendarDate(now));
   return days < 0 ? null : days;
 }

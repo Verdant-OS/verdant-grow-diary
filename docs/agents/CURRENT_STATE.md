@@ -39,7 +39,7 @@ Read this section first. It doesn't replace the observation log below.
 - **Read-back (`source claim`, same session):** `plants.health` defaults to `'unknown'`; `validate_plant_row` accepts `'unknown'`; the trigger is still attached; the comment is set; all 282 rows are unchanged.
 - **Ledger gap (`source claim`):** no `supabase_migrations.schema_migrations` row was added for this version, so the ledger is out of step with the schema.
 - **Effect (`source claim`):** this fixed the production plant-create 400 (`P0001`, `invalid plant health: unknown`). PR #2150 was closed unmerged as superseded. The #1989 PREFLIGHT/APPLY chase is cancelled.
-- **Project identity (`source claim`):** production is `knkwiiywfkbqznbxwqfh`. `bzatgtgjvuojpoxcknaa` is not production. Treat any check labeled prod that ran against `bzatgtgjvuojpoxcknaa` as unverified. This receipt does not lift the production database lock, and it records no new write from this session.
+- **Project identity (`source claim`):** production is `knkwiiywfkbqznbxwqfh`. `bzatgtgjvuojpoxcknaa` is not production. Treat any check labeled prod that ran against `bzatgtgjvuojpoxcknaa` as unverified. This receipt does not lift the production database lock. The cloud agent that wrote this receipt made no production query or write; the apply was done by Cheeko's own session.
 
 ## Follow-up observation — 2026-10-14T18:25 UTC
 

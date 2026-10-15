@@ -186,36 +186,91 @@ $proof$;
 `;
 
 const DIARY_ONLY = `
-insert into public.diary_entries(id, user_id, note, details)
-values (
-  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4', '${OWNER}', 'diary only',
-  '{"event_type":"watering","quick_log_version":2,"watering":{"volume_ml":320}}'
-);
-select public.quicklog_correct_entry(
-  'wrong_value', '{"volume_ml":330}'::jsonb,
-  null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4', null) as result;
+do $pre$
+declare
+  v jsonb;
+  details jsonb;
+  previous numeric;
+begin
+  insert into public.diary_entries(id, user_id, note, details)
+  values (
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4', '${OWNER}', 'diary only',
+    '{"event_type":"watering","quick_log_version":2,"watering":{"volume_ml":320}}'
+  );
+  v := public.quicklog_correct_entry(
+    'wrong_value', '{"volume_ml":330}'::jsonb,
+    null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4', null);
+  select d.details into details
+    from public.diary_entries d
+   where d.id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4';
+  select (r.previous_state ->> 'volume_ml')::numeric into previous
+    from public.quicklog_entry_revisions r
+   where r.diary_entry_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4';
+  if coalesce((v->>'ok')::boolean, false) is not true then
+    raise exception 'diary-only lost history: expected a successful overwrite, got %', v;
+  end if;
+  if previous is not null then
+    raise exception 'diary-only lost history: previous volume was kept: %', previous;
+  end if;
+  if (details #>> '{watering,volume_ml}')::numeric is distinct from 330 then
+    raise exception 'diary-only lost history: live volume did not change: %', details;
+  end if;
+end
+$pre$;
 `;
 
 const FLAT_WATERING = `
-insert into public.diary_entries(id, user_id, note, details)
-values (
-  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6', '${OWNER}', 'flat water',
-  '{"event_type":"watering","quick_log_version":2,"watering_amount_ml":410}'
-);
-select public.quicklog_correct_entry(
-  'wrong_value', '{"volume_ml":420}'::jsonb,
-  null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6', null) as result;
+do $pre$
+declare
+  v jsonb;
+  details jsonb;
+begin
+  insert into public.diary_entries(id, user_id, note, details)
+  values (
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6', '${OWNER}', 'flat water',
+    '{"event_type":"watering","quick_log_version":2,"watering_amount_ml":410}'
+  );
+  v := public.quicklog_correct_entry(
+    'wrong_value', '{"volume_ml":420}'::jsonb,
+    null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6', null);
+  select d.details into details
+    from public.diary_entries d
+   where d.id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6';
+  if coalesce((v->>'ok')::boolean, false) is not true then
+    raise exception 'flat watering missing field: expected success, got %', v;
+  end if;
+  if (details->>'watering_amount_ml')::numeric is distinct from 410 then
+    raise exception 'flat watering missing field: watering_amount_ml changed: %', details;
+  end if;
+end
+$pre$;
 `;
 
 const NUTRIENTS_DOSE = `
-insert into public.diary_entries(id, user_id, note, details)
-values (
-  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb5', '${OWNER}', 'nutrient only',
-  '{"event_type":"feeding","quick_log_version":2,"nutrients":[{"name":"Grow","amount":2,"unit":"ml"}]}'
-);
-select public.quicklog_correct_entry(
-  'wrong_value', '{"dose_amount":4}'::jsonb,
-  null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb5', null) as result;
+do $pre$
+declare
+  v jsonb;
+  details jsonb;
+begin
+  insert into public.diary_entries(id, user_id, note, details)
+  values (
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb5', '${OWNER}', 'nutrient only',
+    '{"event_type":"feeding","quick_log_version":2,"nutrients":[{"name":"Grow","amount":2,"unit":"ml"}]}'
+  );
+  v := public.quicklog_correct_entry(
+    'wrong_value', '{"dose_amount":4}'::jsonb,
+    null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb5', null);
+  select d.details into details
+    from public.diary_entries d
+   where d.id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb5';
+  if v->>'reason' is distinct from 'unsupported_change' then
+    raise exception 'nutrients dose ignored: expected unsupported_change, got %', v;
+  end if;
+  if (details #>> '{nutrients,0,amount}')::numeric is distinct from 2 then
+    raise exception 'nutrients dose ignored: amount changed: %', details;
+  end if;
+end
+$pre$;
 `;
 
 const NULL_HUMIDITY = `
@@ -264,9 +319,13 @@ function pgArgs() {
 }
 
 function psql(db, sql) {
-  return spawnSync("psql", [...pgArgs(), "-d", db, "-v", "ON_ERROR_STOP=1", "-c", sql], {
-    encoding: "utf8",
-  });
+  return spawnSync(
+    "psql",
+    [...pgArgs(), "-d", db, "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=verbose", "-c", sql],
+    {
+      encoding: "utf8",
+    },
+  );
 }
 
 function psqlOrThrow(db, sql) {
@@ -311,8 +370,24 @@ function realOwnershipSql() {
       corrections,
       "CREATE OR REPLACE FUNCTION public.quicklog_revision_sibling_env_ids",
     ),
-    extractFunction(corrections, "CREATE OR REPLACE FUNCTION public.quicklog_correct_entry"),
   ].join("\n");
+}
+
+const PRE_FIX_MEASURED_SHA = "8d0566278";
+
+function preFixMeasuredSql() {
+  const shown = spawnSync(
+    "git",
+    [
+      "show",
+      `${PRE_FIX_MEASURED_SHA}:supabase/migrations/20261014210000_quicklog_correction_editable_values.sql`,
+    ],
+    { encoding: "utf8" },
+  );
+  if (shown.status !== 0 || !shown.stdout.includes("quicklog_correct_entry")) {
+    throw new Error(shown.stderr || "could not load the pre-fix measured function");
+  }
+  return shown.stdout;
 }
 
 function main() {
@@ -321,26 +396,38 @@ function main() {
   if (created.status !== 0) throw new Error(created.stderr || "createdb failed");
   psqlOrThrow(DB, SETUP);
   applyMigration(DB, realOwnershipSql());
-  for (const [label, sql] of [
-    ["diary-only orphan", DIARY_ONLY],
-    ["flat watering_amount_ml", FLAT_WATERING],
-    ["dose from nutrients only", NUTRIENTS_DOSE],
-    ["null humidity", NULL_HUMIDITY],
+  applyMigration(DB, preFixMeasuredSql());
+  for (const [label, sql, expect23502] of [
+    ["diary-only orphan", DIARY_ONLY, false],
+    ["flat watering_amount_ml", FLAT_WATERING, false],
+    ["dose from nutrients only", NUTRIENTS_DOSE, false],
+    ["null humidity", NULL_HUMIDITY, true],
   ]) {
     const preFix = psql(DB, sql);
     const text = `${preFix.stdout ?? ""}\n${preFix.stderr ?? ""}`;
-    const reason = text.match(/"reason": "([^"]+)"/)?.[1] ?? "";
-    if (preFix.status !== 0 || reason !== "unsupported_change") {
+    if (expect23502) {
+      if (preFix.status === 0 || !text.includes("23502")) {
+        throw new Error(
+          `${label} did not raise 23502 on the pre-fix function: status ${preFix.status} ${text}`,
+        );
+      }
+      console.log(`pre-fix ${label}: 23502`);
+    } else if (preFix.status !== 0) {
       throw new Error(
-        `${label} did not fail closed on the pre-fix function: status ${preFix.status} ${text}`,
+        `${label} did not show its specific pre-fix failure: status ${preFix.status} ${text}`,
       );
+    } else {
+      console.log(`pre-fix ${label}: specific failure held`);
     }
-    console.log(`pre-fix ${label}: ${reason}`);
     psqlOrThrow(
       DB,
       "truncate public.grow_events, public.diary_entries, public.watering_events, public.feeding_events, public.environment_events, public.quicklog_entry_revisions",
     );
   }
+  psqlOrThrow(
+    DB,
+    "drop function if exists public.quicklog_correction_apply_measured_values(uuid, text, uuid, uuid[], uuid[], boolean, numeric, boolean, numeric, boolean, jsonb)",
+  );
   psqlOrThrow(
     DB,
     "truncate public.grow_events, public.diary_entries, public.watering_events, public.feeding_events, public.environment_events, public.quicklog_entry_revisions",

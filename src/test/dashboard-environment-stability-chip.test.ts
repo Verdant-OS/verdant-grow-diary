@@ -46,8 +46,11 @@ describe("Dashboard environment stability chip — wiring", () => {
     // Alerts do (Codex review on #1683); the behavior is rendered in
     // dashboard-strip-stage-and-manual-save-gate.
     expect(SRC).toMatch(/const envStage = resolveTentEnvironmentStage\(/);
+    expect(SRC).toMatch(/mergeVpdStabilityInputs/);
+    expect(SRC).toMatch(/vpdStabilityInputsFromWideReadings/);
+    expect(SRC).toMatch(/singleStripTentId/);
     expect(SRC).toMatch(
-      /computeEnvironmentStability\(\s*rs\s*,\s*\{\s*stage:\s*envStage\s*\}\s*\)/,
+      /computeEnvironmentStability\(\s*stabilityReadings\s*,\s*\{\s*stage:\s*envStage\s*\}\s*\)/,
     );
     expect(SRC).toMatch(/formatStabilityChipView\(stability\)/);
   });

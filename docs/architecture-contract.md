@@ -1029,10 +1029,13 @@ forced tool and only a shape check. "AI Doctor output is tool-forced and validat
 review function, not of every surface named AI Doctor.
 `established fact`.
 
-**AC-5.4 — Credits are metered server-side before the model call, with idempotency, and refunded on
-failure.**
+**AC-5.4 — Credits are metered server-side before the model call, with idempotency, and a refund is
+attempted on failure.**
 `ai_credit_spend` is called with a UUID-validated `p_idempotency_key` before inference; a failed
-call reverses through `ai_credit_refund` with its own key. Reversals are append-only.
+call is not an unconditional reversal. It attempts an idempotent `ai_credit_refund` keyed `refund:`
+plus the spend id through `failureAfterRefund` (`ai-doctor-review/index.ts:493-523`). A confirmed
+refund is an append-only reversal. An unconfirmed attempt, including a missing spend id, returns
+`result_pending`. Confirmed and pending stay separate outcomes.
 
 **`idempotencyKey` has a request-body path.** The edge function validates
 `request.idempotencyKey` as a UUID (`ai-doctor-review/index.ts:428-431`) and passes it to

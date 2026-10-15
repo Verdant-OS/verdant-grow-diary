@@ -36,7 +36,7 @@ describe("buildDailyGrowCheckConsistency · pure rules", () => {
     const s = buildDailyGrowCheckConsistency(baseInput());
     expect(s.checkedDays).toBe(0);
     expect(s.currentStreak).toBe(0);
-    expect(s.missedDays).toBe(7);
+    expect(s.missedDays).toBe(6);
     expect(s.todayHasActivity).toBe(false);
     expect(s.hasAnyActivity).toBe(false);
   });

@@ -15,6 +15,7 @@ import {
   fetchSensorReadings,
 } from "@/lib/growRepo";
 import { buildPrivateGrowQueryKey } from "@/lib/growDataQueryKeyRules";
+import { withCriticalReadDeadline } from "@/lib/boundedReadRules";
 import { useAuth } from "@/store/auth";
 
 // ---------------------------------------------------------------------------
@@ -242,14 +243,16 @@ export function useGrowTents(growId?: string): UseQueryResult<Tent[]> {
     queryKey: buildPrivateGrowQueryKey(ownerId, ["tents", growId ?? "all"]),
     retry: false,
     queryFn: () =>
-      withSourceMeta({
-        scope: "tents",
-        ownerId,
-        key,
-        run: () => fetchTents(growId),
-        emptyValue: () => [] as Tent[],
-        isEmpty: isArrEmpty,
-      }),
+      withCriticalReadDeadline(
+        withSourceMeta({
+          scope: "tents",
+          ownerId,
+          key,
+          run: () => fetchTents(growId),
+          emptyValue: () => [] as Tent[],
+          isEmpty: isArrEmpty,
+        }),
+      ),
   });
 }
 
@@ -298,14 +301,16 @@ export function useGrowPlants(
     ]),
     retry: false,
     queryFn: () =>
-      withSourceMeta({
-        scope: "plants",
-        ownerId,
-        key,
-        run: () => fetchPlants(tentId, growId, { includeArchived }),
-        emptyValue: () => [] as Plant[],
-        isEmpty: isArrEmpty,
-      }),
+      withCriticalReadDeadline(
+        withSourceMeta({
+          scope: "plants",
+          ownerId,
+          key,
+          run: () => fetchPlants(tentId, growId, { includeArchived }),
+          emptyValue: () => [] as Plant[],
+          isEmpty: isArrEmpty,
+        }),
+      ),
   });
 }
 

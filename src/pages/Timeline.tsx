@@ -4,6 +4,7 @@ import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { orderNewestFirstStable } from "@/lib/timelineQueryOrderRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
+import { withCriticalReadDeadline } from "@/lib/boundedReadRules";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
 import TimelineLightingGuideCard from "@/components/TimelineLightingGuideCard";
@@ -246,6 +247,7 @@ import {
   buildTimelinePageReadView,
   hasTimelineRequiredReadError,
   mergeTimelinePartialSources,
+  resolveTimelineFetchScope,
   type TimelineCoreReadState,
   type TimelineSupplementalReadSource,
 } from "@/lib/timelinePageReadStateRules";
@@ -442,9 +444,13 @@ export default function Timeline() {
   // active grow instead of creating a scope/read-key disagreement that can
   // leave the page waiting forever.
   const urlGrowId = rawUrlGrowId?.trim() || null;
-  const hasInvalidScope = Boolean(urlGrowId) && !isValidScopedGrow;
-  const preferredGrowId = urlGrowId ?? storeGrowId;
-  const activeGrowId = hasInvalidScope ? null : preferredGrowId;
+  const { activeGrowId, hasInvalidScope } = resolveTimelineFetchScope({
+    urlGrowId,
+    storeGrowId,
+    growsLoading,
+    growsError,
+    isValidScopedGrow,
+  });
   const activeGrow = urlGrowId ? (isValidScopedGrow ? scopedGrow : null) : storeActiveGrow;
   const isLogsRoute = pathname.startsWith("/logs");
   const scopeLabel = isLogsRoute ? "logs" : "timeline";
@@ -688,11 +694,11 @@ export default function Timeline() {
 
     try {
       // `diary_entries` and `grow_events` are the two authoritative core
-      // Timeline sources. Stage both locally and commit them atomically only
+      // Timeline sources. Start both together and commit them atomically only
       // after both reads succeed for the same owner/grow/range key.
       // Page-critical read: falls back to unfiltered pre-migration (the
       // retracted_at column ships in 20260811090000) instead of failing.
-      const entriesResult = await selectWithRetractionCompat((withRetractionFilter) => {
+      const entriesPromise = selectWithRetractionCompat((withRetractionFilter) => {
         let entriesQuery = orderNewestFirstStable(
           supabase
             .from("diary_entries")
@@ -709,15 +715,6 @@ export default function Timeline() {
           entriesQuery = entriesQuery.lte("entry_at", timelineDateRangeBounds.endIso);
         return entriesQuery;
       });
-      if (!isCurrentRequest()) return;
-      if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
-
-      const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
-      const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
-        rows,
-        user,
-      );
-      const paths = [...new Set(privatePhotoPathById.values())];
 
       // Filtered by is_deleted here so the visible-event page (its 100-row
       // budget, and growEvents.length UI-copy gates below) never shows or
@@ -737,9 +734,20 @@ export default function Timeline() {
         growEventsQuery = growEventsQuery.gte("occurred_at", timelineDateRangeBounds.startIso);
       if (timelineDateRangeBounds.endIso)
         growEventsQuery = growEventsQuery.lte("occurred_at", timelineDateRangeBounds.endIso);
-      const growEventsResult = await growEventsQuery;
+
+      const [entriesResult, growEventsResult] = await withCriticalReadDeadline(
+        Promise.all([entriesPromise, growEventsQuery]),
+      );
       if (!isCurrentRequest()) return;
+      if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
       if (hasTimelineRequiredReadError(growEventsResult)) throw growEventsResult.error;
+
+      const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
+      const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
+        rows,
+        user,
+      );
+      const paths = [...new Set(privatePhotoPathById.values())];
       const nextGrowEvents = growEventsResult.data as unknown as GrowEventRowForRecent[];
 
       // Core plant memory is confirmed for the exact active scope. Make it

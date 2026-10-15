@@ -200,6 +200,28 @@ export function collectSensorsQuickLogManualReadings(input: {
   return out;
 }
 
+export function collectSensorsQuickLogManualReadingsForTents(input: {
+  tentIds: ReadonlyArray<string | null | undefined> | null | undefined;
+  growEvents?: ReadonlyArray<RawGrowEventRow | null | undefined> | null;
+  diaryEntries?: ReadonlyArray<SensorsQuickLogDiaryRow | null | undefined> | null;
+  now?: Date;
+}): SensorReading[] {
+  const ids = Array.from(
+    new Set(
+      (input.tentIds ?? []).map((id) => (typeof id === "string" ? id.trim() : "")).filter(Boolean),
+    ),
+  );
+  if (ids.length === 0) return [];
+  return ids.flatMap((tentId) =>
+    collectSensorsQuickLogManualReadings({
+      tentId,
+      growEvents: input.growEvents,
+      diaryEntries: input.diaryEntries,
+      now: input.now,
+    }),
+  );
+}
+
 const ALL_METRIC_KEYS: readonly SensorReadingMetricKey[] = [
   "temp",
   "rh",
@@ -258,10 +280,26 @@ export function mergeSensorsSeriesWithQuickLogManuals(
 /**
  * Merge Dashboard chart readings with Quick Log manual readings and return
  * in ascending chronological order (oldest → newest).
+ *
+ * Keyed by `(tentId, captureMs, source)` so cross-source readings at the same
+ * millisecond (`live`/`csv` vs `manual`) retain their own provenance and status
+ * instead of collapsing into one `manual` reading.
  */
 export function mergeDashboardChartReadingsWithQuickLogManuals(
   chartReadings: readonly SensorReading[] | null | undefined,
   quickLogManuals: readonly SensorReading[] | null | undefined,
 ): SensorReading[] {
-  return [...mergeSensorsSeriesWithQuickLogManuals(chartReadings, quickLogManuals)].reverse();
+  const byKey = new Map<string, SensorReading>();
+  for (const reading of chartReadings ?? []) {
+    if (!reading) continue;
+    const key = `${captureKey(reading)}|${reading.source}`;
+    byKey.set(key, { ...reading });
+  }
+  for (const reading of quickLogManuals ?? []) {
+    if (!reading || reading.source !== SENSORS_QL_MANUAL_SERIES_SOURCE) continue;
+    const key = `${captureKey(reading)}|${reading.source}`;
+    const existing = byKey.get(key);
+    byKey.set(key, existing ? mergeCollidingManual(existing, reading) : { ...reading });
+  }
+  return [...sortSensorReadingsNewestFirst(Array.from(byKey.values()))].reverse();
 }

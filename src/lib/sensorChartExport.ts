@@ -108,19 +108,35 @@ function refreshForExport(reading: SensorReading, now: Date): SensorReading {
   return status === reading.status ? reading : { ...reading, status };
 }
 
+export interface BuildSensorReadingsCsvOptions {
+  /** Optional map of `tentId` → human-readable tent name for multi-tent exports. */
+  tentNamesById?: Readonly<Record<string, string>>;
+  /** Explicitly include the trailing `Tent` column even when only one tent is present. */
+  includeTentColumn?: boolean;
+}
+
 export function buildSensorReadingsCsv(
   readings: ReadonlyArray<SensorReading>,
   nowMs?: number,
   temperatureUnit?: TemperatureUnitPreference | "F" | "C",
+  options?: BuildSensorReadingsCsvOptions,
 ): string {
   const resolvedUnit = resolveExportTemperatureUnit(temperatureUnit);
-  const header = resolvedUnit === "fahrenheit" ? CSV_HEADER_FAHRENHEIT : CSV_HEADER_CELSIUS;
+  const distinctTents = new Set(
+    readings.map((r) => (typeof r.tentId === "string" ? r.tentId.trim() : "")).filter(Boolean),
+  );
+  const includeTent =
+    options?.includeTentColumn === true ||
+    options?.tentNamesById !== undefined ||
+    distinctTents.size > 1;
+  const baseHeader = resolvedUnit === "fahrenheit" ? CSV_HEADER_FAHRENHEIT : CSV_HEADER_CELSIUS;
+  const header = includeTent ? `${baseHeader},Tent` : baseHeader;
   const clocked =
     nowMs !== undefined && Number.isFinite(nowMs)
       ? readings.map((r) => refreshForExport(r, new Date(nowMs)))
       : readings;
-  const rows = clocked.map((r) =>
-    [
+  const rows = clocked.map((r) => {
+    const cells: Array<string | number | null | undefined> = [
       formatUtcTimestamp(r.ts),
       formatExportTemperature(readObservedSensorMetric(r, "temp"), resolvedUnit),
       readObservedSensorMetric(r, "rh"),
@@ -137,10 +153,13 @@ export function buildSensorReadingsCsv(
         ? "stale"
         : r.status,
       formatUtcTimestamp(r.capturedAt),
-    ]
-      .map(csvEscape)
-      .join(","),
-  );
+    ];
+    if (includeTent) {
+      const tentLabel = options?.tentNamesById?.[r.tentId] || r.tentId || "";
+      cells.push(tentLabel);
+    }
+    return cells.map(csvEscape).join(",");
+  });
   return [header, ...rows].join("\n");
 }
 

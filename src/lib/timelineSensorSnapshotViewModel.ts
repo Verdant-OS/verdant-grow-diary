@@ -262,12 +262,27 @@ export function buildTimelineSensorSnapshotViewModel(
     return { kind: "none" };
   }
   const genericTemp = isFiniteNumber(tempGeneric) && options.genericTempUnit ? tempGeneric : null;
-  const manualTemp = isFiniteNumber(tempF) ? tempF : isFiniteNumber(tempC) ? tempC : genericTemp;
-  const manualTempUnit = isFiniteNumber(tempF)
-    ? "F"
-    : isFiniteNumber(tempC)
+  const preferCelsius = options.preferUnit === "C";
+  const manualTemp =
+    preferCelsius && isFiniteNumber(tempC)
+      ? tempC
+      : isFiniteNumber(tempF)
+        ? tempF
+        : isFiniteNumber(tempC)
+          ? tempC
+          : genericTemp;
+  const manualTempUnit =
+    preferCelsius && isFiniteNumber(tempC)
       ? "C"
-      : (options.genericTempUnit ?? "C");
+      : isFiniteNumber(tempF)
+        ? "F"
+        : isFiniteNumber(tempC)
+          ? "C"
+          : (options.genericTempUnit ?? "C");
+  const dualTempMismatch =
+    isFiniteNumber(tempF) &&
+    isFiniteNumber(tempC) &&
+    Math.abs(fahrenheitToCelsius(tempF) - tempC) > 0.6;
   const legacyPrecision =
     options.preserveLegacyPrecision ||
     (options.genericTempUnit === "C" &&
@@ -299,15 +314,18 @@ export function buildTimelineSensorSnapshotViewModel(
   ) {
     manualWarnings.push("Temperature unit unverified; the generic temperature was not shown.");
   }
-  const explicitTempF = isFiniteNumber(tempF)
-    ? tempF
-    : isFiniteNumber(tempC)
+  const explicitTempF =
+    preferCelsius && isFiniteNumber(tempC)
       ? tempFFromC(tempC)
-      : genericTemp === null
-        ? null
-        : manualTempUnit === "C"
-          ? tempFFromC(genericTemp)
-          : genericTemp;
+      : isFiniteNumber(tempF)
+        ? tempF
+        : isFiniteNumber(tempC)
+          ? tempFFromC(tempC)
+          : genericTemp === null
+            ? null
+            : manualTempUnit === "C"
+              ? tempFFromC(genericTemp)
+              : genericTemp;
   const manualTempOutsideRealisticBand =
     manualValidation !== null &&
     explicitTempF !== null &&
@@ -318,6 +336,9 @@ export function buildTimelineSensorSnapshotViewModel(
     manualValidation !== null && isFiniteNumber(vpd) && !classifyManualMetric("vpd_kpa", vpd).valid;
   const manualCo2OutsideRealisticBand =
     manualValidation !== null && isFiniteNumber(co2) && !classifyManualMetric("co2_ppm", co2).valid;
+  if (dualTempMismatch) {
+    manualErrors.push("Air temperature °F and °C fields do not match; the reading was not shown.");
+  }
   if (manualTempOutsideRealisticBand) {
     manualErrors.push(
       `Air temperature is outside the realistic ${AIR_TEMP_F_REALISTIC.min}–${AIR_TEMP_F_REALISTIC.max}°F grow-room range.`,
@@ -344,7 +365,7 @@ export function buildTimelineSensorSnapshotViewModel(
     manualWarnings.push(`Humidity ${rh}% may indicate a stuck sensor; review before trusting.`);
   }
   const allowedManualFields = new Set(manualValidation?.metrics.map((metric) => metric.field));
-  if (manualTempOutsideRealisticBand) allowedManualFields.delete("air_temp_c");
+  if (manualTempOutsideRealisticBand || dualTempMismatch) allowedManualFields.delete("air_temp_c");
   if (manualEcUnitMismatch) allowedManualFields.delete("reservoir_ec_mscm");
   if (manualVpdOutsideRealisticBand) allowedManualFields.delete("vpd_kpa");
   if (manualCo2OutsideRealisticBand) allowedManualFields.delete("co2_ppm");

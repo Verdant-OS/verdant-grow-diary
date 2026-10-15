@@ -34,6 +34,12 @@ interface Props {
   data: SensorReading[];
   /** Optional full dataset for CSV export when the chart plots a subset. Defaults to `data`. */
   exportData?: SensorReading[];
+  /** Optional map of `tentId` → tent name so multi-tent exports attribute each row to its tent. */
+  tentNamesById?: Readonly<Record<string, string>>;
+  /** Disable CSV export while a contributing reading source is still loading or errored. */
+  exportDisabled?: boolean;
+  /** Tooltip / accessible reason when `exportDisabled` is true. */
+  exportDisabledReason?: string | null;
   metric: "temp" | "rh" | "vpd" | "co2" | "soil" | "ppfd";
   height?: number;
   variant?: "area" | "line";
@@ -52,6 +58,9 @@ interface Props {
 export default function SensorChart({
   data,
   exportData,
+  tentNamesById,
+  exportDisabled = false,
+  exportDisabledReason = null,
   metric,
   height = 220,
   variant = "area",
@@ -91,7 +100,13 @@ export default function SensorChart({
   }, [filteredData, metric, temperatureUnit]);
 
   const handleExport = () => {
-    const csv = buildSensorReadingsCsv(filteredExportData, Date.now(), temperatureUnit);
+    if (exportDisabled) return;
+    const csv = buildSensorReadingsCsv(
+      filteredExportData,
+      Date.now(),
+      temperatureUnit,
+      tentNamesById ? { tentNamesById } : undefined,
+    );
     const filename = `sensor-readings-${metric}-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
     downloadTextFile(csv, filename);
   };
@@ -122,8 +137,14 @@ export default function SensorChart({
             <button
               type="button"
               onClick={handleExport}
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-              title="Download CSV for current range"
+              disabled={exportDisabled}
+              aria-disabled={exportDisabled || undefined}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              title={
+                exportDisabled && exportDisabledReason
+                  ? exportDisabledReason
+                  : "Download CSV for current range"
+              }
               data-testid="sensor-chart-export-btn"
             >
               <Download className="h-3.5 w-3.5" />

@@ -195,24 +195,6 @@ export default function Dashboard() {
   const dashboardSensorRows = selectDashboardSensorEvidenceRows(rawReadings);
   const readings = groupDashboardSensorReadings(dashboardSensorRows);
   const temperatureUnit = useTemperatureUnitPreference();
-  // Pick the first tent that actually has readings so the chart isn't blank
-  // when tents[0] has none but other tents do. Falls back to tents[0] (or null).
-  const chartTent =
-    tents.find((t) => (readings as unknown as SensorReading[]).some((r) => r.tentId === t.id)) ??
-    tents[0] ??
-    null;
-  const chartTentName = chartTent?.name ?? "Tent";
-  const chartQuickLogManualQuery = useSensorsQuickLogManualReadings(chartTent?.id ?? null);
-  const chartReadings = chartTent
-    ? mergeDashboardChartReadingsWithQuickLogManuals(
-        (readings as unknown as SensorReading[]).filter((r) => r.tentId === chartTent.id),
-        chartQuickLogManualQuery.data ?? [],
-      )
-    : [];
-  const dashboardExportReadings = mergeDashboardChartReadingsWithQuickLogManuals(
-    readings as unknown as SensorReading[],
-    chartQuickLogManualQuery.data ?? [],
-  );
   // Per-tent sensor windows for the stability summary. Each tent gets its
   // own 200-row window so a busy tent cannot push another tent's VPD rows
   // out of a shared global cap. Read-only; no writes.
@@ -220,6 +202,25 @@ export default function Dashboard() {
   // column — only query real UUIDs; a non-UUID id cannot have rows, so its
   // absence is established (same guard as the Tents list).
   const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
+  const chartQuickLogManualQuery = useSensorsQuickLogManualReadings(tentIds);
+  const quickLogManualsIncomplete =
+    chartQuickLogManualQuery.isPending || chartQuickLogManualQuery.isError;
+  const quickLogManualReadings = quickLogManualsIncomplete
+    ? []
+    : (chartQuickLogManualQuery.data ?? []);
+  const dashboardExportReadings = mergeDashboardChartReadingsWithQuickLogManuals(
+    readings as unknown as SensorReading[],
+    quickLogManualReadings,
+  );
+  // Pick the first tent that actually has readings so the chart isn't blank
+  // when tents[0] has none but other tents do. Falls back to tents[0] (or null).
+  const chartTent =
+    tents.find((t) => dashboardExportReadings.some((r) => r.tentId === t.id)) ?? tents[0] ?? null;
+  const chartTentName = chartTent?.name ?? "Tent";
+  const chartReadings = chartTent
+    ? dashboardExportReadings.filter((r) => r.tentId === chartTent.id)
+    : [];
+  const tentNamesById = Object.fromEntries(tents.map((t) => [t.id, t.name]));
   const { byTent: readingsByTent, statusByTent: sensorStatusByTent } =
     useSensorReadingsByTents(tentIds);
   // Freshness is time-relative: re-evaluate the snapshot strip's clock every
@@ -875,6 +876,13 @@ export default function Dashboard() {
                                 <SensorChart
                                   data={chartReadings}
                                   exportData={dashboardExportReadings}
+                                  tentNamesById={tentNamesById}
+                                  exportDisabled={quickLogManualsIncomplete}
+                                  exportDisabledReason={
+                                    chartQuickLogManualQuery.isError
+                                      ? "Quick Log manual history could not be checked — CSV export is disabled until all sources load."
+                                      : "Checking Quick Log manual history…"
+                                  }
                                   metric="temp"
                                   height={200}
                                 />

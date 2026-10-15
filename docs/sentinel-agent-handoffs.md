@@ -192,6 +192,27 @@ no competing executable slice. Governance #2086/#1971/#1876 and shared-log
 #1933/#1941 were identified and preserved. That exchange proves the existing child
 channel, separately from the later runner-assisted probe.
 
+The later **real router-assisted internal proof completed**, at implementation head
+`46540f55494346a16a89b55372dd61d24cbf7860`, on 2026-10-15 around 15:20 UTC:
+
+- Correlation: `sentinel-20261015-router-proof-1`.
+- Verified recipient/destination: `routing_audit`, `collaboration:/root/routing_audit`.
+- Policy digest: `3c93f22fa1b539bb22b2a31a58d29c7e95b29942b1901298cd02023868c902aa`.
+- Dispatch ID: correlation + `/` + policy digest + `/hop-1/attempt-1`.
+- Host persisted `AWAITING_ACK`, delivered that exact packet through the existing
+  child tool, and received a real pickup ACK and automatic child return. The child
+  verified `git rev-parse HEAD` exited 0 with the exact requested head.
+- The CLI recorded `ACKNOWLEDGED` then `COMPLETED`, one attempt and two receipts;
+  `acceptance` stayed `NOT_MEASURED`. A repeated CLI dispatch emitted `action: null`.
+- Exact generated payload, host commands, observed receipt JSON and journal are in
+  `C:/Users/G8/AppData/Local/Temp/verdant-sentinel-20261015/internal-proof/`.
+  `dispatched.json` is the already-used payload; `ack-receipt.json` and
+  `return-receipt.json` are actual observed child receipts. **Do not resend it.**
+
+This is an actual existing child channel exercised through the host bridge. It is
+not autonomous CLI delivery or external agent adoption. The receipt-only docs commit
+after the implementation does not alter the tested runner or its tests.
+
 Independent acceptance remains with the externally assigned seat at the exact final
 head; local/child peer review cannot replace it. Drafts stay draft. Rollback is a
 separately authorized revert PR; stopping this explicit runner stops its activity.

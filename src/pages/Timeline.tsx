@@ -205,7 +205,7 @@ import {
 } from "@/constants/sensorSourceLabels";
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
-import { correctionValuePropsFromDiaryDetails } from "@/lib/quick-log/quickLogRevisionRules";
+import { correctionValuesForTimelineDiaryEntry } from "@/lib/quick-log/quickLogRevisionRules";
 import { isLinkedQuickLogDiaryDetails } from "@/lib/diaryEntryRemovalRules";
 import {
   parseTimelineHighlightToken,
@@ -2685,8 +2685,9 @@ export default function Timeline() {
                                     plantId={e.plant_id ?? null}
                                     tentId={e.tent_id ?? null}
                                     growId={loopGrowId}
-                                    correctionValues={correctionValuePropsFromDiaryDetails(
-                                      e.details,
+                                    correctionValues={correctionValuesForTimelineDiaryEntry(
+                                      e,
+                                      growEvents,
                                     )}
                                     onChanged={() => void load()}
                                   />

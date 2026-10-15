@@ -193,8 +193,16 @@ end
 $proof$;
 `;
 
+function pgArgs() {
+  const args = [];
+  if (process.env.PGHOST) args.push("-h", process.env.PGHOST);
+  if (process.env.PGPORT) args.push("-p", process.env.PGPORT);
+  if (process.env.PGUSER) args.push("-U", process.env.PGUSER);
+  return args;
+}
+
 function psql(db, sql) {
-  const result = spawnSync("psql", ["-d", db, "-v", "ON_ERROR_STOP=1", "-c", sql], {
+  const result = spawnSync("psql", [...pgArgs(), "-d", db, "-v", "ON_ERROR_STOP=1", "-c", sql], {
     encoding: "utf8",
   });
   if (result.status !== 0) {
@@ -203,8 +211,8 @@ function psql(db, sql) {
 }
 
 function main() {
-  spawnSync("dropdb", ["--if-exists", DB], { encoding: "utf8" });
-  const created = spawnSync("createdb", [DB], { encoding: "utf8" });
+  spawnSync("dropdb", [...pgArgs(), "--if-exists", DB], { encoding: "utf8" });
+  const created = spawnSync("createdb", [...pgArgs(), DB], { encoding: "utf8" });
   if (created.status !== 0) throw new Error(created.stderr || "createdb failed");
   psql(DB, SETUP);
   psql(DB, "set check_function_bodies = off");
@@ -217,13 +225,23 @@ function main() {
   );
   const applied = spawnSync(
     "psql",
-    ["-d", DB, "-v", "ON_ERROR_STOP=1", "-c", "set check_function_bodies = off", "-c", migration],
+    [
+      ...pgArgs(),
+      "-d",
+      DB,
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      "set check_function_bodies = off",
+      "-c",
+      migration,
+    ],
     { encoding: "utf8" },
   );
   if (applied.status !== 0) throw new Error(applied.stderr || applied.stdout);
   psql(DB, PROOF);
   console.log("owner fence: non-owner received not_found_or_not_owned and the volume stayed 500");
-  spawnSync("dropdb", ["--if-exists", DB], { encoding: "utf8" });
+  spawnSync("dropdb", [...pgArgs(), "--if-exists", DB], { encoding: "utf8" });
 }
 
 main();

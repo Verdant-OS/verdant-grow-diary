@@ -439,6 +439,66 @@ export function correctionValuePropsFromDiaryDetails(
   return null;
 }
 
+interface TimelineEnvironmentChild {
+  temperature_c?: unknown;
+  humidity_pct?: unknown;
+  vpd_kpa?: unknown;
+}
+
+interface TimelineEnvironmentSibling {
+  id?: string;
+  event_type?: unknown;
+  source?: unknown;
+  plant_id?: string | null;
+  occurred_at?: unknown;
+  environment_events?: TimelineEnvironmentChild | readonly TimelineEnvironmentChild[] | null;
+}
+
+function sensorFromEnvironmentChild(
+  child: TimelineEnvironmentChild | null | undefined,
+): QuickLogCorrectionSensorValues | null {
+  if (!child) return null;
+  const sensor: QuickLogCorrectionSensorValues = {};
+  const temperature = finiteOrNull(child.temperature_c);
+  const humidity = finiteOrNull(child.humidity_pct);
+  const vpd = finiteOrNull(child.vpd_kpa);
+  if (temperature !== null) sensor.temperature_c = temperature;
+  if (humidity !== null) sensor.humidity_pct = humidity;
+  if (vpd !== null) sensor.vpd_kpa = vpd;
+  return Object.keys(sensor).length > 0 ? sensor : null;
+}
+
+/**
+ * Timeline diary cards for a V2 Fast Check keep the note on the observation
+ * row. The temperature, humidity, and VPD live on the same-instant manual
+ * environment sibling, not in diary details.
+ */
+export function correctionValuesForTimelineDiaryEntry(
+  entry: { details?: unknown; plant_id?: string | null; entry_at?: string | null },
+  growEvents?: readonly TimelineEnvironmentSibling[],
+): QuickLogCorrectionValueContext | null {
+  const fromDetails = correctionValuePropsFromDiaryDetails(entry?.details);
+  if (fromDetails) return fromDetails;
+  const details = isPlainObject(entry?.details) ? entry.details : null;
+  if (!details || details.event_type !== "observation") return null;
+  const entryAt = entry?.entry_at;
+  if (typeof entryAt !== "string") return null;
+  const entryMs = Date.parse(entryAt);
+  if (!Number.isFinite(entryMs)) return null;
+  const plantId = entry?.plant_id ?? null;
+  for (const row of growEvents ?? []) {
+    if (row.event_type !== "environment" || row.source !== "manual") continue;
+    if ((row.plant_id ?? null) !== plantId) continue;
+    if (typeof row.occurred_at !== "string" || Date.parse(row.occurred_at) !== entryMs) continue;
+    const child = Array.isArray(row.environment_events)
+      ? row.environment_events[0]
+      : row.environment_events;
+    const sensor = sensorFromEnvironmentChild(child);
+    if (sensor) return { kind: "sensor", sensor };
+  }
+  return null;
+}
+
 export interface QuickLogEntryHandleRef {
   growEventId?: string;
   diaryEntryId?: string;

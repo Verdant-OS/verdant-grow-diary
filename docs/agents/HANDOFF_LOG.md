@@ -58,7 +58,7 @@ head_sha: b6a6c3f7742d9c1ce0d3d98a3ee6c5675b1c0b33
 state: pushed draft. Cheeko approved the migration (4:54 PM CT) and the scorer-locked pin update only (5:57 PM CT). Graft FAIL at aae343d3 is addressed on this head. No merge.
 next_action: required CI at the draft head, then Graft one-time exact-head review. Stay draft.
 files: src/lib/quick-log/quickLogRevisionRules.ts; src/components/QuickLogEntryIntegrityControls.tsx; src/components/QuickLogHistoryPanels.tsx; src/components/QuickLogGroupedTimelineSection.tsx; src/components/WateringHistoryPanel.tsx; src/components/FeedingHistoryPanel.tsx; src/pages/Timeline.tsx; src/test/quicklog-correction-editable-values.test.ts; src/test/quicklog-correction-editable-values-dialog.test.tsx; src/test/quicklog-correction-copilot-followup.test.tsx; scripts/prove-quicklog-correction-owner-fence.mjs; supabase/migrations/20261014210000_quicklog_correction_editable_values.sql; docs/agents/HANDOFF_LOG.md
-blockers: none for the writer. Fingerprint pin stays at the pre-Copilot body because the 5:57 PM CT receipt allows a pin update only and that pin already landed.
+blockers: Graft FAIL at 3633b7e3 is the open review. Follow-up: the grouped timeline feeding editor still does not receive a stored dose (QuickLogGroupedTimelineSection.tsx correctionValues call). The locked PG15 harness is back to the base file. No merge.
 artifacts: PR body
 reviewer_seat: Graft one-time exact-head after required CI is green. Blue Dream (.tsx). Critical Mass (rules, tests, migration).
 claimed_by: bc-6f1bd555, 2026-10-14 23:20 UTC

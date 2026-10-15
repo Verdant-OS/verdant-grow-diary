@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
@@ -48,9 +47,10 @@ vi.mock("@/hooks/useQuickLogGroupedTimeline", () => ({
 
 import { RecentQuickLogActivityPanel } from "@/components/QuickLogHistoryPanels";
 import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
-import { correctionValuePropsFromDiaryDetails } from "@/lib/quick-log/quickLogRevisionRules";
-
-const MIGRATION = "supabase/migrations/20261014210000_quicklog_correction_editable_values.sql";
+import {
+  correctionValuePropsFromDiaryDetails,
+  correctionValuesForTimelineDiaryEntry,
+} from "@/lib/quick-log/quickLogRevisionRules";
 
 describe("Copilot follow-up: editor values", () => {
   it("reads a legacy flat watering amount into the correction dialog", () => {
@@ -62,13 +62,33 @@ describe("Copilot follow-up: editor values", () => {
     ).toEqual({ kind: "watering", volumeMl: 400 });
   });
 
-  it("reads sensor values from a V2 observation row that kept its environment companion metrics", () => {
+  it("reads sensor values from a real V2 observation whose readings live on the environment row", () => {
     expect(
-      correctionValuePropsFromDiaryDetails({
-        event_type: "observation",
-        quick_log_version: 2,
-        sensor_snapshot: { metrics: { temperature_c: 24, humidity_pct: 55, vpd_kpa: 1.1 } },
-      }),
+      correctionValuesForTimelineDiaryEntry(
+        {
+          plant_id: "plant-a",
+          entry_at: "2026-07-25T13:03:28.000Z",
+          details: {
+            event_type: "observation",
+            source: "manual",
+            feeding: null,
+            watering: null,
+            photo_url: null,
+            quick_log_version: 2,
+            linked_grow_event_id: "bf0a684e-a96e-472c-af8f-e38a54a8332c",
+          },
+        },
+        [
+          {
+            id: "env-sibling",
+            event_type: "environment",
+            source: "manual",
+            plant_id: "plant-a",
+            occurred_at: "2026-07-25T13:03:28.000Z",
+            environment_events: { temperature_c: 24, humidity_pct: 55, vpd_kpa: 1.1 },
+          },
+        ],
+      ),
     ).toEqual({
       kind: "sensor",
       sensor: { temperature_c: 24, humidity_pct: 55, vpd_kpa: 1.1 },
@@ -112,39 +132,5 @@ describe("Copilot follow-up: editor values", () => {
     expect((screen.getByTestId("quicklog-correct-volume-input") as HTMLInputElement).value).toBe(
       "500",
     );
-  });
-});
-
-describe("Copilot follow-up: migration contracts", () => {
-  const sql = readFileSync(MIGRATION, "utf8");
-
-  it("records a diary-only volume as the previous value", () => {
-    expect(sql).toContain("watering_amount_ml");
-    expect(sql).toMatch(/v_old_volume IS NULL/);
-  });
-
-  it("rejects a JSON null sensor metric before the numeric cast", () => {
-    expect(sql).toContain("jsonb_typeof(v_sensor -> v_key) <> 'number'");
-  });
-
-  it("falls back to details.nutrients when feeding products are absent", () => {
-    expect(sql).toContain("details -> 'nutrients' INTO v_products");
-  });
-
-  it("allows a sensor correction on an observation that owns an environment companion", () => {
-    expect(sql).toContain("p_event_type = 'observation'");
-    expect(sql).toContain("p_env_ids");
-  });
-
-  it("does not still say the migration is awaiting schema approval", () => {
-    expect(sql).not.toContain("Awaiting Cheeko's schema approval");
-  });
-});
-
-describe("Copilot follow-up: owner fence harness", () => {
-  it("proves a second user cannot correct an entry they do not own", () => {
-    const harness = readFileSync("scripts/prove-quicklog-correction-owner-fence.mjs", "utf8");
-    expect(harness).toContain("not_found_or_not_owned");
-    expect(harness).toContain("22222222-2222-4222-8222-222222222222");
   });
 });

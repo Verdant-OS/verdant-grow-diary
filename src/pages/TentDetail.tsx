@@ -44,7 +44,11 @@ import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
 import { groupSensorReadingRows } from "@/lib/growAdapters";
 import { mergeSensorsSeriesWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
-import { vpdStabilityInputsFromWideReadings } from "@/lib/vpdStabilityInputRules";
+import {
+  resolveDisplayedVpdObservation,
+  vpdStabilityInputsFromWideReadings,
+} from "@/lib/vpdStabilityInputRules";
+import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import {
   useImportedSensorHistory,
   IMPORTED_SENSOR_HISTORY_QUERY_LIMIT,
@@ -190,7 +194,24 @@ export default function TentDetail() {
   const nowMs = useNowTick();
   const header = buildTentSensorHeaderView(readings, nowMs);
   const snap = header.snapshot;
-  const headerVpd = snap?.vpd ?? sharedVpdSeries[0]?.vpd ?? null;
+  const headerVpdObservation = resolveDisplayedVpdObservation({
+    snapshotVpd: snap?.vpd,
+    snapshotCapturedAt: header.capturedAt,
+    snapshotSource: snap?.source ?? null,
+    snapshotStale: header.stale,
+    fallback: sharedVpdSeries[0] ?? null,
+    nowMs,
+  });
+  const headerVpd = headerVpdObservation.value;
+  const vpdFromFallback =
+    headerVpdObservation.value !== null && (snap?.vpd === null || snap?.vpd === undefined);
+  const provenanceCapturedAt = vpdFromFallback
+    ? headerVpdObservation.capturedAt
+    : header.capturedAt;
+  const provenanceSourceLabel = vpdFromFallback
+    ? formatSensorSourceLabel({ source: headerVpdObservation.source })
+    : header.sourceLabel;
+  const provenanceStale = vpdFromFallback ? headerVpdObservation.stale : header.stale;
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null], user?.id);
   const activeCount = getActivePlantCount(activePlants);
   // The one safe plant target this tent can prove. Null for zero or several
@@ -428,7 +449,7 @@ export default function TentDetail() {
             const vpd = classifyVpdAgainstStage({
               value: headerVpd,
               stage: envStage,
-              stale: header.stale,
+              stale: headerVpdObservation.stale,
             });
             // #21: route VPD chip through the canonical sensor formatter so
             // header precision matches Recent manual snapshots (2-decimal cap).
@@ -457,7 +478,7 @@ export default function TentDetail() {
           const vpd = classifyVpdAgainstStage({
             value: headerVpd,
             stage: envStage,
-            stale: header.stale,
+            stale: headerVpdObservation.stale,
           });
           return (
             <p
@@ -494,22 +515,23 @@ export default function TentDetail() {
       <div className="glass rounded-2xl p-4 mb-6">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
           <h2 className="font-display font-semibold">Environment</h2>
-          {header.hasReadings && (
+          {(header.hasReadings || vpdFromFallback) && (
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              {header.capturedAt && (
+              {provenanceCapturedAt && (
                 <span data-testid="tent-detail-sensor-captured">
-                  Captured {formatDistanceToNow(new Date(header.capturedAt), { addSuffix: true })}
+                  Captured{" "}
+                  {formatDistanceToNow(new Date(provenanceCapturedAt), { addSuffix: true })}
                 </span>
               )}
-              {header.sourceLabel && (
+              {provenanceSourceLabel && (
                 <span
                   className="rounded-md border px-1.5 py-0.5"
                   data-testid="tent-detail-sensor-source"
                 >
-                  {header.sourceLabel}
+                  {provenanceSourceLabel}
                 </span>
               )}
-              {header.stale && (
+              {provenanceStale && (
                 <span
                   className="rounded-md border border-[hsl(var(--warning))] px-1.5 py-0.5 text-[hsl(var(--warning))]"
                   data-testid="tent-detail-sensor-stale"

@@ -12,6 +12,7 @@ import {
   classifySensorReadingTrust,
   readObservedSensorMetric,
 } from "@/lib/sensorReadingSelectionRules";
+import { isStale } from "@/lib/sensorSnapshot";
 import type { SensorReading } from "@/mock";
 
 export function vpdStabilityInputsFromWideReadings(
@@ -51,4 +52,68 @@ export function mergeVpdStabilityInputs(
     byTs.set(String(row.ts), row);
   }
   return Array.from(byTs.values()).sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
+}
+
+export interface DisplayedVpdObservation {
+  value: number | null;
+  capturedAt: string | null;
+  source: string | null;
+  /**
+   * Current-reading freshness against `nowMs`. This is not the stability
+   * series `stale` flag, which only marks stored source/status lineage.
+   */
+  stale: boolean;
+}
+
+function finiteDisplayedVpd(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function observationTimestamp(ts: StabilityReadingInput["ts"] | null | undefined): string | null {
+  if (typeof ts === "string") {
+    const trimmed = ts.trim();
+    if (!trimmed || !Number.isFinite(new Date(trimmed).getTime())) return null;
+    return trimmed;
+  }
+  if (typeof ts === "number" && Number.isFinite(ts)) return new Date(ts).toISOString();
+  if (ts instanceof Date && Number.isFinite(ts.getTime())) return ts.toISOString();
+  return null;
+}
+
+/**
+ * Header VPD keeps the stored snapshot when that snapshot observed VPD.
+ * Otherwise it uses the newest shared series point, with that point's own
+ * timestamp and source. Freshness is aged against `nowMs`. A series point
+ * can stay eligible for historical stability and still be too old to guide
+ * the current header.
+ */
+export function resolveDisplayedVpdObservation(args: {
+  snapshotVpd: number | null | undefined;
+  snapshotCapturedAt: string | null;
+  snapshotSource: string | null;
+  snapshotStale: boolean;
+  fallback: StabilityReadingInput | null | undefined;
+  nowMs: number;
+}): DisplayedVpdObservation {
+  const snapshotValue = finiteDisplayedVpd(args.snapshotVpd);
+  if (snapshotValue !== null) {
+    return {
+      value: snapshotValue,
+      capturedAt: args.snapshotCapturedAt,
+      source: args.snapshotSource,
+      stale: args.snapshotStale,
+    };
+  }
+  const fallbackValue = finiteDisplayedVpd(args.fallback?.vpd);
+  if (fallbackValue === null || !args.fallback) {
+    return { value: null, capturedAt: null, source: null, stale: false };
+  }
+  const capturedAt = observationTimestamp(args.fallback.ts);
+  const source = typeof args.fallback.source === "string" ? args.fallback.source : null;
+  return {
+    value: fallbackValue,
+    capturedAt,
+    source,
+    stale: capturedAt === null || isStale(capturedAt, args.nowMs, undefined, source),
+  };
 }

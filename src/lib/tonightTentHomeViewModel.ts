@@ -18,6 +18,7 @@ import {
 } from "@/lib/dashboardSensorEvidenceRules";
 import { formatAgeLabel } from "@/lib/sensorSnapshotFreshnessRules";
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { calculateVpdKpa } from "@/lib/greenhouseClimateRules";
 
 export const TONIGHT_TENT_HOME_COPY = {
   missing: "Missing",
@@ -191,9 +192,68 @@ function rowsFailed(status: TonightRowsReadStatus): boolean {
   return status === "error" || status === "refresh_error";
 }
 
+/** Drop future and unknown-source readings. Live past the canon window is stale, still usable. */
+function usableCandidate(candidate: Candidate, nowMs: number): Candidate | null {
+  if (candidate.source === "invalid") return null;
+  const ageMs = nowMs - candidate.epochMs;
+  if (ageMs < -FUTURE_SKEW_MS) return null;
+  if (candidate.source === "live" && ageMs > LIVE_CURRENT_STATE_STALE_MS) {
+    return { ...candidate, source: "stale" };
+  }
+  return candidate;
+}
+
+function newestFirst(a: Candidate, b: Candidate): number {
+  return b.epochMs - a.epochMs || a.origin - b.origin;
+}
+
+/**
+ * VPD from temperature and RH when no stored vpd_kpa exists.
+ * A pair captured at the same time wins over a newer unpaired reading.
+ * Otherwise the latest usable temperature and the latest usable RH are used,
+ * and the result is dated to the older of the two so it is not newer than
+ * either input. Out-of-range inputs stay invalid and carry no number.
+ */
+function calculatedVpdCandidate(
+  temps: readonly Candidate[],
+  rhs: readonly Candidate[],
+  nowMs: number,
+): Candidate | null {
+  const usableTemps = temps
+    .map((c) => usableCandidate(c, nowMs))
+    .filter((c): c is Candidate => c != null)
+    .sort(newestFirst);
+  const usableRhs = rhs
+    .map((c) => usableCandidate(c, nowMs))
+    .filter((c): c is Candidate => c != null)
+    .sort(newestFirst);
+  if (usableTemps.length === 0 || usableRhs.length === 0) return null;
+
+  const rhByEpoch = new Map<number, Candidate>();
+  for (const rh of usableRhs) {
+    if (!rhByEpoch.has(rh.epochMs)) rhByEpoch.set(rh.epochMs, rh);
+  }
+  let temp = usableTemps[0];
+  let rh = usableRhs[0];
+  const paired = usableTemps.find((c) => rhByEpoch.has(c.epochMs));
+  if (paired) {
+    temp = paired;
+    rh = rhByEpoch.get(paired.epochMs)!;
+  }
+
+  const older = temp.epochMs <= rh.epochMs ? temp : rh;
+  const source = temp.source === rh.source ? temp.source : older.source;
+  const vpd = calculateVpdKpa({ tempC: temp.value, rhPercent: rh.value });
+  if (vpd == null) {
+    return { value: 0, source: "invalid", at: older.at, epochMs: older.epochMs, origin: 0 };
+  }
+  return { value: vpd, source, at: older.at, epochMs: older.epochMs, origin: 0 };
+}
+
 /**
  * Newest finite candidate per metric, each keeping its own source and capture
- * time. A newer RH-only record never renews temperature or VPD.
+ * time. A newer RH-only record never renews temperature. VPD with no stored
+ * reading is calculated from temperature and RH (same capture time first).
  */
 export function buildTonightTentMetrics(input: {
   rows: readonly TonightSensorRow[] | null | undefined;
@@ -206,9 +266,11 @@ export function buildTonightTentMetrics(input: {
     ? []
     : selectDashboardSensorEvidenceRows(input.rows ?? []);
 
-  return METRICS.map(({ key, label, readingMetric }) => {
-    const candidates: Candidate[] = [];
+  const byKey = new Map<TonightMetricKey, Candidate[]>();
+  for (const metric of METRICS) byKey.set(metric.key, []);
 
+  for (const { key, readingMetric } of METRICS) {
+    const candidates = byKey.get(key)!;
     for (const row of evidenceRows) {
       if (row.metric !== readingMetric) continue;
       if (typeof row.value !== "number" || !Number.isFinite(row.value)) continue;
@@ -235,8 +297,17 @@ export function buildTonightTentMetrics(input: {
     ) {
       candidates.push({ value: snapValue, source: snapSource, ...snapWhen, origin: 1 });
     }
+    candidates.sort(newestFirst);
+  }
 
-    candidates.sort((a, b) => b.epochMs - a.epochMs || a.origin - b.origin);
+  const vpdCandidates = byKey.get("vpd")!;
+  if (vpdCandidates.length === 0) {
+    const derived = calculatedVpdCandidate(byKey.get("temp")!, byKey.get("rh")!, nowMs);
+    if (derived) vpdCandidates.push(derived);
+  }
+
+  return METRICS.map(({ key, label }) => {
+    const candidates = byKey.get(key)!;
     const best = candidates[0];
 
     if (!best) {

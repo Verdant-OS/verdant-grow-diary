@@ -102,6 +102,29 @@ afterEach(() => {
 });
 
 describe("Coach photo preview runtime", () => {
+  it("flips aria-hidden off in the same turn as the cover crop draw", async () => {
+    const bitmap = fakeBitmap();
+    const pending = deferred<ImageBitmap>();
+    const createImageBitmapMock = vi.fn().mockReturnValue(pending.promise);
+    vi.stubGlobal("createImageBitmap", createImageBitmapMock);
+    renderCoach();
+
+    selectPhoto(makeJpeg("same-turn.jpg"));
+    await waitFor(() => expect(createImageBitmapMock).toHaveBeenCalledTimes(1));
+
+    // Resolve the decode without act so a batched setState would leave the drawn
+    // canvas aria-hidden until a later flush — the race #2103 fixes with flushSync.
+    pending.resolve(bitmap);
+    await Promise.resolve();
+
+    expect(drawImage).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("coach-photo-preview-canvas")).toHaveAttribute(
+      "aria-hidden",
+      "false",
+    );
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+  });
+
   it("decodes a validated JPEG with bounded options, draws its cover crop, and closes it", async () => {
     const bitmap = fakeBitmap();
     const createImageBitmapMock = vi.fn().mockResolvedValue(bitmap);

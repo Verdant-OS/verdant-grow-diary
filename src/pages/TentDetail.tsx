@@ -293,6 +293,7 @@ export default function TentDetail() {
         <GrowDataSourceDisclosure
           resource="tents"
           hasAnyData={false}
+          emptyStateScope="record"
           metas={[tentMeta]}
           testId="tent-detail-data-source-disclosure"
         />

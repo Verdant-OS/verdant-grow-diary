@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### FIX-2146-ARCHITECTURE-CONTRACT-P2S
+
+```text
+TASK FIX-2146-ARCHITECTURE-CONTRACT-P2S  priority: P2  status: OPEN
+goal: Fix the nine Codex P2s from #2073's retrospective review (GitHub #2146, comment 6196768751) in docs/architecture-contract.md. Docs only. Do not edit the merged #2073 body.
+branch: cursor/architecture-contract-p2s-37b4
+base: verdant-grow-diary
+checkout: git fetch origin cursor/architecture-contract-p2s-37b4 verdant-grow-diary && git switch cursor/architecture-contract-p2s-37b4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED until the draft PR is open
+head_sha: parent of the commit that records this line. Observed base before the branch: dfb1567ee8c42b3449ea3314976c6ed1d16a382d.
+state: local contract amendment, not yet pushed
+next_action: push the branch, open the draft PR, run docs-safety. Stay draft. No merge.
+files: docs/architecture-contract.md; docs/agents/HANDOFF_LOG.md
+blockers: none for the repository change
+artifacts: GitHub issue #2146
+reviewer_seat: Graft or Critical Mass (docs-only). The author cannot give the independent PASS.
+claimed_by: Grok, 2026-10-15 17:50 UTC
+last_updated: 2026-10-15 12:50 CT, by Grok
+```
+
 ### PR2072-M7-SERVED-REVISION
 
 ```text

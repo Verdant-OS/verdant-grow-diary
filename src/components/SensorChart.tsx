@@ -73,13 +73,14 @@ export default function SensorChart({
   );
 
   const chartData = useMemo(() => {
-    return filteredData.map((r) => {
+    return filteredData.flatMap((r) => {
       const raw = r[metric as keyof SensorReading] as number | null | undefined;
       const v =
         metric === "temp" && typeof raw === "number"
           ? convertCelsiusForDisplay(raw, temperatureUnit)
           : raw;
-      return { ts: r.ts, value: v };
+      if (typeof v !== "number" || !Number.isFinite(v)) return [];
+      return [{ ts: r.ts, value: v }];
     });
   }, [filteredData, metric, temperatureUnit]);
 
@@ -109,7 +110,7 @@ export default function SensorChart({
               className="inline-block h-2 w-2 rounded-full"
               style={{ background: axisMeta.color }}
             />
-            {legendLabel}
+            {legendLabel} · {chartData.length} {chartData.length === 1 ? "point" : "points"}
           </span>
           {!hideExportButton && (
             <button

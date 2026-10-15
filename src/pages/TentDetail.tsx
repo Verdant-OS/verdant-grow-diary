@@ -6,7 +6,7 @@ import DrybackMonitoringStrip from "@/components/DrybackMonitoringStrip";
 import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useParams, Link, useSearchParams } from "@/lib/react-router-compat";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useAuth } from "@/store/auth";
 import { useNowTick } from "@/hooks/useNowTick";
 import { formatDistanceToNow } from "date-fns";
@@ -41,6 +41,10 @@ import TentSensorSourceHealthCard from "@/components/TentSensorSourceHealthCard"
 import SensorSnapshotTruthStrip from "@/components/SensorSnapshotTruthStrip";
 import { buildSensorSnapshotReadModel } from "@/lib/sensors/sensorSnapshotReadModel";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
+import { groupSensorReadingRows } from "@/lib/growAdapters";
+import { mergeSensorsSeriesWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
+import { vpdStabilityInputsFromWideReadings } from "@/lib/vpdStabilityInputRules";
 import {
   useImportedSensorHistory,
   IMPORTED_SENSOR_HISTORY_QUERY_LIMIT,
@@ -172,9 +176,21 @@ export default function TentDetail() {
   const { data: readings = [] } = sensorReadings;
   const importedHistory = useImportedSensorHistory(id);
   const series = buildTentSensorChartSeries(readings);
+  const quickLogManuals = useSensorsQuickLogManualReadings(id);
+  const sharedVpdSeries = useMemo(
+    () =>
+      vpdStabilityInputsFromWideReadings(
+        mergeSensorsSeriesWithQuickLogManuals(
+          groupSensorReadingRows(readings),
+          quickLogManuals.data ?? [],
+        ),
+      ),
+    [readings, quickLogManuals.data],
+  );
   const nowMs = useNowTick();
   const header = buildTentSensorHeaderView(readings, nowMs);
   const snap = header.snapshot;
+  const headerVpd = snap?.vpd ?? sharedVpdSeries[0]?.vpd ?? null;
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null], user?.id);
   const activeCount = getActivePlantCount(activePlants);
   // The one safe plant target this tent can prove. Null for zero or several
@@ -406,11 +422,11 @@ export default function TentDetail() {
             )}
           />
         )}
-        {snap?.vpd !== null &&
-          snap?.vpd !== undefined &&
+        {headerVpd !== null &&
+          headerVpd !== undefined &&
           (() => {
             const vpd = classifyVpdAgainstStage({
-              value: snap.vpd,
+              value: headerVpd,
               stage: envStage,
               stale: header.stale,
             });
@@ -419,7 +435,7 @@ export default function TentDetail() {
             return (
               <MetricChip
                 label="VPD"
-                value={formatSensorValue("vpd_kpa", snap.vpd).replace(/\s*kPa$/, "")}
+                value={formatSensorValue("vpd_kpa", headerVpd).replace(/\s*kPa$/, "")}
                 unit=" kPa"
                 status={vpdMetricChipStatus(vpd)}
               />
@@ -435,11 +451,11 @@ export default function TentDetail() {
           {tent.light.schedule} · {tent.light.wattage}W
         </span>
       </div>
-      {snap?.vpd !== null &&
-        snap?.vpd !== undefined &&
+      {headerVpd !== null &&
+        headerVpd !== undefined &&
         (() => {
           const vpd = classifyVpdAgainstStage({
-            value: snap.vpd,
+            value: headerVpd,
             stage: envStage,
             stale: header.stale,
           });
@@ -452,8 +468,8 @@ export default function TentDetail() {
             </p>
           );
         })()}
-      {snap?.vpd !== null &&
-        snap?.vpd !== undefined &&
+      {headerVpd !== null &&
+        headerVpd !== undefined &&
         normalizeVpdStage(envStage) === "unknown" && (
           <VpdStageMissingBadge testId="tent-detail-vpd-stage-missing-badge" className="mb-4" />
         )}
@@ -461,7 +477,7 @@ export default function TentDetail() {
       <EnvironmentStabilityCard
         testId="tent-detail-environment-stability"
         className="mb-4"
-        result={computeEnvironmentStability(series, { stage: envStage })}
+        result={computeEnvironmentStability(sharedVpdSeries, { stage: envStage })}
       />
       <WateringCadenceHistoryStrip
         tentId={id ?? null}

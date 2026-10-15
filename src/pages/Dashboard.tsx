@@ -60,6 +60,11 @@ import { selectConnectedOneTentGraph } from "@/lib/connectedOneTentActivationRul
 import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationRules";
 import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEvidence";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
+import {
+  mergeVpdStabilityInputs,
+  vpdStabilityInputsFromWideReadings,
+} from "@/lib/vpdStabilityInputRules";
 import { useNowTick } from "@/hooks/useNowTick";
 import { describeCurrentStateStaleWindow } from "@/lib/sensorTruthCanon";
 import { isUuid } from "@/lib/isUuid";
@@ -175,6 +180,8 @@ export default function Dashboard() {
   const tentsQuery = useGrowTents(scopedGrowId);
   const plantsQuery = useGrowPlants(undefined, scopedGrowId);
   const { data: tents = [] } = tentsQuery;
+  const singleStripTentId = tents.length === 1 ? (tents[0]?.id ?? null) : null;
+  const stripManuals = useSensorsQuickLogManualReadings(singleStripTentId);
   const { data: plants = [] } = plantsQuery;
   // Per-tent windows over this scope's tents; never the unscoped all-tents
   // read, which hit the Postgres statement timeout (QA 2026-09-24).
@@ -400,6 +407,10 @@ export default function Dashboard() {
     const tentRows = selectDashboardSensorEvidenceRows(readingsByTent[t.id] ?? []);
     const chartRows = groupDashboardSensorReadings(tentRows);
     const rs = buildDashboardStabilityReadings(tentRows);
+    const stabilityReadings =
+      t.id === singleStripTentId
+        ? mergeVpdStabilityInputs(rs, vpdStabilityInputsFromWideReadings(stripManuals.data ?? []))
+        : rs;
     const envStage = resolveTentEnvironmentStage({
       tentId: t.id,
       tentGrowId: t.growId ?? null,
@@ -412,7 +423,7 @@ export default function Dashboard() {
       }),
       plants: plantsForStage,
     });
-    const stability = computeEnvironmentStability(rs, { stage: envStage });
+    const stability = computeEnvironmentStability(stabilityReadings, { stage: envStage });
     return {
       tent: t,
       envStage,

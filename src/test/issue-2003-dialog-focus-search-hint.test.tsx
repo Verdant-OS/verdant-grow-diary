@@ -8,6 +8,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearLocalStorageForTest } from "@/test/helpers/localStorageTestHelper";
 
 const rpcMock = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
@@ -117,7 +118,7 @@ function setPlatform(platform: string) {
 beforeEach(() => {
   rpcMock.mockReset();
   window.sessionStorage.clear();
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 afterEach(() => {

@@ -45,11 +45,13 @@ export default function GrowArchiveControlButton({ growId, isArchived, onChanged
     setBusy(true);
     setRestoreError(null);
     try {
-      const { error: archiveError } = await supabase
+      const { data: archivedRows, error: archiveError } = await supabase
         .from("grows")
         .update({ is_archived: true })
-        .eq("id", growId);
-      if (archiveError) {
+        .eq("id", growId)
+        .select();
+      const archivedCount = Array.isArray(archivedRows) ? archivedRows.length : 0;
+      if (archiveError || archivedCount === 0) {
         toast.error(GROW_ARCHIVE_FAILED_COPY);
         return;
       }

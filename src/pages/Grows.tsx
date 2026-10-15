@@ -151,11 +151,18 @@ export default function Grows() {
 
   async function archive(id: string) {
     if (!confirm("Archive this grow? Entries stay saved.")) return;
-    const { error: archiveError } = await supabase
+    const archiveWrite = await supabase
       .from("grows")
       .update({ is_archived: true })
-      .eq("id", id);
+      .eq("id", id)
+      .select();
+    const { error: archiveError } = archiveWrite;
     if (archiveError) {
+      toast.error("Unable to archive this grow. Please try again.");
+      return;
+    }
+    const archivedRows = archiveWrite.data;
+    if (!Array.isArray(archivedRows) || archivedRows.length === 0) {
       toast.error("Unable to archive this grow. Please try again.");
       return;
     }
@@ -247,7 +254,7 @@ export default function Grows() {
           <p className="font-semibold">Unable to load grows.</p>
           <p className="text-xs text-muted-foreground mt-1">Please try again later.</p>
         </div>
-      ) : grows.length === 0 ? (
+      ) : grows.length === 0 && archivedGrowList.length === 0 ? (
         <div className="py-16 text-center" data-testid="grows-empty">
           <div className="mx-auto h-16 w-16 rounded-2xl glass flex items-center justify-center mb-4">
             <Sprout className="h-7 w-7 text-primary" />
@@ -255,6 +262,23 @@ export default function Grows() {
           <h2 className="font-display text-lg font-semibold">No grows yet.</h2>
           <p className="text-sm text-muted-foreground mt-1 mb-4">
             Create your first grow to start logging.
+          </p>
+          <Button
+            onClick={() => handleOpenChange(true)}
+            className="gradient-leaf text-primary-foreground"
+            disabled={createOutcomeUnknown}
+          >
+            Create grow
+          </Button>
+        </div>
+      ) : grows.length === 0 ? (
+        <div
+          className="rounded-3xl border border-border/60 bg-card/65 p-8 text-center shadow-card"
+          data-testid="grows-no-active"
+        >
+          <h2 className="font-display text-lg font-semibold">No active grows.</h2>
+          <p className="text-sm text-muted-foreground mt-1 mb-4">
+            Start a new grow or restore an archived grow below.
           </p>
           <Button
             onClick={() => handleOpenChange(true)}

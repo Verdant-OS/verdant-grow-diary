@@ -45,9 +45,9 @@ import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
 import GrowPendingOutcomeNotice from "@/components/GrowPendingOutcomeNotice";
 
 /**
- * Read-only grow detail hub. Presentational only — all data loading +
- * derivation live in @/hooks/useGrowDetailData and @/lib/growStatus.
- * No writes. No ai-coach call. No device-control surface.
+ * Grow detail hub. Presentational — all data loading + derivation live in
+ * @/hooks/useGrowDetailData and @/lib/growStatus; archive/restore writes live in
+ * @/components/GrowArchiveControlButton. No ai-coach call. No device-control surface.
  */
 export default function GrowDetail() {
   const {

@@ -12,6 +12,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import TimelineMemorySection from "@/components/TimelineMemorySection";
 
 const TIMELINE_SRC = readFileSync(resolve(__dirname, "../pages/Timeline.tsx"), "utf8");
+const MEMORY_SECTION_SRC = readFileSync(
+  resolve(__dirname, "../components/TimelineMemorySection.tsx"),
+  "utf8",
+);
 
 vi.mock("@/integrations/supabase/client", () => {
   const row = {
@@ -61,6 +65,19 @@ describe("timeline horizontal overflow", () => {
     expect(note.className).toContain("[overflow-wrap:anywhere]");
     expect(note.className).toContain("min-w-0");
     expect(note.className).toContain("max-w-full");
+
+    const row = note.closest('[data-testid="timeline-memory-diary-item"]');
+    expect(row).toBeTruthy();
+    expect(row?.className).toContain("min-w-0");
+    expect(row?.className).toContain("max-w-full");
+  });
+
+  it("pins overflow-safe classes on the memory diary row shell", () => {
+    expect(MEMORY_SECTION_SRC).toContain('data-testid="timeline-memory-diary-item"');
+    expect(MEMORY_SECTION_SRC).toMatch(
+      /data-testid="timeline-memory-diary-item"[\s\S]{0,400}className="[^"]*min-w-0[^"]*max-w-full/,
+    );
+    expect(MEMORY_SECTION_SRC).toContain("[overflow-wrap:anywhere]");
   });
 
   it("keeps the Timeline page from growing sideways and wraps entry notes", () => {

@@ -54,8 +54,8 @@ branch: cursor/plants-health-not-assessed-6187
 base: verdant-grow-diary
 checkout: git fetch origin cursor/plants-health-not-assessed-6187 verdant-grow-diary && git switch cursor/plants-health-not-assessed-6187 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: draft, URL recorded after push
-head_sha: recorded after push
-state: local implementation; draft PR next
+head_sha: 85482181b3c3050bc0e7b49a60f6987ba6e29031 (parent of the commit that records this line)
+state: committed locally; push and draft PR next
 next_action: stay draft until Cheeko approves schema work. Do not apply the migration.
 files: supabase/migrations/20261015161000_plants_health_drop_healthy_default.sql; src/lib/plantHealthRules.ts; src/pages/Plants.tsx; src/test/plants-page-unassessed-health-label.test.tsx; src/test/plants-health-drop-healthy-default-migration.test.ts; src/test/plant-health-unknown-rendering.test.tsx
 blockers: production apply waits on Cheeko; knk production database lock remains

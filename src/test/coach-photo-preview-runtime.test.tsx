@@ -119,9 +119,12 @@ describe("Coach photo preview runtime", () => {
     });
     expect(clearRect).toHaveBeenCalledWith(0, 0, 1280, 720);
     expect(drawImage).toHaveBeenCalledWith(bitmap, 0, 0, 1280, 720, 0, 0, 1280, 720);
-    expect(screen.getByTestId("coach-photo-preview-canvas")).toHaveAttribute(
-      "aria-hidden",
-      "false",
+    // drawImage runs before setPhotoPreviewStatus("ready") re-renders, so wait for the attribute.
+    await waitFor(() =>
+      expect(screen.getByTestId("coach-photo-preview-canvas")).toHaveAttribute(
+        "aria-hidden",
+        "false",
+      ),
     );
     expect(bitmap.close).toHaveBeenCalledTimes(1);
   });

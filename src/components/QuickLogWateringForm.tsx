@@ -4,12 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { type QuickLogWateringFormState } from "@/lib/quickLogWateringFormViewModel";
-import {
-  assessLargeWaterAmount,
-  readWaterVolumeUnit,
-  WATER_VOLUME_UNITS,
-  type WaterVolumeUnit,
-} from "@/lib/quickLogWaterVolumeWarningRules";
+import { assessLargeWaterAmount } from "@/lib/quickLogWaterVolumeWarningRules";
 import {
   applyWateringVolumePreset,
   isWateringVolumePresetSelected,
@@ -120,17 +115,16 @@ export default function QuickLogWateringForm({
     entryTemperatureUnit ?? temperatureUnit,
   );
   const review = buildWateringReview(value, entryTemperatureUnit ?? temperatureUnit);
-  const volumeUnit = readWaterVolumeUnit(value.volumeUnit);
   const largeWater = assessLargeWaterAmount({
     amount: value.volumeMl,
-    unit: volumeUnit,
+    unit: "ml",
     confirmedKey: confirmedLargeWaterKey,
   });
 
   return (
     <div className="space-y-4" data-testid="qlv2-watering-form">
       <div>
-        <Label htmlFor="qlv2-volume">Volume ({volumeUnit})</Label>
+        <Label htmlFor="qlv2-volume">Volume (ml)</Label>
         <Input
           id="qlv2-volume"
           inputMode="decimal"
@@ -147,23 +141,6 @@ export default function QuickLogWateringForm({
           onChange={(event) => setField("volumeMl", event.target.value)}
           placeholder="e.g. 500"
         />
-        <div className="mt-2">
-          <Label htmlFor="qlv2-volume-unit">Volume unit</Label>
-          <select
-            id="qlv2-volume-unit"
-            data-testid="qlv2-volume-unit"
-            className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-            value={volumeUnit}
-            disabled={disabled}
-            onChange={(event) => setField("volumeUnit", event.target.value as WaterVolumeUnit)}
-          >
-            {WATER_VOLUME_UNITS.map((unit) => (
-              <option key={unit} value={unit}>
-                {unit}
-              </option>
-            ))}
-          </select>
-        </div>
         {largeWater.message ? (
           <div
             id="qlv2-large-water-warning"
@@ -227,7 +204,6 @@ export default function QuickLogWateringForm({
                   onChange({
                     ...value,
                     volumeMl: applyWateringVolumePreset(value.volumeMl, preset),
-                    volumeUnit: "ml",
                   })
                 }
               >

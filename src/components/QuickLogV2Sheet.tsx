@@ -134,7 +134,6 @@ import { assessQuickLogWaterSaveGate } from "@/lib/quickLogWaterSaveGateRules";
 import {
   assessLargeWaterAmount,
   confirmLargeWaterAmount,
-  readWaterVolumeUnit,
 } from "@/lib/quickLogWaterVolumeWarningRules";
 import {
   EMPTY_QUICKLOG_WATERING_FORM,
@@ -510,6 +509,10 @@ function QuickLogV2SheetForOwner({
     confirmedKey: null,
   });
   const [largeWaterConfirmedKey, setLargeWaterConfirmedKey] = useState<string | null>(null);
+  const clearLargeWaterConfirmation = () => {
+    largeWaterSessionRef.current = { inFlight: false, confirmedKey: null };
+    setLargeWaterConfirmedKey(null);
+  };
   const [maturityEvidenceForm, setMaturityEvidenceForm] =
     useState<QuickLogMaturityEvidenceFormState>(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
   const [feedingSaving, setFeedingSaving] = useState(false);
@@ -898,7 +901,7 @@ function QuickLogV2SheetForOwner({
     form.action === "water" && !retryPending
       ? assessLargeWaterAmount({
           amount: wateringForm.volumeMl,
-          unit: readWaterVolumeUnit(wateringForm.volumeUnit),
+          unit: "ml",
           confirmedKey: largeWaterConfirmedKey,
         })
       : null;
@@ -1032,6 +1035,7 @@ function QuickLogV2SheetForOwner({
       feedingTempEntryUnitRef.current = null;
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
+      clearLargeWaterConfirmation();
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
       setWateringVolumeDefaultsApplied(false);
@@ -1222,6 +1226,7 @@ function QuickLogV2SheetForOwner({
     if (prev === "water") {
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
+      clearLargeWaterConfirmation();
       setWateringVolumeDefaultsApplied(false);
     }
     // Entering feed → maturity evidence surface hides; clear its draft
@@ -1525,7 +1530,7 @@ function QuickLogV2SheetForOwner({
     if (form.action === "water" && !wateringRetrySubmissionRef.current) {
       const largeWater = assessLargeWaterAmount({
         amount: wateringForm.volumeMl,
-        unit: readWaterVolumeUnit(wateringForm.volumeUnit),
+        unit: "ml",
         confirmedKey: largeWaterSessionRef.current.confirmedKey,
       });
       if (largeWater.needsConfirmation) return;
@@ -2548,6 +2553,7 @@ function QuickLogV2SheetForOwner({
     feedingTempEntryUnitRef.current = null;
     setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
     wateringTempEntryUnitRef.current = null;
+    clearLargeWaterConfirmation();
     setWateringRetryPending(false);
     setFailedWaterPhotoUpload(false);
     setWaterPhotoOmitted(false);

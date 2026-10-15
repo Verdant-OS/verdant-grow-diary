@@ -22,6 +22,10 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { AlertTargetContext } from "@/components/AlertTargetContext";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
+import {
+  AlertRowActionQueueButton,
+  queueOpenAlertToActionQueue,
+} from "@/components/AlertRowActionQueueButton";
 import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
 import AlertsContextHeaderForGrow from "@/components/AlertsContextHeaderForGrow";
 import AlertsEmptyStateSnapshotCta from "@/components/AlertsEmptyStateSnapshotCta";
@@ -188,6 +192,29 @@ export default function Alerts() {
   // Read-only per-alert summary of open linked Action Queue items.
   const visibleAlertIds = useMemo(() => alerts.map((a) => a.id), [alerts]);
   const linkedActionCounts = useAlertsLinkedActionCounts(visibleAlertIds);
+  const [locallyQueuedByAlertId, setLocallyQueuedByAlertId] = useState<Record<string, string>>({});
+
+  const effectiveLinkedSummaryForAlert = (alertId: string) => {
+    const existing = linkedActionCounts.get(alertId);
+    if (existing && existing.count > 0) return existing;
+    const localActionId = locallyQueuedByAlertId[alertId];
+    if (localActionId) {
+      return { count: 1, singleActionId: localActionId };
+    }
+    return existing;
+  };
+
+  const handleLoopCardBeforeNavigate = async () => {
+    const candidate = grouped.open.find((a) => {
+      const summary = effectiveLinkedSummaryForAlert(a.id);
+      return !summary || summary.count === 0;
+    });
+    if (!candidate) return;
+    const res = await queueOpenAlertToActionQueue(candidate);
+    if (res.ok && res.actionQueueId) {
+      setLocallyQueuedByAlertId((prev) => ({ ...prev, [candidate.id]: res.actionQueueId! }));
+    }
+  };
 
   /**
    * Status-change handler:
@@ -263,6 +290,7 @@ export default function Alerts() {
           ids={{ growId: urlGrowId ?? null }}
           testId="alerts-one-tent-loop-next-step-card"
           className="mb-3"
+          onBeforeNavigate={handleLoopCardBeforeNavigate}
         />
       ) : null}
       <p
@@ -480,7 +508,10 @@ export default function Alerts() {
                         namesLoading: targetNames.status === "loading",
                         idsLoading: linkedTargets.idsLoading,
                       })}
-                      linkedSummary={linkedActionCounts.get(a.id)}
+                      linkedSummary={effectiveLinkedSummaryForAlert(a.id)}
+                      onQueued={(alertId, actionId) =>
+                        setLocallyQueuedByAlertId((prev) => ({ ...prev, [alertId]: actionId }))
+                      }
                       onAcknowledge={handleAcknowledge}
                       onResolve={handleResolve}
                       onDismiss={handleDismiss}
@@ -534,6 +565,7 @@ interface AlertCardProps {
   alert: AlertRow;
   targetInput: AlertTargetContextInput;
   linkedSummary: ReturnType<ReturnType<typeof useAlertsLinkedActionCounts>["get"]>;
+  onQueued?: (alertId: string, actionId: string) => void;
   onAcknowledge: AlertActionHandler;
   onResolve: AlertActionHandler;
   onDismiss: AlertActionHandler;
@@ -543,6 +575,7 @@ function AlertCard({
   alert: a,
   targetInput,
   linkedSummary,
+  onQueued,
   onAcknowledge,
   onResolve,
   onDismiss,
@@ -638,6 +671,7 @@ function AlertCard({
         />
 
         <div className="flex flex-wrap gap-2">
+          <AlertRowActionQueueButton alert={a} linkedSummary={linkedSummary} onQueued={onQueued} />
           {a.status !== "acknowledged" && a.status !== "resolved" && (
             <Button
               size="sm"

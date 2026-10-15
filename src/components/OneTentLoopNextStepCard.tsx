@@ -28,9 +28,16 @@ interface Props {
   ids?: OneTentLoopIds;
   className?: string;
   testId?: string;
+  onBeforeNavigate?: () => Promise<void> | void;
 }
 
-export default function OneTentLoopNextStepCard({ current, ids, className, testId }: Props) {
+export default function OneTentLoopNextStepCard({
+  current,
+  ids,
+  className,
+  testId,
+  onBeforeNavigate,
+}: Props) {
   const queryClient = useContext(QueryClientContext);
   const plantId = current === "plant" ? ids?.plantId : null;
   // PlantQuickStatusStrip already owns this read. Observe its exact cache key
@@ -108,7 +115,16 @@ export default function OneTentLoopNextStepCard({ current, ids, className, testI
         </Button>
       ) : step.href ? (
         <Button asChild size="sm" data-testid={`${resolvedTestId}-cta`}>
-          <Link to={step.href}>
+          <Link
+            to={step.href}
+            onClick={
+              onBeforeNavigate
+                ? () => {
+                    void onBeforeNavigate();
+                  }
+                : undefined
+            }
+          >
             {step.ctaLabel}
             <ArrowRight className="ml-1 h-4 w-4" aria-hidden />
           </Link>

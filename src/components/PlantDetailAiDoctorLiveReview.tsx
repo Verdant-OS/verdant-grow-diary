@@ -54,7 +54,9 @@ import { isUuid } from "@/lib/isUuid";
 import { aiDoctorSessionDetailPath, plantDetailPath } from "@/lib/routes";
 import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { useAlertDoctorCreditGateReads } from "@/hooks/useAlertDoctorCreditGateReads";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
+import { buildAiDoctorSurfaceCreditViewModel } from "@/lib/aiDoctorSurfaceCreditViewModel";
 import {
   AI_DOCTOR_LOW_CREDIT_SURFACE,
   buildAiDoctorLowCreditTopUpViewModel,
@@ -460,6 +462,34 @@ function PlantDetailAiDoctorLiveReviewScope({
     loading: entitlementLoading,
     lookupFailed: entitlementLookupFailed,
   } = useMyEntitlements();
+  const entitlementReady = !entitlementLoading && !entitlementLookupFailed;
+  const perGrowAiCredits = entitlement?.capabilities?.aiCreditsPerGrow ?? null;
+  const { data: doctorCreditReads, isError: doctorCreditReadsFailed } =
+    useAlertDoctorCreditGateReads(
+      entitlementReady && typeof perGrowAiCredits === "number" && isUuid(growId) ? growId : null,
+    );
+  const surfaceCredit = useMemo(
+    () =>
+      buildAiDoctorSurfaceCreditViewModel({
+        entitlement,
+        entitlementLookupFailed,
+        allowanceUsed: doctorCreditReadsFailed ? null : (doctorCreditReads?.allowanceUsed ?? null),
+        allowanceReadFailed: doctorCreditReadsFailed,
+        postSpendCredit: review.creditRemaining,
+        deniedCredit:
+          review.status === "error" && review.reason === "credit_denied" ? review.credit : null,
+      }),
+    [
+      doctorCreditReads?.allowanceUsed,
+      doctorCreditReadsFailed,
+      entitlement,
+      entitlementLookupFailed,
+      review.credit,
+      review.creditRemaining,
+      review.reason,
+      review.status,
+    ],
+  );
   const canRetryReview = canRetryAiDoctorLiveReviewFailure(review.reason);
   // Keep the start gate on current time. Accepted visibility also checks the
   // current sources at acceptance time, so aging alone cannot hide a review.
@@ -913,6 +943,24 @@ function PlantDetailAiDoctorLiveReviewScope({
       >
         {confidenceCopy}
       </p>
+      {review.status !== "result" || !review.result ? (
+        <>
+          {surfaceCredit.creditRemaining ? (
+            <AiCreditRemainingBadge
+              credit={surfaceCredit.creditRemaining}
+              data-testid="plant-ai-doctor-live-review-credit-remaining"
+            />
+          ) : null}
+          {surfaceCredit.freePlanCreditCopy ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="plant-ai-doctor-live-review-free-credit-note"
+            >
+              {surfaceCredit.freePlanCreditCopy}
+            </p>
+          ) : null}
+        </>
+      ) : null}
       {activeReviewVisibility.showsStaleEvidenceNote ? (
         <p
           className="text-xs text-muted-foreground"
@@ -1133,11 +1181,19 @@ function PlantDetailAiDoctorLiveReviewScope({
               {AI_DOCTOR_HISTORY_SAVE_SKIPPED_COPY}
             </p>
           ) : null}
-          {review.creditRemaining ? (
+          {surfaceCredit.creditRemaining ? (
             <AiCreditRemainingBadge
-              credit={review.creditRemaining}
+              credit={surfaceCredit.creditRemaining}
               data-testid="plant-ai-doctor-live-review-credit-remaining"
             />
+          ) : null}
+          {surfaceCredit.freePlanCreditCopy ? (
+            <p
+              className="mt-1 text-xs text-muted-foreground"
+              data-testid="plant-ai-doctor-live-review-free-credit-note"
+            >
+              {surfaceCredit.freePlanCreditCopy}
+            </p>
           ) : null}
           {/* Paid counterpart to the Free post-value upgrade below: a paying
               grower near the end of their monthly allowance needs a pack, not

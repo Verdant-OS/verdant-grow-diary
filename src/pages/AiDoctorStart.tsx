@@ -9,13 +9,17 @@ import { useMemo } from "react";
 import { ArrowRight, History, Sprout, Stethoscope } from "lucide-react";
 import { Link, useSearchParams } from "@/lib/react-router-compat";
 
+import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import EmptyState from "@/components/EmptyState";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
+import { useAiDoctorGrowCreditUsage } from "@/hooks/useAiDoctorGrowCreditUsage";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiDoctorEntryOptions } from "@/lib/aiDoctorEntryRules";
+import { buildAiDoctorSurfaceCreditViewModel } from "@/lib/aiDoctorSurfaceCreditViewModel";
 import {
   DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY,
   partitionDoctorEntryOptionsByTent,
@@ -122,6 +126,33 @@ export default function AiDoctorStart() {
       ? scope
       : { growId: null, growName: null, tentId: null, tentName: null, hasInvalidScope: false };
 
+  const {
+    entitlement,
+    loading: entitlementLoading,
+    lookupFailed: entitlementLookupFailed,
+  } = useMyEntitlements();
+  const entitlementReady = !entitlementLoading && !entitlementLookupFailed;
+  const perGrowAiCredits = entitlement?.capabilities?.aiCreditsPerGrow ?? null;
+  const singleGrowId =
+    !growsLoading && !growsError && grows.length === 1 && typeof grows[0]?.id === "string"
+      ? grows[0].id
+      : null;
+  const creditGrowId = resolvedScope.growId ?? singleGrowId;
+  const creditUsage = useAiDoctorGrowCreditUsage(
+    creditGrowId,
+    entitlementReady && typeof perGrowAiCredits === "number",
+  );
+  const surfaceCredit = useMemo(
+    () =>
+      buildAiDoctorSurfaceCreditViewModel({
+        entitlement,
+        entitlementLookupFailed,
+        allowanceUsed: creditUsage.isError ? null : creditUsage.allowanceUsed,
+        allowanceReadFailed: creditUsage.isError,
+      }),
+    [creditUsage.allowanceUsed, creditUsage.isError, entitlement, entitlementLookupFailed],
+  );
+
   // Carried tent scope reorders and labels the choices. It never removes one:
   // the explicit plant choice below is doctrine, and a shorter list is a
   // softer way of guessing. A carried plant may be ordered/badged; it is
@@ -193,6 +224,20 @@ export default function AiDoctorStart() {
             Verdant will not guess which plant you mean. Opening a plant prepares its existing
             context; AI Doctor runs only after you press the review button there.
           </p>
+          {surfaceCredit.creditRemaining ? (
+            <AiCreditRemainingBadge
+              credit={surfaceCredit.creditRemaining}
+              data-testid="ai-doctor-start-credit-remaining"
+            />
+          ) : null}
+          {surfaceCredit.freePlanCreditCopy ? (
+            <p
+              className="mt-1 text-xs text-muted-foreground"
+              data-testid="ai-doctor-start-free-credit-note"
+            >
+              {surfaceCredit.freePlanCreditCopy}
+            </p>
+          ) : null}
           {resolvedScope.tentName ? (
             <p
               className="mt-2 text-sm text-muted-foreground"

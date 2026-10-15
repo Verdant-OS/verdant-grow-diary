@@ -53,16 +53,16 @@ goal: Readable bounded Sentinel handoffs: success advances to an authorized next
 branch: codex/sentinel-20261015-bounded-handoffs
 base: verdant-grow-diary at 5459c3a18a402d2bf5b00c96b0688c4475dcf93d
 checkout: git fetch origin codex/sentinel-20261015-bounded-handoffs verdant-grow-diary; verify the PR head before checkout and merge from base per AGENTS.md.
-pr: bootstrap draft creation pending; record the actual PR URL in the next update
-head_sha: bootstrap commit follows 5459c3a18a402d2bf5b00c96b0688c4475dcf93d; read the exact current remote head from the draft PR
-state: scope/ownership bootstrap only; implementation not yet started
-next_action: Open and claim the draft before fail-first tests and implementation.
-files: scripts/lib/sentinelHandoff*.mjs (new); scripts/sentinel-handoff*.mjs (new, including tests); docs/sentinel-agent-handoffs.md (new); docs/agents/HANDOFF_LOG.md (this block only)
-blockers: External Claude/Grok/Graft/Canopy delivery and adoption are NOT_MEASURED; no verified recipient destination or transport integration is implied. Local Documents checkout creation failed; isolated checkout is in authorized temporary workspace. Bun/dependency checks unavailable initially; Node built-in tests planned.
-artifacts: Internal child channel correlation sentinel-20261015-routing-audit acknowledged repository/head at 2026-10-15 14:59 UTC; child is read-only, root is sole writer. This is real internal delivery evidence, not proof of a new router or external delivery.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2133 (draft)
+head_sha: implementation commit follows bootstrap 4ece0d7e6c614ea9ba78b7a90deab209548c005d; read the exact current remote head from the draft PR. A commit cannot contain its own SHA.
+state: local implementation, tests and operational runbook complete; router-assisted internal probe pending
+next_action: Commit the verified implementation, use its exact head for one existing internal child handoff, then record real ACK and RETURN. Keep draft; Critical Mass acceptance remains pending.
+files: scripts/lib/sentinelHandoffRules.mjs; scripts/lib/sentinelHandoffJournal.mjs; scripts/sentinel-handoff.mjs; scripts/sentinel-handoff.test.mjs; scripts/sentinel-handoff-journal.test.mjs; src/test/sentinel-agent-handoff-node-runner.test.ts (all new); docs/sentinel-agent-handoffs.md (new); docs/agents/HANDOFF_LOG.md (this block only)
+blockers: External Claude/Grok/Graft/Canopy delivery/adoption NOT_MEASURED; no recipient destination/authorization is implied. Bun, project dependencies, local Vitest wrapper/lint/typecheck unavailable. No frozen install or dependency change attempted. Pinned Prettier 3.7.3 works from an isolated temporary cache. Machine/power-loss journal durability NOT_MEASURED; process restart is tested.
+artifacts: Node behavior suites 23 PASS / 0 FAIL / 0 SKIP. RED: initial rules 0/13, journal 0/5; added race/scope tests 13/3; cross-task replay 16/1; replay+observation bounds 16/2. Local evidence C:/Users/G8/AppData/Local/Temp/verdant-sentinel-20261015/*-red.log and combined-green.log. Scorer strict, docs safety 3/3, Sentinel parity (0 governed changes) PASS. Internal audit correlation sentinel-20261015-routing-audit produced real pickup+return at base 5459c3a18; no external delivery proof. Peer review found two receipt races and cross-task replay; root added fail-first coverage and fixed them. Peer review is not independent acceptance.
 reviewer_seat: Critical Mass under OWNERSHIP.md path routing; independent acceptance NOT_MEASURED. Codex authors and cannot accept this slice.
-claimed_by: Bloom / Codex, explicit Matthew assignment, 2026-10-15 15:02 UTC; PR claim to follow creation
-last_updated: 2026-10-15 15:02 UTC, by Bloom / Codex
+claimed_by: Bloom / Codex, explicit Matthew assignment; PR comment 6195232612, 2026-10-15 15:03 UTC (read back; no earlier competing claim)
+last_updated: 2026-10-15 15:18 UTC, by Bloom / Codex
 ```
 
 ### TIMELINE-GROW-DAY-2005

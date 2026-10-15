@@ -20,7 +20,8 @@ describe("plants.health drop healthy default", () => {
   // @source-scan-justified: a SQL migration has no resolvable value in vitest.
   const sql = executableSql(MIGRATION);
 
-  it("drops the column default and does not backfill existing rows", () => {
+  it("drops NOT NULL and the column default, and does not backfill existing rows", () => {
+    expect(sql).toMatch(/ALTER TABLE public\.plants ALTER COLUMN health DROP NOT NULL;/);
     expect(sql).toMatch(/ALTER TABLE public\.plants ALTER COLUMN health DROP DEFAULT;/);
     expect(sql).not.toMatch(/SET DEFAULT 'healthy'/);
     expect(sql).not.toMatch(/UPDATE\s+public\.plants/i);

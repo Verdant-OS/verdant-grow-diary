@@ -1367,7 +1367,7 @@ Case-insensitive search across `src/` and `supabase/` at the stamped SHA returns
 `nelson`, `modified z`, `modifiedZ`, `median absolute deviation`, `\bMAD\b`, `z-?score`, `zscore`
 or `robust ?z`, and the same at `2ffe78cc1` and `7e024f93` over `scripts/`, `e2e/`, `tools/`, `plugins/` and
 `spikes/`. Outside this contract, Nelson is mentioned only as not-implemented guidance: the
-2026-08-21 adjudication, `docs/specs/release-topology-specification.md:853` and the review rule at
+2026-08-21 adjudication, `docs/specs/release-topology-specification.md:943` and the review rule at
 `.coderabbit.yaml:205-206`.
 _Source:_ measured at the stamped SHA; `docs/audits/architecture-audit-adjudication-2026-08-21.md`
 §4.1. `established fact`.

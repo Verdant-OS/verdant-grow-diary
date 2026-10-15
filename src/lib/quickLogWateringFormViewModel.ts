@@ -8,11 +8,6 @@
 
 import { resolveEcPpm500Pair } from "./ecPpm500PairRules";
 import {
-  readWaterVolumeUnit,
-  waterEntryToMilliliters,
-  type WaterVolumeUnit,
-} from "./quickLogWaterVolumeWarningRules";
-import {
   ROOT_ZONE_DRAINAGE_OBSERVATIONS,
   ROOT_ZONE_MANUAL_OBSERVATION_DETAILS_KEY,
   ROOT_ZONE_MANUAL_OBSERVATION_SCHEMA_VERSION,
@@ -35,8 +30,6 @@ export type DrainageObservation = "" | RootZoneDrainageObservation;
 
 export interface QuickLogWateringFormState {
   volumeMl: string;
-  /** Display unit for volumeMl. Omitted or "ml" keeps the typed value in milliliters. */
-  volumeUnit?: WaterVolumeUnit;
   ph: string;
   ec: string;
   ppm: string;
@@ -142,11 +135,9 @@ function metricInRange(value: number | null, min: number, max: number): boolean 
 }
 
 export function isWateringFormPristine(form: QuickLogWateringFormState): boolean {
-  const unit = form.volumeUnit;
-  if (unit !== undefined && unit !== "ml") return false;
-  return (Object.keys(form) as (keyof QuickLogWateringFormState)[])
-    .filter((key) => key !== "volumeUnit")
-    .every((key) => form[key] === "");
+  return (Object.keys(form) as (keyof QuickLogWateringFormState)[]).every(
+    (key) => form[key] === "",
+  );
 }
 
 export function buildWateringFormPayload(
@@ -163,9 +154,7 @@ export function buildWateringFormPayload(
   const parsedVolume = parseOptionalNumber(input.form.volumeMl);
   if (!parsedVolume.ok) return { ok: false, reason: "volume_ml:invalid" };
   if (parsedVolume.value === null) return { ok: false, reason: "volume_ml:missing" };
-  const volumeUnit = readWaterVolumeUnit(input.form.volumeUnit);
-  const volumeMl = waterEntryToMilliliters(input.form.volumeMl, volumeUnit);
-  if (volumeMl === null || volumeMl <= 0 || volumeMl > 1_000_000) {
+  if (parsedVolume.value <= 0 || parsedVolume.value > 1_000_000) {
     return { ok: false, reason: "volume_ml:invalid" };
   }
 
@@ -263,7 +252,7 @@ export function buildWateringFormPayload(
     plant_id: input.plantId ?? null,
     occurred_at: occurredAt,
     note: note === "" ? null : note,
-    volume_ml: volumeMl,
+    volume_ml: parsedVolume.value,
     ...parsedMetrics,
     sensor_snapshot:
       hasSensorMetrics && occurredAt

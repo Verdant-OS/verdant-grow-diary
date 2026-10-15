@@ -8,7 +8,6 @@ import {
   LARGE_WATER_AMOUNT_CONFIRM_LABEL,
   assessLargeWaterAmount,
   confirmLargeWaterAmount,
-  waterEntryToMilliliters,
 } from "@/lib/quickLogWaterVolumeWarningRules";
 
 const baseInput = {
@@ -37,26 +36,17 @@ describe("large water amount warning", () => {
     expect(assessment.confirmLabel).toBe(LARGE_WATER_AMOUNT_CONFIRM_LABEL);
   });
 
-  it("converts the selected unit before the 10,000 ml threshold", () => {
-    expect(waterEntryToMilliliters("10", "L")).toBe(10_000);
-    expect(assessLargeWaterAmount({ amount: "10", unit: "L", confirmedKey: null }).warns).toBe(
+  it("treats the typed amount as milliliters", () => {
+    expect(assessLargeWaterAmount({ amount: "10", unit: "ml", confirmedKey: null }).warns).toBe(
       false,
     );
-    expect(waterEntryToMilliliters("10.001", "L")).toBe(10_001);
     expect(
-      assessLargeWaterAmount({ amount: "10.001", unit: "L", confirmedKey: null }),
+      assessLargeWaterAmount({ amount: "10001", unit: "ml", confirmedKey: null }),
     ).toMatchObject({
       warns: true,
       volumeMl: 10_001,
-      enteredLabel: "10.001 L",
+      enteredLabel: "10001 ml",
     });
-    expect(waterEntryToMilliliters("1", "gal")).toBe(3785.411784);
-    expect(assessLargeWaterAmount({ amount: "3", unit: "gal", confirmedKey: null }).warns).toBe(
-      true,
-    );
-    expect(assessLargeWaterAmount({ amount: "2", unit: "gal", confirmedKey: null }).warns).toBe(
-      false,
-    );
   });
 
   it("requires a fresh confirmation after the amount changes", () => {
@@ -108,17 +98,17 @@ describe("large water amount warning", () => {
 
     const aboveWarning = buildWateringFormPayload({
       ...baseInput,
-      form: { ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "10001", volumeUnit: "ml" },
+      form: { ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "10001" },
     });
     expect(aboveWarning.ok).toBe(true);
     if (aboveWarning.ok) expect(aboveWarning.payload.volume_ml).toBe(10_001);
 
-    const liters = buildWateringFormPayload({
+    const fractional = buildWateringFormPayload({
       ...baseInput,
-      form: { ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "10.001", volumeUnit: "L" },
+      form: { ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "10.001" },
     });
-    expect(liters.ok).toBe(true);
-    if (liters.ok) expect(liters.payload.volume_ml).toBe(10_001);
+    expect(fractional.ok).toBe(true);
+    if (fractional.ok) expect(fractional.payload.volume_ml).toBe(10.001);
 
     for (const volumeMl of ["0", "-5", "abc", ""]) {
       const result = buildWateringFormPayload({

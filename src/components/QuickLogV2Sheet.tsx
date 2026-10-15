@@ -1509,11 +1509,27 @@ function QuickLogV2SheetForOwner({
     );
   }
 
+  const releaseUnstartedLargeWaterConfirm = () => {
+    if (saveInFlightRef.current) return;
+    if (
+      !largeWaterSessionRef.current.inFlight &&
+      largeWaterSessionRef.current.confirmedKey === null
+    ) {
+      return;
+    }
+    largeWaterSessionRef.current = { inFlight: false, confirmedKey: null };
+    setLargeWaterConfirmedKey(null);
+  };
+
   const handleSave = async () => {
-    if (recoveryStorageFence || historyCheckRequiredRef.current) return;
+    if (recoveryStorageFence || historyCheckRequiredRef.current) {
+      releaseUnstartedLargeWaterConfirm();
+      return;
+    }
     const lifetime = noteLifetimeRef.current;
     if (videoValidationInFlightRef.current) {
       setLocalError("Wait for the video check to finish before saving.");
+      releaseUnstartedLargeWaterConfirm();
       return;
     }
     // Synchronous re-entry guard: prevents a rapid double-click from
@@ -1525,6 +1541,7 @@ function QuickLogV2SheetForOwner({
         postSaveShown: postSave !== null,
       })
     ) {
+      releaseUnstartedLargeWaterConfirm();
       return;
     }
     if (form.action === "water" && !wateringRetrySubmissionRef.current) {
@@ -1533,7 +1550,10 @@ function QuickLogV2SheetForOwner({
         unit: "ml",
         confirmedKey: largeWaterSessionRef.current.confirmedKey,
       });
-      if (largeWater.needsConfirmation) return;
+      if (largeWater.needsConfirmation) {
+        releaseUnstartedLargeWaterConfirm();
+        return;
+      }
     }
     // Freeze every supported submission before the first await, using the
     // same synchronous guard as Water. Local validation releases this lock.

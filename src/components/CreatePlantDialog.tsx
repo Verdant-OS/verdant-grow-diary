@@ -341,6 +341,9 @@ export default function CreatePlantDialog({
   }
 
   function handleOpenChange(next: boolean) {
+    // The recovery explanation lives in this dialog, and the trigger cannot
+    // reopen it while the outcome is unknown. Closing would hide that notice.
+    if (!next && createOutcomeUnknown) return;
     if (next && createOutcomeUnknown) return;
     // The insert may already be durable, so closing cannot cancel it. Let the
     // grower dismiss a stalled refresh, but suppress the later Quick Log
@@ -441,6 +444,7 @@ export default function CreatePlantDialog({
 
     handoffSuppressedRef.current = false;
     createInFlightRef.current = true;
+    setSaveError(null);
     setBusy(true);
     try {
       const trimmedStrain = form.strain.trim();

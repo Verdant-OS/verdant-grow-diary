@@ -54,15 +54,15 @@ branch: cursor/plant-create-insert-error-99b8
 base: verdant-grow-diary
 checkout: git fetch origin cursor/plant-create-insert-error-99b8 verdant-grow-diary && git switch cursor/plant-create-insert-error-99b8 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2192 (draft)
-head_sha: 75f39a0e7806332445580abdf01296f92bafc1df (parent of the commit that records this URL). Read the PR head before resuming.
-state: pushed draft
-next_action: required checks and Blue Dream review. Stay draft. No merge.
-files: src/components/CreatePlantDialog.tsx; src/lib/plantCreateFailureNotice.ts; src/test/plant-create-insert-failure-notice.test.tsx; docs/agents/HANDOFF_LOG.md
-blockers: none for the repository change. The plants-list health label stays with #2140.
-artifacts: fail-first 3 failed / 1 passed on src/test/plant-create-insert-failure-notice.test.tsx; 4 passed / 0 failed after
+head_sha: 82faee3c36e6dfa21848db327f580d295510f7f4 (parent of the repair commit). Read the PR head before resuming.
+state: pushed draft. Codex asked to close this block as if #2192 had squash-landed; it has not. The block stays OPEN until the PR merges.
+next_action: stay draft for review at the repair head. No merge.
+files: src/components/CreatePlantDialog.tsx; src/lib/plantCreateFailureNotice.ts; src/test/plant-create-insert-failure-notice.test.tsx; src/test/plant-create-retry-recovery-notice.test.tsx; docs/agents/HANDOFF_LOG.md
+blockers: none for the repository change. The plants-list health label stays with #2140. GitHub Actions billing lock failed the suite shards; that is not a code failure.
+artifacts: retry/recovery fail-first 2 failed / 1 passed on src/test/plant-create-retry-recovery-notice.test.tsx
 reviewer_seat: Blue Dream (CreatePlantDialog.tsx)
 claimed_by: cursor cloud agent, 2026-10-15 16:30 CT
-last_updated: 2026-10-15 16:30 CT, by cursor cloud agent
+last_updated: 2026-10-15 17:50 CT, by cursor cloud agent
 ```
 
 ### PR2072-M7-SERVED-REVISION

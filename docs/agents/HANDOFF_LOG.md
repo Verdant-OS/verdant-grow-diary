@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### FIX-1989-PLANTS-HEALTH-NOT-ASSESSED
+
+```text
+TASK FIX-1989-PLANTS-HEALTH-NOT-ASSESSED  priority: P2  status: OPEN
+goal: /plants shows "not assessed" when a plant has no health assessment. New migration drops plants.health default of 'healthy'. No backfill. No production apply. Fixes #1989.
+branch: cursor/plants-health-not-assessed-6187
+base: verdant-grow-diary
+checkout: git fetch origin cursor/plants-health-not-assessed-6187 verdant-grow-diary && git switch cursor/plants-health-not-assessed-6187 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: draft, URL recorded after push
+head_sha: recorded after push
+state: local implementation; draft PR next
+next_action: stay draft until Cheeko approves schema work. Do not apply the migration.
+files: supabase/migrations/20261015161000_plants_health_drop_healthy_default.sql; src/lib/plantHealthRules.ts; src/pages/Plants.tsx; src/test/plants-page-unassessed-health-label.test.tsx; src/test/plants-health-drop-healthy-default-migration.test.ts; src/test/plant-health-unknown-rendering.test.tsx
+blockers: production apply waits on Cheeko; knk production database lock remains
+artifacts: fail-first 4 failed / 0 passed before the label and migration; green after
+reviewer_seat: Codex, Blue Dream, Critical Mass, or Durban Poison (migration)
+claimed_by: grok, 2026-10-15 11:18 CT
+last_updated: 2026-10-15 11:18 CT, by grok
+```
+
 ### PR2072-M7-SERVED-REVISION
 
 ```text

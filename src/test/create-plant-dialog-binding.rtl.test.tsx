@@ -6,7 +6,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
-import { PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE } from "@/lib/plantHealthRules";
+import {
+  PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE,
+  storedHealthUnderLegacyPlantTrigger,
+} from "@/lib/plantHealthRules";
 import { unstable_batchedUpdates } from "react-dom";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
@@ -369,7 +372,7 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(selectMock).toHaveBeenCalledWith("*");
   });
 
-  it("creates a plant as not assessed: unset health is omitted until the grower picks one (BUG-009)", async () => {
+  it("creates a plant as not assessed: 'unknown' is sent until the grower picks one (BUG-009)", async () => {
     renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
     await waitFor(() => {
       expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
@@ -382,10 +385,10 @@ describe("CreatePlantDialog RTL binding", () => {
       expect(insertMock).toHaveBeenCalled();
     });
     const payload = insertMock.mock.calls[0][0] as Record<string, unknown>;
-    // Unset health stays off the insert. The select still shows Not assessed
-    // yet, and the payload does not claim healthy.
-    expect(payload).not.toHaveProperty("health");
-    expect(payload.health).not.toBe("healthy");
+    // Written explicitly. On 20260516204601 an omitted column stores 'healthy'.
+    // Explicit 'unknown' is rejected and nothing is written.
+    expect(payload.health).toBe("unknown");
+    expect(storedHealthUnderLegacyPlantTrigger(payload)).toEqual({ status: "rejected" });
   });
 
   it("fails closed when the database does not accept Not assessed yet", async () => {
@@ -461,10 +464,10 @@ describe("CreatePlantDialog RTL binding", () => {
         expect(insertMock).toHaveBeenCalled();
       });
       const payload = insertMock.mock.calls[0][0] as Record<string, unknown>;
-      // Clearing back to Not assessed yet omits health, same as an untouched select.
-      expect(payload).not.toHaveProperty("health");
-      expect(payload.health).not.toBe("healthy");
-      expect(payload.health).not.toBe("watch");
+      // Clearing back to Not assessed yet writes explicit unknown, which the
+      // legacy trigger rejects instead of storing the healthy default.
+      expect(payload.health).toBe("unknown");
+      expect(storedHealthUnderLegacyPlantTrigger(payload)).toEqual({ status: "rejected" });
     } finally {
       Element.prototype.scrollIntoView = originalScrollIntoView;
     }

@@ -36,9 +36,9 @@ import {
   PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE,
   PLANT_HEALTH_NOT_ASSESSED_LABEL,
   PLANT_HEALTH_NOT_ASSESSED_OPTION,
+  buildPlantHealthCreateInsert,
   isPlantHealthClearRejected,
   plantCreateErrorShouldRevealHealth,
-  plantHealthCreateColumn,
   plantHealthFromSelectValue,
 } from "@/lib/plantHealthRules";
 import {
@@ -443,9 +443,9 @@ export default function CreatePlantDialog({
         name: form.name.trim(),
         strain: trimmedStrain || null,
         stage: form.stage,
-        // Unset health stays off the insert so the column default applies.
-        // The production trigger rejects an explicit "unknown".
-        ...plantHealthCreateColumn(form.health),
+        // Always explicit, "unknown" when not assessed: the column default is
+        // "healthy" until 20260924120000 is applied (QA 2026-09-24, BUG-009).
+        ...buildPlantHealthCreateInsert(form.health),
         plant_type: form.plant_type,
         grow_id: targetGrowId,
       };

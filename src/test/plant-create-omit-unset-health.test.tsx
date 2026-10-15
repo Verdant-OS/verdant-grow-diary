@@ -1,14 +1,18 @@
 /**
- * Production create returns 400 when the dialog sends health "unknown".
- * The live trigger only allows healthy, watch, and issue. An unset health
- * must be left out of the insert so the column default applies, and a health
- * rejection must open the collapsed Optional details section that holds the
- * health select.
+ * On 20260516204601, omitting health stores the column default 'healthy'.
+ * An unassessed create must send an explicit value the trigger rejects, so
+ * nothing is stored as healthy, and that rejection opens the health select.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  buildPlantHealthCreateInsert,
+  plantHealthFromSelectValue,
+  PLANT_HEALTH_NOT_ASSESSED_OPTION,
+  storedHealthUnderLegacyPlantTrigger,
+} from "@/lib/plantHealthRules";
 
 const insertMock = vi.fn();
 const singleMock = vi.fn();
@@ -104,7 +108,40 @@ function optionalDetails(): HTMLDetailsElement {
   return details;
 }
 
-describe("CreatePlantDialog omits unset health", () => {
+function storedFromInsert(payload: { readonly health?: unknown }) {
+  return storedHealthUnderLegacyPlantTrigger(payload);
+}
+
+describe("legacy plant-health store", () => {
+  it("stores healthy only when the column is omitted", () => {
+    expect(storedFromInsert({})).toEqual({ status: "stored", health: "healthy" });
+    expect(storedFromInsert(buildPlantHealthCreateInsert(""))).toEqual({ status: "rejected" });
+    expect(storedFromInsert(buildPlantHealthCreateInsert(undefined))).toEqual({
+      status: "rejected",
+    });
+    expect(
+      storedFromInsert(
+        buildPlantHealthCreateInsert(plantHealthFromSelectValue(PLANT_HEALTH_NOT_ASSESSED_OPTION)),
+      ),
+    ).toEqual({ status: "rejected" });
+    expect(storedFromInsert(buildPlantHealthCreateInsert("watch"))).toEqual({
+      status: "stored",
+      health: "watch",
+    });
+    expect(storedFromInsert(buildPlantHealthCreateInsert("healthy"))).toEqual({
+      status: "stored",
+      health: "healthy",
+    });
+    expect(storedFromInsert(buildPlantHealthCreateInsert("issue"))).toEqual({
+      status: "stored",
+      health: "issue",
+    });
+    expect(storedFromInsert({ health: "great" })).toEqual({ status: "rejected" });
+    expect(storedFromInsert({ health: null })).toEqual({ status: "rejected" });
+  });
+});
+
+describe("CreatePlantDialog unassessed health on the legacy schema", () => {
   beforeEach(() => {
     insertMock.mockReset();
     singleMock.mockReset();
@@ -121,16 +158,10 @@ describe("CreatePlantDialog omits unset health", () => {
     tentsState.refetch = vi.fn();
   });
 
-  it("leaves health out of the insert when the grower has not chosen one", async () => {
+  it("does not store the legacy healthy default when health is left untouched", async () => {
     singleMock.mockResolvedValue({
-      data: {
-        id: "77777777-7777-4777-8777-777777777777",
-        name: "Plant A",
-        user_id: USER_ID,
-        grow_id: GROW_ACTIVE,
-        tent_id: TENT_OK,
-      },
-      error: null,
+      data: null,
+      error: { message: "invalid plant health: unknown" },
     });
 
     renderDialog();
@@ -145,9 +176,51 @@ describe("CreatePlantDialog omits unset health", () => {
       expect(insertMock).toHaveBeenCalled();
     });
     const payload = insertMock.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(payload).not.toHaveProperty("health");
     expect(payload.name).toBe("Plant A");
     expect(payload.grow_id).toBe(GROW_ACTIVE);
+    expect(storedFromInsert(payload)).toEqual({ status: "rejected" });
+    await waitFor(() => {
+      expect(optionalDetails().open).toBe(true);
+    });
+    expect(screen.getByTestId("create-plant-health")).toBeVisible();
+  });
+
+  it("does not store the legacy healthy default when the grower selects Not assessed yet", async () => {
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+    singleMock.mockResolvedValue({
+      data: null,
+      error: { message: "invalid plant health: unknown" },
+    });
+
+    try {
+      renderDialog();
+      fireEvent.change(screen.getByPlaceholderText("Plant A"), {
+        target: { value: "Plant A" },
+      });
+      fireEvent.keyDown(screen.getByTestId("create-plant-health"), { key: "ArrowDown" });
+      fireEvent.click(await screen.findByRole("option", { name: "Watch" }));
+      await waitFor(() =>
+        expect(screen.getByTestId("create-plant-health")).toHaveTextContent("Watch"),
+      );
+      fireEvent.keyDown(screen.getByTestId("create-plant-health"), { key: "ArrowDown" });
+      fireEvent.click(await screen.findByRole("option", { name: "Not assessed yet" }));
+      await waitFor(() =>
+        expect(screen.getByTestId("create-plant-health")).toHaveTextContent("Not assessed yet"),
+      );
+      fireEvent.click(screen.getByTestId("plant-create-submit"));
+
+      await waitFor(() => {
+        expect(insertMock).toHaveBeenCalled();
+      });
+      const payload = insertMock.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(storedFromInsert(payload)).toEqual({ status: "rejected" });
+      await waitFor(() => {
+        expect(optionalDetails().open).toBe(true);
+      });
+    } finally {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+    }
   });
 
   it("opens optional details when the database rejects plant health", async () => {
@@ -167,6 +240,43 @@ describe("CreatePlantDialog omits unset health", () => {
     await waitFor(() => {
       expect(optionalDetails().open).toBe(true);
     });
+    const payload = insertMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(storedFromInsert(payload)).toEqual({ status: "rejected" });
     expect(screen.getByTestId("create-plant-health")).toBeVisible();
+  });
+
+  it("stores the health the grower explicitly picks", async () => {
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+    singleMock.mockResolvedValue({
+      data: {
+        id: "77777777-7777-4777-8777-777777777777",
+        name: "Plant A",
+        user_id: USER_ID,
+        grow_id: GROW_ACTIVE,
+        tent_id: TENT_OK,
+        health: "watch",
+      },
+      error: null,
+    });
+    try {
+      renderDialog();
+      fireEvent.change(screen.getByPlaceholderText("Plant A"), {
+        target: { value: "Plant A" },
+      });
+      fireEvent.keyDown(screen.getByTestId("create-plant-health"), { key: "ArrowDown" });
+      fireEvent.click(await screen.findByRole("option", { name: "Watch" }));
+      await waitFor(() =>
+        expect(screen.getByTestId("create-plant-health")).toHaveTextContent("Watch"),
+      );
+      fireEvent.click(screen.getByTestId("plant-create-submit"));
+      await waitFor(() => {
+        expect(insertMock).toHaveBeenCalled();
+      });
+      const payload = insertMock.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(storedFromInsert(payload)).toEqual({ status: "stored", health: "watch" });
+    } finally {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+    }
   });
 });

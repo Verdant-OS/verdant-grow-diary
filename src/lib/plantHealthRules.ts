@@ -96,17 +96,26 @@ export const PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE =
   "\"Not assessed yet\" isn't available yet, so the plant wasn't added. Choose Healthy, Watch or Issue to add it.";
 
 /**
- * Create-plant column for health. An unset choice is omitted so the database
- * default applies, matching guided setup. The production trigger from
- * 20260516204601 rejects an explicit "unknown". A chosen healthy, watch, or
- * issue value is still written. `buildPlantHealthCreateInsert` keeps the
- * explicit-unknown contract used before that default change.
+ * Stored result of a create insert on 20260516204601, the schema targeted
+ * until 20260924120000 is applied. An absent health column becomes the
+ * default 'healthy'. The trigger rejects every other value outside healthy,
+ * watch, and issue, and that statement writes nothing.
  */
-export function plantHealthCreateColumn(
-  value: unknown,
-): { health: StoredPlantHealth } | { health?: never } {
-  const health = editablePlantHealth(value);
-  return health === "" ? {} : { health };
+export type LegacyPlantHealthStoreResult =
+  | { readonly status: "stored"; readonly health: StoredPlantHealth }
+  | { readonly status: "rejected" };
+
+export function storedHealthUnderLegacyPlantTrigger(insert: {
+  readonly health?: unknown;
+}): LegacyPlantHealthStoreResult {
+  if (!Object.hasOwn(insert, "health")) {
+    return { status: "stored", health: "healthy" };
+  }
+  const health = insert.health;
+  if (health === "healthy" || health === "watch" || health === "issue") {
+    return { status: "stored", health };
+  }
+  return { status: "rejected" };
 }
 
 /** A health-trigger rejection should show the collapsed health select. */

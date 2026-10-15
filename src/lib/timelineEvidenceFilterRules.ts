@@ -59,6 +59,11 @@ export interface TimelineEvidenceFilterInput {
    * `timelineDateRangeRules.ts`.
    */
   timeZone?: string | null;
+  /**
+   * Plant directory used by the card when `details.plant_name` is blank.
+   * Keyword search includes that same resolved name.
+   */
+  plantNamesById?: ReadonlyMap<string, string> | null;
 }
 
 const TIMELINE_FILTER_STALE_MS = LIVE_CURRENT_STATE_STALE_MS;
@@ -95,6 +100,38 @@ export function deriveTimelineRowSensorSource(
 }
 
 const SAFE_DETAIL_TEXT_KEYS = ["plant_name", "stage"] as const;
+
+/** Public nutrient/product strings. Not a walk of arbitrary detail payloads. */
+const PUBLIC_FEED_SEARCH_KEYS = new Set([
+  "name",
+  "brand",
+  "nutrient_brand",
+  "product",
+  "product_name",
+  "line_id",
+  "recipe",
+  "products",
+  "nutrients",
+]);
+
+const PUBLIC_FEED_SEARCH_ROOTS = ["feeding", "watering", "products", "nutrients"] as const;
+
+function appendPublicFeedSearchText(parts: string[], value: unknown, depth: number): void {
+  if (depth > 4 || value == null) return;
+  if (typeof value === "string") {
+    parts.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) appendPublicFeedSearchText(parts, item, depth + 1);
+    return;
+  }
+  if (typeof value !== "object") return;
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (!PUBLIC_FEED_SEARCH_KEYS.has(key)) continue;
+    appendPublicFeedSearchText(parts, child, depth + 1);
+  }
+}
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -141,7 +178,10 @@ function normalize(v: unknown): string {
   return typeof v === "string" ? v.trim().toLowerCase() : "";
 }
 
-function safeRowText(row: TimelineEvidenceRow): string {
+function safeRowText(
+  row: TimelineEvidenceRow,
+  plantNamesById?: ReadonlyMap<string, string> | null,
+): string {
   const parts: string[] = [];
   if (typeof row.note === "string") parts.push(row.note);
   if (typeof row.stage === "string") parts.push(row.stage);
@@ -150,6 +190,18 @@ function safeRowText(row: TimelineEvidenceRow): string {
     const v = details[key];
     if (typeof v === "string") parts.push(v);
   }
+  for (const key of PUBLIC_FEED_SEARCH_ROOTS) {
+    appendPublicFeedSearchText(parts, details[key], 0);
+  }
+  for (const key of ["nutrient_brand", "brand", "recipe"] as const) {
+    appendPublicFeedSearchText(parts, details[key], 0);
+  }
+  const resolvedPlant = resolveTimelineCardPlaceLabels({
+    plantId: row.plant_id,
+    details,
+    plantNamesById,
+  }).plantName;
+  if (resolvedPlant) parts.push(resolvedPlant);
   const eventType = details["event_type"];
   if (typeof eventType === "string") parts.push(eventType);
   return parts.join(" \u0001 ").toLowerCase();
@@ -172,7 +224,7 @@ export function timelineEvidenceRowMatches(
 
   const q = normalize(input.query);
   if (q !== "") {
-    if (!safeRowText(row).includes(q)) return false;
+    if (!safeRowText(row, input.plantNamesById).includes(q)) return false;
   }
 
   if (input.plantId && input.plantId.trim() !== "") {
@@ -244,6 +296,56 @@ export interface TimelineEvidenceFilterOption {
  * an array, so callers can tell a failed read from an empty directory.
  * Malformed rows are skipped; the first name seen for an id wins. Pure.
  */
+export interface TimelineCardPlaceLabels {
+  plantName: string | null;
+  tentName: string | null;
+}
+
+function trimmedLabel(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Plant and tent names for a Timeline card and its detail drawer.
+ * A name already stored on the diary details wins. Otherwise the loaded
+ * directory supplies the name for the row's plant_id / tent_id. Never
+ * invents a name when both are missing.
+ */
+export function resolveTimelineCardPlaceLabels(input: {
+  plantId?: string | null;
+  tentId?: string | null;
+  details?: Record<string, unknown> | null;
+  plantNamesById?: ReadonlyMap<string, string> | null;
+  tentNamesById?: ReadonlyMap<string, string> | null;
+}): TimelineCardPlaceLabels {
+  const detailsPlant = trimmedLabel(input.details?.plant_name);
+  const detailsTent = trimmedLabel(input.details?.tent_name);
+  const plantId = trimmedLabel(input.plantId);
+  const tentId = trimmedLabel(input.tentId);
+  const directoryPlant =
+    plantId && input.plantNamesById ? trimmedLabel(input.plantNamesById.get(plantId)) : "";
+  const directoryTent =
+    tentId && input.tentNamesById ? trimmedLabel(input.tentNamesById.get(tentId)) : "";
+  return {
+    plantName: detailsPlant || directoryPlant || null,
+    tentName: detailsTent || directoryTent || null,
+  };
+}
+
+/**
+ * Copy of `details` with plant_name / tent_name filled only where the row
+ * did not already carry a non-blank name. The drawer reads those two keys.
+ */
+export function withResolvedTimelinePlaceDetails(
+  details: Record<string, unknown> | null | undefined,
+  labels: TimelineCardPlaceLabels,
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...(details ?? {}) };
+  if (labels.plantName && trimmedLabel(next.plant_name) === "") next.plant_name = labels.plantName;
+  if (labels.tentName && trimmedLabel(next.tent_name) === "") next.tent_name = labels.tentName;
+  return next;
+}
+
 export function buildTimelineNameLookup(rows: unknown): ReadonlyMap<string, string> | null {
   if (!Array.isArray(rows)) return null;
   const m = new Map<string, string>();
@@ -413,6 +515,27 @@ export function isTimelineEvidenceFilterActive(input: TimelineEvidenceFilterInpu
   if (isTimelineDateFilterValue(input.endDate)) return true;
   return false;
 }
+
+/** Any non-empty date field, including an inverted or otherwise unapplied value. */
+export function timelineEnteredDateKeepsClearEnabled(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+export function timelineClearFiltersEnabled(input: {
+  evidenceActive: boolean;
+  chipFiltersActive: boolean;
+  enteredStartDate: string | null | undefined;
+  enteredEndDate: string | null | undefined;
+}): boolean {
+  return (
+    input.evidenceActive ||
+    input.chipFiltersActive ||
+    timelineEnteredDateKeepsClearEnabled(input.enteredStartDate) ||
+    timelineEnteredDateKeepsClearEnabled(input.enteredEndDate)
+  );
+}
+
+export { timelineDateParamsAfterSync } from "@/lib/timelineDateSearchParamRules";
 
 export const TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER = "Search timeline";
 export const TIMELINE_EVIDENCE_EMPTY_TITLE = "No matches";

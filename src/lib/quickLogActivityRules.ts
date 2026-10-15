@@ -51,6 +51,28 @@ export function validateQuickLogActivityNote(
     : null;
 }
 
+/** Typed length, including spaces. The save gate trims; the counter does not. */
+export function quickLogActivityNoteCharacterCount(note: string): number {
+  return Array.from(note).length;
+}
+
+/**
+ * Live "/500" label for notes the event RPC rejects over 500 characters.
+ * Standalone Notes, Water, photos, and manual snapshots have no such cap.
+ */
+export function quickLogActivityNoteLimitLabel(
+  activityId: QuickLogActivityId | null | undefined,
+): string | null {
+  if (
+    !activityId ||
+    activityId === "photo" ||
+    QUICK_LOG_ACTIVITY_DEFINITIONS[activityId]?.saveRoute !== "event"
+  ) {
+    return null;
+  }
+  return `/${QUICK_LOG_ACTIVITY_NOTE_MAX_LENGTH}`;
+}
+
 // Only structured responses emitted before the logical event insert prove
 // that THIS RPC did not write. Transport errors, save_failed, malformed replies,
 // and idempotency conflicts cannot release an unresolved retry claim.

@@ -10,7 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { combineGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
 import InfoPopover from "@/components/InfoPopover";
+import { isSuccessfulEmptyGrowRead } from "@/lib/growDataEmptyReadRules";
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
+
+export { isSuccessfulEmptyGrowRead };
 
 type Label = "Live" | "Demo" | "Mixed" | "Unavailable";
 
@@ -43,12 +46,14 @@ interface Props {
   className?: string;
   testId?: string;
   /**
-   * What an empty, unavailable read describes. "account" (default) is a
-   * list read: nothing exists yet. "record" is a single-record read (for
-   * example one plant by id): its absence says nothing about the account's
-   * other records, so it must not say "No real plants yet".
+   * What an empty, unavailable read describes. "account" (default) and
+   * "list" are collection reads: nothing exists yet, so a successful
+   * no-rows result hides the Unavailable badge. "record" is a single-record
+   * read (for example one plant by id): its absence says nothing about the
+   * account's other records, so it must not say "No real plants yet", and a
+   * missing record keeps the Unavailable badge.
    */
-  emptyStateScope?: "account" | "record";
+  emptyStateScope?: "account" | "list" | "record";
 }
 
 export default function GrowDataSourceDisclosure({
@@ -86,7 +91,13 @@ export default function GrowDataSourceDisclosure({
   const helpCopyByLabel: Record<Label, { title: string; body: string }> = {
     Live: {
       title: "Current grow data",
-      body: `Plants, tents, and ${resource} saved in your Verdant workspace — not a live sensor reading. Sensor readings are labeled separately in the Environment and sensor sections.`,
+      body: (() => {
+        const normalized = resource.trim().toLowerCase();
+        const isTent = normalized === "tent" || normalized === "tents";
+        return isTent
+          ? "Plants and tents saved in your Verdant workspace — not a live sensor reading. Sensor readings are labeled separately in the Environment and sensor sections."
+          : `Plants, tents, and ${resource} saved in your Verdant workspace — not a live sensor reading. Sensor readings are labeled separately in the Environment and sensor sections.`;
+      })(),
     },
     Demo: {
       title: "Demo data",
@@ -104,23 +115,29 @@ export default function GrowDataSourceDisclosure({
 
   // Welcome / empty state — no usable data anywhere.
   if (!hasAnyData && combined.dataSource === "unavailable") {
+    const emptySuccess =
+      isSuccessfulEmptyGrowRead(metas) &&
+      (emptyStateScope === "account" || emptyStateScope === "list");
     return (
       <section
         data-testid={testId}
         data-source={combined.dataSource}
+        data-empty-reason={emptySuccess ? "no-rows" : "unavailable"}
         className={cn("glass rounded-2xl p-4 mb-4", className)}
         aria-label={`Grow ${resource} data source`}
       >
-        <div className="flex items-center gap-2 mb-2">
-          <Badge
-            variant="destructive"
-            data-testid={`${testId}-badge`}
-            data-label="Unavailable"
-            className="text-[10px] uppercase tracking-wide"
-          >
-            Unavailable
-          </Badge>
-        </div>
+        {!emptySuccess && (
+          <div className="flex items-center gap-2 mb-2">
+            <Badge
+              variant="destructive"
+              data-testid={`${testId}-badge`}
+              data-label="Unavailable"
+              className="text-[10px] uppercase tracking-wide"
+            >
+              Unavailable
+            </Badge>
+          </div>
+        )}
         {emptyStateScope === "record" ? (
           <>
             <h2 className="font-display font-semibold">

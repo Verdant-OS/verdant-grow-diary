@@ -27,7 +27,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
-import { STAGES, stageLabel } from "@/lib/grow";
+import { STAGES } from "@/lib/grow";
+import { timelineStagePresentationLabel } from "@/lib/timelineStagePresentationRules";
 import { TimelineGrowDayLabel } from "@/components/TimelineGrowDayLabel";
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { format, formatDistanceToNow } from "date-fns";
@@ -1595,7 +1596,7 @@ export default function Timeline() {
   const groupedByStage = useMemo(() => {
     const groups: { stage: string; items: Entry[] }[] = [];
     filtered.forEach((e) => {
-      const key = resolveTimelineDiaryEntryStage(e) ?? "unknown";
+      const key = resolveTimelineDiaryEntryStage(e) ?? "";
       const last = groups[groups.length - 1];
       if (last && last.stage === key) last.items.push(e);
       else groups.push({ stage: key, items: [e] });
@@ -2434,7 +2435,7 @@ export default function Timeline() {
               <div className="flex items-center gap-2 mb-2 sticky top-0 z-10 py-1 bg-background/80 backdrop-blur-sm">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
                   <Sprout className="h-3.5 w-3.5" />
-                  {stageLabel(group.stage)}
+                  {timelineStagePresentationLabel(group.stage)}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
                   {group.items.length} {group.items.length === 1 ? "entry" : "entries"}
@@ -2650,7 +2651,9 @@ export default function Timeline() {
                                 </span>
                                 <span className="inline-flex items-center gap-1 text-primary">
                                   <Sprout className="h-3 w-3" />
-                                  {stageLabel(resolveTimelineDiaryEntryStage(e))}
+                                  {timelineStagePresentationLabel(
+                                    resolveTimelineDiaryEntryStage(e),
+                                  )}
                                 </span>
                                 {plantName && (
                                   <span

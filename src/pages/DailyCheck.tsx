@@ -625,6 +625,8 @@ export default function DailyCheck() {
           plantId={activityTarget.plantId}
           plantStage={(selectedPlant as { stage?: unknown } | null)?.stage ?? null}
           testIdPrefix="daily-check-all-activities"
+          openStructuredFeeding
+          onOpenManualSensorReading={() => setStep("manual")}
           requestedActivityId={requestedActivityId}
           // D5: Daily Check is a real plant-scoped save surface. Without this
           // the remembered target goes stale here, so an unscoped Quick Log

@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const MIGRATION = "supabase/migrations/20261015161000_plants_health_drop_healthy_default.sql";
+const PRIOR_MIGRATION = "20260924120000";
 
 function executableSql(path: string): string {
   return readFileSync(resolve(process.cwd(), path), "utf8")
@@ -23,5 +24,22 @@ describe("plants.health drop healthy default", () => {
     expect(sql).toMatch(/ALTER TABLE public\.plants ALTER COLUMN health DROP DEFAULT;/);
     expect(sql).not.toMatch(/SET DEFAULT 'healthy'/);
     expect(sql).not.toMatch(/UPDATE\s+public\.plants/i);
+  });
+
+  it("requires 20260924120000 to be delivered first and does not advertise the reverse order", () => {
+    const raw = readFileSync(resolve(process.cwd(), MIGRATION), "utf8");
+    const thisVersion = MIGRATION.split("/").pop()!.slice(0, 14);
+    expect(PRIOR_MIGRATION < thisVersion).toBe(true);
+    expect(raw).not.toMatch(/either side/i);
+    expect(raw).toMatch(/Deliver 20260924120000 first/);
+    expect(raw).toMatch(/reverse\n-- order is not supported/);
+    expect(sql).toMatch(
+      /plants_health_drop_healthy_default requires 20260924120000 to be delivered first/,
+    );
+    expect(sql).toMatch(/health_column\.attnotnull/);
+    expect(sql).toMatch(/'''unknown''::text/);
+    expect(sql).toMatch(/validate_fn\.prosrc LIKE '%''unknown''%'/);
+    expect(sql.indexOf("requires 20260924120000")).toBeLessThan(sql.indexOf("DROP NOT NULL"));
+    expect(sql.indexOf("requires 20260924120000")).toBeLessThan(sql.indexOf("DROP DEFAULT"));
   });
 });

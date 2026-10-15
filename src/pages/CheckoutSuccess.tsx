@@ -343,11 +343,11 @@ export default function CheckoutSuccess() {
             </Button>
           )}
           {view === "no_context" ? (
-            <Link to="/pricing" data-testid="checkout-success-pricing-link">
-              <Button size="lg" variant="outline">
+            <Button asChild size="lg" variant="outline">
+              <Link to="/pricing" data-testid="checkout-success-pricing-link">
                 See plans & pricing
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           ) : (
             <Link
               to={confirmed ? activation.primaryHref : (safeReturnTo ?? "/")}

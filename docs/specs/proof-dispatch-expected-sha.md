@@ -49,8 +49,11 @@ The `one_tent_proof` job already does this correctly, before any secret is avail
 7. checks out `inputs.expected_sha` and requires `git rev-parse HEAD` to equal it.
 
 Checks 1-6 are one step, "Verify immutable dispatch identity" (`:150-166`).
-`src/test/one-tent-authenticated-proof-workflow.test.ts:216-251` pins that order and each
-assertion. The change below applies checks 1-6 to the four jobs the checklist dispatches.
+`src/test/one-tent-authenticated-proof-workflow.test.ts:216-251` pins that order and the
+SHA, actor, triggering-actor and first-attempt assertions (checks 1-5); the ref assertion
+(check 6) is pinned separately at `:175` (`established fact`, re-read at `5b16f3243`:
+`expect(job).toContain(` with `"$GITHUB_REF" = "${BRANCH_REF}"`). The change below
+applies checks 1-6 to the four jobs the checklist dispatches.
 Check 7 is replaced by §3.3: once check 2 passes, checking out `github.sha` is checking out
 the expected SHA.
 
@@ -208,16 +211,26 @@ in `src/test/signed-in-readonly-proof.test.ts:507-556` and
 1. Each of the three read-only proofs declares `inputs.expected_sha` with
    `type: string, required: true`. The `quicklog-smoke` input stays `required: false`.
 2. In each of the four jobs, `Verify dispatch SHA` exists. Its `env` carries no
-   `secrets.*` and maps `inputs.expected_sha`, `github.sha`, `github.actor`,
-   `github.triggering_actor`, `github.run_attempt` and `github.ref`. Its `run` is exactly
-   `node scripts/verify-dispatch-sha.mjs`, with no `continue-on-error` and no `if:`. Its
-   index is lower than every step whose `env` references a secret. At least one step
-   before it is a checkout of `${{ github.sha }}` with `persist-credentials: false` (the
-   runner must exist on disk), and every step before it is such a checkout.
+   `secrets.*` and is exactly the seven-key mapping of §3.2: `EVENT_NAME` equal to
+   `${{ github.event_name }}`, plus `inputs.expected_sha`, `github.sha`, `github.actor`,
+   `github.triggering_actor`, `github.run_attempt` and `github.ref` under their §3.2
+   names. Assert the resolved `env.EVENT_NAME` string itself, not only that the key
+   exists: the event name is what selects the rule (§3.2), so a step that hard-codes
+   `EVENT_NAME: push` passes every other assertion and lets a dispatch skip the SHA
+   check. Its `run` is exactly `node scripts/verify-dispatch-sha.mjs`, with no
+   `continue-on-error` and no `if:`. Its index is lower than every step whose `env`
+   references a secret. At least one step before it is a checkout of `${{ github.sha }}`
+   with `persist-credentials: false` (the runner must exist on disk), and every step
+   before it is such a checkout.
 3. The existing pin assertions still hold: checkout `ref` is `${{ github.sha }}`, and the
    pin compares against `GITHUB_SHA` and writes `E2E_EXPECTED_SHA`.
 4. The existing `if:` gate matrices (`signed-in-readonly-proof.test.ts:540-556` and the
    equivalents) are unchanged.
+5. Mutation evidence for the event binding, in each of the four workflows: with the
+   step's `EVENT_NAME` line deleted, and separately with it hard-coded to `push`, the
+   workflow's contract suite must FAIL on the B.2 assertion. Record both failing counts
+   per workflow in the PR body next to the RED counts in §5.C, then restore and show
+   0 failures.
 
 **C. RED proof**
 
@@ -271,8 +284,14 @@ Verdict: **safe to implement**, as a tightening that only removes false-PASS pat
   holder. Claude does not implement this here.
 - **Scorer unlock:** Matthew, via `node scripts/scorer-lock.mjs --unlock …`, naming every
   renegotiated check in the PR body.
-- **Independent acceptance:** Graft (Matthew's routing, 2026-10-13), PASS at the exact head.
-  Merge by Chemdawg after 35/35.
+- **Independent acceptance of this specification (#2057):** Graft, PASS at the exact head
+  (Matthew's one-time exception for #2055 and #2057, 2026-10-13). Merge by Chemdawg after
+  35/35.
+- **Independent acceptance of the implementation PR:** a separate reviewer eligible for
+  `.github/workflows` and scorer-locked test files under `docs/agents/OWNERSHIP.md` §2 and
+  `AGENTS.md`: Blue Dream, Critical Mass or Durban Poison, or Codex only if Codex neither
+  implemented nor repaired it. Graft's #2057 exception does not extend to that PR unless
+  Matthew grants a separate explicit exception.
 
 ## 8. Known unknowns
 

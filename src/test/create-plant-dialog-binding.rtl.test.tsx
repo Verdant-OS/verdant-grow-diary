@@ -369,7 +369,7 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(selectMock).toHaveBeenCalledWith("*");
   });
 
-  it("creates a plant as not assessed: 'unknown' is sent until the grower picks one (BUG-009)", async () => {
+  it("creates a plant as not assessed: unset health is omitted until the grower picks one (BUG-009)", async () => {
     renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
     await waitFor(() => {
       expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
@@ -382,10 +382,10 @@ describe("CreatePlantDialog RTL binding", () => {
       expect(insertMock).toHaveBeenCalled();
     });
     const payload = insertMock.mock.calls[0][0] as Record<string, unknown>;
-    // Written explicitly, never left to the column default: before
-    // 20260924120000 is applied that default is "healthy", a claim the
-    // grower did not make.
-    expect(payload.health).toBe("unknown");
+    // Unset health stays off the insert. The select still shows Not assessed
+    // yet, and the payload does not claim healthy.
+    expect(payload).not.toHaveProperty("health");
+    expect(payload.health).not.toBe("healthy");
   });
 
   it("fails closed when the database does not accept Not assessed yet", async () => {
@@ -460,7 +460,11 @@ describe("CreatePlantDialog RTL binding", () => {
       await waitFor(() => {
         expect(insertMock).toHaveBeenCalled();
       });
-      expect((insertMock.mock.calls[0][0] as Record<string, unknown>).health).toBe("unknown");
+      const payload = insertMock.mock.calls[0][0] as Record<string, unknown>;
+      // Clearing back to Not assessed yet omits health, same as an untouched select.
+      expect(payload).not.toHaveProperty("health");
+      expect(payload.health).not.toBe("healthy");
+      expect(payload.health).not.toBe("watch");
     } finally {
       Element.prototype.scrollIntoView = originalScrollIntoView;
     }

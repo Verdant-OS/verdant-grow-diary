@@ -373,21 +373,48 @@ function realOwnershipSql() {
   ].join("\n");
 }
 
-const PRE_FIX_MEASURED_SHA = "8d0566278";
+const DIARY_VOLUME_FALLBACK = `    IF v_old_volume IS NULL THEN
+      SELECT CASE
+        WHEN p_event_type = 'watering' THEN COALESCE(
+          CASE WHEN jsonb_typeof(d.details -> 'watering' -> 'volume_ml') = 'number'
+            THEN (d.details -> 'watering' ->> 'volume_ml')::numeric END,
+          CASE WHEN jsonb_typeof(d.details -> 'watering_amount_ml') = 'number'
+            THEN (d.details ->> 'watering_amount_ml')::numeric END,
+          CASE WHEN jsonb_typeof(d.details -> 'wateringAmountMl') = 'number'
+            THEN (d.details ->> 'wateringAmountMl')::numeric END
+        )
+        ELSE CASE WHEN jsonb_typeof(d.details -> 'feeding' -> 'volume_ml') = 'number'
+          THEN (d.details -> 'feeding' ->> 'volume_ml')::numeric END
+      END
+      INTO v_old_volume
+      FROM public.diary_entries d
+      WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
+      LIMIT 1;
+    END IF;
+`;
 
-function preFixMeasuredSql() {
-  const shown = spawnSync(
-    "git",
-    [
-      "show",
-      `${PRE_FIX_MEASURED_SHA}:supabase/migrations/20261014210000_quicklog_correction_editable_values.sql`,
-    ],
-    { encoding: "utf8" },
-  );
-  if (shown.status !== 0 || !shown.stdout.includes("quicklog_correct_entry")) {
-    throw new Error(shown.stderr || "could not load the pre-fix measured function");
-  }
-  return shown.stdout;
+const FLAT_WATERING_UPDATE = `      UPDATE public.diary_entries d
+         SET details = jsonb_set(d.details, '{watering_amount_ml}', to_jsonb(p_volume), false)
+       WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
+         AND jsonb_typeof(d.details -> 'watering_amount_ml') = 'number';
+`;
+
+const NUTRIENTS_FALLBACK = `    IF v_products IS NULL OR jsonb_typeof(v_products) <> 'array' OR jsonb_array_length(v_products) = 0 THEN
+      SELECT d.details -> 'nutrients' INTO v_products
+        FROM public.diary_entries d
+       WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
+       LIMIT 1;
+    END IF;
+`;
+
+const NULL_HUMIDITY_GUARD = `      IF jsonb_typeof(v_sensor -> v_key) <> 'number' THEN
+        RETURN jsonb_build_object('ok', false, 'reason', 'invalid_changes');
+      END IF;
+`;
+
+function replaceOnce(sql, needle, label) {
+  if (!sql.includes(needle)) throw new Error(`missing break target: ${label}`);
+  return sql.replace(needle, "");
 }
 
 function main() {
@@ -396,13 +423,54 @@ function main() {
   if (created.status !== 0) throw new Error(created.stderr || "createdb failed");
   psqlOrThrow(DB, SETUP);
   applyMigration(DB, realOwnershipSql());
-  applyMigration(DB, preFixMeasuredSql());
-  for (const [label, sql, expect23502] of [
-    ["diary-only orphan", DIARY_ONLY, false],
-    ["flat watering_amount_ml", FLAT_WATERING, false],
-    ["dose from nutrients only", NUTRIENTS_DOSE, false],
-    ["null humidity", NULL_HUMIDITY, true],
-  ]) {
+  const measuredMigration = migrationText("20261014210000_quicklog_correction_editable_values.sql");
+  const measuredHelper = extractFunction(
+    measuredMigration,
+    "CREATE FUNCTION public.quicklog_correction_apply_measured_values",
+  ).replace(
+    "CREATE FUNCTION public.quicklog_correction_apply_measured_values",
+    "CREATE OR REPLACE FUNCTION public.quicklog_correction_apply_measured_values",
+  );
+  const measuredEntry = extractFunction(
+    measuredMigration,
+    "CREATE OR REPLACE FUNCTION public.quicklog_correct_entry",
+  );
+  applyMigration(DB, measuredMigration);
+  const breaks = [
+    [
+      "diary-only orphan",
+      DIARY_ONLY,
+      replaceOnce(measuredHelper, DIARY_VOLUME_FALLBACK, "diary volume"),
+      measuredEntry,
+      false,
+    ],
+    [
+      "flat watering_amount_ml",
+      FLAT_WATERING,
+      replaceOnce(measuredHelper, FLAT_WATERING_UPDATE, "flat watering"),
+      measuredEntry,
+      false,
+    ],
+    [
+      "dose from nutrients only",
+      NUTRIENTS_DOSE,
+      measuredHelper.replaceAll(NUTRIENTS_FALLBACK, ""),
+      measuredEntry,
+      false,
+    ],
+    [
+      "null humidity",
+      NULL_HUMIDITY,
+      measuredHelper,
+      replaceOnce(measuredEntry, NULL_HUMIDITY_GUARD, "null humidity"),
+      true,
+    ],
+  ];
+  if (!measuredHelper.includes(NUTRIENTS_FALLBACK)) {
+    throw new Error("missing break target: nutrients dose");
+  }
+  for (const [label, sql, brokenHelper, brokenEntry, expect23502] of breaks) {
+    applyMigration(DB, `${brokenHelper}\n${brokenEntry}`);
     const preFix = psql(DB, sql);
     const text = `${preFix.stdout ?? ""}\n${preFix.stderr ?? ""}`;
     if (expect23502) {
@@ -419,6 +487,7 @@ function main() {
     } else {
       console.log(`pre-fix ${label}: specific failure held`);
     }
+    applyMigration(DB, `${measuredHelper}\n${measuredEntry}`);
     psqlOrThrow(
       DB,
       "truncate public.grow_events, public.diary_entries, public.watering_events, public.feeding_events, public.environment_events, public.quicklog_entry_revisions",
@@ -426,13 +495,8 @@ function main() {
   }
   psqlOrThrow(
     DB,
-    "drop function if exists public.quicklog_correction_apply_measured_values(uuid, text, uuid, uuid[], uuid[], boolean, numeric, boolean, numeric, boolean, jsonb)",
-  );
-  psqlOrThrow(
-    DB,
     "truncate public.grow_events, public.diary_entries, public.watering_events, public.feeding_events, public.environment_events, public.quicklog_entry_revisions",
   );
-  applyMigration(DB, migrationText("20261014210000_quicklog_correction_editable_values.sql"));
   applyMigration(DB, BROKEN_OWNERSHIP);
   const broken = psql(DB, PROOF);
   if (broken.status === 0) {

@@ -165,6 +165,24 @@ export function buildFeedingDefaults(input: FeedingDefaultsInput): FeedingDefaul
  * Merge derived defaults into the empty Quick Log feeding form. Always
  * returns a fresh state object — never mutates `EMPTY_QUICKLOG_FEEDING_FORM`.
  */
+/**
+ * Log another may reset the one-shot flag while the feed-defaults query still
+ * holds the pre-save recipe. Apply only after that refetch has settled.
+ */
+export function feedingDefaultsPrefillSettled(input: {
+  isFetching: boolean;
+  isPending: boolean;
+  isError: boolean;
+  dataUpdatedAt: number;
+  refetchRequiredAfter: number;
+}): boolean {
+  if (input.isFetching || input.isPending || input.isError) return false;
+  if (input.refetchRequiredAfter > 0 && input.dataUpdatedAt < input.refetchRequiredAfter) {
+    return false;
+  }
+  return true;
+}
+
 export function applyFeedingDefaultsToForm(
   result: FeedingDefaultsResult,
 ): QuickLogFeedingFormState {

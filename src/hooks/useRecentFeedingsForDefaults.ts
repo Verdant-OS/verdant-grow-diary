@@ -21,6 +21,30 @@ import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterComp
 
 export const RECENT_FEEDINGS_DEFAULTS_LIMIT = 20;
 
+export function recentFeedingsDefaultsQueryKey(plantId: string | null) {
+  return ["quicklog_v2_feed_defaults", plantId] as const;
+}
+
+export interface RecentFeedingsDefaultsQueryClient {
+  invalidateQueries: (opts: { queryKey: readonly unknown[] }) => Promise<unknown> | unknown;
+  refetchQueries: (opts: {
+    queryKey: readonly unknown[];
+    type?: "active";
+  }) => Promise<unknown> | unknown;
+}
+
+/** After a feeding save, drop the 30s cache and refetch before Log another prefills. */
+export async function refetchRecentFeedingsForDefaults(
+  client: RecentFeedingsDefaultsQueryClient,
+  plantId: string | null | undefined,
+): Promise<boolean> {
+  if (!plantId) return false;
+  const queryKey = recentFeedingsDefaultsQueryKey(plantId);
+  await client.invalidateQueries({ queryKey });
+  await client.refetchQueries({ queryKey, type: "active" });
+  return true;
+}
+
 export interface RecentFeedingsForDefaultsInput {
   plantId?: string | null;
 }
@@ -30,7 +54,7 @@ export function useRecentFeedingsForDefaults(input: RecentFeedingsForDefaultsInp
   const enabled = Boolean(plantId);
 
   return useQuery({
-    queryKey: ["quicklog_v2_feed_defaults", plantId],
+    queryKey: recentFeedingsDefaultsQueryKey(plantId),
     enabled,
     staleTime: 30_000,
     queryFn: async () => {

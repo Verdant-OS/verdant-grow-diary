@@ -148,9 +148,13 @@ import QuickLogMaturityEvidenceFields from "@/components/QuickLogMaturityEvidenc
 import {
   buildFeedingDefaults,
   applyFeedingDefaultsToForm,
+  feedingDefaultsPrefillSettled,
   FEEDING_DEFAULTS_LABEL,
 } from "@/lib/feedingDefaultsViewModel";
-import { useRecentFeedingsForDefaults } from "@/hooks/useRecentFeedingsForDefaults";
+import {
+  refetchRecentFeedingsForDefaults,
+  useRecentFeedingsForDefaults,
+} from "@/hooks/useRecentFeedingsForDefaults";
 import {
   applyWateringVolumeDefaultsToForm,
   buildWateringVolumeDefaults,
@@ -527,6 +531,7 @@ function QuickLogV2SheetForOwner({
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [videoChecking, setVideoChecking] = useState(false);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
+  const [feedingDefaultsRefetchAfter, setFeedingDefaultsRefetchAfter] = useState(0);
   const [wateringVolumeDefaultsApplied, setWateringVolumeDefaultsApplied] = useState(false);
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
   const [visitMode, setVisitMode] = useState<GrowWalkVisitMode>("fast_check");
@@ -815,7 +820,13 @@ function QuickLogV2SheetForOwner({
 
   const recentFeedingsQ = useRecentFeedingsForDefaults({
     plantId: resolvedContext.plantId,
-  }) as { data?: unknown[] };
+  }) as {
+    data?: unknown[];
+    isFetching?: boolean;
+    isPending?: boolean;
+    isError?: boolean;
+    dataUpdatedAt?: number;
+  };
   const feedingDefaults = useMemo(
     () =>
       buildFeedingDefaults({
@@ -1089,6 +1100,16 @@ function QuickLogV2SheetForOwner({
     if (!open || submissionLockedRef.current) return;
     if (form.action !== "feed") return;
     if (feedingDefaultsApplied) return;
+    if (
+      !feedingDefaultsPrefillSettled({
+        isFetching: Boolean(recentFeedingsQ.isFetching),
+        isPending: Boolean(recentFeedingsQ.isPending),
+        isError: Boolean(recentFeedingsQ.isError),
+        dataUpdatedAt: recentFeedingsQ.dataUpdatedAt ?? 0,
+        refetchRequiredAfter: feedingDefaultsRefetchAfter,
+      })
+    )
+      return;
     if (!feedingDefaults.defaults) return;
     // Defaults affect only the recipe. A note handed off from Note/Water (for
     // example a selected Better/Same/Worse response) must neither block those
@@ -1099,7 +1120,18 @@ function QuickLogV2SheetForOwner({
       note: previous.note,
     }));
     setFeedingDefaultsApplied(true);
-  }, [open, form.action, feedingDefaults, feedingDefaultsApplied, feedingForm]);
+  }, [
+    open,
+    form.action,
+    feedingDefaults,
+    feedingDefaultsApplied,
+    feedingDefaultsRefetchAfter,
+    feedingForm,
+    recentFeedingsQ.isFetching,
+    recentFeedingsQ.isPending,
+    recentFeedingsQ.isError,
+    recentFeedingsQ.dataUpdatedAt,
+  ]);
 
   // One-shot prefill of Water volume from the plant's most recent watering
   // that recorded a positive volume. Fail closed: never invent 200/500/pot
@@ -1716,6 +1748,12 @@ function QuickLogV2SheetForOwner({
       // The logical feeding save is complete. Rotate only now so a retry
       // after a failed/unknown response reuses the original server key.
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      const savedPlantId = resolved.plantId ?? null;
+      if (savedPlantId) {
+        const refetchAfter = Date.now();
+        setFeedingDefaultsRefetchAfter(refetchAfter);
+        await refetchRecentFeedingsForDefaults(queryClient, savedPlantId);
+      }
       setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
       showTimelineConfirmation(FEEDING_SAVE_SUCCESS_MESSAGE, {
         // Feed uses the same canonical grow-scoped Timeline as note/water.

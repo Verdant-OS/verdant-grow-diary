@@ -3073,6 +3073,10 @@ function QuickLogV2SheetForOwner({
                   } else if (nextWaterTempC === "") {
                     wateringTempEntryUnitRef.current = null;
                   }
+                  if (next.volumeMl !== wateringForm.volumeMl) {
+                    largeWaterSessionRef.current = { inFlight: false, confirmedKey: null };
+                    setLargeWaterConfirmedKey(null);
+                  }
                   setWateringForm(next);
                   setLocalError(null);
                 }}

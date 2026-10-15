@@ -14,6 +14,8 @@ export const WATER_VOLUME_UNIT = "ml" as const;
 export type WaterVolumeUnit = typeof WATER_VOLUME_UNIT;
 
 const PLAIN_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+/** Stops a pasted numeric string from building an unbounded BigInt on each render. */
+export const MAX_WATER_VOLUME_TEXT_LENGTH = 32;
 
 interface ParsedDecimal {
   negative: boolean;
@@ -23,6 +25,7 @@ interface ParsedDecimal {
 
 function parseDecimal(raw: string): ParsedDecimal | null {
   const trimmed = raw.trim();
+  if (trimmed.length > MAX_WATER_VOLUME_TEXT_LENGTH) return null;
   if (!PLAIN_NUMBER.test(trimmed)) return null;
   const negative = trimmed.startsWith("-");
   const body = trimmed.replace(/^[+-]/, "");

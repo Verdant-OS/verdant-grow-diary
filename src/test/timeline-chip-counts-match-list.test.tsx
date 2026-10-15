@@ -262,6 +262,10 @@ function chipCount(label: string): number {
 }
 
 function listedEntries(): HTMLElement[] {
+  return screen.queryAllByTestId("timeline-entry");
+}
+
+function listedDiaryEntries(): HTMLElement[] {
   return screen
     .queryAllByTestId("timeline-entry")
     .filter((node) => !node.id.startsWith("timeline-entry-sensor-reading:"));
@@ -355,7 +359,7 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
     expect(chipCount("All stages")).toBe(6);
     expect(chipCount("Notes")).toBe(6);
     expect(chipCount("Photos")).toBe(1);
-    expect(chipCount("Measurements")).toBe(1);
+    expect(chipCount("Measurements")).toBe(5);
     expect(chipCount("Follow-ups")).toBe(2);
     expect(chipCount("Action responses")).toBe(1);
 
@@ -372,11 +376,22 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
     for (const label of chips) {
       fireEvent.click(chipButton(label));
       const count = chipCount(label);
-      const rows = listedEntries();
-      expect(rows, `chip ${label} listed count must match chip count`).toHaveLength(count);
-      expect(screen.getByTestId("timeline-results-count")).toHaveTextContent(
-        `Detailed diary: showing ${count} of 6 entries`,
-      );
+      if (label === "Measurements") {
+        expect(listedEntries(), "Measurements chip count includes sensor receipts").toHaveLength(
+          count,
+        );
+        expect(listedDiaryEntries()).toHaveLength(1);
+        expect(screen.getByTestId("timeline-results-count")).toHaveTextContent(
+          "Detailed diary: showing 1 of 6 entries",
+        );
+      } else {
+        expect(listedDiaryEntries(), `chip ${label} listed diary count must match`).toHaveLength(
+          count,
+        );
+        expect(screen.getByTestId("timeline-results-count")).toHaveTextContent(
+          `Detailed diary: showing ${count} of 6 entries`,
+        );
+      }
     }
   }, 20_000);
 

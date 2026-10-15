@@ -131,6 +131,7 @@ import {
   EMPTY_TIMELINE_DIARY_PHOTO_IDS,
   timelineDiaryRowsForChipCounts,
   timelineEntryCountsAsPhoto,
+  timelineMeasurementChipCount,
   unionTimelineDiaryPhotoIds,
 } from "@/lib/timelineChipCountRules";
 import {
@@ -1349,6 +1350,10 @@ export default function Timeline() {
       stageFilter === "all"
         ? diaryChipEntries
         : diaryChipEntries.filter((e) => resolveTimelineDiaryEntryStage(e) === stageFilter);
+    const stageMatchedAll =
+      stageFilter === "all"
+        ? evidenceFilteredEntries
+        : evidenceFilteredEntries.filter((e) => resolveTimelineDiaryEntryStage(e) === stageFilter);
     const m = {
       all: stageMatchedDiary.length,
       photo: 0,
@@ -1362,8 +1367,9 @@ export default function Timeline() {
         m[k] = (m[k] || 0) + 1;
       }),
     );
+    m.measurement = timelineMeasurementChipCount(m.measurement, stageMatchedAll);
     return m;
-  }, [diaryChipEntries, stageFilter, diaryPhotoIds]);
+  }, [diaryChipEntries, evidenceFilteredEntries, stageFilter, diaryPhotoIds]);
 
   const filtered = useMemo(() => {
     return evidenceFilteredEntries.filter((e) => {

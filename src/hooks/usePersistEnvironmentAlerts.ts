@@ -78,11 +78,23 @@ const SOURCE = "environment_alerts";
 // Shared across mounted hook instances within the same active view,
 // keyed with snapshot capture time so concurrent evaluations of the same
 // snapshot observation never duplicate an alert or its CREATED audit event
-// before `listAlerts` reflects the new open row. Cleared when all mounted
-// hook instances unmount.
+// before `listAlerts` reflects the new open row. Reservations stay held
+// while any write is still in flight, even if the last hook instance
+// unmounts mid-write, and clear only once both mounted instances and
+// active writes reach zero.
 let mountedPersistHookCount = 0;
+let activePersistWriteCount = 0;
 const globalInFlightSnapshotKeys = new Set<string>();
 const globalCreatedEventLoggedKeys = new Set<string>();
+
+function maybeClearGlobalSnapshotReservations(): void {
+  if (mountedPersistHookCount <= 0 && activePersistWriteCount <= 0) {
+    mountedPersistHookCount = 0;
+    activePersistWriteCount = 0;
+    globalInFlightSnapshotKeys.clear();
+    globalCreatedEventLoggedKeys.clear();
+  }
+}
 
 function thresholdDirectionKey(
   growId: string | null,
@@ -179,11 +191,7 @@ export function usePersistEnvironmentAlerts(
     mountedPersistHookCount += 1;
     return () => {
       mountedPersistHookCount -= 1;
-      if (mountedPersistHookCount <= 0) {
-        mountedPersistHookCount = 0;
-        globalInFlightSnapshotKeys.clear();
-        globalCreatedEventLoggedKeys.clear();
-      }
+      maybeClearGlobalSnapshotReservations();
     };
   }, []);
 
@@ -371,6 +379,7 @@ export function usePersistEnvironmentAlerts(
         const snapKey = `${key}::${tsKey}`;
         pendingKeys.delete(key);
         pendingSnapshotKeys.delete(snapKey);
+        activePersistWriteCount += 1;
         try {
           // Explicit refs only: metric_refs (sensor_readings) first, then
           // diary_evidence_ref (Environment Check diary row). Never
@@ -407,6 +416,9 @@ export function usePersistEnvironmentAlerts(
           activeKeys.delete(key);
           globalInFlightSnapshotKeys.delete(snapKey);
           lastError = (err as Error).message ?? "insert failed";
+        } finally {
+          activePersistWriteCount -= 1;
+          maybeClearGlobalSnapshotReservations();
         }
       }
 

@@ -103,8 +103,8 @@ describe("One CREATED event per alert and no duplicate RH alert with mismatched 
     const snapshot = {
       ...alertsIo.snapshotState.snapshot,
       temp: 32,
-      rh: 68, // inside seedling RH 65-75%
-      vpd: 0.6, // inside seedling VPD 0.4-0.8 kPa
+      rh: 68, // inside seedling RH band
+      vpd: 0.6, // inside seedling VPD band
     };
     const hookInput: PersistEnvironmentAlertsInput = {
       growId: "grow-1",
@@ -222,6 +222,150 @@ describe("One CREATED event per alert and no duplicate RH alert with mismatched 
     expect(why.kind).not.toBe("unavailable");
     expect(why.text).not.toContain("Target context unavailable");
     expect(why.text).toContain("50–70%");
+  });
+
+  it("retains in-flight snapshot reservation across last-instance unmount while saveAlert is pending (#2165)", async () => {
+    const saveGate = deferred<{ id: string }>();
+    alertsIo.save.mockReturnValue(saveGate.promise);
+
+    const snapshot = {
+      ...alertsIo.snapshotState.snapshot,
+      temp: 32,
+      rh: 68,
+      vpd: 0.6,
+    };
+    const hookInput: PersistEnvironmentAlertsInput = {
+      growId: "grow-1",
+      tentId: "tent-1",
+      enabled: true,
+      stage: "seedling",
+      snapshot,
+      quality: evaluateSensorQuality(snapshot),
+      targets: compareSnapshotToTargets(snapshot, null),
+    };
+
+    const first = renderHook((props) => usePersistEnvironmentAlerts(props), {
+      initialProps: hookInput,
+    });
+
+    await waitFor(() => expect(alertsIo.save).toHaveBeenCalledTimes(1));
+
+    // Unmount the last hook instance while saveAlert is still in flight, then
+    // immediately remount (e.g. StrictMode or rapid route transition) while
+    // listAlerts still returns [].
+    first.unmount();
+
+    const second = renderHook((props) => usePersistEnvironmentAlerts(props), {
+      initialProps: hookInput,
+    });
+
+    await waitFor(() => expect(alertsIo.list).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      saveGate.resolve({ id: "alert-rapid-1" });
+      await saveGate.promise;
+    });
+
+    await waitFor(() => {
+      expect(alertsIo.log).toHaveBeenCalledTimes(1);
+    });
+    expect(alertsIo.save).toHaveBeenCalledTimes(1);
+
+    second.unmount();
+  });
+
+  it("parses decimal VPD/temp configured ranges without truncation and converts one-sided temp targets to Fahrenheit (#2179)", () => {
+    const vpdSnap = {
+      ...EMPTY_SNAPSHOT,
+      source: "manual" as const,
+      ts: "2026-10-15T12:00:00.000Z",
+      temp: 24,
+      rh: 55,
+      vpd: 1.5,
+    };
+    const vpdCmp = compareSnapshotToTargets(vpdSnap, { vpd: { min: 0.85, max: 1.25 } });
+    const vpdDerived = buildEnvironmentAlerts({
+      snapshot: vpdSnap,
+      quality: evaluateSensorQuality(vpdSnap),
+      targets: vpdCmp,
+      stage: "veg",
+      includeConfiguredRangeInTargetBreachReason: true,
+    });
+    const vpdAlert = vpdDerived.find((a) => a.metric === "vpd")!;
+    expect(vpdAlert).toBeDefined();
+    const vpdWhy = deriveAlertWhyContext(vpdAlert);
+    expect(vpdWhy.kind).toBe("configured");
+    expect(vpdWhy.text).toBe("Configured target: 0.85–1.25 kPa");
+
+    const tempPairSnap = {
+      ...EMPTY_SNAPSHOT,
+      source: "manual" as const,
+      ts: "2026-10-15T12:00:00.000Z",
+      temp: 30,
+      rh: 55,
+      vpd: 1.0,
+    };
+    const tempPairCmp = compareSnapshotToTargets(tempPairSnap, {
+      temp: { min: 22.5, max: 26.5 },
+    });
+    const tempPairAlert = buildEnvironmentAlerts({
+      snapshot: tempPairSnap,
+      quality: evaluateSensorQuality(tempPairSnap),
+      targets: tempPairCmp,
+      stage: "veg",
+      includeConfiguredRangeInTargetBreachReason: true,
+    }).find((a) => a.metric === "temp")!;
+    expect(deriveAlertWhyContext(tempPairAlert, "celsius").text).toBe(
+      "Configured target: 22.5–26.5°C",
+    );
+    expect(deriveAlertWhyContext(tempPairAlert, "fahrenheit").text).toBe(
+      "Configured target: 72.5–79.7°F",
+    );
+
+    const minOnlySnap = {
+      ...EMPTY_SNAPSHOT,
+      source: "manual" as const,
+      ts: "2026-10-15T12:00:00.000Z",
+      temp: 18,
+      rh: 55,
+      vpd: 1.0,
+    };
+    const minOnlyCmp = compareSnapshotToTargets(minOnlySnap, {
+      temp: { min: 22, max: null },
+    });
+    const minOnlyAlert = buildEnvironmentAlerts({
+      snapshot: minOnlySnap,
+      quality: evaluateSensorQuality(minOnlySnap),
+      targets: minOnlyCmp,
+      stage: "veg",
+      includeConfiguredRangeInTargetBreachReason: true,
+    }).find((a) => a.metric === "temp")!;
+    expect(deriveAlertWhyContext(minOnlyAlert, "fahrenheit").text).toBe(
+      "Configured target: ≥ 71.6°F",
+    );
+    expect(deriveAlertWhyContext(minOnlyAlert, "celsius").text).toBe("Configured target: ≥ 22°C");
+
+    const maxOnlySnap = {
+      ...EMPTY_SNAPSHOT,
+      source: "manual" as const,
+      ts: "2026-10-15T12:00:00.000Z",
+      temp: 31,
+      rh: 55,
+      vpd: 1.0,
+    };
+    const maxOnlyCmp = compareSnapshotToTargets(maxOnlySnap, {
+      temp: { min: null, max: 28 },
+    });
+    const maxOnlyAlert = buildEnvironmentAlerts({
+      snapshot: maxOnlySnap,
+      quality: evaluateSensorQuality(maxOnlySnap),
+      targets: maxOnlyCmp,
+      stage: "veg",
+      includeConfiguredRangeInTargetBreachReason: true,
+    }).find((a) => a.metric === "temp")!;
+    expect(deriveAlertWhyContext(maxOnlyAlert, "fahrenheit").text).toBe(
+      "Configured target: ≤ 82.4°F",
+    );
   });
 
   it("collapses duplicate CREATED alert_events for the same alert_id on the Timeline while keeping status transitions (#2165)", () => {

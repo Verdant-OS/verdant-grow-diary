@@ -157,9 +157,9 @@ function parseConfiguredTargetFromReason(
   reason: string,
   tempUnit: TemperatureUnitPreference,
 ): AlertWhyConfiguredTargetContext | null {
-  const m = /configured target\s+([^).]+)/i.exec(reason);
+  const m = /configured target\s+([^)]+)/i.exec(reason);
   if (!m) return null;
-  const raw = m[1].trim();
+  const raw = m[1].trim().replace(/\.+$/, "");
   if (!raw) return null;
   if (metric === "temp" || metric === "soil_temp") {
     const pair = /^([+-]?\d+(?:\.\d+)?)–([+-]?\d+(?:\.\d+)?)°C$/i.exec(raw);
@@ -170,6 +170,15 @@ function parseConfiguredTargetFromReason(
         kind: "configured",
         metric,
         text: `Configured target: ${fmtTemp(minF)}–${fmtTemp(maxF)}°F`,
+      };
+    }
+    const single = /^([≥≤])\s*([+-]?\d+(?:\.\d+)?)°C$/i.exec(raw);
+    if (single && tempUnit === "fahrenheit") {
+      const boundF = roundTo1(celsiusToFahrenheit(Number(single[2])));
+      return {
+        kind: "configured",
+        metric,
+        text: `Configured target: ${single[1]} ${fmtTemp(boundF)}°F`,
       };
     }
   }

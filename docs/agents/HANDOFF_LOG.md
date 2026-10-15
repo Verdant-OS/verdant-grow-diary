@@ -53,8 +53,8 @@ goal: /plants shows "not assessed" when a plant has no health assessment. New mi
 branch: cursor/plants-health-not-assessed-6187
 base: verdant-grow-diary
 checkout: git fetch origin cursor/plants-health-not-assessed-6187 verdant-grow-diary && git switch cursor/plants-health-not-assessed-6187 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: draft, URL recorded after push
-head_sha: 055eda52f14cbbd9bb9fe2e941bd8644301181ef
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2140 (draft)
+head_sha: dd43053efb8e0c156fc790322a6725dca76625dc (parent of the commit that records this line)
 state: pushed draft
 next_action: stay draft until Cheeko approves schema work. Do not apply the migration.
 files: supabase/migrations/20261015161000_plants_health_drop_healthy_default.sql; src/lib/plantHealthRules.ts; src/pages/Plants.tsx; src/test/plants-page-unassessed-health-label.test.tsx; src/test/plants-health-drop-healthy-default-migration.test.ts; src/test/plant-health-unknown-rendering.test.tsx

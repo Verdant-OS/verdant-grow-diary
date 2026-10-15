@@ -54,15 +54,15 @@ branch: cursor/quicklog-correction-editable-values-fc1d
 base: verdant-grow-diary
 checkout: git fetch origin cursor/quicklog-correction-editable-values-fc1d verdant-grow-diary && git switch cursor/quicklog-correction-editable-values-fc1d && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2118 (draft)
-head_sha: d22ce90d8c03231d6bd28de4288a78aec892f18c
-state: pushed draft. Graft FAIL at 96a0e983 is addressed in d22ce90d8: shared root-zone select matches base, Timeline uses its own sensor select, the measured-values job has contents:read, and the owner-fence script loads the migration ownership function. The locked PG15 harness matches base. No merge.
-next_action: required CI, the PostgreSQL 15 runtime contract, and Quick Log correction measured values at the docs commit that records this line, then Graft one-time exact-head review. Stay draft.
+head_sha: 3be3a218d82ff028969d30bb425ff51e55ce8807
+state: pushed draft. Cheeko 8:52 PM CT assigned the four Graft P2s at 6e105e57. Sensor query failure is partial, the dialog reads timelineSensorEvents, grouped feeding evidence supplies the dose, and the pre-fix CI proof requires unsupported_change. No merge.
+next_action: required CI, the PostgreSQL 15 runtime contract, and Quick Log correction measured values at the docs commit that records this line, then Graft one-time exact-head re-review. Stay draft.
 files: src/lib/quick-log/quickLogRevisionRules.ts; src/components/QuickLogEntryIntegrityControls.tsx; src/components/QuickLogHistoryPanels.tsx; src/components/QuickLogGroupedTimelineSection.tsx; src/components/WateringHistoryPanel.tsx; src/components/FeedingHistoryPanel.tsx; src/pages/Timeline.tsx; src/test/quicklog-correction-editable-values.test.ts; src/test/quicklog-correction-editable-values-dialog.test.tsx; src/test/quicklog-correction-copilot-followup.test.tsx; scripts/prove-quicklog-correction-owner-fence.mjs; supabase/migrations/20261014210000_quicklog_correction_editable_values.sql; docs/agents/HANDOFF_LOG.md
-blockers: Graft FAIL at 96a0e983 is addressed pending CI. Follow-up: the grouped timeline feeding editor still does not receive a stored dose (QuickLogGroupedTimelineSection.tsx correctionValues call). The locked PG15 harness matches base. No merge.
+blockers: Graft re-review of the 8:52 PM CT fixes is pending CI. The locked PG15 harness matches base. No merge.
 artifacts: PR body
 reviewer_seat: Graft one-time exact-head after required CI is green. Blue Dream (.tsx). Critical Mass (rules, tests, migration).
 claimed_by: bc-6f1bd555, 2026-10-14 23:20 UTC
-last_updated: 2026-10-15 01:25 UTC, by bc-6f1bd555
+last_updated: 2026-10-15 02:05 UTC, by bc-6f1bd555
 ```
 
 ### TIMELINE-GROW-DAY-2005

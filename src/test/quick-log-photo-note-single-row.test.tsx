@@ -7,7 +7,7 @@
  * update `PlantQuickLog` already uses) and never inserts a second row.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
@@ -202,6 +202,14 @@ function uploadedPath(): string {
   expect(upload, "photo upload").toBeTruthy();
   return upload!.args[0] as string;
 }
+function pendingKey(): string {
+  return `verdant:quick-log:pending-note:v1:${context.userId}`;
+}
+function journalPayload(): QuickLogV2SavePayload {
+  const raw = window.sessionStorage.getItem(pendingKey());
+  expect(raw, "pending-note journal").toBeTruthy();
+  return (JSON.parse(raw!) as { payload: QuickLogV2SavePayload }).payload;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -283,6 +291,47 @@ describe("Quick Log note with a photo saves one diary row", () => {
     const second = rpcMock.mock.calls[1][1] as QuickLogV2SavePayload;
     expect(first.p_details?.photo_url).toBe(uploadedPath());
     expect(second).toEqual(first);
+    expect(photoEntryMock).not.toHaveBeenCalled();
+  });
+
+  it("writes the photo path into the pending-note journal before the RPC so a reload retries the same payload", async () => {
+    modelLostThenCommittedReply();
+    renderSheet();
+    typeNote();
+    attachPhoto();
+    save();
+    await waitFor(() => expect(screen.getByTestId("qlv2-save-retry")).toBeEnabled());
+
+    // quicklog_save_manual hashes p_details into its replay lock, so the
+    // journal a reload restores must carry the same photo_url the RPC saw.
+    const journal = journalPayload();
+    expect(journal.p_details?.photo_url).toBe(uploadedPath());
+    expect(journal).toEqual(rpcMock.mock.calls[0][1]);
+  });
+
+  it("replays the identical photo-bearing payload after a remount and fills photo_url without a second upload", async () => {
+    modelLostThenCommittedReply();
+    renderSheet();
+    typeNote();
+    attachPhoto();
+    save();
+    await waitFor(() => expect(screen.getByTestId("qlv2-save-retry")).toBeEnabled());
+    const first = rpcMock.mock.calls[0][1] as QuickLogV2SavePayload;
+    // The tab reloads: the File is gone, the journal is not.
+    cleanup();
+
+    renderSheet();
+    fireEvent.click(await screen.findByTestId("qlv2-save-retry"));
+    await expectPostSave();
+
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock).toHaveBeenCalledTimes(2);
+    expect(rpcMock.mock.calls[1][1]).toEqual(first);
+    expect(updateMock).toHaveBeenCalledWith("diary_entries", { photo_url: uploadedPath() }, [
+      "details->>linked_grow_event_id",
+      "eq",
+      confirmedEventId,
+    ]);
     expect(photoEntryMock).not.toHaveBeenCalled();
   });
 });

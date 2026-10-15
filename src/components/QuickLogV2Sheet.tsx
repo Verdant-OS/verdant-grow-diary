@@ -5,6 +5,7 @@ import {
   claimPendingQuickLogNote,
   clearPendingQuickLogNote,
   markPendingQuickLogNoteHistoryCheck,
+  updatePendingQuickLogNotePayload,
   NOTE_RECOVERY_UNAVAILABLE,
   NOTE_RECOVERY_PENDING,
   NOTE_RECOVERY_CLEAR_FAILED,
@@ -306,6 +307,9 @@ function loadRecentTargetRecord(userId: string | null | undefined) {
 }
 
 function restoredNoteSubmission(record: PendingQuickLogNote): LockedManualSubmission {
+  // A journal written after the upload already names the photo path; the
+  // restored retry replays that same payload and never uploads again.
+  const journaledPhotoPath = record.payload.p_details?.photo_url;
   return {
     recovery: record,
     payload: record.payload,
@@ -315,6 +319,7 @@ function restoredNoteSubmission(record: PendingQuickLogNote): LockedManualSubmis
     videoMeta: null,
     note: record.payload.p_note ?? "",
     action: "note",
+    uploadedPath: typeof journaledPhotoPath === "string" ? journaledPhotoPath : null,
   };
 }
 
@@ -1981,16 +1986,33 @@ function QuickLogV2SheetForOwner({
       // The photo travels inside the single quicklog_save_manual write, so
       // its diary mirror is the only row (production QA 2026-10-14 saw the
       // mirror plus a second "Photo attached" companion insert).
+      // Keep the upload on the in-memory lock first: an exact retry reuses it
+      // whether or not the journal write below lands.
+      exactManualSubmission.uploadedPath = uploadedPath;
       if (exactManualSubmission.payload.p_details?.photo_url !== uploadedPath) {
-        exactManualSubmission.payload = {
+        const payloadWithPhoto: QuickLogV2SavePayload = {
           ...exactManualSubmission.payload,
           p_details: {
             ...(exactManualSubmission.payload.p_details ?? {}),
             photo_url: uploadedPath,
           },
         };
+        // The RPC hashes p_details into its replay lock, so the journal a
+        // reload restores must carry this exact payload before dispatch.
+        const journaled = updatePendingQuickLogNotePayload(
+          exactManualSubmission.recovery,
+          payloadWithPhoto,
+        );
+        if (journaled.status !== "updated") {
+          keepSubmissionLockedRef.current = true;
+          setExactRetryPending(true);
+          setLocalError(NOTE_RECOVERY_UNAVAILABLE);
+          setSaveStatus("");
+          return;
+        }
+        exactManualSubmission.payload = journaled.record.payload;
+        exactManualSubmission.recovery = journaled.record;
       }
-      exactManualSubmission.uploadedPath = uploadedPath;
     }
 
     let res: Awaited<ReturnType<typeof save>>;

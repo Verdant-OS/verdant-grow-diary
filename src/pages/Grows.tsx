@@ -24,7 +24,11 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { evaluateGrowCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlements/freeTierGates";
-import { growRestoreFailureCopy, planGrowRestore } from "@/lib/archivedGrowQuickLogRules";
+import {
+  growRestoreFailureCopy,
+  nextActiveGrowIdAfterArchive,
+  planGrowRestore,
+} from "@/lib/archivedGrowQuickLogRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import {
   buildConnectedActivationRoutes,
@@ -154,6 +158,15 @@ export default function Grows() {
     if (archiveError) {
       toast.error("Unable to archive this grow. Please try again.");
       return;
+    }
+    if (activeGrowId === id) {
+      setActiveGrowId(
+        nextActiveGrowIdAfterArchive({
+          archivedGrowId: id,
+          activeGrowId,
+          activeGrows: grows,
+        }),
+      );
     }
     await refresh();
     toast.success("Archived");
@@ -306,16 +319,15 @@ export default function Grows() {
                     Set active
                   </button>
                 )}
-                {g.id !== activeGrowId && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => archive(g.id)}
-                    aria-label="Archive grow"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => archive(g.id)}
+                  aria-label="Archive grow"
+                  data-testid="archive-grow"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             </li>
           ))}
@@ -341,12 +353,16 @@ export default function Grows() {
                 className="rounded-3xl border border-border/60 bg-card/65 p-5 shadow-card"
                 data-testid="archived-grow-row"
               >
-                <div className="flex items-center gap-2 flex-wrap mb-3">
+                <Link
+                  to={`/grows/${g.id}`}
+                  className="mb-3 flex items-center gap-2 flex-wrap hover:underline"
+                  data-testid="archived-grow-card-link"
+                >
                   <span className="font-semibold">{g.name}</span>
                   <Badge variant="outline" className="text-[10px]">
                     archived
                   </Badge>
-                </div>
+                </Link>
                 <Button
                   type="button"
                   size="sm"

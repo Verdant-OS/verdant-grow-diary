@@ -39,6 +39,7 @@ import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 import StartBreedingLogButton from "@/components/StartBreedingLogButton";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
+import GrowArchiveControlButton from "@/components/GrowArchiveControlButton";
 import { GrowFollowUpReviewSection } from "@/components/GrowFollowUpReviewSection";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
 import GrowPendingOutcomeNotice from "@/components/GrowPendingOutcomeNotice";
@@ -207,6 +208,11 @@ export default function GrowDetail() {
             <FileDown className="h-4 w-4" aria-hidden="true" />
             Export PDF
           </Button>
+          <GrowArchiveControlButton
+            growId={grow.id}
+            isArchived={grow.is_archived}
+            onChanged={refetch}
+          />
         </div>
       </header>
 

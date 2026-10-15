@@ -9,9 +9,44 @@ import { isCurrentStateStale } from "@/lib/sensorTruthCanon";
 import { leastTrustedStatus, refreshSensorReadingStatus } from "@/lib/growAdapters";
 import type { SensorReading } from "@/mock";
 import { readObservedSensorMetric } from "@/lib/sensorReadingSelectionRules";
+import {
+  celsiusToFahrenheit,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
-const CSV_HEADER =
+const CSV_HEADER_CELSIUS =
   "Timestamp (UTC),Temperature (°C),Humidity (%),VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At (UTC)";
+
+const CSV_HEADER_FAHRENHEIT =
+  "Timestamp (UTC),Temperature (°F),Humidity (%),VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At (UTC)";
+
+function resolveExportTemperatureUnit(
+  unit?: TemperatureUnitPreference | "F" | "C",
+): TemperatureUnitPreference {
+  if (unit === "fahrenheit" || unit === "F") return "fahrenheit";
+  if (unit === "celsius" || unit === "C") return "celsius";
+  try {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage?.getItem("verdant:temperatureUnit");
+      if (stored === "fahrenheit") return "fahrenheit";
+      if (stored === "celsius") return "celsius";
+    }
+  } catch {
+    // ignore storage access errors
+  }
+  return "celsius";
+}
+
+function formatExportTemperature(
+  celsius: number | null,
+  unit: TemperatureUnitPreference,
+): number | null {
+  if (celsius === null || !Number.isFinite(celsius)) return null;
+  if (unit === "fahrenheit") {
+    return Math.round(celsiusToFahrenheit(celsius) * 10) / 10;
+  }
+  return celsius;
+}
 
 function formatUtcTimestamp(value: string | null | undefined): string {
   if (!value) return "";
@@ -76,7 +111,10 @@ function refreshForExport(reading: SensorReading, now: Date): SensorReading {
 export function buildSensorReadingsCsv(
   readings: ReadonlyArray<SensorReading>,
   nowMs?: number,
+  temperatureUnit?: TemperatureUnitPreference | "F" | "C",
 ): string {
+  const resolvedUnit = resolveExportTemperatureUnit(temperatureUnit);
+  const header = resolvedUnit === "fahrenheit" ? CSV_HEADER_FAHRENHEIT : CSV_HEADER_CELSIUS;
   const clocked =
     nowMs !== undefined && Number.isFinite(nowMs)
       ? readings.map((r) => refreshForExport(r, new Date(nowMs)))
@@ -84,7 +122,7 @@ export function buildSensorReadingsCsv(
   const rows = clocked.map((r) =>
     [
       formatUtcTimestamp(r.ts),
-      readObservedSensorMetric(r, "temp"),
+      formatExportTemperature(readObservedSensorMetric(r, "temp"), resolvedUnit),
       readObservedSensorMetric(r, "rh"),
       readObservedSensorMetric(r, "vpd"),
       readObservedSensorMetric(r, "co2"),
@@ -103,7 +141,7 @@ export function buildSensorReadingsCsv(
       .map(csvEscape)
       .join(","),
   );
-  return [CSV_HEADER, ...rows].join("\n");
+  return [header, ...rows].join("\n");
 }
 
 /**

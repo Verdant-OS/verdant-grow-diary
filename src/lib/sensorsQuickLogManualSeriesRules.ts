@@ -22,7 +22,11 @@ import {
   classifySensorSnapshotStatus,
   type SensorSnapshotStatus,
 } from "@/lib/sensorSnapshotStatusContract";
-import { snapshotFromManualSensorSnapshot, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import {
+  snapshotFromEnvironmentCheck,
+  snapshotFromManualSensorSnapshot,
+  type SensorSnapshot,
+} from "@/lib/sensorSnapshot";
 import {
   isHumidityValid,
   isTemperatureValid,
@@ -154,11 +158,18 @@ export function sensorReadingFromQuickLogDiaryManual(
   if (!isDiaryRowInTentScope(row.tent_id, [tentId])) return null;
   const details = row.details;
   if (!details || typeof details !== "object" || Array.isArray(details)) return null;
-  const snap = snapshotFromManualSensorSnapshot(
-    row.entry_at ?? null,
-    (details as { manual_sensor_snapshot?: Record<string, unknown> }).manual_sensor_snapshot,
-    { diaryEntryId: typeof row.id === "string" ? row.id : null },
-  );
+  const diaryOpts = { diaryEntryId: typeof row.id === "string" ? row.id : null };
+  const snap =
+    snapshotFromManualSensorSnapshot(
+      row.entry_at ?? null,
+      (details as { manual_sensor_snapshot?: Record<string, unknown> }).manual_sensor_snapshot,
+      diaryOpts,
+    ) ??
+    snapshotFromEnvironmentCheck(
+      row.entry_at ?? null,
+      (details as { environment_check?: Record<string, unknown> }).environment_check,
+      diaryOpts,
+    );
   if (!snap) return null;
   return readingFromSnapshot(tentId, snap, now);
 }
@@ -189,8 +200,25 @@ export function collectSensorsQuickLogManualReadings(input: {
   return out;
 }
 
+const ALL_METRIC_KEYS: readonly SensorReadingMetricKey[] = [
+  "temp",
+  "rh",
+  "vpd",
+  "co2",
+  "soil",
+  "ppfd",
+];
+
+function inferObservedMetrics(reading: SensorReading): SensorReadingMetricKey[] {
+  if (Array.isArray(reading.observedMetrics)) return [...reading.observedMetrics];
+  return ALL_METRIC_KEYS.filter((key) => {
+    const val = reading[key];
+    return typeof val === "number" && Number.isFinite(val);
+  });
+}
+
 function mergeCollidingManual(existing: SensorReading, incoming: SensorReading): SensorReading {
-  const observed = new Set<SensorReadingMetricKey>(existing.observedMetrics ?? []);
+  const observed = new Set<SensorReadingMetricKey>(inferObservedMetrics(existing));
   const next: SensorReading = { ...existing, observedMetrics: [...observed] };
   for (const metric of incoming.observedMetrics ?? []) {
     next[metric] = incoming[metric] as never;
@@ -225,4 +253,15 @@ export function mergeSensorsSeriesWithQuickLogManuals(
     byKey.set(key, existing ? mergeCollidingManual(existing, reading) : { ...reading });
   }
   return sortSensorReadingsNewestFirst(Array.from(byKey.values()));
+}
+
+/**
+ * Merge Dashboard chart readings with Quick Log manual readings and return
+ * in ascending chronological order (oldest → newest).
+ */
+export function mergeDashboardChartReadingsWithQuickLogManuals(
+  chartReadings: readonly SensorReading[] | null | undefined,
+  quickLogManuals: readonly SensorReading[] | null | undefined,
+): SensorReading[] {
+  return [...mergeSensorsSeriesWithQuickLogManuals(chartReadings, quickLogManuals)].reverse();
 }

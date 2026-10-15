@@ -32,6 +32,8 @@ import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreferen
 
 interface Props {
   data: SensorReading[];
+  /** Optional full dataset for CSV export when the chart plots a subset. Defaults to `data`. */
+  exportData?: SensorReading[];
   metric: "temp" | "rh" | "vpd" | "co2" | "soil" | "ppfd";
   height?: number;
   variant?: "area" | "line";
@@ -49,6 +51,7 @@ interface Props {
 
 export default function SensorChart({
   data,
+  exportData,
   metric,
   height = 220,
   variant = "area",
@@ -71,6 +74,10 @@ export default function SensorChart({
     () => filterTimeSeriesByRange(data, range, (r) => r.ts),
     [data, range],
   );
+  const filteredExportData = useMemo(
+    () => (exportData ? filterTimeSeriesByRange(exportData, range, (r) => r.ts) : filteredData),
+    [exportData, filteredData, range],
+  );
 
   const chartData = useMemo(() => {
     return filteredData.map((r) => {
@@ -84,7 +91,7 @@ export default function SensorChart({
   }, [filteredData, metric, temperatureUnit]);
 
   const handleExport = () => {
-    const csv = buildSensorReadingsCsv(filteredData, Date.now());
+    const csv = buildSensorReadingsCsv(filteredExportData, Date.now(), temperatureUnit);
     const filename = `sensor-readings-${metric}-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
     downloadTextFile(csv, filename);
   };

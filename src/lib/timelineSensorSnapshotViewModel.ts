@@ -23,7 +23,11 @@ import { validateManualSnapshot } from "@/lib/manualSensorSnapshotRules";
 import { resolveSensorSourceLabel, type ResolvedSourceLabel } from "@/lib/sensorSourceLabelRules";
 import { classifyManualMetric, CO2_PPM_RANGE } from "@/lib/sensorTruthRules";
 import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRules";
-import { tempFFromC } from "@/lib/temperatureUnits";
+import { fahrenheitToCelsius, tempFFromC } from "@/lib/temperatureUnits";
+import {
+  loadTemperatureUnitPreference,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export type TimelineSensorChipMetric =
   "temp_f" | "temp_c" | "rh" | "ph" | "ec" | "vpd" | "soil_moisture" | "co2";
@@ -141,14 +145,19 @@ export function resolveTimelineCardSensorResolution(
 /** Validate every persisted source; manual provenance only selects the existing copy. */
 export function buildTimelineCardSensorSnapshotViewModel(
   input: TimelineCardSensorResolution | null | undefined,
-  options: { validateManualCompatibility: true } = { validateManualCompatibility: true },
+  options: {
+    validateManualCompatibility?: boolean;
+    temperatureUnit?: TemperatureUnitPreference;
+  } = { validateManualCompatibility: true },
 ): TimelineCardSensorSnapshotViewModel {
   const resolution = input ?? { sensor: undefined, useManualValidation: false };
+  const temperatureUnit = options.temperatureUnit ?? loadTemperatureUnitPreference();
+  const preferUnit = temperatureUnit === "celsius" ? "C" : "F";
   return {
     ...resolution,
     sensorViewModel: buildTimelineSensorSnapshotViewModel(resolution.sensor, {
-      preferUnit: "F",
-      validateManualCompatibility: options.validateManualCompatibility,
+      preferUnit,
+      validateManualCompatibility: options.validateManualCompatibility ?? true,
       // Retain Timeline's persisted generic-temperature Celsius convention.
       genericTempUnit: "C",
       preserveLegacyPrecision: !resolution.useManualValidation,
@@ -344,16 +353,28 @@ export function buildTimelineSensorSnapshotViewModel(
 
   const chips: TimelineSensorChip[] = [];
 
-  // Temperature chip — never double-convert explicit Fahrenheit values.
+  // Temperature chip — never double-convert explicit Fahrenheit or Celsius values.
   if (isFiniteNumber(tempF) && allows("air_temp_c")) {
-    const v = roundTo(tempF, 1);
-    chips.push({
-      metric: "temp_f",
-      label: "Temp",
-      value: v,
-      unit: "°F",
-      display: `${v}°F`,
-    });
+    if (options.preferUnit === "C") {
+      const convertedC = isFiniteNumber(tempC) ? tempC : fahrenheitToCelsius(tempF);
+      const v = roundTo(convertedC, 1);
+      chips.push({
+        metric: "temp_c",
+        label: "Temp",
+        value: v,
+        unit: "°C",
+        display: `${v}°C`,
+      });
+    } else {
+      const v = roundTo(tempF, 1);
+      chips.push({
+        metric: "temp_f",
+        label: "Temp",
+        value: v,
+        unit: "°F",
+        display: `${v}°F`,
+      });
+    }
   } else if (isFiniteNumber(tempC) && allows("air_temp_c")) {
     if (options.preferUnit === "C") {
       const v = roundTo(tempC, 1);

@@ -22,8 +22,7 @@ export const ROOT_ZONE_MANUAL_OBSERVATION_COMPANION_QUERY_CAP = ROOT_ZONE_OBSERV
 export const ROOT_ZONE_GROW_EVENT_SELECT =
   "id,grow_id,plant_id,tent_id,event_type,occurred_at,note,source,is_deleted," +
   "watering_events(volume_ml,ph,ec_ms_cm,runoff_ml,runoff_ph,runoff_ec,water_temp_c)," +
-  "feeding_events(volume_ml,ph,ec_ms_cm,ec_in,ec_out,runoff_ml,runoff_ph,runoff_ec,water_temp_c,line_id,products,nutrient_brand)," +
-  "environment_events(temperature_c,humidity_pct,vpd_kpa)";
+  "feeding_events(volume_ml,ph,ec_ms_cm,ec_in,ec_out,runoff_ml,runoff_ph,runoff_ec,water_temp_c,line_id,products,nutrient_brand)";
 
 /** Separate RLS-scoped companion read; `grow_events` has no details column. */
 export const ROOT_ZONE_MANUAL_OBSERVATION_DIARY_SELECT =

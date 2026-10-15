@@ -377,6 +377,10 @@ function entryKinds(e: Entry): EventFilter[] {
  * fetched". `onResolved`/`onPartial` own their scope-currency guards and the
  * merge into the supplemental collapse-only state.
  */
+/** Timeline-only. The shared root-zone select stays unchanged for the other readers. */
+const TIMELINE_SENSOR_GROW_EVENT_SELECT =
+  "id,plant_id,event_type,source,occurred_at,environment_events(temperature_c,humidity_pct,vpd_kpa)";
+
 async function resolveMissingLinkedGrowEventParents(input: {
   growId: string;
   diaryRows: ReadonlyArray<{ id: string; details?: unknown }>;
@@ -469,6 +473,7 @@ export default function Timeline() {
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
+  const [timelineSensorEvents, setTimelineSensorEvents] = useState<GrowEventRowForRecent[]>([]);
   const [growEventsTotal, setGrowEventsTotal] = useState<number | null>(null);
   // Deleted or out-of-page grow_event parents that a loaded diary companion
   // references (details.linked_grow_event_id). Resolved separately from the
@@ -642,6 +647,7 @@ export default function Timeline() {
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setTimelineSensorEvents([]);
       setGrowEventsTotal(null);
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
@@ -663,6 +669,7 @@ export default function Timeline() {
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setTimelineSensorEvents([]);
       setGrowEventsTotal(null);
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
@@ -742,6 +749,23 @@ export default function Timeline() {
       if (!isCurrentRequest()) return;
       if (hasTimelineRequiredReadError(growEventsResult)) throw growEventsResult.error;
       const nextGrowEvents = growEventsResult.data as unknown as GrowEventRowForRecent[];
+      let sensorEventsQuery = orderNewestFirstStable(
+        supabase
+          .from("grow_events")
+          .select(TIMELINE_SENSOR_GROW_EVENT_SELECT)
+          .eq("grow_id", activeGrowId)
+          .eq("event_type", "environment")
+          .eq("is_deleted", false),
+        "occurred_at",
+      ).limit(100);
+      if (timelineDateRangeBounds.startIso)
+        sensorEventsQuery = sensorEventsQuery.gte("occurred_at", timelineDateRangeBounds.startIso);
+      if (timelineDateRangeBounds.endIso)
+        sensorEventsQuery = sensorEventsQuery.lte("occurred_at", timelineDateRangeBounds.endIso);
+      const sensorEventsResult = await sensorEventsQuery;
+      if (!isCurrentRequest()) return;
+      if (hasTimelineRequiredReadError(sensorEventsResult)) throw sensorEventsResult.error;
+      const nextSensorEvents = sensorEventsResult.data as unknown as GrowEventRowForRecent[];
 
       // Core plant memory is confirmed for the exact active scope. Make it
       // visible immediately; photos/action/alert context continues separately
@@ -751,6 +775,7 @@ export default function Timeline() {
       setManualSensorHistoryLimited(false);
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
       setGrowEvents(nextGrowEvents);
+      setTimelineSensorEvents(nextSensorEvents);
       setGrowEventsTotal(
         typeof growEventsResult.count === "number" ? growEventsResult.count : null,
       );
@@ -2687,7 +2712,7 @@ export default function Timeline() {
                                     growId={loopGrowId}
                                     correctionValues={correctionValuesForTimelineDiaryEntry(
                                       e,
-                                      growEvents,
+                                      timelineSensorEvents,
                                     )}
                                     onChanged={() => void load()}
                                   />

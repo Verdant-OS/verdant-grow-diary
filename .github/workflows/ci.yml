@@ -804,6 +804,8 @@ jobs:
 
   quicklog-correction-measured-values:
     name: Quick Log correction measured values
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:

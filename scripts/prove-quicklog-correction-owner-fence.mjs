@@ -30,7 +30,8 @@ create table if not exists public.grow_events (
   tent_id uuid,
   plant_id uuid,
   is_deleted boolean,
-  deleted_at timestamptz
+  deleted_at timestamptz,
+  created_at timestamptz not null default now()
 );
 create table if not exists public.diary_entries (
   id uuid primary key,
@@ -68,32 +69,8 @@ create table if not exists public.environment_events (
   event_id uuid primary key, user_id uuid not null,
   temperature_c numeric not null, humidity_pct numeric not null, vpd_kpa numeric not null
 );
-create or replace function public.quicklog_revision_sibling_env_ids(uuid) returns uuid[]
-language sql stable as $$ select '{}'::uuid[] $$;
 create or replace function public.quicklog_revision_rebase_captured_at(jsonb, timestamptz, timestamptz)
 returns jsonb language sql stable as $$ select $1 $$;
-create or replace function public.quicklog_revision_resolve_root(
-  uid uuid, p_grow_event_id uuid, p_diary_entry_id uuid,
-  out out_reason text, out out_grow_event_id uuid, out out_diary_entry_id uuid
-) returns record language plpgsql as $$
-begin
-  if p_grow_event_id is not null and exists (
-    select 1 from public.grow_events e
-     where e.id = p_grow_event_id and e.user_id = uid and e.source = 'manual'
-  ) then
-    out_grow_event_id := p_grow_event_id;
-    return;
-  end if;
-  if p_diary_entry_id is not null and exists (
-    select 1 from public.diary_entries d
-     where d.id = p_diary_entry_id and d.user_id = uid
-  ) then
-    out_diary_entry_id := p_diary_entry_id;
-    return;
-  end if;
-  out_reason := 'not_found_or_not_owned';
-end;
-$$;
 `;
 
 const PROOF = `
@@ -189,9 +166,94 @@ begin
        where diary_entry_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6') is distinct from 410 then
     raise exception 'flat watering history lost the original amount';
   end if;
+
+  insert into public.grow_events(id, user_id, event_type, source)
+  values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', '${OWNER}', 'environment', 'manual');
+  insert into public.environment_events(event_id, user_id, temperature_c, humidity_pct, vpd_kpa)
+  values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', '${OWNER}', 24, 55, 1.2);
+  v_denied := public.quicklog_correct_entry(
+    'wrong_value', '{"sensor_values":{"humidity_pct":null}}'::jsonb,
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', null, null);
+  if coalesce(v_denied ->> 'reason', '') <> 'invalid_changes' then
+    raise exception 'null humidity was not rejected: %', v_denied;
+  end if;
+  if (select humidity_pct from public.environment_events
+       where event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4') is distinct from 55 then
+    raise exception 'null humidity changed the stored humidity';
+  end if;
 end
 $proof$;
 `;
+
+const DIARY_ONLY = `
+insert into public.diary_entries(id, user_id, note, details)
+values (
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4', '${OWNER}', 'diary only',
+  '{"event_type":"watering","quick_log_version":2,"watering":{"volume_ml":320}}'
+);
+select public.quicklog_correct_entry(
+  'wrong_value', '{"volume_ml":330}'::jsonb,
+  null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4', null) as result;
+`;
+
+const FLAT_WATERING = `
+insert into public.diary_entries(id, user_id, note, details)
+values (
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6', '${OWNER}', 'flat water',
+  '{"event_type":"watering","quick_log_version":2,"watering_amount_ml":410}'
+);
+select public.quicklog_correct_entry(
+  'wrong_value', '{"volume_ml":420}'::jsonb,
+  null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6', null) as result;
+`;
+
+const NUTRIENTS_DOSE = `
+insert into public.diary_entries(id, user_id, note, details)
+values (
+  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb5', '${OWNER}', 'nutrient only',
+  '{"event_type":"feeding","quick_log_version":2,"nutrients":[{"name":"Grow","amount":2,"unit":"ml"}]}'
+);
+select public.quicklog_correct_entry(
+  'wrong_value', '{"dose_amount":4}'::jsonb,
+  null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb5', null) as result;
+`;
+
+const NULL_HUMIDITY = `
+insert into public.grow_events(id, user_id, event_type, source)
+values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', '${OWNER}', 'environment', 'manual');
+insert into public.environment_events(event_id, user_id, temperature_c, humidity_pct, vpd_kpa)
+values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', '${OWNER}', 24, 55, 1.2);
+select public.quicklog_correct_entry(
+  'wrong_value', '{"sensor_values":{"humidity_pct":null}}'::jsonb,
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', null, null) as result;
+`;
+
+const BROKEN_OWNERSHIP = `
+create or replace function public.quicklog_revision_resolve_root(
+  uid uuid, p_grow_event_id uuid, p_diary_entry_id uuid,
+  out out_reason text, out out_grow_event_id uuid, out out_diary_entry_id uuid
+) returns record language plpgsql as $$
+begin
+  out_grow_event_id := p_grow_event_id;
+  out_diary_entry_id := p_diary_entry_id;
+end;
+$$;
+`;
+
+function extractFunction(sql, startMarker) {
+  const start = sql.indexOf(startMarker);
+  if (start < 0) throw new Error(`missing ${startMarker}`);
+  const dollar = sql.indexOf("\n$$;", start);
+  const named = sql.indexOf("\n$function$;", start);
+  const cut = [dollar, named].filter((index) => index >= 0).sort((a, b) => a - b)[0];
+  if (cut === undefined) throw new Error(`unterminated ${startMarker}`);
+  const closer = cut === named ? "\n$function$;" : "\n$$;";
+  return sql.slice(start, cut + closer.length);
+}
+
+function migrationText(name) {
+  return readFileSync(new URL(`../supabase/migrations/${name}`, import.meta.url), "utf8");
+}
 
 function pgArgs() {
   const args = [];
@@ -202,44 +264,105 @@ function pgArgs() {
 }
 
 function psql(db, sql) {
-  const result = spawnSync("psql", [...pgArgs(), "-d", db, "-v", "ON_ERROR_STOP=1", "-c", sql], {
+  return spawnSync("psql", [...pgArgs(), "-d", db, "-v", "ON_ERROR_STOP=1", "-c", sql], {
     encoding: "utf8",
   });
+}
+
+function psqlOrThrow(db, sql) {
+  const result = psql(db, sql);
   if (result.status !== 0) {
     throw new Error(result.stderr || result.stdout || "psql failed");
   }
+}
+
+function applyMigration(db, sql) {
+  const applied = spawnSync(
+    "psql",
+    [
+      ...pgArgs(),
+      "-d",
+      db,
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      "set check_function_bodies = off",
+      "-c",
+      sql,
+    ],
+    { encoding: "utf8" },
+  );
+  if (applied.status !== 0) throw new Error(applied.stderr || applied.stdout);
+}
+
+function realOwnershipSql() {
+  const parseUuid = extractFunction(
+    migrationText("20260725024026_quicklog_dual_timestamp_foundation.sql"),
+    "CREATE FUNCTION public.quicklog_try_parse_uuid",
+  );
+  const corrections = migrationText("20260811090000_quicklog_corrections_retractions.sql");
+  return [
+    parseUuid,
+    extractFunction(
+      corrections,
+      "CREATE OR REPLACE FUNCTION public.quicklog_revision_resolve_root",
+    ),
+    extractFunction(
+      corrections,
+      "CREATE OR REPLACE FUNCTION public.quicklog_revision_sibling_env_ids",
+    ),
+    extractFunction(corrections, "CREATE OR REPLACE FUNCTION public.quicklog_correct_entry"),
+  ].join("\n");
 }
 
 function main() {
   spawnSync("dropdb", [...pgArgs(), "--if-exists", DB], { encoding: "utf8" });
   const created = spawnSync("createdb", [...pgArgs(), DB], { encoding: "utf8" });
   if (created.status !== 0) throw new Error(created.stderr || "createdb failed");
-  psql(DB, SETUP);
-  psql(DB, "set check_function_bodies = off");
-  const migration = readFileSync(
-    new URL(
-      "../supabase/migrations/20261014210000_quicklog_correction_editable_values.sql",
-      import.meta.url,
-    ),
-    "utf8",
-  );
-  const applied = spawnSync(
-    "psql",
-    [
-      ...pgArgs(),
-      "-d",
+  psqlOrThrow(DB, SETUP);
+  applyMigration(DB, realOwnershipSql());
+  for (const [label, sql] of [
+    ["diary-only orphan", DIARY_ONLY],
+    ["flat watering_amount_ml", FLAT_WATERING],
+    ["dose from nutrients only", NUTRIENTS_DOSE],
+    ["null humidity", NULL_HUMIDITY],
+  ]) {
+    const preFix = psql(DB, sql);
+    const text = `${preFix.stdout ?? ""}\n${preFix.stderr ?? ""}`;
+    const passed = preFix.status === 0 && text.includes('"ok": true');
+    if (passed) throw new Error(`${label} unexpectedly passed on the pre-fix function`);
+    const reason = text.match(/"reason": "([^"]+)"/)?.[1] ?? "rejected";
+    console.log(`pre-fix ${label}: ${reason}`);
+    psqlOrThrow(
       DB,
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-c",
-      "set check_function_bodies = off",
-      "-c",
-      migration,
-    ],
-    { encoding: "utf8" },
+      "truncate public.grow_events, public.diary_entries, public.watering_events, public.feeding_events, public.environment_events, public.quicklog_entry_revisions",
+    );
+  }
+  psqlOrThrow(
+    DB,
+    "truncate public.grow_events, public.diary_entries, public.watering_events, public.feeding_events, public.environment_events, public.quicklog_entry_revisions",
   );
-  if (applied.status !== 0) throw new Error(applied.stderr || applied.stdout);
-  psql(DB, PROOF);
+  applyMigration(DB, migrationText("20261014210000_quicklog_correction_editable_values.sql"));
+  applyMigration(DB, BROKEN_OWNERSHIP);
+  const broken = psql(DB, PROOF);
+  if (broken.status === 0) {
+    throw new Error("broken ownership check unexpectedly refused the non-owner");
+  }
+  console.log(
+    `broken ownership failed: ${(broken.stderr || broken.stdout || "").split("\n").find((line) => line.includes("ERROR")) ?? "non-zero"}`,
+  );
+  psqlOrThrow(
+    DB,
+    "truncate public.grow_events, public.diary_entries, public.watering_events, public.feeding_events, public.environment_events, public.quicklog_entry_revisions",
+  );
+  applyMigration(
+    DB,
+    extractFunction(
+      migrationText("20260811090000_quicklog_corrections_retractions.sql"),
+      "CREATE OR REPLACE FUNCTION public.quicklog_revision_resolve_root",
+    ),
+  );
+  psqlOrThrow(DB, PROOF);
   console.log("owner fence: non-owner received not_found_or_not_owned and the volume stayed 500");
   spawnSync("dropdb", [...pgArgs(), "--if-exists", DB], { encoding: "utf8" });
 }

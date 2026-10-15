@@ -91,7 +91,10 @@ export default function GrowDataSourceDisclosure({
   const helpCopyByLabel: Record<Label, { title: string; body: string }> = {
     Live: {
       title: "Current grow data",
-      body: `Plants, tents, and ${resource} saved in your Verdant workspace — not a live sensor reading. Sensor readings are labeled separately in the Environment and sensor sections.`,
+      body:
+        resource.trim().toLowerCase() === "tent"
+          ? "Plants and tents saved in your Verdant workspace — not a live sensor reading. Sensor readings are labeled separately in the Environment and sensor sections."
+          : `Plants, tents, and ${resource} saved in your Verdant workspace — not a live sensor reading. Sensor readings are labeled separately in the Environment and sensor sections.`,
     },
     Demo: {
       title: "Demo data",

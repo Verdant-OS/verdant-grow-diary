@@ -223,6 +223,15 @@ export function formatMergeTargetHelperText(summary: MergeTargetVisibilitySummar
   return parts.join(" ");
 }
 
+/** Hide Merge Duplicate until the plant list has loaded and a target exists. */
+export function isMergeDuplicateEntryEnabled(input: {
+  fetched: boolean;
+  visibleOptionCount: number;
+}): boolean {
+  if (!input.fetched) return true;
+  return input.visibleOptionCount > 0;
+}
+
 export const MERGE_TARGET_EMPTY_STATE = "No same-grow merge targets available.";
 
 export const MERGE_TARGET_SOURCE_MISSING_GROW_CONTEXT =

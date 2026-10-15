@@ -61,6 +61,12 @@ export interface PersistEnvironmentAlertsInput {
   /** Default false. Setting false short-circuits the hook entirely. */
   enabled?: boolean;
   /**
+   * True while the grow-targets read is still loading or unavailable so the
+   * persistence hook does not evaluate against a false `missing_targets`
+   * fallback before real targets arrive.
+   */
+  targetsPending?: boolean;
+  /**
    * Plant/grow/tent stage. When provided, VPD alerts are evaluated against
    * stage-aware bands instead of the legacy generic 0.6–1.6 kPa default.
    */
@@ -68,6 +74,30 @@ export interface PersistEnvironmentAlertsInput {
 }
 
 const SOURCE = "environment_alerts";
+
+// Shared across mounted hook instances within the same active view,
+// keyed with snapshot capture time so concurrent evaluations of the same
+// snapshot observation never duplicate an alert or its CREATED audit event
+// before `listAlerts` reflects the new open row. Cleared when all mounted
+// hook instances unmount.
+let mountedPersistHookCount = 0;
+const globalInFlightSnapshotKeys = new Set<string>();
+const globalCreatedEventLoggedKeys = new Set<string>();
+
+function thresholdDirectionKey(
+  growId: string | null,
+  tentId: string | null,
+  source: string,
+  metric: string | null | undefined,
+  title: string | null | undefined,
+): string | null {
+  const m = (metric ?? "").toString().trim().toLowerCase();
+  const t = (title ?? "").toString().trim().toLowerCase();
+  if (!m || !t) return null;
+  const match = t.match(/\b(above|below)\s+(target|stage range|default range)\b/);
+  if (!match) return null;
+  return `${growId ?? ""}::${tentId ?? ""}::${source.trim().toLowerCase()}::${m}::${match[1]}`;
+}
 
 /**
  * Resolve originating timeline refs for a derived alert.
@@ -137,6 +167,7 @@ export function usePersistEnvironmentAlerts(
           .join("|")
       : (input.targets?.status ?? "missing_targets");
   const enabled = input.enabled !== false;
+  const targetsPending = input.targetsPending === true;
   const growId = input.growId ?? null;
   const isDemoData = input.isDemoData === true;
   // Part of the dedupe key, so a tent change must re-run the effect.
@@ -145,11 +176,24 @@ export function usePersistEnvironmentAlerts(
   const stageKey = stageProvided ? (input.stage ?? "__unknown__") : "__legacy__";
 
   useEffect(() => {
-    if (!enabled || !growId) {
+    mountedPersistHookCount += 1;
+    return () => {
+      mountedPersistHookCount -= 1;
+      if (mountedPersistHookCount <= 0) {
+        mountedPersistHookCount = 0;
+        globalInFlightSnapshotKeys.clear();
+        globalCreatedEventLoggedKeys.clear();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!enabled || targetsPending || !growId) {
       setState({ status: "skipped", persistedCount: 0, lastError: null });
       return;
     }
 
+    const pendingSnapshotKeys = new Set<string>();
     let cancelled = false;
     let wakeId: number | null = null;
     const activeKeys = inFlightKeys.current;
@@ -173,6 +217,7 @@ export function usePersistEnvironmentAlerts(
         snapshot: input.snapshot,
         quality: input.quality,
         targets: input.targets,
+        includeConfiguredRangeInTargetBreachReason: true,
         ...(stageProvided ? { stage: input.stage ?? null } : {}),
       });
 
@@ -280,12 +325,29 @@ export function usePersistEnvironmentAlerts(
         ),
       );
 
+      const existingDirections = new Set<string>();
+      for (const r of openRows) {
+        const dirKey = thresholdDirectionKey(growId, r.tent, r.source ?? SOURCE, r.metric, r.title);
+        if (dirKey) existingDirections.add(dirKey);
+      }
+
       const toInsert = persistable.filter((a) => {
         const key = scopedKey(observedTentId, derivedAlertKey(a, SOURCE));
-        if (existing.has(key)) return false;
-        if (activeKeys.has(key)) return false;
+        const snapKey = `${key}::${tsKey}`;
+        const dirKey = thresholdDirectionKey(
+          growId,
+          observedTentId,
+          SOURCE,
+          typeof a.metric === "string" ? a.metric : null,
+          a.title,
+        );
+        if (existing.has(key) || (dirKey !== null && existingDirections.has(dirKey))) return false;
+        if (activeKeys.has(key) || globalInFlightSnapshotKeys.has(snapKey)) return false;
         activeKeys.add(key);
         pendingKeys.add(key);
+        globalInFlightSnapshotKeys.add(snapKey);
+        pendingSnapshotKeys.add(snapKey);
+        if (dirKey) existingDirections.add(dirKey);
         return true;
       });
 
@@ -306,7 +368,9 @@ export function usePersistEnvironmentAlerts(
       for (const a of toInsert) {
         if (cancelled) return;
         const key = scopedKey(observedTentId, derivedAlertKey(a, SOURCE));
+        const snapKey = `${key}::${tsKey}`;
         pendingKeys.delete(key);
+        pendingSnapshotKeys.delete(snapKey);
         try {
           // Explicit refs only: metric_refs (sensor_readings) first, then
           // diary_evidence_ref (Environment Check diary row). Never
@@ -322,20 +386,26 @@ export function usePersistEnvironmentAlerts(
             source: SOURCE,
             originating_timeline_events: refs,
           });
-          try {
-            await logAlertEvent({
-              alert_id: saved.id,
-              grow_id: growId,
-              event_type: "created",
-              new_status: "open",
-            });
-          } catch (logErr) {
-            lastError = `audit log failed: ${(logErr as Error).message}`;
+          const logDedupKey = `${saved?.id ?? ""}::${snapKey}`;
+          if (!globalCreatedEventLoggedKeys.has(logDedupKey)) {
+            globalCreatedEventLoggedKeys.add(logDedupKey);
+            try {
+              await logAlertEvent({
+                alert_id: saved.id,
+                grow_id: growId,
+                event_type: "created",
+                new_status: "open",
+              });
+            } catch (logErr) {
+              globalCreatedEventLoggedKeys.delete(logDedupKey);
+              lastError = `audit log failed: ${(logErr as Error).message}`;
+            }
           }
           persistedCount += 1;
         } catch (err) {
           // Release the in-flight guard so a later real attempt can retry.
           activeKeys.delete(key);
+          globalInFlightSnapshotKeys.delete(snapKey);
           lastError = (err as Error).message ?? "insert failed";
         }
       }
@@ -354,10 +424,13 @@ export function usePersistEnvironmentAlerts(
       if (wakeId !== null) window.clearTimeout(wakeId);
       for (const key of pendingKeys) activeKeys.delete(key);
       pendingKeys.clear();
+      for (const snapKey of pendingSnapshotKeys) globalInFlightSnapshotKeys.delete(snapKey);
+      pendingSnapshotKeys.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     enabled,
+    targetsPending,
     growId,
     tsKey,
     sourceKey,

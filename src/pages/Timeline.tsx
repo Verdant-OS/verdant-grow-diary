@@ -126,6 +126,14 @@ import {
   timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
 import {
+  collectTimelineDiaryPhotoIds,
+  dedupeAlertEventsForTimeline,
+  EMPTY_TIMELINE_DIARY_PHOTO_IDS,
+  timelineDiaryRowsForChipCounts,
+  timelineEntryCountsAsPhoto,
+  unionTimelineDiaryPhotoIds,
+} from "@/lib/timelineChipCountRules";
+import {
   effectiveSensorReadingsQuery,
   requireEffectiveSensorReadings,
 } from "@/lib/effectiveSensorReadings";
@@ -337,9 +345,10 @@ interface AlertEventRow {
 
 type EventFilter = "all" | "photo" | "note" | "measurement" | "followup" | "actionresponse";
 
-function entryKinds(e: Entry): EventFilter[] {
-  const kinds: EventFilter[] = ["note"];
-  if (e.photo_url) kinds.push("photo");
+function entryKinds(e: Entry, diaryPhotoIds: ReadonlySet<string>): EventFilter[] {
+  const kinds: EventFilter[] = [];
+  if (!isTimelineSensorDerivedDiaryId(e.id)) kinds.push("note");
+  if (timelineEntryCountsAsPhoto(e, diaryPhotoIds)) kinds.push("photo");
   // Diary measurement keys, QL environment envelopes, and tent
   // `sensor_readings` (source=manual) projected as receipts. Stale-drawer
   // manuals use the same LIVE window as the evidence drawer badge.
@@ -459,6 +468,9 @@ export default function Timeline() {
     if (urlGrowId !== storeGrowId) setActiveGrowId(urlGrowId);
   }, [urlGrowId, grows, storeGrowId, setActiveGrowId]);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [diaryPhotoIds, setDiaryPhotoIds] = useState<ReadonlySet<string>>(
+    () => EMPTY_TIMELINE_DIARY_PHOTO_IDS,
+  );
   // Tent Manual Snapshots live in `sensor_readings`, not diary_entries.
   // Read-side receipts only — never a second write path.
   const [manualSensorMeasurementEntries, setManualSensorMeasurementEntries] = useState<Entry[]>([]);
@@ -637,6 +649,7 @@ export default function Timeline() {
     const requestId = ++readRequestIdRef.current;
     if (!user || !activeGrowId) {
       setEntries([]);
+      setDiaryPhotoIds(EMPTY_TIMELINE_DIARY_PHOTO_IDS);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
@@ -658,6 +671,7 @@ export default function Timeline() {
     // the network boundary instead of ever issuing an unscoped read.
     if (!activeReadKey) {
       setEntries([]);
+      setDiaryPhotoIds(EMPTY_TIMELINE_DIARY_PHOTO_IDS);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
@@ -713,6 +727,7 @@ export default function Timeline() {
       if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
 
       const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
+      const nextDiaryPhotoIds = collectTimelineDiaryPhotoIds(rows, user);
       const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rows,
         user,
@@ -746,6 +761,7 @@ export default function Timeline() {
       // visible immediately; photos/action/alert context continues separately
       // and is never allowed to hold the diary or watering history hostage.
       setEntries(coreRows);
+      setDiaryPhotoIds(nextDiaryPhotoIds);
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
@@ -1025,6 +1041,7 @@ export default function Timeline() {
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
       const rawOlder = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
+      const olderPhotoIds = collectTimelineDiaryPhotoIds(rawOlder, user);
       const { rows: older, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
         rawOlder,
         user,
@@ -1058,6 +1075,7 @@ export default function Timeline() {
         }
       }
       if (isCurrentPage() && older.length) {
+        setDiaryPhotoIds((current) => unionTimelineDiaryPhotoIds(current, olderPhotoIds));
         setEntries((prev) => {
           const seen = new Set(prev.map((e) => e.id));
           return [...prev, ...older.filter((e) => !seen.has(e.id))];
@@ -1125,27 +1143,53 @@ export default function Timeline() {
     0,
   );
 
-  const displayEntries = useMemo(
-    () => mergeTimelineMeasurementDisplayEntries(entries, manualSensorMeasurementEntries),
-    [entries, manualSensorMeasurementEntries],
-  );
-
-  const eventCounts = useMemo(() => {
-    const m = {
-      all: displayEntries.length,
-      photo: 0,
-      note: 0,
-      measurement: 0,
-      followup: 0,
-      actionresponse: 0,
-    };
-    displayEntries.forEach((e) =>
-      entryKinds(e).forEach((k) => {
-        m[k] = (m[k] || 0) + 1;
-      }),
+  const enrichedEntries = useMemo(() => {
+    const knownGrowEvents =
+      supplementalLinkedGrowEvents.length === 0
+        ? growEvents
+        : [...growEvents, ...supplementalLinkedGrowEvents];
+    if (knownGrowEvents.length === 0) return entries;
+    const growMappedById = new Map(
+      mapGrowEventsToRecentRawEntries(knownGrowEvents).map((r) => [r.id, r] as const),
     );
-    return m;
-  }, [displayEntries]);
+    return entries.map((e) => {
+      const details = (e.details ?? null) as Record<string, unknown> | null;
+      if (!details) return e;
+      const link =
+        typeof details.linked_grow_event_id === "string"
+          ? details.linked_grow_event_id
+          : typeof details.grow_event_id === "string"
+            ? details.grow_event_id
+            : null;
+      if (!link) return e;
+      const mapped = growMappedById.get(link);
+      if (!mapped) return e;
+      let nextDetails = details;
+      const hasType =
+        typeof details.event_type === "string" &&
+        details.event_type.trim() !== "" &&
+        details.event_type !== "quick_log" &&
+        details.event_type !== "note";
+      if (!hasType && mapped.entry_type === "watering") {
+        nextDetails = { ...nextDetails, event_type: "watering" };
+      }
+      const hasVol =
+        nextDetails.watering != null ||
+        nextDetails.watering_amount_ml != null ||
+        nextDetails.wateringAmountMl != null ||
+        nextDetails.volume_ml != null;
+      const vol = mapped.details?.watering_amount_ml;
+      if (!hasVol && typeof vol === "number" && Number.isFinite(vol)) {
+        nextDetails = { ...nextDetails, watering: { volume_ml: vol } };
+      }
+      return nextDetails === details ? e : { ...e, details: nextDetails };
+    });
+  }, [entries, growEvents, supplementalLinkedGrowEvents]);
+
+  const displayEntries = useMemo(
+    () => mergeTimelineMeasurementDisplayEntries(enrichedEntries, manualSensorMeasurementEntries),
+    [enrichedEntries, manualSensorMeasurementEntries],
+  );
 
   // Canonical Action Response Memory (read-only). One grower response renders
   // as ONE compact card inside its own evidence row — never an extra event.
@@ -1253,26 +1297,82 @@ export default function Timeline() {
     };
   }, [plantFilter, tentFilter, plantNamesById, tentNamesById, activeGrowId]);
 
+  const evidenceFilteredEntries = useMemo(
+    () =>
+      filterTimelineEvidenceRows(displayEntries, {
+        query: searchQuery,
+        plantId: plantFilter,
+        tentId: tentFilter,
+        eventType: eventTypeFilter,
+        sensorSources: sensorSourceFilter,
+        startDate: effectiveStartDate,
+        endDate: effectiveEndDate,
+        timeZone: TIMELINE_LOCAL_TIME_ZONE,
+        plantNamesById,
+      }),
+    [
+      displayEntries,
+      searchQuery,
+      plantFilter,
+      tentFilter,
+      eventTypeFilter,
+      sensorSourceFilter,
+      effectiveStartDate,
+      effectiveEndDate,
+      plantNamesById,
+    ],
+  );
+
+  const diaryChipEntries = useMemo(
+    () => timelineDiaryRowsForChipCounts(evidenceFilteredEntries),
+    [evidenceFilteredEntries],
+  );
+
+  const chipStageCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    diaryChipEntries.forEach((e) => {
+      if (eventFilter !== "all" && !entryKinds(e, diaryPhotoIds).includes(eventFilter)) return;
+      const stage = resolveTimelineDiaryEntryStage(e);
+      if (stage) m[stage] = (m[stage] || 0) + 1;
+    });
+    return m;
+  }, [diaryChipEntries, eventFilter, diaryPhotoIds]);
+
+  const chipAllStagesCount = useMemo(() => {
+    if (eventFilter === "all") return diaryChipEntries.length;
+    return diaryChipEntries.filter((e) => entryKinds(e, diaryPhotoIds).includes(eventFilter))
+      .length;
+  }, [diaryChipEntries, eventFilter, diaryPhotoIds]);
+
+  const eventCounts = useMemo(() => {
+    const stageMatchedDiary =
+      stageFilter === "all"
+        ? diaryChipEntries
+        : diaryChipEntries.filter((e) => resolveTimelineDiaryEntryStage(e) === stageFilter);
+    const m = {
+      all: stageMatchedDiary.length,
+      photo: 0,
+      note: 0,
+      measurement: 0,
+      followup: 0,
+      actionresponse: 0,
+    };
+    stageMatchedDiary.forEach((e) =>
+      entryKinds(e, diaryPhotoIds).forEach((k) => {
+        m[k] = (m[k] || 0) + 1;
+      }),
+    );
+    return m;
+  }, [diaryChipEntries, stageFilter, diaryPhotoIds]);
+
   const filtered = useMemo(() => {
-    const afterStageEvent = displayEntries.filter((e) => {
+    return evidenceFilteredEntries.filter((e) => {
       if (stageFilter !== "all" && resolveTimelineDiaryEntryStage(e) !== stageFilter) return false;
-      if (eventFilter !== "all" && !entryKinds(e).includes(eventFilter)) return false;
+      if (eventFilter !== "all" && !entryKinds(e, diaryPhotoIds).includes(eventFilter))
+        return false;
       return true;
     });
-    return filterTimelineEvidenceRows(afterStageEvent, evidenceFilterInput);
-  }, [
-    displayEntries,
-    stageFilter,
-    eventFilter,
-    searchQuery,
-    plantFilter,
-    tentFilter,
-    eventTypeFilter,
-    sensorSourceFilter,
-    effectiveStartDate,
-    effectiveEndDate,
-    plantNamesById,
-  ]);
+  }, [evidenceFilteredEntries, stageFilter, eventFilter, diaryPhotoIds]);
 
   const openLabelsById = useMemo(() => {
     const rows = filtered.map((e) => {
@@ -2225,7 +2325,7 @@ export default function Timeline() {
             active={stageFilter === "all"}
             onClick={() => setStageFilter("all")}
             label="All stages"
-            count={displayEntries.length}
+            count={chipAllStagesCount}
           />
           {STAGES.map((s) => (
             <FilterChip
@@ -2233,8 +2333,8 @@ export default function Timeline() {
               active={stageFilter === s.value}
               onClick={() => setStageFilter(s.value)}
               label={s.label}
-              count={stageCounts[s.value] || 0}
-              disabled={!stageCounts[s.value]}
+              count={chipStageCounts[s.value] || 0}
+              disabled={!chipStageCounts[s.value]}
             />
           ))}
         </div>
@@ -3279,10 +3379,9 @@ const ALERT_EVENT_TONE: Record<AlertEventType, string> = {
 
 function AlertEventsSection({ events }: { events: AlertEventRow[] }) {
   if (!events?.length) return null;
-  // Defensive: sort newest-first regardless of fetch order.
-  const sorted = [...events].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
+  // Defensive: sort newest-first regardless of fetch order, and keep at most
+  // one CREATED event per alert_id.
+  const sorted = dedupeAlertEventsForTimeline(events);
   return (
     <section className="glass rounded-2xl p-4 mb-4" aria-label="Alert events">
       <div className="flex items-center gap-2 mb-3">

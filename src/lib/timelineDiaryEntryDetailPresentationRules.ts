@@ -166,7 +166,7 @@ function friendlyAttachedAction(value: unknown): string | null {
 
 const TYPED_ACTIVITY_ENVELOPES = ["watering", "feeding"] as const;
 
-const TYPED_ACTIVITY_FIELD_LABELS: Record<string, string> = {
+export const TYPED_ACTIVITY_FIELD_LABELS: Record<string, string> = {
   ph: "pH",
   ec_ms_cm: "EC",
   ec_in: "EC in",
@@ -175,6 +175,11 @@ const TYPED_ACTIVITY_FIELD_LABELS: Record<string, string> = {
   runoff_ph: "Runoff pH",
   runoff_ec: "Runoff EC",
   water_temp_c: "Water temperature",
+  watering_amount_ml: "Water Volume",
+  wateringAmountMl: "Water Volume",
+  watering_amount: "Water Volume",
+  wateringAmount: "Water Volume",
+  volume_ml: "Water Volume",
 };
 
 function typedActivityScalar(
@@ -183,7 +188,16 @@ function typedActivityScalar(
   tempUnit: TemperatureUnitPreference,
 ): string | null {
   if (typeof value === "number" && Number.isFinite(value)) {
-    if (key === "volume_ml" || key === "runoff_ml") return `${value} ml`;
+    if (
+      key === "volume_ml" ||
+      key === "runoff_ml" ||
+      key === "watering_amount_ml" ||
+      key === "wateringAmountMl" ||
+      key === "watering_amount" ||
+      key === "wateringAmount"
+    ) {
+      return `${value} ml`;
+    }
     if (key === "water_temp_c") {
       const displayed = tempUnit === "fahrenheit" ? celsiusToFahrenheit(value) : value;
       const shown = String(Math.round(displayed * 10) / 10);
@@ -314,12 +328,34 @@ export function presentTimelineDiaryEntryDetails(
   for (const envelope of TYPED_ACTIVITY_ENVELOPES) {
     detailLines.push(...typedActivityEnvelopeLines(envelope, record[envelope], tempUnit));
   }
+  const hasWaterVolumeLine = detailLines.some((line) => line.key === "watering.volume_ml");
+  if (!hasWaterVolumeLine) {
+    for (const flatVolKey of [
+      "watering_amount_ml",
+      "wateringAmountMl",
+      "watering_amount",
+      "wateringAmount",
+      "volume_ml",
+    ] as const) {
+      if (!(flatVolKey in record)) continue;
+      const text = typedActivityScalar(flatVolKey, record[flatVolKey], tempUnit);
+      if (text) {
+        detailLines.push({ key: "watering.volume_ml", label: "Water Volume", value: text });
+        break;
+      }
+    }
+  }
   const extra = Object.entries(record)
     .filter(
       ([k]) =>
         !HIDDEN_DIARY_DETAIL_KEYS.has(k) &&
         !QUICK_LOG_DETAIL_FIELD_KEYS.has(k) &&
-        !TYPED_ACTIVITY_ENVELOPES.includes(k as (typeof TYPED_ACTIVITY_ENVELOPES)[number]),
+        !TYPED_ACTIVITY_ENVELOPES.includes(k as (typeof TYPED_ACTIVITY_ENVELOPES)[number]) &&
+        k !== "watering_amount_ml" &&
+        k !== "wateringAmountMl" &&
+        k !== "watering_amount" &&
+        k !== "wateringAmount" &&
+        k !== "volume_ml",
     )
     .map(([k, v]) => {
       const text = plainDetailValue(v);

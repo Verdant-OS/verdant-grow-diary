@@ -174,8 +174,10 @@ function rowLocalDay(row: TimelineEvidenceRow, timeZone: string): string | null 
   }
 }
 
+const EDGE_QUOTES_RE = /^[\s"'“”‘’]+|[\s"'“”‘’]+$/g;
+
 function normalize(v: unknown): string {
-  return typeof v === "string" ? v.trim().toLowerCase() : "";
+  return typeof v === "string" ? v.replace(EDGE_QUOTES_RE, "").toLowerCase() : "";
 }
 
 function safeRowText(

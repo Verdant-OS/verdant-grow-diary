@@ -60,7 +60,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useInRouterContext, useNavigate } from "@/lib/react-router-compat";
 import {
   buildQuickLogTimelineNavTarget,
@@ -151,7 +151,11 @@ import {
   feedingDefaultsPrefillSettled,
   FEEDING_DEFAULTS_LABEL,
 } from "@/lib/feedingDefaultsViewModel";
-import { recordFeedingDefaultsSaveCutoff } from "@/lib/feedingDefaultsSaveCutoff";
+import {
+  feedingDefaultsSaveCutoffQueryKey,
+  readFeedingDefaultsSaveCutoff,
+  recordFeedingDefaultsSaveCutoff,
+} from "@/lib/feedingDefaultsSaveCutoff";
 import { useRecentFeedingsForDefaults } from "@/hooks/useRecentFeedingsForDefaults";
 import {
   applyWateringVolumeDefaultsToForm,
@@ -818,6 +822,15 @@ function QuickLogV2SheetForOwner({
       }
     : { plantId: null, tentId: null, growId: null };
 
+  const feedingDefaultsSaveCutoffQ = useQuery({
+    queryKey: feedingDefaultsSaveCutoffQueryKey(resolvedContext.plantId ?? ""),
+    enabled: false,
+    staleTime: Infinity,
+    queryFn: () => 0,
+  });
+  const recordedFeedingDefaultsSaveCutoff =
+    typeof feedingDefaultsSaveCutoffQ.data === "number" ? feedingDefaultsSaveCutoffQ.data : 0;
+
   const recentFeedingsQ = useRecentFeedingsForDefaults({
     plantId: resolvedContext.plantId,
   }) as {
@@ -1109,6 +1122,7 @@ function QuickLogV2SheetForOwner({
         refetchRequiredAfter: 0,
         plantId: resolvedContext.plantId,
         refetchRequiredAfterByPlant: feedingDefaultsRefetchAfterByPlant,
+        recordedSaveCutoff: recordedFeedingDefaultsSaveCutoff,
       })
     )
       return;
@@ -1128,6 +1142,7 @@ function QuickLogV2SheetForOwner({
     feedingDefaults,
     feedingDefaultsApplied,
     feedingDefaultsRefetchAfterByPlant,
+    recordedFeedingDefaultsSaveCutoff,
     resolvedContext.plantId,
     feedingForm,
     recentFeedingsQ.isFetching,
@@ -1754,7 +1769,7 @@ function QuickLogV2SheetForOwner({
       const savedPlantId = resolved.plantId ?? null;
       if (savedPlantId) {
         const refetchAfter = Date.now();
-        recordFeedingDefaultsSaveCutoff(savedPlantId, refetchAfter);
+        recordFeedingDefaultsSaveCutoff(queryClient, savedPlantId, refetchAfter);
         setFeedingDefaultsRefetchAfterByPlant((previous) => ({
           ...previous,
           [savedPlantId]: refetchAfter,

@@ -1,20 +1,33 @@
 /**
- * Last feeding-save time per plant, shared by every Quick Log sheet in this
- * page session. A second sheet does not inherit the first sheet's React state,
- * and an offline refetch leaves the cached recipe in place.
+ * Per-plant feeding-save time, stored on the caller's QueryClient.
+ * A second sheet on the same client sees the cutoff. A new client, including
+ * each test's QueryClient, starts empty, so the cutoff cannot leak across tests.
  */
-const cutoffByPlant = new Map<string, number>();
-
-export function recordFeedingDefaultsSaveCutoff(plantId: string, savedAt: number): void {
-  const previous = cutoffByPlant.get(plantId) ?? 0;
-  if (savedAt > previous) cutoffByPlant.set(plantId, savedAt);
+export function feedingDefaultsSaveCutoffQueryKey(plantId: string) {
+  return ["quicklog_v2_feed_defaults_saved_at", plantId] as const;
 }
 
-export function feedingDefaultsSaveCutoff(plantId: string | null | undefined): number {
+export interface FeedingDefaultsSaveCutoffClient {
+  getQueryData: (queryKey: readonly unknown[]) => unknown;
+  setQueryData: (queryKey: readonly unknown[], data: number) => unknown;
+}
+
+export function recordFeedingDefaultsSaveCutoff(
+  client: FeedingDefaultsSaveCutoffClient,
+  plantId: string,
+  savedAt: number,
+): void {
+  const key = feedingDefaultsSaveCutoffQueryKey(plantId);
+  const previous = client.getQueryData(key);
+  const previousAt = typeof previous === "number" ? previous : 0;
+  if (savedAt > previousAt) client.setQueryData(key, savedAt);
+}
+
+export function readFeedingDefaultsSaveCutoff(
+  client: Pick<FeedingDefaultsSaveCutoffClient, "getQueryData">,
+  plantId: string | null | undefined,
+): number {
   if (!plantId) return 0;
-  return cutoffByPlant.get(plantId) ?? 0;
-}
-
-export function clearFeedingDefaultsSaveCutoffs(): void {
-  cutoffByPlant.clear();
+  const value = client.getQueryData(feedingDefaultsSaveCutoffQueryKey(plantId));
+  return typeof value === "number" ? value : 0;
 }

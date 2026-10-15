@@ -20,6 +20,7 @@ import {
   sortDiaryEntriesNewestFirst,
   type NormalizedDiaryEntry,
 } from "./diaryEntryRules";
+import { feedingDefaultsSaveCutoff } from "./feedingDefaultsSaveCutoff";
 import {
   EMPTY_QUICKLOG_FEEDING_FORM,
   FEEDING_FORM_DEFAULT_UNIT,
@@ -179,11 +180,13 @@ export function feedingDefaultsPrefillSettled(input: {
   refetchRequiredAfterByPlant?: Readonly<Record<string, number>>;
 }): boolean {
   if (input.isFetching || input.isPending || input.isError) return false;
-  const cutoff = input.refetchRequiredAfterByPlant
+  const fromCaller = input.refetchRequiredAfterByPlant
     ? input.plantId
       ? (input.refetchRequiredAfterByPlant[input.plantId] ?? 0)
       : 0
     : input.refetchRequiredAfter;
+  const recorded = feedingDefaultsSaveCutoff(input.plantId);
+  const cutoff = Math.max(fromCaller, recorded);
   if (cutoff > 0 && input.dataUpdatedAt < cutoff) return false;
   return true;
 }

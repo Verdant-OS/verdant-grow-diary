@@ -151,6 +151,7 @@ import {
   feedingDefaultsPrefillSettled,
   FEEDING_DEFAULTS_LABEL,
 } from "@/lib/feedingDefaultsViewModel";
+import { recordFeedingDefaultsSaveCutoff } from "@/lib/feedingDefaultsSaveCutoff";
 import { useRecentFeedingsForDefaults } from "@/hooks/useRecentFeedingsForDefaults";
 import {
   applyWateringVolumeDefaultsToForm,
@@ -1753,6 +1754,7 @@ function QuickLogV2SheetForOwner({
       const savedPlantId = resolved.plantId ?? null;
       if (savedPlantId) {
         const refetchAfter = Date.now();
+        recordFeedingDefaultsSaveCutoff(savedPlantId, refetchAfter);
         setFeedingDefaultsRefetchAfterByPlant((previous) => ({
           ...previous,
           [savedPlantId]: refetchAfter,

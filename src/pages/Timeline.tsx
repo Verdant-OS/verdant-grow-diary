@@ -1273,6 +1273,7 @@ export default function Timeline() {
     effectiveStartDate,
     effectiveEndDate,
     plantNamesById,
+    tentNamesById,
   ]);
 
   const openLabelsById = useMemo(() => {

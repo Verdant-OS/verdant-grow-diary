@@ -2801,6 +2801,7 @@ export default function Timeline() {
                                     tentId={e.tent_id ?? null}
                                     growId={loopGrowId}
                                     correctionValues={correctionValuesForTimelineDiaryEntry(e, [
+                                      ...growEvents,
                                       ...timelineLinkedRoots,
                                       ...timelineSensorEvents,
                                     ])}

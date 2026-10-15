@@ -193,6 +193,27 @@ begin
     raise exception 'feeding history lost the original values: %', v_prev;
   end if;
 
+  insert into public.grow_events(id, user_id, event_type, source, note)
+  values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', '${OWNER}', 'feeding', 'manual', 'flat feed');
+  insert into public.diary_entries(id, user_id, note, details)
+  values (
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4', '${OWNER}', 'flat feed',
+    '{"event_type":"feeding","linked_grow_event_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4","watering_amount_ml":180}'
+  );
+  insert into public.feeding_events(event_id, user_id, volume_ml, products)
+  values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', '${OWNER}', null, '[{"name":"Grow","amount":1,"unit":"ml"}]');
+  v_feed := public.quicklog_correct_entry(
+    'wrong_value', '{"volume_ml":250}'::jsonb,
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', null, null);
+  if coalesce(v_feed ->> 'ok', '') <> 'true' then
+    raise exception 'flat feeding volume correction failed: %', v_feed;
+  end if;
+  select previous_state into v_prev from public.quicklog_entry_revisions
+   where grow_event_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4';
+  if (v_prev ->> 'volume_ml')::numeric is distinct from 180 then
+    raise exception 'feeding audit fallback ignored the flat volume alias: %', v_prev;
+  end if;
+
   v_sensor := public.quicklog_correct_entry(
     'wrong_value', '{"sensor_values":{"temperature_c":26,"humidity_pct":60,"vpd_kpa":1.4}}'::jsonb,
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3', null, null);

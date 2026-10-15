@@ -426,7 +426,14 @@ export function correctionValuePropsFromDiaryDetails(
     return { kind: "watering", volumeMl: structured ?? flat };
   }
   if (eventType === "feeding") {
-    return { kind: "feeding", doseAmount: doseFromDetails(details) };
+    const feeding = isPlainObject(details.feeding) ? details.feeding : null;
+    const structured = finiteOrNull(feeding?.volume_ml);
+    const flat = finiteOrNull(details.watering_amount_ml) ?? finiteOrNull(details.wateringAmountMl);
+    const volumeMl = structured ?? flat;
+    const doseAmount = doseFromDetails(details);
+    return volumeMl == null
+      ? { kind: "feeding", doseAmount }
+      : { kind: "feeding", doseAmount, volumeMl };
   }
   if (
     eventType === "environment" ||

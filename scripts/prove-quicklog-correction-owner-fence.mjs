@@ -383,8 +383,14 @@ const DIARY_VOLUME_FALLBACK = `    IF v_old_volume IS NULL THEN
           CASE WHEN jsonb_typeof(d.details -> 'wateringAmountMl') = 'number'
             THEN (d.details ->> 'wateringAmountMl')::numeric END
         )
-        ELSE CASE WHEN jsonb_typeof(d.details -> 'feeding' -> 'volume_ml') = 'number'
-          THEN (d.details -> 'feeding' ->> 'volume_ml')::numeric END
+        ELSE COALESCE(
+          CASE WHEN jsonb_typeof(d.details -> 'feeding' -> 'volume_ml') = 'number'
+            THEN (d.details -> 'feeding' ->> 'volume_ml')::numeric END,
+          CASE WHEN jsonb_typeof(d.details -> 'watering_amount_ml') = 'number'
+            THEN (d.details ->> 'watering_amount_ml')::numeric END,
+          CASE WHEN jsonb_typeof(d.details -> 'wateringAmountMl') = 'number'
+            THEN (d.details ->> 'wateringAmountMl')::numeric END
+        )
       END
       INTO v_old_volume
       FROM public.diary_entries d

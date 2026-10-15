@@ -67,7 +67,7 @@ import {
   type AlertStatusRow,
 } from "@/lib/alerts";
 import { showAlertsOneTentLoopNextStep } from "@/lib/oneTentLoopNavigationRules";
-import { alertDetailPath, alertsPath } from "@/lib/routes";
+import { actionsPath, alertDetailPath, alertsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
 
 type StatusFilter = AlertStatusRow | "all";
@@ -204,16 +204,33 @@ export default function Alerts() {
     return existing;
   };
 
+  const unlinkedOpenAlerts = useMemo(
+    () =>
+      grouped.open.filter((a) => {
+        const summary = effectiveLinkedSummaryForAlert(a.id);
+        return !summary || summary.count === 0;
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [grouped.open, linkedActionCounts, locallyQueuedByAlertId],
+  );
+  const singleUnlinkedOpenAlert = unlinkedOpenAlerts.length === 1 ? unlinkedOpenAlerts[0] : null;
+  const loopCardGrowId = urlGrowId ?? singleUnlinkedOpenAlert?.grow_id ?? null;
+
   const handleLoopCardBeforeNavigate = async () => {
-    const candidate = grouped.open.find((a) => {
-      const summary = effectiveLinkedSummaryForAlert(a.id);
-      return !summary || summary.count === 0;
-    });
-    if (!candidate) return;
-    const res = await queueOpenAlertToActionQueue(candidate);
-    if (res.ok && res.actionQueueId) {
-      setLocallyQueuedByAlertId((prev) => ({ ...prev, [candidate.id]: res.actionQueueId! }));
+    // Only auto-queue from the generic loop CTA when the target alert is
+    // unambiguous (exactly one unlinked open alert). When multiple open
+    // alerts exist, navigate to /actions without guessing so the grower
+    // chooses via the per-row "Add to Action Queue" buttons.
+    if (!singleUnlinkedOpenAlert) return;
+    const res = await queueOpenAlertToActionQueue(singleUnlinkedOpenAlert);
+    if (!res.ok) return false;
+    if (res.actionQueueId) {
+      setLocallyQueuedByAlertId((prev) => ({
+        ...prev,
+        [singleUnlinkedOpenAlert.id]: res.actionQueueId!,
+      }));
     }
+    return actionsPath(urlGrowId ?? singleUnlinkedOpenAlert.grow_id ?? null);
   };
 
   /**
@@ -287,7 +304,7 @@ export default function Alerts() {
       {showAlertsOneTentLoopNextStep(grouped.open.length) ? (
         <OneTentLoopNextStepCard
           current="alert"
-          ids={{ growId: urlGrowId ?? null }}
+          ids={{ growId: loopCardGrowId }}
           testId="alerts-one-tent-loop-next-step-card"
           className="mb-3"
           onBeforeNavigate={handleLoopCardBeforeNavigate}

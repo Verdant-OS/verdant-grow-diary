@@ -71,18 +71,25 @@ export function ActionQueueCreateButton({
   async function handleSubmit() {
     if (!canSubmit || !effectiveGrowId) return;
     setSubmitting(true);
-    const result = await createActionQueueItem({
-      grow_id: effectiveGrowId,
-      action_type: "advisory",
-      target_metric: "general",
-      suggested_change: suggestedChange.trim(),
-      reason: reason.trim(),
-      risk_level: riskLevel,
-      source: ACTION_QUEUE_SOURCE_VALUES.MANUAL,
-      audit_note: "Created manually in Action Queue (approval required)",
-      originating_timeline_events: [],
-    });
-    setSubmitting(false);
+    let result: Awaited<ReturnType<typeof createActionQueueItem>>;
+    try {
+      result = await createActionQueueItem({
+        grow_id: effectiveGrowId,
+        action_type: "advisory",
+        target_metric: "general",
+        suggested_change: suggestedChange.trim(),
+        reason: reason.trim(),
+        risk_level: riskLevel,
+        source: ACTION_QUEUE_SOURCE_VALUES.MANUAL,
+        audit_note: "Created manually in Action Queue (approval required)",
+        originating_timeline_events: [],
+      });
+    } catch {
+      toast.error(actionQueueCreateFailureCopy(null));
+      return;
+    } finally {
+      setSubmitting(false);
+    }
     if (!result.ok) {
       toast.error(actionQueueCreateFailureCopy(result.reason));
       return;

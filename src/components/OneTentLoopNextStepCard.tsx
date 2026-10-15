@@ -8,9 +8,9 @@
  * - Never renders internal IDs as visible copy.
  * - Action Queue wording is always approval-required.
  */
-import { useCallback, useContext, useSyncExternalStore } from "react";
+import { useCallback, useContext, useState, useSyncExternalStore } from "react";
 import { QueryClientContext } from "@tanstack/react-query";
-import { Link } from "@/lib/react-router-compat";
+import { Link, useNavigate } from "@/lib/react-router-compat";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +28,7 @@ interface Props {
   ids?: OneTentLoopIds;
   className?: string;
   testId?: string;
-  onBeforeNavigate?: () => Promise<void> | void;
+  onBeforeNavigate?: () => Promise<boolean | string | void> | boolean | string | void;
 }
 
 export default function OneTentLoopNextStepCard({
@@ -38,6 +38,8 @@ export default function OneTentLoopNextStepCard({
   testId,
   onBeforeNavigate,
 }: Props) {
+  const navigate = useNavigate();
+  const [navigating, setNavigating] = useState(false);
   const queryClient = useContext(QueryClientContext);
   const plantId = current === "plant" ? ids?.plantId : null;
   // PlantQuickStatusStrip already owns this read. Observe its exact cache key
@@ -117,10 +119,32 @@ export default function OneTentLoopNextStepCard({
         <Button asChild size="sm" data-testid={`${resolvedTestId}-cta`}>
           <Link
             to={step.href}
+            aria-disabled={navigating || undefined}
             onClick={
               onBeforeNavigate
-                ? () => {
-                    void onBeforeNavigate();
+                ? (event) => {
+                    if (
+                      event.defaultPrevented ||
+                      event.button !== 0 ||
+                      event.metaKey ||
+                      event.ctrlKey ||
+                      event.shiftKey ||
+                      event.altKey
+                    ) {
+                      return;
+                    }
+                    event.preventDefault();
+                    if (navigating) return;
+                    const dest = step.href!;
+                    setNavigating(true);
+                    void Promise.resolve(onBeforeNavigate())
+                      .then((outcome) => {
+                        if (outcome === false) return;
+                        navigate(typeof outcome === "string" && outcome ? outcome : dest);
+                      })
+                      .finally(() => {
+                        setNavigating(false);
+                      });
                   }
                 : undefined
             }

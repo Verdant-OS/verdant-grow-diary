@@ -142,8 +142,13 @@ export function shouldAdvanceGuidedDailyCheckOnSubmit(input: {
 export function shouldWarnOnEmptyManualStepNext(input: {
   renderedStep: DailyGrowCheckStep;
   state: DailyGrowCheckState;
+  hasSavedManualSnapshot?: boolean;
 }): boolean {
-  return input.renderedStep === "manual" && input.state.manual === "pending";
+  if (input.renderedStep !== "manual") return false;
+  if (input.hasSavedManualSnapshot !== undefined) {
+    return !input.hasSavedManualSnapshot && input.state.manual !== "visited";
+  }
+  return input.state.manual === "pending";
 }
 
 /**

@@ -51,11 +51,7 @@ export async function queueOpenAlertToActionQueue(
     originating_timeline_events: forwardAlertRefsToActionQueue(alert),
   });
   if (!result.ok) {
-    if (
-      result.reason === "plant_not_in_grow" ||
-      result.reason === "tent_not_in_grow" ||
-      result.reason === "forbidden"
-    ) {
+    if (result.reason === "plant_not_in_grow" || result.reason === "tent_not_in_grow") {
       toast.error("This action cannot be queued until the plant/tent is assigned to this grow.", {
         description: "Open Lineage Repair to assign tents to this grow.",
       });

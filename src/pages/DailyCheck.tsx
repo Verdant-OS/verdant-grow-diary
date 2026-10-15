@@ -495,7 +495,13 @@ export default function DailyCheck() {
   }
 
   function handleFooterNext() {
-    if (shouldWarnOnEmptyManualStepNext({ renderedStep, state })) {
+    if (
+      shouldWarnOnEmptyManualStepNext({
+        renderedStep,
+        state,
+        hasSavedManualSnapshot: state.manual === "added" || lastSubmittedSource === "sensor",
+      })
+    ) {
       setEmptyManualWarning(true);
       toast.warning(DAILY_GROW_CHECK_EMPTY_MANUAL_STEP_WARNING);
     } else if (renderedStep === "manual") {

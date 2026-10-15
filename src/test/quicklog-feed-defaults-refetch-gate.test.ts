@@ -69,30 +69,26 @@ describe("feedingDefaultsPrefillSettled", () => {
 });
 
 describe("refetchRecentFeedingsForDefaults", () => {
-  it("invalidates and refetches the plant feed-defaults key after a feeding save", async () => {
+  it("invalidates the plant feed-defaults key once after a feeding save", async () => {
     const invalidateQueries = vi.fn(async () => undefined);
     const refetchQueries = vi.fn(async () => undefined);
     const plantId = "plant-1";
+    const client = { invalidateQueries, refetchQueries };
 
-    await expect(
-      refetchRecentFeedingsForDefaults({ invalidateQueries, refetchQueries }, plantId),
-    ).resolves.toBe(true);
+    await expect(refetchRecentFeedingsForDefaults(client, plantId)).resolves.toBe(true);
 
     const queryKey = recentFeedingsDefaultsQueryKey(plantId);
     expect(queryKey).toEqual(["quicklog_v2_feed_defaults", plantId]);
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey });
-    expect(refetchQueries).toHaveBeenCalledWith({ queryKey, type: "active" });
-    expect(invalidateQueries.mock.invocationCallOrder[0]).toBeLessThan(
-      refetchQueries.mock.invocationCallOrder[0],
-    );
+    expect(refetchQueries).not.toHaveBeenCalled();
   });
 
   it("does not touch the cache when the save has no plant id", async () => {
     const invalidateQueries = vi.fn();
     const refetchQueries = vi.fn();
-    await expect(
-      refetchRecentFeedingsForDefaults({ invalidateQueries, refetchQueries }, null),
-    ).resolves.toBe(false);
+    const client = { invalidateQueries, refetchQueries };
+    await expect(refetchRecentFeedingsForDefaults(client, null)).resolves.toBe(false);
     expect(invalidateQueries).not.toHaveBeenCalled();
     expect(refetchQueries).not.toHaveBeenCalled();
   });

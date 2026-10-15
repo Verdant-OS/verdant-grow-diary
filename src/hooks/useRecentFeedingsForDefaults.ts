@@ -27,10 +27,6 @@ export function recentFeedingsDefaultsQueryKey(plantId: string | null) {
 
 export interface RecentFeedingsDefaultsQueryClient {
   invalidateQueries: (opts: { queryKey: readonly unknown[] }) => Promise<unknown> | unknown;
-  refetchQueries: (opts: {
-    queryKey: readonly unknown[];
-    type?: "active";
-  }) => Promise<unknown> | unknown;
 }
 
 /** After a feeding save, drop the 30s cache and refetch before Log another prefills. */
@@ -41,7 +37,6 @@ export async function refetchRecentFeedingsForDefaults(
   if (!plantId) return false;
   const queryKey = recentFeedingsDefaultsQueryKey(plantId);
   await client.invalidateQueries({ queryKey });
-  await client.refetchQueries({ queryKey, type: "active" });
   return true;
 }
 

@@ -120,7 +120,11 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   // plants" bug: a database-level `grow_id = X` filter would drop a
   // candidate whose `grow_id` is null even when its assigned tent
   // belongs to the same grow.
-  const { data: allPlants = [], isSuccess: plantsSucceeded } = useGrowPlants(undefined, undefined);
+  const {
+    data: allPlants = [],
+    isFetched: plantsFetched,
+    isSuccess: plantsSucceeded,
+  } = useGrowPlants(undefined, undefined);
 
   // Normalize once: every plant the user can see (excluding archived
   // by default at the data layer — we still defensively re-check below
@@ -161,7 +165,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   // Anything that should render in the picker: selectable + disabled.
   const visibleOptions = useMemo(() => classifications.filter((c) => !c.hidden), [classifications]);
   const mergeEntryEnabled = isMergeDuplicateEntryEnabled({
-    fetched: false,
+    fetched: plantsFetched,
     succeeded: plantsSucceeded,
     selectableOptionCount: classifications.filter((c) => c.selectable).length,
   });

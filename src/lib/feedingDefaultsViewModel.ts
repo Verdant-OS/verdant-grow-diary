@@ -175,11 +175,16 @@ export function feedingDefaultsPrefillSettled(input: {
   isError: boolean;
   dataUpdatedAt: number;
   refetchRequiredAfter: number;
+  plantId?: string | null;
+  refetchRequiredAfterByPlant?: Readonly<Record<string, number>>;
 }): boolean {
   if (input.isFetching || input.isPending || input.isError) return false;
-  if (input.refetchRequiredAfter > 0 && input.dataUpdatedAt < input.refetchRequiredAfter) {
-    return false;
-  }
+  const cutoff = input.refetchRequiredAfterByPlant
+    ? input.plantId
+      ? (input.refetchRequiredAfterByPlant[input.plantId] ?? 0)
+      : 0
+    : input.refetchRequiredAfter;
+  if (cutoff > 0 && input.dataUpdatedAt < cutoff) return false;
   return true;
 }
 

@@ -151,10 +151,7 @@ import {
   feedingDefaultsPrefillSettled,
   FEEDING_DEFAULTS_LABEL,
 } from "@/lib/feedingDefaultsViewModel";
-import {
-  refetchRecentFeedingsForDefaults,
-  useRecentFeedingsForDefaults,
-} from "@/hooks/useRecentFeedingsForDefaults";
+import { useRecentFeedingsForDefaults } from "@/hooks/useRecentFeedingsForDefaults";
 import {
   applyWateringVolumeDefaultsToForm,
   buildWateringVolumeDefaults,
@@ -531,7 +528,9 @@ function QuickLogV2SheetForOwner({
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [videoChecking, setVideoChecking] = useState(false);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
-  const [feedingDefaultsRefetchAfter, setFeedingDefaultsRefetchAfter] = useState(0);
+  const [feedingDefaultsRefetchAfterByPlant, setFeedingDefaultsRefetchAfterByPlant] = useState<
+    Record<string, number>
+  >({});
   const [wateringVolumeDefaultsApplied, setWateringVolumeDefaultsApplied] = useState(false);
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
   const [visitMode, setVisitMode] = useState<GrowWalkVisitMode>("fast_check");
@@ -1106,7 +1105,9 @@ function QuickLogV2SheetForOwner({
         isPending: Boolean(recentFeedingsQ.isPending),
         isError: Boolean(recentFeedingsQ.isError),
         dataUpdatedAt: recentFeedingsQ.dataUpdatedAt ?? 0,
-        refetchRequiredAfter: feedingDefaultsRefetchAfter,
+        refetchRequiredAfter: 0,
+        plantId: resolvedContext.plantId,
+        refetchRequiredAfterByPlant: feedingDefaultsRefetchAfterByPlant,
       })
     )
       return;
@@ -1125,7 +1126,8 @@ function QuickLogV2SheetForOwner({
     form.action,
     feedingDefaults,
     feedingDefaultsApplied,
-    feedingDefaultsRefetchAfter,
+    feedingDefaultsRefetchAfterByPlant,
+    resolvedContext.plantId,
     feedingForm,
     recentFeedingsQ.isFetching,
     recentFeedingsQ.isPending,
@@ -1751,8 +1753,13 @@ function QuickLogV2SheetForOwner({
       const savedPlantId = resolved.plantId ?? null;
       if (savedPlantId) {
         const refetchAfter = Date.now();
-        setFeedingDefaultsRefetchAfter(refetchAfter);
-        await refetchRecentFeedingsForDefaults(queryClient, savedPlantId);
+        setFeedingDefaultsRefetchAfterByPlant((previous) => ({
+          ...previous,
+          [savedPlantId]: refetchAfter,
+        }));
+        void queryClient.invalidateQueries({
+          queryKey: ["quicklog_v2_feed_defaults", savedPlantId],
+        });
       }
       setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
       showTimelineConfirmation(FEEDING_SAVE_SUCCESS_MESSAGE, {

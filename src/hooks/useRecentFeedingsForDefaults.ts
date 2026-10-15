@@ -29,14 +29,16 @@ export interface RecentFeedingsDefaultsQueryClient {
   invalidateQueries: (opts: { queryKey: readonly unknown[] }) => Promise<unknown> | unknown;
 }
 
-/** After a feeding save, drop the 30s cache and refetch before Log another prefills. */
-export async function refetchRecentFeedingsForDefaults(
+/**
+ * Drop the 30-second feed-defaults cache. `invalidateQueries` already refetches
+ * active observers, so this does not issue a second read and does not wait.
+ */
+export function refetchRecentFeedingsForDefaults(
   client: RecentFeedingsDefaultsQueryClient,
   plantId: string | null | undefined,
-): Promise<boolean> {
+): boolean {
   if (!plantId) return false;
-  const queryKey = recentFeedingsDefaultsQueryKey(plantId);
-  await client.invalidateQueries({ queryKey });
+  void client.invalidateQueries({ queryKey: recentFeedingsDefaultsQueryKey(plantId) });
   return true;
 }
 

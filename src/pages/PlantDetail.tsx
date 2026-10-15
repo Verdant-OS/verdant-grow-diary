@@ -38,7 +38,6 @@ import PlantLogStreakMarker from "@/components/PlantLogStreakMarker";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
 import { usePlantDetailPhotoStripItems } from "@/hooks/usePlantDetailPhotoStripItems";
-import { resolvePlantHeroPhotoSrc } from "@/lib/plantPhotoPreviewStrip";
 import PhotoDiagnosisReviewDialog from "@/components/PhotoDiagnosisReviewDialog";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
 import PlantDetailRecentActionResponse from "@/components/PlantDetailRecentActionResponse";
@@ -299,10 +298,6 @@ export default function PlantDetail() {
   });
   const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null);
   const photoStrip = usePlantDetailPhotoStripItems(plant?.id ?? null);
-  const heroPhotoSrc = resolvePlantHeroPhotoSrc(
-    plant?.photo,
-    photoStrip.items[0]?.thumbnailUrl ?? null,
-  );
   // Same query key as PlantQuickStatusStrip, so this adds no request.
   const recentActivityQuery = usePlantRecentActivity(plant?.id ?? null);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null], user?.id);
@@ -621,7 +616,8 @@ export default function PlantDetail() {
         <div className="grid min-w-0 gap-4 lg:grid-cols-3">
           <div className="min-w-0 rounded-2xl glass overflow-hidden lg:col-span-1">
             <PlantPhoto
-              src={heroPhotoSrc}
+              src={plant.photo}
+              fallbackSrc={photoStrip.items[0]?.thumbnailUrl ?? null}
               alt={plant.name}
               className="aspect-square"
               caption="No plant photo yet"

@@ -5,6 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { type QuickLogWateringFormState } from "@/lib/quickLogWateringFormViewModel";
 import {
+  assessLargeWaterAmount,
+  readWaterVolumeUnit,
+  WATER_VOLUME_UNITS,
+  type WaterVolumeUnit,
+} from "@/lib/quickLogWaterVolumeWarningRules";
+import {
   applyWateringVolumePreset,
   isWateringVolumePresetSelected,
   QUICK_LOG_WATERING_VOLUME_PRESET_HELP,
@@ -59,6 +65,9 @@ interface Props {
    */
   entryTemperatureUnit?: TemperatureUnitPreference;
   volumeError?: string | null;
+  /** Set after the grower confirms this exact entered amount. */
+  confirmedLargeWaterKey?: string | null;
+  onConfirmLargeWater?: (confirmationKey: string) => void;
 }
 
 interface ObservationOption {
@@ -73,6 +82,8 @@ export default function QuickLogWateringForm({
   disabled,
   entryTemperatureUnit,
   volumeError,
+  confirmedLargeWaterKey = null,
+  onConfirmLargeWater,
 }: Props) {
   const temperatureUnit = useTemperatureUnitPreference();
   // Display-side canonicalization only: the write seam converts from the
@@ -109,25 +120,82 @@ export default function QuickLogWateringForm({
     entryTemperatureUnit ?? temperatureUnit,
   );
   const review = buildWateringReview(value, entryTemperatureUnit ?? temperatureUnit);
+  const volumeUnit = readWaterVolumeUnit(value.volumeUnit);
+  const largeWater = assessLargeWaterAmount({
+    amount: value.volumeMl,
+    unit: volumeUnit,
+    confirmedKey: confirmedLargeWaterKey,
+  });
 
   return (
     <div className="space-y-4" data-testid="qlv2-watering-form">
       <div>
-        <Label htmlFor="qlv2-volume">Volume (ml)</Label>
+        <Label htmlFor="qlv2-volume">Volume ({volumeUnit})</Label>
         <Input
           id="qlv2-volume"
           inputMode="decimal"
           value={value.volumeMl}
           disabled={disabled}
-          aria-invalid={Boolean(volumeError) || undefined}
+          aria-invalid={Boolean(volumeError) || largeWater.needsConfirmation || undefined}
           aria-describedby={
             volumeError
               ? "qlv2-volume-help qlv2-volume-presets-help qlv2-volume-error"
-              : "qlv2-volume-help qlv2-volume-presets-help"
+              : largeWater.message
+                ? "qlv2-volume-help qlv2-volume-presets-help qlv2-large-water-warning"
+                : "qlv2-volume-help qlv2-volume-presets-help"
           }
           onChange={(event) => setField("volumeMl", event.target.value)}
           placeholder="e.g. 500"
         />
+        <div className="mt-2">
+          <Label htmlFor="qlv2-volume-unit">Volume unit</Label>
+          <select
+            id="qlv2-volume-unit"
+            data-testid="qlv2-volume-unit"
+            className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+            value={volumeUnit}
+            disabled={disabled}
+            onChange={(event) => setField("volumeUnit", event.target.value as WaterVolumeUnit)}
+          >
+            {WATER_VOLUME_UNITS.map((unit) => (
+              <option key={unit} value={unit}>
+                {unit}
+              </option>
+            ))}
+          </select>
+        </div>
+        {largeWater.message ? (
+          <div
+            id="qlv2-large-water-warning"
+            role="status"
+            data-testid="qlv2-large-water-warning"
+            className="mt-2 space-y-2 rounded-md border border-border/60 bg-secondary/20 p-2"
+          >
+            <p className="text-sm text-foreground">{largeWater.message}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                data-testid="qlv2-large-water-edit"
+                onClick={() => document.getElementById("qlv2-volume")?.focus()}
+              >
+                {largeWater.editLabel}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                data-testid="qlv2-large-water-confirm"
+                disabled={disabled || !largeWater.needsConfirmation}
+                onClick={() => {
+                  if (largeWater.confirmationKey) onConfirmLargeWater?.(largeWater.confirmationKey);
+                }}
+              >
+                {largeWater.confirmLabel}
+              </Button>
+            </div>
+          </div>
+        ) : null}
         {volumeError ? (
           <p
             id="qlv2-volume-error"
@@ -156,7 +224,11 @@ export default function QuickLogWateringForm({
                 disabled={disabled}
                 data-testid={`qlv2-volume-preset-${preset.ml}`}
                 onClick={() =>
-                  setField("volumeMl", applyWateringVolumePreset(value.volumeMl, preset))
+                  onChange({
+                    ...value,
+                    volumeMl: applyWateringVolumePreset(value.volumeMl, preset),
+                    volumeUnit: "ml",
+                  })
                 }
               >
                 {preset.label}

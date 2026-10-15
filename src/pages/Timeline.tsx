@@ -379,7 +379,8 @@ function entryKinds(e: Entry): EventFilter[] {
  */
 /** Timeline-only. The shared root-zone select stays unchanged for the other readers. */
 const TIMELINE_SENSOR_GROW_EVENT_SELECT =
-  "id,plant_id,event_type,source,occurred_at,environment_events(temperature_c,humidity_pct,vpd_kpa)";
+  "id,plant_id,event_type,source,occurred_at,created_at,environment_events(temperature_c,humidity_pct,vpd_kpa)";
+const TIMELINE_LINKED_ROOT_SELECT = "id,created_at,event_type,source,plant_id,occurred_at";
 
 function linkedEnvironmentEventIds(diaryRows: ReadonlyArray<{ details?: unknown }>): string[] {
   const ids: string[] = [];
@@ -488,6 +489,7 @@ export default function Timeline() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
   const [timelineSensorEvents, setTimelineSensorEvents] = useState<GrowEventRowForRecent[]>([]);
+  const [timelineLinkedRoots, setTimelineLinkedRoots] = useState<GrowEventRowForRecent[]>([]);
   const [growEventsTotal, setGrowEventsTotal] = useState<number | null>(null);
   // Deleted or out-of-page grow_event parents that a loaded diary companion
   // references (details.linked_grow_event_id). Resolved separately from the
@@ -662,6 +664,7 @@ export default function Timeline() {
       setEntriesTotal(null);
       setGrowEvents([]);
       setTimelineSensorEvents([]);
+      setTimelineLinkedRoots([]);
       setGrowEventsTotal(null);
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
@@ -684,6 +687,7 @@ export default function Timeline() {
       setEntriesTotal(null);
       setGrowEvents([]);
       setTimelineSensorEvents([]);
+      setTimelineLinkedRoots([]);
       setGrowEventsTotal(null);
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
@@ -792,6 +796,7 @@ export default function Timeline() {
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
       setGrowEvents(nextGrowEvents);
       setTimelineSensorEvents(nextSensorEvents);
+      setTimelineLinkedRoots([]);
       setGrowEventsTotal(
         typeof growEventsResult.count === "number" ? growEventsResult.count : null,
       );
@@ -1126,34 +1131,67 @@ export default function Timeline() {
             );
           },
         });
-        const knownSensorIds = new Set(timelineSensorEvents.map((row) => row.id));
-        const missingSensorIds = linkedEnvironmentEventIds(older).filter(
-          (id) => !knownSensorIds.has(id),
+        const knownRootIds = new Set(timelineLinkedRoots.map((row) => row.id));
+        const missingRootIds = linkedEnvironmentEventIds(older).filter(
+          (id) => !knownRootIds.has(id),
         );
-        if (missingSensorIds.length > 0 && isCurrentPage()) {
+        if (missingRootIds.length > 0 && isCurrentPage()) {
           try {
-            const sensorSiblingResult = await supabase
+            const rootResult = await supabase
               .from("grow_events")
-              .select(TIMELINE_SENSOR_GROW_EVENT_SELECT)
+              .select(TIMELINE_LINKED_ROOT_SELECT)
               .eq("grow_id", requestedGrowId)
-              .eq("event_type", "environment")
-              .eq("is_deleted", false)
-              .in("id", missingSensorIds);
+              .in("id", missingRootIds);
             if (!isCurrentPage()) return;
-            if (
-              hasTimelineRequiredReadError(sensorSiblingResult) ||
-              !Array.isArray(sensorSiblingResult.data)
-            ) {
+            if (hasTimelineRequiredReadError(rootResult) || !Array.isArray(rootResult.data)) {
               setPartialReadSources((current) =>
                 mergeTimelinePartialSources(current, ["manual_sensor_readings"]),
               );
             } else {
-              const siblings = sensorSiblingResult.data as unknown as GrowEventRowForRecent[];
-              setTimelineSensorEvents((current) => {
+              const roots = rootResult.data as unknown as GrowEventRowForRecent[];
+              setTimelineLinkedRoots((current) => {
                 const seen = new Set(current.map((row) => row.id));
-                const extra = siblings.filter((row) => row.id && !seen.has(row.id));
+                const extra = roots.filter((row) => row.id && !seen.has(row.id));
                 return extra.length === 0 ? current : [...current, ...extra];
               });
+              const createdAts = [
+                ...new Set(
+                  roots
+                    .map((row) => {
+                      const createdAt = (row as unknown as { created_at?: unknown }).created_at;
+                      return typeof createdAt === "string" && createdAt.length > 0
+                        ? createdAt
+                        : null;
+                    })
+                    .filter((value): value is string => value !== null),
+                ),
+              ];
+              if (createdAts.length > 0 && isCurrentPage()) {
+                const sensorSiblingResult = await supabase
+                  .from("grow_events")
+                  .select(TIMELINE_SENSOR_GROW_EVENT_SELECT)
+                  .eq("grow_id", requestedGrowId)
+                  .eq("event_type", "environment")
+                  .eq("source", "manual")
+                  .eq("is_deleted", false)
+                  .in("created_at", createdAts);
+                if (!isCurrentPage()) return;
+                if (
+                  hasTimelineRequiredReadError(sensorSiblingResult) ||
+                  !Array.isArray(sensorSiblingResult.data)
+                ) {
+                  setPartialReadSources((current) =>
+                    mergeTimelinePartialSources(current, ["manual_sensor_readings"]),
+                  );
+                } else {
+                  const siblings = sensorSiblingResult.data as unknown as GrowEventRowForRecent[];
+                  setTimelineSensorEvents((current) => {
+                    const seen = new Set(current.map((row) => row.id));
+                    const extra = siblings.filter((row) => row.id && !seen.has(row.id));
+                    return extra.length === 0 ? current : [...current, ...extra];
+                  });
+                }
+              }
             }
           } catch {
             if (!isCurrentPage()) return;
@@ -2762,10 +2800,10 @@ export default function Timeline() {
                                     plantId={e.plant_id ?? null}
                                     tentId={e.tent_id ?? null}
                                     growId={loopGrowId}
-                                    correctionValues={correctionValuesForTimelineDiaryEntry(
-                                      e,
-                                      timelineSensorEvents,
-                                    )}
+                                    correctionValues={correctionValuesForTimelineDiaryEntry(e, [
+                                      ...timelineLinkedRoots,
+                                      ...timelineSensorEvents,
+                                    ])}
                                     onChanged={() => void load()}
                                   />
                                 ) : !isTimelineSensorDerivedDiaryId(e.id) ? (

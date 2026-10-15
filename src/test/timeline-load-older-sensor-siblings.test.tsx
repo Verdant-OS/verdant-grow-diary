@@ -175,7 +175,8 @@ vi.mock("@/components/TimelineLightingGuideCard", () => ({ default: () => null }
 
 import Timeline from "@/pages/Timeline";
 
-const LINKED_ID = "11111111-1111-4111-8111-111111111111";
+const ROOT_ID = "11111111-1111-4111-8111-111111111111";
+const ROOT_CREATED_AT = "2026-07-15T12:00:00.512Z";
 
 describe("Timeline loadOlder sensor siblings", () => {
   beforeEach(() => {
@@ -183,7 +184,7 @@ describe("Timeline loadOlder sensor siblings", () => {
     harness.executeQuery.mockReset();
   });
 
-  it("fetches environment siblings for the older diary page by linked id", async () => {
+  it("loads the linked root, then the environment companion that shares its created_at", async () => {
     harness.executeQuery.mockImplementation((spec) => {
       if (spec.table === "diary_entries") {
         if (spec.filters.some((f) => f.op === "lt" && f.column === "entry_at")) {
@@ -194,7 +195,7 @@ describe("Timeline loadOlder sensor siblings", () => {
                 note: "older observation",
                 photo_url: null,
                 stage: "vegetative",
-                details: { event_type: "observation", linked_grow_event_id: LINKED_ID },
+                details: { event_type: "observation", linked_grow_event_id: ROOT_ID },
                 entry_at: "2026-07-15T12:00:00.000Z",
                 plant_id: null,
                 tent_id: null,
@@ -220,6 +221,25 @@ describe("Timeline loadOlder sensor siblings", () => {
           count: 2,
         };
       }
+      if (spec.table === "grow_events") {
+        const idFilter = spec.filters.find((f) => f.column === "id" && Array.isArray(f.value));
+        const environment = spec.filters.some(
+          (f) => f.column === "event_type" && f.value === "environment",
+        );
+        if (idFilter && !environment && (idFilter.value as unknown[]).includes(ROOT_ID)) {
+          return {
+            data: [
+              {
+                id: ROOT_ID,
+                event_type: "observation",
+                source: "manual",
+                created_at: ROOT_CREATED_AT,
+              },
+            ],
+            error: null,
+          };
+        }
+      }
       return { data: [], error: null };
     });
 
@@ -242,11 +262,20 @@ describe("Timeline loadOlder sensor siblings", () => {
           q.filters.some(
             (f) => f.op === "eq" && f.column === "event_type" && f.value === "environment",
           ) &&
+          q.filters.some((f) => f.column === "source" && f.value === "manual") &&
           q.filters.some(
-            (f) => f.column === "id" && Array.isArray(f.value) && f.value.includes(LINKED_ID),
+            (f) =>
+              f.column === "created_at" &&
+              Array.isArray(f.value) &&
+              f.value.includes(ROOT_CREATED_AT),
           ),
       );
       expect(sibling).toBeDefined();
+      expect(
+        sibling?.filters.some(
+          (f) => f.column === "id" && Array.isArray(f.value) && f.value.includes(ROOT_ID),
+        ),
+      ).toBe(false);
     });
   });
 });

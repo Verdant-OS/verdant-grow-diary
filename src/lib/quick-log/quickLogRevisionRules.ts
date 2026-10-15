@@ -457,6 +457,7 @@ interface TimelineEnvironmentSibling {
   source?: unknown;
   plant_id?: string | null;
   occurred_at?: unknown;
+  created_at?: unknown;
   environment_events?: TimelineEnvironmentChild | readonly TimelineEnvironmentChild[] | null;
 }
 
@@ -495,13 +496,20 @@ export function correctionValuesForTimelineDiaryEntry(
   const linkedId = nonEmpty(details.linked_grow_event_id);
   const rows = growEvents ?? [];
   if (linkedId) {
-    const linked = rows.find(
-      (row) => row.id === linkedId && row.event_type === "environment" && row.source === "manual",
-    );
-    if (linked) {
-      const child = Array.isArray(linked.environment_events)
-        ? linked.environment_events[0]
-        : linked.environment_events;
+    const root = rows.find((row) => row.id === linkedId);
+    const rootCreatedAt = root && typeof root.created_at === "string" ? root.created_at : null;
+    if (root && rootCreatedAt) {
+      const companion = rows.find(
+        (row) =>
+          row.id !== root.id &&
+          row.event_type === "environment" &&
+          row.source === "manual" &&
+          row.created_at === rootCreatedAt,
+      );
+      if (!companion) return null;
+      const child = Array.isArray(companion.environment_events)
+        ? companion.environment_events[0]
+        : companion.environment_events;
       const sensor = sensorFromEnvironmentChild(child);
       return sensor ? { kind: "sensor", sensor } : null;
     }

@@ -36,8 +36,9 @@ import {
   PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE,
   PLANT_HEALTH_NOT_ASSESSED_LABEL,
   PLANT_HEALTH_NOT_ASSESSED_OPTION,
-  buildPlantHealthCreateInsert,
   isPlantHealthClearRejected,
+  plantCreateErrorShouldRevealHealth,
+  plantHealthCreateColumn,
   plantHealthFromSelectValue,
 } from "@/lib/plantHealthRules";
 import {
@@ -245,6 +246,7 @@ export default function CreatePlantDialog({
   const currentOwnerIdRef = useRef<string | null>(user?.id ?? null);
   currentOwnerIdRef.current = user?.id ?? null;
   const [form, setForm] = useState(() => emptyForm(initialTentId));
+  const [optionalDetailsOpen, setOptionalDetailsOpen] = useState(false);
   /** Once grower explicitly picks a compatible tent after a conflict, allow write. */
   const [explicitCompatiblePick, setExplicitCompatiblePick] = useState(false);
   useEffect(() => {
@@ -441,9 +443,9 @@ export default function CreatePlantDialog({
         name: form.name.trim(),
         strain: trimmedStrain || null,
         stage: form.stage,
-        // Always explicit, "unknown" when not assessed: the column default is
-        // "healthy" until 20260924120000 is applied (QA 2026-09-24, BUG-009).
-        ...buildPlantHealthCreateInsert(form.health),
+        // Unset health stays off the insert so the column default applies.
+        // The production trigger rejects an explicit "unknown".
+        ...plantHealthCreateColumn(form.health),
         plant_type: form.plant_type,
         grow_id: targetGrowId,
       };
@@ -512,6 +514,9 @@ export default function CreatePlantDialog({
             : "Plant could not be created";
         // Before 20260924120000 the trigger rejects "unknown" and nothing is
         // written; the form stays open so the grower can pick a health value.
+        if (plantCreateErrorShouldRevealHealth(message) && mountedRef.current) {
+          setOptionalDetailsOpen(true);
+        }
         toast.error(
           isPlantHealthClearRejected(message)
             ? PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE
@@ -923,7 +928,11 @@ export default function CreatePlantDialog({
                 </p>
               )}
             </div>
-            <details className="rounded-md border border-border/40 px-3 py-2">
+            <details
+              className="rounded-md border border-border/40 px-3 py-2"
+              open={optionalDetailsOpen}
+              onToggle={(event) => setOptionalDetailsOpen(event.currentTarget.open)}
+            >
               <summary className="cursor-pointer text-xs text-muted-foreground select-none">
                 Optional details (enrich later)
               </summary>

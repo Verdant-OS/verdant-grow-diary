@@ -94,3 +94,22 @@ export const PLANT_HEALTH_CLEAR_UNAVAILABLE_MESSAGE =
 
 export const PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE =
   "\"Not assessed yet\" isn't available yet, so the plant wasn't added. Choose Healthy, Watch or Issue to add it.";
+
+/**
+ * Create-plant column for health. An unset choice is omitted so the database
+ * default applies, matching guided setup. The production trigger from
+ * 20260516204601 rejects an explicit "unknown". A chosen healthy, watch, or
+ * issue value is still written. `buildPlantHealthCreateInsert` keeps the
+ * explicit-unknown contract used before that default change.
+ */
+export function plantHealthCreateColumn(
+  value: unknown,
+): { health: StoredPlantHealth } | { health?: never } {
+  const health = editablePlantHealth(value);
+  return health === "" ? {} : { health };
+}
+
+/** A health-trigger rejection should show the collapsed health select. */
+export function plantCreateErrorShouldRevealHealth(message: unknown): boolean {
+  return isPlantHealthClearRejected(message);
+}

@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### SENTINEL-20261015-BOUNDED-HANDOFFS
+
+```text
+TASK SENTINEL-20261015-BOUNDED-HANDOFFS  priority: P2  status: OPEN
+goal: Readable bounded Sentinel handoffs: success advances to an authorized next owner, failure returns a concrete bounded repair request, missing acknowledgment retries only when delivery is proved absent or records a blocker. Matthew assigned Bloom this sole focus on 2026-10-15.
+branch: codex/sentinel-20261015-bounded-handoffs
+base: verdant-grow-diary at 5459c3a18a402d2bf5b00c96b0688c4475dcf93d
+checkout: git fetch origin codex/sentinel-20261015-bounded-handoffs verdant-grow-diary; verify the PR head before checkout and merge from base per AGENTS.md.
+pr: bootstrap draft creation pending; record the actual PR URL in the next update
+head_sha: bootstrap commit follows 5459c3a18a402d2bf5b00c96b0688c4475dcf93d; read the exact current remote head from the draft PR
+state: scope/ownership bootstrap only; implementation not yet started
+next_action: Open and claim the draft before fail-first tests and implementation.
+files: scripts/lib/sentinelHandoff*.mjs (new); scripts/sentinel-handoff*.mjs (new, including tests); docs/sentinel-agent-handoffs.md (new); docs/agents/HANDOFF_LOG.md (this block only)
+blockers: External Claude/Grok/Graft/Canopy delivery and adoption are NOT_MEASURED; no verified recipient destination or transport integration is implied. Local Documents checkout creation failed; isolated checkout is in authorized temporary workspace. Bun/dependency checks unavailable initially; Node built-in tests planned.
+artifacts: Internal child channel correlation sentinel-20261015-routing-audit acknowledged repository/head at 2026-10-15 14:59 UTC; child is read-only, root is sole writer. This is real internal delivery evidence, not proof of a new router or external delivery.
+reviewer_seat: Critical Mass under OWNERSHIP.md path routing; independent acceptance NOT_MEASURED. Codex authors and cannot accept this slice.
+claimed_by: Bloom / Codex, explicit Matthew assignment, 2026-10-15 15:02 UTC; PR claim to follow creation
+last_updated: 2026-10-15 15:02 UTC, by Bloom / Codex
+```
+
 ### TIMELINE-GROW-DAY-2005
 
 ```text

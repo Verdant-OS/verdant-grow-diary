@@ -60,9 +60,9 @@ describe("QA #2017 copy and accessibility", () => {
   });
 
   it("keeps Merge Duplicate closed until a target exists and names the footer Cancel", () => {
-    expect(isMergeDuplicateEntryEnabled({ fetched: false, visibleOptionCount: 0 })).toBe(true);
-    expect(isMergeDuplicateEntryEnabled({ fetched: true, visibleOptionCount: 0 })).toBe(false);
-    expect(isMergeDuplicateEntryEnabled({ fetched: true, visibleOptionCount: 1 })).toBe(true);
+    expect(isMergeDuplicateEntryEnabled({ fetched: false, selectableOptionCount: 0 })).toBe(true);
+    expect(isMergeDuplicateEntryEnabled({ fetched: true, selectableOptionCount: 0 })).toBe(false);
+    expect(isMergeDuplicateEntryEnabled({ fetched: true, selectableOptionCount: 1 })).toBe(true);
     expect(MERGE_DIALOG).toContain("isMergeDuplicateEntryEnabled");
     expect(MERGE_DIALOG).toMatch(/data-testid="plant-merge-cancel"[\s\S]{0,160}>\s*Cancel\s*</);
   });

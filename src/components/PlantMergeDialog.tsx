@@ -162,7 +162,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   const visibleOptions = useMemo(() => classifications.filter((c) => !c.hidden), [classifications]);
   const mergeEntryEnabled = isMergeDuplicateEntryEnabled({
     fetched: plantsFetched,
-    visibleOptionCount: visibleOptions.length,
+    selectableOptionCount: classifications.filter((c) => c.selectable).length,
   });
 
   // Backwards-compatible `candidates` list (PlantForMerge[]) used by

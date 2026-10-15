@@ -1,22 +1,41 @@
 /**
  * useAiDoctorGrowCreditUsage — presentation-only read of per-grow AI credit
- * allowance usage for AI Doctor surfaces that may mount outside a QueryClient
- * (such as AiDoctorStart).
+ * allowance usage and credit-pack presence for AI Doctor surfaces that may
+ * mount outside a QueryClient (such as AiDoctorStart).
  *
- * Mirrors the allowance arm of useAlertDoctorCreditGateReads: counts own
- * `ai_credit_spends` rows for the grow whose `meta->>'funded_by'` is distinct
- * from `'pack'`. Read-only; RLS enforces ownership.
+ * Mirrors useAlertDoctorCreditGateReads: counts own `ai_credit_spends` rows
+ * for the grow whose `meta->>'funded_by'` is distinct from `'pack'` and checks
+ * whether any unexpired `ai_credit_grants` row exists. Read-only; RLS enforces
+ * ownership.
  */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  hasUnexpiredAiCreditGrants,
+  sumAiDoctorAllowanceSpends,
+  type AiDoctorGrantRowLike,
+  type AiDoctorSpendRowLike,
+} from "@/lib/aiDoctorSurfaceCreditViewModel";
 import { isUuid } from "@/lib/isUuid";
 import { useAuth } from "@/store/auth";
 
 export interface AiDoctorGrowCreditUsageResult {
   allowanceUsed: number | null;
+  hasPackCredits: boolean | null;
   isError: boolean;
 }
 
+interface ScopedCreditUsageState {
+  scopeKey: string | null;
+  allowanceUsed: number | null;
+  hasPackCredits: boolean | null;
+  isError: boolean;
+}
+
+/**
+ * Loads per-grow AI Doctor allowance usage and credit-pack grant presence for
+ * the authenticated user and target grow UUID.
+ */
 export function useAiDoctorGrowCreditUsage(
   growId: string | null | undefined,
   enabled = true,
@@ -24,41 +43,64 @@ export function useAiDoctorGrowCreditUsage(
   const { user, loading: authLoading } = useAuth();
   const userId = user?.id ?? null;
   const validGrowId = isUuid(growId) ? growId : null;
-  const [allowanceUsed, setAllowanceUsed] = useState<number | null>(null);
-  const [isError, setIsError] = useState(false);
+  const activeScopeKey =
+    enabled && !authLoading && userId && validGrowId ? `${userId}:${validGrowId}` : null;
+
+  const [state, setState] = useState<ScopedCreditUsageState>({
+    scopeKey: null,
+    allowanceUsed: null,
+    hasPackCredits: null,
+    isError: false,
+  });
 
   useEffect(() => {
-    if (!enabled || authLoading || !userId || !validGrowId) {
-      setAllowanceUsed(null);
-      setIsError(false);
+    if (!activeScopeKey || !userId || !validGrowId) {
       return;
     }
 
     let cancelled = false;
     void (async () => {
       try {
-        const res = await supabase
-          .from("ai_credit_spends")
-          .select("weight, funded_by:meta->>funded_by")
-          .eq("user_id", userId)
-          .eq("grow_id", validGrowId);
+        const [spendsRes, grantsRes] = await Promise.all([
+          supabase
+            .from("ai_credit_spends")
+            .select("weight, funded_by:meta->>funded_by")
+            .eq("user_id", userId)
+            .eq("grow_id", validGrowId),
+          supabase.from("ai_credit_grants").select("credits, expires_at").eq("user_id", userId),
+        ]);
 
         if (cancelled) return;
-        if (res.error) {
-          setAllowanceUsed(null);
-          setIsError(true);
+        if (spendsRes.error || grantsRes.error) {
+          setState({
+            scopeKey: activeScopeKey,
+            allowanceUsed: null,
+            hasPackCredits: null,
+            isError: true,
+          });
           return;
         }
-        const used = (res.data ?? []).reduce((sum, row) => {
-          const r = row as { weight: number | null; funded_by: string | null };
-          return r.funded_by === "pack" ? sum : sum + (r.weight ?? 0);
-        }, 0);
-        setAllowanceUsed(used);
-        setIsError(false);
+        const used = sumAiDoctorAllowanceSpends(
+          (spendsRes.data ?? []) as ReadonlyArray<AiDoctorSpendRowLike>,
+        );
+        const hasPacks = hasUnexpiredAiCreditGrants(
+          (grantsRes.data ?? []) as ReadonlyArray<AiDoctorGrantRowLike>,
+          Date.now(),
+        );
+        setState({
+          scopeKey: activeScopeKey,
+          allowanceUsed: used,
+          hasPackCredits: hasPacks,
+          isError: false,
+        });
       } catch {
         if (!cancelled) {
-          setAllowanceUsed(null);
-          setIsError(true);
+          setState({
+            scopeKey: activeScopeKey,
+            allowanceUsed: null,
+            hasPackCredits: null,
+            isError: true,
+          });
         }
       }
     })();
@@ -66,7 +108,15 @@ export function useAiDoctorGrowCreditUsage(
     return () => {
       cancelled = true;
     };
-  }, [authLoading, enabled, userId, validGrowId]);
+  }, [activeScopeKey, userId, validGrowId]);
 
-  return { allowanceUsed, isError };
+  if (!activeScopeKey || state.scopeKey !== activeScopeKey) {
+    return { allowanceUsed: null, hasPackCredits: null, isError: false };
+  }
+
+  return {
+    allowanceUsed: state.allowanceUsed,
+    hasPackCredits: state.hasPackCredits,
+    isError: state.isError,
+  };
 }

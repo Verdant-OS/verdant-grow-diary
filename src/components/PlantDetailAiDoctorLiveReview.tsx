@@ -472,8 +472,12 @@ function PlantDetailAiDoctorLiveReviewScope({
     () =>
       buildAiDoctorSurfaceCreditViewModel({
         entitlement,
+        entitlementLoading,
         entitlementLookupFailed,
         allowanceUsed: doctorCreditReadsFailed ? null : (doctorCreditReads?.allowanceUsed ?? null),
+        hasPackCredits: doctorCreditReadsFailed
+          ? null
+          : (doctorCreditReads?.hasPackCredits ?? null),
         allowanceReadFailed: doctorCreditReadsFailed,
         postSpendCredit: review.creditRemaining,
         deniedCredit:
@@ -481,8 +485,10 @@ function PlantDetailAiDoctorLiveReviewScope({
       }),
     [
       doctorCreditReads?.allowanceUsed,
+      doctorCreditReads?.hasPackCredits,
       doctorCreditReadsFailed,
       entitlement,
+      entitlementLoading,
       entitlementLookupFailed,
       review.credit,
       review.creditRemaining,

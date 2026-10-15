@@ -59,6 +59,10 @@ const SCHEMA_UNAVAILABLE_RESULT: SoilMoistureCalibrationReadResult = {
 const schemaUnavailableClients = new WeakSet<QueryClient>();
 const inflightSchemaCheckByClient = new WeakMap<QueryClient, Promise<boolean>>();
 
+/**
+ * Checks whether a QueryClient has already recorded that
+ * `soil_moisture_calibrations` is missing on this deployment.
+ */
 function soilMoistureCalibrationSchemaUnavailableCached(client: QueryClient): boolean {
   if (schemaUnavailableClients.has(client)) return true;
   if (client.getQueryData(SOIL_MOISTURE_CALIBRATION_SCHEMA_UNAVAILABLE_KEY) === true) {
@@ -68,12 +72,26 @@ function soilMoistureCalibrationSchemaUnavailableCached(client: QueryClient): bo
   return false;
 }
 
+/**
+ * Records a confirmed missing `soil_moisture_calibrations` table on the
+ * QueryClient and propagates `SCHEMA_UNAVAILABLE_RESULT` to any existing
+ * calibration query keys on that client.
+ */
 function rememberSoilMoistureCalibrationSchemaUnavailable(client: QueryClient): void {
   schemaUnavailableClients.add(client);
   client.setQueryDefaults(SOIL_MOISTURE_CALIBRATION_SCHEMA_UNAVAILABLE_KEY, {
     gcTime: Number.POSITIVE_INFINITY,
   });
   client.setQueryData(SOIL_MOISTURE_CALIBRATION_SCHEMA_UNAVAILABLE_KEY, true);
+  client.setQueriesData<SoilMoistureCalibrationReadResult>(
+    {
+      queryKey: ["soil_moisture_calibrations"],
+      predicate: (query) =>
+        query.queryKey[0] === "soil_moisture_calibrations" &&
+        query.queryKey[1] !== "schema_unavailable",
+    },
+    SCHEMA_UNAVAILABLE_RESULT,
+  );
 }
 
 export function mapSoilMoistureCalibrationRow(

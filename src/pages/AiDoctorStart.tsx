@@ -146,11 +146,20 @@ export default function AiDoctorStart() {
     () =>
       buildAiDoctorSurfaceCreditViewModel({
         entitlement,
+        entitlementLoading,
         entitlementLookupFailed,
         allowanceUsed: creditUsage.isError ? null : creditUsage.allowanceUsed,
+        hasPackCredits: creditUsage.isError ? null : creditUsage.hasPackCredits,
         allowanceReadFailed: creditUsage.isError,
       }),
-    [creditUsage.allowanceUsed, creditUsage.isError, entitlement, entitlementLookupFailed],
+    [
+      creditUsage.allowanceUsed,
+      creditUsage.hasPackCredits,
+      creditUsage.isError,
+      entitlement,
+      entitlementLoading,
+      entitlementLookupFailed,
+    ],
   );
 
   // Carried tent scope reorders and labels the choices. It never removes one:

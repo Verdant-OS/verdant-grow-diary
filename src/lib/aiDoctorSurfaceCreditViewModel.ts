@@ -15,11 +15,52 @@ export const AI_DOCTOR_FREE_PLAN_CREDIT_ALLOWANCE = FREE_CAPABILITIES.aiCreditsP
 export const AI_DOCTOR_FREE_PLAN_CREDIT_COPY =
   `Free plan includes ${AI_DOCTOR_FREE_PLAN_CREDIT_ALLOWANCE} AI Doctor credits per grow.` as const;
 
+export interface AiDoctorSpendRowLike {
+  weight: number | null;
+  funded_by: string | null;
+}
+
+export interface AiDoctorGrantRowLike {
+  credits: number | null;
+  expires_at: string | null;
+}
+
+/**
+ * Sums allowance-funded spend weights for a grow, excluding pack-funded rows
+ * (`funded_by === "pack"`) to mirror the server's allowance arm.
+ */
+export function sumAiDoctorAllowanceSpends(
+  rows: ReadonlyArray<AiDoctorSpendRowLike> | null | undefined,
+): number {
+  return (rows ?? []).reduce((sum, row) => {
+    return row.funded_by === "pack" ? sum : sum + (row.weight ?? 0);
+  }, 0);
+}
+
+/**
+ * Returns true when any grant row has positive credits and has not expired as
+ * of `nowMs`.
+ */
+export function hasUnexpiredAiCreditGrants(
+  rows: ReadonlyArray<AiDoctorGrantRowLike> | null | undefined,
+  nowMs: number,
+): boolean {
+  return (rows ?? []).some((row) => {
+    if (!row.credits || row.credits <= 0) return false;
+    if (!row.expires_at) return true;
+    const expiresAtMs = Date.parse(row.expires_at);
+    return !Number.isFinite(expiresAtMs) || expiresAtMs > nowMs;
+  });
+}
+
 export interface AiDoctorSurfaceCreditInput {
   entitlement?: ResolvedEntitlement | null;
+  entitlementLoading?: boolean;
   entitlementLookupFailed?: boolean;
-  /** Allowance-funded credits used on the current grow, when known. */
+  /** Allowance-funded credits used on the current grow, when resolved. */
   allowanceUsed?: number | null;
+  /** True when the user owns any unexpired credit-pack grant row. */
+  hasPackCredits?: boolean | null;
   /** True when the client allowance-used read failed. */
   allowanceReadFailed?: boolean;
   /** Fresh post-spend credit envelope returned by `ai-doctor-review`. */
@@ -38,10 +79,14 @@ export interface AiDoctorSurfaceCreditViewModel {
   freePlanCreditCopy: string | null;
 }
 
+/**
+ * Resolves the pre-run / post-run credit remaining badge input and Free-plan
+ * 3-credit allowance copy for AI Doctor surfaces.
+ */
 export function buildAiDoctorSurfaceCreditViewModel(
   input: AiDoctorSurfaceCreditInput,
 ): AiDoctorSurfaceCreditViewModel {
-  if (input.entitlementLookupFailed === true) {
+  if (input.entitlementLoading === true || input.entitlementLookupFailed === true) {
     return {
       creditRemaining: input.postSpendCredit ?? null,
       freePlanCreditCopy: null,
@@ -127,25 +172,26 @@ export function buildAiDoctorSurfaceCreditViewModel(
     };
   }
 
-  if (input.allowanceReadFailed === true) {
+  if (
+    input.allowanceReadFailed === true ||
+    typeof input.allowanceUsed !== "number" ||
+    !Number.isFinite(input.allowanceUsed) ||
+    input.allowanceUsed < 0
+  ) {
     return {
       creditRemaining: null,
       freePlanCreditCopy,
     };
   }
 
-  const used =
-    typeof input.allowanceUsed === "number" &&
-    Number.isFinite(input.allowanceUsed) &&
-    input.allowanceUsed >= 0
-      ? Math.floor(input.allowanceUsed)
-      : 0;
+  const used = Math.floor(input.allowanceUsed);
 
   return {
     creditRemaining: {
       remaining: Math.max(perGrowLimit - used, 0),
       scope: "per_grow",
       scope_limit: perGrowLimit,
+      ...(input.hasPackCredits === true ? { has_pack_credits: true } : {}),
     },
     freePlanCreditCopy,
   };

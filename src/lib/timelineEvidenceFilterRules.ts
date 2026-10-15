@@ -494,7 +494,7 @@ export function deriveTimelineTentOptions(
 const TIMELINE_EVENT_TYPE_OPTION_LABELS: Readonly<Record<string, string>> = {
   note: "Note",
   photo: "Photo",
-  quicklog_photo_attachment: "Photo",
+  quicklog_photo_attachment: "Photo attachment",
   watering: "Watering",
   feeding: "Feeding",
   observation: "Observation",
@@ -508,7 +508,9 @@ const TIMELINE_EVENT_TYPE_OPTION_LABELS: Readonly<Record<string, string>> = {
 
 /** Grower-facing log-type label. The option value stays the stored token. */
 export function timelineEventTypeOptionLabel(token: string): string {
-  const known = TIMELINE_EVENT_TYPE_OPTION_LABELS[token];
+  const known = Object.hasOwn(TIMELINE_EVENT_TYPE_OPTION_LABELS, token)
+    ? TIMELINE_EVENT_TYPE_OPTION_LABELS[token]
+    : undefined;
   if (known) return known;
   const words = token
     .split(/[_-]+/)

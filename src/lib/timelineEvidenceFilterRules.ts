@@ -106,6 +106,38 @@ export function deriveTimelineRowSensorSource(
 
 const SAFE_DETAIL_TEXT_KEYS = ["plant_name", "stage"] as const;
 
+/** Public nutrient/product strings. Not a walk of arbitrary detail payloads. */
+const PUBLIC_FEED_SEARCH_KEYS = new Set([
+  "name",
+  "brand",
+  "nutrient_brand",
+  "product",
+  "product_name",
+  "line_id",
+  "recipe",
+  "products",
+  "nutrients",
+]);
+
+const PUBLIC_FEED_SEARCH_ROOTS = ["feeding", "watering", "products", "nutrients"] as const;
+
+function appendPublicFeedSearchText(parts: string[], value: unknown, depth: number): void {
+  if (depth > 4 || value == null) return;
+  if (typeof value === "string") {
+    parts.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) appendPublicFeedSearchText(parts, item, depth + 1);
+    return;
+  }
+  if (typeof value !== "object") return;
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (!PUBLIC_FEED_SEARCH_KEYS.has(key)) continue;
+    appendPublicFeedSearchText(parts, child, depth + 1);
+  }
+}
+
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
@@ -163,6 +195,12 @@ function safeRowText(
   for (const key of SAFE_DETAIL_TEXT_KEYS) {
     const v = details[key];
     if (typeof v === "string") parts.push(v);
+  }
+  for (const key of PUBLIC_FEED_SEARCH_ROOTS) {
+    appendPublicFeedSearchText(parts, details[key], 0);
+  }
+  for (const key of ["nutrient_brand", "brand", "recipe"] as const) {
+    appendPublicFeedSearchText(parts, details[key], 0);
   }
   const labels = resolveTimelineCardPlaceLabels({
     plantId: row.plant_id,
@@ -486,6 +524,27 @@ export function isTimelineEvidenceFilterActive(input: TimelineEvidenceFilterInpu
   if (isTimelineDateFilterValue(input.endDate)) return true;
   return false;
 }
+
+/** Any non-empty date field, including an inverted or otherwise unapplied value. */
+export function timelineEnteredDateKeepsClearEnabled(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+export function timelineClearFiltersEnabled(input: {
+  evidenceActive: boolean;
+  chipFiltersActive: boolean;
+  enteredStartDate: string | null | undefined;
+  enteredEndDate: string | null | undefined;
+}): boolean {
+  return (
+    input.evidenceActive ||
+    input.chipFiltersActive ||
+    timelineEnteredDateKeepsClearEnabled(input.enteredStartDate) ||
+    timelineEnteredDateKeepsClearEnabled(input.enteredEndDate)
+  );
+}
+
+export { timelineDateParamsAfterSync } from "@/lib/timelineDateSearchParamRules";
 
 export const TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER = "Search timeline";
 export const TIMELINE_EVIDENCE_EMPTY_TITLE = "No matches";

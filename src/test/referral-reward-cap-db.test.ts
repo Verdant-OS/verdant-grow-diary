@@ -22,6 +22,7 @@ const migrations = [
   "20260721105000_ai_credit_grants_non_paddle_grants.sql",
   "20260721106000_referrals_conversion.sql",
   "20261003020000_referral_referrer_monthly_cap.sql",
+  "20261014010000_referral_cap_counts_deleted_referees.sql",
 ];
 let workdir = "";
 let dataDir = "";

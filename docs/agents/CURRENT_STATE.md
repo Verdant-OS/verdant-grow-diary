@@ -33,6 +33,14 @@ Read this section first. It doesn't replace the observation log below.
 
 # Verdant — Current Operating State
 
+## Follow-up observation — 2026-10-15T18:54 UTC
+
+- **Production receipt, plants health default (`source claim`, Cheeko, 2026-10-15 1:54 PM CT).** Migration `20260924120000_plants_health_unassessed_default` was applied verbatim to production Supabase project `knkwiiywfkbqznbxwqfh` (Lovable Cloud), by Cheeko's own session via the Lovable SQL editor. That apply was not the PREFLIGHT/APPLY workflow.
+- **Read-back (`source claim`, same session):** `plants.health` defaults to `'unknown'`; `validate_plant_row` accepts `'unknown'`; the trigger is still attached; the comment is set; all 282 rows are unchanged.
+- **Ledger gap (`source claim`):** no `supabase_migrations.schema_migrations` row was added for this version, so the ledger is out of step with the schema.
+- **Effect (`source claim`):** this fixed the production plant-create 400 (`P0001`, `invalid plant health: unknown`). PR #2150 was closed unmerged as superseded. The #1989 PREFLIGHT/APPLY chase is cancelled.
+- **Project identity (`source claim`):** production is `knkwiiywfkbqznbxwqfh`. `bzatgtgjvuojpoxcknaa` is not production. Treat any check labeled prod that ran against `bzatgtgjvuojpoxcknaa` as unverified. This receipt does not lift the production database lock, and it records no new write from this session.
+
 ## Follow-up observation — 2026-10-14T18:25 UTC
 
 - **#2056 merged (supersedes the 01:06 UTC block, which left it queued).** #2056 merged into `verdant-grow-diary` at **2026-10-14T01:20:30 UTC** as `06b6266ca6d668d103c2100fe747938d17b942e4` through the merge queue. It was enqueued 01:00:57 UTC at `1802e539483be0eec0248e50d0c0b4b4af8009df`; `merged` and `removed_from_merge_queue` by `github-merge-queue[bot]` were both at 01:20:30 UTC, and its branch was deleted at 01:20:32 UTC. The merge commit has a single parent (`3700d1eea`), i.e. a squash, and changes one file, `docs/agents/CURRENT_STATE.md`, +63 / -0. Gates: 35/35 required at `1802e5394` and queue CI green. **No independent exact-head PASS**: it merged on Matthew's owner waiver ("Accept all" → "Queue both, waive review", 01:00 UTC), not on the documented exact-head review gate.

@@ -24,7 +24,6 @@ import SignOutConfirmDialog from "./SignOutConfirmDialog";
 import VerificationPendingBanner from "./VerificationPendingBanner";
 import { SubscriptionPastDueBanner } from "./SubscriptionPastDueBanner";
 import GlobalSearchDialog from "./GlobalSearchDialog";
-import { SearchShortcutHint } from "./SearchShortcutHint";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { readQuickLogStartEventType } from "@/lib/globalSearchQuickLogFallbackRules";
 import { readGuidePhenoQuickLogPrefill } from "@/lib/guidePhenoQuickLogHandoffRules";
@@ -378,7 +377,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                 >
                   <Search className="h-4 w-4" />
                   <span className="hidden lg:inline">Search…</span>
-                  <SearchShortcutHint className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40" />
+                  <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">
+                    ⌘K
+                  </kbd>
                 </button>
                 {/* Mobile-reachable search entry: the ⌘K composite button
                     above is desktop-only, so mobile growers need an

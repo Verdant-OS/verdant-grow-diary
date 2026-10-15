@@ -12,7 +12,6 @@
  * notice and never presents "no matches" as a verified empty conclusion.
  */
 import { useEffect, useMemo, useState } from "react";
-import { useDialogOpenerRestore } from "@/hooks/useDialogOpenerRestore";
 import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { Command as CommandPrimitive } from "cmdk";
 import {
@@ -122,7 +121,6 @@ function resultsContentKey(rows: readonly GlobalSearchResult[]): string {
 }
 
 export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
-  const onCloseAutoFocus = useDialogOpenerRestore(open);
   const navigate = useNavigate();
   const location = useLocation();
   // Signed-in growers must never be handed the public /quick-log starter:
@@ -415,10 +413,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent
-        className="overflow-hidden p-0 shadow-lg md:max-w-3xl"
-        onCloseAutoFocus={onCloseAutoFocus}
-      >
+      <DialogContent className="overflow-hidden p-0 shadow-lg md:max-w-3xl">
         <CommandPrimitive
           shouldFilter={false}
           value={activeValue}
@@ -745,7 +740,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                           <SearchX className="h-5 w-5" aria-hidden="true" />
                         </div>
                         <div className="space-y-1">
-                          <p className="break-words text-sm font-medium text-foreground [overflow-wrap:anywhere]">
+                          <p className="text-sm font-medium text-foreground">
                             No matches for “{trimmed}”
                           </p>
                           <p className="text-xs text-muted-foreground">

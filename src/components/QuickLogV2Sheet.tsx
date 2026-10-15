@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
-import { useDialogOpenerRestore } from "@/hooks/useDialogOpenerRestore";
 import { validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import {
@@ -358,7 +357,6 @@ function QuickLogV2SheetForOwner({
   defaultTargetKey,
   defaultAction = "note",
 }: Props) {
-  const onCloseAutoFocus = useDialogOpenerRestore(open);
   const { user } = useAuth();
   const [initialRecovery] = useState(() => readPendingQuickLogNote(user?.id ?? null));
   const initialNote = initialRecovery.status === "pending" ? initialRecovery.record : null;
@@ -2620,7 +2618,6 @@ function QuickLogV2SheetForOwner({
         side="bottom"
         className="max-h-[92vh] overflow-y-auto text-base"
         aria-describedby="qlv2-sheet-description"
-        onCloseAutoFocus={onCloseAutoFocus}
       >
         <SheetHeader>
           <SheetTitle>Quick Log</SheetTitle>

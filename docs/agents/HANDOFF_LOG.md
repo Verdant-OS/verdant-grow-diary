@@ -69,20 +69,20 @@ last_updated: 2026-10-14 19:38 CT, by Codex
 
 ```text
 TASK ISSUE-1997-EDIT-PLANT-BLANK-NAME  priority: P1  status: OPEN
-goal: Block Edit Plant save when Name is blank or whitespace-only, with an inline error, before any upload or update. Partial slice of #1997.
+goal: Finish the Edit Plant side of #1997: whitespace Name, earliest start date, name length and wrapping, linked labels, and Cancel. Edit Tent stays on #2032.
 branch: cursor/edit-plant-blank-name-3bf6
 base: verdant-grow-diary at 5459c3a18a402d2bf5b00c96b0688c4475dcf93d (merged for this repair)
 checkout: git fetch origin cursor/edit-plant-blank-name-3bf6 verdant-grow-diary && git switch cursor/edit-plant-blank-name-3bf6 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2041 (observed non-draft at 2026-10-14 22:00 UTC; no readiness change by this repair)
 head_sha: dce1e1f309fe3d66b2cce41c9bc3b3136b4f39bd, observed on origin/cursor/edit-plant-blank-name-3bf6 at 2026-10-14 22:00 UTC before this repair checkpoint. Fetch and re-read the PR head after push; this commit cannot contain its own SHA. Prior CI/review evidence applies only to its named SHA.
-state: Name slice implemented. Latest base merged; handoff conflict resolved while retaining the base's task entries and closures. Repository repair only.
-next_action: verify required checks and obtain independent Blue Dream review (.tsx product, P1) at the new remote head. No ready, merge, or deploy from this repair.
-files: src/components/EditPlantDialog.tsx; src/lib/formIdentityFailClosedRules.ts; src/test/edit-plant-identity-fail-closed.test.tsx; docs/agents/HANDOFF_LOG.md (conflict resolution and this record)
-blockers: final-head CI and independent review must be refreshed after push. No production write.
-artifacts: src/test/edit-plant-identity-fail-closed.test.tsx. Local merged-tree validation: 3 files / 71 tests PASS (4 identity regressions and 67 docs-safety tests); docs-safety scanner PASS in all 3 categories. Application files and tests unchanged by the repair. Full suite/build NOT_MEASURED.
+state: Edit Plant remainder of #1997 implemented after merging origin/verdant-grow-diary. Edit Tent not touched (open PR #2032 owns EditTentDialog.tsx).
+next_action: required checks and independent Blue Dream review (.tsx product, P1) at the new remote head. No ready-state change, merge, or deploy from this writer.
+files: src/components/EditPlantDialog.tsx; src/lib/formIdentityFailClosedRules.ts; src/lib/plantStartDateRules.ts; src/test/edit-plant-identity-fail-closed.test.tsx; src/test/edit-plant-issue-1997-remainder.test.tsx; docs/agents/HANDOFF_LOG.md
+blockers: final-head CI and independent review. No production write.
+artifacts: new test RED 3 failed / 0 passed before the fix; GREEN 3 passed / 0 failed after. Related set 7 files / 45 passed / 0 failed. Typecheck PASS.
 reviewer_seat: Blue Dream
-claimed_by: Codex, 2026-10-14 22:00 UTC, explicitly assigned the repair by Matthew in this chat; no GitHub comment authorized
-last_updated: 2026-10-14 17:00 CT, by Codex
+claimed_by: cursor cloud agent, 2026-10-15, sole writer assigned in chat; no GitHub comment
+last_updated: 2026-10-15 17:07 UTC, by Grok
 ```
 
 ### TIMELINE-GROW-DAY-2005

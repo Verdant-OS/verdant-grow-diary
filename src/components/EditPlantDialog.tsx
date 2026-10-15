@@ -5,6 +5,7 @@ import { useAuth } from "@/store/auth";
 import { buildPlantTypeUpdate } from "@/lib/plantTypeRules";
 import {
   plantStartDateInputMax,
+  plantStartDateInputMin,
   plantStartDateInputToIso,
   plantStartDateInputValue,
   plantStartDateSaveMessage,
@@ -31,6 +32,7 @@ import {
 import { Pencil, Camera, ImagePlus, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  PLANT_DISPLAY_NAME_MAX_LENGTH,
   TRIMMED_REQUIRED_IDENTITY_MESSAGE,
   hasTrimmedRequiredIdentity,
 } from "@/lib/formIdentityFailClosedRules";
@@ -356,7 +358,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-3">
           <div>
-            <Label>Profile photo for {previewName}</Label>
+            <Label className="break-words min-w-0">Profile photo for {previewName}</Label>
             <div className="flex items-start gap-3 mt-1">
               <div className="h-20 w-20 rounded-lg overflow-hidden border border-border/60 flex-shrink-0">
                 {selected ? (
@@ -507,9 +509,11 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             </div>
           </div>
           <div>
-            <Label>Name</Label>
+            <Label htmlFor="edit-plant-name">Name</Label>
             <Input
+              id="edit-plant-name"
               required
+              maxLength={PLANT_DISPLAY_NAME_MAX_LENGTH}
               value={form.name}
               onChange={(e) => {
                 const name = e.target.value;
@@ -532,17 +536,18 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             ) : null}
           </div>
           <div>
-            <Label>Strain</Label>
+            <Label htmlFor="edit-plant-strain">Strain</Label>
             <Input
+              id="edit-plant-strain"
               value={form.strain}
               onChange={(e) => setForm({ ...form, strain: e.target.value })}
               data-testid="edit-plant-strain"
             />
           </div>
           <div>
-            <Label>Tent</Label>
+            <Label htmlFor="edit-plant-tent">Tent</Label>
             <Select value={form.tent_id} onValueChange={(v) => setForm({ ...form, tent_id: v })}>
-              <SelectTrigger data-testid="edit-plant-tent">
+              <SelectTrigger id="edit-plant-tent" data-testid="edit-plant-tent">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -557,9 +562,9 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label>Stage</Label>
+              <Label htmlFor="edit-plant-stage">Stage</Label>
               <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                <SelectTrigger>
+                <SelectTrigger id="edit-plant-stage">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -572,12 +577,12 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
               </Select>
             </div>
             <div>
-              <Label>Health</Label>
+              <Label htmlFor="edit-plant-health">Health</Label>
               <Select
                 value={form.health}
                 onValueChange={(v) => setForm({ ...form, health: plantHealthFromSelectValue(v) })}
               >
-                <SelectTrigger>
+                <SelectTrigger id="edit-plant-health">
                   <SelectValue placeholder={PLANT_HEALTH_NOT_ASSESSED_LABEL} />
                 </SelectTrigger>
                 <SelectContent>
@@ -594,12 +599,12 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             </div>
           </div>
           <div>
-            <Label>Type</Label>
+            <Label htmlFor="edit-plant-type">Type</Label>
             <Select
               value={form.plant_type}
               onValueChange={(v) => setForm({ ...form, plant_type: v })}
             >
-              <SelectTrigger data-testid="edit-plant-type-select">
+              <SelectTrigger id="edit-plant-type" data-testid="edit-plant-type-select">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -613,11 +618,18 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             </p>
           </div>
           <div>
-            <Label>Started at</Label>
+            <Label htmlFor="edit-plant-started-at">Started at</Label>
             <Input
+              id="edit-plant-started-at"
               type="date"
-              // An unchanged stored date (even a legacy future one) must not
-              // trip the browser's own limit and block unrelated edits.
+              // An unchanged stored date (even a legacy future or pre-2000
+              // one) must not trip the browser's own limit and block
+              // unrelated edits.
+              min={
+                form.started_at === plantStartDateInputValue(plant.startedAt)
+                  ? undefined
+                  : plantStartDateInputMin()
+              }
               max={
                 form.started_at === plantStartDateInputValue(plant.startedAt)
                   ? undefined
@@ -628,23 +640,34 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             />
           </div>
           <div>
-            <Label>Notes</Label>
+            <Label htmlFor="edit-plant-notes">Notes</Label>
             <Textarea
+              id="edit-plant-notes"
               value={form.last_note}
               onChange={(e) => setForm({ ...form, last_note: e.target.value })}
               rows={3}
               data-testid="edit-plant-notes"
             />
           </div>
-          <Button
-            disabled={busy}
-            className="gradient-leaf text-primary-foreground gap-1"
-            data-testid="edit-plant-submit"
-            aria-live="polite"
-          >
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-            {busy ? "Saving…" : "Save changes"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              data-testid="edit-plant-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={busy || !hasTrimmedRequiredIdentity(form.name)}
+              className="gradient-leaf text-primary-foreground gap-1"
+              data-testid="edit-plant-submit"
+              aria-live="polite"
+            >
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {busy ? "Saving…" : "Save changes"}
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

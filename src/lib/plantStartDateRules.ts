@@ -76,25 +76,51 @@ export function plantStartDateInputMax(now: Date): string {
   return formatCalendarDateInput(localCalendarDate(now));
 }
 
+export type PlantStartDateRejectReason = "invalid" | "future" | "too_early";
+
 export type PlantStartDateSaveResult =
-  { ok: true; iso: string } | { ok: false; reason: "invalid" | "future" };
+  { ok: true; iso: string } | { ok: false; reason: PlantStartDateRejectReason };
+
+/** Earliest calendar start a grower can newly save. 1900-01-01 is not a grow start. */
+export const PLANT_START_DATE_EARLIEST_INPUT = "2000-01-01";
 
 export const PLANT_START_DATE_FUTURE_MESSAGE =
   "Start date can't be in the future. Pick today or an earlier date.";
 export const PLANT_START_DATE_INVALID_MESSAGE = "Enter a valid start date.";
+export const PLANT_START_DATE_TOO_EARLY_MESSAGE = "Start date can't be before January 1, 2000.";
+
+/** The `min` value for a start-date input the grower is changing. */
+export function plantStartDateInputMin(): string {
+  return PLANT_START_DATE_EARLIEST_INPUT;
+}
 
 /** Date input → stored instant (UTC midnight of the picked date). */
 export function plantStartDateInputToIso(value: string, now: Date): PlantStartDateSaveResult {
   const date = parsePlantStartDateInput(value);
   if (!date) return { ok: false, reason: "invalid" };
+  const earliest = parsePlantStartDateInput(PLANT_START_DATE_EARLIEST_INPUT);
+  if (earliest && calendarDaysBetween(earliest, date) < 0) {
+    return { ok: false, reason: "too_early" };
+  }
   if (calendarDaysBetween(localCalendarDate(now), date) > 0) {
     return { ok: false, reason: "future" };
   }
   return { ok: true, iso: new Date(Date.UTC(date.year, date.month - 1, date.day)).toISOString() };
 }
 
-export function plantStartDateSaveMessage(reason: "invalid" | "future"): string {
-  return reason === "future" ? PLANT_START_DATE_FUTURE_MESSAGE : PLANT_START_DATE_INVALID_MESSAGE;
+export function plantStartDateSaveMessage(reason: PlantStartDateRejectReason): string {
+  switch (reason) {
+    case "future":
+      return PLANT_START_DATE_FUTURE_MESSAGE;
+    case "too_early":
+      return PLANT_START_DATE_TOO_EARLY_MESSAGE;
+    case "invalid":
+      return PLANT_START_DATE_INVALID_MESSAGE;
+    default: {
+      const unreachable: never = reason;
+      return unreachable;
+    }
+  }
 }
 
 /**

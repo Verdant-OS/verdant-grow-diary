@@ -9,6 +9,9 @@
  */
 export const TRIMMED_REQUIRED_IDENTITY_MESSAGE = "A name is required.";
 
+/** Edit Plant Name input cap so a long unbroken name cannot blow out the dialog. */
+export const PLANT_DISPLAY_NAME_MAX_LENGTH = 80;
+
 export function hasTrimmedRequiredIdentity(value: unknown): boolean {
   return typeof value === "string" && value.trim().length > 0;
 }

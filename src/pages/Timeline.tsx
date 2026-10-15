@@ -1113,25 +1113,25 @@ export default function Timeline() {
     };
   }, [load]);
 
-  const stageCounts = useMemo(() => {
-    const m: Record<string, number> = {};
-    entries.forEach((e) => {
-      const stage = resolveTimelineDiaryEntryStage(e);
-      if (stage) m[stage] = (m[stage] || 0) + 1;
-    });
-    return m;
-  }, [entries]);
-  const stageTaggedEntryCount = STAGES.reduce(
-    (total, stage) => total + (stageCounts[stage.value] || 0),
-    0,
-  );
-
   const displayEntries = useMemo(
     () =>
       dropBlankQuickLogPlaceholderRows(
         mergeTimelineMeasurementDisplayEntries(entries, manualSensorMeasurementEntries),
       ),
     [entries, manualSensorMeasurementEntries],
+  );
+
+  const stageCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    displayEntries.forEach((e) => {
+      const stage = resolveTimelineDiaryEntryStage(e);
+      if (stage) m[stage] = (m[stage] || 0) + 1;
+    });
+    return m;
+  }, [displayEntries]);
+  const stageTaggedEntryCount = STAGES.reduce(
+    (total, stage) => total + (stageCounts[stage.value] || 0),
+    0,
   );
 
   const eventCounts = useMemo(() => {

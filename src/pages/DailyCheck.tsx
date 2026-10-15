@@ -399,23 +399,32 @@ export default function DailyCheck() {
     };
   }, [renderedStep]);
 
+  // Sole-plant preselect fills the form when the URL names no plant. Post-submit
+  // return actions stay on the route plant, or a plant the grower chose after
+  // that default, so an implicit sole plant does not add View Plant.
+  const postSubmitPlantId =
+    plantResolution.status === "valid"
+      ? (routePlant?.id ?? null)
+      : renderedPlantId && renderedPlantId !== fallbackPlantId
+        ? renderedPlantId
+        : null;
   const postSubmitActions = useMemo(
     () =>
       buildDailyCheckPostSubmitActions({
-        plantId: selectedPlant?.id ?? null,
+        plantId: postSubmitPlantId,
         source: entrySource,
         growId: urlGrowId,
       }),
-    [selectedPlant?.id, entrySource, urlGrowId],
+    [postSubmitPlantId, entrySource, urlGrowId],
   );
   const postSubmitHref = useMemo(
     () =>
       resolveDailyCheckPostSubmitHref({
-        plantId: selectedPlant?.id ?? null,
+        plantId: postSubmitPlantId,
         source: entrySource,
         growId: urlGrowId,
       }),
-    [selectedPlant?.id, entrySource, urlGrowId],
+    [postSubmitPlantId, entrySource, urlGrowId],
   );
   const scopedBackAction = urlGrowId ? postSubmitActions.find((action) => action.primary) : null;
   const backHref = useMemo(

@@ -223,12 +223,20 @@ export function formatMergeTargetHelperText(summary: MergeTargetVisibilitySummar
   return parts.join(" ");
 }
 
-/** Hide Merge Duplicate until the plant list has loaded and a selectable target exists. */
+/**
+ * Hide Merge Duplicate only after a successful plant-list read with no
+ * selectable target. A failed read stays available, the same as before
+ * the list has loaded.
+ */
 export function isMergeDuplicateEntryEnabled(input: {
   fetched: boolean;
   selectableOptionCount: number;
+  /** False when the plant-list read failed. Omitted keeps the fetched gate. */
+  succeeded?: boolean;
 }): boolean {
-  if (!input.fetched) return true;
+  if (input.succeeded === false) return true;
+  const settled = input.succeeded === true || input.fetched;
+  if (!settled) return true;
   return input.selectableOptionCount > 0;
 }
 

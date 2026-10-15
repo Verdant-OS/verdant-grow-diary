@@ -764,8 +764,10 @@ export default function Timeline() {
         sensorEventsQuery = sensorEventsQuery.lte("occurred_at", timelineDateRangeBounds.endIso);
       const sensorEventsResult = await sensorEventsQuery;
       if (!isCurrentRequest()) return;
-      if (hasTimelineRequiredReadError(sensorEventsResult)) throw sensorEventsResult.error;
-      const nextSensorEvents = sensorEventsResult.data as unknown as GrowEventRowForRecent[];
+      const sensorReadFailed = hasTimelineRequiredReadError(sensorEventsResult);
+      const nextSensorEvents = sensorReadFailed
+        ? []
+        : (sensorEventsResult.data as unknown as GrowEventRowForRecent[]);
 
       // Core plant memory is confirmed for the exact active scope. Make it
       // visible immediately; photos/action/alert context continues separately
@@ -787,7 +789,7 @@ export default function Timeline() {
       setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
-      setPartialReadSources([]);
+      setPartialReadSources(sensorReadFailed ? ["manual_sensor_readings"] : []);
       setCoreRead({ status: "success", readKey: requestedReadKey });
       setLoading(false);
 

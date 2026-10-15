@@ -329,9 +329,12 @@ function main() {
   ]) {
     const preFix = psql(DB, sql);
     const text = `${preFix.stdout ?? ""}\n${preFix.stderr ?? ""}`;
-    const passed = preFix.status === 0 && text.includes('"ok": true');
-    if (passed) throw new Error(`${label} unexpectedly passed on the pre-fix function`);
-    const reason = text.match(/"reason": "([^"]+)"/)?.[1] ?? "rejected";
+    const reason = text.match(/"reason": "([^"]+)"/)?.[1] ?? "";
+    if (preFix.status !== 0 || reason !== "unsupported_change") {
+      throw new Error(
+        `${label} did not fail closed on the pre-fix function: status ${preFix.status} ${text}`,
+      );
+    }
     console.log(`pre-fix ${label}: ${reason}`);
     psqlOrThrow(
       DB,

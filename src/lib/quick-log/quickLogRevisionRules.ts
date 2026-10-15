@@ -387,7 +387,11 @@ function sensorFromDetails(
  * Returns null for notes, photos, and any other entry type.
  */
 export function correctionValuesForTimelineAction(
-  action: { kind: string; volumeMl?: number | null },
+  action: {
+    kind: string;
+    volumeMl?: number | null;
+    aiDoctorPhase1Evidence?: { details?: unknown } | null;
+  },
   readings?: ReadonlyArray<{ field: string; value: number }>,
 ): QuickLogCorrectionValueContext | null {
   if (action.kind === "water") {
@@ -399,6 +403,8 @@ export function correctionValuesForTimelineAction(
           : null,
     };
   }
+  const fromEvidence = correctionValuePropsFromDiaryDetails(action.aiDoctorPhase1Evidence?.details);
+  if (fromEvidence?.kind === "feeding") return fromEvidence;
   const sensor: QuickLogCorrectionSensorValues = {};
   for (const reading of readings ?? []) {
     if (reading.field === "air_temp_c") sensor.temperature_c = reading.value;

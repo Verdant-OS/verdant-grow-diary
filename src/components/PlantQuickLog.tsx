@@ -61,6 +61,11 @@ import {
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
 import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
+import {
+  quickLogPngClaimCanBeInspected,
+  validateQuickLogPngClaim,
+} from "@/lib/quickLogPhotoContentRules";
+import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import { buildPlantQuickLogV2SavePayload } from "@/lib/plantQuickLogV2SaveAdapter";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
@@ -151,6 +156,9 @@ export default function PlantQuickLog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [photoAttachmentUnconfirmed, setPhotoAttachmentUnconfirmed] = useState(false);
+  const [photoChecking, setPhotoChecking] = useState(false);
+  const photoValidationGenerationRef = useRef(0);
+  const photoOnlyAttemptRef = useRef<{ entryId: string; path: string; file: File } | null>(null);
 
   useEffect(() => {
     // A draft and its asynchronous save belong to one owner, target and open
@@ -159,12 +167,15 @@ export default function PlantQuickLog({
     saveInFlightRef.current = false;
     saveKeyRef.current = null;
     pendingPhotoSaveRef.current = null;
+    photoOnlyAttemptRef.current = null;
+    photoValidationGenerationRef.current += 1;
     setPhotoFile(null);
     setPhotoPreview(null);
     setNote("");
     setSensors(EMPTY_SENSORS);
     setError(null);
     setBusy(false);
+    setPhotoChecking(false);
     setPhotoAttachmentUnconfirmed(false);
     if (fileRef.current) fileRef.current.value = "";
     if (libraryFileRef.current) libraryFileRef.current.value = "";
@@ -215,7 +226,8 @@ export default function PlantQuickLog({
   const hasPlantResponseCheck = hasResponseCheck(note);
   const timelineNote = buildTimelineNote(note, hasPhoto, hasManualReadings);
   const hasAnyContent = timelineNote.trim().length > 0;
-  const canSave = hasAnyContent && !busy && !photoAttachmentUnconfirmed && !!growId;
+  const canSave =
+    hasAnyContent && !busy && !photoAttachmentUnconfirmed && !photoChecking && !!growId;
 
   const saveHelper = !growId
     ? "Missing grow context. This plant needs a grow before saving."
@@ -245,6 +257,7 @@ export default function PlantQuickLog({
     // close, which is the only other thing that clears the key.
     saveKeyRef.current = null;
     pendingPhotoSaveRef.current = null;
+    photoOnlyAttemptRef.current = null;
     setPhotoFile(null);
     setPhotoPreview(null);
     setNote("");
@@ -266,6 +279,9 @@ export default function PlantQuickLog({
       // An uncertain prior upload may already be referenced; never delete it.
       saveKeyRef.current = null;
       pendingPhotoSaveRef.current = null;
+      if (photoOnlyAttemptRef.current && photoOnlyAttemptRef.current.file !== file) {
+        photoOnlyAttemptRef.current = null;
+      }
     }
     setPhotoFile(file);
     setPhotoPreview(file ? URL.createObjectURL(file) : null);
@@ -274,9 +290,36 @@ export default function PlantQuickLog({
 
   function handlePhotoInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.currentTarget.files?.[0] ?? null;
-    if (!file) return;
-    handleFileSelected(file);
     e.currentTarget.value = "";
+    if (!file) return;
+    if (!quickLogPngClaimCanBeInspected(file)) {
+      photoValidationGenerationRef.current += 1;
+      setPhotoChecking(false);
+      handleFileSelected(file);
+      return;
+    }
+    const generation = photoValidationGenerationRef.current + 1;
+    photoValidationGenerationRef.current = generation;
+    setPhotoChecking(true);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setError(null);
+    void validateQuickLogPngClaim(file).then(
+      (claim) => {
+        if (generation !== photoValidationGenerationRef.current) return;
+        setPhotoChecking(false);
+        if (!claim.ok) {
+          setError(claim.message);
+          return;
+        }
+        handleFileSelected(file);
+      },
+      () => {
+        if (generation !== photoValidationGenerationRef.current) return;
+        setPhotoChecking(false);
+        setError("That photo could not be read. Try a different file.");
+      },
+    );
   }
 
   function clearPhoto() {
@@ -340,12 +383,27 @@ export default function PlantQuickLog({
     const pending = pendingPhotoSaveRef.current;
     const retry =
       pending?.key === resolvedSaveKey.state.key && pending.file === photoFile ? pending : null;
-    let uploadedPath: string | null = retry?.path ?? null;
+    const photoOnly =
+      !!photoFile && !!user && !hasManualReadings && isPhotoOnlyQuickLogNote(timelineNote);
+    const retainedPhotoOnly =
+      photoOnly && photoOnlyAttemptRef.current?.file === photoFile
+        ? photoOnlyAttemptRef.current
+        : null;
+    let photoOnlyEntryId = retainedPhotoOnly?.entryId ?? null;
+    if (photoOnly && !photoOnlyEntryId) {
+      const minted = globalThis.crypto?.randomUUID?.();
+      photoOnlyEntryId = typeof minted === "string" && minted.trim() !== "" ? minted : null;
+    }
+    let uploadedPath: string | null = retry?.path ?? retainedPhotoOnly?.path ?? null;
     // A later rejection cannot disprove an earlier uncertain commit.
-    let cleanupAllowed = !retry;
+    let cleanupAllowed = !retry && !retainedPhotoOnly;
     let saveConfirmed = false;
     try {
-      if (photoFile && user && !retry) {
+      if (photoOnly && !photoOnlyEntryId) {
+        setError("Verdant could not prepare a safe photo attachment. Refresh and try again.");
+        return;
+      }
+      if (photoFile && user && !retry && !retainedPhotoOnly) {
         const ext = (photoFile.name.split(".").pop() || "jpg").toLowerCase();
         const path = `${user.id}/${growId}/${Date.now()}.${ext}`;
         const { error: upErr } = await supabase.storage
@@ -365,13 +423,7 @@ export default function PlantQuickLog({
         uploadedPath = path;
       }
 
-      if (
-        uploadedPath &&
-        user &&
-        photoFile &&
-        !hasManualReadings &&
-        isPhotoOnlyQuickLogNote(timelineNote)
-      ) {
+      if (uploadedPath && user && photoFile && photoOnly && photoOnlyEntryId) {
         const entryResult = await createQuickLogPhotoDiaryEntry({
           ownerId: user.id,
           growId,
@@ -381,11 +433,22 @@ export default function PlantQuickLog({
           noteRaw: timelineNote,
           action: "photo",
           eventType: "photo",
+          entryId: photoOnlyEntryId,
         });
         if (!canContinue()) return;
         if (!entryResult.ok) {
           const failure = entryResult as { message: string; ambiguous?: boolean };
-          if (!failure.ambiguous && cleanupAllowed) {
+          if (failure.ambiguous) {
+            photoOnlyAttemptRef.current = {
+              entryId: photoOnlyEntryId,
+              path: uploadedPath,
+              file: photoFile,
+            };
+            setPhotoAttachmentUnconfirmed(true);
+            setError(failure.message);
+            return;
+          }
+          if (cleanupAllowed) {
             await supabase.storage
               .from("diary-photos")
               .remove([uploadedPath])
@@ -396,17 +459,16 @@ export default function PlantQuickLog({
           return;
         }
         saveConfirmed = true;
-        if (growId) {
-          rememberRecentQuickLogTarget(
-            {
-              plantId,
-              growId,
-              tentId: tentId ?? null,
-              savedAt: new Date().toISOString(),
-            },
-            user.id,
-          );
-        }
+        trackQuickLogSuccess("photo", { reused: false });
+        rememberRecentQuickLogTarget(
+          {
+            plantId,
+            growId,
+            tentId: tentId ?? null,
+            savedAt: new Date().toISOString(),
+          },
+          user.id,
+        );
         applyQuickLogV2Refresh(queryClient, {
           targetType: "plant",
           targetId: plantId,
@@ -418,7 +480,7 @@ export default function PlantQuickLog({
           }),
         );
         if (!canContinue()) return;
-        toast.success("Log saved to timeline.");
+        announceSavedPlantQuickLog();
         resetForm();
         onOpenChange(false);
         onSaved?.();
@@ -547,7 +609,7 @@ export default function PlantQuickLog({
         );
         return;
       }
-      toast.success("Log saved to timeline.");
+      announceSavedPlantQuickLog();
       resetForm();
       onOpenChange(false);
       onSaved?.();
@@ -960,4 +1022,8 @@ function SensorField({ id, label, value, onChange, inputMode, step, delta }: Sen
       )}
     </div>
   );
+}
+
+function announceSavedPlantQuickLog() {
+  toast.success("Log saved to timeline.");
 }

@@ -15,6 +15,18 @@ export function fileClaimsPng(file: { name?: string | null; type?: string | null
   return name.endsWith(".png") || type === "image/png";
 }
 
+/**
+ * A PNG claim can be inspected once the file is long enough to hold the
+ * 8-byte signature. A shorter file has no signature bytes to compare.
+ */
+export function quickLogPngClaimCanBeInspected(file: {
+  name?: string | null;
+  type?: string | null;
+  size: number;
+}): boolean {
+  return fileClaimsPng(file) && file.size >= PNG_SIGNATURE.length;
+}
+
 export function hasPngSignature(bytes: Uint8Array): boolean {
   if (bytes.length < PNG_SIGNATURE.length) return false;
   return PNG_SIGNATURE.every((byte, index) => bytes[index] === byte);

@@ -28,6 +28,6 @@ describe("PaymentTestModeBanner learn more", () => {
     const banner = screen.getByTestId("payments-test-mode-banner");
     const hrefs = [...banner.querySelectorAll("a")].map((anchor) => anchor.getAttribute("href"));
     expect(hrefs.some((href) => href?.includes("lovable.dev"))).toBe(false);
-    expect(hrefs).toEqual(["/pricing"]);
+    expect(hrefs).toEqual(["/pricing#pricing-faq-checkout-live"]);
   });
 });

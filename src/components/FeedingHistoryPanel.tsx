@@ -111,7 +111,11 @@ function Row({
             currentNote={currentNote ?? null}
             currentOccurredAt={row.occurredAt}
             currentPlantId={row.plantId}
-            correctionValues={{ kind: "feeding", doseAmount: row.nutrients[0]?.amount ?? null }}
+            correctionValues={{
+              kind: "feeding",
+              doseAmount: row.nutrients[0]?.amount ?? null,
+              volumeMl: row.volumeMl,
+            }}
             plantId={row.plantId}
             tentId={row.tentId}
             onChanged={onEntryChanged}

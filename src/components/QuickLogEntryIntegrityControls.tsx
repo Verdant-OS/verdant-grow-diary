@@ -110,6 +110,17 @@ function draftSensor(
   return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
 }
 
+function volumeDraftFrom(values: QuickLogCorrectionValueContext | null | undefined): string {
+  if (
+    (values?.kind === "watering" || values?.kind === "feeding") &&
+    values.volumeMl != null &&
+    Number.isFinite(values.volumeMl)
+  ) {
+    return String(values.volumeMl);
+  }
+  return "";
+}
+
 function toDatetimeLocalValue(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -207,11 +218,7 @@ function RevisionControls({
   const [noteDraft, setNoteDraft] = useState<string>(currentNote ?? "");
   const [timeDraft, setTimeDraft] = useState<string>(toDatetimeLocalValue(currentOccurredAt));
   const [plantDraft, setPlantDraft] = useState<string>(currentPlantId ?? "");
-  const [volumeDraft, setVolumeDraft] = useState<string>(
-    correctionValues?.kind === "watering" && correctionValues.volumeMl != null
-      ? String(correctionValues.volumeMl)
-      : "",
-  );
+  const [volumeDraft, setVolumeDraft] = useState<string>(volumeDraftFrom(correctionValues));
   const [doseDraft, setDoseDraft] = useState<string>(
     correctionValues?.kind === "feeding" && correctionValues.doseAmount != null
       ? String(correctionValues.doseAmount)
@@ -267,11 +274,7 @@ function RevisionControls({
       return;
     }
     setNoteDraft(currentNote ?? "");
-    setVolumeDraft(
-      correctionValues?.kind === "watering" && correctionValues.volumeMl != null
-        ? String(correctionValues.volumeMl)
-        : "",
-    );
+    setVolumeDraft(volumeDraftFrom(correctionValues));
     setDoseDraft(
       correctionValues?.kind === "feeding" && correctionValues.doseAmount != null
         ? String(correctionValues.doseAmount)
@@ -310,7 +313,10 @@ function RevisionControls({
       changes.targetType = "plant";
       changes.targetId = plantDraft;
     }
-    if (correctionValues?.kind === "watering") {
+    if (
+      correctionValues?.kind === "watering" ||
+      (correctionValues?.kind === "feeding" && correctionValues.volumeMl != null)
+    ) {
       const parsed = Number(volumeDraft);
       if (volumeDraft.trim() !== "" && parsed !== correctionValues.volumeMl) {
         changes.volumeMl = parsed;
@@ -432,7 +438,8 @@ function RevisionControls({
               }}
               testIdPrefix="quicklog-correct"
             />
-            {correctionValues?.kind === "watering" && (
+            {(correctionValues?.kind === "watering" ||
+              (correctionValues?.kind === "feeding" && correctionValues.volumeMl != null)) && (
               <label className="block text-xs text-muted-foreground">
                 Volume (ml)
                 <input

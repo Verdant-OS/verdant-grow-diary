@@ -381,6 +381,20 @@ function entryKinds(e: Entry): EventFilter[] {
 const TIMELINE_SENSOR_GROW_EVENT_SELECT =
   "id,plant_id,event_type,source,occurred_at,environment_events(temperature_c,humidity_pct,vpd_kpa)";
 
+function linkedEnvironmentEventIds(diaryRows: ReadonlyArray<{ details?: unknown }>): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const row of diaryRows) {
+    const details = row.details;
+    if (!details || typeof details !== "object" || Array.isArray(details)) continue;
+    const linked = (details as Record<string, unknown>).linked_grow_event_id;
+    if (typeof linked !== "string" || linked.length === 0 || seen.has(linked)) continue;
+    seen.add(linked);
+    ids.push(linked);
+  }
+  return ids;
+}
+
 async function resolveMissingLinkedGrowEventParents(input: {
   growId: string;
   diaryRows: ReadonlyArray<{ id: string; details?: unknown }>;
@@ -1112,6 +1126,42 @@ export default function Timeline() {
             );
           },
         });
+        const knownSensorIds = new Set(timelineSensorEvents.map((row) => row.id));
+        const missingSensorIds = linkedEnvironmentEventIds(older).filter(
+          (id) => !knownSensorIds.has(id),
+        );
+        if (missingSensorIds.length > 0 && isCurrentPage()) {
+          try {
+            const sensorSiblingResult = await supabase
+              .from("grow_events")
+              .select(TIMELINE_SENSOR_GROW_EVENT_SELECT)
+              .eq("grow_id", requestedGrowId)
+              .eq("event_type", "environment")
+              .eq("is_deleted", false)
+              .in("id", missingSensorIds);
+            if (!isCurrentPage()) return;
+            if (
+              hasTimelineRequiredReadError(sensorSiblingResult) ||
+              !Array.isArray(sensorSiblingResult.data)
+            ) {
+              setPartialReadSources((current) =>
+                mergeTimelinePartialSources(current, ["manual_sensor_readings"]),
+              );
+            } else {
+              const siblings = sensorSiblingResult.data as unknown as GrowEventRowForRecent[];
+              setTimelineSensorEvents((current) => {
+                const seen = new Set(current.map((row) => row.id));
+                const extra = siblings.filter((row) => row.id && !seen.has(row.id));
+                return extra.length === 0 ? current : [...current, ...extra];
+              });
+            }
+          } catch {
+            if (!isCurrentPage()) return;
+            setPartialReadSources((current) =>
+              mergeTimelinePartialSources(current, ["manual_sensor_readings"]),
+            );
+          }
+        }
       }
     } catch {
       if (isCurrentPage()) setLoadOlderError(true);

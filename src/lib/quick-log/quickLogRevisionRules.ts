@@ -492,7 +492,21 @@ export function correctionValuesForTimelineDiaryEntry(
   const entryMs = Date.parse(entryAt);
   if (!Number.isFinite(entryMs)) return null;
   const plantId = entry?.plant_id ?? null;
-  for (const row of growEvents ?? []) {
+  const linkedId = nonEmpty(details.linked_grow_event_id);
+  const rows = growEvents ?? [];
+  if (linkedId) {
+    const linked = rows.find(
+      (row) => row.id === linkedId && row.event_type === "environment" && row.source === "manual",
+    );
+    if (linked) {
+      const child = Array.isArray(linked.environment_events)
+        ? linked.environment_events[0]
+        : linked.environment_events;
+      const sensor = sensorFromEnvironmentChild(child);
+      return sensor ? { kind: "sensor", sensor } : null;
+    }
+  }
+  for (const row of rows) {
     if (row.event_type !== "environment" || row.source !== "manual") continue;
     if ((row.plant_id ?? null) !== plantId) continue;
     if (typeof row.occurred_at !== "string" || Date.parse(row.occurred_at) !== entryMs) continue;

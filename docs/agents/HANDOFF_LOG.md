@@ -45,6 +45,26 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### QA-2128-FAB-CLEARANCE
+
+```text
+TASK QA-2128-FAB-CLEARANCE  priority: other  status: OPEN
+goal: Keep the last line of signed-in pages, including Derived VPD, clear of the fixed Quick Log button at 200% zoom. #1992 Enter submit and #1990 ranking chips already shipped (#2022, #2012). Do not edit GlobalSearchDialog; PR #2083 owns that file.
+branch: cursor/qa-fab-clearance-4fe4
+base: verdant-grow-diary
+checkout: git fetch origin cursor/qa-fab-clearance-4fe4 verdant-grow-diary && git switch cursor/qa-fab-clearance-4fe4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: draft, opened with this change
+head_sha: parent of the commit that records this line
+state: implemented
+next_action: required checks and independent review. Stay draft.
+files: src/lib/quickLogFabClearanceRules.ts; src/components/AppShell.tsx; src/test/quick-log-fab-content-clearance.test.ts; docs/agents/HANDOFF_LOG.md
+blockers: scorer lock on src/test/dashboard-mobile-layout-safety.test.ts, left unchanged
+artifacts: PR body
+reviewer_seat: Blue Dream (AppShell.tsx) and Critical Mass (rules and tests)
+claimed_by: cursor cloud agent, 2026-10-15
+last_updated: 2026-10-15 11:21 CT, by Grok
+```
+
 ### TIMELINE-GROW-DAY-2005
 
 ```text

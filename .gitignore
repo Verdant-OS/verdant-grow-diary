@@ -79,3 +79,7 @@ public/version.json
 # Generated build/deploy residue must not taint publisher provenance.
 /.output/
 /.wrangler/deploy/config.json
+
+# simple-workflow plugin artifacts (local-only; delete entries to share via git)
+.simple-workflow/
+.simple-workflow

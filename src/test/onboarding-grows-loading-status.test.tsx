@@ -45,10 +45,10 @@ describe("Onboarding while grows are loading", () => {
         </Routes>
       </MemoryRouter>,
     );
+    expect(container.querySelector("#onboarding-heading")).toBeNull();
     expect(screen.getByTestId("onboarding-grows-loading")).toHaveTextContent(
       ONBOARDING_GROWS_LOADING_COPY,
     );
     expect(ONBOARDING_GROWS_LOADING_COPY).not.toBe("Loading…");
-    expect(container.querySelector("[data-testid='onboarding-heading']")).toBeNull();
   });
 });

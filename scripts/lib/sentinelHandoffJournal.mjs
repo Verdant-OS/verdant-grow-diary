@@ -4,16 +4,15 @@ import {
   closeSync,
   existsSync,
   fsyncSync,
-  lstatSync,
   mkdirSync,
   openSync,
-  readFileSync,
   renameSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { transition } from "./sentinelHandoffRules.mjs";
+import { readBoundedJson } from "./sentinelHandoffJson.mjs";
 
 export function journalPaths(journalDir, policy) {
   const key = createHash("sha256").update(`${policy.repository}\n${policy.taskId}`).digest("hex");
@@ -50,16 +49,14 @@ export function runCommand({ journalDir, policy, command }, { commit = atomicCom
   try {
     if (existsSync(paths.pendingPath))
       throw new Error("JOURNAL_PENDING: reconcile interrupted persistence before dispatch");
-    let previous = null;
-    if (existsSync(paths.statePath)) {
-      const stat = lstatSync(paths.statePath);
-      if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 1024 * 1024)
-        throw new Error("JOURNAL_CORRUPT");
-      try {
-        previous = JSON.parse(readFileSync(paths.statePath, "utf8"));
-      } catch {
-        throw new Error("JOURNAL_CORRUPT");
-      }
+    let previous;
+    try {
+      previous = readBoundedJson(paths.statePath, { allowMissing: true });
+    } catch {
+      throw new Error("JOURNAL_CORRUPT");
+    }
+    if (previous === undefined) previous = null;
+    else {
       if (
         previous?.version !== 1 ||
         !Array.isArray(previous.history) ||

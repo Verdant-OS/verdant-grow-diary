@@ -172,12 +172,38 @@ expansion. That is an integration gate, not a request for new credentials or a s
 ## Validation and pickup evidence
 
 ```text
-node --test scripts/sentinel-handoff.test.mjs scripts/sentinel-handoff-journal.test.mjs
+node --test scripts/sentinel-handoff.test.mjs scripts/sentinel-handoff-journal.test.mjs scripts/sentinel-handoff-filesystem-race.test.mjs
 ```
 
 The new `src/test/sentinel-agent-handoff-node-runner.test.ts` wrapper includes these
 Node suites in existing Vitest shard discovery without a workflow or package change.
 It is not an additional set of unique behavior cases.
+
+CodeQL findings [275](https://github.com/Verdant-OS/verdant-grow-diary/security/code-scanning/275)
+and [276](https://github.com/Verdant-OS/verdant-grow-diary/security/code-scanning/276)
+were verified against `679f468aee41e75c0f8173c1508b05d9d5faa8c9`: pathname metadata
+checks followed by pathname reads could consume a replacement or an oversized file.
+The journal, policy and command readers now open once, validate the descriptor and
+post-open pathname identity, then read at most one MiB plus one overflow byte from
+that descriptor. They reject overflow, non-regular files, symlinks and observed
+in-place metadata changes; descriptors close even on error. Optional no-follow flags
+are supplemented by the identity check on Windows, where those flags are absent.
+Only an initial open `ENOENT` with no directory entry means a missing journal;
+JSON `null` and present entries with missing targets remain corrupt.
+These checks require trusted directories and cooperative exclusive writing. They do
+not establish a snapshot against a writer changing the same inode or protect every
+ancestor directory from an adversarial replacement.
+
+The new filesystem suite reproduced four defects before repair (1 PASS / 4 FAIL):
+stale journal replacement, journal growth and policy/command growth after metadata
+inspection. A separate new corruption case caught the missing-versus-null regression
+during repair (5 PASS / 1 FAIL); a simulated missing-target open with a still-present
+entry also failed first (6 PASS / 1 FAIL). The final seven filesystem cases,
+including the exact one MiB input boundary, pass alongside the original 23 cases:
+30 PASS / 0 FAIL /
+0 SKIP. A separate new Vitest wrapper includes them in existing shard discovery;
+the original tracked tests and wrapper are unchanged. All mutations use local fake
+fixtures. The new code head requires fresh hosted CI and independent acceptance.
 
 Fail-first evidence: initial rules 0 pass / 13 fail; initial journal 0 pass / 5 fail;
 later uncertainty/late ACK/scope rules 13 pass / 3 fail; cross-task replay 16 pass /
@@ -210,8 +236,9 @@ The later **real router-assisted internal proof completed**, at implementation h
   `return-receipt.json` are actual observed child receipts. **Do not resend it.**
 
 This is an actual existing child channel exercised through the host bridge. It is
-not autonomous CLI delivery or external agent adoption. The receipt-only docs commit
-after the implementation does not alter the tested runner or its tests.
+not autonomous CLI delivery or external agent adoption. This historical handoff
+remains evidence only for its recorded head. The filesystem repair changes the
+runner; it does not make that old receipt proof of live delivery on the repair head.
 
 Independent acceptance remains with the externally assigned seat at the exact final
 head; local/child peer review cannot replace it. Drafts stay draft. Rollback is a

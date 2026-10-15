@@ -1,12 +1,8 @@
 #!/usr/bin/env node
 // Explicit host bridge; no background loop and no outbound transport built in.
-import { readFileSync, statSync } from "node:fs";
 import { runCommand } from "./lib/sentinelHandoffJournal.mjs";
+import { readBoundedJson } from "./lib/sentinelHandoffJson.mjs";
 
-function readJson(path) {
-  if (statSync(path).size > 1024 * 1024) throw new Error("INPUT_TOO_LARGE");
-  return JSON.parse(readFileSync(path, "utf8"));
-}
 try {
   const [policyPath, journalDir, commandPath, ...extra] = process.argv.slice(2);
   if (!policyPath || !journalDir || !commandPath || extra.length) {
@@ -16,8 +12,8 @@ try {
   }
   const result = runCommand({
     journalDir,
-    policy: readJson(policyPath),
-    command: readJson(commandPath),
+    policy: readBoundedJson(policyPath),
+    command: readBoundedJson(commandPath),
   });
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 } catch (error) {

@@ -53,10 +53,10 @@ goal: Fix the nine Codex P2s from #2073's retrospective review (GitHub #2146, co
 branch: cursor/architecture-contract-p2s-37b4
 base: verdant-grow-diary
 checkout: git fetch origin cursor/architecture-contract-p2s-37b4 verdant-grow-diary && git switch cursor/architecture-contract-p2s-37b4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED until the draft PR is open
-head_sha: parent of the commit that records this line. Observed base before the branch: dfb1567ee8c42b3449ea3314976c6ed1d16a382d.
-state: local contract amendment, not yet pushed
-next_action: push the branch, open the draft PR, run docs-safety. Stay draft. No merge.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2149 (draft)
+head_sha: parent of the commit that records this line. Implementation commit aa181f2e6f826c015157b46c87c6afb4dce8acb7. Base dfb1567ee8c42b3449ea3314976c6ed1d16a382d.
+state: pushed draft
+next_action: required checks and an independent exact-head review. Stay draft. No merge.
 files: docs/architecture-contract.md; docs/agents/HANDOFF_LOG.md
 blockers: none for the repository change
 artifacts: GitHub issue #2146

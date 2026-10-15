@@ -56,9 +56,11 @@ import {
   applyQuickLogActionChip,
   applyResponseCheck,
   hasResponseCheck,
+  isPhotoOnlyQuickLogNote,
   type QuickLogActionChip,
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
+import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import { buildPlantQuickLogV2SavePayload } from "@/lib/plantQuickLogV2SaveAdapter";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
@@ -361,6 +363,66 @@ export default function PlantQuickLog({
           return;
         }
         uploadedPath = path;
+      }
+
+      if (
+        uploadedPath &&
+        user &&
+        photoFile &&
+        !hasManualReadings &&
+        isPhotoOnlyQuickLogNote(timelineNote)
+      ) {
+        const entryResult = await createQuickLogPhotoDiaryEntry({
+          ownerId: user.id,
+          growId,
+          tentId: tentId ?? null,
+          plantId,
+          photoPath: uploadedPath,
+          noteRaw: timelineNote,
+          action: "photo",
+          eventType: "photo",
+        });
+        if (!canContinue()) return;
+        if (!entryResult.ok) {
+          const failure = entryResult as { message: string; ambiguous?: boolean };
+          if (!failure.ambiguous && cleanupAllowed) {
+            await supabase.storage
+              .from("diary-photos")
+              .remove([uploadedPath])
+              .catch(() => {});
+          }
+          if (!canContinue()) return;
+          setError(failure.message);
+          return;
+        }
+        saveConfirmed = true;
+        if (growId) {
+          rememberRecentQuickLogTarget(
+            {
+              plantId,
+              growId,
+              tentId: tentId ?? null,
+              savedAt: new Date().toISOString(),
+            },
+            user.id,
+          );
+        }
+        applyQuickLogV2Refresh(queryClient, {
+          targetType: "plant",
+          targetId: plantId,
+          tentId: tentId ?? null,
+        });
+        window.dispatchEvent(
+          new CustomEvent("verdant:entry-created", {
+            detail: { plantId, createdAt: new Date().toISOString() },
+          }),
+        );
+        if (!canContinue()) return;
+        toast.success("Log saved to timeline.");
+        resetForm();
+        onOpenChange(false);
+        onSaved?.();
+        return;
       }
 
       // Reuse the first upload and payload together. A reused RPC key returns

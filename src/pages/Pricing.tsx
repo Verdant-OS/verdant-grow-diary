@@ -53,6 +53,8 @@ import {
 } from "@/lib/paidAcquisitionAttributionRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
+import { SandboxCheckoutTestModeNote } from "@/components/SandboxCheckoutTestModeNote";
+import { CHECKOUT_LIVE_FAQ_ID } from "@/lib/sandboxCheckoutTestModeNoteRules";
 import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -655,6 +657,7 @@ export default function Pricing() {
       </section>
 
       <section className="px-6 pb-8 max-w-3xl mx-auto" aria-label="Checkout status">
+        <SandboxCheckoutTestModeNote environment={checkoutEnvironment} />
         <div
           data-testid="pricing-checkout-trust"
           data-checkout-state={checkoutTrustCopy.state}
@@ -1372,7 +1375,11 @@ export default function Pricing() {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="checkout-status" data-testid="pricing-faq-checkout-status">
+          <AccordionItem
+            id={CHECKOUT_LIVE_FAQ_ID}
+            value="checkout-status"
+            data-testid="pricing-faq-checkout-status"
+          >
             <AccordionTrigger>{checkoutTrustCopy.faqQuestion}</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
               {checkoutTrustCopy.faqAnswer}

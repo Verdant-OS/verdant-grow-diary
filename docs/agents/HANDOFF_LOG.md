@@ -54,15 +54,15 @@ branch: cursor/quicklog-correction-editable-values-fc1d
 base: verdant-grow-diary
 checkout: git fetch origin cursor/quicklog-correction-editable-values-fc1d verdant-grow-diary && git switch cursor/quicklog-correction-editable-values-fc1d && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2118 (draft)
-head_sha: e9525c1a743888cfd8365b8c5417f2ab85cba3ba
-state: pushed draft. Graft FAIL at 3633b7e3 moved the measured proof off the locked harness and feeds environment readings into the Timeline dialog. The proof step sits inside test:legal-seo. No merge.
-next_action: required CI and the PostgreSQL 15 runtime contract at this head, then Graft one-time exact-head review. Stay draft.
+head_sha: c9b524d3eda4636e645bee60387679b516c62f3e
+state: pushed draft. Cheeko approved the Quick Log correction measured values job at 7:45 PM CT. The locked PG15 harness matches base. No merge.
+next_action: required CI, the PostgreSQL 15 runtime contract, and Quick Log correction measured values at this head, then Graft one-time exact-head review. Stay draft.
 files: src/lib/quick-log/quickLogRevisionRules.ts; src/components/QuickLogEntryIntegrityControls.tsx; src/components/QuickLogHistoryPanels.tsx; src/components/QuickLogGroupedTimelineSection.tsx; src/components/WateringHistoryPanel.tsx; src/components/FeedingHistoryPanel.tsx; src/pages/Timeline.tsx; src/test/quicklog-correction-editable-values.test.ts; src/test/quicklog-correction-editable-values-dialog.test.tsx; src/test/quicklog-correction-copilot-followup.test.tsx; scripts/prove-quicklog-correction-owner-fence.mjs; supabase/migrations/20261014210000_quicklog_correction_editable_values.sql; docs/agents/HANDOFF_LOG.md
 blockers: Graft FAIL at 3633b7e3 is the open review. Follow-up: the grouped timeline feeding editor still does not receive a stored dose (QuickLogGroupedTimelineSection.tsx correctionValues call). The locked PG15 harness is back to the base file. No merge.
 artifacts: PR body
 reviewer_seat: Graft one-time exact-head after required CI is green. Blue Dream (.tsx). Critical Mass (rules, tests, migration).
 claimed_by: bc-6f1bd555, 2026-10-14 23:20 UTC
-last_updated: 2026-10-15 00:48 UTC, by bc-6f1bd555
+last_updated: 2026-10-15 00:56 UTC, by bc-6f1bd555
 ```
 
 ### TIMELINE-GROW-DAY-2005

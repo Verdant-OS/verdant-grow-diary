@@ -80,6 +80,5 @@ public/version.json
 /.output/
 /.wrangler/deploy/config.json
 
-# simple-workflow plugin artifacts (local-only; delete entries to share via git)
-.simple-workflow/
+# Local scratch written by the simple-workflow agent plugin (session logs, plans).
 .simple-workflow

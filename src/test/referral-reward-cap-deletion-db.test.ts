@@ -4,7 +4,7 @@
  * rewarded conversion slot. The referrer's grant row stays.
  * Disposable PostgreSQL on a private socket. No hosted database.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -121,6 +121,8 @@ afterAll(() => {
   if (workdir) rmSync(workdir, { recursive: true, force: true });
 }, 30_000);
 
+beforeEach(() => sql("TRUNCATE public.referrals, public.ai_credit_grants;"));
+
 function convert(refereeId: string) {
   return JSON.parse(
     sql(
@@ -132,6 +134,26 @@ function convert(refereeId: string) {
 }
 
 describe("referral cap survives referee deletion", () => {
+  it("does not free a rewarded slot when the referrals row is removed but the grant remains", () => {
+    for (let i = 0; i < 10; i++) {
+      expect(convert(referee(i))).toMatchObject({ referrer_credits: 10, referrer_capped: false });
+    }
+    const referralId = sql(
+      "SELECT id FROM public.referrals WHERE referee_user_id = " + literal(referee(0)) + ";",
+    );
+    sql("DELETE FROM public.referrals WHERE id = " + literal(referralId) + ";");
+    expect(
+      sql(
+        "SELECT count(*) FROM public.referrals WHERE referrer_user_id = " + literal(REFERRER) + ";",
+      ),
+    ).toBe("9");
+    expect(convert(referee(10))).toMatchObject({
+      referrer_credits: 0,
+      referee_credits: 10,
+      referrer_capped: true,
+    });
+  });
+
   it("does not free a rewarded slot when the referee account is deleted", () => {
     for (let i = 0; i < 10; i++) {
       expect(convert(referee(i))).toMatchObject({ referrer_credits: 10, referrer_capped: false });

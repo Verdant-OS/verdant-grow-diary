@@ -118,6 +118,7 @@ import {
 import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayRules";
 import {
   completeManualSensorTimelineRows,
+  type ManualSensorTimelineMetricRow,
   diaryEntryBelongsInTimelineMeasurements,
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
@@ -460,8 +461,12 @@ export default function Timeline() {
   }, [urlGrowId, grows, storeGrowId, setActiveGrowId]);
   const [entries, setEntries] = useState<Entry[]>([]);
   // Tent Manual Snapshots live in `sensor_readings`, not diary_entries.
-  // Read-side receipts only — never a second write path.
-  const [manualSensorMeasurementEntries, setManualSensorMeasurementEntries] = useState<Entry[]>([]);
+  // Read-side receipts only — never a second write path. The fetched rows are
+  // kept raw; their display receipts derive at render (see
+  // manualSensorMeasurementEntries below) so a unit change never refetches.
+  const [manualSensorPageRows, setManualSensorPageRows] = useState<ManualSensorTimelineMetricRow[]>(
+    [],
+  );
   const [manualSensorHistoryLimited, setManualSensorHistoryLimited] = useState(false);
   // Keyset pagination (audit M1): the diary is unbounded but the page used
   // to silently cap at the newest 100 rows and report "Showing 100 of 100".
@@ -637,7 +642,7 @@ export default function Timeline() {
     const requestId = ++readRequestIdRef.current;
     if (!user || !activeGrowId) {
       setEntries([]);
-      setManualSensorMeasurementEntries([]);
+      setManualSensorPageRows([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
@@ -658,7 +663,7 @@ export default function Timeline() {
     // the network boundary instead of ever issuing an unscoped read.
     if (!activeReadKey) {
       setEntries([]);
-      setManualSensorMeasurementEntries([]);
+      setManualSensorPageRows([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
       setGrowEvents([]);
@@ -746,7 +751,7 @@ export default function Timeline() {
       // visible immediately; photos/action/alert context continues separately
       // and is never allowed to hold the diary or watering history hostage.
       setEntries(coreRows);
-      setManualSensorMeasurementEntries([]);
+      setManualSensorPageRows([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
       setGrowEvents(nextGrowEvents);
@@ -886,7 +891,7 @@ export default function Timeline() {
               if (!isCurrentRequest()) return;
               if (tentsResult.error || !Array.isArray(tentsResult.data)) {
                 markPartial("manual_sensor_readings");
-                setManualSensorMeasurementEntries([]);
+                setManualSensorPageRows([]);
                 setManualSensorHistoryLimited(false);
                 return;
               }
@@ -894,7 +899,7 @@ export default function Timeline() {
                 .map((row) => (typeof row.id === "string" ? row.id : null))
                 .filter((id): id is string => Boolean(id));
               if (tentIds.length === 0) {
-                setManualSensorMeasurementEntries([]);
+                setManualSensorPageRows([]);
                 setManualSensorHistoryLimited(false);
                 return;
               }
@@ -937,7 +942,7 @@ export default function Timeline() {
                 !Array.isArray(legacyResult.data)
               ) {
                 markPartial("manual_sensor_readings");
-                setManualSensorMeasurementEntries([]);
+                setManualSensorPageRows([]);
                 setManualSensorHistoryLimited(false);
                 return;
               }
@@ -945,25 +950,12 @@ export default function Timeline() {
                 ...requireEffectiveSensorReadings(capturedResult.data),
                 ...requireEffectiveSensorReadings(legacyResult.data),
               ]);
-              let receipts = manualSensorReadingsToTimelineEntries(manualPage.rows, new Date(), {
-                temperatureUnit,
-              });
-              if (timelineDateRangeBounds.startIso) {
-                receipts = receipts.filter(
-                  (row) => row.entry_at >= timelineDateRangeBounds.startIso!,
-                );
-              }
-              if (timelineDateRangeBounds.endIso) {
-                receipts = receipts.filter(
-                  (row) => row.entry_at <= timelineDateRangeBounds.endIso!,
-                );
-              }
-              setManualSensorMeasurementEntries(receipts as Entry[]);
+              setManualSensorPageRows(manualPage.rows);
               setManualSensorHistoryLimited(manualPage.hasOlderRows);
             } catch {
               if (!isCurrentRequest()) return;
               markPartial("manual_sensor_readings");
-              setManualSensorMeasurementEntries([]);
+              setManualSensorPageRows([]);
               setManualSensorHistoryLimited(false);
             }
           })(),
@@ -979,14 +971,7 @@ export default function Timeline() {
       setCoreRead({ status: "error", readKey: requestedReadKey });
       setLoading(false);
     }
-  }, [
-    activeGrowId,
-    activeReadKey,
-    directoryGrowId,
-    timelineDateRangeBounds,
-    user,
-    temperatureUnit,
-  ]);
+  }, [activeGrowId, activeReadKey, directoryGrowId, timelineDateRangeBounds, user]);
 
   /**
    * Keyset "Load older" — fetches the next page strictly before the oldest
@@ -1133,6 +1118,22 @@ export default function Timeline() {
     (total, stage) => total + (stageCounts[stage.value] || 0),
     0,
   );
+
+  // Receipts derive from the fetched rows at render: a unit change (Settings in
+  // this document or another tab) reformats them in place and never re-runs the
+  // fetch effect, which would reset "Load older" pagination (#2111 review).
+  const manualSensorMeasurementEntries = useMemo(() => {
+    let receipts = manualSensorReadingsToTimelineEntries(manualSensorPageRows, new Date(), {
+      temperatureUnit,
+    });
+    if (timelineDateRangeBounds.startIso) {
+      receipts = receipts.filter((row) => row.entry_at >= timelineDateRangeBounds.startIso!);
+    }
+    if (timelineDateRangeBounds.endIso) {
+      receipts = receipts.filter((row) => row.entry_at <= timelineDateRangeBounds.endIso!);
+    }
+    return receipts as Entry[];
+  }, [manualSensorPageRows, temperatureUnit, timelineDateRangeBounds]);
 
   const displayEntries = useMemo(
     () => mergeTimelineMeasurementDisplayEntries(entries, manualSensorMeasurementEntries),

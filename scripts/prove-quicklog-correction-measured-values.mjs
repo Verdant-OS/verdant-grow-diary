@@ -135,7 +135,7 @@ values
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1', '${OWNER}', 'water',
     '{"event_type":"watering","linked_grow_event_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1","watering":{"volume_ml":500}}'),
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2', '${OWNER}', 'feed',
-    '{"event_type":"feeding","linked_grow_event_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2","feeding":{"volume_ml":200,"products":[{"name":"Grow","amount":2,"unit":"ml"}]}}'),
+    '{"event_type":"feeding","linked_grow_event_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2","watering_amount_ml":200,"feeding":{"volume_ml":200,"products":[{"name":"Grow","amount":2,"unit":"ml"}]}}'),
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3', '${OWNER}', 'sensor',
     '{"event_type":"environment","linked_grow_event_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3","sensor_snapshot":{"metrics":{"temperature_c":24,"humidity_pct":55,"vpd_kpa":1.2}}}');
 insert into public.watering_events(event_id, user_id, volume_ml)
@@ -177,6 +177,9 @@ begin
   select details into v_feed_details from public.diary_entries where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
   if (v_feed_details #>> '{feeding,volume_ml}')::numeric <> 300 then
     raise exception 'feeding volume missing from feeding details: %', v_feed_details;
+  end if;
+  if (v_feed_details ->> 'watering_amount_ml')::numeric is distinct from 300 then
+    raise exception 'feeding flat watering_amount_ml alias stayed stale: %', v_feed_details;
   end if;
   if v_feed_details #> '{watering,volume_ml}' is not null then
     raise exception 'feeding volume wrote watering details: %', v_feed_details;

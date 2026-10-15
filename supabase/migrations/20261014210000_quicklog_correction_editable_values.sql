@@ -136,6 +136,14 @@ BEGIN
       UPDATE public.diary_entries d
          SET details = jsonb_set(COALESCE(d.details, '{}'::jsonb), '{feeding,volume_ml}', to_jsonb(p_volume), true)
        WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid;
+      UPDATE public.diary_entries d
+         SET details = jsonb_set(d.details, '{watering_amount_ml}', to_jsonb(p_volume), false)
+       WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
+         AND jsonb_typeof(d.details -> 'watering_amount_ml') = 'number';
+      UPDATE public.diary_entries d
+         SET details = jsonb_set(d.details, '{wateringAmountMl}', to_jsonb(p_volume), false)
+       WHERE d.id = ANY (p_diary_ids) AND d.user_id = p_uid
+         AND jsonb_typeof(d.details -> 'wateringAmountMl') = 'number';
     END IF;
   END IF;
 

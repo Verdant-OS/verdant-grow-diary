@@ -53,10 +53,10 @@ goal: When creating a plant fails, show the error in the dialog and as a toast, 
 branch: cursor/plant-create-insert-error-99b8
 base: verdant-grow-diary
 checkout: git fetch origin cursor/plant-create-insert-error-99b8 verdant-grow-diary && git switch cursor/plant-create-insert-error-99b8 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: draft against verdant-grow-diary, to be recorded after open
-head_sha: parent of the commit that records this line
-state: implemented locally, not yet pushed
-next_action: push the branch and open the draft PR. Stay draft. No merge.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2192 (draft)
+head_sha: 75f39a0e7806332445580abdf01296f92bafc1df (parent of the commit that records this URL). Read the PR head before resuming.
+state: pushed draft
+next_action: required checks and Blue Dream review. Stay draft. No merge.
 files: src/components/CreatePlantDialog.tsx; src/lib/plantCreateFailureNotice.ts; src/test/plant-create-insert-failure-notice.test.tsx; docs/agents/HANDOFF_LOG.md
 blockers: none for the repository change. The plants-list health label stays with #2140.
 artifacts: fail-first 3 failed / 1 passed on src/test/plant-create-insert-failure-notice.test.tsx; 4 passed / 0 failed after

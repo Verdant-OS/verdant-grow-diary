@@ -251,9 +251,14 @@ describe("CreatePlantDialog tent selection and submit safety", () => {
       expect(screen.queryByRole("dialog", { name: "New plant" })).not.toBeInTheDocument();
     });
     expect(await screen.findByText("Plant created")).toBeVisible();
-    // Dialog close after submit must not leave focus on the New plant trigger where a trailing key/click reopens it empty.
-    expect(newPlantTrigger).not.toHaveFocus();
+    // Codex P2 at 84e6874b: keyboard users get focus back on the New plant trigger,
+    // and a trailing key from the submitting gesture (held Enter before keyup) must
+    // not reopen the dialog empty.
+    expect(newPlantTrigger).toHaveFocus();
+    fireEvent.keyDown(newPlantTrigger, { key: "Enter" });
+    fireEvent.click(newPlantTrigger);
     expect(screen.queryByRole("dialog", { name: "New plant" })).not.toBeInTheDocument();
+    fireEvent.keyUp(window, { key: "Enter" });
 
     await user.click(newPlantTrigger);
     await screen.findByTestId("create-plant-form");

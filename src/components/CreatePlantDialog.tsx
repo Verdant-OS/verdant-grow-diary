@@ -239,6 +239,8 @@ export default function CreatePlantDialog({
   const createInFlightRef = useRef(false);
   const suppressTentSelectSubmitRef = useRef(false);
   const closedAfterSubmitRef = useRef(false);
+  const releaseReopenGuardRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => releaseReopenGuardRef.current?.(), []);
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
     ownerId: user?.id,
   });
@@ -350,11 +352,22 @@ export default function CreatePlantDialog({
     }
   }
 
-  function handleDialogCloseAutoFocus(event: Event) {
-    if (closedAfterSubmitRef.current) {
+  // After a successful create, let Radix return focus to the New plant trigger
+  // (keyboard users keep their place) but keep the reopen guard armed until the
+  // submitting gesture ends: a held or trailing key must not reopen the dialog
+  // empty. The next keyup or pointerdown releases it.
+  function handleDialogCloseAutoFocus(_event: Event) {
+    if (!closedAfterSubmitRef.current) return;
+    releaseReopenGuardRef.current?.();
+    const release = () => {
       closedAfterSubmitRef.current = false;
-      event.preventDefault();
-    }
+      window.removeEventListener("keyup", release, true);
+      window.removeEventListener("pointerdown", release, true);
+      releaseReopenGuardRef.current = null;
+    };
+    releaseReopenGuardRef.current = release;
+    window.addEventListener("keyup", release, true);
+    window.addEventListener("pointerdown", release, true);
   }
 
   function handleOpenChange(next: boolean) {

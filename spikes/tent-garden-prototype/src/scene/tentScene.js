@@ -7,6 +7,14 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { TENT, clampToTent } from "../rules/layoutRules.js";
 import { visualForStage, labelFor } from "../rules/plantVisualRules.js";
+import {
+  STORYBOOK,
+  toon,
+  outlined,
+  seedFor,
+  buildStorybookPot,
+  buildStorybookPlant,
+} from "./storybookPlant.js";
 
 const UNIT = 1; // 1 scene unit = 1 inch
 const FLOOR_Y = 0;
@@ -14,30 +22,21 @@ const POT_H = 7;
 const WALL_H = 26;
 const TRANSITION_MS = 1500;
 
-// Cartoon palette: flat, saturated, friendly. Shading comes from the toon gradient, not here.
+// Storybook palette (style B): warm paper, muted greens, terracotta. Shading comes from the
+// two-step toon gradient in storybookPlant.js, not from these colours.
 const COLORS = {
-  sky: 0xdff0e6,
-  floor: 0xb9a27d,
-  grid: 0x9c8663,
-  wall: 0x4e6b5c,
-  frame: 0x2f3f37,
-  lamp: 0x5a6b7a,
-  pot: 0xe07a3f,
-  potRim: 0xf09a5a,
-  soil: 0x5b3a26,
-  stem: 0x4d9a3f,
-  seedling: 0xb6ef7a,
-  veg: 0x5fcf5a,
-  flower: 0x3fb463,
-  cluster: 0xe9f5a8,
-  pistil: 0xff9d4d,
-  neutral: 0xa9b8b0,
+  sky: STORYBOOK.paper,
+  floor: STORYBOOK.ground,
+  grid: STORYBOOK.grid,
+  wall: STORYBOOK.wall,
+  frame: STORYBOOK.frame,
+  lamp: STORYBOOK.lamp,
   selectRing: 0xff5c8a,
   ghost: 0x2ec27e,
-  door: 0xffd23f,
+  door: STORYBOOK.door,
 };
 
-const DEFAULT_CAMERA = { azimuthDeg: -30, polarDeg: 54, distance: 125 };
+const DEFAULT_CAMERA = { azimuthDeg: -30, polarDeg: 58, distance: 125 };
 
 export function isWebGLAvailable() {
   try {
@@ -286,7 +285,7 @@ export function createTentScene(host, handlers) {
         p.group.remove(p.plantMesh);
         disposeDeep(p.plantMesh);
       }
-      p.plantMesh = buildPlant(v);
+      p.plantMesh = buildPlant(v, plantRecord?.id);
       p.plantMesh.position.y = POT_H - 0.5;
       p.group.add(p.plantMesh);
       p.visualKey = key;
@@ -455,32 +454,6 @@ export function createTentScene(host, handlers) {
 
 // ---- geometry builders ------------------------------------------------------------------
 
-// ---- toon helpers --------------------------------------------------------------------------
-
-/** Three-step gradient so toon materials shade in flat bands. */
-const TOON_GRADIENT = (() => {
-  const data = new Uint8Array([70, 150, 235]);
-  const tex = new THREE.DataTexture(data, 3, 1, THREE.RedFormat);
-  tex.minFilter = THREE.NearestFilter;
-  tex.magFilter = THREE.NearestFilter;
-  tex.needsUpdate = true;
-  return tex;
-})();
-
-function toon(color, extra = {}) {
-  return new THREE.MeshToonMaterial({ color, gradientMap: TOON_GRADIENT, ...extra });
-}
-
-const INK = new THREE.MeshBasicMaterial({ color: 0x1f2a24, side: THREE.BackSide });
-
-/** Ink outline: a slightly larger back-face copy behind the mesh. */
-function outlined(mesh, thickness = 0.06) {
-  const ink = new THREE.Mesh(mesh.geometry, INK);
-  ink.scale.setScalar(1 + thickness);
-  mesh.add(ink);
-  return mesh;
-}
-
 function buildTent(scene) {
   const w = TENT.widthIn * UNIT;
   const d = TENT.depthIn * UNIT;
@@ -494,11 +467,11 @@ function buildTent(scene) {
 
   const grid = new THREE.GridHelper(w, TENT.widthIn / TENT.snapIn, COLORS.grid, COLORS.grid);
   grid.material.transparent = true;
-  grid.material.opacity = 0.45;
+  grid.material.opacity = 0.3;
   grid.position.set(w / 2, FLOOR_Y + 0.02, d / 2);
   scene.add(grid);
 
-  const wallMat = toon(COLORS.wall, { side: THREE.DoubleSide, transparent: true, opacity: 0.55 });
+  const wallMat = toon(COLORS.wall, { side: THREE.DoubleSide, transparent: true, opacity: 0.35 });
   const back = new THREE.Mesh(new THREE.PlaneGeometry(w, WALL_H), wallMat);
   back.position.set(w / 2, WALL_H / 2, 0);
   scene.add(back);
@@ -511,7 +484,8 @@ function buildTent(scene) {
   right.position.set(w, WALL_H / 2, d / 2);
   scene.add(right);
 
-  // chunky frame poles and a light bar; front stays open at the door
+  // slim frame poles and a thin light bar; front stays open at the door. The front-right
+  // pole and the bar are translucent so hardware never hides a plant from the default view.
   const poleMat = toon(COLORS.frame);
   for (const [x, z] of [
     [0, 0],
@@ -519,38 +493,41 @@ function buildTent(scene) {
     [0, d],
     [w, d],
   ]) {
-    const pole = outlined(
-      new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, WALL_H + 6, 10), poleMat),
-      0.08,
-    );
+    const mat =
+      x === w && z === d ? toon(COLORS.frame, { transparent: true, opacity: 0.3 }) : poleMat;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, WALL_H + 6, 10), mat);
+    if (mat === poleMat) outlined(pole, 0.06);
     pole.position.set(x, (WALL_H + 6) / 2, z);
     scene.add(pole);
   }
   for (const z of [0, d]) {
-    const rail = outlined(new THREE.Mesh(new THREE.BoxGeometry(w, 1.6, 1.6), poleMat), 0.05);
+    const rail = outlined(new THREE.Mesh(new THREE.BoxGeometry(w, 1.0, 1.0), poleMat), 0.06);
     rail.position.set(w / 2, WALL_H + 5.2, z);
     scene.add(rail);
   }
   for (const x of [0, w]) {
-    const rail = outlined(new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, d), poleMat), 0.05);
+    const rail = outlined(new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, d), poleMat), 0.06);
     rail.position.set(x, WALL_H + 5.2, d / 2);
     scene.add(rail);
   }
-  const bar = outlined(new THREE.Mesh(new THREE.BoxGeometry(w * 0.8, 2, 11), toon(COLORS.lamp)));
-  bar.position.set(w / 2, WALL_H + 3.5, d / 2);
+  const bar = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 0.7, 1.0, 6),
+    toon(COLORS.lamp, { transparent: true, opacity: 0.55 }),
+  );
+  bar.position.set(w / 2, WALL_H + 4.2, d / 2);
   scene.add(bar);
   const barGlow = new THREE.Mesh(
-    new THREE.PlaneGeometry(w * 0.76, 9),
-    new THREE.MeshBasicMaterial({ color: 0xfff6c8 }),
+    new THREE.PlaneGeometry(w * 0.66, 4.6),
+    new THREE.MeshBasicMaterial({ color: 0xfff6d2, transparent: true, opacity: 0.8 }),
   );
   barGlow.rotation.x = Math.PI / 2;
-  barGlow.position.set(w / 2, WALL_H + 2.4, d / 2);
+  barGlow.position.set(w / 2, WALL_H + 3.6, d / 2);
   scene.add(barGlow);
 
   // door mat at the front edge with an upright label
   const doorStrip = outlined(
     new THREE.Mesh(new THREE.BoxGeometry(w, 0.8, 2.4), toon(COLORS.door)),
-    0.04,
+    0.06,
   );
   doorStrip.position.set(w / 2, FLOOR_Y + 0.4, d + 1.2);
   scene.add(doorStrip);
@@ -563,13 +540,14 @@ function buildTent(scene) {
 }
 
 function buildLights(scene) {
-  scene.add(new THREE.HemisphereLight(0xfff8e8, 0x8fb39a, 1.1));
-  const key = new THREE.DirectionalLight(0xffffff, 2.2);
+  scene.add(new THREE.HemisphereLight(0xfff6e0, 0xb8a888, 1.05));
+  const key = new THREE.DirectionalLight(0xfff0c8, 1.35);
   key.position.set(20, 60, 34);
   key.target.position.set(24, 0, 24);
   key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.mapSize.set(2048, 2048);
   key.shadow.radius = 2;
+  key.shadow.bias = -0.0006;
   const sc = key.shadow.camera;
   sc.left = -40;
   sc.right = 40;
@@ -582,28 +560,7 @@ function buildLights(scene) {
 }
 
 function buildPot() {
-  const g = new THREE.Group();
-  const r = TENT.potRadiusIn;
-  const body = outlined(
-    new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.78, POT_H, 24), toon(COLORS.pot)),
-    0.05,
-  );
-  body.position.y = POT_H / 2;
-  body.castShadow = true;
-  body.receiveShadow = true;
-  g.add(body);
-  const rim = outlined(
-    new THREE.Mesh(new THREE.TorusGeometry(r - 0.2, 0.75, 10, 32), toon(COLORS.potRim)),
-    0.08,
-  );
-  rim.rotation.x = Math.PI / 2;
-  rim.position.y = POT_H;
-  g.add(rim);
-  const soil = new THREE.Mesh(new THREE.CircleGeometry(r - 0.8, 24), toon(COLORS.soil));
-  soil.rotation.x = -Math.PI / 2;
-  soil.position.y = POT_H - 0.3;
-  g.add(soil);
-  return g;
+  return buildStorybookPot(TENT.potRadiusIn, POT_H);
 }
 
 function buildGhost() {
@@ -620,90 +577,9 @@ function buildGhost() {
   return m;
 }
 
-/** A cartoon fan leaf: a flat lozenge with a pointed tip, extruded a touch so it has edges. */
-const LEAF_GEO = (() => {
-  const shape = new THREE.Shape();
-  shape.moveTo(0, 0);
-  shape.quadraticCurveTo(0.55, 0.3, 0.42, 0.75);
-  shape.quadraticCurveTo(0.2, 0.95, 0, 1);
-  shape.quadraticCurveTo(-0.2, 0.95, -0.42, 0.75);
-  shape.quadraticCurveTo(-0.55, 0.3, 0, 0);
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.08, bevelEnabled: false });
-  geo.rotateX(-Math.PI / 2); // lies flat, pointing along +z
-  return geo;
-})();
-
-/**
- * Stylised cartoon plant. One consistent design: a thick stem, fan-leaf whorls whose
- * count/size follow recorded stage, and round flower clusters that fill in by recorded week.
- */
-function buildPlant(v) {
-  const g = new THREE.Group();
-  const leafColor = v.neutral ? COLORS.neutral : COLORS[v.colorKey];
-  const stemMat = toon(v.neutral ? 0x8c9a92 : COLORS.stem);
-  const leafMat = toon(leafColor, { side: THREE.DoubleSide });
-
-  const stem = outlined(
-    new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.9, v.heightIn, 8), stemMat),
-    0.1,
-  );
-  stem.position.y = v.heightIn / 2;
-  stem.castShadow = true;
-  g.add(stem);
-
-  for (let tier = 0; tier < v.leafTiers; tier++) {
-    const frac = (tier + 1) / (v.leafTiers + 1);
-    const y = v.heightIn * frac;
-    const radius = v.canopyRadiusIn * (1.05 - frac * 0.45);
-    const leaves = v.stage === "seedling" ? 2 : 5;
-    for (let i = 0; i < leaves; i++) {
-      const a = (i / leaves) * Math.PI * 2 + tier * 0.7;
-      const leaf = outlined(new THREE.Mesh(LEAF_GEO, leafMat), 0.05);
-      leaf.scale.set(radius * 0.95, 1, radius * 1.15);
-      leaf.position.set(Math.cos(a) * 0.6, y, Math.sin(a) * 0.6);
-      leaf.rotation.y = Math.PI / 2 - a;
-      leaf.rotation.x = v.neutral ? 0.05 : -0.35; // droop up toward the light
-      leaf.castShadow = true;
-      g.add(leaf);
-    }
-  }
-
-  if (v.clusterCount > 0) {
-    const clusterMat = toon(COLORS.cluster);
-    const pistilMat = toon(COLORS.pistil);
-    const clusterGeo = new THREE.SphereGeometry(1, 12, 10);
-    const cola = outlined(new THREE.Mesh(clusterGeo, clusterMat), 0.06);
-    cola.scale.set(
-      1.6 * v.clusterScale + 0.6,
-      2.6 * v.clusterScale + 0.9,
-      1.6 * v.clusterScale + 0.6,
-    );
-    cola.position.y = v.heightIn + cola.scale.y * 0.6;
-    cola.castShadow = true;
-    g.add(cola);
-    for (let i = 0; i < v.clusterCount; i++) {
-      const a = (i / v.clusterCount) * Math.PI * 2 + 0.3;
-      const ringR = v.canopyRadiusIn * (0.35 + 0.25 * (i % 2));
-      const y = v.heightIn * (0.55 + 0.35 * ((i % 3) / 2));
-      const c = outlined(new THREE.Mesh(clusterGeo, i % 4 === 3 ? pistilMat : clusterMat), 0.08);
-      const s = 0.7 + v.clusterScale * 1.0;
-      c.scale.set(s, s * 1.4, s);
-      c.position.set(Math.cos(a) * ringR, y, Math.sin(a) * ringR);
-      c.castShadow = true;
-      g.add(c);
-    }
-  }
-
-  if (v.neutral) {
-    // unknown stage: a question-mark-ish tag so the record reads as "not recorded"
-    const tag = outlined(
-      new THREE.Mesh(new THREE.OctahedronGeometry(1.4, 0), toon(0xcfd8d3)),
-      0.08,
-    );
-    tag.position.y = v.heightIn + 2.6;
-    g.add(tag);
-  }
-  return g;
+/** Storybook plant for a visual record; deterministic per plant id. */
+function buildPlant(v, id) {
+  return buildStorybookPlant(v, seedFor(id));
 }
 
 function disposeDeep(obj) {

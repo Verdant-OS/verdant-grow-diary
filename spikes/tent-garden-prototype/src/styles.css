@@ -183,43 +183,45 @@ button {
 }
 .plant-label {
   pointer-events: none;
-  background: #ffffff;
-  border: 2px solid #1f2a24;
-  color: #1f2a24;
+  background: #fbf3df;
+  border: 1.5px solid #3f3327;
+  color: #3a2e22;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
   font-size: 13px;
   font-weight: 700;
   line-height: 1.15;
-  padding: 4px 9px;
-  border-radius: 10px;
+  padding: 4px 10px;
+  border-radius: 6px 14px 8px 12px;
   white-space: nowrap;
-  transform: translateY(-8px);
-  box-shadow: 0 3px 0 #1f2a24;
+  transform: translateY(-8px) rotate(-1.2deg);
+  box-shadow: 2px 2px 0 #3f3327;
 }
 .plant-label small {
   display: block;
-  color: #4b5a52;
+  color: #6b5a48;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 400;
 }
 .plant-label.is-selected {
   background: #fff1b8;
   border-color: #ff5c8a;
-  box-shadow: 0 3px 0 #ff5c8a;
+  box-shadow: 2px 2px 0 #ff5c8a;
 }
 .plant-label.is-neutral {
   border-style: dashed;
 }
 .door-label {
   pointer-events: none;
-  color: #1f2a24;
+  color: #3a2e22;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  letter-spacing: 0.5px;
   background: #ffd23f;
-  border: 2px solid #1f2a24;
+  border: 1.5px solid #3f3327;
   padding: 2px 8px;
   border-radius: 999px;
+  box-shadow: 1px 1px 0 #3f3327;
 }
 .history-banner {
   position: absolute;

@@ -37,6 +37,7 @@ import { renderErrorPage } from "@/lib/error-page";
 import appCss from "@/styles.css?url";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "@/lib/build/siteSoftwareApplicationJsonLd";
 import { GROW_HELP_TOOLKIT_PATH } from "@/lib/growHelpToolkitState";
+import { normalizeRouteError } from "@/lib/rootRouteErrorRules";
 import { OAUTH_HASH_EARLY_WIPE_SCRIPT } from "@/lib/oauthHashSessionConsumeRules";
 
 const SITE_URL = "https://verdantgrowdiary.com";
@@ -131,10 +132,7 @@ function isGrowHelpToolkitPath(pathname: string): boolean {
 }
 
 function RootErrorComponent({ error }: { error: unknown }) {
-  const normalizedError = useMemo(
-    () => (error instanceof Error ? error : new Error(String(error))),
-    [error],
-  );
+  const normalizedError = useMemo(() => normalizeRouteError(error), [error]);
   const pathname = useRouterState({
     select: (state) => state.resolvedLocation?.pathname ?? state.location.pathname,
   });

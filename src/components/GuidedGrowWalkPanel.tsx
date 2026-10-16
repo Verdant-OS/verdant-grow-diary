@@ -132,6 +132,7 @@ export default function GuidedGrowWalkPanel({
             type="button"
             size="sm"
             variant={visitMode === mode.id ? "default" : "outline"}
+            className="h-auto min-h-9 min-w-0 whitespace-normal break-words py-1.5 text-center leading-tight"
             aria-pressed={visitMode === mode.id}
             data-testid={`${testIdPrefix}-visit-mode-${mode.id}`}
             onClick={() => onVisitModeChange(mode.id)}

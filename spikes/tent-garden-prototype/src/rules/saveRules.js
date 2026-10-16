@@ -188,6 +188,21 @@ export function undoLastSave(state) {
   };
 }
 
+/**
+ * A pending (failed) save is only retryable while nothing underneath it has moved.
+ * It records the batch id it was built from; the caller recomputes the id from the current
+ * saved baseline + draft and compares. Any difference — an Undo of a saved batch, a new
+ * draft edit, a note change — invalidates the pending save so Retry cannot restore stale
+ * content.
+ */
+export function pendingIsCurrent(pending, { saveSeq, baseline, draft, baselineNotes, draftNotes }) {
+  if (!pending?.batchId) return false;
+  const changes = netChanges(baseline, draft);
+  const notes = noteChanges(baselineNotes, draftNotes);
+  if (changes.length === 0 && notes.length === 0) return false;
+  return batchIdFor(saveSeq, changes, notes) === pending.batchId;
+}
+
 /** Draft history helpers for pre-save Undo. Pure stack operations. */
 export function pushDraft(history, draft) {
   return [...history, { ...draft }];

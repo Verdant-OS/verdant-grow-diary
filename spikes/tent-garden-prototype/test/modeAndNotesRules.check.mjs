@@ -117,3 +117,50 @@ test("note batches are idempotent and undo restores the previous notes", () => {
   assert.deepEqual(undone.savedNotes, {});
   assert.equal(undone.events[0].undone, true);
 });
+
+test("regression: a failed save is invalidated when Undo (or any edit) changes what it was built on", async () => {
+  const { pendingIsCurrent } = await import("../src/rules/saveRules.js");
+  // Baseline: a saved batch that moved P-106; then a second draft move fails to save.
+  const firstDraft = resolveDrop(TODAY_LAYOUT, "P-106", { x: 40, z: 24 }).layout;
+  const p1 = buildSavePreview(TODAY_LAYOUT, firstDraft, PLANTS_BY_ID, {}, {});
+  const b1 = batchIdFor(1, p1.changes, p1.notes);
+  const e1 = eventsForSave({
+    preview: p1,
+    intents: { "move:P-106": "physical" },
+    batchId: b1,
+    now: NOW,
+    plantsById: PLANTS_BY_ID,
+  });
+  const state0 = {
+    savedLayout: { ...TODAY_LAYOUT },
+    savedNotes: {},
+    events: [],
+    appliedBatchIds: [],
+    lastBatch: null,
+  };
+  const saved = applySave(state0, { batchId: b1, draft: firstDraft, notes: {}, events: e1 }).state;
+
+  const secondDraft = resolveDrop(saved.savedLayout, "P-105", { x: 24, z: 10 }).layout;
+  const p2 = buildSavePreview(saved.savedLayout, secondDraft, PLANTS_BY_ID, saved.savedNotes, {});
+  const pending = { batchId: batchIdFor(2, p2.changes, p2.notes), draft: secondDraft, notes: {} };
+  const ctx = {
+    saveSeq: 2,
+    baseline: saved.savedLayout,
+    draft: secondDraft,
+    baselineNotes: saved.savedNotes,
+    draftNotes: {},
+  };
+  assert.equal(pendingIsCurrent(pending, ctx), true, "untouched pending save is retryable");
+
+  // Undo the last saved batch: the baseline moves, so the pending save is stale.
+  const undone = undoLastSave(saved).state;
+  assert.equal(pendingIsCurrent(pending, { ...ctx, baseline: undone.savedLayout }), false);
+  // Continued editing after the failure also invalidates the old pending save.
+  const edited = resolveDrop(secondDraft, "P-105", { x: 24, z: 8 }).layout;
+  assert.equal(pendingIsCurrent(pending, { ...ctx, draft: edited }), false);
+  // A note typed after the failure invalidates it too.
+  assert.equal(pendingIsCurrent(pending, { ...ctx, draftNotes: { "P-101": "late note" } }), false);
+  // Degenerate inputs are never "current".
+  assert.equal(pendingIsCurrent(null, ctx), false);
+  assert.equal(pendingIsCurrent(pending, { ...ctx, draft: saved.savedLayout }), false);
+});

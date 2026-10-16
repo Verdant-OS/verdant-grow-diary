@@ -18,6 +18,7 @@ import {
   popDraft,
   noteChanges,
   normalizeNote,
+  pendingIsCurrent,
 } from "../rules/saveRules.js";
 import { timelinePoints, pointAt, evidenceFor } from "../rules/historyRules.js";
 import { resolveModeChange, cameraLocked } from "../rules/modeRules.js";
@@ -439,8 +440,36 @@ function nudgeSelected(dx, dz) {
   commitDrop(state.selectedId, { x: cur.x + dx * TENT.snapIn, z: cur.z + dz * TENT.snapIn });
 }
 
+function pendingContext() {
+  return {
+    saveSeq: state.saveSeq,
+    baseline: state.saved.savedLayout,
+    draft: draft(),
+    baselineNotes: state.saved.savedNotes,
+    draftNotes: draftNotes(),
+  };
+}
+
+/** Drop a pending (failed) save whenever the baseline or draft it was built from changes. */
+function invalidatePendingIfStale() {
+  if (state.pendingBatch && !pendingIsCurrent(state.pendingBatch, pendingContext())) {
+    state.pendingBatch = null;
+    state.saveStatus = "idle";
+    return true;
+  }
+  return false;
+}
+
 function openSave() {
+  // A note typed but not yet blurred must be part of what gets saved.
+  const ta = $("noteDraft");
+  if (ta && state.selectedId) commitNoteDraft(state.selectedId, ta.value);
   if (state.pendingBatch && state.saveStatus === "failed") {
+    if (invalidatePendingIfStale()) {
+      render();
+      toast("The draft changed since that save failed. Review the new preview before saving.");
+      return;
+    }
     retrySave();
     return;
   }
@@ -497,6 +526,10 @@ function openSave() {
 }
 
 function retrySave() {
+  if (invalidatePendingIfStale()) {
+    render();
+    return;
+  }
   $("simulateFail").checked = false;
   commitPending();
 }
@@ -527,6 +560,9 @@ function undoSaved() {
   const { state: next, undone } = undoLastSave(state.saved);
   if (!undone) return;
   state.saved = next;
+  // The saved baseline moved: any pending (failed) save was built on the old one.
+  state.pendingBatch = null;
+  if (state.saveStatus === "failed") state.saveStatus = "idle";
   if (state.mode === "edit") state.draftHistory = [freshDraft()];
   render();
   toast("Last saved batch undone. Its simulated event is marked Undone, not deleted.");

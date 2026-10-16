@@ -376,9 +376,16 @@ export function createTentScene(host, handlers) {
     animations = !!on;
   }
   let cameraLockedFlag = false;
+  /** Lock the camera: cancel any in-flight camera animation and freeze orbit damping. */
   function setCameraLocked(on) {
     cameraLockedFlag = !!on;
-    controls.enabled = !cameraLockedFlag && !drag;
+    if (cameraLockedFlag) {
+      // Rotate followed immediately by Edit: stop where we are, do not glide to the target.
+      camAnim = null;
+      controls.enabled = false;
+    } else {
+      controls.enabled = !drag;
+    }
   }
 
   // ---- render loop --------------------------------------------------------------------
@@ -405,12 +412,9 @@ export function createTentScene(host, handlers) {
         p.plantMesh.scale.setScalar(s);
         if (k >= 1) p.scaleT0 = 0;
       }
-      if (p.ring.visible) {
-        const pulse = animations ? 0.75 + 0.15 * Math.sin(now / 350) : 0.85;
-        p.ring.material.opacity = pulse;
-      }
     }
-    controls.update();
+    // While locked, skip controls.update() so orbit damping cannot drift the camera.
+    if (!cameraLockedFlag) controls.update();
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);
     lastRenderedTick = now;
@@ -437,6 +441,7 @@ export function createTentScene(host, handlers) {
       setCamera({ ...s, azimuthDeg: s.azimuthDeg + deg }, true);
     },
     isDragging: () => !!drag,
+    isCameraAnimating: () => !!camAnim,
     lastRenderedTick: () => lastRenderedTick,
     dispose() {
       cancelAnimationFrame(raf);

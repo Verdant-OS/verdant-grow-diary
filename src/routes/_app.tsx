@@ -1,5 +1,7 @@
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import AppShell from "@/components/AppShell";
+import { AppDocumentTitle } from "@/components/AppDocumentTitle";
+import { appLayoutDocumentHead } from "@/lib/appDocumentTitleRules";
 
 /**
  * Authenticated layout route.
@@ -10,12 +12,15 @@ import AppShell from "@/components/AppShell";
  * table behind these routes is RLS-scoped server-side.
  */
 export const Route = createFileRoute("/_app")({
+  head: ({ matches }) => appLayoutDocumentHead(matches),
   component: AppLayout,
 });
 
 function AppLayout() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   return (
     <AppShell>
+      <AppDocumentTitle pathname={pathname} />
       <Outlet />
     </AppShell>
   );

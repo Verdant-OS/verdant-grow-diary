@@ -27,12 +27,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
-import { STAGES, stageLabel } from "@/lib/grow";
+import { STAGES } from "@/lib/grow";
+import { timelineStagePresentationLabel } from "@/lib/timelineStagePresentationRules";
+import { TimelineGrowDayLabel } from "@/components/TimelineGrowDayLabel";
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   Sprout,
-  Image as ImageIcon,
   Camera,
   FileText,
   FlaskConical,
@@ -149,10 +150,12 @@ import {
   filterTimelineEvidenceRows,
   isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
+  timelineClearFiltersEnabled,
   resolveTimelineCardPlaceLabels,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
   withResolvedTimelinePlaceDetails,
 } from "@/lib/timelineEvidenceFilterRules";
+import { timelineDateParamsAfterSync } from "@/lib/timelineDateSearchParamRules";
 import {
   buildMissingActionCopy,
   findNewestEntryIdForCategory,
@@ -577,12 +580,7 @@ export default function Timeline() {
     const urlStart = searchParams.get(TIMELINE_START_DATE_PARAM) ?? "";
     const urlEnd = searchParams.get(TIMELINE_END_DATE_PARAM) ?? "";
     if (urlStart === startDateFilter && urlEnd === endDateFilter) return;
-    const next = new URLSearchParams(searchParams);
-    if (isTimelineDateFilterValue(startDateFilter))
-      next.set(TIMELINE_START_DATE_PARAM, startDateFilter);
-    else next.delete(TIMELINE_START_DATE_PARAM);
-    if (isTimelineDateFilterValue(endDateFilter)) next.set(TIMELINE_END_DATE_PARAM, endDateFilter);
-    else next.delete(TIMELINE_END_DATE_PARAM);
+    const next = timelineDateParamsAfterSync(searchParams, startDateFilter, endDateFilter);
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDateFilter, endDateFilter]);
@@ -1237,6 +1235,7 @@ export default function Timeline() {
     // second, stale UTC-day interpretation.
     timeZone: TIMELINE_LOCAL_TIME_ZONE,
     plantNamesById,
+    tentNamesById,
   };
   const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
 
@@ -1274,6 +1273,7 @@ export default function Timeline() {
     effectiveStartDate,
     effectiveEndDate,
     plantNamesById,
+    tentNamesById,
   ]);
 
   const openLabelsById = useMemo(() => {
@@ -1344,7 +1344,12 @@ export default function Timeline() {
   }
 
   const chipFiltersActive = stageFilter !== "all" || eventFilter !== "all";
-  const anyFilterActive = evidenceActive || chipFiltersActive;
+  const anyFilterActive = timelineClearFiltersEnabled({
+    evidenceActive,
+    chipFiltersActive,
+    enteredStartDate: startDateFilter,
+    enteredEndDate: endDateFilter,
+  });
 
   // "Next missing action": infer per-category logging rhythm from the
   // merged diary + Quick Log rows and surface the category most behind
@@ -1590,7 +1595,7 @@ export default function Timeline() {
   const groupedByStage = useMemo(() => {
     const groups: { stage: string; items: Entry[] }[] = [];
     filtered.forEach((e) => {
-      const key = resolveTimelineDiaryEntryStage(e) ?? "unknown";
+      const key = resolveTimelineDiaryEntryStage(e) ?? "";
       const last = groups[groups.length - 1];
       if (last && last.stage === key) last.items.push(e);
       else groups.push({ stage: key, items: [e] });
@@ -1793,15 +1798,7 @@ export default function Timeline() {
           title={activeGrow.name}
           description="Trace observations, evidence, and decisions across this grow."
           icon={<Sprout className="size-5" aria-hidden="true" />}
-          meta={
-            <span className="text-sm text-muted-foreground">
-              {stageLabel(activeGrow.stage)} · day{" "}
-              {Math.max(
-                1,
-                Math.floor((Date.now() - new Date(activeGrow.started_at).getTime()) / 86400000),
-              )}
-            </span>
-          }
+          meta={<TimelineGrowDayLabel startedAt={activeGrow.started_at} stage={activeGrow.stage} />}
         />
       )}
 
@@ -2437,7 +2434,7 @@ export default function Timeline() {
               <div className="flex items-center gap-2 mb-2 sticky top-0 z-10 py-1 bg-background/80 backdrop-blur-sm">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
                   <Sprout className="h-3.5 w-3.5" />
-                  {stageLabel(group.stage)}
+                  {timelineStagePresentationLabel(group.stage)}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
                   {group.items.length} {group.items.length === 1 ? "entry" : "entries"}
@@ -2471,49 +2468,45 @@ export default function Timeline() {
                           hidden
                         />
                       ) : null}
-                      {e.photo_url ? (
-                        (() => {
-                          const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
-                          const item = idx >= 0 ? lightboxItems[idx] : null;
-                          const alt = buildTimelinePhotoAltText(item);
-                          const showNonDiagnostic = shouldShowPhotoNonDiagnosticLabel({
-                            hasPhoto: true,
-                            details: e.details,
-                          });
-                          return (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (idx >= 0) setLightboxPhotoId(e.id);
-                                }}
-                                aria-label={`Open photo: ${alt}`}
-                                data-testid="timeline-photo-open"
-                                className="block w-full focus:outline-hidden focus:ring-2 focus:ring-primary/60"
-                              >
-                                <img
-                                  src={e.photo_url}
-                                  className="w-full aspect-[4/3] object-cover"
-                                  alt={alt}
-                                  loading="lazy"
-                                />
-                              </button>
-                              {showNonDiagnostic && (
-                                <div
-                                  data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
-                                  className="px-3 py-1.5 text-[11px] text-muted-foreground bg-secondary/30 border-t border-border/30"
+                      {e.photo_url
+                        ? (() => {
+                            const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
+                            const item = idx >= 0 ? lightboxItems[idx] : null;
+                            const alt = buildTimelinePhotoAltText(item);
+                            const showNonDiagnostic = shouldShowPhotoNonDiagnosticLabel({
+                              hasPhoto: true,
+                              details: e.details,
+                            });
+                            return (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (idx >= 0) setLightboxPhotoId(e.id);
+                                  }}
+                                  aria-label={`Open photo: ${alt}`}
+                                  data-testid="timeline-photo-open"
+                                  className="block w-full focus:outline-hidden focus:ring-2 focus:ring-primary/60"
                                 >
-                                  {PHOTO_NON_DIAGNOSTIC_LABEL}
-                                </div>
-                              )}
-                            </>
-                          );
-                        })()
-                      ) : (
-                        <div className="w-full aspect-[4/3] bg-secondary/40 flex items-center justify-center text-muted-foreground">
-                          <ImageIcon className="h-8 w-8" />
-                        </div>
-                      )}
+                                  <img
+                                    src={e.photo_url}
+                                    className="w-full aspect-[4/3] object-cover"
+                                    alt={alt}
+                                    loading="lazy"
+                                  />
+                                </button>
+                                {showNonDiagnostic && (
+                                  <div
+                                    data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
+                                    className="px-3 py-1.5 text-[11px] text-muted-foreground bg-secondary/30 border-t border-border/30"
+                                  >
+                                    {PHOTO_NON_DIAGNOSTIC_LABEL}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()
+                        : null}
                       <div
                         className="p-4"
                         onClick={() => setDetailEntryId(e.id)}
@@ -2653,7 +2646,9 @@ export default function Timeline() {
                                 </span>
                                 <span className="inline-flex items-center gap-1 text-primary">
                                   <Sprout className="h-3 w-3" />
-                                  {stageLabel(resolveTimelineDiaryEntryStage(e))}
+                                  {timelineStagePresentationLabel(
+                                    resolveTimelineDiaryEntryStage(e),
+                                  )}
                                 </span>
                                 {plantName && (
                                   <span
@@ -2727,7 +2722,7 @@ export default function Timeline() {
                                 ) : null}
                               </div>
                               <p
-                                className="text-sm whitespace-pre-wrap cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
+                                className="text-sm text-foreground whitespace-pre-wrap cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
                                 role="button"
                                 tabIndex={0}
                                 data-testid="timeline-entry-body"

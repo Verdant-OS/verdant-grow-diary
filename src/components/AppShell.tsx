@@ -33,6 +33,10 @@ import {
   resolvePlantQuickLogRouteTarget,
 } from "@/lib/quickLogRouteTargetRules";
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
+import {
+  QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS,
+  QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS,
+} from "@/lib/quickLogFabClearanceRules";
 import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { TentQuickLogTargetScope } from "@/components/TentQuickLogTargetScope";
@@ -43,6 +47,11 @@ import {
   isQuickLogV2OpenIntent,
   type QuickLogV2OpenIntent,
 } from "@/lib/quickLogV2OpenIntent";
+import {
+  QUICK_LOG_V2_FEED_OPEN_EVENT,
+  isQuickLogV2FeedOpenIntent,
+  type QuickLogV2FeedOpenIntent,
+} from "@/lib/quickLogV2FeedOpenIntent";
 
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading, isSignOutNavigationPending } = useAuth();
@@ -97,9 +106,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const [mobileLaunchTargetKey, setMobileLaunchTargetKey] = useState<string | null>(null);
   const [tentQuickLogTargetEvidence, setTentQuickLogTargetEvidence] =
     useState<TentQuickLogTargetEvidence | null>(null);
-  const [structuredOpenIntent, setStructuredOpenIntent] = useState<QuickLogV2OpenIntent | null>(
-    null,
-  );
+  const [structuredOpenIntent, setStructuredOpenIntent] = useState<
+    QuickLogV2OpenIntent | QuickLogV2FeedOpenIntent | null
+  >(null);
   const [legacyQuickLogSession, setLegacyQuickLogSession] = useState(0);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -189,7 +198,21 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       setOpenScopedLog(true);
     }
     window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
-    return () => window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
+    function onOpenFeed(event: Event) {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (!isQuickLogV2FeedOpenIntent(detail)) return;
+      setOpenLog(false);
+      setPrefill(null);
+      setLegacyQuickLogSession((session) => session + 1);
+      setMobileLaunchTargetKey(null);
+      setStructuredOpenIntent(detail);
+      setOpenScopedLog(true);
+    }
+    window.addEventListener(QUICK_LOG_V2_FEED_OPEN_EVENT, onOpenFeed as EventListener);
+    return () => {
+      window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
+      window.removeEventListener(QUICK_LOG_V2_FEED_OPEN_EVENT, onOpenFeed as EventListener);
+    };
   }, []);
 
   useEffect(() => {
@@ -418,14 +441,19 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           <main
             id="main-content"
             tabIndex={-1}
-            className="mx-auto w-full min-w-0 max-w-[1440px] flex-1 px-3 pb-28 pt-5 sm:px-5 md:px-7 md:pb-9 md:pt-7 lg:px-10"
+            className={`mx-auto w-full min-w-0 max-w-[1440px] flex-1 px-3 pb-28 pt-5 sm:px-5 md:px-7 md:pt-7 lg:px-10 ${QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS}`}
           >
             {isEmailVerificationPending(user) ? (
               <VerificationPendingBanner email={user.email ?? ""} />
             ) : (
-              <TentQuickLogTargetScope register={registerTentQuickLogTarget}>
-                {pageContent}
-              </TentQuickLogTargetScope>
+              <div
+                data-testid="app-shell-page-content"
+                className={QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS}
+              >
+                <TentQuickLogTargetScope register={registerTentQuickLogTarget}>
+                  {pageContent}
+                </TentQuickLogTargetScope>
+              </div>
             )}
             {/* In-flow legal footer: stays at the end of scrolled content
                 (never fixed), so the mobile FAB cannot clip it. */}

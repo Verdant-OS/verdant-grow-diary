@@ -273,21 +273,6 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
             </Button>
           }
         />
-        <AssignTentDialog
-          plantId={plant.id}
-          growId={plant.growId ?? null}
-          currentTentId={plant.tentId ?? null}
-          trigger={
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1"
-              data-testid="plant-detail-move-plant"
-            >
-              <Move className="h-4 w-4" /> Move Plant
-            </Button>
-          }
-        />
         {plant.tentId && (
           <Button
             size="sm"

@@ -17,6 +17,11 @@ vi.mock("@/hooks/usePlantTentLatestReadings", () => ({
     refetch: state.refetch,
   }),
 }));
+// Quick Log manual environment events are read by a sibling hook; this suite
+// pins presenter ageing from the sensor rows above, so that read is empty.
+vi.mock("@/hooks/usePlantManualEnvironmentReadings", () => ({
+  usePlantManualEnvironmentReadings: () => ({ data: [], status: "success", isError: false }),
+}));
 vi.mock("@/hooks/useTemperatureUnitPreference", () => ({
   useTemperatureUnitPreference: () => "celsius",
 }));

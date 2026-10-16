@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
+import { usePlantManualEnvironmentReadings } from "@/hooks/usePlantManualEnvironmentReadings";
+import { mergePlantTentReadingsWithManualEvents } from "@/lib/plantManualEnvironmentEventRules";
 import { useNowTick } from "@/hooks/useNowTick";
 import {
   buildPlantEnvironmentReadView,
@@ -53,7 +55,10 @@ export default function PlantTentEnvironmentPanel({
   const temperatureUnit = useTemperatureUnitPreference();
   const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
   const readingsQuery = usePlantTentLatestReadings(tentId ?? null);
-  const rows = enabled ? (readingsQuery.data ?? []) : [];
+  const manualQuery = usePlantManualEnvironmentReadings(tentId ?? null, plantId ?? null);
+  const rows = enabled
+    ? mergePlantTentReadingsWithManualEvents(readingsQuery.data ?? [], manualQuery.data ?? [])
+    : [];
   const readView = buildPlantEnvironmentReadView({
     ...readingsQuery,
     enabled,

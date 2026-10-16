@@ -56,8 +56,11 @@ import {
   buildCreateGrowBindingView,
   canWriteCreateGrowId,
   evaluateSuppliedTentBinding,
+  createGrowIdsEqual,
   evaluateTentGrowCompatibility,
   plantCreateAllowsTentless,
+  plantCreateNoTentsHintVisible,
+  selectCreatePlantTents,
   resolveInitialPlantTentId,
   resolveSetupName,
   suppliedTentBlocksWrite,
@@ -209,13 +212,17 @@ export default function CreatePlantDialog({
     requireTent || !!defaultTentId || suppliedTent.requireCompatibleTentSelection;
 
   const tents = targetGrowId
-    ? tentRows.filter(
-        (tent, _index, rows) =>
-          tent.grow_id === targetGrowId &&
-          tent.id.trim().length > 0 &&
-          rows.filter((candidate) => candidate.id === tent.id).length === 1,
+    ? selectCreatePlantTents(tentRows, targetGrowId).filter(
+        (t) =>
+          t.grow_id === targetGrowId ||
+          t.grow_id?.trim().toLowerCase() === targetGrowId.trim().toLowerCase(),
       )
     : [];
+  const showNoTentsHint = plantCreateNoTentsHintVisible({
+    selectableTentCount: tents.length,
+    tentsSettled: tentsLoaded,
+    tentsReadFailed: tentsError,
+  });
 
   const initialTentId = resolveInitialPlantTentId({
     defaultTentId,
@@ -259,7 +266,7 @@ export default function CreatePlantDialog({
   useEffect(() => {
     if (!pendingNestedTentId || !targetGrowId) return;
     const nestedTent = uniqueTentById(tentRows, pendingNestedTentId);
-    if (!nestedTent || nestedTent.grow_id !== targetGrowId) return;
+    if (!nestedTent || !createGrowIdsEqual(nestedTent.grow_id, targetGrowId)) return;
     setForm((current) => ({ ...current, tent_id: nestedTent.id }));
     setExplicitCompatiblePick(true);
     setPendingNestedTentId(null);
@@ -267,8 +274,10 @@ export default function CreatePlantDialog({
 
   const selectedTentRow = uniqueTentById(tentRows, form.tent_id);
   const selectedTentGrowId = selectedTentRow?.grow_id ?? null;
-  const selectedTentIsLocallyVerified =
-    uniqueTentById(nestedTents, form.tent_id)?.grow_id === targetGrowId;
+  const selectedTentIsLocallyVerified = createGrowIdsEqual(
+    uniqueTentById(nestedTents, form.tent_id)?.grow_id,
+    targetGrowId,
+  );
   const selectedTentHasVerifiedSource =
     selectedTentIsLocallyVerified || (tentsLoaded && !tentsError);
   const hasVerifiedCompatibleReplacement =
@@ -277,7 +286,7 @@ export default function CreatePlantDialog({
     selectedTentHasVerifiedSource &&
     !!selectedTentRow &&
     !!targetGrowId &&
-    selectedTentRow.grow_id === targetGrowId;
+    createGrowIdsEqual(selectedTentRow.grow_id, targetGrowId);
 
   const tentCompat = evaluateTentGrowCompatibility({
     selectedTentId: form.tent_id,
@@ -349,7 +358,7 @@ export default function CreatePlantDialog({
     }
 
     const row = uniqueTentById(tentRows, v);
-    if (!row || !targetGrowId || row.grow_id !== targetGrowId) {
+    if (!row || !createGrowIdsEqual(row.grow_id, targetGrowId)) {
       setForm((current) => ({ ...current, tent_id: "none" }));
       setExplicitCompatiblePick(false);
       return;
@@ -360,7 +369,7 @@ export default function CreatePlantDialog({
   }
 
   function handleNestedTentCreated(tent: CreatedTent) {
-    if (!targetGrowId || tent.grow_id !== targetGrowId) {
+    if (!createGrowIdsEqual(tent.grow_id, targetGrowId)) {
       setForm((current) => ({ ...current, tent_id: "none" }));
       setExplicitCompatiblePick(false);
       setPendingNestedTentId(null);
@@ -905,8 +914,11 @@ export default function CreatePlantDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {tents.length === 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
+              {showNoTentsHint && (
+                <p
+                  className="text-xs text-muted-foreground mt-1"
+                  data-testid="create-plant-no-tents-hint"
+                >
                   No tents yet. Create a tent first.
                 </p>
               )}

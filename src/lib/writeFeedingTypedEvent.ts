@@ -20,6 +20,7 @@ import {
   type TypedQuickLogChildReader,
   type TypedReceiptReadClient,
 } from "./quickLogTypedReusedReceiptService";
+import type { TypedReusedReviewTarget } from "./quickLogTypedReusedReceiptRules";
 import { ROOT_ZONE_PRODUCT_CAP } from "./rootZoneObservationRules";
 import {
   quickLogSaveRequiresHistoryCheck,
@@ -87,7 +88,13 @@ export interface FeedingTypedEventInput {
 }
 
 export type WriteFeedingTypedEventResult =
-  { ok: true; eventId: string; reused: boolean } | { ok: false; reason: WriteFeedingFailureReason };
+  | { ok: true; eventId: string; reused: boolean }
+  | {
+      ok: false;
+      reason: WriteFeedingFailureReason;
+      /** Only with receipt_target_moved: where the reused entry lives now. */
+      reviewTarget?: TypedReusedReviewTarget;
+    };
 
 export type WriteFeedingFailureReason =
   | QuickLogHistoryCheckReason
@@ -289,9 +296,8 @@ export async function writeFeedingTypedEvent(
 
   // Read the receipt back through the same client the RPC used.
   const readers = resolveTypedReceiptReaders(options);
-  if (
-    envelope.reused === true &&
-    !(await verifyActiveTypedQuickLogEvent(
+  if (envelope.reused === true) {
+    const receipt = await verifyActiveTypedQuickLogEvent(
       {
         id: eventId,
         eventType: "feeding",
@@ -303,9 +309,15 @@ export async function writeFeedingTypedEvent(
       },
       readers.eventReader,
       readers.childReader,
-    ))
-  )
-    return { ok: false, reason: "rpc:receipt_unverified" };
+    );
+    // A read failure stays retryable with the same key; a confirmed mismatch is
+    // returned again by every same-key Retry, so it goes to history review.
+    if (receipt.status === "unavailable") return { ok: false, reason: "rpc:receipt_unverified" };
+    if (receipt.status === "refused")
+      return receipt.reviewTarget
+        ? { ok: false, reason: receipt.reason, reviewTarget: receipt.reviewTarget }
+        : { ok: false, reason: receipt.reason };
+  }
 
   return {
     ok: true,

@@ -20,15 +20,16 @@ vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "user-1" }, loading: false, signOut: vi.fn() }),
 }));
 
-// Non-empty grows so Start your room hero stays hidden and classic heading copy remains.
+// Zero grows keep the chooser. Accounts with a grow leave /onboarding for the
+// dashboard (onboarding-existing-grow-dashboard.test.tsx).
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
-    grows: [{ id: "g1", name: "Existing" }],
+    grows: [],
     loading: false,
-    activeGrowId: "g1",
+    activeGrowId: null,
     setActiveGrowId: vi.fn(),
     refresh: vi.fn(),
-    activeGrow: { id: "g1", name: "Existing" },
+    activeGrow: null,
     error: null,
   }),
 }));
@@ -54,7 +55,7 @@ describe("Onboarding page", () => {
   it("renders an accessible heading and radiogroup with all start-screen options", () => {
     renderPage();
     expect(
-      screen.getByRole("heading", { name: /where do you want verdant to open first/i }),
+      screen.getByRole("heading", { name: /or choose where to open first/i }),
     ).toBeInTheDocument();
     expect(screen.getByRole("radiogroup")).toBeInTheDocument();
     const radios = screen.getAllByRole("radio");
@@ -111,7 +112,7 @@ describe("Onboarding page", () => {
   it("focuses the heading on mount for screen readers / keyboard users", () => {
     renderPage();
     const heading = screen.getByRole("heading", {
-      name: /where do you want verdant to open first/i,
+      name: /or choose where to open first/i,
     });
     expect(document.activeElement).toBe(heading);
   });

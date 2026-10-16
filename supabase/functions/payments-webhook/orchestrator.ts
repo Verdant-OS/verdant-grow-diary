@@ -58,6 +58,16 @@ export type FounderAllocationResult =
 export type CreditPackAllocationResult =
   { ok: true; reason: "granted" | "idempotent" } | { ok: false; reason: "invalid_input" | string };
 
+/**
+ * Result of clawback_lovable_credit_pack. `clawed_back` appended a reversal
+ * for the full grant; `idempotent` found the existing reversal; `no_grant`
+ * means the transaction was not a credit pack in this environment (or the
+ * refund arrived first, in which case the grant RPC refuses later).
+ */
+export type CreditPackClawbackResult =
+  | { ok: true; reason: "clawed_back" | "idempotent" | "no_grant" }
+  | { ok: false; error: string };
+
 import type { EventLike } from "./eventProcessor.ts";
 
 export interface ExistingEventRow {
@@ -187,6 +197,18 @@ export interface Deps {
     environment: PaddleEnv;
     now: Date;
   }): Promise<IoResult & { subscriptionsUpdated?: number; foundersUpdated?: number }>;
+  /**
+   * Grant-path audit (2026-10-03): called for the same approved
+   * refund/chargeback decision, after the founder revoke. Wraps the
+   * service-role RPC clawback_lovable_credit_pack, which appends one
+   * reversal for the full pack grant and is idempotent per transaction.
+   * Returns `no_grant` for non-pack transactions, so it is safe on every
+   * refund. Unwired fails the refund (500) rather than acknowledging it.
+   */
+  clawbackCreditPack?(input: {
+    paddle_transaction_id: string;
+    environment: PaddleEnv;
+  }): Promise<CreditPackClawbackResult>;
 }
 
 export interface HandleResult {
@@ -482,6 +504,20 @@ export async function handleVerifiedEvent(
         environment: decision.env,
       });
       if (!grant.ok) {
+        if (grant.reason === "credit_pack_refund_precedes_purchase") {
+          // An approved refund for this transaction is already recorded. The
+          // RPC reconciled any earlier grant under its lock; nothing to grant.
+          const mark = await deps.markEvent(paddleEventId, {
+            processing_status: "skipped",
+            processed_ok: false,
+            skip_reason: "credit_pack_refund_precedes_purchase",
+            last_error: null,
+          });
+          if ("error" in mark) {
+            return { httpStatus: 500, reason: `mark_skipped_failed:${redactError(mark.error)}` };
+          }
+          return { httpStatus: 200, reason: "skipped:credit_pack_refund_precedes_purchase" };
+        }
         if (grant.reason === "invalid_input") {
           // Deterministic bad payload — retrying cannot fix it. Skip (200) so
           // Paddle stops retrying; the operator sees it in the audit log.
@@ -556,6 +592,17 @@ export async function handleVerifiedEvent(
           now,
         })
       : { ok: false, error: "founder_refund_revoke_unwired" };
+    // The same refund also reverses a credit-pack grant on this transaction.
+    // Both RPCs are idempotent, so a retry after either fails is safe.
+    if (!("error" in writeRes)) {
+      const clawback = deps.clawbackCreditPack
+        ? await deps.clawbackCreditPack({
+            paddle_transaction_id: decision.paddleTransactionId,
+            environment: decision.env,
+          })
+        : { ok: false as const, error: "credit_pack_clawback_unwired" };
+      if (!clawback.ok) writeRes = { ok: false, error: clawback.error };
+    }
   } else {
     writeRes = await deps.updateSubscription(decision.paddleSubscriptionId, decision.patch, env);
   }

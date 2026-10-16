@@ -500,7 +500,7 @@ export default function Dashboard() {
   // Non-landmark container: AppShell already owns the <main> landmark around
   // the route Outlet, so the page root must not nest another.
   return (
-    <div className="min-w-0 max-w-full space-y-4 md:space-y-6" data-testid="dashboard-root">
+    <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}
@@ -793,7 +793,7 @@ export default function Dashboard() {
                           : `Latest reading is stale (${describeCurrentStateStaleWindow(sensorState.snapshot.source)}) — not shown as current.`}
                     </div>
                   )}
-                  <div className="grid min-w-0 lg:grid-cols-3 gap-4">
+                  <div className="grid lg:grid-cols-3 gap-4">
                     {(() => {
                       // Pick the first tent that actually has readings so the chart
                       // isn't blank when tents[0] has none but other tents do.
@@ -813,7 +813,7 @@ export default function Dashboard() {
                         : [];
                       const latest = chartReadings.slice(-1)[0];
                       return (
-                        <div className="min-w-0 lg:col-span-2 glass rounded-2xl p-4">
+                        <div className="lg:col-span-2 glass rounded-2xl p-4">
                           <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
                             <div className="flex items-center gap-2 flex-wrap">
                               <div>
@@ -873,7 +873,7 @@ export default function Dashboard() {
                       );
                     })()}
 
-                    <div className="min-w-0 glass rounded-2xl p-4">
+                    <div className="glass rounded-2xl p-4">
                       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h2 className="font-display font-semibold">Environment strip</h2>
@@ -1073,8 +1073,8 @@ export default function Dashboard() {
       >
         Needs attention
       </h2>
-      <div className="grid min-w-0 lg:grid-cols-2 gap-4">
-        <div className="min-w-0 glass rounded-2xl p-4">
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between mb-3">
             {/* h3: nested under the "Needs attention" section H2 above —
                 keeping both as H2 rendered two identical visible H2s. */}
@@ -1138,7 +1138,7 @@ export default function Dashboard() {
           </ul>
         </div>
 
-        <div className="min-w-0 glass rounded-2xl p-4">
+        <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-display font-semibold">AI insights</h2>
             <Button asChild size="sm" variant="ghost">
@@ -1376,7 +1376,7 @@ export default function Dashboard() {
                       : "border-muted-foreground text-muted-foreground";
                 return (
                   <div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center justify-between mb-2">
                       <div>
                         <h2 className="font-display font-semibold">Sensor Data Quality</h2>
                         <p className="text-xs text-muted-foreground">
@@ -1422,7 +1422,7 @@ export default function Dashboard() {
             Advanced
           </h2>
           <section className="glass rounded-2xl p-4 mt-2" aria-label="Environment Trends">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div className="flex items-center justify-between mb-2">
               <div>
                 <h2 className="font-display font-semibold">Environment Trends</h2>
                 <p className="text-xs text-muted-foreground">
@@ -1510,14 +1510,14 @@ export default function Dashboard() {
                     : "border-muted-foreground text-muted-foreground";
               return (
                 <div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center justify-between mb-2">
                     <div>
                       <h2 className="font-display font-semibold">Target Comparison</h2>
                       <p className="text-xs text-muted-foreground">
                         Latest snapshot vs configured grow targets. Not a plant-health diagnosis.
                       </p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-3">
                       <Link
                         to={timelinePath(scopedGrowId)}
                         className="text-xs text-primary hover:underline"

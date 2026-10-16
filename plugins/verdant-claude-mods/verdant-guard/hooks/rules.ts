@@ -464,23 +464,48 @@ const PW_LITERAL_FILTER = /^[A-Za-z0-9._/:@+=-]+$/;
 
 const PW_DEBUG_MODES = new Set(["inspector", "cli"]);
 
+// pnpm and yarn global options that take the next word as their value when written without `=`
+// (`pnpm -C dir exec …`, `yarn --cwd dir exec …`). Any other leading option is read as a flag.
+const PM_GLOBAL_VALUE_OPTIONS = new Set([
+  "-C",
+  "--dir",
+  "-F",
+  "--filter",
+  "--filter-prod",
+  "--cwd",
+  "--reporter",
+  "--loglevel",
+  "--workspace-concurrency",
+]);
+
+/** For `pnpm [global options] exec|dlx …` returns the index of `exec`/`dlx`, or -1. */
+function pmRunnerIndex(tokens: string[]): number {
+  let i = 1;
+  for (let t = tokens[i]; t !== undefined && t.startsWith("-"); t = tokens[i]) {
+    i += !t.includes("=") && PM_GLOBAL_VALUE_OPTIONS.has(t) ? 2 : 1;
+  }
+  return tokens[i] === "dlx" || tokens[i] === "exec" ? i : -1;
+}
+
 /** Drops a package-runner prefix: `bunx`, `npx`, `bun x`, `pnpm dlx|exec`, `yarn dlx|exec`. */
 function stripRunner(tokens: string[]): string[] {
   const [a, b] = tokens;
   let rest: string[];
   if (a === "bunx" || a === "npx") rest = tokens.slice(1);
   else if (a === "bun" && b === "x") rest = tokens.slice(2);
-  else if ((a === "pnpm" || a === "yarn") && (b === "dlx" || b === "exec")) rest = tokens.slice(2);
-  else return tokens;
+  else if ((a === "pnpm" || a === "yarn") && pmRunnerIndex(tokens) > 0) {
+    rest = tokens.slice(pmRunnerIndex(tokens) + 1);
+  } else return tokens;
   // Skip the runner's own flags (`-y`, `--yes`, `--bun`, `--silent`, …). `-p`/`--package`
-  // take a value; `-c`/`--call` take the command itself, which is what gets checked.
+  // take a value; `-c`/`--call` take the command itself as one shell string, which is split
+  // the way a shell would (quotes removed) before it is checked.
   for (let i = 0; i < rest.length; i += 1) {
     const t = rest[i] ?? "";
     if (!t.startsWith("-")) return rest.slice(i);
     if ((t === "-c" || t === "--call") && rest[i + 1] !== undefined) {
-      return rest[i + 1]!.split(/\s+/).filter(Boolean);
+      return shellWords(rest[i + 1]!);
     }
-    if (t.startsWith("--call=")) return t.slice("--call=".length).split(/\s+/).filter(Boolean);
+    if (t.startsWith("--call=")) return shellWords(t.slice("--call=".length));
     if (t === "-p" || t === "--package") i += 1;
   }
   return [];
@@ -617,7 +642,8 @@ export function checkBash(command: string): string | null {
       return "`env -S` with `$`, `\\`, `#`, braces, globs, backticks or `~` uses expansion, escapes or comments this guard cannot follow, so the command it runs cannot be checked here. Write the command out without `env -S`.";
     }
     if (tokens.length === 0) continue;
-    const git = gitArgs(tokens);
+    // A package runner can carry git too (`npx -c 'git push -f'`, `pnpm -C . exec git push -f`).
+    const git = gitArgs(tokens) ?? gitArgs(stripPrefix(stripRunner(tokens)));
     const reason =
       (git ? checkGit(git) : null) ??
       checkPackageManager(tokens) ??

@@ -299,4 +299,122 @@ describe("timeline log-type filter labels", () => {
     expect(timelineEventTypeOptionLabel("constructor")).toBe("Constructor");
     expect(timelineEventTypeOptionLabel("toString")).toBe("ToString");
   });
+
+  it("produces no duplicate option labels across known event types including environment and environment_check", async () => {
+    const knownTokens = [
+      "note",
+      "photo",
+      "quicklog_photo_attachment",
+      "watering",
+      "feeding",
+      "observation",
+      "measurement",
+      "environment",
+      "environment_check",
+      "training",
+      "harvest",
+      "pest_disease",
+    ];
+    const opts = deriveTimelineEventTypeOptions(
+      knownTokens.map((token, idx) => ({
+        id: `row-${idx}`,
+        note: `Row ${token}`,
+        stage: "vegetative",
+        plant_id: "plant-a",
+        tent_id: "tent-1",
+        details: { event_type: token },
+      })),
+    );
+    const labels = opts.map((o) => o.label);
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(timelineEventTypeOptionLabel("environment")).toBe("Environment");
+    expect(timelineEventTypeOptionLabel("environment_check")).toBe("Environment check");
+
+    const tieForward = deriveTimelineEventTypeOptions([
+      {
+        id: "t1",
+        note: "a",
+        stage: null,
+        plant_id: null,
+        tent_id: null,
+        details: { event_type: "custom_type" },
+      },
+      {
+        id: "t2",
+        note: "b",
+        stage: null,
+        plant_id: null,
+        tent_id: null,
+        details: { event_type: "custom-type" },
+      },
+    ]);
+    const tieReverse = deriveTimelineEventTypeOptions([
+      {
+        id: "t2",
+        note: "b",
+        stage: null,
+        plant_id: null,
+        tent_id: null,
+        details: { event_type: "custom-type" },
+      },
+      {
+        id: "t1",
+        note: "a",
+        stage: null,
+        plant_id: null,
+        tent_id: null,
+        details: { event_type: "custom_type" },
+      },
+    ]);
+    expect(tieForward.map((o) => o.id)).toEqual(tieReverse.map((o) => o.id));
+
+    harness.executeQuery.mockImplementation((table: string) => {
+      if (table === "diary_entries") {
+        return {
+          data: [
+            {
+              id: "entry-env",
+              note: "Legacy environment log",
+              photo_url: null,
+              stage: "vegetative",
+              entry_at: "2026-07-25T13:14:40.000Z",
+              plant_id: "plant-a",
+              tent_id: "tent-1",
+              details: { event_type: "environment", source: "manual" },
+            },
+            {
+              id: "entry-env-check",
+              note: "Quick Log environment check",
+              photo_url: null,
+              stage: "vegetative",
+              entry_at: "2026-07-25T13:10:00.000Z",
+              plant_id: "plant-a",
+              tent_id: "tent-1",
+              details: { event_type: "environment_check", source: "manual" },
+            },
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      return { data: [], error: null, count: 0 };
+    });
+
+    renderTimeline();
+    await screen.findByText("Legacy environment log");
+    await screen.findByText("Quick Log environment check");
+
+    const select = (await screen.findByTestId("timeline-event-type-filter")) as HTMLSelectElement;
+    const optionTexts = Array.from(select.options).map((o) => o.textContent);
+    expect(new Set(optionTexts).size).toBe(optionTexts.length);
+    expect(optionTexts).toEqual(["All log types", "Environment (1)", "Environment check (1)"]);
+
+    fireEvent.change(select, { target: { value: "environment" } });
+    expect(screen.getByText("Legacy environment log")).toBeInTheDocument();
+    expect(screen.queryByText("Quick Log environment check")).toBeNull();
+
+    fireEvent.change(select, { target: { value: "environment_check" } });
+    expect(screen.getByText("Quick Log environment check")).toBeInTheDocument();
+    expect(screen.queryByText("Legacy environment log")).toBeNull();
+  });
 });

@@ -499,7 +499,7 @@ const TIMELINE_EVENT_TYPE_OPTION_LABELS: Readonly<Record<string, string>> = {
   feeding: "Feeding",
   observation: "Observation",
   measurement: "Measurement",
-  environment: "Environment check",
+  environment: "Environment",
   environment_check: "Environment check",
   training: "Training",
   harvest: "Harvest",
@@ -530,7 +530,7 @@ export function deriveTimelineEventTypeOptions(
   }
   return Array.from(m.entries())
     .map(([id, count]) => ({ id, label: timelineEventTypeOptionLabel(id), count }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id));
 }
 
 export function isTimelineEvidenceFilterActive(input: TimelineEvidenceFilterInput): boolean {

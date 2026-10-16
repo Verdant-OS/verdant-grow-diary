@@ -54,7 +54,11 @@ import {
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
 import { SandboxCheckoutTestModeNote } from "@/components/SandboxCheckoutTestModeNote";
-import { CHECKOUT_LIVE_FAQ_ID } from "@/lib/sandboxCheckoutTestModeNoteRules";
+import {
+  CHECKOUT_LIVE_FAQ_ID,
+  CHECKOUT_LIVE_FAQ_ITEM_VALUE,
+  resolvePricingFaqValueForHash,
+} from "@/lib/sandboxCheckoutTestModeNoteRules";
 import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -223,6 +227,14 @@ export default function Pricing() {
   const recoveryRef = useRef<HTMLElement>(null);
   const creditPacksRef = useRef<HTMLElement>(null);
   const handledCreditPacksHashRef = useRef<string | null>(null);
+  const [openFaqItem, setOpenFaqItem] = useState<string>(() => {
+    const fromRouter = resolvePricingFaqValueForHash(location.hash);
+    if (fromRouter) return fromRouter;
+    if (typeof window !== "undefined") {
+      return resolvePricingFaqValueForHash(window.location.hash) ?? "";
+    }
+    return "";
+  });
   const {
     openCheckout,
     loading: checkoutLoading,
@@ -459,6 +471,26 @@ export default function Pricing() {
   }, [location.hash, preselectedCreditPack]);
 
   useEffect(() => {
+    const faqValue =
+      resolvePricingFaqValueForHash(location.hash) ??
+      (typeof window !== "undefined" ? resolvePricingFaqValueForHash(window.location.hash) : null);
+    if (!faqValue) return;
+    setOpenFaqItem(faqValue);
+  }, [location.hash]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleHashChange = () => {
+      const faqValue = resolvePricingFaqValueForHash(window.location.hash);
+      if (faqValue) {
+        setOpenFaqItem(faqValue);
+      }
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  useEffect(() => {
     if (!blockedReason) {
       // openCheckout clears blockedReason on a fresh attempt; drop the SKU
       // binding with it so a stale one can never keep a button labelled
@@ -671,7 +703,10 @@ export default function Pricing() {
       </section>
 
       <section className="px-6 pb-8 max-w-3xl mx-auto" aria-label="Checkout status">
-        <SandboxCheckoutTestModeNote environment={checkoutEnvironment} />
+        <SandboxCheckoutTestModeNote
+          environment={checkoutEnvironment}
+          onCheckoutLiveClick={() => setOpenFaqItem(CHECKOUT_LIVE_FAQ_ITEM_VALUE)}
+        />
         <div
           data-testid="pricing-checkout-trust"
           data-checkout-state={checkoutTrustCopy.state}
@@ -1286,7 +1321,9 @@ export default function Pricing() {
           type="single"
           collapsible
           className="mt-6"
+          value={openFaqItem}
           onValueChange={(value) => {
+            setOpenFaqItem(value);
             if (value) trackPricingEvent("pricing_faq_opened", { item: value });
           }}
         >

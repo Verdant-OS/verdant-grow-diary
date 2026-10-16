@@ -144,8 +144,14 @@ describe("#2171 plant create insert failure", () => {
 
     await typeNameAndSubmit("Kept Plant");
 
-    const toast = await screen.findByText('new row violates check constraint "plants_stage_check"');
-    fireEvent.pointerDown(toast, { bubbles: true, button: 0, pointerId: 1 });
+    const region = await screen.findByRole("region", { name: /notifications/i });
+    const toastText = await within(region).findByText(
+      'new row violates check constraint "plants_stage_check"',
+    );
+    const toast = toastText.closest("[data-sonner-toast]");
+    expect(toast).not.toBeNull();
+    expect(dialog().contains(toast as HTMLElement)).toBe(false);
+    fireEvent.pointerDown(toast as HTMLElement, { bubbles: true, button: 0, pointerId: 1 });
 
     expect(dialog()).toBeInTheDocument();
     expect(within(dialog()).getByRole("alert")).toHaveTextContent(

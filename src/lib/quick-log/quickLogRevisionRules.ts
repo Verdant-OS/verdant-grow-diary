@@ -1,3 +1,9 @@
+import {
+  isHumidityValid,
+  isTemperatureValid,
+  isVpdValid,
+} from "@/lib/sensorReadingNormalizationRules";
+
 /**
  * Quick Log Corrections & Retractions v1 — pure rules (issue #786).
  *
@@ -207,11 +213,34 @@ export function isRetractedDiaryRow(row: RetractableDiaryRowLike | null | undefi
   return typeof row?.retracted_at === "string" && row.retracted_at.length > 0;
 }
 
+/** Merged writer bound. The open 50,000 ml cap (#2110) is not applied here. */
+export const QUICKLOG_CORRECTION_VOLUME_MAX_ML = 1_000_000;
+/** Merged feeding product amount bound in root-zone observation rules. */
+export const QUICKLOG_CORRECTION_DOSE_MAX = 1_000_000;
+
+export interface QuickLogCorrectionSensorValues {
+  temperature_c?: number;
+  humidity_pct?: number;
+  vpd_kpa?: number;
+}
+
+export type QuickLogCorrectionValueKind = "watering" | "feeding" | "sensor";
+
+export interface QuickLogCorrectionValueContext {
+  kind: QuickLogCorrectionValueKind;
+  volumeMl?: number | null;
+  doseAmount?: number | null;
+  sensor?: QuickLogCorrectionSensorValues | null;
+}
+
 export interface QuickLogCorrectionChanges {
   note?: string | null;
   occurredAt?: string;
   targetType?: "plant" | "tent";
   targetId?: string;
+  volumeMl?: number;
+  doseAmount?: number;
+  sensorValues?: QuickLogCorrectionSensorValues;
 }
 
 export type QuickLogCorrectionValidation =
@@ -259,10 +288,250 @@ export function validateQuickLogCorrection(
     changes.target_type = input.targetType;
     changes.target_id = input.targetId;
   }
+  if (input.volumeMl !== undefined) {
+    if (!isCorrectionVolumeMl(input.volumeMl)) return { ok: false, reason: "invalid_changes" };
+    changes.volume_ml = input.volumeMl;
+  }
+  if (input.doseAmount !== undefined) {
+    if (!isCorrectionDoseAmount(input.doseAmount)) return { ok: false, reason: "invalid_changes" };
+    changes.dose_amount = input.doseAmount;
+  }
+  if (input.sensorValues !== undefined) {
+    const sensor = normalizeCorrectionSensorValues(input.sensorValues);
+    if (!sensor) return { ok: false, reason: "invalid_changes" };
+    changes.sensor_values = sensor;
+  }
   if (Object.keys(changes).length === 0) {
     return { ok: false, reason: "no_changes" };
   }
   return { ok: true, changes };
+}
+
+function isCorrectionVolumeMl(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value > 0 &&
+    value <= QUICKLOG_CORRECTION_VOLUME_MAX_ML
+  );
+}
+
+function isCorrectionDoseAmount(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= QUICKLOG_CORRECTION_DOSE_MAX
+  );
+}
+
+function normalizeCorrectionSensorValues(
+  input: QuickLogCorrectionSensorValues | null,
+): QuickLogCorrectionSensorValues | null {
+  if (!input || typeof input !== "object") return null;
+  const next: QuickLogCorrectionSensorValues = {};
+  if (input.temperature_c !== undefined) {
+    if (!isTemperatureValid(input.temperature_c) || input.temperature_c === null) return null;
+    next.temperature_c = input.temperature_c;
+  }
+  if (input.humidity_pct !== undefined) {
+    if (!isHumidityValid(input.humidity_pct) || input.humidity_pct === null) return null;
+    next.humidity_pct = input.humidity_pct;
+  }
+  if (input.vpd_kpa !== undefined) {
+    if (!isVpdValid(input.vpd_kpa) || input.vpd_kpa === null) return null;
+    next.vpd_kpa = input.vpd_kpa;
+  }
+  return Object.keys(next).length > 0 ? next : null;
+}
+
+function finiteOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function doseFromDetails(details: Record<string, unknown>): number | null {
+  const feeding = isPlainObject(details.feeding) ? details.feeding : null;
+  const products = feeding && Array.isArray(feeding.products) ? feeding.products : null;
+  const firstProduct = products && isPlainObject(products[0]) ? products[0] : null;
+  if (firstProduct) {
+    const amount = finiteOrNull(firstProduct.amount);
+    if (amount !== null) return amount;
+  }
+  const nutrients = Array.isArray(details.nutrients) ? details.nutrients : null;
+  const firstNutrient = nutrients && isPlainObject(nutrients[0]) ? nutrients[0] : null;
+  return firstNutrient ? finiteOrNull(firstNutrient.amount) : null;
+}
+
+function sensorFromDetails(
+  details: Record<string, unknown>,
+): QuickLogCorrectionSensorValues | null {
+  const snapshot = isPlainObject(details.sensor_snapshot)
+    ? details.sensor_snapshot
+    : isPlainObject(details.manual_sensor_snapshot)
+      ? details.manual_sensor_snapshot
+      : null;
+  const metrics = snapshot && isPlainObject(snapshot.metrics) ? snapshot.metrics : snapshot;
+  if (!metrics) return null;
+  const sensor: QuickLogCorrectionSensorValues = {};
+  const temperature = finiteOrNull(metrics.temperature_c);
+  const humidity = finiteOrNull(metrics.humidity_pct);
+  const vpd = finiteOrNull(metrics.vpd_kpa);
+  if (temperature !== null) sensor.temperature_c = temperature;
+  if (humidity !== null) sensor.humidity_pct = humidity;
+  if (vpd !== null) sensor.vpd_kpa = vpd;
+  return Object.keys(sensor).length > 0 ? sensor : null;
+}
+
+/**
+ * Which value the correction dialog can edit for one saved Quick Log entry.
+ * Returns null for notes, photos, and any other entry type.
+ */
+export function correctionValuesForTimelineAction(
+  action: {
+    kind: string;
+    volumeMl?: number | null;
+    aiDoctorPhase1Evidence?: { details?: unknown } | null;
+  },
+  readings?: ReadonlyArray<{ field: string; value: number }>,
+): QuickLogCorrectionValueContext | null {
+  if (action.kind === "water") {
+    return {
+      kind: "watering",
+      volumeMl:
+        typeof action.volumeMl === "number" && Number.isFinite(action.volumeMl)
+          ? action.volumeMl
+          : null,
+    };
+  }
+  const fromEvidence = correctionValuePropsFromDiaryDetails(action.aiDoctorPhase1Evidence?.details);
+  if (fromEvidence?.kind === "feeding") return fromEvidence;
+  const sensor: QuickLogCorrectionSensorValues = {};
+  for (const reading of readings ?? []) {
+    if (reading.field === "air_temp_c") sensor.temperature_c = reading.value;
+    if (reading.field === "humidity_pct") sensor.humidity_pct = reading.value;
+    if (reading.field === "vpd_kpa") sensor.vpd_kpa = reading.value;
+  }
+  return Object.keys(sensor).length > 0 ? { kind: "sensor", sensor } : null;
+}
+
+export function correctionValuePropsFromDiaryDetails(
+  details: unknown,
+): QuickLogCorrectionValueContext | null {
+  if (!isPlainObject(details)) return null;
+  const eventType = typeof details.event_type === "string" ? details.event_type : "";
+  if (eventType === "watering") {
+    const watering = isPlainObject(details.watering) ? details.watering : null;
+    const structured = finiteOrNull(watering?.volume_ml);
+    const flat = finiteOrNull(details.watering_amount_ml) ?? finiteOrNull(details.wateringAmountMl);
+    return { kind: "watering", volumeMl: structured ?? flat };
+  }
+  if (eventType === "feeding") {
+    const feeding = isPlainObject(details.feeding) ? details.feeding : null;
+    const structured = finiteOrNull(feeding?.volume_ml);
+    const flat = finiteOrNull(details.watering_amount_ml) ?? finiteOrNull(details.wateringAmountMl);
+    const volumeMl = structured ?? flat;
+    const doseAmount = doseFromDetails(details);
+    return volumeMl == null
+      ? { kind: "feeding", doseAmount }
+      : { kind: "feeding", doseAmount, volumeMl };
+  }
+  if (
+    eventType === "environment" ||
+    eventType === "environment_check" ||
+    eventType === "manual_sensor_snapshot"
+  ) {
+    return { kind: "sensor", sensor: sensorFromDetails(details) };
+  }
+  // V2 Fast Check stores the action as an observation and the measurements
+  // on the environment companion. Timeline merge keeps those metrics on the
+  // same details object while the spine event_type stays observation.
+  if (eventType === "observation") {
+    const sensor = sensorFromDetails(details);
+    if (sensor) return { kind: "sensor", sensor };
+  }
+  return null;
+}
+
+interface TimelineEnvironmentChild {
+  temperature_c?: unknown;
+  humidity_pct?: unknown;
+  vpd_kpa?: unknown;
+}
+
+interface TimelineEnvironmentSibling {
+  id?: string;
+  event_type?: unknown;
+  source?: unknown;
+  plant_id?: string | null;
+  occurred_at?: unknown;
+  created_at?: unknown;
+  environment_events?: TimelineEnvironmentChild | readonly TimelineEnvironmentChild[] | null;
+}
+
+function sensorFromEnvironmentChild(
+  child: TimelineEnvironmentChild | null | undefined,
+): QuickLogCorrectionSensorValues | null {
+  if (!child) return null;
+  const sensor: QuickLogCorrectionSensorValues = {};
+  const temperature = finiteOrNull(child.temperature_c);
+  const humidity = finiteOrNull(child.humidity_pct);
+  const vpd = finiteOrNull(child.vpd_kpa);
+  if (temperature !== null) sensor.temperature_c = temperature;
+  if (humidity !== null) sensor.humidity_pct = humidity;
+  if (vpd !== null) sensor.vpd_kpa = vpd;
+  return Object.keys(sensor).length > 0 ? sensor : null;
+}
+
+/**
+ * Timeline diary cards for a V2 Fast Check keep the note on the observation
+ * row. The temperature, humidity, and VPD live on the same-instant manual
+ * environment sibling, not in diary details.
+ */
+export function correctionValuesForTimelineDiaryEntry(
+  entry: { details?: unknown; plant_id?: string | null; entry_at?: string | null },
+  growEvents?: readonly TimelineEnvironmentSibling[],
+): QuickLogCorrectionValueContext | null {
+  const fromDetails = correctionValuePropsFromDiaryDetails(entry?.details);
+  if (fromDetails) return fromDetails;
+  const details = isPlainObject(entry?.details) ? entry.details : null;
+  if (!details || details.event_type !== "observation") return null;
+  const entryAt = entry?.entry_at;
+  if (typeof entryAt !== "string") return null;
+  const entryMs = Date.parse(entryAt);
+  if (!Number.isFinite(entryMs)) return null;
+  const plantId = entry?.plant_id ?? null;
+  const linkedId = nonEmpty(details.linked_grow_event_id);
+  const rows = growEvents ?? [];
+  if (linkedId) {
+    const root = rows.find((row) => row.id === linkedId);
+    const rootCreatedAt = root && typeof root.created_at === "string" ? root.created_at : null;
+    if (root && rootCreatedAt) {
+      const companion = rows.find(
+        (row) =>
+          row.id !== root.id &&
+          row.event_type === "environment" &&
+          row.source === "manual" &&
+          row.created_at === rootCreatedAt,
+      );
+      if (!companion) return null;
+      const child = Array.isArray(companion.environment_events)
+        ? companion.environment_events[0]
+        : companion.environment_events;
+      const sensor = sensorFromEnvironmentChild(child);
+      return sensor ? { kind: "sensor", sensor } : null;
+    }
+  }
+  for (const row of rows) {
+    if (row.event_type !== "environment" || row.source !== "manual") continue;
+    if ((row.plant_id ?? null) !== plantId) continue;
+    if (typeof row.occurred_at !== "string" || Date.parse(row.occurred_at) !== entryMs) continue;
+    const child = Array.isArray(row.environment_events)
+      ? row.environment_events[0]
+      : row.environment_events;
+    const sensor = sensorFromEnvironmentChild(child);
+    if (sensor) return { kind: "sensor", sensor };
+  }
+  return null;
 }
 
 export interface QuickLogEntryHandleRef {

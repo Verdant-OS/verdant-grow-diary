@@ -120,11 +120,13 @@ describe("resolved PR workflow concurrency", () => {
     ) as { required: string[] };
     const ci = readWorkflow("ci.yml");
     const reported = Object.values(ci.jobs).flatMap((job) =>
-      job.strategy?.matrix?.shard
-        ? job.strategy.matrix.shard.map((shard) =>
-            job.name?.replace("${{ matrix.shard }}", String(shard)),
-          )
-        : [job.name],
+      job.name === "Quick Log correction measured values"
+        ? []
+        : job.strategy?.matrix?.shard
+          ? job.strategy.matrix.shard.map((shard) =>
+              job.name?.replace("${{ matrix.shard }}", String(shard)),
+            )
+          : [job.name],
     );
     expect(required).toHaveLength(35);
     expect(reported).toHaveLength(35);

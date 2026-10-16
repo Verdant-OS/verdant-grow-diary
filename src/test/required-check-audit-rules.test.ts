@@ -1008,6 +1008,11 @@ describe("auditRequiredChecks — PR #769 regression (real evidence)", () => {
     // fixture and that is correct: the two irrigation jobs are `skipped`
     // (NOT_MEASURED) and `Deno bridge auth + handler E2E` is absent (MISSING),
     // and a conditional entry fails only on FAIL.
+    //
+    // badge pgTAP (disposable local DB) is alwaysRuns with no path filter, so
+    // its absence from this 2026-08-07 fixture is a failing MISSING finding.
+    // The length moved from 3 to 4 in the same commit that added that entry
+    // (Cheeko, 2026-10-13 9:00 AM CT, #1979).
     const result = auditRequiredChecks({
       pinned: PINNED,
       checkRuns: PR_769.checkRuns,
@@ -1018,7 +1023,8 @@ describe("auditRequiredChecks — PR #769 regression (real evidence)", () => {
     expect(failing).toContain("Full test suite (shard 26/32)");
     expect(failing).toContain("test:security-regression");
     expect(failing).toContain("test:security-db-local");
-    expect(result.failingFindings).toHaveLength(3);
+    expect(failing).toContain("badge pgTAP (disposable local DB)");
+    expect(result.failingFindings).toHaveLength(4);
   });
 
   it("stays quiet about conditional gates that skipped or never reported on #769", () => {

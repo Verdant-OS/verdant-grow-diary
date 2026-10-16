@@ -21,9 +21,15 @@ import {
 } from "@/lib/manualSensorSnapshotHistoryListRules";
 import type { ChangeContextReading } from "@/lib/manualSensorSnapshotChangeContextRules";
 
+/** The five columns the history list reads; V2 manual events supply the same. */
+export type ManualSnapshotHistoryReading = Pick<
+  SensorReadingRow,
+  "ts" | "metric" | "value" | "source" | "tent_id"
+>;
+
 interface Props {
   tentId: string | null | undefined;
-  readings: ReadonlyArray<SensorReadingRow>;
+  readings: ReadonlyArray<ManualSnapshotHistoryReading>;
   readStatus: "pending" | "error" | "success";
   isFetching?: boolean;
   onRetry: () => void;
@@ -71,11 +77,7 @@ export default function TentManualSnapshotHistoryList({
       </div>
 
       {readStatus === "error" ? (
-        <div
-          role="alert"
-          aria-busy={isFetching}
-          data-testid="tent-manual-snapshot-history-error"
-        >
+        <div role="alert" aria-busy={isFetching} data-testid="tent-manual-snapshot-history-error">
           <p className="text-sm text-muted-foreground">Manual snapshot history is unavailable.</p>
           <Button
             type="button"

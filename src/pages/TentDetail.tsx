@@ -27,7 +27,11 @@ import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import PlantPhoto from "@/components/PlantPhoto";
 import TentManualSnapshotChangeContext from "@/components/TentManualSnapshotChangeContext";
-import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistoryList";
+import TentManualSnapshotHistoryList, {
+  type ManualSnapshotHistoryReading,
+} from "@/components/TentManualSnapshotHistoryList";
+import { useTentManualEnvironmentEvents } from "@/hooks/useTentManualEnvironmentEvents";
+import { buildTentManualHistoryRead } from "@/lib/tentManualEnvironmentEventRules";
 import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
 import TimelineMemorySection from "@/components/TimelineMemorySection";
 import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
@@ -170,6 +174,14 @@ export default function TentDetail() {
   const allPlants = plantListRead.plants;
   const sensorReadings = useSensorReadings(id);
   const { data: readings = [] } = sensorReadings;
+  // Quick Log V2 manual snapshots are grow_events, never sensor_readings.
+  const manualEvents = useTentManualEnvironmentEvents(id);
+  // Both reads gate the history: a pending or failed grow_events read must not
+  // let the list declare an empty or complete history.
+  const manualHistoryRead = buildTentManualHistoryRead<ManualSnapshotHistoryReading>({
+    sensor: sensorReadings,
+    manual: manualEvents,
+  });
   const importedHistory = useImportedSensorHistory(id);
   const series = buildTentSensorChartSeries(readings);
   const nowMs = useNowTick();
@@ -539,12 +551,10 @@ export default function TentDetail() {
 
       <TentManualSnapshotHistoryList
         tentId={id ?? null}
-        readings={readings}
-        readStatus={sensorReadings.status}
-        isFetching={sensorReadings.isFetching}
-        onRetry={() => {
-          void sensorReadings.refetch();
-        }}
+        readings={manualHistoryRead.readings}
+        readStatus={manualHistoryRead.readStatus}
+        isFetching={manualHistoryRead.isFetching}
+        onRetry={manualHistoryRead.onRetry}
       />
 
       <ManualSnapshotTimelineSection scope="tent" tentId={id ?? null} />

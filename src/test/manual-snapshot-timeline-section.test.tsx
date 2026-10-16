@@ -94,7 +94,10 @@ function pendingRead() {
 }
 
 vi.mock("@/integrations/supabase/client", () => {
-  function makeQuery() {
+  // The tent lifecycle now reads two tables per cycle (diary_entries plus the
+  // Quick Log V2 grow_events snapshots). readCount keeps counting the diary
+  // read so each lifecycle step still counts once.
+  function makeQuery(table: string) {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = (column: string, value: string) => {
@@ -105,14 +108,14 @@ vi.mock("@/integrations/supabase/client", () => {
     q.is = () => q;
     q.order = () => q;
     q.limit = () => {
-      readCount += 1;
+      if (table === "diary_entries") readCount += 1;
       return Promise.resolve(nextResponse);
     };
     return q;
   }
   return {
     supabase: {
-      from: () => makeQuery(),
+      from: (table: string) => makeQuery(table),
     },
   };
 });

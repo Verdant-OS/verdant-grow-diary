@@ -131,10 +131,14 @@ function isGrowHelpToolkitPath(pathname: string): boolean {
 }
 
 function RootErrorComponent({ error }: { error: unknown }) {
-  const normalizedError = useMemo(
-    () => (error instanceof Error ? error : new Error(String(error))),
-    [error],
-  );
+  const normalizedError = useMemo(() => {
+    if (error instanceof Error) return error;
+    try {
+      return new Error(String(error));
+    } catch {
+      return new Error(Object.prototype.toString.call(error));
+    }
+  }, [error]);
   const pathname = useRouterState({
     select: (state) => state.resolvedLocation?.pathname ?? state.location.pathname,
   });

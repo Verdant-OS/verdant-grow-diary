@@ -120,7 +120,8 @@ base: verdant-grow-diary; the owner squashed the branch onto 8e1ffe395 (2026-10-
 checkout: git fetch origin claude/quicklog-event-occurred-at-utc-hash verdant-grow-diary && git switch claude/quicklog-event-occurred-at-utc-hash && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/1846 (ready for review; the owner
   marked it ready 2026-10-12 18:56 UTC)
-head_sha: 45cdac32c764a6ed0401749623247ca37b52a2bb, remote observed 2026-10-13 18:17 UTC
+head_sha: 45cdac32c764a6ed0401749623247ca37b52a2bb, remote observed 2026-10-16 18:58 UTC (unchanged
+  since 2026-10-13 18:17 UTC)
 state: Migration renumbered to 20261013190000 at the owner's instruction (2026-10-13). This fixes
   the failure at a4c30977: required shard 11's version-order test, flagged as P1 by Codex, failed
   because 20261010120000 (#1961) had merged after 20261001190000. The bytes are unchanged
@@ -131,22 +132,23 @@ state: Migration renumbered to 20261013190000 at the owner's instruction (2026-1
   and diff-check all pass. Hosted CI at 45cdac32: NOT_MEASURED (running).
   "native save/retrieve (local backend)" failed once at b7481653d on a retraction-reason chip
   click (manual path, outside this change) and passed on re-run.
-next_action: Watch 45cdac32's CI to terminal (35 required checks plus the PG15 event-replay
-  job), then hand the exact head to the DB reviewer. Do not merge: migration PRs are held for
-  Matthew.
+next_action: Matthew: per-item approval for the scorer-workflow edits (Codex BLOCKED at
+  45cdac32, 2026-10-14 22:15 UTC), or remove them. Then a deep exact-head review by the DB seat.
+  Do not merge: migration PRs are held for Matthew.
 files: supabase/migrations/20261013190000_quicklog_event_request_hash_utc.sql;
   scripts/run-quicklog-event-request-hash-utc-pg15-harness.mjs;
   src/test/quicklog-event-request-hash-utc-pg15-harness.test.ts;
   .github/workflows/quicklog-event-replay-lock-pg15.yml;
   docs/specs/quicklog-event-request-hash-timezone.md
-blockers: Matthew: ship/merge (migration PRs are held for him). Independent review not yet
-  performed. GitHub comments, including the reply on Codex's P1 thread, need his approval.
+blockers: Matthew: scorer-workflow approval and ship/merge decision. Hosted CI at 45cdac32:
+  35/35 required SUCCESS (re-read 2026-10-16). Deep migration review not performed. #1841 merged
+  2026-10-13 as feb94d9ad.
 artifacts: PR #1846 body (RED/GREEN, local and hosted evidence); earlier hosted PG15 run
   36894367680; shard-11 failure before the fix: run 38294348060
-reviewer_seat: Blue Dream or Durban Poison (DB), per CURRENT_STATE "Start here"; Grok 91 routes
-claimed_by: Claude, 2026-10-13 18:01 UTC (PR #1846 comment, approved by the owner). This
-  replaces Canopy's lapsed 2026-10-10 06:48 UTC claim.
-last_updated: 2026-10-13 13:17 CT, by Claude
+reviewer_seat: Blue Dream or Durban Poison (DB), or Codex (Codex did not author or repair)
+claimed_by: Claude (close-out session "Terminal [b6d701]"), 2026-10-16 18:56 UTC (PR #1846
+  issuecomment-6222597481; Matthew's 2026-10-16 transfer)
+last_updated: 2026-10-16 13:58 CT, by Claude (close-out session)
 ```
 
 ### CLAUDE-CODE-ACTION-002

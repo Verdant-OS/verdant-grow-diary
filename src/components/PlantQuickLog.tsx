@@ -451,61 +451,80 @@ export default function PlantQuickLog({
             contentType: photoFile.type,
             upsert: false,
           });
-        if (!canContinue()) return;
         if (upErr) {
-          console.error("PlantQuickLog photo upload failed", upErr);
-          setError(
-            "Could not upload the photo, so nothing was saved. Check your connection and try again, or remove the photo and save the log without it.",
-          );
+          if (canContinue()) {
+            console.error("PlantQuickLog photo upload failed", upErr);
+            setError(
+              "Could not upload the photo, so nothing was saved. Check your connection and try again, or remove the photo and save the log without it.",
+            );
+          }
           return;
         }
         uploadedPath = path;
+        if (!canContinue() && !photoOnly) return;
       }
 
       if (uploadedPath && user && photoFile && photoOnly && photoOnlyEntryId) {
-        const entryResult = await createQuickLogPhotoDiaryEntry({
+        const photoOnlyScope = {
           ownerId: user.id,
           growId,
           tentId: tentId ?? null,
           plantId,
-          photoPath: uploadedPath,
-          noteRaw: timelineNote,
-          action: "photo",
-          eventType: "photo",
-          entryId: photoOnlyEntryId,
-        });
-        if (!canContinue()) return;
+        };
+        const capturedEntryId = photoOnlyEntryId;
+        const capturedPath = uploadedPath;
+        const capturedFile = photoFile;
+        cleanupAllowed = false;
+        let entryResult: Awaited<ReturnType<typeof createQuickLogPhotoDiaryEntry>>;
+        try {
+          entryResult = await createQuickLogPhotoDiaryEntry({
+            ownerId: photoOnlyScope.ownerId,
+            growId: photoOnlyScope.growId,
+            tentId: photoOnlyScope.tentId,
+            plantId: photoOnlyScope.plantId,
+            photoPath: capturedPath,
+            noteRaw: timelineNote,
+            action: "photo",
+            eventType: "photo",
+            entryId: capturedEntryId,
+          });
+        } catch {
+          recordQuickLogPhotoAttachmentRecoveryLock(photoOnlyScope, capturedEntryId);
+          if (canContinue()) {
+            photoOnlyAttemptRef.current = {
+              entryId: capturedEntryId,
+              path: capturedPath,
+              file: capturedFile,
+            };
+            setPhotoAttachmentUnconfirmed(true);
+            setError("Could not confirm the photo attachment; it may still appear in history.");
+          }
+          return;
+        }
         if (!entryResult.ok) {
           const failure = entryResult as { message: string; ambiguous?: boolean };
           if (failure.ambiguous) {
-            photoOnlyAttemptRef.current = {
-              entryId: photoOnlyEntryId,
-              path: uploadedPath,
-              file: photoFile,
-            };
-            recordQuickLogPhotoAttachmentRecoveryLock(
-              {
-                ownerId: user.id,
-                growId,
-                tentId: tentId ?? null,
-                plantId,
-              },
-              photoOnlyEntryId,
-            );
-            setPhotoAttachmentUnconfirmed(true);
-            setError(failure.message);
+            recordQuickLogPhotoAttachmentRecoveryLock(photoOnlyScope, capturedEntryId);
+            if (canContinue()) {
+              photoOnlyAttemptRef.current = {
+                entryId: capturedEntryId,
+                path: capturedPath,
+                file: capturedFile,
+              };
+              setPhotoAttachmentUnconfirmed(true);
+              setError(failure.message);
+            }
             return;
           }
-          if (cleanupAllowed) {
-            await supabase.storage
-              .from("diary-photos")
-              .remove([uploadedPath])
-              .catch(() => {});
-          }
+          await supabase.storage
+            .from("diary-photos")
+            .remove([capturedPath])
+            .catch(() => {});
           if (!canContinue()) return;
           setError(failure.message);
           return;
         }
+        if (!canContinue()) return;
         saveConfirmed = true;
         trackQuickLogSuccess("photo", { reused: false });
         rememberRecentQuickLogTarget(

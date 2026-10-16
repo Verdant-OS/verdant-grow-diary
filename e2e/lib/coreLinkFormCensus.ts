@@ -367,7 +367,13 @@ export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
     fieldPolicy: "fill-safe-fields",
     expectedContent: [{ kind: "test-id", value: "tent-detail-metric-chips" }],
   },
-  { path: "/onboarding", label: "Onboarding", fieldPolicy: "fill-safe-fields" },
+  {
+    // A signed-in account with a grow is sent to the dashboard (#2045).
+    path: "/onboarding",
+    expectedPathname: "/",
+    label: "Onboarding",
+    fieldPolicy: "fill-safe-fields",
+  },
   { path: "/start-room", label: "Start your room", fieldPolicy: "fill-safe-fields" },
   { path: "/health", label: "App health", fieldPolicy: "audit-only" },
 ] as const satisfies readonly CoreCensusRoute[];
@@ -519,17 +525,26 @@ function matchingManifestRoute(
 }
 
 /**
+ * Redirects the signed-in census fixture triggers. The fixture account has a
+ * grow, so /onboarding sends it to the dashboard (src/pages/Onboarding.tsx, #2045).
+ */
+export const SIGNED_IN_FIXTURE_REDIRECTS: Readonly<Record<string, string>> = {
+  "/onboarding": "/",
+};
+
+/**
  * Where a clicked link must finish. On the signed-out lane a protected target
  * lands on the sign-in screen (`SIGNED_OUT_LANDING` in
  * src/lib/authRedirectRules.ts: "/auth", destination preserved as redirectTo),
- * never the marketing /welcome.
+ * never the marketing /welcome. On the signed-in lane only the fixture
+ * redirects above move a link off its own pathname.
  */
 export function expectedCensusNavigationPath(
   pathname: string,
   manifest: ReadonlyArray<Pick<AppRouteEntry, "path" | "access">>,
   signedIn: boolean,
 ): string {
-  if (signedIn) return pathname;
+  if (signedIn) return SIGNED_IN_FIXTURE_REDIRECTS[pathname] ?? pathname;
 
   const route = matchingManifestRoute(pathname, manifest);
   if (route && ["auth", "operator", "internal"].includes(route.access)) {

@@ -3,6 +3,7 @@
 
 const PAD = 6; // gap between labels
 const LIFT = 8; // gap between anchor and label bottom
+const POT_KEEPOUT = 10; // px around each pot point that other labels must leave clear (they are clickable)
 
 /**
  * @typedef {{ id:string, ax:number, ay:number, bx?:number, by?:number, w?:number, h?:number }} LabelItem
@@ -107,16 +108,28 @@ function placeOnce(items, opts) {
     if (p.by !== q.by) return q.by - p.by;
     return p.id < q.id ? -1 : p.id > q.id ? 1 : 0;
   });
+  // Labels are clickable: one resting on another plant's pot would capture that pot's tap.
+  const pots = list
+    .filter((it) => Number.isFinite(it.bx) && Number.isFinite(it.by))
+    .map((it) => ({
+      id: it.id,
+      x: it.bx - POT_KEEPOUT,
+      y: it.by - POT_KEEPOUT,
+      w: 2 * POT_KEEPOUT,
+      h: 2 * POT_KEEPOUT,
+    }));
   const placed = [];
   const out = [];
   for (const it of list) {
     const { w, h } = it;
+    const coversPot = (r) => pots.some((q) => q.id !== it.id && overlaps(r, q, 0));
     let chosen = null;
     for (const c of candidates(it, w, h)) {
       const r = { x: c.x, y: c.y, w, h };
       if (!inBounds(r, width, height)) continue;
       if (avoid.some((a) => overlaps(r, a, PAD))) continue; // keep a gap: labels are slightly rotated
       if (placed.some((p) => overlaps(r, p))) continue;
+      if (coversPot(r)) continue;
       chosen = r;
       break;
     }
@@ -128,6 +141,7 @@ function placeOnce(items, opts) {
         if (!inBounds(r, width, height)) continue;
         if (avoid.some((a) => overlaps(r, a, PAD))) continue;
         if (placed.some((p) => overlaps(r, p))) continue;
+        if (coversPot(r)) continue;
         placed.push(r);
         const pref = candidates(it, it.cw, it.ch)[0];
         out.push({

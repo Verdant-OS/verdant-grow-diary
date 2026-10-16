@@ -185,3 +185,28 @@ test("regression: a label never strands a plant by covering its pot while that p
     [],
   );
 });
+
+test("regression: a shown label never covers another plant's pot, so tapping a pot selects that plant", () => {
+  // Measured in the browser: Sprout's label sat on P-103's pot, so a tap on P-103 selected Sprout.
+  const box = { width: 400, height: 300, avoid: [] };
+  const a = { id: "A", ax: 200, ay: 150, bx: 200, by: 200, w: 100, h: 30, cw: 0, ch: 0 };
+  // B's pot is exactly where A's preferred label would sit (centred above A's anchor).
+  const b = { id: "B", ax: 330, ay: 60, bx: 200, by: 125, w: 100, h: 30, cw: 0, ch: 0 };
+  const out = layoutLabels([a, b], box);
+  const covering = out.filter(
+    (l) =>
+      !l.hidden &&
+      out.some(
+        (o) =>
+          o.id !== l.id && o.bx >= l.x && o.bx <= l.x + l.w && o.by >= l.y && o.by <= l.y + l.h,
+      ),
+  );
+  assert.deepEqual(
+    covering.map((l) => l.id),
+    [],
+  );
+  assert.ok(
+    out.find((l) => l.id === "A" && !l.hidden),
+    "A still gets a label, just not on B's pot",
+  );
+});

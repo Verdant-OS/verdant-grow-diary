@@ -1,3 +1,5 @@
+import { createGrowIdsEqual } from "@/lib/createDialogGrowBindingRules";
+
 /**
  * startYourRoomRules — pure step machine for the first-session
  * "Start your room" wizard.
@@ -215,10 +217,14 @@ export function resolveStartYourRoomResume(
   if (input.grows.length !== 1) return null;
   const grow = input.grows[0];
   if (!grow?.id) return null;
-  if (input.activeGrowId != null && input.activeGrowId !== grow.id) return null;
+  if (input.activeGrowId != null && !createGrowIdsEqual(input.activeGrowId, grow.id)) {
+    return null;
+  }
 
   const growName = trimName(grow.name);
-  const tents = input.tents.filter((tent) => tent.grow_id === grow.id && !!tent.id);
+  const tents = input.tents.filter(
+    (tent) => createGrowIdsEqual(tent.grow_id, grow.id) && !!tent.id,
+  );
   if (tents.length === 0) {
     return {
       step: "tent",
@@ -235,7 +241,10 @@ export function resolveStartYourRoomResume(
   const tentName = trimName(tent.name);
 
   const plants = input.plants.filter(
-    (plant) => plant.grow_id === grow.id && plant.tent_id === tent.id && !!plant.id,
+    (plant) =>
+      createGrowIdsEqual(plant.grow_id, grow.id) &&
+      createGrowIdsEqual(plant.tent_id, tent.id) &&
+      !!plant.id,
   );
   if (plants.length === 0) {
     return {

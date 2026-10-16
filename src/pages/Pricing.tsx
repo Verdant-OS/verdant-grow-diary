@@ -54,6 +54,7 @@ import {
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
 import { SandboxCheckoutTestModeNote } from "@/components/SandboxCheckoutTestModeNote";
+import { CHECKOUT_LIVE_FAQ_ID } from "@/lib/sandboxCheckoutTestModeNoteRules";
 import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -616,14 +617,21 @@ export default function Pricing() {
 
       {/* Billing toggle */}
       <section className="px-6 pb-8 max-w-6xl mx-auto flex items-center justify-center gap-3">
-        <span
+        <button
+          type="button"
           className={[
-            "text-sm font-medium",
+            "min-h-11 px-2 text-sm font-medium",
             billing === "monthly" ? "text-foreground" : "text-muted-foreground",
           ].join(" ")}
+          aria-pressed={billing === "monthly"}
+          onClick={() => {
+            setBilling("monthly");
+            setInterestPlan("pro_monthly");
+            trackPricingEvent("pricing_billing_toggle", { period: "monthly" });
+          }}
         >
           Monthly
-        </span>
+        </button>
         <button
           data-testid="billing-toggle"
           type="button"
@@ -645,14 +653,21 @@ export default function Pricing() {
             ].join(" ")}
           />
         </button>
-        <span
+        <button
+          type="button"
           className={[
-            "text-sm font-medium",
+            "min-h-11 px-2 text-sm font-medium",
             billing === "annual" ? "text-foreground" : "text-muted-foreground",
           ].join(" ")}
+          aria-pressed={billing === "annual"}
+          onClick={() => {
+            setBilling("annual");
+            setInterestPlan("pro_annual");
+            trackPricingEvent("pricing_billing_toggle", { period: "annual" });
+          }}
         >
           Annual
-        </span>
+        </button>
       </section>
 
       <section className="px-6 pb-8 max-w-3xl mx-auto" aria-label="Checkout status">
@@ -1374,7 +1389,11 @@ export default function Pricing() {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="checkout-status" data-testid="pricing-faq-checkout-status">
+          <AccordionItem
+            id={CHECKOUT_LIVE_FAQ_ID}
+            value="checkout-status"
+            data-testid="pricing-faq-checkout-status"
+          >
             <AccordionTrigger>{checkoutTrustCopy.faqQuestion}</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
               {checkoutTrustCopy.faqAnswer}

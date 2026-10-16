@@ -144,6 +144,7 @@ import {
   mapGrowEventsToRecentRawEntries,
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
+import { applyLinkedEventTypes, LINKED_SPINE_EVENT_TYPES } from "@/lib/diaryLinkedEventTypeRules";
 import { ROOT_ZONE_GROW_EVENT_SELECT } from "@/lib/rootZoneObservationRules";
 import {
   collapseQuickLogSaveFanOut,
@@ -1150,10 +1151,12 @@ export default function Timeline() {
         ? growEvents
         : [...growEvents, ...supplementalLinkedGrowEvents];
     if (knownGrowEvents.length === 0) return entries;
-    const growMappedById = new Map(
-      mapGrowEventsToRecentRawEntries(knownGrowEvents).map((r) => [r.id, r] as const),
+    const mappedGrowEvents = mapGrowEventsToRecentRawEntries(knownGrowEvents);
+    const spineTypes = new Map(
+      mappedGrowEvents.map((r) => [r.id.trim().toLowerCase(), r.entry_type] as const),
     );
-    return entries.map((e) => {
+    const growMappedById = new Map(mappedGrowEvents.map((r) => [r.id, r] as const));
+    return applyLinkedEventTypes(entries, spineTypes).map((e) => {
       const details = (e.details ?? null) as Record<string, unknown> | null;
       if (!details) return e;
       const link =
@@ -1166,22 +1169,40 @@ export default function Timeline() {
       const mapped = growMappedById.get(link);
       if (!mapped) return e;
       let nextDetails = details;
+      const declaredType =
+        typeof (details.event_type ?? details.eventType) === "string"
+          ? String(details.event_type ?? details.eventType)
+              .trim()
+              .toLowerCase()
+          : "";
       const hasType =
-        typeof details.event_type === "string" &&
-        details.event_type.trim() !== "" &&
-        details.event_type !== "quick_log" &&
-        details.event_type !== "note";
-      if (!hasType && mapped.entry_type === "watering") {
-        nextDetails = { ...nextDetails, event_type: "watering" };
+        declaredType !== "" && declaredType !== "quick_log" && declaredType !== "note";
+      const mappedType =
+        typeof mapped.entry_type === "string" ? mapped.entry_type.trim().toLowerCase() : "";
+      if (!hasType && LINKED_SPINE_EVENT_TYPES.has(mappedType)) {
+        nextDetails = { ...nextDetails, event_type: mappedType };
       }
+      const effectiveType =
+        typeof (nextDetails.event_type ?? nextDetails.eventType) === "string"
+          ? String(nextDetails.event_type ?? nextDetails.eventType)
+              .trim()
+              .toLowerCase()
+          : "";
       const hasVol =
         nextDetails.watering != null ||
+        nextDetails.feeding != null ||
         nextDetails.watering_amount_ml != null ||
         nextDetails.wateringAmountMl != null ||
         nextDetails.volume_ml != null;
       const vol = mapped.details?.watering_amount_ml;
-      if (!hasVol && typeof vol === "number" && Number.isFinite(vol)) {
-        nextDetails = { ...nextDetails, watering: { volume_ml: vol } };
+      if (
+        !hasVol &&
+        (effectiveType === "watering" || effectiveType === "feeding") &&
+        typeof vol === "number" &&
+        Number.isFinite(vol)
+      ) {
+        const volumeEnvelope = effectiveType === "feeding" ? "feeding" : "watering";
+        nextDetails = { ...nextDetails, [volumeEnvelope]: { volume_ml: vol } };
       }
       return nextDetails === details ? e : { ...e, details: nextDetails };
     });

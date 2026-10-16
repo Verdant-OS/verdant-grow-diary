@@ -471,4 +471,40 @@ describe("Timeline chip counts match listed entries (#2163)", () => {
     expect(chipCount("Photos")).toBe(2);
     expect(listedEntries()).toHaveLength(2);
   });
+
+  it("preserves feeding identity and Feed Volume when a diary companion carries only linked_grow_event_id to a feeding grow_event", async () => {
+    const linkedGrowEventId = "11111111-1111-4111-8111-111111111111";
+    const diaryRows = [
+      diaryEntry("feed-companion-1", "Bloom feed note", "2026-07-20T12:00:00.000Z", null, {
+        linked_grow_event_id: linkedGrowEventId,
+      }),
+    ];
+    const growEventRows = [
+      {
+        id: linkedGrowEventId,
+        grow_id: GROW_A.id,
+        plant_id: null,
+        tent_id: TENT_ID,
+        event_type: "feeding",
+        occurred_at: "2026-07-20T12:00:00.000Z",
+        note: "Bloom feed note",
+        source: "manual",
+        is_deleted: false,
+        feeding_events: [{ volume_ml: 750 }],
+      },
+    ];
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: diaryRows, error: null, count: 1 };
+      if (spec.table === "grow_events") return { data: growEventRows, error: null, count: 1 };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Bloom feed note")).toBeInTheDocument();
+    const card = screen.getByTestId("timeline-entry");
+    expect(card).toHaveTextContent("Feeding");
+    expect(card).toHaveTextContent("Feed Volume: 750 ml");
+    expect(card).not.toHaveTextContent("Water Volume: 750 ml");
+  });
 });

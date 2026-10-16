@@ -204,7 +204,9 @@ export default function Dashboard() {
   const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
   const chartQuickLogManualQuery = useSensorsQuickLogManualReadings(tentIds);
   const quickLogManualsIncomplete =
-    chartQuickLogManualQuery.isPending || chartQuickLogManualQuery.isError;
+    chartQuickLogManualQuery.isPending ||
+    chartQuickLogManualQuery.isError ||
+    chartQuickLogManualQuery.fetchStatus === "fetching";
   const quickLogManualReadings = quickLogManualsIncomplete
     ? []
     : (chartQuickLogManualQuery.data ?? []);
@@ -1669,6 +1671,7 @@ export default function Dashboard() {
                 quality,
                 targets: targetsCmp,
                 stage: alertContextStage,
+                now: nowTick,
               });
               // Candidates above are DISPLAY-scoped and stay source-aware, so a
               // manual reading current for 24h still shows its warning. Saving

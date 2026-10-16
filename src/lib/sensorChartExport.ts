@@ -60,13 +60,21 @@ function formatUtcTimestamp(value: string | null | undefined): string {
     .replace(/\.\d{3}Z$/, "");
 }
 
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+
 /**
- * Escape a field for CSV inclusion. Wraps in quotes and escapes inner
- * quotes when the value contains a comma, quote, or newline.
+ * Escape a field for CSV inclusion. Neutralises spreadsheet formula injection
+ * on string values with a leading `=`, `+`, `-`, `@`, tab, or CR (numbers pass
+ * through unguarded so negative temperatures stay numeric), then wraps in
+ * quotes and escapes inner quotes when the value contains a comma, quote, CR,
+ * or newline.
  */
 function csvEscape(value: string | number | null | undefined): string {
-  const s = value == null ? "" : String(value);
-  if (/[",\n]/.test(s)) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number") return String(value);
+  let s = String(value);
+  if (FORMULA_TRIGGER.test(s)) s = `'${s}`;
+  if (/[",\n\r]/.test(s)) {
     return `"${s.replace(/"/g, '"' + '"')}"`;
   }
   return s;
@@ -129,6 +137,20 @@ export function buildSensorReadingsCsv(
     options?.includeTentColumn === true ||
     options?.tentNamesById !== undefined ||
     distinctTents.size > 1;
+  const duplicateTentNames = new Set<string>();
+  if (includeTent && options?.tentNamesById) {
+    const seenNames = new Map<string, string>();
+    for (const [tentId, rawName] of Object.entries(options.tentNamesById)) {
+      const name = typeof rawName === "string" ? rawName.trim() : "";
+      if (!name) continue;
+      const priorTentId = seenNames.get(name);
+      if (priorTentId !== undefined && priorTentId !== tentId) {
+        duplicateTentNames.add(name);
+      } else {
+        seenNames.set(name, tentId);
+      }
+    }
+  }
   const baseHeader = resolvedUnit === "fahrenheit" ? CSV_HEADER_FAHRENHEIT : CSV_HEADER_CELSIUS;
   const header = includeTent ? `${baseHeader},Tent` : baseHeader;
   const clocked =
@@ -155,7 +177,13 @@ export function buildSensorReadingsCsv(
       formatUtcTimestamp(r.capturedAt),
     ];
     if (includeTent) {
-      const tentLabel = options?.tentNamesById?.[r.tentId] || r.tentId || "";
+      const rawName = options?.tentNamesById?.[r.tentId] || "";
+      const trimmedName = rawName.trim();
+      const tentLabel = rawName
+        ? duplicateTentNames.has(trimmedName) && r.tentId
+          ? `${rawName} (${r.tentId})`
+          : rawName
+        : r.tentId || "";
       cells.push(tentLabel);
     }
     return cells.map(csvEscape).join(",");

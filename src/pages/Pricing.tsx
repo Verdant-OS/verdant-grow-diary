@@ -664,7 +664,7 @@ export default function Pricing() {
         <button
           type="button"
           className={[
-            "text-sm font-medium",
+            "min-h-11 px-2 text-sm font-medium",
             billing === "monthly" ? "text-foreground" : "text-muted-foreground",
           ].join(" ")}
           aria-pressed={billing === "monthly"}
@@ -700,7 +700,7 @@ export default function Pricing() {
         <button
           type="button"
           className={[
-            "text-sm font-medium",
+            "min-h-11 px-2 text-sm font-medium",
             billing === "annual" ? "text-foreground" : "text-muted-foreground",
           ].join(" ")}
           aria-pressed={billing === "annual"}

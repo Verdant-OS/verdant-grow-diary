@@ -1369,6 +1369,7 @@ function QuickLogV2SheetForOwner({
     photoPath: string;
     noteRaw: string;
     action: QuickLogV2Action;
+    linkedGrowEventId?: string | null;
   }): Promise<QuickLogAttachmentWriteResult> {
     // Sync re-entry guard: if a photo-diary insert is already in
     // flight, drop the second call rather than creating a duplicate
@@ -1391,6 +1392,7 @@ function QuickLogV2SheetForOwner({
         photoPath: input.photoPath,
         noteRaw: input.noteRaw,
         action: input.action,
+        linkedGrowEventId: input.linkedGrowEventId,
       });
     } catch {
       return {
@@ -2277,6 +2279,7 @@ function QuickLogV2SheetForOwner({
         photoPath: uploadedPath,
         noteRaw: submissionNote,
         action: submissionAction,
+        linkedGrowEventId: res.growEventId,
       });
       if (exactSubmission && !canContinueNote()) return;
       if (photoEntry.ok) {

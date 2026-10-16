@@ -37,6 +37,12 @@ export interface QuickLogPhotoDiaryEntryInput {
    */
   extraDetails?: Readonly<Record<string, string>> | null;
   /**
+   * Grow-event id from the manual save that this photo is attached to.
+   * Stored as details.linked_grow_event_id so Timeline can hide that save's
+   * blank "(quick log)" mirror. Omitted when the caller has no id.
+   */
+  linkedGrowEventId?: string | null;
+  /**
    * Diary event type. Defaults to the attachment marker
    * "quicklog_photo_attachment" (the V2-sheet contract plant-memory episodes
    * key on). The STANDALONE Photo activity passes "photo" so the read layers
@@ -89,11 +95,15 @@ export function buildQuickLogPhotoDiaryEntryRow(
     entry_at: now.toISOString(),
     details: {
       // Caller-supplied structured detail first; fixed identity keys win so
-      // no extraDetails key can spoof the attachment envelope.
+      // no extraDetails key can spoof the attachment envelope. The save's
+      // grow-event id is applied last for the same reason.
       ...(input.extraDetails ?? {}),
       event_type: input.eventType ?? "quicklog_photo_attachment",
       source: "manual",
       attached_to_action: input.action,
+      ...(typeof input.linkedGrowEventId === "string" && input.linkedGrowEventId.trim() !== ""
+        ? { linked_grow_event_id: input.linkedGrowEventId.trim() }
+        : {}),
     },
   };
 }

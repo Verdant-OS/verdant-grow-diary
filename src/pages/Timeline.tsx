@@ -964,7 +964,9 @@ export default function Timeline() {
           capturedQuery = capturedQuery.lte("captured_at", timelineDateRangeBounds.endIso);
           legacyQuery = legacyQuery.lte("ts", timelineDateRangeBounds.endIso);
         }
-        const [capturedResult, legacyResult] = await Promise.all([capturedQuery, legacyQuery]);
+        const [capturedResult, legacyResult] = await withCriticalReadDeadline(
+          Promise.all([capturedQuery, legacyQuery]),
+        );
         if (!isCurrentRequest()) return;
         if (
           capturedResult.error ||

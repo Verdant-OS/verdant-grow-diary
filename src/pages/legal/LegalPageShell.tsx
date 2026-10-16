@@ -47,11 +47,14 @@ export function LegalPageShell({
       />
       <main className="min-h-screen bg-background text-foreground">
         <header className="border-b border-border/40 px-6 py-4">
-          <div className="mx-auto max-w-3xl flex items-center justify-between text-sm">
+          <div className="mx-auto max-w-3xl flex flex-wrap items-center justify-between gap-3 text-sm">
             <Link to="/welcome" className="font-semibold hover:text-primary">
               Verdant Grow Diary
             </Link>
-            <nav className="flex gap-4 text-muted-foreground">
+            <nav className="flex flex-wrap gap-x-4 gap-y-2 text-muted-foreground">
+              <Link to="/" className="font-medium text-foreground hover:text-primary">
+                Back to home
+              </Link>
               <Link to="/terms" className="hover:text-foreground">
                 Terms of Service
               </Link>

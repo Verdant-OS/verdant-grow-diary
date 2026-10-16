@@ -1,10 +1,11 @@
+import { TERMS_PAGE_LAST_UPDATED } from "@/constants/agreements";
 import { LegalPageShell } from "./legal/LegalPageShell";
 
 export default function TermsOfService() {
   return (
     <LegalPageShell
       title="Terms of Service"
-      lastUpdated="July 9, 2026"
+      lastUpdated={TERMS_PAGE_LAST_UPDATED}
       path="/terms"
       description="Terms of Service for Verdant Grow Diary — seller identity, Paddle Merchant of Record disclosure, acceptable use, and plain-language liability terms."
     >

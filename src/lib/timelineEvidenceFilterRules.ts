@@ -8,7 +8,7 @@
  *    rows. Never mutates input.
  *  - Original ordering preserved (callers sort upstream).
  *  - Keyword search runs only over render-safe display fields:
- *    note text, plant name, stage label, and the `event_type` token.
+ *    note text, plant name, tent name, stage label, and the `event_type` token.
  *    Never searches secret-bearing payloads, tokens, or unknown nested
  *    detail blobs.
  *  - Case-insensitive, trimmed. Empty query returns all rows.
@@ -64,6 +64,11 @@ export interface TimelineEvidenceFilterInput {
    * Keyword search includes that same resolved name.
    */
   plantNamesById?: ReadonlyMap<string, string> | null;
+  /**
+   * Tent directory used by the card when `details.tent_name` is blank.
+   * Keyword search includes that same resolved name.
+   */
+  tentNamesById?: ReadonlyMap<string, string> | null;
 }
 
 const TIMELINE_FILTER_STALE_MS = LIVE_CURRENT_STATE_STALE_MS;
@@ -181,6 +186,7 @@ function normalize(v: unknown): string {
 function safeRowText(
   row: TimelineEvidenceRow,
   plantNamesById?: ReadonlyMap<string, string> | null,
+  tentNamesById?: ReadonlyMap<string, string> | null,
 ): string {
   const parts: string[] = [];
   if (typeof row.note === "string") parts.push(row.note);
@@ -196,12 +202,15 @@ function safeRowText(
   for (const key of ["nutrient_brand", "brand", "recipe"] as const) {
     appendPublicFeedSearchText(parts, details[key], 0);
   }
-  const resolvedPlant = resolveTimelineCardPlaceLabels({
+  const labels = resolveTimelineCardPlaceLabels({
     plantId: row.plant_id,
+    tentId: row.tent_id,
     details,
     plantNamesById,
-  }).plantName;
-  if (resolvedPlant) parts.push(resolvedPlant);
+    tentNamesById,
+  });
+  if (labels.plantName) parts.push(labels.plantName);
+  if (labels.tentName) parts.push(labels.tentName);
   const eventType = details["event_type"];
   if (typeof eventType === "string") parts.push(eventType);
   return parts.join(" \u0001 ").toLowerCase();
@@ -224,7 +233,7 @@ export function timelineEvidenceRowMatches(
 
   const q = normalize(input.query);
   if (q !== "") {
-    if (!safeRowText(row, input.plantNamesById).includes(q)) return false;
+    if (!safeRowText(row, input.plantNamesById, input.tentNamesById).includes(q)) return false;
   }
 
   if (input.plantId && input.plantId.trim() !== "") {
@@ -491,6 +500,34 @@ export function deriveTimelineTentOptions(
  * Derive distinct event-type options from the rows (already lower-cased
  * tokens such as "watering", "feeding", "note").
  */
+const TIMELINE_EVENT_TYPE_OPTION_LABELS: Readonly<Record<string, string>> = {
+  note: "Note",
+  photo: "Photo",
+  quicklog_photo_attachment: "Photo attachment",
+  watering: "Watering",
+  feeding: "Feeding",
+  observation: "Observation",
+  measurement: "Measurement",
+  environment: "Environment",
+  environment_check: "Environment check",
+  training: "Training",
+  harvest: "Harvest",
+  pest_disease: "Pest / disease",
+};
+
+/** Grower-facing log-type label. The option value stays the stored token. */
+export function timelineEventTypeOptionLabel(token: string): string {
+  const known = Object.hasOwn(TIMELINE_EVENT_TYPE_OPTION_LABELS, token)
+    ? TIMELINE_EVENT_TYPE_OPTION_LABELS[token]
+    : undefined;
+  if (known) return known;
+  const words = token
+    .split(/[_-]+/)
+    .filter((word) => word.length > 0)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1));
+  return words.length > 0 ? words.join(" ") : token;
+}
+
 export function deriveTimelineEventTypeOptions(
   rows: ReadonlyArray<TimelineEvidenceRow>,
 ): TimelineEvidenceFilterOption[] {
@@ -500,9 +537,21 @@ export function deriveTimelineEventTypeOptions(
     if (!t) continue;
     m.set(t, (m.get(t) ?? 0) + 1);
   }
-  return Array.from(m.entries())
-    .map(([id, count]) => ({ id, label: id, count }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+  const options = Array.from(m.entries()).map(([id, count]) => ({
+    id,
+    label: timelineEventTypeOptionLabel(id),
+    count,
+  }));
+  const labelCounts = new Map<string, number>();
+  for (const option of options) {
+    labelCounts.set(option.label, (labelCounts.get(option.label) ?? 0) + 1);
+  }
+  return options
+    .map((option) => {
+      if ((labelCounts.get(option.label) ?? 0) < 2 || option.label === option.id) return option;
+      return { ...option, label: `${option.label} (${option.id})` };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id));
 }
 
 export function isTimelineEvidenceFilterActive(input: TimelineEvidenceFilterInput): boolean {

@@ -45,6 +45,37 @@ async function readHeader(file: Blob, length: number): Promise<Uint8Array | null
   });
 }
 
+/**
+ * Some in-memory blobs already hold their bytes (jsdom's file impl). A
+ * same-turn Save, as the plant photo fixtures do, has to see the signature
+ * decision before the change handler returns. Browsers without that buffer
+ * stay on the async read.
+ */
+function inMemoryBytes(file: Blob): Uint8Array | null {
+  for (const symbol of Object.getOwnPropertySymbols(file)) {
+    const value = (file as unknown as Record<symbol, unknown>)[symbol];
+    if (!value || typeof value !== "object" || !("_buffer" in value)) continue;
+    const buffer = (value as { _buffer?: Uint8Array })._buffer;
+    if (!buffer || typeof buffer.length !== "number" || typeof buffer.byteOffset !== "number") {
+      continue;
+    }
+    return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.length);
+  }
+  return null;
+}
+
+export function inspectQuickLogPngClaimNow(
+  file: Blob & { name?: string | null; type?: string | null },
+): { ok: true } | { ok: false; message: string } | null {
+  if (!fileClaimsPng(file)) return { ok: true };
+  const bytes = inMemoryBytes(file);
+  if (!bytes) return null;
+  if (!hasPngSignature(bytes.subarray(0, PNG_SIGNATURE.length))) {
+    return { ok: false, message: QUICK_LOG_FAKE_PNG_MESSAGE };
+  }
+  return { ok: true };
+}
+
 export async function validateQuickLogPngClaim(
   file: Blob & { name?: string | null; type?: string | null },
 ): Promise<{ ok: true } | { ok: false; message: string }> {

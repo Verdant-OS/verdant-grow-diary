@@ -61,7 +61,11 @@ import {
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
 import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
-import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
+import {
+  fileClaimsPng,
+  inspectQuickLogPngClaimNow,
+  validateQuickLogPngClaim,
+} from "@/lib/quickLogPhotoContentRules";
 import {
   hasQuickLogPhotoAttachmentRecoveryLock,
   recordQuickLogPhotoAttachmentRecoveryLock,
@@ -305,6 +309,19 @@ export default function PlantQuickLog({
     if (!fileClaimsPng(file)) {
       photoValidationGenerationRef.current += 1;
       setPhotoChecking(false);
+      handleFileSelected(file);
+      return;
+    }
+    const immediate = inspectQuickLogPngClaimNow(file);
+    if (immediate) {
+      photoValidationGenerationRef.current += 1;
+      setPhotoChecking(false);
+      if (!immediate.ok) {
+        setPhotoFile(null);
+        setPhotoPreview(null);
+        setError(immediate.message);
+        return;
+      }
       handleFileSelected(file);
       return;
     }

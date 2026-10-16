@@ -126,9 +126,9 @@ describe("Photo only Codex findings", () => {
 
     await waitFor(() => {
       expect(insertCalls.length).toBeGreaterThan(0);
+      expect(trackQuickLogSuccessMock).toHaveBeenCalledWith("photo", { reused: false });
     });
     expect(saveCalls).toHaveLength(0);
-    expect(trackQuickLogSuccessMock).toHaveBeenCalledWith("photo", { reused: false });
   });
 
   it("locks an ambiguous Photo only write so a retry does not upload another object", async () => {

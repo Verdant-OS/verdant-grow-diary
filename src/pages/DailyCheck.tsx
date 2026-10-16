@@ -77,6 +77,7 @@ import {
   DAILY_CHECK_WHAT_COUNTS_HINT,
   defaultDailyCheckPlantId,
   resolveDailyCheckPlantSelection,
+  resolveDailyCheckPostSubmitPlantId,
   type DailyCheckPlantResolution,
 } from "@/lib/dailyCheckPlantSelectionRules";
 import { resolveDailyCheckActivityTarget } from "@/lib/dailyCheckWaterContextRules";
@@ -411,12 +412,12 @@ export default function DailyCheck() {
   // follows an explicit selector choice, including a cleared picker. An
   // untouched route plant still returns there. An untouched sole-plant default
   // does not add View Plant.
-  const postSubmitPlantId =
-    plantChoice === "explicit"
-      ? renderedPlantId || null
-      : plantResolution.status === "valid"
-        ? (routePlant?.id ?? null)
-        : null;
+  const postSubmitPlantId = resolveDailyCheckPostSubmitPlantId({
+    plantChoice,
+    renderedPlantId,
+    resolutionStatus: plantResolution.status,
+    routePlantId: routePlant?.id ?? null,
+  });
   const postSubmitActions = useMemo(
     () =>
       buildDailyCheckPostSubmitActions({

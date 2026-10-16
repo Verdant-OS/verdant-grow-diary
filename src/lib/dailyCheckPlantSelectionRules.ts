@@ -119,6 +119,22 @@ export function resolveDailyCheckPlantSelection(
  * Exactly one in-scope plant is selected. Several plants, or a rejected
  * plant id, stay unselected so the grower chooses.
  */
+/**
+ * Plant the post-submit links and redirect should name.
+ * An explicit picker choice wins, including a cleared picker. An untouched
+ * valid route plant stays. An untouched sole-plant default does not.
+ */
+export function resolveDailyCheckPostSubmitPlantId(input: {
+  plantChoice: "route" | "explicit";
+  renderedPlantId: string;
+  resolutionStatus: DailyCheckPlantResolutionStatus;
+  routePlantId: string | null;
+}): string | null {
+  if (input.plantChoice === "explicit") return input.renderedPlantId || null;
+  if (input.resolutionStatus === "valid") return input.routePlantId || null;
+  return null;
+}
+
 export function defaultDailyCheckPlantId(input: {
   routePlantId: string;
   resolutionStatus: DailyCheckPlantResolutionStatus;

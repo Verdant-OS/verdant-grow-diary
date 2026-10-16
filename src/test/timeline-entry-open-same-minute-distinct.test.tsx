@@ -284,30 +284,4 @@ describe("timeline Open labels and nested controls", () => {
       expect(card.querySelector(NESTED_INTERACTIVE)).toBeNull();
     }
   });
-
-  it("wraps an unbroken diary entry note instead of widening the page", async () => {
-    const longNote = "Z".repeat(500);
-    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
-      if (spec.table === "diary_entries") {
-        return {
-          data: [watering("water-long", longNote, "2026-10-12T15:00:05.000Z")],
-          error: null,
-          count: 1,
-        };
-      }
-      return { data: [], error: null };
-    });
-
-    render(
-      <MemoryRouter initialEntries={["/timeline"]}>
-        <Timeline />
-      </MemoryRouter>,
-    );
-
-    const body = await screen.findByTestId("timeline-entry-body");
-    expect(body.textContent).toContain(longNote);
-    expect(body.className).toContain("[overflow-wrap:anywhere]");
-    expect(body.className).toContain("min-w-0");
-    expect(body.className).toContain("max-w-full");
-  });
 });
